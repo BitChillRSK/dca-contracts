@@ -326,10 +326,8 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
                 || numOfPurchases != purchaseAmounts.length
         ) revert DcaManager__BatchPurchaseArraysLengthMismatch();
         for (uint256 i; i < numOfPurchases; ++i) {
-            /**
-             * @notice Update balances and timestamps, returned values are not needed here
-             */
-            _rBtcPurchaseChecksEffects(buyers[i], token, scheduleIndexes[i], scheduleIds[i]);
+            (uint256 purchaseAmount, ) = _rBtcPurchaseChecksEffects(buyers[i], token, scheduleIndexes[i], scheduleIds[i]);
+            if (purchaseAmount != purchaseAmounts[i]) revert DcaManager__PurchaseAmountMismatch(buyers[i], token, scheduleIds[i], scheduleIndexes[i], purchaseAmount, purchaseAmounts[i]);
         }
         IPurchaseRbtc(address(_handler(token, lendingProtocolIndex))).batchBuyRbtc(
             buyers, scheduleIds, purchaseAmounts
