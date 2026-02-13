@@ -63,6 +63,7 @@ abstract contract FeeHandler is IFeeHandler, Ownable {
      * @param minFeeRate: the minimum fee rate
      */
     function setMinFeeRate(uint256 minFeeRate) public override onlyOwner {
+        if (minFeeRate > s_maxFeeRate) revert FeeHandler__MinFeeRateCannotBeHigherThanMax();
         s_minFeeRate = minFeeRate;
         emit FeeHandler__MinFeeRateSet(minFeeRate);
     }
@@ -72,6 +73,7 @@ abstract contract FeeHandler is IFeeHandler, Ownable {
      * @param maxFeeRate: the maximum fee rate
      */
     function setMaxFeeRate(uint256 maxFeeRate) public override onlyOwner {
+        if (maxFeeRate < s_minFeeRate) revert FeeHandler__MinFeeRateCannotBeHigherThanMax();
         s_maxFeeRate = maxFeeRate;
         emit FeeHandler__MaxFeeRateSet(maxFeeRate);
     }
