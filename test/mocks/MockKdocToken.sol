@@ -38,6 +38,12 @@ contract MockKdocToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
     function redeemUnderlying(uint256 amount) public returns (uint256) {
         uint256 kDocToBurn = amount * DECIMALS / exchangeRateCurrent();
         require(balanceOf(msg.sender) >= kDocToBurn, "Insufficient balance");
+        // Ensure we have enough stablecoin to transfer (mint if needed to simulate yield generation)
+        uint256 currentBalance = i_docToken.balanceOf(address(this));
+        if (currentBalance < amount) {
+            // Mint the difference to simulate yield generation from the lending protocol
+            IStablecoin(address(i_docToken)).mint(address(this), amount - currentBalance);
+        }
         i_docToken.transfer(msg.sender, amount);
         _burn(msg.sender, kDocToBurn); // Burn an amount of kDOC equivalent to the amount of DOC divided by the exchange rate (e.g.: 1 DOC redeemed => 1 / 0.02 = 50 kDOC burnt)
         return 0;
@@ -46,6 +52,12 @@ contract MockKdocToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
     function redeem(uint256 kDocToBurn) public returns (uint256) {
         uint256 docToRedeem = kDocToBurn * exchangeRateCurrent() / DECIMALS;
         require(balanceOf(msg.sender) >= kDocToBurn, "Insufficient balance");
+        // Ensure we have enough stablecoin to transfer (mint if needed to simulate yield generation)
+        uint256 currentBalance = i_docToken.balanceOf(address(this));
+        if (currentBalance < docToRedeem) {
+            // Mint the difference to simulate yield generation from the lending protocol
+            IStablecoin(address(i_docToken)).mint(address(this), docToRedeem - currentBalance);
+        }
         i_docToken.transfer(msg.sender, docToRedeem);
         _burn(msg.sender, kDocToBurn); // Burn an amount of kDOC equivalent to the amount of DOC divided by the exchange rate (e.g.: 1 DOC redeemed => 1 / 0.02 = 50 kDOC burnt)
         return 0;

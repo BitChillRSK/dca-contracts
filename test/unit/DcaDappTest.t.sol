@@ -533,8 +533,8 @@ contract DcaDappTest is Test {
                 totalStablecoinSpent += netPurchaseAmount;
                 totalStablecoinRedeemed += schedulePurchaseAmount;
 
-                // vm.warp(block.timestamp + schedulePurchasePeriod);
-                if (block.chainid != ANVIL_CHAIN_ID) updateExchangeRate(schedulePurchasePeriod);
+                // Advance time so the next purchase can be made (purchase period check)
+                updateExchangeRate(schedulePurchasePeriod);
             }
         }
         

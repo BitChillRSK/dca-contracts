@@ -3,6 +3,8 @@ SWAP_TYPE ?= mocSwaps
 LENDING_PROTOCOL ?= tropykus
 STABLECOIN_TYPE ?= DOC
 TEST_CMD := forge test --no-match-test invariant --no-match-contract ComparePurchaseMethods -j 1
+# Exclude ai-generated tests on fork: they use mocks and vm.prank with raw addresses, causing RPC 429 and revert-depth failures
+FORK_TEST_CMD := $(TEST_CMD) --no-match-path "test/ai-generated/**"
 
 # Targets
 .PHONY: all test moc dex help
@@ -34,13 +36,13 @@ moc-sovryn:
 
 fork:
 	@echo "Executing fork tests with $(LENDING_PROTOCOL) and $(STABLECOIN_TYPE)..."
-	STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD) --fork-url $(RSK_MAINNET_RPC_URL)
+	STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(FORK_TEST_CMD) --fork-url $(RSK_MAINNET_RPC_URL)
 fork-tropykus:
 	@echo "Executing Tropykus fork tests with $(STABLECOIN_TYPE)..."
-	LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD) --fork-url $(RSK_MAINNET_RPC_URL)
+	LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(FORK_TEST_CMD) --fork-url $(RSK_MAINNET_RPC_URL)
 fork-sovryn:
 	@echo "Executing Sovryn fork tests with $(STABLECOIN_TYPE)..."
-	LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD) --fork-url $(RSK_MAINNET_RPC_URL)
+	LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(FORK_TEST_CMD) --fork-url $(RSK_MAINNET_RPC_URL)
 
 # DexSwaps specific tests
 dex:
