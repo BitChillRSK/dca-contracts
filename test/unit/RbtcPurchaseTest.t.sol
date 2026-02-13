@@ -198,6 +198,54 @@ contract RbtcPurchaseTest is DcaDappTest {
         );
     }
 
+    function testBatchPurchaseFailsIfPurchaseAmountMismatch() external {
+        address[] memory users = new address[](1);
+        users[0] = USER;
+        uint256[] memory scheduleIndexes = new uint256[](1);
+        scheduleIndexes[0] = SCHEDULE_INDEX;
+        bytes32[] memory scheduleIds = new bytes32[](1);
+        scheduleIds[0] = dcaManager.getScheduleId(USER, address(stablecoin), SCHEDULE_INDEX);
+        uint256[] memory purchaseAmounts = new uint256[](1);
+        purchaseAmounts[0] = AMOUNT_TO_SPEND + 1; // wrong: schedule has AMOUNT_TO_SPEND
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDcaManager.DcaManager__PurchaseAmountMismatch.selector,
+                USER,
+                address(stablecoin),
+                scheduleIds[0],
+                SCHEDULE_INDEX,
+                AMOUNT_TO_SPEND,
+                AMOUNT_TO_SPEND + 1
+            )
+        );
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_lendingProtocolIndex);
+    }
+
+    function testBatchPurchaseFailsIfLendingProtocolIndexMismatch() external {
+        address[] memory users = new address[](1);
+        users[0] = USER;
+        uint256[] memory scheduleIndexes = new uint256[](1);
+        scheduleIndexes[0] = SCHEDULE_INDEX;
+        bytes32[] memory scheduleIds = new bytes32[](1);
+        scheduleIds[0] = dcaManager.getScheduleId(USER, address(stablecoin), SCHEDULE_INDEX);
+        uint256[] memory purchaseAmounts = new uint256[](1);
+        purchaseAmounts[0] = AMOUNT_TO_SPEND;
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDcaManager.DcaManager__LendingProtocolIndexMismatch.selector,
+                USER,
+                address(stablecoin),
+                scheduleIds[0],
+                SCHEDULE_INDEX,
+                s_lendingProtocolIndex,
+                s_lendingProtocolIndex + 1
+            )
+        );
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_lendingProtocolIndex + 1);
+    }
+
     function testBatchPurchaseFailsIfArraysHaveDifferentLenghts() external {
         address[] memory users = new address[](1);
         uint256[] memory dummyUintArray = new uint256[](3);
