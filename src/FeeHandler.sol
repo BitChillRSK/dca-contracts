@@ -50,7 +50,7 @@ abstract contract FeeHandler is IFeeHandler, Ownable {
     {
         // Validate parameters
         if (minFeeRate > maxFeeRate) revert FeeHandler__MinFeeRateCannotBeHigherThanMax();
-        if (feePurchaseLowerBound > feePurchaseUpperBound) revert FeeHandler__FeeLowerBoundCannotBeHigherThanUpperBound();
+        if (feePurchaseLowerBound >= feePurchaseUpperBound) revert FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound();
 
         if (s_minFeeRate != minFeeRate) setMinFeeRate(minFeeRate);
         if (s_maxFeeRate != maxFeeRate) setMaxFeeRate(maxFeeRate);
