@@ -31,7 +31,7 @@ interface IFeeHandler {
     //////////////////////
 
     error FeeHandler__MinFeeRateCannotBeHigherThanMax();
-    error FeeHandler__FeeLowerBoundCAnnotBeHigherThanUpperBound();
+    error FeeHandler__FeeLowerBoundCannotBeHigherThanUpperBound();
 
     ///////////////////////////////
     // External functions /////////

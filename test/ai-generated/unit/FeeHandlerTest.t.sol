@@ -73,7 +73,7 @@ contract FeeHandlerTest is Test {
     }
 
     function test_setFeeRateParams_reverts_invalidBounds() public {
-        vm.expectRevert(IFeeHandler.FeeHandler__FeeLowerBoundCAnnotBeHigherThanUpperBound.selector);
+        vm.expectRevert(IFeeHandler.FeeHandler__FeeLowerBoundCannotBeHigherThanUpperBound.selector);
         feeHandler.setFeeRateParams(MIN_FEE_RATE, MAX_FEE_RATE, 1000 ether, 500 ether); // lower > upper
     }
 
