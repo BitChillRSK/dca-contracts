@@ -29,11 +29,11 @@ contract StablecoinHandlerTest is DcaDappTest {
 
     function testStablecoinHandlerSetFeeRateParams() external {
         vm.prank(OWNER);
-        IFeeHandler(address(stablecoinHandler)).setFeeRateParams(5, 5, 5, 5);
-        assertEq(IFeeHandler(address(stablecoinHandler)).getMinFeeRate(), 5);
-        assertEq(IFeeHandler(address(stablecoinHandler)).getMaxFeeRate(), 5);
-        assertEq(IFeeHandler(address(stablecoinHandler)).getFeePurchaseLowerBound(), 5);
-        assertEq(IFeeHandler(address(stablecoinHandler)).getFeePurchaseUpperBound(), 5);
+        IFeeHandler(address(stablecoinHandler)).setFeeRateParams(100, 200, 1000 ether, 100000 ether);
+        assertEq(IFeeHandler(address(stablecoinHandler)).getMinFeeRate(), 100);
+        assertEq(IFeeHandler(address(stablecoinHandler)).getMaxFeeRate(), 200);
+        assertEq(IFeeHandler(address(stablecoinHandler)).getFeePurchaseLowerBound(), 1000 ether);
+        assertEq(IFeeHandler(address(stablecoinHandler)).getFeePurchaseUpperBound(), 100000 ether);
     }
 
     function testStablecoinHandlerSetFeeCollectorAddress() external {
