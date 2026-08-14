@@ -44,13 +44,4 @@ abstract contract TokenLending is ITokenLending {
     {
         underlyingAmount = lendingTokenAmount * exchangeRate / i_exchangeRateDecimals;
     }
-
-    /**
-     * @notice round up (add 1 WEI to) the lending token amount to avoid underestimating the amount to withdraw from each user's balance
-     * @param lendingTokenAmount: the amount of lending token to round up
-     * @return lendingTokenAmount the rounded up amount of lending token
-     */
-    function _lendingTokenRoundUp(uint256 lendingTokenAmount) internal pure returns (uint256) {
-        return lendingTokenAmount + 1;
-    }
 }
