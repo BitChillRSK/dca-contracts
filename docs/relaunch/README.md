@@ -22,5 +22,5 @@ Document any extra files in the PR. Do not search `out/`, `cache/`, or `lib/`. D
 
 - Merged: [R23-toolchain-baseline.md](./R23-toolchain-baseline.md) (PR 1, GitHub [#42](https://github.com/BitChillRSK/dca-contracts/pull/42)). Rootstock testnet accepted solc 0.8.36 / `cancun`.
 - Assigned: [R2-utc-purchase-period.md](./R2-utc-purchase-period.md) (PR 3, GitHub [#44](https://github.com/BitChillRSK/dca-contracts/pull/44)). No product gates. Does not wait on PR 2.
-- Assigned: [R7-dca-manager-small-fixes.md](./R7-dca-manager-small-fixes.md) (PR 4, stacked on [#44](https://github.com/BitChillRSK/dca-contracts/pull/44)). Bundles R7 / R11 / R14. No product gates.
-- Next unassigned: after this PR opens. PR 2 (decision record) stays available when the human wants to record fee / R18 / R19.
+- Assigned: [R7-dca-manager-small-fixes.md](./R7-dca-manager-small-fixes.md) (PR 4, GitHub [#45](https://github.com/BitChillRSK/dca-contracts/pull/45)). Bundles R7 / R11 / R14. No product gates. Stacked on [#44](https://github.com/BitChillRSK/dca-contracts/pull/44).
+- Next unassigned: `Start with R3` (PR 5, fee handling: R3 / R4 / R5). Ask fee model if PR 2 did not record it. PR 2 (decision record) stays available when the human wants to record fee / R18 / R19.

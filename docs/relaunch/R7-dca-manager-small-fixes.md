@@ -1,6 +1,6 @@
 # R7 — DcaManager small fixes (R7, R11, R14)
 
-Status: **in progress** · Assigned: yes · Optional/further-review: no
+Status: **in progress** (GitHub #45) · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
