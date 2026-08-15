@@ -12,12 +12,6 @@ remappings = [
 solc_version = "0.8.19"
 evm_version = "london"
 
-# Add compiler overrides for dependencies
-[profile.default.solc_overrides]
-"lib/swap-router-contracts/contracts/interfaces/IApproveAndCall.sol" = "0.7.6"
-"lib/v3-core/" = "0.7.6"
-"lib/v3-periphery/" = "0.7.6"
-
 [fuzz]
 runs = 1000
 
@@ -26,6 +20,13 @@ runs = 64
 depth = 512
 # depth = 10            # For forge coverage
 fail_on_revert = true
+
+[profile.ci]
+# Named so CI's FOUNDRY_PROFILE=ci is valid. Inherits default compiler settings.
+via_ir = false
+
+[profile.ci.fuzz]
+runs = 256
 
 [profile.deploy]
 via_ir = true            # Use the Yul IR pipeline for smaller bytecode

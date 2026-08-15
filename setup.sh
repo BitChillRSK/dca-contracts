@@ -6,13 +6,7 @@ git submodule init
 git submodule update
 
 echo "🔧 Applying Solidity version compatibility fixes..."
-# For macOS
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    find lib/ -type f -name "*.sol" -exec sed -i '' 's/pragma solidity =0.7.6;/pragma solidity >=0.7.6 <0.9.0;/g' {} \;
-# For Linux
-else
-    find lib/ -type f -name "*.sol" -exec sed -i 's/pragma solidity =0.7.6;/pragma solidity >=0.7.6 <0.9.0;/g' {} \;
-fi
+make patch-deps
 
 echo "🏗️ Building the project..."
 forge build

@@ -1,0 +1,10 @@
+# Secrets
+.env
+
+# Build artifacts (Grep/Glob traps — tens of MB of JSON)
+out/
+cache/
+broadcast/
+
+# Third-party. Open a path only when a src/ import leads here.
+lib/

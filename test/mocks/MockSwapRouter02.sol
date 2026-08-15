@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import "../../script/Constants.sol";
 import {MockWrbtcToken} from "./MockWrbtcToken.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // Minimal mock interface for Uniswap V3 SwapRouter
 interface IV3SwapRouter {
@@ -29,13 +30,18 @@ contract MockSwapRouter02 is IV3SwapRouter {
     // Mock function to simulate exactInput swap
     function exactInput(ExactInputParams calldata params) external payable override returns (uint256 amountOut) {
         require(params.amountIn > 0, "AmountIn must be greater than zero");
+        require(params.path.length >= 20, "Path too short");
 
         amountOut = (params.amountIn * 997) / (1000 * s_outputTokenPrice);
 
         require(params.amountOutMinimum <= amountOut, "Insufficient output amount");
 
-        // To simulate the DocHandlerDex contract receiving WRBTC when exactInput is called, we deposit rBTC in the WRBTC contract here
-        // msg.sender is the DocHandlerDex contract
+        // Pull the input token like a real router (path starts with tokenIn)
+        address tokenIn = address(uint160(bytes20(params.path[:20])));
+        require(IERC20(tokenIn).transferFrom(msg.sender, address(this), params.amountIn), "transferFrom failed");
+
+        // To simulate the handler receiving WRBTC when exactInput is called, deposit rBTC in the WRBTC contract
+        // msg.sender is the handler
         s_mockWrbtcToken.deposit{value: amountOut}(msg.sender);
 
         return amountOut;

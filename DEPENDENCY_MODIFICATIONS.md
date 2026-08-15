@@ -6,16 +6,13 @@
 This project is deployed on Rootstock, which requires Solidity 0.8.19 compatibility. However, several dependencies (Uniswap V3 Core, V3 Periphery, and Swap Router Contracts) use a strict Solidity 0.7.6 version requirement.
 
 ### Modifications Made
-We modified the pragma statements in the dependency files to allow compatibility with Solidity 0.8.19 while maintaining backward compatibility with 0.7.6:
+We patch the pragma statements in the dependency files to allow compatibility with Solidity 0.8.19 while maintaining backward compatibility with 0.7.6:
 
 ```bash
-# Command used to modify the files
-# For macOS
-find lib/ -type f -name "*.sol" -exec sed -i '' 's/pragma solidity =0.7.6;/pragma solidity >=0.7.6 <0.9.0;/g' {} \;
-
-# For Linux (if you were on Linux)
-find lib/ -type f -name "*.sol" -exec sed -i 's/pragma solidity =0.7.6;/pragma solidity >=0.7.6 <0.9.0;/g' {} \;
+make patch-deps
 ```
+
+`setup.sh`, local builds through `make build` / `make check`, and CI all use this target. The patch mutates vendored submodules under `lib/`; those submodule dirties are expected locally after setup and must not be staged in BitChill PRs.
 
 ### Affected Files
 The following files had their pragma statements modified from `=0.7.6` to `>=0.7.6 <0.9.0`:
