@@ -7,7 +7,7 @@ TEST_CMD := forge test --no-match-test invariant --no-match-contract ComparePurc
 FORK_TEST_CMD := $(TEST_CMD) --no-match-path "test/ai-generated/**"
 
 # Targets
-.PHONY: all test moc dex help
+.PHONY: all test moc dex help check build slither moc-tropykus moc-sovryn dex-tropykus dex-sovryn fork fork-tropykus fork-sovryn coverage
 
 all: help
 
@@ -22,6 +22,19 @@ test:
 		echo "Invalid SWAP_TYPE: $(SWAP_TYPE)"; \
 		exit 1; \
 	fi
+
+# Local "am I done" gate. Does not run forge fmt --check (src is not fmt-clean).
+# Does not fail if slither is missing; run `make slither` explicitly for that.
+check: build
+	$(MAKE) moc-tropykus
+
+build:
+	forge --version
+	forge build
+
+slither:
+	@command -v slither >/dev/null 2>&1 || { echo "slither is not installed. pipx install slither-analyzer"; exit 1; }
+	slither . --config-file slither.config.json
 
 # MocSwaps specific tests
 moc:
@@ -44,10 +57,16 @@ fork-sovryn:
 	@echo "Executing Sovryn fork tests with $(STABLECOIN_TYPE)..."
 	LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(FORK_TEST_CMD) --fork-url $(RSK_MAINNET_RPC_URL)
 
-# DexSwaps specific tests
+# DexSwaps specific tests (DcaDappTest requires SWAP_TYPE and LENDING_PROTOCOL)
 dex:
-	@echo "Executing DexSwaps tests with $(STABLECOIN_TYPE)..."
-	SWAP_TYPE=dexSwaps STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
+	@echo "Executing DexSwaps tests with $(LENDING_PROTOCOL) and $(STABLECOIN_TYPE)..."
+	SWAP_TYPE=dexSwaps LENDING_PROTOCOL=$(LENDING_PROTOCOL) STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
+dex-tropykus:
+	@echo "Executing DexSwaps Tropykus tests with $(STABLECOIN_TYPE)..."
+	SWAP_TYPE=dexSwaps LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
+dex-sovryn:
+	@echo "Executing DexSwaps Sovryn tests with $(STABLECOIN_TYPE)..."
+	SWAP_TYPE=dexSwaps LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
 
 coverage:
 	@echo "Calculating coverage excluding invariant tests..."
@@ -56,16 +75,20 @@ coverage:
 # Help target
 help:
 	@echo "Available targets:"
-	@echo "  make test SWAP_TYPE=mocSwaps LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=DOC  # Run tests with specified parameters"
+	@echo "  make check                     # Build + default suite (moc-tropykus)"
+	@echo "  make slither                   # Run slither (must be installed)"
+	@echo "  make test SWAP_TYPE=mocSwaps LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=DOC"
 	@echo ""
-	@echo "  make moc                       # Directly run MocSwaps local tests"
-	@echo "  make moc-tropykus              # Run MocSwaps Tropykus local tests"
-	@echo "  make moc-sovryn                # Run MocSwaps Sovryn local tests"
-	@echo "  make dex                       # Directly run DexSwaps local tests"
+	@echo "  make moc                       # MocSwaps local tests (LENDING_PROTOCOL from env, default tropykus)"
+	@echo "  make moc-tropykus              # MocSwaps + Tropykus"
+	@echo "  make moc-sovryn                # MocSwaps + Sovryn"
+	@echo "  make dex                       # DexSwaps local tests (LENDING_PROTOCOL from env, default tropykus)"
+	@echo "  make dex-tropykus              # DexSwaps + Tropykus"
+	@echo "  make dex-sovryn                # DexSwaps + Sovryn"
 	@echo ""
-	@echo "  make fork                      # Run fork tests"
-	@echo "  make fork-tropykus             # Run Tropykus fork tests"
-	@echo "  make fork-sovryn               # Run Sovryn fork tests"
+	@echo "  make fork                      # Fork tests (needs RSK_MAINNET_RPC_URL)"
+	@echo "  make fork-tropykus             # Tropykus fork tests"
+	@echo "  make fork-sovryn               # Sovryn fork tests"
 	@echo ""
 	@echo "Environment variables:"
 	@echo "  SWAP_TYPE: mocSwaps (default) or dexSwaps"
@@ -73,6 +96,6 @@ help:
 	@echo "  STABLECOIN_TYPE: DOC (default) or USDRIF"
 	@echo ""
 	@echo "Example:"
-	@echo "  STABLECOIN_TYPE=USDRIF make moc-tropykus  # Run MocSwaps Tropykus tests with USDRIF"
+	@echo "  STABLECOIN_TYPE=USDRIF make dex-tropykus"
 	@echo ""
 	@echo "  make help                      # Show this help message"

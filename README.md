@@ -145,6 +145,9 @@ git checkout smart-contracts
 
 ### Testing
 ```bash
+# Local done-gate (build + default moc-tropykus suite)
+make check
+
 # Run tests with DOC and Tropykus
 make moc-tropykus 
 
@@ -152,10 +155,10 @@ make moc-tropykus
 make moc-sovryn 
 
 # Run tests with USDRIF and Tropykus
-make dex-tropykus
+STABLECOIN_TYPE=USDRIF make dex-tropykus
 
 # Run tests with USDRIF and Sovryn
-make dex-sovryn
+STABLECOIN_TYPE=USDRIF make dex-sovryn
 
 # Run specific test file with custom parameters
 STABLECOIN_TYPE=USDRIF SWAP_TYPE=dexSwaps LENDING_PROTOCOL=tropykus forge test --match-path test/unit/DcaDappTest.t.sol -vvv

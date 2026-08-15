@@ -27,6 +27,13 @@ depth = 512
 # depth = 10            # For forge coverage
 fail_on_revert = true
 
+[profile.ci]
+# Named so CI's FOUNDRY_PROFILE=ci is valid. Inherits default compiler settings.
+via_ir = false
+
+[profile.ci.fuzz]
+runs = 256
+
 [profile.deploy]
 via_ir = true            # Use the Yul IR pipeline for smaller bytecode
 optimizer_runs = 200

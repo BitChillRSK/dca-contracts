@@ -1,17 +1,27 @@
 name: test
 
-on: workflow_dispatch
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
 env:
   FOUNDRY_PROFILE: ci
+  FOUNDRY_DISABLE_NIGHTLY_WARNING: 1
 
 jobs:
-  check:
-    strategy:
-      fail-fast: true
-
-    name: Foundry project
+  test:
+    name: ${{ matrix.target }} (${{ matrix.stablecoin }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: moc-sovryn
+            stablecoin: DOC
+          - target: dex-sovryn
+            stablecoin: USDRIF
     steps:
       - uses: actions/checkout@v4
         with:
@@ -20,15 +30,15 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: nightly
+          version: stable
 
-      - name: Run Forge build
-        run: |
-          forge --version
-          forge build --sizes
-        id: build
+      - name: Patch Uniswap pragmas for Foundry
+        run: find lib/ -type f -name "*.sol" -exec sed -i 's/pragma solidity =0.7.6;/pragma solidity >=0.7.6 <0.9.0;/g' {} \;
 
-      - name: Run Forge tests
-        run: |
-          forge test -vvv
-        id: test
+      - name: Forge version
+        run: forge --version
+
+      - name: Run ${{ matrix.target }}
+        env:
+          STABLECOIN_TYPE: ${{ matrix.stablecoin }}
+        run: make ${{ matrix.target }}
