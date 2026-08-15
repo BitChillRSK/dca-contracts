@@ -48,6 +48,15 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     }
 
     /**
+     * @notice protocol minimum purchase period cannot be below one UTC day
+     * @param minPurchasePeriod the minimum purchase period to validate
+     */
+    modifier validateMinPurchasePeriod(uint256 minPurchasePeriod) {
+        if (minPurchasePeriod < 1 days) revert DcaManager__MinPurchasePeriodMustBeAtLeastOneDay();
+        _;
+    }
+
+    /**
      * @notice only allow swapper role
      */
     modifier onlySwapper() {
@@ -67,7 +76,10 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      * @param maxSchedulesPerToken the maximum number of schedules allowed per token
      * @param defaultMinPurchaseAmount the default minimum purchase amount for all tokens
      */
-    constructor(address operationsAdminAddress, uint256 minPurchasePeriod, uint256 maxSchedulesPerToken, uint256 defaultMinPurchaseAmount) Ownable() {
+    constructor(address operationsAdminAddress, uint256 minPurchasePeriod, uint256 maxSchedulesPerToken, uint256 defaultMinPurchaseAmount)
+        Ownable()
+        validateMinPurchasePeriod(minPurchasePeriod)
+    {
         s_operationsAdmin = OperationsAdmin(operationsAdminAddress);
         s_minPurchasePeriod = minPurchasePeriod;
         s_maxSchedulesPerToken = maxSchedulesPerToken;
@@ -412,7 +424,12 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      * @notice modify the minimum period between purchases
      * @param minPurchasePeriod: the new period
      */
-    function modifyMinPurchasePeriod(uint256 minPurchasePeriod) external override onlyOwner {
+    function modifyMinPurchasePeriod(uint256 minPurchasePeriod)
+        external
+        override
+        onlyOwner
+        validateMinPurchasePeriod(minPurchasePeriod)
+    {
         s_minPurchasePeriod = minPurchasePeriod;
         emit DcaManager__MinPurchasePeriodModified(minPurchasePeriod);
     }
@@ -531,11 +548,14 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
 
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
 
-        // @notice: If this is not the first purchase for this schedule, check that period has elapsed before making a new purchase
-        if (dcaSchedule.lastPurchaseTimestamp > 0 && block.timestamp - dcaSchedule.lastPurchaseTimestamp < dcaSchedule.purchasePeriod) {
-            revert DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed(
-                dcaSchedule.lastPurchaseTimestamp + dcaSchedule.purchasePeriod - block.timestamp
-            );
+        // @notice: After the first purchase, the schedule is eligible once the UTC day of last + period has started
+        if (dcaSchedule.lastPurchaseTimestamp != 0) {
+            uint256 currentDayStart = block.timestamp - (block.timestamp % 1 days);
+            uint256 nextDueTimestamp = dcaSchedule.lastPurchaseTimestamp + dcaSchedule.purchasePeriod;
+            uint256 nextPurchaseDayStart = nextDueTimestamp - (nextDueTimestamp % 1 days);
+            if (currentDayStart < nextPurchaseDayStart) {
+                revert DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed(nextPurchaseDayStart - block.timestamp);
+            }
         }
 
         if (dcaSchedule.purchaseAmount > dcaSchedule.tokenBalance) {
@@ -545,14 +565,18 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         dcaScheduleStorage.tokenBalance = dcaSchedule.tokenBalance;
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, dcaSchedule.tokenBalance);
 
-        // @notice: this way purchases are possible with the wanted periodicity even if 
+        // @notice: this way purchases are possible with the wanted periodicity even if
         // - a previous purchase was delayed
         // - the schedule run out of stablecoin and was resumed later with a new deposit
-        uint256 periodsElapsed = (block.timestamp - dcaSchedule.lastPurchaseTimestamp) / dcaSchedule.purchasePeriod;
-        unchecked {
-            dcaSchedule.lastPurchaseTimestamp = dcaSchedule.lastPurchaseTimestamp == 0
-                ? block.timestamp
-                : dcaSchedule.lastPurchaseTimestamp + periodsElapsed * dcaSchedule.purchasePeriod;
+        // Floor periodsElapsed at 1 so an early UTC-day buy still consumes a slot
+        if (dcaSchedule.lastPurchaseTimestamp == 0) {
+            dcaSchedule.lastPurchaseTimestamp = block.timestamp;
+        } else {
+            uint256 periodsElapsed = (block.timestamp - dcaSchedule.lastPurchaseTimestamp) / dcaSchedule.purchasePeriod;
+            if (periodsElapsed == 0) periodsElapsed = 1;
+            unchecked {
+                dcaSchedule.lastPurchaseTimestamp += periodsElapsed * dcaSchedule.purchasePeriod;
+            }
         }
         dcaScheduleStorage.lastPurchaseTimestamp = dcaSchedule.lastPurchaseTimestamp;
         emit DcaManager__LastPurchaseTimestampUpdated(token, scheduleId, dcaSchedule.lastPurchaseTimestamp);

@@ -539,7 +539,7 @@ contract Handler is Test {
      * @notice Test modifying minimum purchase period (owner-only)
      */
     function modifyMinPurchasePeriod(uint256 newMinPurchasePeriod) external {
-        newMinPurchasePeriod = bound(newMinPurchasePeriod, 1 hours, 365 days);
+        newMinPurchasePeriod = bound(newMinPurchasePeriod, 1 days, 365 days);
         
         vm.startPrank(OWNER);
         try dcaManager.modifyMinPurchasePeriod(newMinPurchasePeriod) {

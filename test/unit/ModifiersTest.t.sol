@@ -4,8 +4,10 @@ pragma solidity 0.8.36;
 
 import {Test, console} from "forge-std/Test.sol";
 import {DcaDappTest} from "./DcaDappTest.t.sol";
+import {DcaManager} from "../../src/DcaManager.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
+import "../../script/Constants.sol";
 
 contract ModifiersTest is DcaDappTest {
     // Events
@@ -48,5 +50,25 @@ contract ModifiersTest is DcaDappTest {
         dcaManager.modifyMinPurchasePeriod(newMinPurchasePeriod);
         minPurchasePeriodAfter = dcaManager.getMinPurchasePeriod();
         assertEq(minPurchasePeriodAfter, newMinPurchasePeriod);
+    }
+
+    function testModifyMinPurchasePeriodRevertsBelowOneDay() external {
+        vm.prank(OWNER);
+        vm.expectRevert(IDcaManager.DcaManager__MinPurchasePeriodMustBeAtLeastOneDay.selector);
+        dcaManager.modifyMinPurchasePeriod(1 days - 1);
+        assertEq(dcaManager.getMinPurchasePeriod(), MIN_PURCHASE_PERIOD);
+    }
+
+    function testModifyMinPurchasePeriodAllowsOneDay() external {
+        vm.prank(OWNER);
+        dcaManager.modifyMinPurchasePeriod(2 days);
+        vm.prank(OWNER);
+        dcaManager.modifyMinPurchasePeriod(1 days);
+        assertEq(dcaManager.getMinPurchasePeriod(), 1 days);
+    }
+
+    function testConstructorRevertsIfMinPurchasePeriodBelowOneDay() external {
+        vm.expectRevert(IDcaManager.DcaManager__MinPurchasePeriodMustBeAtLeastOneDay.selector);
+        new DcaManager(address(operationsAdmin), 1 days - 1, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT);
     }
 }
