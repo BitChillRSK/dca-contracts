@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity 0.8.36;
 
 interface IStablecoin {
     function transfer(address to, uint256 amount) external returns (bool);

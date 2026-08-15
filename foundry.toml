@@ -9,8 +9,8 @@ remappings = [
     '@uniswap/swap-router-contracts=lib/swap-router-contracts',
 ]
 
-solc_version = "0.8.19"
-evm_version = "london"
+solc_version = "0.8.36"
+evm_version = "cancun"
 
 [fuzz]
 runs = 1000
@@ -29,6 +29,8 @@ via_ir = false
 runs = 256
 
 [profile.deploy]
+solc_version = "0.8.36"
+evm_version = "cancun"
 via_ir = true            # Use the Yul IR pipeline for smaller bytecode
 optimizer_runs = 200
 

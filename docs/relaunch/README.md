@@ -22,4 +22,4 @@ Document any extra files in the PR. Do not search `out/`, `cache/`, or `lib/`.
 
 ## Status
 
-No relaunch specs are assigned yet. Do not change `src/`, `test/`, or `script/` from this README.
+Assigned: [R23-toolchain-baseline.md](./R23-toolchain-baseline.md) (PR 1). Implement that spec only.

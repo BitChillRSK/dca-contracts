@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity 0.8.36;
 
 import {HandlerTestHarness} from "./HandlerTestHarness.t.sol";
 import {ITokenHandler} from "../../../src/interfaces/ITokenHandler.sol";

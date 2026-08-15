@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity 0.8.36;
 
 import "../../script/Constants.sol";
 import {MockWrbtcToken} from "./MockWrbtcToken.sol";

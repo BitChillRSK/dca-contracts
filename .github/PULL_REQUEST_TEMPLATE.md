@@ -8,6 +8,7 @@
 
 - Spec:
 - R-item (if any):
+- Stacked on (branch or “`main`”):
 
 ## Scope / out of scope
 

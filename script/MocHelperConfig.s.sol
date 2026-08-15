@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity 0.8.36;
 
 import {MockStablecoin} from "../test/mocks/MockStablecoin.sol";
 import {MockKdocToken} from "../test/mocks/MockKdocToken.sol";

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity 0.8.36;
 
 import {TropykusErc20Handler} from "./TropykusErc20Handler.sol";
 import {PurchaseMoc} from "src/PurchaseMoc.sol";
