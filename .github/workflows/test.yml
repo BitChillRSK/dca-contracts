@@ -32,13 +32,7 @@ jobs:
         with:
           version: stable
 
-      - name: Patch Uniswap pragmas for Foundry
-        run: find lib/ -type f -name "*.sol" -exec sed -i 's/pragma solidity =0.7.6;/pragma solidity >=0.7.6 <0.9.0;/g' {} \;
-
-      - name: Forge version
-        run: forge --version
-
       - name: Run ${{ matrix.target }}
         env:
           STABLECOIN_TYPE: ${{ matrix.stablecoin }}
-        run: make ${{ matrix.target }}
+        run: make patch-deps && make ${{ matrix.target }}

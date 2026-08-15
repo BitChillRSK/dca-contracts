@@ -54,6 +54,7 @@ make check
 - [ ] No optional / further-review work unless the spec assigned it
 - [ ] PR is small and behavior-scoped; no unrelated refactors
 - [ ] Extra files beyond the spec are listed and justified
-- [ ] Tests listed above were run; CI matrix is green
+- [ ] Tests listed above were run locally
+- [ ] GitHub Actions CI is green after the latest push
 - [ ] Protocol invariants in `AGENTS.md` still hold unless the spec changed one
 - [ ] No broadcast, live-chain interaction, or secrets in the diff

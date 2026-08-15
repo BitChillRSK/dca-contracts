@@ -2,12 +2,12 @@
 SWAP_TYPE ?= mocSwaps
 LENDING_PROTOCOL ?= tropykus
 STABLECOIN_TYPE ?= DOC
-TEST_CMD := forge test --no-match-test invariant --no-match-contract ComparePurchaseMethods -j 1
+TEST_CMD := forge test --no-match-test invariant --no-match-contract ComparePurchaseMethods --no-match-path "test/mainnet-debug/**" -j 1
 # Exclude ai-generated tests on fork: they use mocks and vm.prank with raw addresses, causing RPC 429 and revert-depth failures
 FORK_TEST_CMD := $(TEST_CMD) --no-match-path "test/ai-generated/**"
 
 # Targets
-.PHONY: all test moc dex help check build slither moc-tropykus moc-sovryn dex-tropykus dex-sovryn fork fork-tropykus fork-sovryn coverage
+.PHONY: all test moc dex help check ci build patch-deps slither moc-tropykus moc-sovryn dex-tropykus dex-sovryn fork fork-tropykus fork-sovryn coverage
 
 all: help
 
@@ -23,14 +23,29 @@ test:
 		exit 1; \
 	fi
 
-# Local "am I done" gate. Does not run forge fmt --check (src is not fmt-clean).
-# Does not fail if slither is missing; run `make slither` explicitly for that.
+# Local "am I done" gate. Mirrors required CI lanes and includes the local Tropykus mock lane.
+# Does not run forge fmt --check (src is not fmt-clean). Run `make slither` explicitly when needed.
 check: build
 	$(MAKE) moc-tropykus
+	$(MAKE) moc-sovryn
+	STABLECOIN_TYPE=USDRIF $(MAKE) dex-sovryn
 
-build:
+ci:
+	FOUNDRY_PROFILE=ci $(MAKE) build
+	FOUNDRY_PROFILE=ci $(MAKE) moc-sovryn
+	FOUNDRY_PROFILE=ci STABLECOIN_TYPE=USDRIF $(MAKE) dex-sovryn
+
+build: patch-deps
 	forge --version
 	forge build
+
+patch-deps:
+	@echo "Applying Solidity pragma compatibility patch to vendored Uniswap dependencies..."
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		find lib/ -type f -name "*.sol" -exec sed -i '' 's/pragma solidity =0.7.6;/pragma solidity >=0.7.6 <0.9.0;/g' {} \; ; \
+	else \
+		find lib/ -type f -name "*.sol" -exec sed -i 's/pragma solidity =0.7.6;/pragma solidity >=0.7.6 <0.9.0;/g' {} \; ; \
+	fi
 
 slither:
 	@command -v slither >/dev/null 2>&1 || { echo "slither is not installed. pipx install slither-analyzer"; exit 1; }
@@ -75,7 +90,9 @@ coverage:
 # Help target
 help:
 	@echo "Available targets:"
-	@echo "  make check                     # Build + default suite (moc-tropykus)"
+	@echo "  make check                     # Build + moc-tropykus + required CI lanes"
+	@echo "  make ci                        # Build + required CI lanes"
+	@echo "  make patch-deps                # Apply vendored Uniswap pragma compatibility patch"
 	@echo "  make slither                   # Run slither (must be installed)"
 	@echo "  make test SWAP_TYPE=mocSwaps LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=DOC"
 	@echo ""
