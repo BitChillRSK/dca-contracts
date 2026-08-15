@@ -8,11 +8,11 @@ Treat a schedule as eligible once the UTC calendar day of `lastPurchaseTimestamp
 
 ## Background
 
-Eligibility today requires a full `purchasePeriod` of wall-clock seconds since `lastPurchaseTimestamp`. A first daily buy at 20:00 UTC blocks the next buy until 20:00 the following day.
+Eligibility used to require a full `purchasePeriod` of wall-clock seconds since `lastPurchaseTimestamp`. A first daily buy at 20:00 UTC blocked the next buy until 20:00 the following day.
 
-Missed-period timestamp snap (`6335994`) already landed: after a gap, `lastPurchaseTimestamp` advances by `periodsElapsed * purchasePeriod`, not `1 * period`. **Keep that snap.** First purchase (`lastPurchaseTimestamp == 0`) still stamps `block.timestamp`.
+Missed-period timestamp snap (`6335994`) already landed: after a gap, `lastPurchaseTimestamp` advances by `periodsElapsed * purchasePeriod`, not `1 * period`. **Keep that snap.** First purchase (`lastPurchaseTimestamp == 0`) stamps 00:00 UTC of that day, not `block.timestamp`.
 
-R2 replaces the remaining strict-seconds check. Daily is the highest frequency BitChill will support; the one-day floor is both required by the UTC-day math (a sub-day period would round to 00:00 today and allow an immediate second buy) and the intended product maximum.
+R2 replaces the remaining strict-seconds check. Daily is the highest frequency BitChill will support; periods must be whole UTC days (`period % 1 days == 0`) and at least one day. That is both required by the UTC-day math (a sub-day period would round to 00:00 today and allow an immediate second buy) and the intended product maximum.
 
 ## Open product decisions
 
@@ -114,6 +114,6 @@ Fork tests: not required.
 
 ## ABI / deploy / cutover impact
 
-- ABI: new error `DcaManager__MinPurchasePeriodMustBeAtLeastOneDay`. Existing `DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed(uint256 timeRemaining)` kept; `timeRemaining` is now seconds until 00:00 UTC of the due day, not until `last + period` wall-clock. No function or event signature changes.
+- ABI: new errors `DcaManager__MinPurchasePeriodMustBeAtLeastOneDay` and `DcaManager__PurchasePeriodMustBeWholeDays`. Existing `DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed(uint256 timeRemaining)` kept; `timeRemaining` is now seconds until 00:00 UTC of the due day, not until `last + period` wall-clock. No function or event signature changes.
 - Scripts: none. Deploy scripts already pass `MIN_PURCHASE_PERIOD = 1 days`.
 - Cutover: swapper may run at a fixed UTC time once the due calendar day has started. `lastPurchaseTimestamp` is the UTC-day grid (first buy's 00:00, then whole periods), not execution time. Indexers should use `PurchaseRbtc__RbtcBought` plus the log's `block.timestamp` for purchase history. Do not include broadcast steps.
