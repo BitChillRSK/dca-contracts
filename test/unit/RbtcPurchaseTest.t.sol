@@ -73,13 +73,25 @@ contract RbtcPurchaseTest is DcaDappTest {
         vm.prank(SWAPPER);
         dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
 
-        uint256 dueDayStart = _utcDayStart(firstBuy) + 1 days; // still 20 hours before last + period
+        uint256 dueDayStart = _utcDayStart(firstBuy) + 1 days;
         vm.warp(dueDayStart);
         vm.prank(SWAPPER);
         dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
 
         IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
-        assertEq(schedule.lastPurchaseTimestamp, firstBuy + MIN_PURCHASE_PERIOD);
+        assertEq(schedule.lastPurchaseTimestamp, _utcDayStart(firstBuy) + MIN_PURCHASE_PERIOD);
+    }
+
+    function testFirstPurchaseStampsUtcDayStart() external {
+        uint256 firstBuy = _nextUtcTimestamp(20 hours);
+        vm.warp(firstBuy);
+        bytes32 scheduleId = dcaManager.getScheduleId(USER, address(stablecoin), SCHEDULE_INDEX);
+        vm.prank(SWAPPER);
+        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
+
+        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
+        assertEq(schedule.lastPurchaseTimestamp, _utcDayStart(firstBuy));
+        assertTrue(schedule.lastPurchaseTimestamp != 0);
     }
 
     function testCannotBuyOneSecondBeforeDueUtcDay() external {
@@ -113,7 +125,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
 
         IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
-        assertEq(schedule.lastPurchaseTimestamp, firstBuy + MIN_PURCHASE_PERIOD);
+        assertEq(schedule.lastPurchaseTimestamp, _utcDayStart(firstBuy) + MIN_PURCHASE_PERIOD);
 
         vm.warp(dueDayStart + 9 hours); // still the due UTC day
         bytes memory encodedRevert = abi.encodeWithSelector(
@@ -141,7 +153,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
 
         IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
-        assertEq(schedule.lastPurchaseTimestamp, firstBuy + weeklyPeriod);
+        assertEq(schedule.lastPurchaseTimestamp, _utcDayStart(firstBuy) + weeklyPeriod);
     }
 
     function testGapResumeOnDueUtcDayConsumesThatDaySlot() external {
@@ -158,7 +170,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
 
         IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
-        assertEq(schedule.lastPurchaseTimestamp, firstBuy + 3 * MIN_PURCHASE_PERIOD);
+        assertEq(schedule.lastPurchaseTimestamp, _utcDayStart(firstBuy) + 3 * MIN_PURCHASE_PERIOD);
 
         vm.warp(thirdDueDayStart + 9 hours);
         bytes memory encodedRevert = abi.encodeWithSelector(
@@ -205,21 +217,19 @@ contract RbtcPurchaseTest is DcaDappTest {
     function testLastPurchaseTimestampConsistencyWhenScheduleResumed(uint256 timeUntilResume) public {
         if (timeUntilResume < MIN_PURCHASE_PERIOD) return; // Avoid known revert
         if (timeUntilResume > 100 * 52 weeks) return; // Avoid overflows
-        uint256 firstPurchaseTimestamp = block.timestamp;
         bytes32 scheduleId = dcaManager.getScheduleId(USER, address(stablecoin), SCHEDULE_INDEX);
         vm.prank(SWAPPER);
         dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
-        
-        // Imagine after the first purchase, the schedule runs out of stablecoin and is resumed later 
-        vm.warp(vm.getBlockTimestamp() + timeUntilResume); 
-        
+        uint256 gridOrigin = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX].lastPurchaseTimestamp;
+
+        // Imagine after the first purchase, the schedule runs out of stablecoin and is resumed later
+        vm.warp(vm.getBlockTimestamp() + timeUntilResume);
+
         vm.prank(SWAPPER);
         dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
 
         IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
-        uint256 expectedLast = _snappedLastPurchaseTimestamp(
-            firstPurchaseTimestamp, MIN_PURCHASE_PERIOD, block.timestamp
-        );
+        uint256 expectedLast = _snappedLastPurchaseTimestamp(gridOrigin, MIN_PURCHASE_PERIOD, block.timestamp);
         assertEq(schedule.lastPurchaseTimestamp, expectedLast);
         assertLt(schedule.lastPurchaseTimestamp, block.timestamp + MIN_PURCHASE_PERIOD);
         assertGt(schedule.lastPurchaseTimestamp, block.timestamp - MIN_PURCHASE_PERIOD);
@@ -853,8 +863,10 @@ contract RbtcPurchaseTest is DcaDappTest {
     }
 
     function _nextUtcTimestamp(uint256 hourOfDay) private view returns (uint256) {
-        uint256 candidate = _utcDayStart(block.timestamp) + hourOfDay;
-        if (candidate < block.timestamp) {
+        // Skip unix day 0 so a 00:00 stamp cannot collide with the "never purchased" sentinel.
+        uint256 ts = block.timestamp < 1 days ? 1 days : block.timestamp;
+        uint256 candidate = _utcDayStart(ts) + hourOfDay;
+        if (candidate < ts) {
             candidate += 1 days;
         }
         return candidate;

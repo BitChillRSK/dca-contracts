@@ -38,7 +38,8 @@ R2 replaces the remaining strict-seconds check. Daily is the highest frequency B
 
   ```solidity
   if (lastPurchaseTimestamp == 0) {
-      lastPurchaseTimestamp = block.timestamp;
+      uint256 dayStart = block.timestamp - (block.timestamp % 1 days);
+      lastPurchaseTimestamp = dayStart == 0 ? 1 : dayStart; // 0 stays "never purchased"
   } else {
       uint256 periodsElapsed = (block.timestamp - lastPurchaseTimestamp) / purchasePeriod;
       if (periodsElapsed == 0) periodsElapsed = 1;
@@ -51,7 +52,7 @@ R2 replaces the remaining strict-seconds check. Daily is the highest frequency B
   }
   ```
 
-  After an early UTC-day buy, `lastPurchaseTimestamp` may be greater than `block.timestamp`. That is intended.
+  First purchase stamps 00:00 UTC of that day. Later purchases add whole periods from that midnight so a weekly schedule keeps its weekday after a gap. Floor / extra-period remain as guards. Actual execution time is the purchase transaction's `block.timestamp` (indexer / `PurchaseRbtc__RbtcBought` log), not this field.
 
 - [x] Add modifier `validateMinPurchasePeriod`: revert if `minPurchasePeriod < 1 days`. Apply on `constructor` and `modifyMinPurchasePeriod`. New error on `IDcaManager` (e.g. `DcaManager__MinPurchasePeriodMustBeAtLeastOneDay`). User schedules still cannot go below `s_minPurchasePeriod` (`_validatePurchasePeriod` unchanged in spirit).
 
@@ -90,7 +91,7 @@ make check
 
 Behaviors to assert:
 
-- First buy late in the UTC day → next buy allowed at 00:00 UTC of the due day, even if `last + period` is still hours away.
+- First buy late in the UTC day → `lastPurchaseTimestamp` is 00:00 UTC of that day (not `block.timestamp`); next buy allowed at 00:00 UTC of the due day.
 - Still reverts one second before 00:00 UTC of the due day.
 - Same-block / same-day second buy still reverts (`testCannotBuyIfPeriodNotElapsed` keeps passing; update the error's `timeRemaining` to seconds until the due UTC day start).
 - Weekly: allowed any time on the due UTC day, not only after the exact second.
@@ -122,4 +123,4 @@ Fork tests: not required.
 
 - ABI: new error `DcaManager__MinPurchasePeriodMustBeAtLeastOneDay`. Existing `DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed(uint256 timeRemaining)` kept; `timeRemaining` is now seconds until 00:00 UTC of the due day, not until `last + period` wall-clock. No function or event signature changes.
 - Scripts: none. Deploy scripts already pass `MIN_PURCHASE_PERIOD = 1 days`.
-- Cutover: swapper may run at a fixed UTC time once the due calendar day has started. Frontend/ops: eligibility is UTC-day, not exact second. Do not include broadcast steps.
+- Cutover: swapper may run at a fixed UTC time once the due calendar day has started. `lastPurchaseTimestamp` is the UTC-day grid (first buy's 00:00, then whole periods), not execution time. Indexers should use `PurchaseRbtc__RbtcBought` plus the log's `block.timestamp` for purchase history. Do not include broadcast steps.

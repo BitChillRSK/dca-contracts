@@ -566,14 +566,13 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         dcaScheduleStorage.tokenBalance = dcaSchedule.tokenBalance;
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, dcaSchedule.tokenBalance);
 
-        // @notice: this way purchases are possible with the wanted periodicity even if
-        // - a previous purchase was delayed
-        // - the schedule run out of stablecoin and was resumed later with a new deposit
-        // Floor periodsElapsed at 1 so an early UTC-day buy still consumes a slot.
-        // If the wall-clock snap still leaves today's UTC day due (gap after a late-in-day last),
-        // consume one more period so a second buy the same day cannot pass.
+        // First purchase stamps 00:00 UTC of that day (0 stays "never purchased").
+        // Later purchases add whole periods from that midnight so weekly stays on the
+        // original weekday after a gap. Floor periodsElapsed at 1, then consume one more
+        // period if that snap still leaves today's UTC day due.
         if (dcaSchedule.lastPurchaseTimestamp == 0) {
-            dcaSchedule.lastPurchaseTimestamp = block.timestamp;
+            uint256 dayStart = block.timestamp - (block.timestamp % 1 days);
+            dcaSchedule.lastPurchaseTimestamp = dayStart == 0 ? 1 : dayStart;
         } else {
             uint256 periodsElapsed = (block.timestamp - dcaSchedule.lastPurchaseTimestamp) / dcaSchedule.purchasePeriod;
             if (periodsElapsed == 0) periodsElapsed = 1;
