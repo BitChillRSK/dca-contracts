@@ -8,9 +8,23 @@ Agents should use this file to choose the next PR, then work only from the assig
 
 - One PR should have one behavioral purpose. If two R-items share the same files and tests, bundle them only when this file says so.
 - Write or assign the specific `R<n>-...md` spec before implementation starts.
+- Branch before edits; commit, push, and open the PR when the spec’s success criteria pass (`AGENTS.md` Git section). Stack PR N+1 on PR N’s branch. Merge in order after review.
 - Run targeted tests first, then the repo done-gate from `AGENTS.md`.
-- Do not deploy, broadcast, or touch live contracts from implementation PRs.
+- Do not `--broadcast` or touch live contracts from implementation PRs.
 - Keep OpenZeppelin at `v4.9.3` during the main relaunch work. A major OpenZeppelin upgrade is optional late work.
+
+## Rootstock compiler / EVM proof
+
+`forge test --fork-url` and Anvil copy Rootstock **state** but execute on **revm**. Passing fork tests does not mean Rootstock will accept 0.8.36 / `cancun` bytecode.
+
+Do this **after PR 1 is merged (or on that bytecode) and before merging PR 3** (first behavior change). Opening later PRs for review is fine; merging them on an unproven pin is how the whole stack would have to roll back.
+
+1. Using `[profile.deploy]` (`0.8.36`, `cancun`, `via_ir`), deploy one first-party contract (e.g. `OperationsAdmin`) to Rootstock **testnet**. Human/ops runs the broadcast, not the implementation agent.
+2. The tx must succeed (the node accepted the code). Deployed bytecode must not start with `0xEF`.
+3. If Blockscout lists solc 0.8.36, verify with `cancun`. If it only lists 0.8.34, that is an explorer catalog limit, not a consensus cap — still confirm the **tx** succeeded.
+4. If the node rejects the tx, fall back to `shanghai` (PUSH0 only) or the portal-listed solc, still not `london` unless the node rejects shanghai. Land that fallback on the R23 branch **before** merging behavior PRs.
+
+Do not set `prague` / `osaka` / `amsterdam`. Do not use blob opcodes.
 
 ## Required decisions before code changes
 
@@ -31,7 +45,7 @@ Default if undecided:
 
 ### PR 1 - R23 toolchain and dependency baseline
 
-Bump first-party Solidity and Rootstock EVM settings before other code changes. Prefer the latest stable `0.8.x` compiler and `evm_version = "cancun"` if Rootstock testnet/fork verification passes.
+Bump first-party Solidity and Rootstock EVM settings before other code changes. Pin latest stable `0.8.x` and `evm_version = "cancun"`. Anvil/fork tests are not the Rootstock proof — see [Rootstock compiler / EVM proof](#rootstock-compiler--evm-proof) before merging PR 3.
 
 Keep OpenZeppelin `v4.9.3`. Uniswap **sources** stay `=0.7.6` in git; they cannot be compiled with solc 0.7.6 while first-party Dex files import them (see R23). `make patch-deps` remains required. Do not include OpenZeppelin 5.x migration in this PR.
 

@@ -11,6 +11,8 @@ Rootstock executes `PUSH0` since Arrowhead (2024-04-03) and Cancun memory / tran
 
 `[profile.deploy]` sets the same `solc_version` and `evm_version` (plus `via_ir` for size).
 
+Anvil and `forge test --fork-url` execute on revm, not rskj. Prove the pin on Rootstock **testnet** before merging relaunch behavior PRs (see `docs/relaunch/IMPLEMENTATION_ORDER.md`).
+
 OpenZeppelin stays **v4.9.3**. Do not re-run any `sed` on `lib/openzeppelin-contracts`. A 5.x upgrade is a separate optional PR. Compiling OZ 4.9.3 with 0.8.36 emits warning 6335 (`error` will become a keyword in `ECDSA._throwError`); that is expected and not a reason to bump OZ in this PR.
 
 Rootstock does **not** require Solidity 0.8.19. That pin was a blunt way to stay off `PUSH0` before Arrowhead; `evm_version = "london"` on a newer solc would have been enough at the time.

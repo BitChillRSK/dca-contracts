@@ -56,8 +56,18 @@ Unless the assigned spec explicitly changes one:
 - `make patch-deps` applies the vendored Uniswap pragma compatibility patch used by local builds and CI. It mutates `lib/` submodules; do not commit those submodule dirties.
 - `make slither` if slither is installed; not part of `make check` (no clean baseline yet).
 - Do not `forge fmt` existing files unless the spec says to (`src/` is not fmt-clean).
-- Fork tests (`make fork-*`) need an RPC and are not in CI. `test/mainnet-debug/**` is excluded from normal local/CI runs.
+- Fork tests (`make fork-*`) need an RPC and are not in CI. `test/mainnet-debug/**` is excluded from normal local/CI runs. They run on **Anvil/revm**, not rskj: useful for live Sovryn/MoC state, **not** a Rootstock opcode/compiler proof. `make fork-*` currently passes `--no-match-path` twice (Forge rejects that); use one glob until that Makefile bug is fixed.
+
+## Git (relaunch)
+
+Do this even if a user-level rule says “don’t commit until asked.” An assigned `docs/relaunch/` spec **is** authorization to branch, commit, push, and open a PR.
+
+1. **Branch before the first edit.** Never implement on `main`. `git checkout -b <type>/r<n>-<slug>` from `main` if the previous relaunch PR is merged, otherwise from that PR’s branch (stack).
+2. **Commit when the spec’s success criteria pass.** Small, targeted commits a reviewer can walk (spec/docs, then code, then follow-up docs). Subject line: `type: why`.
+3. **Push and open a PR** with `.github/PULL_REQUEST_TEMPLATE.md`. Point at the spec. Do not commit `lib/` dirt from `make patch-deps`, secrets, or `.env`.
+4. **One implementer per PR.** Parallel Cursor/Codex/Claude **review** is expected. Parallel **implementation** on overlapping Solidity (`DcaManager`, handlers, `DcaDappTest`) is not. Git worktrees do not help that overlap; skip them for this relaunch except a docs-only PR.
+5. **Stack, merge in order.** Open PR N+1 based on PR N’s branch. The human merges one by one after review. Do not merge PR 3+ until the Rootstock compiler/EVM proof in `docs/relaunch/IMPLEMENTATION_ORDER.md` has passed (Anvil fork is not that proof).
 
 ## PRs
 
-Small, behavior-scoped, reviewable history. No drive-by refactors. Do not commit secrets or `.env`. Use `.github/PULL_REQUEST_TEMPLATE.md`. Point at the spec; do not restate the invariants — say whether they still hold.
+Small, behavior-scoped, reviewable history. No drive-by refactors. Use the template. Do not restate the invariants — say whether they still hold.

@@ -74,7 +74,7 @@ Behaviors to assert:
 - No first-party use of `blobhash` / `block.blobbasefee`.
 - OpenZeppelin remains 4.9.3 (`lib/openzeppelin-contracts` not upgraded).
 
-Fork tests: not required for merge. If `RSK_MAINNET_RPC_URL` is set, a one-contract `forge create --rpc-url` or `forge script` smoke on a Rootstock fork is recommended; otherwise note the skip. Fallback if the fork rejects cancun bytecode: `shanghai` (PUSH0 only) or portal-listed solc 0.8.34, still not london unless the fork itself rejects shanghai — and document that fallback in `DEPENDENCY_MODIFICATIONS.md`.
+Fork tests: not required for merge, and **not** a Rootstock opcode proof (Anvil/revm). After this PR’s bytecode exists, a human/ops Rootstock **testnet** deploy of one first-party contract is the proof that later relaunch PRs may merge on this pin (`IMPLEMENTATION_ORDER.md`). Fallback if that node rejects cancun: `shanghai` (PUSH0 only) or portal-listed solc 0.8.34, still not london unless the node rejects shanghai — land the fallback on this branch before merging PR 3+.
 
 ## Success criteria
 
