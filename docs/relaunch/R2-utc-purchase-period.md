@@ -45,7 +45,7 @@ R2 replaces the remaining strict-seconds check. Daily is the highest frequency B
 
   Actual execution time is the purchase transaction's `block.timestamp` (indexer / `PurchaseRbtc__RbtcBought` log), not this field.
 
-- [x] Add modifier `validateMinPurchasePeriod`: revert if `minPurchasePeriod < 1 days` or not a multiple of 1 day. Apply on `constructor` and `modifyMinPurchasePeriod`. Errors on `IDcaManager`: `DcaManager__MinPurchasePeriodMustBeAtLeastOneDay`, `DcaManager__PurchasePeriodMustBeWholeDays`. User schedules still cannot go below `s_minPurchasePeriod` (`_validatePurchasePeriod`).
+- [x] Add `_validateMinPurchasePeriod`: revert if `minPurchasePeriod < 1 days` or not a multiple of 1 day. Call from `constructor` and `modifyMinPurchasePeriod`. Errors on `IDcaManager`: `DcaManager__MinPurchasePeriodMustBeAtLeastOneDay`, `DcaManager__PurchasePeriodMustBeWholeDays`. User schedules still cannot go below `s_minPurchasePeriod` (`_validatePurchasePeriod`).
 
 ## Out of scope
 

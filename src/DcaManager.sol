@@ -48,16 +48,6 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice protocol minimum purchase period cannot be below one day
-     * @param minPurchasePeriod the minimum purchase period to validate
-     */
-    modifier validateMinPurchasePeriod(uint256 minPurchasePeriod) {
-        if (minPurchasePeriod < 1 days) revert DcaManager__MinPurchasePeriodMustBeAtLeastOneDay();
-        _requireWholeDays(minPurchasePeriod);
-        _;
-    }
-
-    /**
      * @notice only allow swapper role
      */
     modifier onlySwapper() {
@@ -79,8 +69,8 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      */
     constructor(address operationsAdminAddress, uint256 minPurchasePeriod, uint256 maxSchedulesPerToken, uint256 defaultMinPurchaseAmount)
         Ownable()
-        validateMinPurchasePeriod(minPurchasePeriod)
     {
+        _validateMinPurchasePeriod(minPurchasePeriod);
         s_operationsAdmin = OperationsAdmin(operationsAdminAddress);
         s_minPurchasePeriod = minPurchasePeriod;
         s_maxSchedulesPerToken = maxSchedulesPerToken;
@@ -429,8 +419,8 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         external
         override
         onlyOwner
-        validateMinPurchasePeriod(minPurchasePeriod)
     {
+        _validateMinPurchasePeriod(minPurchasePeriod);
         s_minPurchasePeriod = minPurchasePeriod;
         emit DcaManager__MinPurchasePeriodModified(minPurchasePeriod);
     }
@@ -501,6 +491,15 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         if (purchaseAmount > (tokenBalance) / 2) {
             revert DcaManager__PurchaseAmountMustBeLowerThanHalfOfBalance();
         }
+    }
+
+    /**
+     * @notice validate the protocol minimum purchase period
+     * @param minPurchasePeriod the minimum purchase period to validate
+     */
+    function _validateMinPurchasePeriod(uint256 minPurchasePeriod) private pure {
+        if (minPurchasePeriod < 1 days) revert DcaManager__MinPurchasePeriodMustBeAtLeastOneDay();
+        _requireWholeDays(minPurchasePeriod);
     }
 
     /**
