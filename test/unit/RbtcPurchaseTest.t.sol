@@ -878,8 +878,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         returns (uint256)
     {
         uint256 nextDueTimestamp = lastPurchaseTimestamp + purchasePeriod;
-        uint256 nextPurchaseDayStart = _utcDayStart(nextDueTimestamp);
-        return nextPurchaseDayStart - block.timestamp;
+        return nextDueTimestamp - block.timestamp;
     }
 
     function _snappedLastPurchaseTimestamp(uint256 lastPurchaseTimestamp, uint256 purchasePeriod, uint256 timestamp)

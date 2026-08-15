@@ -24,15 +24,13 @@ R2 replaces the remaining strict-seconds check. Daily is the highest frequency B
 
   ```solidity
   uint256 currentDayStart = block.timestamp - (block.timestamp % 1 days);
-  uint256 nextPurchaseDayStart =
-      lastPurchaseTimestamp + purchasePeriod
-      - (lastPurchaseTimestamp + purchasePeriod) % 1 days;
-  if (lastPurchaseTimestamp != 0 && currentDayStart < nextPurchaseDayStart) {
-      revert DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed(/* time until nextPurchaseDayStart */);
+  uint256 nextDueTimestamp = lastPurchaseTimestamp + purchasePeriod;
+  if (lastPurchaseTimestamp != 0 && currentDayStart < nextDueTimestamp) {
+      revert DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed(/* time until nextDueTimestamp */);
   }
   ```
 
-  Keep the existing error. `timeRemaining` is seconds until `nextPurchaseDayStart` (`nextPurchaseDayStart - block.timestamp`).
+  Keep the existing error. `timeRemaining` is seconds until `nextDueTimestamp` (`nextDueTimestamp - block.timestamp`). `last` and `period` are whole UTC days, so `last + period` is already 00:00 UTC of the due day.
 
 - [x] Keep the `6335994` snap. Periods must be whole UTC days (`period % 1 days == 0`) on the protocol min (constructor / `modifyMinPurchasePeriod`) and on user schedules (`_validatePurchasePeriod`). First purchase stamps 00:00 UTC; later purchases add `periodsElapsed * purchasePeriod` from that midnight so weekly stays on the original weekday after a gap:
 

@@ -48,7 +48,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice protocol minimum purchase period cannot be below one UTC day
+     * @notice protocol minimum purchase period cannot be below one day
      * @param minPurchasePeriod the minimum purchase period to validate
      */
     modifier validateMinPurchasePeriod(uint256 minPurchasePeriod) {
@@ -554,14 +554,14 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
 
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
 
-        // @notice: After the first purchase, the schedule is eligible once the UTC day of last + period has started
+        // After the first purchase, eligible once the UTC day of last + period has started.
+        // last and period are whole days, so last + period is already that day's 00:00 UTC.
         uint256 currentDayStart;
         if (dcaSchedule.lastPurchaseTimestamp != 0) {
             currentDayStart = block.timestamp - (block.timestamp % 1 days);
             uint256 nextDueTimestamp = dcaSchedule.lastPurchaseTimestamp + dcaSchedule.purchasePeriod;
-            uint256 nextPurchaseDayStart = nextDueTimestamp - (nextDueTimestamp % 1 days);
-            if (currentDayStart < nextPurchaseDayStart) {
-                revert DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed(nextPurchaseDayStart - block.timestamp);
+            if (currentDayStart < nextDueTimestamp) {
+                revert DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed(nextDueTimestamp - block.timestamp);
             }
         }
 
