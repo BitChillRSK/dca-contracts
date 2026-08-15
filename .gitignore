@@ -17,6 +17,5 @@ node_modules/
 # Aderyn report
 report.md
 
-# Cursor
+# Cursor (commit .cursorignore so clones skip out/ and lib/ in search)
 .cursor
-.cursorignore
