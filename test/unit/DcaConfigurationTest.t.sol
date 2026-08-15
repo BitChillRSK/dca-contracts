@@ -110,6 +110,28 @@ contract DcaConfigurationTest is DcaDappTest {
         dcaManager.setPurchasePeriod(address(stablecoin), SCHEDULE_INDEX, scheduleId, MIN_PURCHASE_PERIOD - 1);
     }
 
+    function testPurchasePeriodMustBeWholeDays() external {
+        vm.prank(USER);
+        bytes32 scheduleId = dcaManager.getMyScheduleId(address(stablecoin), SCHEDULE_INDEX);
+        vm.expectRevert(IDcaManager.DcaManager__PurchasePeriodMustBeWholeDays.selector);
+        vm.prank(USER);
+        dcaManager.setPurchasePeriod(address(stablecoin), SCHEDULE_INDEX, scheduleId, MIN_PURCHASE_PERIOD + 12 hours);
+    }
+
+    function testCreateDcaScheduleRevertsIfPeriodNotWholeDays() external {
+        vm.startPrank(USER);
+        stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
+        vm.expectRevert(IDcaManager.DcaManager__PurchasePeriodMustBeWholeDays.selector);
+        dcaManager.createDcaSchedule(
+            address(stablecoin),
+            AMOUNT_TO_DEPOSIT,
+            AMOUNT_TO_SPEND,
+            MIN_PURCHASE_PERIOD + 12 hours,
+            s_lendingProtocolIndex
+        );
+        vm.stopPrank();
+    }
+
     function testMaxSchedulesPerTokenCannotBeExceeded() external {
         uint256 maxSchedulesPerToken = dcaManager.getMaxSchedulesPerToken();
         bytes memory encodedRevert = abi.encodeWithSelector(

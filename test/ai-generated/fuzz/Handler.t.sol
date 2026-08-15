@@ -103,6 +103,7 @@ contract Handler is Test {
         // Prevent pathological gas / overflow situations without shrinking search-space too much
         depositAmount  = bound(depositAmount,  MIN_DEPOSIT_AMOUNT,  INTERNAL_UPPER_AMOUNT);
         purchasePeriod = bound(purchasePeriod, MIN_PURCHASE_PERIOD, INTERNAL_UPPER_PERIOD);
+        purchasePeriod = (purchasePeriod / 1 days) * 1 days;
         purchaseAmount = bound(purchaseAmount, MIN_PURCHASE_AMOUNT, depositAmount / 2);
 
         // Mint enough tokens for the user and approve handler without arbitrary caps
@@ -255,6 +256,7 @@ contract Handler is Test {
         if (purchasePeriod > 0) {
             vm.assume(purchasePeriod >= MIN_PURCHASE_PERIOD);
             purchasePeriod = bound(purchasePeriod, MIN_PURCHASE_PERIOD, INTERNAL_UPPER_PERIOD);
+            purchasePeriod = (purchasePeriod / 1 days) * 1 days;
         }
 
         // Mint tokens for additional deposit if needed
@@ -539,7 +541,7 @@ contract Handler is Test {
      * @notice Test modifying minimum purchase period (owner-only)
      */
     function modifyMinPurchasePeriod(uint256 newMinPurchasePeriod) external {
-        newMinPurchasePeriod = bound(newMinPurchasePeriod, 1 hours, 365 days);
+        newMinPurchasePeriod = bound(newMinPurchasePeriod, 1, 365) * 1 days;
         
         vm.startPrank(OWNER);
         try dcaManager.modifyMinPurchasePeriod(newMinPurchasePeriod) {
