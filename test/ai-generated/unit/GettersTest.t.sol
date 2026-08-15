@@ -114,6 +114,35 @@ contract GettersTest is DcaDappTest {
         assertEq(maxSchedules, MAX_SCHEDULES_PER_TOKEN);
     }
 
+    function test_dcaManager_getAccumulatedRbtcBalance_matchesHandler() public {
+        super.makeSinglePurchase();
+        uint256 fromManager =
+            dcaManager.getAccumulatedRbtcBalance(USER, address(stablecoin), s_lendingProtocolIndex);
+        uint256 fromHandler = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
+        assertEq(fromManager, fromHandler);
+        assertGt(fromManager, 0);
+    }
+
+    function test_dcaManager_getMyAccumulatedRbtcBalance_usesMsgSender() public {
+        super.makeSinglePurchase();
+        vm.prank(USER);
+        uint256 mine = dcaManager.getMyAccumulatedRbtcBalance(address(stablecoin), s_lendingProtocolIndex);
+        vm.prank(OWNER);
+        uint256 owners = dcaManager.getMyAccumulatedRbtcBalance(address(stablecoin), s_lendingProtocolIndex);
+        assertEq(mine, IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER));
+        assertEq(owners, 0);
+        assertGt(mine, 0);
+    }
+
+    function test_dcaManager_getAccumulatedRbtcBalance_reverts_unknownTokenProtocol() public {
+        address unknownToken = makeAddr("unknownToken");
+        bytes memory encodedRevert = abi.encodeWithSelector(
+            IDcaManager.DcaManager__TokenNotAccepted.selector, unknownToken, s_lendingProtocolIndex
+        );
+        vm.expectRevert(encodedRevert);
+        dcaManager.getAccumulatedRbtcBalance(USER, unknownToken, s_lendingProtocolIndex);
+    }
+
     function test_dcaManager_getMyInterestAccrued_whenSupported() public {
         // Only test if the lending protocol supports interest
         if (s_lendingProtocolIndex > 0) {

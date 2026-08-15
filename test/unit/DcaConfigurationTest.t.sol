@@ -83,12 +83,46 @@ contract DcaConfigurationTest is DcaDappTest {
         assertEq(MAX_SCHEDULES_PER_TOKEN, dcaManager.getMaxSchedulesPerToken());
     }
 
-    function testPurchaseAmountCannotBeMoreThanHalfBalance() external {
+    function testPurchaseAmountEqualToBalanceSucceeds() external {
+        vm.startPrank(USER);
+        bytes32 scheduleId = dcaManager.getMyScheduleId(address(stablecoin), SCHEDULE_INDEX);
+        dcaManager.setPurchaseAmount(address(stablecoin), SCHEDULE_INDEX, scheduleId, AMOUNT_TO_DEPOSIT);
+        assertEq(AMOUNT_TO_DEPOSIT, dcaManager.getMySchedulePurchaseAmount(address(stablecoin), SCHEDULE_INDEX));
+        vm.stopPrank();
+    }
+
+    function testPurchaseAmountCannotExceedBalance() external {
         vm.prank(USER);
         bytes32 scheduleId = dcaManager.getMyScheduleId(address(stablecoin), SCHEDULE_INDEX);
-        vm.expectRevert(IDcaManager.DcaManager__PurchaseAmountMustBeLowerThanHalfOfBalance.selector);
+        bytes memory encodedRevert = abi.encodeWithSelector(
+            IDcaManager.DcaManager__PurchaseAmountExceedsBalance.selector,
+            address(stablecoin),
+            AMOUNT_TO_DEPOSIT + 1,
+            AMOUNT_TO_DEPOSIT
+        );
+        vm.expectRevert(encodedRevert);
         vm.prank(USER);
-        dcaManager.setPurchaseAmount(address(stablecoin), SCHEDULE_INDEX, scheduleId, AMOUNT_TO_DEPOSIT / 2 + 1);
+        dcaManager.setPurchaseAmount(address(stablecoin), SCHEDULE_INDEX, scheduleId, AMOUNT_TO_DEPOSIT + 1);
+    }
+
+    function testCreateScheduleFundedForExactlyOnePurchase() external {
+        uint256 onePurchaseAmount = AMOUNT_TO_SPEND;
+        vm.startPrank(USER);
+        stablecoin.approve(address(stablecoinHandler), onePurchaseAmount);
+        dcaManager.createDcaSchedule(
+            address(stablecoin), onePurchaseAmount, onePurchaseAmount, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
+        );
+        uint256 scheduleIndex = 1; // setUp already created schedule 0
+        bytes32 scheduleId = dcaManager.getMyScheduleId(address(stablecoin), scheduleIndex);
+        assertEq(onePurchaseAmount, dcaManager.getMyScheduleTokenBalance(address(stablecoin), scheduleIndex));
+        assertEq(onePurchaseAmount, dcaManager.getMySchedulePurchaseAmount(address(stablecoin), scheduleIndex));
+        vm.stopPrank();
+
+        vm.prank(SWAPPER);
+        dcaManager.buyRbtc(USER, address(stablecoin), scheduleIndex, scheduleId);
+
+        vm.prank(USER);
+        assertEq(0, dcaManager.getMyScheduleTokenBalance(address(stablecoin), scheduleIndex));
     }
 
     function testPurchaseAmountMustBeGreaterThanMin() external {
@@ -126,6 +160,36 @@ contract DcaConfigurationTest is DcaDappTest {
             );
             vm.stopPrank();
         }
+    }
+
+    function testCreateRevertsAfterOwnerLowersMaxBelowCurrentCount() external {
+        uint256 maxSchedulesPerToken = dcaManager.getMaxSchedulesPerToken();
+        // setUp already created one schedule; fill up to the current max
+        for (uint256 i = 1; i < maxSchedulesPerToken; ++i) {
+            vm.startPrank(USER);
+            stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
+            dcaManager.createDcaSchedule(
+                address(stablecoin), AMOUNT_TO_DEPOSIT / 2, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
+            );
+            vm.stopPrank();
+        }
+        vm.prank(USER);
+        assertEq(maxSchedulesPerToken, dcaManager.getMyDcaSchedules(address(stablecoin)).length);
+
+        uint256 loweredMax = maxSchedulesPerToken - 1;
+        vm.prank(OWNER);
+        dcaManager.modifyMaxSchedulesPerToken(loweredMax);
+
+        bytes memory encodedRevert = abi.encodeWithSelector(
+            IDcaManager.DcaManager__MaxSchedulesPerTokenReached.selector, address(stablecoin)
+        );
+        vm.startPrank(USER);
+        stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
+        vm.expectRevert(encodedRevert);
+        dcaManager.createDcaSchedule(
+            address(stablecoin), AMOUNT_TO_DEPOSIT / 2, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
+        );
+        vm.stopPrank();
     }
 
     ///////////////////////////////

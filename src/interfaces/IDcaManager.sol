@@ -64,7 +64,7 @@ interface IDcaManager {
     error DcaManager__PurchaseAmountMustBeGreaterThanMinimum(address token, uint256 minPurchaseAmount);
     error DcaManager__PurchasePeriodMustBeGreaterThanMinimum();
     error DcaManager__MinPurchasePeriodMustBeAtLeastOneDay();
-    error DcaManager__PurchaseAmountMustBeLowerThanHalfOfBalance();
+    error DcaManager__PurchaseAmountExceedsBalance(address token, uint256 purchaseAmount, uint256 tokenBalance);
     error DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed(uint256 timeRemaining);
     error DcaManager__InexistentScheduleIndex();
     error DcaManager__ScheduleIdAndIndexMismatch();
@@ -361,6 +361,26 @@ interface IDcaManager {
      * @return the interest accrued by the user for the token and lending protocol index
      */
     function getMyInterestAccrued(address token, uint256 lendingProtocolIndex) external view returns (uint256);
+
+    /**
+     * @notice get the rBTC accumulated by a user on the handler for a token and lending protocol index
+     * @param user the user address
+     * @param token the token address
+     * @param lendingProtocolIndex the lending protocol index
+     * @return the accumulated rBTC balance
+     */
+    function getAccumulatedRbtcBalance(address user, address token, uint256 lendingProtocolIndex)
+        external
+        view
+        returns (uint256);
+
+    /**
+     * @notice get the rBTC accumulated by the caller on the handler for a token and lending protocol index
+     * @param token the token address
+     * @param lendingProtocolIndex the lending protocol index
+     * @return the accumulated rBTC balance
+     */
+    function getMyAccumulatedRbtcBalance(address token, uint256 lendingProtocolIndex) external view returns (uint256);
 
     /**
      * @dev returns the minimum period that can be set for purchases
