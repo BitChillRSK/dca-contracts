@@ -38,8 +38,7 @@ R2 replaces the remaining strict-seconds check. Daily is the highest frequency B
 
   ```solidity
   if (lastPurchaseTimestamp == 0) {
-      uint256 dayStart = block.timestamp - (block.timestamp % 1 days);
-      lastPurchaseTimestamp = dayStart == 0 ? 1 : dayStart; // 0 stays "never purchased"
+      lastPurchaseTimestamp = block.timestamp - (block.timestamp % 1 days);
   } else {
       uint256 periodsElapsed = (block.timestamp - lastPurchaseTimestamp) / purchasePeriod;
       if (periodsElapsed == 0) periodsElapsed = 1;
