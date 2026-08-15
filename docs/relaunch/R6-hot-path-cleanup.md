@@ -1,6 +1,6 @@
 # R6 — Purchase hot-path cleanup (R6, R17)
 
-Status: **in progress** · Assigned: yes · Optional/further-review: no
+Status: **in progress** (GitHub #47) · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
