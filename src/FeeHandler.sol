@@ -23,8 +23,11 @@ abstract contract FeeHandler is IFeeHandler, Ownable {
     uint256 internal s_feePurchaseUpperBound; // Spending above upper bound gets the minimum fee rate
     address internal s_feeCollector; // Address to which the fees charged to the user will be sent
     uint256 constant FEE_PERCENTAGE_DIVISOR = 10_000; // feeRate will belong to [100, 200], so we need to divide by 10,000 (100 * 100)
+    /// @notice Hard ceiling on fee rates (5%). Owner cannot set max (or a flat min==max) above this.
+    uint256 public constant MAX_FEE_RATE_CAP = 500;
 
     constructor(address feeCollector, FeeSettings memory feeSettings) Ownable() {
+        if (feeCollector == address(0)) revert FeeHandler__InvalidFeeCollector();
         _validateFeeSettings(
             feeSettings.minFeeRate,
             feeSettings.maxFeeRate,
@@ -90,6 +93,7 @@ abstract contract FeeHandler is IFeeHandler, Ownable {
      * @param maxFeeRate: the maximum fee rate
      */
     function setMaxFeeRate(uint256 maxFeeRate) public override onlyOwner {
+        if (maxFeeRate > MAX_FEE_RATE_CAP) revert FeeHandler__MaxFeeRateExceedsCap();
         if (maxFeeRate < s_minFeeRate) revert FeeHandler__MinFeeRateCannotBeHigherThanMax();
         s_maxFeeRate = maxFeeRate;
         emit FeeHandler__MaxFeeRateSet(maxFeeRate);
@@ -124,6 +128,7 @@ abstract contract FeeHandler is IFeeHandler, Ownable {
      * @param feeCollector: the fee collector address
      */
     function setFeeCollectorAddress(address feeCollector) external override onlyOwner {
+        if (feeCollector == address(0)) revert FeeHandler__InvalidFeeCollector();
         s_feeCollector = feeCollector;
         emit FeeHandler__FeeCollectorAddressSet(feeCollector);
     }
@@ -170,6 +175,13 @@ abstract contract FeeHandler is IFeeHandler, Ownable {
         return s_feeCollector;
     }
 
+    /**
+     * @notice get the fee settings used for purchase fee calculation
+     */
+    function getFeeSettings() external view override returns (FeeSettings memory) {
+        return _feeSettings();
+    }
+
     /*//////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -180,6 +192,7 @@ abstract contract FeeHandler is IFeeHandler, Ownable {
         uint256 feePurchaseLowerBound,
         uint256 feePurchaseUpperBound
     ) private pure {
+        if (maxFeeRate > MAX_FEE_RATE_CAP) revert FeeHandler__MaxFeeRateExceedsCap();
         if (minFeeRate > maxFeeRate) revert FeeHandler__MinFeeRateCannotBeHigherThanMax();
         if (feePurchaseLowerBound >= feePurchaseUpperBound) revert FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound();
     }
