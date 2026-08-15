@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity 0.8.36;
 
 import {IOperationsAdmin} from "./interfaces/IOperationsAdmin.sol";
 import {ITokenHandler} from "./interfaces/ITokenHandler.sol";

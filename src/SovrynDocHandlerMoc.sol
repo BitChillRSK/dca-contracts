@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity 0.8.36;
 
 import {PurchaseMoc} from "./PurchaseMoc.sol";
 import {PurchaseRbtc} from "./PurchaseRbtc.sol";

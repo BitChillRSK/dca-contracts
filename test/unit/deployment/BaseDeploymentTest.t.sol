@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity 0.8.36;
 
 import {Test, console} from "forge-std/Test.sol";
 import {DeployMocSwaps} from "../../../script/DeployMocSwaps.s.sol";

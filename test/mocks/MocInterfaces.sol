@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity 0.8.36;
 
 interface IMocStateV1 {
     function getBtcPriceProvider() external view returns (address);

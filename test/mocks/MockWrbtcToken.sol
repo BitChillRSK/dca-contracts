@@ -4,7 +4,7 @@
 // git repo: https://github.com/DistributedCollective/Sovryn-smart-contracts
 // git file: https://github.com/DistributedCollective/Sovryn-smart-contracts/blob/f4aee58fb18703c2a2a536e01bd23c0ead0392db/contracts/testhelpers/TestWrbtc.sol
 
-pragma solidity 0.8.19;
+pragma solidity 0.8.36;
 
 contract MockWrbtcToken {
     string public name = "Wrapped BTC";

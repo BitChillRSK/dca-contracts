@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Foundry Solidity repo for BitChill DCA-in contracts on Rootstock (`0.8.19`, EVM `london`). Users talk to `DcaManager`; a swapper bot triggers purchases; handlers hold funds and talk to lending, Money on Chain, and Uniswap.
+Foundry Solidity repo for BitChill DCA-in contracts on Rootstock (`0.8.36`, EVM `cancun`). Users talk to `DcaManager`; a swapper bot triggers purchases; handlers hold funds and talk to lending, Money on Chain, and Uniswap.
 
 ## Read order
 

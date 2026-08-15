@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity 0.8.36;
 
 import {IDcaManagerAccessControl} from "src/interfaces/IDcaManagerAccessControl.sol";
 

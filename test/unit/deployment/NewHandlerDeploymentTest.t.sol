@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity 0.8.36;
 
 import {BaseDeploymentTest} from "./BaseDeploymentTest.t.sol";
 import {DeployUsdrifHandler} from "../../../script/DeployUsdrifHandler.s.sol";
