@@ -103,6 +103,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         DcaDetails storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
         _handler(token, dcaSchedule.lendingProtocolIndex).depositToken(msg.sender, depositAmount);
+        _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
         uint256 newTokenBalance = dcaSchedule.tokenBalance + depositAmount;
         dcaSchedule.tokenBalance = newTokenBalance;
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
@@ -223,8 +224,9 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
             dcaSchedule.purchasePeriod = purchasePeriod;
         }
         if (depositAmount > 0) {
-            _handler(token, dcaSchedule.lendingProtocolIndex).depositToken(msg.sender, depositAmount);
             dcaSchedule.tokenBalance += depositAmount;
+            _handler(token, dcaSchedule.lendingProtocolIndex).depositToken(msg.sender, depositAmount);
+            _validateScheduleId(scheduleId, schedules[scheduleIndex].scheduleId);
         }
         if (purchaseAmount > 0) {
             _validatePurchaseAmount(token, purchaseAmount, dcaSchedule.tokenBalance);
@@ -329,6 +331,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         uint256 lendingProtocolIndex
     ) external override onlySwapper {
         uint256 numOfPurchases = buyers.length;
+        if (numOfPurchases == 0) revert DcaManager__EmptyBatchPurchaseArrays();
         if (
             numOfPurchases != scheduleIndexes.length || numOfPurchases != scheduleIds.length
                 || numOfPurchases != purchaseAmounts.length
@@ -550,6 +553,9 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
             }
         }
 
+        if (dcaSchedule.purchaseAmount > dcaSchedule.tokenBalance) {
+            revert DcaManager__ScheduleBalanceNotEnoughForPurchase(scheduleIndex, scheduleId, token, dcaSchedule.tokenBalance);
+        }
         dcaSchedule.tokenBalance -= dcaSchedule.purchaseAmount;
         dcaScheduleStorage.tokenBalance = dcaSchedule.tokenBalance;
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, dcaSchedule.tokenBalance);

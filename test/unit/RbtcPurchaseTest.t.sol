@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.36;
 
-import {Test, console2, stdError} from "forge-std/Test.sol";
+import {Test, console2} from "forge-std/Test.sol";
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 // import {RbtcBaseTest} from "./RbtcBaseTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
@@ -208,7 +208,10 @@ contract RbtcPurchaseTest is DcaDappTest {
             vm.warp(vm.getBlockTimestamp() + MIN_PURCHASE_PERIOD);
         }
         // Attempt to purchase once more
-        vm.expectRevert(stdError.arithmeticError);
+        bytes memory encodedRevert = abi.encodeWithSelector(
+            IDcaManager.DcaManager__ScheduleBalanceNotEnoughForPurchase.selector, SCHEDULE_INDEX, scheduleId, address(stablecoin), 0
+        );
+        vm.expectRevert(encodedRevert);
         // vm.prank(OWNER);
         vm.prank(SWAPPER);
         dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
@@ -256,6 +259,22 @@ contract RbtcPurchaseTest is DcaDappTest {
     function testBatchPurchasesOneUser() external {
         super.createSeveralDcaSchedules();
         super.makeBatchPurchasesOneUser();
+    }
+
+    function testBatchPurchaseFailsIfArraysEmpty() external {
+        address[] memory emptyAddressArray;
+        uint256[] memory emptyUintArray;
+        bytes32[] memory emptyBytes32Array;
+        vm.expectRevert(IDcaManager.DcaManager__EmptyBatchPurchaseArrays.selector);
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(
+            emptyAddressArray,
+            address(stablecoin),
+            emptyUintArray,
+            emptyBytes32Array,
+            emptyUintArray,
+            s_lendingProtocolIndex
+        );
     }
 
     function testBatchPurchaseFailsIfPurchaseAmountMismatch() external {

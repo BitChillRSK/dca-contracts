@@ -366,6 +366,24 @@ contract DcaManagerEdgeCasesTest is Test {
                            BATCH OPERATIONS EDGE CASES
     //////////////////////////////////////////////////////////////*/
     
+    function test_batchBuyRbtc_reverts_emptyArrays() public {
+        address[] memory emptyUsers = new address[](0);
+        uint256[] memory emptyIndexes = new uint256[](0);
+        bytes32[] memory emptyIds = new bytes32[](0);
+        uint256[] memory emptyAmounts = new uint256[](0);
+        
+        vm.expectRevert(IDcaManager.DcaManager__EmptyBatchPurchaseArrays.selector);
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(
+            emptyUsers,
+            address(stablecoin),
+            emptyIndexes,
+            emptyIds,
+            emptyAmounts,
+            TROPYKUS_INDEX
+        );
+    }
+    
     function test_batchBuyRbtc_reverts_arrayLengthMismatch() public {
         address[] memory users = new address[](2);
         users[0] = USER;

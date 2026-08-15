@@ -39,4 +39,15 @@ contract StablecoinDepositTest is DcaDappTest {
         assertEq(dcaManager.getMyScheduleTokenBalance(address(stablecoin), SCHEDULE_INDEX), balanceBefore);
         vm.stopPrank();
     }
+
+    function testDepositRevertsOnWrongScheduleId() external {
+        vm.startPrank(USER);
+        stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
+        bytes32 wrongId = keccak256("not-a-schedule");
+        uint256 balanceBefore = dcaManager.getMyScheduleTokenBalance(address(stablecoin), SCHEDULE_INDEX);
+        vm.expectRevert(IDcaManager.DcaManager__ScheduleIdAndIndexMismatch.selector);
+        dcaManager.depositToken(address(stablecoin), SCHEDULE_INDEX, wrongId, AMOUNT_TO_DEPOSIT);
+        assertEq(dcaManager.getMyScheduleTokenBalance(address(stablecoin), SCHEDULE_INDEX), balanceBefore);
+        vm.stopPrank();
+    }
 } 

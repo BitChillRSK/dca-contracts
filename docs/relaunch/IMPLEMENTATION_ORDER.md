@@ -84,9 +84,9 @@ If the fee model is flattened, this PR becomes the one-rate rewrite instead. Do 
 
 ### PR 6 - R6 and R17 hot-path cleanup
 
-Trim only gas-only purchase reverts while keeping period, schedule-id, amount, lending-index, access-control, and malformed-calldata checks.
+Drop `nonReentrant` on purchase and non-rBTC-withdraw paths, and cache `SWAPPER_ROLE` on `DcaManager`. Keep period, schedule-id, amount, lending-index, access-control, malformed-calldata, underfunded-schedule, and empty-batch checks (the last two are diagnostic, not hot-path).
 
-Remove unnecessary `nonReentrant` modifiers from non-rBTC-withdraw paths and make `depositToken` / `updateDcaSchedule` pull before crediting.
+`depositToken` pulls before crediting. `updateDcaSchedule` keeps its memory-copy order (storage write was already after the pull). After every `handler.depositToken`, re-validate `scheduleId` so a swap-pop hook cannot write through a stale slot. See `R6-hot-path-cleanup.md`.
 
 ### PR 7 - R8 remove stuck-rBTC rescue
 
@@ -97,6 +97,8 @@ Delete the owner rescue path for another account's accumulated rBTC. Keep rBTC w
 Fix Sovryn for SIP-0094 and apply the broader rule that integrator return values and views are not cash.
 
 Measure token/native balance deltas after Sovryn, Tropykus, MoC, and Uniswap operations that move funds to BitChill or to the user. Use views only to size share burns, then clamp to shares held.
+
+**R6 leftover — clamp desync, this PR owns it:** `DcaManager._withdrawToken` / `deleteDcaSchedule` deduct the *requested* amount, then Tropykus/Sovryn `withdrawToken` may clamp to the user's lending position and pay less. That is not R1 (Sovryn `burn` return vs net). It is R20: do not treat the requested amount as cash paid. After the handler call, measure the user's token delta (or take the actual payout) and only deduct that from `tokenBalance`. Do not leave this as a footnote on R1.
 
 ### PR 9 - R15 withdraw-all sentinel and share dust
 
