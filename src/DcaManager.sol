@@ -53,6 +53,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      */
     modifier validateMinPurchasePeriod(uint256 minPurchasePeriod) {
         if (minPurchasePeriod < 1 days) revert DcaManager__MinPurchasePeriodMustBeAtLeastOneDay();
+        _requireWholeDays(minPurchasePeriod);
         _;
     }
 
@@ -508,6 +509,11 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      */
     function _validatePurchasePeriod(uint256 purchasePeriod) private view {
         if (purchasePeriod < s_minPurchasePeriod) revert DcaManager__PurchasePeriodMustBeGreaterThanMinimum();
+        _requireWholeDays(purchasePeriod);
+    }
+
+    function _requireWholeDays(uint256 period) private pure {
+        if (period % 1 days != 0) revert DcaManager__PurchasePeriodMustBeWholeDays();
     }
 
     /**
@@ -568,21 +574,13 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
 
         // First purchase stamps 00:00 UTC of that day (0 stays "never purchased").
         // Later purchases add whole periods from that midnight so weekly stays on the
-        // original weekday after a gap. Consume one more period if that snap still
-        // leaves today's UTC day due.
+        // original weekday after a gap.
         if (dcaSchedule.lastPurchaseTimestamp == 0) {
             dcaSchedule.lastPurchaseTimestamp = block.timestamp - (block.timestamp % 1 days);
         } else {
             uint256 periodsElapsed = (block.timestamp - dcaSchedule.lastPurchaseTimestamp) / dcaSchedule.purchasePeriod;
             unchecked {
                 dcaSchedule.lastPurchaseTimestamp += periodsElapsed * dcaSchedule.purchasePeriod;
-            }
-            uint256 nextDueTimestamp = dcaSchedule.lastPurchaseTimestamp + dcaSchedule.purchasePeriod;
-            uint256 nextPurchaseDayStart = nextDueTimestamp - (nextDueTimestamp % 1 days);
-            if (currentDayStart >= nextPurchaseDayStart) {
-                unchecked {
-                    dcaSchedule.lastPurchaseTimestamp += dcaSchedule.purchasePeriod;
-                }
             }
         }
         dcaScheduleStorage.lastPurchaseTimestamp = dcaSchedule.lastPurchaseTimestamp;
