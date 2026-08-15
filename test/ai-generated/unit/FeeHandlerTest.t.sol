@@ -124,6 +124,79 @@ contract FeeHandlerTest is Test {
         assertEq(feeHandler.getFeePurchaseUpperBound(), newUpper, "Upper bound not set");
     }
 
+    function test_setFeeRateParams_raisesMinAboveOldMax() public {
+        uint256 newMin = 250;
+        uint256 newMax = 400;
+
+        feeHandler.setFeeRateParams(newMin, newMax, LOWER_BOUND, UPPER_BOUND);
+
+        assertEq(feeHandler.getMinFeeRate(), newMin);
+        assertEq(feeHandler.getMaxFeeRate(), newMax);
+        assertEq(feeHandler.getFeePurchaseLowerBound(), LOWER_BOUND);
+        assertEq(feeHandler.getFeePurchaseUpperBound(), UPPER_BOUND);
+    }
+
+    function test_setFeeRateParams_raisesBothBoundsAboveOldUpper() public {
+        uint256 newLower = 2000 ether;
+        uint256 newUpper = 5000 ether;
+
+        feeHandler.setFeeRateParams(MIN_FEE_RATE, MAX_FEE_RATE, newLower, newUpper);
+
+        assertEq(feeHandler.getFeePurchaseLowerBound(), newLower);
+        assertEq(feeHandler.getFeePurchaseUpperBound(), newUpper);
+    }
+
+    function test_setPurchaseLowerBound_reverts_whenGteUpper() public {
+        vm.expectRevert(IFeeHandler.FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound.selector);
+        feeHandler.setPurchaseLowerBound(UPPER_BOUND);
+
+        vm.expectRevert(IFeeHandler.FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound.selector);
+        feeHandler.setPurchaseLowerBound(UPPER_BOUND + 1);
+    }
+
+    function test_setPurchaseUpperBound_reverts_whenLteLower() public {
+        vm.expectRevert(IFeeHandler.FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound.selector);
+        feeHandler.setPurchaseUpperBound(LOWER_BOUND);
+
+        vm.expectRevert(IFeeHandler.FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound.selector);
+        feeHandler.setPurchaseUpperBound(LOWER_BOUND - 1);
+    }
+
+    function test_calculateFee_flatMinEqualsMax() public {
+        uint256 flatRate = 100;
+        feeHandler.testSetMinFeeRate(flatRate);
+        feeHandler.testSetMaxFeeRate(flatRate);
+
+        uint256 below = 50 ether;
+        uint256 mid = 550 ether;
+        uint256 above = 2000 ether;
+        assertEq(feeHandler.exposedCalculateFee(below), below * flatRate / 10_000);
+        assertEq(feeHandler.exposedCalculateFee(mid), mid * flatRate / 10_000);
+        assertEq(feeHandler.exposedCalculateFee(above), above * flatRate / 10_000);
+    }
+
+    function test_calculateFeeAndNetAmounts_matchesSequentialCalculateFee() public {
+        uint256[] memory amounts = new uint256[](4);
+        amounts[0] = 50 ether;
+        amounts[1] = LOWER_BOUND;
+        amounts[2] = 550 ether;
+        amounts[3] = 2000 ether;
+
+        (uint256 aggregatedFee, uint256[] memory netAmounts, uint256 totalNet) =
+            feeHandler.exposedCalculateFeeAndNetAmounts(amounts);
+
+        uint256 expectedAggregatedFee;
+        uint256 expectedTotalNet;
+        for (uint256 i; i < amounts.length; ++i) {
+            uint256 expectedFee = feeHandler.exposedCalculateFee(amounts[i]);
+            expectedAggregatedFee += expectedFee;
+            expectedTotalNet += amounts[i] - expectedFee;
+            assertEq(netAmounts[i], amounts[i] - expectedFee);
+        }
+        assertEq(aggregatedFee, expectedAggregatedFee);
+        assertEq(totalNet, expectedTotalNet);
+    }
+
     // Test to ensure monotonicity: higher purchase amounts should have lower or equal fee rates
     function test_feeMonotonicity() public {
         uint256[] memory amounts = new uint256[](5);

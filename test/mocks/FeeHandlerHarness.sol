@@ -11,6 +11,14 @@ contract FeeHandlerHarness is FeeHandler {
         return _calculateFee(amount);
     }
 
+    function exposedCalculateFeeAndNetAmounts(uint256[] memory purchaseAmounts)
+        external
+        view
+        returns (uint256 aggregatedFee, uint256[] memory netAmountsToSpend, uint256 totalAmountToSpend)
+    {
+        return _calculateFeeAndNetAmounts(purchaseAmounts);
+    }
+
     // Test-only setters without onlyOwner restriction for convenience
     function testSetFeeRateParams(uint256 minFee, uint256 maxFee, uint256 lower, uint256 upper) external {
         s_minFeeRate = minFee;

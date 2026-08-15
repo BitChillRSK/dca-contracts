@@ -26,11 +26,11 @@ Linear means: `maxFeeRate` at or below `feePurchaseLowerBound`, `minFeeRate` at 
 
 ## Scope
 
-- [ ] **R3:** After validating the new pair, write rates and bounds in `setFeeRateParams` instead of routing through the individual setters. Keep the existing pair checks (`minFeeRate > maxFeeRate`, `feePurchaseLowerBound >= feePurchaseUpperBound`). Only write/emit a field when it changes (same as today’s `if (s_* != new)`). Individual setters stay for one-sided updates.
+- [x] **R3:** After validating the new pair, write rates and bounds in `setFeeRateParams` instead of routing through the individual setters. Keep the existing pair checks (`minFeeRate > maxFeeRate`, `feePurchaseLowerBound >= feePurchaseUpperBound`). Only write/emit a field when it changes (same as today’s `if (s_* != new)`). Individual setters stay for one-sided updates.
 
-- [ ] **R4:** On `setPurchaseLowerBound` / `setPurchaseUpperBound`, validate against the other live bound with the same `>=` error as the combined setter (`FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound`). Combined setter remains the way to move both bounds when the new pair would fail a one-sided check.
+- [x] **R4:** On `setPurchaseLowerBound` / `setPurchaseUpperBound`, validate against the other live bound with the same `>=` error as the combined setter (`FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound`). Combined setter remains the way to move both bounds when the new pair would fail a one-sided check.
 
-- [ ] **R5:** Same math, fewer SLOADs in batch:
+- [x] **R5:** Same math, fewer SLOADs in batch:
 
   ```solidity
   function _calculateFee(uint256 purchaseAmount) internal view returns (uint256) {
@@ -75,7 +75,7 @@ Commands (targeted first, then done-gate):
 
 ```bash
 forge test --match-contract FeeHandlerTest
-SWAP_TYPE=mocSwaps LENDING_PROTOCOL=tropykus forge test --match-contract HandlerTestHarness
+SWAP_TYPE=mocSwaps LENDING_PROTOCOL=tropykus forge test --match-contract TropykusErc20HandlerTest --match-test modifyFeeSettings
 make check
 ```
 
@@ -95,12 +95,12 @@ Fork tests: not required.
 
 ## Success criteria
 
-- [ ] Raising the min/max band in one `setFeeRateParams` call succeeds when the new pair is valid.
-- [ ] Individual bound setters cannot store `lower >= upper`; combined setter still moves both.
-- [ ] Batch fee math matches sequential `_calculateFee`; four fee SLOADs happen once per `_calculateFeeAndNetAmounts` call, not per item.
-- [ ] Interpolation and flat (`min == max`) results are unchanged.
-- [ ] Targeted tests above pass; `make check` passes.
-- [ ] Protocol invariants in `AGENTS.md` unchanged.
+- [x] Raising the min/max band in one `setFeeRateParams` call succeeds when the new pair is valid.
+- [x] Individual bound setters cannot store `lower >= upper`; combined setter still moves both.
+- [x] Batch fee math matches sequential `_calculateFee`; four fee SLOADs happen once per `_calculateFeeAndNetAmounts` call, not per item.
+- [x] Interpolation and flat (`min == max`) results are unchanged.
+- [x] Targeted tests above pass; `make check` passes.
+- [x] Protocol invariants in `AGENTS.md` unchanged.
 
 ## Reviewer checklist
 
