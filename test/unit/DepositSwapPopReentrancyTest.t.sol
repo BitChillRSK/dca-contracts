@@ -42,6 +42,10 @@ contract ReentrantDepositor is ITransferFromHook {
         dca.createDcaSchedule(token, depositAmount, purchaseAmount, period, lendingIndex);
     }
 
+    function remove(uint256 scheduleIndex, bytes32 scheduleId) external {
+        dca.deleteDcaSchedule(token, scheduleIndex, scheduleId);
+    }
+
     function deposit(uint256 scheduleIndex, bytes32 scheduleId, uint256 amount) external {
         dca.depositToken(token, scheduleIndex, scheduleId, amount);
     }
@@ -118,7 +122,7 @@ contract DepositSwapPopReentrancyTest is Test {
         user.armDelete(0, idA);
         token.setHook(address(user), true);
 
-        vm.expectRevert(IDcaManager.DcaManager__ScheduleIdAndIndexMismatch.selector);
+        vm.expectRevert("ReentrancyGuard: reentrant call");
         user.deposit(0, idA, EXTRA);
 
         IDcaManager.DcaDetails[] memory afterSchedules = dcaManager.getDcaSchedules(address(user), address(token));
@@ -156,7 +160,7 @@ contract DepositSwapPopReentrancyTest is Test {
         user.armDelete(0, idA);
         token.setHook(address(user), true);
 
-        vm.expectRevert(IDcaManager.DcaManager__ScheduleIdAndIndexMismatch.selector);
+        vm.expectRevert("ReentrancyGuard: reentrant call");
         user.deposit(0, idA, EXTRA);
 
         IDcaManager.DcaDetails[] memory afterSchedules = dcaManager.getDcaSchedules(address(user), address(token));
@@ -182,10 +186,54 @@ contract DepositSwapPopReentrancyTest is Test {
         assertEq(afterSchedules[0].tokenBalance, beforeSchedules[0].tokenBalance);
     }
 
+    function test_createDeleteCreate_mintsCollidingScheduleIds() public {
+        (bytes32 idB, bytes32 idC) = _mintCollidingPair();
+        assertEq(idB, idC);
+        IDcaManager.DcaDetails[] memory schedules = dcaManager.getDcaSchedules(address(user), address(token));
+        assertEq(schedules.length, 2);
+        assertEq(schedules[0].scheduleId, schedules[1].scheduleId);
+    }
+
+    function test_depositToken_reverts_whenHookDeletesCollidingIdSlot() public {
+        (bytes32 idB,) = _mintCollidingPair();
+        IDcaManager.DcaDetails[] memory beforeSchedules = dcaManager.getDcaSchedules(address(user), address(token));
+
+        user.armDelete(0, idB);
+        token.setHook(address(user), true);
+
+        // Without the deposit/delete mutex this would pass the post-pull id check (idC == idB) and credit C.
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        user.deposit(0, idB, EXTRA);
+
+        IDcaManager.DcaDetails[] memory afterSchedules = dcaManager.getDcaSchedules(address(user), address(token));
+        assertEq(afterSchedules.length, 2);
+        assertEq(afterSchedules[0].scheduleId, beforeSchedules[0].scheduleId);
+        assertEq(afterSchedules[1].scheduleId, beforeSchedules[1].scheduleId);
+        assertEq(afterSchedules[0].tokenBalance, beforeSchedules[0].tokenBalance);
+        assertEq(afterSchedules[1].tokenBalance, beforeSchedules[1].tokenBalance);
+    }
+
     function _createTwoSchedules() private {
         user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
         vm.warp(block.timestamp + 1);
         user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
         assertEq(dcaManager.getDcaSchedules(address(user), address(token)).length, 2);
+    }
+
+    /// @dev Create A,B then delete A and create C in the same timestamp so idC == idB.
+    function _mintCollidingPair() private returns (bytes32 idB, bytes32 idC) {
+        user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
+        user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
+        IDcaManager.DcaDetails[] memory created = dcaManager.getDcaSchedules(address(user), address(token));
+        bytes32 idA = created[0].scheduleId;
+        idB = created[1].scheduleId;
+        assertTrue(idA != idB);
+
+        user.remove(0, idA);
+        user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
+        IDcaManager.DcaDetails[] memory afterCreate = dcaManager.getDcaSchedules(address(user), address(token));
+        assertEq(afterCreate.length, 2);
+        assertEq(afterCreate[0].scheduleId, idB);
+        idC = afterCreate[1].scheduleId;
     }
 }

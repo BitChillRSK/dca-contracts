@@ -97,6 +97,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     function depositToken(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 depositAmount)
         external
         override
+        nonReentrant
         validateScheduleIndex(msg.sender, token, scheduleIndex)
     {
         _validateDeposit(depositAmount);
@@ -253,6 +254,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      */
     function deleteDcaSchedule(address token, uint256 scheduleIndex, bytes32 scheduleId) external override 
         validateScheduleIndex(msg.sender, token, scheduleIndex)
+        nonReentrant
     {
         DcaDetails[] storage schedules = s_dcaSchedules[msg.sender][token];
         

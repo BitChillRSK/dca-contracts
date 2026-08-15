@@ -84,9 +84,9 @@ If the fee model is flattened, this PR becomes the one-rate rewrite instead. Do 
 
 ### PR 6 - R6 and R17 hot-path cleanup
 
-Drop `nonReentrant` on purchase and non-rBTC-withdraw paths, and cache `SWAPPER_ROLE` on `DcaManager`. Keep period, schedule-id, amount, lending-index, access-control, malformed-calldata, underfunded-schedule, and empty-batch checks (the last two are diagnostic, not hot-path).
+Drop `nonReentrant` on purchase and on CEI-clean withdraw/interest paths, and cache `SWAPPER_ROLE` on `DcaManager`. Keep it on `depositToken` and `deleteDcaSchedule`: schedule IDs are `keccak256(user, token, timestamp, length)` and are not unique, so a post-pull id check cannot substitute for the mutex. Keep period, schedule-id, amount, lending-index, access-control, malformed-calldata, underfunded-schedule, and empty-batch checks (the last two are diagnostic, not hot-path).
 
-`depositToken` pulls before crediting. `updateDcaSchedule` keeps its memory-copy order (storage write was already after the pull). After every `handler.depositToken`, re-validate `scheduleId` so a swap-pop hook cannot write through a stale slot. See `R6-hot-path-cleanup.md`.
+`depositToken` pulls before crediting. `updateDcaSchedule` keeps its memory-copy order (storage write was already after the pull) and re-validates `scheduleId` after the pull (distinct-id swap-pop only; colliding-id swap-pop there is pre-existing). See `R6-hot-path-cleanup.md`.
 
 ### PR 7 - R8 remove stuck-rBTC rescue
 
