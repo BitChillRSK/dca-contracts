@@ -100,7 +100,7 @@ The current architecture balances extensibility with gas efficiency:
 - Balance checks before operations
 
 ### Contract Dependencies
-- Rootstock-compatible compiler version (v0.8.19)
+- Rootstock-compatible compiler version (v0.8.36, EVM cancun)
 - OpenZeppelin Contracts v4.9.3
 - Money on Chain Protocol (for DOC)
 - Uniswap V3 Protocol (for other stablecoins)
@@ -300,7 +300,7 @@ This project uses Git submodules for dependency management. The following depend
 - Uniswap V3 Periphery v1.3.0
 - Uniswap Swap Router Contracts v1.3.0
 
-Due to Rootstock's requirement for Solidity 0.8.19, we've modified the pragma statements in some dependencies. These modifications are documented in [DEPENDENCY_MODIFICATIONS.md](./DEPENDENCY_MODIFICATIONS.md).
+Uniswap V3 sources still declare `pragma solidity =0.7.6`. Local builds and CI patch those pragmas so they compile with first-party solc 0.8.36. Details: [DEPENDENCY_MODIFICATIONS.md](./DEPENDENCY_MODIFICATIONS.md).
 
 For a complete list of contract addresses used in the protocol (including both mainnet and testnet), please refer to [ADDRESSES.md](./ADDRESSES.md).
 

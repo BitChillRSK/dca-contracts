@@ -33,9 +33,7 @@ Default if undecided:
 
 Bump first-party Solidity and Rootstock EVM settings before other code changes. Prefer the latest stable `0.8.x` compiler and `evm_version = "cancun"` if Rootstock testnet/fork verification passes.
 
-Keep OpenZeppelin `v4.9.3`. Keep Uniswap dependencies compiled as `0.7.6`. Prove whether `make patch-deps` is still required; update `DEPENDENCY_MODIFICATIONS.md` accordingly.
-
-Do not include OpenZeppelin 5.x migration in this PR.
+Keep OpenZeppelin `v4.9.3`. Uniswap **sources** stay `=0.7.6` in git; they cannot be compiled with solc 0.7.6 while first-party Dex files import them (see R23). `make patch-deps` remains required. Do not include OpenZeppelin 5.x migration in this PR.
 
 ### PR 2 - Decision record
 
