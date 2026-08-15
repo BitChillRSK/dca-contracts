@@ -1,6 +1,6 @@
 # R3 — FeeHandler linear-fee fixes (R3, R4, R5)
 
-Status: **in progress** · Assigned: yes · Optional/further-review: no
+Status: **in progress** (GitHub #46) · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
