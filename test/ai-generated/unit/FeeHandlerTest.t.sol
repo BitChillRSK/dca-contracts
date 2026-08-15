@@ -30,6 +30,30 @@ contract FeeHandlerTest is Test {
         feeHandler = new FeeHandlerHarness(settings);
     }
 
+    function test_constructor_reverts_invalidRates() public {
+        IFeeHandler.FeeSettings memory settings = IFeeHandler.FeeSettings({
+            minFeeRate: 300,
+            maxFeeRate: 200,
+            feePurchaseLowerBound: LOWER_BOUND,
+            feePurchaseUpperBound: UPPER_BOUND
+        });
+
+        vm.expectRevert(IFeeHandler.FeeHandler__MinFeeRateCannotBeHigherThanMax.selector);
+        new FeeHandlerHarness(settings);
+    }
+
+    function test_constructor_reverts_invalidBounds() public {
+        IFeeHandler.FeeSettings memory settings = IFeeHandler.FeeSettings({
+            minFeeRate: MIN_FEE_RATE,
+            maxFeeRate: MAX_FEE_RATE,
+            feePurchaseLowerBound: UPPER_BOUND,
+            feePurchaseUpperBound: LOWER_BOUND
+        });
+
+        vm.expectRevert(IFeeHandler.FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound.selector);
+        new FeeHandlerHarness(settings);
+    }
+
     function test_calculateFee_belowLowerBound() public {
         uint256 purchaseAmount = 50 ether; // below lower bound
         uint256 expectedFee = purchaseAmount * MAX_FEE_RATE / 10_000;
@@ -216,4 +240,4 @@ contract FeeHandlerTest is Test {
             assertGe(rate1, rate2, "Fee rate should decrease or stay equal with higher amounts");
         }
     }
-} 
+}

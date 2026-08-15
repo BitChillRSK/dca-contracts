@@ -25,6 +25,13 @@ abstract contract FeeHandler is IFeeHandler, Ownable {
     uint256 constant FEE_PERCENTAGE_DIVISOR = 10_000; // feeRate will belong to [100, 200], so we need to divide by 10,000 (100 * 100)
 
     constructor(address feeCollector, FeeSettings memory feeSettings) Ownable() {
+        _validateFeeSettings(
+            feeSettings.minFeeRate,
+            feeSettings.maxFeeRate,
+            feeSettings.feePurchaseLowerBound,
+            feeSettings.feePurchaseUpperBound
+        );
+
         s_feeCollector = feeCollector;
         s_minFeeRate = feeSettings.minFeeRate;
         s_maxFeeRate = feeSettings.maxFeeRate;
@@ -48,9 +55,7 @@ abstract contract FeeHandler is IFeeHandler, Ownable {
         override
         onlyOwner
     {
-        // Validate parameters
-        if (minFeeRate > maxFeeRate) revert FeeHandler__MinFeeRateCannotBeHigherThanMax();
-        if (feePurchaseLowerBound >= feePurchaseUpperBound) revert FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound();
+        _validateFeeSettings(minFeeRate, maxFeeRate, feePurchaseLowerBound, feePurchaseUpperBound);
 
         if (s_minFeeRate != minFeeRate) {
             s_minFeeRate = minFeeRate;
@@ -168,6 +173,16 @@ abstract contract FeeHandler is IFeeHandler, Ownable {
     /*//////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    function _validateFeeSettings(
+        uint256 minFeeRate,
+        uint256 maxFeeRate,
+        uint256 feePurchaseLowerBound,
+        uint256 feePurchaseUpperBound
+    ) private pure {
+        if (minFeeRate > maxFeeRate) revert FeeHandler__MinFeeRateCannotBeHigherThanMax();
+        if (feePurchaseLowerBound >= feePurchaseUpperBound) revert FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound();
+    }
 
     /**
      * @dev Calculates the fee based on the purchase amount.

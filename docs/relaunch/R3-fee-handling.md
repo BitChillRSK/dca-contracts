@@ -4,7 +4,7 @@ Status: **in progress** (GitHub #46) · Assigned: yes · Optional/further-review
 
 ## Objective
 
-Keep the linear fee model. Make `setFeeRateParams` able to raise the rate band in one call, keep purchase-bound invariants on the individual setters, and load fee storage once per batch so interpolation math does not re-SLOAD on every purchase.
+Keep the linear fee model. Make `setFeeRateParams` able to raise the rate band in one call, keep purchase-bound invariants on the individual setters and constructor, and load fee storage once per batch so interpolation math does not re-SLOAD on every purchase.
 
 ## Background
 
@@ -17,6 +17,8 @@ Linear means: `maxFeeRate` at or below `feePurchaseLowerBound`, `minFeeRate` at 
 **R4:** Combined setter requires `lower < upper`, but `setPurchaseLowerBound` / `setPurchaseUpperBound` still write without comparing to the other live bound, so `lower ≥ upper` can be stored.
 
 **R5:** `_calculateFeeAndNetAmounts` calls `_calculateFee` per item. `_calculateFee` is `view` and SLOAD’s the four fee fields on every iteration. Those values do not change during the tx.
+
+**Constructor hardening:** User-requested after review. Constructor fee settings should satisfy the same `min <= max` and `lower < upper` invariants as owner updates, so a handler cannot be born with fee settings that later setters would reject.
 
 `PurchaseMoc` / `PurchaseUniswap` keep calling `_calculateFee` / `_calculateFeeAndNetAmounts`. Do not change fee rates, interpolation, or which path (`buyRbtc` vs batch) is used.
 
@@ -47,11 +49,12 @@ Linear means: `maxFeeRate` at or below `feePurchaseLowerBound`, `minFeeRate` at 
 
   `_calculateFeeAndNetAmounts` loads `FeeSettings` once before the loop and calls `_calculateFeeWithParams`. Linear formula stays identical to today’s `_calculateFee`. Do not add `getFeeSettings()` on `IFeeHandler`.
 
+- [x] Constructor validation: reject invalid initial fee settings with the same errors as `setFeeRateParams` (`minFeeRate > maxFeeRate`, `feePurchaseLowerBound >= feePurchaseUpperBound`). Do not add a `maxFeeRate` cap.
+
 ## Out of scope
 
 - [ ] Flatten to one rate, new purchase bounds, or a `maxFeeRate` cap.
 - [ ] `getFeeSettings()` on `IFeeHandler`.
-- [ ] Constructor validation of fee settings.
 - [ ] R18 packing, R19 pause, R12/R13/optionals (PR 2 / later PRs).
 - [ ] R6 / R17 purchase-path / `nonReentrant` work.
 - [ ] Event reshaping (R9); fee events keep today’s indexed uints.
@@ -86,6 +89,7 @@ Behaviors to assert:
 - `setFeeRateParams` that raises min above the old max but below the new max (e.g. 100/200 → 250/400) succeeds and stores the new pair.
 - `setFeeRateParams` that moves both bounds so the new lower is `>=` the old upper (e.g. 100/1000 ether → 2000/5000 ether) succeeds.
 - Invalid combined pairs still revert (`min > max`, `lower >= upper`).
+- Constructor settings with `min > max` or `lower >= upper` revert with the same errors as the combined setter.
 - `setPurchaseLowerBound` with `lower >=` current upper reverts; `setPurchaseUpperBound` with `upper <=` current lower reverts.
 - One-sided bound updates that stay strictly inside the other live bound still succeed.
 - `_calculateFeeAndNetAmounts` does not call a `view` helper that re-reads fee storage inside the loop (reviewer: inspect the loop).
@@ -98,6 +102,7 @@ Fork tests: not required.
 - [x] Raising the min/max band in one `setFeeRateParams` call succeeds when the new pair is valid.
 - [x] Individual bound setters cannot store `lower >= upper`; combined setter still moves both.
 - [x] Batch fee math matches sequential `_calculateFee`; four fee SLOADs happen once per `_calculateFeeAndNetAmounts` call, not per item.
+- [x] Constructor cannot deploy a handler with invalid fee settings.
 - [x] Interpolation and flat (`min == max`) results are unchanged.
 - [x] Targeted tests above pass; `make check` passes.
 - [x] Protocol invariants in `AGENTS.md` unchanged.
