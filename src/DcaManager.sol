@@ -511,6 +511,10 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         _requireWholeDays(purchasePeriod);
     }
 
+    /**
+     * @notice require that the period is a whole day
+     * @param period the period to validate
+     */
     function _requireWholeDays(uint256 period) private pure {
         if (period % 1 days != 0) revert DcaManager__PurchasePeriodMustBeWholeDays();
     }
