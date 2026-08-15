@@ -148,6 +148,40 @@ contract DepositSwapPopReentrancyTest is Test {
         assertEq(afterSchedules[1].tokenBalance, beforeSchedules[1].tokenBalance);
     }
 
+    function test_depositToken_reverts_whenHookDeletesLastRemainingSchedule() public {
+        user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
+        IDcaManager.DcaDetails[] memory beforeSchedules = dcaManager.getDcaSchedules(address(user), address(token));
+        bytes32 idA = beforeSchedules[0].scheduleId;
+
+        user.armDelete(0, idA);
+        token.setHook(address(user), true);
+
+        vm.expectRevert(IDcaManager.DcaManager__ScheduleIdAndIndexMismatch.selector);
+        user.deposit(0, idA, EXTRA);
+
+        IDcaManager.DcaDetails[] memory afterSchedules = dcaManager.getDcaSchedules(address(user), address(token));
+        assertEq(afterSchedules.length, 1);
+        assertEq(afterSchedules[0].scheduleId, idA);
+        assertEq(afterSchedules[0].tokenBalance, beforeSchedules[0].tokenBalance);
+    }
+
+    function test_updateDcaSchedule_reverts_whenHookDeletesLastRemainingSchedule() public {
+        user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
+        IDcaManager.DcaDetails[] memory beforeSchedules = dcaManager.getDcaSchedules(address(user), address(token));
+        bytes32 idA = beforeSchedules[0].scheduleId;
+
+        user.armDelete(0, idA);
+        token.setHook(address(user), true);
+
+        vm.expectRevert(abi.encodeWithSignature("Panic(uint256)", 0x32));
+        user.update(0, idA, EXTRA);
+
+        IDcaManager.DcaDetails[] memory afterSchedules = dcaManager.getDcaSchedules(address(user), address(token));
+        assertEq(afterSchedules.length, 1);
+        assertEq(afterSchedules[0].scheduleId, idA);
+        assertEq(afterSchedules[0].tokenBalance, beforeSchedules[0].tokenBalance);
+    }
+
     function _createTwoSchedules() private {
         user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
         vm.warp(block.timestamp + 1);

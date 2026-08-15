@@ -45,15 +45,15 @@ At RSK ~0.06 gwei, 3,480 gas ≈ 2.1 × 10⁻⁷ rBTC per purchase. The two earl
 4. The hook calls `deleteDcaSchedule(token, 0, idA)` — **the same index being updated**, not B. Delete pays out A's 1000 (`DcaManager.sol:270`), swap-pops B into index 0, and shortens the array.
 5. The outer call resumes, sets the memory copy to 1001, and stamps A's stale struct over B. Index 0 is still in bounds, so nothing reverts.
 
-What this does **not** do on current handlers: drain the pool. After the swap-pop, DcaManager shows 1001 while the user's lending shares still back B plus the 1 deposited — or, if the numbers do not line up, a later `withdrawToken` is clamped to the real position and the DcaManager ledger desyncs. That desync is R1/R20 territory, not insolvency of other users. DOC and USDRIF have no transfer hooks, so this is not live.
+What this does **not** do on current handlers: drain the pool. After the swap-pop, DcaManager shows 1001 while the user's lending shares still back B plus the 1 deposited — or, if the numbers do not line up, a later `withdrawToken` is clamped to the real position and the DcaManager ledger desyncs. That desync is **PR 8 / R20**, not R1. DOC and USDRIF have no transfer hooks, so this is not live.
 
-It is still a stale write-back that can destroy B's identity and leave the caller's own schedules inconsistent. Fix it here because the check is ~100 gas on a non-hot path, and because leaving it makes "never list a hook-capable token" a security-critical invariant rather than a preference.
+It is still a stale write-back that can destroy B's identity and leave the caller's own schedules inconsistent. Fix it here because the extra array read is a few hundred gas on a non-hot path (measured ~281 on `updateDcaSchedule`, not ~100), and because leaving it makes "never list a hook-capable token" a security-critical invariant rather than a preference.
 
 `depositToken` after #47 holds a **storage pointer** across the pull, then credits. The same swap-pop misattributes the deposit onto whichever schedule now sits in that slot (still the caller's). Re-validating `scheduleId` after the pull reverts instead.
 
 `createDcaSchedule` pulls then pushes a **new** row. It has no write-back of a pre-call copy of an existing slot. No extra check there.
 
-Same-id re-entrancy that does *not* change `scheduleId` (e.g. a hook `depositToken` on the same schedule) can still be clobbered by `updateDcaSchedule`'s stale memory copy. That is obscure self-grief. Out of scope: do not refresh every field from storage. The id check is the minimum that closes the swap-pop.
+Same-id re-entrancy that does *not* change `scheduleId` (e.g. a hook `depositToken` or `setPurchaseAmount` on the same schedule) can still be clobbered by `updateDcaSchedule`'s stale memory copy. That is obscure self-grief. Out of scope: do not refresh every field from storage. The id check closes **swap-pop** (and the last-index shrink), not the stale-copy class as a whole.
 
 ## Background
 
@@ -119,7 +119,7 @@ Items marked **(revert)** undo work already merged in #47.
   dcaSchedule.tokenBalance = newTokenBalance;
   ```
 
-  In `updateDcaSchedule` the memory copy predates the call, so after the pull read storage at `scheduleIndex` (~100 gas, only when `depositAmount > 0`):
+  In `updateDcaSchedule` the memory copy predates the call, so after the pull read storage at `scheduleIndex` (measured ~281 gas for the length load + bounds check + SLOAD, only when `depositAmount > 0`):
 
   ```solidity
   if (depositAmount > 0) {
@@ -183,9 +183,11 @@ Behaviors to assert:
 - Same-period second buy still reverts.
 - `onlySwapper` still rejects non-swappers.
 - `depositToken` / `updateDcaSchedule` still credit after a successful pull; a failed pull (no approval) reverts with no lasting credit.
-- Wrong `scheduleId` on `depositToken` still reverts with `DcaManager__ScheduleIdAndIndexMismatch` (pre-pull check kept; same end state as post-pull-only because reverts are atomic).
-- **New — swap-pop, not “the other schedule”:** User has two schedules. A mock token `transferFrom` re-enters `deleteDcaSchedule` on the **same** `scheduleIndex` being deposited into (so delete swap-pops the other schedule into that slot). Both `depositToken` and `updateDcaSchedule` must revert on `_validateScheduleId` (or Panic(0x32) if the array shrank past the index). No `tokenBalance` write-back. A test that deletes the *other* (last) schedule does **not** count: that pop leaves index 0 unchanged and would pass against #47 without the fix.
+- Wrong `scheduleId` on `depositToken` reverts with `DcaManager__ScheduleIdAndIndexMismatch`. Tests cannot tell pre-pull from post-pull-only (reverts are atomic). That the first check still runs **before** `handler.depositToken` is inspection of source order, not a test.
+- **New — swap-pop, not “the other schedule”:** User has two schedules. A mock token `transferFrom` re-enters `deleteDcaSchedule` on the **same** `scheduleIndex` being deposited into (so delete swap-pops the other schedule into that slot). Both `depositToken` and `updateDcaSchedule` must revert on `_validateScheduleId`. No `tokenBalance` write-back. A test that deletes the *other* (last) schedule does **not** count: that pop leaves index 0 unchanged and would pass against #47 without the fix.
+- **New — last remaining schedule:** User has one schedule. The hook deletes that same index (array length becomes 0). `depositToken` reverts `ScheduleIdAndIndexMismatch` (storage pointer reads a zeroed `scheduleId`). `updateDcaSchedule` reverts Panic(0x32) on `schedules[scheduleIndex]`. No write-back in either case.
 - `nonReentrant` remains only on the two rBTC withdraw functions (reviewer: inspect modifiers).
+- `depositToken` still has `_validateScheduleId` both before and after the pull (reviewer: inspect; not test-distinguishable from post-pull-only).
 
 Fork tests: not required.
 
@@ -194,9 +196,10 @@ Fork tests: not required.
 - [x] Both custom errors are present and asserted again.
 - [x] `onlySwapper` uses the cached `keccak256("SWAPPER")`.
 - [x] `nonReentrant` remains only on rBTC withdraws; `ReentrancyGuard` inheritance stays.
-- [x] `depositToken` validates the schedule id **before and after** the pull; `updateDcaSchedule` re-reads storage and validates id after the pull.
+- [x] `depositToken` validates the schedule id **before and after** the pull (inspection of source order for “before”); `updateDcaSchedule` re-reads storage and validates id after the pull.
 - [x] `updateDcaSchedule`'s memory increment still happens before `handler.depositToken` (same order as `fix/r3-fee-handling`).
 - [x] The swap-pop reentrancy test above fails against #47 as merged and passes after this change.
+- [x] Last-index shrink: `depositToken` → `ScheduleIdAndIndexMismatch`; `updateDcaSchedule` → Panic(0x32).
 - [x] Existing CEI on withdraw/delete unchanged.
 - [x] Targeted tests pass; `make check` passes.
 - [x] Protocol invariants in `AGENTS.md` unchanged.
@@ -205,13 +208,14 @@ Fork tests: not required.
 
 - [ ] Matches **Scope**; nothing from **Out of scope**.
 - [ ] Protocol invariants in `AGENTS.md` still hold.
-- [ ] Tests in the PR match **Required tests**, including swap-pop of the **same** index (not delete-the-other-schedule).
+- [ ] Tests in the PR match **Required tests**, including swap-pop of the **same** index (not delete-the-other-schedule) and last-index shrink.
 - [ ] No unrelated refactors; no line reordering without a stated, observable reason.
 - [ ] `_rBtcPurchaseChecksEffects` enforces period, scheduleId, the balance comparison, and the subtraction.
 - [ ] `batchBuyRbtc` checks non-empty, array-length match, per-item amount, and per-item lending index.
 - [ ] `buyRbtc` / `batchBuyRbtc` have no `nonReentrant`.
 - [ ] No `handler.depositToken` call site writes through a reference obtained before it without re-validating the id.
 - [ ] Does not claim this bug drains other users' principal on Tropykus/Sovryn (clamp).
+- [ ] Pre-pull id check on `depositToken` is confirmed by reading the function, not by a test that cannot distinguish it from post-pull-only.
 
 ## ABI / deploy / cutover impact
 
