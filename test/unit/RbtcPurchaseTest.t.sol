@@ -888,7 +888,6 @@ contract RbtcPurchaseTest is DcaDappTest {
         returns (uint256)
     {
         uint256 periodsElapsed = (timestamp - lastPurchaseTimestamp) / purchasePeriod;
-        if (periodsElapsed == 0) periodsElapsed = 1;
         uint256 snapped = lastPurchaseTimestamp + periodsElapsed * purchasePeriod;
         uint256 nextDueTimestamp = snapped + purchasePeriod;
         uint256 nextPurchaseDayStart = _utcDayStart(nextDueTimestamp);

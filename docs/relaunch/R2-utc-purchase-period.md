@@ -34,14 +34,13 @@ R2 replaces the remaining strict-seconds check. Daily is the highest frequency B
 
   Keep the existing error. `timeRemaining` is seconds until `nextPurchaseDayStart` (`nextPurchaseDayStart - block.timestamp`).
 
-- [x] Keep the `6335994` snap, aligned to UTC due days. Floor `periodsElapsed` at 1 so an early UTC-day buy still consumes a slot. If that wall-clock snap still leaves today's UTC day due (multi-period gap after a late-in-day `last`), consume one more period so a second buy the same day reverts:
+- [x] Keep the `6335994` snap, aligned to UTC due days. If that wall-clock snap still leaves today's UTC day due (multi-period gap after a late-in-day `last`), consume one more period so a second buy the same day reverts:
 
   ```solidity
   if (lastPurchaseTimestamp == 0) {
       lastPurchaseTimestamp = block.timestamp - (block.timestamp % 1 days);
   } else {
       uint256 periodsElapsed = (block.timestamp - lastPurchaseTimestamp) / purchasePeriod;
-      if (periodsElapsed == 0) periodsElapsed = 1;
       lastPurchaseTimestamp += periodsElapsed * purchasePeriod;
       uint256 nextDueTimestamp = lastPurchaseTimestamp + purchasePeriod;
       uint256 nextPurchaseDayStart = nextDueTimestamp - (nextDueTimestamp % 1 days);
@@ -51,7 +50,7 @@ R2 replaces the remaining strict-seconds check. Daily is the highest frequency B
   }
   ```
 
-  First purchase stamps 00:00 UTC of that day. Later purchases add whole periods from that midnight so a weekly schedule keeps its weekday after a gap. Floor / extra-period remain as guards. Actual execution time is the purchase transaction's `block.timestamp` (indexer / `PurchaseRbtc__RbtcBought` log), not this field.
+  First purchase stamps 00:00 UTC of that day. Later purchases add whole periods from that midnight so a weekly schedule keeps its weekday after a gap. Actual execution time is the purchase transaction's `block.timestamp` (indexer / `PurchaseRbtc__RbtcBought` log), not this field.
 
 - [x] Add modifier `validateMinPurchasePeriod`: revert if `minPurchasePeriod < 1 days`. Apply on `constructor` and `modifyMinPurchasePeriod`. New error on `IDcaManager` (e.g. `DcaManager__MinPurchasePeriodMustBeAtLeastOneDay`). User schedules still cannot go below `s_minPurchasePeriod` (`_validatePurchasePeriod` unchanged in spirit).
 

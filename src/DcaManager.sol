@@ -568,13 +568,12 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
 
         // First purchase stamps 00:00 UTC of that day (0 stays "never purchased").
         // Later purchases add whole periods from that midnight so weekly stays on the
-        // original weekday after a gap. Floor periodsElapsed at 1, then consume one more
-        // period if that snap still leaves today's UTC day due.
+        // original weekday after a gap. Consume one more period if that snap still
+        // leaves today's UTC day due.
         if (dcaSchedule.lastPurchaseTimestamp == 0) {
             dcaSchedule.lastPurchaseTimestamp = block.timestamp - (block.timestamp % 1 days);
         } else {
             uint256 periodsElapsed = (block.timestamp - dcaSchedule.lastPurchaseTimestamp) / dcaSchedule.purchasePeriod;
-            if (periodsElapsed == 0) periodsElapsed = 1;
             unchecked {
                 dcaSchedule.lastPurchaseTimestamp += periodsElapsed * dcaSchedule.purchasePeriod;
             }
