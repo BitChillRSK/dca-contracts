@@ -7,7 +7,7 @@ Status: **planning guide**. Orders PRs. Not an implementation spec. Human prompt
 - One PR, one behavioral purpose. Bundle R-items only when this file says so.
 - Write `docs/relaunch/R<n>-...md` from `TASK_TEMPLATE.md` before Solidity. You may read `.cursor/relaunch-plan.md` only to draft that spec; implement from the spec.
 - Ask product questions only from the **Ask** column below. Empty Ask = do not ask; implement.
-- Branch before edits; stack on the latest open relaunch PR, else `main`. Commit, push, open the PR (`AGENTS.md`). Stop. Human merges in order.
+- Branch before edits; stack on the latest open relaunch PR, else `main`. Commit, push, open the PR (`AGENTS.md`). Update `docs/relaunch/README.md` **Status** with the PR link and next unassigned prompt (follow-up commit if the URL was unknown before open). Stop. Remind the human of that next prompt. Human merges in order.
 - Run targeted tests, then the `AGENTS.md` done-gate.
 - Do not `--broadcast`. Keep OpenZeppelin `v4.9.3` until an optional late upgrade PR.
 

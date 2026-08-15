@@ -20,6 +20,6 @@ Document any extra files in the PR. Do not search `out/`, `cache/`, or `lib/`. D
 
 ## Status
 
-- Merged: [R23-toolchain-baseline.md](./R23-toolchain-baseline.md) (PR 1, GitHub #42). Rootstock testnet accepted solc 0.8.36 / `cancun`.
-- Assigned: none.
-- Next: the human names an R-item. Typical: PR 2 (decision record) or PR 3 / R2 (UTC period; no product gates). R2 does not wait on PR 2.
+- Merged: [R23-toolchain-baseline.md](./R23-toolchain-baseline.md) (PR 1, GitHub [#42](https://github.com/BitChillRSK/dca-contracts/pull/42)). Rootstock testnet accepted solc 0.8.36 / `cancun`.
+- Assigned: docs hardening — GitHub [#43](https://github.com/BitChillRSK/dca-contracts/pull/43) (`docs/relaunch-short-agent-prompts`).
+- Next unassigned: `Start with R2` (PR 3, UTC purchase-period). No product gates. Does not wait on PR 2.
