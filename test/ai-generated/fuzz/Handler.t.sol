@@ -42,7 +42,7 @@ contract Handler is Test {
     //  require() checks so that handler calls never revert when `fail_on_revert`
     //  is active.  No arbitrary upper caps – we rely on vm.assume instead.
     // ----------------------------------------------------------------------------
-    uint256 constant MIN_DEPOSIT_AMOUNT   = MIN_PURCHASE_AMOUNT * 2; // protocol-level rule
+    uint256 constant MIN_DEPOSIT_AMOUNT   = MIN_PURCHASE_AMOUNT;
 
     // Upper-bound safety helpers (prevent overflow / gas OOM without masking logic)
     uint256 constant INTERNAL_UPPER_AMOUNT = 1e32;   // ≈ 10^14 ether – far above realistic amounts
@@ -98,12 +98,12 @@ contract Handler is Test {
         vm.assume(depositAmount >= MIN_DEPOSIT_AMOUNT);
         vm.assume(purchasePeriod >= MIN_PURCHASE_PERIOD);
         vm.assume(purchaseAmount >= MIN_PURCHASE_AMOUNT);
-        vm.assume(purchaseAmount <= depositAmount / 2);
+        vm.assume(purchaseAmount <= depositAmount);
 
         // Prevent pathological gas / overflow situations without shrinking search-space too much
         depositAmount  = bound(depositAmount,  MIN_DEPOSIT_AMOUNT,  INTERNAL_UPPER_AMOUNT);
         purchasePeriod = bound(purchasePeriod, MIN_PURCHASE_PERIOD, INTERNAL_UPPER_PERIOD);
-        purchaseAmount = bound(purchaseAmount, MIN_PURCHASE_AMOUNT, depositAmount / 2);
+        purchaseAmount = bound(purchaseAmount, MIN_PURCHASE_AMOUNT, depositAmount);
 
         // Mint enough tokens for the user and approve handler without arbitrary caps
         uint256 userBalance = stablecoin.balanceOf(user);
@@ -248,7 +248,7 @@ contract Handler is Test {
         if (purchaseAmount > 0) {
             vm.assume(purchaseAmount >= MIN_PURCHASE_AMOUNT);
             // Must also satisfy _validatePurchaseAmount
-            vm.assume(purchaseAmount <= schedules[scheduleIndex].tokenBalance / 2 + depositAmount / 2);
+            vm.assume(purchaseAmount <= schedules[scheduleIndex].tokenBalance + depositAmount);
             purchaseAmount = bound(purchaseAmount, MIN_PURCHASE_AMOUNT, INTERNAL_UPPER_AMOUNT);
         }
 

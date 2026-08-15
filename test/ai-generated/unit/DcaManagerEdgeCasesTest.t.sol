@@ -223,13 +223,19 @@ contract DcaManagerEdgeCasesTest is Test {
     }
     
     function test_buyRbtc_reverts_insufficientBalance() public {
-        // Create schedule with purchase amount equal to more than half of deposit (should fail validation)
-        vm.expectRevert(IDcaManager.DcaManager__PurchaseAmountMustBeLowerThanHalfOfBalance.selector);
+        // Create schedule with purchase amount above the deposit (should fail validation)
+        bytes memory encodedRevert = abi.encodeWithSelector(
+            IDcaManager.DcaManager__PurchaseAmountExceedsBalance.selector,
+            address(stablecoin),
+            501 ether,
+            500 ether
+        );
+        vm.expectRevert(encodedRevert);
         vm.prank(USER);
         dcaManager.createDcaSchedule(
             address(stablecoin),
-            500 ether,  // depositAmount 
-            300 ether, // purchaseAmount (more than half of deposit)
+            500 ether,  // depositAmount
+            501 ether, // purchaseAmount exceeds deposit
             MIN_PURCHASE_PERIOD,
             TROPYKUS_INDEX
         );
@@ -575,11 +581,18 @@ contract DcaManagerEdgeCasesTest is Test {
             TROPYKUS_INDEX
         );
         
-        // Test with invalid purchase amounts (more than half of deposit)
+        // Test with invalid purchase amounts (more than deposit)
         uint256 deposit = bound(seed, 100 ether, 1000 ether);
-        uint256 purchaseAmount = deposit / 2 + 1; // More than half
-        
-        vm.expectRevert(IDcaManager.DcaManager__PurchaseAmountMustBeLowerThanHalfOfBalance.selector);
+        uint256 purchaseAmount = deposit + 1;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDcaManager.DcaManager__PurchaseAmountExceedsBalance.selector,
+                address(stablecoin),
+                purchaseAmount,
+                deposit
+            )
+        );
         vm.prank(USER);
         dcaManager.createDcaSchedule(
             address(stablecoin),

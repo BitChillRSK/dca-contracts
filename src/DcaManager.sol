@@ -113,7 +113,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      * @param scheduleIndex the schedule index
      * @param scheduleId the schedule id for validation
      * @param purchaseAmount the amount of stablecoin to swap periodically for rBTC
-     * @notice the amount cannot be greater than or equal to half of the deposited amount
+     * @notice the amount cannot exceed the schedule's current token balance
      */
     function setPurchaseAmount(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 purchaseAmount)
         external
@@ -168,7 +168,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
 
         DcaDetails[] storage schedules = s_dcaSchedules[msg.sender][token];
         uint256 numOfSchedules = schedules.length;
-        if (numOfSchedules == s_maxSchedulesPerToken) {
+        if (numOfSchedules >= s_maxSchedulesPerToken) {
             revert DcaManager__MaxSchedulesPerTokenReached(token);
         }
 
@@ -494,11 +494,8 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         if (purchaseAmount < minPurchaseAmount) {
             revert DcaManager__PurchaseAmountMustBeGreaterThanMinimum(token, minPurchaseAmount);
         }
-        /**
-         * @notice Purchase amount must be at least twice the balance of the token in the contract to allow at least two DCA purchases
-         */
-        if (purchaseAmount > (tokenBalance) / 2) {
-            revert DcaManager__PurchaseAmountMustBeLowerThanHalfOfBalance();
+        if (purchaseAmount > tokenBalance) {
+            revert DcaManager__PurchaseAmountExceedsBalance(token, purchaseAmount, tokenBalance);
         }
     }
 
@@ -835,6 +832,37 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      */
     function getMyInterestAccrued(address token, uint256 lendingProtocolIndex) external view override returns (uint256) {
         return getInterestAccrued(msg.sender, token, lendingProtocolIndex);
+    }
+
+    /**
+     * @notice get the rBTC accumulated by a user on the handler for a token and lending protocol
+     * @param user: the user to get the accumulated rBTC for
+     * @param token: the token
+     * @param lendingProtocolIndex: the lending protocol index
+     * @return the accumulated rBTC balance
+     */
+    function getAccumulatedRbtcBalance(address user, address token, uint256 lendingProtocolIndex)
+        public
+        view
+        override
+        returns (uint256)
+    {
+        return IPurchaseRbtc(address(_handler(token, lendingProtocolIndex))).getAccumulatedRbtcBalance(user);
+    }
+
+    /**
+     * @notice get the rBTC accumulated by the caller on the handler for a token and lending protocol
+     * @param token: the token
+     * @param lendingProtocolIndex: the lending protocol index
+     * @return the accumulated rBTC balance
+     */
+    function getMyAccumulatedRbtcBalance(address token, uint256 lendingProtocolIndex)
+        external
+        view
+        override
+        returns (uint256)
+    {
+        return getAccumulatedRbtcBalance(msg.sender, token, lendingProtocolIndex);
     }
 
     /**
