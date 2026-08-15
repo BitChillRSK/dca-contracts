@@ -32,6 +32,8 @@ interface IFeeHandler {
 
     error FeeHandler__MinFeeRateCannotBeHigherThanMax();
     error FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound();
+    error FeeHandler__InvalidFeeCollector();
+    error FeeHandler__MaxFeeRateExceedsCap();
 
     ///////////////////////////////
     // External functions /////////
@@ -101,4 +103,9 @@ interface IFeeHandler {
      * @dev Gets the fee collector address
      */
     function getFeeCollectorAddress() external returns (address);
+
+    /**
+     * @dev Gets the four fee settings used for purchase fee calculation.
+     */
+    function getFeeSettings() external view returns (FeeSettings memory);
 }

@@ -5,10 +5,18 @@ import {FeeHandler} from "../../src/FeeHandler.sol";
 import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
 
 contract FeeHandlerHarness is FeeHandler {
-    constructor(IFeeHandler.FeeSettings memory settings) FeeHandler(address(0xBEEF), settings) {}
+    constructor(address feeCollector, IFeeHandler.FeeSettings memory settings) FeeHandler(feeCollector, settings) {}
 
     function exposedCalculateFee(uint256 amount) external view returns (uint256) {
         return _calculateFee(amount);
+    }
+
+    function exposedCalculateFeeAndNetAmounts(uint256[] memory purchaseAmounts)
+        external
+        view
+        returns (uint256 aggregatedFee, uint256[] memory netAmountsToSpend, uint256 totalAmountToSpend)
+    {
+        return _calculateFeeAndNetAmounts(purchaseAmounts);
     }
 
     // Test-only setters without onlyOwner restriction for convenience
@@ -34,4 +42,4 @@ contract FeeHandlerHarness is FeeHandler {
     function testSetFeePurchaseUpperBound(uint256 upper) external {
         s_feePurchaseUpperBound = upper;
     }
-} 
+}

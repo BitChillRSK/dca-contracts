@@ -23,8 +23,18 @@ abstract contract FeeHandler is IFeeHandler, Ownable {
     uint256 internal s_feePurchaseUpperBound; // Spending above upper bound gets the minimum fee rate
     address internal s_feeCollector; // Address to which the fees charged to the user will be sent
     uint256 constant FEE_PERCENTAGE_DIVISOR = 10_000; // feeRate will belong to [100, 200], so we need to divide by 10,000 (100 * 100)
+    /// @notice Hard ceiling on fee rates (5%). Owner cannot set max (or a flat min==max) above this.
+    uint256 public constant MAX_FEE_RATE_CAP = 500;
 
     constructor(address feeCollector, FeeSettings memory feeSettings) Ownable() {
+        if (feeCollector == address(0)) revert FeeHandler__InvalidFeeCollector();
+        _validateFeeSettings(
+            feeSettings.minFeeRate,
+            feeSettings.maxFeeRate,
+            feeSettings.feePurchaseLowerBound,
+            feeSettings.feePurchaseUpperBound
+        );
+
         s_feeCollector = feeCollector;
         s_minFeeRate = feeSettings.minFeeRate;
         s_maxFeeRate = feeSettings.maxFeeRate;
@@ -48,14 +58,24 @@ abstract contract FeeHandler is IFeeHandler, Ownable {
         override
         onlyOwner
     {
-        // Validate parameters
-        if (minFeeRate > maxFeeRate) revert FeeHandler__MinFeeRateCannotBeHigherThanMax();
-        if (feePurchaseLowerBound >= feePurchaseUpperBound) revert FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound();
+        _validateFeeSettings(minFeeRate, maxFeeRate, feePurchaseLowerBound, feePurchaseUpperBound);
 
-        if (s_minFeeRate != minFeeRate) setMinFeeRate(minFeeRate);
-        if (s_maxFeeRate != maxFeeRate) setMaxFeeRate(maxFeeRate);
-        if (s_feePurchaseLowerBound != feePurchaseLowerBound) setPurchaseLowerBound(feePurchaseLowerBound);
-        if (s_feePurchaseUpperBound != feePurchaseUpperBound) setPurchaseUpperBound(feePurchaseUpperBound);
+        if (s_minFeeRate != minFeeRate) {
+            s_minFeeRate = minFeeRate;
+            emit FeeHandler__MinFeeRateSet(minFeeRate);
+        }
+        if (s_maxFeeRate != maxFeeRate) {
+            s_maxFeeRate = maxFeeRate;
+            emit FeeHandler__MaxFeeRateSet(maxFeeRate);
+        }
+        if (s_feePurchaseLowerBound != feePurchaseLowerBound) {
+            s_feePurchaseLowerBound = feePurchaseLowerBound;
+            emit FeeHandler__PurchaseLowerBoundSet(feePurchaseLowerBound);
+        }
+        if (s_feePurchaseUpperBound != feePurchaseUpperBound) {
+            s_feePurchaseUpperBound = feePurchaseUpperBound;
+            emit FeeHandler__PurchaseUpperBoundSet(feePurchaseUpperBound);
+        }
     }
 
     /**
@@ -73,6 +93,7 @@ abstract contract FeeHandler is IFeeHandler, Ownable {
      * @param maxFeeRate: the maximum fee rate
      */
     function setMaxFeeRate(uint256 maxFeeRate) public override onlyOwner {
+        if (maxFeeRate > MAX_FEE_RATE_CAP) revert FeeHandler__MaxFeeRateExceedsCap();
         if (maxFeeRate < s_minFeeRate) revert FeeHandler__MinFeeRateCannotBeHigherThanMax();
         s_maxFeeRate = maxFeeRate;
         emit FeeHandler__MaxFeeRateSet(maxFeeRate);
@@ -83,6 +104,9 @@ abstract contract FeeHandler is IFeeHandler, Ownable {
      * @param feePurchaseLowerBound: the purchase lower bound
      */
     function setPurchaseLowerBound(uint256 feePurchaseLowerBound) public override onlyOwner {
+        if (feePurchaseLowerBound >= s_feePurchaseUpperBound) {
+            revert FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound();
+        }
         s_feePurchaseLowerBound = feePurchaseLowerBound;
         emit FeeHandler__PurchaseLowerBoundSet(feePurchaseLowerBound);
     }
@@ -92,6 +116,9 @@ abstract contract FeeHandler is IFeeHandler, Ownable {
      * @param feePurchaseUpperBound: the purchase upper bound
      */
     function setPurchaseUpperBound(uint256 feePurchaseUpperBound) public override onlyOwner {
+        if (s_feePurchaseLowerBound >= feePurchaseUpperBound) {
+            revert FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound();
+        }
         s_feePurchaseUpperBound = feePurchaseUpperBound;
         emit FeeHandler__PurchaseUpperBoundSet(feePurchaseUpperBound);
     }
@@ -101,6 +128,7 @@ abstract contract FeeHandler is IFeeHandler, Ownable {
      * @param feeCollector: the fee collector address
      */
     function setFeeCollectorAddress(address feeCollector) external override onlyOwner {
+        if (feeCollector == address(0)) revert FeeHandler__InvalidFeeCollector();
         s_feeCollector = feeCollector;
         emit FeeHandler__FeeCollectorAddressSet(feeCollector);
     }
@@ -147,9 +175,27 @@ abstract contract FeeHandler is IFeeHandler, Ownable {
         return s_feeCollector;
     }
 
+    /**
+     * @notice get the fee settings used for purchase fee calculation
+     */
+    function getFeeSettings() external view override returns (FeeSettings memory) {
+        return _feeSettings();
+    }
+
     /*//////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    function _validateFeeSettings(
+        uint256 minFeeRate,
+        uint256 maxFeeRate,
+        uint256 feePurchaseLowerBound,
+        uint256 feePurchaseUpperBound
+    ) private pure {
+        if (maxFeeRate > MAX_FEE_RATE_CAP) revert FeeHandler__MaxFeeRateExceedsCap();
+        if (minFeeRate > maxFeeRate) revert FeeHandler__MinFeeRateCannotBeHigherThanMax();
+        if (feePurchaseLowerBound >= feePurchaseUpperBound) revert FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound();
+    }
 
     /**
      * @dev Calculates the fee based on the purchase amount.
@@ -157,10 +203,60 @@ abstract contract FeeHandler is IFeeHandler, Ownable {
      * @return The fee amount to be deducted from the purchase amount.
      */
     function _calculateFee(uint256 purchaseAmount) internal view returns (uint256) {
-        uint256 minFeeRate = s_minFeeRate;
-        uint256 maxFeeRate = s_maxFeeRate;
-        uint256 feePurchaseLowerBound = s_feePurchaseLowerBound;
-        uint256 feePurchaseUpperBound = s_feePurchaseUpperBound;
+        return _calculateFeeWithParams(purchaseAmount, _feeSettings());
+    }
+
+    /**
+     * @notice Calculate the fee and net amounts for a batch of purchase amounts.
+     * @param purchaseAmounts The array with the raw purchase amounts specified by users.
+     * @return aggregatedFee      The total fee to be collected for all purchases.
+     * @return netAmountsToSpend  An array with the net amounts (purchase amount minus fee) for each user.
+     * @return totalAmountToSpend The aggregated net amount that will actually be used to buy rBTC.
+     */
+    function _calculateFeeAndNetAmounts(uint256[] memory purchaseAmounts)
+        internal
+        view
+        returns (uint256 aggregatedFee, uint256[] memory netAmountsToSpend, uint256 totalAmountToSpend)
+    {
+        uint256 len = purchaseAmounts.length;
+        netAmountsToSpend = new uint256[](len);
+        FeeSettings memory feeSettings = _feeSettings();
+
+        for (uint256 i; i < len; ++i) {
+            uint256 amount = purchaseAmounts[i];
+            uint256 fee = _calculateFeeWithParams(amount, feeSettings);
+            aggregatedFee += fee;
+
+            uint256 net = amount - fee;
+            netAmountsToSpend[i] = net;
+            totalAmountToSpend += net;
+        }
+    }
+
+    /**
+     * @dev Pack the four fee storage fields for a single load per batch.
+     */
+    function _feeSettings() internal view returns (FeeSettings memory) {
+        return FeeSettings({
+            minFeeRate: s_minFeeRate,
+            maxFeeRate: s_maxFeeRate,
+            feePurchaseLowerBound: s_feePurchaseLowerBound,
+            feePurchaseUpperBound: s_feePurchaseUpperBound
+        });
+    }
+
+    /**
+     * @dev Same interpolation as `_calculateFee`, using already-loaded fee settings.
+     */
+    function _calculateFeeWithParams(uint256 purchaseAmount, FeeSettings memory feeSettings)
+        internal
+        pure
+        returns (uint256)
+    {
+        uint256 minFeeRate = feeSettings.minFeeRate;
+        uint256 maxFeeRate = feeSettings.maxFeeRate;
+        uint256 feePurchaseLowerBound = feeSettings.feePurchaseLowerBound;
+        uint256 feePurchaseUpperBound = feeSettings.feePurchaseUpperBound;
 
         if (minFeeRate == maxFeeRate || purchaseAmount >= feePurchaseUpperBound) {
             return purchaseAmount * minFeeRate / FEE_PERCENTAGE_DIVISOR;
@@ -178,32 +274,6 @@ abstract contract FeeHandler is IFeeHandler, Ownable {
                     / (feePurchaseUpperBound - feePurchaseLowerBound);
         }
         return purchaseAmount * feeRate / FEE_PERCENTAGE_DIVISOR;
-    }
-
-    /**
-     * @notice Calculate the fee and net amounts for a batch of purchase amounts.
-     * @param purchaseAmounts The array with the raw purchase amounts specified by users.
-     * @return aggregatedFee      The total fee to be collected for all purchases.
-     * @return netAmountsToSpend  An array with the net amounts (purchase amount minus fee) for each user.
-     * @return totalAmountToSpend The aggregated net amount that will actually be used to buy rBTC.
-     */
-    function _calculateFeeAndNetAmounts(uint256[] memory purchaseAmounts)
-        internal
-        view
-        returns (uint256 aggregatedFee, uint256[] memory netAmountsToSpend, uint256 totalAmountToSpend)
-    {
-        uint256 len = purchaseAmounts.length;
-        netAmountsToSpend = new uint256[](len);
-        
-        for (uint256 i; i < len; ++i) {
-            uint256 amount = purchaseAmounts[i];
-            uint256 fee = _calculateFee(amount);
-            aggregatedFee += fee;
-
-            uint256 net = amount - fee;
-            netAmountsToSpend[i] = net;
-            totalAmountToSpend += net;
-        }
     }
 
     /**
