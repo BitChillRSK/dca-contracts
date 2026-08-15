@@ -5,8 +5,9 @@ Foundry Solidity repo for BitChill DCA-in contracts on Rootstock (`0.8.19`, EVM 
 ## Read order
 
 1. This file.
-2. The assigned spec under `docs/relaunch/` (required before Solidity changes). `.cursor/relaunch-plan.md` is private planner notes — not a task list.
-3. Start from the spec’s file list. Expand only through imports, inheritance, interfaces, mocks, failing tests, and compiler errors. Name extra files in the PR.
+2. `docs/relaunch/IMPLEMENTATION_ORDER.md` when choosing the next relaunch PR or checking dependency gates.
+3. The assigned spec under `docs/relaunch/` (required before Solidity changes). `.cursor/relaunch-plan.md` is private planner notes — not a task list.
+4. Start from the spec’s file list. Expand only through imports, inheritance, interfaces, mocks, failing tests, and compiler errors. Name extra files in the PR.
 
 Do not implement optional/further-review items unless the spec assigns them. Sibling repo `dca-out-contracts` is out of scope unless named.
 
