@@ -1,6 +1,6 @@
 # R23 — Toolchain and dependency baseline
 
-Status: **implemented — awaiting user confirmation** · Assigned: yes · Optional/further-review: no
+Status: **merged** (GitHub #42) · Assigned: no · Optional/further-review: no
 
 ## Objective
 

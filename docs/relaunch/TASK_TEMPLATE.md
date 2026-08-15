@@ -12,6 +12,10 @@ One or two sentences: what changes and why. The PR must be reviewable against th
 
 Only what the implementer needs (current bug, invariant, or product rule). Do not paste the private relaunch plan. Link related specs in this folder if they must land first.
 
+## Open product decisions
+
+**none** — or list the questions this PR must ask the human. Do not ask gates that belong to another PR (`IMPLEMENTATION_ORDER.md`). If this section is **none**, implement without asking.
+
 ## Scope
 
 - [ ] Concrete code/behavior changes for this PR.

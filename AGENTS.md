@@ -6,10 +6,19 @@ Foundry Solidity repo for BitChill DCA-in contracts on Rootstock (`0.8.36`, EVM 
 
 1. This file.
 2. `docs/relaunch/IMPLEMENTATION_ORDER.md` when choosing the next relaunch PR or checking dependency gates.
-3. The assigned spec under `docs/relaunch/` (required before Solidity changes). `.cursor/relaunch-plan.md` is private planner notes — not a task list.
+3. The assigned spec under `docs/relaunch/` (required before Solidity changes).
 4. Start from the spec’s file list. Expand only through imports, inheritance, interfaces, mocks, failing tests, and compiler errors. Name extra files in the PR.
 
 Do not implement optional/further-review items unless the spec assigns them. Sibling repo `dca-out-contracts` is out of scope unless named.
+
+## Starting a relaunch chat
+
+The human prompt is one line: `Start with R2` or `Start with PR 3`. Do not expect base branch, fee model, or “don’t start the next item” in the prompt.
+
+1. Map the R-item to a PR in `IMPLEMENTATION_ORDER.md`. One chat = that PR only. Stop when the PR is open and README Status is updated. Remind the human of the next unassigned prompt.
+2. If `docs/relaunch/R<n>-*.md` is missing, copy `TASK_TEMPLATE.md`, fill it, and assign it in `docs/relaunch/README.md` **before** Solidity. You may read gitignored `.cursor/relaunch-plan.md` **only** to draft that one spec. Implement from the spec, never from the plan.
+3. Ask the human **only** the open product gates listed for that PR in `IMPLEMENTATION_ORDER.md` (and the spec’s **Open product decisions** section). If that list is empty, do not ask; implement. Do not ask fee / packing / pause / optional items unless that PR’s list names them.
+4. `git fetch`. Branch from `main` if no relaunch PR is open; otherwise from the latest open relaunch PR’s head (stack). Never implement on `main`. Branch **before** the first edit.
 
 ## Layout
 
@@ -62,11 +71,11 @@ Unless the assigned spec explicitly changes one:
 
 Do this even if a user-level rule says “don’t commit until asked.” An assigned `docs/relaunch/` spec **is** authorization to branch, commit, push, and open a PR.
 
-1. **Branch before the first edit.** Never implement on `main`. `git checkout -b <type>/r<n>-<slug>` from `main` if the previous relaunch PR is merged, otherwise from that PR’s branch (stack).
-2. **Commit when the spec’s success criteria pass.** Small, targeted commits a reviewer can walk (spec/docs, then code, then follow-up docs). Subject line: `type: why`.
+1. **Branch before the first edit** (`git checkout -b <type>/r<n>-<slug>` from the base in **Starting a relaunch chat**).
+2. **Commit when the spec’s success criteria pass.** Small, targeted commits (spec/docs, then code, then follow-up docs). Subject: `type: why`.
 3. **Push and open a PR** with `.github/PULL_REQUEST_TEMPLATE.md`. Point at the spec. Do not commit `lib/` dirt from `make patch-deps`, secrets, or `.env`.
-4. **One implementer per PR.** Parallel Cursor/Codex/Claude **review** is expected. Parallel **implementation** on overlapping Solidity (`DcaManager`, handlers, `DcaDappTest`) is not. Git worktrees do not help that overlap; skip them for this relaunch except a docs-only PR.
-5. **Stack, merge in order.** Open PR N+1 based on PR N’s branch. The human merges one by one after review. Do not merge PR 3+ until the Rootstock compiler/EVM proof in `docs/relaunch/IMPLEMENTATION_ORDER.md` has passed (Anvil fork is not that proof).
+4. **One implementer per PR.** Parallel review (Cursor/Codex/Claude/Bugbot) is expected. Parallel implementation on overlapping Solidity is not. Skip git worktrees for this relaunch except a docs-only PR that does not share files.
+5. After the PR is open, set `docs/relaunch/README.md` **Status** to this PR (full GitHub link) and “next unassigned: …” (the one-line prompt for the following chat). If the URL is only known after opening, add that Status update in a follow-up commit and push, then stop. Do not start the next R-item in this chat. The human merges in order. In the closing message, remind the human of that next prompt so they can spin up the following agent.
 
 ## PRs
 

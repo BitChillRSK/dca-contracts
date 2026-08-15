@@ -1,53 +1,58 @@
 # Relaunch implementation order
 
-Status: **planning guide**. This file orders the relaunch work. It is not an implementation spec.
-
-Agents should use this file to choose the next PR, then work only from the assigned `docs/relaunch/R<n>-<short-slug>.md` spec for that PR. Do not implement directly from `.cursor/relaunch-plan.md`.
+Status: **planning guide**. Orders PRs. Not an implementation spec. Human prompt: `Start with R<n>` (`AGENTS.md`).
 
 ## Ground rules
 
-- One PR should have one behavioral purpose. If two R-items share the same files and tests, bundle them only when this file says so.
-- Write or assign the specific `R<n>-...md` spec before implementation starts.
-- Branch before edits; commit, push, and open the PR when the spec’s success criteria pass (`AGENTS.md` Git section). Stack PR N+1 on PR N’s branch. Merge in order after review.
-- Run targeted tests first, then the repo done-gate from `AGENTS.md`.
-- Do not `--broadcast` or touch live contracts from implementation PRs.
-- Keep OpenZeppelin at `v4.9.3` during the main relaunch work. A major OpenZeppelin upgrade is optional late work.
+- One PR, one behavioral purpose. Bundle R-items only when this file says so.
+- Write `docs/relaunch/R<n>-...md` from `TASK_TEMPLATE.md` before Solidity. You may read `.cursor/relaunch-plan.md` only to draft that spec; implement from the spec.
+- Ask product questions only from the **Ask** column below. Empty Ask = do not ask; implement.
+- Branch before edits; stack on the latest open relaunch PR, else `main`. Commit, push, open the PR (`AGENTS.md`). Update `docs/relaunch/README.md` **Status** with the PR link and next unassigned prompt (follow-up commit if the URL was unknown before open). Stop. Remind the human of that next prompt. Human merges in order.
+- Run targeted tests, then the `AGENTS.md` done-gate.
+- Do not `--broadcast`. Keep OpenZeppelin `v4.9.3` until an optional late upgrade PR.
 
 ## Rootstock compiler / EVM proof
 
-`forge test --fork-url` and Anvil copy Rootstock **state** but execute on **revm**. Passing fork tests does not mean Rootstock will accept 0.8.36 / `cancun` bytecode.
+**Passed (2026-08-15).** Rootstock testnet (chain 31) accepted first-party bytecode compiled with solc **0.8.36** / `cancun`. Blockscout verified `OperationsAdmin`, `DcaManager`, and `TropykusDocHandlerMoc` at those settings. Anvil/`forge test --fork-url` is still not rskj; this testnet tx is the consensus proof. PR 3+ may merge on this pin. Do not set `prague` / `osaka` / `amsterdam`. Do not use blob opcodes.
 
-Do this **after PR 1 is merged (or on that bytecode) and before merging PR 3** (first behavior change). Opening later PRs for review is fine; merging them on an unproven pin is how the whole stack would have to roll back.
+## Product gates (PR 2)
 
-1. Using `[profile.deploy]` (`0.8.36`, `cancun`, `via_ir`), deploy one first-party contract (e.g. `OperationsAdmin`) to Rootstock **testnet**. Human/ops runs the broadcast, not the implementation agent.
-2. The tx must succeed (the node accepted the code). Deployed bytecode must not start with `0xEF`.
-3. If Blockscout lists solc 0.8.36, verify with `cancun`. If it only lists 0.8.34, that is an explorer catalog limit, not a consensus cap — still confirm the **tx** succeeded.
-4. If the node rejects the tx, fall back to `shanghai` (PUSH0 only) or the portal-listed solc, still not `london` unless the node rejects shanghai. Land that fallback on the R23 branch **before** merging behavior PRs.
+Record these **before the first PR that changes fee logic, `DcaDetails`, handler per-user storage, or event ABI** (not before R2). If the human starts that later PR and PR 2 is not merged, ask **only** the gates that PR needs.
 
-Do not set `prague` / `osaka` / `amsterdam`. Do not use blob opcodes.
+- Fee model: keep linear / flatten to one rate / leave as-is for now.
+- R18 packing: skip / `DcaDetails` only / `DcaDetails` plus handler per-user state.
+- R19 pause: this relaunch or defer.
+- Optional: R12 compound, R13 admin, owner sweep, on-chain deposit pause.
 
-## Required decisions before code changes
-
-Decide these before the first PR that changes fee logic, `DcaDetails`, handler per-user storage, or event ABI:
-
-- Fee model: keep the linear decreasing fee, flatten to one rate, or leave as-is for now.
-- R18 packing: skip, `DcaDetails` only, or `DcaDetails` plus handler per-user state.
-- R19 pause: ship per-schedule pause in this relaunch or defer it.
-- Optional items: R12 compound interest, R13 admin model, handler owner sweep, on-chain deposit pause.
-
-Default if undecided:
-
-- Keep OpenZeppelin `v4.9.3`.
-- Skip storage packing, but still use `calldata` for handler batch arrays when those files are touched.
-- Defer R12, R13, R19, owner sweep, and on-chain deposit pause.
+Defaults if the human says “use defaults”: keep OZ `v4.9.3`; skip packing (still `calldata` on handler batch arrays); defer R12, R13, R19, owner sweep, deposit pause. Do not apply defaults unless they say so.
 
 ## PR order
 
+Ask = product questions for that PR only. `Start with R2` means PR 3.
+
+| Start with | PR | Ask |
+|---|---|---|
+| R23 | 1 (merged) | — |
+| PR 2, decision record | 2 | Fee model, R18, R19, optionals listed above |
+| R2 | 3 | none |
+| R7, R11, R14 | 4 | none |
+| R3, R4, R5 | 5 | Fee model if PR 2 did not record it |
+| R6, R17 | 6 | none |
+| R8 | 7 | none |
+| R1, R20 | 8 | none |
+| R15 | 9 | none |
+| R22 (folders) | 10 | none |
+| R22 (idle) | 11 | none |
+| R22 (LayerBank) | 12 | none |
+| R22 (deploy/CI) | 13 | none |
+| R9 | 14 | R18/R19 if not recorded (ABI freeze) |
+| R16 | 15 | none |
+| R10 | 16 | none |
+| R12, R13, R18, R19, OZ 5.x | optional late | only if the human named that item |
+
 ### PR 1 - R23 toolchain and dependency baseline
 
-Bump first-party Solidity and Rootstock EVM settings before other code changes. Pin latest stable `0.8.x` and `evm_version = "cancun"`. Anvil/fork tests are not the Rootstock proof — see [Rootstock compiler / EVM proof](#rootstock-compiler--evm-proof) before merging PR 3.
-
-Keep OpenZeppelin `v4.9.3`. Uniswap **sources** stay `=0.7.6` in git; they cannot be compiled with solc 0.7.6 while first-party Dex files import them (see R23). `make patch-deps` remains required. Do not include OpenZeppelin 5.x migration in this PR.
+**Merged.** First-party `0.8.36` / `cancun`. Uniswap git sources stay `=0.7.6`; `make patch-deps` remains required. OZ `v4.9.3`. Testnet proof passed.
 
 ### PR 2 - Decision record
 
