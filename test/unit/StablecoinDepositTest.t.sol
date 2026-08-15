@@ -33,8 +33,10 @@ contract StablecoinDepositTest is DcaDappTest {
     function testDepositRevertsIfStablecoinNotApproved() external {
         vm.startPrank(USER);
         bytes32 scheduleId = dcaManager.getMyScheduleId(address(stablecoin), SCHEDULE_INDEX);
+        uint256 balanceBefore = dcaManager.getMyScheduleTokenBalance(address(stablecoin), SCHEDULE_INDEX);
         vm.expectRevert();
         dcaManager.depositToken(address(stablecoin), SCHEDULE_INDEX, scheduleId, AMOUNT_TO_DEPOSIT);
+        assertEq(dcaManager.getMyScheduleTokenBalance(address(stablecoin), SCHEDULE_INDEX), balanceBefore);
         vm.stopPrank();
     }
 } 

@@ -91,6 +91,18 @@ contract DcaScheduleTest is DcaDappTest {
         vm.stopPrank();
     }
 
+    function testUpdateDcaScheduleDoesNotCreditIfDepositReverts() external {
+        vm.startPrank(USER);
+        bytes32 scheduleId = dcaManager.getMyScheduleId(address(stablecoin), SCHEDULE_INDEX);
+        uint256 balanceBefore = dcaManager.getMyScheduleTokenBalance(address(stablecoin), SCHEDULE_INDEX);
+        vm.expectRevert();
+        dcaManager.updateDcaSchedule(
+            address(stablecoin), SCHEDULE_INDEX, scheduleId, AMOUNT_TO_DEPOSIT, 0, 0
+        );
+        assertEq(dcaManager.getMyScheduleTokenBalance(address(stablecoin), SCHEDULE_INDEX), balanceBefore);
+        vm.stopPrank();
+    }
+
     function testDeleteDcaSchedule() external {
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT * 5);

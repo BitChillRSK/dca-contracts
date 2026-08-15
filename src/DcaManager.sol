@@ -21,6 +21,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     //////////////////////////////////////////////////////////////*/
 
     OperationsAdmin private s_operationsAdmin;
+    bytes32 private constant SWAPPER_ROLE = keccak256("SWAPPER");
 
     /**
      * @notice Each user may create different schedules with one or more stablecoins
@@ -60,7 +61,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      * @notice only allow swapper role
      */
     modifier onlySwapper() {
-        if (!s_operationsAdmin.hasRole(s_operationsAdmin.SWAPPER_ROLE(), msg.sender)) {
+        if (!s_operationsAdmin.hasRole(SWAPPER_ROLE, msg.sender)) {
             revert DcaManager__UnauthorizedSwapper(msg.sender);
         }
         _;
@@ -96,15 +97,14 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     function depositToken(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 depositAmount)
         external
         override
-        nonReentrant
         validateScheduleIndex(msg.sender, token, scheduleIndex)
     {
         _validateDeposit(depositAmount);
         DcaDetails storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
+        _handler(token, dcaSchedule.lendingProtocolIndex).depositToken(msg.sender, depositAmount);
         uint256 newTokenBalance = dcaSchedule.tokenBalance + depositAmount;
         dcaSchedule.tokenBalance = newTokenBalance;
-        _handler(token, dcaSchedule.lendingProtocolIndex).depositToken(msg.sender, depositAmount);
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
     }
 
@@ -223,8 +223,8 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
             dcaSchedule.purchasePeriod = purchasePeriod;
         }
         if (depositAmount > 0) {
-            dcaSchedule.tokenBalance += depositAmount;
             _handler(token, dcaSchedule.lendingProtocolIndex).depositToken(msg.sender, depositAmount);
+            dcaSchedule.tokenBalance += depositAmount;
         }
         if (purchaseAmount > 0) {
             _validatePurchaseAmount(token, purchaseAmount, dcaSchedule.tokenBalance);
@@ -251,7 +251,6 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      */
     function deleteDcaSchedule(address token, uint256 scheduleIndex, bytes32 scheduleId) external override 
         validateScheduleIndex(msg.sender, token, scheduleIndex)
-        nonReentrant
     {
         DcaDetails[] storage schedules = s_dcaSchedules[msg.sender][token];
         
@@ -285,7 +284,6 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     function withdrawToken(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 withdrawalAmount)
         external
         override
-        nonReentrant
     {
         _withdrawToken(token, scheduleIndex, scheduleId, withdrawalAmount);
     }
@@ -300,7 +298,6 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     function buyRbtc(address buyer, address token, uint256 scheduleIndex, bytes32 scheduleId)
         external
         override
-        nonReentrant
         onlySwapper
     {
         (uint256 purchaseAmount, uint256 lendingProtocolIndex) =
@@ -330,9 +327,8 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         bytes32[] calldata scheduleIds,
         uint256[] calldata purchaseAmounts,
         uint256 lendingProtocolIndex
-    ) external override nonReentrant onlySwapper {
+    ) external override onlySwapper {
         uint256 numOfPurchases = buyers.length;
-        if (numOfPurchases == 0) revert DcaManager__EmptyBatchPurchaseArrays();
         if (
             numOfPurchases != scheduleIndexes.length || numOfPurchases != scheduleIds.length
                 || numOfPurchases != purchaseAmounts.length
@@ -387,7 +383,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         bytes32 scheduleId,
         uint256 withdrawalAmount,
         uint256 lendingProtocolIndex
-    ) external override nonReentrant {
+    ) external override {
         _withdrawToken(token, scheduleIndex, scheduleId, withdrawalAmount);
         _withdrawInterest(token, lendingProtocolIndex);
     }
@@ -400,7 +396,6 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     function withdrawAllAccumulatedInterest(address[] calldata tokens, uint256[] calldata lendingProtocolIndexes)
         external
         override
-        nonReentrant
     {
         for (uint256 i; i < tokens.length; ++i) {
             for (uint256 j; j < lendingProtocolIndexes.length; ++j) {
@@ -555,9 +550,6 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
             }
         }
 
-        if (dcaSchedule.purchaseAmount > dcaSchedule.tokenBalance) {
-            revert DcaManager__ScheduleBalanceNotEnoughForPurchase(scheduleIndex, scheduleId, token, dcaSchedule.tokenBalance);
-        }
         dcaSchedule.tokenBalance -= dcaSchedule.purchaseAmount;
         dcaScheduleStorage.tokenBalance = dcaSchedule.tokenBalance;
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, dcaSchedule.tokenBalance);

@@ -1,6 +1,6 @@
 # R6 — Purchase hot-path cleanup (R6, R17)
 
-Status: **not started** · Assigned: yes · Optional/further-review: no
+Status: **in progress** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
@@ -44,19 +44,19 @@ Do **not** skip scheduleId or period checks for gas. Without the period check, `
 
 ## Scope
 
-- [ ] **R6:** Remove `DcaManager__ScheduleBalanceNotEnoughForPurchase` and the explicit `purchaseAmount > tokenBalance` comparison in `_rBtcPurchaseChecksEffects`. Keep the subtraction (underflow reverts if the bot is wrong).
+- [x] **R6:** Remove `DcaManager__ScheduleBalanceNotEnoughForPurchase` and the explicit `purchaseAmount > tokenBalance` comparison in `_rBtcPurchaseChecksEffects`. Keep the subtraction (underflow reverts if the bot is wrong).
 
-- [ ] **R6:** Remove `DcaManager__EmptyBatchPurchaseArrays` and the `numOfPurchases == 0` check. Keep `DcaManager__BatchPurchaseArraysLengthMismatch`.
+- [x] **R6:** Remove `DcaManager__EmptyBatchPurchaseArrays` and the `numOfPurchases == 0` check. Keep `DcaManager__BatchPurchaseArraysLengthMismatch`.
 
-- [ ] **R6:** Do **not** remove period, scheduleId, amount, or lending-index checks. Keep `onlySwapper`.
+- [x] **R6:** Do **not** remove period, scheduleId, amount, or lending-index checks. Keep `onlySwapper`.
 
-- [ ] **R6:** Cache `keccak256("SWAPPER")` in `DcaManager` so `onlySwapper` does not call `OperationsAdmin.SWAPPER_ROLE()` on every purchase. Still call `hasRole` on `OperationsAdmin`. The hash must match `OperationsAdmin` (`keccak256("SWAPPER")`).
+- [x] **R6:** Cache `keccak256("SWAPPER")` in `DcaManager` so `onlySwapper` does not call `OperationsAdmin.SWAPPER_ROLE()` on every purchase. Still call `hasRole` on `OperationsAdmin`. The hash must match `OperationsAdmin` (`keccak256("SWAPPER")`).
 
-- [ ] **R17:** Keep `nonReentrant` only on `withdrawRbtcFromTokenHandler` and `withdrawAllAccumulatedRbtc`. Remove it from `buyRbtc`, `batchBuyRbtc`, `depositToken`, `withdrawToken`, `deleteDcaSchedule`, `withdrawTokenAndInterest`, `withdrawAllAccumulatedInterest`. Keep `ReentrancyGuard` inheritance.
+- [x] **R17:** Keep `nonReentrant` only on `withdrawRbtcFromTokenHandler` and `withdrawAllAccumulatedRbtc`. Remove it from `buyRbtc`, `batchBuyRbtc`, `depositToken`, `withdrawToken`, `deleteDcaSchedule`, `withdrawTokenAndInterest`, `withdrawAllAccumulatedInterest`. Keep `ReentrancyGuard` inheritance.
 
-- [ ] **R17:** Make `depositToken` and `updateDcaSchedule` call `handler.depositToken` **before** increasing `tokenBalance`, same as `createDcaSchedule`. Do not add `nonReentrant` to create/update.
+- [x] **R17:** Make `depositToken` and `updateDcaSchedule` call `handler.depositToken` **before** increasing `tokenBalance`, same as `createDcaSchedule`. Do not add `nonReentrant` to create/update.
 
-- [ ] Update tests that expect the custom balance/empty-batch errors (expect underflow / Panic(0x11) for oversize buys; drop dedicated empty-batch tests).
+- [x] Update tests that expect the custom balance/empty-batch errors (expect underflow / Panic(0x11) for oversize buys; drop dedicated empty-batch tests).
 
 ## Out of scope
 
@@ -109,15 +109,15 @@ Fork tests: not required.
 
 ## Success criteria
 
-- [ ] Period / scheduleId / amount / lending-index mismatch still revert with the current custom errors.
-- [ ] Buying with `purchaseAmount > tokenBalance` still reverts (underflow); `DcaManager__ScheduleBalanceNotEnoughForPurchase` is gone.
-- [ ] `DcaManager__EmptyBatchPurchaseArrays` is gone.
-- [ ] `onlySwapper` uses a cached `keccak256("SWAPPER")` and still gates purchases.
-- [ ] `nonReentrant` remains only on rBTC withdraws; `ReentrancyGuard` inheritance stays.
-- [ ] `depositToken` / `updateDcaSchedule` call `handler.depositToken` before increasing `tokenBalance`.
-- [ ] Existing CEI on withdraw/delete (deduct/pop, then transfer) unchanged.
-- [ ] Targeted tests above pass; `make check` passes.
-- [ ] Protocol invariants in `AGENTS.md` unchanged.
+- [x] Period / scheduleId / amount / lending-index mismatch still revert with the current custom errors.
+- [x] Buying with `purchaseAmount > tokenBalance` still reverts (underflow); `DcaManager__ScheduleBalanceNotEnoughForPurchase` is gone.
+- [x] `DcaManager__EmptyBatchPurchaseArrays` is gone.
+- [x] `onlySwapper` uses a cached `keccak256("SWAPPER")` and still gates purchases.
+- [x] `nonReentrant` remains only on rBTC withdraws; `ReentrancyGuard` inheritance stays.
+- [x] `depositToken` / `updateDcaSchedule` call `handler.depositToken` before increasing `tokenBalance`.
+- [x] Existing CEI on withdraw/delete (deduct/pop, then transfer) unchanged.
+- [x] Targeted tests above pass; `make check` passes.
+- [x] Protocol invariants in `AGENTS.md` unchanged.
 
 ## Reviewer checklist
 
