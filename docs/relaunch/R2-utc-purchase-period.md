@@ -34,7 +34,7 @@ R2 replaces the remaining strict-seconds check. Daily is the highest frequency B
 
   Keep the existing error. `timeRemaining` is seconds until `nextPurchaseDayStart` (`nextPurchaseDayStart - block.timestamp`).
 
-- [x] Keep the `6335994` snap. Floor `periodsElapsed` at 1 so an early UTC-day buy (allowed before `last + period` wall-clock) still consumes a slot and a same-day second buy reverts:
+- [x] Keep the `6335994` snap, aligned to UTC due days. Floor `periodsElapsed` at 1 so an early UTC-day buy still consumes a slot. If that wall-clock snap still leaves today's UTC day due (multi-period gap after a late-in-day `last`), consume one more period so a second buy the same day reverts:
 
   ```solidity
   if (lastPurchaseTimestamp == 0) {
@@ -43,6 +43,11 @@ R2 replaces the remaining strict-seconds check. Daily is the highest frequency B
       uint256 periodsElapsed = (block.timestamp - lastPurchaseTimestamp) / purchasePeriod;
       if (periodsElapsed == 0) periodsElapsed = 1;
       lastPurchaseTimestamp += periodsElapsed * purchasePeriod;
+      uint256 nextDueTimestamp = lastPurchaseTimestamp + purchasePeriod;
+      uint256 nextPurchaseDayStart = nextDueTimestamp - (nextDueTimestamp % 1 days);
+      if (currentDayStart >= nextPurchaseDayStart) {
+          lastPurchaseTimestamp += purchasePeriod;
+      }
   }
   ```
 
@@ -90,8 +95,9 @@ Behaviors to assert:
 - Same-block / same-day second buy still reverts (`testCannotBuyIfPeriodNotElapsed` keeps passing; update the error's `timeRemaining` to seconds until the due UTC day start).
 - Weekly: allowed any time on the due UTC day, not only after the exact second.
 - Owner cannot set `minPurchasePeriod` below 1 day (constructor + `modifyMinPurchasePeriod`). `1 days` remains valid.
-- Existing `testLastPurchaseTimestampConsistencyWhenScheduleResumed`: gap of N days still advances `N * period`, not `1 * period`.
+- Existing `testLastPurchaseTimestampConsistencyWhenScheduleResumed`: gap snap still skips missed slots (not `1 * period`); expected `last` is the latest period whose UTC due day has started.
 - Buy allowed by UTC-day but still before `last + period` wall-clock: timestamp advances by **one** period (`periodsElapsed` floor); same-day second buy reverts.
+- Gap resume on the UTC start of the third due day (first buy 20:00, warp to day 3 00:00): `last` advances to the **third** period slot; same-day second buy reverts.
 
 Fork tests: not required.
 
@@ -99,7 +105,7 @@ Fork tests: not required.
 
 - [x] Daily and weekly schedules can be executed at a consistent UTC time of day without waiting out a delayed previous run.
 - [x] Protocol min cannot be set below 1 day (constructor and owner setter).
-- [x] Missed-period snap (`6335994`) still holds; `periodsElapsed` floor of 1 prevents same-day double-buy after an early UTC-day purchase.
+- [x] Missed-period snap (`6335994`) still holds; `periodsElapsed` floor of 1 plus a UTC-due-day extra period prevent same-day double-buy after an early UTC-day purchase **and** after a multi-period gap.
 - [x] `testCannotBuyIfPeriodNotElapsed` still reverts.
 - [x] Targeted tests above pass; `make check` passes.
 - [x] Protocol invariants in `AGENTS.md` unchanged.

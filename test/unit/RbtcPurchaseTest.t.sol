@@ -144,6 +144,32 @@ contract RbtcPurchaseTest is DcaDappTest {
         assertEq(schedule.lastPurchaseTimestamp, firstBuy + weeklyPeriod);
     }
 
+    function testGapResumeOnDueUtcDayConsumesThatDaySlot() external {
+        uint256 firstBuy = _nextUtcTimestamp(20 hours);
+        vm.warp(firstBuy);
+        bytes32 scheduleId = dcaManager.getScheduleId(USER, address(stablecoin), SCHEDULE_INDEX);
+        vm.prank(SWAPPER);
+        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
+
+        // Day 0 20:00, then resume at 00:00 UTC of the third due day (52h later, 2 wall-clock periods)
+        uint256 thirdDueDayStart = _utcDayStart(firstBuy) + 3 days;
+        vm.warp(thirdDueDayStart);
+        vm.prank(SWAPPER);
+        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
+
+        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
+        assertEq(schedule.lastPurchaseTimestamp, firstBuy + 3 * MIN_PURCHASE_PERIOD);
+
+        vm.warp(thirdDueDayStart + 9 hours);
+        bytes memory encodedRevert = abi.encodeWithSelector(
+            IDcaManager.DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed.selector,
+            _secondsUntilDueUtcDayStart(schedule.lastPurchaseTimestamp, schedule.purchasePeriod)
+        );
+        vm.expectRevert(encodedRevert);
+        vm.prank(SWAPPER);
+        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
+    }
+
     function testSeveralPurchasesOneSchedule() external {
         uint256 numOfPurchases = 5;
 
@@ -191,10 +217,12 @@ contract RbtcPurchaseTest is DcaDappTest {
         dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
 
         IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
-        assertLe(schedule.lastPurchaseTimestamp, block.timestamp);
+        uint256 expectedLast = _snappedLastPurchaseTimestamp(
+            firstPurchaseTimestamp, MIN_PURCHASE_PERIOD, block.timestamp
+        );
+        assertEq(schedule.lastPurchaseTimestamp, expectedLast);
+        assertLt(schedule.lastPurchaseTimestamp, block.timestamp + MIN_PURCHASE_PERIOD);
         assertGt(schedule.lastPurchaseTimestamp, block.timestamp - MIN_PURCHASE_PERIOD);
-        uint256 periodsElapsed = (block.timestamp - firstPurchaseTimestamp) / MIN_PURCHASE_PERIOD;
-        assertEq(schedule.lastPurchaseTimestamp, firstPurchaseTimestamp + periodsElapsed * MIN_PURCHASE_PERIOD);
     }
 
     function testRevertPurchasetIfStablecoinRunsOut() external {
@@ -840,5 +868,22 @@ contract RbtcPurchaseTest is DcaDappTest {
         uint256 nextDueTimestamp = lastPurchaseTimestamp + purchasePeriod;
         uint256 nextPurchaseDayStart = _utcDayStart(nextDueTimestamp);
         return nextPurchaseDayStart - block.timestamp;
+    }
+
+    function _snappedLastPurchaseTimestamp(uint256 lastPurchaseTimestamp, uint256 purchasePeriod, uint256 timestamp)
+        private
+        pure
+        returns (uint256)
+    {
+        uint256 periodsElapsed = (timestamp - lastPurchaseTimestamp) / purchasePeriod;
+        if (periodsElapsed == 0) periodsElapsed = 1;
+        uint256 snapped = lastPurchaseTimestamp + periodsElapsed * purchasePeriod;
+        uint256 nextDueTimestamp = snapped + purchasePeriod;
+        uint256 nextPurchaseDayStart = _utcDayStart(nextDueTimestamp);
+        uint256 currentDayStart = _utcDayStart(timestamp);
+        if (currentDayStart >= nextPurchaseDayStart) {
+            snapped += purchasePeriod;
+        }
+        return snapped;
     }
 }

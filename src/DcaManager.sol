@@ -549,8 +549,9 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
 
         // @notice: After the first purchase, the schedule is eligible once the UTC day of last + period has started
+        uint256 currentDayStart;
         if (dcaSchedule.lastPurchaseTimestamp != 0) {
-            uint256 currentDayStart = block.timestamp - (block.timestamp % 1 days);
+            currentDayStart = block.timestamp - (block.timestamp % 1 days);
             uint256 nextDueTimestamp = dcaSchedule.lastPurchaseTimestamp + dcaSchedule.purchasePeriod;
             uint256 nextPurchaseDayStart = nextDueTimestamp - (nextDueTimestamp % 1 days);
             if (currentDayStart < nextPurchaseDayStart) {
@@ -568,7 +569,9 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         // @notice: this way purchases are possible with the wanted periodicity even if
         // - a previous purchase was delayed
         // - the schedule run out of stablecoin and was resumed later with a new deposit
-        // Floor periodsElapsed at 1 so an early UTC-day buy still consumes a slot
+        // Floor periodsElapsed at 1 so an early UTC-day buy still consumes a slot.
+        // If the wall-clock snap still leaves today's UTC day due (gap after a late-in-day last),
+        // consume one more period so a second buy the same day cannot pass.
         if (dcaSchedule.lastPurchaseTimestamp == 0) {
             dcaSchedule.lastPurchaseTimestamp = block.timestamp;
         } else {
@@ -576,6 +579,13 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
             if (periodsElapsed == 0) periodsElapsed = 1;
             unchecked {
                 dcaSchedule.lastPurchaseTimestamp += periodsElapsed * dcaSchedule.purchasePeriod;
+            }
+            uint256 nextDueTimestamp = dcaSchedule.lastPurchaseTimestamp + dcaSchedule.purchasePeriod;
+            uint256 nextPurchaseDayStart = nextDueTimestamp - (nextDueTimestamp % 1 days);
+            if (currentDayStart >= nextPurchaseDayStart) {
+                unchecked {
+                    dcaSchedule.lastPurchaseTimestamp += dcaSchedule.purchasePeriod;
+                }
             }
         }
         dcaScheduleStorage.lastPurchaseTimestamp = dcaSchedule.lastPurchaseTimestamp;
