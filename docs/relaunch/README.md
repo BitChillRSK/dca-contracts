@@ -21,5 +21,5 @@ Document any extra files in the PR. Do not search `out/`, `cache/`, or `lib/`. D
 ## Status
 
 - Merged: [R23-toolchain-baseline.md](./R23-toolchain-baseline.md) (PR 1, GitHub [#42](https://github.com/BitChillRSK/dca-contracts/pull/42)). Rootstock testnet accepted solc 0.8.36 / `cancun`.
-- Assigned: [R2-utc-purchase-period.md](./R2-utc-purchase-period.md) (PR 3). No product gates. Does not wait on PR 2.
+- Assigned: [R2-utc-purchase-period.md](./R2-utc-purchase-period.md) (PR 3, GitHub [#44](https://github.com/BitChillRSK/dca-contracts/pull/44)). No product gates. Does not wait on PR 2.
 - Next unassigned: `Start with R7` (PR 4, DcaManager small fixes: R7 / R11 / R14). No product gates. PR 2 (decision record) stays available when the human wants to record fee / R18 / R19.
