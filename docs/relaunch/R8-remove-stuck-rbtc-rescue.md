@@ -1,6 +1,6 @@
 # R8 — Remove stuck-rBTC rescue
 
-Status: **in progress** · Assigned: yes · Optional/further-review: no
+Status: **in progress** (GitHub #48) · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
