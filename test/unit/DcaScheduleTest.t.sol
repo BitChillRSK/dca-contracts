@@ -24,15 +24,17 @@ contract DcaScheduleTest is DcaDappTest {
         vm.startPrank(USER);
         uint256 scheduleIndex = dcaManager.getMyDcaSchedules(address(stablecoin)).length;
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
-        bytes32 scheduleId =
-            keccak256(abi.encodePacked(USER, address(stablecoin), block.timestamp, dcaManager.getMyDcaSchedules(address(stablecoin)).length));
-        vm.expectEmit(true, true, true, true);
+        // scheduleId derives from a monotonic nonce and cannot be precomputed; it is checked
+        // against storage after the call instead of being predicted here.
+        vm.expectEmit(true, true, false, true);
         emit DcaManager__DcaScheduleCreated(
-            USER, address(stablecoin), scheduleId, AMOUNT_TO_DEPOSIT, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
+            USER, address(stablecoin), bytes32(0), AMOUNT_TO_DEPOSIT, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
         );
+        vm.recordLogs();
         dcaManager.createDcaSchedule(
             address(stablecoin), AMOUNT_TO_DEPOSIT, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
         );
+        _assertCreatedEventIdMatchesStorage();
         uint256 scheduleBalanceAfterDeposit = dcaManager.getMyScheduleTokenBalance(address(stablecoin), scheduleIndex);
         assertEq(AMOUNT_TO_DEPOSIT, scheduleBalanceAfterDeposit);
         assertEq(AMOUNT_TO_SPEND, dcaManager.getMySchedulePurchaseAmount(address(stablecoin), scheduleIndex));
@@ -43,27 +45,52 @@ contract DcaScheduleTest is DcaDappTest {
     function testDcaScheduleIdsDontCollide() external {
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
-        bytes32 scheduleId =
-            keccak256(abi.encodePacked(USER, address(stablecoin), block.timestamp, dcaManager.getMyDcaSchedules(address(stablecoin)).length));
+        // Both schedules are created in the same block: ids must still differ.
         console.log("First timestamp", block.timestamp);
-        vm.expectEmit(true, true, true, true);
+        vm.expectEmit(true, true, false, true);
         emit DcaManager__DcaScheduleCreated(
-            USER, address(stablecoin), scheduleId, AMOUNT_TO_DEPOSIT / 2, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
+            USER, address(stablecoin), bytes32(0), AMOUNT_TO_DEPOSIT / 2, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
         );
+        vm.recordLogs();
         dcaManager.createDcaSchedule(
             address(stablecoin), AMOUNT_TO_DEPOSIT / 2, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
         );
-        bytes32 scheduleId2 =
-            keccak256(abi.encodePacked(USER, address(stablecoin), block.timestamp, dcaManager.getMyDcaSchedules(address(stablecoin)).length));
+        _assertCreatedEventIdMatchesStorage();
+        bytes32 scheduleId = _lastScheduleId();
         console.log("Second timestamp", block.timestamp);
-        vm.expectEmit(true, true, true, true);
+        vm.expectEmit(true, true, false, true);
         emit DcaManager__DcaScheduleCreated(
-            USER, address(stablecoin), scheduleId2, AMOUNT_TO_DEPOSIT / 2, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
+            USER, address(stablecoin), bytes32(0), AMOUNT_TO_DEPOSIT / 2, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
         );
+        vm.recordLogs();
         dcaManager.createDcaSchedule(
             address(stablecoin), AMOUNT_TO_DEPOSIT / 2, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
         );
-        assert(scheduleId != scheduleId2);
+        _assertCreatedEventIdMatchesStorage();
+        bytes32 scheduleId2 = _lastScheduleId();
+        assertTrue(scheduleId != scheduleId2);
+        // and neither collides with the schedule created in setUp
+        assertTrue(scheduleId != dcaManager.getMyScheduleId(address(stablecoin), 0));
+        assertTrue(scheduleId2 != dcaManager.getMyScheduleId(address(stablecoin), 0));
+        vm.stopPrank();
+    }
+
+    function testSchedulesCreatedCountTracksCreatesAndIgnoresDeletes() external {
+        // setUp() already created one schedule
+        uint256 countAfterSetUp = dcaManager.getSchedulesCreatedCount();
+        assertEq(countAfterSetUp, 1);
+
+        vm.startPrank(USER);
+        stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
+        dcaManager.createDcaSchedule(
+            address(stablecoin), AMOUNT_TO_DEPOSIT / 2, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
+        );
+        assertEq(dcaManager.getSchedulesCreatedCount(), countAfterSetUp + 1);
+
+        // deleting must not decrement: the count is a lifetime total for indexer cross-checks
+        dcaManager.deleteDcaSchedule(address(stablecoin), 1, _lastScheduleId());
+        assertEq(dcaManager.getSchedulesCreatedCount(), countAfterSetUp + 1);
+        assertEq(dcaManager.getMyDcaSchedules(address(stablecoin)).length, 1);
         vm.stopPrank();
     }
 
@@ -74,9 +101,8 @@ contract DcaScheduleTest is DcaDappTest {
         vm.startPrank(USER);
         uint256 userBalanceBeforeDeposit = dcaManager.getMyScheduleTokenBalance(address(stablecoin), SCHEDULE_INDEX);
         stablecoin.approve(address(stablecoinHandler), extraStablecoinToDeposit);
-        bytes32 scheduleId = keccak256(
-            abi.encodePacked(USER, address(stablecoin), block.timestamp, dcaManager.getMyDcaSchedules(address(stablecoin)).length - 1)
-        );
+        bytes32 scheduleId =
+            dcaManager.getMyScheduleId(address(stablecoin), dcaManager.getMyDcaSchedules(address(stablecoin)).length - 1);
         vm.expectEmit(true, true, true, true);
         emit DcaManager__DcaScheduleUpdated(
             USER, address(stablecoin), scheduleId, AMOUNT_TO_DEPOSIT + extraStablecoinToDeposit, newPurchaseAmount, newPurchasePeriod
@@ -91,21 +117,31 @@ contract DcaScheduleTest is DcaDappTest {
         vm.stopPrank();
     }
 
+    function testUpdateDcaScheduleDoesNotCreditIfDepositReverts() external {
+        vm.startPrank(USER);
+        bytes32 scheduleId = dcaManager.getMyScheduleId(address(stablecoin), SCHEDULE_INDEX);
+        uint256 balanceBefore = dcaManager.getMyScheduleTokenBalance(address(stablecoin), SCHEDULE_INDEX);
+        vm.expectRevert();
+        dcaManager.updateDcaSchedule(
+            address(stablecoin), SCHEDULE_INDEX, scheduleId, AMOUNT_TO_DEPOSIT, 0, 0
+        );
+        assertEq(dcaManager.getMyScheduleTokenBalance(address(stablecoin), SCHEDULE_INDEX), balanceBefore);
+        vm.stopPrank();
+    }
+
     function testDeleteDcaSchedule() external {
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT * 5);
         // Create two schedules in different blocks
-        bytes32 scheduleId =
-            keccak256(abi.encodePacked(USER, address(stablecoin), block.timestamp, dcaManager.getMyDcaSchedules(address(stablecoin)).length));
         dcaManager.createDcaSchedule(
             address(stablecoin), AMOUNT_TO_DEPOSIT * 2, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
         );
+        bytes32 scheduleId = _lastScheduleId();
         vm.warp(block.timestamp + 1 minutes);
-        bytes32 scheduleId2 =
-            keccak256(abi.encodePacked(USER, address(stablecoin), block.timestamp, dcaManager.getMyDcaSchedules(address(stablecoin)).length));
         dcaManager.createDcaSchedule(
             address(stablecoin), AMOUNT_TO_DEPOSIT * 3, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
         );
+        bytes32 scheduleId2 = _lastScheduleId();
         console.log("scheduleId is", vm.toString(scheduleId));
         console.log("scheduleId2 is", vm.toString(scheduleId2));
         // Delete one
@@ -123,17 +159,15 @@ contract DcaScheduleTest is DcaDappTest {
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT * 5);
         // Create two schedules in different blocks
-        bytes32 scheduleId =
-            keccak256(abi.encodePacked(USER, address(stablecoin), block.timestamp, dcaManager.getMyDcaSchedules(address(stablecoin)).length));
         dcaManager.createDcaSchedule(
             address(stablecoin), AMOUNT_TO_DEPOSIT * 2, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
         );
+        bytes32 scheduleId = _lastScheduleId();
         vm.warp(block.timestamp + 1 minutes);
-        bytes32 scheduleId2 =
-            keccak256(abi.encodePacked(USER, address(stablecoin), block.timestamp, dcaManager.getMyDcaSchedules(address(stablecoin)).length));
         dcaManager.createDcaSchedule(
             address(stablecoin), AMOUNT_TO_DEPOSIT * 3, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
         );
+        bytes32 scheduleId2 = _lastScheduleId();
         console.log("scheduleId is", vm.toString(scheduleId));
         console.log(vm.toString(dcaManager.getMyDcaSchedules(address(stablecoin))[1].scheduleId));
         console.log("scheduleId 2 is", vm.toString(scheduleId2));
@@ -158,7 +192,7 @@ contract DcaScheduleTest is DcaDappTest {
         super.createSeveralDcaSchedules();
         vm.startPrank(USER);
         for (int256 i = int256(NUM_OF_SCHEDULES) - 1; i >= 0; --i) {
-            bytes32 scheduleId = keccak256(abi.encodePacked(USER, address(stablecoin), block.timestamp, uint256(i)));
+            bytes32 scheduleId = dcaManager.getMyScheduleId(address(stablecoin), uint256(i));
             dcaManager.deleteDcaSchedule(address(stablecoin), uint256(i), scheduleId);
         }
         vm.stopPrank();
@@ -172,17 +206,15 @@ contract DcaScheduleTest is DcaDappTest {
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT * 5);
         // Create two schedules in different blocks
-        bytes32 scheduleId =
-            keccak256(abi.encodePacked(USER, address(stablecoin), block.timestamp, dcaManager.getMyDcaSchedules(address(stablecoin)).length));
         dcaManager.createDcaSchedule(
             address(stablecoin), AMOUNT_TO_DEPOSIT * 2, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
         );
+        bytes32 scheduleId = _lastScheduleId();
         vm.warp(block.timestamp + 1 minutes);
-        bytes32 scheduleId2 =
-            keccak256(abi.encodePacked(USER, address(stablecoin), block.timestamp, dcaManager.getMyDcaSchedules(address(stablecoin)).length));
         dcaManager.createDcaSchedule(
             address(stablecoin), AMOUNT_TO_DEPOSIT * 3, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
         );
+        bytes32 scheduleId2 = _lastScheduleId();
         console.log("scheduleId is", vm.toString(scheduleId));
         console.log(vm.toString(dcaManager.getMyDcaSchedules(address(stablecoin))[1].scheduleId));
         console.log("scheduleId 2 is", vm.toString(scheduleId2));

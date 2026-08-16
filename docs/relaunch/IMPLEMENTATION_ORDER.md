@@ -84,9 +84,11 @@ If the fee model is flattened, this PR becomes the one-rate rewrite instead. Do 
 
 ### PR 6 - R6 and R17 hot-path cleanup
 
-Trim only gas-only purchase reverts while keeping period, schedule-id, amount, lending-index, access-control, and malformed-calldata checks.
+Drop `nonReentrant` on `buyRbtc` / `batchBuyRbtc` and cache `SWAPPER_ROLE` on `DcaManager`. That is where the measured 3,437 gas is; both are swapper-only and write nothing after their handler call. Keep period, schedule-id, amount, lending-index, access-control, malformed-calldata, underfunded-schedule, and empty-batch checks (the last two are diagnostic, not hot-path).
 
-Remove unnecessary `nonReentrant` modifiers from non-rBTC-withdraw paths and make `depositToken` / `updateDcaSchedule` pull before crediting.
+Keep `nonReentrant` on **every** external function that writes `s_dcaSchedules` (`AGENTS.md` invariant 6). Removing it from user paths saves ~2,300 gas — about 1.4 cents, paid by users, not the protocol — and three review rounds produced three exploitable states trying to reason it away. A partial set is worse than none, since OZ's guard only blocks other *guarded* functions.
+
+Schedule ids come from a monotonic `s_scheduleNonce`, never from array state (`AGENTS.md` invariant 7). `depositToken` pulls before crediting. `updateDcaSchedule` keeps its memory-copy order — the storage write was always after the pull, so reordering it was a no-op. See `R6-hot-path-cleanup.md`.
 
 ### PR 7 - R8 remove stuck-rBTC rescue
 
@@ -97,6 +99,22 @@ Delete the owner rescue path for another account's accumulated rBTC. Keep rBTC w
 Fix Sovryn for SIP-0094 and apply the broader rule that integrator return values and views are not cash.
 
 Measure token/native balance deltas after Sovryn, Tropykus, MoC, and Uniswap operations that move funds to BitChill or to the user. Use views only to size share burns, then clamp to shares held.
+
+**R6 leftover — clamp desync, this PR owns it:** `DcaManager._withdrawToken` / `deleteDcaSchedule` deduct the *requested* amount, then Tropykus/Sovryn `withdrawToken` may clamp to the user's lending position and pay less. That is not R1 (Sovryn `burn` return vs net). It is R20: do not treat the requested amount as cash paid. After the handler call, measure the user's token delta (or take the actual payout) and only deduct that from `tokenBalance`. Do not leave this as a footnote on R1.
+
+### Heads-up for any future idle-funds handler
+
+**Read this before writing a handler that holds the stablecoin instead of lending it.**
+
+Per-user accounting exists only in `TropykusErc20Handler.s_kTokenBalances` and `SovrynErc20Handler.s_iSusdBalances`. The base `TokenHandler.withdrawToken` is a bare `safeTransfer` with **no cap and no mapping behind it**, so a handler that extends `TokenHandler` without adding its own per-user tracking pays out whatever `DcaManager` asks from a pooled balance.
+
+Both lending handlers clamp a withdrawal to the caller's own position (`TropykusErc20Handler.sol:79-82`, `SovrynErc20Handler.sol:79-82`) instead of reverting. That clamp is what currently bounds *every* `DcaManager` accounting bug to the user who caused it. Remove it and the same bugs become solvency bugs against other users' pooled funds. Concretely, the `updateDcaSchedule` stale-write-back reentrancy that R6 analysed is self-desync under a lending handler and a straight pool drain under an idle one.
+
+So, for an idle-funds handler:
+
+- It **must** carry per-user accounting and clamp `withdrawToken` to the caller's own balance, or it inherits an uncapped withdraw. Consider making the base class enforce this rather than leaving it to each subclass.
+- Invariant 6 in `AGENTS.md` (comprehensive `nonReentrant` on schedule mutators) stops being cheap insurance and becomes load-bearing. Do not relax it in the same relaunch that introduces pooled idle funds.
+- The R20 balance-delta work above matters more, not less: with no clamp, `DcaManager.tokenBalance` is the only thing standing between a user and the pool.
 
 ### PR 9 - R15 withdraw-all sentinel and share dust
 
