@@ -17,6 +17,14 @@ contract MockIsusdToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
     uint256 immutable i_deploymentTimestamp;
     uint256 constant ANNUAL_INCREASE = 5; // The DOC tokens redeemed by each iSUSD token increase by 5% annually (mocking behaviour)
     uint256 constant YEAR_IN_SECONDS = 31536000;
+    uint256 constant BPS_DIVISOR = 10_000;
+    /**
+     * @notice SIP-0094 Perimeter Fee, in basis points, charged on burn().
+     * @dev Zero models both the pre-activation state and Sovryn's fail-open path, where net == gross.
+     * When non-zero, burn() pays the receiver the NET amount and still returns the GROSS one, which is the
+     * behaviour that breaks any integrator trusting the return value.
+     */
+    uint256 private s_exitFeeBps;
 
     constructor(address docTokenAddress) ERC20("Tropykus iSUSD", "iSUSD") Ownable() ERC20Permit("Tropykus iSUSD") {
         i_docToken = IStablecoin(docTokenAddress);
@@ -38,10 +46,27 @@ contract MockIsusdToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
      */
     function burn(address receiver, uint256 burnAmount) external returns (uint256 loanAmountPaid) {
         require(balanceOf(msg.sender) >= burnAmount, "Insufficient balance");
-        loanAmountPaid = Math.ceilDiv(burnAmount * tokenPrice(), DECIMALS);
-        i_docToken.transfer(receiver, loanAmountPaid);
+        loanAmountPaid = Math.ceilDiv(burnAmount * tokenPrice(), DECIMALS); // GROSS
+        uint256 exitFee = loanAmountPaid * s_exitFeeBps / BPS_DIVISOR;
+        i_docToken.transfer(receiver, loanAmountPaid - exitFee); // NET: the fee stays behind, as Sovryn's goes to the ExitFeeVault
         _burn(msg.sender, burnAmount);
-        return loanAmountPaid;
+        return loanAmountPaid; // the return value stays GROSS even when the payout was NET
+    }
+
+    /**
+     * @notice Enable or disable the SIP-0094 Perimeter Fee on burn().
+     * @param exitFeeBps the fee in basis points (10 = the 0.10% Sovryn approved). Zero disables it.
+     */
+    function setExitFeeBps(uint256 exitFeeBps) external {
+        require(exitFeeBps <= BPS_DIVISOR, "Fee above 100%");
+        s_exitFeeBps = exitFeeBps;
+    }
+
+    /**
+     * @notice the exit fee currently charged on burn(), in basis points
+     */
+    function getExitFeeBps() external view returns (uint256) {
+        return s_exitFeeBps;
     }
 
     /**
@@ -61,23 +86,12 @@ contract MockIsusdToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
     }
 
     /**
-     * @notice Get the initially deposited amount of DOC
-     * @return The user's initial balance of underlying token.
-     *
+     * @notice Get the current underlying value of the owner's iSUSD, interest included.
+     * @dev Matches Sovryn: assetBalanceOf is balance * tokenPrice, not the starting rate. profitOf is gone
+     * with the redeem preflight that misused it (R1); it was a subset of this value, never an addition to it.
+     * @return The user's balance of underlying token.
      */
     function assetBalanceOf(address _owner) public view returns (uint256) {
-        return balanceOf(_owner) * STARTING_EXCHANGE_RATE / DECIMALS;
-    }
-
-    /**
-     * @notice Wrapper for internal _profitOf low level function.
-     * @param user The user address.
-     * @return The profit of a user.
-     *
-     */
-    function profitOf(address user) external view returns (int256) {
-        uint256 initialDocBalance = assetBalanceOf(user);
-        uint256 currentDocBalance = balanceOf(user) * tokenPrice() / DECIMALS;
-        return int256(currentDocBalance) - int256(initialDocBalance);
+        return balanceOf(_owner) * tokenPrice() / DECIMALS;
     }
 }

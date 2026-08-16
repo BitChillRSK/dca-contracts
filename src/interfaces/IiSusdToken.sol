@@ -31,14 +31,6 @@ interface IiSusdToken {
     function assetBalanceOf(address _owner) external view returns (uint256);
 
     /**
-     * @notice Wrapper for internal _profitOf low level function.
-     * @param user The user address.
-     * @return The profit of a user.
-     *
-     */
-    function profitOf(address user) external view returns (int256);
-
-    /**
      * @dev Returns the balance of the specified address.
      * @param owner The address to query the balance of.
      * @return The balance of the specified address.

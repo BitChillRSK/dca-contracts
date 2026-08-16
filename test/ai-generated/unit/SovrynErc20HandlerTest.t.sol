@@ -288,36 +288,31 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
         assertGt(finalBalance2, 0);
     }
     
+    /**
+     * @notice The assetBalanceOf + profitOf preflight is gone (R1): a lending-protocol view is never a
+     * ceiling on what a redemption will pay. Over-redeeming must still fail, just from real accounting
+     * rather than from a view — here the per-user share exceeds the balance we track for that user.
+     */
     function test_sovryn_batchRedeemStablecoin_exceedsBalance_reverts() public {
-        // Set up a scenario where the redemption amount exceeds available balance
         address user1 = makeAddr("user1");
         address[] memory users = new address[](1);
         users[0] = user1;
-        
+
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = DEPOSIT_AMOUNT;
-        
+
         // Give tokens to user and set up approvals
         stablecoin.mint(user1, DEPOSIT_AMOUNT);
         vm.prank(user1);
         stablecoin.approve(address(sovrynHandler), type(uint256).max);
-        
+
         // Deposit a smaller amount
         vm.prank(address(dcaManager));
         handler.depositToken(user1, DEPOSIT_AMOUNT / 10); // Deposit only 1/10th
-        
-        // Try to redeem more than what's available in the underlying balance
-        // This should trigger the TokenLending__UnderlyingRedeemAmountExceedsBalance error
+
         uint256 excessiveAmount = DEPOSIT_AMOUNT * 2; // Try to redeem 2x more than deposited
-        
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ITokenLending.TokenLending__UnderlyingRedeemAmountExceedsBalance.selector,
-                excessiveAmount,
-                iSusdToken.assetBalanceOf(address(sovrynHandler)) + uint256(iSusdToken.profitOf(address(sovrynHandler)))
-            )
-        );
-        
+
+        vm.expectRevert(abi.encodeWithSignature("Panic(uint256)", 0x11)); // arithmetic under/overflow
         sovrynHandler.testBatchRedeemStablecoin(users, amounts, excessiveAmount);
     }
 }

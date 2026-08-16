@@ -58,7 +58,10 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending, ISovrynErc20
         if (i_stableToken.allowance(address(this), address(i_iSusdToken)) < depositAmount) {
             i_stableToken.safeApprove(address(i_iSusdToken), depositAmount);
         }
-        uint256 mintedAmount = i_iSusdToken.mint(address(this), depositAmount);
+        // @notice the iSusd we credit is the balance we actually gained, never mint()'s return value
+        uint256 prevIsusdBalance = i_iSusdToken.balanceOf(address(this));
+        i_iSusdToken.mint(address(this), depositAmount);
+        uint256 mintedAmount = i_iSusdToken.balanceOf(address(this)) - prevIsusdBalance;
         if (mintedAmount == 0) revert TokenLending__LendingProtocolDepositFailed();
         s_iSusdBalances[user] += mintedAmount;
     }
@@ -67,11 +70,13 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending, ISovrynErc20
      * @notice withdraw the token amount sending it back to the user's address
      * @param user: the address of the user making the withdrawal
      * @param withdrawalAmount: the amount to withdraw
+     * @return the amount of stablecoin actually paid to the user
      */
     function withdrawToken(address user, uint256 withdrawalAmount)
         public
         override(TokenHandler, ITokenHandler)
         onlyDcaManager
+        returns (uint256)
     {
         uint256 exchangeRate = i_iSusdToken.tokenPrice();
         uint256 stablecoinInSovryn = _lendingTokenToStablecoin(s_iSusdBalances[user], exchangeRate);
@@ -81,8 +86,9 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending, ISovrynErc20
             withdrawalAmount = stablecoinInSovryn;
         }
 
+        // @notice we pay out what the redemption actually produced, which may be less than requested
         withdrawalAmount = _redeemStablecoin(user, withdrawalAmount, exchangeRate);
-        super.withdrawToken(user, withdrawalAmount);
+        return super.withdrawToken(user, withdrawalAmount);
     }
 
     /**
@@ -159,7 +165,10 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending, ISovrynErc20
      * @param stablecoinToRedeem: the amount of stablecoin to redeem
      * @param exchangeRate: the exchange rate of stablecoin to rBTC
      * @param stablecoinRecipient: the address of the recipient of the stablecoin
-     * @return stablecoinRedeemed the amount of stablecoin redeemed
+     * @return stablecoinRedeemed the amount of stablecoin the recipient actually received
+     * @dev Sovryn's burn() returns the GROSS amount and pays the NET one once an exit fee is enabled
+     * (SIP-0094), so the recipient's measured balance delta is the only trustworthy amount. Measuring the
+     * recipient rather than this contract covers withdrawInterest(), where Sovryn pays the user directly.
      */
     function _redeemStablecoin(address user, uint256 stablecoinToRedeem, uint256 exchangeRate, address stablecoinRecipient)
         internal
@@ -176,7 +185,9 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending, ISovrynErc20
             emit TokenLending__AmountToRepayAdjusted(user, oldiSusdToRepay, iSusdToRepay, oldStablecoinToRedeem, stablecoinToRedeem);
         }
         s_iSusdBalances[user] -= iSusdToRepay;
-        stablecoinRedeemed = i_iSusdToken.burn(stablecoinRecipient, iSusdToRepay);
+        uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(stablecoinRecipient);
+        i_iSusdToken.burn(stablecoinRecipient, iSusdToRepay);
+        stablecoinRedeemed = i_stableToken.balanceOf(stablecoinRecipient) - stablecoinBalanceBefore;
         if (stablecoinRedeemed == 0) revert SovrynErc20Lending__RedeemUnderlyingFailed();
         emit TokenLending__UnderlyingRedeemed(user, stablecoinRedeemed, iSusdToRepay);
     }
@@ -186,17 +197,15 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending, ISovrynErc20
      * @param users: the addresses of the users
      * @param purchaseAmounts: the amounts of stablecoin to redeem
      * @param totalErc20ToRedeem: the total amount of stablecoin to redeem
-     * @return stablecoinRedeemed: the amount of stablecoin redeemed
+     * @return stablecoinRedeemed: the amount of stablecoin this contract actually received
+     * @dev No preflight against assetBalanceOf / profitOf: those are views, and a view is never a ceiling on
+     * what a redemption will pay. Burning more iSusd than we hold reverts inside burn() anyway.
      */
     function _batchRedeemStablecoin(address[] memory users, uint256[] memory purchaseAmounts, uint256 totalErc20ToRedeem)
         internal
         virtual
         returns (uint256)
     {
-        uint256 underlyingAmount = uint256(int256(i_iSusdToken.assetBalanceOf(address(this))) + i_iSusdToken.profitOf(address(this)));
-        if (totalErc20ToRedeem > underlyingAmount) {
-            revert TokenLending__UnderlyingRedeemAmountExceedsBalance(totalErc20ToRedeem, underlyingAmount);
-        }
         uint256 totaliSusdToRepay = _stablecoinToLendingToken(totalErc20ToRedeem, i_iSusdToken.tokenPrice());
 
         uint256 numOfPurchases = users.length;
@@ -207,8 +216,10 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending, ISovrynErc20
             s_iSusdBalances[users[i]] -= usersRepaidiSusd;
             emit TokenLending__UnderlyingRedeemed(users[i], purchaseAmounts[i], usersRepaidiSusd);
         }
-        uint256 stablecoinRedeemed = i_iSusdToken.burn(address(this), totaliSusdToRepay);
-        if (stablecoinRedeemed > 0) emit TokenLending__UnderlyingRedeemedBatch(totalErc20ToRedeem, totaliSusdToRepay);
+        uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(address(this));
+        i_iSusdToken.burn(address(this), totaliSusdToRepay);
+        uint256 stablecoinRedeemed = i_stableToken.balanceOf(address(this)) - stablecoinBalanceBefore;
+        if (stablecoinRedeemed > 0) emit TokenLending__UnderlyingRedeemedBatch(stablecoinRedeemed, totaliSusdToRepay);
         else revert SovrynErc20Lending__RedeemUnderlyingFailed();
         return stablecoinRedeemed;
     }

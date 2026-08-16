@@ -262,7 +262,9 @@ abstract contract PurchaseUniswap is
 
     /**
      * @param stablecoinAmountToSpend the amount of stablecoin to swap for rBTC
-     * @return amountOut the amount of rBTC received
+     * @return amountOut the amount of WRBTC this contract actually received
+     * @dev The router's return value is treated as success/failure only; the measured WRBTC balance delta is
+     * the amount we can credit. amountOutMinimum still bounds the swap.
      */
     function _swapStablecoinForWrbtc(uint256 stablecoinAmountToSpend) internal returns (uint256 amountOut) {
         // Approve the router to spend stablecoin.
@@ -276,7 +278,9 @@ abstract contract PurchaseUniswap is
             amountOutMinimum: _getAmountOutMinimum(stablecoinAmountToSpend)
         });
 
-        amountOut = i_swapRouter02.exactInput(params);
+        uint256 wrBtcBalanceBefore = i_wrBtcToken.balanceOf(address(this));
+        i_swapRouter02.exactInput(params);
+        amountOut = i_wrBtcToken.balanceOf(address(this)) - wrBtcBalanceBefore;
     }
 
     /**

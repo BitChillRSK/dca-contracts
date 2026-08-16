@@ -276,11 +276,14 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         }
         schedules.pop();
 
+        uint256 amountWithdrawn;
         if (tokenBalance > 0) {
-            _handler(token, lendingProtocolIndex).withdrawToken(msg.sender, tokenBalance);
+            // @notice the event reports what the handler actually paid, which may be less than the schedule's
+            // recorded balance. The schedule is already gone, so there is nothing left to credit back.
+            amountWithdrawn = _handler(token, lendingProtocolIndex).withdrawToken(msg.sender, tokenBalance);
         }
 
-        emit DcaManager__DcaScheduleDeleted(msg.sender, token, scheduleId, tokenBalance);
+        emit DcaManager__DcaScheduleDeleted(msg.sender, token, scheduleId, amountWithdrawn);
     }
 
     /**
@@ -608,7 +611,14 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         }
         uint256 newTokenBalance = tokenBalance - withdrawalAmount;
         dcaSchedule.tokenBalance = newTokenBalance;
-        _handler(token, dcaSchedule.lendingProtocolIndex).withdrawToken(msg.sender, withdrawalAmount);
+        uint256 amountWithdrawn = _handler(token, dcaSchedule.lendingProtocolIndex).withdrawToken(msg.sender, withdrawalAmount);
+        // @notice a handler may pay less than requested (it clamps to the user's lending position, and the
+        // lending protocol may charge a redemption fee), so only what was actually paid may be deducted.
+        // @notice the write-back reads the storage slot at this point: nothing stale is carried across the call.
+        if (amountWithdrawn < withdrawalAmount) {
+            newTokenBalance = dcaSchedule.tokenBalance + (withdrawalAmount - amountWithdrawn);
+            dcaSchedule.tokenBalance = newTokenBalance;
+        }
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
     }
 
