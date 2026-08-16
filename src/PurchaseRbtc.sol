@@ -3,13 +3,12 @@ pragma solidity 0.8.36;
 
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {DcaManagerAccessControl} from "./DcaManagerAccessControl.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title PurchaseRbtc
  * @notice Base contract for purchasing and handling rBTC
  */
-abstract contract PurchaseRbtc is IPurchaseRbtc, Ownable, DcaManagerAccessControl {
+abstract contract PurchaseRbtc is IPurchaseRbtc, DcaManagerAccessControl {
     //////////////////////
     // State variables ///
     //////////////////////
@@ -27,17 +26,6 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, Ownable, DcaManagerAccessContro
     function withdrawAccumulatedRbtc(address user) external virtual override onlyDcaManager {
         uint256 rbtcBalance = _withdrawRbtcChecksEffects(user);
         _withdrawRbtc(user, rbtcBalance);
-    }
-
-    /**
-     * @notice Emergency function to withdraw rBTC stuck in contracts that cannot receive native tokens
-     * @param stuckUserContract The address of the user contract where rBTC is stuck
-     * @param rescueAddress The address to send the rescued rBTC to
-     * @dev This function can only be called by the owner
-     */
-    function withdrawStuckRbtc(address stuckUserContract, address rescueAddress) external virtual onlyOwner {
-        uint256 rbtcBalance = _withdrawRbtcChecksEffects(stuckUserContract);
-        _withdrawStuckRbtc(stuckUserContract, rescueAddress, rbtcBalance);
     }
 
     /**
@@ -83,26 +71,6 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, Ownable, DcaManagerAccessContro
         (bool sent,) = user.call{value: rbtcBalance}("");
         if (!sent) revert PurchaseRbtc__rBtcWithdrawalFailed();
         emit PurchaseRbtc__rBtcWithdrawn(user, rbtcBalance);
-    }
-
-    /**
-     * @notice withdraw rBTC from stuck contract. Only necessary for users who (poorly) interacted with Bitchill from a contract
-     * @param stuckUserContract: the address of the contract that interacted with Bitchill
-     * @param rescueAddress: the address to send the rBTC to
-     * @param rbtcBalance: the amount of rBTC to withdraw
-     */
-    function _withdrawStuckRbtc(address stuckUserContract, address rescueAddress, uint256 rbtcBalance) internal {
-        // First try to send to the contract (might work if it has a fallback)
-        (bool sentToContract,) = stuckUserContract.call{value: rbtcBalance}("");
-        
-        // If failed, send to the rescue address
-        if (!sentToContract) {
-            (bool sentToRescue,) = rescueAddress.call{value: rbtcBalance}("");
-            if (!sentToRescue) revert PurchaseRbtc__rBtcWithdrawalFailed();
-            emit PurchaseRbtc__rBtcRescued(stuckUserContract, rescueAddress, rbtcBalance);
-        } else {
-            emit PurchaseRbtc__rBtcWithdrawn(stuckUserContract, rbtcBalance);
-        }
     }
 
     /**

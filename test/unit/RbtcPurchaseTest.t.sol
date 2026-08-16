@@ -20,8 +20,6 @@ contract RbtcPurchaseTest is DcaDappTest {
         uint256[] purchaseAmounts;
     }
 
-    event PurchaseRbtc__rBtcRescued(address indexed stuckUserContract, address indexed rescueAddress, uint256 amount);
-
     function setUp() public override {
         super.setUp();
     }
@@ -419,48 +417,6 @@ contract RbtcPurchaseTest is DcaDappTest {
         uint256 userAccumulatedRbtcPost = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance();
         // The user's balance is also equal (since we're batching the purchases of 5 schedules but only one user)
         assertEq(userAccumulatedRbtcPost - userAccumulatedRbtcPrev, 0);
-    }
-    
-    function testRescueRbtcFromStuckContract() external {
-        // First do a purchase to accumulate some rBTC on the handler contract
-        super.makeSinglePurchase();
-
-        address stuckContract = USER;
-        // Deploy bytecode that reverts when receiving rBTC to the user address to test the rescue function
-        vm.etch(stuckContract, hex"60006000fd"); // simplest bytecode to always revert
-        
-        // Verify the balance was set correctly
-        vm.prank(stuckContract);
-        uint256 stuckContractBalance = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance();
-        assertGt(stuckContractBalance, 0);
-
-        address rescueAddress = makeAddr("rescueAddress");
-        
-        // Try to rescue the funds
-        vm.expectEmit(true, true, true, true);
-        emit PurchaseRbtc__rBtcRescued(stuckContract, rescueAddress, stuckContractBalance);
-        vm.prank(OWNER);
-        IPurchaseRbtc(address(stablecoinHandler)).withdrawStuckRbtc(stuckContract, rescueAddress);
-        
-        // Verify rBTC was correctly sent to the rescue address
-        assertGt(rescueAddress.balance, 0);
-        
-        // Verify the stuck contract's accumulated rBTC is now 0
-        vm.prank(stuckContract);
-        assertEq(IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(), 0);
-    }
-
-    function testCannotRescueIfNoAccumulatedRbtc() external {
-        // Create a mock contract address 
-        address stuckContract = makeAddr("stuckContract");
-        address rescueAddress = makeAddr("rescueAddress");
-        
-        // Set up the revert expectation
-        vm.expectRevert(IPurchaseRbtc.PurchaseRbtc__NoAccumulatedRbtcToWithdraw.selector);
-        
-        // Try to rescue the funds when there are none
-        vm.prank(OWNER);
-        IPurchaseRbtc(address(stablecoinHandler)).withdrawStuckRbtc(stuckContract, rescueAddress);
     }
 
     function testOnlyUserCanWithdrawRbtc() external {

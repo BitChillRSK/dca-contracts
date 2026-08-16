@@ -12,17 +12,12 @@ import {MockWrbtcToken} from "test/mocks/MockWrbtcToken.sol";
 import {TropykusDocHandlerMoc} from "src/TropykusDocHandlerMoc.sol";
 import {SovrynDocHandlerMoc} from "src/SovrynDocHandlerMoc.sol";
 import {TropykusErc20HandlerDex} from "src/TropykusErc20HandlerDex.sol";
-import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {IPurchaseUniswap} from "src/interfaces/IPurchaseUniswap.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import "script/Constants.sol";
 import {IWRBTC} from "src/interfaces/IWRBTC.sol";
 import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces/ISwapRouter02.sol";
 import {ICoinPairPrice} from "src/interfaces/ICoinPairPrice.sol";
-
-contract NonPayableReceiver {
-    // no receive() / fallback() & no payable functions
-}
 
 contract EdgeCasesTest is Test {
     /*//////////////////////////////////////////////////////////////
@@ -73,32 +68,6 @@ contract EdgeCasesTest is Test {
 
         vm.expectRevert();
         handler.buyRbtc(USER, bytes32("schedule"), 100 ether);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                      PurchaseRbtc.withdrawStuckRbtc
-    //////////////////////////////////////////////////////////////*/
-    function test_withdrawStuckRbtc_rescues_to_backup_address() public {
-        (TropykusDocHandlerMoc handler, MockStablecoin doc,,) = _deployTropykusMocHandler(true);
-        address RESCUE = address(0xBEEF);
-        NonPayableReceiver stuck = new NonPayableReceiver();
-
-        // Fund stuck contract via handler buy flow
-        doc.mint(address(stuck), 600 ether);
-        vm.prank(address(stuck));
-        doc.approve(address(handler), type(uint256).max);
-        handler.depositToken(address(stuck), 600 ether);
-        handler.buyRbtc(address(stuck), bytes32("sched"), 200 ether);
-
-        uint256 rescueBalanceBefore = RESCUE.balance;
-        uint256 stuckAccrued = handler.getAccumulatedRbtcBalance(address(stuck));
-        assertGt(stuckAccrued, 0, "setup failed - no accrued rBTC");
-
-        // Owner (test contract) calls rescue
-        handler.withdrawStuckRbtc(address(stuck), RESCUE);
-
-        assertEq(handler.getAccumulatedRbtcBalance(address(stuck)), 0, "mapping not cleared");
-        assertEq(RESCUE.balance, rescueBalanceBefore + stuckAccrued, "funds not rescued");
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -89,4 +89,32 @@ contract RbtcWithdrawalTest is DcaDappTest {
         uint256 rbtcBalanceAfterWithdrawal = USER.balance;
         assertEq(rbtcBalanceAfterWithdrawal, rbtcBalanceBeforeWithdrawal);
     }
+
+    function testWithdrawRbtcFromTokenHandlerCreditsSignerOnly() external {
+        super.makeSinglePurchase();
+
+        uint256 userAccrued = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
+        assertGt(userAccrued, 0);
+
+        address attacker = makeAddr("attacker");
+        uint256 attackerBalanceBefore = attacker.balance;
+        uint256 ownerBalanceBefore = OWNER.balance;
+
+        vm.prank(attacker);
+        vm.expectRevert(IPurchaseRbtc.PurchaseRbtc__NoAccumulatedRbtcToWithdraw.selector);
+        dcaManager.withdrawRbtcFromTokenHandler(address(stablecoin), s_lendingProtocolIndex);
+
+        assertEq(attacker.balance, attackerBalanceBefore);
+        assertEq(OWNER.balance, ownerBalanceBefore);
+        assertEq(IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER), userAccrued);
+
+        uint256 userBalanceBefore = USER.balance;
+        vm.prank(USER);
+        dcaManager.withdrawRbtcFromTokenHandler(address(stablecoin), s_lendingProtocolIndex);
+
+        assertEq(USER.balance, userBalanceBefore + userAccrued);
+        assertEq(attacker.balance, attackerBalanceBefore);
+        assertEq(OWNER.balance, ownerBalanceBefore);
+        assertEq(IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER), 0);
+    }
 }

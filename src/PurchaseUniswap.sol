@@ -161,17 +161,6 @@ abstract contract PurchaseUniswap is
     }
 
     /**
-     * @param stuckUserContract: the contract to withdraw the rBTC from
-     * @param rescueAddress: the address to send the rBTC to if the contract has no fallback
-     * @notice the owner can at any time withdraw the rBTC that has been accumulated through periodical purchases
-     */
-    function withdrawStuckRbtc(address stuckUserContract, address rescueAddress) external override onlyOwner {
-        uint256 rbtcBalance = _withdrawRbtcChecksEffects(stuckUserContract);
-        i_wrBtcToken.withdraw(rbtcBalance);
-        _withdrawStuckRbtc(stuckUserContract, rescueAddress, rbtcBalance);
-    }
-
-    /**
      * @notice Sets a new swap path.
      *  @param intermediateTokens The array of intermediate token addresses in the path.
      * @param poolFeeRates The array of pool fees for each swap step.

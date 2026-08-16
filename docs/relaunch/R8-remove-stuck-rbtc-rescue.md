@@ -1,6 +1,6 @@
 # R8 — Remove stuck-rBTC rescue
 
-Status: **not started** · Assigned: yes · Optional/further-review: no
+Status: **in progress** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
@@ -22,11 +22,11 @@ BitChill users come through the frontend as EOAs. Contract users who cannot rece
 
 ## Scope
 
-- [ ] Delete `withdrawStuckRbtc`, `_withdrawStuckRbtc`, and `PurchaseRbtc__rBtcRescued` from `PurchaseRbtc`, the `PurchaseUniswap` override, and `IPurchaseRbtc`.
-- [ ] Keep `withdrawAccumulatedRbtc(user)`, `withdrawRbtcFromTokenHandler`, and `withdrawAllAccumulatedRbtc` sending native rBTC to `user` (`msg.sender` from DcaManager). No `to` on any withdraw ABI.
-- [ ] Drop `Ownable` from `PurchaseRbtc` if it is unused after this deletion and the handler inheritance graph still compiles. Keep it if C3 linearization requires it. `PurchaseUniswap` owner setters continue to use `onlyOwner` via `FeeHandler`.
-- [ ] Drop tests that exist only for the rescue. Keep and, if missing, add withdraw-to-signer coverage: a third party calling `withdrawRbtcFromTokenHandler` does not move another user’s accumulated rBTC; a successful user withdraw credits the signer only.
-- [ ] Remove `withdrawStuckRbtc` stubs from fuzz handler wrappers.
+- [x] Delete `withdrawStuckRbtc`, `_withdrawStuckRbtc`, and `PurchaseRbtc__rBtcRescued` from `PurchaseRbtc`, the `PurchaseUniswap` override, and `IPurchaseRbtc`.
+- [x] Keep `withdrawAccumulatedRbtc(user)`, `withdrawRbtcFromTokenHandler`, and `withdrawAllAccumulatedRbtc` sending native rBTC to `user` (`msg.sender` from DcaManager). No `to` on any withdraw ABI.
+- [x] Drop `Ownable` from `PurchaseRbtc` if it is unused after this deletion and the handler inheritance graph still compiles. Keep it if C3 linearization requires it. `PurchaseUniswap` owner setters continue to use `onlyOwner` via `FeeHandler`.
+- [x] Drop tests that exist only for the rescue. Keep and, if missing, add withdraw-to-signer coverage: a third party calling `withdrawRbtcFromTokenHandler` does not move another user’s accumulated rBTC; a successful user withdraw credits the signer only.
+- [x] Remove `withdrawStuckRbtc` stubs from fuzz handler wrappers.
 
 ## Out of scope
 
@@ -56,7 +56,8 @@ Implementer may follow compiler errors into fuzz wrappers and unused helper cont
 Commands (targeted first, then done-gate):
 
 ```bash
-SWAP_TYPE=mocSwaps LENDING_PROTOCOL=tropykus forge test --match-path test/unit/RbtcPurchaseTest.t.sol --match-path test/unit/RbtcWithdrawalTest.t.sol
+SWAP_TYPE=mocSwaps LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=DOC forge test --match-contract RbtcPurchaseTest
+SWAP_TYPE=mocSwaps LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=DOC forge test --match-contract RbtcWithdrawalTest
 SWAP_TYPE=mocSwaps LENDING_PROTOCOL=tropykus forge test --match-contract EdgeCasesTest
 LENDING_PROTOCOL=tropykus SWAP_TYPE=mocSwaps forge test --match-contract InvariantTest
 make check
@@ -74,11 +75,11 @@ Fork tests: not required.
 
 ## Success criteria
 
-- [ ] `withdrawStuckRbtc` / `_withdrawStuckRbtc` / `PurchaseRbtc__rBtcRescued` are gone.
-- [ ] No owner path can move another account’s rBTC.
-- [ ] User withdraws still credit the signer only. No `to` on the ABI.
-- [ ] Targeted tests above pass; `make check` passes.
-- [ ] Protocol invariants in `AGENTS.md` unchanged (invariant 3 now matches the code).
+- [x] `withdrawStuckRbtc` / `_withdrawStuckRbtc` / `PurchaseRbtc__rBtcRescued` are gone.
+- [x] No owner path can move another account’s rBTC.
+- [x] User withdraws still credit the signer only. No `to` on the ABI.
+- [x] Targeted tests above pass; `make check` passes.
+- [x] Protocol invariants in `AGENTS.md` unchanged (invariant 3 now matches the code).
 
 ## Reviewer checklist
 
