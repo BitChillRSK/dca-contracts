@@ -141,7 +141,7 @@ contract DepositSwapPopReentrancyTest is Test {
         user.armDelete(0, idA);
         token.setHook(address(user), true);
 
-        vm.expectRevert(IDcaManager.DcaManager__ScheduleIdAndIndexMismatch.selector);
+        vm.expectRevert("ReentrancyGuard: reentrant call");
         user.update(0, idA, EXTRA);
 
         IDcaManager.DcaDetails[] memory afterSchedules = dcaManager.getDcaSchedules(address(user), address(token));
@@ -177,7 +177,7 @@ contract DepositSwapPopReentrancyTest is Test {
         user.armDelete(0, idA);
         token.setHook(address(user), true);
 
-        vm.expectRevert(abi.encodeWithSignature("Panic(uint256)", 0x32));
+        vm.expectRevert("ReentrancyGuard: reentrant call");
         user.update(0, idA, EXTRA);
 
         IDcaManager.DcaDetails[] memory afterSchedules = dcaManager.getDcaSchedules(address(user), address(token));
