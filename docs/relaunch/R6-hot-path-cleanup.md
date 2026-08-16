@@ -4,7 +4,7 @@ Status: **in progress** (GitHub #47, spec revision implemented) · Assigned: yes
 
 ## Objective
 
-Trim `nonReentrant` and role-lookup overhead on the **purchase** hot path, without weakening diagnostic checks. Keep the deposit/delete mutex: schedule IDs are not unique, so a post-pull id check cannot replace it. On `updateDcaSchedule` (never guarded), re-validate `scheduleId` after the pull so distinct-id swap-pop reverts.
+Trim `nonReentrant` and role-lookup overhead on the **purchase** hot path, without weakening diagnostic checks. Keep `nonReentrant` on every user-facing schedule mutator. Derive schedule ids from a monotonic nonce, not from array state. `depositToken` pulls before crediting. No post-pull id check.
 
 ## Revision note (supersedes the first pass)
 
@@ -24,9 +24,7 @@ Resolution: comprehensive mutex + monotonic nonce, and the post-pull id checks a
 
 The gas case for keeping the user-path guards off never justified the analysis it required: ~2,300 gas ≈ 1.4 cents per user transaction, against three exploitable states found across three review rounds. The entire measured win — 3,437 gas — sits on `buyRbtc`/`batchBuyRbtc` and the `SWAPPER_ROLE` cache, which this decision does not touch.
 
-An earlier pass (Cursor) also corrected three things in the first revision: the swap-pop is self-desync / ledger mismatch, not a live pool drain; the reentrancy test must delete the **same** slot being deposited into, not the “other” schedule; `depositToken` keeps the cheap pre-pull id check **and** re-validates after the pull.
-
-A third pass: the post-pull id check assumes two live schedules cannot share an ID. They can. `createDcaSchedule` hashes `msg.sender`, `token`, `block.timestamp`, and `schedules.length`. In one transaction a contract can create A and B, delete A (B moves to index 0, length 1), and create C — C reuses B’s timestamp and length, so `idC == idB`. A hook that then deletes B during `depositToken` swap-pops C into B’s slot; line 106 sees the same id and credits C. `vm.warp` in the two-schedule tests is not what hid this — those tests never mint a third colliding schedule. OpenZeppelin’s guard only blocks *other* `nonReentrant` functions, so restoring it on `depositToken` alone does not stop nested `deleteDcaSchedule`. The original protection was the **pair**. Restore both. Do not change the id formula in this PR (tests and clients reconstruct it).
+An earlier pass also corrected that the swap-pop is self-desync / ledger mismatch on current lending handlers, not a live pool drain, and that a reentrancy test must delete the **same** slot being deposited into. The post-pull id check from that pass is gone (third pass).
 
 ### Measured cost of each edit
 
@@ -36,9 +34,9 @@ Method: cumulative single-edit builds off `fix/r3-fee-handling`, `SWAP_TYPE=mocS
 |---|---:|---:|---|
 | Drop `nonReentrant` on `buyRbtc` / `batchBuyRbtc` | 2,399 | 69% | protocol (bot) |
 | Cache `SWAPPER_ROLE` | 1,038 | 30% | protocol (bot) |
-| Drop `purchaseAmount > tokenBalance` check | 43 | 1.2% | protocol (bot) |
-| Drop `numOfPurchases == 0` check | ~24 per batch tx | ~0% | protocol (bot) |
-| Drop `nonReentrant` on deposit / withdraw / delete / interest | ~2,300 per user tx | — | **users** |
+| Drop `purchaseAmount > tokenBalance` check | 43 | 1.2% | protocol (bot) — **not taken**; diagnostic revert kept |
+| Drop `numOfPurchases == 0` check | ~24 per batch tx | ~0% | protocol (bot) — **not taken**; diagnostic revert kept |
+| Drop `nonReentrant` on user paths | ~2,300 per user tx | — | **not taken**; mutex stays |
 | Reorder credit vs. pull | 0 | 0% | — |
 
 The first two are **per transaction**, so in `batchBuyRbtc` they amortise across the batch: measured 1,038 per *batch call*, not per purchase. At batch size 50 the per-purchase saving falls to ~112 gas. Only the 43-gas balance check is per item.
@@ -49,7 +47,7 @@ At RSK ~0.06 gwei, 3,480 gas ≈ 2.1 × 10⁻⁷ rBTC per purchase. The two earl
 
 **1. "`updateDcaSchedule` credits then pulls, same order as `depositToken`."** False. In `updateDcaSchedule`, `dcaSchedule` is a **memory** copy committed by `schedules[scheduleIndex] = dcaSchedule` at the end of the function. `dcaSchedule.tokenBalance += depositAmount` is a memory increment; the storage write was already after the interaction. Swapping those two lines is a no-op that no reentrant caller can observe. It is diff noise and is reverted below.
 
-**2. "Pull-then-credit is the real defense, so the guard is not required."** Overstated. A *reverting* `transferFrom` rolls back a prior storage credit — that is ordinary CEI. A *succeeding* pull that fires a transfer hook can still observe mid-call state; CEI does not cover that. What actually stops a phantom credit from paying out **other users'** tokens today is that Tropykus and Sovryn **clamp** `withdrawToken` to the caller's lending position (`TropykusErc20Handler.sol:79-82`, `SovrynErc20Handler.sol:79-82`) instead of transferring the requested amount. Pull-then-credit on `depositToken` is still cheap and mildly preferable (no phantom credit, no clamp-induced DcaManager-vs-handler desync on that path). It cannot carry the weight of justifying the guard removals. The guard removals are justified separately: withdraw/delete are already CEI-clean, and deposit paths get the targeted id re-validation below.
+**2. "Pull-then-credit is the real defense, so the guard is not required."** Overstated. A *reverting* `transferFrom` rolls back a prior storage credit — that is ordinary CEI. A *succeeding* pull that fires a transfer hook can still observe mid-call state; CEI does not cover that. What actually stops a phantom credit from paying out **other users'** tokens today is that Tropykus and Sovryn **clamp** `withdrawToken` to the caller's lending position (`TropykusErc20Handler.sol:79-82`, `SovrynErc20Handler.sol:79-82`) instead of transferring the requested amount. Pull-then-credit on `depositToken` is still cheap and mildly preferable. It does not replace the user-path mutex.
 
 ### The defect the previous version missed
 
@@ -63,13 +61,7 @@ At RSK ~0.06 gwei, 3,480 gas ≈ 2.1 × 10⁻⁷ rBTC per purchase. The two earl
 
 What this does **not** do on current handlers: drain the pool. After the swap-pop, DcaManager shows 1001 while the user's lending shares still back B plus the 1 deposited — or, if the numbers do not line up, a later `withdrawToken` is clamped to the real position and the DcaManager ledger desyncs. That desync is **PR 8 / R20**, not R1. DOC and USDRIF have no transfer hooks, so this is not live.
 
-It is still a stale write-back that can destroy B's identity and leave the caller's own schedules inconsistent. On `depositToken`, the mutex (`nonReentrant` on deposit **and** delete) is what stops nested deletion, including the colliding-id case. The post-pull id check is defense in depth for **distinct** ids only.
-
-`depositToken` after #47 holds a **storage pointer** across the pull, then credits. Distinct-id swap-pop would misattribute the deposit onto whichever schedule now sits in that slot (still the caller's). Re-validating `scheduleId` after the pull would revert — but colliding ids make that check pass, which is why the mutex stays.
-
-`createDcaSchedule` pulls then pushes a **new** row. It has no write-back of a pre-call copy of an existing slot. No extra check there. It remains unguarded (already was) and is how colliding ids are minted.
-
-Same-id re-entrancy that does *not* change `scheduleId` (e.g. a hook `depositToken` or `setPurchaseAmount` on the same schedule) can still be clobbered by `updateDcaSchedule`'s stale memory copy. Colliding-id swap-pop on `updateDcaSchedule` is also still open: that function never had `nonReentrant`, and this PR does not add it. Both are obscure self-grief. Out of scope: do not refresh every field from storage; do not change the id formula. The id check on update closes **distinct-id** swap-pop (and last-index shrink), not colliding-id swap-pop and not the stale-copy class as a whole.
+It is still a stale write-back that can destroy B's identity and leave the caller's own schedules inconsistent. The third pass closes it with the comprehensive mutex (nested delete cannot run) and unique ids (even without a hook, `create,create,delete,create` no longer remints a live id). Post-pull id checks are not used. `updateDcaSchedule` keeps its memory-copy shape; do not refresh every field from storage.
 
 ## Background
 
@@ -96,10 +88,8 @@ Do **not** skip scheduleId or period checks for gas. Without the period check, `
 | Function | Keep `nonReentrant`? |
 |---|---|
 | `withdrawRbtcFromTokenHandler` / `withdrawAllAccumulatedRbtc` | **Keep.** Native `user.call{value}`. |
-| `buyRbtc` / `batchBuyRbtc` | **Drop.** `onlySwapper` + handler `onlyDcaManager`. 69% of the saving. |
-| `withdrawToken` / interest withdraws | **Drop.** Verified CEI-clean: each writes its state before the handler call; `_withdrawInterest` writes no `DcaManager` state at all. Nested withdraw does not swap-pop. |
-| `depositToken` / `deleteDcaSchedule` | **Keep.** IDs are not unique. OZ `nonReentrant` only blocks other guarded functions, so both must hold the lock or nested delete during deposit still runs. |
-| `createDcaSchedule` / `updateDcaSchedule` | **Already unguarded.** Do not add the modifier. Distinct-id swap-pop on update is closed by the post-pull id check; colliding-id swap-pop there is pre-existing leftover. |
+| `buyRbtc` / `batchBuyRbtc` | **Drop.** `onlySwapper` + handler `onlyDcaManager`. Writes schedule state before the handler call. 69% of the saving. |
+| `createDcaSchedule` / `depositToken` / `updateDcaSchedule` / `deleteDcaSchedule` / `withdrawToken` / `withdrawTokenAndInterest` / `withdrawAllAccumulatedInterest` / `setPurchaseAmount` / `setPurchasePeriod` | **Keep.** Comprehensive mutex (`AGENTS.md` invariant 6). A partial set protects nothing. |
 
 ## Open product decisions
 
@@ -117,9 +107,9 @@ Items marked **(revert)** undo work already merged in #47.
 
 - [x] **R6:** Do **not** remove period, scheduleId, amount, or lending-index checks. Keep `onlySwapper`.
 
-- [x] **R17 (superseded by the third pass):** Comprehensive mutex. `nonReentrant` on every external function that writes `s_dcaSchedules`: `createDcaSchedule`, `depositToken`, `updateDcaSchedule`, `deleteDcaSchedule`, `withdrawToken`, `withdrawTokenAndInterest`, `withdrawAllAccumulatedInterest`, `setPurchaseAmount`, `setPurchasePeriod` — plus the two rBTC withdraws. **Not** on `buyRbtc` / `batchBuyRbtc`: swapper-only, and verified to write nothing after their handler call. A partial set is worse than none, because OZ's guard only blocks other *guarded* functions.
+- [x] **R17 (third pass):** Comprehensive mutex. `nonReentrant` on every external function that writes `s_dcaSchedules`: `createDcaSchedule`, `depositToken`, `updateDcaSchedule`, `deleteDcaSchedule`, `withdrawToken`, `withdrawTokenAndInterest`, `withdrawAllAccumulatedInterest`, `setPurchaseAmount`, `setPurchasePeriod` — plus the two rBTC withdraws. **Not** on `buyRbtc` / `batchBuyRbtc`: swapper-only, and verified to write nothing after their handler call. A partial set is worse than none, because OZ's guard only blocks other *guarded* functions.
 
-- [x] **R17 (superseded by the third pass):** Remove both post-pull `_validateScheduleId` calls. Unreachable under the mutex, and independently insufficient — blind to same-slot mutations that leave the id untouched.
+- [x] **R17 (third pass):** Remove both post-pull `_validateScheduleId` calls. Unreachable under the mutex, and independently insufficient — blind to same-slot mutations that leave the id untouched.
 
 - [x] **R17 (revert):** Restore the original line order in `updateDcaSchedule` — `dcaSchedule.tokenBalance += depositAmount;` before `_handler(...).depositToken(...)`. The storage commit was always after the interaction, so the reorder was unobservable.
 
@@ -157,7 +147,6 @@ Items marked **(revert)** undo work already merged in #47.
 - [ ] Fee model / FeeHandler (R3–R5).
 - [ ] Full natspec rewrite (R10). Opportunistic comment fixes on touched lines are fine.
 - [ ] `forge fmt` of existing files.
-- [ ] Adding `nonReentrant` to `createDcaSchedule` or `updateDcaSchedule` (never had it).
 - [ ] Asserting the cached `SWAPPER_ROLE` against `OperationsAdmin.SWAPPER_ROLE()`. A mismatch reverts every purchase loudly; both contracts are first-party.
 - [ ] Deploy broadcasts or live addresses.
 - [ ] `dca-out-contracts`.
@@ -173,7 +162,8 @@ Items marked **(revert)** undo work already merged in #47.
 - `test/unit/DcaScheduleTest.t.sol`
 - `test/ai-generated/unit/DcaManagerEdgeCasesTest.t.sol`
 - `docs/relaunch/README.md` (assignment status)
-- `docs/relaunch/IMPLEMENTATION_ORDER.md` (PR 6 blurb; PR 8 clamp-desync note)
+- `docs/relaunch/IMPLEMENTATION_ORDER.md` (PR 6 blurb; PR 8 clamp-desync note; idle-handler heads-up)
+- `AGENTS.md` (invariants 6 and 7)
 
 ## Required tests
 
@@ -195,12 +185,10 @@ Behaviors to assert:
 - Same-period second buy still reverts.
 - `onlySwapper` still rejects non-swappers.
 - `depositToken` / `updateDcaSchedule` still credit after a successful pull; a failed pull (no approval) reverts with no lasting credit.
-- Wrong `scheduleId` on `depositToken` reverts with `DcaManager__ScheduleIdAndIndexMismatch`. Tests cannot tell pre-pull from post-pull-only (reverts are atomic). That the first check still runs **before** `handler.depositToken` is inspection of source order, not a test.
-- **New — swap-pop, not “the other schedule”:** User has two schedules. A mock token `transferFrom` re-enters `deleteDcaSchedule` on the **same** `scheduleIndex` being deposited into. `depositToken` reverts `ReentrancyGuard: reentrant call` (nested delete is guarded). `updateDcaSchedule` is unguarded, so nested delete runs and must then revert on `_validateScheduleId` (distinct ids) or Panic(0x32) (last index). No `tokenBalance` write-back. A test that deletes the *other* (last) schedule does **not** count for the update path: that pop leaves index 0 unchanged.
-- **New — last remaining schedule:** User has one schedule. The hook deletes that same index. `depositToken` reverts `ReentrancyGuard: reentrant call`. `updateDcaSchedule` reverts Panic(0x32) on `schedules[scheduleIndex]`. No write-back in either case.
-- **New — colliding ids:** Create A and B in one timestamp, delete A, create C. `idC == idB`. Documented leftover. `depositToken` into B with a hook that deletes B still reverts `ReentrancyGuard` (would have credited C without the mutex).
-- `nonReentrant` remains on the two rBTC withdraws, `depositToken`, and `deleteDcaSchedule` (reviewer: inspect modifiers). Not on create/update/buy/withdraw-token/interest.
-- `depositToken` still has `_validateScheduleId` both before and after the pull (reviewer: inspect; not test-distinguishable from post-pull-only).
+- Wrong `scheduleId` on `depositToken` reverts with `DcaManager__ScheduleIdAndIndexMismatch`. That this check runs **before** `handler.depositToken` is inspection of source order (reverts are atomic). There is no post-pull id check.
+- **Swap-pop, same index:** A mock token `transferFrom` re-enters `deleteDcaSchedule` on the **same** `scheduleIndex` being deposited into. Both `depositToken` and `updateDcaSchedule` revert `ReentrancyGuard: reentrant call`. No `tokenBalance` write-back. Last remaining schedule: same revert, both paths.
+- **Unique ids:** `create,create,delete,create` in one block yields `idB != idC`. Swap-pop rewind (`create A,B,C`, delete index 0, create D) does not remint C's id.
+- `nonReentrant` on every schedule mutator listed in Scope, plus both rBTC withdraws. Not on `buyRbtc` / `batchBuyRbtc` (reviewer: inspect modifiers).
 
 Fork tests: not required.
 
@@ -222,23 +210,18 @@ Fork tests: not required.
 
 - [ ] Matches **Scope**; nothing from **Out of scope**.
 - [ ] Protocol invariants in `AGENTS.md` still hold.
-- [ ] Tests in the PR match **Required tests**, including same-index swap-pop, last-index shrink, and colliding-id mint + deposit.
+- [ ] Tests in the PR match **Required tests**, including same-index swap-pop (both deposit paths revert `ReentrancyGuard`), unique ids, and swap-pop rewind.
 - [ ] No unrelated refactors; no line reordering without a stated, observable reason.
 - [ ] `_rBtcPurchaseChecksEffects` enforces period, scheduleId, the balance comparison, and the subtraction.
 - [ ] Every external function writing `s_dcaSchedules` has `nonReentrant`; `buyRbtc` / `batchBuyRbtc` do not (`AGENTS.md` invariant 6).
 - [ ] No schedule id is derived from `block.timestamp` or array state anywhere in `src/` (`AGENTS.md` invariant 7).
 - [ ] No post-pull `_validateScheduleId` remains — the mutex is the control, not an id check.
 - [ ] `batchBuyRbtc` checks non-empty, array-length match, per-item amount, and per-item lending index.
-- [ ] `buyRbtc` / `batchBuyRbtc` have no `nonReentrant`.
-- [ ] `depositToken` and `deleteDcaSchedule` have `nonReentrant`; create/update do not.
-- [ ] No `handler.depositToken` call site writes through a reference obtained before it without re-validating the id.
 - [ ] Does not claim this bug drains other users' principal on Tropykus/Sovryn (clamp).
-- [ ] Pre-pull id check on `depositToken` is confirmed by reading the function, not by a test that cannot distinguish it from post-pull-only.
-- [ ] Does not claim the post-pull id check closes colliding-id swap-pop. That needs unique IDs (out of scope) or the deposit/delete mutex.
 
 ## ABI / deploy / cutover impact
 
-- ABI: unchanged from `fix/r3-fee-handling`. Both errors stay; function selectors and event signatures unchanged. (Relative to #47 as merged, this restores two errors.)
+- ABI: add `getSchedulesCreatedCount() view returns (uint256)`. Both diagnostic errors stay; existing function selectors and event signatures unchanged. Schedule **id values** change (new derivation); they remain `bytes32`.
 - Scripts: none — no script reconstructs a schedule id.
 - **Cutover — schedule id derivation changed.** Ids are now `keccak256(user, token, nonce)` instead of `keccak256(user, token, block.timestamp, arrayLength)`. Any off-chain consumer that *recomputes* an id must instead read it from `getScheduleId` / `getDcaSchedules` or from the `DcaManager__DcaScheduleCreated` event. Consumers that already treat the id as an opaque value from events or getters need no change. No migration: fresh relaunch deployment, no existing schedules to re-key. This is the cheapest point to make this change — post-launch it would be a state migration.
 - Frontends/indexers keyed on the two restored errors keep working. Do not include broadcast steps.
