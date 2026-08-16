@@ -89,4 +89,54 @@ contract RbtcWithdrawalTest is DcaDappTest {
         uint256 rbtcBalanceAfterWithdrawal = USER.balance;
         assertEq(rbtcBalanceAfterWithdrawal, rbtcBalanceBeforeWithdrawal);
     }
+
+    function testWithdrawRbtcFromTokenHandlerCreditsSignerOnly() external {
+        address attacker = makeAddr("attacker");
+        vm.deal(attacker, 10 ether);
+        if (block.chainid == ANVIL_CHAIN_ID) {
+            stablecoin.mint(attacker, AMOUNT_TO_DEPOSIT);
+        } else {
+            vm.prank(USER);
+            stablecoin.transfer(attacker, AMOUNT_TO_DEPOSIT);
+        }
+
+        vm.startPrank(attacker);
+        stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
+        dcaManager.createDcaSchedule(
+            address(stablecoin), AMOUNT_TO_DEPOSIT, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
+        );
+        vm.stopPrank();
+
+        super.makeSinglePurchase();
+
+        bytes32 attackerScheduleId = dcaManager.getScheduleId(attacker, address(stablecoin), SCHEDULE_INDEX);
+        vm.prank(SWAPPER);
+        dcaManager.buyRbtc(attacker, address(stablecoin), SCHEDULE_INDEX, attackerScheduleId);
+
+        uint256 userAccrued = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
+        uint256 attackerAccrued = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(attacker);
+        assertGt(userAccrued, 0);
+        assertGt(attackerAccrued, 0);
+
+        uint256 userBalanceBefore = USER.balance;
+        uint256 attackerBalanceBefore = attacker.balance;
+        uint256 ownerBalanceBefore = OWNER.balance;
+
+        vm.prank(attacker);
+        dcaManager.withdrawRbtcFromTokenHandler(address(stablecoin), s_lendingProtocolIndex);
+
+        assertEq(attacker.balance, attackerBalanceBefore + attackerAccrued, "attacker did not receive only their rBTC");
+        assertEq(USER.balance, userBalanceBefore, "USER native balance moved on attacker withdraw");
+        assertEq(OWNER.balance, ownerBalanceBefore, "OWNER received rBTC");
+        assertEq(IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER), userAccrued);
+        assertEq(IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(attacker), 0);
+
+        vm.prank(USER);
+        dcaManager.withdrawRbtcFromTokenHandler(address(stablecoin), s_lendingProtocolIndex);
+
+        assertEq(USER.balance, userBalanceBefore + userAccrued, "USER did not receive only their rBTC");
+        assertEq(attacker.balance, attackerBalanceBefore + attackerAccrued, "attacker balance changed on USER withdraw");
+        assertEq(OWNER.balance, ownerBalanceBefore, "OWNER received rBTC");
+        assertEq(IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER), 0);
+    }
 }

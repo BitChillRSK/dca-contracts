@@ -399,13 +399,6 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
     function getAccumulatedRbtcBalance() external view returns (uint256) {
         return s_usersAccumulatedRbtc[msg.sender];
     }
-
-    /**
-     * @notice Emergency function to withdraw rBTC stuck in contracts  
-     */  
-    function withdrawStuckRbtc(address, address) external pure {
-        revert("Mock function - not implemented for testing");
-    }
     
     /**
      * @notice Withdraw accumulated rBTC - transfers rBTC from handler to user
@@ -532,13 +525,6 @@ contract SovrynHandlerWrapper is SovrynErc20Handler {
      */
     function getAccumulatedRbtcBalance() external view returns (uint256) {
         return s_usersAccumulatedRbtc[msg.sender];
-    }
-
-    /**
-     * @notice Emergency function to withdraw rBTC stuck in contracts  
-     */
-    function withdrawStuckRbtc(address, address) external pure {
-        revert("Mock function - not implemented for testing");
     }
     
     /**
