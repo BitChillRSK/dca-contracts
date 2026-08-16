@@ -393,6 +393,12 @@ interface IDcaManager {
     function getMaxSchedulesPerToken() external view returns (uint256);
 
     /**
+     * @dev returns the lifetime count of DCA schedules created across all users and tokens.
+     * Never decreases; deletions do not decrement it.
+     */
+    function getSchedulesCreatedCount() external view returns (uint256);
+
+    /**
      * @dev returns the default minimum purchase amount for all tokens
      */
     function getDefaultMinPurchaseAmount() external view returns (uint256);

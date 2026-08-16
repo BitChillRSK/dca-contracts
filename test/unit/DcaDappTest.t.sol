@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.36;
 
-import {Test, console2} from "forge-std/Test.sol";
+import {Test, console2, Vm} from "forge-std/Test.sol";
 import {DcaManager} from "../../src/DcaManager.sol";
 import {DcaManagerAccessControl} from "../../src/DcaManagerAccessControl.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
@@ -378,13 +378,37 @@ contract DcaDappTest is Test {
                       UNIT TESTS COMMON FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev Asserts the scheduleId carried by the most recent DcaScheduleCreated log is exactly
+    /// what storage kept. Call `vm.recordLogs()` before the create. This checks event/storage
+    /// agreement without re-deriving the id, so it survives future changes to the derivation.
+    function _assertCreatedEventIdMatchesStorage() internal {
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 sig =
+            keccak256("DcaManager__DcaScheduleCreated(address,address,bytes32,uint256,uint256,uint256,uint256)");
+        bool found;
+        bytes32 emittedId;
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].topics.length == 4 && logs[i].topics[0] == sig) {
+                emittedId = logs[i].topics[3];
+                found = true;
+            }
+        }
+        assertTrue(found, "no DcaManager__DcaScheduleCreated log recorded");
+        assertEq(emittedId, _lastScheduleId(), "event scheduleId does not match stored scheduleId");
+    }
+
+    /// @dev Schedule ids derive from a monotonic nonce, so tests must read them back
+    /// instead of recomputing the derivation. Returns the id of the most recently created schedule.
+    function _lastScheduleId() internal view returns (bytes32) {
+        uint256 len = dcaManager.getDcaSchedules(USER, address(stablecoin)).length;
+        return dcaManager.getScheduleId(USER, address(stablecoin), len - 1);
+    }
+
     function depositStablecoin() internal returns (uint256, uint256) {
         vm.startPrank(USER);
         uint256 userBalanceBeforeDeposit = dcaManager.getMyScheduleTokenBalance(address(stablecoin), SCHEDULE_INDEX);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
-        bytes32 scheduleId = keccak256(
-            abi.encodePacked(USER, address(stablecoin), block.timestamp, dcaManager.getMyDcaSchedules(address(stablecoin)).length - 1)
-        );
+        bytes32 scheduleId = dcaManager.getMyScheduleId(address(stablecoin), SCHEDULE_INDEX);
         vm.expectEmit(true, true, true, false);
         emit TokenHandler__TokenDeposited(address(stablecoin), USER, AMOUNT_TO_DEPOSIT);
         vm.expectEmit(true, true, true, false);
@@ -412,9 +436,7 @@ contract DcaDappTest is Test {
         uint256 stablecoinToDeposit = AMOUNT_TO_DEPOSIT / NUM_OF_SCHEDULES;
         uint256 purchaseAmount = AMOUNT_TO_SPEND / NUM_OF_SCHEDULES;
         // Delete the schedule created in setUp to have all five schedules with the same amounts
-        bytes32 scheduleId = keccak256(
-            abi.encodePacked(USER, address(stablecoin), block.timestamp, dcaManager.getMyDcaSchedules(address(stablecoin)).length - 1)
-        );
+        bytes32 scheduleId = dcaManager.getMyScheduleId(address(stablecoin), 0);
         dcaManager.deleteDcaSchedule(address(stablecoin), 0, scheduleId);
         for (uint256 i = 0; i < NUM_OF_SCHEDULES; ++i) {
             uint256 scheduleIndex = SCHEDULE_INDEX + i;
@@ -425,16 +447,17 @@ contract DcaDappTest is Test {
             } else {
                 userBalanceBeforeDeposit = 0;
             }
-            scheduleId = keccak256(
-                abi.encodePacked(USER, address(stablecoin), block.timestamp, dcaManager.getMyDcaSchedules(address(stablecoin)).length)
-            );
-            vm.expectEmit(true, true, true, true);
+            // scheduleId comes from a monotonic nonce, so it cannot be precomputed here.
+            // Check user/token/data and skip the scheduleId topic; uniqueness is asserted separately.
+            vm.expectEmit(true, true, false, true);
             emit DcaManager__DcaScheduleCreated(
-                USER, address(stablecoin), scheduleId, stablecoinToDeposit, purchaseAmount, purchasePeriod, s_lendingProtocolIndex
+                USER, address(stablecoin), bytes32(0), stablecoinToDeposit, purchaseAmount, purchasePeriod, s_lendingProtocolIndex
             );
+            vm.recordLogs();
             dcaManager.createDcaSchedule(
                 address(stablecoin), stablecoinToDeposit, purchaseAmount, purchasePeriod, s_lendingProtocolIndex
             );
+            _assertCreatedEventIdMatchesStorage();
             uint256 userBalanceAfterDeposit = dcaManager.getMyScheduleTokenBalance(address(stablecoin), scheduleIndex);
             assertEq(stablecoinToDeposit, userBalanceAfterDeposit - userBalanceBeforeDeposit);
             assertEq(purchaseAmount, dcaManager.getMySchedulePurchaseAmount(address(stablecoin), scheduleIndex));

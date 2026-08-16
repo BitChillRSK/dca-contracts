@@ -186,22 +186,48 @@ contract DepositSwapPopReentrancyTest is Test {
         assertEq(afterSchedules[0].tokenBalance, beforeSchedules[0].tokenBalance);
     }
 
-    function test_createDeleteCreate_mintsCollidingScheduleIds() public {
-        (bytes32 idB, bytes32 idC) = _mintCollidingPair();
-        assertEq(idB, idC);
+    /// @dev create,create,delete,create in one block used to remint the survivor's id.
+    function test_createDeleteCreate_mintsUniqueScheduleIds() public {
+        (bytes32 idB, bytes32 idC) = _createDeleteCreateSequence();
+        assertTrue(idB != idC);
         IDcaManager.DcaDetails[] memory schedules = dcaManager.getDcaSchedules(address(user), address(token));
         assertEq(schedules.length, 2);
-        assertEq(schedules[0].scheduleId, schedules[1].scheduleId);
+        assertTrue(schedules[0].scheduleId != schedules[1].scheduleId);
     }
 
-    function test_depositToken_reverts_whenHookDeletesCollidingIdSlot() public {
-        (bytes32 idB,) = _mintCollidingPair();
+    /// @dev Regression: deriving ids from array state let swap-pop rewind the chain.
+    /// create A,B,C then delete index 0 moves C into slot 0 and makes B last again,
+    /// so a chained derivation reproduced idC while C was still live.
+    function test_swapPopRewind_doesNotRemintLiveScheduleId() public {
+        user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX); // A
+        user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX); // B
+        user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX); // C
+        IDcaManager.DcaDetails[] memory created = dcaManager.getDcaSchedules(address(user), address(token));
+        bytes32 idA = created[0].scheduleId;
+        bytes32 idC = created[2].scheduleId;
+
+        user.remove(0, idA); // C swap-pops into slot 0; B becomes the last element again
+        user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX); // D
+
+        IDcaManager.DcaDetails[] memory live = dcaManager.getDcaSchedules(address(user), address(token));
+        assertEq(live.length, 3);
+        assertEq(live[0].scheduleId, idC); // C is still live in slot 0
+        assertTrue(live[2].scheduleId != idC); // D must not reuse it
+        for (uint256 i; i < live.length; ++i) {
+            for (uint256 j = i + 1; j < live.length; ++j) {
+                assertTrue(live[i].scheduleId != live[j].scheduleId);
+            }
+        }
+    }
+
+    function test_depositToken_reverts_whenHookDeletesReusedSlot() public {
+        (bytes32 idB,) = _createDeleteCreateSequence();
         IDcaManager.DcaDetails[] memory beforeSchedules = dcaManager.getDcaSchedules(address(user), address(token));
 
         user.armDelete(0, idB);
         token.setHook(address(user), true);
 
-        // Without the deposit/delete mutex this would pass the post-pull id check (idC == idB) and credit C.
+        // The deposit/delete mutex stops the nested delete before any swap-pop can happen.
         vm.expectRevert("ReentrancyGuard: reentrant call");
         user.deposit(0, idB, EXTRA);
 
@@ -220,8 +246,8 @@ contract DepositSwapPopReentrancyTest is Test {
         assertEq(dcaManager.getDcaSchedules(address(user), address(token)).length, 2);
     }
 
-    /// @dev Create A,B then delete A and create C in the same timestamp so idC == idB.
-    function _mintCollidingPair() private returns (bytes32 idB, bytes32 idC) {
+    /// @dev Create A,B then delete A and create C in the same timestamp.
+    function _createDeleteCreateSequence() private returns (bytes32 idB, bytes32 idC) {
         user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
         user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
         IDcaManager.DcaDetails[] memory created = dcaManager.getDcaSchedules(address(user), address(token));

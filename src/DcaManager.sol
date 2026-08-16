@@ -31,6 +31,12 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     uint256 private s_maxSchedulesPerToken; // Maximum number of schedules per stablecoin
     uint256 private s_defaultMinPurchaseAmount; // Default minimum purchase amount for all tokens
     mapping(address token => uint256) private s_tokenMinPurchaseAmounts; // Custom minimum purchase amounts per token
+    /**
+     * @notice Strictly increasing counter used to derive schedule ids.
+     * @dev Ids must not be derived from array state: swap-pop on delete can restore a previous
+     * array shape within a block, which would let two live schedules share an id.
+     */
+    uint256 private s_scheduleNonce = 1;
 
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
@@ -175,8 +181,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
             revert DcaManager__MaxSchedulesPerTokenReached(token);
         }
 
-        bytes32 scheduleId =
-            keccak256(abi.encodePacked(msg.sender, token, block.timestamp, numOfSchedules));
+        bytes32 scheduleId = keccak256(abi.encodePacked(msg.sender, token, s_scheduleNonce++));
 
         DcaDetails memory dcaSchedule = DcaDetails(
             depositAmount,
@@ -804,6 +809,16 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      */
     function getMaxSchedulesPerToken() external view override returns (uint256) {
         return s_maxSchedulesPerToken;
+    }
+
+    /**
+     * @notice get the total number of DCA schedules ever created, across all users and tokens
+     * @dev Never decreases: deleting a schedule does not decrement it. Compare against the number of
+     * DcaManager__DcaScheduleCreated events an indexer has ingested to detect missed events.
+     * @return the lifetime count of created schedules
+     */
+    function getSchedulesCreatedCount() external view override returns (uint256) {
+        return s_scheduleNonce - 1;
     }
 
     /**
