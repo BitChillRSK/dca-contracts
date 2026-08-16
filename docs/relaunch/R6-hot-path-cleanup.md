@@ -120,12 +120,12 @@ Items marked **(revert)** undo work already merged in #47.
   ```solidity
   uint256 private s_scheduleNonce = 1;   // declaration initialiser: the 0 -> 1 SSTORE is paid at deploy
   ...
-  bytes32 scheduleId = keccak256(abi.encodePacked(msg.sender, token, s_scheduleNonce++));
+  bytes32 scheduleId = keccak256(abi.encodePacked(msg.sender, token, ++s_scheduleNonce));
   ```
 
   `block.timestamp` is constant within a block and every array-derived value is replayable through swap-pop, so a counter is the only sound source. Cost is one SSTORE on `createDcaSchedule`, which already exceeds 250k gas.
 
-  Post-increment, so nonce 1 belongs to the first schedule ever created and `s_scheduleNonce` reads as "the nonce the next schedule will use". Pre-increment measured 6 gas cheaper (251,303 vs 251,309) and skips 1 as a dead value — not worth the worse semantics at 0.002% of the transaction.
+  Pre-increment saves 6 gas (251,303 vs 251,309). Nonce 1 is intentionally unused; `s_scheduleNonce - 1` remains the lifetime schedule count.
 
   `msg.sender` and `token` are not needed for uniqueness (the nonce alone is unique); they domain-separate ids and keep them opaque, so nothing downstream mistakes them for indices. They are **not** there for unpredictability: ids are consistency checks against `(index, id)`, never bearer capabilities, and every id is already public via `getDcaSchedules`. Do not start treating an id as an authorisation token.
 

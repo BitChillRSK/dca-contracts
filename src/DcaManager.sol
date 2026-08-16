@@ -181,7 +181,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
             revert DcaManager__MaxSchedulesPerTokenReached(token);
         }
 
-        bytes32 scheduleId = keccak256(abi.encodePacked(msg.sender, token, s_scheduleNonce++));
+        bytes32 scheduleId = keccak256(abi.encodePacked(msg.sender, token, ++s_scheduleNonce));
 
         DcaDetails memory dcaSchedule = DcaDetails(
             depositAmount,
