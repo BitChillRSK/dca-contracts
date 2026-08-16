@@ -47,6 +47,7 @@ BitChill users come through the frontend as EOAs. Contract users who cannot rece
 - `test/unit/RbtcWithdrawalTest.t.sol`
 - `test/ai-generated/unit/EdgeCasesTest.t.sol`
 - `test/ai-generated/fuzz/Invariants.t.sol`
+- `test/ai-generated/fuzz/README_INVARIANTS.md`
 - `docs/relaunch/README.md` (assignment status)
 
 Implementer may follow compiler errors into fuzz wrappers and unused helper contracts (`NonPayableReceiver`). Extra files belong in the PR write-up.
@@ -67,7 +68,7 @@ Behaviors to assert:
 
 - `withdrawStuckRbtc` is gone from `src/` and `src/interfaces/`.
 - Owner (or any other account) cannot move another user’s accumulated rBTC.
-- `withdrawRbtcFromTokenHandler` / `withdrawAllAccumulatedRbtc` credit `msg.sender` only. Existing `RbtcWithdrawalTest` cases keep passing.
+- `withdrawRbtcFromTokenHandler` / `withdrawAllAccumulatedRbtc` credit `msg.sender` only. A second account with its own accrued rBTC receives exactly that amount; the first user’s accrued balance is unchanged. Existing `RbtcWithdrawalTest` cases keep passing.
 - `testOnlyUserCanWithdrawRbtc` still reverts for a non-manager caller.
 - Rescue-only tests are deleted, not rewritten to expect a revert on a removed function.
 

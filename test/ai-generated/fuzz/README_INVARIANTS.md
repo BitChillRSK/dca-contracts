@@ -78,7 +78,7 @@ LENDING_PROTOCOL=tropykus forge test --match-contract InvariantTest
 
 - ✅ **TropykusHandlerWrapper**: Now properly simulates rBTC accounting
 - ✅ **SovrynHandlerWrapper**: Added missing Sovryn wrapper for consistency
-- ✅ **Complete Interface**: Added missing `getAccumulatedRbtcBalance()` and `withdrawStuckRbtc` methods
+- ✅ **Complete Interface**: Added missing `getAccumulatedRbtcBalance()` on the fuzz wrappers
 - ✅ **rBTC Invariant**: Fixed foundry setup issues, now tests rBTC balance bounds
 - ✅ **Fork Testing**: Added environment variable support like unit tests
 - ✅ **Compiler Version**: Fixed pragma to match project (0.8.36)
