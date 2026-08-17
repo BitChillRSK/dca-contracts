@@ -198,6 +198,11 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending, ITropykusE
         if (result == 0) {
             uint256 stablecoinBalanceAfter = i_stableToken.balanceOf(address(this));
             stablecoinRedeemed = stablecoinBalanceAfter - stablecoinBalanceBefore;
+            // @notice a success code with no stablecoin received still burnt the user's kToken, so revert
+            // instead of paying out zero
+            if (stablecoinToRedeem > 0 && stablecoinRedeemed == 0) {
+                revert TropykusErc20Lending__ZeroStablecoinRedeemed(stablecoinToRedeem);
+            }
             emit TokenLending__UnderlyingRedeemed(user, stablecoinRedeemed, kTokenToRepay);
         } else {
             revert TropykusErc20Lending__RedeemUnderlyingFailed(result);

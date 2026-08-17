@@ -54,6 +54,9 @@ because the clamp fix below writes to `s_dcaSchedules` after an external call.
       precomputed gross. Keep the **planned** net total as the denominator when splitting purchased rBTC
       across buyers, so the per-user weights still sum to exactly 1 and the contract can never credit more
       rBTC than it received. Revert with a named error if the redeemed amount cannot cover the fee.
+      The planned amounts are weights only: each `PurchaseRbtc__RbtcBought` must report the buyer's share of
+      what was **actually** spent, so per-user events sum to the batch event instead of contradicting it. Same
+      for the Uniswap batch below.
 - [ ] `PurchaseUniswap._swapStablecoinForWrbtc`: return the measured WRBTC `balanceOf` delta rather than
       `exactInput`'s `amountOut`. Keep `amountOutMinimum` exactly as is.
 - [ ] `PurchaseUniswap.batchBuyRbtc`: same treatment as `PurchaseMoc`. It already spends the redeem result,
@@ -65,6 +68,12 @@ because the clamp fix below writes to `s_dcaSchedules` after an external call.
       net-returning redeem in this PR is what arms it.
 - [ ] `TropykusErc20Handler.withdrawToken`: transfer the amount `_redeemStablecoin` actually produced, not the
       requested amount. Sovryn already assigns the redeem result; Tropykus discarded it.
+- [ ] `TropykusErc20Handler._redeemInternal`: revert when a positive redemption request measures a zero
+      stablecoin delta, even though the market returned the success code. The kToken is burnt either way and
+      `DcaManager` has already debited the schedule, so a zero payout would destroy principal. Sovryn's redeem
+      paths already revert on a zero delta; this is the same guard. Paying out the measured amount is only
+      safe together with this check — transferring the *requested* amount used to make a zero payout revert in
+      `safeTransfer` by accident.
 - [ ] `ITokenHandler.withdrawToken` returns `uint256` — the amount actually paid to the user. `TokenHandler`,
       `TropykusErc20Handler`, and `SovrynErc20Handler` all return their real payout.
 - [ ] **Clamp desync (the R6 leftover; this PR owns it).** The handlers must stop paying out a number they
@@ -122,6 +131,9 @@ Behaviours to assert, with the mock's exit fee **enabled** (returns gross, pays 
 - `buyRbtc` and `batchBuyRbtc` on Sovryn+MoC succeed, and spend the net amount rather than reverting.
 - Sum of per-user accumulated rBTC credited by a batch is never greater than the rBTC the handler received,
   on both the MoC and the Uniswap batch paths.
+- Sum of the per-user `amountSpent` in a batch is never greater than the batch event's total spend.
+- A redemption that reports success but transfers nothing reverts instead of paying zero, on both handlers,
+  for `withdrawToken` and for `withdrawInterest`.
 - `withdrawToken` pays the user the net amount, while the schedule's `tokenBalance` drops by exactly what was
   requested. The fee is not credited back as phantom principal.
 - `deleteDcaSchedule` succeeds and its event reports the amount actually paid.

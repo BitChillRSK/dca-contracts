@@ -136,13 +136,14 @@ abstract contract PurchaseUniswap is
         if (wrBtcPurchased == 0) revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(i_purchasingToken));
 
         for (uint256 i; i < numOfPurchases; ++i) {
-            // @notice the weights are shares of the planned net total, so they sum to exactly 1 even when the
-            // redemption paid less than planned. Dividing by the smaller actual spend instead would credit
-            // more rBTC than this contract received.
+            // @notice the planned net amounts are only allocation weights: they sum to totalNetStablecoinPlanned,
+            // so the shares below sum to exactly 1 even when the redemption paid less. Both the rBTC credited
+            // and the stablecoin reported as spent are shares of what actually moved.
             uint256 usersPurchasedWrbtc = wrBtcPurchased * netStablecoinAmountsToSpend[i] / totalNetStablecoinPlanned;
+            uint256 usersStablecoinSpent = totalStablecoinAmountToSpend * netStablecoinAmountsToSpend[i] / totalNetStablecoinPlanned;
             s_usersAccumulatedRbtc[buyers[i]] += usersPurchasedWrbtc;
             emit PurchaseRbtc__RbtcBought(
-                buyers[i], address(i_purchasingToken), usersPurchasedWrbtc, scheduleIds[i], netStablecoinAmountsToSpend[i]
+                buyers[i], address(i_purchasingToken), usersPurchasedWrbtc, scheduleIds[i], usersStablecoinSpent
             );
         }
         emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(

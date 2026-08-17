@@ -184,6 +184,41 @@ contract NetRedemptionTest is DcaDappTest {
     }
 
     /**
+     * @notice Per-user events must add up to the batch event. After a short redemption the batch reports the
+     * smaller actual spend, so reporting each buyer's *planned* net amount would make the per-user totals
+     * exceed the cash that moved. The planned amounts are allocation weights, not amounts spent.
+     */
+    function test_sovryn_batchBuyRbtcEventsReportActualSpending() public onlySovrynMocMocks {
+        createSeveralDcaSchedules();
+        _enableExitFee();
+
+        (
+            address[] memory users,
+            uint256[] memory scheduleIndexes,
+            bytes32[] memory scheduleIds,
+            uint256[] memory purchaseAmounts
+        ) = _batchArrays();
+
+        uint256 plannedNetTotal;
+        for (uint256 i; i < purchaseAmounts.length; ++i) {
+            plannedNetTotal += purchaseAmounts[i] - feeCalculator.calculateFee(purchaseAmounts[i]);
+        }
+
+        vm.recordLogs();
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(
+            users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_lendingProtocolIndex
+        );
+
+        (uint256 perUserSpentTotal, uint256 batchSpent) = _batchSpendFromLogs();
+
+        assertLt(batchSpent, plannedNetTotal, "the exit fee should have shortened the spend");
+        assertLe(perUserSpentTotal, batchSpent, "per-user events report more spending than the batch did");
+        // and they are not silently zeroed either: rounding may drop a wei per buyer, nothing more
+        assertApproxEqAbs(perUserSpentTotal, batchSpent, NUM_OF_SCHEDULES);
+    }
+
+    /**
      * @notice The guard for a redemption that cannot even cover BitChill's own fee.
      * @dev This is deliberately not a SIP-0094 scenario. The Perimeter Fee is 10 bps against a BitChill fee
      * of ~100-200 bps, so a batch always redeems roughly a hundred times what it owes in fees and
@@ -307,6 +342,29 @@ contract NetRedemptionTest is DcaDappTest {
             scheduleIds[i] = dcaManager.getDcaSchedules(USER, address(stablecoin))[i].scheduleId;
             purchaseAmounts[i] = dcaManager.getDcaSchedules(USER, address(stablecoin))[i].purchaseAmount;
         }
+    }
+
+    /**
+     * @dev Sums the amountSpent of every PurchaseRbtc__RbtcBought and reads the batch event's total spend.
+     * RbtcBought indexes user, tokenSpent and scheduleId, leaving (rBtcBought, amountSpent) in data;
+     * SuccessfulRbtcBatchPurchase indexes everything, so its spend is the last topic.
+     */
+    function _batchSpendFromLogs() internal returns (uint256 perUserSpentTotal, uint256 batchSpent) {
+        bytes32 boughtSig = keccak256("PurchaseRbtc__RbtcBought(address,address,uint256,bytes32,uint256)");
+        bytes32 batchSig = keccak256("PurchaseRbtc__SuccessfulRbtcBatchPurchase(address,uint256,uint256)");
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bool foundBatch;
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].topics[0] == boughtSig) {
+                (, uint256 amountSpent) = abi.decode(logs[i].data, (uint256, uint256));
+                perUserSpentTotal += amountSpent;
+            } else if (logs[i].topics[0] == batchSig) {
+                batchSpent = uint256(logs[i].topics[3]);
+                foundBatch = true;
+            }
+        }
+        assertTrue(foundBatch, "no PurchaseRbtc__SuccessfulRbtcBatchPurchase log recorded");
+        assertGt(perUserSpentTotal, 0, "no PurchaseRbtc__RbtcBought logs recorded");
     }
 
     /// @dev refundedAmount is the only non-indexed field of DcaManager__DcaScheduleDeleted

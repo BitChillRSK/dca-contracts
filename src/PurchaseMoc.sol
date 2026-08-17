@@ -103,13 +103,14 @@ abstract contract PurchaseMoc is FeeHandler, PurchaseRbtc, IPurchaseMoc {
         }
 
         for (uint256 i; i < numOfPurchases; ++i) {
-            // @notice the weights are shares of the planned net total, so they sum to exactly 1 even when the
-            // redemption paid less than planned. Dividing by the smaller actual spend instead would credit
-            // more rBTC than this contract received.
+            // @notice the planned net amounts are only allocation weights: they sum to totalNetDocPlanned, so
+            // the shares below sum to exactly 1 even when the redemption paid less. Both the rBTC credited
+            // and the DOC reported as spent are shares of what actually moved.
             uint256 usersPurchasedRbtc = totalPurchasedRbtc * netDocAmountsToSpend[i] / totalNetDocPlanned;
+            uint256 usersDocSpent = totalDocAmountToSpend * netDocAmountsToSpend[i] / totalNetDocPlanned;
             s_usersAccumulatedRbtc[buyers[i]] += usersPurchasedRbtc;
             emit PurchaseRbtc__RbtcBought(
-                buyers[i], address(i_docToken), usersPurchasedRbtc, scheduleIds[i], netDocAmountsToSpend[i]
+                buyers[i], address(i_docToken), usersPurchasedRbtc, scheduleIds[i], usersDocSpent
             );
         }
         emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(address(i_docToken), totalPurchasedRbtc, totalDocAmountToSpend);
