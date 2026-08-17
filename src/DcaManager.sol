@@ -595,16 +595,17 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      * @param token: the token to withdraw
      * @param scheduleIndex: the index of the schedule
      * @param scheduleId: the schedule id for validation
-     * @param withdrawalAmount: the amount to withdraw
+     * @param withdrawalAmount: the amount to withdraw, or type(uint256).max for this schedule's whole token balance
      */
-    function _withdrawToken(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 withdrawalAmount) 
+    function _withdrawToken(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 withdrawalAmount)
         private
         validateScheduleIndex(msg.sender, token, scheduleIndex)
     {
-        if (withdrawalAmount == 0) revert DcaManager__WithdrawalAmountMustBeGreaterThanZero();
         DcaDetails storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
         uint256 tokenBalance = dcaSchedule.tokenBalance;
+        if (withdrawalAmount == type(uint256).max) withdrawalAmount = tokenBalance;
+        if (withdrawalAmount == 0) revert DcaManager__WithdrawalAmountMustBeGreaterThanZero();
         if (withdrawalAmount > tokenBalance) {
             revert DcaManager__WithdrawalAmountExceedsBalance(token, withdrawalAmount, tokenBalance);
         }

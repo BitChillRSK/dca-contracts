@@ -95,7 +95,7 @@ interface IDcaManager {
      * @param token The token address of the stablecoin to deposit.
      * @param scheduleIndex The index of the DCA schedule
      * @param scheduleId The schedule id for validation
-     * @param withdrawalAmount The amount of the stablecoin to withdraw.
+     * @param withdrawalAmount The amount of the stablecoin to withdraw. Pass type(uint256).max to withdraw this schedule’s whole token balance.
      */
     function withdrawToken(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 withdrawalAmount) external;
 
@@ -204,7 +204,7 @@ interface IDcaManager {
      * @param token The token address of the stablecoin to deposit.
      * @param scheduleIndex The index of the DCA schedule
      * @param scheduleId The schedule id for validation
-     * @param withdrawalAmount The amount of the stablecoin to withdraw.
+     * @param withdrawalAmount The amount of the stablecoin to withdraw, or type(uint256).max for this schedule's whole token balance.
      * @param lendingProtocolIndex: the lending protocol index
      */
     function withdrawTokenAndInterest(

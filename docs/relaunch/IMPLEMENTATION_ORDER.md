@@ -121,9 +121,9 @@ So, for an idle-funds handler:
 
 Stacked on PR 8. Test/Makefile only. `make moc-sovryn` must actually run Sovryn (`BaseDeploymentTest` must not `vm.setEnv` `LENDING_PROTOCOL`). `make fork-*` must pass a single `--no-match-path`. Tropykus fork tests pin Rootstock block `8700000` (2026-04-05); kDOC mint was paused between blocks 8739512 and 8740674. See `R24-test-harness-matrix.md`.
 
-### PR 10 - R15 withdraw-all sentinel and share dust
+### PR 10 - R15 withdraw-all sentinel
 
-Add `type(uint256).max` as "withdraw this schedule's full tokenBalance." Sweep leftover lending shares when the user's locked balance for that token/protocol is zero.
+Add `type(uint256).max` as "withdraw this schedule's full tokenBalance." Lending-share dust is deferred, not fixed; the decision is recorded in `R15-withdraw-all-sentinel.md`.
 
 This should follow R1/R20 so net redemption behavior is settled first.
 
