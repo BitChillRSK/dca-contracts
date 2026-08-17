@@ -14,6 +14,8 @@ R1 / R20 measure cash on lending redemptions, MoC, Uniswap, and withdrawals. Dep
 
 Lending is worse: the handler then `mint`s the requested amount, which can exceed the DOC it actually holds.
 
+**Do not delete the insufficient-balance guards on the way past.** Crediting received-on-deposit closes the last way to desync the books while `DcaManager` is correct, which will make `IdleErc20Handler__InsufficientIdleBalance` and `TokenLending__InsufficientLendingTokenBalance` (PR 12) read as dead code. They are not. Checked arithmetic reverts on those subtractions either way, so removing the `if` does not remove the revert — it only downgrades a named error carrying the offending user to a bare `Panic(0x11)` the swapper has to bisect a batch to interpret. Their job is to bound a `DcaManager` accounting bug to the user who caused it (the `updateDcaSchedule` stale-write-back class R6 analysed), which is the same reason the single-redeem clamps exist. FOT is not what they defend against. Keep both.
+
 Withdrawals stay on the R20 rule: principal falls by the **requested** amount because a redemption fee consumes principal. Do not credit the difference back. Outbound FOT (user receives less than the handler sent) is the same shape: the handler spent the requested amount.
 
 `createDcaSchedule` currently validates `purchaseAmount` against the requested `depositAmount` *before* the pull. After this PR it must validate against the credited `tokenBalance` (the received amount).
@@ -35,6 +37,7 @@ Withdrawals stay on the R20 rule: principal falls by the **requested** amount be
 ## Out of scope
 
 - [ ] Changing the R20 withdraw rule (requested amount still leaves `tokenBalance`).
+- [ ] Removing the batch-redeem insufficient-balance guards or the single-redeem clamps as newly-dead code. See **Background**.
 - [ ] LayerBank (PR 15). LayerBank must copy this deposit pattern; do not implement LayerBank here.
 - [ ] R16 redeem glossary.
 - [ ] Registering a FOT token in `DeployMocSwaps` / production constants. DOC/USDRIF stay the live tokens.

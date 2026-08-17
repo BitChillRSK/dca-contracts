@@ -112,7 +112,7 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler {
         for (uint256 i; i < numOfPurchases; ++i) {
             uint256 amount = purchaseAmounts[i];
             uint256 idleBalance = s_idleBalances[users[i]];
-            if (idleBalance < amount) {
+            if (amount > idleBalance) {
                 revert IdleErc20Handler__InsufficientIdleBalance(users[i], amount, idleBalance);
             }
             s_idleBalances[users[i]] = idleBalance - amount;
