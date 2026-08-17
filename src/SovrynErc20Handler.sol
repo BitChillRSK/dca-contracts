@@ -106,10 +106,6 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending, ISovrynErc20
      * @param stablecoinLockedInDcaSchedules: the amount of stablecoin locked in DCA schedules
      */
     function withdrawInterest(address user, uint256 stablecoinLockedInDcaSchedules) external override onlyDcaManager {
-        if (stablecoinLockedInDcaSchedules == 0) {
-            _sweepLendingPosition(user);
-            return;
-        }
         uint256 exchangeRate = i_iSusdToken.tokenPrice();
         uint256 totalErc20InLending = _lendingTokenToStablecoin(s_iSusdBalances[user], exchangeRate);
         if (totalErc20InLending <= stablecoinLockedInDcaSchedules) {
@@ -140,24 +136,6 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending, ISovrynErc20
     /*//////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice burn every iSusd left for a user who locks no stablecoin in DCA schedules on this handler
-     * @dev burns shares rather than a stablecoin amount converted back into shares: rounding leaves balances
-     * whose underlying truncates to zero, and those would otherwise stay mapped to the user forever
-     * @param user: the address of the user exiting the lending position
-     */
-    function _sweepLendingPosition(address user) private {
-        uint256 iSusdToBurn = s_iSusdBalances[user];
-        if (iSusdToBurn == 0) return;
-        s_iSusdBalances[user] = 0;
-        uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(user);
-        i_iSusdToken.burn(user, iSusdToBurn);
-        // @notice a sweep may legitimately produce nothing, so unlike a redemption it does not revert on zero
-        uint256 stablecoinRedeemed = i_stableToken.balanceOf(user) - stablecoinBalanceBefore;
-        emit TokenLending__UnderlyingRedeemed(user, stablecoinRedeemed, iSusdToBurn);
-        emit TokenLending__InterestWithdrawn(user, address(i_stableToken), stablecoinRedeemed);
-    }
 
     /**
      * @notice redeem stablecoin

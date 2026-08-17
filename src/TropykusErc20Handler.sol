@@ -102,10 +102,6 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending, ITropykusE
      * @param stablecoinLockedInDcaSchedules: the amount of stablecoin locked in DCA schedules
      */
     function withdrawInterest(address user, uint256 stablecoinLockedInDcaSchedules) external override onlyDcaManager {
-        if (stablecoinLockedInDcaSchedules == 0) {
-            _sweepLendingPosition(user);
-            return;
-        }
         uint256 exchangeRate = i_kToken.exchangeRateCurrent();
         uint256 totalStablecoinInLending = _lendingTokenToStablecoin(s_kTokenBalances[user], exchangeRate);
         if (totalStablecoinInLending <= stablecoinLockedInDcaSchedules) {
@@ -132,26 +128,6 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending, ITropykusE
     /*//////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice burn every kToken left for a user who locks no stablecoin in DCA schedules on this handler
-     * @dev burns shares rather than a stablecoin amount converted back into shares: rounding leaves balances
-     * whose underlying truncates to zero, and those would otherwise stay mapped to the user forever
-     * @param user: the address of the user exiting the lending position
-     */
-    function _sweepLendingPosition(address user) private {
-        uint256 kTokenToBurn = s_kTokenBalances[user];
-        if (kTokenToBurn == 0) return;
-        s_kTokenBalances[user] = 0;
-        uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(address(this));
-        uint256 result = i_kToken.redeem(kTokenToBurn);
-        if (result != 0) revert TropykusErc20Lending__RedeemUnderlyingFailed(result);
-        // @notice a sweep may legitimately produce nothing, so unlike a redemption it does not revert on zero
-        uint256 stablecoinRedeemed = i_stableToken.balanceOf(address(this)) - stablecoinBalanceBefore;
-        emit TokenLending__UnderlyingRedeemed(user, stablecoinRedeemed, kTokenToBurn);
-        if (stablecoinRedeemed > 0) i_stableToken.safeTransfer(user, stablecoinRedeemed);
-        emit TokenLending__InterestWithdrawn(user, address(i_stableToken), stablecoinRedeemed);
-    }
 
     /**
      * @notice redeem stablecoin

@@ -281,10 +281,6 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
             amountWithdrawn = _handler(token, lendingProtocolIndex).withdrawToken(msg.sender, tokenBalance);
         }
 
-        // @notice closing the last schedule on this handler must also exit the lending position, or the
-        // shares rounding left behind stay mapped to the user with no call that can ever release them
-        _sweepLendingPositionIfUnlocked(token, lendingProtocolIndex);
-
         // @notice the event reports what the lending protocol actually paid, which may be less than the schedule's tokenBalance
         emit DcaManager__DcaScheduleDeleted(msg.sender, token, scheduleId, amountWithdrawn);
     }
@@ -631,41 +627,14 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     function _withdrawInterest(address token, uint256 lendingProtocolIndex) private {
         _checkTokenYieldsInterest(token, lendingProtocolIndex);
         ITokenHandler tokenHandler = _handler(token, lendingProtocolIndex);
-        ITokenLending(address(tokenHandler)).withdrawInterest(
-            msg.sender, _lockedTokenAmount(token, lendingProtocolIndex)
-        );
-    }
-
-    /**
-     * @notice hand the handler a zero locked balance so it releases the caller's whole lending position
-     * @dev no-op when the schedules left still lock stablecoin on this handler, or when the protocol index
-     * has no lending protocol behind it (an idle handler has no shares and no withdrawInterest to call)
-     * @param token: the token whose lending position may be swept
-     * @param lendingProtocolIndex: the lending protocol index
-     */
-    function _sweepLendingPositionIfUnlocked(address token, uint256 lendingProtocolIndex) private {
-        if (!_tokenYieldsInterest(lendingProtocolIndex)) return;
-        if (_lockedTokenAmount(token, lendingProtocolIndex) > 0) return;
-        ITokenLending(address(_handler(token, lendingProtocolIndex))).withdrawInterest(msg.sender, 0);
-    }
-
-    /**
-     * @notice the stablecoin the caller still locks in schedules held on one lending protocol
-     * @param token: the token of the schedules
-     * @param lendingProtocolIndex: the lending protocol index
-     * @return lockedTokenAmount the sum of the token balances of the caller's schedules on that protocol
-     */
-    function _lockedTokenAmount(address token, uint256 lendingProtocolIndex)
-        private
-        view
-        returns (uint256 lockedTokenAmount)
-    {
         DcaDetails[] memory dcaSchedules = s_dcaSchedules[msg.sender][token];
+        uint256 lockedTokenAmount;
         for (uint256 i; i < dcaSchedules.length; ++i) {
             if (dcaSchedules[i].lendingProtocolIndex == lendingProtocolIndex) {
                 lockedTokenAmount += dcaSchedules[i].tokenBalance;
             }
         }
+        ITokenLending(address(tokenHandler)).withdrawInterest(msg.sender, lockedTokenAmount);
     }
 
     /**
@@ -674,18 +643,9 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      * @param lendingProtocolIndex: the lending protocol index
      */
     function _checkTokenYieldsInterest(address token, uint256 lendingProtocolIndex) private view {
-        if (!_tokenYieldsInterest(lendingProtocolIndex)) revert DcaManager__TokenDoesNotYieldInterest(token);
-    }
-
-    /**
-     * @notice whether a lending protocol is registered for an index
-     * @param lendingProtocolIndex: the lending protocol index
-     * @return true if a protocol name is registered for that index
-     */
-    function _tokenYieldsInterest(uint256 lendingProtocolIndex) private view returns (bool) {
         bytes32 protocolNameHash =
             keccak256(abi.encodePacked(s_operationsAdmin.getLendingProtocolName(lendingProtocolIndex)));
-        return protocolNameHash != keccak256(abi.encodePacked(""));
+        if (protocolNameHash == keccak256(abi.encodePacked(""))) revert DcaManager__TokenDoesNotYieldInterest(token);
     }
 
     /*//////////////////////////////////////////////////////////////

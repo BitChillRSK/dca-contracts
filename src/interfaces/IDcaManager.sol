@@ -138,8 +138,6 @@ interface IDcaManager {
 
     /**
      * @dev function to delete a DCA schedule: cancels DCA and retrieves the funds
-     * @notice deleting the caller's last schedule on that token and lending protocol also burns the lending
-     * tokens left over on the handler, so closing a position takes no second call
      * @param token the token used for DCA in the schedule to be deleted
      * @param scheduleIndex the index of the schedule to delete
      * @param scheduleId the unique identifier of the schedule to be deleted for validation
@@ -210,8 +208,8 @@ interface IDcaManager {
      * @param scheduleIndex The index of the DCA schedule
      * @param scheduleId The schedule id for validation
      * @param withdrawalAmount The amount of the stablecoin to withdraw, or type(uint256).max for this
-     * schedule's whole token balance. Combining the sentinel with the interest withdrawal exits the position:
-     * once no schedule locks stablecoin on that handler, the remaining lending tokens are burnt too.
+     * schedule's whole token balance. The sentinel takes the schedule's principal only; interest is
+     * withdrawn in the same call through this function's interest path.
      * @param lendingProtocolIndex: the lending protocol index
      */
     function withdrawTokenAndInterest(
