@@ -39,13 +39,13 @@ Handlers = TokenHandler + TokenLending + a Purchase*:
                                             └─ SovrynErc20HandlerDex (+ PurchaseUniswap)
   src/tropykus-legacy/   TropykusErc20Handler ─┬─ TropykusDocHandlerMoc   (+ PurchaseMoc)
                                               └─ TropykusErc20HandlerDex (+ PurchaseUniswap)
-  src/idle/              index 0 (PR 12)
+  src/idle/              IdleErc20Handler ── IdleDocHandlerMoc (+ PurchaseMoc)  index 0
   src/layerbank/         index 1 (PR 13)
 ```
 
-- `src/interfaces/` — shared first-party ABIs; keep in sync with implementations. Protocol-specific interfaces (`IiSusdToken`, `IkToken`, `ISovrynErc20Lending`, `ITropykusErc20Lending`) live next to their handlers.
+- `src/interfaces/` — shared first-party ABIs; keep in sync with implementations. Protocol-specific interfaces (`IiSusdToken`, `IkToken`, `ISovrynErc20Lending`, `ITropykusErc20Lending`, `IIdleErc20Handler`) live next to their handlers.
 - `test/unit/DcaDappTest.t.sol` — shared harness; **requires** `SWAP_TYPE` and `LENDING_PROTOCOL` (no fallback).
-- `test/unit/`, `test/mocks/`, `test/ai-generated/` — unit / mocks / extra + fuzz. Dedicated handler tests: `test/ai-generated/unit/sovryn/`, `test/ai-generated/unit/tropykus-legacy/`.
+- `test/unit/`, `test/mocks/`, `test/ai-generated/` — unit / mocks / extra + fuzz. Dedicated handler tests: `test/ai-generated/unit/sovryn/`, `test/ai-generated/unit/tropykus-legacy/`, `test/ai-generated/unit/idle/`.
 - `script/` — deploy helpers. Do not `--broadcast` or talk to live contracts.
 
 ## Protocol invariants

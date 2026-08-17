@@ -1,1 +1,1 @@
-Idle DOC handler (lending index 0). Solidity lands in PR 12; this folder exists so the R22 layout is complete before that PR.
+Idle DOC handler (lending index 0). Deposits stay on the handler; no lending token is minted. Buys and withdrawals spend idle DOC. Interest calls revert because index 0 has no protocol name.

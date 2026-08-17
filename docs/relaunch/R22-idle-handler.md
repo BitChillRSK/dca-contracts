@@ -65,10 +65,8 @@ Targeted:
 ```
 SWAP_TYPE=mocSwaps LENDING_PROTOCOL=tropykus EXPECTED_LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=DOC \
   forge test --no-match-test invariant --no-match-contract ComparePurchaseMethods \
-  --match-path "test/ai-generated/unit/idle/**" --match-path "test/ai-generated/unit/HandlerTestHarness.t.sol" -j 1
+  --match-path "test/ai-generated/unit/idle/**" -j 1
 ```
-
-(`HandlerTestHarness` is abstract; the idle path is enough. Existing sovryn/tropykus-legacy harness children still run under `make check`.)
 
 Then the done-gate:
 
