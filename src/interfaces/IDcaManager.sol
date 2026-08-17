@@ -86,7 +86,7 @@ interface IDcaManager {
      * @param token The token address of the stablecoin to deposit.
      * @param scheduleIndex The index of the DCA schedule
      * @param scheduleId The schedule id for validation
-     * @param depositAmount The amount of the stablecoin to deposit.
+     * @param depositAmount The amount of the stablecoin requested from the user. The schedule is credited with the amount the handler actually received.
      */
     function depositToken(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 depositAmount) external;
 
@@ -102,8 +102,8 @@ interface IDcaManager {
     /**
      * @notice Create a new DCA schedule depositing a specified amount of a stablecoin into the contract.
      * @param token The token address of the stablecoin to deposit.
-     * @param depositAmount The amount of the stablecoin to deposit.
-     * @param purchaseAmount The amount of to spend periodically in buying rBTC
+     * @param depositAmount The amount of the stablecoin requested from the user. The schedule is credited with the amount the handler actually received.
+     * @param purchaseAmount The amount of to spend periodically in buying rBTC. Validated against the credited token balance, not the requested deposit.
      * @param purchasePeriod The period for recurrent purchases
      * @param lendingProtocolIndex: the index in the OperationsAdmin contract of the lending protocol, if any, where the token will be deposited to generate yield
      */
@@ -120,8 +120,8 @@ interface IDcaManager {
      * @param token The token address of the stablecoin to deposit.
      * @param scheduleIndex The index of the DCA schedule
      * @param scheduleId The schedule id for validation
-     * @param depositAmount The amount of the stablecoin to deposit.
-     * @param purchaseAmount The amount of to spend periodically in buying rBTC
+     * @param depositAmount The amount of the stablecoin requested from the user. The schedule is credited with the amount the handler actually received.
+     * @param purchaseAmount The amount of to spend periodically in buying rBTC. Validated against the post-deposit token balance.
      * @param purchasePeriod The period for recurrent purchases
      */
     function updateDcaSchedule(

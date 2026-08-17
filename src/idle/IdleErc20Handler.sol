@@ -33,16 +33,16 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler {
     /**
      * @notice deposit the full token amount for DCA on the contract
      * @param user: the address of the user making the deposit
-     * @param depositAmount: the amount to deposit
+     * @param depositAmount: the amount requested from the user
+     * @return received the amount actually credited to the user's idle balance
      */
     function depositToken(address user, uint256 depositAmount)
         public
         override
         onlyDcaManager
+        returns (uint256 received)
     {
-        uint256 balanceBefore = i_stableToken.balanceOf(address(this));
-        super.depositToken(user, depositAmount);
-        uint256 received = i_stableToken.balanceOf(address(this)) - balanceBefore;
+        received = super.depositToken(user, depositAmount);
         if (depositAmount > 0 && received == 0) revert IdleErc20Handler__ZeroStablecoinReceived();
         s_idleBalances[user] += received;
     }

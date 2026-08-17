@@ -42,11 +42,15 @@ abstract contract TokenHandler is ITokenHandler, ERC165, Ownable, FeeHandler, Dc
      * @notice This function transfers the selected token from the user to this contract. The user must have called the token contract's
      * approve function with this contract's address and the amount approved
      * @param user: the address of the user making the deposit
-     * @param depositAmount: the amount to deposit
+     * @param depositAmount: the amount requested from the user
+     * @return received the amount this contract actually received (balance delta around transferFrom)
      */
-    function depositToken(address user, uint256 depositAmount) public virtual override onlyDcaManager {
+    function depositToken(address user, uint256 depositAmount) public virtual override onlyDcaManager returns (uint256 received) {
+        uint256 balanceBefore = i_stableToken.balanceOf(address(this));
         i_stableToken.safeTransferFrom(user, address(this), depositAmount);
-        emit TokenHandler__TokenDeposited(address(i_stableToken), user, depositAmount);
+        received = i_stableToken.balanceOf(address(this)) - balanceBefore;
+        if (depositAmount > 0 && received == 0) revert TokenHandler__ZeroStablecoinReceived();
+        emit TokenHandler__TokenDeposited(address(i_stableToken), user, received);
     }
 
     /**

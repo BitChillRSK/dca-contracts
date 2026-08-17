@@ -1,6 +1,6 @@
 # R21 — Fee-on-transfer deposits
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **in review** · Assigned: yes · Optional/further-review: no
 
 PR 13. Stack on the idle handler PR. Land before LayerBank.
 
@@ -26,13 +26,13 @@ Withdrawals stay on the R20 rule: principal falls by the **requested** amount be
 
 ## Scope
 
-- [ ] `ITokenHandler.depositToken` returns `uint256` — the amount the handler actually received (balance delta of `address(this)` around `transferFrom`).
-- [ ] `TokenHandler.depositToken` measures that delta, reverts if a positive request received 0, returns it. Event reports received, not requested.
-- [ ] `IdleErc20Handler.depositToken` uses the base return (or the same delta) for `s_idleBalances`. Keep the zero-received revert.
-- [ ] Sovryn / Tropykus `depositToken`: pull via the base (received), then mint **received** into the lending token, then credit the share `balanceOf` delta as today.
-- [ ] `DcaManager.depositToken` / `createDcaSchedule` / `updateDcaSchedule`: credit `tokenBalance` with the handler return. `create` / `update` validate `purchaseAmount` against the post-deposit `tokenBalance`, not the requested deposit. Events that report the new balance use the credited amount.
-- [ ] `updateDcaSchedule`: pull then credit (do not add `depositAmount` to the memory copy before the handler returns).
-- [ ] Mock + tests in the same style as `MockReentrantStablecoin` / `test/unit/DepositSwapPopReentrancyTest.t.sol`: a dedicated mock that takes a fee on `transfer` / `transferFrom`, and tests that prove create / extra deposit / buy / withdraw keep `tokenBalance` equal to the handler book (idle mapping or underlying value of shares, modulo the existing 100-wei lending rounding slack). Another user's funds are untouched. A zero-received deposit reverts.
+- [x] `ITokenHandler.depositToken` returns `uint256` — the amount the handler actually received (balance delta of `address(this)` around `transferFrom`).
+- [x] `TokenHandler.depositToken` measures that delta, reverts if a positive request received 0, returns it. Event reports received, not requested.
+- [x] `IdleErc20Handler.depositToken` uses the base return (or the same delta) for `s_idleBalances`. Keep the zero-received revert.
+- [x] Sovryn / Tropykus `depositToken`: pull via the base (received), then mint **received** into the lending token, then credit the share `balanceOf` delta as today.
+- [x] `DcaManager.depositToken` / `createDcaSchedule` / `updateDcaSchedule`: credit `tokenBalance` with the handler return. `create` / `update` validate `purchaseAmount` against the post-deposit `tokenBalance`, not the requested deposit. Events that report the new balance use the credited amount.
+- [x] `updateDcaSchedule`: pull then credit (do not add `depositAmount` to the memory copy before the handler returns).
+- [x] Mock + tests in the same style as `MockReentrantStablecoin` / `test/unit/DepositSwapPopReentrancyTest.t.sol`: a dedicated mock that takes a fee on `transfer` / `transferFrom`, and tests that prove create / extra deposit / buy / withdraw keep `tokenBalance` equal to the handler book (idle mapping or underlying value of shares, modulo the existing 100-wei lending rounding slack). Another user's funds are untouched. A zero-received deposit reverts.
 
 ## Out of scope
 
@@ -79,10 +79,10 @@ Fork tests: not required.
 
 ## Success criteria
 
-- [ ] Handler `depositToken` returns the measured received amount; DcaManager credits that amount.
-- [ ] Lending mints from received, not requested.
-- [ ] FOT tests prove the books stay in lockstep; `make check` still passes on DOC/USDRIF.
-- [ ] Withdraw still debits requested principal (R20).
+- [x] Handler `depositToken` returns the measured received amount; DcaManager credits that amount.
+- [x] Lending mints from received, not requested.
+- [x] FOT tests prove the books stay in lockstep; `make check` still passes on DOC/USDRIF.
+- [x] Withdraw still debits requested principal (R20).
 
 ## Reviewer checklist
 

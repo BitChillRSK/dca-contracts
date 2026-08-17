@@ -18,8 +18,10 @@ contract MockMocProxy {
 
     function redeemFreeDoc(uint256 docAmount) external {
         uint256 redeemedRbtc = docAmount / BTC_PRICE;
+        uint256 balanceBefore = mockDocToken.balanceOf(address(this));
         mockDocToken.transferFrom(msg.sender, address(this), docAmount);
-        mockDocToken.burn(docAmount);
+        uint256 received = mockDocToken.balanceOf(address(this)) - balanceBefore;
+        mockDocToken.burn(received);
         (bool success,) = msg.sender.call{value: redeemedRbtc}("");
         if (success) {
             emit MockMocProxy__DocRedeemed(msg.sender, docAmount, redeemedRbtc);

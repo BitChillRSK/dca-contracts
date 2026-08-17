@@ -47,20 +47,22 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending, ISovrynErc20
     /**
      * @notice deposit the full token amount for DCA on the contract
      * @param user: the address of the user making the deposit
-     * @param depositAmount: the amount to deposit
+     * @param depositAmount: the amount requested from the user
+     * @return received the stablecoin amount actually received before minting iTokens
      */
     function depositToken(address user, uint256 depositAmount)
         public
         override(TokenHandler, ITokenHandler)
         onlyDcaManager
+        returns (uint256 received)
     {
-        super.depositToken(user, depositAmount);
-        if (i_stableToken.allowance(address(this), address(i_iSusdToken)) < depositAmount) {
-            i_stableToken.safeApprove(address(i_iSusdToken), depositAmount);
+        received = super.depositToken(user, depositAmount);
+        if (i_stableToken.allowance(address(this), address(i_iSusdToken)) < received) {
+            i_stableToken.safeApprove(address(i_iSusdToken), received);
         }
         // @notice the iSusd we credit is the balance we actually gained, never mint()'s return value
         uint256 prevIsusdBalance = i_iSusdToken.balanceOf(address(this));
-        i_iSusdToken.mint(address(this), depositAmount);
+        i_iSusdToken.mint(address(this), received);
         uint256 mintedAmount = i_iSusdToken.balanceOf(address(this)) - prevIsusdBalance;
         if (mintedAmount == 0) revert TokenLending__LendingProtocolDepositFailed();
         s_iSusdBalances[user] += mintedAmount;

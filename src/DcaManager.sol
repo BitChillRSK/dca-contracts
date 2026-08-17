@@ -98,7 +98,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      * @param token the token address
      * @param scheduleIndex the schedule index
      * @param scheduleId the schedule id for validation
-     * @param depositAmount the amount of stablecoin to deposit
+     * @param depositAmount the amount of stablecoin requested from the user; the schedule is credited with what the handler received
      */
     function depositToken(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 depositAmount)
         external
@@ -109,8 +109,8 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         _validateDeposit(depositAmount);
         DcaDetails storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
-        _handler(token, dcaSchedule.lendingProtocolIndex).depositToken(msg.sender, depositAmount);
-        uint256 newTokenBalance = dcaSchedule.tokenBalance + depositAmount;
+        uint256 received = _handler(token, dcaSchedule.lendingProtocolIndex).depositToken(msg.sender, depositAmount);
+        uint256 newTokenBalance = dcaSchedule.tokenBalance + received;
         dcaSchedule.tokenBalance = newTokenBalance;
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
     }
@@ -158,8 +158,8 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     /**
      * @notice deposit the full stablecoin amount for DCA on the contract, set the period and the amount for purchases
      * @param token: the token address of stablecoin to deposit
-     * @param depositAmount: the amount of stablecoin to deposit
-     * @param purchaseAmount: the amount of stablecoin to swap periodically for rBTC
+     * @param depositAmount: the amount of stablecoin requested from the user; the schedule is credited with what the handler received
+     * @param purchaseAmount: the amount of stablecoin to swap periodically for rBTC (validated against the credited balance)
      * @param purchasePeriod: the time (in seconds) between rBTC purchases for each user
      * @param lendingProtocolIndex: the lending protocol, if any, where the token will be deposited to generate yield
      */
@@ -172,8 +172,8 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     ) external override nonReentrant {
         _validatePurchasePeriod(purchasePeriod);
         _validateDeposit(depositAmount);
-        _validatePurchaseAmount(token, purchaseAmount, depositAmount);
-        _handler(token, lendingProtocolIndex).depositToken(msg.sender, depositAmount);
+        uint256 received = _handler(token, lendingProtocolIndex).depositToken(msg.sender, depositAmount);
+        _validatePurchaseAmount(token, purchaseAmount, received);
 
         DcaDetails[] storage schedules = s_dcaSchedules[msg.sender][token];
         uint256 numOfSchedules = schedules.length;
@@ -184,7 +184,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         bytes32 scheduleId = keccak256(abi.encodePacked(msg.sender, token, ++s_scheduleNonce));
 
         DcaDetails memory dcaSchedule = DcaDetails(
-            depositAmount,
+            received,
             purchaseAmount,
             purchasePeriod,
             0, // lastPurchaseTimestamp
@@ -197,7 +197,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
             msg.sender, 
             token,
             scheduleId, 
-            depositAmount, 
+            received, 
             purchaseAmount, 
             purchasePeriod, 
             lendingProtocolIndex
@@ -210,8 +210,8 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      * @param token: the token address of stablecoin to deposit
      * @param scheduleIndex: the index of the schedule to create or update
      * @param scheduleId: the schedule id for validation
-     * @param depositAmount: the amount of stablecoin to add to the existing schedule (final token balance for the schedule is the previous balance + depositAmount)
-     * @param purchaseAmount: the amount of stablecoin to swap periodically for rBTC
+     * @param depositAmount: the amount of stablecoin requested from the user (final token balance is the previous balance plus what the handler received)
+     * @param purchaseAmount: the amount of stablecoin to swap periodically for rBTC (validated against the post-deposit token balance)
      * @param purchasePeriod: the time (in seconds) between rBTC purchases for each user
      */
     function updateDcaSchedule(
@@ -231,8 +231,8 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
             dcaSchedule.purchasePeriod = purchasePeriod;
         }
         if (depositAmount > 0) {
-            dcaSchedule.tokenBalance += depositAmount;
-            _handler(token, dcaSchedule.lendingProtocolIndex).depositToken(msg.sender, depositAmount);
+            uint256 received = _handler(token, dcaSchedule.lendingProtocolIndex).depositToken(msg.sender, depositAmount);
+            dcaSchedule.tokenBalance += received;
         }
         if (purchaseAmount > 0) {
             _validatePurchaseAmount(token, purchaseAmount, dcaSchedule.tokenBalance);
