@@ -211,7 +211,7 @@ abstract contract FeeHandler is IFeeHandler, Ownable {
      * @param purchaseAmounts The array with the raw purchase amounts specified by users.
      * @return aggregatedFee      The total fee to be collected for all purchases.
      * @return netAmountsToSpend  An array with the net amounts (purchase amount minus fee) for each user.
-     * @return totalAmountToSpend The aggregated net amount that will actually be used to buy rBTC.
+     * @return totalAmountToSpend The aggregated net amount that will actually be used to buy rBTC after fee is charged.
      */
     function _calculateFeeAndNetAmounts(uint256[] memory purchaseAmounts)
         internal

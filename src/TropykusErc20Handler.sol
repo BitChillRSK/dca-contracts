@@ -68,11 +68,13 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending, ITropykusE
      * @notice withdraw the token amount sending it back to the user's address
      * @param user: the address of the user making the withdrawal
      * @param withdrawalAmount: the amount to withdraw
+     * @return the amount of stablecoin actually paid to the user
      */
     function withdrawToken(address user, uint256 withdrawalAmount)
         public
         override(TokenHandler, ITokenHandler)
         onlyDcaManager
+        returns (uint256)
     {
         uint256 exchangeRate = i_kToken.exchangeRateCurrent();
         uint256 stablecoinInTropykus = _lendingTokenToStablecoin(s_kTokenBalances[user], exchangeRate);
@@ -80,8 +82,9 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending, ITropykusE
             emit TokenLending__WithdrawalAmountAdjusted(user, withdrawalAmount, stablecoinInTropykus);
             withdrawalAmount = stablecoinInTropykus;
         }
-        _redeemStablecoin(user, withdrawalAmount, exchangeRate);
-        super.withdrawToken(user, withdrawalAmount);
+        // @notice we pay out what the redemption actually produced, which may be less than requested
+        withdrawalAmount = _redeemStablecoin(user, withdrawalAmount, exchangeRate);
+        return super.withdrawToken(user, withdrawalAmount);
     }
 
     /**
@@ -195,6 +198,11 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending, ITropykusE
         if (result == 0) {
             uint256 stablecoinBalanceAfter = i_stableToken.balanceOf(address(this));
             stablecoinRedeemed = stablecoinBalanceAfter - stablecoinBalanceBefore;
+            // @notice a success code with no stablecoin received still burnt the user's kToken, so revert
+            // instead of paying out zero
+            if (stablecoinToRedeem > 0 && stablecoinRedeemed == 0) {
+                revert TropykusErc20Lending__ZeroStablecoinRedeemed(stablecoinToRedeem);
+            }
             emit TokenLending__UnderlyingRedeemed(user, stablecoinRedeemed, kTokenToRepay);
         } else {
             revert TropykusErc20Lending__RedeemUnderlyingFailed(result);

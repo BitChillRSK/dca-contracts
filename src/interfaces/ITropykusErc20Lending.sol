@@ -13,4 +13,6 @@ interface ITropykusErc20Lending is ITokenLending {
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
     error TropykusErc20Lending__RedeemUnderlyingFailed(uint256 errorCode);
+    /// @notice the redemption reported success but paid nothing, so the burnt kToken bought no stablecoin
+    error TropykusErc20Lending__ZeroStablecoinRedeemed(uint256 stablecoinRequested);
 }

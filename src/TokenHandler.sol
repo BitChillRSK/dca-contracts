@@ -54,10 +54,12 @@ abstract contract TokenHandler is ITokenHandler, ERC165, Ownable, FeeHandler, Dc
      * @notice This function transfers stablecoin token from this contract back to the user
      * @param user: the address of the user making the withdrawal
      * @param withdrawalAmount: the amount of stablecoin token to withdraw
+     * @return the amount transferred to the user
      */
-    function withdrawToken(address user, uint256 withdrawalAmount) public virtual override onlyDcaManager {
+    function withdrawToken(address user, uint256 withdrawalAmount) public virtual override onlyDcaManager returns (uint256) {
         i_stableToken.safeTransfer(user, withdrawalAmount);
         emit TokenHandler__TokenWithdrawn(address(i_stableToken), user, withdrawalAmount);
+        return withdrawalAmount;
     }
 
     /**

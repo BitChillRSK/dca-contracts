@@ -80,34 +80,40 @@ abstract contract PurchaseMoc is FeeHandler, PurchaseRbtc, IPurchaseMoc {
         uint256 numOfPurchases = buyers.length;
 
         // Calculate net amounts
-        (uint256 aggregatedFee, uint256[] memory netDocAmountsToSpend, uint256 totalDocAmountToSpend) =
+        (uint256 aggregatedFee, uint256[] memory netDocAmountsToSpend, uint256 totalNetDocPlanned) =
             _calculateFeeAndNetAmounts(purchaseAmounts);
 
         // Redeem DOC (and repay kDOC)
-        _batchRedeemStablecoin(buyers, purchaseAmounts, totalDocAmountToSpend + aggregatedFee); // total DOC to redeem by repaying kDOC in order to spend it to redeem rBTC is totalDocAmountToSpend + aggregatedFee
+        // @notice we spend the DOC we actually received, which might not match totalNetDocPlanned, the full amount we asked the lending protocol for
+        uint256 totalDocAmountToSpend = _batchRedeemStablecoin(buyers, purchaseAmounts, totalNetDocPlanned + aggregatedFee); // total DOC to redeem by repaying kDOC in order to spend it to redeem rBTC is totalNetDocPlanned + aggregatedFee
+        if (totalDocAmountToSpend <= aggregatedFee) {
+            revert PurchaseRbtc__RedeemedAmountBelowFee(totalDocAmountToSpend, aggregatedFee);
+        }
+        totalDocAmountToSpend -= aggregatedFee;
 
         // Charge fees
         _transferFee(i_docToken, aggregatedFee);
 
         // Redeem DOC for rBTC
-        (uint256 balancePrev, uint256 balancePost) = _redeemRbtc(totalDocAmountToSpend);
-
-        if (balancePost > balancePrev) {
-            uint256 totalPurchasedRbtc = balancePost - balancePrev;
-
-            for (uint256 i; i < numOfPurchases; ++i) {
-                uint256 usersPurchasedRbtc = totalPurchasedRbtc * netDocAmountsToSpend[i] / totalDocAmountToSpend;
-                s_usersAccumulatedRbtc[buyers[i]] += usersPurchasedRbtc;
-                emit PurchaseRbtc__RbtcBought(
-                    buyers[i], address(i_docToken), usersPurchasedRbtc, scheduleIds[i], netDocAmountsToSpend[i]
-                );
-            }
-            emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
-                address(i_docToken), totalPurchasedRbtc, totalDocAmountToSpend
-            );
-        } else {
-            revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(i_docToken));
+        uint256 totalPurchasedRbtc;
+        {
+            (uint256 balancePrev, uint256 balancePost) = _redeemRbtc(totalDocAmountToSpend);
+            if (balancePost <= balancePrev) revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(i_docToken));
+            totalPurchasedRbtc = balancePost - balancePrev;
         }
+
+        for (uint256 i; i < numOfPurchases; ++i) {
+            // @notice the planned net amounts are only allocation weights: they sum to totalNetDocPlanned, so
+            // the shares below sum to exactly 1 even when the redemption paid less. Both the rBTC credited
+            // and the DOC reported as spent are shares of what actually moved.
+            uint256 usersPurchasedRbtc = totalPurchasedRbtc * netDocAmountsToSpend[i] / totalNetDocPlanned;
+            uint256 usersDocSpent = totalDocAmountToSpend * netDocAmountsToSpend[i] / totalNetDocPlanned;
+            s_usersAccumulatedRbtc[buyers[i]] += usersPurchasedRbtc;
+            emit PurchaseRbtc__RbtcBought(
+                buyers[i], address(i_docToken), usersPurchasedRbtc, scheduleIds[i], usersDocSpent
+            );
+        }
+        emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(address(i_docToken), totalPurchasedRbtc, totalDocAmountToSpend);
     }
 
     /*//////////////////////////////////////////////////////////////

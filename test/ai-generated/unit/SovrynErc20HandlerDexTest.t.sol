@@ -132,6 +132,53 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
         sovrynDexHandler.setAmountOutMinimumPercent(safetyCheck - 1);
     }
     
+    /**
+     * @notice R1 / R20. When the redeem pays less than planned — SIP-0094's exit fee, or any short
+     * redemption — the batch must not hand out more WRBTC than the swap produced. The per-user weights are
+     * shares of the planned net total, so they still sum to one; dividing by the smaller actual spend would
+     * credit each buyer a slice of rBTC the handler never received.
+     */
+    function test_sovrynDex_batchBuyRbtcCreditsNoMoreRbtcThanReceived() public {
+        address buyerOne = makeAddr("dexBuyerOne");
+        address buyerTwo = makeAddr("dexBuyerTwo");
+
+        stablecoin.mint(buyerOne, DEPOSIT_AMOUNT);
+        stablecoin.mint(buyerTwo, DEPOSIT_AMOUNT);
+        vm.prank(buyerOne);
+        stablecoin.approve(address(sovrynDexHandler), type(uint256).max);
+        vm.prank(buyerTwo);
+        stablecoin.approve(address(sovrynDexHandler), type(uint256).max);
+
+        vm.startPrank(address(dcaManager));
+        sovrynDexHandler.depositToken(buyerOne, DEPOSIT_AMOUNT);
+        sovrynDexHandler.depositToken(buyerTwo, DEPOSIT_AMOUNT);
+        vm.stopPrank();
+
+        iSusdToken.setExitFeeBps(10); // the 0.10% Sovryn approved
+
+        address[] memory buyers = new address[](2);
+        buyers[0] = buyerOne;
+        buyers[1] = buyerTwo;
+        bytes32[] memory scheduleIds = new bytes32[](2);
+        scheduleIds[0] = bytes32(uint256(1));
+        scheduleIds[1] = bytes32(uint256(2));
+        uint256[] memory purchaseAmounts = new uint256[](2);
+        purchaseAmounts[0] = DEPOSIT_AMOUNT / 4;
+        purchaseAmounts[1] = DEPOSIT_AMOUNT / 2;
+
+        uint256 handlerWrbtcBefore = wrbtcToken.balanceOf(address(sovrynDexHandler));
+
+        vm.prank(address(dcaManager));
+        sovrynDexHandler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts);
+
+        uint256 received = wrbtcToken.balanceOf(address(sovrynDexHandler)) - handlerWrbtcBefore;
+        uint256 credited = sovrynDexHandler.getAccumulatedRbtcBalance(buyerOne)
+            + sovrynDexHandler.getAccumulatedRbtcBalance(buyerTwo);
+
+        assertGt(credited, 0);
+        assertLe(credited, received, "credited more rBTC than the handler received");
+    }
+
     function test_sovrynDex_setAmountOutMinimumPercent_reverts_notOwner() public {
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(USER);

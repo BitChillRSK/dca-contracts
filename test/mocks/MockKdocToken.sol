@@ -35,9 +35,24 @@ contract MockKdocToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
         return 0;
     }
 
+    /**
+     * @notice When set, redeem calls burn the kDOC, transfer nothing, and still return the success code 0.
+     * @dev Models a Compound-style market that reports success while paying out nothing (paused transfer,
+     * empty market, upgraded implementation). Integrators that trust the return code lose the burnt shares.
+     */
+    bool private s_silentZeroPayout;
+
+    function setSilentZeroPayout(bool silentZeroPayout) external {
+        s_silentZeroPayout = silentZeroPayout;
+    }
+
     function redeemUnderlying(uint256 amount) public returns (uint256) {
         uint256 kDocToBurn = amount * DECIMALS / exchangeRateCurrent();
         require(balanceOf(msg.sender) >= kDocToBurn, "Insufficient balance");
+        if (s_silentZeroPayout) {
+            _burn(msg.sender, kDocToBurn);
+            return 0;
+        }
         // Ensure we have enough stablecoin to transfer (mint if needed to simulate yield generation)
         uint256 currentBalance = i_docToken.balanceOf(address(this));
         if (currentBalance < amount) {
@@ -52,6 +67,10 @@ contract MockKdocToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
     function redeem(uint256 kDocToBurn) public returns (uint256) {
         uint256 docToRedeem = kDocToBurn * exchangeRateCurrent() / DECIMALS;
         require(balanceOf(msg.sender) >= kDocToBurn, "Insufficient balance");
+        if (s_silentZeroPayout) {
+            _burn(msg.sender, kDocToBurn);
+            return 0;
+        }
         // Ensure we have enough stablecoin to transfer (mint if needed to simulate yield generation)
         uint256 currentBalance = i_docToken.balanceOf(address(this));
         if (currentBalance < docToRedeem) {

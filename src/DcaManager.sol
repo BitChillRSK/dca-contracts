@@ -276,11 +276,13 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         }
         schedules.pop();
 
+        uint256 amountWithdrawn;
         if (tokenBalance > 0) {
-            _handler(token, lendingProtocolIndex).withdrawToken(msg.sender, tokenBalance);
+            amountWithdrawn = _handler(token, lendingProtocolIndex).withdrawToken(msg.sender, tokenBalance);
         }
 
-        emit DcaManager__DcaScheduleDeleted(msg.sender, token, scheduleId, tokenBalance);
+        // @notice the event reports what the lending protocol actually paid, which may be less than the schedule's tokenBalance
+        emit DcaManager__DcaScheduleDeleted(msg.sender, token, scheduleId, amountWithdrawn);
     }
 
     /**
@@ -606,8 +608,10 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         if (withdrawalAmount > tokenBalance) {
             revert DcaManager__WithdrawalAmountExceedsBalance(token, withdrawalAmount, tokenBalance);
         }
-        uint256 newTokenBalance = tokenBalance - withdrawalAmount;
+        // @notice subtract the requested withdrawal amount from the token balance, not the amount the lending protocol paid
+        uint256 newTokenBalance = tokenBalance - withdrawalAmount; 
         dcaSchedule.tokenBalance = newTokenBalance;
+        // @notice ignore `withdrawToken()`'s return value (amount actually paid back by the lending protocol)
         _handler(token, dcaSchedule.lendingProtocolIndex).withdrawToken(msg.sender, withdrawalAmount);
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
     }

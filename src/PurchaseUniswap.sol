@@ -117,33 +117,38 @@ abstract contract PurchaseUniswap is
         uint256 numOfPurchases = buyers.length;
 
         // Calculate net amounts
-        (uint256 aggregatedFee, uint256[] memory netStablecoinAmountsToSpend, uint256 totalStablecoinAmountToSpend) =
+        (uint256 aggregatedFee, uint256[] memory netStablecoinAmountsToSpend, uint256 totalNetStablecoinPlanned) =
             _calculateFeeAndNetAmounts(purchaseAmounts);
 
         // Redeem stablecoin (and repay lending token)
-        uint256 stablecoinRedeemed = _batchRedeemStablecoin(buyers, purchaseAmounts, totalStablecoinAmountToSpend + aggregatedFee); // totalStablecoinAmountToSpend (on rBTC) + aggregatedFee (charged by BitChill)
-        totalStablecoinAmountToSpend = stablecoinRedeemed - aggregatedFee;
+        // @notice we spend the stablecoin we actually received, never the gross amount we asked the lending protocol for
+        uint256 totalStablecoinAmountToSpend = _batchRedeemStablecoin(buyers, purchaseAmounts, totalNetStablecoinPlanned + aggregatedFee); // totalNetStablecoinPlanned (on rBTC) + aggregatedFee (charged by BitChill)
+        if (totalStablecoinAmountToSpend <= aggregatedFee) {
+            revert PurchaseRbtc__RedeemedAmountBelowFee(totalStablecoinAmountToSpend, aggregatedFee);
+        }
+        totalStablecoinAmountToSpend -= aggregatedFee;
 
         // Charge fees
         _transferFee(i_purchasingToken, aggregatedFee);
 
         // Swap stablecoin for wrBTC
         uint256 wrBtcPurchased = _swapStablecoinForWrbtc(totalStablecoinAmountToSpend);
+        if (wrBtcPurchased == 0) revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(i_purchasingToken));
 
-        if (wrBtcPurchased > 0) {
-            for (uint256 i; i < numOfPurchases; ++i) {
-                uint256 usersPurchasedWrbtc = wrBtcPurchased * netStablecoinAmountsToSpend[i] / totalStablecoinAmountToSpend;
-                s_usersAccumulatedRbtc[buyers[i]] += usersPurchasedWrbtc;
-                emit PurchaseRbtc__RbtcBought(
-                    buyers[i], address(i_purchasingToken), usersPurchasedWrbtc, scheduleIds[i], netStablecoinAmountsToSpend[i]
-                );
-            }
-            emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
-                address(i_purchasingToken), wrBtcPurchased, totalStablecoinAmountToSpend
+        for (uint256 i; i < numOfPurchases; ++i) {
+            // @notice the planned net amounts are only allocation weights: they sum to totalNetStablecoinPlanned,
+            // so the shares below sum to exactly 1 even when the redemption paid less. Both the rBTC credited
+            // and the stablecoin reported as spent are shares of what actually moved.
+            uint256 usersPurchasedWrbtc = wrBtcPurchased * netStablecoinAmountsToSpend[i] / totalNetStablecoinPlanned;
+            uint256 usersStablecoinSpent = totalStablecoinAmountToSpend * netStablecoinAmountsToSpend[i] / totalNetStablecoinPlanned;
+            s_usersAccumulatedRbtc[buyers[i]] += usersPurchasedWrbtc;
+            emit PurchaseRbtc__RbtcBought(
+                buyers[i], address(i_purchasingToken), usersPurchasedWrbtc, scheduleIds[i], usersStablecoinSpent
             );
-        } else {
-            revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(i_purchasingToken));
         }
+        emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
+            address(i_purchasingToken), wrBtcPurchased, totalStablecoinAmountToSpend
+        );
     }
 
     /**
@@ -262,7 +267,9 @@ abstract contract PurchaseUniswap is
 
     /**
      * @param stablecoinAmountToSpend the amount of stablecoin to swap for rBTC
-     * @return amountOut the amount of rBTC received
+     * @return amountOut the amount of WRBTC this contract actually received
+     * @dev The router's return value is treated as success/failure only; the measured WRBTC balance delta is
+     * the amount we can credit. amountOutMinimum still bounds the swap.
      */
     function _swapStablecoinForWrbtc(uint256 stablecoinAmountToSpend) internal returns (uint256 amountOut) {
         // Approve the router to spend stablecoin.
@@ -276,7 +283,9 @@ abstract contract PurchaseUniswap is
             amountOutMinimum: _getAmountOutMinimum(stablecoinAmountToSpend)
         });
 
-        amountOut = i_swapRouter02.exactInput(params);
+        uint256 wrBtcBalanceBefore = i_wrBtcToken.balanceOf(address(this));
+        i_swapRouter02.exactInput(params);
+        amountOut = i_wrBtcToken.balanceOf(address(this)) - wrBtcBalanceBefore;
     }
 
     /**

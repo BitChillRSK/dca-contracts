@@ -6,6 +6,7 @@ import {ITokenHandler} from "../../../src/interfaces/ITokenHandler.sol";
 import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
 import {IPurchaseUniswap} from "../../../src/interfaces/IPurchaseUniswap.sol";
 import {TropykusErc20Handler} from "../../../src/TropykusErc20Handler.sol";
+import {ITropykusErc20Lending} from "../../../src/interfaces/ITropykusErc20Lending.sol";
 import {MockKdocToken} from "../../mocks/MockKdocToken.sol";
 import {MockStablecoin} from "../../mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -169,6 +170,57 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
         assertGt(userBalance, 0);
     }
     
+    /**
+     * @notice R1 / R20. A Compound-style market can return the success code and still pay nothing. The kToken
+     * is burnt either way, and `DcaManager` has already debited the schedule by then, so accepting that as a
+     * successful withdrawal would hand the user a zero transfer and destroy their principal. The measured
+     * delta, not the return code, decides whether the redemption happened.
+     */
+    function test_tropykus_zeroPayoutRedeemReverts() public {
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        uint256 kTokenBalanceBefore = tropykusHandler.getUsersLendingTokenBalance(USER);
+        uint256 userBalanceBefore = stablecoin.balanceOf(USER);
+
+        kToken.setSilentZeroPayout(true);
+
+        vm.prank(address(dcaManager));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ITropykusErc20Lending.TropykusErc20Lending__ZeroStablecoinRedeemed.selector, WITHDRAWAL_AMOUNT
+            )
+        );
+        handler.withdrawToken(USER, WITHDRAWAL_AMOUNT);
+
+        // the revert must leave both the user's stablecoin and their lending position untouched
+        assertEq(stablecoin.balanceOf(USER), userBalanceBefore);
+        assertEq(tropykusHandler.getUsersLendingTokenBalance(USER), kTokenBalanceBefore);
+    }
+
+    /**
+     * @notice Interest withdrawals go through the same redeem path and must not pay zero either.
+     */
+    function test_tropykus_zeroPayoutInterestWithdrawalReverts() public {
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 kTokenBalanceBefore = tropykusHandler.getUsersLendingTokenBalance(USER);
+        uint256 userBalanceBefore = stablecoin.balanceOf(USER);
+
+        kToken.setSilentZeroPayout(true);
+
+        // the accrued amount is derived from exchangeRateStored while the redeem uses exchangeRateCurrent, so
+        // the revert argument is not predictable here; that the guard fires at all is what matters
+        vm.prank(address(dcaManager));
+        vm.expectRevert();
+        tropykusHandler.withdrawInterest(USER, DEPOSIT_AMOUNT / 2);
+
+        assertEq(stablecoin.balanceOf(USER), userBalanceBefore);
+        assertEq(tropykusHandler.getUsersLendingTokenBalance(USER), kTokenBalanceBefore);
+    }
+
     /*//////////////////////////////////////////////////////////////
                            TROPYKUS EDGE CASES
     //////////////////////////////////////////////////////////////*/
