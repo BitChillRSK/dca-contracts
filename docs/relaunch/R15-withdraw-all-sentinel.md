@@ -1,6 +1,6 @@
 # R15 — Withdraw-all sentinel and lending-share dust
 
-Status: **assigned** · Assigned: yes · Optional/further-review: no
+Status: **in review** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
