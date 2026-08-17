@@ -5,10 +5,12 @@ import {Test} from "forge-std/Test.sol";
 import {DcaManager} from "src/DcaManager.sol";
 import {OperationsAdmin} from "src/OperationsAdmin.sol";
 import {IdleDocHandlerMoc} from "src/idle/IdleDocHandlerMoc.sol";
+import {TropykusDocHandlerMoc} from "src/tropykus-legacy/TropykusDocHandlerMoc.sol";
 import {IDcaManager} from "src/interfaces/IDcaManager.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
+import {MockKdocToken} from "test/mocks/MockKdocToken.sol";
 import "script/Constants.sol";
 
 /**
@@ -134,11 +136,50 @@ contract IdleDcaManagerTest is Test {
         uint256[] memory indexes = new uint256[](1);
         indexes[0] = IDLE_INDEX;
         vm.prank(USER);
-        vm.expectRevert(encodedRevert);
         dcaManager.withdrawAllAccumulatedInterest(tokens, indexes);
 
         vm.prank(USER);
         vm.expectRevert(encodedRevert);
         dcaManager.withdrawTokenAndInterest(address(docToken), 0, scheduleId, MIN_PURCHASE_AMOUNT, IDLE_INDEX);
+    }
+
+    function test_withdrawAllAccumulatedInterest_skipsIdleAndWithdrawsLending() public {
+        vm.prank(USER);
+        dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
+
+        vm.prank(ADMIN);
+        operationsAdmin.addOrUpdateLendingProtocol(TROPYKUS_STRING, TROPYKUS_INDEX);
+
+        MockKdocToken kDoc = new MockKdocToken(address(docToken));
+        docToken.mint(address(kDoc), 100_000 ether);
+        TropykusDocHandlerMoc tropykusHandler = new TropykusDocHandlerMoc(
+            address(dcaManager),
+            address(docToken),
+            address(kDoc),
+            MIN_PURCHASE_AMOUNT,
+            FEE_COLLECTOR,
+            address(mocProxy),
+            IFeeHandler.FeeSettings({
+                minFeeRate: MIN_FEE_RATE,
+                maxFeeRate: MAX_FEE_RATE_TEST,
+                feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
+                feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+            }),
+            EXCHANGE_RATE_DECIMALS
+        );
+        vm.prank(ADMIN);
+        operationsAdmin.assignOrUpdateTokenHandler(address(docToken), TROPYKUS_INDEX, address(tropykusHandler));
+        vm.prank(USER);
+        docToken.approve(address(tropykusHandler), type(uint256).max);
+        vm.prank(USER);
+        dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
+
+        address[] memory tokens = new address[](1);
+        tokens[0] = address(docToken);
+        uint256[] memory indexes = new uint256[](2);
+        indexes[0] = IDLE_INDEX;
+        indexes[1] = TROPYKUS_INDEX;
+        vm.prank(USER);
+        dcaManager.withdrawAllAccumulatedInterest(tokens, indexes);
     }
 }

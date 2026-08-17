@@ -7,8 +7,9 @@ import {IIdleErc20Handler} from "./IIdleErc20Handler.sol";
 /**
  * @title IdleErc20Handler
  * @notice Holds deposited stablecoin on the handler instead of minting a lending token.
- * @dev Per-user idle balances clamp withdrawals and purchases so a DcaManager accounting
- * bug cannot spend another user's pooled DOC.
+ * @dev Per-user idle balances clamp withdrawals and single purchases so a DcaManager
+ * accounting bug cannot spend another user's pooled DOC. Batch purchases revert instead
+ * of clamping, because PurchaseMoc splits rBTC by the original planned weights.
  */
 abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler {
     //////////////////////
@@ -58,10 +59,14 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler {
         onlyDcaManager
         returns (uint256)
     {
+        uint256 requested = withdrawalAmount;
         withdrawalAmount = _debitIdleBalance(user, withdrawalAmount);
+        if (requested > 0 && withdrawalAmount == 0) revert IdleErc20Handler__ZeroStablecoinPaid(requested);
         uint256 userBalanceBefore = i_stableToken.balanceOf(user);
         super.withdrawToken(user, withdrawalAmount);
-        return i_stableToken.balanceOf(user) - userBalanceBefore;
+        uint256 paid = i_stableToken.balanceOf(user) - userBalanceBefore;
+        if (requested > 0 && paid == 0) revert IdleErc20Handler__ZeroStablecoinPaid(requested);
+        return paid;
     }
 
     /**
@@ -78,7 +83,9 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice debit idle DOC for a purchase; the tokens are already on this contract
+     * @notice make `amount` of the user's idle DOC available for the purchase path
+     * @dev This is PurchaseRbtc's hook, named when lending handlers burnt k/iTokens to
+     * pull DOC onto the handler. Idle DOC is already here, so this only debits the mapping.
      * @param user: the address of the user
      * @param amount: the amount of stablecoin to debit
      * @return the amount actually debited
@@ -88,10 +95,13 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler {
     }
 
     /**
-     * @notice debit idle DOC for a batch of purchases; the tokens are already on this contract
+     * @notice debit each buyer's idle DOC for a batch purchase
+     * @dev Reverts if any buyer cannot cover their purchase amount. Clamping here would
+     * return a short total that PurchaseMoc still splits by the original planned weights,
+     * so one underfunded buyer would dilute every other buyer in the batch.
      * @param users: the addresses of the users
      * @param purchaseAmounts: the amounts of stablecoin to debit
-     * @return totalRedeemed the total amount actually debited
+     * @return totalRedeemed the total amount debited
      */
     function _batchRedeemStablecoin(address[] memory users, uint256[] memory purchaseAmounts, uint256)
         internal
@@ -100,7 +110,13 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler {
     {
         uint256 numOfPurchases = users.length;
         for (uint256 i; i < numOfPurchases; ++i) {
-            totalRedeemed += _debitIdleBalance(users[i], purchaseAmounts[i]);
+            uint256 amount = purchaseAmounts[i];
+            uint256 idleBalance = s_idleBalances[users[i]];
+            if (idleBalance < amount) {
+                revert IdleErc20Handler__InsufficientIdleBalance(users[i], amount, idleBalance);
+            }
+            s_idleBalances[users[i]] = idleBalance - amount;
+            totalRedeemed += amount;
         }
     }
 

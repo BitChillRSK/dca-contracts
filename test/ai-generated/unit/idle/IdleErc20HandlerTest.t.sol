@@ -82,7 +82,7 @@ contract IdleErc20HandlerTest is HandlerTestHarness {
         handler.depositToken(other, DEPOSIT_AMOUNT);
 
         uint256 userBalanceBefore = stablecoin.balanceOf(USER);
-        vm.expectEmit(true, true, true, true, address(handler));
+        vm.expectEmit(true, false, false, true, address(handler));
         emit IIdleErc20Handler.IdleErc20Handler__AmountAdjusted(USER, DEPOSIT_AMOUNT * 2, DEPOSIT_AMOUNT);
         handler.withdrawToken(USER, DEPOSIT_AMOUNT * 2);
         vm.stopPrank();
@@ -98,7 +98,7 @@ contract IdleErc20HandlerTest is HandlerTestHarness {
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);
 
-        vm.expectEmit(true, true, true, true, address(handler));
+        vm.expectEmit(true, false, false, true, address(handler));
         emit IIdleErc20Handler.IdleErc20Handler__AmountAdjusted(USER, DEPOSIT_AMOUNT * 2, DEPOSIT_AMOUNT);
         uint256 redeemed = idleHandler.testRedeemStablecoin(USER, DEPOSIT_AMOUNT * 2);
 
@@ -108,7 +108,15 @@ contract IdleErc20HandlerTest is HandlerTestHarness {
         assertEq(stablecoin.balanceOf(address(handler)), DEPOSIT_AMOUNT);
     }
 
-    function test_idle_batchRedeem_clampsEachUser() public {
+    function test_idle_withdraw_revertsWhenIdleIsZero() public {
+        vm.prank(address(dcaManager));
+        vm.expectRevert(
+            abi.encodeWithSelector(IIdleErc20Handler.IdleErc20Handler__ZeroStablecoinPaid.selector, DEPOSIT_AMOUNT)
+        );
+        handler.withdrawToken(USER, DEPOSIT_AMOUNT);
+    }
+
+    function test_idle_batchRedeem_revertsIfInsufficient() public {
         address user1 = makeAddr("user1");
         address user2 = makeAddr("user2");
         stablecoin.mint(user1, DEPOSIT_AMOUNT);
@@ -130,12 +138,18 @@ contract IdleErc20HandlerTest is HandlerTestHarness {
         amounts[0] = DEPOSIT_AMOUNT * 2;
         amounts[1] = DEPOSIT_AMOUNT / 2;
 
-        uint256 redeemed = idleHandler.testBatchRedeemStablecoin(users, amounts, amounts[0] + amounts[1]);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IIdleErc20Handler.IdleErc20Handler__InsufficientIdleBalance.selector,
+                user1,
+                DEPOSIT_AMOUNT * 2,
+                DEPOSIT_AMOUNT
+            )
+        );
+        idleHandler.testBatchRedeemStablecoin(users, amounts, amounts[0] + amounts[1]);
 
-        assertEq(redeemed, DEPOSIT_AMOUNT + DEPOSIT_AMOUNT / 2);
-        assertEq(idleHandler.getUsersIdleTokenBalance(user1), 0);
-        assertEq(idleHandler.getUsersIdleTokenBalance(user2), DEPOSIT_AMOUNT / 2);
-        assertEq(stablecoin.balanceOf(address(handler)), DEPOSIT_AMOUNT * 2);
+        assertEq(idleHandler.getUsersIdleTokenBalance(user1), DEPOSIT_AMOUNT);
+        assertEq(idleHandler.getUsersIdleTokenBalance(user2), DEPOSIT_AMOUNT);
     }
 }
 

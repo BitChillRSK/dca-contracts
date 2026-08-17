@@ -24,9 +24,11 @@ Do not add per-user balances to `TokenHandler` itself. Lending handlers already 
 
 - [ ] Add `IdleErc20Handler` (`TokenHandler` + per-user idle DOC mapping; no `TokenLending`) and `IdleDocHandlerMoc` (`IdleErc20Handler` + `PurchaseMoc`).
 - [ ] `depositToken` pulls DOC onto the handler (balance-delta) and credits the user’s idle balance. Do not mint a lending token.
-- [ ] `withdrawToken` clamps to the caller’s idle balance, debits that mapping, then transfers.
-- [ ] `_redeemStablecoin` / `_batchRedeemStablecoin` debit the idle mapping and return the amount; DOC is already on the handler. Clamp each user to their own balance.
+- [ ] `withdrawToken` clamps to the caller’s idle balance, debits that mapping, then transfers. Revert if a positive request would pay 0.
+- [ ] `_redeemStablecoin` (single) debits the idle mapping and returns the amount; clamp to the user’s own balance.
+- [ ] `_batchRedeemStablecoin` debits each buyer’s exact purchase amount or reverts `InsufficientIdleBalance`. Do not clamp: `PurchaseMoc` still splits rBTC by the original planned weights.
 - [ ] Do not implement `ITokenLending`. Do not register a protocol name for index 0.
+- [ ] `DcaManager.withdrawAllAccumulatedInterest` skips indexes with an empty protocol name so a mixed idle+lending call still pays lending interest. Single-index interest getters / `withdrawTokenAndInterest` at 0 still revert.
 - [ ] Dedicated unit tests under `test/ai-generated/unit/idle/`, plus a standalone `DcaManager` path at index 0 (create / buy / withdraw / interest reverts).
 - [ ] Skip `addOrUpdateLendingProtocol` in `HandlerTestHarness` when the index is 0 (that call reverts; assigning a handler at 0 does not need a name).
 - [ ] Update `src/idle/README.md` and the `AGENTS.md` Layout line for `src/idle/`.
@@ -54,6 +56,7 @@ New:
 Edit:
 
 - `src/idle/README.md`
+- `src/DcaManager.sol` (`withdrawAllAccumulatedInterest` skips empty protocol names)
 - `test/ai-generated/unit/HandlerTestHarness.t.sol` (skip protocol-name registration when index is 0)
 - `AGENTS.md`
 - `docs/relaunch/README.md`
@@ -79,9 +82,12 @@ Behaviors to assert:
 - Deposit leaves DOC on the handler; no lending token is minted; `getUsersIdleTokenBalance` equals the received amount.
 - Withdraw pays the user and debits that user’s idle balance only.
 - `withdrawToken` for more than the user’s idle balance clamps; another user’s idle DOC is untouched.
-- `buyRbtc` / `batchBuyRbtc` spend idle DOC via MoC and credit accumulated rBTC; idle balances fall by the spent DOC.
+- `withdrawToken` reverts when the user’s idle balance is 0 and the requested amount is > 0.
+- `buyRbtc` spends idle DOC via MoC and credits accumulated rBTC; idle balances fall by the spent DOC.
+- `batchBuyRbtc` / `_batchRedeemStablecoin` revert if any buyer cannot cover their purchase amount; other buyers’ idle balances are unchanged.
 - `createDcaSchedule(..., 0)` works when the idle handler is assigned at index 0 with no protocol name.
-- `getInterestAccrued` / `withdrawInterest` / `withdrawTokenAndInterest` at index 0 revert `DcaManager__TokenDoesNotYieldInterest`.
+- `getInterestAccrued` / `withdrawTokenAndInterest` at index 0 revert `DcaManager__TokenDoesNotYieldInterest`.
+- `withdrawAllAccumulatedInterest` with index 0 in the list does not revert; a mixed `[0, tropykus]` call still reaches the lending handler.
 - Existing Tropykus and Sovryn lanes are unchanged.
 
 Fork tests: not required.
@@ -89,8 +95,8 @@ Fork tests: not required.
 ## Success criteria
 
 - [ ] `IdleDocHandlerMoc` is constructable without a lending-token address or `exchangeRateDecimals`.
-- [ ] Deposits stay on the handler; buys and withdrawals spend idle DOC; per-user idle balances clamp `withdrawToken` and both redeem paths.
-- [ ] Index 0 has no protocol name; interest calls revert.
+- [ ] Deposits stay on the handler; buys and withdrawals spend idle DOC; per-user idle balances clamp `withdrawToken` and single redeem. Batch redeem reverts on insufficient idle.
+- [ ] Index 0 has no protocol name; single-index interest calls revert; `withdrawAllAccumulatedInterest` skips index 0.
 - [ ] Deploy scripts, `Constants.sol` indexes, and the shared `DcaDappTest` harness are unchanged.
 - [ ] Done-gate lanes pass.
 
@@ -104,6 +110,6 @@ Fork tests: not required.
 
 ## ABI / deploy / cutover impact
 
-- ABI: new contracts `IdleErc20Handler` / `IdleDocHandlerMoc`. No change to `DcaManager` / `OperationsAdmin` / existing handler ABIs.
+- ABI: new contracts `IdleErc20Handler` / `IdleDocHandlerMoc`. `IdleErc20Handler__AmountAdjusted` indexes only `user`. `DcaManager.withdrawAllAccumulatedInterest` skips empty protocol names (behavior change vs reverting the whole call once a handler exists at 0). No change to existing handler ABIs.
 - Scripts: none. Live registration of index 0 is PR 14.
 - Cutover: none in this PR. Frontend can target index 0 only after PR 14 assigns the handler on the new admin.
