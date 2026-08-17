@@ -1,6 +1,6 @@
 # R22 — Repo layout preparation
 
-Status: **assigned** · Assigned: yes · Optional/further-review: no
+Status: **in review** · Assigned: yes · Optional/further-review: no
 
 PR 11 of R22. Idle handler, LayerBank handler, and deploy/CI index-map work are later PRs.
 
