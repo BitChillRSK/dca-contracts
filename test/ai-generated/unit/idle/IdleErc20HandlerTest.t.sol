@@ -29,7 +29,7 @@ contract IdleErc20HandlerTest is HandlerTestHarness {
     }
 
     function getLendingProtocolIndex() internal pure override returns (uint256) {
-        return 0;
+        return IDLE_INDEX;
     }
 
     function isDexHandler() internal pure override returns (bool) {

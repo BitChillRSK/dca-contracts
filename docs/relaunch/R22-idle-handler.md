@@ -31,12 +31,13 @@ Do not add per-user balances to `TokenHandler` itself. Lending handlers already 
 - [ ] `DcaManager.withdrawAllAccumulatedInterest` skips indexes with an empty protocol name so a mixed idle+lending call still pays lending interest. Single-index interest getters / `withdrawTokenAndInterest` at 0 still revert.
 - [ ] Dedicated unit tests under `test/ai-generated/unit/idle/`, plus a standalone `DcaManager` path at index 0 (create / buy / withdraw / interest reverts).
 - [ ] Skip `addOrUpdateLendingProtocol` in `HandlerTestHarness` when the index is 0 (that call reverts; assigning a handler at 0 does not need a name).
+- [ ] Add-on `script/DeployIdleHandler.s.sol` (same shape as `DeployUsdrifHandler`). `IdleDcaManagerTest` and a deployment test go through that script. Do not register idle inside `DeployMocSwaps`.
 - [ ] Update `src/idle/README.md` and the `AGENTS.md` Layout line for `src/idle/`.
 
 ## Out of scope
 
 - [ ] LayerBank handler (PR 13).
-- [ ] `script/Constants.sol` index map, `DeployMocSwaps` / `DeployDexSwaps` registration, `DcaDappTest` split, `ILendingToken` deletion, CI matrix (`none` / `layerbank` / `sovryn`) — those are PR 14.
+- [ ] `script/Constants.sol` index remap (LayerBank at 1), `DeployMocSwaps` / `DeployDexSwaps` registration, `DcaDappTest` split, `ILendingToken` deletion, CI matrix (`none` / `layerbank` / `sovryn`) — those are PR 14. This PR may add `IDLE_INDEX = 0` and `DeployIdleHandler` as an add-on.
 - [ ] Idle Uniswap / USDRIF handler. Dex sources stay where they are.
 - [ ] Registering a name for index 0.
 - [ ] Changing `TokenHandler` to own per-user accounting.
@@ -52,12 +53,15 @@ New:
 - `test/ai-generated/unit/idle/IdleErc20HandlerTest.t.sol`
 - `test/ai-generated/unit/idle/IdleDocHandlerMocTest.t.sol`
 - `test/ai-generated/unit/idle/IdleDcaManagerTest.t.sol`
+- `script/DeployIdleHandler.s.sol`
+- `test/unit/deployment/IdleHandlerDeploymentTest.t.sol`
 
 Edit:
 
 - `src/idle/README.md`
 - `src/DcaManager.sol` (`withdrawAllAccumulatedInterest` skips empty protocol names)
 - `test/ai-generated/unit/HandlerTestHarness.t.sol` (skip protocol-name registration when index is 0)
+- `script/Constants.sol` (`IDLE_INDEX = 0` only; do not remap Tropykus/Sovryn)
 - `AGENTS.md`
 - `docs/relaunch/README.md`
 
@@ -69,6 +73,9 @@ Targeted:
 SWAP_TYPE=mocSwaps LENDING_PROTOCOL=tropykus EXPECTED_LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=DOC \
   forge test --no-match-test invariant --no-match-contract ComparePurchaseMethods \
   --match-path "test/ai-generated/unit/idle/**" -j 1
+
+SWAP_TYPE=mocSwaps LENDING_PROTOCOL=tropykus EXPECTED_LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=DOC \
+  forge test --match-contract IdleHandlerDeploymentTest -j 1
 ```
 
 Then the done-gate:
@@ -97,7 +104,7 @@ Fork tests: not required.
 - [ ] `IdleDocHandlerMoc` is constructable without a lending-token address or `exchangeRateDecimals`.
 - [ ] Deposits stay on the handler; buys and withdrawals spend idle DOC; per-user idle balances clamp `withdrawToken` and single redeem. Batch redeem reverts on insufficient idle.
 - [ ] Index 0 has no protocol name; single-index interest calls revert; `withdrawAllAccumulatedInterest` skips index 0.
-- [ ] Deploy scripts, `Constants.sol` indexes, and the shared `DcaDappTest` harness are unchanged.
+- [ ] `DeployIdleHandler` deploys `IdleDocHandlerMoc` and can register it at index 0 with no protocol name. `DeployMocSwaps` / `DeployDexSwaps` / `DcaDappTest` are unchanged (PR 14).
 - [ ] Done-gate lanes pass.
 
 ## Reviewer checklist
@@ -111,5 +118,5 @@ Fork tests: not required.
 ## ABI / deploy / cutover impact
 
 - ABI: new contracts `IdleErc20Handler` / `IdleDocHandlerMoc`. `IdleErc20Handler__AmountAdjusted` indexes only `user`. `DcaManager.withdrawAllAccumulatedInterest` skips empty protocol names (behavior change vs reverting the whole call once a handler exists at 0). No change to existing handler ABIs.
-- Scripts: none. Live registration of index 0 is PR 14.
+- Scripts: add-on `DeployIdleHandler` (not wired into `DeployMocSwaps`). Live registration of index 0 on the main deploy path is PR 14.
 - Cutover: none in this PR. Frontend can target index 0 only after PR 14 assigns the handler on the new admin.

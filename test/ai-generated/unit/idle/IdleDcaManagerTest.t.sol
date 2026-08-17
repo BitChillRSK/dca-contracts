@@ -1,33 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
-import {Test} from "forge-std/Test.sol";
-import {DcaManager} from "src/DcaManager.sol";
-import {OperationsAdmin} from "src/OperationsAdmin.sol";
+import {BaseDeploymentTest} from "test/unit/deployment/BaseDeploymentTest.t.sol";
+import {DeployIdleHandler} from "script/DeployIdleHandler.s.sol";
 import {IdleDocHandlerMoc} from "src/idle/IdleDocHandlerMoc.sol";
-import {TropykusDocHandlerMoc} from "src/tropykus-legacy/TropykusDocHandlerMoc.sol";
 import {IDcaManager} from "src/interfaces/IDcaManager.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
-import {MockKdocToken} from "test/mocks/MockKdocToken.sol";
 import "script/Constants.sol";
 
 /**
  * @title IdleDcaManagerTest
  * @notice DcaManager paths against an idle handler assigned at index 0 with no protocol name.
+ * @dev Goes through DeployMocSwaps (via BaseDeploymentTest) and DeployIdleHandler so both scripts are exercised.
  */
-contract IdleDcaManagerTest is Test {
-    uint256 internal constant IDLE_INDEX = 0;
-
-    address internal constant OWNER = address(0x1111);
-    address internal constant ADMIN = address(0x2222);
-    address internal constant SWAPPER = address(0x3333);
+contract IdleDcaManagerTest is BaseDeploymentTest {
     address internal constant USER = address(0x4444);
-    address internal constant FEE_COLLECTOR = address(0x5555);
+    address internal constant SWAPPER = address(0x3333);
 
-    DcaManager internal dcaManager;
-    OperationsAdmin internal operationsAdmin;
     MockStablecoin internal docToken;
     MockMocProxy internal mocProxy;
     IdleDocHandlerMoc internal handler;
@@ -35,40 +25,26 @@ contract IdleDcaManagerTest is Test {
     uint256 internal constant DEPOSIT = 200 ether;
     uint256 internal constant PURCHASE = 50 ether;
 
-    function setUp() public {
-        vm.prank(OWNER);
-        operationsAdmin = new OperationsAdmin();
+    function setUp() public override {
+        string memory coinType = vm.envOr("STABLECOIN_TYPE", DEFAULT_STABLECOIN);
+        if (keccak256(abi.encodePacked(coinType)) != keccak256(abi.encodePacked("DOC"))) {
+            vm.skip(true);
+            return;
+        }
+        super.setUp();
 
-        vm.prank(OWNER);
-        dcaManager = new DcaManager(
-            address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT
+        handler = IdleDocHandlerMoc(
+            payable(new DeployIdleHandler().run(helperConfig, address(operationsAdmin), address(dcaManager)))
         );
+        docToken = MockStablecoin(helperConfig.getStablecoinAddress());
+        mocProxy = MockMocProxy(helperConfig.getActiveNetworkConfig().mocProxyAddress);
 
-        docToken = new MockStablecoin(address(this));
-        mocProxy = new MockMocProxy(address(docToken));
-        vm.deal(address(mocProxy), 100 ether);
-
-        vm.prank(OWNER);
-        operationsAdmin.setAdminRole(ADMIN);
         vm.prank(ADMIN);
         operationsAdmin.setSwapperRole(SWAPPER);
-
-        handler = new IdleDocHandlerMoc(
-            address(dcaManager),
-            address(docToken),
-            FEE_COLLECTOR,
-            address(mocProxy),
-            IFeeHandler.FeeSettings({
-                minFeeRate: MIN_FEE_RATE,
-                maxFeeRate: MAX_FEE_RATE_TEST,
-                feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-                feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
-            })
-        );
-
         vm.prank(ADMIN);
         operationsAdmin.assignOrUpdateTokenHandler(address(docToken), IDLE_INDEX, address(handler));
 
+        vm.deal(address(mocProxy), 100 ether);
         vm.prank(address(handler));
         docToken.approve(address(mocProxy), type(uint256).max);
 
@@ -147,38 +123,20 @@ contract IdleDcaManagerTest is Test {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
 
+        uint256 lendingIndex = address(sovrynHandler) != address(0) ? SOVRYN_INDEX : TROPYKUS_INDEX;
         vm.prank(ADMIN);
-        operationsAdmin.addOrUpdateLendingProtocol(TROPYKUS_STRING, TROPYKUS_INDEX);
+        operationsAdmin.assignOrUpdateTokenHandler(address(docToken), lendingIndex, docHandlerMocAddress);
 
-        MockKdocToken kDoc = new MockKdocToken(address(docToken));
-        docToken.mint(address(kDoc), 100_000 ether);
-        TropykusDocHandlerMoc tropykusHandler = new TropykusDocHandlerMoc(
-            address(dcaManager),
-            address(docToken),
-            address(kDoc),
-            MIN_PURCHASE_AMOUNT,
-            FEE_COLLECTOR,
-            address(mocProxy),
-            IFeeHandler.FeeSettings({
-                minFeeRate: MIN_FEE_RATE,
-                maxFeeRate: MAX_FEE_RATE_TEST,
-                feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-                feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
-            }),
-            EXCHANGE_RATE_DECIMALS
-        );
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(address(docToken), TROPYKUS_INDEX, address(tropykusHandler));
         vm.prank(USER);
-        docToken.approve(address(tropykusHandler), type(uint256).max);
+        docToken.approve(docHandlerMocAddress, type(uint256).max);
         vm.prank(USER);
-        dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
+        dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, lendingIndex);
 
         address[] memory tokens = new address[](1);
         tokens[0] = address(docToken);
         uint256[] memory indexes = new uint256[](2);
         indexes[0] = IDLE_INDEX;
-        indexes[1] = TROPYKUS_INDEX;
+        indexes[1] = lendingIndex;
         vm.prank(USER);
         dcaManager.withdrawAllAccumulatedInterest(tokens, indexes);
     }
