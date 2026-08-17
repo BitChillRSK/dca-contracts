@@ -29,8 +29,9 @@ interface ITokenHandler {
      * @param amount The amount of the stablecoin to withdraw.
      * @param user The user making the withdrawal.
      * @return The amount actually paid to the user, which a lending handler may clamp to the user's position
-     * or reduce by a redemption fee charged by the lending protocol. Callers must account for this amount,
-     * never for the requested one.
+     * or reduce by a redemption fee charged by the lending protocol. Report this amount; do not debit a
+     * schedule's principal with it. Principal is reduced by the amount requested, because a redemption fee
+     * consumes principal rather than leaving it behind.
      */
     function withdrawToken(address user, uint256 amount) external returns (uint256);
 }

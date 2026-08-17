@@ -611,14 +611,11 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         }
         uint256 newTokenBalance = tokenBalance - withdrawalAmount;
         dcaSchedule.tokenBalance = newTokenBalance;
-        uint256 amountWithdrawn = _handler(token, dcaSchedule.lendingProtocolIndex).withdrawToken(msg.sender, withdrawalAmount);
-        // @notice a handler may pay less than requested (it clamps to the user's lending position, and the
-        // lending protocol may charge a redemption fee), so only what was actually paid may be deducted.
-        // @notice the write-back reads the storage slot at this point: nothing stale is carried across the call.
-        if (amountWithdrawn < withdrawalAmount) {
-            newTokenBalance = dcaSchedule.tokenBalance + (withdrawalAmount - amountWithdrawn);
-            dcaSchedule.tokenBalance = newTokenBalance;
-        }
+        // @notice the schedule is debited the requested amount, never the cash the user ended up holding. A
+        // lending protocol's redemption fee consumes principal that is gone; crediting the difference back
+        // would invent principal the handler no longer has. Purchases behave the same way: the schedule pays
+        // the full purchaseAmount even when a fee shrinks what reaches the user.
+        _handler(token, dcaSchedule.lendingProtocolIndex).withdrawToken(msg.sender, withdrawalAmount);
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
     }
 

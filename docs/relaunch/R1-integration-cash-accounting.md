@@ -67,12 +67,14 @@ because the clamp fix below writes to `s_dcaSchedules` after an external call.
       requested amount. Sovryn already assigns the redeem result; Tropykus discarded it.
 - [ ] `ITokenHandler.withdrawToken` returns `uint256` — the amount actually paid to the user. `TokenHandler`,
       `TropykusErc20Handler`, and `SovrynErc20Handler` all return their real payout.
-- [ ] **Clamp desync (the R6 leftover; this PR owns it).** `DcaManager._withdrawToken` deducts the *requested*
-      amount, but both lending handlers clamp the withdrawal to the user's own lending position and pay less
-      (`TropykusErc20Handler.sol:79-82`, `SovrynErc20Handler.sol:79-82`). Deduct the requested amount as an
-      effect, then credit back `requested - actuallyPaid` after the handler returns, and emit
-      `DcaManager__TokenBalanceUpdated` once with the final balance. The write-back must go through the
-      storage pointer, never a stale memory copy carried across the call (the R6 lesson).
+- [ ] **Clamp desync (the R6 leftover; this PR owns it).** The handlers must stop paying out a number they
+      did not receive: `TropykusErc20Handler.withdrawToken` transfers the redeemed amount, and both handlers
+      return what they actually paid. `DcaManager._withdrawToken` keeps debiting the **requested** amount and
+      writes `tokenBalance` before the call, unchanged. Cash received drives what is transferred, what is
+      credited as rBTC, and what events report — it must not drive schedule principal. A redemption fee
+      consumes principal that is gone, so crediting the difference back would invent principal the handler no
+      longer holds and leave dust that later reverts in `burn`. Purchases already debit the full
+      `purchaseAmount` regardless of fees; withdrawals match that.
 - [ ] `DcaManager.deleteDcaSchedule`: emit the amount the handler actually paid in
       `DcaManager__DcaScheduleDeleted`. The schedule is already gone, so there is no balance to correct — only
       the event must stop overstating.
@@ -120,16 +122,16 @@ Behaviours to assert, with the mock's exit fee **enabled** (returns gross, pays 
 - `buyRbtc` and `batchBuyRbtc` on Sovryn+MoC succeed, and spend the net amount rather than reverting.
 - Sum of per-user accumulated rBTC credited by a batch is never greater than the rBTC the handler received,
   on both the MoC and the Uniswap batch paths.
-- `withdrawToken` pays the user the net amount, and the schedule's `tokenBalance` drops by exactly what was
-  paid — not by what was requested.
+- `withdrawToken` pays the user the net amount, while the schedule's `tokenBalance` drops by exactly what was
+  requested. The fee is not credited back as phantom principal.
 - `deleteDcaSchedule` succeeds and its event reports the amount actually paid.
 - `withdrawInterest` pays net and emits net.
 - With the exit fee at **0** (fail-open, or pre-activation), every one of the above is 1:1 with the requested
   amount — no silent haircut appears where there is no fee.
 - Tropykus paths behave identically before and after this PR, except `withdrawToken` now transfers the
   redeemed amount.
-- A withdrawal clamped by the user's lending position leaves `tokenBalance` credited with the unpaid
-  remainder, so a second withdrawal can still claim it.
+- After a withdrawal reduced by the exit fee, the schedule's remaining balance is exactly what was not
+  requested, and that remainder is still withdrawable.
 
 ## Success criteria
 
@@ -141,7 +143,8 @@ Behaviours to assert, with the mock's exit fee **enabled** (returns gross, pays 
 - [ ] Purchases, `withdrawToken`, `deleteDcaSchedule`, and `withdrawTokenAndInterest` all succeed against a
       mock that returns gross and pays net, and all move the net amount.
 - [ ] The same tests with the fee at 0 stay exactly 1:1.
-- [ ] `DcaManager.tokenBalance` only ever decreases by what a handler actually paid.
+- [ ] `DcaManager.tokenBalance` decreases by the requested amount; no cash-received figure is ever written
+      back onto a schedule.
 - [ ] Tropykus behaviour is unchanged except that `withdrawToken` transfers the redeemed amount.
 - [ ] `make check` passes.
 
