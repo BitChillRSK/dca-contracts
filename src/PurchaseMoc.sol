@@ -10,7 +10,7 @@ import {IPurchaseMoc} from "./interfaces/IPurchaseMoc.sol";
 
 /**
  * @title PurchaseMoc
- * @notice This contract handles swaps of DOC for rBTC directly redeeming the latter from the MoC contract
+ * @notice This contract handles swaps of DOC for rBTC, redeeming the DOC at the MoC contract
  */
 abstract contract PurchaseMoc is FeeHandler, PurchaseRbtc, IPurchaseMoc {
     using SafeERC20 for IERC20;
@@ -45,16 +45,16 @@ abstract contract PurchaseMoc is FeeHandler, PurchaseRbtc, IPurchaseMoc {
         override
         onlyDcaManager
     {
-        // Redeem DOC (repaying kDOC)
-        purchaseAmount = _redeemStablecoin(buyer, purchaseAmount); 
+        // Retrieve the DOC to spend
+        purchaseAmount = _retrieveStablecoin(buyer, purchaseAmount);
 
         // Charge fee
         uint256 fee = _calculateFee(purchaseAmount);
         uint256 netPurchaseAmount = purchaseAmount - fee;
         _transferFee(i_docToken, fee);
 
-        // Redeem rBTC repaying DOC
-        (uint256 balancePrev, uint256 balancePost) = _redeemRbtc(netPurchaseAmount);
+        // Redeem the DOC for rBTC
+        (uint256 balancePrev, uint256 balancePost) = _redeemDoc(netPurchaseAmount);
 
         if (balancePost > balancePrev) {
             s_usersAccumulatedRbtc[buyer] += (balancePost - balancePrev);
@@ -83,21 +83,21 @@ abstract contract PurchaseMoc is FeeHandler, PurchaseRbtc, IPurchaseMoc {
         (uint256 aggregatedFee, uint256[] memory netDocAmountsToSpend, uint256 totalNetDocPlanned) =
             _calculateFeeAndNetAmounts(purchaseAmounts);
 
-        // Redeem DOC (and repay kDOC)
+        // Retrieve the DOC to spend
         // @notice we spend the DOC we actually received, which might not match totalNetDocPlanned, the full amount we asked the lending protocol for
-        uint256 totalDocAmountToSpend = _batchRedeemStablecoin(buyers, purchaseAmounts, totalNetDocPlanned + aggregatedFee); // total DOC to redeem by repaying kDOC in order to spend it to redeem rBTC is totalNetDocPlanned + aggregatedFee
+        uint256 totalDocAmountToSpend = _batchRetrieveStablecoin(buyers, purchaseAmounts, totalNetDocPlanned + aggregatedFee); // the DOC we need on the handler is totalNetDocPlanned + aggregatedFee
         if (totalDocAmountToSpend <= aggregatedFee) {
-            revert PurchaseRbtc__RedeemedAmountBelowFee(totalDocAmountToSpend, aggregatedFee);
+            revert PurchaseRbtc__StablecoinRetrievedBelowFee(totalDocAmountToSpend, aggregatedFee);
         }
         totalDocAmountToSpend -= aggregatedFee;
 
         // Charge fees
         _transferFee(i_docToken, aggregatedFee);
 
-        // Redeem DOC for rBTC
+        // Redeem the DOC for rBTC
         uint256 totalPurchasedRbtc;
         {
-            (uint256 balancePrev, uint256 balancePost) = _redeemRbtc(totalDocAmountToSpend);
+            (uint256 balancePrev, uint256 balancePost) = _redeemDoc(totalDocAmountToSpend);
             if (balancePost <= balancePrev) revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(i_docToken));
             totalPurchasedRbtc = balancePost - balancePrev;
         }
@@ -121,10 +121,12 @@ abstract contract PurchaseMoc is FeeHandler, PurchaseRbtc, IPurchaseMoc {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice the guys at Money on Chain mistakenly named their functions as "redeem DOC", when it is rBTC that gets redeemed (by repaying DOC)
-     * @param docAmountToSpend the amount of DOC to repay to redeem rBTC
+     * @notice redeem DOC for rBTC at Money on Chain
+     * @param docAmountToSpend the amount of DOC to redeem
+     * @return the contract's rBTC balance before the redemption
+     * @return the contract's rBTC balance after the redemption
      */
-    function _redeemRbtc(uint256 docAmountToSpend) internal returns (uint256, uint256) {
+    function _redeemDoc(uint256 docAmountToSpend) internal returns (uint256, uint256) {
         try i_mocProxy.redeemDocRequest(docAmountToSpend) {}
         catch {
             revert PurchaseMoc__RedeemDocRequestFailed();

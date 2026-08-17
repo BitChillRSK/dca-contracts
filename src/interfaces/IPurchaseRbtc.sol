@@ -30,8 +30,8 @@ interface IPurchaseRbtc {
     error PurchaseRbtc__rBtcWithdrawalFailed();
     error PurchaseRbtc__RbtcPurchaseFailed(address user, address tokenSpent);
     error PurchaseRbtc__RbtcBatchPurchaseFailed(address tokenSpent);
-    /// @notice the redemption paid less than the fee owed on the batch, so there is nothing left to spend
-    error PurchaseRbtc__RedeemedAmountBelowFee(uint256 stablecoinRedeemed, uint256 aggregatedFee);
+    /// @notice the batch retrieved less stablecoin than the fee it owes, so there is nothing left to spend
+    error PurchaseRbtc__StablecoinRetrievedBelowFee(uint256 stablecoinRetrieved, uint256 aggregatedFee);
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS

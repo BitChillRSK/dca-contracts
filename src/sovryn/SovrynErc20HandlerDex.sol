@@ -52,31 +52,31 @@ contract SovrynErc20HandlerDex is SovrynErc20Handler, PurchaseUniswap {
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
     /**
-     * @notice Override the _redeemStablecoin function to resolve ambiguity between parent contracts
-     * @param user The address of the user for whom stablecoin is being redeemed
-     * @param amount The amount of stablecoin to redeem
+     * @notice Override the _retrieveStablecoin hook to resolve ambiguity between parent contracts
+     * @param user The address of the user whose stablecoin is being retrieved
+     * @param amount The amount of stablecoin wanted
      */
-    function _redeemStablecoin(address user, uint256 amount)
+    function _retrieveStablecoin(address user, uint256 amount)
         internal
         override(SovrynErc20Handler, PurchaseRbtc)
         returns (uint256)
     {
-        // Call SovrynErc20Handler's version of _redeemStablecoin
-        return SovrynErc20Handler._redeemStablecoin(user, amount);
+        // Call SovrynErc20Handler's version of _retrieveStablecoin
+        return SovrynErc20Handler._retrieveStablecoin(user, amount);
     }
 
     /**
-     * @notice Override the _batchRedeemStablecoin function to resolve ambiguity between parent contracts
-     * @param users The array of user addresses for whom stablecoin is being redeemed
-     * @param purchaseAmounts The array of amounts of stablecoin to redeem for each user
-     * @param totalStablecoinAmountToRedeem The total amount of stablecoin to redeem
+     * @notice Override the _batchRetrieveStablecoin hook to resolve ambiguity between parent contracts
+     * @param users The array of user addresses whose stablecoin is being retrieved
+     * @param purchaseAmounts The array of amounts of stablecoin charged to each user
+     * @param totalStablecoinToRetrieve The total amount of stablecoin wanted
      */
-    function _batchRedeemStablecoin(address[] memory users, uint256[] memory purchaseAmounts, uint256 totalStablecoinAmountToRedeem)
+    function _batchRetrieveStablecoin(address[] memory users, uint256[] memory purchaseAmounts, uint256 totalStablecoinToRetrieve)
         internal
         override(SovrynErc20Handler, PurchaseRbtc)
         returns (uint256)
     {
-        // Call SovrynErc20Handler's version of _batchRedeemStablecoin
-        return SovrynErc20Handler._batchRedeemStablecoin(users, purchaseAmounts, totalStablecoinAmountToRedeem);
+        // Call SovrynErc20Handler's version of _batchRetrieveStablecoin
+        return SovrynErc20Handler._batchRetrieveStablecoin(users, purchaseAmounts, totalStablecoinToRetrieve);
     }
 }

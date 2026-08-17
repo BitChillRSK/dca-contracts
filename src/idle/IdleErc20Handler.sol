@@ -80,14 +80,14 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice make `amount` of the user's idle DOC available for the purchase path
-     * @dev This is PurchaseRbtc's hook, named when lending handlers burnt k/iTokens to
-     * pull DOC onto the handler. Idle DOC is already here, so this only debits the mapping.
+     * @notice retrieve `amount` of the user's idle DOC for the purchase path
+     * @dev Lending handlers redeem their lending token to pull DOC onto the handler; idle DOC is
+     * already here, so this only debits the mapping.
      * @param user: the address of the user
      * @param amount: the amount of stablecoin to debit
      * @return the amount actually debited
      */
-    function _redeemStablecoin(address user, uint256 amount) internal virtual returns (uint256) {
+    function _retrieveStablecoin(address user, uint256 amount) internal virtual returns (uint256) {
         return _debitIdleBalance(user, amount);
     }
 
@@ -98,12 +98,12 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler {
      * so one underfunded buyer would dilute every other buyer in the batch.
      * @param users: the addresses of the users
      * @param purchaseAmounts: the amounts of stablecoin to debit
-     * @return totalRedeemed the total amount debited
+     * @return totalWithdrawn the total amount debited
      */
-    function _batchRedeemStablecoin(address[] memory users, uint256[] memory purchaseAmounts, uint256)
+    function _batchRetrieveStablecoin(address[] memory users, uint256[] memory purchaseAmounts, uint256)
         internal
         virtual
-        returns (uint256 totalRedeemed)
+        returns (uint256 totalWithdrawn)
     {
         uint256 numOfPurchases = users.length;
         for (uint256 i; i < numOfPurchases; ++i) {
@@ -113,7 +113,7 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler {
                 revert IdleErc20Handler__InsufficientIdleBalance(users[i], amount, idleBalance);
             }
             s_idleBalances[users[i]] = idleBalance - amount;
-            totalRedeemed += amount;
+            totalWithdrawn += amount;
         }
     }
 

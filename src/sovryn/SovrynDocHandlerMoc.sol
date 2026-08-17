@@ -7,7 +7,7 @@ import {SovrynErc20Handler} from "./SovrynErc20Handler.sol";
 
 /**
  * @title SovrynDocHandlerMoc
- * @notice This contract handles swaps of DOC for rBTC directly redeeming the latter from the MoC contract
+ * @notice This contract handles swaps of DOC for rBTC, redeeming the DOC at the MoC contract
  */
 contract SovrynDocHandlerMoc is SovrynErc20Handler, PurchaseMoc {
     /**
@@ -43,31 +43,31 @@ contract SovrynDocHandlerMoc is SovrynErc20Handler, PurchaseMoc {
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
     /**
-     * @notice Override the _redeemStablecoin function to resolve ambiguity between parent contracts
-     * @param user The address of the user for whom DOC is being redeemed
-     * @param amount The amount of DOC to redeem
+     * @notice Override the _retrieveStablecoin hook to resolve ambiguity between parent contracts
+     * @param user The address of the user whose DOC is being retrieved
+     * @param amount The amount of DOC wanted
      */
-    function _redeemStablecoin(address user, uint256 amount)
+    function _retrieveStablecoin(address user, uint256 amount)
         internal
         override(SovrynErc20Handler, PurchaseRbtc)
         returns (uint256)
     {
-        // Call SovrynErc20Handler's version of _redeemStablecoin
-        return SovrynErc20Handler._redeemStablecoin(user, amount);
+        // Call SovrynErc20Handler's version of _retrieveStablecoin
+        return SovrynErc20Handler._retrieveStablecoin(user, amount);
     }
 
     /**
-     * @notice Override the _batchRedeemStablecoin function to resolve ambiguity between parent contracts
-     * @param users The array of user addresses for whom DOC is being redeemed
-     * @param purchaseAmounts The array of amounts of DOC to redeem for each user
-     * @param totalDocAmountToSpend The total amount of DOC to redeem
+     * @notice Override the _batchRetrieveStablecoin hook to resolve ambiguity between parent contracts
+     * @param users The array of user addresses whose DOC is being retrieved
+     * @param purchaseAmounts The array of amounts of DOC charged to each user
+     * @param totalDocAmountToSpend The total amount of DOC wanted
      */
-    function _batchRedeemStablecoin(address[] memory users, uint256[] memory purchaseAmounts, uint256 totalDocAmountToSpend)
+    function _batchRetrieveStablecoin(address[] memory users, uint256[] memory purchaseAmounts, uint256 totalDocAmountToSpend)
         internal
         override(SovrynErc20Handler, PurchaseRbtc)
         returns (uint256)
     {
-        // Call SovrynErc20Handler's version of _batchRedeemStablecoin
-        return SovrynErc20Handler._batchRedeemStablecoin(users, purchaseAmounts, totalDocAmountToSpend);
+        // Call SovrynErc20Handler's version of _batchRetrieveStablecoin
+        return SovrynErc20Handler._batchRetrieveStablecoin(users, purchaseAmounts, totalDocAmountToSpend);
     }
 }

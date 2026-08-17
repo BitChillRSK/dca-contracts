@@ -17,8 +17,8 @@ abstract contract TokenLending is ITokenLending {
 
     /**
      * @notice convert underlying token to lending token
-     * @dev Rounds up the lending token amount to avoid underestimating the amount to subtract from each user's balance when 
-     * redeeming stablecoin (which would cause accounting errors if 1 WEI less than gets burned is subtracted)
+     * @dev Rounds up the lending token amount to avoid underestimating the amount to subtract from each user's balance when
+     * redeeming the lending token (which would cause accounting errors if 1 WEI less than gets burned is subtracted)
      * @param underlyingAmount: the amount of underlying token to convert
      * @param exchangeRate: the exchange rate of underlying token to lending token
      * @return lendingTokenAmount the amount of lending token

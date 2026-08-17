@@ -7,7 +7,7 @@ import {PurchaseRbtc} from "src/PurchaseRbtc.sol";
 
 /**
  * @title IdleDocHandlerMoc
- * @notice DOC stays on the handler (lending index 0). Swaps DOC for rBTC by redeeming from the MoC contract.
+ * @notice DOC stays on the handler (lending index 0). Redeems DOC for rBTC at the MoC contract.
  */
 contract IdleDocHandlerMoc is IdleErc20Handler, PurchaseMoc {
     /**
@@ -26,29 +26,29 @@ contract IdleDocHandlerMoc is IdleErc20Handler, PurchaseMoc {
     ) IdleErc20Handler(dcaManagerAddress, docTokenAddress, feeCollector, feeSettings) PurchaseMoc(docTokenAddress, mocProxyAddress) {}
 
     /**
-     * @notice Override the _redeemStablecoin function to resolve ambiguity between parent contracts
-     * @param user The address of the user for whom DOC is being redeemed
-     * @param amount The amount of DOC to redeem
+     * @notice Override the _retrieveStablecoin hook to resolve ambiguity between parent contracts
+     * @param user The address of the user whose DOC is being retrieved
+     * @param amount The amount of DOC wanted
      */
-    function _redeemStablecoin(address user, uint256 amount)
+    function _retrieveStablecoin(address user, uint256 amount)
         internal
         override(IdleErc20Handler, PurchaseRbtc)
         returns (uint256)
     {
-        return IdleErc20Handler._redeemStablecoin(user, amount);
+        return IdleErc20Handler._retrieveStablecoin(user, amount);
     }
 
     /**
-     * @notice Override the _batchRedeemStablecoin function to resolve ambiguity between parent contracts
-     * @param users The array of user addresses for whom DOC is being redeemed
-     * @param purchaseAmounts The array of amounts of DOC to redeem for each user
-     * @param totalDocAmountToSpend The total amount of DOC to redeem
+     * @notice Override the _batchRetrieveStablecoin hook to resolve ambiguity between parent contracts
+     * @param users The array of user addresses whose DOC is being retrieved
+     * @param purchaseAmounts The array of amounts of DOC charged to each user
+     * @param totalDocAmountToSpend The total amount of DOC wanted
      */
-    function _batchRedeemStablecoin(address[] memory users, uint256[] memory purchaseAmounts, uint256 totalDocAmountToSpend)
+    function _batchRetrieveStablecoin(address[] memory users, uint256[] memory purchaseAmounts, uint256 totalDocAmountToSpend)
         internal
         override(IdleErc20Handler, PurchaseRbtc)
         returns (uint256)
     {
-        return IdleErc20Handler._batchRedeemStablecoin(users, purchaseAmounts, totalDocAmountToSpend);
+        return IdleErc20Handler._batchRetrieveStablecoin(users, purchaseAmounts, totalDocAmountToSpend);
     }
 }
