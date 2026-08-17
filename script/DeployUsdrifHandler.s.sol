@@ -4,7 +4,7 @@ pragma solidity 0.8.36;
 
 import {DeployBase} from "./DeployBase.s.sol";
 import {UsdrifHelperConfig} from "./UsdrifHelperConfig.s.sol";
-import {TropykusErc20HandlerDex} from "../src/TropykusErc20HandlerDex.sol";
+import {TropykusErc20HandlerDex} from "../src/tropykus-legacy/TropykusErc20HandlerDex.sol";
 import {OperationsAdmin} from "../src/OperationsAdmin.sol";
 import {IPurchaseUniswap} from "../src/interfaces/IPurchaseUniswap.sol";
 import {IFeeHandler} from "../src/interfaces/IFeeHandler.sol";

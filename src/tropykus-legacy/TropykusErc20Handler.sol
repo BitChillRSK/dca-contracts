@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
-import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
-import {TokenHandler} from "./TokenHandler.sol";
-import {ITropykusErc20Lending} from "./interfaces/ITropykusErc20Lending.sol";
-import {IkToken} from "./interfaces/IkToken.sol";
+import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
+import {TokenHandler} from "src/TokenHandler.sol";
+import {ITropykusErc20Lending} from "./ITropykusErc20Lending.sol";
+import {IkToken} from "./IkToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {TokenLending} from "src/TokenLending.sol";

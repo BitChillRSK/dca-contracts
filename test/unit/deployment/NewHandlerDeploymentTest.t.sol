@@ -4,7 +4,7 @@ pragma solidity 0.8.36;
 import {BaseDeploymentTest} from "./BaseDeploymentTest.t.sol";
 import {DeployUsdrifHandler} from "../../../script/DeployUsdrifHandler.s.sol";
 import {UsdrifHelperConfig} from "../../../script/UsdrifHelperConfig.s.sol";
-import {TropykusErc20HandlerDex} from "../../../src/TropykusErc20HandlerDex.sol";
+import {TropykusErc20HandlerDex} from "../../../src/tropykus-legacy/TropykusErc20HandlerDex.sol";
 import {console} from "forge-std/Test.sol";
 import "../../Constants.sol";
 

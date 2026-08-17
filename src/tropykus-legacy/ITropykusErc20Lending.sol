@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
-import {ITokenLending} from "./ITokenLending.sol";
+import {ITokenLending} from "src/interfaces/ITokenLending.sol";
 
 /**
  * @title ITropykusErc20Lending

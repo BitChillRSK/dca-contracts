@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
-import {HandlerTestHarness} from "./HandlerTestHarness.t.sol";
-import {ITokenHandler} from "../../../src/interfaces/ITokenHandler.sol";
-import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
-import {SovrynErc20Handler} from "../../../src/SovrynErc20Handler.sol";
-import {MockIsusdToken} from "../../mocks/MockIsusdToken.sol";
-import {MockStablecoin} from "../../mocks/MockStablecoin.sol";
+import {HandlerTestHarness} from "../HandlerTestHarness.t.sol";
+import {ITokenHandler} from "../../../../src/interfaces/ITokenHandler.sol";
+import {IFeeHandler} from "../../../../src/interfaces/IFeeHandler.sol";
+import {SovrynErc20Handler} from "../../../../src/sovryn/SovrynErc20Handler.sol";
+import {MockIsusdToken} from "../../../mocks/MockIsusdToken.sol";
+import {MockStablecoin} from "../../../mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ITokenLending} from "../../../src/interfaces/ITokenLending.sol";
-import "../../../script/Constants.sol";
+import {ITokenLending} from "../../../../src/interfaces/ITokenLending.sol";
+import "../../../../script/Constants.sol";
 
 /**
  * @title SovrynErc20HandlerTest 

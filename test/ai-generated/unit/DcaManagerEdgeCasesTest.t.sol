@@ -6,7 +6,7 @@ import {DcaManager} from "../../../src/DcaManager.sol";
 import {OperationsAdmin} from "../../../src/OperationsAdmin.sol";
 import {MockStablecoin} from "../../mocks/MockStablecoin.sol";
 import {MockKdocToken} from "../../mocks/MockKdocToken.sol";
-import {TropykusErc20HandlerDex} from "../../../src/TropykusErc20HandlerDex.sol";
+import {TropykusErc20HandlerDex} from "../../../src/tropykus-legacy/TropykusErc20HandlerDex.sol";
 import {IPurchaseUniswap} from "../../../src/interfaces/IPurchaseUniswap.sol";
 import {ICoinPairPrice} from "../../../src/interfaces/ICoinPairPrice.sol";
 import {MockMocOracle} from "../../mocks/MockMocOracle.sol";

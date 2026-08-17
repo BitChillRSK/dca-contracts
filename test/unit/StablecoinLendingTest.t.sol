@@ -6,10 +6,10 @@ import {Test, console2} from "forge-std/Test.sol";
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
-import {TropykusDocHandlerMoc} from "../../src/TropykusDocHandlerMoc.sol";
-import {SovrynDocHandlerMoc} from "../../src/SovrynDocHandlerMoc.sol";
+import {TropykusDocHandlerMoc} from "../../src/tropykus-legacy/TropykusDocHandlerMoc.sol";
+import {SovrynDocHandlerMoc} from "../../src/sovryn/SovrynDocHandlerMoc.sol";
 import {ILendingToken} from "../interfaces/ILendingToken.sol";
-import {IkToken} from "../../src/interfaces/IkToken.sol";
+import {IkToken} from "../../src/tropykus-legacy/IkToken.sol";
 import {MocHelperConfig} from "../../script/MocHelperConfig.s.sol";
 import "../../script/Constants.sol";
 
