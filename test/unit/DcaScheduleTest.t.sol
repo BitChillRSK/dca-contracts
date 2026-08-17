@@ -12,9 +12,11 @@ contract DcaScheduleTest is DcaDappTest {
     // Events
     event DcaManager__DcaScheduleDeleted(address user, address token, bytes32 scheduleId, uint256 refundedAmount);
 
-    /// @dev the refund is what the handler actually paid, and a lending protocol's share conversion rounds
-    /// up, so the amount can exceed the schedule's recorded balance by dust
-    uint256 constant REFUND_ROUNDING_TOLERANCE = 1e6;
+    /// @dev The refund is what the handler actually paid. `_stablecoinToLendingToken` rounds the share amount
+    /// up, so the payout can exceed the schedule's recorded balance — by at most one share unit converted back
+    /// to stablecoin, which is sub-wei at these exchange rates and measures 1 wei. Kept this tight on purpose:
+    /// if the gap ever grows, that is a finding, not noise to widen the tolerance for.
+    uint256 constant REFUND_ROUNDING_TOLERANCE = 1;
 
     function setUp() public override {
         super.setUp();
