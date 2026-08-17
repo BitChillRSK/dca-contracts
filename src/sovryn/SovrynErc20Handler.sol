@@ -210,7 +210,11 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending, ISovrynErc20
             // @notice the amount of iSusd each user repays is proportional to the ratio of 
             // that user's stablecoin getting redeemed over the total stablecoin getting redeemed
             uint256 usersRepaidiSusd = Math.mulDiv(totaliSusdToRepay, purchaseAmounts[i], totalErc20ToRedeem, Math.Rounding.Up);
-            s_iSusdBalances[users[i]] -= usersRepaidiSusd;
+            uint256 usersIsusdBalance = s_iSusdBalances[users[i]];
+            if (usersRepaidiSusd > usersIsusdBalance) {
+                revert TokenLending__InsufficientLendingTokenBalance(users[i], usersRepaidiSusd, usersIsusdBalance);
+            }
+            s_iSusdBalances[users[i]] = usersIsusdBalance - usersRepaidiSusd;
             emit TokenLending__UnderlyingRedeemed(users[i], purchaseAmounts[i], usersRepaidiSusd);
         }
         uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(address(this));

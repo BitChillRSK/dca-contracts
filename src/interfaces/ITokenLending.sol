@@ -36,6 +36,9 @@ interface ITokenLending is ITokenHandler {
 
     error TokenLending__LendingProtocolDepositFailed();
     error TokenLending__BatchRedeemUnderlyingFailed();
+    /// @notice batch redeem asked for more of this user's shares than the handler tracks. Same
+    /// outcome as a 0.8 underflow on `s_*Balances[user] -=`; the named error is for the swapper.
+    error TokenLending__InsufficientLendingTokenBalance(address user, uint256 requested, uint256 available);
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS

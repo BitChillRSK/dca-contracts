@@ -62,6 +62,7 @@ Edit:
 - `src/DcaManager.sol` (`withdrawAllAccumulatedInterest` skips empty protocol names)
 - `test/ai-generated/unit/HandlerTestHarness.t.sol` (skip protocol-name registration when index is 0)
 - `script/Constants.sol` (`IDLE_INDEX = 0` only; do not remap Tropykus/Sovryn)
+- `src/sovryn/SovrynErc20Handler.sol`, `src/tropykus-legacy/TropykusErc20Handler.sol`, `src/interfaces/ITokenLending.sol` (named batch-redeem insufficient-balance error, same as idle)
 - `AGENTS.md`
 - `docs/relaunch/README.md`
 
@@ -117,6 +118,6 @@ Fork tests: not required.
 
 ## ABI / deploy / cutover impact
 
-- ABI: new contracts `IdleErc20Handler` / `IdleDocHandlerMoc`. `IdleErc20Handler__AmountAdjusted` indexes only `user`. `DcaManager.withdrawAllAccumulatedInterest` skips empty protocol names (behavior change vs reverting the whole call once a handler exists at 0). No change to existing handler ABIs.
+- ABI: new contracts `IdleErc20Handler` / `IdleDocHandlerMoc`. `IdleErc20Handler__AmountAdjusted` indexes only `user`. `DcaManager.withdrawAllAccumulatedInterest` skips empty protocol names (behavior change vs reverting the whole call once a handler exists at 0). `ITokenLending.TokenLending__InsufficientLendingTokenBalance` replaces a 0.8 underflow panic on Sovryn/Tropykus batch redeem (same revert, named). No other change to existing handler ABIs.
 - Scripts: add-on `DeployIdleHandler` (not wired into `DeployMocSwaps`). Live registration of index 0 on the main deploy path is PR 14.
 - Cutover: none in this PR. Frontend can target index 0 only after PR 14 assigns the handler on the new admin.

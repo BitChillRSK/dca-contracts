@@ -10,6 +10,8 @@ import {ITropykusErc20Lending} from "../../../../src/tropykus-legacy/ITropykusEr
 import {MockKdocToken} from "../../../mocks/MockKdocToken.sol";
 import {MockStablecoin} from "../../../mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ITokenLending} from "../../../../src/interfaces/ITokenLending.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import "../../../../script/Constants.sol";
 
 /**
@@ -252,6 +254,36 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
         uint256 lendingBalance = tropykusHandler.getUsersLendingTokenBalance(USER);
         assertGt(lendingBalance, 0);
     }
+
+    function test_tropykus_batchRedeemStablecoin_exceedsBalance_reverts() public {
+        address user1 = makeAddr("user1");
+        address[] memory users = new address[](1);
+        users[0] = user1;
+
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = DEPOSIT_AMOUNT;
+
+        stablecoin.mint(user1, DEPOSIT_AMOUNT);
+        vm.prank(user1);
+        stablecoin.approve(address(tropykusHandler), type(uint256).max);
+
+        vm.prank(address(dcaManager));
+        handler.depositToken(user1, DEPOSIT_AMOUNT / 10);
+
+        uint256 excessiveAmount = DEPOSIT_AMOUNT * 2;
+        uint256 available = tropykusHandler.getUsersLendingTokenBalance(user1);
+        uint256 exchangeRate = kToken.exchangeRateCurrent();
+        uint256 totalKtokenToRepay =
+            Math.mulDiv(excessiveAmount, EXCHANGE_RATE_DECIMALS, exchangeRate, Math.Rounding.Up);
+        uint256 requested = Math.mulDiv(totalKtokenToRepay, amounts[0], excessiveAmount, Math.Rounding.Up);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ITokenLending.TokenLending__InsufficientLendingTokenBalance.selector, user1, requested, available
+            )
+        );
+        tropykusHandler.testBatchRedeemStablecoin(users, amounts, excessiveAmount);
+    }
 }
 
 /**
@@ -283,5 +315,13 @@ contract TropykusTestHandler is TropykusErc20Handler {
         uint256 /* purchaseAmount */
     ) external pure returns (uint256) {
         return 0; // Minimal implementation for testing
+    }
+
+    function testBatchRedeemStablecoin(
+        address[] memory users,
+        uint256[] memory purchaseAmounts,
+        uint256 totalStablecoinToRedeem
+    ) external returns (uint256) {
+        return _batchRedeemStablecoin(users, purchaseAmounts, totalStablecoinToRedeem);
     }
 } 

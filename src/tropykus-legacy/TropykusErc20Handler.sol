@@ -228,7 +228,11 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending, ITropykusE
             // that user's stablecoin getting redeemed over the total stablecoin getting redeemed
             // @notice Rounds up the lending token amount to avoid underestimating the amount to subtract from each user's balance
             uint256 usersRepaidKtoken = Math.mulDiv(totalKtokenToRepay, purchaseAmounts[i], totalStablecoinToRedeem, Math.Rounding.Up);
-            s_kTokenBalances[users[i]] -= usersRepaidKtoken;
+            uint256 usersKtokenBalance = s_kTokenBalances[users[i]];
+            if (usersRepaidKtoken > usersKtokenBalance) {
+                revert TokenLending__InsufficientLendingTokenBalance(users[i], usersRepaidKtoken, usersKtokenBalance);
+            }
+            s_kTokenBalances[users[i]] = usersKtokenBalance - usersRepaidKtoken;
             emit TokenLending__UnderlyingRedeemed(users[i], purchaseAmounts[i], usersRepaidKtoken);
         }
         
