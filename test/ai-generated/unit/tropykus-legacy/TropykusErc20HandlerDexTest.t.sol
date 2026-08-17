@@ -326,10 +326,10 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
     //////////////////////////////////////////////////////////////*/
     
     /**
-     * @notice Test that specifically calls buyRbtc to trigger _redeemStablecoin override
-     * @dev This test ensures the TropykusErc20HandlerDex._redeemStablecoin override is covered
+     * @notice Test that specifically calls buyRbtc to trigger _retrieveStablecoin override
+     * @dev This test ensures the TropykusErc20HandlerDex._retrieveStablecoin override is covered
      */
-    function test_tropykusDex_buyRbtcTriggersRedeemStablecoinOverride() public {
+    function test_tropykusDex_buyRbtcTriggersRetrieveStablecoinOverride() public {
         // Setup: User deposits tokens first
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);
@@ -341,7 +341,7 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         uint256 purchaseAmount = 100 ether;
         bytes32 mockScheduleId = keccak256("test_schedule");
         
-        // Call buyRbtc which triggers _redeemStablecoin override
+        // Call buyRbtc which triggers _retrieveStablecoin override
         vm.prank(address(dcaManager));
         tropykusDexHandler.buyRbtc(USER, mockScheduleId, purchaseAmount);
         
@@ -355,10 +355,10 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
     }
     
     /**
-     * @notice Test that specifically calls batchBuyRbtc to trigger _batchRedeemStablecoin override
-     * @dev This test ensures the TropykusErc20HandlerDex._batchRedeemStablecoin override is covered
+     * @notice Test that specifically calls batchBuyRbtc to trigger _batchRetrieveStablecoin override
+     * @dev This test ensures the TropykusErc20HandlerDex._batchRetrieveStablecoin override is covered
      */
-    function test_tropykusDex_batchBuyRbtcTriggersRedeemStablecoinOverride() public {
+    function test_tropykusDex_batchBuyRbtcTriggersRetrieveStablecoinOverride() public {
         // Setup: Multiple users deposit tokens
         address user1 = address(0x2001);
         address user2 = address(0x2002);
@@ -398,7 +398,7 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         purchaseAmounts[0] = 100 ether;
         purchaseAmounts[1] = 80 ether;
         
-        // Call batchBuyRbtc which triggers _batchRedeemStablecoin override
+        // Call batchBuyRbtc which triggers _batchRetrieveStablecoin override
         vm.prank(address(dcaManager));
         tropykusDexHandler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts);
         

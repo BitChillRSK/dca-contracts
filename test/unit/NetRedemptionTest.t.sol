@@ -222,7 +222,7 @@ contract NetRedemptionTest is DcaDappTest {
      * @notice The guard for a redemption that cannot even cover BitChill's own fee.
      * @dev This is deliberately not a SIP-0094 scenario. The Perimeter Fee is 10 bps against a BitChill fee
      * of ~100-200 bps, so a batch always redeems roughly a hundred times what it owes in fees and
-     * `PurchaseRbtc__RedeemedAmountBelowFee` is unreachable in production. It fires only if a lending
+     * `PurchaseRbtc__StablecoinRetrievedBelowFee` is unreachable in production. It fires only if a lending
      * protocol withholds almost the entire redemption — a rug or an insolvent pool — which is what the
      * ~99% fee below simulates. The point is that BitChill reverts cleanly instead of underflowing.
      */
@@ -232,7 +232,7 @@ contract NetRedemptionTest is DcaDappTest {
         // Purchases here are AMOUNT_TO_SPEND / NUM_OF_SCHEDULES = 40 DOC, below FEE_PURCHASE_LOWER_BOUND, so
         // they pay the max rate (200 bps locally): 4 DOC of fees on a 200 DOC batch. Withholding 99.5%
         // leaves 1 DOC redeemed, which is below the fee but still above zero — a zero payout would revert
-        // earlier with SovrynErc20Lending__RedeemUnderlyingFailed, which is a different failure.
+        // earlier with TokenLending__ZeroStablecoinReceived, which is a different failure.
         MockIsusdToken(address(lendingToken)).setExitFeeBps(RUG_EXIT_FEE_BPS);
 
         (
@@ -255,7 +255,7 @@ contract NetRedemptionTest is DcaDappTest {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IPurchaseRbtc.PurchaseRbtc__RedeemedAmountBelowFee.selector, expectedRedeemed, aggregatedFee
+                IPurchaseRbtc.PurchaseRbtc__StablecoinRetrievedBelowFee.selector, expectedRedeemed, aggregatedFee
             )
         );
         vm.prank(SWAPPER);

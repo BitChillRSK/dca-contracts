@@ -76,7 +76,7 @@ contract TropykusDocHandlerMocTest is Test {
         // Deposit DOC on behalf of USER (onlyDcaManager)
         handler.depositToken(USER, depositAmount);
 
-        // Perform rBTC purchase – triggers _redeemStablecoin override plus MoC redemption
+        // Perform rBTC purchase – triggers the _retrieveStablecoin override plus the MoC swap
         handler.buyRbtc(USER, scheduleId, purchaseAmount);
 
         // Verify rBTC was accounted
