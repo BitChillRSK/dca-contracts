@@ -604,8 +604,6 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         DcaDetails storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
         uint256 tokenBalance = dcaSchedule.tokenBalance;
-        // @notice the sentinel resolves against live storage, so a purchase landing between the caller's
-        // read of tokenBalance and this transaction no longer turns the withdrawal into a revert
         if (withdrawalAmount == type(uint256).max) withdrawalAmount = tokenBalance;
         if (withdrawalAmount == 0) revert DcaManager__WithdrawalAmountMustBeGreaterThanZero();
         if (withdrawalAmount > tokenBalance) {
