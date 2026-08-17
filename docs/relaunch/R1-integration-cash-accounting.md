@@ -56,6 +56,13 @@ because the clamp fix below writes to `s_dcaSchedules` after an external call.
       rBTC than it received. Revert with a named error if the redeemed amount cannot cover the fee.
 - [ ] `PurchaseUniswap._swapStablecoinForWrbtc`: return the measured WRBTC `balanceOf` delta rather than
       `exactInput`'s `amountOut`. Keep `amountOutMinimum` exactly as is.
+- [ ] `PurchaseUniswap.batchBuyRbtc`: same treatment as `PurchaseMoc`. It already spends the redeem result,
+      but it overwrites the planned net total with `redeemed - aggregatedFee` and then divides the per-user
+      weights by that smaller number, while `netStablecoinAmountsToSpend[i]` still sums to the planned total —
+      so a short redemption credits `purchased * planned / actual`, more WRBTC than the handler received.
+      Keep the planned net total as the denominator and carry the actual spend in its own variable. This is
+      latent today only because the Sovryn redeem returns gross and the path reverts at the swap instead; the
+      net-returning redeem in this PR is what arms it.
 - [ ] `TropykusErc20Handler.withdrawToken`: transfer the amount `_redeemStablecoin` actually produced, not the
       requested amount. Sovryn already assigns the redeem result; Tropykus discarded it.
 - [ ] `ITokenHandler.withdrawToken` returns `uint256` — the amount actually paid to the user. `TokenHandler`,
@@ -74,13 +81,9 @@ because the clamp fix below writes to `s_dcaSchedules` after an external call.
 
 ## Out of scope
 
-- [ ] **`PurchaseUniswap.batchBuyRbtc`'s per-user split.** Line 125 reassigns the spend total to
-      `redeemed - aggregatedFee` while `netStablecoinAmountsToSpend[i]` still sums to the *planned* total, so
-      a short redemption credits `purchased * planned / actual` — more WRBTC than the handler received. Today
-      the Sovryn redeem returns gross and the path reverts at the swap instead; the net-returning redeem in
-      this PR converts that revert into a silent over-credit. **Deferred at the human's request** (2026-08-16)
-      pending their own read of the code; the Dex handlers are not deployed this relaunch (`R22`). The fix is
-      one variable — keep the planned net total as the denominator, exactly as `PurchaseMoc` does here.
+- [ ] Anything else in `PurchaseUniswap`. The swap path is brought in line with the balance-delta rule and its
+      batch split is corrected because this PR arms that bug; the Dex handlers are otherwise untouched and are
+      not deployed this relaunch (`R22`).
 - [ ] R15's `type(uint256).max` withdraw sentinel and lending-share dust sweep. This PR settles net redemption
       first; R15 follows.
 - [ ] Rebuilding deposit accounting around a measured `transferFrom`. DOC and USDRIF are not fee-on-transfer.
@@ -115,7 +118,8 @@ because the clamp fix below writes to `s_dcaSchedules` after an external call.
 Behaviours to assert, with the mock's exit fee **enabled** (returns gross, pays net):
 
 - `buyRbtc` and `batchBuyRbtc` on Sovryn+MoC succeed, and spend the net amount rather than reverting.
-- Sum of per-user accumulated rBTC credited by a batch is never greater than the rBTC the handler received.
+- Sum of per-user accumulated rBTC credited by a batch is never greater than the rBTC the handler received,
+  on both the MoC and the Uniswap batch paths.
 - `withdrawToken` pays the user the net amount, and the schedule's `tokenBalance` drops by exactly what was
   paid — not by what was requested.
 - `deleteDcaSchedule` succeeds and its event reports the amount actually paid.
@@ -143,8 +147,8 @@ Behaviours to assert, with the mock's exit fee **enabled** (returns gross, pays 
 
 ## Reviewer checklist
 
-- [ ] Matches **Scope**; nothing from **Out of scope** — in particular `PurchaseUniswap.batchBuyRbtc`'s
-      per-user split is untouched and its deferral is stated in the PR body.
+- [ ] Matches **Scope**; nothing from **Out of scope**.
+- [ ] No batch path divides per-user weights by anything other than the planned net total they sum to.
 - [ ] `AGENTS.md` invariants 1 and 2 now hold in code, and 3-7 are unchanged.
 - [ ] Every state write that happens after an external call reads storage at that point; no stale memory copy
       is written back.
