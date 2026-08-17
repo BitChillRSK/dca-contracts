@@ -17,6 +17,9 @@ contract MockMocProxy {
     function redeemDocRequest(uint256 docAmount) external {}
 
     function redeemFreeDoc(uint256 docAmount) external {
+        // Priced off the requested amount on purpose: production DOC is not fee-on-transfer, so
+        // received == docAmount. The burn below uses the measured delta only so this mock stays
+        // solvent when a FOT stablecoin mock is swapped in; it is not modelling a MoC payout rule.
         uint256 redeemedRbtc = docAmount / BTC_PRICE;
         uint256 balanceBefore = mockDocToken.balanceOf(address(this));
         mockDocToken.transferFrom(msg.sender, address(this), docAmount);
