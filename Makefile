@@ -6,8 +6,10 @@ STABLECOIN_TYPE ?= DOC
 # (mocks + vm.prank with raw addresses → RPC 429 and revert-depth failures).
 TEST_CMD := forge test --no-match-test invariant --no-match-contract ComparePurchaseMethods --no-match-path "test/mainnet-debug/**" -j 1
 FORK_TEST_CMD := forge test --no-match-test invariant --no-match-contract ComparePurchaseMethods --no-match-path "test/{mainnet-debug,ai-generated}/**" -j 1
-# Rootstock mainnet 2026-04-26, the day before Tropykus paused kDOC mint (2026-04-27).
-FORK_BLOCK_TROPYKUS ?= 8774377
+# Rootstock mainnet 2026-04-05, comfortably before Tropykus paused kDOC mint. Measured by bisecting
+# mint on a fork: block 8739512 (2026-04-16 16:20 UTC) still mints, 8740674 (2026-04-17 00:13 UTC)
+# reverts with kToken error "C2". Do not raise this past 8739512.
+FORK_BLOCK_TROPYKUS ?= 8700000
 
 # Targets
 .PHONY: all test moc dex help check ci build patch-deps slither moc-tropykus moc-sovryn dex-tropykus dex-sovryn fork fork-tropykus fork-sovryn coverage

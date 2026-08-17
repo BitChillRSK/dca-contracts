@@ -14,7 +14,7 @@ Three harness bugs, none of them protocol logic:
 
 2. **`make fork-*` passes `--no-match-path` twice.** PR 1 added `test/mainnet-debug/**` to `TEST_CMD`. `FORK_TEST_CMD` still appends `test/ai-generated/**`. Forge clap rejects a repeated flag, so fork targets never start. The original Makefile (Feb 2026) was valid because `TEST_CMD` had no path filter.
 
-3. **Tropykus paused deposits on 2026-04-27.** Forking `latest` makes `make fork-tropykus` fail on mint. Pin a mainnet block from the day before. Sovryn mint is still live; `make fork-sovryn` stays on the tip.
+3. **Tropykus paused deposits mid-April 2026.** Forking `latest` makes `make fork-tropykus` fail on mint with kToken error `C2`. Bisecting mint on a fork puts the pause between blocks 8739512 (2026-04-16) and 8740674 (2026-04-17); pin below that. Sovryn mint is still live; `make fork-sovryn` stays on the tip.
 
 The Sovryn deplete failures are the mock, not the handlers: `MockKdocToken` mints extra DOC when a redeem exceeds inventory (yield). `MockIsusdToken.burn` uses `ceilDiv` against a growing `tokenPrice` and does not, so a long purchase loop drains the mock’s DOC and reverts on `transfer`.
 
@@ -25,7 +25,7 @@ The Sovryn deplete failures are the mock, not the handlers: `MockKdocToken` mint
 ## Scope
 
 - [ ] `Makefile`: `FORK_TEST_CMD` uses a **single** `--no-match-path` glob that excludes both `test/mainnet-debug/**` and `test/ai-generated/**`.
-- [ ] `Makefile`: `make fork` and `make fork-tropykus` pass `--fork-block-number 8774377` (Rootstock mainnet, 2026-04-26, the day before Tropykus paused mint). `make fork-sovryn` does not pin.
+- [ ] `Makefile`: `make fork` and `make fork-tropykus` pass `--fork-block-number 8700000` (Rootstock mainnet, 2026-04-05, before Tropykus paused mint). `make fork-sovryn` does not pin.
 - [ ] `Makefile`: `make fork-*` pass `SWAP_TYPE=$(SWAP_TYPE)` (Forge has no fallback). Source `.env` for `RSK_MAINNET_RPC_URL` and fail if it is empty — Make expands `--fork-url` before Forge loads dotenv, and an empty URL makes Forge treat the cwd as an IPC socket.
 - [ ] `Makefile`: every test target that sets `LENDING_PROTOCOL` also sets `EXPECTED_LENDING_PROTOCOL` to the same value so a canary can detect `vm.setEnv` overwrites.
 - [ ] `BaseDeploymentTest.setUp`: stop writing `LENDING_PROTOCOL`. Keep `REAL_DEPLOYMENT=false`. Skip (do not `setEnv`) when `STABLECOIN_TYPE` is not DOC, because this suite always calls `DeployMocSwaps`. `NewHandlerDeploymentTest` must skip on the same lanes — `vm.skip` in the parent does not abort the child `setUp`.
@@ -70,7 +70,7 @@ make moc-tropykus
 make check
 ```
 
-Fork tests with RPC: **not required** for the done-gate. If `RSK_MAINNET_RPC_URL` is set, `make fork-tropykus` should get past clap and fork block `8774377`.
+Fork tests with RPC: **not required** for the done-gate, but verify them when an RPC is available — the pin is only useful if the target is actually green. With `RSK_MAINNET_RPC_URL` set, `make fork-tropykus` and `make fork-sovryn` both pass (127 passed, 10 skipped each).
 
 Behaviours:
 
@@ -83,7 +83,7 @@ Behaviours:
 
 - [ ] No `vm.setEnv("LENDING_PROTOCOL", …)` in first-party tests.
 - [ ] Fork Make targets pass exactly one `--no-match-path`.
-- [ ] Tropykus fork targets pin `8774377`; Sovryn fork targets do not.
+- [ ] Tropykus fork targets pin a block below 8739512 (currently `8700000`); Sovryn fork targets do not.
 - [ ] Canary fails if someone writes `LENDING_PROTOCOL` back to tropykus during a Sovryn lane.
 - [ ] Four previously hidden Sovryn failures pass.
 - [ ] `make check` passes, and the Sovryn lane’s skip/pass counts differ from Tropykus where Sovryn-only tests exist.

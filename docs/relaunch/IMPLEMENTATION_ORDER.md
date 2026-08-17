@@ -119,7 +119,7 @@ So, for an idle-funds handler:
 
 ### PR 9 - R24 test harness matrix
 
-Stacked on PR 8. Test/Makefile only. `make moc-sovryn` must actually run Sovryn (`BaseDeploymentTest` must not `vm.setEnv` `LENDING_PROTOCOL`). `make fork-*` must pass a single `--no-match-path`. Tropykus fork tests pin Rootstock block `8774377` (2026-04-26), the day before kDOC mint was paused. See `R24-test-harness-matrix.md`.
+Stacked on PR 8. Test/Makefile only. `make moc-sovryn` must actually run Sovryn (`BaseDeploymentTest` must not `vm.setEnv` `LENDING_PROTOCOL`). `make fork-*` must pass a single `--no-match-path`. Tropykus fork tests pin Rootstock block `8700000` (2026-04-05); kDOC mint was paused between blocks 8739512 and 8740674. See `R24-test-harness-matrix.md`.
 
 ### PR 10 - R15 withdraw-all sentinel and share dust
 
