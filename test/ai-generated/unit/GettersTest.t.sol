@@ -12,10 +12,10 @@ import {ITokenLending} from "../../../src/interfaces/ITokenLending.sol";
 import {ICoinPairPrice} from "../../../src/interfaces/ICoinPairPrice.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {PurchaseUniswap} from "../../../src/PurchaseUniswap.sol";
-import {TropykusErc20Handler} from "../../../src/TropykusErc20Handler.sol";
-import {SovrynErc20Handler} from "../../../src/SovrynErc20Handler.sol";
-import {TropykusErc20HandlerDex} from "../../../src/TropykusErc20HandlerDex.sol";
-import {SovrynErc20HandlerDex} from "../../../src/SovrynErc20HandlerDex.sol";
+import {TropykusErc20Handler} from "../../../src/tropykus-legacy/TropykusErc20Handler.sol";
+import {SovrynErc20Handler} from "../../../src/sovryn/SovrynErc20Handler.sol";
+import {TropykusErc20HandlerDex} from "../../../src/tropykus-legacy/TropykusErc20HandlerDex.sol";
+import {SovrynErc20HandlerDex} from "../../../src/sovryn/SovrynErc20HandlerDex.sol";
 import {console2} from "forge-std/console2.sol";
 import "../../../script/Constants.sol";
 

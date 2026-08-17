@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
-import {HandlerTestHarness} from "./HandlerTestHarness.t.sol";
-import {ITokenHandler} from "../../../src/interfaces/ITokenHandler.sol";
-import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
-import {IPurchaseUniswap} from "../../../src/interfaces/IPurchaseUniswap.sol";
-import {IWRBTC} from "../../../src/interfaces/IWRBTC.sol";
+import {HandlerTestHarness} from "../HandlerTestHarness.t.sol";
+import {ITokenHandler} from "../../../../src/interfaces/ITokenHandler.sol";
+import {IFeeHandler} from "../../../../src/interfaces/IFeeHandler.sol";
+import {IPurchaseUniswap} from "../../../../src/interfaces/IPurchaseUniswap.sol";
+import {IWRBTC} from "../../../../src/interfaces/IWRBTC.sol";
 import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces/ISwapRouter02.sol";
-import {ICoinPairPrice} from "../../../src/interfaces/ICoinPairPrice.sol";
-import {TropykusErc20HandlerDex} from "../../../src/TropykusErc20HandlerDex.sol";
-import {MockKToken} from "../../mocks/MockKToken.sol";
-import {MockWrbtcToken} from "../../mocks/MockWrbtcToken.sol";
-import {MockMocOracle} from "../../mocks/MockMocOracle.sol";
-import {MockSwapRouter02} from "../../mocks/MockSwapRouter02.sol";
+import {ICoinPairPrice} from "../../../../src/interfaces/ICoinPairPrice.sol";
+import {TropykusErc20HandlerDex} from "../../../../src/tropykus-legacy/TropykusErc20HandlerDex.sol";
+import {MockKToken} from "../../../mocks/MockKToken.sol";
+import {MockWrbtcToken} from "../../../mocks/MockWrbtcToken.sol";
+import {MockMocOracle} from "../../../mocks/MockMocOracle.sol";
+import {MockSwapRouter02} from "../../../mocks/MockSwapRouter02.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../../../script/Constants.sol";
+import "../../../../script/Constants.sol";
 
 /**
  * @title TropykusErc20HandlerDexTest 

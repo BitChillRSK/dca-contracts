@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.36;
 
-import {IkToken} from "../../src/interfaces/IkToken.sol";
-import {IiSusdToken} from "../../src/interfaces/IiSusdToken.sol";
+import {IkToken} from "../../src/tropykus-legacy/IkToken.sol";
+import {IiSusdToken} from "../../src/sovryn/IiSusdToken.sol";
 
 /**
  * @title ILendingToken

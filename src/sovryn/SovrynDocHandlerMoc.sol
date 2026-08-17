@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
-import {PurchaseMoc} from "./PurchaseMoc.sol";
-import {PurchaseRbtc} from "./PurchaseRbtc.sol";
+import {PurchaseMoc} from "src/PurchaseMoc.sol";
+import {PurchaseRbtc} from "src/PurchaseRbtc.sol";
 import {SovrynErc20Handler} from "./SovrynErc20Handler.sol";
 
 /**

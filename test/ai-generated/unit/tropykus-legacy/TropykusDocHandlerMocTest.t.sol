@@ -2,7 +2,7 @@
 pragma solidity 0.8.36;
 
 import {Test, console2} from "forge-std/Test.sol";
-import {TropykusDocHandlerMoc} from "src/TropykusDocHandlerMoc.sol";
+import {TropykusDocHandlerMoc} from "src/tropykus-legacy/TropykusDocHandlerMoc.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockKdocToken} from "test/mocks/MockKdocToken.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";

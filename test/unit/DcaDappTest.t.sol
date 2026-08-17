@@ -8,8 +8,8 @@ import {DcaManagerAccessControl} from "../../src/DcaManagerAccessControl.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {IStablecoinHandler} from "../../test/interfaces/IStablecoinHandler.sol";
 import {ICoinPairPrice} from "../../src/interfaces/ICoinPairPrice.sol";
-import {TropykusDocHandlerMoc} from "../../src/TropykusDocHandlerMoc.sol";
-import {SovrynDocHandlerMoc} from "../../src/SovrynDocHandlerMoc.sol";
+import {TropykusDocHandlerMoc} from "../../src/tropykus-legacy/TropykusDocHandlerMoc.sol";
+import {SovrynDocHandlerMoc} from "../../src/sovryn/SovrynDocHandlerMoc.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import {OperationsAdmin} from "../../src/OperationsAdmin.sol";
@@ -28,8 +28,8 @@ import {MockWrbtcToken} from "../mocks/MockWrbtcToken.sol";
 import {MockSwapRouter02} from "../mocks/MockSwapRouter02.sol";
 import "../../script/Constants.sol";
 import "./TestsHelper.t.sol";
-import {IkToken} from "../../src/interfaces/IkToken.sol";
-import {IiSusdToken} from "../../src/interfaces/IiSusdToken.sol";
+import {IkToken} from "../../src/tropykus-legacy/IkToken.sol";
+import {IiSusdToken} from "../../src/sovryn/IiSusdToken.sol";
 import {IPurchaseUniswap} from "../../src/interfaces/IPurchaseUniswap.sol";
 
 contract DcaDappTest is Test {

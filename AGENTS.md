@@ -35,15 +35,17 @@ PurchaseMoc         MoC redeem DOC → rBTC
 PurchaseUniswap     Uniswap V3 → WRBTC
 
 Handlers = TokenHandler + TokenLending + a Purchase*:
-  TropykusErc20Handler ─┬─ TropykusDocHandlerMoc      (+ PurchaseMoc)
-                        └─ TropykusErc20HandlerDex    (+ PurchaseUniswap)
-  SovrynErc20Handler   ─┬─ SovrynDocHandlerMoc        (+ PurchaseMoc)
-                        └─ SovrynErc20HandlerDex      (+ PurchaseUniswap)
+  src/sovryn/            SovrynErc20Handler ─┬─ SovrynDocHandlerMoc   (+ PurchaseMoc)
+                                            └─ SovrynErc20HandlerDex (+ PurchaseUniswap)
+  src/tropykus-legacy/   TropykusErc20Handler ─┬─ TropykusDocHandlerMoc   (+ PurchaseMoc)
+                                              └─ TropykusErc20HandlerDex (+ PurchaseUniswap)
+  src/idle/              index 0 (PR 12)
+  src/layerbank/         index 1 (PR 13)
 ```
 
-- `src/interfaces/` — first-party ABIs; keep in sync with implementations.
+- `src/interfaces/` — shared first-party ABIs; keep in sync with implementations. Protocol-specific interfaces (`IiSusdToken`, `IkToken`, `ISovrynErc20Lending`, `ITropykusErc20Lending`) live next to their handlers.
 - `test/unit/DcaDappTest.t.sol` — shared harness; **requires** `SWAP_TYPE` and `LENDING_PROTOCOL` (no fallback).
-- `test/unit/`, `test/mocks/`, `test/ai-generated/` — unit / mocks / extra + fuzz.
+- `test/unit/`, `test/mocks/`, `test/ai-generated/` — unit / mocks / extra + fuzz. Dedicated handler tests: `test/ai-generated/unit/sovryn/`, `test/ai-generated/unit/tropykus-legacy/`.
 - `script/` — deploy helpers. Do not `--broadcast` or talk to live contracts.
 
 ## Protocol invariants

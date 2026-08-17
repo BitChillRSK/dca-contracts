@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
-import {HandlerTestHarness} from "./HandlerTestHarness.t.sol";
-import {ITokenHandler} from "../../../src/interfaces/ITokenHandler.sol";
-import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
-import {IPurchaseUniswap} from "../../../src/interfaces/IPurchaseUniswap.sol";
-import {TropykusErc20Handler} from "../../../src/TropykusErc20Handler.sol";
-import {ITropykusErc20Lending} from "../../../src/interfaces/ITropykusErc20Lending.sol";
-import {MockKdocToken} from "../../mocks/MockKdocToken.sol";
-import {MockStablecoin} from "../../mocks/MockStablecoin.sol";
+import {HandlerTestHarness} from "../HandlerTestHarness.t.sol";
+import {ITokenHandler} from "../../../../src/interfaces/ITokenHandler.sol";
+import {IFeeHandler} from "../../../../src/interfaces/IFeeHandler.sol";
+import {IPurchaseUniswap} from "../../../../src/interfaces/IPurchaseUniswap.sol";
+import {TropykusErc20Handler} from "../../../../src/tropykus-legacy/TropykusErc20Handler.sol";
+import {ITropykusErc20Lending} from "../../../../src/tropykus-legacy/ITropykusErc20Lending.sol";
+import {MockKdocToken} from "../../../mocks/MockKdocToken.sol";
+import {MockStablecoin} from "../../../mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../../../script/Constants.sol";
+import "../../../../script/Constants.sol";
 
 /**
  * @title TropykusErc20HandlerTest 

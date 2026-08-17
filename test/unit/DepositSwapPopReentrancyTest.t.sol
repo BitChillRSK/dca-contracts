@@ -4,7 +4,7 @@ pragma solidity 0.8.36;
 import {Test} from "forge-std/Test.sol";
 import {DcaManager} from "../../src/DcaManager.sol";
 import {OperationsAdmin} from "../../src/OperationsAdmin.sol";
-import {TropykusDocHandlerMoc} from "../../src/TropykusDocHandlerMoc.sol";
+import {TropykusDocHandlerMoc} from "../../src/tropykus-legacy/TropykusDocHandlerMoc.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
 import {MockReentrantStablecoin, ITransferFromHook} from "../mocks/MockReentrantStablecoin.sol";
