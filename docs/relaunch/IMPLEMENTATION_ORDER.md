@@ -40,14 +40,15 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R6, R17 | 6 | none |
 | R8 | 7 | none |
 | R1, R20 | 8 | none |
-| R15 | 9 | none |
-| R22 (folders) | 10 | none |
-| R22 (idle) | 11 | none |
-| R22 (LayerBank) | 12 | none |
-| R22 (deploy/CI) | 13 | none |
-| R9 | 14 | R18/R19 if not recorded (ABI freeze) |
-| R16 | 15 | none |
-| R10 | 16 | none |
+| R24 | 9 | none |
+| R15 | 10 | none |
+| R22 (folders) | 11 | none |
+| R22 (idle) | 12 | none |
+| R22 (LayerBank) | 13 | none |
+| R22 (deploy/CI) | 14 | none |
+| R9 | 15 | R18/R19 if not recorded (ABI freeze) |
+| R16 | 16 | none |
+| R10 | 17 | none |
 | R12, R13, R18, R19, OZ 5.x | optional late | only if the human named that item |
 
 ### PR 1 - R23 toolchain and dependency baseline
@@ -116,13 +117,17 @@ So, for an idle-funds handler:
 - Invariant 6 in `AGENTS.md` (comprehensive `nonReentrant` on schedule mutators) stops being cheap insurance and becomes load-bearing. Do not relax it in the same relaunch that introduces pooled idle funds.
 - The R20 balance-delta work above matters more, not less: with no clamp, `DcaManager.tokenBalance` is the only thing standing between a user and the pool.
 
-### PR 9 - R15 withdraw-all sentinel and share dust
+### PR 9 - R24 test harness matrix
+
+Stacked on PR 8. Test/Makefile only. `make moc-sovryn` must actually run Sovryn (`BaseDeploymentTest` must not `vm.setEnv` `LENDING_PROTOCOL`). `make fork-*` must pass a single `--no-match-path`. Tropykus fork tests pin Rootstock block `8774377` (2026-04-26), the day before kDOC mint was paused. See `R24-test-harness-matrix.md`.
+
+### PR 10 - R15 withdraw-all sentinel and share dust
 
 Add `type(uint256).max` as "withdraw this schedule's full tokenBalance." Sweep leftover lending shares when the user's locked balance for that token/protocol is zero.
 
 This should follow R1/R20 so net redemption behavior is settled first.
 
-### PR 10 - R22 repo layout preparation
+### PR 11 - R22 repo layout preparation
 
 Move protocol-specific sources and tests into folders:
 
@@ -133,19 +138,19 @@ Move protocol-specific sources and tests into folders:
 
 Keep behavior unchanged where possible. Tropykus remains legacy code and tests, but it must not be registered in the new deployment path.
 
-### PR 11 - R22 idle handler
+### PR 12 - R22 idle handler
 
 Ship the index-0 idle DOC + MoC handler. Deposits stay on the handler; no lending token is minted; buys and withdrawals spend idle DOC.
 
 Interest calls for index 0 should continue to revert because no protocol name is registered for index 0.
 
-### PR 12 - R22 LayerBank handler
+### PR 13 - R22 LayerBank handler
 
 Add LayerBank as index 1 for DOC + MoC. Use balance-delta accounting from the start. Add mocks or fork tests based on the Rootstock LayerBank lToken ABI.
 
 Do not rename Tropykus in place and do not deploy USDRIF/Uniswap handlers for this relaunch.
 
-### PR 13 - R22 deploy scripts, constants, harness, and CI matrix
+### PR 14 - R22 deploy scripts, constants, harness, and CI matrix
 
 Update constants and deploy scripts for the new map:
 
@@ -156,19 +161,19 @@ Update constants and deploy scripts for the new map:
 
 Split the shared test harness so lending-token assertions live only in lending-protocol-specific tests. CI should cover `none`, `layerbank`, and `sovryn` with `SWAP_TYPE=mocSwaps`.
 
-### PR 14 - R9 event indexing and ABI cleanup
+### PR 15 - R9 event indexing and ABI cleanup
 
 Index only addresses and `scheduleId`. Do not index amounts, timestamps, periods, rates, strings, bytes, or arrays.
 
 Do this once the shipped ABI surface is known, including any optional pause or compound-interest events that were approved.
 
-### PR 15 - R16 redeem glossary
+### PR 16 - R16 redeem glossary
 
 Rename first-party internals, events, variables, and comments so "redeem" names the token being given up. Do not rename third-party ABI functions.
 
 This should land before the full natspec pass.
 
-### PR 16 - R10 natspec and comments
+### PR 17 - R10 natspec and comments
 
 Rewrite first-party natspec after ABI, names, handlers, and layout are stable. Put user-facing docs on interfaces and use `@inheritdoc` in implementations.
 

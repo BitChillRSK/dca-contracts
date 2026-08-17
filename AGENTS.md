@@ -62,12 +62,12 @@ Unless the assigned spec explicitly changes one:
 
 - Targeted tests for the spec first. Document exact commands in the PR.
 - **Done-gate:** `make check` (`forge build`, `make moc-tropykus`, `make moc-sovryn`, and `STABLECOIN_TYPE=USDRIF make dex-sovryn`).
-- **CI (every PR):** `make moc-sovryn` and `STABLECOIN_TYPE=USDRIF make dex-sovryn`. Locally, `make ci` runs those lanes under `FOUNDRY_PROFILE=ci`. Local Tropykus targets remain useful for mock-based coverage; Tropykus fork deposits may fail while live mint is paused.
+- **CI (every PR):** `make moc-sovryn` and `STABLECOIN_TYPE=USDRIF make dex-sovryn`. Locally, `make ci` runs those lanes under `FOUNDRY_PROFILE=ci`. Local Tropykus targets remain useful for mock-based coverage. Tropykus fork tests pin a pre-pause block; see the fork-tests bullet below.
 - Defaults: `SWAP_TYPE=mocSwaps`, `LENDING_PROTOCOL=tropykus`, `STABLECOIN_TYPE=DOC`. Dex paths often use `STABLECOIN_TYPE=USDRIF`.
 - `make patch-deps` applies the vendored Uniswap pragma compatibility patch used by local builds and CI. It mutates `lib/` submodules; do not commit those submodule dirties.
 - `make slither` if slither is installed; not part of `make check` (no clean baseline yet).
 - Do not `forge fmt` existing files unless the spec says to (`src/` is not fmt-clean).
-- Fork tests (`make fork-*`) need an RPC and are not in CI. `test/mainnet-debug/**` is excluded from normal local/CI runs. They run on **Anvil/revm**, not rskj: useful for live Sovryn/MoC state, **not** a Rootstock opcode/compiler proof. `make fork-*` currently passes `--no-match-path` twice (Forge rejects that); use one glob until that Makefile bug is fixed.
+- Fork tests (`make fork-*`) need an RPC and are not in CI. `test/mainnet-debug/**` is excluded from normal local/CI runs. They run on **Anvil/revm**, not rskj: useful for live Sovryn/MoC state, **not** a Rootstock opcode/compiler proof. `make fork-tropykus` (and `make fork` when `LENDING_PROTOCOL=tropykus`) pins `--fork-block-number 8774377` (2026-04-26), the day before Tropykus paused kDOC mint. `make fork-sovryn` stays on the chain tip. Do not `vm.setEnv("LENDING_PROTOCOL", …)` in tests — it is process-wide and makes every later suite ignore the Makefile lane (`EXPECTED_LENDING_PROTOCOL` is the canary).
 
 ## Git (relaunch)
 
