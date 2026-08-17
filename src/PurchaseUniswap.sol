@@ -117,33 +117,37 @@ abstract contract PurchaseUniswap is
         uint256 numOfPurchases = buyers.length;
 
         // Calculate net amounts
-        (uint256 aggregatedFee, uint256[] memory netStablecoinAmountsToSpend, uint256 totalStablecoinAmountToSpend) =
+        (uint256 aggregatedFee, uint256[] memory netStablecoinAmountsToSpend, uint256 totalNetStablecoinPlanned) =
             _calculateFeeAndNetAmounts(purchaseAmounts);
 
         // Redeem stablecoin (and repay lending token)
-        uint256 stablecoinRedeemed = _batchRedeemStablecoin(buyers, purchaseAmounts, totalStablecoinAmountToSpend + aggregatedFee); // totalStablecoinAmountToSpend (on rBTC) + aggregatedFee (charged by BitChill)
-        totalStablecoinAmountToSpend = stablecoinRedeemed - aggregatedFee;
+        // @notice we spend the stablecoin we actually received, never the gross amount we asked the lending protocol for
+        uint256 totalStablecoinAmountToSpend = _batchRedeemStablecoin(buyers, purchaseAmounts, totalNetStablecoinPlanned + aggregatedFee); // totalNetStablecoinPlanned (on rBTC) + aggregatedFee (charged by BitChill)
+        if (totalStablecoinAmountToSpend <= aggregatedFee) {
+            revert PurchaseRbtc__RedeemedAmountBelowFee(totalStablecoinAmountToSpend, aggregatedFee);
+        }
+        totalStablecoinAmountToSpend -= aggregatedFee;
 
         // Charge fees
         _transferFee(i_purchasingToken, aggregatedFee);
 
         // Swap stablecoin for wrBTC
         uint256 wrBtcPurchased = _swapStablecoinForWrbtc(totalStablecoinAmountToSpend);
+        if (wrBtcPurchased == 0) revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(i_purchasingToken));
 
-        if (wrBtcPurchased > 0) {
-            for (uint256 i; i < numOfPurchases; ++i) {
-                uint256 usersPurchasedWrbtc = wrBtcPurchased * netStablecoinAmountsToSpend[i] / totalStablecoinAmountToSpend;
-                s_usersAccumulatedRbtc[buyers[i]] += usersPurchasedWrbtc;
-                emit PurchaseRbtc__RbtcBought(
-                    buyers[i], address(i_purchasingToken), usersPurchasedWrbtc, scheduleIds[i], netStablecoinAmountsToSpend[i]
-                );
-            }
-            emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
-                address(i_purchasingToken), wrBtcPurchased, totalStablecoinAmountToSpend
+        for (uint256 i; i < numOfPurchases; ++i) {
+            // @notice the weights are shares of the planned net total, so they sum to exactly 1 even when the
+            // redemption paid less than planned. Dividing by the smaller actual spend instead would credit
+            // more rBTC than this contract received.
+            uint256 usersPurchasedWrbtc = wrBtcPurchased * netStablecoinAmountsToSpend[i] / totalNetStablecoinPlanned;
+            s_usersAccumulatedRbtc[buyers[i]] += usersPurchasedWrbtc;
+            emit PurchaseRbtc__RbtcBought(
+                buyers[i], address(i_purchasingToken), usersPurchasedWrbtc, scheduleIds[i], netStablecoinAmountsToSpend[i]
             );
-        } else {
-            revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(i_purchasingToken));
         }
+        emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
+            address(i_purchasingToken), wrBtcPurchased, totalStablecoinAmountToSpend
+        );
     }
 
     /**
