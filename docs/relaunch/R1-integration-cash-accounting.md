@@ -71,9 +71,12 @@ because the clamp fix below writes to `s_dcaSchedules` after an external call.
 - [ ] `TropykusErc20Handler._redeemInternal`: revert when a positive redemption request measures a zero
       stablecoin delta, even though the market returned the success code. The kToken is burnt either way and
       `DcaManager` has already debited the schedule, so a zero payout would destroy principal. Sovryn's redeem
-      paths already revert on a zero delta; this is the same guard. Paying out the measured amount is only
-      safe together with this check — transferring the *requested* amount used to make a zero payout revert in
-      `safeTransfer` by accident.
+      paths already revert on a zero delta; this is the same guard. The two call sites differed before this
+      PR, verified by reconstructing the old behaviour against a market that returns success and pays nothing:
+      `withdrawInterest` already transferred the measured amount, so it **already** paid zero silently — a
+      pre-existing bug fixed here. `withdrawToken` transferred the *requested* amount, so the same market
+      reverted in `safeTransfer` by accident; paying out the measured amount removes that backstop, which is
+      why the guard has to land in the same change.
 - [ ] `ITokenHandler.withdrawToken` returns `uint256` — the amount actually paid to the user. `TokenHandler`,
       `TropykusErc20Handler`, and `SovrynErc20Handler` all return their real payout.
 - [ ] **Clamp desync (the R6 leftover; this PR owns it).** The handlers must stop paying out a number they
