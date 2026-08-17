@@ -84,7 +84,7 @@ abstract contract PurchaseMoc is FeeHandler, PurchaseRbtc, IPurchaseMoc {
             _calculateFeeAndNetAmounts(purchaseAmounts);
 
         // Redeem DOC (and repay kDOC)
-        // @notice we spend the DOC we actually received, never the gross amount we asked the lending protocol for
+        // @notice we spend the DOC we actually received, which might not match totalNetDocPlanned, the full amount we asked the lending protocol for
         uint256 totalDocAmountToSpend = _batchRedeemStablecoin(buyers, purchaseAmounts, totalNetDocPlanned + aggregatedFee); // total DOC to redeem by repaying kDOC in order to spend it to redeem rBTC is totalNetDocPlanned + aggregatedFee
         if (totalDocAmountToSpend <= aggregatedFee) {
             revert PurchaseRbtc__RedeemedAmountBelowFee(totalDocAmountToSpend, aggregatedFee);

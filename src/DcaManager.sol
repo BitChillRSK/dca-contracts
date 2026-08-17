@@ -278,11 +278,10 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
 
         uint256 amountWithdrawn;
         if (tokenBalance > 0) {
-            // @notice the event reports what the handler actually paid, which may be less than the schedule's
-            // recorded balance. The schedule is already gone, so there is nothing left to credit back.
             amountWithdrawn = _handler(token, lendingProtocolIndex).withdrawToken(msg.sender, tokenBalance);
         }
 
+        // @notice the event reports what the lending protocol actually paid, which may be less than the schedule's tokenBalance
         emit DcaManager__DcaScheduleDeleted(msg.sender, token, scheduleId, amountWithdrawn);
     }
 
@@ -609,12 +608,10 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         if (withdrawalAmount > tokenBalance) {
             revert DcaManager__WithdrawalAmountExceedsBalance(token, withdrawalAmount, tokenBalance);
         }
-        uint256 newTokenBalance = tokenBalance - withdrawalAmount;
+        // @notice subtract the requested withdrawal amount from the token balance, not the amount the lending protocol paid
+        uint256 newTokenBalance = tokenBalance - withdrawalAmount; 
         dcaSchedule.tokenBalance = newTokenBalance;
-        // @notice the schedule is debited the requested amount, never the cash the user ended up holding. A
-        // lending protocol's redemption fee consumes principal that is gone; crediting the difference back
-        // would invent principal the handler no longer has. Purchases behave the same way: the schedule pays
-        // the full purchaseAmount even when a fee shrinks what reaches the user.
+        // @notice ignore `withdrawToken()`'s return value (amount actually paid back by the lending protocol)
         _handler(token, dcaSchedule.lendingProtocolIndex).withdrawToken(msg.sender, withdrawalAmount);
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
     }

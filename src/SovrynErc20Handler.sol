@@ -167,8 +167,7 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending, ISovrynErc20
      * @param stablecoinRecipient: the address of the recipient of the stablecoin
      * @return stablecoinRedeemed the amount of stablecoin the recipient actually received
      * @dev Sovryn's burn() returns the GROSS amount and pays the NET one once an exit fee is enabled
-     * (SIP-0094), so the recipient's measured balance delta is the only trustworthy amount. Measuring the
-     * recipient rather than this contract covers withdrawInterest(), where Sovryn pays the user directly.
+     * (SIP-0094), so the recipient's measured balance delta is the only trustworthy amount.
      */
     function _redeemStablecoin(address user, uint256 stablecoinToRedeem, uint256 exchangeRate, address stablecoinRecipient)
         internal
@@ -198,8 +197,6 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending, ISovrynErc20
      * @param purchaseAmounts: the amounts of stablecoin to redeem
      * @param totalErc20ToRedeem: the total amount of stablecoin to redeem
      * @return stablecoinRedeemed: the amount of stablecoin this contract actually received
-     * @dev No preflight against assetBalanceOf / profitOf: those are views, and a view is never a ceiling on
-     * what a redemption will pay. Burning more iSusd than we hold reverts inside burn() anyway.
      */
     function _batchRedeemStablecoin(address[] memory users, uint256[] memory purchaseAmounts, uint256 totalErc20ToRedeem)
         internal
