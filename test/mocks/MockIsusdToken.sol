@@ -48,7 +48,14 @@ contract MockIsusdToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
         require(balanceOf(msg.sender) >= burnAmount, "Insufficient balance");
         loanAmountPaid = Math.ceilDiv(burnAmount * tokenPrice(), DECIMALS); // GROSS
         uint256 exitFee = loanAmountPaid * s_exitFeeBps / BPS_DIVISOR;
-        i_docToken.transfer(receiver, loanAmountPaid - exitFee); // NET: the fee stays behind, as Sovryn's goes to the ExitFeeVault
+        uint256 netPayout = loanAmountPaid - exitFee;
+        // Yield (tokenPrice grows with time) can exceed the DOC this mock was deposited with.
+        // Mint the shortfall the same way MockKdocToken.redeemUnderlying does.
+        uint256 currentBalance = i_docToken.balanceOf(address(this));
+        if (currentBalance < netPayout) {
+            IStablecoin(address(i_docToken)).mint(address(this), netPayout - currentBalance);
+        }
+        i_docToken.transfer(receiver, netPayout); // NET: the fee stays behind, as Sovryn's goes to the ExitFeeVault
         _burn(msg.sender, burnAmount);
         return loanAmountPaid; // the return value stays GROSS even when the payout was NET
     }

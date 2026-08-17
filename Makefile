@@ -2,9 +2,14 @@
 SWAP_TYPE ?= mocSwaps
 LENDING_PROTOCOL ?= tropykus
 STABLECOIN_TYPE ?= DOC
+# Forge clap allows only one --no-match-path. Local/CI skip mainnet-debug; forks also skip ai-generated
+# (mocks + vm.prank with raw addresses → RPC 429 and revert-depth failures).
 TEST_CMD := forge test --no-match-test invariant --no-match-contract ComparePurchaseMethods --no-match-path "test/mainnet-debug/**" -j 1
-# Exclude ai-generated tests on fork: they use mocks and vm.prank with raw addresses, causing RPC 429 and revert-depth failures
-FORK_TEST_CMD := $(TEST_CMD) --no-match-path "test/ai-generated/**"
+FORK_TEST_CMD := forge test --no-match-test invariant --no-match-contract ComparePurchaseMethods --no-match-path "test/{mainnet-debug,ai-generated}/**" -j 1
+# Rootstock mainnet 2026-04-05, comfortably before Tropykus paused kDOC mint. Measured by bisecting
+# mint on a fork: block 8739512 (2026-04-16 16:20 UTC) still mints, 8740674 (2026-04-17 00:13 UTC)
+# reverts with kToken error "C2". Do not raise this past 8739512.
+FORK_BLOCK_TROPYKUS ?= 8700000
 
 # Targets
 .PHONY: all test moc dex help check ci build patch-deps slither moc-tropykus moc-sovryn dex-tropykus dex-sovryn fork fork-tropykus fork-sovryn coverage
@@ -52,36 +57,55 @@ slither:
 	slither . --config-file slither.config.json
 
 # MocSwaps specific tests
+# EXPECTED_LENDING_PROTOCOL is a canary: tests assert LENDING_PROTOCOL was not overwritten by vm.setEnv.
 moc:
 	@echo "Executing MocSwaps tests with $(LENDING_PROTOCOL) and $(STABLECOIN_TYPE)..."
-	SWAP_TYPE=mocSwaps LENDING_PROTOCOL=$(LENDING_PROTOCOL) STABLECOIN_TYPE=DOC $(TEST_CMD)
+	SWAP_TYPE=mocSwaps LENDING_PROTOCOL=$(LENDING_PROTOCOL) EXPECTED_LENDING_PROTOCOL=$(LENDING_PROTOCOL) STABLECOIN_TYPE=DOC $(TEST_CMD)
 moc-tropykus:
 	@echo "Executing MocSwaps Tropykus tests with $(STABLECOIN_TYPE)..."
-	SWAP_TYPE=mocSwaps LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
+	SWAP_TYPE=mocSwaps LENDING_PROTOCOL=tropykus EXPECTED_LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
 moc-sovryn:
 	@echo "Executing MocSwaps Sovryn tests with $(STABLECOIN_TYPE)..."
-	SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
+	SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn EXPECTED_LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
 
+# Forge reads SWAP_TYPE via vm.envString (no fallback). Make's ?= default is not
+# exported, so fork recipes must pass it. --fork-url is expanded by Make/shell
+# before Forge loads .env, so source .env here and fail if the RPC is missing.
 fork:
-	@echo "Executing fork tests with $(LENDING_PROTOCOL) and $(STABLECOIN_TYPE)..."
-	STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(FORK_TEST_CMD) --fork-url $(RSK_MAINNET_RPC_URL)
+	@if [ "$(LENDING_PROTOCOL)" = "sovryn" ]; then \
+		$(MAKE) fork-sovryn; \
+	else \
+		$(MAKE) fork-tropykus; \
+	fi
 fork-tropykus:
-	@echo "Executing Tropykus fork tests with $(STABLECOIN_TYPE)..."
-	LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(FORK_TEST_CMD) --fork-url $(RSK_MAINNET_RPC_URL)
+	@echo "Executing Tropykus fork tests with SWAP_TYPE=$(SWAP_TYPE) $(STABLECOIN_TYPE) at block $(FORK_BLOCK_TROPYKUS)..."
+	@set -a; [ -f .env ] && . ./.env; set +a; \
+	if [ -z "$$RSK_MAINNET_RPC_URL" ]; then \
+		echo "error: RSK_MAINNET_RPC_URL is not set. Add it to .env or export it."; \
+		exit 1; \
+	fi; \
+	SWAP_TYPE=$(SWAP_TYPE) LENDING_PROTOCOL=tropykus EXPECTED_LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=$(STABLECOIN_TYPE) \
+	$(FORK_TEST_CMD) --fork-url $$RSK_MAINNET_RPC_URL --fork-block-number $(FORK_BLOCK_TROPYKUS)
 fork-sovryn:
-	@echo "Executing Sovryn fork tests with $(STABLECOIN_TYPE)..."
-	LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(FORK_TEST_CMD) --fork-url $(RSK_MAINNET_RPC_URL)
+	@echo "Executing Sovryn fork tests with SWAP_TYPE=$(SWAP_TYPE) $(STABLECOIN_TYPE)..."
+	@set -a; [ -f .env ] && . ./.env; set +a; \
+	if [ -z "$$RSK_MAINNET_RPC_URL" ]; then \
+		echo "error: RSK_MAINNET_RPC_URL is not set. Add it to .env or export it."; \
+		exit 1; \
+	fi; \
+	SWAP_TYPE=$(SWAP_TYPE) LENDING_PROTOCOL=sovryn EXPECTED_LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=$(STABLECOIN_TYPE) \
+	$(FORK_TEST_CMD) --fork-url $$RSK_MAINNET_RPC_URL
 
 # DexSwaps specific tests (DcaDappTest requires SWAP_TYPE and LENDING_PROTOCOL)
 dex:
 	@echo "Executing DexSwaps tests with $(LENDING_PROTOCOL) and $(STABLECOIN_TYPE)..."
-	SWAP_TYPE=dexSwaps LENDING_PROTOCOL=$(LENDING_PROTOCOL) STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
+	SWAP_TYPE=dexSwaps LENDING_PROTOCOL=$(LENDING_PROTOCOL) EXPECTED_LENDING_PROTOCOL=$(LENDING_PROTOCOL) STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
 dex-tropykus:
 	@echo "Executing DexSwaps Tropykus tests with $(STABLECOIN_TYPE)..."
-	SWAP_TYPE=dexSwaps LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
+	SWAP_TYPE=dexSwaps LENDING_PROTOCOL=tropykus EXPECTED_LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
 dex-sovryn:
 	@echo "Executing DexSwaps Sovryn tests with $(STABLECOIN_TYPE)..."
-	SWAP_TYPE=dexSwaps LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
+	SWAP_TYPE=dexSwaps LENDING_PROTOCOL=sovryn EXPECTED_LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
 
 coverage:
 	@echo "Calculating coverage excluding invariant tests..."
@@ -103,9 +127,9 @@ help:
 	@echo "  make dex-tropykus              # DexSwaps + Tropykus"
 	@echo "  make dex-sovryn                # DexSwaps + Sovryn"
 	@echo ""
-	@echo "  make fork                      # Fork tests (needs RSK_MAINNET_RPC_URL)"
-	@echo "  make fork-tropykus             # Tropykus fork tests"
-	@echo "  make fork-sovryn               # Sovryn fork tests"
+	@echo "  make fork                      # Fork tests (reads RSK_MAINNET_RPC_URL from env/.env); tropykus pins block $(FORK_BLOCK_TROPYKUS)"
+	@echo "  make fork-tropykus             # Tropykus fork tests (pinned: kDOC mint paused 2026-04-27)"
+	@echo "  make fork-sovryn               # Sovryn fork tests (chain tip)"
 	@echo ""
 	@echo "Environment variables:"
 	@echo "  SWAP_TYPE: mocSwaps (default) or dexSwaps"

@@ -15,7 +15,12 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
     UsdrifHelperConfig public usdrifHelperConfig;
     
     function setUp() public override {
-        // Deploy base protocol first using parent setup
+        // Parent deploys MoC DOC. Skip on USDRIF lanes (vm.skip in the parent does not stop this setUp).
+        string memory coinType = vm.envOr("STABLECOIN_TYPE", DEFAULT_STABLECOIN);
+        if (keccak256(abi.encodePacked(coinType)) != keccak256(abi.encodePacked("DOC"))) {
+            vm.skip(true);
+            return;
+        }
         super.setUp();
         
         // Initialize USDRIF helper config and update with protocol addresses
