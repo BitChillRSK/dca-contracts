@@ -44,11 +44,12 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R15 | 10 | none |
 | R22 (folders) | 11 | none |
 | R22 (idle) | 12 | none |
-| R22 (LayerBank) | 13 | none |
-| R22 (deploy/CI) | 14 | none |
-| R9 | 15 | R18/R19 if not recorded (ABI freeze) |
-| R16 | 16 | none |
-| R10 | 17 | none |
+| R21 | 13 | none |
+| R16 | 14 | none |
+| R22 (LayerBank) | 15 | none |
+| R22 (deploy/CI) | 16 | none |
+| R9 | 17 | R18/R19 if not recorded (ABI freeze) |
+| R10 | 18 | none |
 | R12, R13, R18, R19, OZ 5.x | optional late | only if the human named that item |
 
 ### PR 1 - R23 toolchain and dependency baseline
@@ -117,6 +118,27 @@ So, for an idle-funds handler:
 - Invariant 6 in `AGENTS.md` (comprehensive `nonReentrant` on schedule mutators) stops being cheap insurance and becomes load-bearing. Do not relax it in the same relaunch that introduces pooled idle funds.
 - The R20 balance-delta work above matters more, not less: with no clamp, `DcaManager.tokenBalance` is the only thing standing between a user and the pool.
 
+### Open question — handler replacement in `OperationsAdmin`
+
+**Not assigned to a PR. Decide before the relaunch cutover; see the deadline note below.**
+
+`OperationsAdmin.assignOrUpdateTokenHandler` gives the same ceremony to two very different operations: assigning a handler where none exists, and overwriting one that is already live and holding user funds. Only the first is safe. After a replacement, `DcaManager` routes to the new handler while the old one still holds every user's position (kDOC, iSUSD, or idle stablecoin) with no way to get it out — the new handler's per-user mappings are empty, so withdrawals clamp to zero or revert.
+
+This is **not specific to the idle handler**. Stranded kDOC is user principal on exactly the same terms as stranded DOC; the idle handler was just where the question surfaced. Any note or fix should be written against handlers in general.
+
+Two constraints make this harder than it looks, and they pull in opposite directions:
+
+- **Remediation is deliberately unavailable.** R8 removed the owner's power over another account's funds to satisfy invariant 3. A rescue or admin-driven migration entry point that drains the old handler reintroduces precisely that privilege. Do not solve it that way.
+- **Prohibition is unavailable too.** Handlers are immutable and unproxied (see R8), so replacing the contract *is* the only upgrade path. `assignOrUpdate` cannot simply become assign-once.
+
+So the fix has to be preventive and has to preserve replacement. Options worth weighing when this gets picked up:
+
+- Split the entry point: `assignTokenHandler` reverts when a handler is already set, and a separate `replaceTokenHandler` carries the risk in its name. This is only fat-finger protection — it does **not** stop funds being stranded by an intentional replacement — but it is cheap and removes the silent-overwrite footgun.
+- Give handlers a cooperative migration path (old handler pushes positions to the new one on its own authority, no owner destination). This actually solves stranding, but it requires the capability to exist in the *old* handler, so it only protects handlers deployed after the change.
+- Accept the current behavior and write the operational procedure down instead: users withdraw, then the handler is swapped, with a documented drain-first sequence.
+
+**Deadline, and it is asymmetric** (same argument as R8): anything needing handler cooperation must ship before the relaunch cutover, because afterwards it means new handler contracts and a user migration. The `assignTokenHandler` / `replaceTokenHandler` split is admin-side only and stays cheap indefinitely. If only one thing gets done, the ordering follows from that.
+
 ### PR 9 - R24 test harness matrix
 
 Stacked on PR 8. Test/Makefile only. `make moc-sovryn` must actually run Sovryn (`BaseDeploymentTest` must not `vm.setEnv` `LENDING_PROTOCOL`). `make fork-*` must pass a single `--no-match-path`. Tropykus fork tests pin Rootstock block `8700000` (2026-04-05); kDOC mint was paused between blocks 8739512 and 8740674. See `R24-test-harness-matrix.md`.
@@ -144,13 +166,29 @@ Ship the index-0 idle DOC + MoC handler. Deposits stay on the handler; no lendin
 
 Interest calls for index 0 should continue to revert because no protocol name is registered for index 0.
 
-### PR 13 - R22 LayerBank handler
+### PR 13 - R21 fee-on-transfer deposits
 
-Add LayerBank as index 1 for DOC + MoC. Use balance-delta accounting from the start. Add mocks or fork tests based on the Rootstock LayerBank lToken ABI.
+R1 left deposit accounting as "credit the requested amount." Idle already credits the handler mapping from a balance delta; `DcaManager` still credits `depositAmount`. A fee-on-transfer stablecoin would desync those books. Same composability hygiene as invariant 6 for tokens with hooks: DOC/USDRIF are not FOT, but BitChill must not break if one is used.
+
+`TokenHandler.depositToken` measures `balanceOf(address(this))` before/after `transferFrom` and returns the received amount. `DcaManager` create / deposit / update credits that return, and validates `purchaseAmount` against the post-deposit `tokenBalance`. Lending handlers mint from the received amount, not the requested one. Do not change the R20 withdraw rule (principal falls by the requested amount; a fee consumes principal).
+
+Land this before LayerBank so the new handler copies the measured-deposit pattern. Tests: a `MockFeeOnTransferStablecoin` in the same style as `MockReentrantStablecoin` / `DepositSwapPopReentrancyTest`. See `R21-fee-on-transfer-deposits.md`.
+
+### PR 14 - R16 redeem glossary
+
+Rename first-party internals, events, variables, and comments so "redeem" names the token being given up. Do not rename third-party ABI functions (`redeemFreeDoc`, `redeemUnderlying`, iToken `burn`, …). No behavior change; no new tests.
+
+PurchaseRbtc's `_redeemStablecoin` hook is "make stablecoin available to spend," not a redeem. Idle only debits a mapping. MoC's first-party wrapper spends DOC to receive rBTC. Land this before LayerBank so the new handler does not copy the current names. See `R16-redeem-glossary.md`.
+
+This should land before the full natspec pass (R10).
+
+### PR 15 - R22 LayerBank handler
+
+Add LayerBank as index 1 for DOC + MoC. Use balance-delta accounting from the start (including R21 deposit returns). Add mocks or fork tests based on the Rootstock LayerBank lToken ABI.
 
 Do not rename Tropykus in place and do not deploy USDRIF/Uniswap handlers for this relaunch.
 
-### PR 14 - R22 deploy scripts, constants, harness, and CI matrix
+### PR 16 - R22 deploy scripts, constants, harness, and CI matrix
 
 Update constants and deploy scripts for the new map:
 
@@ -161,19 +199,13 @@ Update constants and deploy scripts for the new map:
 
 Split the shared test harness so lending-token assertions live only in lending-protocol-specific tests. CI should cover `none`, `layerbank`, and `sovryn` with `SWAP_TYPE=mocSwaps`.
 
-### PR 15 - R9 event indexing and ABI cleanup
+### PR 17 - R9 event indexing and ABI cleanup
 
 Index only addresses and `scheduleId`. Do not index amounts, timestamps, periods, rates, strings, bytes, or arrays.
 
 Do this once the shipped ABI surface is known, including any optional pause or compound-interest events that were approved.
 
-### PR 16 - R16 redeem glossary
-
-Rename first-party internals, events, variables, and comments so "redeem" names the token being given up. Do not rename third-party ABI functions.
-
-This should land before the full natspec pass.
-
-### PR 17 - R10 natspec and comments
+### PR 18 - R10 natspec and comments
 
 Rewrite first-party natspec after ABI, names, handlers, and layout are stable. Put user-facing docs on interfaces and use `@inheritdoc` in implementations.
 

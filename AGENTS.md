@@ -40,7 +40,7 @@ Handlers = TokenHandler + TokenLending + a Purchase*:
   src/tropykus-legacy/   TropykusErc20Handler ─┬─ TropykusDocHandlerMoc   (+ PurchaseMoc)
                                               └─ TropykusErc20HandlerDex (+ PurchaseUniswap)
   src/idle/              IdleErc20Handler ── IdleDocHandlerMoc (+ PurchaseMoc)  index 0
-  src/layerbank/         index 1 (PR 13)
+  src/layerbank/         index 1 (PR 15)
 ```
 
 - `src/interfaces/` — shared first-party ABIs; keep in sync with implementations. Protocol-specific interfaces (`IiSusdToken`, `IkToken`, `ISovrynErc20Lending`, `ITropykusErc20Lending`, `IIdleErc20Handler`) live next to their handlers.
