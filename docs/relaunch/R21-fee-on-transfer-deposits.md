@@ -28,7 +28,7 @@ Withdrawals stay on the R20 rule: principal falls by the **requested** amount be
 
 - [x] `ITokenHandler.depositToken` returns `uint256` — the amount the handler actually received (balance delta of `address(this)` around `transferFrom`).
 - [x] `TokenHandler.depositToken` measures that delta, reverts if a positive request received 0, returns it. Event reports received, not requested.
-- [x] `IdleErc20Handler.depositToken` uses the base return (or the same delta) for `s_idleBalances`. Keep the zero-received revert.
+- [x] `IdleErc20Handler.depositToken` uses the base return (or the same delta) for `s_idleBalances`. The zero-received revert lives in `TokenHandler` now that the base owns the measurement, so the idle-level copy (and `IdleErc20Handler__ZeroStablecoinReceived`) was dropped as unreachable — `TokenHandler__ZeroStablecoinReceived` is the live guard.
 - [x] Sovryn / Tropykus `depositToken`: pull via the base (received), then mint **received** into the lending token, then credit the share `balanceOf` delta as today.
 - [x] `DcaManager.depositToken` / `createDcaSchedule` / `updateDcaSchedule`: credit `tokenBalance` with the handler return. `create` / `update` validate `purchaseAmount` against the post-deposit `tokenBalance`, not the requested deposit. Events that report the new balance use the credited amount.
 - [x] `updateDcaSchedule`: pull then credit (do not add `depositAmount` to the memory copy before the handler returns).

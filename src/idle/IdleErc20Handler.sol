@@ -35,6 +35,8 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler {
      * @param user: the address of the user making the deposit
      * @param depositAmount: the amount requested from the user
      * @return received the amount actually credited to the user's idle balance
+     * @dev TokenHandler owns the balance-delta measurement and the zero-received revert,
+     * so a fee-on-transfer token that delivers nothing never reaches the idle balance.
      */
     function depositToken(address user, uint256 depositAmount)
         public
@@ -43,7 +45,6 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler {
         returns (uint256 received)
     {
         received = super.depositToken(user, depositAmount);
-        if (depositAmount > 0 && received == 0) revert IdleErc20Handler__ZeroStablecoinReceived();
         s_idleBalances[user] += received;
     }
 

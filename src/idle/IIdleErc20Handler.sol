@@ -17,7 +17,6 @@ interface IIdleErc20Handler {
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
 
-    error IdleErc20Handler__ZeroStablecoinReceived();
     error IdleErc20Handler__ZeroStablecoinPaid(uint256 requested);
     error IdleErc20Handler__InsufficientIdleBalance(address user, uint256 requested, uint256 available);
 
