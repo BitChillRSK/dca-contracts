@@ -26,6 +26,7 @@ The Sovryn deplete failures are the mock, not the handlers: `MockKdocToken` mint
 
 - [ ] `Makefile`: `FORK_TEST_CMD` uses a **single** `--no-match-path` glob that excludes both `test/mainnet-debug/**` and `test/ai-generated/**`.
 - [ ] `Makefile`: `make fork` and `make fork-tropykus` pass `--fork-block-number 8774377` (Rootstock mainnet, 2026-04-26, the day before Tropykus paused mint). `make fork-sovryn` does not pin.
+- [ ] `Makefile`: `make fork-*` pass `SWAP_TYPE=$(SWAP_TYPE)` (Forge has no fallback). Source `.env` for `RSK_MAINNET_RPC_URL` and fail if it is empty — Make expands `--fork-url` before Forge loads dotenv, and an empty URL makes Forge treat the cwd as an IPC socket.
 - [ ] `Makefile`: every test target that sets `LENDING_PROTOCOL` also sets `EXPECTED_LENDING_PROTOCOL` to the same value so a canary can detect `vm.setEnv` overwrites.
 - [ ] `BaseDeploymentTest.setUp`: stop writing `LENDING_PROTOCOL`. Keep `REAL_DEPLOYMENT=false`. Skip (do not `setEnv`) when `STABLECOIN_TYPE` is not DOC, because this suite always calls `DeployMocSwaps`. `NewHandlerDeploymentTest` must skip on the same lanes — `vm.skip` in the parent does not abort the child `setUp`.
 - [ ] A canary test: `LENDING_PROTOCOL` still equals `EXPECTED_LENDING_PROTOCOL` after `BaseDeploymentTest.setUp` (and after `DcaDappTest` construction). On a Sovryn lane the deployed handler is Sovryn.

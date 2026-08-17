@@ -66,6 +66,9 @@ moc-sovryn:
 	@echo "Executing MocSwaps Sovryn tests with $(STABLECOIN_TYPE)..."
 	SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn EXPECTED_LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
 
+# Forge reads SWAP_TYPE via vm.envString (no fallback). Make's ?= default is not
+# exported, so fork recipes must pass it. --fork-url is expanded by Make/shell
+# before Forge loads .env, so source .env here and fail if the RPC is missing.
 fork:
 	@if [ "$(LENDING_PROTOCOL)" = "sovryn" ]; then \
 		$(MAKE) fork-sovryn; \
@@ -73,11 +76,23 @@ fork:
 		$(MAKE) fork-tropykus; \
 	fi
 fork-tropykus:
-	@echo "Executing Tropykus fork tests with $(STABLECOIN_TYPE) at block $(FORK_BLOCK_TROPYKUS)..."
-	LENDING_PROTOCOL=tropykus EXPECTED_LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(FORK_TEST_CMD) --fork-url $(RSK_MAINNET_RPC_URL) --fork-block-number $(FORK_BLOCK_TROPYKUS)
+	@echo "Executing Tropykus fork tests with SWAP_TYPE=$(SWAP_TYPE) $(STABLECOIN_TYPE) at block $(FORK_BLOCK_TROPYKUS)..."
+	@set -a; [ -f .env ] && . ./.env; set +a; \
+	if [ -z "$$RSK_MAINNET_RPC_URL" ]; then \
+		echo "error: RSK_MAINNET_RPC_URL is not set. Add it to .env or export it."; \
+		exit 1; \
+	fi; \
+	SWAP_TYPE=$(SWAP_TYPE) LENDING_PROTOCOL=tropykus EXPECTED_LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=$(STABLECOIN_TYPE) \
+	$(FORK_TEST_CMD) --fork-url $$RSK_MAINNET_RPC_URL --fork-block-number $(FORK_BLOCK_TROPYKUS)
 fork-sovryn:
-	@echo "Executing Sovryn fork tests with $(STABLECOIN_TYPE)..."
-	LENDING_PROTOCOL=sovryn EXPECTED_LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(FORK_TEST_CMD) --fork-url $(RSK_MAINNET_RPC_URL)
+	@echo "Executing Sovryn fork tests with SWAP_TYPE=$(SWAP_TYPE) $(STABLECOIN_TYPE)..."
+	@set -a; [ -f .env ] && . ./.env; set +a; \
+	if [ -z "$$RSK_MAINNET_RPC_URL" ]; then \
+		echo "error: RSK_MAINNET_RPC_URL is not set. Add it to .env or export it."; \
+		exit 1; \
+	fi; \
+	SWAP_TYPE=$(SWAP_TYPE) LENDING_PROTOCOL=sovryn EXPECTED_LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=$(STABLECOIN_TYPE) \
+	$(FORK_TEST_CMD) --fork-url $$RSK_MAINNET_RPC_URL
 
 # DexSwaps specific tests (DcaDappTest requires SWAP_TYPE and LENDING_PROTOCOL)
 dex:
@@ -110,7 +125,7 @@ help:
 	@echo "  make dex-tropykus              # DexSwaps + Tropykus"
 	@echo "  make dex-sovryn                # DexSwaps + Sovryn"
 	@echo ""
-	@echo "  make fork                      # Fork tests (needs RSK_MAINNET_RPC_URL); tropykus pins block $(FORK_BLOCK_TROPYKUS)"
+	@echo "  make fork                      # Fork tests (reads RSK_MAINNET_RPC_URL from env/.env); tropykus pins block $(FORK_BLOCK_TROPYKUS)"
 	@echo "  make fork-tropykus             # Tropykus fork tests (pinned: kDOC mint paused 2026-04-27)"
 	@echo "  make fork-sovryn               # Sovryn fork tests (chain tip)"
 	@echo ""
