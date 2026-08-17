@@ -95,7 +95,10 @@ interface IDcaManager {
      * @param token The token address of the stablecoin to deposit.
      * @param scheduleIndex The index of the DCA schedule
      * @param scheduleId The schedule id for validation
-     * @param withdrawalAmount The amount of the stablecoin to withdraw.
+     * @param withdrawalAmount The amount of the stablecoin to withdraw. Pass type(uint256).max to withdraw
+     * this schedule's whole token balance as it stands when the transaction runs, which avoids reverting when
+     * a purchase lands between reading the balance and sending the withdrawal. The sentinel takes the
+     * schedule's principal only; interest is withdrawn through the interest functions.
      */
     function withdrawToken(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 withdrawalAmount) external;
 
@@ -135,6 +138,8 @@ interface IDcaManager {
 
     /**
      * @dev function to delete a DCA schedule: cancels DCA and retrieves the funds
+     * @notice deleting the caller's last schedule on that token and lending protocol also burns the lending
+     * tokens left over on the handler, so closing a position takes no second call
      * @param token the token used for DCA in the schedule to be deleted
      * @param scheduleIndex the index of the schedule to delete
      * @param scheduleId the unique identifier of the schedule to be deleted for validation
@@ -204,7 +209,9 @@ interface IDcaManager {
      * @param token The token address of the stablecoin to deposit.
      * @param scheduleIndex The index of the DCA schedule
      * @param scheduleId The schedule id for validation
-     * @param withdrawalAmount The amount of the stablecoin to withdraw.
+     * @param withdrawalAmount The amount of the stablecoin to withdraw, or type(uint256).max for this
+     * schedule's whole token balance. Combining the sentinel with the interest withdrawal exits the position:
+     * once no schedule locks stablecoin on that handler, the remaining lending tokens are burnt too.
      * @param lendingProtocolIndex: the lending protocol index
      */
     function withdrawTokenAndInterest(

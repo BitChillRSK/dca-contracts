@@ -50,6 +50,9 @@ interface ITokenLending is ITokenHandler {
     /**
      * @dev Withdraws the interest earned for a user.
      * @notice This function needs to be in this interface (even though it is not implemented in the TokenHandler abstract contract) because it is called by the DCA Manager contract
+     * @notice A zero tokenLockedInDcaSchedules means the user keeps nothing on this handler, so the whole
+     * remaining lending-token balance is burnt and the user's accounting is zeroed. Rounding can leave shares
+     * worth zero stablecoin; the sweep still burns them, and paying out nothing is not an error.
      * @param user The address of the user withdrawing the interest.
      * @param tokenLockedInDcaSchedules The amount of stablecoin locked in DCA schedules by the user.
      */
