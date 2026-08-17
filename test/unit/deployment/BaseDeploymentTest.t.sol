@@ -24,30 +24,37 @@ contract BaseDeploymentTest is Test {
     SovrynDocHandlerMoc public sovrynHandler;
 
     function setUp() public virtual {
-        // Set up environment variables for deployment
+        // REAL_DEPLOYMENT is local-only. Do not write LENDING_PROTOCOL: vm.setEnv is process-wide
+        // and would force every later suite in this forge run onto tropykus (R24).
         vm.setEnv("REAL_DEPLOYMENT", "false");
-        vm.setEnv("LENDING_PROTOCOL", TROPYKUS_STRING);
-        
-        // Deploy the core protocol
-        DeployMocSwaps deployer = new DeployMocSwaps();
-        (operationsAdmin, docHandlerMocAddress, dcaManager, helperConfig) = deployer.run();
-        
-        // Check which handler type was deployed based on the lending protocol
-        string memory lendingProtocol = vm.envString("LENDING_PROTOCOL");
-        if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(TROPYKUS_STRING))) {
-            tropykusHandler = TropykusDocHandlerMoc(payable(docHandlerMocAddress));
-        } else if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(SOVRYN_STRING))) {
-            sovrynHandler = SovrynDocHandlerMoc(payable(docHandlerMocAddress));
+
+        // This suite always deploys DeployMocSwaps (DOC). Skip on USDRIF lanes rather than
+        // setEnv STABLECOIN_TYPE — that would poison DcaDappTest the same way LENDING_PROTOCOL did.
+        string memory coinType = vm.envOr("STABLECOIN_TYPE", DEFAULT_STABLECOIN);
+        if (keccak256(abi.encodePacked(coinType)) != keccak256(abi.encodePacked("DOC"))) {
+            vm.skip(true);
+            return;
         }
 
-        // Grant admin role to test contract and register the handler
+        DeployMocSwaps deployer = new DeployMocSwaps();
+        (operationsAdmin, docHandlerMocAddress, dcaManager, helperConfig) = deployer.run();
+
+        string memory lendingProtocol = vm.envString("LENDING_PROTOCOL");
+        bool isSovryn = keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(SOVRYN_STRING));
+        if (isSovryn) {
+            sovrynHandler = SovrynDocHandlerMoc(payable(docHandlerMocAddress));
+        } else {
+            tropykusHandler = TropykusDocHandlerMoc(payable(docHandlerMocAddress));
+        }
+
         vm.prank(OWNER);
         operationsAdmin.setAdminRole(ADMIN);
+        // Both names must exist: NewHandlerDeploymentTest assigns USDRIF to TROPYKUS_INDEX
+        // even when this suite deployed a Sovryn DOC handler for the lane.
         vm.prank(ADMIN);
-        operationsAdmin.addOrUpdateLendingProtocol(
-            TROPYKUS_STRING,
-            TROPYKUS_INDEX
-        );
+        operationsAdmin.addOrUpdateLendingProtocol(TROPYKUS_STRING, TROPYKUS_INDEX);
+        vm.prank(ADMIN);
+        operationsAdmin.addOrUpdateLendingProtocol(SOVRYN_STRING, SOVRYN_INDEX);
     }
     
     function testCoreProtocolDeployment() public {
