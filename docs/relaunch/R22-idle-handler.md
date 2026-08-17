@@ -1,6 +1,6 @@
 # R22 — Idle DOC + MoC handler
 
-Status: **not started** · Assigned: yes · Optional/further-review: no
+Status: **in review** · Assigned: yes · Optional/further-review: no
 
 PR 12 of R22. LayerBank, deploy/constants/harness/CI index-map work are later PRs.
 
