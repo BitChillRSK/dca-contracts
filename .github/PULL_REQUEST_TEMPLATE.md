@@ -32,6 +32,8 @@
 
 ```
 make check
+make fork-sovryn
+make fork-tropykus
 ```
 
 ## ABI changes

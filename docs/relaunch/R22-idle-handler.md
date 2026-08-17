@@ -65,6 +65,8 @@ Edit:
 - `src/sovryn/SovrynErc20Handler.sol`, `src/tropykus-legacy/TropykusErc20Handler.sol`, `src/interfaces/ITokenLending.sol` (named batch-redeem insufficient-balance error, same as idle)
 - `AGENTS.md`
 - `docs/relaunch/README.md`
+- `test/unit/DcaDappTest.t.sol` (`makeBatchPurchasesOneUser` must not require `UnderlyingRedeemedBatch` topic1 to equal the requested gross)
+- `.github/PULL_REQUEST_TEMPLATE.md` (fork lanes in the Tests run default)
 
 ## Required tests
 
@@ -79,10 +81,12 @@ SWAP_TYPE=mocSwaps LENDING_PROTOCOL=tropykus EXPECTED_LENDING_PROTOCOL=tropykus 
   forge test --match-contract IdleHandlerDeploymentTest -j 1
 ```
 
-Then the done-gate:
+Then the done-gate and the pre-push fork lanes (see `AGENTS.md`):
 
 ```
 make check
+make fork-sovryn
+make fork-tropykus
 ```
 
 Behaviors to assert:
@@ -97,8 +101,9 @@ Behaviors to assert:
 - `getInterestAccrued` / `withdrawTokenAndInterest` at index 0 revert `DcaManager__TokenDoesNotYieldInterest`.
 - `withdrawAllAccumulatedInterest` with index 0 in the list does not revert; a mixed `[0, tropykus]` call still reaches the lending handler.
 - Existing Tropykus and Sovryn lanes are unchanged.
+- `makeBatchPurchasesOneUser` still asserts that `TokenLending__UnderlyingRedeemedBatch` is emitted, but does not require topic1 to equal the requested gross (after R1 that topic is the measured net; SIP-0094 haircuts ~0.1% on a Sovryn fork at tip).
 
-Fork tests: not required.
+Fork tests: `make fork-sovryn` and `make fork-tropykus` before push (`AGENTS.md`).
 
 ## Success criteria
 
@@ -106,7 +111,7 @@ Fork tests: not required.
 - [ ] Deposits stay on the handler; buys and withdrawals spend idle DOC; per-user idle balances clamp `withdrawToken` and single redeem. Batch redeem reverts on insufficient idle.
 - [ ] Index 0 has no protocol name; single-index interest calls revert; `withdrawAllAccumulatedInterest` skips index 0.
 - [ ] `DeployIdleHandler` deploys `IdleDocHandlerMoc` and can register it at index 0 with no protocol name. `DeployMocSwaps` / `DeployDexSwaps` / `DcaDappTest` are unchanged (PR 16).
-- [ ] Done-gate lanes pass.
+- [ ] Done-gate lanes pass. `make fork-sovryn` and `make fork-tropykus` pass before push.
 
 ## Reviewer checklist
 

@@ -607,7 +607,10 @@ contract DcaDappTest is Test {
             scheduleIds[i] = dcaManager.getDcaSchedules(users[0], address(stablecoin))[i].scheduleId;
             vm.stopPrank();
         }
-        vm.expectEmit(true, false, false, false);
+        // After R1 this event's first topic is the measured DOC received, not the requested
+        // gross. Anvil mocks pay 1:1 so they match; a Sovryn fork at tip haircuts ~0.1%
+        // (SIP-0094) and a topic1 check then fails against SuccessfulRbtcBatchPurchase.
+        vm.expectEmit(false, false, false, false);
         emit TokenLending__UnderlyingRedeemedBatch(totalNetPurchaseAmount + totalFee, 0);
 
         for (uint8 i; i < NUM_OF_SCHEDULES; ++i) {
