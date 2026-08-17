@@ -26,6 +26,8 @@ Suggested first-party direction (implementer may pick equivalent names if they r
 - MoC first-party wrapper: spend/repay DOC, receive rBTC. Do not rename MoC's functions.
 - Events / errors / comments / natspec on first-party types follow the same glossary. R10 will rewrite natspec after this; this PR only has to stop lying in names.
 
+**Why the batch-redeem event needs a value guard in this PR.** These renames touch the `TokenLending__UnderlyingRedeemedBatch` emit sites in both lending handlers, where the emitted amount and the returned amount are the same local variable one line apart. The return is load-bearing — it becomes `totalDocAmountToSpend` in the purchase path, so balance and rBTC assertions cover it. The emit is report-only and, since PR 12 relaxed the check, unasserted anywhere in the suite. A rename that touches only the emit expression would therefore ship a lying event with every fund-flow test still green: exactly the R1 failure mode, in the one PR most likely to cause it. See **Required tests**.
+
 ## Open product decisions
 
 **none** — `IMPLEMENTATION_ORDER.md` lists no gates for PR 14. Implement without asking.
@@ -63,19 +65,24 @@ Any first-party file that says "redeem" for the wrong asset. Start here and foll
 
 ## Required tests
 
-None new. `make check` must still pass (renames are compile-breaking until tests import the new names).
+Renames are compile-breaking until tests import the new names, so `make check` must still pass. One assertion to add, for the reason in **Background**.
 
 ```
 make check
 ```
 
-Fork tests: not required.
+Behaviors to assert:
+
+- `makeBatchPurchasesOneUser` (`test/unit/DcaDappTest.t.sol`) checks that `TokenLending__UnderlyingRedeemedBatch` reports the **measured** stablecoin, not the requested gross. PR 12 relaxed this to a selector-only `vm.expectEmit(false, false, false, false)` because a topic1 *equality* check cannot survive SIP-0094 on a Sovryn fork at tip. Restore the value check with a tolerance rather than equality: `vm.recordLogs()`, find the log by selector, and assert `underlyingAmountRedeemed` is within ~1% of the requested gross (exact against Anvil mocks, ~0.1% low on a Sovryn fork). Leave `lendingTokenAmountRepayed` unasserted — it always has been, and PR 12 did not change that.
+
+Fork tests: no fork-specific assertions. The tolerance above exists so the restored check passes on `make fork-sovryn` at tip as well as on the Anvil lanes.
 
 ## Success criteria
 
 - [ ] Grep of first-party `src/` no longer uses "redeem" for the token being received, except when quoting a third-party ABI.
 - [ ] Third-party function names unchanged.
 - [ ] `make check` passes. No behavior change.
+- [ ] The batch-redeem measured-amount assertion is restored with a tolerance and passes on `make check` and `make fork-sovryn`.
 
 ## Reviewer checklist
 
