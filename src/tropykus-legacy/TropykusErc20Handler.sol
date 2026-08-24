@@ -47,19 +47,21 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending, ITropykusE
     /**
      * @notice deposit the full token amount for DCA on the contract
      * @param user: the address of the user making the deposit
-     * @param depositAmount: the amount to deposit
+     * @param depositAmount: the amount requested from the user
+     * @return depositedAmount the stablecoin amount actually received before minting kTokens
      */
     function depositToken(address user, uint256 depositAmount)
         public
         override(TokenHandler, ITokenHandler)
         onlyDcaManager
+        returns (uint256 depositedAmount)
     {
-        super.depositToken(user, depositAmount);
-        if (i_stableToken.allowance(address(this), address(i_kToken)) < depositAmount) {
-            i_stableToken.safeApprove(address(i_kToken), depositAmount);
+        depositedAmount = super.depositToken(user, depositAmount);
+        if (i_stableToken.allowance(address(this), address(i_kToken)) < depositedAmount) {
+            i_stableToken.safeApprove(address(i_kToken), depositedAmount);
         }
         uint256 prevKtokenBalance = i_kToken.balanceOf(address(this));
-        if(i_kToken.mint(depositAmount) != 0) revert TokenLending__LendingProtocolDepositFailed();
+        if(i_kToken.mint(depositedAmount) != 0) revert TokenLending__LendingProtocolDepositFailed();
         uint256 postKtokenBalance = i_kToken.balanceOf(address(this));
         s_kTokenBalances[user] += postKtokenBalance - prevKtokenBalance;
     }
@@ -68,7 +70,7 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending, ITropykusE
      * @notice withdraw the token amount sending it back to the user's address
      * @param user: the address of the user making the withdrawal
      * @param withdrawalAmount: the amount to withdraw
-     * @return the amount of stablecoin actually paid to the user
+     * @return withdrawnAmount the amount that left this contract after redeeming
      */
     function withdrawToken(address user, uint256 withdrawalAmount)
         public

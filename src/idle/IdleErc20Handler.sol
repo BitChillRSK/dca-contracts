@@ -33,25 +33,26 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler {
     /**
      * @notice deposit the full token amount for DCA on the contract
      * @param user: the address of the user making the deposit
-     * @param depositAmount: the amount to deposit
+     * @param depositAmount: the amount requested from the user
+     * @return depositedAmount the amount actually credited to the user's idle balance
+     * @dev TokenHandler owns the balance-delta measurement and the zero-received revert,
+     * so a fee-on-transfer token that delivers nothing never reaches the idle balance.
      */
     function depositToken(address user, uint256 depositAmount)
         public
         override
         onlyDcaManager
+        returns (uint256 depositedAmount)
     {
-        uint256 balanceBefore = i_stableToken.balanceOf(address(this));
-        super.depositToken(user, depositAmount);
-        uint256 received = i_stableToken.balanceOf(address(this)) - balanceBefore;
-        if (depositAmount > 0 && received == 0) revert IdleErc20Handler__ZeroStablecoinReceived();
-        s_idleBalances[user] += received;
+        depositedAmount = super.depositToken(user, depositAmount);
+        s_idleBalances[user] += depositedAmount;
     }
 
     /**
      * @notice withdraw the token amount sending it back to the user's address
      * @param user: the address of the user making the withdrawal
      * @param withdrawalAmount: the amount to withdraw
-     * @return the amount of stablecoin actually paid to the user
+     * @return withdrawnAmount the amount that left this contract after debiting the idle mapping
      */
     function withdrawToken(address user, uint256 withdrawalAmount)
         public
@@ -62,11 +63,7 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler {
         uint256 requested = withdrawalAmount;
         withdrawalAmount = _debitIdleBalance(user, withdrawalAmount);
         if (requested > 0 && withdrawalAmount == 0) revert IdleErc20Handler__ZeroStablecoinPaid(requested);
-        uint256 userBalanceBefore = i_stableToken.balanceOf(user);
-        super.withdrawToken(user, withdrawalAmount);
-        uint256 paid = i_stableToken.balanceOf(user) - userBalanceBefore;
-        if (requested > 0 && paid == 0) revert IdleErc20Handler__ZeroStablecoinPaid(requested);
-        return paid;
+        return super.withdrawToken(user, withdrawalAmount);
     }
 
     /**

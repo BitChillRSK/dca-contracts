@@ -168,9 +168,9 @@ Interest calls for index 0 should continue to revert because no protocol name is
 
 ### PR 13 - R21 fee-on-transfer deposits
 
-R1 left deposit accounting as "credit the requested amount." Idle already credits the handler mapping from a balance delta; `DcaManager` still credits `depositAmount`. A fee-on-transfer stablecoin would desync those books. Same composability hygiene as invariant 6 for tokens with hooks: DOC/USDRIF are not FOT, but BitChill must not break if one is used.
+R1 left deposit accounting as "credit the requested amount." Idle already credits the handler mapping from a balance delta; `DcaManager` still credits `depositAmount`. FOT is not a supported token class. This PR is hop-1 hygiene so a listed proxy that suddenly turns on a transfer fee cannot mint more than the handler holds and cannot freeze withdrawals. Purchases after that are not guaranteed.
 
-`TokenHandler.depositToken` measures `balanceOf(address(this))` before/after `transferFrom` and returns the received amount. `DcaManager` create / deposit / update credits that return, and validates `purchaseAmount` against the post-deposit `tokenBalance`. Lending handlers mint from the received amount, not the requested one. Do not change the R20 withdraw rule (principal falls by the requested amount; a fee consumes principal).
+`TokenHandler.depositToken` measures `balanceOf(address(this))` before/after `transferFrom` and returns the received amount. `DcaManager` create / deposit / update credits that return, and validates `purchaseAmount` against the post-deposit `tokenBalance`. Lending handlers mint from the received amount, not the requested one. A lending hop-2 lag can make `batchBuyRbtc` revert for the whole batch (named error; swapper drops the row) — same as any share shortfall. Do not change the R20 withdraw rule (principal falls by the requested amount; a fee consumes principal). Do not add recipient-side withdraw measurement.
 
 Land this before LayerBank so the new handler copies the measured-deposit pattern. Tests: a `MockFeeOnTransferStablecoin` in the same style as `MockReentrantStablecoin` / `DepositSwapPopReentrancyTest`. See `R21-fee-on-transfer-deposits.md`.
 
