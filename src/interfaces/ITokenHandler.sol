@@ -37,7 +37,7 @@ interface ITokenHandler {
      * @param amount The amount of the stablecoin to withdraw.
      * @param user The user making the withdrawal.
      * @return withdrawnAmount The amount that left this contract, measured as a `balanceOf(address(this))` delta around
-     * `safeTransfer`. Do not measure the user: a forwarding wallet can make `balanceOf(user)` look like 0.
+     * `safeTransfer`. Do not measure the user: invariant 1 is handler cash, and `balanceOf(user)` is not received-by-us.
      * A lending handler may clamp to the user's position first; this return is then the post-redeem transfer
      * delta. Do not debit a schedule's principal with this amount. Principal is reduced by the amount
      * requested, because a redemption fee consumes principal rather than leaving it behind.
