@@ -190,9 +190,9 @@ This should land before the full natspec pass (R10).
 
 ### PR 15 - R22 LayerBank handler
 
-Add LayerBank as index 1 for DOC + MoC. Use balance-delta accounting from the start (including R21 deposit returns). Add mocks or fork tests based on the Rootstock LayerBank lToken ABI.
+Add LayerBank as index 1 for DOC + MoC. Use balance-delta accounting from the start (including R21 deposit returns). Add mocks or a live fork probe based on the Rootstock LayerBank **Pool / aToken** ABI (Aave-v3-style lRooDOC). Do not implement against the stale v2 Core / lToken README — that Core never listed DOC.
 
-LayerBank owns exact per-user virtual lToken balances and implements the shared `getUsersLendingTokenBalance(user)` getter. External incentives are out of scope: no Merkl interfaces, reward token, harvest, claim, operator, reward-debt, or unwrap logic. R9 later adds the canonical balance-transition event across the final lending-handler set; LayerBank must expose every share mutation cleanly enough for that event to cover deposits, withdrawals, interest, and single/batch purchases. See [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md).
+LayerBank owns exact per-user virtual **scaled aToken** balances and implements the shared `getUsersLendingTokenBalance(user)` getter. External incentives are out of scope: no Merkl interfaces, reward token, harvest, claim, operator, reward-debt, or unwrap logic. R9 later adds the canonical balance-transition event across the final lending-handler set; LayerBank must expose every share mutation cleanly enough for that event to cover deposits, withdrawals, interest, and single/batch purchases. See [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md).
 
 Do not rename Tropykus in place and do not deploy USDRIF/Uniswap handlers for this relaunch.
 
