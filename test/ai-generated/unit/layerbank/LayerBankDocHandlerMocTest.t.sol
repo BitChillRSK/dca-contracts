@@ -4,7 +4,7 @@ pragma solidity 0.8.36;
 import {Test} from "forge-std/Test.sol";
 import {LayerBankDocHandlerMoc} from "src/layerbank/LayerBankDocHandlerMoc.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
-import {MockLToken, MockLayerBankCore} from "test/mocks/MockLayerBank.sol";
+import {MockLayerBankAToken, MockLayerBankPool} from "test/mocks/MockLayerBank.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import "script/Constants.sol";
@@ -18,16 +18,16 @@ contract LayerBankDocHandlerMocTest is Test {
     address internal FEE_COLLECTOR = address(0xFEE);
 
     MockStablecoin internal docToken;
-    MockLToken internal lToken;
-    MockLayerBankCore internal core;
+    MockLayerBankAToken internal aToken;
+    MockLayerBankPool internal pool;
     MockMocProxy internal mocProxy;
     LayerBankDocHandlerMoc internal handler;
 
     function setUp() public {
         docToken = new MockStablecoin(address(this));
-        lToken = new MockLToken(address(docToken));
-        core = new MockLayerBankCore(lToken);
-        lToken.setCore(address(core));
+        aToken = new MockLayerBankAToken(address(docToken));
+        pool = new MockLayerBankPool(aToken);
+        aToken.setPool(address(pool));
         mocProxy = new MockMocProxy(address(docToken));
 
         vm.deal(address(mocProxy), 100 ether);
@@ -35,7 +35,7 @@ contract LayerBankDocHandlerMocTest is Test {
         handler = new LayerBankDocHandlerMoc(
             address(this),
             address(docToken),
-            address(lToken),
+            address(aToken),
             FEE_COLLECTOR,
             address(mocProxy),
             IFeeHandler.FeeSettings({
@@ -44,7 +44,7 @@ contract LayerBankDocHandlerMocTest is Test {
                 feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
                 feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
             }),
-            EXCHANGE_RATE_DECIMALS
+            LAYERBANK_EXCHANGE_RATE_DECIMALS
         );
 
         docToken.mint(USER, 1000 ether);
@@ -54,7 +54,7 @@ contract LayerBankDocHandlerMocTest is Test {
         vm.prank(address(handler));
         docToken.approve(address(mocProxy), type(uint256).max);
 
-        docToken.mint(address(lToken), 10000 ether);
+        docToken.mint(address(aToken), 10000 ether);
     }
 
     function test_buyRbtc_flow() public {
@@ -63,14 +63,14 @@ contract LayerBankDocHandlerMocTest is Test {
         bytes32 scheduleId = keccak256("schedule");
 
         handler.depositToken(USER, depositAmount);
-        uint256 lTokensBefore = handler.getUsersLendingTokenBalance(USER);
-        assertGt(lTokensBefore, 0);
+        uint256 sharesBefore = handler.getUsersLendingTokenBalance(USER);
+        assertGt(sharesBefore, 0);
 
         handler.buyRbtc(USER, scheduleId, purchaseAmount);
 
         uint256 rbtcAccrued = handler.getAccumulatedRbtcBalance(USER);
         assertGt(rbtcAccrued, 0);
-        assertLt(handler.getUsersLendingTokenBalance(USER), lTokensBefore);
+        assertLt(handler.getUsersLendingTokenBalance(USER), sharesBefore);
 
         handler.withdrawAccumulatedRbtc(USER);
         assertEq(handler.getAccumulatedRbtcBalance(USER), 0);

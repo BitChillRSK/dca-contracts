@@ -39,9 +39,14 @@ contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
 
         assertEq(layerbankHandler.i_dcaManager(), address(dcaManager), "LayerBank handler doesn't reference DcaManager");
         assertEq(address(layerbankHandler.i_docToken()), helperConfig.getStablecoinAddress(), "LayerBank handler DOC mismatch");
-        assertNotEq(address(layerbankHandler.i_lToken()), address(0), "LayerBank lToken not set");
-        assertNotEq(address(layerbankHandler.i_core()), address(0), "LayerBank Core not set");
-        assertEq(layerbankHandler.i_lToken().core(), address(layerbankHandler.i_core()), "lToken.core must match handler Core");
+        assertNotEq(address(layerbankHandler.i_aToken()), address(0), "LayerBank aToken not set");
+        assertNotEq(address(layerbankHandler.i_pool()), address(0), "LayerBank Pool not set");
+        assertEq(layerbankHandler.i_aToken().POOL(), address(layerbankHandler.i_pool()), "aToken.POOL must match handler Pool");
+        assertEq(
+            layerbankHandler.i_aToken().UNDERLYING_ASSET_ADDRESS(),
+            helperConfig.getStablecoinAddress(),
+            "aToken underlying must be DOC"
+        );
         assertEq(layerbankHandler.owner(), makeAddr(OWNER_STRING), "LayerBank handler owner not set correctly");
 
         address registeredHandler = operationsAdmin.getTokenHandler(helperConfig.getStablecoinAddress(), LAYERBANK_INDEX);

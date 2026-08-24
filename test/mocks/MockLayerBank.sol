@@ -2,154 +2,167 @@
 pragma solidity 0.8.36;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IStablecoin} from "src/interfaces/IStablecoin.sol";
 
 /**
- * @title MockLToken
- * @notice LayerBank lToken mock: `onlyCore` supply/redeem, 1e18 starting exchange rate, 5% linear APR.
- * @dev `core` starts unset; call `setCore` once after deploying `MockLayerBankCore`.
+ * @title MockLayerBankAToken
+ * @notice LayerBank aToken mock: scaled ERC20 storage, rebasing `balanceOf`, RAY (1e27) index.
+ * @dev `pool` starts unset; call `setPool` once after deploying `MockLayerBankPool`.
  */
-contract MockLToken is ERC20 {
-    uint256 constant DECIMALS = 1e18;
-    uint256 constant STARTING_EXCHANGE_RATE = 1e18;
+contract MockLayerBankAToken is ERC20 {
+    uint256 public constant RAY = 1e27;
     uint256 constant ANNUAL_INCREASE = 5;
     uint256 constant YEAR_IN_SECONDS = 31536000;
 
-    IStablecoin public immutable underlyingToken;
-    address public core;
+    IStablecoin public immutable underlyingAsset;
+    address public pool;
     uint256 private immutable i_deploymentTimestamp;
     bool private s_silentZeroPayout;
     bool private s_forceZeroMint;
+    bool private s_useMintOverride;
+    uint256 private s_mintOverride;
     bool private s_usePayoutCap;
     uint256 private s_payoutCap;
 
-    error MockLToken__OnlyCore();
-    error MockLToken__CoreAlreadySet();
-    error MockLToken__InvalidCore();
-    error MockLToken__InvalidLAmount();
+    error MockLayerBankAToken__OnlyPool();
+    error MockLayerBankAToken__PoolAlreadySet();
+    error MockLayerBankAToken__InvalidPool();
+    error MockLayerBankAToken__InvalidScaledAmount();
 
-    modifier onlyCore() {
-        if (msg.sender != core) revert MockLToken__OnlyCore();
+    modifier onlyPool() {
+        if (msg.sender != pool) revert MockLayerBankAToken__OnlyPool();
         _;
     }
 
-    constructor(address underlying_) ERC20("LayerBank lToken", "lTKN") {
-        underlyingToken = IStablecoin(underlying_);
+    constructor(address underlying_) ERC20("LayerBank Rootstock DOC", "lRooDOC") {
+        underlyingAsset = IStablecoin(underlying_);
         i_deploymentTimestamp = block.timestamp;
     }
 
-    function setCore(address core_) external {
-        if (core != address(0)) revert MockLToken__CoreAlreadySet();
-        if (core_ == address(0)) revert MockLToken__InvalidCore();
-        core = core_;
+    function setPool(address pool_) external {
+        if (pool != address(0)) revert MockLayerBankAToken__PoolAlreadySet();
+        if (pool_ == address(0)) revert MockLayerBankAToken__InvalidPool();
+        pool = pool_;
     }
 
     function setSilentZeroPayout(bool silentZeroPayout) external {
         s_silentZeroPayout = silentZeroPayout;
     }
 
-    /// @notice Core.supply succeeds but mints nothing, so the handler's zero-delta guard can fire.
+    /// @notice Pool.supply succeeds but mints nothing, so the handler's zero-delta guard can fire.
     function setForceZeroMint(bool forceZeroMint) external {
         s_forceZeroMint = forceZeroMint;
     }
 
-    /// @notice Cap the underlying paid on redeem so tests can assert the handler pays the measured delta.
-    /// @dev Live LayerBank `_redeem` requires `getCash() >= uAmountIn` and reverts rather than under-paying.
-    ///      This hook is deliberately more permissive so AGENTS.md invariant 1 has coverage.
-    ///      Do not "fix" the mock to match live behavior.
+    /// @notice Mint a fixed scaled amount regardless of underlying received, so tests can prove
+    ///         the handler credits `scaledBalanceOf` delta instead of a computed conversion.
+    function setMintOverride(uint256 scaled, bool enabled) external {
+        s_mintOverride = scaled;
+        s_useMintOverride = enabled;
+    }
+
+    /// @notice Cap the underlying paid on withdraw so tests can assert the handler pays the measured delta.
+    /// @dev Live Aave `withdraw` transfers underlying from the aToken and reverts on insufficient
+    ///      cash rather than under-paying. This hook is deliberately more permissive so
+    ///      AGENTS.md invariant 1 has coverage. Do not "fix" the mock to match live behavior.
     function setPayoutCap(uint256 cap, bool enabled) external {
         s_payoutCap = cap;
         s_usePayoutCap = enabled;
     }
 
-    function underlying() external view returns (address) {
-        return address(underlyingToken);
+    function POOL() external view returns (address) {
+        return pool;
     }
 
-    /// @notice View rate including pending interest (LayerBank `exchangeRate` already does this).
-    function exchangeRate() public view returns (uint256) {
+    function UNDERLYING_ASSET_ADDRESS() external view returns (address) {
+        return address(underlyingAsset);
+    }
+
+    function scaledBalanceOf(address account) public view returns (uint256) {
+        return super.balanceOf(account);
+    }
+
+    /// @notice Rebasing view. Do not store this; the handler uses `scaledBalanceOf`.
+    function balanceOf(address account) public view override returns (uint256) {
+        return super.balanceOf(account) * getNormalizedIncome() / RAY;
+    }
+
+    function getNormalizedIncome() public view returns (uint256) {
         uint256 timeElapsed = block.timestamp - i_deploymentTimestamp;
-        uint256 yearsElapsed = (timeElapsed * DECIMALS) / YEAR_IN_SECONDS;
-        uint256 increase = (STARTING_EXCHANGE_RATE * ANNUAL_INCREASE * yearsElapsed) / (100 * DECIMALS);
-        return STARTING_EXCHANGE_RATE + increase;
+        uint256 yearsElapsed = (timeElapsed * RAY) / YEAR_IN_SECONDS;
+        uint256 increase = (RAY * ANNUAL_INCREASE * yearsElapsed) / (100 * RAY);
+        return RAY + increase;
     }
 
-    /// @notice Mutating rate entry point (LayerBank `accruedExchangeRate`). Live LayerBank writes
-    ///         accrual then returns `exchangeRate()`, so the two are the same number.
-    function accruedExchangeRate() external view returns (uint256) {
-        return exchangeRate();
-    }
-
-    function supply(address account, uint256 uAmount) external onlyCore returns (uint256 lAmount) {
+    function mintScaled(address onBehalfOf, uint256 underlyingReceived) external onlyPool returns (uint256 scaled) {
         if (s_forceZeroMint) return 0;
-        uint256 rate = exchangeRate();
-        uint256 balanceBefore = underlyingToken.balanceOf(address(this));
-        underlyingToken.transferFrom(account, address(this), uAmount);
-        uint256 received = underlyingToken.balanceOf(address(this)) - balanceBefore;
-        lAmount = received * DECIMALS / rate;
-        if (lAmount == 0) revert MockLToken__InvalidLAmount();
-        _mint(account, lAmount);
+        if (s_useMintOverride) {
+            scaled = s_mintOverride;
+        } else {
+            scaled = underlyingReceived * RAY / getNormalizedIncome();
+        }
+        if (scaled == 0) revert MockLayerBankAToken__InvalidScaledAmount();
+        _mint(onBehalfOf, scaled);
     }
 
-    function redeemUnderlying(address account, uint256 uAmount) external onlyCore returns (uint256) {
-        uint256 rate = exchangeRate();
-        uint256 lAmount = (uAmount * DECIMALS + rate - 1) / rate;
-        _burn(account, lAmount);
+    function burnScaled(address from, address to, uint256 underlyingAmount) external onlyPool returns (uint256 paid) {
+        uint256 rate = getNormalizedIncome();
+        uint256 scaled = (underlyingAmount * RAY + rate - 1) / rate;
+        _burn(from, scaled);
         if (s_silentZeroPayout) return 0;
-        _payout(account, uAmount);
-        return uAmount;
+        return _payout(to, underlyingAmount);
     }
 
-    function redeemToken(address account, uint256 lAmount) external onlyCore returns (uint256 uAmount) {
-        uint256 rate = exchangeRate();
-        uAmount = lAmount * rate / DECIMALS;
-        _burn(account, lAmount);
-        if (s_silentZeroPayout) return 0;
-        _payout(account, uAmount);
-    }
-
-    function _payout(address to, uint256 amount) private {
+    function _payout(address to, uint256 amount) private returns (uint256) {
         uint256 pay = amount;
         if (s_usePayoutCap && pay > s_payoutCap) pay = s_payoutCap;
-        if (pay == 0) return;
-        uint256 currentBalance = underlyingToken.balanceOf(address(this));
+        if (pay == 0) return 0;
+        uint256 currentBalance = underlyingAsset.balanceOf(address(this));
         if (currentBalance < pay) {
-            underlyingToken.mint(address(this), pay - currentBalance);
+            underlyingAsset.mint(address(this), pay - currentBalance);
         }
-        underlyingToken.transfer(to, pay);
+        IERC20(address(underlyingAsset)).transfer(to, pay);
+        return pay;
     }
 }
 
 /**
- * @title MockLayerBankCore
- * @notice Forwards supply/redeem to the lToken as LayerBank Core does. Returns can be set to a lie
- *         so tests prove the handler measures balance deltas instead of trusting Core.
+ * @title MockLayerBankPool
+ * @notice Forwards supply/withdraw to the aToken as the live Aave Pool does. `supply` matches
+ *         the live ABI (no return). `withdraw` can lie about its return so tests prove the
+ *         handler measures DOC `balanceOf` deltas instead of trusting it.
  */
-contract MockLayerBankCore {
-    MockLToken public immutable lToken;
-    uint256 public supplyReturnOverride;
-    bool public useSupplyReturnOverride;
+contract MockLayerBankPool {
+    MockLayerBankAToken public immutable aToken;
+    uint256 public withdrawReturnOverride;
+    bool public useWithdrawReturnOverride;
 
-    constructor(MockLToken lToken_) {
-        lToken = lToken_;
+    constructor(MockLayerBankAToken aToken_) {
+        aToken = aToken_;
     }
 
-    function setSupplyReturnOverride(uint256 value, bool enabled) external {
-        supplyReturnOverride = value;
-        useSupplyReturnOverride = enabled;
+    function setWithdrawReturnOverride(uint256 value, bool enabled) external {
+        withdrawReturnOverride = value;
+        useWithdrawReturnOverride = enabled;
     }
 
-    function supply(address, uint256 uAmount) external returns (uint256) {
-        uint256 minted = lToken.supply(msg.sender, uAmount);
-        if (useSupplyReturnOverride) return supplyReturnOverride;
-        return minted;
+    function supply(address asset, uint256 amount, address onBehalfOf, uint16) external {
+        IERC20 token = IERC20(asset);
+        uint256 balanceBefore = token.balanceOf(address(aToken));
+        token.transferFrom(msg.sender, address(aToken), amount);
+        uint256 received = token.balanceOf(address(aToken)) - balanceBefore;
+        aToken.mintScaled(onBehalfOf, received);
     }
 
-    function redeemToken(address, uint256 lAmount) external returns (uint256) {
-        return lToken.redeemToken(msg.sender, lAmount);
+    function withdraw(address asset, uint256 amount, address to) external returns (uint256) {
+        require(asset == address(aToken.UNDERLYING_ASSET_ADDRESS()), "asset");
+        uint256 paid = aToken.burnScaled(msg.sender, to, amount);
+        if (useWithdrawReturnOverride) return withdrawReturnOverride;
+        return paid;
     }
 
-    function redeemUnderlying(address, uint256 uAmount) external returns (uint256) {
-        return lToken.redeemUnderlying(msg.sender, uAmount);
+    function getReserveNormalizedIncome(address) external view returns (uint256) {
+        return aToken.getNormalizedIncome();
     }
 }

@@ -8,14 +8,14 @@ import {LayerBankDocHandlerMoc} from "../src/layerbank/LayerBankDocHandlerMoc.so
 import {OperationsAdmin} from "../src/OperationsAdmin.sol";
 import {IFeeHandler} from "../src/interfaces/IFeeHandler.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {MockLToken, MockLayerBankCore} from "../test/mocks/MockLayerBank.sol";
+import {MockLayerBankAToken, MockLayerBankPool} from "../test/mocks/MockLayerBank.sol";
 import {console} from "forge-std/Test.sol";
 import "./Constants.sol";
 
 /**
  * @title DeployLayerBankHandler
  * @notice Add-on deploy for the index-1 LayerBank DOC + MoC handler, same shape as DeployIdleHandler.
- * @dev Local and fork tests deploy Core/lToken mocks. Live lDOC addresses and DeployMocSwaps
+ * @dev Local and fork tests deploy Pool/aToken mocks. Live Pool/aToken addresses and DeployMocSwaps
  *      registration are PR 16. Index 1 currently belongs to Tropykus on the shared admin;
  *      dedicated tests may overwrite it.
  */
@@ -26,7 +26,7 @@ contract DeployLayerBankHandler is DeployBase {
     struct DeployParams {
         address dcaManager;
         address tokenAddress;
-        address lToken;
+        address aToken;
         address mocProxy;
         address feeCollector;
     }
@@ -43,11 +43,11 @@ contract DeployLayerBankHandler is DeployBase {
             new LayerBankDocHandlerMoc(
                 params.dcaManager,
                 params.tokenAddress,
-                params.lToken,
+                params.aToken,
                 params.feeCollector,
                 params.mocProxy,
                 feeSettings,
-                EXCHANGE_RATE_DECIMALS
+                LAYERBANK_EXCHANGE_RATE_DECIMALS
             )
         );
     }
@@ -57,7 +57,7 @@ contract DeployLayerBankHandler is DeployBase {
         returns (address)
     {
         if (environment == Environment.TESTNET || environment == Environment.MAINNET) {
-            revert("Live LayerBank lDOC addresses are PR 16");
+            revert("Live LayerBank Pool/aToken addresses are PR 16");
         }
 
         MocHelperConfig helperConfig =
@@ -78,16 +78,16 @@ contract DeployLayerBankHandler is DeployBase {
 
         vm.startBroadcast();
 
-        MockLToken lToken = new MockLToken(docTokenAddress);
-        MockLayerBankCore core = new MockLayerBankCore(lToken);
-        lToken.setCore(address(core));
-        console.log("Mock lToken:", address(lToken));
-        console.log("Mock Core:", address(core));
+        MockLayerBankAToken aToken = new MockLayerBankAToken(docTokenAddress);
+        MockLayerBankPool pool = new MockLayerBankPool(aToken);
+        aToken.setPool(address(pool));
+        console.log("Mock aToken:", address(aToken));
+        console.log("Mock Pool:", address(pool));
 
         DeployParams memory params = DeployParams({
             dcaManager: dcaManagerAddress,
             tokenAddress: docTokenAddress,
-            lToken: address(lToken),
+            aToken: address(aToken),
             mocProxy: mocProxyAddress,
             feeCollector: getFeeCollector(environment)
         });
