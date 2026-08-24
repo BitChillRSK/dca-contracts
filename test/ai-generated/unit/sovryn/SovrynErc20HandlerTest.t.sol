@@ -9,6 +9,7 @@ import {MockIsusdToken} from "../../../mocks/MockIsusdToken.sol";
 import {MockStablecoin} from "../../../mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ITokenLending} from "../../../../src/interfaces/ITokenLending.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import "../../../../script/Constants.sol";
 
 /**
@@ -292,6 +293,7 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
      * @notice The assetBalanceOf + profitOf preflight is gone (R1): a lending-protocol view is never a
      * ceiling on what a redemption will pay. Over-redeeming must still fail, just from real accounting
      * rather than from a view — here the per-user share exceeds the balance we track for that user.
+     * Named `TokenLending__InsufficientLendingTokenBalance` instead of a 0.8 underflow panic.
      */
     function test_sovryn_batchRedeemStablecoin_exceedsBalance_reverts() public {
         address user1 = makeAddr("user1");
@@ -310,9 +312,17 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
         vm.prank(address(dcaManager));
         handler.depositToken(user1, DEPOSIT_AMOUNT / 10); // Deposit only 1/10th
 
-        uint256 excessiveAmount = DEPOSIT_AMOUNT * 2; // Try to redeem 2x more than deposited
+        uint256 excessiveAmount = DEPOSIT_AMOUNT * 2;
+        uint256 available = sovrynHandler.getUsersLendingTokenBalance(user1);
+        uint256 price = iSusdToken.tokenPrice();
+        uint256 totaliSusdToRepay = Math.mulDiv(excessiveAmount, EXCHANGE_RATE_DECIMALS, price, Math.Rounding.Up);
+        uint256 requested = Math.mulDiv(totaliSusdToRepay, amounts[0], excessiveAmount, Math.Rounding.Up);
 
-        vm.expectRevert(abi.encodeWithSignature("Panic(uint256)", 0x11)); // arithmetic under/overflow
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ITokenLending.TokenLending__InsufficientLendingTokenBalance.selector, user1, requested, available
+            )
+        );
         sovrynHandler.testBatchRedeemStablecoin(users, amounts, excessiveAmount);
     }
 }

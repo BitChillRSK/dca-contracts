@@ -607,8 +607,12 @@ contract DcaDappTest is Test {
             scheduleIds[i] = dcaManager.getDcaSchedules(users[0], address(stablecoin))[i].scheduleId;
             vm.stopPrank();
         }
-        vm.expectEmit(true, false, false, false);
-        emit TokenLending__UnderlyingRedeemedBatch(totalNetPurchaseAmount + totalFee, 0);
+        // After R1 topic1 is the measured DOC from burn, not the requested amount. expectEmit
+        // cannot check that: indexed topics are exact, and on a live iSUSD fork tokenPrice
+        // rounding is 1 wei off (SIP-0094 is not charging). Per-user redeem logs and the
+        // iToken Transfer also fire first, so a selector-only expectEmit for the batch event
+        // is order-fragile on a fork. Read the log after the call.
+        vm.recordLogs();
 
         for (uint8 i; i < NUM_OF_SCHEDULES; ++i) {
             vm.expectEmit(false, false, false, false);
@@ -636,6 +640,8 @@ contract DcaDappTest is Test {
             s_lendingProtocolIndex
         );
 
+        _assertBatchRedemptionReported(totalNetPurchaseAmount + totalFee);
+
         uint256 postStablecoinHandlerBalance;
 
         if (isMocSwaps) {
@@ -660,6 +666,7 @@ contract DcaDappTest is Test {
         );
 
         vm.warp(block.timestamp + 5 weeks); // warp to a time far in the future so all schedules are long due for a new purchase
+        vm.recordLogs();
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
             users,
@@ -683,6 +690,28 @@ contract DcaDappTest is Test {
             totalNetPurchaseAmount / s_btcPrice,
             MAX_SLIPPAGE_PERCENT // Allow a maximum difference of 0.5% (on fork tests we saw this was necessary for both MoC and Uniswap purchases)
         );
+
+        _assertBatchRedemptionReported(totalNetPurchaseAmount + totalFee);
+    }
+
+    /**
+     * @notice assert that the batch redemption event reports the stablecoin the handler measured
+     * @param requestedGross the total stablecoin the purchase path asked the lending protocol for
+     * @dev topic1 is the measured redemption. Live iSUSD / kDOC conversion can be 1 wei off the
+     * request; SIP-0094 is not enabled, so a 0.1% band would hide a wrong emit. If the Perimeter
+     * Fee starts charging, this 1-wei check will fail on `make fork-sovryn` — that is the signal.
+     */
+    function _assertBatchRedemptionReported(uint256 requestedGross) internal {
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        bool found;
+        for (uint256 i; i < entries.length; ++i) {
+            if (entries[i].topics.length == 3 && entries[i].topics[0] == TokenLending__UnderlyingRedeemedBatch.selector) {
+                assertApproxEqAbs(uint256(entries[i].topics[1]), requestedGross, 1);
+                found = true;
+                break;
+            }
+        }
+        assertTrue(found, "TokenLending__UnderlyingRedeemedBatch not emitted");
     }
 
     function updateExchangeRate(uint256 secondsPassed) internal {

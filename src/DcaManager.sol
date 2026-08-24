@@ -415,6 +415,9 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
             for (uint256 j; j < lendingProtocolIndexes.length; ++j) {
                 address tokenHandlerAddress = s_operationsAdmin.getTokenHandler(tokens[i], lendingProtocolIndexes[j]);
                 if (tokenHandlerAddress == address(0)) continue;
+                // Index 0 is idle (no protocol name). Skip it so a mixed idle+lending
+                // call still withdraws interest from the indexes that yield.
+                if (!_tokenYieldsInterest(lendingProtocolIndexes[j])) continue;
                 _withdrawInterest(tokens[i], lendingProtocolIndexes[j]);
             }
         }
@@ -636,14 +639,21 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     }
 
     /**
+     * @notice whether a lending-protocol index has a registered name (index 0 never does)
+     * @param lendingProtocolIndex: the lending protocol index
+     */
+    function _tokenYieldsInterest(uint256 lendingProtocolIndex) private view returns (bool) {
+        return keccak256(abi.encodePacked(s_operationsAdmin.getLendingProtocolName(lendingProtocolIndex)))
+            != keccak256(abi.encodePacked(""));
+    }
+
+    /**
      * @notice check if a token yields interest
      * @param token: the token to check
      * @param lendingProtocolIndex: the lending protocol index
      */
     function _checkTokenYieldsInterest(address token, uint256 lendingProtocolIndex) private view {
-        bytes32 protocolNameHash =
-            keccak256(abi.encodePacked(s_operationsAdmin.getLendingProtocolName(lendingProtocolIndex)));
-        if (protocolNameHash == keccak256(abi.encodePacked(""))) revert DcaManager__TokenDoesNotYieldInterest(token);
+        if (!_tokenYieldsInterest(lendingProtocolIndex)) revert DcaManager__TokenDoesNotYieldInterest(token);
     }
 
     /*//////////////////////////////////////////////////////////////

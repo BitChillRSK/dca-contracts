@@ -18,6 +18,7 @@ uint256 constant RSK_MAINNET_CHAIN_ID = 30;
 uint256 constant RSK_TESTNET_CHAIN_ID = 31;
 
 // Lending protocols
+uint256 constant IDLE_INDEX = 0; // no lending
 string constant TROPYKUS_STRING = "tropykus";
 uint256 constant TROPYKUS_INDEX = 1;
 string constant SOVRYN_STRING = "sovryn";

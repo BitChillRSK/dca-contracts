@@ -140,9 +140,13 @@ abstract contract HandlerTestHarness is Test {
     function setupRolesAndPermissions() internal {
         vm.prank(OWNER);
         operationsAdmin.setAdminRole(ADMIN);
-        
-        vm.prank(ADMIN);
-        operationsAdmin.addOrUpdateLendingProtocol("testProtocol", lendingProtocolIndex);
+
+        // Index 0 is "not lent": OperationsAdmin forbids a protocol name there, but still
+        // allows assignOrUpdateTokenHandler(..., 0, handler).
+        if (lendingProtocolIndex != 0) {
+            vm.prank(ADMIN);
+            operationsAdmin.addOrUpdateLendingProtocol("testProtocol", lendingProtocolIndex);
+        }
     }
     
     /*//////////////////////////////////////////////////////////////

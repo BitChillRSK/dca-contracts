@@ -10,11 +10,11 @@ Move protocol-specific sources and their dedicated handler tests into `src/sovry
 
 ## Background
 
-R22 as a whole makes lending optional (idle at index 0), puts LayerBank at 1, and keeps Sovryn at 2. Tropykus is shutdown: keep the code, do not deploy it on the new admin. That full map is PRs 12–14.
+R22 as a whole makes lending optional (idle at index 0), puts LayerBank at 1, and keeps Sovryn at 2. Tropykus is shutdown: keep the code, do not deploy it on the new admin. Idle is PR 12; LayerBank and the deploy/CI map follow R21 and R16 (PRs 15–16).
 
 This PR is only the folder split (`IMPLEMENTATION_ORDER.md` PR 11). Foundry `src = "src"` already compiles subfolders. `PurchaseMoc` and `PurchaseUniswap` stay in core — they are purchase methods, not lending protocols. Do not create `src/moc-lending/`.
 
-Live deploy scripts still register Tropykus after this PR. Dropping that registration is PR 14; doing it here would break `make moc-tropykus`. The `tropykus-legacy/` name is the signal, not a deploy-script change.
+Live deploy scripts still register Tropykus after this PR. Dropping that registration is PR 16; doing it here would break `make moc-tropykus`. The `tropykus-legacy/` name is the signal, not a deploy-script change.
 
 ## Open product decisions
 
@@ -31,7 +31,7 @@ Live deploy scripts still register Tropykus after this PR. Dropping that registr
 
 ## Out of scope
 
-- [ ] Idle handler (PR 12), LayerBank handler (PR 13), deploy/constants/harness/CI matrix (PR 14).
+- [ ] Idle handler (PR 12), LayerBank handler (PR 15), deploy/constants/harness/CI matrix (PR 16).
 - [ ] Changing `TROPYKUS_INDEX` / `SOVRYN_INDEX` / `Protocol` enum / `LENDING_PROTOCOL` env values.
 - [ ] Stopping Tropykus (or Dex/USDRIF) registration in `DeployMocSwaps` / `DeployDexSwaps`. Scripts only change import paths.
 - [ ] Splitting `DcaDappTest`, deleting `ILendingToken`, or moving `test/mocks/` (`MockKdocToken` / `MockIsusdToken` / `MockKToken` are still used by the shared harness and helper configs).
@@ -111,4 +111,4 @@ Fork tests: not required.
 
 - ABI: none.
 - Scripts: import paths only. No new env vars, no index change, no broadcast.
-- Cutover: none. Frontend index map is unchanged until PR 14.
+- Cutover: none. Frontend index map is unchanged until PR 16.

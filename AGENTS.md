@@ -39,14 +39,14 @@ Handlers = TokenHandler + TokenLending + a Purchase*:
                                             └─ SovrynErc20HandlerDex (+ PurchaseUniswap)
   src/tropykus-legacy/   TropykusErc20Handler ─┬─ TropykusDocHandlerMoc   (+ PurchaseMoc)
                                               └─ TropykusErc20HandlerDex (+ PurchaseUniswap)
-  src/idle/              index 0 (PR 12)
-  src/layerbank/         index 1 (PR 13)
+  src/idle/              IdleErc20Handler ── IdleDocHandlerMoc (+ PurchaseMoc)  index 0
+  src/layerbank/         index 1 (PR 15)
 ```
 
-- `src/interfaces/` — shared first-party ABIs; keep in sync with implementations. Protocol-specific interfaces (`IiSusdToken`, `IkToken`, `ISovrynErc20Lending`, `ITropykusErc20Lending`) live next to their handlers.
+- `src/interfaces/` — shared first-party ABIs; keep in sync with implementations. Protocol-specific interfaces (`IiSusdToken`, `IkToken`, `ISovrynErc20Lending`, `ITropykusErc20Lending`, `IIdleErc20Handler`) live next to their handlers.
 - `test/unit/DcaDappTest.t.sol` — shared harness; **requires** `SWAP_TYPE` and `LENDING_PROTOCOL` (no fallback).
-- `test/unit/`, `test/mocks/`, `test/ai-generated/` — unit / mocks / extra + fuzz. Dedicated handler tests: `test/ai-generated/unit/sovryn/`, `test/ai-generated/unit/tropykus-legacy/`.
-- `script/` — deploy helpers. Do not `--broadcast` or talk to live contracts.
+- `test/unit/`, `test/mocks/`, `test/ai-generated/` — unit / mocks / extra + fuzz. Dedicated handler tests: `test/ai-generated/unit/sovryn/`, `test/ai-generated/unit/tropykus-legacy/`, `test/ai-generated/unit/idle/`.
+- `script/` — deploy helpers. Do not `--broadcast` or talk to live contracts. A new production handler ships its deploy path in the same PR: extend `DeployMocSwaps` / `DeployDexSwaps` when it belongs in the main index map, or add a `Deploy<Handler>.s.sol` add-on (see `DeployUsdrifHandler`, `DeployIdleHandler`). DcaManager and deployment tests must construct that handler through the script (`DcaDappTest`, `BaseDeploymentTest`, `NewHandlerDeploymentTest`). `new Handler(...)` is only for test subclasses that expose internals, or handler-level tests that set `dcaManager` to the test contract so they can call `onlyDcaManager` entry points.
 
 ## Protocol invariants
 
@@ -64,6 +64,7 @@ Unless the assigned spec explicitly changes one:
 
 - Targeted tests for the spec first. Document exact commands in the PR.
 - **Done-gate:** `make check` (`forge build`, `make moc-tropykus`, `make moc-sovryn`, and `STABLECOIN_TYPE=USDRIF make dex-sovryn`).
+- **Before push (every relaunch PR):** `make check` is not enough. Also run `make fork-sovryn` and `make fork-tropykus` (need `RSK_MAINNET_RPC_URL` in `.env`). Fork tests are not in CI; Anvil lanes will not catch live-protocol mismatches (for example R1's batch event reports net DOC, while `makeBatchPurchasesOneUser` used to expect the requested gross). If the RPC is unset, stop and ask the human — do not push. Document the exact fork commands in the PR.
 - **CI (every PR):** `make moc-sovryn` and `STABLECOIN_TYPE=USDRIF make dex-sovryn`. Locally, `make ci` runs those lanes under `FOUNDRY_PROFILE=ci`. Local Tropykus targets remain useful for mock-based coverage. Tropykus fork tests pin a pre-pause block; see the fork-tests bullet below.
 - Defaults: `SWAP_TYPE=mocSwaps`, `LENDING_PROTOCOL=tropykus`, `STABLECOIN_TYPE=DOC`. Dex paths often use `STABLECOIN_TYPE=USDRIF`.
 - `make patch-deps` applies the vendored Uniswap pragma compatibility patch used by local builds and CI. It mutates `lib/` submodules; do not commit those submodule dirties.
@@ -77,10 +78,12 @@ Do this even if a user-level rule says “don’t commit until asked.” An assi
 
 1. **Branch before the first edit** (`git checkout -b <type>/r<n>-<slug>` from the base in **Starting a relaunch chat**).
 2. **Commit when the spec’s success criteria pass.** Small, targeted commits (spec/docs, then code, then follow-up docs). Subject: `type: why`.
-3. **Push and open a PR** with `.github/PULL_REQUEST_TEMPLATE.md`. Point at the spec. Do not commit `lib/` dirt from `make patch-deps`, secrets, or `.env`.
+3. **Push and open a PR** only after `make check`, `make fork-sovryn`, and `make fork-tropykus` pass. Use `.github/PULL_REQUEST_TEMPLATE.md`. Point at the spec. Do not commit `lib/` dirt from `make patch-deps`, secrets, or `.env`.
 4. **One implementer per PR.** Parallel review (Cursor/Codex/Claude/Bugbot) is expected. Parallel implementation on overlapping Solidity is not. Skip git worktrees for this relaunch except a docs-only PR that does not share files.
 5. After the PR is open, set `docs/relaunch/README.md` **Status** to this PR (full GitHub link) and “next unassigned: …” (the one-line prompt for the following chat). If the URL is only known after opening, add that Status update in a follow-up commit and push, then stop. Do not start the next R-item in this chat. The human merges in order. In the closing message, remind the human of that next prompt so they can spin up the following agent.
 
 ## PRs
 
 Small, behavior-scoped, reviewable history. No drive-by refactors. Use the template. Do not restate the invariants — say whether they still hold.
+
+When reviewing a PR by number, fetch its actual diff (e.g. `gh pr diff <N>` or `gh pr view <N> --json files`) and confirm the changed files match before trusting any findings — don't assume the locally checked-out branch is that PR's diff.

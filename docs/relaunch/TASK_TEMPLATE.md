@@ -34,7 +34,7 @@ The implementer may follow imports, inheritance, mocks, failing tests, and compi
 
 - Commands to run (include `SWAP_TYPE` / `LENDING_PROTOCOL` / `STABLECOIN_TYPE` or `--match-path` / `--match-test`).
 - Behaviors to assert (happy path, revert, fee=0 vs net≠gross, sibling path unchanged, etc.).
-- Fork tests: required / not required.
+- Fork tests: still run `make fork-sovryn` and `make fork-tropykus` before push (`AGENTS.md`). Use this line only to say whether this item adds fork-specific assertions.
 
 ## Success criteria
 
