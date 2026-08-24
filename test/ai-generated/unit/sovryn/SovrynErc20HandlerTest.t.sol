@@ -243,7 +243,7 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
         assertGt(stablecoin.balanceOf(USER), 0);
     }
     
-    function test_sovryn_batchRedeemStablecoin() public {
+    function test_sovryn_batchRetrieveStablecoin() public {
         // Set up multiple users and deposits
         address user1 = makeAddr("user1");
         address user2 = makeAddr("user2");
@@ -270,13 +270,13 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
         vm.prank(address(dcaManager));
         handler.depositToken(user2, DEPOSIT_AMOUNT);
         
-        // Call _batchRedeemStablecoin through the test handler
-        uint256 totalToRedeem = amounts[0] + amounts[1];
+        // Call _batchRetrieveStablecoin through the test handler
+        uint256 totalToRetrieve = amounts[0] + amounts[1];
         
-        uint256 redeemed = sovrynHandler.testBatchRedeemStablecoin(users, amounts, totalToRedeem);
+        uint256 retrieved = sovrynHandler.testBatchRetrieveStablecoin(users, amounts, totalToRetrieve);
         
         // Verify the batch redemption worked
-        assertGt(redeemed, 0);
+        assertGt(retrieved, 0);
         
         // Check that users' lending balances were adjusted (decreased from their maximum possible)
         // Note: Due to interest accrual, balances might be higher than original deposit
@@ -295,7 +295,7 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
      * rather than from a view — here the per-user share exceeds the balance we track for that user.
      * Named `TokenLending__InsufficientLendingTokenBalance` instead of a 0.8 underflow panic.
      */
-    function test_sovryn_batchRedeemStablecoin_exceedsBalance_reverts() public {
+    function test_sovryn_batchRetrieveStablecoin_exceedsBalance_reverts() public {
         address user1 = makeAddr("user1");
         address[] memory users = new address[](1);
         users[0] = user1;
@@ -323,7 +323,7 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
                 ITokenLending.TokenLending__InsufficientLendingTokenBalance.selector, user1, requested, available
             )
         );
-        sovrynHandler.testBatchRedeemStablecoin(users, amounts, excessiveAmount);
+        sovrynHandler.testBatchRetrieveStablecoin(users, amounts, excessiveAmount);
     }
 }
 
@@ -359,14 +359,14 @@ contract SovrynTestHandler is SovrynErc20Handler {
     }
     
     /**
-     * @notice Expose _batchRedeemStablecoin for testing
+     * @notice Expose _batchRetrieveStablecoin for testing
      * @dev This allows us to test the internal batch redemption logic
      */
-    function testBatchRedeemStablecoin(
+    function testBatchRetrieveStablecoin(
         address[] memory users,
         uint256[] memory purchaseAmounts,
-        uint256 totalErc20ToRedeem
+        uint256 totalStablecoinAmount
     ) external returns (uint256) {
-        return _batchRedeemStablecoin(users, purchaseAmounts, totalErc20ToRedeem);
+        return _batchRetrieveStablecoin(users, purchaseAmounts, totalStablecoinAmount);
     }
 } 

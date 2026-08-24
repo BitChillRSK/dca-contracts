@@ -74,25 +74,27 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, DcaManagerAccessControl {
     }
 
     /**
-     * @notice redeem stablecoin for rBTC
+     * @notice retrieve the buyer's stablecoin onto the handler so the purchase can spend it
      * @notice define abstract functions to be implemented by child contracts
+     * @dev lending handlers redeem their lending token to get the stablecoin here, while the
+     * idle handler only debits its own mapping.
      * @dev these functions semantically belong to the TokenLending contract,
-     * however, putting them there and changing the inheritance graph made it 
+     * however, putting them there and changing the inheritance graph made it
      * impossible to linearize and finding another solution  would have required a major refactor.
      * @param buyer: the address of the buyer
-     * @param amount: the amount of stablecoin to redeem
-     * @return the amount of stablecoin redeemed
+     * @param amount: the amount of stablecoin wanted
+     * @return the amount of stablecoin actually available to spend
      */
-    function _redeemStablecoin(address buyer, uint256 amount) internal virtual returns (uint256);
+    function _retrieveStablecoin(address buyer, uint256 amount) internal virtual returns (uint256);
 
     /**
-     * @notice redeem stablecoin for rBTC in batch
+     * @notice retrieve several buyers' stablecoin for a batch purchase
      * @param buyers: the addresses of the buyers
-     * @param purchaseAmounts: the amounts of stablecoin to redeem for each buyer
-     * @param totalStablecoinAmountToRedeem: the total amount of stablecoin to redeem
-     * @return the total amount of stablecoin redeemed
+     * @param purchaseAmounts: the amounts of stablecoin charged to each buyer
+     * @param totalStablecoinToRetrieve: the total amount of stablecoin wanted
+     * @return the total amount of stablecoin actually available to spend
      */
-    function _batchRedeemStablecoin(address[] memory buyers, uint256[] memory purchaseAmounts, uint256 totalStablecoinAmountToRedeem)
+    function _batchRetrieveStablecoin(address[] memory buyers, uint256[] memory purchaseAmounts, uint256 totalStablecoinToRetrieve)
         internal
         virtual
         returns (uint256);

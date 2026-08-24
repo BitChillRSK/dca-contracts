@@ -18,8 +18,8 @@ interface IiSusdToken {
 
     /**
      * @dev This function is used to withdraw stablecoin from the Sovryn protocol and give back the corresponding iSusd
-     * @param receiver The account getting the redeemed iSusd tokens.
-     * @param burnAmount The amount of loan tokens to redeem.
+     * @param receiver The account getting the stablecoin freed by the redemption.
+     * @param burnAmount The amount of loan tokens (iSusd) to redeem.
      */
     function burn(address receiver, uint256 burnAmount) external returns (uint256 loanAmountPaid);
 

@@ -111,8 +111,8 @@ contract DcaDappTest is Test {
     event TokenHandler__TokenWithdrawn(address indexed token, address indexed user, uint256 indexed amount);
     
     // TokenLending
-    event TokenLending__UnderlyingRedeemed(
-        address indexed user, uint256 indexed underlyingAmountRedeemed, uint256 indexed lendingTokenAmountRepayed
+    event TokenLending__LendingTokenRedeemed(
+        address indexed user, uint256 indexed underlyingAmount, uint256 indexed lendingTokenAmountRedeemed
     );
 
     // IPurchaseRbtc
@@ -139,7 +139,7 @@ contract DcaDappTest is Test {
     event TokenLending__WithdrawalAmountAdjusted(
         address indexed user, uint256 indexed originalAmount, uint256 indexed adjustedAmount
     );
-    event TokenLending__UnderlyingRedeemedBatch(uint256 indexed underlyingAmountRedeemed, uint256 indexed lendingTokenAmountRepayed);
+    event TokenLending__LendingTokenRedeemedBatch(uint256 indexed underlyingAmount, uint256 indexed lendingTokenAmountRedeemed);
 
     modifier onlyDexSwaps() {
         if (!isDexSwaps) {
@@ -480,7 +480,7 @@ contract DcaDappTest is Test {
         uint256 lastPurchaseTimestamp = dcaDetails[SCHEDULE_INDEX].lastPurchaseTimestamp == 0 ? block.timestamp : dcaDetails[SCHEDULE_INDEX].lastPurchaseTimestamp + dcaDetails[SCHEDULE_INDEX].purchasePeriod;
         emit DcaManager__LastPurchaseTimestampUpdated(address(stablecoin), dcaDetails[SCHEDULE_INDEX].scheduleId, lastPurchaseTimestamp);
         vm.expectEmit(true, false, false, false);
-        emit TokenLending__UnderlyingRedeemed(USER, 0, 0);
+        emit TokenLending__LendingTokenRedeemed(USER, 0, 0);
         if (block.chainid == ANVIL_CHAIN_ID && isMocSwaps) {
             vm.expectEmit(true, true, true, true);
         } else {
@@ -519,7 +519,6 @@ contract DcaDappTest is Test {
         // createSeveralDcaSchedules();
 
         uint8 numOfPurchases = 5;
-        uint256 totalStablecoinRedeemed;
 
         for (uint8 i; i < NUM_OF_SCHEDULES; ++i) {
             uint256 scheduleIndex = i;
@@ -554,7 +553,6 @@ contract DcaDappTest is Test {
                 );
 
                 totalStablecoinSpent += netPurchaseAmount;
-                totalStablecoinRedeemed += schedulePurchaseAmount;
 
                 // Advance time so the next purchase can be made (purchase period check)
                 updateExchangeRate(schedulePurchasePeriod);
@@ -705,13 +703,13 @@ contract DcaDappTest is Test {
         Vm.Log[] memory entries = vm.getRecordedLogs();
         bool found;
         for (uint256 i; i < entries.length; ++i) {
-            if (entries[i].topics.length == 3 && entries[i].topics[0] == TokenLending__UnderlyingRedeemedBatch.selector) {
+            if (entries[i].topics.length == 3 && entries[i].topics[0] == TokenLending__LendingTokenRedeemedBatch.selector) {
                 assertApproxEqAbs(uint256(entries[i].topics[1]), requestedGross, 1);
                 found = true;
                 break;
             }
         }
-        assertTrue(found, "TokenLending__UnderlyingRedeemedBatch not emitted");
+        assertTrue(found, "TokenLending__LendingTokenRedeemedBatch not emitted");
     }
 
     function updateExchangeRate(uint256 secondsPassed) internal {

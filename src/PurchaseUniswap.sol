@@ -82,8 +82,8 @@ abstract contract PurchaseUniswap is
         override
         onlyDcaManager
     {
-        // Redeem stablecoin (repaying yield bearing token)
-        purchaseAmount = _redeemStablecoin(buyer, purchaseAmount);
+        // Retrieve the stablecoin to spend
+        purchaseAmount = _retrieveStablecoin(buyer, purchaseAmount);
 
         // Charge fee
         uint256 fee = _calculateFee(purchaseAmount);
@@ -120,11 +120,11 @@ abstract contract PurchaseUniswap is
         (uint256 aggregatedFee, uint256[] memory netStablecoinAmountsToSpend, uint256 totalNetStablecoinPlanned) =
             _calculateFeeAndNetAmounts(purchaseAmounts);
 
-        // Redeem stablecoin (and repay lending token)
+        // Retrieve the stablecoin to spend
         // @notice we spend the stablecoin we actually received, never the gross amount we asked the lending protocol for
-        uint256 totalStablecoinAmountToSpend = _batchRedeemStablecoin(buyers, purchaseAmounts, totalNetStablecoinPlanned + aggregatedFee); // totalNetStablecoinPlanned (on rBTC) + aggregatedFee (charged by BitChill)
+        uint256 totalStablecoinAmountToSpend = _batchRetrieveStablecoin(buyers, purchaseAmounts, totalNetStablecoinPlanned + aggregatedFee); // totalNetStablecoinPlanned (on rBTC) + aggregatedFee (charged by BitChill)
         if (totalStablecoinAmountToSpend <= aggregatedFee) {
-            revert PurchaseRbtc__RedeemedAmountBelowFee(totalStablecoinAmountToSpend, aggregatedFee);
+            revert PurchaseRbtc__StablecoinRetrievedBelowFee(totalStablecoinAmountToSpend, aggregatedFee);
         }
         totalStablecoinAmountToSpend -= aggregatedFee;
 

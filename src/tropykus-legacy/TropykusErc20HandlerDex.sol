@@ -49,31 +49,31 @@ contract TropykusErc20HandlerDex is TropykusErc20Handler, PurchaseUniswap {
     {}
 
     /**
-     * @notice Override the _redeemStablecoin function to resolve ambiguity between parent contracts
-     * @param user The address of the user for whom the stablecoin is being redeemed
-     * @param amount The amount of stablecoin to redeem
+     * @notice Override the _retrieveStablecoin hook to resolve ambiguity between parent contracts
+     * @param user The address of the user whose stablecoin is being retrieved
+     * @param amount The amount of stablecoin wanted
      */
-    function _redeemStablecoin(address user, uint256 amount)
+    function _retrieveStablecoin(address user, uint256 amount)
         internal
         override(TropykusErc20Handler, PurchaseRbtc)
         returns (uint256)
     {
-        // Call TropykusErc20Handler's version of _redeemStablecoin
-        return TropykusErc20Handler._redeemStablecoin(user, amount);
+        // Call TropykusErc20Handler's version of _retrieveStablecoin
+        return TropykusErc20Handler._retrieveStablecoin(user, amount);
     }
 
     /**
-     * @notice Override the _batchRedeemStablecoin function to resolve ambiguity between parent contracts
-     * @param users The array of user addresses for whom the stablecoin is being redeemed
-     * @param purchaseAmounts The array of amounts of stablecoin to redeem for each user
-     * @param totalStablecoinAmountToRedeem The total amount of stablecoin to redeem from Tropykus
+     * @notice Override the _batchRetrieveStablecoin hook to resolve ambiguity between parent contracts
+     * @param users The array of user addresses whose stablecoin is being retrieved
+     * @param purchaseAmounts The array of amounts of stablecoin charged to each user
+     * @param totalStablecoinToRetrieve The total amount of stablecoin wanted
      */
-    function _batchRedeemStablecoin(address[] memory users, uint256[] memory purchaseAmounts, uint256 totalStablecoinAmountToRedeem)
+    function _batchRetrieveStablecoin(address[] memory users, uint256[] memory purchaseAmounts, uint256 totalStablecoinToRetrieve)
         internal
         override(TropykusErc20Handler, PurchaseRbtc)
         returns (uint256)
     {
-        // Call TropykusErc20Handler's version of _batchRedeemStablecoin
-        return TropykusErc20Handler._batchRedeemStablecoin(users, purchaseAmounts, totalStablecoinAmountToRedeem);
+        // Call TropykusErc20Handler's version of _batchRetrieveStablecoin
+        return TropykusErc20Handler._batchRetrieveStablecoin(users, purchaseAmounts, totalStablecoinToRetrieve);
     }
 }

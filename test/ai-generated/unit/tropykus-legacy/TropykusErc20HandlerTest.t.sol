@@ -6,7 +6,6 @@ import {ITokenHandler} from "../../../../src/interfaces/ITokenHandler.sol";
 import {IFeeHandler} from "../../../../src/interfaces/IFeeHandler.sol";
 import {IPurchaseUniswap} from "../../../../src/interfaces/IPurchaseUniswap.sol";
 import {TropykusErc20Handler} from "../../../../src/tropykus-legacy/TropykusErc20Handler.sol";
-import {ITropykusErc20Lending} from "../../../../src/tropykus-legacy/ITropykusErc20Lending.sol";
 import {MockKdocToken} from "../../../mocks/MockKdocToken.sol";
 import {MockStablecoin} from "../../../mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -190,7 +189,7 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
         vm.prank(address(dcaManager));
         vm.expectRevert(
             abi.encodeWithSelector(
-                ITropykusErc20Lending.TropykusErc20Lending__ZeroStablecoinRedeemed.selector, WITHDRAWAL_AMOUNT
+                ITokenLending.TokenLending__ZeroStablecoinReceived.selector, WITHDRAWAL_AMOUNT
             )
         );
         handler.withdrawToken(USER, WITHDRAWAL_AMOUNT);
@@ -255,7 +254,7 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
         assertGt(lendingBalance, 0);
     }
 
-    function test_tropykus_batchRedeemStablecoin_exceedsBalance_reverts() public {
+    function test_tropykus_batchRetrieveStablecoin_exceedsBalance_reverts() public {
         address user1 = makeAddr("user1");
         address[] memory users = new address[](1);
         users[0] = user1;
@@ -282,7 +281,7 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
                 ITokenLending.TokenLending__InsufficientLendingTokenBalance.selector, user1, requested, available
             )
         );
-        tropykusHandler.testBatchRedeemStablecoin(users, amounts, excessiveAmount);
+        tropykusHandler.testBatchRetrieveStablecoin(users, amounts, excessiveAmount);
     }
 }
 
@@ -317,11 +316,11 @@ contract TropykusTestHandler is TropykusErc20Handler {
         return 0; // Minimal implementation for testing
     }
 
-    function testBatchRedeemStablecoin(
+    function testBatchRetrieveStablecoin(
         address[] memory users,
         uint256[] memory purchaseAmounts,
-        uint256 totalStablecoinToRedeem
+        uint256 totalStablecoinAmount
     ) external returns (uint256) {
-        return _batchRedeemStablecoin(users, purchaseAmounts, totalStablecoinToRedeem);
+        return _batchRetrieveStablecoin(users, purchaseAmounts, totalStablecoinAmount);
     }
 } 

@@ -363,7 +363,7 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
     
     /**
      * @notice Mock implementation of buyRbtc for testing
-     * @dev Properly simulates rBTC flow: redeems stablecoin, converts to rBTC, updates balances
+     * @dev Properly simulates rBTC flow: retrieves stablecoin, converts to rBTC, updates balances
      */
     function buyRbtc(
         address buyer,
@@ -425,10 +425,10 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
         bytes32 scheduleId,
         uint256 purchaseAmount
     ) internal {
-        // Redeem stablecoin from lending protocol
-        uint256 redeemed = _redeemStablecoin(buyer, purchaseAmount);
+        // Retrieve the stablecoin the purchase will spend
+        uint256 retrieved = _retrieveStablecoin(buyer, purchaseAmount);
         
-        // ✅ SIMULATE: Consume the redeemed stablecoin (as it would be used for actual rBTC purchase)
+        // ✅ SIMULATE: Consume the stablecoin retrieved (as it would be used for actual rBTC purchase)
         // In real protocol, this stablecoin gets sent to DEX/MoC and consumed
         // We simulate this by transferring it away (burn it)
         uint256 handlerBalance = i_stableToken.balanceOf(address(this));
@@ -437,7 +437,7 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
         }
         
         // Mock conversion: 1 stablecoin = 0.00003 rBTC (roughly $50k BTC price)
-        uint256 rbtcAmount = (redeemed * 3e16) / 1e18; // 0.03 rBTC per token
+        uint256 rbtcAmount = (retrieved * 3e16) / 1e18; // 0.03 rBTC per token
         
         // Ensure handler has enough rBTC (should have been allocated in setUp)
         require(address(this).balance >= rbtcAmount, "Handler insufficient rBTC balance");
@@ -551,10 +551,10 @@ contract SovrynHandlerWrapper is SovrynErc20Handler {
         bytes32 scheduleId,
         uint256 purchaseAmount
     ) internal {
-        // Redeem stablecoin from lending protocol
-        uint256 redeemed = _redeemStablecoin(buyer, purchaseAmount);
+        // Retrieve the stablecoin the purchase will spend
+        uint256 retrieved = _retrieveStablecoin(buyer, purchaseAmount);
         
-        // ✅ SIMULATE: Consume the redeemed stablecoin (as it would be used for actual rBTC purchase)
+        // ✅ SIMULATE: Consume the stablecoin retrieved (as it would be used for actual rBTC purchase)
         // In real protocol, this stablecoin gets sent to DEX/MoC and consumed
         // We simulate this by transferring it away (burn it)
         uint256 handlerBalance = i_stableToken.balanceOf(address(this));
@@ -563,7 +563,7 @@ contract SovrynHandlerWrapper is SovrynErc20Handler {
         }
         
         // Mock conversion: 1 stablecoin = 0.00003 rBTC
-        uint256 rbtcAmount = (redeemed * 3e16) / 1e18; // 0.03 rBTC per token
+        uint256 rbtcAmount = (retrieved * 3e16) / 1e18; // 0.03 rBTC per token
         
         // Ensure handler has enough rBTC (should have been allocated in setUp)
         require(address(this).balance >= rbtcAmount, "Handler insufficient rBTC balance");

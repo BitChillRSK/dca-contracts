@@ -12,12 +12,14 @@ interface ITokenLending is ITokenHandler {
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    event TokenLending__UnderlyingRedeemed(
-        address indexed user, uint256 indexed underlyingAmountRedeemed, uint256 indexed lendingTokenAmountRepayed
+    /// @notice in a batch this fires per user with that user's planned share; the batch event
+    /// below carries the total the handler measured
+    event TokenLending__LendingTokenRedeemed(
+        address indexed user, uint256 indexed underlyingAmount, uint256 indexed lendingTokenAmountRedeemed
     );
-    event TokenLending__UnderlyingRedeemedBatch(uint256 indexed underlyingAmountRedeemed, uint256 indexed lendingTokenAmountRepayed);
+    event TokenLending__LendingTokenRedeemedBatch(uint256 indexed underlyingAmount, uint256 indexed lendingTokenAmountRedeemed);
     event TokenLending__InterestWithdrawn(
-        address indexed user, address indexed token, uint256 indexed underlyingAmountRedeemed
+        address indexed user, address indexed token, uint256 indexed underlyingAmountWithdrawn
     );
     event TokenLending__WithdrawalAmountAdjusted(
         address indexed user, uint256 indexed originalAmount, uint256 indexed adjustedAmount
@@ -35,7 +37,12 @@ interface ITokenLending is ITokenHandler {
     //////////////////////////////////////////////////////////////*/
 
     error TokenLending__LendingProtocolDepositFailed();
-    error TokenLending__BatchRedeemUnderlyingFailed();
+    /// @notice the lending protocol's redemption call reported failure with a non-zero error code
+    error TokenLending__LendingProtocolRedeemFailed(uint256 errorCode);
+    /// @notice the redemption burnt the user's shares but produced no stablecoin, so revert
+    /// instead of paying out zero. `stablecoinAttempted` is the amount the redemption asked the
+    /// protocol for, after any clamp to the shares the user actually holds.
+    error TokenLending__ZeroStablecoinReceived(uint256 stablecoinAttempted);
     /// @notice batch redeem asked for more of this user's shares than the handler tracks. Same
     /// outcome as a 0.8 underflow on `s_*Balances[user] -=`; the named error is for the swapper.
     error TokenLending__InsufficientLendingTokenBalance(address user, uint256 requested, uint256 available);

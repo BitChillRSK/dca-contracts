@@ -94,15 +94,15 @@ contract IdleErc20HandlerTest is HandlerTestHarness {
         assertEq(stablecoin.balanceOf(other), 0);
     }
 
-    function test_idle_redeem_clampsToOwnBalance() public {
+    function test_idle_retrieveStablecoin_clampsToOwnBalance() public {
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);
 
         vm.expectEmit(true, false, false, true, address(handler));
         emit IIdleErc20Handler.IdleErc20Handler__AmountAdjusted(USER, DEPOSIT_AMOUNT * 2, DEPOSIT_AMOUNT);
-        uint256 redeemed = idleHandler.testRedeemStablecoin(USER, DEPOSIT_AMOUNT * 2);
+        uint256 retrieved = idleHandler.testRetrieveStablecoin(USER, DEPOSIT_AMOUNT * 2);
 
-        assertEq(redeemed, DEPOSIT_AMOUNT);
+        assertEq(retrieved, DEPOSIT_AMOUNT);
         assertEq(idleHandler.getUsersIdleTokenBalance(USER), 0);
         // DOC stays on the handler until a purchase or withdraw moves it
         assertEq(stablecoin.balanceOf(address(handler)), DEPOSIT_AMOUNT);
@@ -116,7 +116,7 @@ contract IdleErc20HandlerTest is HandlerTestHarness {
         handler.withdrawToken(USER, DEPOSIT_AMOUNT);
     }
 
-    function test_idle_batchRedeem_revertsIfInsufficient() public {
+    function test_idle_batchRetrieveStablecoin_revertsIfInsufficient() public {
         address user1 = makeAddr("user1");
         address user2 = makeAddr("user2");
         stablecoin.mint(user1, DEPOSIT_AMOUNT);
@@ -146,7 +146,7 @@ contract IdleErc20HandlerTest is HandlerTestHarness {
                 DEPOSIT_AMOUNT
             )
         );
-        idleHandler.testBatchRedeemStablecoin(users, amounts, amounts[0] + amounts[1]);
+        idleHandler.testBatchRetrieveStablecoin(users, amounts, amounts[0] + amounts[1]);
 
         assertEq(idleHandler.getUsersIdleTokenBalance(user1), DEPOSIT_AMOUNT);
         assertEq(idleHandler.getUsersIdleTokenBalance(user2), DEPOSIT_AMOUNT);
@@ -155,7 +155,7 @@ contract IdleErc20HandlerTest is HandlerTestHarness {
 
 /**
  * @title IdleTestHandler
- * @notice Concrete IdleErc20Handler for deposit/withdraw/redeem unit tests.
+ * @notice Concrete IdleErc20Handler for deposit/withdraw/take unit tests.
  */
 contract IdleTestHandler is IdleErc20Handler {
     constructor(
@@ -165,15 +165,15 @@ contract IdleTestHandler is IdleErc20Handler {
         FeeSettings memory feeSettings
     ) IdleErc20Handler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings) {}
 
-    function testRedeemStablecoin(address user, uint256 amount) external returns (uint256) {
-        return _redeemStablecoin(user, amount);
+    function testRetrieveStablecoin(address user, uint256 amount) external returns (uint256) {
+        return _retrieveStablecoin(user, amount);
     }
 
-    function testBatchRedeemStablecoin(
+    function testBatchRetrieveStablecoin(
         address[] memory users,
         uint256[] memory purchaseAmounts,
-        uint256 totalErc20ToRedeem
+        uint256 totalStablecoinAmount
     ) external returns (uint256) {
-        return _batchRedeemStablecoin(users, purchaseAmounts, totalErc20ToRedeem);
+        return _batchRetrieveStablecoin(users, purchaseAmounts, totalStablecoinAmount);
     }
 }
