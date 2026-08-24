@@ -34,7 +34,7 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler {
      * @notice deposit the full token amount for DCA on the contract
      * @param user: the address of the user making the deposit
      * @param depositAmount: the amount requested from the user
-     * @return received the amount actually credited to the user's idle balance
+     * @return depositedAmount the amount actually credited to the user's idle balance
      * @dev TokenHandler owns the balance-delta measurement and the zero-received revert,
      * so a fee-on-transfer token that delivers nothing never reaches the idle balance.
      */
@@ -42,17 +42,17 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler {
         public
         override
         onlyDcaManager
-        returns (uint256 received)
+        returns (uint256 depositedAmount)
     {
-        received = super.depositToken(user, depositAmount);
-        s_idleBalances[user] += received;
+        depositedAmount = super.depositToken(user, depositAmount);
+        s_idleBalances[user] += depositedAmount;
     }
 
     /**
      * @notice withdraw the token amount sending it back to the user's address
      * @param user: the address of the user making the withdrawal
      * @param withdrawalAmount: the amount to withdraw
-     * @return the amount that left this contract after debiting the idle mapping
+     * @return withdrawnAmount the amount that left this contract after debiting the idle mapping
      */
     function withdrawToken(address user, uint256 withdrawalAmount)
         public

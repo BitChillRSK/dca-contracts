@@ -43,14 +43,14 @@ abstract contract TokenHandler is ITokenHandler, ERC165, Ownable, FeeHandler, Dc
      * approve function with this contract's address and the amount approved
      * @param user: the address of the user making the deposit
      * @param depositAmount: the amount requested from the user
-     * @return received the amount this contract actually received (balance delta around transferFrom)
+     * @return depositedAmount the amount this contract actually received (balance delta around transferFrom)
      */
-    function depositToken(address user, uint256 depositAmount) public virtual override onlyDcaManager returns (uint256 received) {
+    function depositToken(address user, uint256 depositAmount) public virtual override onlyDcaManager returns (uint256 depositedAmount) {
         uint256 balanceBefore = i_stableToken.balanceOf(address(this));
         i_stableToken.safeTransferFrom(user, address(this), depositAmount);
-        received = i_stableToken.balanceOf(address(this)) - balanceBefore;
-        if (depositAmount > 0 && received == 0) revert TokenHandler__ZeroStablecoinReceived();
-        emit TokenHandler__TokenDeposited(address(i_stableToken), user, received);
+        depositedAmount = i_stableToken.balanceOf(address(this)) - balanceBefore;
+        if (depositAmount > 0 && depositedAmount == 0) revert TokenHandler__ZeroStablecoinReceived();
+        emit TokenHandler__TokenDeposited(address(i_stableToken), user, depositedAmount);
     }
 
     /**
@@ -58,13 +58,13 @@ abstract contract TokenHandler is ITokenHandler, ERC165, Ownable, FeeHandler, Dc
      * @notice This function transfers stablecoin token from this contract back to the user
      * @param user: the address of the user making the withdrawal
      * @param withdrawalAmount: the amount of stablecoin token to withdraw
-     * @return spent the amount that left this contract (balance delta around safeTransfer)
+     * @return withdrawnAmount the amount that left this contract (balance delta around safeTransfer)
      */
-    function withdrawToken(address user, uint256 withdrawalAmount) public virtual override onlyDcaManager returns (uint256 spent) {
+    function withdrawToken(address user, uint256 withdrawalAmount) public virtual override onlyDcaManager returns (uint256 withdrawnAmount) {
         uint256 balanceBefore = i_stableToken.balanceOf(address(this));
         i_stableToken.safeTransfer(user, withdrawalAmount);
-        spent = balanceBefore - i_stableToken.balanceOf(address(this));
-        emit TokenHandler__TokenWithdrawn(address(i_stableToken), user, spent);
+        withdrawnAmount = balanceBefore - i_stableToken.balanceOf(address(this));
+        emit TokenHandler__TokenWithdrawn(address(i_stableToken), user, withdrawnAmount);
     }
 
     /**

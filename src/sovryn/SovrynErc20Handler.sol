@@ -48,21 +48,21 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending, ISovrynErc20
      * @notice deposit the full token amount for DCA on the contract
      * @param user: the address of the user making the deposit
      * @param depositAmount: the amount requested from the user
-     * @return received the stablecoin amount actually received before minting iTokens
+     * @return depositedAmount the stablecoin amount actually received before minting iTokens
      */
     function depositToken(address user, uint256 depositAmount)
         public
         override(TokenHandler, ITokenHandler)
         onlyDcaManager
-        returns (uint256 received)
+        returns (uint256 depositedAmount)
     {
-        received = super.depositToken(user, depositAmount);
-        if (i_stableToken.allowance(address(this), address(i_iSusdToken)) < received) {
-            i_stableToken.safeApprove(address(i_iSusdToken), received);
+        depositedAmount = super.depositToken(user, depositAmount);
+        if (i_stableToken.allowance(address(this), address(i_iSusdToken)) < depositedAmount) {
+            i_stableToken.safeApprove(address(i_iSusdToken), depositedAmount);
         }
         // @notice the iSusd we credit is the balance we actually gained, never mint()'s return value
         uint256 prevIsusdBalance = i_iSusdToken.balanceOf(address(this));
-        i_iSusdToken.mint(address(this), received);
+        i_iSusdToken.mint(address(this), depositedAmount);
         uint256 mintedAmount = i_iSusdToken.balanceOf(address(this)) - prevIsusdBalance;
         if (mintedAmount == 0) revert TokenLending__LendingProtocolDepositFailed();
         s_iSusdBalances[user] += mintedAmount;
@@ -72,7 +72,7 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending, ISovrynErc20
      * @notice withdraw the token amount sending it back to the user's address
      * @param user: the address of the user making the withdrawal
      * @param withdrawalAmount: the amount to withdraw
-     * @return the amount of stablecoin actually paid to the user
+     * @return withdrawnAmount the amount that left this contract after redeeming
      */
     function withdrawToken(address user, uint256 withdrawalAmount)
         public

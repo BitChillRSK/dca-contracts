@@ -27,20 +27,20 @@ interface ITokenHandler {
      * @notice Deposit a specified amount of a stablecoin into the contract for DCA operations.
      * @param user The user making the deposit.
      * @param amount The amount of the stablecoin requested from the user.
-     * @return The amount this contract actually received, measured as a `balanceOf` delta around `transferFrom`.
+     * @return depositedAmount The amount this contract actually received, measured as a `balanceOf` delta around `transferFrom`.
      * Credit this amount, not `amount`. A fee-on-transfer token may deliver less than requested.
      */
-    function depositToken(address user, uint256 amount) external returns (uint256);
+    function depositToken(address user, uint256 amount) external returns (uint256 depositedAmount);
 
     /**
      * @notice Withdraw a specified amount of a stablecoin from the contract.
      * @param amount The amount of the stablecoin to withdraw.
      * @param user The user making the withdrawal.
-     * @return The amount that left this contract, measured as a `balanceOf(address(this))` delta around
+     * @return withdrawnAmount The amount that left this contract, measured as a `balanceOf(address(this))` delta around
      * `safeTransfer`. Do not measure the user: a forwarding wallet can make `balanceOf(user)` look like 0.
      * A lending handler may clamp to the user's position first; this return is then the post-redeem transfer
      * delta. Do not debit a schedule's principal with this amount. Principal is reduced by the amount
      * requested, because a redemption fee consumes principal rather than leaving it behind.
      */
-    function withdrawToken(address user, uint256 amount) external returns (uint256);
+    function withdrawToken(address user, uint256 amount) external returns (uint256 withdrawnAmount);
 }
