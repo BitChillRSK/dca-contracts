@@ -26,6 +26,12 @@ Record these **before the first PR that changes fee logic, `DcaDetails`, handler
 
 Defaults if the human says “use defaults”: keep OZ `v4.9.3`; skip packing (still `calldata` on handler batch arrays); defer R12, R13, R19, owner sweep, deposit pause. Do not apply defaults unless they say so.
 
+## External lending incentives
+
+The relaunch handlers distribute native lending interest only. They do not claim or redistribute temporary third-party incentives. Future campaign support should use off-chain forwarding directly to users; if a provider does not integrate BitChill, the handler leaves those rewards unclaimed rather than adding an approximate harvest-time allocation or an owner claim. Frontends must not present an incentive-inclusive APR as BitChill yield unless forwarding is live.
+
+This does **not** depend on a provider response. R9 must make the handlers indexer-ready by emitting one canonical per-user virtual lending-share balance transition after every share mint or burn. See [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md) for the decided event shape, required emit sites, and scope boundary.
+
 ## PR order
 
 Ask = product questions for that PR only. `Start with R2` means PR 3.
@@ -186,6 +192,8 @@ This should land before the full natspec pass (R10).
 
 Add LayerBank as index 1 for DOC + MoC. Use balance-delta accounting from the start (including R21 deposit returns). Add mocks or fork tests based on the Rootstock LayerBank lToken ABI.
 
+LayerBank owns exact per-user virtual lToken balances and implements the shared `getUsersLendingTokenBalance(user)` getter. External incentives are out of scope: no Merkl interfaces, reward token, harvest, claim, operator, reward-debt, or unwrap logic. R9 later adds the canonical balance-transition event across the final lending-handler set; LayerBank must expose every share mutation cleanly enough for that event to cover deposits, withdrawals, interest, and single/batch purchases. See [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md).
+
 Do not rename Tropykus in place and do not deploy USDRIF/Uniswap handlers for this relaunch.
 
 ### PR 16 - R22 deploy scripts, constants, harness, and CI matrix
@@ -202,6 +210,8 @@ Split the shared test harness so lending-token assertions live only in lending-p
 ### PR 17 - R9 event indexing and ABI cleanup
 
 Index only addresses and `scheduleId`. Do not index amounts, timestamps, periods, rates, strings, bytes, or arrays.
+
+Add `TokenLending__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares)` to the shared lending interface and emit it after every successful per-user virtual lending-share mutation in the shipped lending handlers. Deposits report the exact measured lending-token mint, not the stablecoin input. Withdrawals, interest, single purchases, and every buyer debit in a batch are covered; repeated users in one batch produce sequential transitions. Tests must show each `newShares` equals `getUsersLendingTokenBalance(user)` and that replay from the fresh deployment reconstructs current balances. This is protocol observability for possible off-chain forwarding, not an on-chain external-reward integration. See [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md).
 
 Do this once the shipped ABI surface is known, including any optional pause or compound-interest events that were approved.
 

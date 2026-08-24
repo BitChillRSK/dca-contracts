@@ -18,6 +18,10 @@ Document any extra files in the PR. Do not search `out/`, `cache/`, or `lib/`. D
 3. Optional/further-review items get a spec only when explicitly assigned.
 4. One spec = one PR unless **Scope** names a tight bundle.
 
+## Decision records
+
+- [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md) — lending handlers distribute native protocol interest only; external campaigns use off-chain forwarding if available. R9 must add a canonical per-user lending-share balance-transition event so forwarding does not depend on transaction traces or a provider response.
+
 ## Status
 
 - Merged: [R23-toolchain-baseline.md](./R23-toolchain-baseline.md) (PR 1, GitHub [#42](https://github.com/BitChillRSK/dca-contracts/pull/42)). Rootstock testnet accepted solc 0.8.36 / `cancun`.
