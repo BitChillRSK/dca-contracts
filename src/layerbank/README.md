@@ -17,5 +17,5 @@ The v2-contracts README Core listing is stale and never included DOC. Do not cal
 
 - aToken exposes `POOL()`, `UNDERLYING_ASSET_ADDRESS()`, `scaledBalanceOf`. No `core()`, `accruedExchangeRate()`, or `underlying()`.
 - Pool `supply` has no return. `withdraw(asset, amount, to)` returns an amount — the handler measures DOC `balanceOf` deltas instead. `getReserveNormalizedIncome` is RAY (`1e27`).
-- Snapshotting `i_pool` from `aToken.POOL()` matches the Aave aToken's immutable Pool. A Pool migration means a new aToken and therefore a new handler.
+- Snapshotting `i_pool` from `aToken.POOL()` matches the Aave aToken's immutable Pool. A Pool migration means a new aToken and therefore a new handler. `TokenLending` is initialized with hardcoded RAY (`1e27`); there is no `exchangeRateDecimals` constructor arg.
 - Live `withdraw` reverts on insufficient aToken cash rather than under-paying. ~56,907 DOC cash vs ~199,584 supplied (2026-08-24): an illiquid reserve aborts the entire `batchBuyRbtc`, not one buyer. Same shape as Tropykus/Sovryn; ops note for PR 16.

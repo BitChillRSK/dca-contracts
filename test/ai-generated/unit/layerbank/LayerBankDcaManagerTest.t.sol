@@ -37,7 +37,15 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
         super.setUp();
 
         handler = LayerBankDocHandlerMoc(
-            payable(new DeployLayerBankHandler().run(helperConfig, address(operationsAdmin), address(dcaManager)))
+            payable(
+                new DeployLayerBankHandler().deployMocksAndHandler(
+                    address(dcaManager),
+                    helperConfig.getStablecoinAddress(),
+                    helperConfig.getActiveNetworkConfig().mocProxyAddress,
+                    makeAddr(FEE_COLLECTOR_STRING),
+                    operationsAdmin.owner()
+                )
+            )
         );
         docToken = MockStablecoin(helperConfig.getStablecoinAddress());
         mocProxy = MockMocProxy(helperConfig.getActiveNetworkConfig().mocProxyAddress);

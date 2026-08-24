@@ -24,9 +24,15 @@ contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
         DeployLayerBankHandler layerbankDeployer = new DeployLayerBankHandler();
         console.log("LayerBank handler deployer:", address(layerbankDeployer));
 
-        layerbankHandlerAddress = layerbankDeployer.run(helperConfig, address(operationsAdmin), address(dcaManager));
-        layerbankHandler = LayerBankDocHandlerMoc(payable(layerbankHandlerAddress));
         address docTokenAddress = helperConfig.getStablecoinAddress();
+        layerbankHandlerAddress = layerbankDeployer.deployMocksAndHandler(
+            address(dcaManager),
+            docTokenAddress,
+            helperConfig.getActiveNetworkConfig().mocProxyAddress,
+            makeAddr(FEE_COLLECTOR_STRING),
+            operationsAdmin.owner()
+        );
+        layerbankHandler = LayerBankDocHandlerMoc(payable(layerbankHandlerAddress));
 
         vm.prank(ADMIN);
         operationsAdmin.addOrUpdateLendingProtocol("layerbank", LAYERBANK_INDEX);
@@ -54,5 +60,21 @@ contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
         assertEq(
             keccak256(bytes(operationsAdmin.getLendingProtocolName(LAYERBANK_INDEX))), keccak256(bytes("layerbank"))
         );
+        assertEq(layerbankHandler.RAY(), 1e27);
+    }
+
+    function test_run_revertsWhenNotLocal() public {
+        if (block.chainid == ANVIL_CHAIN_ID) vm.skip(true);
+        DeployLayerBankHandler deployer = new DeployLayerBankHandler();
+        vm.expectRevert(bytes("Live LayerBank Pool/aToken addresses are PR 16"));
+        deployer.run(helperConfig, address(operationsAdmin), address(dcaManager));
+    }
+
+    function test_run_deploysOnAnvil() public {
+        if (block.chainid != ANVIL_CHAIN_ID) vm.skip(true);
+        address deployed =
+            new DeployLayerBankHandler().run(helperConfig, address(operationsAdmin), address(dcaManager));
+        assertNotEq(deployed, address(0));
+        assertEq(LayerBankDocHandlerMoc(payable(deployed)).owner(), makeAddr(OWNER_STRING));
     }
 }

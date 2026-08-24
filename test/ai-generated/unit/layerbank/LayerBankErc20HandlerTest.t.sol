@@ -291,7 +291,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         uint256 available = layerbankHandler.getUsersLendingTokenBalance(user1);
         uint256 exchangeRate = aToken.getNormalizedIncome();
         uint256 totalAtokenToRepay =
-            Math.mulDiv(excessiveAmount, LAYERBANK_EXCHANGE_RATE_DECIMALS, exchangeRate, Math.Rounding.Up);
+            Math.mulDiv(excessiveAmount, aToken.RAY(), exchangeRate, Math.Rounding.Up);
         uint256 requested = Math.mulDiv(totalAtokenToRepay, amounts[0], excessiveAmount, Math.Rounding.Up);
 
         vm.expectRevert(
@@ -343,8 +343,7 @@ contract LayerBankTestHandler is LayerBankErc20Handler {
             stableTokenAddress,
             aTokenAddress,
             feeCollector,
-            feeSettings,
-            LAYERBANK_EXCHANGE_RATE_DECIMALS
+            feeSettings
         )
     {}
 

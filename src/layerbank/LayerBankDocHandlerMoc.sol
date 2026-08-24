@@ -24,16 +24,14 @@ contract LayerBankDocHandlerMoc is LayerBankErc20Handler, PurchaseMoc {
         address aTokenAddress,
         address feeCollector,
         address mocProxyAddress,
-        FeeSettings memory feeSettings,
-        uint256 exchangeRateDecimals
+        FeeSettings memory feeSettings
     )
         LayerBankErc20Handler(
             dcaManagerAddress,
             docTokenAddress,
             aTokenAddress,
             feeCollector,
-            feeSettings,
-            exchangeRateDecimals
+            feeSettings
         )
         PurchaseMoc(docTokenAddress, mocProxyAddress)
     {}

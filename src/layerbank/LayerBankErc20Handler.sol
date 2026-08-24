@@ -22,6 +22,10 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending {
     error LayerBankErc20Handler__PoolNotSet();
     error LayerBankErc20Handler__UnderlyingMismatch();
 
+    /// @notice Aave liquidity-index scale. Fixed for this protocol; not a constructor arg
+    ///         (passing Tropykus/Sovryn's 1e18 would size withdrawals 1e9× too large).
+    uint256 public constant RAY = 1e27;
+
     //////////////////////
     // State variables ///
     //////////////////////
@@ -41,11 +45,10 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending {
         address stableTokenAddress,
         address aTokenAddress,
         address feeCollector,
-        FeeSettings memory feeSettings,
-        uint256 exchangeRateDecimals
+        FeeSettings memory feeSettings
     )
         TokenHandler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings)
-        TokenLending(exchangeRateDecimals)
+        TokenLending(RAY)
     {
         i_aToken = ILayerBankAToken(aTokenAddress);
         if (i_aToken.UNDERLYING_ASSET_ADDRESS() != stableTokenAddress) {

@@ -15,9 +15,11 @@ import "./Constants.sol";
 /**
  * @title DeployLayerBankHandler
  * @notice Add-on deploy for the index-1 LayerBank DOC + MoC handler, same shape as DeployIdleHandler.
- * @dev Local and fork tests deploy Pool/aToken mocks. Live Pool/aToken addresses and DeployMocSwaps
- *      registration are PR 16. Index 1 currently belongs to Tropykus on the shared admin;
- *      dedicated tests may overwrite it.
+ * @dev `run()` is Anvil-only. `DeployBase` reports FORK (not MAINNET) for a real RSK RPC
+ *      unless `REAL_DEPLOYMENT=true`, so gating on TESTNET/MAINNET would still broadcast
+ *      mocks onto chain 30. Live Pool/aToken addresses and DeployMocSwaps registration are
+ *      PR 16. Index 1 currently belongs to Tropykus on the shared admin; dedicated tests
+ *      may overwrite it via `deployMocksAndHandler`.
  */
 contract DeployLayerBankHandler is DeployBase {
     uint256 public constant LAYERBANK_INDEX = 1;
@@ -46,17 +48,43 @@ contract DeployLayerBankHandler is DeployBase {
                 params.aToken,
                 params.feeCollector,
                 params.mocProxy,
-                feeSettings,
-                LAYERBANK_EXCHANGE_RATE_DECIMALS
+                feeSettings
             )
         );
+    }
+
+    /**
+     * @notice Deploy Pool/aToken mocks and the handler. Used by tests on Anvil and on a fork.
+     * @dev Does not `broadcast` or call `assignOrUpdateTokenHandler`. `run()` is the
+     *      Anvil-only broadcast entry.
+     */
+    function deployMocksAndHandler(
+        address dcaManager,
+        address tokenAddress,
+        address mocProxy,
+        address feeCollector,
+        address owner
+    ) public returns (address handler) {
+        MockLayerBankAToken aToken = new MockLayerBankAToken(tokenAddress);
+        MockLayerBankPool pool = new MockLayerBankPool(aToken);
+        aToken.setPool(address(pool));
+        handler = deployLayerBankDocHandlerMoc(
+            DeployParams({
+                dcaManager: dcaManager,
+                tokenAddress: tokenAddress,
+                aToken: address(aToken),
+                mocProxy: mocProxy,
+                feeCollector: feeCollector
+            })
+        );
+        Ownable(handler).transferOwnership(owner);
     }
 
     function run(MocHelperConfig existingConfig, address operationsAdminAddress, address dcaManagerAddress)
         external
         returns (address)
     {
-        if (environment == Environment.TESTNET || environment == Environment.MAINNET) {
+        if (environment != Environment.LOCAL) {
             revert("Live LayerBank Pool/aToken addresses are PR 16");
         }
 
@@ -78,24 +106,16 @@ contract DeployLayerBankHandler is DeployBase {
 
         vm.startBroadcast();
 
-        MockLayerBankAToken aToken = new MockLayerBankAToken(docTokenAddress);
-        MockLayerBankPool pool = new MockLayerBankPool(aToken);
-        aToken.setPool(address(pool));
-        console.log("Mock aToken:", address(aToken));
-        console.log("Mock Pool:", address(pool));
-
-        DeployParams memory params = DeployParams({
-            dcaManager: dcaManagerAddress,
-            tokenAddress: docTokenAddress,
-            aToken: address(aToken),
-            mocProxy: mocProxyAddress,
-            feeCollector: getFeeCollector(environment)
-        });
-
-        address layerbankHandler = deployLayerBankDocHandlerMoc(params);
+        OperationsAdmin operationsAdmin = OperationsAdmin(operationsAdminAddress);
+        address layerbankHandler = deployMocksAndHandler(
+            dcaManagerAddress,
+            docTokenAddress,
+            mocProxyAddress,
+            getFeeCollector(environment),
+            operationsAdmin.owner()
+        );
         console.log("LayerBank DOC handler deployed at:", layerbankHandler);
 
-        OperationsAdmin operationsAdmin = OperationsAdmin(operationsAdminAddress);
         bool isAdmin = operationsAdmin.hasRole(keccak256("ADMIN"), msg.sender);
 
         if (!isAdmin) {
@@ -109,10 +129,6 @@ contract DeployLayerBankHandler is DeployBase {
             operationsAdmin.assignOrUpdateTokenHandler(docTokenAddress, LAYERBANK_INDEX, layerbankHandler);
             console.log("LayerBank DOC handler registered with OperationsAdmin at index", LAYERBANK_INDEX);
         }
-
-        address currentOwner = operationsAdmin.owner();
-        Ownable(layerbankHandler).transferOwnership(currentOwner);
-        console.log("Handler ownership transferred to:", currentOwner);
 
         vm.stopBroadcast();
 

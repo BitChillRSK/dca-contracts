@@ -60,8 +60,7 @@ contract LayerBankLivePoolProbe is Test {
                 maxFeeRate: MAX_FEE_RATE_TEST,
                 feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
                 feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
-            }),
-            LAYERBANK_EXCHANGE_RATE_DECIMALS
+            })
         );
         assertEq(address(handler.i_aToken()), ATOKEN);
         assertEq(address(handler.i_pool()), POOL);

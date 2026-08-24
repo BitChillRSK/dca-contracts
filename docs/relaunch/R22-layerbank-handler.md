@@ -42,7 +42,7 @@ Live aToken surface this handler calls: `POOL()`, `UNDERLYING_ASSET_ADDRESS()`, 
 
 Aave aTokens **look** rebasing via `balanceOf` but internally store **scaled** balances and a RAY (`1e27`) liquidity index (`getReserveNormalizedIncome`). Store scaled share deltas (analog of kToken/iToken amounts). Convert with the normalized income the way Tropykus uses `exchangeRateCurrent`. If the handler instead stores rebasing `balanceOf`, interest accounting will desync.
 
-Constructor `exchangeRateDecimals` is **`1e27` (RAY)** for this handler, not `EXCHANGE_RATE_DECIMALS` (`1e18`) used by Tropykus/Sovryn. Pass it in; do not change Tropykus/Sovryn.
+Constructor hardcodes RAY (`1e27`) into `TokenLending`. Do not take `exchangeRateDecimals` as a constructor argument — Tropykus/Sovryn's `EXCHANGE_RATE_DECIMALS` (`1e18`) is one line away in `Constants.sol` and would size withdrawals 1e9× too large. Do not change Tropykus/Sovryn.
 
 Cash rule (R1/R20, invariant 1): after `supply`, credit `aToken.scaledBalanceOf(handler)` delta. After `withdraw`, pay the measured `DOC.balanceOf` delta (handler, then `safeTransfer` to the user). Do not treat Pool return values as cash received. Do not cap redemptions with Aave views (`getReserveData`, liquidity index, `balanceOf` as “DOC we will get”).
 
@@ -52,7 +52,7 @@ R16: hook names are `_retrieveStablecoin` / `_redeemLendingToken`. Do not reintr
 
 External incentives are out of scope (`EXTERNAL_REWARDS.md`). The handler must not claim Merkl / LAB / `claimLab` / harvest. R9 later emits `TokenLending__UserSharesUpdated` on this handler — every share mint/burn site must be a single, complete update to the per-user scaled mapping so that event can cover deposits, withdrawals, interest, and single/batch purchases.
 
-Constructor: same shape as `TropykusErc20Handler` (dcaManager, stable, lending token, feeCollector, feeSettings, exchangeRateDecimals). Read the Pool from `aToken.POOL()` (v2 used `lToken.core()`). Revert if Pool is unset. Revert `LayerBankErc20Handler__UnderlyingMismatch` if `aToken.UNDERLYING_ASSET_ADDRESS()` is not the stablecoin — the live token has no `underlying()`. Do not add a Pool constructor arg. Do not copy the unused `minPurchaseAmount` leftover on `TropykusDocHandlerMoc` / `SovrynDocHandlerMoc`.
+Constructor: same shape as `TropykusErc20Handler` except **no** `exchangeRateDecimals` argument — `TokenLending` is initialized with hardcoded `RAY` (`1e27`). Read the Pool from `aToken.POOL()` (v2 used `lToken.core()`). Revert if Pool is unset. Revert `LayerBankErc20Handler__UnderlyingMismatch` if `aToken.UNDERLYING_ASSET_ADDRESS()` is not the stablecoin — the live token has no `underlying()`. Do not add a Pool constructor arg. Do not copy the unused `minPurchaseAmount` leftover on `TropykusDocHandlerMoc` / `SovrynDocHandlerMoc`.
 
 Redeem-to-user: Aave `withdraw(..., to)` exists; still withdraw **onto the handler**, measure the DOC delta, then `safeTransfer` to the user. No `to` on rBTC.
 
@@ -80,7 +80,7 @@ Live Aave `withdraw` reverts on insufficient cash (ERC20 transfer from the aToke
 
 ## Out of scope
 
-- [ ] `script/Constants.sol` index remap (`LAYERBANK_INDEX = 1` replacing Tropykus), `DeployMocSwaps` / `DeployDexSwaps` registration, `MocHelperConfig` live Pool/aToken fields, `DcaDappTest` split, `ILendingToken` deletion, CI matrix (`none` / `layerbank` / `sovryn`) — those are PR 16. This PR may register LayerBank at index 1 **inside dedicated tests** on that test's `OperationsAdmin` (overwriting Tropykus there is fine). This PR may add `LAYERBANK_EXCHANGE_RATE_DECIMALS = 1e27` next to the existing 1e18 constant; that is not the index remap.
+- [ ] `script/Constants.sol` index remap (`LAYERBANK_INDEX = 1` replacing Tropykus), `DeployMocSwaps` / `DeployDexSwaps` registration, `MocHelperConfig` live Pool/aToken fields, `DcaDappTest` split, `ILendingToken` deletion, CI matrix (`none` / `layerbank` / `sovryn`) — those are PR 16. This PR may register LayerBank at index 1 **inside dedicated tests** on that test's `OperationsAdmin` (overwriting Tropykus there is fine).
 - Ops (PR 16, no code change wanted): live `Pool.withdraw` reverts on insufficient aToken cash, so an illiquid DOC reserve blocks the entire `batchBuyRbtc` for every buyer in that batch, not just the one who cannot be served. Same shape as Tropykus/Sovryn; cash today is ~57k of ~200k supplied.
 - [ ] LayerBank Uniswap / USDRIF handler.
 - [ ] Merkl / LAB / `claimLab` / harvest / reward-debt / unwrap.
@@ -112,7 +112,7 @@ Edit:
 - `script/DeployLayerBankHandler.s.sol`
 - `test/unit/deployment/LayerBankHandlerDeploymentTest.t.sol`
 - `src/layerbank/README.md`
-- `script/Constants.sol` (`LAYERBANK_EXCHANGE_RATE_DECIMALS = 1e27` only)
+- `script/Constants.sol`
 - `AGENTS.md`
 - `docs/relaunch/README.md` (keep Status on #58)
 - `docs/relaunch/IMPLEMENTATION_ORDER.md` (PR 15 ABI is Pool/aToken, not v2 Core/lToken)
@@ -152,7 +152,8 @@ Behaviors to assert:
 - `buyRbtc` / `batchBuyRbtc` spend DOC via MoC and credit accumulated rBTC; virtual scaled balances fall.
 - `batchBuyRbtc` / `_batchRetrieveStablecoin` revert `TokenLending__InsufficientLendingTokenBalance` if any buyer cannot cover their share.
 - Dedicated DcaManager path: create / buy / withdraw at the test's index 1 against this handler.
-- Constructor reverts if `POOL()` is unset or `UNDERLYING_ASSET_ADDRESS()` mismatches the stablecoin.
+- Constructor reverts if `POOL()` is unset or `UNDERLYING_ASSET_ADDRESS()` mismatches the stablecoin. RAY is hardcoded (`1e27`); there is no `exchangeRateDecimals` constructor arg.
+- `DeployLayerBankHandler.run()` reverts unless `Environment.LOCAL` (Anvil). Fork tests use `deployMocksAndHandler` (no broadcast). A real RSK RPC without `REAL_DEPLOYMENT=true` is `FORK`, not `MAINNET`.
 - Live probe (fork tip): `aToken.POOL()` is the live Pool; `UNDERLYING_ASSET_ADDRESS()` is DOC; `getReserveNormalizedIncome` is RAY-scale (`>= 1e27`); `core()` / `accruedExchangeRate()` are absent; handler constructs against the live aToken.
 - Existing Tropykus and Sovryn lanes in `make check` are unchanged.
 
@@ -176,6 +177,6 @@ Fork tests: `make fork-sovryn` and `make fork-tropykus` before push (`AGENTS.md`
 
 ## ABI / deploy / cutover impact
 
-- ABI: `LayerBankErc20Handler` / `LayerBankDocHandlerMoc` now take the aToken (not a v2 lToken). Constructor reads Pool from `aToken.POOL()`. Reuses `ITokenLending` events/errors. No change to existing handler ABIs.
-- Scripts: add-on `DeployLayerBankHandler` (not wired into `DeployMocSwaps`). Live Pool / aToken addresses and index-1 registration on the main deploy path are PR 16.
+- ABI: `LayerBankErc20Handler` / `LayerBankDocHandlerMoc` take the aToken (not a v2 lToken) and do **not** take `exchangeRateDecimals` — `TokenLending` is initialized with hardcoded RAY (`1e27`). Constructor reads Pool from `aToken.POOL()`. Reuses `ITokenLending` events/errors. No change to existing handler ABIs.
+- Scripts: add-on `DeployLayerBankHandler`. `run()` is Anvil-only; live Pool / aToken addresses and index-1 registration on the main deploy path are PR 16.
 - Cutover: none in this PR. Frontend cannot target LayerBank until PR 16 assigns the handler on the new admin. An illiquid market reverts `Pool.withdraw` for the whole `batchBuyRbtc`, not per buyer — ops note for whoever wires the live market (cash ~57k of ~200k supplied; same shape as Tropykus/Sovryn; no code change).
