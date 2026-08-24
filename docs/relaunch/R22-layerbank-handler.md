@@ -1,6 +1,6 @@
 # R22 — LayerBank DOC + MoC handler
 
-Status: **implemented** · Assigned: yes · Optional/further-review: no
+Status: **in review** · Assigned: yes · Optional/further-review: no
 
 PR 15 of R22. Deploy/constants/harness/CI index-map work is PR 16.
 
