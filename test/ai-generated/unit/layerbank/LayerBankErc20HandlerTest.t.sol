@@ -213,6 +213,12 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         assertEq(layerbankHandler.getUsersLendingTokenBalance(USER), lTokenBalanceBefore);
     }
 
+    /**
+     * @notice Live LayerBank cannot produce a partial payout: Market._redeem requires
+     *         `getCash() >= uAmountIn` and reverts rather than under-paying. `setPayoutCap`
+     *         is deliberately more permissive so AGENTS.md invariant 1 (balance-delta cash)
+     *         has coverage. Do not "fix" the mock to match live behavior.
+     */
     function test_layerbank_withdrawPaysMeasuredShortfall() public {
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);

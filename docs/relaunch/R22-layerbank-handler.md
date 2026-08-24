@@ -54,6 +54,7 @@ Redeem-to-user: LayerBank always pays the Core caller (the handler). Interest wi
 ## Out of scope
 
 - [ ] `script/Constants.sol` index remap (`LAYERBANK_INDEX = 1` replacing Tropykus), `DeployMocSwaps` / `DeployDexSwaps` registration, `MocHelperConfig` live lDOC/Core fields, `DcaDappTest` split, `ILendingToken` deletion, CI matrix (`none` / `layerbank` / `sovryn`) — those are PR 16. This PR may register LayerBank at index 1 **inside dedicated tests** on that test's `OperationsAdmin` (overwriting Tropykus there is fine).
+- Ops (PR 16, no code change wanted): live `_redeem` requires `getCash() >= uAmountIn`, so an illiquid lDOC market makes `Core.redeemUnderlying` revert and blocks the entire `batchBuyRbtc` for every buyer in that batch, not just the one who cannot be served. Same shape as Tropykus/Sovryn; flag it when wiring the live market.
 - [ ] LayerBank Uniswap / USDRIF handler.
 - [ ] Merkl / LAB / `claimLab` / harvest / reward-debt / unwrap.
 - [ ] R9 `TokenLending__UserSharesUpdated`.
@@ -137,4 +138,4 @@ Fork tests: `make fork-sovryn` and `make fork-tropykus` before push (`AGENTS.md`
 
 - ABI: new contracts `LayerBankErc20Handler` / `LayerBankDocHandlerMoc`. Constructor takes the lToken, not Core. Reuses `ITokenLending` events/errors. No change to existing handler ABIs.
 - Scripts: add-on `DeployLayerBankHandler` (not wired into `DeployMocSwaps`). Live Core / lDOC addresses and index-1 registration on the main deploy path are PR 16.
-- Cutover: none in this PR. Frontend cannot target LayerBank until PR 16 assigns the handler on the new admin **and** LayerBank lists DOC (or product picks another listed stable).
+- Cutover: none in this PR. Frontend cannot target LayerBank until PR 16 assigns the handler on the new admin **and** LayerBank lists DOC (or product picks another listed stable). An illiquid market reverts `_redeem` for the whole `batchBuyRbtc`, not per buyer — ops note for whoever wires the live market (same shape as Tropykus/Sovryn; no code change).

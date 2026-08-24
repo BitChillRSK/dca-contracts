@@ -210,6 +210,12 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending {
                 user, oldLtokenToRepay, lTokenToRepay, oldStablecoinAmount, stablecoinAmount
             );
         }
+        // @notice Solvency: LayerBank Market._redeem burns
+        // `uAmountIn.mul(1e18).div(exchangeRate())` (round down). We debit
+        // `_stablecoinToLendingToken` (Math.Rounding.Up). Debiting >= the
+        // shares LayerBank burns keeps `sum(s_lTokenBalances)` <= the handler's
+        // real lToken balance. Flipping either side to round down breaks this;
+        // no existing test would catch it.
         s_lTokenBalances[user] -= lTokenToRepay;
         uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(address(this));
 
@@ -246,6 +252,7 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending {
             // @notice the amount of lToken each user repays is proportional to the ratio of
             // that user's stablecoin being retrieved over the total being retrieved
             // @notice Rounds up the lending token amount to avoid underestimating the amount to subtract from each user's balance
+            // @notice Same solvency pairing as the single-redeem debit: LayerBank `_redeem` rounds the share burn down; we round the virtual debit up. Flipping either side breaks `sum(s_lTokenBalances)` <= real lToken balance, and no test would catch it.
             uint256 usersRepaidLtoken =
                 Math.mulDiv(totalLtokenToRepay, purchaseAmounts[i], totalStablecoinAmount, Math.Rounding.Up);
             uint256 usersLtokenBalance = s_lTokenBalances[users[i]];

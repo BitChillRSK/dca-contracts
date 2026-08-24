@@ -54,6 +54,9 @@ contract MockLToken is ERC20 {
     }
 
     /// @notice Cap the underlying paid on redeem so tests can assert the handler pays the measured delta.
+    /// @dev Live LayerBank `_redeem` requires `getCash() >= uAmountIn` and reverts rather than under-paying.
+    ///      This hook is deliberately more permissive so AGENTS.md invariant 1 has coverage.
+    ///      Do not "fix" the mock to match live behavior.
     function setPayoutCap(uint256 cap, bool enabled) external {
         s_payoutCap = cap;
         s_usePayoutCap = enabled;
