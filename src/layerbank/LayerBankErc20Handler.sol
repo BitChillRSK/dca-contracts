@@ -20,6 +20,7 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending {
     using SafeERC20 for IERC20;
 
     error LayerBankErc20Handler__CoreNotSet();
+    error LayerBankErc20Handler__UnderlyingMismatch();
 
     //////////////////////
     // State variables ///
@@ -47,6 +48,8 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending {
         TokenLending(exchangeRateDecimals)
     {
         i_lToken = ILToken(lTokenAddress);
+        if (i_lToken.underlying() != stableTokenAddress) revert LayerBankErc20Handler__UnderlyingMismatch();
+        // LayerBank `setCore` is one-shot; snapshotting matches that immutability.
         address core = i_lToken.core();
         if (core == address(0)) revert LayerBankErc20Handler__CoreNotSet();
         i_core = ILayerBankCore(core);

@@ -6,6 +6,7 @@ import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {LayerBankErc20Handler} from "src/layerbank/LayerBankErc20Handler.sol";
 import {MockLToken, MockLayerBankCore} from "test/mocks/MockLayerBank.sol";
+import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ITokenLending} from "src/interfaces/ITokenLending.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -73,6 +74,25 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         new LayerBankTestHandler(address(dcaManager), address(stablecoin), address(unset), FEE_COLLECTOR, feeSettings);
     }
 
+    function test_layerbank_constructor_revertsIfUnderlyingMismatch() public {
+        MockStablecoin other = new MockStablecoin(address(this));
+        MockLToken mismatch = new MockLToken(address(other));
+        MockLayerBankCore mismatchCore = new MockLayerBankCore(mismatch);
+        mismatch.setCore(address(mismatchCore));
+
+        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+            minFeeRate: MIN_FEE_RATE,
+            maxFeeRate: MAX_FEE_RATE_TEST,
+            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
+            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+        });
+
+        vm.expectRevert(LayerBankErc20Handler.LayerBankErc20Handler__UnderlyingMismatch.selector);
+        new LayerBankTestHandler(
+            address(dcaManager), address(stablecoin), address(mismatch), FEE_COLLECTOR, feeSettings
+        );
+    }
+
     function test_layerbank_lTokenMinting() public {
         uint256 initialLTokenBalance = lToken.balanceOf(address(handler));
 
@@ -130,9 +150,9 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         uint256 userBalanceBeforeInterestWithdraw = stablecoin.balanceOf(USER);
 
         vm.prank(address(dcaManager));
-        layerbankHandler.withdrawInterest(USER, DEPOSIT_AMOUNT / 2);
+        layerbankHandler.withdrawInterest(USER, DEPOSIT_AMOUNT);
 
-        assertGe(stablecoin.balanceOf(USER), userBalanceBeforeInterestWithdraw);
+        assertGt(stablecoin.balanceOf(USER), userBalanceBeforeInterestWithdraw);
     }
 
     function test_layerbank_interestWithdrawal_noInterestScenario() public {
@@ -148,6 +168,8 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
     }
 
     function test_layerbank_mintFailureHandling() public {
+        // Hop-1 insufficient balance (same as the Tropykus/Sovryn twin). The zero-mint guard is
+        // `test_layerbank_zeroMintReverts`.
         uint256 currentBalance = stablecoin.balanceOf(USER);
         if (currentBalance > 0) {
             vm.prank(USER);
@@ -159,6 +181,17 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         vm.prank(address(dcaManager));
         vm.expectRevert();
         handler.depositToken(USER, DEPOSIT_AMOUNT);
+    }
+
+    function test_layerbank_zeroMintReverts() public {
+        lToken.setForceZeroMint(true);
+
+        vm.prank(address(dcaManager));
+        vm.expectRevert(ITokenLending.TokenLending__LendingProtocolDepositFailed.selector);
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        assertEq(layerbankHandler.getUsersLendingTokenBalance(USER), 0);
+        assertEq(lToken.balanceOf(address(handler)), 0);
     }
 
     function test_layerbank_zeroPayoutRedeemReverts() public {
@@ -178,6 +211,23 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
 
         assertEq(stablecoin.balanceOf(USER), userBalanceBefore);
         assertEq(layerbankHandler.getUsersLendingTokenBalance(USER), lTokenBalanceBefore);
+    }
+
+    function test_layerbank_withdrawPaysMeasuredShortfall() public {
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        uint256 shortfall = WITHDRAWAL_AMOUNT / 2;
+        lToken.setPayoutCap(shortfall, true);
+
+        uint256 userBalanceBefore = stablecoin.balanceOf(USER);
+        uint256 sharesBefore = layerbankHandler.getUsersLendingTokenBalance(USER);
+
+        vm.prank(address(dcaManager));
+        handler.withdrawToken(USER, WITHDRAWAL_AMOUNT);
+
+        assertEq(stablecoin.balanceOf(USER) - userBalanceBefore, shortfall);
+        assertLt(layerbankHandler.getUsersLendingTokenBalance(USER), sharesBefore);
     }
 
     function test_layerbank_zeroPayoutInterestWithdrawalReverts() public {
@@ -226,6 +276,33 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
             )
         );
         layerbankHandler.testBatchRetrieveStablecoin(users, amounts, excessiveAmount);
+    }
+
+    function test_layerbank_batchRetrieveStablecoin_zeroPayout_reverts() public {
+        address user1 = makeAddr("user1");
+        address[] memory users = new address[](1);
+        users[0] = user1;
+
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = DEPOSIT_AMOUNT / 2;
+
+        stablecoin.mint(user1, DEPOSIT_AMOUNT);
+        vm.prank(user1);
+        stablecoin.approve(address(layerbankHandler), type(uint256).max);
+
+        vm.prank(address(dcaManager));
+        handler.depositToken(user1, DEPOSIT_AMOUNT);
+
+        uint256 lTokenBalanceBefore = layerbankHandler.getUsersLendingTokenBalance(user1);
+
+        lToken.setSilentZeroPayout(true);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ITokenLending.TokenLending__ZeroStablecoinReceived.selector, amounts[0])
+        );
+        layerbankHandler.testBatchRetrieveStablecoin(users, amounts, amounts[0]);
+
+        assertEq(layerbankHandler.getUsersLendingTokenBalance(user1), lTokenBalanceBefore);
     }
 }
 

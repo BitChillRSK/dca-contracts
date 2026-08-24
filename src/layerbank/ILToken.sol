@@ -14,9 +14,11 @@ interface ILToken {
 
     function balanceOf(address account) external view returns (uint256);
 
-    /// @notice View exchange rate (1e18 scale), including pending interest.
+    /// @notice View exchange rate (1e18 scale). LayerBank already folds pending interest into this
+    ///         view (`pendingAccrueSnapshot`); it is not Compound's stale `exchangeRateStored`.
     function exchangeRate() external view returns (uint256);
 
-    /// @notice Accrue interest and return the current exchange rate (1e18 scale).
+    /// @notice Accrue interest to storage and return the current exchange rate (1e18 scale).
+    ///         Same number as `exchangeRate()` after the write.
     function accruedExchangeRate() external returns (uint256);
 }

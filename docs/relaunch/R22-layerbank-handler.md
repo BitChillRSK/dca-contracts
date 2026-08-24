@@ -31,7 +31,7 @@ External incentives are out of scope (`EXTERNAL_REWARDS.md`). Core still calls `
 
 **Rootstock listing (2026-08-24, LayerBank v2-contracts README):** Core `0xc30991623fb2a63E6e1B59A29987E1EEE57447bF`. Markets: lRBTC, lRIF, lUSDCe, lUSDT, lWETH. **No lDOC yet.** This PR still ships a DOC-parameterized handler (lToken address in the constructor, same as kDOC / iSUSD). Live lDOC wiring is PR 16, if and when LayerBank lists DOC. Unit tests use mocks of the Rootstock ABI.
 
-Constructor: same shape as `TropykusErc20Handler` (dcaManager, stable, lToken, feeCollector, feeSettings, exchangeRateDecimals). Read Core from `lToken.core()`; revert if it is unset. Do not add a second Core constructor arg. Do not copy the unused `minPurchaseAmount` leftover on `TropykusDocHandlerMoc` / `SovrynDocHandlerMoc`.
+Constructor: same shape as `TropykusErc20Handler` (dcaManager, stable, lToken, feeCollector, feeSettings, exchangeRateDecimals). Read Core from `lToken.core()`; revert if it is unset. Revert if `lToken.underlying()` is not the stablecoin — PR 16 will pick a live lToken and a mismatch would otherwise construct cleanly then fail on first deposit. Do not add a second Core constructor arg. Do not copy the unused `minPurchaseAmount` leftover on `TropykusDocHandlerMoc` / `SovrynDocHandlerMoc`.
 
 Redeem-to-user: LayerBank always pays the Core caller (the handler). Interest withdrawals follow Tropykus: redeem onto the handler, then `safeTransfer` to the user. Do not invent a `to` parameter.
 
@@ -43,7 +43,7 @@ Redeem-to-user: LayerBank always pays the Core caller (the handler). Interest wi
 
 - [x] `LayerBankErc20Handler` (`TokenHandler` + `TokenLending`) with per-user `s_lTokenBalances` and `getUsersLendingTokenBalance`.
 - [x] `LayerBankDocHandlerMoc` (`LayerBankErc20Handler` + `PurchaseMoc`).
-- [x] Slim `ILToken` / `ILayerBankCore` next to the handler (only the functions this handler calls). Do not add an empty `ILayerBankErc20Handler`.
+- [x] Slim `ILToken` / `ILayerBankCore` next to the handler (only the functions this handler calls). Constructor checks `underlying()` matches the stablecoin. Do not add an empty `ILayerBankErc20Handler`.
 - [x] Deposit: hop-1 via `super.depositToken`; approve the **lToken** (it pulls from the handler); `Core.supply`; credit lToken `balanceOf` delta; revert `TokenLending__LendingProtocolDepositFailed` if the delta is 0.
 - [x] Withdraw / single retrieve: clamp to the user's converted lToken balance (same events as Tropykus/Sovryn), then `Core.redeemUnderlying`. Pay the measured DOC delta.
 - [x] Interest: size with `accruedExchangeRate`, redeem by shares via `Core.redeemToken` (Tropykus `_burnKtoken` analogue), transfer the measured DOC to the user.
@@ -106,7 +106,9 @@ Behaviors to assert:
 
 - Deposit mints lTokens to the handler (not the user); `getUsersLendingTokenBalance` equals the measured mint, not Core's return (mock may lie about the return).
 - Withdraw pays the user and debits only that user's virtual lToken balance. Oversize withdraw clamps.
-- Zero-payout redeem (shares burnt, no DOC) reverts `TokenLending__ZeroStablecoinReceived` and leaves the virtual balance intact.
+- Zero-payout redeem (shares burnt, no DOC) reverts `TokenLending__ZeroStablecoinReceived` and leaves the virtual balance intact. Same for the batch path (Sovryn/R20).
+- Deposit with a successful Core.supply that mints 0 lTokens reverts `TokenLending__LendingProtocolDepositFailed`.
+- Withdraw pays the measured DOC delta when the market pays a shortfall.
 - Interest accrues with the exchange rate; `withdrawInterest` pays the user; no-interest is a no-op.
 - `buyRbtc` / `batchBuyRbtc` spend DOC via MoC and credit accumulated rBTC; virtual lToken balances fall.
 - `batchBuyRbtc` / `_batchRetrieveStablecoin` revert `TokenLending__InsufficientLendingTokenBalance` if any buyer cannot cover their share.
@@ -117,7 +119,7 @@ Fork tests: `make fork-sovryn` and `make fork-tropykus` before push (`AGENTS.md`
 
 ## Success criteria
 
-- [x] `LayerBankDocHandlerMoc` is constructable with an lToken whose `core()` is set; it reverts if Core is unset.
+- [x] `LayerBankDocHandlerMoc` is constructable with an lToken whose `core()` is set and whose `underlying()` matches the stablecoin; it reverts if Core is unset or the underlying mismatches.
 - [x] Deposits, withdrawals, interest, and MoC purchases use balance-delta cash and exact per-user virtual lToken balances. Batch redeem reverts on insufficient shares or zero DOC received.
 - [x] No Merkl/LAB claim path. No empty per-protocol lending interface.
 - [x] `DeployLayerBankHandler` deploys `LayerBankDocHandlerMoc` via mocks on local and fork tests and can register it. `DeployMocSwaps` / `DeployDexSwaps` / `DcaDappTest` / `Constants.sol` indexes are unchanged (PR 16).

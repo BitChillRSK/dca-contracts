@@ -19,6 +19,9 @@ contract MockLToken is ERC20 {
     address public core;
     uint256 private immutable i_deploymentTimestamp;
     bool private s_silentZeroPayout;
+    bool private s_forceZeroMint;
+    bool private s_usePayoutCap;
+    uint256 private s_payoutCap;
 
     error MockLToken__OnlyCore();
     error MockLToken__CoreAlreadySet();
@@ -45,11 +48,22 @@ contract MockLToken is ERC20 {
         s_silentZeroPayout = silentZeroPayout;
     }
 
+    /// @notice Core.supply succeeds but mints nothing, so the handler's zero-delta guard can fire.
+    function setForceZeroMint(bool forceZeroMint) external {
+        s_forceZeroMint = forceZeroMint;
+    }
+
+    /// @notice Cap the underlying paid on redeem so tests can assert the handler pays the measured delta.
+    function setPayoutCap(uint256 cap, bool enabled) external {
+        s_payoutCap = cap;
+        s_usePayoutCap = enabled;
+    }
+
     function underlying() external view returns (address) {
         return address(underlyingToken);
     }
 
-    /// @notice View rate including pending interest (LayerBank `exchangeRate`).
+    /// @notice View rate including pending interest (LayerBank `exchangeRate` already does this).
     function exchangeRate() public view returns (uint256) {
         uint256 timeElapsed = block.timestamp - i_deploymentTimestamp;
         uint256 yearsElapsed = (timeElapsed * DECIMALS) / YEAR_IN_SECONDS;
@@ -57,12 +71,14 @@ contract MockLToken is ERC20 {
         return STARTING_EXCHANGE_RATE + increase;
     }
 
-    /// @notice Mutating rate entry point (LayerBank `accruedExchangeRate`). Same value as the view.
+    /// @notice Mutating rate entry point (LayerBank `accruedExchangeRate`). Live LayerBank writes
+    ///         accrual then returns `exchangeRate()`, so the two are the same number.
     function accruedExchangeRate() external view returns (uint256) {
         return exchangeRate();
     }
 
     function supply(address account, uint256 uAmount) external onlyCore returns (uint256 lAmount) {
+        if (s_forceZeroMint) return 0;
         uint256 rate = exchangeRate();
         uint256 balanceBefore = underlyingToken.balanceOf(address(this));
         underlyingToken.transferFrom(account, address(this), uAmount);
@@ -90,11 +106,14 @@ contract MockLToken is ERC20 {
     }
 
     function _payout(address to, uint256 amount) private {
+        uint256 pay = amount;
+        if (s_usePayoutCap && pay > s_payoutCap) pay = s_payoutCap;
+        if (pay == 0) return;
         uint256 currentBalance = underlyingToken.balanceOf(address(this));
-        if (currentBalance < amount) {
-            underlyingToken.mint(address(this), amount - currentBalance);
+        if (currentBalance < pay) {
+            underlyingToken.mint(address(this), pay - currentBalance);
         }
-        underlyingToken.transfer(to, amount);
+        underlyingToken.transfer(to, pay);
     }
 }
 
