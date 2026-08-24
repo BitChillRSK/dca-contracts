@@ -18,6 +18,10 @@ Document any extra files in the PR. Do not search `out/`, `cache/`, or `lib/`. D
 3. Optional/further-review items get a spec only when explicitly assigned.
 4. One spec = one PR unless **Scope** names a tight bundle.
 
+## Decision records
+
+- [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md) (GitHub [#57](https://github.com/BitChillRSK/dca-contracts/pull/57)) — lending handlers distribute native protocol interest only; external campaigns use off-chain forwarding if available. R9 must add a canonical per-user lending-share balance-transition event so forwarding does not depend on transaction traces or a provider response.
+
 ## Status
 
 - Merged: [R23-toolchain-baseline.md](./R23-toolchain-baseline.md) (PR 1, GitHub [#42](https://github.com/BitChillRSK/dca-contracts/pull/42)). Rootstock testnet accepted solc 0.8.36 / `cancun`.
@@ -33,4 +37,5 @@ Document any extra files in the PR. Do not search `out/`, `cache/`, or `lib/`. D
 - Assigned: [R22-idle-handler.md](./R22-idle-handler.md) (PR 12, GitHub [#53](https://github.com/BitChillRSK/dca-contracts/pull/53)). Idle DOC + MoC handler at index 0. No product gates. Stacked on [#52](https://github.com/BitChillRSK/dca-contracts/pull/52).
 - Assigned: [R21-fee-on-transfer-deposits.md](./R21-fee-on-transfer-deposits.md) (PR 13, GitHub [#54](https://github.com/BitChillRSK/dca-contracts/pull/54)). Hop-1 received-on-deposit. FOT unsupported; withdraw still works if a listed token turns on a fee. No product gates. Stacked on [#53](https://github.com/BitChillRSK/dca-contracts/pull/53).
 - Assigned: [R16-redeem-glossary.md](./R16-redeem-glossary.md) (PR 14, GitHub [#55](https://github.com/BitChillRSK/dca-contracts/pull/55)). Rename-only; first-party "redeem" now names the asset given up. Keeps PR 13's 1-wei batch-redemption event check. No product gates. Stacked on [#54](https://github.com/BitChillRSK/dca-contracts/pull/54).
-- Next unassigned: `Start with R22 (LayerBank)` (PR 15). No product gates. Handler-replacement in `OperationsAdmin` stays unassigned (later). PR 2 (decision record) stays available when the human wants to record R18 / R19 / optionals.
+- Supporting: [EXTERNAL_REWARDS.md](./EXTERNAL_REWARDS.md) (GitHub [#57](https://github.com/BitChillRSK/dca-contracts/pull/57)). Docs-only external-incentive boundary and indexer-ready R9 share-event requirement. Stacked on the live Sovryn probe [#56](https://github.com/BitChillRSK/dca-contracts/pull/56); no Solidity or ABI change in this PR.
+- Next unassigned: `Start with R22 (LayerBank)` (PR 15). No product gates. Stack on [#57](https://github.com/BitChillRSK/dca-contracts/pull/57). Handler-replacement in `OperationsAdmin` stays unassigned (later). PR 2 (decision record) stays available when the human wants to record R18 / R19 / optionals.
