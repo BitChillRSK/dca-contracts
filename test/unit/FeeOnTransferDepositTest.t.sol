@@ -255,6 +255,25 @@ contract FeeOnTransferDepositTest is Test {
         assertApproxEqAbs(_tropykusUnderlying(USER), 0, LENDING_ROUNDING_SLACK);
     }
 
+    function test_deleteDcaSchedule_reportsHandlerSpent_notUserReceived() public {
+        vm.prank(USER);
+        dcaManager.createDcaSchedule(address(token), REQUESTED, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, IDLE_INDEX);
+        bytes32 scheduleId = dcaManager.getDcaSchedules(USER, address(token))[0].scheduleId;
+
+        uint256 userBefore = token.balanceOf(USER);
+        vm.expectEmit(true, true, true, true, address(idleHandler));
+        emit ITokenHandler.TokenHandler__TokenWithdrawn(address(token), USER, RECEIVED);
+        vm.expectEmit(false, false, false, true, address(dcaManager));
+        emit IDcaManager.DcaManager__DcaScheduleDeleted(USER, address(token), scheduleId, RECEIVED);
+        vm.prank(USER);
+        dcaManager.deleteDcaSchedule(address(token), 0, scheduleId);
+
+        assertEq(idleHandler.getUsersIdleTokenBalance(USER), 0);
+        uint256 userGained = token.balanceOf(USER) - userBefore;
+        assertLt(userGained, RECEIVED);
+        assertGt(userGained, 0);
+    }
+
     function _createIdle(address who, uint256 purchaseAmount) private returns (uint256 received) {
         vm.prank(who);
         dcaManager.createDcaSchedule(address(token), REQUESTED, purchaseAmount, MIN_PURCHASE_PERIOD, IDLE_INDEX);

@@ -33,6 +33,7 @@ Withdrawals stay on the R20 rule: principal falls by the **requested** amount be
 - [x] `DcaManager.depositToken` / `createDcaSchedule` / `updateDcaSchedule`: credit `tokenBalance` with the handler return. `create` / `update` validate `purchaseAmount` against the post-deposit `tokenBalance`, not the requested deposit. Events that report the new balance use the credited amount.
 - [x] `updateDcaSchedule`: pull then credit (do not add `depositAmount` to the memory copy before the handler returns).
 - [x] Mock + tests in the same style as `MockReentrantStablecoin` / `test/unit/DepositSwapPopReentrancyTest.t.sol`: a dedicated mock that takes a fee on `transfer` / `transferFrom`, and tests that prove create / extra deposit / buy / withdraw keep `tokenBalance` equal to the handler book (idle mapping or underlying value of shares, modulo the existing 100-wei lending rounding slack). Another user's funds are untouched. A zero-received deposit reverts.
+- [x] `TokenHandler.withdrawToken` measures `i_stableToken.balanceOf(address(this))` around `safeTransfer`, returns that, event uses that. Do not measure the user (a forwarding wallet can make `balanceOf(user)` look like 0). Idle debits the mapping then `return super.withdrawToken(...)`. Sovryn/Tropykus keep returning `super.withdrawToken(...)` after `_redeemStablecoin`. `DcaManager.withdrawToken` still ignores the return and subtracts the requested amount. `deleteDcaSchedule` keeps using the handler return for the event.
 
 ## Out of scope
 
@@ -94,6 +95,6 @@ Fork tests: not required.
 
 ## ABI / deploy / cutover impact
 
-- ABI: `ITokenHandler.depositToken` returns `uint256`. `DcaManager` user-facing deposit/create/update signatures unchanged; events report credited (received) balances.
+- ABI: `ITokenHandler.depositToken` returns `uint256` (received). `ITokenHandler.withdrawToken` still returns `uint256`, now the handler `balanceOf` delta rather than echoing the argument. `DcaManager` user-facing deposit/create/update signatures unchanged; events report credited (received) balances. `deleteDcaSchedule` still reports the handler withdraw return.
 - Scripts: none.
 - Cutover: none. Live tokens are not FOT.

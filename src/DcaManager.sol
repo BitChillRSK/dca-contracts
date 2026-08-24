@@ -281,7 +281,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
             amountWithdrawn = _handler(token, lendingProtocolIndex).withdrawToken(msg.sender, tokenBalance);
         }
 
-        // @notice the event reports what the lending protocol actually paid, which may be less than the schedule's tokenBalance
+        // @notice the event reports what left the handler, which may be less than the schedule's tokenBalance
         emit DcaManager__DcaScheduleDeleted(msg.sender, token, scheduleId, amountWithdrawn);
     }
 

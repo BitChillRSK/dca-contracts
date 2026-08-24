@@ -52,7 +52,7 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler {
      * @notice withdraw the token amount sending it back to the user's address
      * @param user: the address of the user making the withdrawal
      * @param withdrawalAmount: the amount to withdraw
-     * @return the amount of stablecoin actually paid to the user
+     * @return the amount that left this contract after debiting the idle mapping
      */
     function withdrawToken(address user, uint256 withdrawalAmount)
         public
@@ -63,11 +63,7 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler {
         uint256 requested = withdrawalAmount;
         withdrawalAmount = _debitIdleBalance(user, withdrawalAmount);
         if (requested > 0 && withdrawalAmount == 0) revert IdleErc20Handler__ZeroStablecoinPaid(requested);
-        uint256 userBalanceBefore = i_stableToken.balanceOf(user);
-        super.withdrawToken(user, withdrawalAmount);
-        uint256 paid = i_stableToken.balanceOf(user) - userBalanceBefore;
-        if (requested > 0 && paid == 0) revert IdleErc20Handler__ZeroStablecoinPaid(requested);
-        return paid;
+        return super.withdrawToken(user, withdrawalAmount);
     }
 
     /**
