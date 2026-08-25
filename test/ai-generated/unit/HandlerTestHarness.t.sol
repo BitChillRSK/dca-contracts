@@ -82,6 +82,15 @@ abstract contract HandlerTestHarness is Test {
      * @notice Get the shares for this handler
      */
     function getShareToken() internal virtual returns (IERC20);
+
+    /**
+     * @notice Shares this handler actually holds at the lending protocol.
+     * @dev Defaults to the share token's balance. LayerBank overrides it: its share is the aToken's
+     *      scaled balance, and reading the rebasing `balanceOf` instead would compare two different units.
+     */
+    function handlerShareBalance() internal virtual returns (uint256) {
+        return getShareToken().balanceOf(address(handler));
+    }
     
     /**
      * @notice Setup any handler-specific mocks or configurations
@@ -309,8 +318,38 @@ abstract contract HandlerTestHarness is Test {
         vm.prank(address(dcaManager));
         lendingHandler.withdrawInterest(USER, DEPOSIT_AMOUNT / 2); // Half locked in DCA
         
-        // User should receive interest (balance should increase or stay same)
-        assertGe(stablecoin.balanceOf(USER), initialBalance);
+        assertGt(stablecoin.balanceOf(USER), initialBalance);
+    }
+
+    /**
+     * @notice The share count booked out of a user must never come out below what the protocol
+     *         actually burnt, or `sum(s_shares)` drifts above the shares the handler holds and the
+     *         shortfall is paid out of somebody else's position.
+     * @dev Every redeem is sized by the booked count: Tropykus `redeem` and Sovryn `burn` take it
+     *      directly, so they burn it exactly. LayerBank converts it to underlying because Aave has no
+     *      share-sized withdraw, and burns at or below it thanks to the `_stablecoinToShares` round-up.
+     */
+    function test_handler_lending_bookDebitCoversProtocolBurn() public {
+        if (!supportsLending) return;
+
+        ITokenLending lendingHandler = ITokenLending(address(handler));
+
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 bookBefore = lendingHandler.getUserShares(USER);
+        uint256 heldBefore = handlerShareBalance();
+
+        vm.prank(address(dcaManager));
+        handler.withdrawToken(USER, WITHDRAWAL_AMOUNT);
+
+        uint256 bookDebit = bookBefore - lendingHandler.getUserShares(USER);
+        uint256 protocolBurn = heldBefore - handlerShareBalance();
+
+        assertGt(bookDebit, 0);
+        assertGe(bookDebit, protocolBurn);
+        assertLe(lendingHandler.getUserShares(USER), handlerShareBalance());
     }
     
     /*//////////////////////////////////////////////////////////////

@@ -25,6 +25,12 @@ contract MockIsusdToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
      * behaviour that breaks any integrator trusting the return value.
      */
     uint256 private s_exitFeeBps;
+    /**
+     * @notice When set, burn() burns the iSUSD, transfers nothing, and still returns the GROSS amount.
+     * @dev Models a Sovryn iToken that reports success while paying out nothing. Integrators that
+     *      trust the return value lose the burnt shares; the handler must revert on a zero DOC delta.
+     */
+    bool private s_silentZeroPayout;
 
     constructor(address docTokenAddress) ERC20("Tropykus iSUSD", "iSUSD") Ownable() ERC20Permit("Tropykus iSUSD") {
         i_docToken = IStablecoin(docTokenAddress);
@@ -52,6 +58,10 @@ contract MockIsusdToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
         loanAmountPaid = Math.ceilDiv(burnAmount * tokenPrice(), DECIMALS); // GROSS
         uint256 exitFee = loanAmountPaid * s_exitFeeBps / BPS_DIVISOR;
         uint256 netPayout = loanAmountPaid - exitFee;
+        if (s_silentZeroPayout) {
+            _burn(msg.sender, burnAmount);
+            return loanAmountPaid;
+        }
         // Yield (tokenPrice grows with time) can exceed the DOC this mock was deposited with.
         // Mint the shortfall the same way MockKdocToken.redeemUnderlying does.
         uint256 currentBalance = i_docToken.balanceOf(address(this));
@@ -70,6 +80,10 @@ contract MockIsusdToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
     function setExitFeeBps(uint256 exitFeeBps) external {
         require(exitFeeBps <= BPS_DIVISOR, "Fee above 100%");
         s_exitFeeBps = exitFeeBps;
+    }
+
+    function setSilentZeroPayout(bool silentZeroPayout) external {
+        s_silentZeroPayout = silentZeroPayout;
     }
 
     /**

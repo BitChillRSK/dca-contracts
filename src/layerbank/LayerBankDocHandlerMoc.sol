@@ -2,6 +2,7 @@
 pragma solidity 0.8.36;
 
 import {LayerBankErc20Handler} from "./LayerBankErc20Handler.sol";
+import {LendingErc20Handler} from "src/LendingErc20Handler.sol";
 import {PurchaseMoc} from "src/PurchaseMoc.sol";
 import {PurchaseRbtc} from "src/PurchaseRbtc.sol";
 
@@ -43,10 +44,10 @@ contract LayerBankDocHandlerMoc is LayerBankErc20Handler, PurchaseMoc {
      */
     function _retrieveStablecoin(address user, uint256 amount)
         internal
-        override(LayerBankErc20Handler, PurchaseRbtc)
+        override(LendingErc20Handler, PurchaseRbtc)
         returns (uint256)
     {
-        return LayerBankErc20Handler._retrieveStablecoin(user, amount);
+        return LendingErc20Handler._retrieveStablecoin(user, amount);
     }
 
     /**
@@ -59,7 +60,7 @@ contract LayerBankDocHandlerMoc is LayerBankErc20Handler, PurchaseMoc {
         address[] memory users,
         uint256[] memory purchaseAmounts,
         uint256 totalDocAmountToSpend
-    ) internal override(LayerBankErc20Handler, PurchaseRbtc) returns (uint256) {
-        return LayerBankErc20Handler._batchRetrieveStablecoin(users, purchaseAmounts, totalDocAmountToSpend);
+    ) internal override(LendingErc20Handler, PurchaseRbtc) returns (uint256) {
+        return LendingErc20Handler._batchRetrieveStablecoin(users, purchaseAmounts, totalDocAmountToSpend);
     }
 }

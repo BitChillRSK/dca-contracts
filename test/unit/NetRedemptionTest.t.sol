@@ -160,8 +160,7 @@ contract NetRedemptionTest is DcaDappTest {
     }
 
     /**
-     * @notice Sovryn pays the user directly here, so the handler cannot read its own delta: it must measure
-     * the user's.
+     * @notice Interest redeems onto the handler then transfers; the event must report the net the user received.
      */
     function test_sovryn_withdrawInterestPaysAndReportsNet() public onlySovrynMocMocks {
         vm.warp(block.timestamp + 365 days); // the mock's exchange rate grows 5% a year

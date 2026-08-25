@@ -17,12 +17,6 @@ interface IkToken {
     function mint(uint256 mintAmount) external returns (uint256);
 
     /**
-     * @dev This function is used to withdraw the underlying ERC20 from the Tropykus protocol and give back the corresponding kToken
-     * @param redeemAmount the amount of the underlying ERC20 to be withdrawn
-     */
-    function redeemUnderlying(uint256 redeemAmount) external returns (uint256);
-
-    /**
      * @notice Sender redeems cTokens in exchange for the underlying asset
      * @dev Accrues interest whether or not the operation succeeds, unless reverted
      * @param redeemTokens The number of cTokens to redeem into underlying

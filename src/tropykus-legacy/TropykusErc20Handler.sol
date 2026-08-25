@@ -1,26 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
-import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
-import {TokenHandler} from "src/TokenHandler.sol";
+import {LendingErc20Handler} from "src/LendingErc20Handler.sol";
 import {IkToken} from "./IkToken.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {TokenLending} from "src/TokenLending.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @title TropykusErc20Handler
- * @notice This abstract contract contains the functions that are common regardless of the method used to swap ERC20 stablecoin for rBTC
+ * @notice Tropykus adapter: Compound-style kToken mint/redeem. Share accounting lives on LendingErc20Handler.
  */
-abstract contract TropykusErc20Handler is TokenHandler, TokenLending {
-    using SafeERC20 for IERC20;
-
-    //////////////////////
-    // State variables ///
-    //////////////////////
+abstract contract TropykusErc20Handler is LendingErc20Handler {
     IkToken public immutable i_kToken;
-    mapping(address user => uint256 balance) internal s_kTokenBalances;
 
     /**
      * @param dcaManagerAddress the address of the DCA Manager contract
@@ -37,220 +26,38 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending {
         FeeSettings memory feeSettings,
         uint256 exchangeRateDecimals
     )
-        TokenHandler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings)
-        TokenLending(exchangeRateDecimals)
+        LendingErc20Handler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, exchangeRateDecimals)
     {
         i_kToken = IkToken(kTokenAddress);
     }
 
+    function _exchangeRate() internal override returns (uint256) {
+        return i_kToken.exchangeRateCurrent();
+    }
+
+    function _viewExchangeRate() internal view override returns (uint256) {
+        return i_kToken.exchangeRateStored();
+    }
+
+    function _lendingSpender() internal view override returns (address) {
+        return address(i_kToken);
+    }
+
     /**
-     * @notice deposit the full token amount for DCA on the contract
-     * @param user: the address of the user making the deposit
-     * @param depositAmount: the amount requested from the user
-     * @return depositedAmount the stablecoin amount actually received before minting kTokens
+     * @notice the kToken we credit is the balance we actually gained, never mint()'s return value
      */
-    function depositToken(address user, uint256 depositAmount)
-        public
-        override(TokenHandler, ITokenHandler)
-        onlyDcaManager
-        returns (uint256 depositedAmount)
-    {
-        depositedAmount = super.depositToken(user, depositAmount);
-        if (i_stableToken.allowance(address(this), address(i_kToken)) < depositedAmount) {
-            i_stableToken.safeApprove(address(i_kToken), depositedAmount);
-        }
-        // @notice the kToken we credit is the balance we actually gained, never mint()'s return value
+    function _protocolDeposit(uint256 stablecoinAmount) internal override returns (uint256 mintedShares) {
         uint256 prevKtokenBalance = i_kToken.balanceOf(address(this));
-        if (i_kToken.mint(depositedAmount) != 0) revert TokenLending__LendingProtocolDepositFailed();
-        uint256 mintedAmount = i_kToken.balanceOf(address(this)) - prevKtokenBalance;
-        if (mintedAmount == 0) revert TokenLending__LendingProtocolDepositFailed();
-        s_kTokenBalances[user] += mintedAmount;
+        if (i_kToken.mint(stablecoinAmount) != 0) revert TokenLending__LendingProtocolDepositFailed();
+        mintedShares = i_kToken.balanceOf(address(this)) - prevKtokenBalance;
     }
 
     /**
-     * @notice withdraw the token amount sending it back to the user's address
-     * @param user: the address of the user making the withdrawal
-     * @param withdrawalAmount: the amount to withdraw
-     * @return withdrawnAmount the amount that left this contract after redeeming
+     * @notice Redeem kTokens onto this contract
+     * @dev Burns the booked share count. Only the Compound return code is raised here.
      */
-    function withdrawToken(address user, uint256 withdrawalAmount)
-        public
-        override(TokenHandler, ITokenHandler)
-        onlyDcaManager
-        returns (uint256)
-    {
-        uint256 exchangeRate = i_kToken.exchangeRateCurrent();
-        uint256 totalStablecoinInLending = _sharesToStablecoin(s_kTokenBalances[user], exchangeRate);
-        if (totalStablecoinInLending < withdrawalAmount) {
-            emit TokenLending__WithdrawalAmountAdjusted(user, withdrawalAmount, totalStablecoinInLending);
-            withdrawalAmount = totalStablecoinInLending;
-        }
-        // @notice we pay out what the redemption actually produced, which may be less than requested
-        withdrawalAmount = _redeemByUnderlying(user, withdrawalAmount, exchangeRate);
-        return super.withdrawToken(user, withdrawalAmount);
-    }
-
-    /**
-     * @notice get the users shares balance
-     * @param user: the address of the user
-     * @return the users shares balance
-     */
-    function getUserShares(address user) external view override returns (uint256) {
-        return s_kTokenBalances[user];
-    }
-
-    /**
-     * @notice withdraw the interest
-     * @param user: the address of the user
-     * @param stablecoinLockedInDcaSchedules: the amount of stablecoin locked in DCA schedules
-     */
-    function withdrawInterest(address user, uint256 stablecoinLockedInDcaSchedules) external override onlyDcaManager {
-        uint256 exchangeRate = i_kToken.exchangeRateCurrent();
-        uint256 totalStablecoinInLending = _sharesToStablecoin(s_kTokenBalances[user], exchangeRate);
-        if (totalStablecoinInLending <= stablecoinLockedInDcaSchedules) {
-            return; // No interest to withdraw
-        }
-        uint256 stablecoinInterestAmount = totalStablecoinInLending - stablecoinLockedInDcaSchedules;
-        uint256 stablecoinReceived = _redeemByShares(user, stablecoinInterestAmount, exchangeRate);
-        
-        i_stableToken.safeTransfer(user, stablecoinReceived);
-        emit TokenLending__InterestWithdrawn(user, address(i_stableToken), stablecoinReceived);
-    }
-
-    /**
-     * @notice get the accrued interest
-     * @param user: the address of the user
-     * @param stablecoinLockedInDcaSchedules: the amount of stablecoin locked in DCA schedules
-     * @return stablecoinInterestAmount the amount of accrued interest
-     */
-    function getAccruedInterest(address user, uint256 stablecoinLockedInDcaSchedules)
-        external
-        view
-        override
-        onlyDcaManager
-        returns (uint256 stablecoinInterestAmount)
-    {
-        uint256 totalStablecoinInLending = _sharesToStablecoin(s_kTokenBalances[user], i_kToken.exchangeRateStored());
-        stablecoinInterestAmount = totalStablecoinInLending > stablecoinLockedInDcaSchedules ? totalStablecoinInLending - stablecoinLockedInDcaSchedules : 0;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                           INTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice retrieve the user's stablecoin by redeeming kToken
-     * @param user: the address of the user
-     * @param stablecoinAmount: the amount of stablecoin wanted
-     * @return the amount of stablecoin this contract actually received
-     */
-    function _retrieveStablecoin(address user, uint256 stablecoinAmount) internal virtual returns (uint256) {
-        return _redeemByUnderlying(user, stablecoinAmount, i_kToken.exchangeRateCurrent());
-    }
-
-    /**
-     * @notice redeem the user's kToken sized by underlying: ask Tropykus for `stablecoinAmount` of stablecoin
-     * @param user: the address of the user
-     * @param stablecoinAmount: the amount of stablecoin wanted
-     * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
-     * @return the amount of stablecoin this contract actually received
-     */
-    function _redeemByUnderlying(address user, uint256 stablecoinAmount, uint256 exchangeRate) internal virtual returns (uint256) {
-        return _redeemInternal(user, stablecoinAmount, exchangeRate, true);
-    }
-
-    /**
-     * @notice redeem the user's kToken sized by shares: burn the share count `stablecoinAmount` converts to
-     * @param user: the address of the user
-     * @param stablecoinAmount: the amount of stablecoin wanted
-     * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
-     * @return stablecoinReceived the amount of stablecoin this contract actually received
-     */
-    function _redeemByShares(address user, uint256 stablecoinAmount, uint256 exchangeRate)
-        internal
-        returns (uint256 stablecoinReceived)
-    {
-        return _redeemInternal(user, stablecoinAmount, exchangeRate, false);
-    }
-
-    /**
-     * @notice Internal kToken redemption, sized either by underlying amount or by share count
-     * @param user: the address of the user
-     * @param stablecoinAmount: the amount of stablecoin wanted
-     * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
-     * @param sizeByUnderlying: true to call kToken's redeemUnderlying, false to call its redeem
-     * @return stablecoinReceived the amount of stablecoin this contract actually received
-     */
-    function _redeemInternal(address user, uint256 stablecoinAmount, uint256 exchangeRate, bool sizeByUnderlying) 
-        internal 
-        returns (uint256 stablecoinReceived) 
-    {
-        uint256 usersKtokenBalance = s_kTokenBalances[user];
-        uint256 kTokenToRedeem = _stablecoinToShares(stablecoinAmount, exchangeRate);
-        if (kTokenToRedeem > usersKtokenBalance) {
-            uint256 oldKtokenToRedeem = kTokenToRedeem;
-            uint256 oldStablecoinAmount = stablecoinAmount;
-            kTokenToRedeem = usersKtokenBalance;
-            stablecoinAmount = _sharesToStablecoin(kTokenToRedeem, exchangeRate);
-            emit TokenLending__AmountToRedeemAdjusted(user, oldKtokenToRedeem, kTokenToRedeem, oldStablecoinAmount, stablecoinAmount);
-        }
-        s_kTokenBalances[user] -= kTokenToRedeem;
-        uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(address(this));
-        
-        uint256 result;
-        if (sizeByUnderlying) {
-            result = i_kToken.redeemUnderlying(stablecoinAmount);
-        } else {
-            result = i_kToken.redeem(kTokenToRedeem);
-        }
-        
-        if (result == 0) {
-            uint256 stablecoinBalanceAfter = i_stableToken.balanceOf(address(this));
-            stablecoinReceived = stablecoinBalanceAfter - stablecoinBalanceBefore;
-            // @notice a success code with no stablecoin received still burnt the user's kToken, so revert
-            // instead of paying out zero
-            if (stablecoinAmount > 0 && stablecoinReceived == 0) {
-                revert TokenLending__ZeroStablecoinReceived(stablecoinAmount);
-            }
-            emit TokenLending__SharesRedeemed(user, stablecoinReceived, kTokenToRedeem);
-        } else {
-            revert TokenLending__LendingProtocolRedeemFailed(result);
-        }
-    }
-
-    /**
-     * @notice retrieve several users' stablecoin in one kToken redemption
-     * @param users: the addresses of the users
-     * @param purchaseAmounts: the amounts of stablecoin charged to each user
-     * @param totalStablecoinAmount: the total amount of stablecoin wanted
-     * @return the amount of stablecoin this contract actually received
-     */
-    function _batchRetrieveStablecoin(address[] memory users, uint256[] memory purchaseAmounts, uint256 totalStablecoinAmount)
-        internal
-        virtual
-        returns (uint256)
-    {
-        uint256 totalKtokenToRedeem = _stablecoinToShares(totalStablecoinAmount, i_kToken.exchangeRateCurrent());
-        uint256 numOfPurchases = users.length;
-        for (uint256 i; i < numOfPurchases; ++i) {
-            // @notice the amount of kToken each user redeems is proportional to the ratio of
-            // that user's stablecoin being retrieved over the total being retrieved
-            // @notice Rounds up the shares amount to avoid underestimating the amount to subtract from each user's balance
-            uint256 usersKtokenToRedeem = Math.mulDiv(totalKtokenToRedeem, purchaseAmounts[i], totalStablecoinAmount, Math.Rounding.Up);
-            uint256 usersKtokenBalance = s_kTokenBalances[users[i]];
-            if (usersKtokenToRedeem > usersKtokenBalance) {
-                revert TokenLending__InsufficientShares(users[i], usersKtokenToRedeem, usersKtokenBalance);
-            }
-            s_kTokenBalances[users[i]] = usersKtokenBalance - usersKtokenToRedeem;
-            emit TokenLending__SharesRedeemed(users[i], purchaseAmounts[i], usersKtokenToRedeem);
-        }
-        
-        uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(address(this));
-        uint256 result = i_kToken.redeemUnderlying(totalStablecoinAmount);
+    function _protocolRedeem(uint256 sharesAmount, uint256) internal override {
+        uint256 result = i_kToken.redeem(sharesAmount);
         if (result != 0) revert TokenLending__LendingProtocolRedeemFailed(result);
-        uint256 stablecoinReceived = i_stableToken.balanceOf(address(this)) - stablecoinBalanceBefore;
-        if (stablecoinReceived > 0) emit TokenLending__SharesRedeemedBatch(stablecoinReceived, totalKtokenToRedeem);
-        else revert TokenLending__ZeroStablecoinReceived(totalStablecoinAmount);
-        return stablecoinReceived;
     }
 }

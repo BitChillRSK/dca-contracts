@@ -381,7 +381,7 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
     //////////////////////////////////////////////////////////////*/
     
     function test_sovrynDex_lendingProtocolIntegration() public {
-        // Test that Sovryn's burn-to-recipient mechanism works with DEX
+        // Test that Sovryn's iSUSD burn works with DEX
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);
         
@@ -393,19 +393,17 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
         assertGt(handlerBalance, 0); // Mock implementation holds tokens in handler (unlike real Sovryn)
     }
     
-    function test_sovrynDex_burnToSpecificRecipientWithDex() public {
-        // Verify that burn operations work correctly with DEX functionality
+    function test_sovrynDex_withdrawInterestPaysUser() public {
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);
         
-        // Simulate interest withdrawal which uses burn to specific recipient
         uint256 userBalanceBefore = stablecoin.balanceOf(USER);
         
         vm.prank(address(dcaManager));
-        sovrynDexHandler.withdrawInterest(USER, 0); // Withdraw all as interest
+        sovrynDexHandler.withdrawInterest(USER, 0);
         
-        uint256 userBalanceAfter = stablecoin.balanceOf(USER);
-        assertGe(userBalanceAfter, userBalanceBefore);
+        assertGt(stablecoin.balanceOf(USER), userBalanceBefore);
+        assertEq(stablecoin.balanceOf(address(sovrynDexHandler)), 0);
     }
 
     /*//////////////////////////////////////////////////////////////

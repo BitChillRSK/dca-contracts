@@ -305,19 +305,17 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         assertEq(tropykusDexHandler.getSwapPath().length, 66); // 3 addresses + 2 fees
     }
 
-    function test_tropykusDex_burnToSpecificRecipientWithDex() public {
-        // Verify that burn operations work correctly with DEX functionality
+    function test_tropykusDex_withdrawInterestPaysUser() public {
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);
         
-        // Simulate interest withdrawal which uses burn to specific recipient
         uint256 userBalanceBefore = stablecoin.balanceOf(USER);
         
         vm.prank(address(dcaManager));
-        tropykusDexHandler.withdrawInterest(USER, 0); // Withdraw all as interest
+        tropykusDexHandler.withdrawInterest(USER, 0);
         
-        uint256 userBalanceAfter = stablecoin.balanceOf(USER);
-        assertGe(userBalanceAfter, userBalanceBefore);
+        assertGt(stablecoin.balanceOf(USER), userBalanceBefore);
+        assertEq(stablecoin.balanceOf(address(tropykusDexHandler)), 0);
     }
 
     /*//////////////////////////////////////////////////////////////
