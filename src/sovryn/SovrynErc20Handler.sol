@@ -177,20 +177,20 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending {
         returns (uint256 stablecoinReceived)
     {
         uint256 usersIsusdBalance = s_iSusdBalances[user];
-        uint256 iTokensToRedeem = _stablecoinToLendingToken(stablecoinAmount, exchangeRate);
-        if (iTokensToRedeem > usersIsusdBalance) {
-            uint256 oldITokensToRedeem = iTokensToRedeem;
+        uint256 iSusdToRedeem = _stablecoinToLendingToken(stablecoinAmount, exchangeRate);
+        if (iSusdToRedeem > usersIsusdBalance) {
+            uint256 oldIsusdToRedeem = iSusdToRedeem;
             uint256 oldStablecoinAmount = stablecoinAmount;
-            iTokensToRedeem = usersIsusdBalance;
-            stablecoinAmount = _lendingTokenToStablecoin(iTokensToRedeem, exchangeRate);
-            emit TokenLending__AmountToRedeemAdjusted(user, oldITokensToRedeem, iTokensToRedeem, oldStablecoinAmount, stablecoinAmount);
+            iSusdToRedeem = usersIsusdBalance;
+            stablecoinAmount = _lendingTokenToStablecoin(iSusdToRedeem, exchangeRate);
+            emit TokenLending__AmountToRedeemAdjusted(user, oldIsusdToRedeem, iSusdToRedeem, oldStablecoinAmount, stablecoinAmount);
         }
-        s_iSusdBalances[user] -= iTokensToRedeem;
+        s_iSusdBalances[user] -= iSusdToRedeem;
         uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(stablecoinRecipient);
-        i_iSusdToken.burn(stablecoinRecipient, iTokensToRedeem);
+        i_iSusdToken.burn(stablecoinRecipient, iSusdToRedeem);
         stablecoinReceived = i_stableToken.balanceOf(stablecoinRecipient) - stablecoinBalanceBefore;
         if (stablecoinReceived == 0) revert TokenLending__ZeroStablecoinReceived(stablecoinAmount);
-        emit TokenLending__LendingTokenRedeemed(user, stablecoinReceived, iTokensToRedeem);
+        emit TokenLending__LendingTokenRedeemed(user, stablecoinReceived, iSusdToRedeem);
     }
 
     /**
@@ -205,24 +205,24 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending {
         virtual
         returns (uint256)
     {
-        uint256 totalITokensToRedeem = _stablecoinToLendingToken(totalStablecoinAmount, i_iSusdToken.tokenPrice());
+        uint256 totalIsusdToRedeem = _stablecoinToLendingToken(totalStablecoinAmount, i_iSusdToken.tokenPrice());
 
         uint256 numOfPurchases = users.length;
         for (uint256 i; i < numOfPurchases; ++i) {
             // @notice the amount of iSusd each user redeems is proportional to the ratio of
             // that user's stablecoin being retrieved over the total being retrieved
-            uint256 buyerSharesToRedeem = Math.mulDiv(totalITokensToRedeem, purchaseAmounts[i], totalStablecoinAmount, Math.Rounding.Up);
+            uint256 usersIsusdToRedeem = Math.mulDiv(totalIsusdToRedeem, purchaseAmounts[i], totalStablecoinAmount, Math.Rounding.Up);
             uint256 usersIsusdBalance = s_iSusdBalances[users[i]];
-            if (buyerSharesToRedeem > usersIsusdBalance) {
-                revert TokenLending__InsufficientLendingTokenBalance(users[i], buyerSharesToRedeem, usersIsusdBalance);
+            if (usersIsusdToRedeem > usersIsusdBalance) {
+                revert TokenLending__InsufficientLendingTokenBalance(users[i], usersIsusdToRedeem, usersIsusdBalance);
             }
-            s_iSusdBalances[users[i]] = usersIsusdBalance - buyerSharesToRedeem;
-            emit TokenLending__LendingTokenRedeemed(users[i], purchaseAmounts[i], buyerSharesToRedeem);
+            s_iSusdBalances[users[i]] = usersIsusdBalance - usersIsusdToRedeem;
+            emit TokenLending__LendingTokenRedeemed(users[i], purchaseAmounts[i], usersIsusdToRedeem);
         }
         uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(address(this));
-        i_iSusdToken.burn(address(this), totalITokensToRedeem);
+        i_iSusdToken.burn(address(this), totalIsusdToRedeem);
         uint256 stablecoinReceived = i_stableToken.balanceOf(address(this)) - stablecoinBalanceBefore;
-        if (stablecoinReceived > 0) emit TokenLending__LendingTokenRedeemedBatch(stablecoinReceived, totalITokensToRedeem);
+        if (stablecoinReceived > 0) emit TokenLending__LendingTokenRedeemedBatch(stablecoinReceived, totalIsusdToRedeem);
         else revert TokenLending__ZeroStablecoinReceived(totalStablecoinAmount);
         return stablecoinReceived;
     }

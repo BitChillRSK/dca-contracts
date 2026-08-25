@@ -41,7 +41,7 @@ This PR **supersedes** R16’s sanction of the “repay” alias for share-amoun
 
 ## Scope
 
-- [ ] **Locals / parameters** in Tropykus, Sovryn, and LayerBank (and matching test strings only if they assert symbol names): `*ToRepay` → `*ToRedeem` (e.g. `kTokensToRedeem`, `iTokensToRedeem`, `scaledATokensToRedeem`, `total*ToRedeem`, `buyerSharesToRedeem`, `old*ToRedeem`).
+- [ ] **Locals / parameters** in Tropykus, Sovryn, and LayerBank (and matching test strings only if they assert symbol names): `*ToRepay` → `*ToRedeem`. **Keep each file's own token noun and capitalization — change only `Repay` → `Redeem`.** Sovryn's locals say `iSusd` (`s_iSusdBalances`, `usersIsusdBalance`), so they become `iSusdToRedeem` / `oldIsusdToRedeem` / `totalIsusdToRedeem`, **not** `iTokens*`; likewise `kTokenToRedeem` and `aTokenToRedeem`. The per-buyer batch local matches its neighbouring balance local (`usersKtokenToRedeem` beside `usersKtokenBalance`), not a generic `buyerShares*` — the loop already calls that actor `users[i]`.
 - [ ] **Tropykus / LayerBank helpers** (symmetric pair):
   - `_redeemLendingToken` (3-arg, underlying-sized) → `_redeemByUnderlying`
   - `_burnKtoken` / `_burnAtoken` → `_redeemByShares`

@@ -291,9 +291,9 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         uint256 excessiveAmount = DEPOSIT_AMOUNT * 2;
         uint256 available = layerbankHandler.getUsersLendingTokenBalance(user1);
         uint256 exchangeRate = aToken.getNormalizedIncome();
-        uint256 totalScaledATokensToRedeem =
+        uint256 totalAtokenToRedeem =
             Math.mulDiv(excessiveAmount, aToken.RAY(), exchangeRate, Math.Rounding.Up);
-        uint256 requested = Math.mulDiv(totalScaledATokensToRedeem, amounts[0], excessiveAmount, Math.Rounding.Up);
+        uint256 requested = Math.mulDiv(totalAtokenToRedeem, amounts[0], excessiveAmount, Math.Rounding.Up);
 
         vm.expectRevert(
             abi.encodeWithSelector(

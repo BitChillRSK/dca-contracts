@@ -271,9 +271,9 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
         uint256 excessiveAmount = DEPOSIT_AMOUNT * 2;
         uint256 available = tropykusHandler.getUsersLendingTokenBalance(user1);
         uint256 exchangeRate = kToken.exchangeRateCurrent();
-        uint256 totalKtokensToRedeem =
+        uint256 totalKtokenToRedeem =
             Math.mulDiv(excessiveAmount, EXCHANGE_RATE_DECIMALS, exchangeRate, Math.Rounding.Up);
-        uint256 requested = Math.mulDiv(totalKtokensToRedeem, amounts[0], excessiveAmount, Math.Rounding.Up);
+        uint256 requested = Math.mulDiv(totalKtokenToRedeem, amounts[0], excessiveAmount, Math.Rounding.Up);
 
         vm.expectRevert(
             abi.encodeWithSelector(
