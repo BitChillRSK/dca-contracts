@@ -1,26 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
-import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
-import {TokenHandler} from "src/TokenHandler.sol";
+import {LendingErc20Handler} from "src/LendingErc20Handler.sol";
 import {IiSusdToken} from "./IiSusdToken.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {TokenLending} from "src/TokenLending.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @title SovrynErc20Handler
- * @notice This abstract contract contains the stablecoin related functions that are common regardless of the method used to swap stablecoin for rBTC
+ * @notice Sovryn adapter: iSUSD mint/burn. Share accounting lives on LendingErc20Handler.
  */
-abstract contract SovrynErc20Handler is TokenHandler, TokenLending {
-    using SafeERC20 for IERC20;
-
-    //////////////////////
-    // State variables ///
-    //////////////////////
+abstract contract SovrynErc20Handler is LendingErc20Handler {
     IiSusdToken public immutable i_iSusdToken;
-    mapping(address user => uint256 balance) internal s_iSusdBalances;
 
     /**
      * @param dcaManagerAddress the address of the DCA Manager contract
@@ -37,193 +26,46 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending {
         FeeSettings memory feeSettings,
         uint256 exchangeRateDecimals
     )
-        TokenHandler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings)
-        TokenLending(exchangeRateDecimals)
+        LendingErc20Handler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, exchangeRateDecimals)
     {
         i_iSusdToken = IiSusdToken(iSusdTokenAddress);
     }
 
+    function _exchangeRate() internal view override returns (uint256) {
+        return i_iSusdToken.tokenPrice();
+    }
+
+    function _viewExchangeRate() internal view override returns (uint256) {
+        return i_iSusdToken.tokenPrice();
+    }
+
+    function _lendingSpender() internal view override returns (address) {
+        return address(i_iSusdToken);
+    }
+
     /**
-     * @notice deposit the full token amount for DCA on the contract
-     * @param user: the address of the user making the deposit
-     * @param depositAmount: the amount requested from the user
-     * @return depositedAmount the stablecoin amount actually received before minting iTokens
+     * @notice the iSusd we credit is the balance we actually gained, never mint()'s return value
      */
-    function depositToken(address user, uint256 depositAmount)
-        public
-        override(TokenHandler, ITokenHandler)
-        onlyDcaManager
-        returns (uint256 depositedAmount)
-    {
-        depositedAmount = super.depositToken(user, depositAmount);
-        if (i_stableToken.allowance(address(this), address(i_iSusdToken)) < depositedAmount) {
-            i_stableToken.safeApprove(address(i_iSusdToken), depositedAmount);
-        }
-        // @notice the iSusd we credit is the balance we actually gained, never mint()'s return value
+    function _protocolDeposit(uint256 stablecoinAmount) internal override returns (uint256 mintedShares) {
         uint256 prevIsusdBalance = i_iSusdToken.balanceOf(address(this));
-        i_iSusdToken.mint(address(this), depositedAmount);
-        uint256 mintedAmount = i_iSusdToken.balanceOf(address(this)) - prevIsusdBalance;
-        if (mintedAmount == 0) revert TokenLending__LendingProtocolDepositFailed();
-        s_iSusdBalances[user] += mintedAmount;
+        i_iSusdToken.mint(address(this), stablecoinAmount);
+        mintedShares = i_iSusdToken.balanceOf(address(this)) - prevIsusdBalance;
     }
 
     /**
-     * @notice withdraw the token amount sending it back to the user's address
-     * @param user: the address of the user making the withdrawal
-     * @param withdrawalAmount: the amount to withdraw
-     * @return withdrawnAmount the amount that left this contract after redeeming
+     * @notice redeem the user's iSusd and send the stablecoin it frees to `recipient`
+     * @dev Ignores `sizeByUnderlying`. Sovryn's burn() returns the GROSS amount and pays the NET
+     *      one once an exit fee is enabled (SIP-0094), so the recipient's measured balance delta
+     *      is the only trustworthy amount.
      */
-    function withdrawToken(address user, uint256 withdrawalAmount)
-        public
-        override(TokenHandler, ITokenHandler)
-        onlyDcaManager
-        returns (uint256)
-    {
-        uint256 exchangeRate = i_iSusdToken.tokenPrice();
-        uint256 totalStablecoinInLending = _sharesToStablecoin(s_iSusdBalances[user], exchangeRate);
-
-        if (totalStablecoinInLending < withdrawalAmount) {
-            emit TokenLending__WithdrawalAmountAdjusted(user, withdrawalAmount, totalStablecoinInLending);
-            withdrawalAmount = totalStablecoinInLending;
-        }
-
-        // @notice we pay out what the redemption actually produced, which may be less than requested
-        withdrawalAmount = _redeemShares(user, withdrawalAmount, exchangeRate);
-        return super.withdrawToken(user, withdrawalAmount);
-    }
-
-    /**
-     * @notice get the users shares balance
-     * @param user: the address of the user
-     * @return the users shares balance
-     */
-    function getUserShares(address user) external view override returns (uint256) {
-        return s_iSusdBalances[user];
-    }
-
-    /**
-     * @notice withdraw the interest
-     * @param user: the address of the user
-     * @param stablecoinLockedInDcaSchedules: the amount of stablecoin locked in DCA schedules
-     */
-    function withdrawInterest(address user, uint256 stablecoinLockedInDcaSchedules) external override onlyDcaManager {
-        uint256 exchangeRate = i_iSusdToken.tokenPrice();
-        uint256 totalStablecoinInLending = _sharesToStablecoin(s_iSusdBalances[user], exchangeRate);
-        if (totalStablecoinInLending <= stablecoinLockedInDcaSchedules) {
-            return; // No interest to withdraw
-        }
-        uint256 stablecoinInterestAmount = totalStablecoinInLending - stablecoinLockedInDcaSchedules;
-        // @notice the redemption pays the user directly; we emit what it measured, not what we planned
-        uint256 stablecoinReceived = _redeemShares(user, stablecoinInterestAmount, exchangeRate, user);
-        emit TokenLending__InterestWithdrawn(user, address(i_stableToken), stablecoinReceived);
-    }
-
-    /**
-     * @notice get the accrued interest
-     * @param user: the address of the user
-     * @param stablecoinLockedInDcaSchedules: the amount of stablecoin locked in DCA schedules
-     * @return stablecoinInterestAmount the amount of accrued interest
-     */
-    function getAccruedInterest(address user, uint256 stablecoinLockedInDcaSchedules)
-        external
-        view
+    function _protocolRedeem(uint256 stablecoinAmount, uint256 sharesAmount, bool, address recipient)
+        internal
         override
-        onlyDcaManager
-        returns (uint256 stablecoinInterestAmount)
+        returns (uint256 received)
     {
-        uint256 totalStablecoinInLending = _sharesToStablecoin(s_iSusdBalances[user], i_iSusdToken.tokenPrice());
-        stablecoinInterestAmount = totalStablecoinInLending > stablecoinLockedInDcaSchedules ? totalStablecoinInLending - stablecoinLockedInDcaSchedules : 0;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                           INTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice retrieve the user's stablecoin by redeeming iSusd
-     * @param user: the address of the user
-     * @param stablecoinAmount: the amount of stablecoin wanted
-     * @return the amount of stablecoin this contract actually received
-     */
-    function _retrieveStablecoin(address user, uint256 stablecoinAmount) internal virtual returns (uint256) {
-        // For buyRbtc(), we want the stablecoin to come to the contract
-        return _redeemShares(user, stablecoinAmount, i_iSusdToken.tokenPrice(), address(this));
-    }
-
-    /**
-     * @notice redeem enough iSusd to get `stablecoinAmount` of stablecoin onto this contract
-     * @param user: the address of the user
-     * @param stablecoinAmount: the amount of stablecoin wanted
-     * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
-     * @return the amount of stablecoin this contract actually received
-     */
-    function _redeemShares(address user, uint256 stablecoinAmount, uint256 exchangeRate) internal virtual returns (uint256) {
-        return _redeemShares(user, stablecoinAmount, exchangeRate, address(this));
-    }
-
-    /**
-     * @notice redeem the user's iSusd and send the stablecoin it frees to `stablecoinRecipient`
-     * @param user: the address of the user
-     * @param stablecoinAmount: the amount of stablecoin wanted
-     * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
-     * @param stablecoinRecipient: the address of the recipient of the stablecoin
-     * @return stablecoinReceived the amount of stablecoin the recipient actually received
-     * @dev Sovryn's burn() returns the GROSS amount and pays the NET one once an exit fee is enabled
-     * (SIP-0094), so the recipient's measured balance delta is the only trustworthy amount.
-     */
-    function _redeemShares(address user, uint256 stablecoinAmount, uint256 exchangeRate, address stablecoinRecipient)
-        internal
-        virtual
-        returns (uint256 stablecoinReceived)
-    {
-        uint256 usersIsusdBalance = s_iSusdBalances[user];
-        uint256 iSusdToRedeem = _stablecoinToShares(stablecoinAmount, exchangeRate);
-        if (iSusdToRedeem > usersIsusdBalance) {
-            uint256 oldIsusdToRedeem = iSusdToRedeem;
-            uint256 oldStablecoinAmount = stablecoinAmount;
-            iSusdToRedeem = usersIsusdBalance;
-            stablecoinAmount = _sharesToStablecoin(iSusdToRedeem, exchangeRate);
-            emit TokenLending__AmountToRedeemAdjusted(user, oldIsusdToRedeem, iSusdToRedeem, oldStablecoinAmount, stablecoinAmount);
-        }
-        s_iSusdBalances[user] -= iSusdToRedeem;
-        uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(stablecoinRecipient);
-        i_iSusdToken.burn(stablecoinRecipient, iSusdToRedeem);
-        stablecoinReceived = i_stableToken.balanceOf(stablecoinRecipient) - stablecoinBalanceBefore;
-        if (stablecoinReceived == 0) revert TokenLending__ZeroStablecoinReceived(stablecoinAmount);
-        emit TokenLending__SharesRedeemed(user, stablecoinReceived, iSusdToRedeem);
-    }
-
-    /**
-     * @notice retrieve several users' stablecoin in one iSusd redemption
-     * @param users: the addresses of the users
-     * @param purchaseAmounts: the amounts of stablecoin charged to each user
-     * @param totalStablecoinAmount: the total amount of stablecoin wanted
-     * @return the amount of stablecoin this contract actually received
-     */
-    function _batchRetrieveStablecoin(address[] memory users, uint256[] memory purchaseAmounts, uint256 totalStablecoinAmount)
-        internal
-        virtual
-        returns (uint256)
-    {
-        uint256 totalIsusdToRedeem = _stablecoinToShares(totalStablecoinAmount, i_iSusdToken.tokenPrice());
-
-        uint256 numOfPurchases = users.length;
-        for (uint256 i; i < numOfPurchases; ++i) {
-            // @notice the amount of iSusd each user redeems is proportional to the ratio of
-            // that user's stablecoin being retrieved over the total being retrieved
-            uint256 usersIsusdToRedeem = Math.mulDiv(totalIsusdToRedeem, purchaseAmounts[i], totalStablecoinAmount, Math.Rounding.Up);
-            uint256 usersIsusdBalance = s_iSusdBalances[users[i]];
-            if (usersIsusdToRedeem > usersIsusdBalance) {
-                revert TokenLending__InsufficientShares(users[i], usersIsusdToRedeem, usersIsusdBalance);
-            }
-            s_iSusdBalances[users[i]] = usersIsusdBalance - usersIsusdToRedeem;
-            emit TokenLending__SharesRedeemed(users[i], purchaseAmounts[i], usersIsusdToRedeem);
-        }
-        uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(address(this));
-        i_iSusdToken.burn(address(this), totalIsusdToRedeem);
-        uint256 stablecoinReceived = i_stableToken.balanceOf(address(this)) - stablecoinBalanceBefore;
-        if (stablecoinReceived > 0) emit TokenLending__SharesRedeemedBatch(stablecoinReceived, totalIsusdToRedeem);
-        else revert TokenLending__ZeroStablecoinReceived(totalStablecoinAmount);
-        return stablecoinReceived;
+        uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(recipient);
+        i_iSusdToken.burn(recipient, sharesAmount);
+        received = i_stableToken.balanceOf(recipient) - stablecoinBalanceBefore;
+        if (received == 0) revert TokenLending__ZeroStablecoinReceived(stablecoinAmount);
     }
 }

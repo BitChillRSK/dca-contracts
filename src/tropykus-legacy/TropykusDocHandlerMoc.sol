@@ -2,6 +2,7 @@
 pragma solidity 0.8.36;
 
 import {TropykusErc20Handler} from "./TropykusErc20Handler.sol";
+import {LendingErc20Handler} from "src/LendingErc20Handler.sol";
 import {PurchaseMoc} from "src/PurchaseMoc.sol";
 import {PurchaseRbtc} from "src/PurchaseRbtc.sol";
 
@@ -44,11 +45,10 @@ contract TropykusDocHandlerMoc is TropykusErc20Handler, PurchaseMoc {
      */
     function _retrieveStablecoin(address user, uint256 amount)
         internal
-        override(TropykusErc20Handler, PurchaseRbtc)
+        override(LendingErc20Handler, PurchaseRbtc)
         returns (uint256)
     {
-        // Call TropykusErc20Handler's version of _retrieveStablecoin
-        return TropykusErc20Handler._retrieveStablecoin(user, amount);
+        return LendingErc20Handler._retrieveStablecoin(user, amount);
     }
 
     /**
@@ -59,10 +59,9 @@ contract TropykusDocHandlerMoc is TropykusErc20Handler, PurchaseMoc {
      */
     function _batchRetrieveStablecoin(address[] memory users, uint256[] memory purchaseAmounts, uint256 totalDocAmountToSpend)
         internal
-        override(TropykusErc20Handler, PurchaseRbtc)
+        override(LendingErc20Handler, PurchaseRbtc)
         returns (uint256)
     {
-        // Call TropykusErc20Handler's version of _batchRetrieveStablecoin
-        return TropykusErc20Handler._batchRetrieveStablecoin(users, purchaseAmounts, totalDocAmountToSpend);
+        return LendingErc20Handler._batchRetrieveStablecoin(users, purchaseAmounts, totalDocAmountToSpend);
     }
 }

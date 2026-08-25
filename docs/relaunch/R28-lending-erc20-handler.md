@@ -1,6 +1,6 @@
 # R28 — Extract `LendingErc20Handler`
 
-Status: **not started** · Assigned: yes · Optional/further-review: no
+Status: **in progress** · Assigned: yes · Optional/further-review: no
 
 PR 19 (promoted from optional late 2026-08-25). Stack on R27 (PR 18). Do **not** start this in the same chat as R27, R22 deploy/CI, R9, or R10. Requires [R27](./R27-tropykus-lending-guards.md) so Tropykus already matches the Sovryn/LayerBank guards. Land **before** R22 deploy/CI (PR 20) and R9 (PR 21) so `TokenLending__UserSharesUpdated` is emitted in one place and the harness split sees one lending base.
 
@@ -47,7 +47,7 @@ R25 kept Sovryn on one helper (`_redeemShares` after R26) on purpose. Do not inv
 
 ## Scope
 
-- [ ] Add `src/LendingErc20Handler.sol` (name may be `LendingHandler`; do not call it `TokenLending`). Owns:
+- [x] Add `src/LendingErc20Handler.sol` (name may be `LendingHandler`; do not call it `TokenLending`). Owns:
   - `mapping(address => uint256) internal s_shares`
   - `getUserShares`
   - `depositToken` template: `super.depositToken`, approve, `_protocolDeposit`, revert `TokenLending__LendingProtocolDepositFailed` if minted == 0, credit `s_shares[user]`
@@ -55,14 +55,14 @@ R25 kept Sovryn on one helper (`_redeemShares` after R26) on purpose. Do not inv
   - `withdrawInterest` / `getAccruedInterest`
   - `_retrieveStablecoin` / `_batchRetrieveStablecoin` (pro-rata `Math.mulDiv` round-up, insufficient-shares revert, one protocol redeem, zero-received revert)
   - Shared redeem clamp-and-measure (`TokenLending__AmountToRedeemAdjusted`) before the protocol call
-- [ ] Virtual hooks (signatures may vary; this is the required surface):
+- [x] Virtual hooks (signatures may vary; this is the required surface):
   - `_exchangeRate()` (mutating-ok) and `_viewExchangeRate()`
   - `_protocolDeposit(uint256 stablecoinAmount) returns (uint256 mintedShares)` — adapter measures the right balance (`balanceOf` vs `scaledBalanceOf`) and talks to the protocol
   - `_protocolRedeem(uint256 stablecoinAmount, uint256 sharesAmount, bool sizeByUnderlying, address recipient) returns (uint256 received)` — Tropykus uses the Compound code + extra `safeTransfer` when `recipient != address(this)`; Sovryn ignores `sizeByUnderlying` and `burn`s to `recipient`; LayerBank computes `amountOut`, skips the Pool call if 0, otherwise `withdraw` to `recipient` (today: handler, then the base transfers)
-- [ ] `TropykusErc20Handler`, `SovrynErc20Handler`, `LayerBankErc20Handler` become thin adapters (immutables, constructor checks, hook impls). Keep protocol-specific interfaces next to each handler.
-- [ ] `*DocHandlerMoc` (and Sovryn/Tropykus Dex) diamond resolvers: change the parent name to `LendingErc20Handler`; do not try to delete the three resolver files.
-- [ ] If R9 has already landed, move `TokenLending__UserSharesUpdated` emits into `LendingErc20Handler` (do not leave copies in the adapters). If R9 has not landed, emit nothing new here — R9 adds the event once in the base.
-- [ ] Existing unit tests for all three handlers keep passing with no behavior change vs post-R27 Tropykus. Add no new product tests beyond whatever the extract breaks.
+- [x] `TropykusErc20Handler`, `SovrynErc20Handler`, `LayerBankErc20Handler` become thin adapters (immutables, constructor checks, hook impls). Keep protocol-specific interfaces next to each handler.
+- [x] `*DocHandlerMoc` (and Sovryn/Tropykus Dex) diamond resolvers: change the parent name to `LendingErc20Handler`; do not try to delete the three resolver files.
+- [x] If R9 has already landed, move `TokenLending__UserSharesUpdated` emits into `LendingErc20Handler` (do not leave copies in the adapters). If R9 has not landed, emit nothing new here — R9 adds the event once in the base.
+- [x] Existing unit tests for all three handlers keep passing with no behavior change vs post-R27 Tropykus. Add no new product tests beyond whatever the extract breaks.
 
 ## Out of scope
 
@@ -101,12 +101,12 @@ Fork tests: no new fork-specific assertions; run before push per `AGENTS.md`.
 
 ## Success criteria
 
-- [ ] One implementation of the withdraw clamp, interest math, batch pro-rata loop, and zero-mint / zero-received guards.
-- [ ] `TokenLending.sol` still has no `TokenHandler` inherit and no `s_shares` mapping.
-- [ ] Idle handler untouched.
-- [ ] Tropykus Compound return codes exist only in the Tropykus adapter.
-- [ ] Sovryn still redeems to a recipient; LayerBank still measures on the handler then transfers (unless a later spec says otherwise).
-- [ ] `make check` and both fork targets pass. Behavior matches post-R27.
+- [x] One implementation of the withdraw clamp, interest math, batch pro-rata loop, and zero-mint / zero-received guards.
+- [x] `TokenLending.sol` still has no `TokenHandler` inherit and no `s_shares` mapping.
+- [x] Idle handler untouched.
+- [x] Tropykus Compound return codes exist only in the Tropykus adapter.
+- [x] Sovryn still redeems to a recipient; LayerBank still measures on the handler then transfers (unless a later spec says otherwise).
+- [x] `make check` and both fork targets pass. Behavior matches post-R27.
 
 ## Reviewer checklist
 

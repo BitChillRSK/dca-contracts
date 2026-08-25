@@ -30,11 +30,12 @@ OperationsAdmin     roles; token × lending-index → handler
 FeeHandler          fee math (also inherited by Purchase*)
 TokenHandler        deposit/withdraw stablecoin (owns FeeHandler)
 TokenLending        share ↔ underlying conversion (no TokenHandler inherit)
+LendingErc20Handler TokenHandler + TokenLending; per-user shares, withdraw clamp, interest, batch pro-rata
 PurchaseRbtc        accumulated rBTC; withdraw to signer
 PurchaseMoc         MoC redeem DOC → rBTC
 PurchaseUniswap     Uniswap V3 → WRBTC
 
-Handlers = TokenHandler + TokenLending + a Purchase*:
+Handlers = LendingErc20Handler + a Purchase*  (lending adapters) or TokenHandler + a Purchase* (idle):
   src/sovryn/            SovrynErc20Handler ─┬─ SovrynDocHandlerMoc   (+ PurchaseMoc)
                                             └─ SovrynErc20HandlerDex (+ PurchaseUniswap)
   src/tropykus-legacy/   TropykusErc20Handler ─┬─ TropykusDocHandlerMoc   (+ PurchaseMoc)

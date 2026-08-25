@@ -3,6 +3,7 @@ pragma solidity 0.8.36;
 
 import {PurchaseUniswap} from "src/PurchaseUniswap.sol";
 import {PurchaseRbtc} from "src/PurchaseRbtc.sol";
+import {LendingErc20Handler} from "src/LendingErc20Handler.sol";
 import {SovrynErc20Handler} from "./SovrynErc20Handler.sol";
 
 /**
@@ -56,11 +57,10 @@ contract SovrynErc20HandlerDex is SovrynErc20Handler, PurchaseUniswap {
      */
     function _retrieveStablecoin(address user, uint256 amount)
         internal
-        override(SovrynErc20Handler, PurchaseRbtc)
+        override(LendingErc20Handler, PurchaseRbtc)
         returns (uint256)
     {
-        // Call SovrynErc20Handler's version of _retrieveStablecoin
-        return SovrynErc20Handler._retrieveStablecoin(user, amount);
+        return LendingErc20Handler._retrieveStablecoin(user, amount);
     }
 
     /**
@@ -71,10 +71,9 @@ contract SovrynErc20HandlerDex is SovrynErc20Handler, PurchaseUniswap {
      */
     function _batchRetrieveStablecoin(address[] memory users, uint256[] memory purchaseAmounts, uint256 totalStablecoinToRetrieve)
         internal
-        override(SovrynErc20Handler, PurchaseRbtc)
+        override(LendingErc20Handler, PurchaseRbtc)
         returns (uint256)
     {
-        // Call SovrynErc20Handler's version of _batchRetrieveStablecoin
-        return SovrynErc20Handler._batchRetrieveStablecoin(users, purchaseAmounts, totalStablecoinToRetrieve);
+        return LendingErc20Handler._batchRetrieveStablecoin(users, purchaseAmounts, totalStablecoinToRetrieve);
     }
 }
