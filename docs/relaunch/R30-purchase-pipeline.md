@@ -30,10 +30,11 @@ R28's size snapshot put the Dex handlers close to EIP-170. Abstract extraction i
 
 ## Scope
 
-- [x] Add a state-free abstract `src/StablecoinSource.sol` that declares, and does not implement, the two funding hooks:
+- [x] Add a state-free abstract `src/StablecoinSource.sol` that declares, and does not implement, the funding hooks:
   - `_retrieveStablecoin(address buyer, uint256 amount) internal virtual returns (uint256)`
   - `_batchRetrieveStablecoin(address[] memory buyers, uint256[] memory purchaseAmounts, uint256 totalStablecoinToRetrieve) internal virtual returns (uint256)`
-- [x] Make `PurchaseRbtc`, `LendingErc20Handler`, and `IdleErc20Handler` inherit the same `StablecoinSource` seam. `PurchaseRbtc` consumes the hooks without redeclaring them; the lending and idle bases mark their existing implementations `override`.
+  - `_purchaseToken() internal view virtual returns (IERC20)` supplies the stablecoin used for fee transfer, errors, and events. It sits with the funding hooks, not with the route hooks: the handler that holds the stablecoin is the one that can name it, so the token reported as spent is the token actually spent by construction rather than by call-site convention.
+- [x] Make `PurchaseRbtc`, `LendingErc20Handler`, and `IdleErc20Handler` inherit the same `StablecoinSource` seam. `PurchaseRbtc` consumes the hooks without redeclaring them; the lending and idle bases mark their existing implementations `override` and implement `_purchaseToken` as `return i_stableToken`.
 - [x] Delete the twelve forwarding resolvers and their now-unused imports from these six leaves:
   - `IdleDocHandlerMoc`
   - `SovrynDocHandlerMoc`
@@ -42,11 +43,10 @@ R28's size snapshot put the Dex handlers close to EIP-170. Abstract extraction i
   - `TropykusErc20HandlerDex`
   - `LayerBankDocHandlerMoc`
 - [x] Move the external `buyRbtc` and `batchBuyRbtc` implementations into `PurchaseRbtc`. Move `FeeHandler` inheritance with the common algorithm so `PurchaseMoc` and `PurchaseUniswap` no longer inherit it directly; keep constructor arguments and the resulting fee/ownership surface unchanged on concrete handlers.
-- [x] Give the common pipeline two narrow route hooks (names may vary, semantics may not):
-  - `_purchaseToken() internal view virtual returns (IERC20)` supplies the stablecoin used for fee transfer, errors, and events.
+- [x] Give the common pipeline one narrow route hook (name may vary, semantics may not):
   - `_purchaseRbtc(uint256 stablecoinAmount) internal virtual returns (uint256 rbtcReceived)` spends the net stablecoin and returns only measured cash received.
-- [x] Adapt MoC without changing behavior: `_purchaseToken` returns `i_docToken`; `_purchaseRbtc` preserves `redeemDocRequest` / `redeemFreeDoc`, the two existing custom catches, and the native balance delta around `redeemFreeDoc`.
-- [x] Adapt Uniswap without changing behavior: `_purchaseToken` returns `i_purchasingToken`; `_purchaseRbtc` delegates to or absorbs `_swapStablecoinForWrbtc`, whose result remains the measured WRBTC balance delta. Keep Uniswap's withdrawal override unwrapping WRBTC before `_withdrawRbtc`.
+- [x] Adapt MoC without changing behavior: `_purchaseRbtc` preserves `redeemDocRequest` / `redeemFreeDoc`, the two existing custom catches, and the native balance delta around `redeemFreeDoc`.
+- [x] Adapt Uniswap without changing behavior: `_purchaseRbtc` delegates to or absorbs `_swapStablecoinForWrbtc`, whose result remains the measured WRBTC balance delta. Keep Uniswap's withdrawal override unwrapping WRBTC before `_withdrawRbtc`.
 - [x] Preserve the common single path exactly: use the amount actually returned by `_retrieveStablecoin`, calculate the fee from that amount, transfer the fee before the route call, purchase only the net amount, then credit and emit `PurchaseRbtc__RbtcBought`; zero output reverts `PurchaseRbtc__RbtcPurchaseFailed(buyer, token)`.
 - [x] Preserve the common batch path exactly: calculate the planned per-user net amounts and aggregate fee first; retrieve the planned gross total; revert `PurchaseRbtc__StablecoinRetrievedBelowFee` when retrieved cash is not above the fee; transfer the fee before the route call; use planned net amounts only as allocation weights; allocate both measured rBTC and actually spent stablecoin pro rata; then emit the per-user events followed by `PurchaseRbtc__SuccessfulRbtcBatchPurchase`. Zero output reverts `PurchaseRbtc__RbtcBatchPurchaseFailed(token)`.
 - [x] Add base-level tests with a stub funding source and purchase route so the shared algorithm is tested once independently of MoC/Uniswap, while the existing route tests continue to pin each adapter's cash measurement, external calls, errors, and withdrawal behavior.
@@ -124,7 +124,7 @@ Fork tests add no new fork-specific assertions; both still run before push per `
 ## Success criteria
 
 - [x] Exactly one `buyRbtc` implementation and one `batchBuyRbtc` implementation exist under `src/` outside `DcaManager`; MoC and Uniswap contain only route-specific purchase logic.
-- [x] `StablecoinSource` owns the only abstract declarations of the funding hooks; `LendingErc20Handler` and `IdleErc20Handler` own the implementations; the six leaves contain no forwarding implementations.
+- [x] `StablecoinSource` owns the only abstract declarations of the funding hooks, including `_purchaseToken`; `LendingErc20Handler` and `IdleErc20Handler` own the implementations; the six leaves contain no forwarding implementations. `i_docToken` and `i_purchasingToken` remain as public getters only — removing them is an ABI change deferred to Candidate C.
 - [x] No forwarding bridge or funding-source × purchase-route combination base was added.
 - [x] Fee calculation/transfer order, actual-cash accounting, batch weights, accumulated balances, event names/parameters/order, and custom errors match the pre-R30 behavior.
 - [x] External ABI, constructors, deploy scripts, and storage layout are unchanged.

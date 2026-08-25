@@ -35,23 +35,13 @@ abstract contract PurchaseMoc is PurchaseRbtc, IPurchaseMoc {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice the DOC token spent on this MoC route
-     */
-    function _purchaseToken() internal view override returns (IERC20) {
-        return i_docToken;
-    }
-
-    /**
      * @notice redeem DOC for rBTC and return the handler's native-balance delta
      * @param stablecoinAmount the net DOC amount to redeem
      * @return rbtcReceived the measured rBTC this contract actually received
      */
     function _purchaseRbtc(uint256 stablecoinAmount) internal override returns (uint256 rbtcReceived) {
         (uint256 balancePrev, uint256 balancePost) = _redeemDoc(stablecoinAmount);
-        if (balancePost > balancePrev) {
-            return balancePost - balancePrev;
-        }
-        return 0;
+        if (balancePost > balancePrev) rbtcReceived = balancePost - balancePrev;
     }
 
     /**

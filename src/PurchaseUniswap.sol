@@ -15,7 +15,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  * @notice This contract handles swaps of stablecoin for rBTC using Uniswap V3
  */
 abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
-
     //////////////////////
     // State variables ///
     //////////////////////
@@ -178,13 +177,6 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     /*//////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice the stablecoin spent on this Uniswap route
-     */
-    function _purchaseToken() internal view override returns (IERC20) {
-        return i_purchasingToken;
-    }
 
     /**
      * @notice swap net stablecoin for WRBTC and return the handler's WRBTC-balance delta

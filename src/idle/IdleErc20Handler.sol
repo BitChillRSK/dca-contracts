@@ -4,6 +4,7 @@ pragma solidity 0.8.36;
 import {TokenHandler} from "src/TokenHandler.sol";
 import {StablecoinSource} from "src/StablecoinSource.sol";
 import {IIdleErc20Handler} from "./IIdleErc20Handler.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title IdleErc20Handler
@@ -79,6 +80,13 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
     /*//////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice the stablecoin this handler holds idle
+     */
+    function _purchaseToken() internal view override returns (IERC20) {
+        return i_stableToken;
+    }
 
     /**
      * @notice retrieve `amount` of the user's idle DOC for the purchase path

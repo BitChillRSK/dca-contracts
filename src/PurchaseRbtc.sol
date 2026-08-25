@@ -155,11 +155,6 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
     }
 
     /**
-     * @notice the stablecoin used for fee transfer, errors, and events
-     */
-    function _purchaseToken() internal view virtual returns (IERC20);
-
-    /**
      * @notice spend `stablecoinAmount` of net stablecoin and return only measured rBTC or WRBTC received
      * @param stablecoinAmount the net stablecoin amount to spend after fees
      * @return rbtcReceived the measured native rBTC or WRBTC this contract actually received

@@ -406,14 +406,14 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
     }
 
     /*//////////////////////////////////////////////////////////////
-                           COVERAGE TESTS FOR OVERRIDDEN FUNCTIONS
+                           PURCHASE PIPELINE COVERAGE
     //////////////////////////////////////////////////////////////*/
     
     /**
-     * @notice Test that specifically calls buyRbtc to trigger _retrieveStablecoin override
-     * @dev This test ensures the SovrynErc20HandlerDex._retrieveStablecoin override is covered
+     * @notice Test that buyRbtc funds the purchase by redeeming the buyer's lending shares
+     * @dev Covers the shared PurchaseRbtc pipeline resolving _retrieveStablecoin to LendingErc20Handler
      */
-    function test_sovrynDex_buyRbtcTriggersRetrieveStablecoinOverride() public {
+    function test_sovrynDex_buyRbtcRedeemsSharesForPurchase() public {
         // Setup: User deposits tokens first
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);
@@ -425,11 +425,11 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
         uint256 purchaseAmount = 100 ether;
         bytes32 mockScheduleId = keccak256("test_schedule");
         
-        // Call buyRbtc which triggers _retrieveStablecoin override
+        // Call buyRbtc, which redeems shares through _retrieveStablecoin
         vm.prank(address(dcaManager));
         sovrynDexHandler.buyRbtc(USER, mockScheduleId, purchaseAmount);
         
-        // Verify the override was called - lending balance should be reduced
+        // Verify the shares were redeemed - lending balance should be reduced
         uint256 finalLendingBalance = sovrynDexHandler.getUserShares(USER);
         assertLt(finalLendingBalance, initialLendingBalance);
         
@@ -439,10 +439,10 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
     }
     
     /**
-     * @notice Test that specifically calls batchBuyRbtc to trigger _batchRetrieveStablecoin override
-     * @dev This test ensures the SovrynErc20HandlerDex._batchRetrieveStablecoin override is covered
+     * @notice Test that batchBuyRbtc funds the purchase by redeeming every buyer's lending shares
+     * @dev Covers the shared PurchaseRbtc pipeline resolving _batchRetrieveStablecoin to LendingErc20Handler
      */
-    function test_sovrynDex_batchBuyRbtcTriggersRetrieveStablecoinOverride() public {
+    function test_sovrynDex_batchBuyRbtcRedeemsSharesForPurchase() public {
         // Setup: Multiple users deposit tokens
         address user1 = address(0x1001);
         address user2 = address(0x1002);
@@ -482,11 +482,11 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
         purchaseAmounts[0] = 100 ether;
         purchaseAmounts[1] = 80 ether;
         
-        // Call batchBuyRbtc which triggers _batchRetrieveStablecoin override
+        // Call batchBuyRbtc, which redeems shares through _batchRetrieveStablecoin
         vm.prank(address(dcaManager));
         sovrynDexHandler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts);
         
-        // Verify the override was called - lending balances should be reduced
+        // Verify the shares were redeemed - lending balances should be reduced
         uint256 finalBalance1 = sovrynDexHandler.getUserShares(user1);
         uint256 finalBalance2 = sovrynDexHandler.getUserShares(user2);
         assertLt(finalBalance1, initialBalance1);
