@@ -59,6 +59,7 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending {
         if (i_stableToken.allowance(address(this), address(i_kToken)) < depositedAmount) {
             i_stableToken.safeApprove(address(i_kToken), depositedAmount);
         }
+        // @notice the kToken we credit is the balance we actually gained, never mint()'s return value
         uint256 prevKtokenBalance = i_kToken.balanceOf(address(this));
         if (i_kToken.mint(depositedAmount) != 0) revert TokenLending__LendingProtocolDepositFailed();
         uint256 mintedAmount = i_kToken.balanceOf(address(this)) - prevKtokenBalance;
