@@ -54,7 +54,7 @@ make fork-sovryn
 make fork-tropykus
 ```
 
-Assert `sovrynHandler.EXCHANGE_RATE_DECIMALS() == 1e18` and `tropykusHandler.EXCHANGE_RATE_DECIMALS() == 1e18` (LayerBank already asserts `RAY() == 1e27`). Fork tests: no new fork-specific assertions; run before push.
+Assert `sovrynHandler.EXCHANGE_RATE_DECIMALS() == 1e18`, `tropykusHandler.EXCHANGE_RATE_DECIMALS() == 1e18`, and `layerbankHandler.EXCHANGE_RATE_DECIMALS() == 1e27`. Fork tests: no new fork-specific assertions; run before push.
 
 ## Success criteria
 
