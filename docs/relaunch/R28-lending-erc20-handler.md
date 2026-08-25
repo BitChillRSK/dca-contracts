@@ -1,8 +1,8 @@
 # R28 — Extract `LendingErc20Handler`
 
-Status: **in progress** · Assigned: yes · Optional/further-review: no
+Status: **PR open** · Assigned: yes · Optional/further-review: no
 
-PR 19 (promoted from optional late 2026-08-25). Stack on R27 (PR 18). Do **not** start this in the same chat as R27, R22 deploy/CI, R9, or R10. Requires [R27](./R27-tropykus-lending-guards.md) so Tropykus already matches the Sovryn/LayerBank guards. Land **before** R22 deploy/CI (PR 20) and R9 (PR 21) so `TokenLending__UserSharesUpdated` is emitted in one place and the harness split sees one lending base.
+PR 19 (promoted from optional late 2026-08-25), GitHub [#63](https://github.com/BitChillRSK/dca-contracts/pull/63). Stack on R27 (PR 18). Do **not** start this in the same chat as R27, R22 deploy/CI, R9, or R10. Requires [R27](./R27-tropykus-lending-guards.md) so Tropykus already matches the Sovryn/LayerBank guards. Land **before** R22 deploy/CI (PR 20) and R9 (PR 21) so `TokenLending__UserSharesUpdated` is emitted in one place and the harness split sees one lending base.
 
 Write against the **R26 `shares` vocabulary**.
 
