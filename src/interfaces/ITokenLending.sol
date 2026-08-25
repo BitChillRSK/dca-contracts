@@ -61,15 +61,15 @@ interface ITokenLending is ITokenHandler {
      * @dev Withdraws the interest earned for a user.
      * @notice This function needs to be in this interface (even though it is not implemented in the TokenHandler abstract contract) because it is called by the DCA Manager contract
      * @param user The address of the user withdrawing the interest.
-     * @param tokenLockedInDcaSchedules The amount of stablecoin locked in DCA schedules by the user.
+     * @param stablecoinLockedInDcaSchedules The amount of stablecoin locked in DCA schedules by the user.
      */
-    function withdrawInterest(address user, uint256 tokenLockedInDcaSchedules) external;
+    function withdrawInterest(address user, uint256 stablecoinLockedInDcaSchedules) external;
 
     /**
      * @dev Checks the interest earned by a user in total.
      * @param user The address of the user.
-     * @param tokenLockedInDcaSchedules The amount of stablecoin locked in DCA schedules by the user in total.
+     * @param stablecoinLockedInDcaSchedules The amount of stablecoin locked in DCA schedules by the user in total.
      * @return The amount of accrued interest.
      */
-    function getAccruedInterest(address user, uint256 tokenLockedInDcaSchedules) external view returns (uint256);
+    function getAccruedInterest(address user, uint256 stablecoinLockedInDcaSchedules) external view returns (uint256);
 }
