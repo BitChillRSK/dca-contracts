@@ -235,6 +235,27 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
                            TROPYKUS EDGE CASES
     //////////////////////////////////////////////////////////////*/
     
+    /**
+     * @notice `redeem` burns exactly the share count the base booked out, so the two agree to the wei.
+     * @dev This is what share-sizing buys over `redeemUnderlying`, where Tropykus would derive the burn
+     *      from its own rate and the book could come out below it.
+     */
+    function test_tropykus_bookDebitEqualsKtokenBurn() public {
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 bookBefore = tropykusHandler.getUserShares(USER);
+        uint256 heldBefore = kToken.balanceOf(address(handler));
+
+        vm.prank(address(dcaManager));
+        handler.withdrawToken(USER, WITHDRAWAL_AMOUNT);
+
+        uint256 bookDebit = bookBefore - tropykusHandler.getUserShares(USER);
+        assertGt(bookDebit, 0);
+        assertEq(bookDebit, heldBefore - kToken.balanceOf(address(handler)));
+    }
+
     function test_tropykus_zeroTimeExchangeRate() public {
         // Test at deployment time when exchange rate is at starting value
         uint256 exchangeRate = kToken.exchangeRateCurrent();

@@ -77,7 +77,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
         }
 
         // @notice we pay out what the redemption actually produced, which may be less than requested
-        withdrawalAmount = _redeemByUnderlying(user, withdrawalAmount, exchangeRate);
+        withdrawalAmount = _redeemShares(user, withdrawalAmount, exchangeRate);
         return super.withdrawToken(user, withdrawalAmount);
     }
 
@@ -102,7 +102,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
             return; // No interest to withdraw
         }
         uint256 stablecoinInterestAmount = totalStablecoinInLending - stablecoinLockedInDcaSchedules;
-        uint256 stablecoinReceived = _redeemByShares(user, stablecoinInterestAmount, exchangeRate);
+        uint256 stablecoinReceived = _redeemShares(user, stablecoinInterestAmount, exchangeRate);
         if (stablecoinReceived > 0) {
             i_stableToken.safeTransfer(user, stablecoinReceived);
         }
@@ -140,52 +140,24 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
      * @return the amount of stablecoin this contract actually received
      */
     function _retrieveStablecoin(address user, uint256 stablecoinAmount) internal virtual returns (uint256) {
-        return _redeemByUnderlying(user, stablecoinAmount, _exchangeRate());
-    }
-
-    /**
-     * @notice redeem sized by underlying: ask the protocol for `stablecoinAmount` of stablecoin
-     * @dev Sovryn's hook ignores `sizeByUnderlying` and always burns the share count.
-     * @param user: the address of the user
-     * @param stablecoinAmount: the amount of stablecoin wanted
-     * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
-     * @return the amount of stablecoin this contract actually received
-     */
-    function _redeemByUnderlying(address user, uint256 stablecoinAmount, uint256 exchangeRate)
-        internal
-        returns (uint256)
-    {
-        return _redeemInternal(user, stablecoinAmount, exchangeRate, true);
-    }
-
-    /**
-     * @notice redeem sized by shares: burn the share count `stablecoinAmount` converts to
-     * @param user: the address of the user
-     * @param stablecoinAmount: the amount of stablecoin wanted
-     * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
-     * @return the amount of stablecoin this contract actually received
-     */
-    function _redeemByShares(address user, uint256 stablecoinAmount, uint256 exchangeRate)
-        internal
-        returns (uint256)
-    {
-        return _redeemInternal(user, stablecoinAmount, exchangeRate, false);
+        return _redeemShares(user, stablecoinAmount, _exchangeRate());
     }
 
     /**
      * @notice Shared redeem clamp-and-measure before the protocol call
+     * @dev Every redemption is sized by the share count this contract debits, never by the underlying
+     *      amount. The number booked out of `s_shares` is the number handed to the protocol to burn,
+     *      so the books cannot drift above the shares actually held even if a protocol's internal rate
+     *      disagrees with the one read here. What comes back is protocol-chosen and always measured.
      * @param user: the address of the user
      * @param stablecoinAmount: the amount of stablecoin wanted
      * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
-     * @param sizeByUnderlying: true to size the protocol call by underlying; adapters may ignore this
      * @return stablecoinReceived the amount of stablecoin this contract actually received
      */
-    function _redeemInternal(
-        address user,
-        uint256 stablecoinAmount,
-        uint256 exchangeRate,
-        bool sizeByUnderlying
-    ) internal returns (uint256 stablecoinReceived) {
+    function _redeemShares(address user, uint256 stablecoinAmount, uint256 exchangeRate)
+        internal
+        returns (uint256 stablecoinReceived)
+    {
         uint256 usersShares = s_shares[user];
         uint256 sharesToRedeem = _stablecoinToShares(stablecoinAmount, exchangeRate);
         if (sharesToRedeem > usersShares) {
@@ -198,7 +170,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
             );
         }
         s_shares[user] -= sharesToRedeem;
-        stablecoinReceived = _protocolRedeem(stablecoinAmount, sharesToRedeem, sizeByUnderlying, exchangeRate);
+        stablecoinReceived = _protocolRedeem(stablecoinAmount, sharesToRedeem, exchangeRate);
         emit TokenLending__SharesRedeemed(user, stablecoinReceived, sharesToRedeem);
     }
 
@@ -231,8 +203,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
             s_shares[users[i]] = usersShares - usersSharesToRedeem;
             emit TokenLending__SharesRedeemed(users[i], purchaseAmounts[i], usersSharesToRedeem);
         }
-        uint256 stablecoinReceived =
-            _protocolRedeem(totalStablecoinAmount, totalSharesToRedeem, true, exchangeRate);
+        uint256 stablecoinReceived = _protocolRedeem(totalStablecoinAmount, totalSharesToRedeem, exchangeRate);
         if (stablecoinReceived > 0) emit TokenLending__SharesRedeemedBatch(stablecoinReceived, totalSharesToRedeem);
         else revert TokenLending__ZeroStablecoinReceived(totalStablecoinAmount);
         return stablecoinReceived;
@@ -260,17 +231,16 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
     function _protocolDeposit(uint256 stablecoinAmount) internal virtual returns (uint256 mintedShares);
 
     /**
-     * @notice redeem `stablecoinAmount` / `sharesAmount` from the lending protocol onto this contract
+     * @notice burn `sharesAmount` at the lending protocol, crediting this contract
+     * @dev Adapters size the protocol call by `sharesAmount`. `stablecoinAmount` is the caller's
+     *      (post-clamp) intent, used only for the zero-payout guards and their revert argument.
      * @param stablecoinAmount the underlying amount wanted (after any clamp)
      * @param sharesAmount the share count to burn (after any clamp)
-     * @param sizeByUnderlying true to size the protocol call by underlying; Sovryn ignores this
      * @param exchangeRate the rate already read by the caller; do not re-query the protocol
      * @return received the stablecoin amount this contract actually received
      */
-    function _protocolRedeem(
-        uint256 stablecoinAmount,
-        uint256 sharesAmount,
-        bool sizeByUnderlying,
-        uint256 exchangeRate
-    ) internal virtual returns (uint256 received);
+    function _protocolRedeem(uint256 stablecoinAmount, uint256 sharesAmount, uint256 exchangeRate)
+        internal
+        virtual
+        returns (uint256 received);
 }

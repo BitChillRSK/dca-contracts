@@ -54,22 +54,20 @@ abstract contract TropykusErc20Handler is LendingErc20Handler {
 
     /**
      * @notice Compound kToken redemption onto this contract
-     * @dev The `stablecoinAmount > 0 &&` conjunct is the Compound analogue of LayerBank skipping a
-     *      zero Pool.withdraw: `redeemUnderlying(0)` / `redeem(0)` can succeed and pay 0.
+     * @dev Sized by shares, like Sovryn: `redeem` burns exactly the count the base booked out, so the
+     *      book debit can never come out below what Tropykus burns. `redeemUnderlying` is not used —
+     *      it would let Tropykus derive the burn from its own rate instead.
+     *      The `stablecoinAmount > 0 &&` conjunct keeps a dust position (shares worth under 1 wei of
+     *      stablecoin) exitable rather than bricked; a real payout of 0 still reverts.
      */
-    function _protocolRedeem(uint256 stablecoinAmount, uint256 sharesAmount, bool sizeByUnderlying, uint256)
+    function _protocolRedeem(uint256 stablecoinAmount, uint256 sharesAmount, uint256)
         internal
         override
         returns (uint256 received)
     {
         uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(address(this));
 
-        uint256 result;
-        if (sizeByUnderlying) {
-            result = i_kToken.redeemUnderlying(stablecoinAmount);
-        } else {
-            result = i_kToken.redeem(sharesAmount);
-        }
+        uint256 result = i_kToken.redeem(sharesAmount);
 
         if (result != 0) revert TokenLending__LendingProtocolRedeemFailed(result);
 

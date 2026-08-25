@@ -228,6 +228,26 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
         assertGt(lendingBalance, 0);
     }
     
+    /**
+     * @notice `burn` takes the share count the base booked out, so the two agree to the wei even
+     *         when SIP-0094's exit fee makes the stablecoin that comes back smaller.
+     */
+    function test_sovryn_bookDebitEqualsIsusdBurn() public {
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 bookBefore = sovrynHandler.getUserShares(USER);
+        uint256 heldBefore = iSusdToken.balanceOf(address(handler));
+
+        vm.prank(address(dcaManager));
+        handler.withdrawToken(USER, WITHDRAWAL_AMOUNT);
+
+        uint256 bookDebit = bookBefore - sovrynHandler.getUserShares(USER);
+        assertGt(bookDebit, 0);
+        assertEq(bookDebit, heldBefore - iSusdToken.balanceOf(address(handler)));
+    }
+
     function test_sovryn_assetBalanceCalculation() public {
         // Test that asset balance is calculated correctly
         vm.prank(address(dcaManager));

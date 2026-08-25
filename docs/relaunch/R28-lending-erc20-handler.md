@@ -8,7 +8,7 @@ Write against the **R26 `shares` vocabulary**.
 
 ## Objective
 
-Collapse the three lending `*Erc20Handler` twins into one abstract `LendingErc20Handler is TokenHandler, TokenLending` that owns per-user share accounting, the withdraw clamp, interest math, and the batch pro-rata loop. Protocol files become adapters over a small hook set. Idle stays out. Interest always redeems onto the handler then `safeTransfer`s to the user (human named this on PR 19: drop Sovryn `burn(user)` so `_protocolRedeem` needs no recipient). No other product behavior change beyond what R27 already aligned.
+Collapse the three lending `*Erc20Handler` twins into one abstract `LendingErc20Handler is TokenHandler, TokenLending` that owns per-user share accounting, the withdraw clamp, interest math, and the batch pro-rata loop. Protocol files become adapters over a small hook set. Idle stays out. Interest always redeems onto the handler then `safeTransfer`s to the user, and **every** redemption is sized by the share count the base debits (human named both on PR 19: drop Sovryn `burn(user)` so `_protocolRedeem` needs no recipient, then drop `sizeByUnderlying` so it needs no sizing flag either). No other product behavior change beyond what R27 already aligned.
 
 ## Background
 
@@ -25,17 +25,18 @@ That duplication already produced the R27 Tropykus gaps. Do not “fix Tropykus 
 | Exchange rate | `exchangeRateCurrent()` / `exchangeRateStored()` | `tokenPrice()` | `_normalizedIncome()` (RAY `1e27`) |
 | Deposit | `mint(amount)` → Compound code | `mint(this, amount)` | `pool.supply(...)` |
 | Share measurement | `kToken.balanceOf` | `iSusd.balanceOf` | `aToken.scaledBalanceOf` |
-| Redeem | `redeemUnderlying` / `redeem`, always to handler | `burn(this, shares)` | `pool.withdraw(..., this)` |
+| Redeem | `redeem(shares)`, always to handler | `burn(this, shares)` | `pool.withdraw(..., this)` |
 | Failure convention | Compound return code | reverts | reverts; skip call if `amountOut == 0` (`InvalidAmount`) |
-| Redeem sizing | two kToken methods | shares only (`burn`) | always `withdraw`; amount is underlying- or share-sized |
+| Redeem sizing | share count (`redeemUnderlying` unused) | share count (`burn`) | share count converted to underlying — Aave has no share-sized withdraw |
 
-R25 kept Sovryn on one helper (`_redeemShares` after R26) on purpose. Do not invent a fake `_redeemByUnderlying` there.
+R25 kept Sovryn on one helper (`_redeemShares` after R26) on purpose. That helper's name is now the *only* one: R28 collapses `_redeemByUnderlying` / `_redeemByShares` / `_redeemInternal` into it.
 
 ### What does **not** fit four virtuals
 
 - **`TokenLending` stays conversion math.** `AGENTS.md` layout: `TokenLending` does not inherit `TokenHandler`. Do **not** lift `depositToken` / `s_*Balances` into `TokenLending`. The new type is `LendingErc20Handler is TokenHandler, TokenLending`.
 - **Idle is not a fourth sibling.** `IdleErc20Handler` has no shares, no exchange rate, and a batch that reverts instead of clamping. Leave it.
 - **Always redeem onto the handler.** Human named this on PR 19: Sovryn `burn(user)` is not worth a `recipient` parameter on the shared hook. All three adapters redeem to `address(this)` and measure this contract’s stablecoin delta (SIP-0094 still holds: never trust `burn`’s return). `withdrawInterest` in the base then `safeTransfer`s to the user when `received > 0`. Principal withdraw and purchases already worked that way. Do not add `withdraw(..., user)` on LayerBank.
+- **Size every redeem by shares.** Human named this on PR 19 after the recipient removal. The base already computes a matched pair (`sharesToRedeem`, `stablecoinAmount`) that differ by under one rate-unit, so the flag only ever chose between outcomes at most 1 wei apart — while Sovryn ignored it outright and LayerBank used it to pick between two numbers it derived from the same pair. Sizing by the debited share count also states the solvency invariant directly: the number booked out of `s_shares` *is* the number handed to the protocol to burn, so Tropykus and Sovryn burn it exactly and the books cannot drift above the shares held even if a protocol's internal rate disagrees with the one read here. What comes back is protocol-chosen and always measured, which every path already did. Unification had to go this way — Sovryn has no underlying-sized redeem, and inventing one stays forbidden. LayerBank is the exception that proves it: Aave has no share-sized withdraw, so it converts the debited count back to underlying and floors, keeping Aave's `rayDiv` burn at or below the debit.
 - **LayerBank constructor.** Hardcodes `TokenLending(RAY)`; extra `UNDERLYING_ASSET_ADDRESS` / `POOL()` checks. Keep those in the LayerBank adapter.
 - **Index 3 (future MoC lending)** is the payoff for doing this at all. If that handler is not on the horizon and this PR is after R9, the win is one emit site and one clamp implementation.
 
@@ -43,7 +44,7 @@ R25 kept Sovryn on one helper (`_redeemShares` after R26) on purpose. Do not inv
 
 ## Open product decisions
 
-**none** remaining. `IMPLEMENTATION_ORDER.md` Ask column is empty. Layout (`LendingErc20Handler`, not a fatter `TokenLending`) and Tropykus-in-the-base (Compound codes stay in the Tropykus adapter) were recorded here. Human named on PR 19: Sovryn interest uses the same handler-then-`safeTransfer` path as Tropykus/LayerBank; `_protocolRedeem` has no `recipient`.
+**none** remaining. `IMPLEMENTATION_ORDER.md` Ask column is empty. Layout (`LendingErc20Handler`, not a fatter `TokenLending`) and Tropykus-in-the-base (Compound codes stay in the Tropykus adapter) were recorded here. Human named two on PR 19: (1) Sovryn interest uses the same handler-then-`safeTransfer` path as Tropykus/LayerBank, so `_protocolRedeem` has no `recipient`; (2) every redeem is sized by the debited share count, so it has no `sizeByUnderlying` either and Tropykus drops `redeemUnderlying`.
 
 ## Scope
 
@@ -51,18 +52,19 @@ R25 kept Sovryn on one helper (`_redeemShares` after R26) on purpose. Do not inv
   - `mapping(address => uint256) internal s_shares`
   - `getUserShares`
   - `depositToken` template: `super.depositToken`, approve, `_protocolDeposit`, revert `TokenLending__LendingProtocolDepositFailed` if minted == 0, credit `s_shares[user]`
-  - `withdrawToken` clamp + `_redeemByUnderlying` / Sovryn `_redeemShares` + `super.withdrawToken`
+  - `withdrawToken` clamp + `_redeemShares` + `super.withdrawToken`
   - `withdrawInterest` / `getAccruedInterest`
   - `_retrieveStablecoin` / `_batchRetrieveStablecoin` (pro-rata `Math.mulDiv` round-up, insufficient-shares revert, one protocol redeem, zero-received revert)
   - Shared redeem clamp-and-measure (`TokenLending__AmountToRedeemAdjusted`) before the protocol call
 - [x] Virtual hooks (signatures may vary; this is the required surface):
   - `_exchangeRate()` (mutating-ok) and `_viewExchangeRate()`
   - `_protocolDeposit(uint256 stablecoinAmount) returns (uint256 mintedShares)` — adapter measures the right balance (`balanceOf` vs `scaledBalanceOf`) and talks to the protocol
-  - `_protocolRedeem(uint256 stablecoinAmount, uint256 sharesAmount, bool sizeByUnderlying, uint256 exchangeRate) returns (uint256 received)` — always credits this contract. Tropykus uses the Compound code; Sovryn ignores `sizeByUnderlying` and `burn`s to `address(this)`; LayerBank computes `amountOut` from the caller-supplied rate (do not re-query the Pool), skips the Pool call if 0, otherwise `withdraw` to the handler. Interest payout is `safeTransfer` in the base, not in the adapters. Adapter hook impls are `override` not `virtual`: Moc/Dex leaves do not specialize them; a test that needs to stub `_protocolRedeem` should subclass `LendingErc20Handler` directly.
+  - `_protocolRedeem(uint256 stablecoinAmount, uint256 sharesAmount, uint256 exchangeRate) returns (uint256 received)` — always credits this contract, always sized by `sharesAmount`. Tropykus `redeem(sharesAmount)` + the Compound code; Sovryn `burn(address(this), sharesAmount)`; LayerBank derives `amountOut` from `sharesAmount` at the caller-supplied rate (do not re-query the Pool), skips the Pool call if 0, otherwise `withdraw`s to the handler. `stablecoinAmount` survives only as the zero-payout guards' predicate and revert argument. Interest payout is `safeTransfer` in the base, not in the adapters. Adapter hook impls are `override` not `virtual`: Moc/Dex leaves do not specialize them; a test that needs to stub `_protocolRedeem` should subclass `LendingErc20Handler` directly.
 - [x] `TropykusErc20Handler`, `SovrynErc20Handler`, `LayerBankErc20Handler` become thin adapters (immutables, constructor checks, hook impls). Keep protocol-specific interfaces next to each handler.
 - [x] `*DocHandlerMoc` (and Sovryn/Tropykus Dex) diamond resolvers: change the parent name to `LendingErc20Handler`; do not try to delete the three resolver files.
 - [x] If R9 has already landed, move `TokenLending__UserSharesUpdated` emits into `LendingErc20Handler` (do not leave copies in the adapters). If R9 has not landed, emit nothing new here — R9 adds the event once in the base.
-- [x] Existing unit tests for all three handlers keep passing with no behavior change vs post-R27 Tropykus. Add no new product tests beyond whatever the extract breaks.
+- [x] Collapse `_redeemByUnderlying` / `_redeemByShares` / `_redeemInternal` into one `_redeemShares(user, stablecoinAmount, exchangeRate)`; drop `redeemUnderlying` from `IkToken` once nothing calls it (mocks keep it — they model the live kToken ABI).
+- [x] Existing unit tests for all three handlers keep passing. The sizing change does move Tropykus behavior, so pin the new invariant: book debit equals the protocol burn on Tropykus and Sovryn, and never falls below it on LayerBank.
 
 ## Out of scope
 
@@ -71,7 +73,7 @@ R25 kept Sovryn on one helper (`_redeemShares` after R26) on purpose. Do not inv
 - [ ] Making `TokenLending` inherit `TokenHandler`.
 - [ ] Handler replacement in `OperationsAdmin` (still unassigned).
 - [ ] LayerBank interest to `withdraw(..., user)` without a handler-side measure.
-- [ ] Inventing `_redeemByUnderlying` on Sovryn.
+- [ ] Inventing an underlying-sized redeem on Sovryn, or re-deriving one anywhere else.
 - [ ] R10 natspec rewrite beyond the new base and moved declarations.
 - [ ] Deploy/CI index map.
 
@@ -82,7 +84,10 @@ R25 kept Sovryn on one helper (`_redeemShares` after R26) on purpose. Do not inv
 - `src/tropykus-legacy/TropykusErc20Handler.sol` and Moc/Dex leaves
 - `src/sovryn/SovrynErc20Handler.sol` and Moc/Dex leaves
 - `src/layerbank/LayerBankErc20Handler.sol` and Moc leaf
+- `src/tropykus-legacy/IkToken.sol` — `redeemUnderlying` declaration removed
 - Matching handler unit tests if imports / inheritance names break
+- `test/ai-generated/unit/HandlerTestHarness.t.sol` — `handlerShareBalance()` hook + the shared book-debit-covers-burn test
+- Per-adapter book-debit tests in the Tropykus / Sovryn / LayerBank suites
 - `test/ai-generated/unit/HandlerTestHarness.t.sol` — shared `withdrawInterest` assertion is `assertGt`, not a no-op `assertGe`
 - `test/mocks/MockIsusdToken.sol` — `setSilentZeroPayout` so Sovryn’s interest path can be mutated the same way as kDOC / aToken
 - `test/ai-generated/unit/sovryn/SovrynErc20HandlerTest.t.sol` — drop the dead `burnToSpecificRecipient` test; give `withdrawInterest` a real payout assertion; add the sibling zero-payout revert
@@ -110,6 +115,7 @@ Fork tests: no new fork-specific assertions; run before push per `AGENTS.md`.
 - [x] Idle handler untouched.
 - [x] Tropykus Compound return codes exist only in the Tropykus adapter.
 - [x] All three adapters redeem onto the handler and measure this contract’s delta. Interest `safeTransfer` lives in `LendingErc20Handler.withdrawInterest`. SIP-0094 still measures the burn recipient (now always the handler).
+- [x] One redeem helper and one sizing rule: `_protocolRedeem` takes no `bool`, and no adapter calls an underlying-sized protocol method. `s_shares` debit == protocol burn on Tropykus and Sovryn, `>=` on LayerBank, pinned by tests.
 - [x] `make check` and both fork targets pass. Behavior matches post-R27.
 
 ## Reviewer checklist

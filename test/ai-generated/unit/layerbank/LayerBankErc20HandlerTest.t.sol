@@ -55,6 +55,11 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         return IERC20(address(aToken));
     }
 
+    /// @dev LayerBank's share is the scaled balance; `balanceOf` rebases and is not comparable.
+    function handlerShareBalance() internal view override returns (uint256) {
+        return aToken.scaledBalanceOf(address(handler));
+    }
+
     function setupHandlerSpecifics() internal override {
         aToken = new MockLayerBankAToken(address(stablecoin));
         pool = new MockLayerBankPool(aToken);
@@ -131,6 +136,32 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         assertEq(aToken.scaledBalanceOf(address(handler)), scaledAtDeposit);
         assertEq(layerbankHandler.getUserShares(USER), scaledAtDeposit);
         assertGt(aToken.balanceOf(address(handler)), scaledAtDeposit);
+    }
+
+    /**
+     * @notice LayerBank is the one adapter that cannot be share-exact: Aave has no share-sized
+     *         withdraw, so the count the base booked out is converted to underlying and Aave burns
+     *         `amount.rayDiv(index)` back out of it.
+     * @dev What keeps that burn at or below the book debit is that the withdraw amount is *derived*
+     *      from the debited count and floors on the way out, so the round trip can only shrink. This
+     *      pins that direction: it fails if LayerBank goes back to passing the caller's requested
+     *      underlying straight through, where Aave sizes the burn off its own index instead.
+     */
+    function test_layerbank_bookDebitNeverBelowScaledBurn() public {
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 bookBefore = layerbankHandler.getUserShares(USER);
+        uint256 scaledBefore = aToken.scaledBalanceOf(address(handler));
+
+        vm.prank(address(dcaManager));
+        handler.withdrawToken(USER, WITHDRAWAL_AMOUNT);
+
+        uint256 bookDebit = bookBefore - layerbankHandler.getUserShares(USER);
+        assertGt(bookDebit, 0);
+        assertGe(bookDebit, scaledBefore - aToken.scaledBalanceOf(address(handler)));
+        assertLe(layerbankHandler.getUserShares(USER), aToken.scaledBalanceOf(address(handler)));
     }
 
     function test_layerbank_exchangeRateEffect() public {
