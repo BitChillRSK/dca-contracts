@@ -78,10 +78,10 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending {
         returns (uint256)
     {
         uint256 exchangeRate = i_kToken.exchangeRateCurrent();
-        uint256 stablecoinInTropykus = _lendingTokenToStablecoin(s_kTokenBalances[user], exchangeRate);
-        if (stablecoinInTropykus < withdrawalAmount) {
-            emit TokenLending__WithdrawalAmountAdjusted(user, withdrawalAmount, stablecoinInTropykus);
-            withdrawalAmount = stablecoinInTropykus;
+        uint256 totalStablecoinInLending = _sharesToStablecoin(s_kTokenBalances[user], exchangeRate);
+        if (totalStablecoinInLending < withdrawalAmount) {
+            emit TokenLending__WithdrawalAmountAdjusted(user, withdrawalAmount, totalStablecoinInLending);
+            withdrawalAmount = totalStablecoinInLending;
         }
         // @notice we pay out what the redemption actually produced, which may be less than requested
         withdrawalAmount = _redeemByUnderlying(user, withdrawalAmount, exchangeRate);
@@ -89,11 +89,11 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending {
     }
 
     /**
-     * @notice get the users lending token balance
+     * @notice get the users shares balance
      * @param user: the address of the user
-     * @return the users lending token balance
+     * @return the users shares balance
      */
-    function getUsersLendingTokenBalance(address user) external view override returns (uint256) {
+    function getUserShares(address user) external view override returns (uint256) {
         return s_kTokenBalances[user];
     }
 
@@ -104,7 +104,7 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending {
      */
     function withdrawInterest(address user, uint256 stablecoinLockedInDcaSchedules) external override onlyDcaManager {
         uint256 exchangeRate = i_kToken.exchangeRateCurrent();
-        uint256 totalStablecoinInLending = _lendingTokenToStablecoin(s_kTokenBalances[user], exchangeRate);
+        uint256 totalStablecoinInLending = _sharesToStablecoin(s_kTokenBalances[user], exchangeRate);
         if (totalStablecoinInLending <= stablecoinLockedInDcaSchedules) {
             return; // No interest to withdraw
         }
@@ -128,7 +128,7 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending {
         onlyDcaManager
         returns (uint256 stablecoinInterestAmount)
     {
-        uint256 totalStablecoinInLending = _lendingTokenToStablecoin(s_kTokenBalances[user], i_kToken.exchangeRateStored());
+        uint256 totalStablecoinInLending = _sharesToStablecoin(s_kTokenBalances[user], i_kToken.exchangeRateStored());
         stablecoinInterestAmount = totalStablecoinInLending > stablecoinLockedInDcaSchedules ? totalStablecoinInLending - stablecoinLockedInDcaSchedules : 0;
     }
 
@@ -150,7 +150,7 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending {
      * @notice redeem the user's kToken sized by underlying: ask Tropykus for `stablecoinAmount` of stablecoin
      * @param user: the address of the user
      * @param stablecoinAmount: the amount of stablecoin wanted
-     * @param exchangeRate: the exchange rate of stablecoin to lending token
+     * @param exchangeRate: the exchange rate of stablecoin to shares
      * @return the amount of stablecoin this contract actually received
      */
     function _redeemByUnderlying(address user, uint256 stablecoinAmount, uint256 exchangeRate) internal virtual returns (uint256) {
@@ -161,7 +161,7 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending {
      * @notice redeem the user's kToken sized by shares: burn the share count `stablecoinAmount` converts to
      * @param user: the address of the user
      * @param stablecoinAmount: the amount of stablecoin wanted
-     * @param exchangeRate: the exchange rate of stablecoin to lending token
+     * @param exchangeRate: the exchange rate of stablecoin to shares
      * @return stablecoinReceived the amount of stablecoin this contract actually received
      */
     function _redeemByShares(address user, uint256 stablecoinAmount, uint256 exchangeRate)
@@ -175,7 +175,7 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending {
      * @notice Internal kToken redemption, sized either by underlying amount or by share count
      * @param user: the address of the user
      * @param stablecoinAmount: the amount of stablecoin wanted
-     * @param exchangeRate: the exchange rate of stablecoin to lending token
+     * @param exchangeRate: the exchange rate of stablecoin to shares
      * @param sizeByUnderlying: true to call kToken's redeemUnderlying, false to call its redeem
      * @return stablecoinReceived the amount of stablecoin this contract actually received
      */
@@ -184,12 +184,12 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending {
         returns (uint256 stablecoinReceived) 
     {
         uint256 usersKtokenBalance = s_kTokenBalances[user];
-        uint256 kTokenToRedeem = _stablecoinToLendingToken(stablecoinAmount, exchangeRate);
+        uint256 kTokenToRedeem = _stablecoinToShares(stablecoinAmount, exchangeRate);
         if (kTokenToRedeem > usersKtokenBalance) {
             uint256 oldKtokenToRedeem = kTokenToRedeem;
             uint256 oldStablecoinAmount = stablecoinAmount;
             kTokenToRedeem = usersKtokenBalance;
-            stablecoinAmount = _lendingTokenToStablecoin(kTokenToRedeem, exchangeRate);
+            stablecoinAmount = _sharesToStablecoin(kTokenToRedeem, exchangeRate);
             emit TokenLending__AmountToRedeemAdjusted(user, oldKtokenToRedeem, kTokenToRedeem, oldStablecoinAmount, stablecoinAmount);
         }
         s_kTokenBalances[user] -= kTokenToRedeem;
@@ -210,7 +210,7 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending {
             if (stablecoinAmount > 0 && stablecoinReceived == 0) {
                 revert TokenLending__ZeroStablecoinReceived(stablecoinAmount);
             }
-            emit TokenLending__LendingTokenRedeemed(user, stablecoinReceived, kTokenToRedeem);
+            emit TokenLending__SharesRedeemed(user, stablecoinReceived, kTokenToRedeem);
         } else {
             revert TokenLending__LendingProtocolRedeemFailed(result);
         }
@@ -228,19 +228,19 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending {
         virtual
         returns (uint256)
     {
-        uint256 totalKtokenToRedeem = _stablecoinToLendingToken(totalStablecoinAmount, i_kToken.exchangeRateCurrent());
+        uint256 totalKtokenToRedeem = _stablecoinToShares(totalStablecoinAmount, i_kToken.exchangeRateCurrent());
         uint256 numOfPurchases = users.length;
         for (uint256 i; i < numOfPurchases; ++i) {
             // @notice the amount of kToken each user redeems is proportional to the ratio of
             // that user's stablecoin being retrieved over the total being retrieved
-            // @notice Rounds up the lending token amount to avoid underestimating the amount to subtract from each user's balance
+            // @notice Rounds up the shares amount to avoid underestimating the amount to subtract from each user's balance
             uint256 usersKtokenToRedeem = Math.mulDiv(totalKtokenToRedeem, purchaseAmounts[i], totalStablecoinAmount, Math.Rounding.Up);
             uint256 usersKtokenBalance = s_kTokenBalances[users[i]];
             if (usersKtokenToRedeem > usersKtokenBalance) {
-                revert TokenLending__InsufficientLendingTokenBalance(users[i], usersKtokenToRedeem, usersKtokenBalance);
+                revert TokenLending__InsufficientShares(users[i], usersKtokenToRedeem, usersKtokenBalance);
             }
             s_kTokenBalances[users[i]] = usersKtokenBalance - usersKtokenToRedeem;
-            emit TokenLending__LendingTokenRedeemed(users[i], purchaseAmounts[i], usersKtokenToRedeem);
+            emit TokenLending__SharesRedeemed(users[i], purchaseAmounts[i], usersKtokenToRedeem);
         }
         
         uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(address(this));
@@ -249,7 +249,7 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending {
             uint256 stablecoinBalanceAfter = i_stableToken.balanceOf(address(this));
             uint256 stablecoinReceived = stablecoinBalanceAfter - stablecoinBalanceBefore;
             
-            emit TokenLending__LendingTokenRedeemedBatch(stablecoinReceived, totalKtokenToRedeem);
+            emit TokenLending__SharesRedeemedBatch(stablecoinReceived, totalKtokenToRedeem);
             return stablecoinReceived;
         }
         else revert TokenLending__LendingProtocolRedeemFailed(result);

@@ -73,7 +73,7 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
         IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(docToken))[0];
         assertEq(schedule.lendingProtocolIndex, LAYERBANK_INDEX);
         assertEq(schedule.tokenBalance, DEPOSIT);
-        assertGt(handler.getUsersLendingTokenBalance(USER), 0);
+        assertGt(handler.getUserShares(USER), 0);
         assertEq(docToken.balanceOf(address(handler)), 0);
         assertEq(
             keccak256(bytes(operationsAdmin.getLendingProtocolName(LAYERBANK_INDEX))), keccak256(bytes("layerbank"))
@@ -85,13 +85,13 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, LAYERBANK_INDEX);
         bytes32 scheduleId = dcaManager.getScheduleId(USER, address(docToken), 0);
 
-        uint256 lTokensBefore = handler.getUsersLendingTokenBalance(USER);
+        uint256 lTokensBefore = handler.getUserShares(USER);
 
         vm.prank(SWAPPER);
         dcaManager.buyRbtc(USER, address(docToken), 0, scheduleId);
 
         assertGt(dcaManager.getAccumulatedRbtcBalance(USER, address(docToken), LAYERBANK_INDEX), 0);
-        assertLt(handler.getUsersLendingTokenBalance(USER), lTokensBefore);
+        assertLt(handler.getUserShares(USER), lTokensBefore);
         assertEq(dcaManager.getScheduleTokenBalance(USER, address(docToken), 0), DEPOSIT - PURCHASE);
 
         uint256 userDocBefore = docToken.balanceOf(USER);

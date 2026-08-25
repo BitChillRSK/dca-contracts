@@ -10,7 +10,7 @@ import "script/Constants.sol";
 
 /**
  * @title IdleDocHandlerMocTest
- * @notice MoC purchase paths for the idle DOC handler. No lending token.
+ * @notice MoC purchase paths for the idle DOC handler. No shares.
  */
 contract IdleDocHandlerMocTest is Test {
     address internal USER = address(0xAAA1);
@@ -107,7 +107,7 @@ contract IdleDocHandlerMocTest is Test {
         assertEq(docToken.balanceOf(address(handler)), deposit1 + deposit2 - purchaseAmounts[0] - purchaseAmounts[1]);
     }
 
-    function test_buyRbtc_doesNotMintLendingToken() public {
+    function test_buyRbtc_doesNotMintShareToken() public {
         handler.depositToken(USER, 500 ether);
         handler.buyRbtc(USER, keccak256("schedule"), 100 ether);
 

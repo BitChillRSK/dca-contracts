@@ -40,7 +40,7 @@ contract IdleErc20HandlerTest is HandlerTestHarness {
         return false;
     }
 
-    function getLendingToken() internal pure override returns (IERC20) {
+    function getShareToken() internal pure override returns (IERC20) {
         return IERC20(address(0));
     }
 

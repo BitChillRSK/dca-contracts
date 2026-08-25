@@ -134,7 +134,7 @@ contract FullWithdrawalTest is DcaDappTest {
             assertEq(_scheduleBalance(i), scheduleBalance, "another schedule's principal was touched");
         }
         assertGt(
-            stablecoinHandler.getUsersLendingTokenBalance(USER),
+            stablecoinHandler.getUserShares(USER),
             0,
             "the shares backing the remaining schedules were burnt"
         );

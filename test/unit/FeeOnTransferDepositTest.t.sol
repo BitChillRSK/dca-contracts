@@ -276,13 +276,13 @@ contract FeeOnTransferDepositTest is Test {
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = RECEIVED;
 
-        uint256 availableShares = tropykusHandler.getUsersLendingTokenBalance(USER);
+        uint256 availableShares = tropykusHandler.getUserShares(USER);
         uint256 rate = kToken.exchangeRateStored();
         uint256 requestedShares = (RECEIVED * EXCHANGE_RATE_DECIMALS + rate - 1) / rate;
         vm.prank(SWAPPER);
         vm.expectRevert(
             abi.encodeWithSelector(
-                ITokenLending.TokenLending__InsufficientLendingTokenBalance.selector,
+                ITokenLending.TokenLending__InsufficientShares.selector,
                 USER,
                 requestedShares,
                 availableShares
@@ -340,7 +340,7 @@ contract FeeOnTransferDepositTest is Test {
     }
 
     function _tropykusUnderlying(address who) private view returns (uint256) {
-        uint256 shares = tropykusHandler.getUsersLendingTokenBalance(who);
+        uint256 shares = tropykusHandler.getUserShares(who);
         uint256 rate = kToken.exchangeRateStored();
         return shares * rate / EXCHANGE_RATE_DECIMALS;
     }

@@ -20,7 +20,7 @@ contract DeployUsdrifHandler is DeployBase {
     struct DeployParams {
         address dcaManagerAddress;
         address tokenAddress;
-        address lendingTokenAddress;
+        address shareTokenAddress;
         IPurchaseUniswap.UniswapSettings uniswapSettings;
         address feeCollector;
         IFeeHandler.FeeSettings feeSettings;
@@ -70,7 +70,7 @@ contract DeployUsdrifHandler is DeployBase {
         DeployParams memory params = DeployParams({
             dcaManagerAddress: networkConfig.dcaManagerAddress,
             tokenAddress: networkConfig.usdrifTokenAddress,
-            lendingTokenAddress: networkConfig.kUsdrifTokenAddress,
+            shareTokenAddress: networkConfig.kUsdrifTokenAddress,
             uniswapSettings: uniswapSettings,
             feeCollector: feeCollector,
             feeSettings: feeSettings,
@@ -82,7 +82,7 @@ contract DeployUsdrifHandler is DeployBase {
         TropykusErc20HandlerDex usdrifHandler = new TropykusErc20HandlerDex(
             params.dcaManagerAddress,
             params.tokenAddress,
-            params.lendingTokenAddress,
+            params.shareTokenAddress,
             params.uniswapSettings,
             params.feeCollector,
             params.feeSettings,

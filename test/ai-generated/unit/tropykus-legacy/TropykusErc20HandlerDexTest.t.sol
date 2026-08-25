@@ -80,7 +80,7 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         return true; // Tropykus handlers support lending
     }
     
-    function getLendingToken() internal view override returns (IERC20) {
+    function getShareToken() internal view override returns (IERC20) {
         return IERC20(address(kToken));
     }
     
@@ -230,7 +230,7 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         handler.depositToken(USER, DEPOSIT_AMOUNT);
         
         // Check lending balance (inherited from Tropykus base)
-        uint256 lendingBalance = tropykusDexHandler.getUsersLendingTokenBalance(USER);
+        uint256 lendingBalance = tropykusDexHandler.getUserShares(USER);
         assertGt(lendingBalance, 0);
         
         // Check kToken balance increased
@@ -334,7 +334,7 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         handler.depositToken(USER, DEPOSIT_AMOUNT);
         
         // Verify initial state
-        uint256 initialLendingBalance = tropykusDexHandler.getUsersLendingTokenBalance(USER);
+        uint256 initialLendingBalance = tropykusDexHandler.getUserShares(USER);
         assertGt(initialLendingBalance, 0);
         
         uint256 purchaseAmount = 100 ether;
@@ -345,7 +345,7 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         tropykusDexHandler.buyRbtc(USER, mockScheduleId, purchaseAmount);
         
         // Verify the override was called - lending balance should be reduced
-        uint256 finalLendingBalance = tropykusDexHandler.getUsersLendingTokenBalance(USER);
+        uint256 finalLendingBalance = tropykusDexHandler.getUserShares(USER);
         assertLt(finalLendingBalance, initialLendingBalance);
         
         // Verify RBTC was accumulated
@@ -379,8 +379,8 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         handler.depositToken(user2, depositAmount2);
         
         // Verify initial state
-        uint256 initialBalance1 = tropykusDexHandler.getUsersLendingTokenBalance(user1);
-        uint256 initialBalance2 = tropykusDexHandler.getUsersLendingTokenBalance(user2);
+        uint256 initialBalance1 = tropykusDexHandler.getUserShares(user1);
+        uint256 initialBalance2 = tropykusDexHandler.getUserShares(user2);
         assertGt(initialBalance1, 0);
         assertGt(initialBalance2, 0);
         
@@ -402,8 +402,8 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         tropykusDexHandler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts);
         
         // Verify the override was called - lending balances should be reduced
-        uint256 finalBalance1 = tropykusDexHandler.getUsersLendingTokenBalance(user1);
-        uint256 finalBalance2 = tropykusDexHandler.getUsersLendingTokenBalance(user2);
+        uint256 finalBalance1 = tropykusDexHandler.getUserShares(user1);
+        uint256 finalBalance2 = tropykusDexHandler.getUserShares(user2);
         assertLt(finalBalance1, initialBalance1);
         assertLt(finalBalance2, initialBalance2);
         

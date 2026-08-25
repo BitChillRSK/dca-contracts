@@ -21,7 +21,7 @@ contract DeployMocSwaps is DeployBase {
         Protocol protocol;
         address dcaManager;
         address tokenAddress;
-        address lendingToken;
+        address shareToken;
         address mocProxy;
         address feeCollector;
     }
@@ -39,7 +39,7 @@ contract DeployMocSwaps is DeployBase {
                 new TropykusDocHandlerMoc(
                     params.dcaManager, 
                     params.tokenAddress, 
-                    params.lendingToken, 
+                    params.shareToken, 
                     params.feeCollector, 
                     params.mocProxy, 
                     feeSettings,
@@ -51,7 +51,7 @@ contract DeployMocSwaps is DeployBase {
                 new SovrynDocHandlerMoc(
                     params.dcaManager, 
                     params.tokenAddress, 
-                    params.lendingToken, 
+                    params.shareToken, 
                     params.feeCollector, 
                     params.mocProxy, 
                     feeSettings,
@@ -119,19 +119,19 @@ contract DeployMocSwaps is DeployBase {
         if (environment == Environment.LOCAL || environment == Environment.FORK) {
             console.log("Deploying single handler for local/fork environment");
             
-            // Get the appropriate lending token address based on protocol
-            address lendingTokenAddress = helperConfig.getLendingTokenAddress();
-            if (lendingTokenAddress == address(0)) {
-                revert("Lending token not available for the selected combination");
+            // Get the appropriate shares address based on protocol
+            address shareTokenAddress = helperConfig.getShareTokenAddress();
+            if (shareTokenAddress == address(0)) {
+                revert("Shares not available for the selected combination");
             }
             
-            console.log("Lending token address:", lendingTokenAddress);
+            console.log("Shares address:", shareTokenAddress);
             
             DeployParams memory params = DeployParams({
                 protocol: protocol,
                 dcaManager: address(dcaManager),
                 tokenAddress: docTokenAddress,
-                lendingToken: lendingTokenAddress,
+                shareToken: shareTokenAddress,
                 mocProxy: mocProxyAddress,
                 feeCollector: feeCollector
             });
@@ -152,18 +152,18 @@ contract DeployMocSwaps is DeployBase {
             operationsAdmin.addOrUpdateLendingProtocol(TROPYKUS_STRING, TROPYKUS_INDEX); // index 1
             operationsAdmin.addOrUpdateLendingProtocol(SOVRYN_STRING, SOVRYN_INDEX); // index 2
 
-            // Deploy Tropykus handler if there's a valid lending token
-            address tropykusLendingToken = networkConfig.kDocAddress;
+            // Deploy Tropykus handler if there's a valid shares
+            address tropykusShareToken = networkConfig.kDocAddress;
             
-            if (tropykusLendingToken == address(0)) {
-                console.log("Warning: Tropykus lending token not available for this stablecoin");
+            if (tropykusShareToken == address(0)) {
+                console.log("Warning: Tropykus shares not available for this stablecoin");
             } else {
                 // Deploy Tropykus handler
                 DeployParams memory tropykusParams = DeployParams({
                     protocol: Protocol.TROPYKUS,
                     dcaManager: address(dcaManager),
                     tokenAddress: docTokenAddress,
-                    lendingToken: tropykusLendingToken,
+                    shareToken: tropykusShareToken,
                     mocProxy: mocProxyAddress,
                     feeCollector: feeCollector
                 });
@@ -182,18 +182,18 @@ contract DeployMocSwaps is DeployBase {
 
             // Only deploy Sovryn handler if the stablecoin is supported
             if (!isUSDRIF) {
-                // Get Sovryn lending token address
-                address sovrynLendingToken = networkConfig.iSusdAddress;
+                // Get Sovryn shares address
+                address sovrynShareToken = networkConfig.iSusdAddress;
                 
-                if (sovrynLendingToken == address(0)) {
-                    console.log("Warning: Sovryn lending token not available for this stablecoin");
+                if (sovrynShareToken == address(0)) {
+                    console.log("Warning: Sovryn shares not available for this stablecoin");
                 } else {
                     // Deploy Sovryn handler
                     DeployParams memory sovrynParams = DeployParams({
                         protocol: Protocol.SOVRYN,
                         dcaManager: address(dcaManager),
                         tokenAddress: docTokenAddress,
-                        lendingToken: sovrynLendingToken,
+                        shareToken: sovrynShareToken,
                         mocProxy: mocProxyAddress,
                         feeCollector: feeCollector
                     });

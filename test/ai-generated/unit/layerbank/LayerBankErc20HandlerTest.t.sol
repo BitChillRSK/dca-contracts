@@ -51,7 +51,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         return true;
     }
 
-    function getLendingToken() internal view override returns (IERC20) {
+    function getShareToken() internal view override returns (IERC20) {
         return IERC20(address(aToken));
     }
 
@@ -102,7 +102,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
 
         uint256 finalScaled = aToken.scaledBalanceOf(address(handler));
         assertGt(finalScaled, initialScaled);
-        assertEq(layerbankHandler.getUsersLendingTokenBalance(USER), finalScaled - initialScaled);
+        assertEq(layerbankHandler.getUserShares(USER), finalScaled - initialScaled);
         assertEq(stablecoin.balanceOf(address(handler)), 0);
     }
 
@@ -113,7 +113,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);
 
-        uint256 credited = layerbankHandler.getUsersLendingTokenBalance(USER);
+        uint256 credited = layerbankHandler.getUserShares(USER);
         assertEq(credited, overrideScaled);
         assertEq(credited, aToken.scaledBalanceOf(address(handler)));
     }
@@ -123,13 +123,13 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         handler.depositToken(USER, DEPOSIT_AMOUNT);
 
         uint256 scaledAtDeposit = aToken.scaledBalanceOf(address(handler));
-        assertEq(layerbankHandler.getUsersLendingTokenBalance(USER), scaledAtDeposit);
+        assertEq(layerbankHandler.getUserShares(USER), scaledAtDeposit);
         assertEq(aToken.balanceOf(address(handler)), scaledAtDeposit); // index == RAY at t0
 
         vm.warp(block.timestamp + 365 days);
 
         assertEq(aToken.scaledBalanceOf(address(handler)), scaledAtDeposit);
-        assertEq(layerbankHandler.getUsersLendingTokenBalance(USER), scaledAtDeposit);
+        assertEq(layerbankHandler.getUserShares(USER), scaledAtDeposit);
         assertGt(aToken.balanceOf(address(handler)), scaledAtDeposit);
     }
 
@@ -155,7 +155,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
 
         uint256 actualWithdrawn = stablecoin.balanceOf(USER) - userBalanceBeforeWithdraw;
         assertLe(actualWithdrawn, DEPOSIT_AMOUNT);
-        assertEq(layerbankHandler.getUsersLendingTokenBalance(USER), 0);
+        assertEq(layerbankHandler.getUserShares(USER), 0);
     }
 
     function test_layerbank_interestWithdrawal() public {
@@ -207,7 +207,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         vm.expectRevert(ITokenLending.TokenLending__LendingProtocolDepositFailed.selector);
         handler.depositToken(USER, DEPOSIT_AMOUNT);
 
-        assertEq(layerbankHandler.getUsersLendingTokenBalance(USER), 0);
+        assertEq(layerbankHandler.getUserShares(USER), 0);
         assertEq(aToken.scaledBalanceOf(address(handler)), 0);
     }
 
@@ -215,7 +215,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);
 
-        uint256 aTokenBalanceBefore = layerbankHandler.getUsersLendingTokenBalance(USER);
+        uint256 aTokenBalanceBefore = layerbankHandler.getUserShares(USER);
         uint256 userBalanceBefore = stablecoin.balanceOf(USER);
 
         aToken.setSilentZeroPayout(true);
@@ -228,7 +228,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         handler.withdrawToken(USER, WITHDRAWAL_AMOUNT);
 
         assertEq(stablecoin.balanceOf(USER), userBalanceBefore);
-        assertEq(layerbankHandler.getUsersLendingTokenBalance(USER), aTokenBalanceBefore);
+        assertEq(layerbankHandler.getUserShares(USER), aTokenBalanceBefore);
     }
 
     /**
@@ -246,13 +246,13 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         pool.setWithdrawReturnOverride(WITHDRAWAL_AMOUNT, true);
 
         uint256 userBalanceBefore = stablecoin.balanceOf(USER);
-        uint256 sharesBefore = layerbankHandler.getUsersLendingTokenBalance(USER);
+        uint256 sharesBefore = layerbankHandler.getUserShares(USER);
 
         vm.prank(address(dcaManager));
         handler.withdrawToken(USER, WITHDRAWAL_AMOUNT);
 
         assertEq(stablecoin.balanceOf(USER) - userBalanceBefore, shortfall);
-        assertLt(layerbankHandler.getUsersLendingTokenBalance(USER), sharesBefore);
+        assertLt(layerbankHandler.getUserShares(USER), sharesBefore);
     }
 
     function test_layerbank_zeroPayoutInterestWithdrawalReverts() public {
@@ -260,7 +260,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         handler.depositToken(USER, DEPOSIT_AMOUNT);
         vm.warp(block.timestamp + 365 days);
 
-        uint256 aTokenBalanceBefore = layerbankHandler.getUsersLendingTokenBalance(USER);
+        uint256 aTokenBalanceBefore = layerbankHandler.getUserShares(USER);
         uint256 userBalanceBefore = stablecoin.balanceOf(USER);
 
         aToken.setSilentZeroPayout(true);
@@ -270,7 +270,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         layerbankHandler.withdrawInterest(USER, DEPOSIT_AMOUNT / 2);
 
         assertEq(stablecoin.balanceOf(USER), userBalanceBefore);
-        assertEq(layerbankHandler.getUsersLendingTokenBalance(USER), aTokenBalanceBefore);
+        assertEq(layerbankHandler.getUserShares(USER), aTokenBalanceBefore);
     }
 
     function test_layerbank_batchRetrieveStablecoin_exceedsBalance_reverts() public {
@@ -289,7 +289,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         handler.depositToken(user1, DEPOSIT_AMOUNT / 10);
 
         uint256 excessiveAmount = DEPOSIT_AMOUNT * 2;
-        uint256 available = layerbankHandler.getUsersLendingTokenBalance(user1);
+        uint256 available = layerbankHandler.getUserShares(user1);
         uint256 exchangeRate = aToken.getNormalizedIncome();
         uint256 totalAtokenToRedeem =
             Math.mulDiv(excessiveAmount, aToken.RAY(), exchangeRate, Math.Rounding.Up);
@@ -297,7 +297,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                ITokenLending.TokenLending__InsufficientLendingTokenBalance.selector, user1, requested, available
+                ITokenLending.TokenLending__InsufficientShares.selector, user1, requested, available
             )
         );
         layerbankHandler.testBatchRetrieveStablecoin(users, amounts, excessiveAmount);
@@ -318,7 +318,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         vm.prank(address(dcaManager));
         handler.depositToken(user1, DEPOSIT_AMOUNT);
 
-        uint256 aTokenBalanceBefore = layerbankHandler.getUsersLendingTokenBalance(user1);
+        uint256 aTokenBalanceBefore = layerbankHandler.getUserShares(user1);
 
         aToken.setSilentZeroPayout(true);
 
@@ -327,7 +327,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         );
         layerbankHandler.testBatchRetrieveStablecoin(users, amounts, amounts[0]);
 
-        assertEq(layerbankHandler.getUsersLendingTokenBalance(user1), aTokenBalanceBefore);
+        assertEq(layerbankHandler.getUserShares(user1), aTokenBalanceBefore);
     }
 }
 

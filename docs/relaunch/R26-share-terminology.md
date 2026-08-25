@@ -1,6 +1,6 @@
 # R26 — Share terminology for the lending receipt token
 
-Status: **not started** · Assigned: yes · Optional/further-review: no
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
 PR 17. Stack on R25 ([#59](https://github.com/BitChillRSK/dca-contracts/pull/59)). Land **before** R22 deploy/CI (PR 18) and well before R9 (PR 20).
 
@@ -30,23 +30,23 @@ Keep **stablecoin** as the asset noun. Do not adopt ERC-4626's `assets` — that
 
 ## Scope
 
-- [ ] **Shared getter:** `getUsersLendingTokenBalance(address)` → `getUserShares(address)` in `ITokenLending` and every implementing handler (Tropykus, Sovryn, LayerBank, and any test double).
-- [ ] **Conversion helpers** on `TokenLending`: `_stablecoinToLendingToken` → `_stablecoinToShares`; `_lendingTokenToStablecoin` → `_sharesToStablecoin`.
-- [ ] **Events / errors** on `ITokenLending`:
+- [x] **Shared getter:** `getUsersLendingTokenBalance(address)` → `getUserShares(address)` in `ITokenLending` and every implementing handler (Tropykus, Sovryn, LayerBank, and any test double).
+- [x] **Conversion helpers** on `TokenLending`: `_stablecoinToLendingToken` → `_stablecoinToShares`; `_lendingTokenToStablecoin` → `_sharesToStablecoin`.
+- [x] **Events / errors** on `ITokenLending`:
   - `TokenLending__LendingTokenRedeemed` → `TokenLending__SharesRedeemed`
   - `TokenLending__LendingTokenRedeemedBatch` → `TokenLending__SharesRedeemedBatch`
   - `TokenLending__InsufficientLendingTokenBalance` → `TokenLending__InsufficientShares`
-- [ ] **Event parameter names** carrying the same noun: `originalLendingTokenAmount` / `adjustedLendingTokenAmount` on `TokenLending__AmountToRedeemAdjusted`, and `lendingTokenAmount` / `lendingTokenAmountRedeemed`, → the `*Shares` forms. Parameter **order and indexing stay exactly as they are.**
-- [ ] **Sovryn's redeem helper:** `_redeemLendingToken` → `_redeemShares` (both overloads). Sovryn has one sizing path, so it keeps a plain name rather than a `_redeemBy*` contrast — see R25's reasoning. Tropykus/LayerBank's `_redeemByUnderlying` / `_redeemByShares` / `_redeemInternal` are already correct and must not change.
-- [ ] **Test and script identifiers** carrying the noun: `prevLendingTokenBalance` / `postLendingTokenBalance`, `tropykusLendingToken` / `sovrynLendingToken`, `mockLendingToken*`, `getLendingToken` / `getLendingTokenAddress`, `lendingTokenAddress` config fields, `HelperConfig__CreatedMockLendingToken`, and test names such as `testStablecoinWithdrawalBurnsLendingToken`.
-- [ ] **Asset noun: `underlying` → `stablecoin` where it names the same unit.** `TokenLending._stablecoinToLendingToken` takes `underlyingAmount` and `_lendingTokenToStablecoin` returns `underlyingAmount` — the function name says stablecoin, the parameter says underlying, in one declaration. Normalize the converter parameters and returns.
-- [ ] **Revisit R16's event-parameter decision explicitly.** [R16-redeem-glossary.md](./R16-redeem-glossary.md) deliberately kept `underlyingAmount` on `TokenLending__LendingTokenRedeemed(Batch)` as "the neutral" name, because inside a batch it fires per user with a *planned* share rather than a measured receipt. That rationale is about planned-vs-measured, not about the asset noun, so it survives renaming the noun — but it is a recorded decision: state in the PR that you are overriding or preserving it, do not silently flip it. `TokenLending__InterestWithdrawn.underlyingAmountWithdrawn` is the same call.
-- [ ] **One name per expression.** `_lendingTokenToStablecoin(s_*Balances[user], exchangeRate)` is `stablecoinInTropykus` / `stablecoinInSovryn` / `stablecoinInLayerBank` inside `withdrawToken`, but `totalStablecoinInLending` inside `withdrawInterest` and `getAccruedInterest` — same quantity, two names, in all three handlers. Pick one (`totalStablecoinInLending` is protocol-agnostic and already used at two of the three sites, which would make the three files read identically) and apply it to all six call sites.
-- [ ] **Drop "scaled" from LayerBank identifiers and prose; keep it in exactly two places.** Once the generic noun is `shares`, "scaled" is redundant by construction — a share *is* the index-invariant unit. So `aTokenToRedeem` → `sharesToRedeem`, `prevScaledBalance` → `prevShares`, and the four prose sites ("the scaled aTokens we actually gained", "redeem the user's scaled aToken …", "the (clamped) scaled-share debit", "the amount of scaled aToken each user redeems") say `shares`.
+- [x] **Event parameter names** carrying the same noun: `originalLendingTokenAmount` / `adjustedLendingTokenAmount` on `TokenLending__AmountToRedeemAdjusted`, and `lendingTokenAmount` / `lendingTokenAmountRedeemed`, → the `*Shares` forms. Parameter **order and indexing stay exactly as they are.**
+- [x] **Sovryn's redeem helper:** `_redeemLendingToken` → `_redeemShares` (both overloads). Sovryn has one sizing path, so it keeps a plain name rather than a `_redeemBy*` contrast — see R25's reasoning. Tropykus/LayerBank's `_redeemByUnderlying` / `_redeemByShares` / `_redeemInternal` are already correct and must not change.
+- [x] **Test and script identifiers** carrying the noun: `prevLendingTokenBalance` / `postLendingTokenBalance`, `tropykusLendingToken` / `sovrynLendingToken`, `mockLendingToken*`, `getLendingToken` / `getLendingTokenAddress`, `lendingTokenAddress` config fields, `HelperConfig__CreatedMockLendingToken`, and test names such as `testStablecoinWithdrawalBurnsLendingToken`.
+- [x] **Asset noun: `underlying` → `stablecoin` where it names the same unit.** `TokenLending._stablecoinToLendingToken` takes `underlyingAmount` and `_lendingTokenToStablecoin` returns `underlyingAmount` — the function name says stablecoin, the parameter says underlying, in one declaration. Normalize the converter parameters and returns.
+- [x] **Revisit R16's event-parameter decision explicitly.** [R16-redeem-glossary.md](./R16-redeem-glossary.md) deliberately kept `underlyingAmount` on `TokenLending__LendingTokenRedeemed(Batch)` as "the neutral" name, because inside a batch it fires per user with a *planned* share rather than a measured receipt. That rationale is about planned-vs-measured, not about the asset noun, so it survives renaming the noun — but it is a recorded decision: state in the PR that you are overriding or preserving it, do not silently flip it. `TokenLending__InterestWithdrawn.underlyingAmountWithdrawn` is the same call.
+- [x] **One name per expression.** `_lendingTokenToStablecoin(s_*Balances[user], exchangeRate)` is `stablecoinInTropykus` / `stablecoinInSovryn` / `stablecoinInLayerBank` inside `withdrawToken`, but `totalStablecoinInLending` inside `withdrawInterest` and `getAccruedInterest` — same quantity, two names, in all three handlers. Pick one (`totalStablecoinInLending` is protocol-agnostic and already used at two of the three sites, which would make the three files read identically) and apply it to all six call sites.
+- [x] **Drop "scaled" from LayerBank identifiers and prose; keep it in exactly two places.** Once the generic noun is `shares`, "scaled" is redundant by construction — a share *is* the index-invariant unit. So `aTokenToRedeem` → `sharesToRedeem`, `prevScaledBalance` → `prevShares`, and the four prose sites ("the scaled aTokens we actually gained", "redeem the user's scaled aToken …", "the (clamped) scaled-share debit", "the amount of scaled aToken each user redeems") say `shares`.
   - **Keep** the contract-level `@dev`, restated as a rule with its stake rather than a label: *shares in this contract are aToken **scaled** amounts; the rebasing `balanceOf` is never read, because mixing the two breaks the round-up solvency invariant.*
   - **Keep** `ILayerBankAToken`'s existing `scaledBalanceOf` note verbatim.
   - No `_handlerShares()` wrapper or other ceremony is needed: `ILayerBankAToken` does not declare `balanceOf`, so the rebasing balance is unreachable without deliberately widening the interface — and the "Store this, not `balanceOf`" warning already sits at exactly the line someone would have to edit to do that. The invariant is structural, not doc-only, which is what makes dropping the per-identifier prefix safe.
-- [ ] Natspec and comments on every touched declaration say "shares" (or the handler's own `kToken` / `iSusd` / `aToken` noun where the sentence is protocol-specific — R25's rule).
+- [x] Natspec and comments on every touched declaration say "shares" (or the handler's own `kToken` / `iSusd` / `aToken` noun where the sentence is protocol-specific — R25's rule).
 
 **Explicitly keep** — "lending" is a fine domain word; only "lending *token*" is wrong:
 
@@ -101,23 +101,23 @@ Fork tests: no new fork-specific assertions; run before push per `AGENTS.md`.
 
 ## Success criteria
 
-- [ ] `grep -rnE "[Ll]ending[Tt]oken" --include="*.sol" src/ test/ script/` returns **nothing**. The **Scope** keeps cannot match this pattern — `ITokenLending`, `TokenLending`, and `LendingProtocol*Failed` are `Token`+`Lending` or `Lending`+`Protocol`, never `Lending`+`Token` — so every hit is a real leftover. Do not classify one as a keep.
-- [ ] No `underlyingAmount` remains where the unit is the stablecoin, except any event parameter the PR explicitly argues to keep (R16 decision).
-- [ ] `_lendingTokenToStablecoin(s_*Balances[user], …)` has one name across all six call sites in the three handlers.
-- [ ] `getUserShares` is the only per-user share getter; no `getUsersLendingTokenBalance` remains.
-- [ ] Conversion helpers are `_stablecoinToShares` / `_sharesToStablecoin`.
-- [ ] The three renamed events/errors keep their original parameter order and indexed fields.
-- [ ] Sovryn exposes `_redeemShares` (+ recipient overload); Tropykus/LayerBank keep `_redeemByUnderlying` / `_redeemByShares` / `_redeemInternal` unchanged.
-- [ ] `make check`, `make fork-sovryn`, and `make fork-tropykus` pass.
-- [ ] No behavior diff intentional; PR is reviewable as rename-only.
+- [x] `grep -rnE "[Ll]ending[Tt]oken" --include="*.sol" src/ test/ script/` returns **nothing**. The **Scope** keeps cannot match this pattern — `ITokenLending`, `TokenLending`, and `LendingProtocol*Failed` are `Token`+`Lending` or `Lending`+`Protocol`, never `Lending`+`Token` — so every hit is a real leftover. Do not classify one as a keep.
+- [x] No `underlyingAmount` remains where the unit is the stablecoin, except any event parameter the PR explicitly argues to keep (R16 decision).
+- [x] `_lendingTokenToStablecoin(s_*Balances[user], …)` has one name across all six call sites in the three handlers.
+- [x] `getUserShares` is the only per-user share getter; no `getUsersLendingTokenBalance` remains.
+- [x] Conversion helpers are `_stablecoinToShares` / `_sharesToStablecoin`.
+- [x] The three renamed events/errors keep their original parameter order and indexed fields.
+- [x] Sovryn exposes `_redeemShares` (+ recipient overload); Tropykus/LayerBank keep `_redeemByUnderlying` / `_redeemByShares` / `_redeemInternal` unchanged.
+- [x] `make check`, `make fork-sovryn`, and `make fork-tropykus` pass.
+- [x] No behavior diff intentional; PR is reviewable as rename-only.
 
 ## Reviewer checklist
 
-- [ ] Matches **Scope**; nothing from **Out of scope**.
-- [ ] Protocol invariants in `AGENTS.md` still hold (this spec changes none).
-- [ ] Tests in the PR match **Required tests**.
-- [ ] Files beyond this list are limited to direct dependencies and are named in the PR.
-- [ ] No unrelated refactors; history is reviewable.
+- [x] Matches **Scope**; nothing from **Out of scope**.
+- [x] Protocol invariants in `AGENTS.md` still hold (this spec changes none).
+- [x] Tests in the PR match **Required tests**.
+- [x] Files beyond this list are limited to direct dependencies and are named in the PR.
+- [x] No unrelated refactors; history is reviewable.
 
 ## ABI / deploy / cutover impact
 

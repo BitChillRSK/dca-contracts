@@ -6,7 +6,7 @@ import {IIdleErc20Handler} from "./IIdleErc20Handler.sol";
 
 /**
  * @title IdleErc20Handler
- * @notice Holds deposited stablecoin on the handler instead of minting a lending token.
+ * @notice Holds deposited stablecoin on the handler instead of minting shares.
  * @dev Per-user idle balances clamp withdrawals and single purchases so a DcaManager
  * accounting bug cannot spend another user's pooled DOC. Batch purchases revert instead
  * of clamping, because PurchaseMoc splits rBTC by the original planned weights.
@@ -81,7 +81,7 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler {
 
     /**
      * @notice retrieve `amount` of the user's idle DOC for the purchase path
-     * @dev Lending handlers redeem their lending token to pull DOC onto the handler; idle DOC is
+     * @dev Lending handlers redeem their shares to pull DOC onto the handler; idle DOC is
      * already here, so this only debits the mapping.
      * @param user: the address of the user
      * @param amount: the amount of stablecoin to debit

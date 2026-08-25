@@ -38,7 +38,7 @@ contract DeployMocAndUniswap is DeployBase {
         Protocol protocol;
         address dcaManager;
         address tokenAddress;
-        address lendingToken;
+        address shareToken;
         IPurchaseUniswap.UniswapSettings uniswapSettings;
         address feeCollector;
         uint256 amountOutMinimumPercent;
@@ -81,18 +81,18 @@ contract DeployMocAndUniswap is DeployBase {
         address docTokenAddress = networkConfig.docTokenAddress;
         address mocProxy = networkConfig.mocProxyAddress;
         
-        // Select the appropriate lending token based on protocol
-        address lendingToken;
+        // Select the appropriate shares based on protocol
+        address shareToken;
         
         if (protocol == Protocol.TROPYKUS) {
-            lendingToken = networkConfig.kDocAddress;
+            shareToken = networkConfig.kDocAddress;
         } else if (protocol == Protocol.SOVRYN) {
             // Check if this stablecoin is supported by Sovryn
             bool isUSDRIF = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked("USDRIF"));
             if (isUSDRIF) {
                 revert("USDRIF is not supported by Sovryn");
             }
-            lendingToken = networkConfig.iSusdAddress;
+            shareToken = networkConfig.iSusdAddress;
         } else {
             revert("Unsupported lending protocol");
         }
@@ -107,7 +107,7 @@ contract DeployMocAndUniswap is DeployBase {
             protocol: protocol,
             dcaManager: address(dcaManMoc),
             tokenAddress: docTokenAddress,
-            lendingToken: lendingToken,
+            shareToken: shareToken,
             mocProxy: mocProxy,
             feeCollector: feeCollector
         });
@@ -150,18 +150,18 @@ contract DeployMocAndUniswap is DeployBase {
         // Get token addresses from network config
         address stablecoinAddress = networkConfig.stablecoinAddress;
         
-        // Select the appropriate lending token based on protocol
-        address lendingToken;
+        // Select the appropriate shares based on protocol
+        address shareToken;
         
         if (protocol == Protocol.TROPYKUS) {
-            lendingToken = networkConfig.tropykusLendingToken;
+            shareToken = networkConfig.tropykusShareToken;
         } else if (protocol == Protocol.SOVRYN) {
             // Check if this stablecoin is supported by Sovryn
             bool isUSDRIF = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked("USDRIF"));
             if (isUSDRIF) {
                 revert("USDRIF is not supported by Sovryn");
             }
-            lendingToken = networkConfig.sovrynLendingToken;
+            shareToken = networkConfig.sovrynShareToken;
         } else {
             revert("Unsupported lending protocol");
         }
@@ -182,7 +182,7 @@ contract DeployMocAndUniswap is DeployBase {
             protocol: protocol,
             dcaManager: address(dcaManUni),
             tokenAddress: stablecoinAddress,
-            lendingToken: lendingToken,
+            shareToken: shareToken,
             uniswapSettings: uniswapSettings,
             feeCollector: feeCollector,
             amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
@@ -196,7 +196,7 @@ contract DeployMocAndUniswap is DeployBase {
                 protocol: params.protocol,
                 dcaManager: params.dcaManager,
                 tokenAddress: params.tokenAddress,
-                lendingToken: params.lendingToken,
+                shareToken: params.shareToken,
                 uniswapSettings: params.uniswapSettings,
                 feeCollector: params.feeCollector,
                 amountOutMinimumPercent: params.amountOutMinimumPercent,
