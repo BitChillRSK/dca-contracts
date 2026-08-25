@@ -2,7 +2,7 @@
 
 Status: **implemented** · Assigned: yes · Optional/further-review: no
 
-PR 20. Stack on R28 (PR 19, GitHub [#63](https://github.com/BitChillRSK/dca-contracts/pull/63)). Land **before** R22 deploy/CI (now PR 21) so that PR does not freeze a constructor arg that is a protocol constant.
+PR 20, GitHub [#64](https://github.com/BitChillRSK/dca-contracts/pull/64). Stack on R28 (PR 19, GitHub [#63](https://github.com/BitChillRSK/dca-contracts/pull/63)). Land **before** R30 (PR 21) and R22 deploy/CI (now PR 22) so neither inherits or freezes a constructor arg that is a protocol constant.
 
 ## Objective
 
@@ -35,7 +35,7 @@ Named on R28 review (GitHub #63): copy LayerBank’s pattern onto the other two;
 - [ ] Changing `TokenLending` / `LendingErc20Handler` to drop their constructor arg.
 - [ ] Adding `exchangeRateDecimals` to LayerBank.
 - [ ] R22 deploy/CI index map, harness split, or CI lanes.
-- [ ] R9 events. Diamond-resolver mixin. Idle constructors.
+- [ ] R30 shared purchase pipeline / stablecoin-source seam. R9 events. Idle constructors.
 
 ## Files likely touched
 

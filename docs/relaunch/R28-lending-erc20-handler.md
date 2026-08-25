@@ -2,7 +2,7 @@
 
 Status: **PR open** · Assigned: yes · Optional/further-review: no
 
-PR 19 (promoted from optional late 2026-08-25), GitHub [#63](https://github.com/BitChillRSK/dca-contracts/pull/63). Stack on R27 (PR 18). Do **not** start this in the same chat as R27, R29, R22 deploy/CI, R9, or R10. Requires [R27](./R27-tropykus-lending-guards.md) so Tropykus already matches the Sovryn/LayerBank guards. Land **before** R29 (PR 20), R22 deploy/CI (PR 21), and R9 (PR 22) so `TokenLending__UserSharesUpdated` is emitted in one place and the harness split sees one lending base.
+PR 19 (promoted from optional late 2026-08-25), GitHub [#63](https://github.com/BitChillRSK/dca-contracts/pull/63). Stack on R27 (PR 18). Do **not** start this in the same chat as R27, R29, R30, R22 deploy/CI, R9, or R10. Requires [R27](./R27-tropykus-lending-guards.md) so Tropykus already matches the Sovryn/LayerBank guards. Land **before** R29 (PR 20), R30 (PR 21), R22 deploy/CI (PR 22), and R9 (PR 23) so `TokenLending__UserSharesUpdated` is emitted in one place and the harness split sees one lending base.
 
 Write against the **R26 `shares` vocabulary**.
 
@@ -111,7 +111,7 @@ make fork-sovryn
 make fork-tropykus
 ```
 
-R22 deploy/CI (PR 21) has not landed yet when this PR runs, so the LayerBank lane may still be add-on-only; `make check` / `make moc-tropykus` / both forks are the gate. If PR 21 somehow merges first, also run that CI lane.
+R22 deploy/CI (now PR 22) has not landed yet when this PR runs, so the LayerBank lane may still be add-on-only; `make check` / `make moc-tropykus` / both forks are the gate. If PR 22 somehow merges first, also run that CI lane.
 
 Fork tests: no new fork-specific assertions; run before push per `AGENTS.md`.
 
