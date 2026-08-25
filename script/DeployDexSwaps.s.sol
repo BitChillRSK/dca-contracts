@@ -48,8 +48,7 @@ contract DeployDexSwaps is DeployBase {
                     params.feeCollector, 
                     feeSettings,
                     params.amountOutMinimumPercent,
-                    params.amountOutMinimumSafetyCheck,
-                    EXCHANGE_RATE_DECIMALS
+                    params.amountOutMinimumSafetyCheck
                 )
             );
         } else {
@@ -62,8 +61,7 @@ contract DeployDexSwaps is DeployBase {
                     params.feeCollector, 
                     feeSettings,
                     params.amountOutMinimumPercent,
-                    params.amountOutMinimumSafetyCheck,
-                    EXCHANGE_RATE_DECIMALS
+                    params.amountOutMinimumSafetyCheck
                 )
             );
         }

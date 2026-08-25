@@ -42,8 +42,7 @@ contract DeployMocSwaps is DeployBase {
                     params.shareToken, 
                     params.feeCollector, 
                     params.mocProxy, 
-                    feeSettings,
-                    EXCHANGE_RATE_DECIMALS
+                    feeSettings
                 )
             );
         } else {
@@ -54,8 +53,7 @@ contract DeployMocSwaps is DeployBase {
                     params.shareToken, 
                     params.feeCollector, 
                     params.mocProxy, 
-                    feeSettings,
-                    EXCHANGE_RATE_DECIMALS
+                    feeSettings
                 )
             );
         }

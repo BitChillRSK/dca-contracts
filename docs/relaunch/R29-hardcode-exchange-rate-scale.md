@@ -1,6 +1,6 @@
 # R29 — Hardcode each adapter’s exchange-rate scale
 
-Status: **not started** · Assigned: yes · Optional/further-review: no
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
 PR 20. Stack on R28 (PR 19, GitHub [#63](https://github.com/BitChillRSK/dca-contracts/pull/63)). Land **before** R22 deploy/CI (now PR 21) so that PR does not freeze a constructor arg that is a protocol constant.
 
@@ -22,12 +22,12 @@ Named on R28 review (GitHub #63): copy LayerBank’s pattern onto the other two;
 
 ## Scope
 
-- [ ] `SovrynErc20Handler`: `uint256 public constant EXCHANGE_RATE_DECIMALS = 1e18`; constructor drops the arg and passes the constant into `LendingErc20Handler`.
-- [ ] `TropykusErc20Handler`: same constant and constructor shape.
-- [ ] Leaves drop the arg and stop forwarding it: `SovrynDocHandlerMoc`, `SovrynErc20HandlerDex`, `TropykusDocHandlerMoc`, `TropykusErc20HandlerDex`.
-- [ ] Call sites that construct those types drop the last arg (`script/DeployMocSwaps.s.sol`, `DeployDexSwaps.s.sol`, `DeployUsdrifHandler.s.sol`, handler unit tests, `DcaDappTest` / shared harness if it `new`s a leaf, fuzz/invariants, any other `new Sovryn*` / `new Tropykus*`).
-- [ ] LayerBank unchanged (already `RAY`).
-- [ ] `script/Constants.sol` `EXCHANGE_RATE_DECIMALS` may remain where tests use it as conversion math (not as a constructor arg). Do not delete it unless nothing still references it.
+- [x] `SovrynErc20Handler`: `uint256 public constant EXCHANGE_RATE_DECIMALS = 1e18`; constructor drops the arg and passes the constant into `LendingErc20Handler`.
+- [x] `TropykusErc20Handler`: same constant and constructor shape.
+- [x] Leaves drop the arg and stop forwarding it: `SovrynDocHandlerMoc`, `SovrynErc20HandlerDex`, `TropykusDocHandlerMoc`, `TropykusErc20HandlerDex`.
+- [x] Call sites that construct those types drop the last arg (`script/DeployMocSwaps.s.sol`, `DeployDexSwaps.s.sol`, `DeployUsdrifHandler.s.sol`, handler unit tests, `DcaDappTest` / shared harness if it `new`s a leaf, fuzz/invariants, any other `new Sovryn*` / `new Tropykus*`).
+- [x] LayerBank unchanged (already `RAY`).
+- [x] `script/Constants.sol` `EXCHANGE_RATE_DECIMALS` may remain where tests use it as conversion math (not as a constructor arg). Do not delete it unless nothing still references it.
 
 ## Out of scope
 
@@ -57,10 +57,10 @@ Assert `sovrynHandler.EXCHANGE_RATE_DECIMALS() == 1e18` and `tropykusHandler.EXC
 
 ## Success criteria
 
-- [ ] Three adapters bind scale as a public constant; none take it as a constructor arg.
-- [ ] `TokenLending` still receives the value from the adapter.
-- [ ] Deploy scripts and tests compile without passing the dropped arg.
-- [ ] `make check` and both fork targets pass.
+- [x] Three adapters bind scale as a public constant; none take it as a constructor arg.
+- [x] `TokenLending` still receives the value from the adapter.
+- [x] Deploy scripts and tests compile without passing the dropped arg.
+- [x] `make check` and both fork targets pass.
 
 ## Reviewer checklist
 

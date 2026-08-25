@@ -61,8 +61,7 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
             FEE_COLLECTOR,
             feeSettings,
             9970, // 99.7% minimum output
-            9900, // 99% safety check
-            EXCHANGE_RATE_DECIMALS
+            9900 // 99% safety check
         );
         
         return ITokenHandler(address(tropykusDexHandler));
