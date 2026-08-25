@@ -4,6 +4,8 @@ Status: **in review** · Assigned: yes · Optional/further-review: no
 
 PR 16. Stack on R22 LayerBank ([#58](https://github.com/BitChillRSK/dca-contracts/pull/58)). Land **before** R22 deploy/CI so LayerBank ships with the same names as Tropykus/Sovryn.
 
+> Note: PR numbers below predate the 2026-08-25 reorder (R22 deploy/CI is now PR 20; R9 is PR 21). See [`IMPLEMENTATION_ORDER.md`](./IMPLEMENTATION_ORDER.md).
+
 ## Objective
 
 Finish the R16 redeem-glossary pass that left lending internals half-renamed. Rename first-party lending redeem helpers and share-amount locals so names match the motion: both paths **redeem** the receipt token; one sizes by underlying, one by shares. Drop leftover “repay” / `_burn*` wording. No behavior change.

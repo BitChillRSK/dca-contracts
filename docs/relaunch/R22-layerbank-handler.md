@@ -4,6 +4,8 @@ Status: **in review** · Assigned: yes · Optional/further-review: no
 
 PR 15 of R22. Redeem-helper naming is PR 16 (R25). Deploy/constants/harness/CI index-map work is PR 18.
 
+> Note: PR numbers below predate the 2026-08-25 reorder (R22 deploy/CI is now PR 20; R9 is PR 21). See [`IMPLEMENTATION_ORDER.md`](./IMPLEMENTATION_ORDER.md).
+
 ## Objective
 
 Ship a LayerBank lending handler for DOC + MoC as the index-1 twin of Tropykus and Sovryn: per-user virtual **scaled aToken** shares, balance-delta cash from day one (including R21 deposit returns), and `getUsersLendingTokenBalance(user)`. Talk to the live Aave-v3-style Pool, not the stale v2 Core. Do not remap the live index map or rewrite the shared test harness in this PR.

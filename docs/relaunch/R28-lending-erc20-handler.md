@@ -1,8 +1,8 @@
 # R28 — Extract `LendingErc20Handler`
 
-Status: **not started** · Assigned: yes · Optional/further-review: yes
+Status: **not started** · Assigned: yes · Optional/further-review: no
 
-Optional late. Do **not** start this in the same chat as R26, PR 18, R27, R9, or R10. Prefer after [R27](./R27-tropykus-lending-guards.md) so Tropykus already matches the Sovryn/LayerBank guards. Cheapest relative to R9: land **before** R9 (PR 20) so `TokenLending__UserSharesUpdated` is emitted in one place; after R9 this PR only moves emit sites.
+PR 19 (promoted from optional late 2026-08-25). Stack on R27 (PR 18). Do **not** start this in the same chat as R27, R22 deploy/CI, R9, or R10. Requires [R27](./R27-tropykus-lending-guards.md) so Tropykus already matches the Sovryn/LayerBank guards. Land **before** R22 deploy/CI (PR 20) and R9 (PR 21) so `TokenLending__UserSharesUpdated` is emitted in one place and the harness split sees one lending base.
 
 Write against the **R26 `shares` vocabulary**.
 
@@ -95,7 +95,7 @@ make fork-sovryn
 make fork-tropykus
 ```
 
-If PR 18 has made `layerbank` a first-class lane, run that CI lane too (`make ci` / `STABLECOIN_TYPE=DOC LENDING_PROTOCOL=layerbank make moc-sovryn` per that spec).
+R22 deploy/CI (PR 20) has not landed yet when this PR runs, so the LayerBank lane may still be add-on-only; `make check` / `make moc-tropykus` / both forks are the gate. If PR 20 somehow merges first, also run that CI lane.
 
 Fork tests: no new fork-specific assertions; run before push per `AGENTS.md`.
 

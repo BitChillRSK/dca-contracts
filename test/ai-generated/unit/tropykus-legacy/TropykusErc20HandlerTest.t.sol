@@ -140,20 +140,30 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
     }
     
     function test_tropykus_mintFailureHandling() public {
-        // Test with insufficient balance (realistic failure case)
-        // Reset user's balance to ensure clean state
+        // Hop-1 insufficient balance (same as the Sovryn/LayerBank twin). The zero-mint guard is
+        // `test_tropykus_zeroMintReverts`.
         uint256 currentBalance = stablecoin.balanceOf(USER);
         if (currentBalance > 0) {
             vm.prank(USER);
             stablecoin.transfer(address(0x999), currentBalance);
         }
-        
-        // Give user just enough for fees but not enough for deposit
-        stablecoin.mint(USER, DEPOSIT_AMOUNT / 2); // Half of what we need
-        
+
+        stablecoin.mint(USER, DEPOSIT_AMOUNT / 2);
+
         vm.prank(address(dcaManager));
-        vm.expectRevert(); // Should revert due to insufficient balance
+        vm.expectRevert();
         handler.depositToken(USER, DEPOSIT_AMOUNT);
+    }
+
+    function test_tropykus_zeroMintReverts() public {
+        kToken.setForceZeroMint(true);
+
+        vm.prank(address(dcaManager));
+        vm.expectRevert(ITokenLending.TokenLending__LendingProtocolDepositFailed.selector);
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        assertEq(tropykusHandler.getUserShares(USER), 0);
+        assertEq(kToken.balanceOf(address(handler)), 0);
     }
     
     function test_tropykus_redeemFailureHandling() public {
@@ -281,6 +291,33 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
             )
         );
         tropykusHandler.testBatchRetrieveStablecoin(users, amounts, excessiveAmount);
+    }
+
+    function test_tropykus_batchRetrieveStablecoin_zeroPayout_reverts() public {
+        address user1 = makeAddr("user1");
+        address[] memory users = new address[](1);
+        users[0] = user1;
+
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = DEPOSIT_AMOUNT / 2;
+
+        stablecoin.mint(user1, DEPOSIT_AMOUNT);
+        vm.prank(user1);
+        stablecoin.approve(address(tropykusHandler), type(uint256).max);
+
+        vm.prank(address(dcaManager));
+        handler.depositToken(user1, DEPOSIT_AMOUNT);
+
+        uint256 kTokenBalanceBefore = tropykusHandler.getUserShares(user1);
+
+        kToken.setSilentZeroPayout(true);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ITokenLending.TokenLending__ZeroStablecoinReceived.selector, amounts[0])
+        );
+        tropykusHandler.testBatchRetrieveStablecoin(users, amounts, amounts[0]);
+
+        assertEq(tropykusHandler.getUserShares(user1), kTokenBalanceBefore);
     }
 }
 

@@ -4,6 +4,8 @@ Status: **in review** · Assigned: yes · Optional/further-review: no
 
 PR 11 of R22. Idle handler, LayerBank handler, and deploy/CI index-map work are later PRs.
 
+> Note: PR numbers below predate the 2026-08-25 reorder (R22 deploy/CI is now PR 20; R9 is PR 21). See [`IMPLEMENTATION_ORDER.md`](./IMPLEMENTATION_ORDER.md).
+
 ## Objective
 
 Move protocol-specific sources and their dedicated handler tests into `src/sovryn/`, `src/tropykus-legacy/`, and placeholder folders `src/idle/` and `src/layerbank/`, so later R22 PRs can add idle and LayerBank without renaming Tropykus in place. Behavior, indexes, and who gets deployed stay as they are.

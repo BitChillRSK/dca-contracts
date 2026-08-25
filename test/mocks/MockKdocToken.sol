@@ -28,26 +28,33 @@ contract MockKdocToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
         s_lastAccrualTimestamp = block.timestamp;
     }
 
-    function mint(uint256 amount) public returns (uint256) {
-        require(i_docToken.allowance(msg.sender, address(this)) >= amount, "Insufficient allowance");
-        // Compound-style doTransferIn: mint shares from cash actually received, not the argument.
-        // 1:1 tokens are unchanged (`received == amount`).
-        uint256 balanceBefore = i_docToken.balanceOf(address(this));
-        i_docToken.transferFrom(msg.sender, address(this), amount);
-        uint256 received = i_docToken.balanceOf(address(this)) - balanceBefore;
-        _mint(msg.sender, received * DECIMALS / exchangeRateCurrent());
-        return 0;
-    }
-
     /**
      * @notice When set, redeem calls burn the kDOC, transfer nothing, and still return the success code 0.
      * @dev Models a Compound-style market that reports success while paying out nothing (paused transfer,
      * empty market, upgraded implementation). Integrators that trust the return code lose the burnt shares.
      */
     bool private s_silentZeroPayout;
+    /// @notice mint succeeds (code 0) but mints no kDOC, so the handler's zero-delta guard can fire.
+    bool private s_forceZeroMint;
 
     function setSilentZeroPayout(bool silentZeroPayout) external {
         s_silentZeroPayout = silentZeroPayout;
+    }
+
+    function setForceZeroMint(bool forceZeroMint) external {
+        s_forceZeroMint = forceZeroMint;
+    }
+
+    function mint(uint256 amount) public returns (uint256) {
+        require(i_docToken.allowance(msg.sender, address(this)) >= amount, "Insufficient allowance");
+        // Compound-style doTransferIn: mint shares from cash actually received, not the argument.
+        // 1:1 tokens are unchanged (`received == amount`).
+        uint256 balanceBefore = i_docToken.balanceOf(address(this));
+        i_docToken.transferFrom(msg.sender, address(this), amount);
+        if (s_forceZeroMint) return 0;
+        uint256 received = i_docToken.balanceOf(address(this)) - balanceBefore;
+        _mint(msg.sender, received * DECIMALS / exchangeRateCurrent());
+        return 0;
     }
 
     function redeemUnderlying(uint256 amount) public returns (uint256) {

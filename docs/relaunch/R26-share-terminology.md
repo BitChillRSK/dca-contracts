@@ -4,6 +4,8 @@ Status: **implemented** · Assigned: yes · Optional/further-review: no
 
 PR 17. Stack on R25 ([#59](https://github.com/BitChillRSK/dca-contracts/pull/59)). Land **before** R22 deploy/CI (PR 18) and well before R9 (PR 20).
 
+> Note: PR numbers below predate the 2026-08-25 reorder (R22 deploy/CI is now PR 20; R9 is PR 21). See [`IMPLEMENTATION_ORDER.md`](./IMPLEMENTATION_ORDER.md).
+
 ## Objective
 
 Replace the non-standard noun "lending token" with **shares** for the receipt token a handler holds inside a lending protocol. Rename-only: no logic, rounding, access-control, or call-target changes.

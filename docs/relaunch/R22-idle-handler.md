@@ -4,6 +4,8 @@ Status: **in review** · Assigned: yes · Optional/further-review: no
 
 PR 12 of R22. LayerBank, deploy/constants/harness/CI index-map work are later PRs.
 
+> Note: PR numbers below predate the 2026-08-25 reorder (R22 deploy/CI is now PR 20; R9 is PR 21). See [`IMPLEMENTATION_ORDER.md`](./IMPLEMENTATION_ORDER.md).
+
 ## Objective
 
 Ship an index-0 idle DOC + MoC handler so a schedule can hold DOC on the handler with no lending token. Deposits, buys, and withdrawals spend that idle DOC. Interest calls for index 0 keep reverting because no protocol name is registered.
