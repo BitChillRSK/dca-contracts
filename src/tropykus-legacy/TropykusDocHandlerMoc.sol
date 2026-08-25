@@ -14,7 +14,6 @@ contract TropykusDocHandlerMoc is TropykusErc20Handler, PurchaseMoc {
      * @param dcaManagerAddress the address of the DCA Manager contract
      * @param docTokenAddress the address of the Dollar On Chain token on the blockchain of deployment
      * @param kDocTokenAddress the address of Tropykus' kDOC token contract
-     * @param minPurchaseAmount  the minimum amount of DOC for periodic purchases
      * @param mocProxyAddress the address of the MoC proxy contract on the blockchain of deployment
      * @param feeSettings the settings to calculate the fees charged by the protocol
      */
@@ -22,7 +21,6 @@ contract TropykusDocHandlerMoc is TropykusErc20Handler, PurchaseMoc {
         address dcaManagerAddress,
         address docTokenAddress,
         address kDocTokenAddress,
-        uint256 minPurchaseAmount,
         address feeCollector,
         address mocProxyAddress,
         FeeSettings memory feeSettings,

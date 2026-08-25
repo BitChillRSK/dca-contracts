@@ -93,7 +93,6 @@ contract DepositSwapPopReentrancyTest is Test {
             address(dcaManager),
             address(token),
             address(kToken),
-            MIN_PURCHASE_AMOUNT,
             FEE_COLLECTOR,
             address(mocProxy),
             IFeeHandler.FeeSettings({

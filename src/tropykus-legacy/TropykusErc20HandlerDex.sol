@@ -14,7 +14,6 @@ contract TropykusErc20HandlerDex is TropykusErc20Handler, PurchaseUniswap {
      * @param dcaManagerAddress the address of the DCA Manager contract
      * @param stablecoinAddress the address of the stablecoin token
      * @param kTokenAddress the address of Tropykus' kToken contract
-     * @param minPurchaseAmount  the minimum amount of stablecoin for periodic purchases
      * @param feeCollector the address of to which fees will sent on every purchase
      * @param feeSettings struct with the settings for fee calculations
      * @param amountOutMinimumPercent The minimum percentage of rBTC that must be received from the swap (default: 99.7%)
@@ -25,7 +24,6 @@ contract TropykusErc20HandlerDex is TropykusErc20Handler, PurchaseUniswap {
         address stablecoinAddress,
         address kTokenAddress,
         UniswapSettings memory uniswapSettings,
-        uint256 minPurchaseAmount,
         address feeCollector,
         FeeSettings memory feeSettings,
         uint256 amountOutMinimumPercent,

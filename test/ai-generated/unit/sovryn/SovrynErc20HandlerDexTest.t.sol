@@ -58,7 +58,6 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
             address(stablecoin),
             address(iSusdToken),
             uniswapSettings,
-            MIN_PURCHASE_AMOUNT,
             FEE_COLLECTOR,
             feeSettings,
             9970, // 99.7% minimum output

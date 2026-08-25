@@ -99,7 +99,6 @@ contract DcaManagerEdgeCasesTest is Test {
             address(stablecoin),
             address(kToken),
             uniswapSettings,
-            MIN_PURCHASE_AMOUNT,
             FEE_COLLECTOR,
             feeSettings,
             9970,

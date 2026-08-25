@@ -43,7 +43,6 @@ contract TropykusDocHandlerMocTest is Test {
             address(this),           // dcaManagerAddress
             address(docToken),
             address(kDocToken),
-            MIN_PURCHASE_AMOUNT,
             FEE_COLLECTOR,
             address(mocProxy),
             IFeeHandler.FeeSettings({

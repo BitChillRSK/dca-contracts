@@ -13,8 +13,7 @@ contract SovrynDocHandlerMoc is SovrynErc20Handler, PurchaseMoc {
     /**
      * @param dcaManagerAddress the address of the DCA Manager contract
      * @param docTokenAddress the address of the Dollar On Chain token on the blockchain of deployment
-     * @param iSusdTokenAddress the address of Tropykus' iSUSD token contract
-     * @param minPurchaseAmount  the minimum amount of DOC for periodic purchases
+     * @param iSusdTokenAddress the address of Sovryn's iSUSD token contract
      * @param mocProxyAddress the address of the MoC proxy contract on the blockchain of deployment
      * @param feeSettings the settings to calculate the fees charged by the protocol
      */
@@ -22,7 +21,6 @@ contract SovrynDocHandlerMoc is SovrynErc20Handler, PurchaseMoc {
         address dcaManagerAddress,
         address docTokenAddress,
         address iSusdTokenAddress,
-        uint256 minPurchaseAmount,
         address feeCollector,
         address mocProxyAddress,
         FeeSettings memory feeSettings,

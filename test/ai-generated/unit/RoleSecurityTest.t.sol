@@ -100,7 +100,6 @@ contract RoleSecurityTest is Test {
             address(stablecoin),
             address(kToken),
             uniswapSettings,
-            MIN_PURCHASE_AMOUNT,
             FEE_COLLECTOR,
             feeSettings,
             9970,
@@ -174,7 +173,6 @@ contract RoleSecurityTest is Test {
                 swapPoolFeeRates: new uint24[](1),
                 mocOracle: ICoinPairPrice(address(mocOracle))
             }),
-            MIN_PURCHASE_AMOUNT,
             FEE_COLLECTOR,
             IFeeHandler.FeeSettings({
                 minFeeRate: MIN_FEE_RATE,

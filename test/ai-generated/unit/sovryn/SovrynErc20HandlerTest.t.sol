@@ -38,7 +38,6 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
             address(dcaManager),
             address(stablecoin),
             address(iSusdToken),
-            MIN_PURCHASE_AMOUNT,
             FEE_COLLECTOR,
             feeSettings
         );
@@ -315,8 +314,8 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
         uint256 excessiveAmount = DEPOSIT_AMOUNT * 2;
         uint256 available = sovrynHandler.getUsersLendingTokenBalance(user1);
         uint256 price = iSusdToken.tokenPrice();
-        uint256 totaliSusdToRepay = Math.mulDiv(excessiveAmount, EXCHANGE_RATE_DECIMALS, price, Math.Rounding.Up);
-        uint256 requested = Math.mulDiv(totaliSusdToRepay, amounts[0], excessiveAmount, Math.Rounding.Up);
+        uint256 totalITokensToRedeem = Math.mulDiv(excessiveAmount, EXCHANGE_RATE_DECIMALS, price, Math.Rounding.Up);
+        uint256 requested = Math.mulDiv(totalITokensToRedeem, amounts[0], excessiveAmount, Math.Rounding.Up);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -337,7 +336,6 @@ contract SovrynTestHandler is SovrynErc20Handler {
         address dcaManagerAddress,
         address stableTokenAddress,
         address iSusdTokenAddress,
-        uint256 minPurchaseAmount,
         address feeCollector,
         FeeSettings memory feeSettings
     ) SovrynErc20Handler(

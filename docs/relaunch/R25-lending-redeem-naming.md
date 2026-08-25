@@ -1,6 +1,6 @@
 # R25 — Lending redeem helper naming
 
-Status: **not started** · Assigned: yes · Optional/further-review: no
+Status: **in review** · Assigned: yes · Optional/further-review: no
 
 PR 16. Stack on R22 LayerBank ([#58](https://github.com/BitChillRSK/dca-contracts/pull/58)). Land **before** R22 deploy/CI so LayerBank ships with the same names as Tropykus/Sovryn.
 
