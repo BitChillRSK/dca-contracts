@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: yes · Optional/further-review: no
 
-PR 18 of R22. Stack on R26 (PR 17). Last required R22 PR before R9.
+PR 18 of R22. Stack on R26 (PR 17). Last required R22 PR; R27 (Tropykus guards) then R9 follow.
 
 ## Objective
 
@@ -37,6 +37,8 @@ Related: [R22-layerbank-handler.md](./R22-layerbank-handler.md), [R25-lending-re
 
 - [ ] R25 rename work (must already be merged).
 - [ ] R9 `TokenLending__UserSharesUpdated`.
+- [ ] R27 Tropykus zero-mint / batch zero-received guards ([R27-tropykus-lending-guards.md](./R27-tropykus-lending-guards.md)).
+- [ ] R28 `LendingErc20Handler` extract.
 - [ ] R10 full natspec rewrite.
 - [ ] LayerBank Uniswap / USDRIF.
 - [ ] Merkl / LAB / harvest.

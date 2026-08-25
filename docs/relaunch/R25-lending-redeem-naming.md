@@ -33,7 +33,7 @@ Small leaf-contract nits (same PR; match LayerBank’s cleaner shape):
 
 This PR **supersedes** R16’s sanction of the “repay” alias for share-amount **locals and internal helpers** *and* for the shared event. `TokenLending__AmountToRepayAdjusted` → `TokenLending__AmountToRedeemAdjusted`.
 
-**Decision revised during PR 16** (human call, recorded here so the history is honest): the spec originally held the event back as ABI. That reasoning does not apply to this relaunch — every handler is a fresh deployment with no live log consumer, so `topic0` stability is protecting nothing today. R9 (PR 19) is where the event surface gets **frozen**, which makes it the deadline for this rename, not the venue. Renaming after the freeze is the expensive version of the same change. Parameter list, order, and indexing are untouched; only the name changes.
+**Decision revised during PR 16** (human call, recorded here so the history is honest): the spec originally held the event back as ABI. That reasoning does not apply to this relaunch — every handler is a fresh deployment with no live log consumer, so `topic0` stability is protecting nothing today. R9 (PR 20) is where the event surface gets **frozen**, which makes it the deadline for this rename, not the venue. Renaming after the freeze is the expensive version of the same change. Parameter list, order, and indexing are untouched; only the name changes.
 
 ## Open product decisions
 

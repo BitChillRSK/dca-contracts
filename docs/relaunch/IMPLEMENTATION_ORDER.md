@@ -56,9 +56,10 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R25 | 16 | none |
 | R26 | 17 | none |
 | R22 (deploy/CI) | 18 | none |
-| R9 | 19 | R18/R19 if not recorded (ABI freeze) |
-| R10 | 20 | none |
-| R12, R13, R18, R19, OZ 5.x | optional late | only if the human named that item |
+| R27 | 19 | none |
+| R9 | 20 | R18/R19 if not recorded (ABI freeze) |
+| R10 | 21 | none |
+| R12, R13, R18, R19, R28, OZ 5.x | optional late | only if the human named that item |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -122,7 +123,7 @@ Both lending handlers clamp a withdrawal to the caller's own position (`Tropykus
 
 So, for an idle-funds handler:
 
-- It **must** carry per-user accounting and clamp `withdrawToken` to the caller's own balance, or it inherits an uncapped withdraw. Consider making the base class enforce this rather than leaving it to each subclass.
+- It **must** carry per-user accounting and clamp `withdrawToken` to the caller's own balance, or it inherits an uncapped withdraw. R28 (optional late) extracts a shared `LendingErc20Handler` that would own that clamp for the lending twins; Idle already has its own. Do not wait on R28 to keep the clamp in each lending handler.
 - Invariant 6 in `AGENTS.md` (comprehensive `nonReentrant` on schedule mutators) stops being cheap insurance and becomes load-bearing. Do not relax it in the same relaunch that introduces pooled idle funds.
 - The R20 balance-delta work above matters more, not less: with no clamp, `DcaManager.tokenBalance` is the only thing standing between a user and the pool.
 
@@ -200,7 +201,7 @@ Do not rename Tropykus in place and do not deploy USDRIF/Uniswap handlers for th
 
 ### PR 16 - R25 lending redeem helper naming
 
-Leftover from R16 (PR 14): that glossary pass still left `_burnKtoken` and a “repay” alias. Rename-only (plus tiny leaf cleanup), after LayerBank exists so all three lending handlers match. Drop `_burnKtoken` / `_burnAtoken` and `*ToRepay` locals in favor of `_redeemByUnderlying` / `_redeemByShares` (Tropykus/LayerBank) and `*ToRedeem` locals (all three). Sovryn stays one share-sized helper with a recipient overload; stop reusing `stablecoinInterestAmount` for the measured payout; rename `totalErc20InLending` → `totalStablecoinInLending`. Copy Sovryn’s `getAccruedInterest` natspec onto Tropykus/LayerBank. Drop unused `minPurchaseAmount` from Tropykus/Sovryn MoC/Dex constructors (LayerBank already omitted it); fix SovrynDocHandlerMoc’s “Tropykus' iSUSD” natspec. Also rename the shared event to `TokenLending__AmountToRedeemAdjusted` — the relaunch deploys fresh with no live log consumer, and R9 (PR 19) freezes the event surface, so this is the last cheap moment. See `R25-lending-redeem-naming.md`.
+Leftover from R16 (PR 14): that glossary pass still left `_burnKtoken` and a “repay” alias. Rename-only (plus tiny leaf cleanup), after LayerBank exists so all three lending handlers match. Drop `_burnKtoken` / `_burnAtoken` and `*ToRepay` locals in favor of `_redeemByUnderlying` / `_redeemByShares` (Tropykus/LayerBank) and `*ToRedeem` locals (all three). Sovryn stays one share-sized helper with a recipient overload; stop reusing `stablecoinInterestAmount` for the measured payout; rename `totalErc20InLending` → `totalStablecoinInLending`. Copy Sovryn’s `getAccruedInterest` natspec onto Tropykus/LayerBank. Drop unused `minPurchaseAmount` from Tropykus/Sovryn MoC/Dex constructors (LayerBank already omitted it); fix SovrynDocHandlerMoc’s “Tropykus' iSUSD” natspec. Also rename the shared event to `TokenLending__AmountToRedeemAdjusted` — the relaunch deploys fresh with no live log consumer, and R9 (PR 20) freezes the event surface, so this is the last cheap moment. See `R25-lending-redeem-naming.md`.
 
 Land before R26 and deploy/CI so neither PR freezes the old helper names.
 
@@ -210,7 +211,7 @@ Land before R26 and deploy/CI so neither PR freezes the old helper names.
 
 Keep `ITokenLending` / `TokenLending` / `LENDING_PROTOCOL` / `LendingProtocol*Failed` — "lending" as a domain word is fine; only "lending **token**" is wrong. Keep `stablecoin` as the asset noun; do not adopt 4626's `assets`.
 
-Land before PR 18 for the same reason R25 did: PR 18 splits the harness where 76 of the 295 matching lines live, so renaming afterwards writes them twice. **R9 (PR 19) is the ABI freeze** and already specifies `TokenLending__UserSharesUpdated(…, previousShares, newShares)`; until this PR reworded it, the R9 entry below also required a test asserting `newShares == getUsersLendingTokenBalance(user)` — two names for one quantity. Settle the noun before that lands. See `R26-share-terminology.md`.
+Land before PR 18 for the same reason R25 did: PR 18 splits the harness where 76 of the 295 matching lines live, so renaming afterwards writes them twice. **R9 (PR 20) is the ABI freeze** and already specifies `TokenLending__UserSharesUpdated(…, previousShares, newShares)`; until this PR reworded it, the R9 entry below also required a test asserting `newShares == getUsersLendingTokenBalance(user)` — two names for one quantity. Settle the noun before that lands. See `R26-share-terminology.md`.
 
 ### PR 18 - R22 deploy scripts, constants, harness, and CI matrix
 
@@ -225,7 +226,15 @@ Split the shared test harness so lending-token assertions live only in lending-p
 
 **Required in this PR:** round-up solvency regression on the LayerBank lane — virtual scaled books must stay ≤ handler `scaledBalanceOf` after odd-amount redeems against Aave-like round-nearest burns; the test must fail if `_stablecoinToLendingToken` rounded down. Shared rule lives on `TokenLending`; do not re-document it only on LayerBank. See `R22-deploy-ci.md`.
 
-### PR 19 - R9 event indexing and ABI cleanup
+### PR 19 - R27 Tropykus lending cash guards
+
+Tropykus is not in the new deploy map after PR 18. The legacy handler still has to obey invariant 1.
+
+After a 0 Compound `mint` code, revert `TokenLending__LendingProtocolDepositFailed` if the measured kToken delta is 0 (Sovryn `:66`, LayerBank `:80` already do). After a 0 Compound batch `redeemUnderlying` code, revert `TokenLending__ZeroStablecoinReceived` if the measured DOC delta is 0 (Sovryn `:226`, LayerBank `:284`); do not emit-and-return zero. Keep Tropykus’s single-redeem `stablecoinAmount > 0 &&` conjunct — that is the Compound analogue of LayerBank skipping a zero `Pool.withdraw`, not a third bug.
+
+Do not extract a shared base here. See `R27-tropykus-lending-guards.md`. Land before R9 so the ABI-freeze tests cover the corrected paths.
+
+### PR 20 - R9 event indexing and ABI cleanup
 
 Index only addresses and `scheduleId`. Do not index amounts, timestamps, periods, rates, strings, bytes, or arrays.
 
@@ -233,7 +242,7 @@ Add `TokenLending__UserSharesUpdated(address indexed user, uint256 previousShare
 
 Do this once the shipped ABI surface is known, including any optional pause or compound-interest events that were approved.
 
-### PR 20 - R10 natspec and comments
+### PR 21 - R10 natspec and comments
 
 Rewrite first-party natspec after ABI, names, handlers, and layout are stable. Put user-facing docs on interfaces and use `@inheritdoc` in implementations.
 
@@ -247,6 +256,7 @@ These are deliberately after the core relaunch path:
 - R13: simplify or redesign `OperationsAdmin` owner/admin/swapper roles.
 - R18: storage packing, only if not already chosen and implemented before layout froze.
 - R19: per-schedule pause, only if not already included before event ABI froze.
+- R28: extract `LendingErc20Handler` for the three lending twins (Tropykus / Sovryn / LayerBank). Idle stays out; `TokenLending` stays conversion math. Cheapest before R9 (one `UserSharesUpdated` emit site); after R9 it only moves emit sites. Requires R27 first so the base copies the aligned Tropykus guards. See `R28-lending-erc20-handler.md`.
 - OpenZeppelin major upgrade: evaluate `v4.9.3` to latest audited `5.x` in a standalone PR.
 
 ## OpenZeppelin policy

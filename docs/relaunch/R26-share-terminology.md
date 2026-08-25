@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: yes · Optional/further-review: no
 
-PR 17. Stack on R25 ([#59](https://github.com/BitChillRSK/dca-contracts/pull/59)). Land **before** R22 deploy/CI (PR 18) and well before R9 (PR 19).
+PR 17. Stack on R25 ([#59](https://github.com/BitChillRSK/dca-contracts/pull/59)). Land **before** R22 deploy/CI (PR 18) and well before R9 (PR 20).
 
 ## Objective
 
@@ -57,9 +57,9 @@ Keep **stablecoin** as the asset noun. Do not adopt ERC-4626's `assets` — that
 ## Out of scope
 
 - [ ] Deleting the `ILendingToken` test interface — R22 specs assign that to PR 18 ([R22-deploy-ci.md](./R22-deploy-ci.md)). If PR 18 lands first it is already gone; if not, rename it in place to `IShareToken` and let PR 18 delete it.
-- [ ] Adding `TokenLending__UserSharesUpdated` or any R9 event (PR 19).
+- [ ] Adding `TokenLending__UserSharesUpdated` or any R9 event (PR 20).
 - [ ] Index-map, harness split, constants, CI matrix (PR 18).
-- [ ] Any behavior, rounding, access-control, or call-target change.
+- [ ] Any behavior, rounding, access-control, or call-target change. Tropykus deposit/batch zero-cash guards are [R27](./R27-tropykus-lending-guards.md); the shared-base extract is [R28](./R28-lending-erc20-handler.md).
 - [ ] Third-party ABI names (`redeem`, `redeemUnderlying`, `burn`, `withdraw`, `scaledBalanceOf`, `exchangeRateCurrent`, `tokenPrice`).
 - [ ] R10 natspec rewrite beyond the touched declarations.
 
@@ -121,6 +121,6 @@ Fork tests: no new fork-specific assertions; run before push per `AGENTS.md`.
 
 ## ABI / deploy / cutover impact
 
-- ABI: **yes, deliberately.** Possibly some event *parameter* names too (`underlyingAmount`), which change the ABI JSON but not `topic0`. One external view (`getUsersLendingTokenBalance` → `getUserShares`), two event names, one error name, and several event parameter names. New `topic0` for the two renamed events; parameter order and indexing unchanged. This is pre-freeze by design — R9 (PR 19) is the freeze, and the relaunch deploys fresh with no live log consumer, so the rename is free now and expensive afterwards.
+- ABI: **yes, deliberately.** Possibly some event *parameter* names too (`underlyingAmount`), which change the ABI JSON but not `topic0`. One external view (`getUsersLendingTokenBalance` → `getUserShares`), two event names, one error name, and several event parameter names. New `topic0` for the two renamed events; parameter order and indexing unchanged. This is pre-freeze by design — R9 (PR 20) is the freeze, and the relaunch deploys fresh with no live log consumer, so the rename is free now and expensive afterwards.
 - Scripts: helper-config field names only; local/test. Do not `--broadcast`.
 - Cutover: none — new deployments only. Any frontend or indexer built against the pre-relaunch ABI must target `getUserShares` and the new event names; flag it to whoever wires the live market.
