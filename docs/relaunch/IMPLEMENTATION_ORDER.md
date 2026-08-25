@@ -53,9 +53,10 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R21 | 13 | none |
 | R16 | 14 | none |
 | R22 (LayerBank) | 15 | none |
-| R22 (deploy/CI) | 16 | none |
-| R9 | 17 | R18/R19 if not recorded (ABI freeze) |
-| R10 | 18 | none |
+| R25 | 16 | none |
+| R22 (deploy/CI) | 17 | none |
+| R9 | 18 | R18/R19 if not recorded (ABI freeze) |
+| R10 | 19 | none |
 | R12, R13, R18, R19, OZ 5.x | optional late | only if the human named that item |
 
 ### PR 1 - R23 toolchain and dependency baseline
@@ -190,13 +191,19 @@ This should land before the full natspec pass (R10).
 
 ### PR 15 - R22 LayerBank handler
 
-Add LayerBank as index 1 for DOC + MoC. Use balance-delta accounting from the start (including R21 deposit returns). Add mocks or fork tests based on the Rootstock LayerBank lToken ABI.
+Add LayerBank as index 1 for DOC + MoC. Use balance-delta accounting from the start (including R21 deposit returns). Add mocks or a live fork probe based on the Rootstock LayerBank **Pool / aToken** ABI (Aave-v3-style lRooDOC). Do not implement against the stale v2 Core / lToken README — that Core never listed DOC.
 
-LayerBank owns exact per-user virtual lToken balances and implements the shared `getUsersLendingTokenBalance(user)` getter. External incentives are out of scope: no Merkl interfaces, reward token, harvest, claim, operator, reward-debt, or unwrap logic. R9 later adds the canonical balance-transition event across the final lending-handler set; LayerBank must expose every share mutation cleanly enough for that event to cover deposits, withdrawals, interest, and single/batch purchases. See [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md).
+LayerBank owns exact per-user virtual **scaled aToken** balances and implements the shared `getUsersLendingTokenBalance(user)` getter. External incentives are out of scope: no Merkl interfaces, reward token, harvest, claim, operator, reward-debt, or unwrap logic. R9 later adds the canonical balance-transition event across the final lending-handler set; LayerBank must expose every share mutation cleanly enough for that event to cover deposits, withdrawals, interest, and single/batch purchases. See [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md).
 
 Do not rename Tropykus in place and do not deploy USDRIF/Uniswap handlers for this relaunch.
 
-### PR 16 - R22 deploy scripts, constants, harness, and CI matrix
+### PR 16 - R25 lending redeem helper naming
+
+Leftover from R16 (PR 14): that glossary pass still left `_burnKtoken` and a “repay” alias. Rename-only (plus tiny leaf cleanup), after LayerBank exists so all three lending handlers match. Drop `_burnKtoken` / `_burnAtoken` and `*ToRepay` locals in favor of `_redeemByUnderlying` / `_redeemByShares` (Tropykus/LayerBank) and `*ToRedeem` locals (all three). Sovryn stays one share-sized helper with a recipient overload; stop reusing `stablecoinInterestAmount` for the measured payout; rename `totalErc20InLending` → `totalStablecoinInLending`. Copy Sovryn’s `getAccruedInterest` natspec onto Tropykus/LayerBank. Drop unused `minPurchaseAmount` from Tropykus/Sovryn MoC/Dex constructors (LayerBank already omitted it); fix SovrynDocHandlerMoc’s “Tropykus' iSUSD” natspec. Do not rename `TokenLending__AmountToRepayAdjusted`. See `R25-lending-redeem-naming.md`.
+
+Land before deploy/CI so the index-map PR does not freeze the old helper names.
+
+### PR 17 - R22 deploy scripts, constants, harness, and CI matrix
 
 Update constants and deploy scripts for the new map:
 
@@ -207,7 +214,9 @@ Update constants and deploy scripts for the new map:
 
 Split the shared test harness so lending-token assertions live only in lending-protocol-specific tests. CI should cover `none`, `layerbank`, and `sovryn` with `SWAP_TYPE=mocSwaps`.
 
-### PR 17 - R9 event indexing and ABI cleanup
+**Required in this PR:** round-up solvency regression on the LayerBank lane — virtual scaled books must stay ≤ handler `scaledBalanceOf` after odd-amount redeems against Aave-like round-nearest burns; the test must fail if `_stablecoinToLendingToken` rounded down. Shared rule lives on `TokenLending`; do not re-document it only on LayerBank. See `R22-deploy-ci.md`.
+
+### PR 18 - R9 event indexing and ABI cleanup
 
 Index only addresses and `scheduleId`. Do not index amounts, timestamps, periods, rates, strings, bytes, or arrays.
 
@@ -215,7 +224,7 @@ Add `TokenLending__UserSharesUpdated(address indexed user, uint256 previousShare
 
 Do this once the shipped ABI surface is known, including any optional pause or compound-interest events that were approved.
 
-### PR 18 - R10 natspec and comments
+### PR 19 - R10 natspec and comments
 
 Rewrite first-party natspec after ABI, names, handlers, and layout are stable. Put user-facing docs on interfaces and use `@inheritdoc` in implementations.
 

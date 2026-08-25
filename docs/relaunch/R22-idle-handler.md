@@ -37,7 +37,7 @@ Do not add per-user balances to `TokenHandler` itself. Lending handlers already 
 ## Out of scope
 
 - [ ] LayerBank handler (PR 15).
-- [ ] `script/Constants.sol` index remap (LayerBank at 1), `DeployMocSwaps` / `DeployDexSwaps` registration, `DcaDappTest` split, `ILendingToken` deletion, CI matrix (`none` / `layerbank` / `sovryn`) — those are PR 16. This PR may add `IDLE_INDEX = 0` and `DeployIdleHandler` as an add-on.
+- [ ] `script/Constants.sol` index remap (LayerBank at 1), `DeployMocSwaps` / `DeployDexSwaps` registration, `DcaDappTest` split, `ILendingToken` deletion, CI matrix (`none` / `layerbank` / `sovryn`) — those are PR 17. This PR may add `IDLE_INDEX = 0` and `DeployIdleHandler` as an add-on.
 - [ ] Idle Uniswap / USDRIF handler. Dex sources stay where they are.
 - [ ] Registering a name for index 0.
 - [ ] Changing `TokenHandler` to own per-user accounting.
@@ -110,7 +110,7 @@ Fork tests: `make fork-sovryn` and `make fork-tropykus` before push (`AGENTS.md`
 - [ ] `IdleDocHandlerMoc` is constructable without a lending-token address or `exchangeRateDecimals`.
 - [ ] Deposits stay on the handler; buys and withdrawals spend idle DOC; per-user idle balances clamp `withdrawToken` and single redeem. Batch redeem reverts on insufficient idle.
 - [ ] Index 0 has no protocol name; single-index interest calls revert; `withdrawAllAccumulatedInterest` skips index 0.
-- [ ] `DeployIdleHandler` deploys `IdleDocHandlerMoc` and can register it at index 0 with no protocol name. `DeployMocSwaps` / `DeployDexSwaps` / `DcaDappTest` are unchanged (PR 16).
+- [ ] `DeployIdleHandler` deploys `IdleDocHandlerMoc` and can register it at index 0 with no protocol name. `DeployMocSwaps` / `DeployDexSwaps` / `DcaDappTest` are unchanged (PR 17).
 - [ ] Done-gate lanes pass. `make fork-sovryn` and `make fork-tropykus` pass before push.
 
 ## Reviewer checklist
@@ -124,5 +124,5 @@ Fork tests: `make fork-sovryn` and `make fork-tropykus` before push (`AGENTS.md`
 ## ABI / deploy / cutover impact
 
 - ABI: new contracts `IdleErc20Handler` / `IdleDocHandlerMoc`. `IdleErc20Handler__AmountAdjusted` indexes only `user`. `DcaManager.withdrawAllAccumulatedInterest` skips empty protocol names (behavior change vs reverting the whole call once a handler exists at 0). `ITokenLending.TokenLending__InsufficientLendingTokenBalance` replaces a 0.8 underflow panic on Sovryn/Tropykus batch redeem (same revert, named). No other change to existing handler ABIs.
-- Scripts: add-on `DeployIdleHandler` (not wired into `DeployMocSwaps`). Live registration of index 0 on the main deploy path is PR 16.
-- Cutover: none in this PR. Frontend can target index 0 only after PR 16 assigns the handler on the new admin.
+- Scripts: add-on `DeployIdleHandler` (not wired into `DeployMocSwaps`). Live registration of index 0 on the main deploy path is PR 17.
+- Cutover: none in this PR. Frontend can target index 0 only after PR 17 assigns the handler on the new admin.

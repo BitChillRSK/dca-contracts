@@ -14,7 +14,7 @@ R22 as a whole makes lending optional (idle at index 0), puts LayerBank at 1, an
 
 This PR is only the folder split (`IMPLEMENTATION_ORDER.md` PR 11). Foundry `src = "src"` already compiles subfolders. `PurchaseMoc` and `PurchaseUniswap` stay in core — they are purchase methods, not lending protocols. Do not create `src/moc-lending/`.
 
-Live deploy scripts still register Tropykus after this PR. Dropping that registration is PR 16; doing it here would break `make moc-tropykus`. The `tropykus-legacy/` name is the signal, not a deploy-script change.
+Live deploy scripts still register Tropykus after this PR. Dropping that registration is PR 17; doing it here would break `make moc-tropykus`. The `tropykus-legacy/` name is the signal, not a deploy-script change.
 
 ## Open product decisions
 
@@ -31,7 +31,7 @@ Live deploy scripts still register Tropykus after this PR. Dropping that registr
 
 ## Out of scope
 
-- [ ] Idle handler (PR 12), LayerBank handler (PR 15), deploy/constants/harness/CI matrix (PR 16).
+- [ ] Idle handler (PR 12), LayerBank handler (PR 15), deploy/constants/harness/CI matrix (PR 17).
 - [ ] Changing `TROPYKUS_INDEX` / `SOVRYN_INDEX` / `Protocol` enum / `LENDING_PROTOCOL` env values.
 - [ ] Stopping Tropykus (or Dex/USDRIF) registration in `DeployMocSwaps` / `DeployDexSwaps`. Scripts only change import paths.
 - [ ] Splitting `DcaDappTest`, deleting `ILendingToken`, or moving `test/mocks/` (`MockKdocToken` / `MockIsusdToken` / `MockKToken` are still used by the shared harness and helper configs).
@@ -111,4 +111,4 @@ Fork tests: not required.
 
 - ABI: none.
 - Scripts: import paths only. No new env vars, no index change, no broadcast.
-- Cutover: none. Frontend index map is unchanged until PR 16.
+- Cutover: none. Frontend index map is unchanged until PR 17.

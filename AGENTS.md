@@ -40,13 +40,13 @@ Handlers = TokenHandler + TokenLending + a Purchase*:
   src/tropykus-legacy/   TropykusErc20Handler ─┬─ TropykusDocHandlerMoc   (+ PurchaseMoc)
                                               └─ TropykusErc20HandlerDex (+ PurchaseUniswap)
   src/idle/              IdleErc20Handler ── IdleDocHandlerMoc (+ PurchaseMoc)  index 0
-  src/layerbank/         index 1 (PR 15)
+  src/layerbank/         LayerBankErc20Handler ── LayerBankDocHandlerMoc (+ PurchaseMoc) index 1
 ```
 
-- `src/interfaces/` — shared first-party ABIs; keep in sync with implementations. Protocol-specific interfaces (`IiSusdToken`, `IkToken`, `IIdleErc20Handler`) live next to their handlers. Lending handlers share `ITokenLending` directly — R16 removed the empty per-protocol lending interfaces, so do not add one for a new handler unless it actually declares something.
+- `src/interfaces/` — shared first-party ABIs; keep in sync with implementations. Protocol-specific interfaces (`IiSusdToken`, `IkToken`, `IIdleErc20Handler`, `ILayerBankAToken`, `ILayerBankPool`, `ILayerBankErc20Handler`) live next to their handlers. Lending handlers share `ITokenLending` directly — R16 removed the empty per-protocol lending interfaces, so do not add one for a new handler unless it actually declares something (errors, events, or protocol-specific views — same bar as Idle).
 - `test/unit/DcaDappTest.t.sol` — shared harness; **requires** `SWAP_TYPE` and `LENDING_PROTOCOL` (no fallback).
-- `test/unit/`, `test/mocks/`, `test/ai-generated/` — unit / mocks / extra + fuzz. Dedicated handler tests: `test/ai-generated/unit/sovryn/`, `test/ai-generated/unit/tropykus-legacy/`, `test/ai-generated/unit/idle/`.
-- `script/` — deploy helpers. Do not `--broadcast` or talk to live contracts. A new production handler ships its deploy path in the same PR: extend `DeployMocSwaps` / `DeployDexSwaps` when it belongs in the main index map, or add a `Deploy<Handler>.s.sol` add-on (see `DeployUsdrifHandler`, `DeployIdleHandler`). DcaManager and deployment tests must construct that handler through the script (`DcaDappTest`, `BaseDeploymentTest`, `NewHandlerDeploymentTest`). `new Handler(...)` is only for test subclasses that expose internals, or handler-level tests that set `dcaManager` to the test contract so they can call `onlyDcaManager` entry points.
+- `test/unit/`, `test/mocks/`, `test/ai-generated/` — unit / mocks / extra + fuzz. Dedicated handler tests: `test/ai-generated/unit/sovryn/`, `test/ai-generated/unit/tropykus-legacy/`, `test/ai-generated/unit/idle/`, `test/ai-generated/unit/layerbank/`.
+- `script/` — deploy helpers. Do not `--broadcast` or talk to live contracts. A new production handler ships its deploy path in the same PR: extend `DeployMocSwaps` / `DeployDexSwaps` when it belongs in the main index map, or add a `Deploy<Handler>.s.sol` add-on (see `DeployUsdrifHandler`, `DeployIdleHandler`, `DeployLayerBankHandler`). DcaManager and deployment tests must construct that handler through the script (`DcaDappTest`, `BaseDeploymentTest`, `NewHandlerDeploymentTest`). `new Handler(...)` is only for test subclasses that expose internals, or handler-level tests that set `dcaManager` to the test contract so they can call `onlyDcaManager` entry points.
 
 ## Protocol invariants
 

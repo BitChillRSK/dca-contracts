@@ -17,8 +17,9 @@ abstract contract TokenLending is ITokenLending {
 
     /**
      * @notice convert underlying token to lending token
-     * @dev Rounds up the lending token amount to avoid underestimating the amount to subtract from each user's balance when
-     * redeeming the lending token (which would cause accounting errors if 1 WEI less than gets burned is subtracted)
+     * @dev Rounds up so the virtual share debit is never below what the lending protocol may burn for
+     *      the same underlying (keeps sum of per-user shares <= shares the handler actually holds).
+     *      Round-down would allow the books to drift above reality.
      * @param underlyingAmount: the amount of underlying token to convert
      * @param exchangeRate: the exchange rate of underlying token to lending token
      * @return lendingTokenAmount the amount of lending token
