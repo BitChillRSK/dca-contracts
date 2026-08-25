@@ -53,9 +53,10 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R21 | 13 | none |
 | R16 | 14 | none |
 | R22 (LayerBank) | 15 | none |
-| R22 (deploy/CI) | 16 | none |
-| R9 | 17 | R18/R19 if not recorded (ABI freeze) |
-| R10 | 18 | none |
+| R25 | 16 | none |
+| R22 (deploy/CI) | 17 | none |
+| R9 | 18 | R18/R19 if not recorded (ABI freeze) |
+| R10 | 19 | none |
 | R12, R13, R18, R19, OZ 5.x | optional late | only if the human named that item |
 
 ### PR 1 - R23 toolchain and dependency baseline
@@ -196,7 +197,13 @@ LayerBank owns exact per-user virtual **scaled aToken** balances and implements 
 
 Do not rename Tropykus in place and do not deploy USDRIF/Uniswap handlers for this relaunch.
 
-### PR 16 - R22 deploy scripts, constants, harness, and CI matrix
+### PR 16 - R25 lending redeem helper naming
+
+Rename-only follow-up to R16, after LayerBank exists so all three lending handlers match. Drop `_burnKtoken` / `_burnAtoken` and `*ToRepay` locals in favor of `_redeemByUnderlying` / `_redeemByShares` (Tropykus/LayerBank) and `*ToRedeem` locals (all three). Sovryn stays one share-sized helper with a recipient overload. Do not rename `TokenLending__AmountToRepayAdjusted`. See `R25-lending-redeem-naming.md`.
+
+Land before deploy/CI so the index-map PR does not freeze the old helper names.
+
+### PR 17 - R22 deploy scripts, constants, harness, and CI matrix
 
 Update constants and deploy scripts for the new map:
 
@@ -207,7 +214,7 @@ Update constants and deploy scripts for the new map:
 
 Split the shared test harness so lending-token assertions live only in lending-protocol-specific tests. CI should cover `none`, `layerbank`, and `sovryn` with `SWAP_TYPE=mocSwaps`.
 
-### PR 17 - R9 event indexing and ABI cleanup
+### PR 18 - R9 event indexing and ABI cleanup
 
 Index only addresses and `scheduleId`. Do not index amounts, timestamps, periods, rates, strings, bytes, or arrays.
 
@@ -215,7 +222,7 @@ Add `TokenLending__UserSharesUpdated(address indexed user, uint256 previousShare
 
 Do this once the shipped ABI surface is known, including any optional pause or compound-interest events that were approved.
 
-### PR 18 - R10 natspec and comments
+### PR 19 - R10 natspec and comments
 
 Rewrite first-party natspec after ABI, names, handlers, and layout are stable. Put user-facing docs on interfaces and use `@inheritdoc` in implementations.
 

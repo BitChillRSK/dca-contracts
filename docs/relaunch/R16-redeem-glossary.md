@@ -35,7 +35,7 @@ Suggested first-party direction (implementer may pick equivalent names if they r
 | Put a user's stablecoin on the handler so a purchase can spend it | `_retrieveStablecoin` / `_batchRetrieveStablecoin` |
 | Give up k/iToken to get the stablecoin back | `_redeemLendingToken` (Tropykus core: `_redeemLendingTokenInternal`; the share-exact wrapper stays `_burnKtoken`) |
 | Give up DOC to get rBTC at MoC | `_redeemDoc` |
-| Shares leaving a user's book | "repay" (`iSusdToRepay`, `kTokenToRepay`, `TokenLending__AmountToRepayAdjusted`) — the alias this spec sanctions for the same direction |
+| Shares leaving a user's book | "repay" locals were an R16 alias; **[R25](./R25-lending-redeem-naming.md)** renames them to `*ToRedeem` / `_redeemByUnderlying` / `_redeemByShares`. Event `TokenLending__AmountToRepayAdjusted` stays (ABI). |
 | Stablecoin arriving | "received" (`stablecoinReceived` in both lending handlers, `TokenLending__ZeroStablecoinReceived` when none arrives). The shared event's amount parameter stays the neutral `underlyingAmount`: inside a batch it fires per user with a planned share, not a receipt. |
 
 MoC's `redeemDocRequest` / `redeemFreeDoc` follow this glossary already: DOC is what leaves. The first-party name that did not was `_redeemRbtc`, now `_redeemDoc`.
