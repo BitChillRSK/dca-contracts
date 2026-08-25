@@ -2,8 +2,6 @@
 pragma solidity 0.8.36;
 
 import {PurchaseMoc} from "src/PurchaseMoc.sol";
-import {PurchaseRbtc} from "src/PurchaseRbtc.sol";
-import {LendingErc20Handler} from "src/LendingErc20Handler.sol";
 import {SovrynErc20Handler} from "./SovrynErc20Handler.sol";
 
 /**
@@ -29,34 +27,4 @@ contract SovrynDocHandlerMoc is SovrynErc20Handler, PurchaseMoc {
         SovrynErc20Handler(dcaManagerAddress, docTokenAddress, iSusdTokenAddress, feeCollector, feeSettings)
         PurchaseMoc(docTokenAddress, mocProxyAddress)
     {}
-
-    /*//////////////////////////////////////////////////////////////
-                           INTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-    /**
-     * @notice Override the _retrieveStablecoin hook to resolve ambiguity between parent contracts
-     * @param user The address of the user whose DOC is being retrieved
-     * @param amount The amount of DOC wanted
-     */
-    function _retrieveStablecoin(address user, uint256 amount)
-        internal
-        override(LendingErc20Handler, PurchaseRbtc)
-        returns (uint256)
-    {
-        return LendingErc20Handler._retrieveStablecoin(user, amount);
-    }
-
-    /**
-     * @notice Override the _batchRetrieveStablecoin hook to resolve ambiguity between parent contracts
-     * @param users The array of user addresses whose DOC is being retrieved
-     * @param purchaseAmounts The array of amounts of DOC charged to each user
-     * @param totalDocAmountToSpend The total amount of DOC wanted
-     */
-    function _batchRetrieveStablecoin(address[] memory users, uint256[] memory purchaseAmounts, uint256 totalDocAmountToSpend)
-        internal
-        override(LendingErc20Handler, PurchaseRbtc)
-        returns (uint256)
-    {
-        return LendingErc20Handler._batchRetrieveStablecoin(users, purchaseAmounts, totalDocAmountToSpend);
-    }
 }
