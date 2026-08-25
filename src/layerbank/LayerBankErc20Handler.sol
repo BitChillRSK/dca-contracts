@@ -81,24 +81,13 @@ abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20H
      *      that cannot be share-exact. Live Aave `withdraw` reverts on a zero amount (`InvalidAmount`).
      *      Interest is forwarded by the base after this returns.
      */
-    function _protocolRedeem(uint256 stablecoinAmount, uint256 sharesAmount, uint256 exchangeRate)
-        internal
-        override
-        returns (uint256 received)
-    {
+    function _protocolRedeem(uint256 sharesAmount, uint256 exchangeRate) internal override {
         uint256 amountOut = _sharesToStablecoin(sharesAmount, exchangeRate);
-        // Live Aave `withdraw` reverts on a zero amount (`InvalidAmount`).
-        if (amountOut == 0) {
-            return 0;
-        }
+        // @notice skipping the call is protocol-specific, so it stays here: live Aave `withdraw`
+        // reverts on a zero amount (`InvalidAmount`). The base then measures a zero delta, which it
+        // only treats as a failure when the caller actually asked for stablecoin.
+        if (amountOut == 0) return;
 
-        uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(address(this));
         i_pool.withdraw(address(i_stableToken), amountOut, address(this));
-        received = i_stableToken.balanceOf(address(this)) - stablecoinBalanceBefore;
-        // @notice a success with no stablecoin received still burnt the user's shares, so revert
-        // instead of paying out zero
-        if (received == 0) {
-            revert TokenLending__ZeroStablecoinReceived(stablecoinAmount);
-        }
     }
 }

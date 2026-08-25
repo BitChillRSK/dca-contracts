@@ -170,7 +170,13 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
             );
         }
         s_shares[user] -= sharesToRedeem;
-        stablecoinReceived = _protocolRedeem(stablecoinAmount, sharesToRedeem, exchangeRate);
+        stablecoinReceived = _measuredProtocolRedeem(sharesToRedeem, exchangeRate);
+        // @notice a protocol call that reports success but pays nothing still burnt the user's shares,
+        // so revert instead of paying out zero. A position whose shares are worth under 1 wei of
+        // stablecoin is the exception: it must stay exitable rather than brick.
+        if (stablecoinAmount > 0 && stablecoinReceived == 0) {
+            revert TokenLending__ZeroStablecoinReceived(stablecoinAmount);
+        }
         emit TokenLending__SharesRedeemed(user, stablecoinReceived, sharesToRedeem);
     }
 
@@ -203,7 +209,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
             s_shares[users[i]] = usersShares - usersSharesToRedeem;
             emit TokenLending__SharesRedeemed(users[i], purchaseAmounts[i], usersSharesToRedeem);
         }
-        uint256 stablecoinReceived = _protocolRedeem(totalStablecoinAmount, totalSharesToRedeem, exchangeRate);
+        uint256 stablecoinReceived = _measuredProtocolRedeem(totalSharesToRedeem, exchangeRate);
         if (stablecoinReceived > 0) emit TokenLending__SharesRedeemedBatch(stablecoinReceived, totalSharesToRedeem);
         else revert TokenLending__ZeroStablecoinReceived(totalStablecoinAmount);
         return stablecoinReceived;
@@ -231,16 +237,30 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
     function _protocolDeposit(uint256 stablecoinAmount) internal virtual returns (uint256 mintedShares);
 
     /**
-     * @notice burn `sharesAmount` at the lending protocol, crediting this contract
-     * @dev Adapters size the protocol call by `sharesAmount`. `stablecoinAmount` is the caller's
-     *      (post-clamp) intent, used only for the zero-payout guards and their revert argument.
-     * @param stablecoinAmount the underlying amount wanted (after any clamp)
+     * @notice the one place a redemption's cash is measured
+     * @dev `AGENTS.md` invariant 1 lives here and nowhere else: adapters move the funds, this measures
+     *      what arrived. An adapter that reported its own figure could return an integrator's claim
+     *      instead of a balance delta, which is the mistake the invariant exists to prevent.
      * @param sharesAmount the share count to burn (after any clamp)
      * @param exchangeRate the rate already read by the caller; do not re-query the protocol
-     * @return received the stablecoin amount this contract actually received
+     * @return received the stablecoin amount this contract actually gained
      */
-    function _protocolRedeem(uint256 stablecoinAmount, uint256 sharesAmount, uint256 exchangeRate)
-        internal
-        virtual
-        returns (uint256 received);
+    function _measuredProtocolRedeem(uint256 sharesAmount, uint256 exchangeRate)
+        private
+        returns (uint256 received)
+    {
+        uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(address(this));
+        _protocolRedeem(sharesAmount, exchangeRate);
+        received = i_stableToken.balanceOf(address(this)) - stablecoinBalanceBefore;
+    }
+
+    /**
+     * @notice burn `sharesAmount` at the lending protocol, crediting this contract
+     * @dev Move the funds and nothing else. Do not measure, do not decide what a zero payout means —
+     *      the base does both. Adapters only raise failures their own protocol reports (a Compound
+     *      return code) or skip a call their own protocol rejects (a zero-amount Aave withdraw).
+     * @param sharesAmount the share count to burn (after any clamp)
+     * @param exchangeRate the rate already read by the caller; do not re-query the protocol
+     */
+    function _protocolRedeem(uint256 sharesAmount, uint256 exchangeRate) internal virtual;
 }
