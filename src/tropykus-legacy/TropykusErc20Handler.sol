@@ -9,7 +9,6 @@ import {IkToken} from "./IkToken.sol";
  * @notice Tropykus adapter: Compound-style kToken mint/redeem. Share accounting lives on LendingErc20Handler.
  */
 abstract contract TropykusErc20Handler is LendingErc20Handler {
-    /// @notice Exchange-rate scale (1e18).
     uint256 public constant EXCHANGE_RATE_DECIMALS = 1e18;
 
     IkToken public immutable i_kToken;
