@@ -73,6 +73,6 @@ Assert `sovrynHandler.EXCHANGE_RATE_DECIMALS() == 1e18`, `tropykusHandler.EXCHAN
 
 ## ABI / deploy / cutover impact
 
-- ABI: Sovryn and Tropykus adapter/leaf constructors lose the last `uint256`. Fresh relaunch deployments; no live cutover.
+- ABI: Sovryn and Tropykus adapter/leaf constructors lose the last `uint256`. LayerBank's public constant getter is renamed from `RAY()` to `EXCHANGE_RATE_DECIMALS()`; its value stays `1e27`. Fresh relaunch deployments; no live cutover.
 - Scripts: stop passing `EXCHANGE_RATE_DECIMALS` into those constructors. Local/test only; do not `--broadcast`.
 - Cutover: none.
