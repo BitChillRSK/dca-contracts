@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: yes · Optional/further-review: no
 
-PR 17 of R22. Stack on R25 (PR 16). Last required R22 PR before R9.
+PR 18 of R22. Stack on R26 (PR 17). Last required R22 PR before R9.
 
 ## Objective
 
@@ -10,7 +10,7 @@ Wire LayerBank into the live index map (idle=0, LayerBank=1, Sovryn=2), split th
 
 ## Background
 
-PR 15 shipped `LayerBankDocHandlerMoc` behind an add-on deploy script. PR 16 (R25) finishes redeem-helper naming. This PR is the cutover: constants, `DeployMocSwaps` / harness / Makefile / CI.
+PR 15 shipped `LayerBankDocHandlerMoc` behind an add-on deploy script. PR 16 (R25) finishes redeem-helper naming and PR 17 (R26) swaps the “lending token” noun for `shares` — build the harness split against those names. This PR is the cutover: constants, `DeployMocSwaps` / harness / Makefile / CI.
 
 **Round-up solvency (required in this PR, not deferred).** `_stablecoinToLendingToken` documents `Math.Rounding.Up` for all lending handlers (Tropykus / Sovryn / LayerBank). Aave `withdraw` burns scaled shares with `amount.rayDiv(index)` (round nearest), so LayerBank is the sharpest place to regression-test: debiting ≥ what Aave burns keeps `sum(s_aTokenBalances) <= aToken.scaledBalanceOf(handler)`. Flipping TokenLending to round **down** would let virtual books drift above reality; happy-path suites still pass. Ship a test that fails under round-down sizing — do not leave this as a handler comment.
 
@@ -18,7 +18,7 @@ Related: [R22-layerbank-handler.md](./R22-layerbank-handler.md), [R25-lending-re
 
 ## Open product decisions
 
-**none** — `IMPLEMENTATION_ORDER.md` lists no gates for PR 17. Implement without asking.
+**none** — `IMPLEMENTATION_ORDER.md` lists no gates for PR 18. Implement without asking.
 
 ## Scope
 

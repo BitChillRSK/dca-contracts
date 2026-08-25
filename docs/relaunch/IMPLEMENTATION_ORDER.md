@@ -54,9 +54,10 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R16 | 14 | none |
 | R22 (LayerBank) | 15 | none |
 | R25 | 16 | none |
-| R22 (deploy/CI) | 17 | none |
-| R9 | 18 | R18/R19 if not recorded (ABI freeze) |
-| R10 | 19 | none |
+| R26 | 17 | none |
+| R22 (deploy/CI) | 18 | none |
+| R9 | 19 | R18/R19 if not recorded (ABI freeze) |
+| R10 | 20 | none |
 | R12, R13, R18, R19, OZ 5.x | optional late | only if the human named that item |
 
 ### PR 1 - R23 toolchain and dependency baseline
@@ -199,11 +200,19 @@ Do not rename Tropykus in place and do not deploy USDRIF/Uniswap handlers for th
 
 ### PR 16 - R25 lending redeem helper naming
 
-Leftover from R16 (PR 14): that glossary pass still left `_burnKtoken` and a “repay” alias. Rename-only (plus tiny leaf cleanup), after LayerBank exists so all three lending handlers match. Drop `_burnKtoken` / `_burnAtoken` and `*ToRepay` locals in favor of `_redeemByUnderlying` / `_redeemByShares` (Tropykus/LayerBank) and `*ToRedeem` locals (all three). Sovryn stays one share-sized helper with a recipient overload; stop reusing `stablecoinInterestAmount` for the measured payout; rename `totalErc20InLending` → `totalStablecoinInLending`. Copy Sovryn’s `getAccruedInterest` natspec onto Tropykus/LayerBank. Drop unused `minPurchaseAmount` from Tropykus/Sovryn MoC/Dex constructors (LayerBank already omitted it); fix SovrynDocHandlerMoc’s “Tropykus' iSUSD” natspec. Also rename the shared event to `TokenLending__AmountToRedeemAdjusted` — the relaunch deploys fresh with no live log consumer, and R9 (PR 18) freezes the event surface, so this is the last cheap moment. See `R25-lending-redeem-naming.md`.
+Leftover from R16 (PR 14): that glossary pass still left `_burnKtoken` and a “repay” alias. Rename-only (plus tiny leaf cleanup), after LayerBank exists so all three lending handlers match. Drop `_burnKtoken` / `_burnAtoken` and `*ToRepay` locals in favor of `_redeemByUnderlying` / `_redeemByShares` (Tropykus/LayerBank) and `*ToRedeem` locals (all three). Sovryn stays one share-sized helper with a recipient overload; stop reusing `stablecoinInterestAmount` for the measured payout; rename `totalErc20InLending` → `totalStablecoinInLending`. Copy Sovryn’s `getAccruedInterest` natspec onto Tropykus/LayerBank. Drop unused `minPurchaseAmount` from Tropykus/Sovryn MoC/Dex constructors (LayerBank already omitted it); fix SovrynDocHandlerMoc’s “Tropykus' iSUSD” natspec. Also rename the shared event to `TokenLending__AmountToRedeemAdjusted` — the relaunch deploys fresh with no live log consumer, and R9 (PR 19) freezes the event surface, so this is the last cheap moment. See `R25-lending-redeem-naming.md`.
 
-Land before deploy/CI so the index-map PR does not freeze the old helper names.
+Land before R26 and deploy/CI so neither PR freezes the old helper names.
 
-### PR 17 - R22 deploy scripts, constants, harness, and CI matrix
+### PR 17 - R26 share terminology
+
+"Lending token" is not DeFi nomenclature and reads backwards — `_stablecoinToLendingToken` sounds like "the token being lent", which is the stablecoin. Aave says `aToken`, Compound (Tropykus's fork parent) says `cToken`; the recognized generic is ERC-4626's **shares**. Rename the receipt-token noun to `shares` across `ITokenLending`, `TokenLending`, and the handlers: `getUsersLendingTokenBalance` → `getUserShares`, `_stablecoinToLendingToken` / `_lendingTokenToStablecoin` → `_stablecoinToShares` / `_sharesToStablecoin`, `TokenLending__LendingTokenRedeemed(Batch)` → `…SharesRedeemed(Batch)`, `TokenLending__InsufficientLendingTokenBalance` → `TokenLending__InsufficientShares`, and Sovryn's `_redeemLendingToken` → `_redeemShares`.
+
+Keep `ITokenLending` / `TokenLending` / `LENDING_PROTOCOL` / `LendingProtocol*Failed` — "lending" as a domain word is fine; only "lending **token**" is wrong. Keep `stablecoin` as the asset noun; do not adopt 4626's `assets`.
+
+Land before PR 18 for the same reason R25 did: PR 18 splits the harness where ~75 of the ~370 references live, so renaming afterwards writes them twice. **R9 (PR 19) is the ABI freeze** and already specifies `TokenLending__UserSharesUpdated(…, previousShares, newShares)` with a test asserting `newShares == getUsersLendingTokenBalance(user)` — two names for one quantity. Settle the noun before that lands. See `R26-share-terminology.md`.
+
+### PR 18 - R22 deploy scripts, constants, harness, and CI matrix
 
 Update constants and deploy scripts for the new map:
 
@@ -216,15 +225,15 @@ Split the shared test harness so lending-token assertions live only in lending-p
 
 **Required in this PR:** round-up solvency regression on the LayerBank lane — virtual scaled books must stay ≤ handler `scaledBalanceOf` after odd-amount redeems against Aave-like round-nearest burns; the test must fail if `_stablecoinToLendingToken` rounded down. Shared rule lives on `TokenLending`; do not re-document it only on LayerBank. See `R22-deploy-ci.md`.
 
-### PR 18 - R9 event indexing and ABI cleanup
+### PR 19 - R9 event indexing and ABI cleanup
 
 Index only addresses and `scheduleId`. Do not index amounts, timestamps, periods, rates, strings, bytes, or arrays.
 
-Add `TokenLending__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares)` to the shared lending interface and emit it after every successful per-user virtual lending-share mutation in the shipped lending handlers. Deposits report the exact measured lending-token mint, not the stablecoin input. Withdrawals, interest, single purchases, and every buyer debit in a batch are covered; repeated users in one batch produce sequential transitions. Tests must show each `newShares` equals `getUsersLendingTokenBalance(user)` and that replay from the fresh deployment reconstructs current balances. This is protocol observability for possible off-chain forwarding, not an on-chain external-reward integration. See [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md).
+Add `TokenLending__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares)` to the shared lending interface and emit it after every successful per-user virtual lending-share mutation in the shipped lending handlers. Deposits report the exact measured lending-token mint, not the stablecoin input. Withdrawals, interest, single purchases, and every buyer debit in a batch are covered; repeated users in one batch produce sequential transitions. Tests must show each `newShares` equals the per-user share getter — **renamed `getUserShares` by R26 (PR 17); write this spec against the `shares` vocabulary, not `lendingToken`** — and that replay from the fresh deployment reconstructs current balances. This is protocol observability for possible off-chain forwarding, not an on-chain external-reward integration. See [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md).
 
 Do this once the shipped ABI surface is known, including any optional pause or compound-interest events that were approved.
 
-### PR 19 - R10 natspec and comments
+### PR 20 - R10 natspec and comments
 
 Rewrite first-party natspec after ABI, names, handlers, and layout are stable. Put user-facing docs on interfaces and use `@inheritdoc` in implementations.
 
