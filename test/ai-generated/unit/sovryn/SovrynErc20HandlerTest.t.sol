@@ -215,7 +215,7 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
         
         uint256 recipientBalanceBefore = stablecoin.balanceOf(recipient);
         
-        // Mock the internal withdrawal to specific recipient
+        // Mock the internal withdrawal through interest (handler then transfer)
         // This would be tested through interest withdrawal
         vm.prank(address(dcaManager));
         sovrynHandler.withdrawInterest(USER, 0); // Withdraw all as interest

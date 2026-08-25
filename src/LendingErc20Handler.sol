@@ -102,7 +102,10 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
             return; // No interest to withdraw
         }
         uint256 stablecoinInterestAmount = totalStablecoinInLending - stablecoinLockedInDcaSchedules;
-        uint256 stablecoinReceived = _redeemByShares(user, stablecoinInterestAmount, exchangeRate, user);
+        uint256 stablecoinReceived = _redeemByShares(user, stablecoinInterestAmount, exchangeRate);
+        if (stablecoinReceived > 0) {
+            i_stableToken.safeTransfer(user, stablecoinReceived);
+        }
         emit TokenLending__InterestWithdrawn(user, address(i_stableToken), stablecoinReceived);
     }
 
@@ -152,7 +155,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
         internal
         returns (uint256)
     {
-        return _redeemInternal(user, stablecoinAmount, exchangeRate, true, address(this));
+        return _redeemInternal(user, stablecoinAmount, exchangeRate, true);
     }
 
     /**
@@ -160,14 +163,13 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
      * @param user: the address of the user
      * @param stablecoinAmount: the amount of stablecoin wanted
      * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
-     * @param recipient: who should receive the stablecoin (Sovryn may pay this address directly)
-     * @return the amount of stablecoin the recipient actually received
+     * @return the amount of stablecoin this contract actually received
      */
-    function _redeemByShares(address user, uint256 stablecoinAmount, uint256 exchangeRate, address recipient)
+    function _redeemByShares(address user, uint256 stablecoinAmount, uint256 exchangeRate)
         internal
         returns (uint256)
     {
-        return _redeemInternal(user, stablecoinAmount, exchangeRate, false, recipient);
+        return _redeemInternal(user, stablecoinAmount, exchangeRate, false);
     }
 
     /**
@@ -176,15 +178,13 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
      * @param stablecoinAmount: the amount of stablecoin wanted
      * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
      * @param sizeByUnderlying: true to size the protocol call by underlying; adapters may ignore this
-     * @param recipient: who should receive the stablecoin
-     * @return stablecoinReceived the amount of stablecoin the recipient actually received
+     * @return stablecoinReceived the amount of stablecoin this contract actually received
      */
     function _redeemInternal(
         address user,
         uint256 stablecoinAmount,
         uint256 exchangeRate,
-        bool sizeByUnderlying,
-        address recipient
+        bool sizeByUnderlying
     ) internal returns (uint256 stablecoinReceived) {
         uint256 usersShares = s_shares[user];
         uint256 sharesToRedeem = _stablecoinToShares(stablecoinAmount, exchangeRate);
@@ -198,8 +198,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
             );
         }
         s_shares[user] -= sharesToRedeem;
-        stablecoinReceived =
-            _protocolRedeem(stablecoinAmount, sharesToRedeem, sizeByUnderlying, recipient, exchangeRate);
+        stablecoinReceived = _protocolRedeem(stablecoinAmount, sharesToRedeem, sizeByUnderlying, exchangeRate);
         emit TokenLending__SharesRedeemed(user, stablecoinReceived, sharesToRedeem);
     }
 
@@ -233,7 +232,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
             emit TokenLending__SharesRedeemed(users[i], purchaseAmounts[i], usersSharesToRedeem);
         }
         uint256 stablecoinReceived =
-            _protocolRedeem(totalStablecoinAmount, totalSharesToRedeem, true, address(this), exchangeRate);
+            _protocolRedeem(totalStablecoinAmount, totalSharesToRedeem, true, exchangeRate);
         if (stablecoinReceived > 0) emit TokenLending__SharesRedeemedBatch(stablecoinReceived, totalSharesToRedeem);
         else revert TokenLending__ZeroStablecoinReceived(totalStablecoinAmount);
         return stablecoinReceived;
@@ -261,19 +260,17 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
     function _protocolDeposit(uint256 stablecoinAmount) internal virtual returns (uint256 mintedShares);
 
     /**
-     * @notice redeem `stablecoinAmount` / `sharesAmount` from the lending protocol
+     * @notice redeem `stablecoinAmount` / `sharesAmount` from the lending protocol onto this contract
      * @param stablecoinAmount the underlying amount wanted (after any clamp)
      * @param sharesAmount the share count to burn (after any clamp)
      * @param sizeByUnderlying true to size the protocol call by underlying; Sovryn ignores this
-     * @param recipient who should receive the stablecoin
      * @param exchangeRate the rate already read by the caller; do not re-query the protocol
-     * @return received the stablecoin amount actually received (handler or recipient, adapter-defined)
+     * @return received the stablecoin amount this contract actually received
      */
     function _protocolRedeem(
         uint256 stablecoinAmount,
         uint256 sharesAmount,
         bool sizeByUnderlying,
-        address recipient,
         uint256 exchangeRate
     ) internal virtual returns (uint256 received);
 }

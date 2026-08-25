@@ -53,19 +53,19 @@ abstract contract SovrynErc20Handler is LendingErc20Handler {
     }
 
     /**
-     * @notice redeem the user's iSusd and send the stablecoin it frees to `recipient`
+     * @notice redeem the user's iSusd onto this contract
      * @dev Ignores `sizeByUnderlying`. Sovryn's burn() returns the GROSS amount and pays the NET
-     *      one once an exit fee is enabled (SIP-0094), so the recipient's measured balance delta
-     *      is the only trustworthy amount.
+     *      one once an exit fee is enabled (SIP-0094), so this contract's measured balance delta
+     *      is the only trustworthy amount. Interest is forwarded by the base after this returns.
      */
-    function _protocolRedeem(uint256 stablecoinAmount, uint256 sharesAmount, bool, address recipient, uint256)
+    function _protocolRedeem(uint256 stablecoinAmount, uint256 sharesAmount, bool, uint256)
         internal
         override
         returns (uint256 received)
     {
-        uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(recipient);
-        i_iSusdToken.burn(recipient, sharesAmount);
-        received = i_stableToken.balanceOf(recipient) - stablecoinBalanceBefore;
+        uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(address(this));
+        i_iSusdToken.burn(address(this), sharesAmount);
+        received = i_stableToken.balanceOf(address(this)) - stablecoinBalanceBefore;
         if (received == 0) revert TokenLending__ZeroStablecoinReceived(stablecoinAmount);
     }
 }

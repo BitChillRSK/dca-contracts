@@ -3,16 +3,12 @@ pragma solidity 0.8.36;
 
 import {LendingErc20Handler} from "src/LendingErc20Handler.sol";
 import {IkToken} from "./IkToken.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title TropykusErc20Handler
  * @notice Tropykus adapter: Compound-style kToken mint/redeem. Share accounting lives on LendingErc20Handler.
  */
 abstract contract TropykusErc20Handler is LendingErc20Handler {
-    using SafeERC20 for IERC20;
-
     IkToken public immutable i_kToken;
 
     /**
@@ -57,17 +53,15 @@ abstract contract TropykusErc20Handler is LendingErc20Handler {
     }
 
     /**
-     * @notice Compound kToken redemption. Extra `safeTransfer` when `recipient` is not this contract.
+     * @notice Compound kToken redemption onto this contract
      * @dev The `stablecoinAmount > 0 &&` conjunct is the Compound analogue of LayerBank skipping a
      *      zero Pool.withdraw: `redeemUnderlying(0)` / `redeem(0)` can succeed and pay 0.
      */
-    function _protocolRedeem(
-        uint256 stablecoinAmount,
-        uint256 sharesAmount,
-        bool sizeByUnderlying,
-        address recipient,
-        uint256
-    ) internal override returns (uint256 received) {
+    function _protocolRedeem(uint256 stablecoinAmount, uint256 sharesAmount, bool sizeByUnderlying, uint256)
+        internal
+        override
+        returns (uint256 received)
+    {
         uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(address(this));
 
         uint256 result;
@@ -84,9 +78,6 @@ abstract contract TropykusErc20Handler is LendingErc20Handler {
         // instead of paying out zero
         if (stablecoinAmount > 0 && received == 0) {
             revert TokenLending__ZeroStablecoinReceived(stablecoinAmount);
-        }
-        if (recipient != address(this) && received > 0) {
-            i_stableToken.safeTransfer(recipient, received);
         }
     }
 }

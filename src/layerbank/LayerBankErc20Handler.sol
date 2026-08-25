@@ -5,8 +5,6 @@ import {LendingErc20Handler} from "src/LendingErc20Handler.sol";
 import {ILayerBankAToken} from "./ILayerBankAToken.sol";
 import {ILayerBankErc20Handler} from "./ILayerBankErc20Handler.sol";
 import {ILayerBankPool} from "./ILayerBankPool.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title LayerBankErc20Handler
@@ -16,8 +14,6 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
  *      read, because mixing the two breaks the round-up solvency invariant.
  */
 abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20Handler {
-    using SafeERC20 for IERC20;
-
     /// @notice Aave liquidity-index scale. Fixed for this protocol; not a constructor arg
     ///         (passing Tropykus/Sovryn's 1e18 would size withdrawals 1e9× too large).
     uint256 public constant RAY = 1e27;
@@ -77,17 +73,16 @@ abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20H
     }
 
     /**
-     * @notice withdraw onto the handler, measure, then `safeTransfer` when `recipient` is not this.
+     * @notice withdraw onto this contract and measure
      * @dev Aave has no share-sized withdraw, so `sizeByUnderlying` only changes the amount asked
      *      of `Pool.withdraw`. Live Aave `withdraw` reverts on a zero amount (`InvalidAmount`).
+     *      Interest is forwarded by the base after this returns.
      */
-    function _protocolRedeem(
-        uint256 stablecoinAmount,
-        uint256 sharesAmount,
-        bool sizeByUnderlying,
-        address recipient,
-        uint256 exchangeRate
-    ) internal override returns (uint256 received) {
+    function _protocolRedeem(uint256 stablecoinAmount, uint256 sharesAmount, bool sizeByUnderlying, uint256 exchangeRate)
+        internal
+        override
+        returns (uint256 received)
+    {
         uint256 amountOut = sizeByUnderlying ? stablecoinAmount : _sharesToStablecoin(sharesAmount, exchangeRate);
         // Live Aave `withdraw` reverts on a zero amount (`InvalidAmount`).
         if (amountOut == 0) {
@@ -101,9 +96,6 @@ abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20H
         // instead of paying out zero
         if (received == 0) {
             revert TokenLending__ZeroStablecoinReceived(stablecoinAmount);
-        }
-        if (recipient != address(this)) {
-            i_stableToken.safeTransfer(recipient, received);
         }
     }
 }

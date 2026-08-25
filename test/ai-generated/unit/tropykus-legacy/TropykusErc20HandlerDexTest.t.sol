@@ -310,7 +310,7 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);
         
-        // Simulate interest withdrawal which uses burn to specific recipient
+        // Simulate interest withdrawal (redeem onto handler, then transfer to user)
         uint256 userBalanceBefore = stablecoin.balanceOf(USER);
         
         vm.prank(address(dcaManager));
