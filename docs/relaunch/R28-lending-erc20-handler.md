@@ -38,7 +38,7 @@ R25 kept Sovryn on one helper (`_redeemShares` after R26) on purpose. That helpe
 - **Always redeem onto the handler.** Human named this on PR 19: Sovryn `burn(user)` is not worth a `recipient` parameter on the shared hook. All three adapters redeem to `address(this)` and measure this contract’s stablecoin delta (SIP-0094 still holds: never trust `burn`’s return). `withdrawInterest` in the base then `safeTransfer`s to the user when `received > 0`. Principal withdraw and purchases already worked that way. Do not add `withdraw(..., user)` on LayerBank.
 - **Size every redeem by shares.** Human named this on PR 19 after the recipient removal. The base already computes a matched pair (`sharesToRedeem`, `stablecoinAmount`) that differ by under one rate-unit, so the flag only ever chose between outcomes at most 1 wei apart — while Sovryn ignored it outright and LayerBank used it to pick between two numbers it derived from the same pair. Sizing by the debited share count also states the solvency invariant directly: the number booked out of `s_shares` *is* the number handed to the protocol to burn, so Tropykus and Sovryn burn it exactly and the books cannot drift above the shares held even if a protocol's internal rate disagrees with the one read here. What comes back is protocol-chosen and always measured, which every path already did. Unification had to go this way — Sovryn has no underlying-sized redeem, and inventing one stays forbidden. LayerBank is the exception that proves it: Aave has no share-sized withdraw, so it converts the debited count back to underlying and floors, keeping Aave's `rayDiv` burn at or below the debit.
 - **Measurement and the zero-payout verdict are the base's, not the adapter's.** Adapters move funds and nothing else: `_protocolRedeem` returns `void`. The base brackets the call with one `balanceOf` pair (`_measuredProtocolRedeem`) and decides what a zero delta means. `AGENTS.md` invariant 1 then has exactly one implementation instead of three, and an adapter cannot accidentally report an integrator's claim as cash. What stays adapter-side is only what its own protocol dictates: Tropykus's Compound return code, and LayerBank skipping a zero `Pool.withdraw` that live Aave would reject with `InvalidAmount`.
-- **One zero-payout predicate: Tropykus's.** `stablecoinAmount > 0 && received == 0`. Sovryn's guard used to be unconditional, but its two forms can only differ when `_sharesToStablecoin` floors to zero on a non-zero share count, which needs a rate below the conversion scale. Only Tropykus has that (`exchangeRateCurrent()` is ~`0.02e18`); Sovryn's `tokenPrice()` and LayerBank's index never drop below theirs, so for those two the predicates coincide except on a zero-amount request. Keeping R27's conjunct is what leaves a dust position exitable instead of bricked.
+- **Zero-payout predicate (PR 63 review).** After the per-user share clamp: if `sharesToRedeem == 0`, return 0 without storage writes, protocol calls, or `TokenLending__SharesRedeemed`. Otherwise debit, measure, and **unconditionally** revert `TokenLending__ZeroStablecoinReceived` when the measured payout is 0. That revert rolls back the virtual debit and any protocol-side burn. This supersedes the earlier Tropykus-derived `stablecoinAmount > 0 &&` conjunct, which treated sub-wei positions as “must stay exitable.” That claim contradicts [R15](./R15-withdraw-all-sentinel.md) (**Decision — lending-share dust deferred**): this PR does **not** sweep or fix lending dust. The `sharesToRedeem > usersShares` clamp stays — it is a per-user solvency boundary (R21: `DcaManager` can sit ahead of share-backed underlying; `_retrieveStablecoin` has no `withdrawToken` outer clamp), not a rounding workaround, and it never uses the handler's pooled protocol balance as the ceiling.
 - **LayerBank constructor.** Hardcodes `TokenLending(RAY)`; extra `UNDERLYING_ASSET_ADDRESS` / `POOL()` checks. Keep those in the LayerBank adapter.
 - **Index 3 (future MoC lending)** is the payoff for doing this at all. If that handler is not on the horizon and this PR is after R9, the win is one emit site and one clamp implementation.
 
@@ -46,7 +46,7 @@ R25 kept Sovryn on one helper (`_redeemShares` after R26) on purpose. That helpe
 
 ## Open product decisions
 
-**none** remaining. `IMPLEMENTATION_ORDER.md` Ask column is empty. Layout (`LendingErc20Handler`, not a fatter `TokenLending`) and Tropykus-in-the-base (Compound codes stay in the Tropykus adapter) were recorded here. Human named three on PR 19: (1) Sovryn interest uses the same handler-then-`safeTransfer` path as Tropykus/LayerBank, so `_protocolRedeem` has no `recipient`; (2) every redeem is sized by the debited share count, so it has no `sizeByUnderlying` either and Tropykus drops `redeemUnderlying`; (3) the balance-delta measurement and the zero-payout revert move into the base, so `_protocolRedeem` returns `void` and takes no `stablecoinAmount` — adopting Tropykus's `stablecoinAmount > 0 &&` conjunct as the single predicate.
+**none** remaining. `IMPLEMENTATION_ORDER.md` Ask column is empty. Layout (`LendingErc20Handler`, not a fatter `TokenLending`) and Tropykus-in-the-base (Compound codes stay in the Tropykus adapter) were recorded here. Human named three on PR 19: (1) Sovryn interest uses the same handler-then-`safeTransfer` path as Tropykus/LayerBank, so `_protocolRedeem` has no `recipient`; (2) every redeem is sized by the debited share count, so it has no `sizeByUnderlying` either and Tropykus drops `redeemUnderlying`; (3) the balance-delta measurement and the zero-payout revert move into the base, so `_protocolRedeem` returns `void` and takes no `stablecoinAmount`. **PR 63 review supersedes (3)'s Tropykus-derived `stablecoinAmount > 0 &&` conjunct:** a positive share redemption that pays nothing always reverts; a zero-share result is a no-op. R15 lending-share dust remains deferred.
 
 ## Scope
 
@@ -67,6 +67,7 @@ R25 kept Sovryn on one helper (`_redeemShares` after R26) on purpose. That helpe
 - [x] If R9 has already landed, move `TokenLending__UserSharesUpdated` emits into `LendingErc20Handler` (do not leave copies in the adapters). If R9 has not landed, emit nothing new here — R9 adds the event once in the base.
 - [x] Collapse `_redeemByUnderlying` / `_redeemByShares` / `_redeemInternal` into one `_redeemShares(user, stablecoinAmount, exchangeRate)`; drop `redeemUnderlying` from `IkToken` once nothing calls it (mocks keep it — they model the live kToken ABI).
 - [x] One `balanceOf` bracket in the base (`_measuredProtocolRedeem`) feeding both `_redeemShares` and `_batchRetrieveStablecoin`; no adapter measures or raises `TokenLending__ZeroStablecoinReceived`.
+- [x] After the per-user share clamp: `sharesToRedeem == 0` returns 0 with no protocol call and no `SharesRedeemed`; any positive share burn that pays 0 reverts `TokenLending__ZeroStablecoinReceived` and rolls back. This does not sweep R15 dust.
 - [x] Existing unit tests for all three handlers keep passing. The sizing change does move Tropykus behavior, so pin the new invariant: book debit equals the protocol burn on Tropykus and Sovryn, and never falls below it on LayerBank.
 
 ## Out of scope
@@ -77,6 +78,7 @@ R25 kept Sovryn on one helper (`_redeemShares` after R26) on purpose. That helpe
 - [ ] Handler replacement in `OperationsAdmin` (still unassigned).
 - [ ] LayerBank interest to `withdraw(..., user)` without a handler-side measure.
 - [ ] Inventing an underlying-sized redeem on Sovryn, or re-deriving one anywhere else.
+- [ ] Sweeping or promising to zero leftover lending-share dust (R15 deferred).
 - [ ] R10 natspec rewrite beyond the new base and moved declarations.
 - [ ] Deploy/CI index map.
 
@@ -95,6 +97,8 @@ R25 kept Sovryn on one helper (`_redeemShares` after R26) on purpose. That helpe
 - `test/mocks/MockIsusdToken.sol` — `setSilentZeroPayout` so Sovryn’s interest path can be mutated the same way as kDOC / aToken
 - `test/ai-generated/unit/sovryn/SovrynErc20HandlerTest.t.sol` — drop the dead `burnToSpecificRecipient` test; give `withdrawInterest` a real payout assertion; add the sibling zero-payout revert
 - Dex copies of the same dead-name test renamed and given teeth (`SovrynErc20HandlerDexTest`, `TropykusErc20HandlerDexTest`)
+- `test/unit/LendingErc20HandlerRedeemTest.t.sol` — base-level clamp + zero-share no-op + dust-share zero-payout rollback
+- `src/interfaces/ITokenLending.sol` — `TokenLending__ZeroStablecoinReceived` natspec (error ABI unchanged)
 
 ## Required tests
 
@@ -119,8 +123,8 @@ Fork tests: no new fork-specific assertions; run before push per `AGENTS.md`.
 - [x] Tropykus Compound return codes exist only in the Tropykus adapter.
 - [x] All three adapters redeem onto the handler and measure this contract’s delta. Interest `safeTransfer` lives in `LendingErc20Handler.withdrawInterest`. SIP-0094 still measures the burn recipient (now always the handler).
 - [x] One redeem helper and one sizing rule: `_protocolRedeem` takes no `bool`, and no adapter calls an underlying-sized protocol method. `s_shares` debit == protocol burn on Tropykus and Sovryn, `>=` on LayerBank, pinned by tests.
-- [x] One measurement site and one zero-payout predicate. `grep -r i_stableToken.balanceOf src/sovryn src/tropykus-legacy src/layerbank` is empty — no adapter touches the stablecoin balance at all (they still measure their own **share** balance in `_protocolDeposit`, which is protocol-specific and stays). `TokenLending__ZeroStablecoinReceived` is raised only by `LendingErc20Handler`. The existing per-protocol `zeroPayout*Reverts` tests still fire from the guard's new home.
-- [x] `make check` and both fork targets pass. Behavior matches post-R27.
+- [x] One measurement site. `grep -r i_stableToken.balanceOf src/sovryn src/tropykus-legacy src/layerbank` is empty — no adapter touches the stablecoin balance at all (they still measure their own **share** balance in `_protocolDeposit`, which is protocol-specific and stays). `TokenLending__ZeroStablecoinReceived` is raised only by `LendingErc20Handler`. After the per-user clamp, a zero-share result is a no-op; a positive share redemption that pays nothing always reverts and rolls back. This does not fix or sweep R15 lending-share dust. The existing per-protocol `zeroPayout*Reverts` tests still fire from the guard's new home.
+- [x] `make check` and both fork targets pass. Behavior matches post-R27 except the named Tropykus share-sizing and the PR 63 review zero-payout predicate.
 
 ## Reviewer checklist
 

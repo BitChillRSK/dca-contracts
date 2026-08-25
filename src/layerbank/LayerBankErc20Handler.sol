@@ -84,8 +84,8 @@ abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20H
     function _protocolRedeem(uint256 sharesAmount, uint256 exchangeRate) internal override {
         uint256 amountOut = _sharesToStablecoin(sharesAmount, exchangeRate);
         // @notice skipping the call is protocol-specific, so it stays here: live Aave `withdraw`
-        // reverts on a zero amount (`InvalidAmount`). The base then measures a zero delta, which it
-        // only treats as a failure when the caller actually asked for stablecoin.
+        // reverts on a zero amount (`InvalidAmount`). The base then measures a zero delta and
+        // reverts `TokenLending__ZeroStablecoinReceived` when any shares were actually burnt.
         if (amountOut == 0) return;
 
         i_pool.withdraw(address(i_stableToken), amountOut, address(this));

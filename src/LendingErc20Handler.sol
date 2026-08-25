@@ -149,6 +149,16 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
      *      amount. The number booked out of `s_shares` is the number handed to the protocol to burn,
      *      so the books cannot drift above the shares actually held even if a protocol's internal rate
      *      disagrees with the one read here. What comes back is protocol-chosen and always measured.
+     *
+     *      The `sharesToRedeem > usersShares` clamp is a per-user solvency boundary, not a rounding
+     *      workaround. `_retrieveStablecoin` (single purchase) has no `withdrawToken` outer clamp, and
+     *      `DcaManager.tokenBalance` can legitimately sit ahead of share-backed underlying (R21
+     *      fee-on-transfer second hop). Clamp to this user's book only; never to the handler's pooled
+     *      protocol balance. Batch purchases keep the named `InsufficientShares` revert instead.
+     *
+     *      A zero-share result after that clamp is a no-op: return 0 without touching storage or the
+     *      protocol (R15 dust stays deferred — this is not a sweep). Any positive share redemption
+     *      that pays nothing reverts and rolls the debit back.
      * @param user: the address of the user
      * @param stablecoinAmount: the amount of stablecoin wanted
      * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
@@ -169,12 +179,17 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
                 user, oldSharesToRedeem, sharesToRedeem, oldStablecoinAmount, stablecoinAmount
             );
         }
+        // @notice nothing to burn: do not debit, do not call the protocol, do not emit SharesRedeemed
+        if (sharesToRedeem == 0) {
+            return 0;
+        }
         s_shares[user] -= sharesToRedeem;
         stablecoinReceived = _measuredProtocolRedeem(sharesToRedeem, exchangeRate);
         // @notice a protocol call that reports success but pays nothing still burnt the user's shares,
-        // so revert instead of paying out zero. A position whose shares are worth under 1 wei of
-        // stablecoin is the exception: it must stay exitable rather than brick.
-        if (stablecoinAmount > 0 && stablecoinReceived == 0) {
+        // so revert instead of paying out zero. The revert rolls back the virtual debit and any
+        // protocol-side burn. A positive dust balance (underlying floors below 1 wei) is not an
+        // exception — R15 deferred that sweep.
+        if (stablecoinReceived == 0) {
             revert TokenLending__ZeroStablecoinReceived(stablecoinAmount);
         }
         emit TokenLending__SharesRedeemed(user, stablecoinReceived, sharesToRedeem);
