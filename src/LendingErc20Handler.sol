@@ -12,7 +12,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
  * @title LendingErc20Handler
  * @notice Shared per-user share accounting, withdraw clamp, interest, and batch pro-rata
  *         redeem for lending handlers. Protocol adapters implement the exchange-rate and
- *         mint/redeem hooks; Idle is not a sibling of this type.
+ *         mint/redeem hooks.
  */
 abstract contract LendingErc20Handler is TokenHandler, TokenLending {
     using SafeERC20 for IERC20;
@@ -144,21 +144,10 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
     }
 
     /**
-     * @notice Shared redeem clamp-and-measure before the protocol call
-     * @dev Every redemption is sized by the share count this contract debits, never by the underlying
-     *      amount. The number booked out of `s_shares` is the number handed to the protocol to burn,
-     *      so the books cannot drift above the shares actually held even if a protocol's internal rate
-     *      disagrees with the one read here. What comes back is protocol-chosen and always measured.
-     *
-     *      The `sharesToRedeem > usersShares` clamp is a per-user solvency boundary, not a rounding
-     *      workaround. `_retrieveStablecoin` (single purchase) has no `withdrawToken` outer clamp, and
-     *      `DcaManager.tokenBalance` can legitimately sit ahead of share-backed underlying (R21
-     *      fee-on-transfer second hop). Clamp to this user's book only; never to the handler's pooled
-     *      protocol balance. Batch purchases keep the named `InsufficientShares` revert instead.
-     *
-     *      A zero-share result after that clamp is a no-op: return 0 without touching storage or the
-     *      protocol (R15 dust stays deferred — this is not a sweep). Any positive share redemption
-     *      that pays nothing reverts and rolls the debit back.
+     * @notice Redeem shares for stablecoin, sized by the share count this contract debits
+     * @dev Clamp to this user's book, never the handler's pooled balance: schedule accounting can
+     *      sit ahead of share-backed underlying, and purchases have no outer withdraw clamp.
+     *      Zero shares is a no-op. A positive burn that pays nothing reverts and rolls back.
      * @param user: the address of the user
      * @param stablecoinAmount: the amount of stablecoin wanted
      * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
@@ -179,16 +168,11 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
                 user, oldSharesToRedeem, sharesToRedeem, oldStablecoinAmount, stablecoinAmount
             );
         }
-        // @notice nothing to burn: do not debit, do not call the protocol, do not emit SharesRedeemed
         if (sharesToRedeem == 0) {
             return 0;
         }
         s_shares[user] -= sharesToRedeem;
         stablecoinReceived = _measuredProtocolRedeem(sharesToRedeem, exchangeRate);
-        // @notice a protocol call that reports success but pays nothing still burnt the user's shares,
-        // so revert instead of paying out zero. The revert rolls back the virtual debit and any
-        // protocol-side burn. A positive dust balance (underlying floors below 1 wei) is not an
-        // exception — R15 deferred that sweep.
         if (stablecoinReceived == 0) {
             revert TokenLending__ZeroStablecoinReceived(stablecoinAmount);
         }
@@ -212,9 +196,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
 
         uint256 numOfPurchases = users.length;
         for (uint256 i; i < numOfPurchases; ++i) {
-            // @notice the amount of shares each user redeems is proportional to the ratio of
-            // that user's stablecoin being retrieved over the total being retrieved
-            // @notice Rounds up the shares amount to avoid underestimating the amount to subtract from each user's balance
+            // round up so we never underestimate the debit against this user
             uint256 usersSharesToRedeem =
                 Math.mulDiv(totalSharesToRedeem, purchaseAmounts[i], totalStablecoinAmount, Math.Rounding.Up);
             uint256 usersShares = s_shares[users[i]];
@@ -252,10 +234,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
     function _protocolDeposit(uint256 stablecoinAmount) internal virtual returns (uint256 mintedShares);
 
     /**
-     * @notice the one place a redemption's cash is measured
-     * @dev `AGENTS.md` invariant 1 lives here and nowhere else: adapters move the funds, this measures
-     *      what arrived. An adapter that reported its own figure could return an integrator's claim
-     *      instead of a balance delta, which is the mistake the invariant exists to prevent.
+     * @notice Measure the stablecoin this contract gained from a protocol redeem
      * @param sharesAmount the share count to burn (after any clamp)
      * @param exchangeRate the rate already read by the caller; do not re-query the protocol
      * @return received the stablecoin amount this contract actually gained
@@ -270,10 +249,8 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
     }
 
     /**
-     * @notice burn `sharesAmount` at the lending protocol, crediting this contract
-     * @dev Move the funds and nothing else. Do not measure, do not decide what a zero payout means —
-     *      the base does both. Adapters only raise failures their own protocol reports (a Compound
-     *      return code) or skip a call their own protocol rejects (a zero-amount Aave withdraw).
+     * @notice Burn `sharesAmount` at the lending protocol onto this contract
+     * @dev Adapters move funds only. Measurement and the zero-payout revert live in the base.
      * @param sharesAmount the share count to burn (after any clamp)
      * @param exchangeRate the rate already read by the caller; do not re-query the protocol
      */

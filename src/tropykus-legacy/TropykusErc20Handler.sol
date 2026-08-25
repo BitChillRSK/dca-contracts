@@ -53,12 +53,8 @@ abstract contract TropykusErc20Handler is LendingErc20Handler {
     }
 
     /**
-     * @notice Compound kToken redemption onto this contract
-     * @dev Sized by shares, like Sovryn: `redeem` burns exactly the count the base booked out, so the
-     *      book debit can never come out below what Tropykus burns. `redeemUnderlying` is not used —
-     *      it would let Tropykus derive the burn from its own rate instead.
-     *      The Compound return code is the only failure this adapter raises; a success code that pays
-     *      nothing is the base's call, because it is not protocol-specific.
+     * @notice Redeem kTokens onto this contract
+     * @dev Burns the booked share count. Only the Compound return code is raised here.
      */
     function _protocolRedeem(uint256 sharesAmount, uint256) internal override {
         uint256 result = i_kToken.redeem(sharesAmount);
