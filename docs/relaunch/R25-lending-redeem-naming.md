@@ -12,7 +12,11 @@ Finish the R16 redeem-glossary pass that left lending internals half-renamed. Re
 
 This is leftover from PR 14 ([R16-redeem-glossary.md](./R16-redeem-glossary.md)), not new LayerBank design. R16 set **redeem = asset given up** but still sanctioned `_burnKtoken` and a “repay” alias for share amounts (`kTokenToRepay`, `TokenLending__AmountToRepayAdjusted`). That PR landed before LayerBank, so the new handler copied the incomplete names. Fix all three handlers together.
 
-R16 also left `withdrawInterest` locals inconsistent: Sovryn overwrites `stablecoinInterestAmount` with the redeem return; Tropykus/LayerBank keep planned interest and `stablecoinReceived` separate. Align Sovryn to the two-name form (still emit the measured amount).
+R16 also left interest helpers inconsistent across the three handlers:
+
+- Sovryn overwrites `stablecoinInterestAmount` with the redeem return; Tropykus/LayerBank keep planned interest and `stablecoinReceived` separate. Align Sovryn to the two-name form (still emit the measured amount).
+- Sovryn uses `totalErc20InLending` where Tropykus/LayerBank use `totalStablecoinInLending`. Prefer **stablecoin** — the value is already converted underlying, not an ERC20 token id.
+- Sovryn’s `getAccruedInterest` has full `@notice` / `@param` / `@return` natspec; Tropykus and LayerBank omit it. Copy Sovryn’s block onto the other two (same signature).
 
 | Protocol | Sizing APIs | Current BitChill helpers |
 | --- | --- | --- |
@@ -35,8 +39,9 @@ This PR **supersedes** R16’s sanction of the “repay” alias for share-amoun
   - `_redeemLendingToken` (3-arg, underlying-sized) → `_redeemByUnderlying`
   - `_burnKtoken` / `_burnAtoken` → `_redeemByShares`
   - `_redeemLendingTokenInternal(..., redeemUnderlying)` → keep one shared internal; rename the bool to `sizeByUnderlying` (or equivalent) so LayerBank’s “both call `withdraw`” case stays honest
-- [ ] **Sovryn**: keep a **single** redeem helper (always share-sized). Keep the recipient overload (`address(this)` vs `user`). Rename locals only; do not invent a fake `_redeemByUnderlying`. Stop overwriting `stablecoinInterestAmount` with the redeem return — use `stablecoinReceived` like Tropykus/LayerBank (`withdrawInterest` planned vs measured).
-- [ ] Comments / natspec on touched functions: say redeem/sizing clearly; LayerBank `_redeemByShares` notes that Aave has no share withdraw — the helper sizes `Pool.withdraw` from the debited scaled amount.
+- [ ] **Sovryn**: keep a **single** redeem helper (always share-sized). Keep the recipient overload (`address(this)` vs `user`). Rename locals only; do not invent a fake `_redeemByUnderlying`. Stop overwriting `stablecoinInterestAmount` with the redeem return — use `stablecoinReceived` like Tropykus/LayerBank (`withdrawInterest` planned vs measured). Rename `totalErc20InLending` → `totalStablecoinInLending` in `withdrawInterest` and `getAccruedInterest`.
+- [ ] **Interest natspec**: give Tropykus and LayerBank the same `getAccruedInterest` `@notice` / `@param` / `@return` block Sovryn already has. Do not rewrite other natspec (R10).
+- [ ] Comments / natspec on touched redeem helpers: say redeem/sizing clearly; LayerBank `_redeemByShares` notes that Aave has no share withdraw — the helper sizes `Pool.withdraw` from the debited scaled amount.
 - [ ] No logic, rounding, access-control, or call-target changes.
 
 ## Out of scope
@@ -82,7 +87,8 @@ Fork tests: no new fork-specific assertions; run before push per `AGENTS.md`.
 ## Success criteria
 
 - [ ] Tropykus/LayerBank expose `_redeemByUnderlying` and `_redeemByShares`; no `_burnKtoken` / `_burnAtoken`.
-- [ ] Sovryn still has one redeem helper with recipient overload; share locals use `*ToRedeem`. `withdrawInterest` uses `stablecoinReceived` for the measured payout (does not overwrite `stablecoinInterestAmount`).
+- [ ] Sovryn still has one redeem helper with recipient overload; share locals use `*ToRedeem`. `withdrawInterest` uses `stablecoinReceived` for the measured payout (does not overwrite `stablecoinInterestAmount`). No `totalErc20InLending` remains.
+- [ ] Tropykus and LayerBank `getAccruedInterest` carry the same natspec as Sovryn.
 - [ ] No `*ToRepay` locals remain in the three lending ERC20 handlers.
 - [ ] `TokenLending__AmountToRepayAdjusted` unchanged.
 - [ ] `make check`, `make fork-sovryn`, and `make fork-tropykus` pass.
