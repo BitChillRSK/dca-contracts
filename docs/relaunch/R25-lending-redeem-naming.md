@@ -18,6 +18,11 @@ R16 also left interest helpers inconsistent across the three handlers:
 - Sovryn uses `totalErc20InLending` where Tropykus/LayerBank use `totalStablecoinInLending`. Prefer **stablecoin** — the value is already converted underlying, not an ERC20 token id.
 - Sovryn’s `getAccruedInterest` has full `@notice` / `@param` / `@return` natspec; Tropykus and LayerBank omit it. Copy Sovryn’s block onto the other two (same signature).
 
+Small leaf-contract nits (same PR; match LayerBank’s cleaner shape):
+
+- `TropykusDocHandlerMoc` / `SovrynDocHandlerMoc` / `*Erc20HandlerDex` still take an unused `minPurchaseAmount` constructor arg that is never forwarded (mins live on `DcaManager`). LayerBank correctly omitted it — drop it from the Tropykus/Sovryn leaves and update call sites (scripts/tests).
+- `SovrynDocHandlerMoc` natspec still says “Tropykus' iSUSD” for `iSusdTokenAddress` — fix to Sovryn.
+
 | Protocol | Sizing APIs | Current BitChill helpers |
 | --- | --- | --- |
 | Sovryn | shares only (`burn`) | `_redeemLendingToken` (+ recipient overload) |
@@ -41,8 +46,10 @@ This PR **supersedes** R16’s sanction of the “repay” alias for share-amoun
   - `_redeemLendingTokenInternal(..., redeemUnderlying)` → keep one shared internal; rename the bool to `sizeByUnderlying` (or equivalent) so LayerBank’s “both call `withdraw`” case stays honest
 - [ ] **Sovryn**: keep a **single** redeem helper (always share-sized). Keep the recipient overload (`address(this)` vs `user`). Rename locals only; do not invent a fake `_redeemByUnderlying`. Stop overwriting `stablecoinInterestAmount` with the redeem return — use `stablecoinReceived` like Tropykus/LayerBank (`withdrawInterest` planned vs measured). Rename `totalErc20InLending` → `totalStablecoinInLending` in `withdrawInterest` and `getAccruedInterest`.
 - [ ] **Interest natspec**: give Tropykus and LayerBank the same `getAccruedInterest` `@notice` / `@param` / `@return` block Sovryn already has. Do not rewrite other natspec (R10).
+- [ ] **Leaf constructor cleanup (match LayerBank):** remove the unused `minPurchaseAmount` parameter from `TropykusDocHandlerMoc`, `SovrynDocHandlerMoc`, `TropykusErc20HandlerDex`, and `SovrynErc20HandlerDex` (and any matching `@param`). Update deploy scripts and tests that still pass it. Do not touch `DcaManager` min-purchase logic.
+- [ ] **SovrynDocHandlerMoc natspec:** `iSusdTokenAddress` must not say “Tropykus' iSUSD”.
 - [ ] Comments / natspec on touched redeem helpers: say redeem/sizing clearly; LayerBank `_redeemByShares` notes that Aave has no share withdraw — the helper sizes `Pool.withdraw` from the debited scaled amount.
-- [ ] No logic, rounding, access-control, or call-target changes.
+- [ ] No logic, rounding, access-control, or call-target changes beyond dropping the unused constructor arg.
 
 ## Out of scope
 
@@ -54,10 +61,12 @@ This PR **supersedes** R16’s sanction of the “repay” alias for share-amoun
 
 ## Files likely touched
 
-- `src/tropykus-legacy/TropykusErc20Handler.sol` (and Moc/Dex subclasses only if they call renamed internals)
-- `src/sovryn/SovrynErc20Handler.sol` (and subclasses if needed)
+- `src/tropykus-legacy/TropykusErc20Handler.sol` (and Moc/Dex subclasses)
+- `src/sovryn/SovrynErc20Handler.sol` (and Moc/Dex subclasses)
 - `src/layerbank/LayerBankErc20Handler.sol`
-- Matching tests that reference renamed symbols (compile fixes only)
+- `src/tropykus-legacy/TropykusDocHandlerMoc.sol`, `TropykusErc20HandlerDex.sol`
+- `src/sovryn/SovrynDocHandlerMoc.sol`, `SovrynErc20HandlerDex.sol`
+- Matching tests / `script/` call sites that pass the unused `minPurchaseAmount`
 - `docs/relaunch/R16-redeem-glossary.md` — one-line pointer that R25 supersedes the “repay” local alias (optional, keep short)
 
 ## Required tests
@@ -89,6 +98,7 @@ Fork tests: no new fork-specific assertions; run before push per `AGENTS.md`.
 - [ ] Tropykus/LayerBank expose `_redeemByUnderlying` and `_redeemByShares`; no `_burnKtoken` / `_burnAtoken`.
 - [ ] Sovryn still has one redeem helper with recipient overload; share locals use `*ToRedeem`. `withdrawInterest` uses `stablecoinReceived` for the measured payout (does not overwrite `stablecoinInterestAmount`). No `totalErc20InLending` remains.
 - [ ] Tropykus and LayerBank `getAccruedInterest` carry the same natspec as Sovryn.
+- [ ] Tropykus/Sovryn MoC and Dex leaves no longer take unused `minPurchaseAmount`; call sites updated. `SovrynDocHandlerMoc` natspec names Sovryn’s iToken correctly.
 - [ ] No `*ToRepay` locals remain in the three lending ERC20 handlers.
 - [ ] `TokenLending__AmountToRepayAdjusted` unchanged.
 - [ ] `make check`, `make fork-sovryn`, and `make fork-tropykus` pass.
@@ -104,6 +114,6 @@ Fork tests: no new fork-specific assertions; run before push per `AGENTS.md`.
 
 ## ABI / deploy / cutover impact
 
-- ABI: none (internal + local renames only; shared events/errors untouched).
-- Scripts: none.
-- Cutover: none.
+- ABI: **constructor only** for Tropykus/Sovryn `*DocHandlerMoc` and `*Erc20HandlerDex` — drop unused `minPurchaseAmount` (same shape as LayerBank). No change to external function/event ABIs; `TokenLending__AmountToRepayAdjusted` untouched. Internal renames only otherwise.
+- Scripts: update any `script/` that still passes the dummy min arg (e.g. USDRIF / dex deploy helpers). Local/test only; do not `--broadcast`.
+- Cutover: none (new deployments only; no live handler migration).
