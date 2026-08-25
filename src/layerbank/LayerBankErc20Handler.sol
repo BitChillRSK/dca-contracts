@@ -183,7 +183,7 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending, ILayerBan
         virtual
         returns (uint256)
     {
-        return _redeemLendingTokenInternal(user, stablecoinAmount, exchangeRate, true);
+        return _redeemInternal(user, stablecoinAmount, exchangeRate, true);
     }
 
     /**
@@ -200,7 +200,7 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending, ILayerBan
         internal
         returns (uint256 stablecoinReceived)
     {
-        return _redeemLendingTokenInternal(user, stablecoinAmount, exchangeRate, false);
+        return _redeemInternal(user, stablecoinAmount, exchangeRate, false);
     }
 
     /**
@@ -212,7 +212,7 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending, ILayerBan
      *        underlying equivalent of the (clamped) scaled-share debit
      * @return stablecoinReceived the amount of stablecoin this contract actually received
      */
-    function _redeemLendingTokenInternal(
+    function _redeemInternal(
         address user,
         uint256 stablecoinAmount,
         uint256 exchangeRate,

@@ -45,7 +45,7 @@ This PR **supersedes** R16’s sanction of the “repay” alias for share-amoun
 - [ ] **Tropykus / LayerBank helpers** (symmetric pair):
   - `_redeemLendingToken` (3-arg, underlying-sized) → `_redeemByUnderlying`
   - `_burnKtoken` / `_burnAtoken` → `_redeemByShares`
-  - `_redeemLendingTokenInternal(..., redeemUnderlying)` → keep one shared internal; rename the bool to `sizeByUnderlying` (or equivalent) so LayerBank’s “both call `withdraw`” case stays honest
+  - `_redeemLendingTokenInternal(..., redeemUnderlying)` → keep one shared internal, renamed `_redeemInternal`; rename the bool to `sizeByUnderlying` (or equivalent) so LayerBank’s “both call `withdraw`” case stays honest. Dropping “LendingToken” avoids a near-collision with Sovryn’s `_redeemLendingToken`, which is a different thing (that handler’s only redeem path, share-sized, with a recipient overload).
 - [ ] **Sovryn**: keep a **single** redeem helper (always share-sized). Keep the recipient overload (`address(this)` vs `user`). Rename locals only; do not invent a fake `_redeemByUnderlying`. Stop overwriting `stablecoinInterestAmount` with the redeem return — use `stablecoinReceived` like Tropykus/LayerBank (`withdrawInterest` planned vs measured). Rename `totalErc20InLending` → `totalStablecoinInLending` in `withdrawInterest` and `getAccruedInterest`.
 - [ ] **Interest natspec**: give Tropykus and LayerBank the same `getAccruedInterest` `@notice` / `@param` / `@return` block Sovryn already has. Do not rewrite other natspec (R10).
 - [ ] **Leaf constructor cleanup (match LayerBank):** remove the unused `minPurchaseAmount` parameter from `TropykusDocHandlerMoc`, `SovrynDocHandlerMoc`, `TropykusErc20HandlerDex`, and `SovrynErc20HandlerDex` (and any matching `@param`). Update deploy scripts and tests that still pass it. Do not touch `DcaManager` min-purchase logic.
@@ -99,7 +99,7 @@ Fork tests: no new fork-specific assertions; run before push per `AGENTS.md`.
 
 ## Success criteria
 
-- [ ] Tropykus/LayerBank expose `_redeemByUnderlying` and `_redeemByShares`; no `_burnKtoken` / `_burnAtoken`.
+- [ ] Tropykus/LayerBank expose `_redeemByUnderlying` and `_redeemByShares` over a shared `_redeemInternal`; no `_burnKtoken` / `_burnAtoken`, and no `_redeemLendingToken*` outside Sovryn.
 - [ ] Sovryn still has one redeem helper with recipient overload; share locals use `*ToRedeem`. `withdrawInterest` uses `stablecoinReceived` for the measured payout (does not overwrite `stablecoinInterestAmount`). No `totalErc20InLending` remains.
 - [ ] Tropykus and LayerBank `getAccruedInterest` carry the same natspec as Sovryn.
 - [ ] Tropykus/Sovryn MoC and Dex leaves no longer take unused `minPurchaseAmount`; call sites updated. `SovrynDocHandlerMoc` natspec names Sovryn’s iToken correctly.

@@ -154,7 +154,7 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending {
      * @return the amount of stablecoin this contract actually received
      */
     function _redeemByUnderlying(address user, uint256 stablecoinAmount, uint256 exchangeRate) internal virtual returns (uint256) {
-        return _redeemLendingTokenInternal(user, stablecoinAmount, exchangeRate, true);
+        return _redeemInternal(user, stablecoinAmount, exchangeRate, true);
     }
 
     /**
@@ -168,7 +168,7 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending {
         internal
         returns (uint256 stablecoinReceived)
     {
-        return _redeemLendingTokenInternal(user, stablecoinAmount, exchangeRate, false);
+        return _redeemInternal(user, stablecoinAmount, exchangeRate, false);
     }
 
     /**
@@ -179,7 +179,7 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending {
      * @param sizeByUnderlying: true to call kToken's redeemUnderlying, false to call its redeem
      * @return stablecoinReceived the amount of stablecoin this contract actually received
      */
-    function _redeemLendingTokenInternal(address user, uint256 stablecoinAmount, uint256 exchangeRate, bool sizeByUnderlying) 
+    function _redeemInternal(address user, uint256 stablecoinAmount, uint256 exchangeRate, bool sizeByUnderlying) 
         internal 
         returns (uint256 stablecoinReceived) 
     {
