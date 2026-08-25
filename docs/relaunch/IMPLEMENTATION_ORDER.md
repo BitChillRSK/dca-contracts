@@ -214,6 +214,8 @@ Update constants and deploy scripts for the new map:
 
 Split the shared test harness so lending-token assertions live only in lending-protocol-specific tests. CI should cover `none`, `layerbank`, and `sovryn` with `SWAP_TYPE=mocSwaps`.
 
+**Required in this PR:** LayerBank round-up solvency regression — virtual scaled books must stay ≤ handler `scaledBalanceOf` after odd-amount redeems against Aave-like round-nearest burns; the test must fail if `_stablecoinToLendingToken` rounded down. PR 15 only left a code comment; do not defer again. See `R22-deploy-ci.md`.
+
 ### PR 18 - R9 event indexing and ABI cleanup
 
 Index only addresses and `scheduleId`. Do not index amounts, timestamps, periods, rates, strings, bytes, or arrays.

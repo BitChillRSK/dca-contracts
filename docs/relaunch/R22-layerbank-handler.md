@@ -87,6 +87,7 @@ Live Aave `withdraw` reverts on insufficient cash (ERC20 transfer from the aToke
 - [ ] R9 `TokenLending__UserSharesUpdated`.
 - [ ] Renaming Tropykus in place. Creating `src/moc-lending/`.
 - [ ] Adapting the shared `DcaDappTest` / Makefile / CI matrix so `LENDING_PROTOCOL=layerbank` is a first-class lane.
+- [ ] Round-up solvency regression (`sum(virtual scaled) <= scaledBalanceOf(handler)` under Aave-like round-nearest burns; must fail if TokenLending rounded down) — required in PR 17 ([R22-deploy-ci.md](./R22-deploy-ci.md)), not optional later.
 
 ## Files likely touched
 

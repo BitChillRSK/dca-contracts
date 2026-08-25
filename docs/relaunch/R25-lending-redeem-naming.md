@@ -47,7 +47,7 @@ This PR **supersedes** R16’s sanction of the “repay” alias for share-amoun
 ## Out of scope
 
 - [ ] Renaming `TokenLending__AmountToRepayAdjusted` (or any other `ITokenLending` event/error ABI).
-- [ ] R22 deploy/CI index map, harness, CI matrix (now PR 17).
+- [ ] R22 deploy/CI index map, harness, CI matrix (now PR 17, [R22-deploy-ci.md](./R22-deploy-ci.md)). That PR also owns the LayerBank round-up solvency regression (virtual scaled sum ≤ handler `scaledBalanceOf`); do not leave it to a later “someday” test.
 - [ ] R10 natspec rewrite beyond the touched helpers.
 - [ ] R9 share events.
 - [ ] Third-party ABI names (`redeem`, `redeemUnderlying`, `burn`, `withdraw`, …).
