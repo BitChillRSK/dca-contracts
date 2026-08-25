@@ -1,8 +1,8 @@
 # R27 — Align Tropykus lending cash guards
 
-Status: **in progress** · Assigned: yes · Optional/further-review: no
+Status: **PR open** · Assigned: yes · Optional/further-review: no
 
-PR 18 (reordered 2026-08-25 ahead of R22 deploy/CI). Stack on R26 (PR 17). Land **before** R28 (PR 19), R22 deploy/CI (PR 20), and R9 (PR 21) so the shared-base extract and ABI-freeze tests cover the corrected Tropykus paths. Tropykus is **not** in the new deploy map (PR 20); this PR exists because the legacy handler must still obey invariant 1.
+PR 18 (reordered 2026-08-25 ahead of R22 deploy/CI), GitHub [#62](https://github.com/BitChillRSK/dca-contracts/pull/62). Stack on R26 (PR 17). Land **before** R28 (PR 19), R22 deploy/CI (PR 20), and R9 (PR 21) so the shared-base extract and ABI-freeze tests cover the corrected Tropykus paths. Tropykus is **not** in the new deploy map (PR 20); this PR exists because the legacy handler must still obey invariant 1.
 
 Write this spec against the **R26 `shares` vocabulary** (`getUserShares`, `TokenLending__SharesRedeemed(Batch)`, …).
 
