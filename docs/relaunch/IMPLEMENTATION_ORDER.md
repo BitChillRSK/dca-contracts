@@ -210,7 +210,7 @@ Land before R26 and deploy/CI so neither PR freezes the old helper names.
 
 Keep `ITokenLending` / `TokenLending` / `LENDING_PROTOCOL` / `LendingProtocol*Failed` — "lending" as a domain word is fine; only "lending **token**" is wrong. Keep `stablecoin` as the asset noun; do not adopt 4626's `assets`.
 
-Land before PR 18 for the same reason R25 did: PR 18 splits the harness where ~75 of the ~370 references live, so renaming afterwards writes them twice. **R9 (PR 19) is the ABI freeze** and already specifies `TokenLending__UserSharesUpdated(…, previousShares, newShares)` with a test asserting `newShares == getUsersLendingTokenBalance(user)` — two names for one quantity. Settle the noun before that lands. See `R26-share-terminology.md`.
+Land before PR 18 for the same reason R25 did: PR 18 splits the harness where 76 of the 295 matching lines live, so renaming afterwards writes them twice. **R9 (PR 19) is the ABI freeze** and already specifies `TokenLending__UserSharesUpdated(…, previousShares, newShares)`; until this PR reworded it, the R9 entry below also required a test asserting `newShares == getUsersLendingTokenBalance(user)` — two names for one quantity. Settle the noun before that lands. See `R26-share-terminology.md`.
 
 ### PR 18 - R22 deploy scripts, constants, harness, and CI matrix
 

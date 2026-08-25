@@ -18,9 +18,9 @@ This repo has already picked "shares" without saying so:
 - R25 (PR 16) shipped `_redeemByShares` on Tropykus and LayerBank.
 - LayerBank's deposit comment: "the **shares** we credit are the scaled aTokens we actually gained".
 
-**The forcing function is R9.** [`IMPLEMENTATION_ORDER.md`](./IMPLEMENTATION_ORDER.md) specifies R9's event as `TokenLending__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares)` *and* requires "tests must show each `newShares` equals `getUsersLendingTokenBalance(user)`" — a test asserting that two differently-named things are the same quantity. R9 is also the ABI freeze. Settle the noun before that PR writes it into the frozen surface.
+**The forcing function is R9.** [`IMPLEMENTATION_ORDER.md`](./IMPLEMENTATION_ORDER.md) specifies R9's event as `TokenLending__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares)` *and* required — in its pre-R26 wording, which PR 17 rewrote — that "tests must show each `newShares` equals `getUsersLendingTokenBalance(user)`": a test whose content was that two differently-named things are the same quantity. R9 is also the ABI freeze. Settle the noun before that PR writes it into the frozen surface.
 
-**Why before PR 18 rather than after.** PR 18 splits the shared test harness and rewires constants, deploy scripts, and the CI matrix; `getUsersLendingTokenBalance` alone has ~75 call sites concentrated in exactly that harness. Landing R26 after PR 18 means writing those call sites twice. This is the same ordering argument that put R25 ahead of PR 18.
+**Why before PR 18 rather than after.** PR 18 splits the shared test harness and rewires constants, deploy scripts, and the CI matrix; `getUsersLendingTokenBalance` alone has 76 call sites concentrated in exactly that harness. Landing R26 after PR 18 means writing those call sites twice. This is the same ordering argument that put R25 ahead of PR 18.
 
 Keep **stablecoin** as the asset noun. Do not adopt ERC-4626's `assets` — that would introduce a third word for something this repo already names consistently.
 
@@ -68,11 +68,10 @@ Keep **stablecoin** as the asset noun. Do not adopt ERC-4626's `assets` — that
 - `src/interfaces/ITokenLending.sol` — getter, three events/errors, parameter names
 - `src/TokenLending.sol` — both conversion helpers
 - `src/tropykus-legacy/TropykusErc20Handler.sol`, `src/sovryn/SovrynErc20Handler.sol`, `src/layerbank/LayerBankErc20Handler.sol`
-- `src/idle/IdleErc20Handler.sol` if it implements the getter
 - `script/` helper configs and deploy scripts that expose `lendingToken*` fields
-- `test/unit/`, `test/ai-generated/`, `test/interfaces/`, `test/mocks/` — the bulk of the ~370 references
+- `test/unit/`, `test/ai-generated/`, `test/interfaces/`, `test/mocks/` — the bulk of the matches
 
-Roughly 370 references across ~33 files; ~75 are `getUsersLendingTokenBalance`.
+`grep -rlE "[Ll]ending[Tt]oken" --include="*.sol" src/ test/ script/` matches **295 lines across 31 files** (357 occurrences); **76** of them are `getUsersLendingTokenBalance`. The pattern deliberately excludes the `TokenLending` keeps — `Token`+`Lending` does not match `Lending`+`Token` — so this is the rename surface, not a superset.
 
 ## Required tests
 
@@ -102,7 +101,7 @@ Fork tests: no new fork-specific assertions; run before push per `AGENTS.md`.
 
 ## Success criteria
 
-- [ ] `grep -rn "[Ll]ending[Tt]oken" src/ test/ script/` returns only the deliberate keeps listed in **Scope** (protocol names, `ITokenLending` / `TokenLending`, `LendingProtocol*Failed`).
+- [ ] `grep -rnE "[Ll]ending[Tt]oken" --include="*.sol" src/ test/ script/` returns **nothing**. The **Scope** keeps cannot match this pattern — `ITokenLending`, `TokenLending`, and `LendingProtocol*Failed` are `Token`+`Lending` or `Lending`+`Protocol`, never `Lending`+`Token` — so every hit is a real leftover. Do not classify one as a keep.
 - [ ] No `underlyingAmount` remains where the unit is the stablecoin, except any event parameter the PR explicitly argues to keep (R16 decision).
 - [ ] `_lendingTokenToStablecoin(s_*Balances[user], …)` has one name across all six call sites in the three handlers.
 - [ ] `getUserShares` is the only per-user share getter; no `getUsersLendingTokenBalance` remains.
