@@ -6,11 +6,13 @@ PR 16. Stack on R22 LayerBank ([#58](https://github.com/BitChillRSK/dca-contract
 
 ## Objective
 
-Rename first-party lending redeem helpers and share-amount locals so names match the motion: both paths **redeem** the receipt token; one sizes by underlying, one by shares. Drop leftover “repay” / `_burn*` wording from when redeem direction was misunderstood. No behavior change.
+Finish the R16 redeem-glossary pass that left lending internals half-renamed. Rename first-party lending redeem helpers and share-amount locals so names match the motion: both paths **redeem** the receipt token; one sizes by underlying, one by shares. Drop leftover “repay” / `_burn*` wording. No behavior change.
 
 ## Background
 
-R16 set the glossary **redeem = asset given up** and kept `_burnKtoken` plus a “repay” alias for share amounts (`kTokenToRepay`, `TokenLending__AmountToRepayAdjusted`). After LayerBank (PR 15), the three handlers still read inconsistently:
+This is leftover from PR 14 ([R16-redeem-glossary.md](./R16-redeem-glossary.md)), not new LayerBank design. R16 set **redeem = asset given up** but still sanctioned `_burnKtoken` and a “repay” alias for share amounts (`kTokenToRepay`, `TokenLending__AmountToRepayAdjusted`). That PR landed before LayerBank, so the new handler copied the incomplete names. Fix all three handlers together.
+
+R16 also left `withdrawInterest` locals inconsistent: Sovryn overwrites `stablecoinInterestAmount` with the redeem return; Tropykus/LayerBank keep planned interest and `stablecoinReceived` separate. Align Sovryn to the two-name form (still emit the measured amount).
 
 | Protocol | Sizing APIs | Current BitChill helpers |
 | --- | --- | --- |
@@ -20,7 +22,7 @@ R16 set the glossary **redeem = asset given up** and kept `_burnKtoken` plus a �
 
 `_burnKtoken` and `_redeemLendingToken` both redeem the share token. “Repay” suggests a loan. Fix names only; do not change which protocol call each path uses.
 
-Related: [R16-redeem-glossary.md](./R16-redeem-glossary.md) (PR 14). This PR **supersedes** R16’s sanction of the “repay” alias for share-amount **locals and internal helpers**. It does **not** rename the shared event `TokenLending__AmountToRepayAdjusted` (ABI).
+This PR **supersedes** R16’s sanction of the “repay” alias for share-amount **locals and internal helpers**. It does **not** rename the shared event `TokenLending__AmountToRepayAdjusted` (ABI).
 
 ## Open product decisions
 
@@ -33,7 +35,7 @@ Related: [R16-redeem-glossary.md](./R16-redeem-glossary.md) (PR 14). This PR **s
   - `_redeemLendingToken` (3-arg, underlying-sized) → `_redeemByUnderlying`
   - `_burnKtoken` / `_burnAtoken` → `_redeemByShares`
   - `_redeemLendingTokenInternal(..., redeemUnderlying)` → keep one shared internal; rename the bool to `sizeByUnderlying` (or equivalent) so LayerBank’s “both call `withdraw`” case stays honest
-- [ ] **Sovryn**: keep a **single** redeem helper (always share-sized). Keep the recipient overload (`address(this)` vs `user`). Rename locals only; do not invent a fake `_redeemByUnderlying`.
+- [ ] **Sovryn**: keep a **single** redeem helper (always share-sized). Keep the recipient overload (`address(this)` vs `user`). Rename locals only; do not invent a fake `_redeemByUnderlying`. Stop overwriting `stablecoinInterestAmount` with the redeem return — use `stablecoinReceived` like Tropykus/LayerBank (`withdrawInterest` planned vs measured).
 - [ ] Comments / natspec on touched functions: say redeem/sizing clearly; LayerBank `_redeemByShares` notes that Aave has no share withdraw — the helper sizes `Pool.withdraw` from the debited scaled amount.
 - [ ] No logic, rounding, access-control, or call-target changes.
 
@@ -80,7 +82,7 @@ Fork tests: no new fork-specific assertions; run before push per `AGENTS.md`.
 ## Success criteria
 
 - [ ] Tropykus/LayerBank expose `_redeemByUnderlying` and `_redeemByShares`; no `_burnKtoken` / `_burnAtoken`.
-- [ ] Sovryn still has one redeem helper with recipient overload; share locals use `*ToRedeem`.
+- [ ] Sovryn still has one redeem helper with recipient overload; share locals use `*ToRedeem`. `withdrawInterest` uses `stablecoinReceived` for the measured payout (does not overwrite `stablecoinInterestAmount`).
 - [ ] No `*ToRepay` locals remain in the three lending ERC20 handlers.
 - [ ] `TokenLending__AmountToRepayAdjusted` unchanged.
 - [ ] `make check`, `make fork-sovryn`, and `make fork-tropykus` pass.
