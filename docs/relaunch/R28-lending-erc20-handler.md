@@ -83,10 +83,14 @@ R25 kept Sovryn on one helper (`_redeemShares` after R26) on purpose. Do not inv
 - `src/sovryn/SovrynErc20Handler.sol` and Moc/Dex leaves
 - `src/layerbank/LayerBankErc20Handler.sol` and Moc leaf
 - Matching handler unit tests if imports / inheritance names break
+- `test/ai-generated/unit/HandlerTestHarness.t.sol` — shared `withdrawInterest` assertion is `assertGt`, not a no-op `assertGe`
+- `test/mocks/MockIsusdToken.sol` — `setSilentZeroPayout` so Sovryn’s interest path can be mutated the same way as kDOC / aToken
+- `test/ai-generated/unit/sovryn/SovrynErc20HandlerTest.t.sol` — drop the dead `burnToSpecificRecipient` test; give `withdrawInterest` a real payout assertion; add the sibling zero-payout revert
+- Dex copies of the same dead-name test renamed and given teeth (`SovrynErc20HandlerDexTest`, `TropykusErc20HandlerDexTest`)
 
 ## Required tests
 
-No new product behavior. Full matrix, because all three lending handlers change shape:
+No new product behavior beyond the extract. The extract did change Sovryn interest (redeem onto handler, then `safeTransfer`), so that suite must actually catch a broken payout. Full matrix, because all three lending handlers change shape:
 
 ```
 make check

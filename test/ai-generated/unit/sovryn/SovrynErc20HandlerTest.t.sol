@@ -131,7 +131,8 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
         sovrynHandler.withdrawInterest(USER, DEPOSIT_AMOUNT / 2);
         
         uint256 userBalanceAfterInterestWithdraw = stablecoin.balanceOf(USER);
-        assertGe(userBalanceAfterInterestWithdraw, userBalanceBeforeInterestWithdraw);
+        assertGt(userBalanceAfterInterestWithdraw, userBalanceBeforeInterestWithdraw);
+        assertEq(stablecoin.balanceOf(address(sovrynHandler)), 0);
     }
     
     function test_sovryn_mintFailureHandling() public {
@@ -166,16 +167,38 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
     }
     
     function test_sovryn_interestWithdrawal_noInterestScenario() public {
-        // Deposit tokens
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);
-        
-        // Withdraw interest when there's no interest (locked amount equals total)
+
+        uint256 userBalanceBefore = stablecoin.balanceOf(USER);
+
         vm.prank(address(dcaManager));
-        sovrynHandler.withdrawInterest(USER, DEPOSIT_AMOUNT); // All locked in DCA
-        
-        // Should not revert, but also shouldn't change user balance significantly
-        assertGt(stablecoin.balanceOf(USER), 0);
+        sovrynHandler.withdrawInterest(USER, DEPOSIT_AMOUNT);
+
+        assertEq(stablecoin.balanceOf(USER), userBalanceBefore);
+    }
+
+    /**
+     * @notice Interest withdrawals go through the same redeem path and must not pay zero either.
+     */
+    function test_sovryn_zeroPayoutInterestWithdrawalReverts() public {
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 sharesBefore = sovrynHandler.getUserShares(USER);
+        uint256 userBalanceBefore = stablecoin.balanceOf(USER);
+
+        iSusdToken.setSilentZeroPayout(true);
+
+        // the interest amount is derived from tokenPrice after a year of warp, so the revert
+        // argument is not predictable here; that the guard fires at all is what matters
+        vm.prank(address(dcaManager));
+        vm.expectRevert();
+        sovrynHandler.withdrawInterest(USER, DEPOSIT_AMOUNT / 2);
+
+        assertEq(stablecoin.balanceOf(USER), userBalanceBefore);
+        assertEq(sovrynHandler.getUserShares(USER), sharesBefore);
     }
     
     /*//////////////////////////////////////////////////////////////
@@ -203,26 +226,6 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
         // Should still work but with adjusted amounts
         uint256 lendingBalance = sovrynHandler.getUserShares(USER);
         assertGt(lendingBalance, 0);
-    }
-    
-    function test_sovryn_burnToSpecificRecipient() public {
-        // Test that burn sends tokens to the correct recipient
-        address recipient = address(0x999);
-        
-        // Deposit tokens first
-        vm.prank(address(dcaManager));
-        handler.depositToken(USER, DEPOSIT_AMOUNT);
-        
-        uint256 recipientBalanceBefore = stablecoin.balanceOf(recipient);
-        
-        // Mock the internal withdrawal through interest (handler then transfer)
-        // This would be tested through interest withdrawal
-        vm.prank(address(dcaManager));
-        sovrynHandler.withdrawInterest(USER, 0); // Withdraw all as interest
-        
-        // Note: In the actual implementation, interest goes to the user, not a custom recipient
-        // This test verifies the burn mechanism works correctly
-        assertGe(stablecoin.balanceOf(USER), recipientBalanceBefore);
     }
     
     function test_sovryn_assetBalanceCalculation() public {

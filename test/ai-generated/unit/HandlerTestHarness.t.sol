@@ -309,8 +309,7 @@ abstract contract HandlerTestHarness is Test {
         vm.prank(address(dcaManager));
         lendingHandler.withdrawInterest(USER, DEPOSIT_AMOUNT / 2); // Half locked in DCA
         
-        // User should receive interest (balance should increase or stay same)
-        assertGe(stablecoin.balanceOf(USER), initialBalance);
+        assertGt(stablecoin.balanceOf(USER), initialBalance);
     }
     
     /*//////////////////////////////////////////////////////////////
