@@ -190,7 +190,7 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending {
             uint256 oldStablecoinAmount = stablecoinAmount;
             kTokensToRedeem = usersKtokenBalance;
             stablecoinAmount = _lendingTokenToStablecoin(kTokensToRedeem, exchangeRate);
-            emit TokenLending__AmountToRepayAdjusted(user, oldKtokensToRedeem, kTokensToRedeem, oldStablecoinAmount, stablecoinAmount);
+            emit TokenLending__AmountToRedeemAdjusted(user, oldKtokensToRedeem, kTokensToRedeem, oldStablecoinAmount, stablecoinAmount);
         }
         s_kTokenBalances[user] -= kTokensToRedeem;
         uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(address(this));

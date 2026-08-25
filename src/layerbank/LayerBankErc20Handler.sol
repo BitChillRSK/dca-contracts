@@ -225,7 +225,7 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending, ILayerBan
             uint256 oldStablecoinAmount = stablecoinAmount;
             scaledATokensToRedeem = usersAtokenBalance;
             stablecoinAmount = _lendingTokenToStablecoin(scaledATokensToRedeem, exchangeRate);
-            emit TokenLending__AmountToRepayAdjusted(
+            emit TokenLending__AmountToRedeemAdjusted(
                 user, oldScaledATokensToRedeem, scaledATokensToRedeem, oldStablecoinAmount, stablecoinAmount
             );
         }

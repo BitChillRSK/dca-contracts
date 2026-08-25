@@ -24,7 +24,7 @@ interface ITokenLending is ITokenHandler {
     event TokenLending__WithdrawalAmountAdjusted(
         address indexed user, uint256 indexed originalAmount, uint256 indexed adjustedAmount
     );
-    event TokenLending__AmountToRepayAdjusted(
+    event TokenLending__AmountToRedeemAdjusted(
         address indexed user, 
         uint256 indexed originalLendingTokenAmount, 
         uint256 indexed adjustedLendingTokenAmount, 

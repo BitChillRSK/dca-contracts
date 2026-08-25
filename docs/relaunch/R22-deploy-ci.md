@@ -41,7 +41,7 @@ Related: [R22-layerbank-handler.md](./R22-layerbank-handler.md), [R25-lending-re
 - [ ] LayerBank Uniswap / USDRIF.
 - [ ] Merkl / LAB / harvest.
 - [ ] Adding `stablecoinRecipient` to LayerBank redeem (PR 15 decision: always withdraw onto the handler).
-- [ ] Renaming `TokenLending__AmountToRepayAdjusted`.
+- [ ] Any `ITokenLending` event/error ABI. R25 (PR 16) already renamed the adjustment event to `TokenLending__AmountToRedeemAdjusted`; do not rename it again.
 - [ ] `--broadcast` or live-chain ops.
 
 ## Files likely touched

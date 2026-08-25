@@ -183,7 +183,7 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending {
             uint256 oldStablecoinAmount = stablecoinAmount;
             iTokensToRedeem = usersIsusdBalance;
             stablecoinAmount = _lendingTokenToStablecoin(iTokensToRedeem, exchangeRate);
-            emit TokenLending__AmountToRepayAdjusted(user, oldITokensToRedeem, iTokensToRedeem, oldStablecoinAmount, stablecoinAmount);
+            emit TokenLending__AmountToRedeemAdjusted(user, oldITokensToRedeem, iTokensToRedeem, oldStablecoinAmount, stablecoinAmount);
         }
         s_iSusdBalances[user] -= iTokensToRedeem;
         uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(stablecoinRecipient);
