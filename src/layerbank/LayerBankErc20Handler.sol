@@ -220,11 +220,6 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending, ILayerBan
                 user, oldAtokenToRepay, aTokenToRepay, oldStablecoinAmount, stablecoinAmount
             );
         }
-        // @notice Solvency: Aave burns `amount.rayDiv(index)` (round nearest). We debit
-        // `_stablecoinToLendingToken` (Math.Rounding.Up). Debiting >= the shares Aave
-        // burns keeps `sum(s_aTokenBalances)` <= the handler's real scaled aToken
-        // balance. Flipping our side to round down breaks this; no existing test
-        // would catch it.
         s_aTokenBalances[user] -= aTokenToRepay;
         uint256 amountOut =
             redeemUnderlying ? stablecoinAmount : _lendingTokenToStablecoin(aTokenToRepay, exchangeRate);
@@ -235,8 +230,6 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending, ILayerBan
         }
 
         uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(address(this));
-        // @notice Aave `withdraw(..., to)` exists; still pull onto this handler and
-        // measure the DOC delta. Do not credit the return.
         i_pool.withdraw(address(i_stableToken), amountOut, address(this));
         stablecoinReceived = i_stableToken.balanceOf(address(this)) - stablecoinBalanceBefore;
         // @notice a success with no stablecoin received still burnt the user's shares, so revert
@@ -262,10 +255,9 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending, ILayerBan
         uint256 totalAtokenToRepay = _stablecoinToLendingToken(totalStablecoinAmount, _normalizedIncome());
         uint256 numOfPurchases = users.length;
         for (uint256 i; i < numOfPurchases; ++i) {
-            // @notice the amount of scaled aToken each user repays is proportional to the ratio of
+            // @notice the amount of scaled aToken each user redeems is proportional to the ratio of
             // that user's stablecoin being retrieved over the total being retrieved
             // @notice Rounds up the lending token amount to avoid underestimating the amount to subtract from each user's balance
-            // @notice Same solvency pairing as the single-redeem debit: Aave `rayDiv` rounds nearest; we round the virtual debit up.
             uint256 usersRepaidAtoken =
                 Math.mulDiv(totalAtokenToRepay, purchaseAmounts[i], totalStablecoinAmount, Math.Rounding.Up);
             uint256 usersAtokenBalance = s_aTokenBalances[users[i]];

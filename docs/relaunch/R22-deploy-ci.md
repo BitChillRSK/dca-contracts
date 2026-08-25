@@ -6,13 +6,13 @@ PR 17 of R22. Stack on R25 (PR 16). Last required R22 PR before R9.
 
 ## Objective
 
-Wire LayerBank into the live index map (idle=0, LayerBank=1, Sovryn=2), split the shared harness so lending-token assertions are protocol-specific, and make CI cover `none` / `layerbank` / `sovryn`. Also ship the LayerBank **round-up solvency** regression that PR 15’s comment noted no existing test would catch.
+Wire LayerBank into the live index map (idle=0, LayerBank=1, Sovryn=2), split the shared harness so lending-token assertions are protocol-specific, and make CI cover `none` / `layerbank` / `sovryn`. Also ship the **round-up solvency** regression for `_stablecoinToLendingToken` (documented on `TokenLending`; LayerBank + Aave rayDiv is the sharpest assertion surface).
 
 ## Background
 
 PR 15 shipped `LayerBankDocHandlerMoc` behind an add-on deploy script. PR 16 (R25) finishes redeem-helper naming. This PR is the cutover: constants, `DeployMocSwaps` / harness / Makefile / CI.
 
-**Round-up solvency (required in this PR, not deferred).** `_stablecoinToLendingToken` uses `Math.Rounding.Up`. Aave `withdraw` burns scaled shares with `amount.rayDiv(index)` (round nearest). Debiting ≥ what Aave burns keeps `sum(s_aTokenBalances) <= aToken.scaledBalanceOf(handler)`. Flipping TokenLending to round **down** would let virtual books drift above real scaled balances; happy-path and adapted Tropykus/Sovryn suites still pass. PR 15 documented that gap in a code comment — this PR closes it with a test that fails under round-down sizing.
+**Round-up solvency (required in this PR, not deferred).** `_stablecoinToLendingToken` documents `Math.Rounding.Up` for all lending handlers (Tropykus / Sovryn / LayerBank). Aave `withdraw` burns scaled shares with `amount.rayDiv(index)` (round nearest), so LayerBank is the sharpest place to regression-test: debiting ≥ what Aave burns keeps `sum(s_aTokenBalances) <= aToken.scaledBalanceOf(handler)`. Flipping TokenLending to round **down** would let virtual books drift above reality; happy-path suites still pass. Ship a test that fails under round-down sizing — do not leave this as a handler comment.
 
 Related: [R22-layerbank-handler.md](./R22-layerbank-handler.md), [R25-lending-redeem-naming.md](./R25-lending-redeem-naming.md), [R22-idle-handler.md](./R22-idle-handler.md).
 
