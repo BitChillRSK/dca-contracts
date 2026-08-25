@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: yes · Optional/further-review: no
 
-PR 18 of R22. Stack on R26 (PR 17). Last required R22 PR; R27 (Tropykus guards) then R9 follow.
+PR 20 of R22 (reordered 2026-08-25 after R27/R28). Stack on R28 (PR 19). Last required R22 PR; R9 follows.
 
 ## Objective
 
@@ -18,7 +18,7 @@ Related: [R22-layerbank-handler.md](./R22-layerbank-handler.md), [R25-lending-re
 
 ## Open product decisions
 
-**none** — `IMPLEMENTATION_ORDER.md` lists no gates for PR 18. Implement without asking.
+**none** — `IMPLEMENTATION_ORDER.md` lists no gates for PR 20. Implement without asking.
 
 ## Scope
 
@@ -37,8 +37,8 @@ Related: [R22-layerbank-handler.md](./R22-layerbank-handler.md), [R25-lending-re
 
 - [ ] R25 rename work (must already be merged).
 - [ ] R9 `TokenLending__UserSharesUpdated`.
-- [ ] R27 Tropykus zero-mint / batch zero-received guards ([R27-tropykus-lending-guards.md](./R27-tropykus-lending-guards.md)).
-- [ ] R28 `LendingErc20Handler` extract.
+- [ ] R27 Tropykus zero-mint / batch zero-received guards (must already be merged; [R27-tropykus-lending-guards.md](./R27-tropykus-lending-guards.md)).
+- [ ] R28 `LendingErc20Handler` extract (must already be merged; [R28-lending-erc20-handler.md](./R28-lending-erc20-handler.md)).
 - [ ] R10 full natspec rewrite.
 - [ ] LayerBank Uniswap / USDRIF.
 - [ ] Merkl / LAB / harvest.

@@ -1,10 +1,10 @@
 # R27 — Align Tropykus lending cash guards
 
-Status: **not started** · Assigned: yes · Optional/further-review: no
+Status: **in progress** · Assigned: yes · Optional/further-review: no
 
-PR 19. Stack on R22 deploy/CI (PR 18). Land **before** R9 (PR 20) so the ABI-freeze tests cover the corrected Tropykus paths. Tropykus is **not** in the new deploy map (PR 18); this PR exists because the legacy handler must still obey invariant 1.
+PR 18 (reordered 2026-08-25 ahead of R22 deploy/CI). Stack on R26 (PR 17). Land **before** R28 (PR 19), R22 deploy/CI (PR 20), and R9 (PR 21) so the shared-base extract and ABI-freeze tests cover the corrected Tropykus paths. Tropykus is **not** in the new deploy map (PR 20); this PR exists because the legacy handler must still obey invariant 1.
 
-Write this spec against the **R26 `shares` vocabulary** (`getUserShares`, `TokenLending__SharesRedeemed(Batch)`, …). If R26 has not merged, use the pre-rename names still in the files.
+Write this spec against the **R26 `shares` vocabulary** (`getUserShares`, `TokenLending__SharesRedeemed(Batch)`, …).
 
 ## Objective
 
@@ -25,17 +25,17 @@ A third difference is **not** a bug. Tropykus’s single-redeem guard is `stable
 
 ## Open product decisions
 
-**none** — `IMPLEMENTATION_ORDER.md` lists no gates for PR 19. The single-redeem keep is decided above. Implement without asking.
+**none** — `IMPLEMENTATION_ORDER.md` lists no gates for PR 18. The single-redeem keep is decided above. Implement without asking.
 
 ## Scope
 
-- [ ] **`depositToken`:** after a 0 Compound mint code, if the measured kToken `balanceOf(handler)` delta is 0, revert `TokenLending__LendingProtocolDepositFailed` and do not credit `s_kTokenBalances[user]`. Keep the existing non-zero-code revert.
-- [ ] **`_batchRetrieveStablecoin`:** after a 0 Compound `redeemUnderlying` code, if the measured stablecoin delta is 0, revert `TokenLending__ZeroStablecoinReceived(totalStablecoinAmount)`. Do not emit the batch event on that path. Non-zero-code still reverts `TokenLending__LendingProtocolRedeemFailed`.
-- [ ] **`MockKdocToken`:** add a `setForceZeroMint` (or equivalent) that makes `mint` return 0 and mint no kDOC, matching `MockLayerBank.setForceZeroMint`. Reuse `setSilentZeroPayout` for the batch test.
-- [ ] Port LayerBank’s two tests onto Tropykus (`test/ai-generated/unit/tropykus-legacy/TropykusErc20HandlerTest.t.sol`):
+- [x] **`depositToken`:** after a 0 Compound mint code, if the measured kToken `balanceOf(handler)` delta is 0, revert `TokenLending__LendingProtocolDepositFailed` and do not credit `s_kTokenBalances[user]`. Keep the existing non-zero-code revert.
+- [x] **`_batchRetrieveStablecoin`:** after a 0 Compound `redeemUnderlying` code, if the measured stablecoin delta is 0, revert `TokenLending__ZeroStablecoinReceived(totalStablecoinAmount)`. Do not emit the batch event on that path. Non-zero-code still reverts `TokenLending__LendingProtocolRedeemFailed`.
+- [x] **`MockKdocToken`:** add a `setForceZeroMint` (or equivalent) that makes `mint` return 0 and mint no kDOC, matching `MockLayerBank.setForceZeroMint`. Reuse `setSilentZeroPayout` for the batch test.
+- [x] Port LayerBank’s two tests onto Tropykus (`test/ai-generated/unit/tropykus-legacy/TropykusErc20HandlerTest.t.sol`):
   - `test_tropykus_zeroMintReverts` ← `test_layerbank_zeroMintReverts`
   - `test_tropykus_batchRetrieveStablecoin_zeroPayout_reverts` ← `test_layerbank_batchRetrieveStablecoin_zeroPayout_reverts` (the test subclass already exposes `testBatchRetrieveStablecoin`)
-- [ ] Assert the revert leaves `getUserShares` (pre-R26: `getUsersLendingTokenBalance`) unchanged.
+- [x] Assert the revert leaves `getUserShares` unchanged.
 
 ## Out of scope
 
@@ -70,11 +70,11 @@ Fork tests: no new fork-specific assertions. `make fork-tropykus` still pins blo
 
 ## Success criteria
 
-- [ ] Tropykus `depositToken` reverts `TokenLending__LendingProtocolDepositFailed` on a successful mint code with a 0 share delta; mapping unchanged.
-- [ ] Tropykus `_batchRetrieveStablecoin` reverts `TokenLending__ZeroStablecoinReceived` on a successful redeem code with a 0 DOC delta; mapping unchanged; no batch-redeem event.
-- [ ] Single-redeem still uses `stablecoinAmount > 0 && stablecoinReceived == 0`.
-- [ ] Sovryn and LayerBank diffs are empty.
-- [ ] `make check`, `make fork-sovryn`, and `make fork-tropykus` pass.
+- [x] Tropykus `depositToken` reverts `TokenLending__LendingProtocolDepositFailed` on a successful mint code with a 0 share delta; mapping unchanged.
+- [x] Tropykus `_batchRetrieveStablecoin` reverts `TokenLending__ZeroStablecoinReceived` on a successful redeem code with a 0 DOC delta; mapping unchanged; no batch-redeem event.
+- [x] Single-redeem still uses `stablecoinAmount > 0 && stablecoinReceived == 0`.
+- [x] Sovryn and LayerBank diffs are empty.
+- [x] `make check`, `make fork-sovryn`, and `make fork-tropykus` pass.
 
 ## Reviewer checklist
 
@@ -88,4 +88,4 @@ Fork tests: no new fork-specific assertions. `make fork-tropykus` still pins blo
 
 - ABI: none. Existing errors, already on `ITokenLending`.
 - Scripts: none.
-- Cutover: none. Tropykus is not registered after PR 18. Local `make moc-tropykus` / `make fork-tropykus` are the consumers.
+- Cutover: none. Tropykus is not registered after R22 deploy/CI (PR 20). Local `make moc-tropykus` / `make fork-tropykus` are the consumers.
