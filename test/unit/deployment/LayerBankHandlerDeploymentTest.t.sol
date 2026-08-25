@@ -60,7 +60,7 @@ contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
         assertEq(
             keccak256(bytes(operationsAdmin.getLendingProtocolName(LAYERBANK_INDEX))), keccak256(bytes("layerbank"))
         );
-        assertEq(layerbankHandler.RAY(), 1e27);
+        assertEq(layerbankHandler.EXCHANGE_RATE_DECIMALS(), 1e27);
     }
 
     function test_run_revertsWhenNotLocal() public {

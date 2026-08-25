@@ -26,7 +26,8 @@ Named on R28 review (GitHub #63): copy LayerBank’s pattern onto the other two;
 - [x] `TropykusErc20Handler`: same constant and constructor shape.
 - [x] Leaves drop the arg and stop forwarding it: `SovrynDocHandlerMoc`, `SovrynErc20HandlerDex`, `TropykusDocHandlerMoc`, `TropykusErc20HandlerDex`.
 - [x] Call sites that construct those types drop the last arg (`script/DeployMocSwaps.s.sol`, `DeployDexSwaps.s.sol`, `DeployUsdrifHandler.s.sol`, handler unit tests, `DcaDappTest` / shared harness if it `new`s a leaf, fuzz/invariants, any other `new Sovryn*` / `new Tropykus*`).
-- [x] LayerBank unchanged (already `RAY`).
+- [x] LayerBank already hardcodes the scale; renamed its constant `RAY` → `EXCHANGE_RATE_DECIMALS`
+      so all three adapters expose the same getter. Value and behaviour unchanged (`1e27`).
 - [x] `script/Constants.sol` `EXCHANGE_RATE_DECIMALS` may remain where tests use it as conversion math (not as a constructor arg). Do not delete it unless nothing still references it.
 
 ## Out of scope

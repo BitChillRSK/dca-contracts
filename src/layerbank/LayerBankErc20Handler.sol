@@ -14,7 +14,8 @@ import {ILayerBankPool} from "./ILayerBankPool.sol";
  *      read, because mixing the two breaks the round-up solvency invariant.
  */
 abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20Handler {
-    /// @notice Aave liquidity-index scale (RAY). Fixed for LayerBank
+    /// @notice Aave's liquidity-index scale (RAY). Fixed for this protocol; not a constructor
+    ///         arg (passing Tropykus/Sovryn's 1e18 would size withdrawals 1e9× too large).
     uint256 public constant EXCHANGE_RATE_DECIMALS = 1e27;
 
     ILayerBankAToken public immutable i_aToken;
