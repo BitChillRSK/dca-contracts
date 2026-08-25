@@ -14,10 +14,10 @@ interface ITokenLending is ITokenHandler {
 
     /// @notice in a batch this fires per user with that user's planned share; the batch event
     /// below carries the total the handler measured
-    event TokenLending__LendingTokenRedeemed(
-        address indexed user, uint256 indexed underlyingAmount, uint256 indexed lendingTokenAmountRedeemed
+    event TokenLending__SharesRedeemed(
+        address indexed user, uint256 indexed underlyingAmount, uint256 indexed sharesAmountRedeemed
     );
-    event TokenLending__LendingTokenRedeemedBatch(uint256 indexed underlyingAmount, uint256 indexed lendingTokenAmountRedeemed);
+    event TokenLending__SharesRedeemedBatch(uint256 indexed underlyingAmount, uint256 indexed sharesAmountRedeemed);
     event TokenLending__InterestWithdrawn(
         address indexed user, address indexed token, uint256 indexed underlyingAmountWithdrawn
     );
@@ -26,8 +26,8 @@ interface ITokenLending is ITokenHandler {
     );
     event TokenLending__AmountToRedeemAdjusted(
         address indexed user, 
-        uint256 indexed originalLendingTokenAmount, 
-        uint256 indexed adjustedLendingTokenAmount, 
+        uint256 indexed originalSharesAmount, 
+        uint256 indexed adjustedSharesAmount, 
         uint256 originalStablecoinAmount, 
         uint256 adjustedStablecoinAmount
     );
@@ -45,17 +45,17 @@ interface ITokenLending is ITokenHandler {
     error TokenLending__ZeroStablecoinReceived(uint256 stablecoinAttempted);
     /// @notice batch redeem asked for more of this user's shares than the handler tracks. Same
     /// outcome as a 0.8 underflow on `s_*Balances[user] -=`; the named error is for the swapper.
-    error TokenLending__InsufficientLendingTokenBalance(address user, uint256 requested, uint256 available);
+    error TokenLending__InsufficientShares(address user, uint256 requested, uint256 available);
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Gets the lending token balance of the user
+     * @notice Gets the shares balance of the user
      * @param user The user whose balance is checked
      */
-    function getUsersLendingTokenBalance(address user) external view returns (uint256);
+    function getUserShares(address user) external view returns (uint256);
 
     /**
      * @dev Withdraws the interest earned for a user.

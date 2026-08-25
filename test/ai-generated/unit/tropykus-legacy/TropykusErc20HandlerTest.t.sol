@@ -58,7 +58,7 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
         return true; // Tropykus handlers support lending
     }
     
-    function getLendingToken() internal view override returns (IERC20) {
+    function getShareToken() internal view override returns (IERC20) {
         return IERC20(address(kToken));
     }
     
@@ -180,7 +180,7 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);
 
-        uint256 kTokenBalanceBefore = tropykusHandler.getUsersLendingTokenBalance(USER);
+        uint256 kTokenBalanceBefore = tropykusHandler.getUserShares(USER);
         uint256 userBalanceBefore = stablecoin.balanceOf(USER);
 
         kToken.setSilentZeroPayout(true);
@@ -195,7 +195,7 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
 
         // the revert must leave both the user's stablecoin and their lending position untouched
         assertEq(stablecoin.balanceOf(USER), userBalanceBefore);
-        assertEq(tropykusHandler.getUsersLendingTokenBalance(USER), kTokenBalanceBefore);
+        assertEq(tropykusHandler.getUserShares(USER), kTokenBalanceBefore);
     }
 
     /**
@@ -206,7 +206,7 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
         handler.depositToken(USER, DEPOSIT_AMOUNT);
         vm.warp(block.timestamp + 365 days);
 
-        uint256 kTokenBalanceBefore = tropykusHandler.getUsersLendingTokenBalance(USER);
+        uint256 kTokenBalanceBefore = tropykusHandler.getUserShares(USER);
         uint256 userBalanceBefore = stablecoin.balanceOf(USER);
 
         kToken.setSilentZeroPayout(true);
@@ -218,7 +218,7 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
         tropykusHandler.withdrawInterest(USER, DEPOSIT_AMOUNT / 2);
 
         assertEq(stablecoin.balanceOf(USER), userBalanceBefore);
-        assertEq(tropykusHandler.getUsersLendingTokenBalance(USER), kTokenBalanceBefore);
+        assertEq(tropykusHandler.getUserShares(USER), kTokenBalanceBefore);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -234,7 +234,7 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
         handler.depositToken(USER, DEPOSIT_AMOUNT);
         
         // Should work with starting exchange rate
-        uint256 lendingBalance = tropykusHandler.getUsersLendingTokenBalance(USER);
+        uint256 lendingBalance = tropykusHandler.getUserShares(USER);
         assertGt(lendingBalance, 0);
     }
     
@@ -249,7 +249,7 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
         handler.depositToken(USER, DEPOSIT_AMOUNT);
         
         // Should still work but with adjusted amounts
-        uint256 lendingBalance = tropykusHandler.getUsersLendingTokenBalance(USER);
+        uint256 lendingBalance = tropykusHandler.getUserShares(USER);
         assertGt(lendingBalance, 0);
     }
 
@@ -269,7 +269,7 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
         handler.depositToken(user1, DEPOSIT_AMOUNT / 10);
 
         uint256 excessiveAmount = DEPOSIT_AMOUNT * 2;
-        uint256 available = tropykusHandler.getUsersLendingTokenBalance(user1);
+        uint256 available = tropykusHandler.getUserShares(user1);
         uint256 exchangeRate = kToken.exchangeRateCurrent();
         uint256 totalKtokenToRedeem =
             Math.mulDiv(excessiveAmount, EXCHANGE_RATE_DECIMALS, exchangeRate, Math.Rounding.Up);
@@ -277,7 +277,7 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                ITokenLending.TokenLending__InsufficientLendingTokenBalance.selector, user1, requested, available
+                ITokenLending.TokenLending__InsufficientShares.selector, user1, requested, available
             )
         );
         tropykusHandler.testBatchRetrieveStablecoin(users, amounts, excessiveAmount);

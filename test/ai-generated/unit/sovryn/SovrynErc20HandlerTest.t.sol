@@ -57,7 +57,7 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
         return true; // Sovryn handlers support lending
     }
     
-    function getLendingToken() internal view override returns (IERC20) {
+    function getShareToken() internal view override returns (IERC20) {
         return IERC20(address(iSusdToken));
     }
     
@@ -76,12 +76,12 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
     //////////////////////////////////////////////////////////////*/
     
     function test_sovryn_iSusdMinting() public {
-        uint256 initialUserLendingBalance = sovrynHandler.getUsersLendingTokenBalance(USER);
+        uint256 initialUserLendingBalance = sovrynHandler.getUserShares(USER);
         
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);
         
-        uint256 finalUserLendingBalance = sovrynHandler.getUsersLendingTokenBalance(USER);
+        uint256 finalUserLendingBalance = sovrynHandler.getUserShares(USER);
         assertGt(finalUserLendingBalance, initialUserLendingBalance);
     }
     
@@ -189,7 +189,7 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
         handler.depositToken(USER, DEPOSIT_AMOUNT);
         
         // Should succeed as MockIsusdToken has reasonable price logic
-        uint256 lendingBalance = sovrynHandler.getUsersLendingTokenBalance(USER);
+        uint256 lendingBalance = sovrynHandler.getUserShares(USER);
         assertGt(lendingBalance, 0);
     }
     
@@ -201,7 +201,7 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
         handler.depositToken(USER, DEPOSIT_AMOUNT);
         
         // Should still work but with adjusted amounts
-        uint256 lendingBalance = sovrynHandler.getUsersLendingTokenBalance(USER);
+        uint256 lendingBalance = sovrynHandler.getUserShares(USER);
         assertGt(lendingBalance, 0);
     }
     
@@ -231,7 +231,7 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
         handler.depositToken(USER, DEPOSIT_AMOUNT);
         
         // The mock implementation should handle asset balance correctly
-        uint256 lendingBalance = sovrynHandler.getUsersLendingTokenBalance(USER);
+        uint256 lendingBalance = sovrynHandler.getUserShares(USER);
         assertGt(lendingBalance, 0);
         
         // Test redemption doesn't exceed asset balance
@@ -280,8 +280,8 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
         // Check that users' lending balances were adjusted (decreased from their maximum possible)
         // Note: Due to interest accrual, balances might be higher than original deposit
         // but should be lower after redemption than before
-        uint256 finalBalance1 = sovrynHandler.getUsersLendingTokenBalance(user1);
-        uint256 finalBalance2 = sovrynHandler.getUsersLendingTokenBalance(user2);
+        uint256 finalBalance1 = sovrynHandler.getUserShares(user1);
+        uint256 finalBalance2 = sovrynHandler.getUserShares(user2);
         
         // Both users should still have some balance remaining (since we only redeemed part of it)
         assertGt(finalBalance1, 0);
@@ -292,7 +292,7 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
      * @notice The assetBalanceOf + profitOf preflight is gone (R1): a lending-protocol view is never a
      * ceiling on what a redemption will pay. Over-redeeming must still fail, just from real accounting
      * rather than from a view — here the per-user share exceeds the balance we track for that user.
-     * Named `TokenLending__InsufficientLendingTokenBalance` instead of a 0.8 underflow panic.
+     * Named `TokenLending__InsufficientShares` instead of a 0.8 underflow panic.
      */
     function test_sovryn_batchRetrieveStablecoin_exceedsBalance_reverts() public {
         address user1 = makeAddr("user1");
@@ -312,14 +312,14 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
         handler.depositToken(user1, DEPOSIT_AMOUNT / 10); // Deposit only 1/10th
 
         uint256 excessiveAmount = DEPOSIT_AMOUNT * 2;
-        uint256 available = sovrynHandler.getUsersLendingTokenBalance(user1);
+        uint256 available = sovrynHandler.getUserShares(user1);
         uint256 price = iSusdToken.tokenPrice();
         uint256 totalIsusdToRedeem = Math.mulDiv(excessiveAmount, EXCHANGE_RATE_DECIMALS, price, Math.Rounding.Up);
         uint256 requested = Math.mulDiv(totalIsusdToRedeem, amounts[0], excessiveAmount, Math.Rounding.Up);
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                ITokenLending.TokenLending__InsufficientLendingTokenBalance.selector, user1, requested, available
+                ITokenLending.TokenLending__InsufficientShares.selector, user1, requested, available
             )
         );
         sovrynHandler.testBatchRetrieveStablecoin(users, amounts, excessiveAmount);

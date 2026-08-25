@@ -14,8 +14,9 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 /**
  * @title LayerBankErc20Handler
  * @notice Stablecoin functions that are common regardless of the method used to swap stablecoin for rBTC.
- * @dev Live LayerBank DOC is an Aave-v3 aToken. Supply and withdraw go through the Pool; per-user
- *      virtual balances store **scaled** aToken amounts (not rebasing `balanceOf`).
+ * @dev Live LayerBank DOC is an Aave-v3 aToken. Supply and withdraw go through the Pool.
+ *      Shares in this contract are aToken **scaled** amounts; the rebasing `balanceOf` is never
+ *      read, because mixing the two breaks the round-up solvency invariant.
  */
 abstract contract LayerBankErc20Handler is TokenHandler, TokenLending, ILayerBankErc20Handler {
     using SafeERC20 for IERC20;
@@ -73,10 +74,10 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending, ILayerBan
         if (i_stableToken.allowance(address(this), address(i_pool)) < depositedAmount) {
             i_stableToken.safeApprove(address(i_pool), depositedAmount);
         }
-        // @notice the shares we credit are the scaled aTokens we actually gained, never a Pool return
-        uint256 prevScaledBalance = i_aToken.scaledBalanceOf(address(this));
+        // @notice the shares we credit are the aTokens we actually gained, never a Pool return
+        uint256 prevShares = i_aToken.scaledBalanceOf(address(this));
         i_pool.supply(address(i_stableToken), depositedAmount, address(this), 0);
-        uint256 mintedAmount = i_aToken.scaledBalanceOf(address(this)) - prevScaledBalance;
+        uint256 mintedAmount = i_aToken.scaledBalanceOf(address(this)) - prevShares;
         if (mintedAmount == 0) revert TokenLending__LendingProtocolDepositFailed();
         s_aTokenBalances[user] += mintedAmount;
     }
@@ -94,10 +95,10 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending, ILayerBan
         returns (uint256)
     {
         uint256 exchangeRate = _normalizedIncome();
-        uint256 stablecoinInLayerBank = _lendingTokenToStablecoin(s_aTokenBalances[user], exchangeRate);
-        if (stablecoinInLayerBank < withdrawalAmount) {
-            emit TokenLending__WithdrawalAmountAdjusted(user, withdrawalAmount, stablecoinInLayerBank);
-            withdrawalAmount = stablecoinInLayerBank;
+        uint256 totalStablecoinInLending = _sharesToStablecoin(s_aTokenBalances[user], exchangeRate);
+        if (totalStablecoinInLending < withdrawalAmount) {
+            emit TokenLending__WithdrawalAmountAdjusted(user, withdrawalAmount, totalStablecoinInLending);
+            withdrawalAmount = totalStablecoinInLending;
         }
         // @notice we pay out what the redemption actually produced, which may be less than requested
         withdrawalAmount = _redeemByUnderlying(user, withdrawalAmount, exchangeRate);
@@ -105,11 +106,11 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending, ILayerBan
     }
 
     /**
-     * @notice get the users lending token balance
+     * @notice get the users shares balance
      * @param user: the address of the user
-     * @return the users lending token balance
+     * @return the users shares balance
      */
-    function getUsersLendingTokenBalance(address user) external view override returns (uint256) {
+    function getUserShares(address user) external view override returns (uint256) {
         return s_aTokenBalances[user];
     }
 
@@ -120,7 +121,7 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending, ILayerBan
      */
     function withdrawInterest(address user, uint256 stablecoinLockedInDcaSchedules) external override onlyDcaManager {
         uint256 exchangeRate = _normalizedIncome();
-        uint256 totalStablecoinInLending = _lendingTokenToStablecoin(s_aTokenBalances[user], exchangeRate);
+        uint256 totalStablecoinInLending = _sharesToStablecoin(s_aTokenBalances[user], exchangeRate);
         if (totalStablecoinInLending <= stablecoinLockedInDcaSchedules) {
             return; // No interest to withdraw
         }
@@ -144,7 +145,7 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending, ILayerBan
         onlyDcaManager
         returns (uint256 stablecoinInterestAmount)
     {
-        uint256 totalStablecoinInLending = _lendingTokenToStablecoin(s_aTokenBalances[user], _normalizedIncome());
+        uint256 totalStablecoinInLending = _sharesToStablecoin(s_aTokenBalances[user], _normalizedIncome());
         stablecoinInterestAmount = totalStablecoinInLending > stablecoinLockedInDcaSchedules
             ? totalStablecoinInLending - stablecoinLockedInDcaSchedules
             : 0;
@@ -172,10 +173,10 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending, ILayerBan
     }
 
     /**
-     * @notice redeem the user's scaled aToken sized by underlying: withdraw `stablecoinAmount` from the Pool
+     * @notice redeem the user's shares sized by underlying: withdraw `stablecoinAmount` from the Pool
      * @param user: the address of the user
      * @param stablecoinAmount: the amount of stablecoin wanted
-     * @param exchangeRate: the exchange rate of stablecoin to lending token
+     * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
      * @return the amount of stablecoin this contract actually received
      */
     function _redeemByUnderlying(address user, uint256 stablecoinAmount, uint256 exchangeRate)
@@ -187,13 +188,13 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending, ILayerBan
     }
 
     /**
-     * @notice redeem the user's scaled aToken sized by shares: debit the share count `stablecoinAmount`
+     * @notice redeem the user's shares sized by shares: debit the share count `stablecoinAmount`
      *         converts to, then withdraw that debit's underlying equivalent
      * @dev Aave has no share-sized withdraw, so this helper still calls `Pool.withdraw`; only the
      *      sizing differs from `_redeemByUnderlying`.
      * @param user: the address of the user
      * @param stablecoinAmount: the amount of stablecoin wanted
-     * @param exchangeRate: the exchange rate of stablecoin to lending token
+     * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
      * @return stablecoinReceived the amount of stablecoin this contract actually received
      */
     function _redeemByShares(address user, uint256 stablecoinAmount, uint256 exchangeRate)
@@ -207,9 +208,9 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending, ILayerBan
      * @notice Internal aToken redemption, sized either by underlying amount or by share count
      * @param user: the address of the user
      * @param stablecoinAmount: the amount of stablecoin wanted
-     * @param exchangeRate: the exchange rate of stablecoin to lending token
+     * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
      * @param sizeByUnderlying: true to withdraw `stablecoinAmount`; false to withdraw the
-     *        underlying equivalent of the (clamped) scaled-share debit
+     *        underlying equivalent of the (clamped) share debit
      * @return stablecoinReceived the amount of stablecoin this contract actually received
      */
     function _redeemInternal(
@@ -219,22 +220,22 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending, ILayerBan
         bool sizeByUnderlying
     ) internal returns (uint256 stablecoinReceived) {
         uint256 usersAtokenBalance = s_aTokenBalances[user];
-        uint256 aTokenToRedeem = _stablecoinToLendingToken(stablecoinAmount, exchangeRate);
-        if (aTokenToRedeem > usersAtokenBalance) {
-            uint256 oldAtokenToRedeem = aTokenToRedeem;
+        uint256 sharesToRedeem = _stablecoinToShares(stablecoinAmount, exchangeRate);
+        if (sharesToRedeem > usersAtokenBalance) {
+            uint256 oldSharesToRedeem = sharesToRedeem;
             uint256 oldStablecoinAmount = stablecoinAmount;
-            aTokenToRedeem = usersAtokenBalance;
-            stablecoinAmount = _lendingTokenToStablecoin(aTokenToRedeem, exchangeRate);
+            sharesToRedeem = usersAtokenBalance;
+            stablecoinAmount = _sharesToStablecoin(sharesToRedeem, exchangeRate);
             emit TokenLending__AmountToRedeemAdjusted(
-                user, oldAtokenToRedeem, aTokenToRedeem, oldStablecoinAmount, stablecoinAmount
+                user, oldSharesToRedeem, sharesToRedeem, oldStablecoinAmount, stablecoinAmount
             );
         }
-        s_aTokenBalances[user] -= aTokenToRedeem;
+        s_aTokenBalances[user] -= sharesToRedeem;
         uint256 amountOut =
-            sizeByUnderlying ? stablecoinAmount : _lendingTokenToStablecoin(aTokenToRedeem, exchangeRate);
+            sizeByUnderlying ? stablecoinAmount : _sharesToStablecoin(sharesToRedeem, exchangeRate);
         // Live Aave `withdraw` reverts on a zero amount (`InvalidAmount`).
         if (amountOut == 0) {
-            emit TokenLending__LendingTokenRedeemed(user, 0, aTokenToRedeem);
+            emit TokenLending__SharesRedeemed(user, 0, sharesToRedeem);
             return 0;
         }
 
@@ -246,7 +247,7 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending, ILayerBan
         if (stablecoinReceived == 0) {
             revert TokenLending__ZeroStablecoinReceived(stablecoinAmount);
         }
-        emit TokenLending__LendingTokenRedeemed(user, stablecoinReceived, aTokenToRedeem);
+        emit TokenLending__SharesRedeemed(user, stablecoinReceived, sharesToRedeem);
     }
 
     /**
@@ -261,26 +262,26 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending, ILayerBan
         uint256[] memory purchaseAmounts,
         uint256 totalStablecoinAmount
     ) internal virtual returns (uint256) {
-        uint256 totalAtokenToRedeem = _stablecoinToLendingToken(totalStablecoinAmount, _normalizedIncome());
+        uint256 totalAtokenToRedeem = _stablecoinToShares(totalStablecoinAmount, _normalizedIncome());
         uint256 numOfPurchases = users.length;
         for (uint256 i; i < numOfPurchases; ++i) {
-            // @notice the amount of scaled aToken each user redeems is proportional to the ratio of
+            // @notice the amount of shares each user redeems is proportional to the ratio of
             // that user's stablecoin being retrieved over the total being retrieved
-            // @notice Rounds up the lending token amount to avoid underestimating the amount to subtract from each user's balance
+            // @notice Rounds up the share amount to avoid underestimating the amount to subtract from each user's balance
             uint256 usersAtokenToRedeem =
                 Math.mulDiv(totalAtokenToRedeem, purchaseAmounts[i], totalStablecoinAmount, Math.Rounding.Up);
             uint256 usersAtokenBalance = s_aTokenBalances[users[i]];
             if (usersAtokenToRedeem > usersAtokenBalance) {
-                revert TokenLending__InsufficientLendingTokenBalance(users[i], usersAtokenToRedeem, usersAtokenBalance);
+                revert TokenLending__InsufficientShares(users[i], usersAtokenToRedeem, usersAtokenBalance);
             }
             s_aTokenBalances[users[i]] = usersAtokenBalance - usersAtokenToRedeem;
-            emit TokenLending__LendingTokenRedeemed(users[i], purchaseAmounts[i], usersAtokenToRedeem);
+            emit TokenLending__SharesRedeemed(users[i], purchaseAmounts[i], usersAtokenToRedeem);
         }
 
         uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(address(this));
         i_pool.withdraw(address(i_stableToken), totalStablecoinAmount, address(this));
         uint256 stablecoinReceived = i_stableToken.balanceOf(address(this)) - stablecoinBalanceBefore;
-        if (stablecoinReceived > 0) emit TokenLending__LendingTokenRedeemedBatch(stablecoinReceived, totalAtokenToRedeem);
+        if (stablecoinReceived > 0) emit TokenLending__SharesRedeemedBatch(stablecoinReceived, totalAtokenToRedeem);
         else revert TokenLending__ZeroStablecoinReceived(totalStablecoinAmount);
         return stablecoinReceived;
     }

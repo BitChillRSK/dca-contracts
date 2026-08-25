@@ -352,9 +352,9 @@ contract GettersTest is DcaDappTest {
                         TOKEN LENDING GETTERS TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_tokenLending_getUsersLendingTokenBalance() public {
+    function test_tokenLending_getUserShares() public {
         if (s_lendingProtocolIndex > 0) {
-            uint256 balance = ITokenLending(address(stablecoinHandler)).getUsersLendingTokenBalance(USER);
+            uint256 balance = ITokenLending(address(stablecoinHandler)).getUserShares(USER);
             assertGe(balance, 0);
         }
     }

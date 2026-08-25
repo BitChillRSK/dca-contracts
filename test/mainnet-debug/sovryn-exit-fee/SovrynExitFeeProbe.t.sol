@@ -79,7 +79,7 @@ contract SovrynExitFeeWithdrawalProbe is DcaDappTest {
 
     function testStablecoinWithdrawal_printSovrynFeeSplit() external {
         address doc = address(stablecoin);
-        address iSusd = address(lendingToken);
+        address iSusd = address(shareToken);
         address handler = address(stablecoinHandler);
 
         uint256 vaultDocBefore = IERC20(doc).balanceOf(EXIT_FEE_VAULT);

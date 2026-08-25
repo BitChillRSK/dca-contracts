@@ -60,7 +60,7 @@ contract OperationsAdminTest is DcaDappTest {
         TropykusDocHandlerMoc newTropykusDocHandlerMoc = new TropykusDocHandlerMoc(
             address(dcaManager),
             address(stablecoin),
-            address(lendingToken),
+            address(shareToken),
             FEE_COLLECTOR,
             address(mocProxy),
             IFeeHandler.FeeSettings({

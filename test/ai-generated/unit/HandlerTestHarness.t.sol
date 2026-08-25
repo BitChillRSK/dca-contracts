@@ -34,7 +34,7 @@ abstract contract HandlerTestHarness is Test {
     DcaManager public dcaManager;
     OperationsAdmin public operationsAdmin;
     MockStablecoin public stablecoin;
-    IERC20 public lendingToken;
+    IERC20 public shareToken;
     
     // Test accounts
     address public constant USER = address(0x1234);
@@ -79,9 +79,9 @@ abstract contract HandlerTestHarness is Test {
     function isLendingHandler() internal virtual returns (bool);
     
     /**
-     * @notice Get the lending token for this handler
+     * @notice Get the shares for this handler
      */
-    function getLendingToken() internal virtual returns (IERC20);
+    function getShareToken() internal virtual returns (IERC20);
     
     /**
      * @notice Setup any handler-specific mocks or configurations
@@ -106,14 +106,14 @@ abstract contract HandlerTestHarness is Test {
         lendingProtocolIndex = getLendingProtocolIndex();
         supportsDex = isDexHandler();
         supportsLending = isLendingHandler();
-        lendingToken = getLendingToken();
+        shareToken = getShareToken();
         
-        // Setup lending token balance if needed
+        // Setup shares balance if needed
         if (supportsLending) {
-            vm.deal(address(lendingToken), 1000000 ether);
+            vm.deal(address(shareToken), 1000000 ether);
         }
         
-        // Setup handler specifics (lending tokens, DEX configs, etc.)
+        // Setup handler specifics (shares, DEX configs, etc.)
         setupHandlerSpecifics();
         
         // Deploy the specific handler with proper ownership
@@ -171,7 +171,7 @@ abstract contract HandlerTestHarness is Test {
         // Handler balance might go to lending protocol, so we check based on handler type
         if (supportsLending) {
             // For lending handlers, tokens go to lending protocol
-            uint256 lendingBalance = ITokenLending(address(handler)).getUsersLendingTokenBalance(USER);
+            uint256 lendingBalance = ITokenLending(address(handler)).getUserShares(USER);
             assertGt(lendingBalance, 0);
         } else {
             // For non-lending handlers, tokens stay in handler
@@ -279,7 +279,7 @@ abstract contract HandlerTestHarness is Test {
         handler.depositToken(USER, DEPOSIT_AMOUNT);
         
         // Check lending balance
-        uint256 lendingBalance = lendingHandler.getUsersLendingTokenBalance(USER);
+        uint256 lendingBalance = lendingHandler.getUserShares(USER);
         assertGt(lendingBalance, 0);
         
         // Simulate time passing and interest accrual

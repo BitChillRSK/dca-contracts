@@ -233,7 +233,7 @@ contract NetRedemptionTest is DcaDappTest {
         // they pay the max rate (200 bps locally): 4 DOC of fees on a 200 DOC batch. Withholding 99.5%
         // leaves 1 DOC redeemed, which is below the fee but still above zero — a zero payout would revert
         // earlier with TokenLending__ZeroStablecoinReceived, which is a different failure.
-        MockIsusdToken(address(lendingToken)).setExitFeeBps(RUG_EXIT_FEE_BPS);
+        MockIsusdToken(address(shareToken)).setExitFeeBps(RUG_EXIT_FEE_BPS);
 
         (
             address[] memory users,
@@ -273,7 +273,7 @@ contract NetRedemptionTest is DcaDappTest {
      * is no fee.
      */
     function test_sovryn_withoutExitFeeWithdrawalStaysOneToOne() public onlySovrynMocMocks {
-        assertEq(MockIsusdToken(address(lendingToken)).getExitFeeBps(), 0);
+        assertEq(MockIsusdToken(address(shareToken)).getExitFeeBps(), 0);
 
         bytes32 scheduleId = dcaManager.getScheduleId(USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 scheduleBalanceBefore = dcaManager.getScheduleTokenBalance(USER, address(stablecoin), SCHEDULE_INDEX);
@@ -310,7 +310,7 @@ contract NetRedemptionTest is DcaDappTest {
     //////////////////////////////////////////////////////////////*/
 
     function _enableExitFee() internal {
-        MockIsusdToken(address(lendingToken)).setExitFeeBps(EXIT_FEE_BPS);
+        MockIsusdToken(address(shareToken)).setExitFeeBps(EXIT_FEE_BPS);
     }
 
     function _afterExitFee(uint256 grossAmount) internal pure returns (uint256) {

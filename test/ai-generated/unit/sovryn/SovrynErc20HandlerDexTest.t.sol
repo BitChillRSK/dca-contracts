@@ -80,7 +80,7 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
         return true; // Sovryn handlers support lending
     }
     
-    function getLendingToken() internal view override returns (IERC20) {
+    function getShareToken() internal view override returns (IERC20) {
         return IERC20(address(iSusdToken));
     }
     
@@ -276,7 +276,7 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
         handler.depositToken(USER, DEPOSIT_AMOUNT);
         
         // Check lending balance (inherited from Sovryn base)
-        uint256 lendingBalance = sovrynDexHandler.getUsersLendingTokenBalance(USER);
+        uint256 lendingBalance = sovrynDexHandler.getUserShares(USER);
         assertGt(lendingBalance, 0);
         
         // Check iSUSD balance (in our mock, handler holds tokens instead of burning)
@@ -386,7 +386,7 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
         handler.depositToken(USER, DEPOSIT_AMOUNT);
         
         // Check that user has lending balance but handler has no tokens
-        uint256 lendingBalance = sovrynDexHandler.getUsersLendingTokenBalance(USER);
+        uint256 lendingBalance = sovrynDexHandler.getUserShares(USER);
         uint256 handlerBalance = iSusdToken.balanceOf(address(handler));
         
         assertGt(lendingBalance, 0);
@@ -422,7 +422,7 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
         handler.depositToken(USER, DEPOSIT_AMOUNT);
         
         // Verify initial state
-        uint256 initialLendingBalance = sovrynDexHandler.getUsersLendingTokenBalance(USER);
+        uint256 initialLendingBalance = sovrynDexHandler.getUserShares(USER);
         assertGt(initialLendingBalance, 0);
         
         uint256 purchaseAmount = 100 ether;
@@ -433,7 +433,7 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
         sovrynDexHandler.buyRbtc(USER, mockScheduleId, purchaseAmount);
         
         // Verify the override was called - lending balance should be reduced
-        uint256 finalLendingBalance = sovrynDexHandler.getUsersLendingTokenBalance(USER);
+        uint256 finalLendingBalance = sovrynDexHandler.getUserShares(USER);
         assertLt(finalLendingBalance, initialLendingBalance);
         
         // Verify RBTC was accumulated
@@ -467,8 +467,8 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
         handler.depositToken(user2, depositAmount2);
         
         // Verify initial state
-        uint256 initialBalance1 = sovrynDexHandler.getUsersLendingTokenBalance(user1);
-        uint256 initialBalance2 = sovrynDexHandler.getUsersLendingTokenBalance(user2);
+        uint256 initialBalance1 = sovrynDexHandler.getUserShares(user1);
+        uint256 initialBalance2 = sovrynDexHandler.getUserShares(user2);
         assertGt(initialBalance1, 0);
         assertGt(initialBalance2, 0);
         
@@ -490,8 +490,8 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
         sovrynDexHandler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts);
         
         // Verify the override was called - lending balances should be reduced
-        uint256 finalBalance1 = sovrynDexHandler.getUsersLendingTokenBalance(user1);
-        uint256 finalBalance2 = sovrynDexHandler.getUsersLendingTokenBalance(user2);
+        uint256 finalBalance1 = sovrynDexHandler.getUserShares(user1);
+        uint256 finalBalance2 = sovrynDexHandler.getUserShares(user2);
         assertLt(finalBalance1, initialBalance1);
         assertLt(finalBalance2, initialBalance2);
         

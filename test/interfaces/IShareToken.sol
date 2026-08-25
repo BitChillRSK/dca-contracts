@@ -6,11 +6,11 @@ import {IkToken} from "../../src/tropykus-legacy/IkToken.sol";
 import {IiSusdToken} from "../../src/sovryn/IiSusdToken.sol";
 
 /**
- * @title ILendingToken
+ * @title IShareToken
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @dev Generic interface for lending tokens.
+ * @dev Generic interface for lending share tokens (kToken / iToken).
  */
-interface ILendingToken is IkToken, IiSusdToken {
+interface IShareToken is IkToken, IiSusdToken {
     /**
      * @dev Returns the balance of the specified address.
      * @param owner The address to query the balance of.

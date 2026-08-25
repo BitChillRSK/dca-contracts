@@ -19,7 +19,7 @@ import {DexHelperConfig} from "../../script/DexHelperConfig.s.sol";
 import {DeployDexSwaps} from "../../script/DeployDexSwaps.s.sol";
 import {DeployMocSwaps} from "../../script/DeployMocSwaps.s.sol";
 import {MockStablecoin} from "../mocks/MockStablecoin.sol";
-import {ILendingToken} from "../interfaces/ILendingToken.sol";
+import {IShareToken} from "../interfaces/IShareToken.sol";
 import {MockMocProxy} from "../mocks/MockMocProxy.sol";
 import {IMocStateV1} from "../mocks/MocInterfaces.sol";
 import {MockMocPriceProvider} from "../mocks/MockMocPriceProvider.sol";
@@ -38,7 +38,7 @@ contract DcaDappTest is Test {
     IStablecoinHandler stablecoinHandler;
     OperationsAdmin operationsAdmin;
     MockStablecoin stablecoin;
-    ILendingToken lendingToken;
+    IShareToken shareToken;
     MockWrbtcToken wrBtcToken;
     FeeCalculator feeCalculator;
     
@@ -111,8 +111,8 @@ contract DcaDappTest is Test {
     event TokenHandler__TokenWithdrawn(address indexed token, address indexed user, uint256 indexed amount);
     
     // TokenLending
-    event TokenLending__LendingTokenRedeemed(
-        address indexed user, uint256 indexed underlyingAmount, uint256 indexed lendingTokenAmountRedeemed
+    event TokenLending__SharesRedeemed(
+        address indexed user, uint256 indexed underlyingAmount, uint256 indexed sharesAmountRedeemed
     );
 
     // IPurchaseRbtc
@@ -139,7 +139,7 @@ contract DcaDappTest is Test {
     event TokenLending__WithdrawalAmountAdjusted(
         address indexed user, uint256 indexed originalAmount, uint256 indexed adjustedAmount
     );
-    event TokenLending__LendingTokenRedeemedBatch(uint256 indexed underlyingAmount, uint256 indexed lendingTokenAmountRedeemed);
+    event TokenLending__SharesRedeemedBatch(uint256 indexed underlyingAmount, uint256 indexed sharesAmountRedeemed);
 
     modifier onlyDexSwaps() {
         if (!isDexSwaps) {
@@ -337,10 +337,10 @@ contract DcaDappTest is Test {
             revert("Invalid deploy environment");
         }
 
-        // Set the lending token based on protocol and current stablecoin
-        lendingToken = ILendingToken(getLendingTokenAddress(stablecoinType, s_lendingProtocolIndex));
+        // Set the shares based on protocol and current stablecoin
+        shareToken = IShareToken(getShareTokenAddress(stablecoinType, s_lendingProtocolIndex));
 
-        if (address(lendingToken) == address(0)) {
+        if (address(shareToken) == address(0)) {
             // Skip this test instead of letting it fail
             vm.skip(true);
             return;
@@ -480,7 +480,7 @@ contract DcaDappTest is Test {
         uint256 lastPurchaseTimestamp = dcaDetails[SCHEDULE_INDEX].lastPurchaseTimestamp == 0 ? block.timestamp : dcaDetails[SCHEDULE_INDEX].lastPurchaseTimestamp + dcaDetails[SCHEDULE_INDEX].purchasePeriod;
         emit DcaManager__LastPurchaseTimestampUpdated(address(stablecoin), dcaDetails[SCHEDULE_INDEX].scheduleId, lastPurchaseTimestamp);
         vm.expectEmit(true, false, false, false);
-        emit TokenLending__LendingTokenRedeemed(USER, 0, 0);
+        emit TokenLending__SharesRedeemed(USER, 0, 0);
         if (block.chainid == ANVIL_CHAIN_ID && isMocSwaps) {
             vm.expectEmit(true, true, true, true);
         } else {
@@ -703,22 +703,22 @@ contract DcaDappTest is Test {
         Vm.Log[] memory entries = vm.getRecordedLogs();
         bool found;
         for (uint256 i; i < entries.length; ++i) {
-            if (entries[i].topics.length == 3 && entries[i].topics[0] == TokenLending__LendingTokenRedeemedBatch.selector) {
+            if (entries[i].topics.length == 3 && entries[i].topics[0] == TokenLending__SharesRedeemedBatch.selector) {
                 assertApproxEqAbs(uint256(entries[i].topics[1]), requestedGross, 1);
                 found = true;
                 break;
             }
         }
-        assertTrue(found, "TokenLending__LendingTokenRedeemedBatch not emitted");
+        assertTrue(found, "TokenLending__SharesRedeemedBatch not emitted");
     }
 
     function updateExchangeRate(uint256 secondsPassed) internal {
         vm.warp(block.timestamp + secondsPassed);
 
         if (s_lendingProtocolIndex == TROPYKUS_INDEX) {
-            console2.log("Exchange rate before update:", lendingToken.exchangeRateStored());
+            console2.log("Exchange rate before update:", shareToken.exchangeRateStored());
             vm.roll(block.number + secondsPassed / 30); // Jump to secondsPassed seconds (30 seconds per block) into the future so that some interest has been generated.
-            console2.log("Exchange rate after update:", lendingToken.exchangeRateCurrent()); // This is the one that should be used
+            console2.log("Exchange rate after update:", shareToken.exchangeRateCurrent()); // This is the one that should be used
         }
     }
 
@@ -762,54 +762,54 @@ contract DcaDappTest is Test {
                       HELPER FUNCTIONS FOR STABLECOINS
     //////////////////////////////////////////////////////////////*/
 
-    // Helper function to get lending token address based on stablecoin type and lending protocol
-    function getLendingTokenAddress(string memory _stablecoinType, uint256 lendingProtocolIndex) internal view returns (address) {
+    // Helper function to get shares address based on stablecoin type and lending protocol
+    function getShareTokenAddress(string memory _stablecoinType, uint256 lendingProtocolIndex) internal view returns (address) {
         bool isUSDRIF = keccak256(abi.encodePacked(_stablecoinType)) == keccak256(abi.encodePacked("USDRIF"));
         
         // Check if this stablecoin is supported by Sovryn
         if (lendingProtocolIndex == SOVRYN_INDEX && isUSDRIF) {
-            revert("Lending token not available for the selected combination");
+            revert("Share token not available for the selected combination");
         }
         
-        address lendingTokenAddress = address(0);
+        address shareTokenAddress = address(0);
         
-        // Try to get the lending token address from the helper configs
+        // Try to get the shares address from the helper configs
         if (isMocSwaps && address(mocHelperConfig) != address(0)) {
             MocHelperConfig.NetworkConfig memory networkConfig = mocHelperConfig.getActiveNetworkConfig();
             
             if (lendingProtocolIndex == TROPYKUS_INDEX) {
-                lendingTokenAddress = networkConfig.kDocAddress;
+                shareTokenAddress = networkConfig.kDocAddress;
             } else if (lendingProtocolIndex == SOVRYN_INDEX) {
-                lendingTokenAddress = networkConfig.iSusdAddress;
+                shareTokenAddress = networkConfig.iSusdAddress;
             }
         } else if (isDexSwaps && address(dexHelperConfig) != address(0)) {
             if (lendingProtocolIndex == TROPYKUS_INDEX || lendingProtocolIndex == SOVRYN_INDEX) {
-                lendingTokenAddress = dexHelperConfig.getLendingTokenAddress();
+                shareTokenAddress = dexHelperConfig.getShareTokenAddress();
             }
         }
         
-        // If we couldn't get the lending token address from the helper configs, try to get it from the handler
-        if (lendingTokenAddress == address(0) && address(stablecoinHandler) != address(0)) {
+        // If we couldn't get the shares address from the helper configs, try to get it from the handler
+        if (shareTokenAddress == address(0) && address(stablecoinHandler) != address(0)) {
             if (lendingProtocolIndex == TROPYKUS_INDEX) {
                 try TropykusDocHandlerMoc(payable(address(stablecoinHandler))).i_kToken() returns (IkToken kToken) {
-                    lendingTokenAddress = address(kToken);
+                    shareTokenAddress = address(kToken);
                 } catch {
-                    revert("Failed to get Tropykus lending token from handler");
+                    revert("Failed to get Tropykus shares from handler");
                 }
             } else if (lendingProtocolIndex == SOVRYN_INDEX) {
                 try SovrynDocHandlerMoc(payable(address(stablecoinHandler))).i_iSusdToken() returns (IiSusdToken iSusdToken) {
-                    lendingTokenAddress = address(iSusdToken);
+                    shareTokenAddress = address(iSusdToken);
                 } catch {
-                    revert("Failed to get Sovryn lending token from handler");
+                    revert("Failed to get Sovryn shares from handler");
                 }
             }
         }
         
-        // If we still couldn't get the lending token address, revert
-        if (lendingTokenAddress == address(0)) {
-            revert("Lending token not available for the selected combination");
+        // If we still couldn't get the shares address, revert
+        if (shareTokenAddress == address(0)) {
+            revert("Share token not available for the selected combination");
         }
         
-        return lendingTokenAddress;
+        return shareTokenAddress;
     }
 }

@@ -76,7 +76,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, DcaManagerAccessControl {
     /**
      * @notice retrieve the buyer's stablecoin onto the handler so the purchase can spend it
      * @notice define abstract functions to be implemented by child contracts
-     * @dev lending handlers redeem their lending token to get the stablecoin here, while the
+     * @dev lending handlers redeem their shares to get the stablecoin here, while the
      * idle handler only debits its own mapping.
      * @dev these functions semantically belong to the TokenLending contract,
      * however, putting them there and changing the inheritance graph made it

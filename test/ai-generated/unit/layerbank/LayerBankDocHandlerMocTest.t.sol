@@ -62,14 +62,14 @@ contract LayerBankDocHandlerMocTest is Test {
         bytes32 scheduleId = keccak256("schedule");
 
         handler.depositToken(USER, depositAmount);
-        uint256 sharesBefore = handler.getUsersLendingTokenBalance(USER);
+        uint256 sharesBefore = handler.getUserShares(USER);
         assertGt(sharesBefore, 0);
 
         handler.buyRbtc(USER, scheduleId, purchaseAmount);
 
         uint256 rbtcAccrued = handler.getAccumulatedRbtcBalance(USER);
         assertGt(rbtcAccrued, 0);
-        assertLt(handler.getUsersLendingTokenBalance(USER), sharesBefore);
+        assertLt(handler.getUserShares(USER), sharesBefore);
 
         handler.withdrawAccumulatedRbtc(USER);
         assertEq(handler.getAccumulatedRbtcBalance(USER), 0);

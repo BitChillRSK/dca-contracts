@@ -6,7 +6,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @title TokenLending
- * @notice Defines functions to convert stablecoin balances to lending token and vice versa
+ * @notice Defines functions to convert stablecoin balances to shares and vice versa
  */
 abstract contract TokenLending is ITokenLending {
     uint256 immutable i_exchangeRateDecimals;
@@ -16,33 +16,33 @@ abstract contract TokenLending is ITokenLending {
     }
 
     /**
-     * @notice convert underlying token to lending token
+     * @notice convert stablecoin to shares
      * @dev Rounds up so the virtual share debit is never below what the lending protocol may burn for
-     *      the same underlying (keeps sum of per-user shares <= shares the handler actually holds).
+     *      the same stablecoin amount (keeps sum of per-user shares <= shares the handler actually holds).
      *      Round-down would allow the books to drift above reality.
-     * @param underlyingAmount: the amount of underlying token to convert
-     * @param exchangeRate: the exchange rate of underlying token to lending token
-     * @return lendingTokenAmount the amount of lending token
+     * @param stablecoinAmount: the amount of stablecoin to convert
+     * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
+     * @return sharesAmount the amount of shares
      */
-    function _stablecoinToLendingToken(uint256 underlyingAmount, uint256 exchangeRate)
+    function _stablecoinToShares(uint256 stablecoinAmount, uint256 exchangeRate)
         internal
         view
-        returns (uint256 lendingTokenAmount)
+        returns (uint256 sharesAmount)
     {
-        lendingTokenAmount = Math.mulDiv(underlyingAmount, i_exchangeRateDecimals, exchangeRate, Math.Rounding.Up);
+        sharesAmount = Math.mulDiv(stablecoinAmount, i_exchangeRateDecimals, exchangeRate, Math.Rounding.Up);
     }
 
     /**
-     * @notice convert lending token to underlying token
-     * @param lendingTokenAmount: the amount of lending token to convert
-     * @param exchangeRate: the exchange rate of lending token to underlying
-     * @return underlyingAmount the amount of underlying
+     * @notice convert shares to stablecoin
+     * @param sharesAmount: the amount of shares to convert
+     * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
+     * @return stablecoinAmount the amount of stablecoin
      */
-    function _lendingTokenToStablecoin(uint256 lendingTokenAmount, uint256 exchangeRate)
+    function _sharesToStablecoin(uint256 sharesAmount, uint256 exchangeRate)
         internal
         view
-        returns (uint256 underlyingAmount)
+        returns (uint256 stablecoinAmount)
     {
-        underlyingAmount = lendingTokenAmount * exchangeRate / i_exchangeRateDecimals;
+        stablecoinAmount = sharesAmount * exchangeRate / i_exchangeRateDecimals;
     }
 }

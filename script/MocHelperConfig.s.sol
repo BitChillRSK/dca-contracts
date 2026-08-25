@@ -16,21 +16,21 @@ contract MocHelperConfig is Script {
         // DOC token address (MoC is only for DOC)
         address docTokenAddress;
         
-        // Lending token addresses by protocol
-        address kDocAddress;  // The lending token for Tropykus (kDOC)
-        address iSusdAddress; // The lending token for Sovryn (iSUSD)
+        // Share token addresses by protocol
+        address kDocAddress;  // The share token for Tropykus (kDOC)
+        address iSusdAddress; // The share token for Sovryn (iSUSD)
         
         // MoC protocol
         address mocProxyAddress;
     }
     
     string stablecoinType;
-    address mockLendingTokenAddress;
+    address mockShareTokenAddress;
     NetworkConfig public activeNetworkConfig;
 
     event HelperConfig__CreatedMockStablecoin(address docTokenAddress);
     event HelperConfig__CreatedMockMocProxy(address mocProxyAddress);
-    event HelperConfig__CreatedMockLendingToken(address lendingTokenAddress, string protocol);
+    event HelperConfig__CreatedMockShareToken(address shareTokenAddress, string protocol);
 
     constructor() {
         // Log environment variables
@@ -119,15 +119,15 @@ contract MocHelperConfig is Script {
         address mockDocTokenAddress = address(mockDocToken);
         
         if (lendingProtocolIsTropykus) {
-            MockKdocToken mockLendingToken = new MockKdocToken(mockDocTokenAddress);
-            mockLendingTokenAddress = address(mockLendingToken);
-            console.log("Created MockKdocToken at:", mockLendingTokenAddress);
-            emit HelperConfig__CreatedMockLendingToken(mockLendingTokenAddress, TROPYKUS_STRING);
+            MockKdocToken mockShareToken = new MockKdocToken(mockDocTokenAddress);
+            mockShareTokenAddress = address(mockShareToken);
+            console.log("Created MockKdocToken at:", mockShareTokenAddress);
+            emit HelperConfig__CreatedMockShareToken(mockShareTokenAddress, TROPYKUS_STRING);
         } else if (lendingProtocolIsSovryn) {
-            MockIsusdToken mockLendingToken = new MockIsusdToken(mockDocTokenAddress);
-            mockLendingTokenAddress = address(mockLendingToken);
-            console.log("Created MockIsusdToken at:", mockLendingTokenAddress);
-            emit HelperConfig__CreatedMockLendingToken(mockLendingTokenAddress, SOVRYN_STRING);
+            MockIsusdToken mockShareToken = new MockIsusdToken(mockDocTokenAddress);
+            mockShareTokenAddress = address(mockShareToken);
+            console.log("Created MockIsusdToken at:", mockShareTokenAddress);
+            emit HelperConfig__CreatedMockShareToken(mockShareTokenAddress, SOVRYN_STRING);
         } else {
             revert("Invalid lending protocol");
         }
@@ -142,8 +142,8 @@ contract MocHelperConfig is Script {
         emit HelperConfig__CreatedMockStablecoin(mockDocTokenAddress);
         emit HelperConfig__CreatedMockMocProxy(address(mockMocProxy));
         
-        address kDocAddress = lendingProtocolIsTropykus ? mockLendingTokenAddress : address(0);
-        address iSusdAddress = lendingProtocolIsSovryn ? mockLendingTokenAddress : address(0);
+        address kDocAddress = lendingProtocolIsTropykus ? mockShareTokenAddress : address(0);
+        address iSusdAddress = lendingProtocolIsSovryn ? mockShareTokenAddress : address(0);
         
         console.log("Creating NetworkConfig with:");
         console.log("  docTokenAddress:", mockDocTokenAddress);
@@ -166,10 +166,10 @@ contract MocHelperConfig is Script {
         return activeNetworkConfig.docTokenAddress;
     }
 
-    function getLendingTokenAddress() public view returns (address) {
+    function getShareTokenAddress() public view returns (address) {
         // Read current lending protocol from environment
         string memory lendingProtocol = vm.envString("LENDING_PROTOCOL");
-        console.log("getLendingTokenAddress - Current lending protocol:", lendingProtocol);
+        console.log("getShareTokenAddress - Current lending protocol:", lendingProtocol);
         
         // Read current stablecoin type from environment or use stored value
         string memory currentStablecoinType;
@@ -178,7 +178,7 @@ contract MocHelperConfig is Script {
         } catch {
             currentStablecoinType = stablecoinType;
         }
-        console.log("getLendingTokenAddress - Current stablecoin type:", currentStablecoinType);
+        console.log("getShareTokenAddress - Current stablecoin type:", currentStablecoinType);
         
         bool lendingProtocolIsTropykus =
             keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(TROPYKUS_STRING));
@@ -187,18 +187,18 @@ contract MocHelperConfig is Script {
         bool isUSDRIF = keccak256(abi.encodePacked(currentStablecoinType)) == keccak256(abi.encodePacked("USDRIF"));
         
         if (lendingProtocolIsTropykus) {
-            console.log("getLendingTokenAddress - Returning kDocAddress:", activeNetworkConfig.kDocAddress);
+            console.log("getShareTokenAddress - Returning kDocAddress:", activeNetworkConfig.kDocAddress);
             return activeNetworkConfig.kDocAddress;
         } else if (lendingProtocolIsSovryn) {
             // Check if this stablecoin is supported by Sovryn
             if (isUSDRIF) {
-                console.log("getLendingTokenAddress - WARNING: USDRIF is not supported by Sovryn");
+                console.log("getShareTokenAddress - WARNING: USDRIF is not supported by Sovryn");
                 return address(0);
             }
-            console.log("getLendingTokenAddress - Returning iSusdAddress:", activeNetworkConfig.iSusdAddress);
+            console.log("getShareTokenAddress - Returning iSusdAddress:", activeNetworkConfig.iSusdAddress);
             return activeNetworkConfig.iSusdAddress;
         }
-        console.log("getLendingTokenAddress - ERROR: Unsupported lending protocol");
+        console.log("getShareTokenAddress - ERROR: Unsupported lending protocol");
         revert("Unsupported lending protocol");
     }
 }

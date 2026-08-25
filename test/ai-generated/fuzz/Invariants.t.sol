@@ -180,8 +180,8 @@ contract InvariantTest is StdInvariant, Test {
         for (uint256 i = 0; i < s_users.length; i++) {
             address user = s_users[i];
             
-            // Get user's lending token balance
-            uint256 userLendingBalance = ITokenLending(address(handler)).getUsersLendingTokenBalance(user);
+            // Get user's shares balance
+            uint256 userLendingBalance = ITokenLending(address(handler)).getUserShares(user);
             totalLendingBalances += userLendingBalance;
             
             // Get all schedules for this user with the stablecoin
@@ -194,7 +194,7 @@ contract InvariantTest is StdInvariant, Test {
             }
         }
         
-        // Convert lending token balances to stablecoin equivalent
+        // Convert shares balances to stablecoin equivalent
         uint256 totalStablecoinInLendingProtocol = 0;
         if (totalLendingBalances > 0) {
             if (s_lendingProtocolIndex == TROPYKUS_INDEX) {
@@ -209,7 +209,7 @@ contract InvariantTest is StdInvariant, Test {
         // is immediately after deposits with no time passing.
         if (totalUserDeposits > 0) {
             // ✅ Allow for small rounding errors (1-2 wei) due to integer arithmetic precision loss.
-            // This is normal in DeFi protocols when converting between lending tokens and underlying assets.
+            // This is normal in DeFi protocols when converting between shares and underlying assets.
             uint256 tolerance = 100; // 100 wei tolerance for rounding errors and interest operations
             if (totalStablecoinInLendingProtocol < totalUserDeposits) {
                 uint256 difference = totalUserDeposits - totalStablecoinInLendingProtocol;
@@ -318,7 +318,7 @@ contract InvariantTest is StdInvariant, Test {
                     }
                     
                     if (totalDeposited > 0) {
-                        uint256 lendingBalance = ITokenLending(address(handler)).getUsersLendingTokenBalance(user);
+                        uint256 lendingBalance = ITokenLending(address(handler)).getUserShares(user);
                         assertGe(lendingBalance, 0);
                     }
                 }
