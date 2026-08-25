@@ -9,6 +9,8 @@ import {IkToken} from "./IkToken.sol";
  * @notice Tropykus adapter: Compound-style kToken mint/redeem. Share accounting lives on LendingErc20Handler.
  */
 abstract contract TropykusErc20Handler is LendingErc20Handler {
+    uint256 public constant EXCHANGE_RATE_DECIMALS = 1e18;
+
     IkToken public immutable i_kToken;
 
     /**
@@ -23,10 +25,9 @@ abstract contract TropykusErc20Handler is LendingErc20Handler {
         address stableTokenAddress,
         address kTokenAddress,
         address feeCollector,
-        FeeSettings memory feeSettings,
-        uint256 exchangeRateDecimals
+        FeeSettings memory feeSettings
     )
-        LendingErc20Handler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, exchangeRateDecimals)
+        LendingErc20Handler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, EXCHANGE_RATE_DECIMALS)
     {
         i_kToken = IkToken(kTokenAddress);
     }

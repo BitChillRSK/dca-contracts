@@ -50,8 +50,7 @@ contract TropykusDocHandlerMocTest is Test {
                 maxFeeRate: MAX_FEE_RATE_TEST,
                 feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
                 feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
-            }),
-            EXCHANGE_RATE_DECIMALS
+            })
         );
 
         // Fund USER with DOC and give approval

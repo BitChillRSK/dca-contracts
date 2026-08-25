@@ -74,6 +74,10 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
     /*//////////////////////////////////////////////////////////////
                            SOVRYN-SPECIFIC TESTS
     //////////////////////////////////////////////////////////////*/
+
+    function test_sovryn_exchangeRateDecimalsHardcoded() public {
+        assertEq(sovrynHandler.EXCHANGE_RATE_DECIMALS(), 1e18);
+    }
     
     function test_sovryn_iSusdMinting() public {
         uint256 initialUserLendingBalance = sovrynHandler.getUserShares(USER);
@@ -366,8 +370,7 @@ contract SovrynTestHandler is SovrynErc20Handler {
         stableTokenAddress, 
         iSusdTokenAddress,
         feeCollector,
-        feeSettings,
-        EXCHANGE_RATE_DECIMALS
+        feeSettings
     ) {}
     
     // Implementation required by IPurchaseRbtc interface

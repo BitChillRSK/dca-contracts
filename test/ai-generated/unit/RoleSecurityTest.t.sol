@@ -103,8 +103,7 @@ contract RoleSecurityTest is Test {
             FEE_COLLECTOR,
             feeSettings,
             9970,
-            9900,
-            EXCHANGE_RATE_DECIMALS
+            9900
         );
         
         // Register handler
@@ -181,8 +180,7 @@ contract RoleSecurityTest is Test {
                 feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
             }),
             9970,
-            9900,
-            EXCHANGE_RATE_DECIMALS
+            9900
         );
         
         // Unauthorized user should fail

@@ -14,9 +14,9 @@ import {ILayerBankPool} from "./ILayerBankPool.sol";
  *      read, because mixing the two breaks the round-up solvency invariant.
  */
 abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20Handler {
-    /// @notice Aave liquidity-index scale. Fixed for this protocol; not a constructor arg
-    ///         (passing Tropykus/Sovryn's 1e18 would size withdrawals 1e9× too large).
-    uint256 public constant RAY = 1e27;
+    /// @notice Aave's liquidity-index scale (RAY). Fixed for this protocol; not a constructor
+    ///         arg (passing Tropykus/Sovryn's 1e18 would size withdrawals 1e9× too large).
+    uint256 public constant EXCHANGE_RATE_DECIMALS = 1e27;
 
     ILayerBankAToken public immutable i_aToken;
     ILayerBankPool public immutable i_pool;
@@ -34,7 +34,7 @@ abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20H
         address aTokenAddress,
         address feeCollector,
         FeeSettings memory feeSettings
-    ) LendingErc20Handler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, RAY) {
+    ) LendingErc20Handler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, EXCHANGE_RATE_DECIMALS) {
         i_aToken = ILayerBankAToken(aTokenAddress);
         if (i_aToken.UNDERLYING_ASSET_ADDRESS() != stableTokenAddress) {
             revert LayerBankErc20Handler__UnderlyingMismatch();

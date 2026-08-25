@@ -75,6 +75,10 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
     /*//////////////////////////////////////////////////////////////
                            TROPYKUS-SPECIFIC TESTS
     //////////////////////////////////////////////////////////////*/
+
+    function test_tropykus_exchangeRateDecimalsHardcoded() public {
+        assertEq(tropykusHandler.EXCHANGE_RATE_DECIMALS(), 1e18);
+    }
     
     function test_tropykus_kTokenMinting() public {
         uint256 initialKTokenBalance = kToken.balanceOf(address(handler));
@@ -359,8 +363,7 @@ contract TropykusTestHandler is TropykusErc20Handler {
         stableTokenAddress, 
         kTokenAddress,
         feeCollector,
-        feeSettings,
-        EXCHANGE_RATE_DECIMALS
+        feeSettings
     ) {}
     
     // Implementation required by IPurchaseRbtc interface

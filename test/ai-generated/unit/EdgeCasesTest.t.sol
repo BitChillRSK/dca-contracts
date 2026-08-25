@@ -43,8 +43,7 @@ contract EdgeCasesTest is Test {
                 maxFeeRate: MAX_FEE_RATE_TEST,
                 feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
                 feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
-            }),
-            EXCHANGE_RATE_DECIMALS
+            })
         );
         // Grant handler approvals
         vm.prank(address(handler));
@@ -102,8 +101,7 @@ contract EdgeCasesTest is Test {
                 feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
             }),
             0.997 ether, // amountOutMinimumPercent
-            0.99 ether,  // amountOutMinimumSafetyCheck
-            EXCHANGE_RATE_DECIMALS
+            0.99 ether // amountOutMinimumSafetyCheck
         );
 
         return (dex, doc, kdoc, router, wrbtc, oracle);
@@ -175,8 +173,7 @@ contract EdgeCasesTest is Test {
                 maxFeeRate: MAX_FEE_RATE_TEST,
                 feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
                 feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
-            }),
-            EXCHANGE_RATE_DECIMALS
+            })
         );
         // Prepare user deposit
         address USER = address(0xD0);

@@ -79,8 +79,7 @@ contract FeeOnTransferDepositTest is Test {
             address(kToken),
             FEE_COLLECTOR,
             address(mocProxy),
-            feeSettings,
-            EXCHANGE_RATE_DECIMALS
+            feeSettings
         );
 
         vm.prank(ADMIN);
