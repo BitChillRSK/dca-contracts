@@ -16,9 +16,9 @@ contract MocHelperConfig is Script {
         // DOC token address (MoC is only for DOC)
         address docTokenAddress;
         
-        // Shares addresses by protocol
-        address kDocAddress;  // The shares for Tropykus (kDOC)
-        address iSusdAddress; // The shares for Sovryn (iSUSD)
+        // Share token addresses by protocol
+        address kDocAddress;  // The share token for Tropykus (kDOC)
+        address iSusdAddress; // The share token for Sovryn (iSUSD)
         
         // MoC protocol
         address mocProxyAddress;

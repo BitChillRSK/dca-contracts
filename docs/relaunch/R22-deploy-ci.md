@@ -6,13 +6,13 @@ PR 18 of R22. Stack on R26 (PR 17). Last required R22 PR; R27 (Tropykus guards) 
 
 ## Objective
 
-Wire LayerBank into the live index map (idle=0, LayerBank=1, Sovryn=2), split the shared harness so lending-token assertions are protocol-specific, and make CI cover `none` / `layerbank` / `sovryn`. Also ship the **round-up solvency** regression for `_stablecoinToLendingToken` (documented on `TokenLending`; LayerBank + Aave rayDiv is the sharpest assertion surface).
+Wire LayerBank into the live index map (idle=0, LayerBank=1, Sovryn=2), split the shared harness so lending-share assertions are protocol-specific, and make CI cover `none` / `layerbank` / `sovryn`. Also ship the **round-up solvency** regression for `_stablecoinToShares` (documented on `TokenLending`; LayerBank + Aave rayDiv is the sharpest assertion surface).
 
 ## Background
 
 PR 15 shipped `LayerBankDocHandlerMoc` behind an add-on deploy script. PR 16 (R25) finishes redeem-helper naming and PR 17 (R26) swaps the “lending token” noun for `shares` — build the harness split against those names. This PR is the cutover: constants, `DeployMocSwaps` / harness / Makefile / CI.
 
-**Round-up solvency (required in this PR, not deferred).** `_stablecoinToLendingToken` documents `Math.Rounding.Up` for all lending handlers (Tropykus / Sovryn / LayerBank). Aave `withdraw` burns scaled shares with `amount.rayDiv(index)` (round nearest), so LayerBank is the sharpest place to regression-test: debiting ≥ what Aave burns keeps `sum(s_aTokenBalances) <= aToken.scaledBalanceOf(handler)`. Flipping TokenLending to round **down** would let virtual books drift above reality; happy-path suites still pass. Ship a test that fails under round-down sizing — do not leave this as a handler comment.
+**Round-up solvency (required in this PR, not deferred).** `_stablecoinToShares` documents `Math.Rounding.Up` for all lending handlers (Tropykus / Sovryn / LayerBank). Aave `withdraw` burns scaled shares with `amount.rayDiv(index)` (round nearest), so LayerBank is the sharpest place to regression-test: debiting ≥ what Aave burns keeps `sum(s_aTokenBalances) <= aToken.scaledBalanceOf(handler)`. Flipping TokenLending to round **down** would let virtual books drift above reality; happy-path suites still pass. Ship a test that fails under round-down sizing — do not leave this as a handler comment.
 
 Related: [R22-layerbank-handler.md](./R22-layerbank-handler.md), [R25-lending-redeem-naming.md](./R25-lending-redeem-naming.md), [R22-idle-handler.md](./R22-idle-handler.md).
 
@@ -24,13 +24,13 @@ Related: [R22-layerbank-handler.md](./R22-layerbank-handler.md), [R25-lending-re
 
 - [ ] `script/Constants.sol` index map: `0` idle, `1` LayerBank, `2` Sovryn, `3` reserved for future MoC lending. Drop Tropykus from the new deploy path.
 - [ ] `DeployMocSwaps` / `DeployDexSwaps` (as applicable), `MocHelperConfig` live Pool/aToken fields, register LayerBank at index 1.
-- [ ] Split `DcaDappTest` / shared harness so lending-token assertions live only in lending-protocol-specific tests. `LENDING_PROTOCOL=layerbank` is a first-class lane.
+- [ ] Split `DcaDappTest` / shared harness so lending-share assertions live only in lending-protocol-specific tests. `LENDING_PROTOCOL=layerbank` is a first-class lane.
 - [ ] CI / Makefile: cover `none`, `layerbank`, and `sovryn` with `SWAP_TYPE=mocSwaps` (and existing dex lane policy unchanged unless this PR must touch it).
 - [ ] Ops note already recorded: illiquid LayerBank DOC cash aborts whole `batchBuyRbtc` — document in PR body if not already; no new product behavior.
 - [ ] **Round-up solvency regression (LayerBank):**
   - Add a dedicated test (prefer `test/ai-generated/unit/layerbank/`) that deposits, then redeems many **odd** DOC amounts under a non-`RAY` index (or fuzz), with the mock burning scaled shares via Aave-like **round-nearest** `rayDiv`.
-  - After the sequence, assert `sum` of per-user `getUsersLendingTokenBalance` (or the handler’s tracked mapping exposed in the test subclass) **≤** `aToken.scaledBalanceOf(handler)`.
-  - The test must be written so that replacing `_stablecoinToLendingToken`’s `Rounding.Up` with `Rounding.Down` would fail it (document that in the test comment). Extend `MockLayerBank` if it does not yet expose nearest-rayDiv burn behavior matching live Aave.
+  - After the sequence, assert `sum` of per-user `getUserShares` (or the handler’s tracked mapping exposed in the test subclass) **≤** `aToken.scaledBalanceOf(handler)`.
+  - The test must be written so that replacing `_stablecoinToShares`’s `Rounding.Up` with `Rounding.Down` would fail it (document that in the test comment). Extend `MockLayerBank` if it does not yet expose nearest-rayDiv burn behavior matching live Aave.
   - Run this test in the new `layerbank` CI lane. Do not rely on ported Tropykus/Sovryn suites alone.
 
 ## Out of scope

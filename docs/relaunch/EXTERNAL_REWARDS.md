@@ -34,22 +34,22 @@ Only `user` is indexed, in line with the event-indexing rule. Block number, time
 
 Every lending handler must emit the event after each successful change to its per-user virtual lending-share mapping:
 
-- a deposit, using the lending-token balance delta actually minted to the handler;
+- a deposit, using the share balance delta actually minted to the handler;
 - a normal stablecoin withdrawal;
 - an interest withdrawal;
 - a single rBTC purchase;
 - each per-user debit in a batch purchase, including sequential updates when the same user appears more than once.
 
-`previousShares` lets an indexer detect a missed or inconsistent transition. `newShares` is the canonical post-state and must equal `getUsersLendingTokenBalance(user)` after the transaction. Reverted mutations produce no lasting event.
+`previousShares` lets an indexer detect a missed or inconsistent transition. `newShares` is the canonical post-state and must equal `getUserShares(user)` after the transaction. Reverted mutations produce no lasting event.
 
-No new on-chain `totalShares` counter is required for forwarding. An indexer can sum the latest per-user balances from the event stream and cross-check individual balances through the existing getter. The lending token's `balanceOf(handler)` remains an independent aggregate solvency check, subject to the handler's documented rounding behavior.
+No new on-chain `totalShares` counter is required for forwarding. An indexer can sum the latest per-user balances from the event stream and cross-check individual balances through the existing getter. The share token's `balanceOf(handler)` (or LayerBank `scaledBalanceOf`) remains an independent aggregate solvency check, subject to the handler's documented rounding behavior.
 
 ## Existing events are not a substitute
 
 - `TokenHandler__TokenDeposited` identifies the user but reports stablecoin received, not the exact number of lending shares minted at the then-current exchange rate.
-- `TokenLending__LendingTokenRedeemed` reports exact per-user share burns, including batch debits, but there is no corresponding exact share-mint event.
+- `TokenLending__SharesRedeemed` reports exact per-user share burns, including batch debits, but there is no corresponding exact share-mint event.
 - `DcaManager` events report schedule principal in underlying stablecoin. Schedule principal is not a lending-share balance.
-- `getUsersLendingTokenBalance(user)` exposes current state, not the historical time-weighted balance required for forwarding.
+- `getUserShares(user)` exposes current state, not the historical time-weighted balance required for forwarding.
 
 R9 therefore owns the canonical balance-transition event in addition to correcting which existing event fields are indexed. Merely removing `indexed` from numeric fields is not enough.
 

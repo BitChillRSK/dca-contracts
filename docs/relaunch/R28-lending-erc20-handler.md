@@ -12,7 +12,7 @@ Collapse the three lending `*Erc20Handler` twins into one abstract `LendingErc20
 
 ## Background
 
-After R25, `withdrawInterest`, `getAccruedInterest`, `getUsersLendingTokenBalance` / `getUserShares`, `withdrawToken`’s clamp, the redeem clamp-and-measure body, and `_batchRetrieveStablecoin`’s pro-rata loop are the same algorithm in `SovrynErc20Handler`, `TropykusErc20Handler`, and `LayerBankErc20Handler`. R25 itself had to apply one naming decision three times. R9 will add `TokenLending__UserSharesUpdated` at every share mint/burn in all three — the next drift site.
+After R25 / R26, `withdrawInterest`, `getAccruedInterest`, `getUserShares`, `withdrawToken`’s clamp, the redeem clamp-and-measure body, and `_batchRetrieveStablecoin`’s pro-rata loop are the same algorithm in `SovrynErc20Handler`, `TropykusErc20Handler`, and `LayerBankErc20Handler`. R25 itself had to apply one naming decision three times. R9 will add `TokenLending__UserSharesUpdated` at every share mint/burn in all three — the next drift site.
 
 Normalized (token noun and protocol name stripped, comments dropped): ~60 unique lines appear in all three files, against ~102 / 113 / 134 unique lines for Sovryn / Tropykus / LayerBank. The three `*DocHandlerMoc` diamond resolvers are a fourth copy.
 

@@ -176,7 +176,7 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending, ILayerBan
      * @notice redeem the user's shares sized by underlying: withdraw `stablecoinAmount` from the Pool
      * @param user: the address of the user
      * @param stablecoinAmount: the amount of stablecoin wanted
-     * @param exchangeRate: the exchange rate of stablecoin to shares
+     * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
      * @return the amount of stablecoin this contract actually received
      */
     function _redeemByUnderlying(address user, uint256 stablecoinAmount, uint256 exchangeRate)
@@ -194,7 +194,7 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending, ILayerBan
      *      sizing differs from `_redeemByUnderlying`.
      * @param user: the address of the user
      * @param stablecoinAmount: the amount of stablecoin wanted
-     * @param exchangeRate: the exchange rate of stablecoin to shares
+     * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
      * @return stablecoinReceived the amount of stablecoin this contract actually received
      */
     function _redeemByShares(address user, uint256 stablecoinAmount, uint256 exchangeRate)
@@ -208,7 +208,7 @@ abstract contract LayerBankErc20Handler is TokenHandler, TokenLending, ILayerBan
      * @notice Internal aToken redemption, sized either by underlying amount or by share count
      * @param user: the address of the user
      * @param stablecoinAmount: the amount of stablecoin wanted
-     * @param exchangeRate: the exchange rate of stablecoin to shares
+     * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
      * @param sizeByUnderlying: true to withdraw `stablecoinAmount`; false to withdraw the
      *        underlying equivalent of the (clamped) share debit
      * @return stablecoinReceived the amount of stablecoin this contract actually received

@@ -24,9 +24,9 @@ contract DexHelperConfig is Script {
         // Stablecoin address
         address stablecoinAddress;
         
-        // Shares addresses by protocol
-        address tropykusShareToken;  // The shares for Tropykus (e.g., kDOC, kUSDRIF)
-        address sovrynShareToken;    // The shares for Sovryn (e.g., iSUSD)
+        // Share token addresses by protocol
+        address tropykusShareToken;  // The share token for Tropykus (e.g., kDOC, kUSDRIF)
+        address sovrynShareToken;    // The share token for Sovryn (e.g., iSUSD)
         
         // Swap-related addresses
         address wrbtcTokenAddress;

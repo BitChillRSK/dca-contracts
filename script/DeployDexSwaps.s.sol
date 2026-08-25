@@ -119,10 +119,10 @@ contract DeployDexSwaps is DeployBase {
             // Get the appropriate shares address based on protocol
             address shareTokenAddress = helperConfig.getShareTokenAddress();
             if (shareTokenAddress == address(0)) {
-                revert("Shares not available for the selected combination");
+                revert("Share token not available for the selected combination");
             }
             
-            console.log("Shares address:", shareTokenAddress);
+            console.log("Share token address:", shareTokenAddress);
             
             DeployParams memory params = DeployParams({
                 protocol: protocol,

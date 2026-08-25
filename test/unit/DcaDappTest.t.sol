@@ -768,7 +768,7 @@ contract DcaDappTest is Test {
         
         // Check if this stablecoin is supported by Sovryn
         if (lendingProtocolIndex == SOVRYN_INDEX && isUSDRIF) {
-            revert("Shares not available for the selected combination");
+            revert("Share token not available for the selected combination");
         }
         
         address shareTokenAddress = address(0);
@@ -807,7 +807,7 @@ contract DcaDappTest is Test {
         
         // If we still couldn't get the shares address, revert
         if (shareTokenAddress == address(0)) {
-            revert("Shares not available for the selected combination");
+            revert("Share token not available for the selected combination");
         }
         
         return shareTokenAddress;

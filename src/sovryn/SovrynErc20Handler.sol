@@ -154,7 +154,7 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending {
      * @notice redeem enough iSusd to get `stablecoinAmount` of stablecoin onto this contract
      * @param user: the address of the user
      * @param stablecoinAmount: the amount of stablecoin wanted
-     * @param exchangeRate: the exchange rate of stablecoin to shares
+     * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
      * @return the amount of stablecoin this contract actually received
      */
     function _redeemShares(address user, uint256 stablecoinAmount, uint256 exchangeRate) internal virtual returns (uint256) {
@@ -165,7 +165,7 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending {
      * @notice redeem the user's iSusd and send the stablecoin it frees to `stablecoinRecipient`
      * @param user: the address of the user
      * @param stablecoinAmount: the amount of stablecoin wanted
-     * @param exchangeRate: the exchange rate of stablecoin to shares
+     * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
      * @param stablecoinRecipient: the address of the recipient of the stablecoin
      * @return stablecoinReceived the amount of stablecoin the recipient actually received
      * @dev Sovryn's burn() returns the GROSS amount and pays the NET one once an exit fee is enabled

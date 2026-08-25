@@ -14,7 +14,7 @@ import {MocHelperConfig} from "../../script/MocHelperConfig.s.sol";
 import "../../script/Constants.sol";
 
 contract StablecoinLendingTest is DcaDappTest {
-    uint256 constant LENDING_TOKEN_STARTING_EXCHANGE_RATE = 2e16;
+    uint256 constant SHARE_TOKEN_STARTING_EXCHANGE_RATE = 2e16;
 
     // Events
     event TokenLending__InterestWithdrawn(address indexed user, address indexed token, uint256 indexed amount);
@@ -84,7 +84,7 @@ contract StablecoinLendingTest is DcaDappTest {
         uint256 prevSharesBalance = stablecoinHandler.getUserShares(USER);
         super.makeSinglePurchase();
         uint256 postSharesBalance = stablecoinHandler.getUserShares(USER);
-        uint256 startingExchangeRate = LENDING_TOKEN_STARTING_EXCHANGE_RATE;
+        uint256 startingExchangeRate = SHARE_TOKEN_STARTING_EXCHANGE_RATE;
 
         // On fork tests we need to simulate some operation on Tropykus so that the exchange rate gets updated
         if (block.chainid != ANVIL_CHAIN_ID) {
@@ -114,7 +114,7 @@ contract StablecoinLendingTest is DcaDappTest {
         super.createSeveralDcaSchedules();
         uint256 prevSharesBalance = stablecoinHandler.getUserShares(USER);
 
-        uint256 startingExchangeRate = LENDING_TOKEN_STARTING_EXCHANGE_RATE;
+        uint256 startingExchangeRate = SHARE_TOKEN_STARTING_EXCHANGE_RATE;
         // On fork tests we need to simulate some operation on Tropykus so that the exchange rate gets updated
         if (block.chainid != ANVIL_CHAIN_ID) {
             startingExchangeRate = s_lendingProtocolIndex == TROPYKUS_INDEX
@@ -160,7 +160,7 @@ contract StablecoinLendingTest is DcaDappTest {
         super.createSeveralDcaSchedules(); // This creates NUM_OF_SCHEDULES schedules with purchaseAmount = AMOUNT_TO_SPEND / NUM_OF_SCHEDULES
         uint256 prevSharesBalance = stablecoinHandler.getUserShares(USER);
 
-        uint256 startingExchangeRate = LENDING_TOKEN_STARTING_EXCHANGE_RATE;
+        uint256 startingExchangeRate = SHARE_TOKEN_STARTING_EXCHANGE_RATE;
         // On fork tests we need to simulate some operation on Tropykus so that the exchange rate gets updated
         if (block.chainid != ANVIL_CHAIN_ID) {
             startingExchangeRate = s_lendingProtocolIndex == TROPYKUS_INDEX

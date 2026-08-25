@@ -21,7 +21,7 @@ abstract contract TokenLending is ITokenLending {
      *      the same stablecoin amount (keeps sum of per-user shares <= shares the handler actually holds).
      *      Round-down would allow the books to drift above reality.
      * @param stablecoinAmount: the amount of stablecoin to convert
-     * @param exchangeRate: the exchange rate of stablecoin to shares
+     * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
      * @return sharesAmount the amount of shares
      */
     function _stablecoinToShares(uint256 stablecoinAmount, uint256 exchangeRate)
@@ -35,7 +35,7 @@ abstract contract TokenLending is ITokenLending {
     /**
      * @notice convert shares to stablecoin
      * @param sharesAmount: the amount of shares to convert
-     * @param exchangeRate: the exchange rate of shares to stablecoin
+     * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
      * @return stablecoinAmount the amount of stablecoin
      */
     function _sharesToStablecoin(uint256 sharesAmount, uint256 exchangeRate)
