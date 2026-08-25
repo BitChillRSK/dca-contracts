@@ -240,7 +240,7 @@ Promoted from Candidates A+B in the post-R29 full-`src/` review. Move the duplic
 
 This is behavior-preserving architecture work: no ABI, fee, allocation, event, error, constructor, slippage, or deploy changes. It is primarily a maintenance/drift win, not promised bytecode headroom; measure the concrete handlers and keep both Dex handlers below EIP-170. Give the common algorithm base-level tests plus MoC/Uniswap route-adapter coverage. See [`R30-purchase-pipeline.md`](./R30-purchase-pipeline.md).
 
-Stack on R29 (PR 20, GitHub #64). Land before R22 deploy/CI (now PR 22) so the harness is split around the final purchase shape.
+GitHub [#65](https://github.com/BitChillRSK/dca-contracts/pull/65). Stack on R29 (PR 20, GitHub #64). Land before R22 deploy/CI (now PR 22) so the harness is split around the final purchase shape.
 
 ### Unassigned refactoring review checkpoint (after R30)
 
@@ -302,7 +302,7 @@ Split the shared test harness so lending-share assertions live only in lending-p
 
 **Required in this PR:** round-up solvency regression on the LayerBank lane — virtual scaled books must stay ≤ handler `scaledBalanceOf` after odd-amount redeems against Aave-like round-nearest burns; the test must fail if `_stablecoinToShares` rounded down. Shared rule lives on `TokenLending`; do not re-document it only on LayerBank. See `R22-deploy-ci.md`.
 
-Stack on R30 (PR 21). Tropykus is not in this map; R27 already corrected the legacy handler.
+Stack on R30 (PR 21, GitHub [#65](https://github.com/BitChillRSK/dca-contracts/pull/65)). Tropykus is not in this map; R27 already corrected the legacy handler.
 
 ### PR 23 - R9 event indexing and ABI cleanup
 

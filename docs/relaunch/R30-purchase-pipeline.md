@@ -1,8 +1,8 @@
 # R30 — Shared rBTC purchase pipeline
 
-Status: **not started** · Assigned: yes · Optional/further-review: no
+Status: **PR open; implementation pending** · Assigned: yes · Optional/further-review: no
 
-PR 21. Stack on R29 (PR 20, GitHub [#64](https://github.com/BitChillRSK/dca-contracts/pull/64)). Land **before** the remaining R22 deploy/CI work (now PR 22) so the harness is split around the final purchase inheritance shape.
+PR 21, GitHub [#65](https://github.com/BitChillRSK/dca-contracts/pull/65). Stack on R29 (PR 20, GitHub [#64](https://github.com/BitChillRSK/dca-contracts/pull/64)). Land **before** the remaining R22 deploy/CI work (now PR 22) so the harness is split around the final purchase inheritance shape.
 
 ## Objective
 
