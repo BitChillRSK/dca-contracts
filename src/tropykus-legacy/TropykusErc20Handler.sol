@@ -60,9 +60,10 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending {
             i_stableToken.safeApprove(address(i_kToken), depositedAmount);
         }
         uint256 prevKtokenBalance = i_kToken.balanceOf(address(this));
-        if(i_kToken.mint(depositedAmount) != 0) revert TokenLending__LendingProtocolDepositFailed();
-        uint256 postKtokenBalance = i_kToken.balanceOf(address(this));
-        s_kTokenBalances[user] += postKtokenBalance - prevKtokenBalance;
+        if (i_kToken.mint(depositedAmount) != 0) revert TokenLending__LendingProtocolDepositFailed();
+        uint256 mintedAmount = i_kToken.balanceOf(address(this)) - prevKtokenBalance;
+        if (mintedAmount == 0) revert TokenLending__LendingProtocolDepositFailed();
+        s_kTokenBalances[user] += mintedAmount;
     }
 
     /**
@@ -245,13 +246,10 @@ abstract contract TropykusErc20Handler is TokenHandler, TokenLending {
         
         uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(address(this));
         uint256 result = i_kToken.redeemUnderlying(totalStablecoinAmount);
-        if (result == 0) {
-            uint256 stablecoinBalanceAfter = i_stableToken.balanceOf(address(this));
-            uint256 stablecoinReceived = stablecoinBalanceAfter - stablecoinBalanceBefore;
-            
-            emit TokenLending__SharesRedeemedBatch(stablecoinReceived, totalKtokenToRedeem);
-            return stablecoinReceived;
-        }
-        else revert TokenLending__LendingProtocolRedeemFailed(result);
+        if (result != 0) revert TokenLending__LendingProtocolRedeemFailed(result);
+        uint256 stablecoinReceived = i_stableToken.balanceOf(address(this)) - stablecoinBalanceBefore;
+        if (stablecoinReceived > 0) emit TokenLending__SharesRedeemedBatch(stablecoinReceived, totalKtokenToRedeem);
+        else revert TokenLending__ZeroStablecoinReceived(totalStablecoinAmount);
+        return stablecoinReceived;
     }
 }
