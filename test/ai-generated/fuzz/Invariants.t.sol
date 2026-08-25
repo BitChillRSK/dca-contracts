@@ -117,7 +117,6 @@ contract InvariantTest is StdInvariant, Test {
                 address(dcaManager),
                 address(stablecoin),
                 address(kToken),
-                MIN_PURCHASE_AMOUNT,
                 FEE_COLLECTOR,
                 feeSettings
             )));
@@ -129,7 +128,6 @@ contract InvariantTest is StdInvariant, Test {
                 address(dcaManager),
                 address(stablecoin),
                 address(iSusdToken),
-                MIN_PURCHASE_AMOUNT,
                 FEE_COLLECTOR,
                 feeSettings
             )));
@@ -344,7 +342,6 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
         address dcaManagerAddress,
         address stableTokenAddress,
         address kTokenAddress,
-        uint256 minPurchaseAmount,
         address feeCollector,
         FeeSettings memory feeSettings
     ) TropykusErc20Handler(
@@ -472,7 +469,6 @@ contract SovrynHandlerWrapper is SovrynErc20Handler {
         address dcaManagerAddress,
         address stableTokenAddress,
         address iSusdTokenAddress,
-        uint256 minPurchaseAmount,
         address feeCollector,
         FeeSettings memory feeSettings
     ) SovrynErc20Handler(

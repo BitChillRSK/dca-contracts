@@ -36,7 +36,6 @@ contract EdgeCasesTest is Test {
             address(this), // dcaManager (tests acts as manager)
             address(doc),
             address(kdoc),
-            MIN_PURCHASE_AMOUNT,
             address(0xFEE),
             address(mocProxy),
             IFeeHandler.FeeSettings({
@@ -95,7 +94,6 @@ contract EdgeCasesTest is Test {
             address(doc),
             address(kdoc),
             uniSettings,
-            MIN_PURCHASE_AMOUNT,
             address(0xFEE),
             IFeeHandler.FeeSettings({
                 minFeeRate: MIN_FEE_RATE,
@@ -170,7 +168,6 @@ contract EdgeCasesTest is Test {
             address(this),
             address(doc),
             address(isusd),
-            MIN_PURCHASE_AMOUNT,
             address(0xFEE),
             address(proxy),
             IFeeHandler.FeeSettings({

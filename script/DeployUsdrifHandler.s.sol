@@ -22,7 +22,6 @@ contract DeployUsdrifHandler is DeployBase {
         address tokenAddress;
         address lendingTokenAddress;
         IPurchaseUniswap.UniswapSettings uniswapSettings;
-        uint256 minPurchaseAmount;
         address feeCollector;
         IFeeHandler.FeeSettings feeSettings;
         uint256 amountOutMinimumPercent;
@@ -73,7 +72,6 @@ contract DeployUsdrifHandler is DeployBase {
             tokenAddress: networkConfig.usdrifTokenAddress,
             lendingTokenAddress: networkConfig.kUsdrifTokenAddress,
             uniswapSettings: uniswapSettings,
-            minPurchaseAmount: MIN_PURCHASE_AMOUNT,
             feeCollector: feeCollector,
             feeSettings: feeSettings,
             amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
@@ -86,7 +84,6 @@ contract DeployUsdrifHandler is DeployBase {
             params.tokenAddress,
             params.lendingTokenAddress,
             params.uniswapSettings,
-            params.minPurchaseAmount,
             params.feeCollector,
             params.feeSettings,
             params.amountOutMinimumPercent,

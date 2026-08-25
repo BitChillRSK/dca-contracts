@@ -48,11 +48,11 @@ Cash rule (R1/R20, invariant 1): after `supply`, credit `aToken.scaledBalanceOf(
 
 R21: `super.depositToken` already returns hop-1 received; `Pool.supply` that amount, then credit the measured **scaled** share delta.
 
-R16: hook names are `_retrieveStablecoin` / `_redeemLendingToken`. Do not reintroduce `_redeemStablecoin`.
+R16: hook names are `_retrieveStablecoin` / `_redeemLendingToken` — **[R25](./R25-lending-redeem-naming.md)** later renamed this handler's redeem hooks to `_redeemByUnderlying` / `_redeemByShares`. Do not reintroduce `_redeemStablecoin`.
 
 External incentives are out of scope (`EXTERNAL_REWARDS.md`). The handler must not claim Merkl / LAB / `claimLab` / harvest. R9 later emits `TokenLending__UserSharesUpdated` on this handler — every share mint/burn site must be a single, complete update to the per-user scaled mapping so that event can cover deposits, withdrawals, interest, and single/batch purchases.
 
-Constructor: same shape as `TropykusErc20Handler` except **no** `exchangeRateDecimals` argument — `TokenLending` is initialized with hardcoded `RAY` (`1e27`). Read the Pool from `aToken.POOL()` (v2 used `lToken.core()`). Revert if Pool is unset. Revert `LayerBankErc20Handler__UnderlyingMismatch` if `aToken.UNDERLYING_ASSET_ADDRESS()` is not the stablecoin — the live token has no `underlying()`. Do not add a Pool constructor arg. Do not copy the unused `minPurchaseAmount` leftover on `TropykusDocHandlerMoc` / `SovrynDocHandlerMoc`.
+Constructor: same shape as `TropykusErc20Handler` except **no** `exchangeRateDecimals` argument — `TokenLending` is initialized with hardcoded `RAY` (`1e27`). Read the Pool from `aToken.POOL()` (v2 used `lToken.core()`). Revert if Pool is unset. Revert `LayerBankErc20Handler__UnderlyingMismatch` if `aToken.UNDERLYING_ASSET_ADDRESS()` is not the stablecoin — the live token has no `underlying()`. Do not add a Pool constructor arg. Do not copy the unused `minPurchaseAmount` leftover that `TropykusDocHandlerMoc` / `SovrynDocHandlerMoc` carried at the time (**[R25](./R25-lending-redeem-naming.md)** dropped it there too).
 
 Redeem-to-user: Aave `withdraw(..., to)` exists; still withdraw **onto the handler**, measure the DOC delta, then `safeTransfer` to the user. No `to` on rBTC.
 

@@ -29,7 +29,6 @@ contract SovrynDocHandlerMocTest is Test {
             address(this),
             address(docToken),
             address(iSusdToken),
-            MIN_PURCHASE_AMOUNT,
             FEE_COLLECTOR,
             address(mocProxy),
             IFeeHandler.FeeSettings({

@@ -61,7 +61,6 @@ contract OperationsAdminTest is DcaDappTest {
             address(dcaManager),
             address(stablecoin),
             address(lendingToken),
-            MIN_PURCHASE_AMOUNT,
             FEE_COLLECTOR,
             address(mocProxy),
             IFeeHandler.FeeSettings({

@@ -108,13 +108,14 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending {
      */
     function withdrawInterest(address user, uint256 stablecoinLockedInDcaSchedules) external override onlyDcaManager {
         uint256 exchangeRate = i_iSusdToken.tokenPrice();
-        uint256 totalErc20InLending = _lendingTokenToStablecoin(s_iSusdBalances[user], exchangeRate);
-        if (totalErc20InLending <= stablecoinLockedInDcaSchedules) {
+        uint256 totalStablecoinInLending = _lendingTokenToStablecoin(s_iSusdBalances[user], exchangeRate);
+        if (totalStablecoinInLending <= stablecoinLockedInDcaSchedules) {
             return; // No interest to withdraw
         }
-        uint256 stablecoinInterestAmount = totalErc20InLending - stablecoinLockedInDcaSchedules;
-        stablecoinInterestAmount = _redeemLendingToken(user, stablecoinInterestAmount, exchangeRate, user);
-        emit TokenLending__InterestWithdrawn(user, address(i_stableToken), stablecoinInterestAmount);
+        uint256 stablecoinInterestAmount = totalStablecoinInLending - stablecoinLockedInDcaSchedules;
+        // @notice the redemption pays the user directly; we emit what it measured, not what we planned
+        uint256 stablecoinReceived = _redeemLendingToken(user, stablecoinInterestAmount, exchangeRate, user);
+        emit TokenLending__InterestWithdrawn(user, address(i_stableToken), stablecoinReceived);
     }
 
     /**
@@ -130,8 +131,8 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending {
         onlyDcaManager
         returns (uint256 stablecoinInterestAmount)
     {
-        uint256 totalErc20InLending = _lendingTokenToStablecoin(s_iSusdBalances[user], i_iSusdToken.tokenPrice());
-        stablecoinInterestAmount = totalErc20InLending > stablecoinLockedInDcaSchedules ? totalErc20InLending - stablecoinLockedInDcaSchedules : 0;
+        uint256 totalStablecoinInLending = _lendingTokenToStablecoin(s_iSusdBalances[user], i_iSusdToken.tokenPrice());
+        stablecoinInterestAmount = totalStablecoinInLending > stablecoinLockedInDcaSchedules ? totalStablecoinInLending - stablecoinLockedInDcaSchedules : 0;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -176,20 +177,20 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending {
         returns (uint256 stablecoinReceived)
     {
         uint256 usersIsusdBalance = s_iSusdBalances[user];
-        uint256 iSusdToRepay = _stablecoinToLendingToken(stablecoinAmount, exchangeRate);
-        if (iSusdToRepay > usersIsusdBalance) {
-            uint256 oldiSusdToRepay = iSusdToRepay;
+        uint256 iSusdToRedeem = _stablecoinToLendingToken(stablecoinAmount, exchangeRate);
+        if (iSusdToRedeem > usersIsusdBalance) {
+            uint256 oldIsusdToRedeem = iSusdToRedeem;
             uint256 oldStablecoinAmount = stablecoinAmount;
-            iSusdToRepay = usersIsusdBalance;
-            stablecoinAmount = _lendingTokenToStablecoin(iSusdToRepay, exchangeRate);
-            emit TokenLending__AmountToRepayAdjusted(user, oldiSusdToRepay, iSusdToRepay, oldStablecoinAmount, stablecoinAmount);
+            iSusdToRedeem = usersIsusdBalance;
+            stablecoinAmount = _lendingTokenToStablecoin(iSusdToRedeem, exchangeRate);
+            emit TokenLending__AmountToRedeemAdjusted(user, oldIsusdToRedeem, iSusdToRedeem, oldStablecoinAmount, stablecoinAmount);
         }
-        s_iSusdBalances[user] -= iSusdToRepay;
+        s_iSusdBalances[user] -= iSusdToRedeem;
         uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(stablecoinRecipient);
-        i_iSusdToken.burn(stablecoinRecipient, iSusdToRepay);
+        i_iSusdToken.burn(stablecoinRecipient, iSusdToRedeem);
         stablecoinReceived = i_stableToken.balanceOf(stablecoinRecipient) - stablecoinBalanceBefore;
         if (stablecoinReceived == 0) revert TokenLending__ZeroStablecoinReceived(stablecoinAmount);
-        emit TokenLending__LendingTokenRedeemed(user, stablecoinReceived, iSusdToRepay);
+        emit TokenLending__LendingTokenRedeemed(user, stablecoinReceived, iSusdToRedeem);
     }
 
     /**
@@ -204,24 +205,24 @@ abstract contract SovrynErc20Handler is TokenHandler, TokenLending {
         virtual
         returns (uint256)
     {
-        uint256 totaliSusdToRepay = _stablecoinToLendingToken(totalStablecoinAmount, i_iSusdToken.tokenPrice());
+        uint256 totalIsusdToRedeem = _stablecoinToLendingToken(totalStablecoinAmount, i_iSusdToken.tokenPrice());
 
         uint256 numOfPurchases = users.length;
         for (uint256 i; i < numOfPurchases; ++i) {
-            // @notice the amount of iSusd each user repays is proportional to the ratio of
+            // @notice the amount of iSusd each user redeems is proportional to the ratio of
             // that user's stablecoin being retrieved over the total being retrieved
-            uint256 usersRepaidiSusd = Math.mulDiv(totaliSusdToRepay, purchaseAmounts[i], totalStablecoinAmount, Math.Rounding.Up);
+            uint256 usersIsusdToRedeem = Math.mulDiv(totalIsusdToRedeem, purchaseAmounts[i], totalStablecoinAmount, Math.Rounding.Up);
             uint256 usersIsusdBalance = s_iSusdBalances[users[i]];
-            if (usersRepaidiSusd > usersIsusdBalance) {
-                revert TokenLending__InsufficientLendingTokenBalance(users[i], usersRepaidiSusd, usersIsusdBalance);
+            if (usersIsusdToRedeem > usersIsusdBalance) {
+                revert TokenLending__InsufficientLendingTokenBalance(users[i], usersIsusdToRedeem, usersIsusdBalance);
             }
-            s_iSusdBalances[users[i]] = usersIsusdBalance - usersRepaidiSusd;
-            emit TokenLending__LendingTokenRedeemed(users[i], purchaseAmounts[i], usersRepaidiSusd);
+            s_iSusdBalances[users[i]] = usersIsusdBalance - usersIsusdToRedeem;
+            emit TokenLending__LendingTokenRedeemed(users[i], purchaseAmounts[i], usersIsusdToRedeem);
         }
         uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(address(this));
-        i_iSusdToken.burn(address(this), totaliSusdToRepay);
+        i_iSusdToken.burn(address(this), totalIsusdToRedeem);
         uint256 stablecoinReceived = i_stableToken.balanceOf(address(this)) - stablecoinBalanceBefore;
-        if (stablecoinReceived > 0) emit TokenLending__LendingTokenRedeemedBatch(stablecoinReceived, totaliSusdToRepay);
+        if (stablecoinReceived > 0) emit TokenLending__LendingTokenRedeemedBatch(stablecoinReceived, totalIsusdToRedeem);
         else revert TokenLending__ZeroStablecoinReceived(totalStablecoinAmount);
         return stablecoinReceived;
     }

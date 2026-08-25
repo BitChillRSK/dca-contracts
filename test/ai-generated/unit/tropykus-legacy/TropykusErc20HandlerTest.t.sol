@@ -39,7 +39,6 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
             address(dcaManager),
             address(stablecoin),
             address(kToken),
-            MIN_PURCHASE_AMOUNT,
             FEE_COLLECTOR,
             feeSettings
         );
@@ -272,9 +271,9 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
         uint256 excessiveAmount = DEPOSIT_AMOUNT * 2;
         uint256 available = tropykusHandler.getUsersLendingTokenBalance(user1);
         uint256 exchangeRate = kToken.exchangeRateCurrent();
-        uint256 totalKtokenToRepay =
+        uint256 totalKtokenToRedeem =
             Math.mulDiv(excessiveAmount, EXCHANGE_RATE_DECIMALS, exchangeRate, Math.Rounding.Up);
-        uint256 requested = Math.mulDiv(totalKtokenToRepay, amounts[0], excessiveAmount, Math.Rounding.Up);
+        uint256 requested = Math.mulDiv(totalKtokenToRedeem, amounts[0], excessiveAmount, Math.Rounding.Up);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -295,7 +294,6 @@ contract TropykusTestHandler is TropykusErc20Handler {
         address dcaManagerAddress,
         address stableTokenAddress,
         address kTokenAddress,
-        uint256 minPurchaseAmount,
         address feeCollector,
         FeeSettings memory feeSettings
     ) TropykusErc20Handler(
