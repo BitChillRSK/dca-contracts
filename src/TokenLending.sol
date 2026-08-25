@@ -19,7 +19,7 @@ abstract contract TokenLending is ITokenLending {
      * @notice convert underlying token to lending token
      * @dev Rounds up so the virtual share debit is never below what the lending protocol may burn for
      *      the same underlying (keeps sum of per-user shares <= shares the handler actually holds).
-     *      Round-down would allow the books to drift above reality; regression coverage is R22 deploy/CI.
+     *      Round-down would allow the books to drift above reality.
      * @param underlyingAmount: the amount of underlying token to convert
      * @param exchangeRate: the exchange rate of underlying token to lending token
      * @return lendingTokenAmount the amount of lending token
