@@ -5,6 +5,7 @@ import {HandlerTestHarness} from "../HandlerTestHarness.t.sol";
 import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {LayerBankErc20Handler} from "src/layerbank/LayerBankErc20Handler.sol";
+import {ILayerBankErc20Handler} from "src/layerbank/ILayerBankErc20Handler.sol";
 import {MockLayerBankAToken, MockLayerBankPool} from "test/mocks/MockLayerBank.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -70,7 +71,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
             feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
         });
 
-        vm.expectRevert(LayerBankErc20Handler.LayerBankErc20Handler__PoolNotSet.selector);
+        vm.expectRevert(ILayerBankErc20Handler.LayerBankErc20Handler__PoolNotSet.selector);
         new LayerBankTestHandler(address(dcaManager), address(stablecoin), address(unset), FEE_COLLECTOR, feeSettings);
     }
 
@@ -87,7 +88,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
             feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
         });
 
-        vm.expectRevert(LayerBankErc20Handler.LayerBankErc20Handler__UnderlyingMismatch.selector);
+        vm.expectRevert(ILayerBankErc20Handler.LayerBankErc20Handler__UnderlyingMismatch.selector);
         new LayerBankTestHandler(
             address(dcaManager), address(stablecoin), address(mismatch), FEE_COLLECTOR, feeSettings
         );

@@ -69,7 +69,7 @@ Live Aave `withdraw` reverts on insufficient cash (ERC20 transfer from the aToke
 - [x] Replace the v2 Core/LToken surface in place. Delete `ILToken` / `ILayerBankCore`. Do not leave dead `onlyCore` / `accruedExchangeRate` / `setCore` one-shot comments as if they still applied.
 - [x] `LayerBankErc20Handler` (`TokenHandler` + `TokenLending`) with per-user scaled `s_aTokenBalances` and `getUsersLendingTokenBalance`.
 - [x] `LayerBankDocHandlerMoc` (`LayerBankErc20Handler` + `PurchaseMoc`).
-- [x] Slim `ILayerBankAToken` / `ILayerBankPool` next to the handler (only the functions this handler calls). Constructor checks `UNDERLYING_ASSET_ADDRESS()` matches the stablecoin and `POOL()` is set. Do not add an empty `ILayerBankErc20Handler`.
+- [x] Slim `ILayerBankAToken` / `ILayerBankPool` next to the handler (only the functions this handler calls). Constructor checks `UNDERLYING_ASSET_ADDRESS()` matches the stablecoin and `POOL()` is set. `ILayerBankErc20Handler` holds the two constructor errors (same pattern as `IIdleErc20Handler`); do not put custom errors on the implementation contract.
 - [x] Deposit: hop-1 via `super.depositToken`; approve the **Pool**; `Pool.supply(stable, received, handler, 0)`; credit aToken `scaledBalanceOf` delta; revert `TokenLending__LendingProtocolDepositFailed` if the delta is 0.
 - [x] Withdraw / single retrieve: clamp to the user's converted scaled balance (same events as Tropykus/Sovryn), then `Pool.withdraw(stable, amount, handler)`. Pay the measured DOC delta. Skip the Pool call when the underlying amount is 0 (live Aave reverts `InvalidAmount`).
 - [x] Interest: size with `getReserveNormalizedIncome`, convert scaled shares to underlying, `Pool.withdraw` onto the handler, transfer the measured DOC to the user.
@@ -94,6 +94,7 @@ New:
 
 - `src/layerbank/ILayerBankAToken.sol`
 - `src/layerbank/ILayerBankPool.sol`
+- `src/layerbank/ILayerBankErc20Handler.sol`
 - `test/unit/layerbank/LayerBankLivePoolProbe.t.sol`
 
 Replace (delete v2 files):

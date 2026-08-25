@@ -4,6 +4,7 @@ pragma solidity 0.8.36;
 import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
 import {TokenHandler} from "src/TokenHandler.sol";
 import {ILayerBankAToken} from "./ILayerBankAToken.sol";
+import {ILayerBankErc20Handler} from "./ILayerBankErc20Handler.sol";
 import {ILayerBankPool} from "./ILayerBankPool.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -16,11 +17,8 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
  * @dev Live LayerBank DOC is an Aave-v3 aToken. Supply and withdraw go through the Pool; per-user
  *      virtual balances store **scaled** aToken amounts (not rebasing `balanceOf`).
  */
-abstract contract LayerBankErc20Handler is TokenHandler, TokenLending {
+abstract contract LayerBankErc20Handler is TokenHandler, TokenLending, ILayerBankErc20Handler {
     using SafeERC20 for IERC20;
-
-    error LayerBankErc20Handler__PoolNotSet();
-    error LayerBankErc20Handler__UnderlyingMismatch();
 
     /// @notice Aave liquidity-index scale. Fixed for this protocol; not a constructor arg
     ///         (passing Tropykus/Sovryn's 1e18 would size withdrawals 1e9× too large).
