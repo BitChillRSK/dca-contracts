@@ -118,13 +118,13 @@ Measure token/native balance deltas after Sovryn, Tropykus, MoC, and Uniswap ope
 
 **Read this before writing a handler that holds the stablecoin instead of lending it.**
 
-Per-user accounting exists only in `TropykusErc20Handler.s_kTokenBalances` and `SovrynErc20Handler.s_iSusdBalances`. The base `TokenHandler.withdrawToken` is a bare `safeTransfer` with **no cap and no mapping behind it**, so a handler that extends `TokenHandler` without adding its own per-user tracking pays out whatever `DcaManager` asks from a pooled balance.
+Per-user accounting for lending lives in `LendingErc20Handler.s_shares`. Idle has its own mapping in `IdleErc20Handler`. The base `TokenHandler.withdrawToken` is a bare `safeTransfer` with **no cap and no mapping behind it**, so a handler that extends `TokenHandler` without adding its own per-user tracking pays out whatever `DcaManager` asks from a pooled balance.
 
-Both lending handlers clamp a withdrawal to the caller's own position (`TropykusErc20Handler.sol:79-82`, `SovrynErc20Handler.sol:79-82`) instead of reverting. That clamp is what currently bounds *every* `DcaManager` accounting bug to the user who caused it. Remove it and the same bugs become solvency bugs against other users' pooled funds. Concretely, the `updateDcaSchedule` stale-write-back reentrancy that R6 analysed is self-desync under a lending handler and a straight pool drain under an idle one.
+Lending handlers clamp a withdrawal to the caller's own position (`LendingErc20Handler.withdrawToken`) instead of reverting. That clamp is what currently bounds *every* `DcaManager` accounting bug to the user who caused it. Remove it and the same bugs become solvency bugs against other users' pooled funds. Concretely, the `updateDcaSchedule` stale-write-back reentrancy that R6 analysed is self-desync under a lending handler and a straight pool drain under an idle one.
 
 So, for an idle-funds handler:
 
-- It **must** carry per-user accounting and clamp `withdrawToken` to the caller's own balance, or it inherits an uncapped withdraw. R28 (PR 19) extracts a shared `LendingErc20Handler` that would own that clamp for the lending twins; Idle already has its own. Do not wait on R28 to keep the clamp in each lending handler.
+- It **must** carry per-user accounting and clamp `withdrawToken` to the caller's own balance, or it inherits an uncapped withdraw. R28 put that clamp on `LendingErc20Handler` for the lending twins; Idle already has its own. Do not drop the clamp from a new idle handler.
 - Invariant 6 in `AGENTS.md` (comprehensive `nonReentrant` on schedule mutators) stops being cheap insurance and becomes load-bearing. Do not relax it in the same relaunch that introduces pooled idle funds.
 - The R20 balance-delta work above matters more, not less: with no clamp, `DcaManager.tokenBalance` is the only thing standing between a user and the pool.
 

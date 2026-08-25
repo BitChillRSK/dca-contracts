@@ -58,7 +58,7 @@ abstract contract SovrynErc20Handler is LendingErc20Handler {
      *      one once an exit fee is enabled (SIP-0094), so the recipient's measured balance delta
      *      is the only trustworthy amount.
      */
-    function _protocolRedeem(uint256 stablecoinAmount, uint256 sharesAmount, bool, address recipient)
+    function _protocolRedeem(uint256 stablecoinAmount, uint256 sharesAmount, bool, address recipient, uint256)
         internal
         override
         returns (uint256 received)

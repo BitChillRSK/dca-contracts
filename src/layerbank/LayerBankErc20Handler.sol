@@ -81,13 +81,14 @@ abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20H
      * @dev Aave has no share-sized withdraw, so `sizeByUnderlying` only changes the amount asked
      *      of `Pool.withdraw`. Live Aave `withdraw` reverts on a zero amount (`InvalidAmount`).
      */
-    function _protocolRedeem(uint256 stablecoinAmount, uint256 sharesAmount, bool sizeByUnderlying, address recipient)
-        internal
-        override
-        returns (uint256 received)
-    {
-        uint256 amountOut =
-            sizeByUnderlying ? stablecoinAmount : _sharesToStablecoin(sharesAmount, _normalizedIncome());
+    function _protocolRedeem(
+        uint256 stablecoinAmount,
+        uint256 sharesAmount,
+        bool sizeByUnderlying,
+        address recipient,
+        uint256 exchangeRate
+    ) internal override returns (uint256 received) {
+        uint256 amountOut = sizeByUnderlying ? stablecoinAmount : _sharesToStablecoin(sharesAmount, exchangeRate);
         // Live Aave `withdraw` reverts on a zero amount (`InvalidAmount`).
         if (amountOut == 0) {
             return 0;

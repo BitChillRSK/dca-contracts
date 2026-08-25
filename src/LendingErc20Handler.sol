@@ -198,7 +198,8 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
             );
         }
         s_shares[user] -= sharesToRedeem;
-        stablecoinReceived = _protocolRedeem(stablecoinAmount, sharesToRedeem, sizeByUnderlying, recipient);
+        stablecoinReceived =
+            _protocolRedeem(stablecoinAmount, sharesToRedeem, sizeByUnderlying, recipient, exchangeRate);
         emit TokenLending__SharesRedeemed(user, stablecoinReceived, sharesToRedeem);
     }
 
@@ -214,7 +215,8 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
         uint256[] memory purchaseAmounts,
         uint256 totalStablecoinAmount
     ) internal virtual returns (uint256) {
-        uint256 totalSharesToRedeem = _stablecoinToShares(totalStablecoinAmount, _exchangeRate());
+        uint256 exchangeRate = _exchangeRate();
+        uint256 totalSharesToRedeem = _stablecoinToShares(totalStablecoinAmount, exchangeRate);
 
         uint256 numOfPurchases = users.length;
         for (uint256 i; i < numOfPurchases; ++i) {
@@ -231,7 +233,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
             emit TokenLending__SharesRedeemed(users[i], purchaseAmounts[i], usersSharesToRedeem);
         }
         uint256 stablecoinReceived =
-            _protocolRedeem(totalStablecoinAmount, totalSharesToRedeem, true, address(this));
+            _protocolRedeem(totalStablecoinAmount, totalSharesToRedeem, true, address(this), exchangeRate);
         if (stablecoinReceived > 0) emit TokenLending__SharesRedeemedBatch(stablecoinReceived, totalSharesToRedeem);
         else revert TokenLending__ZeroStablecoinReceived(totalStablecoinAmount);
         return stablecoinReceived;
@@ -264,10 +266,14 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
      * @param sharesAmount the share count to burn (after any clamp)
      * @param sizeByUnderlying true to size the protocol call by underlying; Sovryn ignores this
      * @param recipient who should receive the stablecoin
+     * @param exchangeRate the rate already read by the caller; do not re-query the protocol
      * @return received the stablecoin amount actually received (handler or recipient, adapter-defined)
      */
-    function _protocolRedeem(uint256 stablecoinAmount, uint256 sharesAmount, bool sizeByUnderlying, address recipient)
-        internal
-        virtual
-        returns (uint256 received);
+    function _protocolRedeem(
+        uint256 stablecoinAmount,
+        uint256 sharesAmount,
+        bool sizeByUnderlying,
+        address recipient,
+        uint256 exchangeRate
+    ) internal virtual returns (uint256 received);
 }

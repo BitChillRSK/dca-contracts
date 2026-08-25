@@ -61,11 +61,13 @@ abstract contract TropykusErc20Handler is LendingErc20Handler {
      * @dev The `stablecoinAmount > 0 &&` conjunct is the Compound analogue of LayerBank skipping a
      *      zero Pool.withdraw: `redeemUnderlying(0)` / `redeem(0)` can succeed and pay 0.
      */
-    function _protocolRedeem(uint256 stablecoinAmount, uint256 sharesAmount, bool sizeByUnderlying, address recipient)
-        internal
-        override
-        returns (uint256 received)
-    {
+    function _protocolRedeem(
+        uint256 stablecoinAmount,
+        uint256 sharesAmount,
+        bool sizeByUnderlying,
+        address recipient,
+        uint256
+    ) internal override returns (uint256 received) {
         uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(address(this));
 
         uint256 result;
