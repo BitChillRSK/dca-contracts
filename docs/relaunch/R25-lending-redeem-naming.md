@@ -33,7 +33,7 @@ Small leaf-contract nits (same PR; match LayerBank’s cleaner shape):
 
 This PR **supersedes** R16’s sanction of the “repay” alias for share-amount **locals and internal helpers** *and* for the shared event. `TokenLending__AmountToRepayAdjusted` → `TokenLending__AmountToRedeemAdjusted`.
 
-**Decision revised during PR 16** (human call, recorded here so the history is honest): the spec originally held the event back as ABI. That reasoning does not apply to this relaunch — every handler is a fresh deployment with no live log consumer, so `topic0` stability is protecting nothing today. R9 (PR 18) is where the event surface gets **frozen**, which makes it the deadline for this rename, not the venue. Renaming after the freeze is the expensive version of the same change. Parameter list, order, and indexing are untouched; only the name changes.
+**Decision revised during PR 16** (human call, recorded here so the history is honest): the spec originally held the event back as ABI. That reasoning does not apply to this relaunch — every handler is a fresh deployment with no live log consumer, so `topic0` stability is protecting nothing today. R9 (PR 20) is where the event surface gets **frozen**, which makes it the deadline for this rename, not the venue. Renaming after the freeze is the expensive version of the same change. Parameter list, order, and indexing are untouched; only the name changes.
 
 ## Open product decisions
 
@@ -57,7 +57,7 @@ This PR **supersedes** R16’s sanction of the “repay” alias for share-amoun
 ## Out of scope
 
 - [ ] Any other `ITokenLending` event/error ABI (parameters, order, indexing, error names). Only the one event **name** above changes.
-- [ ] R22 deploy/CI index map, harness, CI matrix (now PR 17, [R22-deploy-ci.md](./R22-deploy-ci.md)). That PR also owns the LayerBank round-up solvency regression (virtual scaled sum ≤ handler `scaledBalanceOf`); do not leave it to a later “someday” test.
+- [ ] R22 deploy/CI index map, harness, CI matrix (now PR 18, [R22-deploy-ci.md](./R22-deploy-ci.md)). That PR also owns the LayerBank round-up solvency regression (virtual scaled sum ≤ handler `scaledBalanceOf`); do not leave it to a later “someday” test.
 - [ ] R10 natspec rewrite beyond the touched helpers.
 - [ ] R9 share events.
 - [ ] Third-party ABI names (`redeem`, `redeemUnderlying`, `burn`, `withdraw`, …).
