@@ -12,7 +12,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  */
 abstract contract StablecoinSource {
     /**
-     * @notice the stablecoin the handler holds, spent by the purchase and reported in fees, errors, and events
+     * @notice the stablecoin handled (held or lent out), spent by the purchase and reported in fees, errors, and events
      * @dev Implemented against the handler's own stablecoin so the purchase route cannot name a different token.
      * @return the stablecoin token
      */

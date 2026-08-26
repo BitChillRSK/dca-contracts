@@ -70,7 +70,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
         // Retrieve the stablecoin to spend
         // @notice we spend the stablecoin we actually received, never the gross amount we asked the lending protocol for
         uint256 totalStablecoinAmountToSpend =
-            _batchRetrieveStablecoin(buyers, purchaseAmounts, totalNetStablecoinPlanned + aggregatedFee); // totalNetStablecoinPlanned (on rBTC) + aggregatedFee (charged by BitChill)
+            _batchRetrieveStablecoin(buyers, purchaseAmounts, totalNetStablecoinPlanned + aggregatedFee); // totalNetStablecoinPlanned (to spend on rBTC) + aggregatedFee (charged by BitChill)
         if (totalStablecoinAmountToSpend <= aggregatedFee) {
             revert PurchaseRbtc__StablecoinRetrievedBelowFee(totalStablecoinAmountToSpend, aggregatedFee);
         }
@@ -84,7 +84,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
 
         for (uint256 i; i < numOfPurchases; ++i) {
             // @notice the planned net amounts are only allocation weights: they sum to totalNetStablecoinPlanned,
-            // so the shares below sum to exactly 1 even when the redemption paid less. Both the rBTC credited
+            // so the shares below sum to exactly 1 even if the redemption paid less than expected. Both the rBTC credited
             // and the stablecoin reported as spent are shares of what actually moved.
             uint256 usersPurchasedRbtc =
                 totalPurchasedRbtc * netStablecoinAmountsToSpend[i] / totalNetStablecoinPlanned;

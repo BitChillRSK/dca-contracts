@@ -135,7 +135,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice the stablecoin this handler holds and lends out
+     * @notice the stablecoin this handler lends out
      */
     function _purchaseToken() internal view override returns (IERC20) {
         return i_stableToken;
