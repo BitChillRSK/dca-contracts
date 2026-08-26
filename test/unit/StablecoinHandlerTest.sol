@@ -30,10 +30,11 @@ contract StablecoinHandlerTest is DcaDappTest {
     function testStablecoinHandlerSetFeeRateParams() external {
         vm.prank(OWNER);
         IFeeHandler(address(stablecoinHandler)).setFeeRateParams(100, 200, 1000 ether, 100000 ether);
-        assertEq(IFeeHandler(address(stablecoinHandler)).getMinFeeRate(), 100);
-        assertEq(IFeeHandler(address(stablecoinHandler)).getMaxFeeRate(), 200);
-        assertEq(IFeeHandler(address(stablecoinHandler)).getFeePurchaseLowerBound(), 1000 ether);
-        assertEq(IFeeHandler(address(stablecoinHandler)).getFeePurchaseUpperBound(), 100000 ether);
+        IFeeHandler.FeeSettings memory settings = IFeeHandler(address(stablecoinHandler)).getFeeSettings();
+        assertEq(settings.minFeeRate, 100);
+        assertEq(settings.maxFeeRate, 200);
+        assertEq(settings.feePurchaseLowerBound, 1000 ether);
+        assertEq(settings.feePurchaseUpperBound, 100000 ether);
     }
 
     function testStablecoinHandlerSetFeeCollectorAddress() external {

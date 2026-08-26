@@ -3,7 +3,6 @@ pragma solidity 0.8.36;
 
 import {PurchaseRbtc} from "./PurchaseRbtc.sol";
 import {IMocProxy} from "./interfaces/IMocProxy.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IPurchaseMoc} from "./interfaces/IPurchaseMoc.sol";
 
 /**
@@ -14,20 +13,13 @@ abstract contract PurchaseMoc is PurchaseRbtc, IPurchaseMoc {
     //////////////////////
     // State variables ///
     //////////////////////
-    IERC20 public immutable i_docToken;
     IMocProxy public immutable i_mocProxy;
 
     /**
-     * @param docTokenAddress the address of the Dollar On Chain token on the blockchain of deployment
      * @param mocProxyAddress the address of the MoC proxy contract on the blockchain of deployment
      */
-    constructor(
-        address docTokenAddress,
-        address mocProxyAddress
-    )
-    {
+    constructor(address mocProxyAddress) {
         i_mocProxy = IMocProxy(mocProxyAddress);
-        i_docToken = IERC20(docTokenAddress);
     }
 
     /*//////////////////////////////////////////////////////////////

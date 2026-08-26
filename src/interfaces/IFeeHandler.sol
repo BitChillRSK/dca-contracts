@@ -50,54 +50,10 @@ interface IFeeHandler {
         external;
 
     /**
-     * @dev Sets the minimum fee rate.
-     * @param minFeeRate The minimum fee rate.
-     */
-    function setMinFeeRate(uint256 minFeeRate) external;
-
-    /**
-     * @dev Sets the maximum fee rate.
-     * @param maxFeeRate The maximum fee rate.
-     */
-    function setMaxFeeRate(uint256 maxFeeRate) external;
-
-    /**
-     * @dev Sets the purchase lower bound for fee calculations.
-     * @param feePurchaseLowerBound The purchase lower bound.
-     */
-    function setPurchaseLowerBound(uint256 feePurchaseLowerBound) external;
-
-    /**
-     * @dev Sets the purchase upper bound for fee calculations.
-     * @param feePurchaseUpperBound The purchase upper bound.
-     */
-    function setPurchaseUpperBound(uint256 feePurchaseUpperBound) external;
-
-    /**
      * @dev Sets the address of the fee collector.
      * @param feeCollector The address of the fee collector.
      */
     function setFeeCollectorAddress(address feeCollector) external;
-
-    /**
-     * @dev Gets the minimum fee rate that may be charged for each purchases
-     */
-    function getMinFeeRate() external returns (uint256);
-
-    /**
-     * @dev Gets the maximum fee rate that may be charged for each purchases
-     */
-    function getMaxFeeRate() external returns (uint256);
-
-    /**
-     * @dev Gets the purchase amount below which the maximum fee rate is applied
-     */
-    function getFeePurchaseLowerBound() external returns (uint256);
-
-    /**
-     * @dev Gets the purchase amount above which the minimum fee rate is applied
-     */
-    function getFeePurchaseUpperBound() external returns (uint256);
 
     /**
      * @dev Gets the fee collector address

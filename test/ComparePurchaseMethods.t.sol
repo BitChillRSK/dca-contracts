@@ -489,7 +489,7 @@ contract ComparePurchaseMethods is Test {
         uint256[] memory startBalances = new uint256[](NUM_OF_USERS);
         for (uint256 i = 0; i < NUM_OF_USERS; i++) {
             vm.startPrank(users[i]);
-            startBalances[i] = IPurchaseRbtc(handlerMoc).getAccumulatedRbtcBalance();
+            startBalances[i] = IPurchaseRbtc(handlerMoc).getAccumulatedRbtcBalance(users[i]);
             vm.stopPrank();
         }
         
@@ -511,7 +511,7 @@ contract ComparePurchaseMethods is Test {
         uint256 totalRbtcPurchased = 0;
         for (uint256 i = 0; i < NUM_OF_USERS; i++) {
             vm.startPrank(users[i]);
-            uint256 endBalance = IPurchaseRbtc(handlerMoc).getAccumulatedRbtcBalance();
+            uint256 endBalance = IPurchaseRbtc(handlerMoc).getAccumulatedRbtcBalance(users[i]);
             totalRbtcPurchased += (endBalance - startBalances[i]);
             vm.stopPrank();
         }
@@ -530,7 +530,7 @@ contract ComparePurchaseMethods is Test {
         uint256[] memory startBalances = new uint256[](NUM_OF_USERS);
         for (uint256 i = 0; i < NUM_OF_USERS; i++) {
             vm.startPrank(users[i]);
-            startBalances[i] = IPurchaseRbtc(handlerUni).getAccumulatedRbtcBalance();
+            startBalances[i] = IPurchaseRbtc(handlerUni).getAccumulatedRbtcBalance(users[i]);
             vm.stopPrank();
         }
         
@@ -552,7 +552,7 @@ contract ComparePurchaseMethods is Test {
         uint256 totalRbtcPurchased = 0;
         for (uint256 i = 0; i < NUM_OF_USERS; i++) {
             vm.startPrank(users[i]);
-            uint256 endBalance = IPurchaseRbtc(handlerUni).getAccumulatedRbtcBalance();
+            uint256 endBalance = IPurchaseRbtc(handlerUni).getAccumulatedRbtcBalance(users[i]);
             totalRbtcPurchased += (endBalance - startBalances[i]);
             vm.stopPrank();
         }
@@ -571,7 +571,7 @@ contract ComparePurchaseMethods is Test {
         uint256[] memory startBalances = new uint256[](NUM_OF_USERS);
         for (uint256 i = 0; i < NUM_OF_USERS; i++) {
             vm.startPrank(users[i]);
-            startBalances[i] = IPurchaseRbtc(handlerMoc).getAccumulatedRbtcBalance();
+            startBalances[i] = IPurchaseRbtc(handlerMoc).getAccumulatedRbtcBalance(users[i]);
             vm.stopPrank();
         }
         
@@ -611,7 +611,7 @@ contract ComparePurchaseMethods is Test {
         uint256 totalRbtcPurchased = 0;
         for (uint256 i = 0; i < NUM_OF_USERS; i++) {
             vm.startPrank(users[i]);
-            uint256 endBalance = IPurchaseRbtc(handlerMoc).getAccumulatedRbtcBalance();
+            uint256 endBalance = IPurchaseRbtc(handlerMoc).getAccumulatedRbtcBalance(users[i]);
             totalRbtcPurchased += (endBalance - startBalances[i]);
             vm.stopPrank();
         }
@@ -630,7 +630,7 @@ contract ComparePurchaseMethods is Test {
         uint256[] memory startBalances = new uint256[](NUM_OF_USERS);
         for (uint256 i = 0; i < NUM_OF_USERS; i++) {
             vm.startPrank(users[i]);
-            startBalances[i] = IPurchaseRbtc(handlerUni).getAccumulatedRbtcBalance();
+            startBalances[i] = IPurchaseRbtc(handlerUni).getAccumulatedRbtcBalance(users[i]);
             vm.stopPrank();
         }
         
@@ -670,7 +670,7 @@ contract ComparePurchaseMethods is Test {
         uint256 totalRbtcPurchased = 0;
         for (uint256 i = 0; i < NUM_OF_USERS; i++) {
             vm.startPrank(users[i]);
-            uint256 endBalance = IPurchaseRbtc(handlerUni).getAccumulatedRbtcBalance();
+            uint256 endBalance = IPurchaseRbtc(handlerUni).getAccumulatedRbtcBalance(users[i]);
             totalRbtcPurchased += (endBalance - startBalances[i]);
             vm.stopPrank();
         }

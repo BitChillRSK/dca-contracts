@@ -4,6 +4,7 @@ pragma solidity 0.8.36;
 
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
+import {ITokenLending} from "../../src/interfaces/ITokenLending.sol";
 import "../Constants.sol";
 
 contract DummyERC165Contract {
@@ -16,6 +17,14 @@ contract DummyERC165Contract {
 contract DummyTokenHandler {
     function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
         return interfaceId == type(ITokenHandler).interfaceId;
+    }
+}
+
+/// @dev ERC-165 `ITokenHandler` + `ITokenLending` stub for lending-route assignment tests.
+contract DummyLendingHandler {
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return interfaceId == type(ITokenHandler).interfaceId
+            || interfaceId == type(ITokenLending).interfaceId;
     }
 }
 

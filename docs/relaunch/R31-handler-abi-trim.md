@@ -1,8 +1,8 @@
 # R31 — Trim the handler ABI before the event freeze
 
-Status: **not started** · Assigned: yes · Optional/further-review: no
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
-PR 25. Stack on R13 (PR 24). Land before R9: R30 left only 329–452 bytes of EIP-170 margin on the two Dex handlers, and R9 must add share-transition emissions to the shared lending path.
+PR 25, GitHub [#69](https://github.com/BitChillRSK/dca-contracts/pull/69). Stack on R13 (PR 24). Land before R9: R30 left only 329–452 bytes of EIP-170 margin on the two Dex handlers, and R9 must add share-transition emissions to the shared lending path.
 
 ## Objective
 
@@ -18,7 +18,7 @@ This is a fresh relaunch, so the ABI should be settled before R9 rather than car
 
 ## Open product decisions
 
-- **Fee mutation surface:** keep the four individual setters, or remove them and make `setFeeRateParams` the only fee-band mutation. Recommended: atomic-only mutation, because it cannot pass through an invalid intermediate band and creates the most bytecode headroom.
+**none** · Fee mutation gate answered 2026-08-26: **atomic-only**. Remove `setMinFeeRate` / `setMaxFeeRate` / `setPurchaseLowerBound` / `setPurchaseUpperBound`. Keep `setFeeRateParams` as the only fee-band mutation. `setFeeCollectorAddress` stays.
 
 The duplicate route-token getters, automatic oracle getter, caller-only accumulated-rBTC getter, individual fee getters, and public fee-cap getter are assigned for removal.
 
@@ -36,17 +36,17 @@ If Dex runtime margin cannot absorb the `supportsInterface` addition **after** t
 
 ## Scope
 
-- [ ] Remove the write-only `i_docToken` and the duplicated `i_purchasingToken`; use `StablecoinSource._purchaseToken()` wherever a purchase route needs the token (currently Uniswap path construction and router approval). Do not add `TokenHandler` to either purchase base.
-- [ ] Drop the now-dead stablecoin parameters from the abstract `PurchaseMoc` and `PurchaseUniswap` constructors and their leaf base-constructor calls. Preserve all six concrete handler constructor ABIs and every deploy-script call signature.
-- [ ] Keep and test the constructor-ordering requirement: when `PurchaseUniswap` builds the initial path through `_purchaseToken()`, the concrete funding base's stablecoin immutable is already initialized and the path starts with that exact token.
-- [ ] Make the Uniswap oracle storage non-public and retain `getMocOracle()` as the canonical getter.
-- [ ] Remove `IPurchaseRbtc.getAccumulatedRbtcBalance()` with no arguments; retain `getAccumulatedRbtcBalance(address)` and DcaManager's user-facing getter.
-- [ ] Remove the four individual fee getters in favor of `getFeeSettings()`.
-- [ ] Make `MAX_FEE_RATE_CAP` non-public while retaining the 5% cap and every validation path.
-- [ ] Apply the recorded fee-setter decision. Keep `setFeeCollectorAddress` and `getFeeCollectorAddress`, because the collector is not part of `FeeSettings`.
-- [ ] Update first-party interfaces, scripts, deployment assertions, handler tests, fuzz wrappers, and any checked-in consumer to the canonical APIs.
-- [ ] Record before/after ABI selector lists and runtime sizes for all six concrete handlers.
-- [ ] Close the R13 class↔handler hole (see **Carried from R13**): ERC-165 `ITokenLending` match on `assignTokenHandler`, or an assigned follow-up spec if Dex margin cannot absorb it.
+- [x] Remove the write-only `i_docToken` and the duplicated `i_purchasingToken`; use `StablecoinSource._purchaseToken()` wherever a purchase route needs the token (currently Uniswap path construction and router approval). Do not add `TokenHandler` to either purchase base.
+- [x] Drop the now-dead stablecoin parameters from the abstract `PurchaseMoc` and `PurchaseUniswap` constructors and their leaf base-constructor calls. Preserve all six concrete handler constructor ABIs and every deploy-script call signature.
+- [x] Keep and test the constructor-ordering requirement: when `PurchaseUniswap` builds the initial path through `_purchaseToken()`, the concrete funding base's stablecoin immutable is already initialized and the path starts with that exact token.
+- [x] Make the Uniswap oracle storage non-public and retain `getMocOracle()` as the canonical getter.
+- [x] Remove `IPurchaseRbtc.getAccumulatedRbtcBalance()` with no arguments; retain `getAccumulatedRbtcBalance(address)` and DcaManager's user-facing getter.
+- [x] Remove the four individual fee getters in favor of `getFeeSettings()`.
+- [x] Make `MAX_FEE_RATE_CAP` non-public while retaining the 5% cap and every validation path.
+- [x] Apply the recorded fee-setter decision. Keep `setFeeCollectorAddress` and `getFeeCollectorAddress`, because the collector is not part of `FeeSettings`.
+- [x] Update first-party interfaces, scripts, deployment assertions, handler tests, fuzz wrappers, and any checked-in consumer to the canonical APIs.
+- [x] Record before/after ABI selector lists and runtime sizes for all six concrete handlers.
+- [x] Close the R13 class↔handler hole (see **Carried from R13**): ERC-165 `ITokenLending` match on `assignTokenHandler`, or an assigned follow-up spec if Dex margin cannot absorb it.
 
 ## Out of scope
 
@@ -96,14 +96,14 @@ Also assert lending-at-idle and idle-at-lending assignment revert (including ind
 
 ## Success criteria
 
-- [ ] Each exposed value has one canonical getter.
-- [ ] Purchase routes use `_purchaseToken()`; no duplicate route-token immutable or dead abstract-base stablecoin parameter remains.
-- [ ] Fee behavior and the 5% cap are unchanged.
-- [ ] The decided fee mutation surface is reflected consistently in implementation, interface, tests, and docs.
-- [ ] Concrete handler constructor ABIs and storage layouts are unchanged; only abstract base-constructor plumbing is reduced.
-- [ ] Concrete-handler runtime margins are measured and improve.
-- [ ] A lending handler cannot be assigned at an idle index, and an idle handler cannot be assigned at a lending index — or a follow-up spec is assigned in this PR because Dex margin could not absorb the check.
-- [ ] Targeted, done-gate, and both fork tests pass.
+- [x] Each exposed value has one canonical getter.
+- [x] Purchase routes use `_purchaseToken()`; no duplicate route-token immutable or dead abstract-base stablecoin parameter remains.
+- [x] Fee behavior and the 5% cap are unchanged.
+- [x] The decided fee mutation surface is reflected consistently in implementation, interface, tests, and docs.
+- [x] Concrete handler constructor ABIs and storage layouts are unchanged; only abstract base-constructor plumbing is reduced.
+- [x] Concrete-handler runtime margins are measured and improve.
+- [x] A lending handler cannot be assigned at an idle index, and an idle handler cannot be assigned at a lending index — or a follow-up spec is assigned in this PR because Dex margin could not absorb the check.
+- [x] Targeted, done-gate, and both fork tests pass.
 
 ## Reviewer checklist
 

@@ -127,6 +127,6 @@ Fork tests: not required.
 
 ## ABI / deploy / cutover impact
 
-- ABI: add `getFeeSettings() view returns (FeeSettings)`; add errors `FeeHandler__InvalidFeeCollector` and `FeeHandler__MaxFeeRateExceedsCap`; add public constant getter `MAX_FEE_RATE_CAP()`. Individual bound setters revert in more cases (`FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound`). `setMaxFeeRate` / `setFeeRateParams` / constructor reject `maxFeeRate > 500`. `setFeeCollectorAddress` and constructor reject `address(0)`.
+- ABI: add `getFeeSettings() view returns (FeeSettings)`; add errors `FeeHandler__InvalidFeeCollector` and `FeeHandler__MaxFeeRateExceedsCap`; add public constant getter `MAX_FEE_RATE_CAP()`. Individual bound setters revert in more cases (`FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound`). `setMaxFeeRate` / `setFeeRateParams` / constructor reject `maxFeeRate > 500`. `setFeeCollectorAddress` and constructor reject `address(0)`. **This is the ABI this PR shipped.** R31 later removed the four individual setters/getters and the public `MAX_FEE_RATE_CAP()` getter; `setFeeRateParams` and `getFeeSettings()` remain — see [`R31-handler-abi-trim.md`](./R31-handler-abi-trim.md).
 - Scripts: none required. Production can keep `minFeeRate == maxFeeRate == 100` (flat 1%), well under the 5% cap.
 - Cutover: owner can raise the fee band in one `setFeeRateParams` call, but never above 5%. Frontends/indexers may read all fee params via `getFeeSettings()`. Do not include broadcast steps.

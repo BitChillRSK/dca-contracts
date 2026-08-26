@@ -210,7 +210,7 @@ contract OperationsAdminTest is DcaDappTest {
 
     function testMistakenHandlerAssignmentRecoveredAtNewIndex() external {
         address oldHandler = operationsAdmin.getTokenHandler(address(stablecoin), s_lendingProtocolIndex);
-        DummyTokenHandler unusedHandler = new DummyTokenHandler();
+        DummyLendingHandler unusedHandler = new DummyLendingHandler();
 
         vm.startPrank(OWNER);
         vm.expectRevert(
@@ -258,7 +258,7 @@ contract OperationsAdminTest is DcaDappTest {
 
     function testOldRouteStillPaysUserAfterNewHandlerRegistered() external {
         address oldHandler = operationsAdmin.getTokenHandler(address(stablecoin), s_lendingProtocolIndex);
-        DummyTokenHandler newHandler = new DummyTokenHandler();
+        DummyLendingHandler newHandler = new DummyLendingHandler();
 
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
@@ -317,7 +317,7 @@ contract OperationsAdminTest is DcaDappTest {
         assertEq(dcaManager.getScheduleTokenBalance(USER, address(stablecoin), 0), userRemaining);
         assertEq(stablecoin.balanceOf(USER), userWalletBefore);
 
-        DummyTokenHandler dummy = new DummyTokenHandler();
+        DummyLendingHandler dummy = new DummyLendingHandler();
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
         operationsAdmin.assignTokenHandler(address(stablecoin), SECOND_LENDING_INDEX, address(dummy));
@@ -327,5 +327,60 @@ contract OperationsAdminTest is DcaDappTest {
         assertEq(dcaManager.getScheduleTokenBalance(USER, address(stablecoin), 0), userRemaining);
         assertEq(stablecoin.balanceOf(USER), userWalletBefore);
         assertEq(operationsAdmin.getTokenHandler(address(stablecoin), s_lendingProtocolIndex), address(stablecoinHandler));
+    }
+
+    function testLendingHandlerRejectedAtIdleIndexZero() external {
+        DummyLendingHandler lendingStub = new DummyLendingHandler();
+        address otherToken = makeAddr("r31IdleZeroToken");
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__LendingHandlerOnIdleRoute.selector, address(lendingStub)
+            )
+        );
+        vm.prank(OWNER);
+        operationsAdmin.assignTokenHandler(otherToken, IDLE_INDEX, address(lendingStub));
+    }
+
+    function testLendingHandlerRejectedAtRegisteredIdleIndex() external {
+        DummyLendingHandler lendingStub = new DummyLendingHandler();
+        address otherToken = makeAddr("r31IdleIndexToken");
+        vm.startPrank(OWNER);
+        operationsAdmin.registerRoute(SECOND_IDLE_INDEX, false);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__LendingHandlerOnIdleRoute.selector, address(lendingStub)
+            )
+        );
+        operationsAdmin.assignTokenHandler(otherToken, SECOND_IDLE_INDEX, address(lendingStub));
+        vm.stopPrank();
+    }
+
+    function testIdleHandlerRejectedAtLendingIndex() external {
+        DummyTokenHandler idleStub = new DummyTokenHandler();
+        address otherToken = makeAddr("r31LendingToken");
+        vm.startPrank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__ContractIsNotTokenLending.selector, address(idleStub)
+            )
+        );
+        operationsAdmin.assignTokenHandler(otherToken, SECOND_LENDING_INDEX, address(idleStub));
+        vm.stopPrank();
+    }
+
+    function testMatchingClassAssignmentsSucceed() external {
+        DummyTokenHandler idleStub = new DummyTokenHandler();
+        DummyLendingHandler lendingStub = new DummyLendingHandler();
+        address otherToken = makeAddr("r31OtherToken");
+
+        vm.startPrank(OWNER);
+        operationsAdmin.assignTokenHandler(otherToken, IDLE_INDEX, address(idleStub));
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        operationsAdmin.assignTokenHandler(otherToken, SECOND_LENDING_INDEX, address(lendingStub));
+        vm.stopPrank();
+
+        assertEq(operationsAdmin.getTokenHandler(otherToken, IDLE_INDEX), address(idleStub));
+        assertEq(operationsAdmin.getTokenHandler(otherToken, SECOND_LENDING_INDEX), address(lendingStub));
     }
 }

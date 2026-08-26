@@ -2,6 +2,7 @@
 pragma solidity 0.8.36;
 
 import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
+import {ITokenLending} from "src/interfaces/ITokenLending.sol";
 import {TokenHandler} from "src/TokenHandler.sol";
 import {TokenLending} from "src/TokenLending.sol";
 import {StablecoinSource} from "src/StablecoinSource.sol";
@@ -89,6 +90,13 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
      */
     function getUserShares(address user) external view override returns (uint256) {
         return s_shares[user];
+    }
+
+    /**
+     * @notice advertise ITokenHandler (via TokenHandler) and ITokenLending
+     */
+    function supportsInterface(bytes4 interfaceID) public view virtual override returns (bool) {
+        return interfaceID == type(ITokenLending).interfaceId || super.supportsInterface(interfaceID);
     }
 
     /**

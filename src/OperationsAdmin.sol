@@ -3,6 +3,7 @@ pragma solidity 0.8.36;
 
 import {IOperationsAdmin} from "./interfaces/IOperationsAdmin.sol";
 import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
+import {ITokenLending} from "./interfaces/ITokenLending.sol";
 import {IERC165} from "lib/forge-std/src/interfaces/IERC165.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -62,10 +63,8 @@ contract OperationsAdmin is IOperationsAdmin, Ownable {
      * @inheritdoc IOperationsAdmin
      * @dev Recovery from a mistaken assignment is a new `(token, index)`, even when this
      *      handler has never held funds: this contract cannot prove a handler is empty.
-     *      Class is not matched to handler capability. A lending handler at an idle
-     *      index (including the constructor's index 0) makes `withdrawInterest`
-     *      unreachable: DcaManager gates it on `isLendingRoute`, and
-     *      `LendingErc20Handler.withdrawInterest` is `onlyDcaManager`.
+     *      Lending routes require ERC-165 `ITokenLending`; idle routes reject it so a
+     *      lending handler cannot be parked at an idle index (including constructor index 0).
      */
     function assignTokenHandler(address token, uint256 routeIndex, address handler) external onlyOwner {
         if (handler.code.length == 0) revert OperationsAdmin__EoaCannotBeHandler(handler);
@@ -79,6 +78,14 @@ contract OperationsAdmin is IOperationsAdmin, Ownable {
         IERC165 tokenHandler = IERC165(handler);
         if (!tokenHandler.supportsInterface(type(ITokenHandler).interfaceId)) {
             revert OperationsAdmin__ContractIsNotTokenHandler(handler);
+        }
+
+        bool isLending = s_routeClass[routeIndex] == RouteClass.Lending;
+        bool supportsLending = tokenHandler.supportsInterface(type(ITokenLending).interfaceId);
+        if (isLending) {
+            if (!supportsLending) revert OperationsAdmin__ContractIsNotTokenLending(handler);
+        } else if (supportsLending) {
+            revert OperationsAdmin__LendingHandlerOnIdleRoute(handler);
         }
 
         s_tokenHandler[token][routeIndex] = handler;

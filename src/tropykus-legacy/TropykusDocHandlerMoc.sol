@@ -25,6 +25,6 @@ contract TropykusDocHandlerMoc is TropykusErc20Handler, PurchaseMoc {
         FeeSettings memory feeSettings
     )
         TropykusErc20Handler(dcaManagerAddress, docTokenAddress, kDocTokenAddress, feeCollector, feeSettings)
-        PurchaseMoc(docTokenAddress, mocProxyAddress)
+        PurchaseMoc(mocProxyAddress)
     {}
 }

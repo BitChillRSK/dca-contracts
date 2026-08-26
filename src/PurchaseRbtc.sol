@@ -118,14 +118,6 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
         return s_usersAccumulatedRbtc[user];
     }
 
-    /**
-     * @notice get the accumulated rBTC balance for the caller
-     * @return the accumulated rBTC balance
-     */
-    function getAccumulatedRbtcBalance() external view override returns (uint256) {
-        return s_usersAccumulatedRbtc[msg.sender];
-    }
-
     /*//////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/

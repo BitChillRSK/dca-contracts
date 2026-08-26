@@ -225,28 +225,13 @@ contract GettersTest is DcaDappTest {
                         FEE HANDLER GETTERS TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_feeHandler_getMinFeeRate() public {
-        uint256 minFeeRate = IFeeHandler(address(stablecoinHandler)).getMinFeeRate();
-        assertGt(minFeeRate, 0); // Should be greater than 0
-    }
-
-    function test_feeHandler_getMaxFeeRate() public {
-        uint256 maxFeeRate = IFeeHandler(address(stablecoinHandler)).getMaxFeeRate();
-        assertGt(maxFeeRate, 0);
-    }
-
-    function test_feeHandler_getFeePurchaseLowerBound() public {
-        uint256 lowerBound = IFeeHandler(address(stablecoinHandler)).getFeePurchaseLowerBound();
-        assertGe(lowerBound, 0);
-    }
-
-    function test_feeHandler_getFeePurchaseUpperBound() public {
-        uint256 upperBound = IFeeHandler(address(stablecoinHandler)).getFeePurchaseUpperBound();
-        assertGe(upperBound, 0);
-        
-        // Upper bound should be >= lower bound
-        uint256 lowerBound = IFeeHandler(address(stablecoinHandler)).getFeePurchaseLowerBound();
-        assertGe(upperBound, lowerBound);
+    function test_feeHandler_getFeeSettings() public {
+        IFeeHandler.FeeSettings memory settings = IFeeHandler(address(stablecoinHandler)).getFeeSettings();
+        assertGt(settings.minFeeRate, 0);
+        assertGt(settings.maxFeeRate, 0);
+        assertLe(settings.minFeeRate, settings.maxFeeRate);
+        assertGe(settings.feePurchaseLowerBound, 0);
+        assertGe(settings.feePurchaseUpperBound, settings.feePurchaseLowerBound);
     }
 
     function test_feeHandler_getFeeCollectorAddress() public {
@@ -255,9 +240,8 @@ contract GettersTest is DcaDappTest {
     }
 
     function test_feeHandler_feeRateConsistency() public {
-        uint256 minFeeRate = IFeeHandler(address(stablecoinHandler)).getMinFeeRate();
-        uint256 maxFeeRate = IFeeHandler(address(stablecoinHandler)).getMaxFeeRate();
-        assertLe(minFeeRate, maxFeeRate); // Min should be <= Max
+        IFeeHandler.FeeSettings memory settings = IFeeHandler(address(stablecoinHandler)).getFeeSettings();
+        assertLe(settings.minFeeRate, settings.maxFeeRate);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -293,6 +277,12 @@ contract GettersTest is DcaDappTest {
         // Test ITokenHandler interface support
         bool supportsTokenHandler = IERC165(address(stablecoinHandler)).supportsInterface(type(ITokenHandler).interfaceId);
         assertTrue(supportsTokenHandler);
+
+        bool supportsLending = IERC165(address(stablecoinHandler)).supportsInterface(type(ITokenLending).interfaceId);
+        // This suite only deploys tropykus/sovryn handlers (`DcaDappTest.setUp`). Idle
+        // `ITokenLending == false` is covered by `HandlerTestHarness.test_handler_supportsInterface`
+        // (`IdleErc20HandlerTest`) and `OperationsAdminTest` idle-stub assignments.
+        assertTrue(supportsLending);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -301,12 +291,6 @@ contract GettersTest is DcaDappTest {
 
     function test_purchaseRbtc_getAccumulatedRbtcBalance_withUser() public {
         uint256 balance = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
-        assertGe(balance, 0);
-    }
-
-    function test_purchaseRbtc_getAccumulatedRbtcBalance_caller() public {
-        vm.prank(USER);
-        uint256 balance = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance();
         assertGe(balance, 0);
     }
 
@@ -463,9 +447,8 @@ contract GettersTest is DcaDappTest {
         assertFalse(operationsAdmin.isLendingRoute(IDLE_INDEX));
 
         // Test fee bounds consistency
-        uint256 lowerBound = IFeeHandler(address(stablecoinHandler)).getFeePurchaseLowerBound();
-        uint256 upperBound = IFeeHandler(address(stablecoinHandler)).getFeePurchaseUpperBound();
-        assertLe(lowerBound, upperBound);
+        IFeeHandler.FeeSettings memory settings = IFeeHandler(address(stablecoinHandler)).getFeeSettings();
+        assertLe(settings.feePurchaseLowerBound, settings.feePurchaseUpperBound);
     }
 
     function test_getters_boundaryConditions() public {

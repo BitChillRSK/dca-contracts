@@ -32,6 +32,6 @@ contract LayerBankDocHandlerMoc is LayerBankErc20Handler, PurchaseMoc {
             feeCollector,
             feeSettings
         )
-        PurchaseMoc(docTokenAddress, mocProxyAddress)
+        PurchaseMoc(mocProxyAddress)
     {}
 }
