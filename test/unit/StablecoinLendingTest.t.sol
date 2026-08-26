@@ -226,29 +226,8 @@ contract StablecoinLendingTest is DcaDappTest {
         assertEq(withdrawableInterest, 0);
     }
 
-    function testIfNoYieldWithdrawInterestFails() external {
-        // vm.warp(block.timestamp + 10 days); // Jump to 10 days into the future (for example) so that some interest has been generated.
-
-        // On fork tests we need to simulate some operation on Tropykus so that the exchange rate gets updated
-        updateExchangeRate(10 days);
-
-        uint256 withdrawableInterestBeforeWithdrawal =
-            dcaManager.getInterestAccrued(USER, address(stablecoin), s_lendingProtocolIndex);
-        uint256 userStablecoinBalanceBeforeInterestWithdrawal = stablecoin.balanceOf(USER);
-        assertGt(withdrawableInterestBeforeWithdrawal, 0);
-        bytes memory encodedRevert =
-            abi.encodeWithSelector(IDcaManager.DcaManager__TokenDoesNotYieldInterest.selector, address(stablecoin));
-        bytes32 scheduleId = dcaManager.getScheduleId(USER, address(stablecoin), 0);
-        vm.expectRevert(encodedRevert);
-        vm.prank(USER);
-        dcaManager.withdrawTokenAndInterest(address(stablecoin), 0, scheduleId, MIN_PURCHASE_AMOUNT, 0);
-        uint256 userStablecoinBalanceAfterInterestWithdrawal = stablecoin.balanceOf(USER);
-        assertEq(userStablecoinBalanceAfterInterestWithdrawal, userStablecoinBalanceBeforeInterestWithdrawal);
-        uint256 withdrawableInterestAfterWithdrawal =
-            dcaManager.getInterestAccrued(USER, address(stablecoin), s_lendingProtocolIndex);
-        assertEq(withdrawableInterestBeforeWithdrawal, withdrawableInterestAfterWithdrawal);
-    }
-
+    /// @notice Combined withdraw derives the lending route from the validated schedule.
+    /// The caller cannot target a different index (the previous fifth argument is gone).
     function testWithdrawTokenAndInterest() external {
         vm.warp(block.timestamp + 10 days);
 
@@ -260,9 +239,9 @@ contract StablecoinLendingTest is DcaDappTest {
         uint256 userStablecoinBalanceBeforeInterestWithdrawal = stablecoin.balanceOf(USER);
         assertGt(withdrawableInterest, 0);
 
-        bytes32 scheduleId = dcaManager.getScheduleId(USER, address(stablecoin), 0);
+        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
         vm.prank(USER);
-        dcaManager.withdrawTokenAndInterest(address(stablecoin), 0, scheduleId, AMOUNT_TO_SPEND, s_lendingProtocolIndex);
+        dcaManager.withdrawTokenAndInterest(address(stablecoin), 0, scheduleId, AMOUNT_TO_SPEND);
 
         uint256 userStablecoinBalanceAfterInterestWithdrawal = stablecoin.balanceOf(USER);
         assertApproxEqRel(

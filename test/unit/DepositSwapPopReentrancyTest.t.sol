@@ -49,10 +49,6 @@ contract ReentrantDepositor is ITransferFromHook {
     function deposit(uint256 scheduleIndex, bytes32 scheduleId, uint256 amount) external {
         dca.depositToken(token, scheduleIndex, scheduleId, amount);
     }
-
-    function update(uint256 scheduleIndex, bytes32 scheduleId, uint256 depositAmount) external {
-        dca.updateDcaSchedule(token, scheduleIndex, scheduleId, depositAmount, 0, 0);
-    }
 }
 
 /// @notice Swap-pop coverage: hook deletes the *same* scheduleIndex being deposited into.
@@ -130,25 +126,6 @@ contract DepositSwapPopReentrancyTest is Test {
         assertEq(afterSchedules[1].tokenBalance, beforeSchedules[1].tokenBalance);
     }
 
-    function test_updateDcaSchedule_reverts_whenHookDeletesSameIndex() public {
-        _createTwoSchedules();
-        IDcaManager.DcaDetails[] memory beforeSchedules = dcaManager.getDcaSchedules(address(user), address(token));
-        bytes32 idA = beforeSchedules[0].scheduleId;
-
-        user.armDelete(0, idA);
-        token.setHook(address(user), true);
-
-        vm.expectRevert("ReentrancyGuard: reentrant call");
-        user.update(0, idA, EXTRA);
-
-        IDcaManager.DcaDetails[] memory afterSchedules = dcaManager.getDcaSchedules(address(user), address(token));
-        assertEq(afterSchedules.length, 2);
-        assertEq(afterSchedules[0].scheduleId, beforeSchedules[0].scheduleId);
-        assertEq(afterSchedules[1].scheduleId, beforeSchedules[1].scheduleId);
-        assertEq(afterSchedules[0].tokenBalance, beforeSchedules[0].tokenBalance);
-        assertEq(afterSchedules[1].tokenBalance, beforeSchedules[1].tokenBalance);
-    }
-
     function test_depositToken_reverts_whenHookDeletesLastRemainingSchedule() public {
         user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
         IDcaManager.DcaDetails[] memory beforeSchedules = dcaManager.getDcaSchedules(address(user), address(token));
@@ -159,23 +136,6 @@ contract DepositSwapPopReentrancyTest is Test {
 
         vm.expectRevert("ReentrancyGuard: reentrant call");
         user.deposit(0, idA, EXTRA);
-
-        IDcaManager.DcaDetails[] memory afterSchedules = dcaManager.getDcaSchedules(address(user), address(token));
-        assertEq(afterSchedules.length, 1);
-        assertEq(afterSchedules[0].scheduleId, idA);
-        assertEq(afterSchedules[0].tokenBalance, beforeSchedules[0].tokenBalance);
-    }
-
-    function test_updateDcaSchedule_reverts_whenHookDeletesLastRemainingSchedule() public {
-        user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
-        IDcaManager.DcaDetails[] memory beforeSchedules = dcaManager.getDcaSchedules(address(user), address(token));
-        bytes32 idA = beforeSchedules[0].scheduleId;
-
-        user.armDelete(0, idA);
-        token.setHook(address(user), true);
-
-        vm.expectRevert("ReentrancyGuard: reentrant call");
-        user.update(0, idA, EXTRA);
 
         IDcaManager.DcaDetails[] memory afterSchedules = dcaManager.getDcaSchedules(address(user), address(token));
         assertEq(afterSchedules.length, 1);

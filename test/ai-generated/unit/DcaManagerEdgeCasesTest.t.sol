@@ -165,7 +165,7 @@ contract DcaManagerEdgeCasesTest is Test {
             TROPYKUS_INDEX       // lendingProtocolIndex
         );
         
-        bytes32 scheduleId = dcaManager.getScheduleId(USER, address(stablecoin), 0);
+        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
         
         // Try to delete as different user
         address otherUser = address(0x9999);
@@ -252,7 +252,7 @@ contract DcaManagerEdgeCasesTest is Test {
         
         // Get the schedule ID after creation
         vm.prank(USER);
-        bytes32 scheduleId = dcaManager.getMyScheduleId(address(stablecoin), 0);
+        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
         vm.expectRevert();
         vm.prank(USER);
         dcaManager.withdrawToken(address(stablecoin), 0, scheduleId, 600 ether); // More than deposited
@@ -271,10 +271,29 @@ contract DcaManagerEdgeCasesTest is Test {
         
         // Get the schedule ID after creation
         vm.prank(USER);
-        bytes32 scheduleId = dcaManager.getMyScheduleId(address(stablecoin), 0);
+        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
         vm.expectRevert();
         vm.prank(USER);
         dcaManager.withdrawToken(address(stablecoin), 0, scheduleId, 0);
+    }
+
+    function test_withdrawTokenAndInterest_usesStoredScheduleRoute() public {
+        vm.prank(USER);
+        dcaManager.createDcaSchedule(
+            address(stablecoin),
+            500 ether,
+            100 ether,
+            MIN_PURCHASE_PERIOD,
+            TROPYKUS_INDEX
+        );
+
+        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedule(USER, address(stablecoin), 0);
+        assertEq(schedule.lendingProtocolIndex, TROPYKUS_INDEX);
+
+        vm.prank(USER);
+        dcaManager.withdrawTokenAndInterest(address(stablecoin), 0, schedule.scheduleId, 100 ether);
+
+        assertEq(dcaManager.getDcaSchedule(USER, address(stablecoin), 0).tokenBalance, 400 ether);
     }
     
     /*//////////////////////////////////////////////////////////////
@@ -418,7 +437,7 @@ contract DcaManagerEdgeCasesTest is Test {
         
         // Get the schedule ID after creation
         vm.prank(USER);
-        bytes32 scheduleId = dcaManager.getMyScheduleId(address(stablecoin), 0);
+        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
         vm.expectRevert();
         vm.prank(USER);
         dcaManager.setPurchaseAmount(address(stablecoin), 0, scheduleId, 0);
@@ -444,7 +463,7 @@ contract DcaManagerEdgeCasesTest is Test {
         
         // Get the schedule ID after creation
         vm.prank(USER);
-        bytes32 scheduleId = dcaManager.getMyScheduleId(address(stablecoin), 0);
+        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
         vm.expectRevert(IDcaManager.DcaManager__PurchasePeriodMustBeGreaterThanMinimum.selector);
         vm.prank(USER);
         dcaManager.setPurchasePeriod(address(stablecoin), 0, scheduleId, MIN_PURCHASE_PERIOD - 1);
@@ -518,7 +537,7 @@ contract DcaManagerEdgeCasesTest is Test {
         
         // Get the schedule ID after creation
         vm.prank(USER);
-        bytes32 scheduleId = dcaManager.getMyScheduleId(address(stablecoin), 0);
+        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
         vm.expectRevert();
         vm.prank(USER);
         dcaManager.depositToken(address(stablecoin), 0, scheduleId, 0);

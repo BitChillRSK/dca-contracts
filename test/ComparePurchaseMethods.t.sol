@@ -497,7 +497,7 @@ contract ComparePurchaseMethods is Test {
         uint256 totalGasUsed = 0;
         for (uint256 i = 0; i < NUM_OF_USERS; i++) {
             vm.prank(users[i]);
-            bytes32 scheduleId = dcaManMoc.getScheduleId(users[i], address(stablecoin), SCHEDULE_INDEX);
+            bytes32 scheduleId = dcaManMoc.getDcaSchedule(users[i], address(stablecoin), SCHEDULE_INDEX).scheduleId;
             
             uint256 gasStart = gasleft();
             vm.prank(SWAPPER);
@@ -538,7 +538,7 @@ contract ComparePurchaseMethods is Test {
         uint256 totalGasUsed = 0;
         for (uint256 i = 0; i < NUM_OF_USERS; i++) {
             vm.prank(users[i]);
-            bytes32 scheduleId = dcaManUni.getScheduleId(users[i], address(stablecoin), SCHEDULE_INDEX);
+            bytes32 scheduleId = dcaManUni.getDcaSchedule(users[i], address(stablecoin), SCHEDULE_INDEX).scheduleId;
             
             uint256 gasStart = gasleft();
             vm.prank(SWAPPER);
@@ -586,11 +586,9 @@ contract ComparePurchaseMethods is Test {
             userArray[i] = users[i];
             scheduleIndexes[i] = SCHEDULE_INDEX;
             
-            vm.startPrank(users[i]);
-            scheduleIds[i] = dcaManMoc.getScheduleId(users[i], address(stablecoin), SCHEDULE_INDEX);
-            purchaseAmounts[i] = dcaManMoc.getMySchedulePurchaseAmount(address(stablecoin), SCHEDULE_INDEX);
-            purchasePeriods[i] = dcaManMoc.getMySchedulePurchasePeriod(address(stablecoin), SCHEDULE_INDEX);
-            vm.stopPrank();
+            scheduleIds[i] = dcaManMoc.getDcaSchedule(users[i], address(stablecoin), SCHEDULE_INDEX).scheduleId;
+            purchaseAmounts[i] = dcaManMoc.getDcaSchedule(users[i], address(stablecoin), SCHEDULE_INDEX).purchaseAmount;
+            purchasePeriods[i] = dcaManMoc.getDcaSchedule(users[i], address(stablecoin), SCHEDULE_INDEX).purchasePeriod;
         }
         
         // Execute batch purchase
@@ -645,11 +643,9 @@ contract ComparePurchaseMethods is Test {
             userArray[i] = users[i];
             scheduleIndexes[i] = SCHEDULE_INDEX;
             
-            vm.startPrank(users[i]);
-            scheduleIds[i] = dcaManUni.getScheduleId(users[i], address(stablecoin), SCHEDULE_INDEX);
-            purchaseAmounts[i] = dcaManUni.getMySchedulePurchaseAmount(address(stablecoin), SCHEDULE_INDEX);
-            purchasePeriods[i] = dcaManUni.getMySchedulePurchasePeriod(address(stablecoin), SCHEDULE_INDEX);
-            vm.stopPrank();
+            scheduleIds[i] = dcaManUni.getDcaSchedule(users[i], address(stablecoin), SCHEDULE_INDEX).scheduleId;
+            purchaseAmounts[i] = dcaManUni.getDcaSchedule(users[i], address(stablecoin), SCHEDULE_INDEX).purchaseAmount;
+            purchasePeriods[i] = dcaManUni.getDcaSchedule(users[i], address(stablecoin), SCHEDULE_INDEX).purchasePeriod;
         }
         
         // Execute batch purchase

@@ -220,7 +220,7 @@ contract RoleSecurityTest is Test {
             TROPYKUS_INDEX
         );
         
-        bytes32 scheduleId = dcaManager.getScheduleId(user, address(stablecoin), 0);
+        bytes32 scheduleId = dcaManager.getDcaSchedule(user, address(stablecoin), 0).scheduleId;
         
         // Unauthorized user should fail
         vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__UnauthorizedSwapper.selector, UNAUTHORIZED_USER));
@@ -241,8 +241,7 @@ contract RoleSecurityTest is Test {
         vm.prank(SWAPPER);
         try dcaManager.buyRbtc(user, address(stablecoin), 0, scheduleId) {
             // Purchase succeeded - verify balance decrease
-            vm.prank(user);
-            assertLt(dcaManager.getMyScheduleTokenBalance(address(stablecoin), 0), 500 ether);
+            assertLt(dcaManager.getDcaSchedule(user, address(stablecoin), 0).tokenBalance, 500 ether);
         } catch Error(string memory reason) {
             // Expected in test environment due to Uniswap mock limitations
             // As long as we didn't get DcaManager__UnauthorizedSwapper, the authorization worked
@@ -280,7 +279,7 @@ contract RoleSecurityTest is Test {
             TROPYKUS_INDEX
         );
         
-        scheduleIds[0] = dcaManager.getScheduleId(users[0], address(stablecoin), 0);
+        scheduleIds[0] = dcaManager.getDcaSchedule(users[0], address(stablecoin), 0).scheduleId;
         
         // Unauthorized user should fail
         vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__UnauthorizedSwapper.selector, UNAUTHORIZED_USER));

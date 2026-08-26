@@ -85,7 +85,7 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
     function test_buyAndWithdraw_spendLayerBankDoc() public {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, LAYERBANK_INDEX);
-        bytes32 scheduleId = dcaManager.getScheduleId(USER, address(docToken), 0);
+        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(docToken), 0).scheduleId;
 
         uint256 lTokensBefore = handler.getUserShares(USER);
 
@@ -94,14 +94,14 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
 
         assertGt(dcaManager.getAccumulatedRbtcBalance(USER, address(docToken), LAYERBANK_INDEX), 0);
         assertLt(handler.getUserShares(USER), lTokensBefore);
-        assertEq(dcaManager.getScheduleTokenBalance(USER, address(docToken), 0), DEPOSIT - PURCHASE);
+        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 0).tokenBalance, DEPOSIT - PURCHASE);
 
         uint256 userDocBefore = docToken.balanceOf(USER);
         vm.prank(USER);
         dcaManager.withdrawToken(address(docToken), 0, scheduleId, DEPOSIT - PURCHASE);
 
         assertEq(docToken.balanceOf(USER), userDocBefore + DEPOSIT - PURCHASE);
-        assertEq(dcaManager.getScheduleTokenBalance(USER, address(docToken), 0), 0);
+        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 0).tokenBalance, 0);
 
         uint256 userRbtcBefore = USER.balance;
         vm.prank(USER);

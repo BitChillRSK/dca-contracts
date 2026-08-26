@@ -38,14 +38,6 @@ interface IDcaManager {
         uint256 purchasePeriod,
         uint256 lendingProtocolIndex
     );
-    event DcaManager__DcaScheduleUpdated(
-        address indexed user,
-        address indexed token,
-        bytes32 indexed scheduleId,
-        uint256 updatedTokenBalance,
-        uint256 updatedPurchaseAmount,
-        uint256 updatedPurchasePeriod
-    );
     event DcaManager__DcaScheduleDeleted(address user, address token, bytes32 scheduleId, uint256 refundedAmount);
     event DcaManager__MaxSchedulesPerTokenModified(uint256 indexed newMaxSchedulesPerToken);
     event DcaManager__OperationsAdminUpdated(address indexed newOperationsAdmin);
@@ -113,24 +105,6 @@ interface IDcaManager {
         uint256 purchaseAmount,
         uint256 purchasePeriod,
         uint256 lendingProtocolIndex
-    ) external;
-
-    /**
-     * @notice Update an existing DCA schedule.
-     * @param token The token address of the stablecoin to deposit.
-     * @param scheduleIndex The index of the DCA schedule
-     * @param scheduleId The schedule id for validation
-     * @param depositAmount The amount of the stablecoin requested from the user. The schedule is credited with the amount the handler actually received.
-     * @param purchaseAmount The amount of to spend periodically in buying rBTC. Validated against the post-deposit token balance.
-     * @param purchasePeriod The period for recurrent purchases
-     */
-    function updateDcaSchedule(
-        address token,
-        uint256 scheduleIndex,
-        bytes32 scheduleId,
-        uint256 depositAmount,
-        uint256 purchaseAmount,
-        uint256 purchasePeriod
     ) external;
 
     /**
@@ -205,14 +179,13 @@ interface IDcaManager {
      * @param scheduleIndex The index of the DCA schedule
      * @param scheduleId The schedule id for validation
      * @param withdrawalAmount The amount of the stablecoin to withdraw, or type(uint256).max for this schedule's whole token balance.
-     * @param lendingProtocolIndex: the lending protocol index
+     * @dev Interest is withdrawn from the schedule's stored lending route. An idle schedule reverts because that route does not yield.
      */
     function withdrawTokenAndInterest(
         address token,
         uint256 scheduleIndex,
         bytes32 scheduleId,
-        uint256 withdrawalAmount,
-        uint256 lendingProtocolIndex
+        uint256 withdrawalAmount
     ) external;
 
     /**
@@ -254,11 +227,13 @@ interface IDcaManager {
     //////////////////////
 
     /**
-     * @notice get the DCA schedules for a user and a token
+     * @notice get one DCA schedule for a user and token
+     * @param user the user address
      * @param token the token address
-     * @return the DCA schedules for the user and the token
+     * @param scheduleIndex the index of the schedule
+     * @return the DCA schedule
      */
-    function getMyDcaSchedules(address token) external view returns (DcaDetails[] memory);
+    function getDcaSchedule(address user, address token, uint256 scheduleIndex) external view returns (DcaDetails memory);
 
     /**
      * @notice get the DCA schedules for a specific user and token
@@ -267,74 +242,6 @@ interface IDcaManager {
      * @return the DCA schedules for the user and the token
      */
     function getDcaSchedules(address user, address token) external view returns (DcaDetails[] memory);
-
-    /**
-     * @notice get the balance of a schedule for the caller
-     * @param token the token address
-     * @param scheduleIndex the index of the schedule
-     * @return the balance of the schedule
-     */
-    function getMyScheduleTokenBalance(address token, uint256 scheduleIndex) external view returns (uint256);
-
-    /**
-     * @notice get the balance of a schedule for a specific user
-     * @param user the user address
-     * @param token the token address
-     * @param scheduleIndex the index of the schedule
-     * @return the balance of the schedule
-     */
-    function getScheduleTokenBalance(address user, address token, uint256 scheduleIndex) external view returns (uint256);
-
-    /**
-     * @notice get the purchase amount of a schedule for the caller
-     * @param token the token address
-     * @param scheduleIndex the index of the schedule
-     * @return the purchase amount of the schedule
-     */
-    function getMySchedulePurchaseAmount(address token, uint256 scheduleIndex) external view returns (uint256);
-
-    /**
-     * @notice get the purchase amount of a schedule for a specific user
-     * @param user the user address
-     * @param token the token address
-     * @param scheduleIndex the index of the schedule
-     * @return the purchase amount of the schedule
-     */
-    function getSchedulePurchaseAmount(address user, address token, uint256 scheduleIndex) external view returns (uint256);
-
-    /**
-     * @notice get the purchase period of a schedule for the caller
-     * @param token the token address
-     * @param scheduleIndex the index of the schedule
-     * @return the purchase period of the schedule
-     */
-    function getMySchedulePurchasePeriod(address token, uint256 scheduleIndex) external view returns (uint256);
-
-    /**
-     * @notice get the purchase period of a schedule for a specific user
-     * @param user the user address
-     * @param token the token address
-     * @param scheduleIndex the index of the schedule
-     * @return the purchase period of the schedule
-     */
-    function getSchedulePurchasePeriod(address user, address token, uint256 scheduleIndex) external view returns (uint256);
-
-    /**
-     * @notice get the schedule ID of a schedule
-     * @param user the user address
-     * @param token the token address
-     * @param scheduleIndex the index of the schedule
-     * @return the schedule ID of the schedule
-     */
-    function getScheduleId(address user, address token, uint256 scheduleIndex) external view returns (bytes32);
-
-    /**
-     * @notice get the schedule ID of a schedule for the caller
-     * @param token the token address
-     * @param scheduleIndex the index of the schedule
-     * @return the schedule ID of the schedule
-     */
-    function getMyScheduleId(address token, uint256 scheduleIndex) external view returns (bytes32);
 
     /**
      * @notice get the admin operations contract's address
@@ -355,14 +262,6 @@ interface IDcaManager {
         returns (uint256);
 
     /**
-     * @notice get the interest accrued by a user for a token and lending protocol index (caller's schedule)
-     * @param token the token address
-     * @param lendingProtocolIndex the lending protocol index
-     * @return the interest accrued by the user for the token and lending protocol index
-     */
-    function getMyInterestAccrued(address token, uint256 lendingProtocolIndex) external view returns (uint256);
-
-    /**
      * @notice get the rBTC accumulated by a user on the handler for a token and lending protocol index
      * @param user the user address
      * @param token the token address
@@ -373,14 +272,6 @@ interface IDcaManager {
         external
         view
         returns (uint256);
-
-    /**
-     * @notice get the rBTC accumulated by the caller on the handler for a token and lending protocol index
-     * @param token the token address
-     * @param lendingProtocolIndex the lending protocol index
-     * @return the accumulated rBTC balance
-     */
-    function getMyAccumulatedRbtcBalance(address token, uint256 lendingProtocolIndex) external view returns (uint256);
 
     /**
      * @dev returns the minimum period that can be set for purchases

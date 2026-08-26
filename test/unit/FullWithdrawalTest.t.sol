@@ -150,7 +150,7 @@ contract FullWithdrawalTest is DcaDappTest {
 
         vm.prank(USER);
         dcaManager.withdrawTokenAndInterest(
-            address(stablecoin), SCHEDULE_INDEX, scheduleId, type(uint256).max, s_lendingProtocolIndex
+            address(stablecoin), SCHEDULE_INDEX, scheduleId, type(uint256).max
         );
 
         assertEq(_scheduleBalance(SCHEDULE_INDEX), 0, "the schedule was not emptied");
@@ -167,10 +167,10 @@ contract FullWithdrawalTest is DcaDappTest {
     //////////////////////////////////////////////////////////////*/
 
     function _scheduleId(uint256 scheduleIndex) internal view returns (bytes32) {
-        return dcaManager.getScheduleId(USER, address(stablecoin), scheduleIndex);
+        return dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).scheduleId;
     }
 
     function _scheduleBalance(uint256 scheduleIndex) internal view returns (uint256) {
-        return dcaManager.getScheduleTokenBalance(USER, address(stablecoin), scheduleIndex);
+        return dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).tokenBalance;
     }
 }
