@@ -114,11 +114,11 @@ Do not change, constrain, or remove it in R13. It is recorded here so the next p
 
 The consequence is permanent under add-only assignment: deposits still lend and mint shares, principal withdrawal still works via `ITokenHandler.withdrawToken`, but `withdrawTokenAndInterest` / `withdrawAllAccumulatedInterest` are gated by `isLendingRoute` (false), and `LendingErc20Handler.withdrawInterest` is `onlyDcaManager`. Yield on that route is unreachable forever. The mirror case (idle handler at a lending index) only bricks the interest path, which is harmless for a handler with no interest.
 
-A real fix needs an ERC-165 id for `ITokenLending` on `assignTokenHandler`. That is a handler `supportsInterface` change, not this PR. **R31** is the next ABI pass — pick the check up there if it fits the bytecode budget; otherwise a follow-up. Until then, the cutover runbook must treat a lending handler at an idle index as a terminal operator error.
+A real fix needs an ERC-165 id for `ITokenLending` on `assignTokenHandler`. That is a handler `supportsInterface` change, not this PR. **R31 owns the close** (see that spec's **Carried from R13** section): ship the check, or if Dex runtime margin cannot absorb it after selector pruning, assign a follow-up spec in the same PR before merging. Do not leave only a cutover warning. Until R31 lands, treat a lending handler at an idle index as a terminal operator error.
 
 ## Noted, not in scope: Ownable2Step
 
-With AccessControl gone there is no second authority. OpenZeppelin 4.9.3 `transferOwnership` has no acceptance step. A wrong governance address permanently freezes `registerRoute`, `assignTokenHandler`, and swapper management, and because routes are add-only there is no recovery (pre-R13, `ADMIN_ROLE` holders were a fallback). This PR overrides `renounceOwnership` to revert so an accidental renounce cannot do the same. Two-step ownership is deferred the same way as `setOperationsAdmin`: a later planning pass, not this consolidation.
+With AccessControl gone there is no second authority. OpenZeppelin 4.9.3 `transferOwnership` has no acceptance step. A wrong governance address permanently freezes `registerRoute`, `assignTokenHandler`, and swapper management, and because routes are add-only there is no recovery (pre-R13, `ADMIN_ROLE` holders were a fallback). This PR overrides `renounceOwnership` to revert so an accidental renounce cannot do the same. Two-step ownership is on the **optional-late** list in `IMPLEMENTATION_ORDER.md` (with OZ 5.x). R31 does not own it.
 
 ## Scope
 

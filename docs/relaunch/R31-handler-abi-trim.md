@@ -22,6 +22,18 @@ This is a fresh relaunch, so the ABI should be settled before R9 rather than car
 
 The duplicate route-token getters, automatic oracle getter, caller-only accumulated-rBTC getter, individual fee getters, and public fee-cap getter are assigned for removal.
 
+## Carried from R13 — class↔handler ERC-165 (required close)
+
+R13 `assignTokenHandler` attests only `ITokenHandler`. A `LendingErc20Handler` at an idle index is accepted — and index `0` is idle by construction and needs no `registerRoute` — so a single mistyped argument permanently strands `withdrawInterest`: DcaManager gates it on `isLendingRoute` (false), and `LendingErc20Handler.withdrawInterest` is `onlyDcaManager`. Principal withdrawal still works. The idle-handler-at-lending-index mirror only bricks the interest path, which is harmless for a handler with no interest.
+
+This is a `supportsInterface` addition, not selector pruning, but it is an ABI-adjacent hole R13 cannot close without changing handlers. **This PR must close it**, not defer it again:
+
+1. Lending handlers advertise `type(ITokenLending).interfaceId` in `supportsInterface` (alongside `ITokenHandler`). Idle handlers must not.
+2. `assignTokenHandler`: if the route is lending, require `ITokenLending`; if idle, reject `ITokenLending`. Keep the existing `ITokenHandler` attestation.
+3. Tests: lending handler at an idle index (including `0`) reverts; idle stub at a lending index reverts; matching pairs still assign.
+
+If Dex runtime margin cannot absorb the `supportsInterface` addition **after** the assigned selector pruning, record before/after sizes in the PR and **create and assign a follow-up spec** in `docs/relaunch/` plus a row in `IMPLEMENTATION_ORDER.md` before merging. Do not merge R31 with only the R13 cutover warning.
+
 ## Scope
 
 - [ ] Remove the write-only `i_docToken` and the duplicated `i_purchasingToken`; use `StablecoinSource._purchaseToken()` wherever a purchase route needs the token (currently Uniswap path construction and router approval). Do not add `TokenHandler` to either purchase base.
@@ -34,13 +46,14 @@ The duplicate route-token getters, automatic oracle getter, caller-only accumula
 - [ ] Apply the recorded fee-setter decision. Keep `setFeeCollectorAddress` and `getFeeCollectorAddress`, because the collector is not part of `FeeSettings`.
 - [ ] Update first-party interfaces, scripts, deployment assertions, handler tests, fuzz wrappers, and any checked-in consumer to the canonical APIs.
 - [ ] Record before/after ABI selector lists and runtime sizes for all six concrete handlers.
+- [ ] Close the R13 class↔handler hole (see **Carried from R13**): ERC-165 `ITokenLending` match on `assignTokenHandler`, or an assigned follow-up spec if Dex margin cannot absorb it.
 
 ## Out of scope
 
 - [ ] Fee formula, bounds, collector policy, cap value, or event semantics.
 - [ ] R33 slippage behavior, R34 DcaManager ABI, R9 event indexing, or further code-size work.
-- [ ] Concrete handler constructor-ABI changes, storage-layout changes, protocol adapters, deploy-index changes, or live broadcasts. The two abstract purchase-base constructor cleanups assigned above are in scope.
-- [ ] R13 class↔handler ERC-165 (`assignTokenHandler` checking `ITokenLending` against `RouteClass`). That is a `supportsInterface` addition, not selector pruning. Pick it up in this ABI pass only if it fits the bytecode budget; otherwise a follow-up. Until then the R13 cutover runbook forbids assigning a lending handler at an idle index.
+- [ ] Concrete handler constructor-ABI changes, storage-layout changes, protocol adapters, deploy-index changes, or live broadcasts. The two abstract purchase-base constructor cleanups assigned above are in scope. The `supportsInterface` addition in **Carried from R13** is the one assigned ABI-adjacent exception.
+- [ ] Ownable2Step / two-step `OperationsAdmin` ownership (R13 optional-late).
 
 ## Files likely touched
 
@@ -57,6 +70,8 @@ The duplicate route-token getters, automatic oracle getter, caller-only accumula
 - `src/tropykus-legacy/TropykusErc20HandlerDex.sol`
 - `src/idle/IdleDocHandlerMoc.sol`
 - `src/layerbank/LayerBankDocHandlerMoc.sol`
+- `src/OperationsAdmin.sol`, `src/interfaces/IOperationsAdmin.sol` (class↔handler ERC-165 on `assignTokenHandler`)
+- `src/LendingErc20Handler.sol` / `src/TokenHandler.sol` (`supportsInterface` for `ITokenLending`)
 - Matching deployment, unit, fuzz-wrapper, and handler tests named by compiler errors or direct selector usage
 
 ## Required tests
@@ -77,6 +92,8 @@ make fork-tropykus
 
 Run the inspection loop against the actual base and head. Assert that only assigned selectors disappear, concrete constructor ABIs and storage slots remain unchanged, the initial and updated Uniswap paths both start with `_purchaseToken()`, fee validation is identical, and all concrete handlers stay below EIP-170 with increased margin.
 
+Also assert lending-at-idle and idle-at-lending assignment revert (including index `0`), unless this PR assigns a follow-up spec because Dex margin could not absorb the `supportsInterface` addition.
+
 ## Success criteria
 
 - [ ] Each exposed value has one canonical getter.
@@ -85,6 +102,7 @@ Run the inspection loop against the actual base and head. Assert that only assig
 - [ ] The decided fee mutation surface is reflected consistently in implementation, interface, tests, and docs.
 - [ ] Concrete handler constructor ABIs and storage layouts are unchanged; only abstract base-constructor plumbing is reduced.
 - [ ] Concrete-handler runtime margins are measured and improve.
+- [ ] A lending handler cannot be assigned at an idle index, and an idle handler cannot be assigned at a lending index — or a follow-up spec is assigned in this PR because Dex margin could not absorb the check.
 - [ ] Targeted, done-gate, and both fork tests pass.
 
 ## Reviewer checklist
