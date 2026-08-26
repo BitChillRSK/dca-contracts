@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: yes · Optional/further-review: no
 
-PR 21 of R22 (reordered after R29). Stack on R29 (PR 20). Last required R22 PR; R9 follows.
+PR 22 of R22 (reordered after R30). Stack on R30 (PR 21). Last required R22 PR; R9 follows as PR 23.
 
 ## Objective
 
@@ -10,7 +10,7 @@ Wire LayerBank into the live index map (idle=0, LayerBank=1, Sovryn=2), split th
 
 ## Background
 
-PR 15 shipped `LayerBankDocHandlerMoc` behind an add-on deploy script. PR 16 (R25) finishes redeem-helper naming and PR 17 (R26) swaps the “lending token” noun for `shares` — build the harness split against those names. This PR is the cutover: constants, `DeployMocSwaps` / harness / Makefile / CI.
+PR 15 shipped `LayerBankDocHandlerMoc` behind an add-on deploy script. PR 16 (R25) finishes redeem-helper naming, PR 17 (R26) swaps the “lending token” noun for `shares`, and PR 21 (R30) centralizes the purchase pipeline and stablecoin-source seam — build the harness split against those final names and inheritance. This PR is the cutover: constants, `DeployMocSwaps` / harness / Makefile / CI.
 
 **Round-up solvency (required in this PR, not deferred).** `_stablecoinToShares` documents `Math.Rounding.Up` for all lending handlers (Tropykus / Sovryn / LayerBank). Aave `withdraw` burns scaled shares with `amount.rayDiv(index)` (round nearest), so LayerBank is the sharpest place to regression-test: debiting ≥ what Aave burns keeps `sum(s_aTokenBalances) <= aToken.scaledBalanceOf(handler)`. Flipping TokenLending to round **down** would let virtual books drift above reality; happy-path suites still pass. Ship a test that fails under round-down sizing — do not leave this as a handler comment.
 
@@ -18,7 +18,7 @@ Related: [R22-layerbank-handler.md](./R22-layerbank-handler.md), [R25-lending-re
 
 ## Open product decisions
 
-**none** — `IMPLEMENTATION_ORDER.md` lists no gates for PR 21. Implement without asking.
+**none** — `IMPLEMENTATION_ORDER.md` lists no gates for PR 22. Implement without asking.
 
 ## Scope
 

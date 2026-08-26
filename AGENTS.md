@@ -27,13 +27,14 @@ Do not Grep/`Glob` `out/`, `cache/`, or `lib/` (see `.cursorignore`). Open a `li
 ```
 DcaManager          user + swapper entry; schedules
 OperationsAdmin     roles; token × lending-index → handler
-FeeHandler          fee math (also inherited by Purchase*)
+FeeHandler          fee math (inherited by TokenHandler and PurchaseRbtc)
 TokenHandler        deposit/withdraw stablecoin (owns FeeHandler)
 TokenLending        share ↔ underlying conversion (no TokenHandler inherit)
 LendingErc20Handler TokenHandler + TokenLending; per-user shares, withdraw clamp, interest, batch pro-rata
-PurchaseRbtc        accumulated rBTC; withdraw to signer
-PurchaseMoc         MoC redeem DOC → rBTC
-PurchaseUniswap     Uniswap V3 → WRBTC
+StablecoinSource    funding-hook + _purchaseToken declarations (PurchaseRbtc consumes; lending/idle implement)
+PurchaseRbtc        shared buy/batch pipeline; accumulated rBTC; withdraw to signer
+PurchaseMoc         MoC redeem DOC → rBTC (_purchaseRbtc only)
+PurchaseUniswap     Uniswap V3 → WRBTC (_purchaseRbtc + WRBTC unwrap on withdraw)
 
 Handlers = LendingErc20Handler + a Purchase*  (lending adapters) or TokenHandler + a Purchase* (idle):
   src/sovryn/            SovrynErc20Handler ─┬─ SovrynDocHandlerMoc   (+ PurchaseMoc)

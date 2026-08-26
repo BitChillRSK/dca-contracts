@@ -58,9 +58,10 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R27 | 18 | none |
 | R28 | 19 | none |
 | R29 | 20 | none |
-| R22 (deploy/CI) | 21 | none |
-| R9 | 22 | R18/R19 if not recorded (ABI freeze) |
-| R10 | 23 | none |
+| R30 | 21 | none |
+| R22 (deploy/CI) | 22 | none |
+| R9 | 23 | R18/R19 if not recorded (ABI freeze) |
+| R10 | 24 | none |
 | R12, R13, R18, R19, OZ 5.x | optional late | only if the human named that item |
 
 ### PR 1 - R23 toolchain and dependency baseline
@@ -203,7 +204,7 @@ Do not rename Tropykus in place and do not deploy USDRIF/Uniswap handlers for th
 
 ### PR 16 - R25 lending redeem helper naming
 
-Leftover from R16 (PR 14): that glossary pass still left `_burnKtoken` and a “repay” alias. Rename-only (plus tiny leaf cleanup), after LayerBank exists so all three lending handlers match. Drop `_burnKtoken` / `_burnAtoken` and `*ToRepay` locals in favor of `_redeemByUnderlying` / `_redeemByShares` (Tropykus/LayerBank) and `*ToRedeem` locals (all three). Sovryn stays one share-sized helper with a recipient overload; stop reusing `stablecoinInterestAmount` for the measured payout; rename `totalErc20InLending` → `totalStablecoinInLending`. Copy Sovryn’s `getAccruedInterest` natspec onto Tropykus/LayerBank. Drop unused `minPurchaseAmount` from Tropykus/Sovryn MoC/Dex constructors (LayerBank already omitted it); fix SovrynDocHandlerMoc’s “Tropykus' iSUSD” natspec. Also rename the shared event to `TokenLending__AmountToRedeemAdjusted` — the relaunch deploys fresh with no live log consumer, and R9 (PR 22) freezes the event surface, so this is the last cheap moment. See `R25-lending-redeem-naming.md`.
+Leftover from R16 (PR 14): that glossary pass still left `_burnKtoken` and a “repay” alias. Rename-only (plus tiny leaf cleanup), after LayerBank exists so all three lending handlers match. Drop `_burnKtoken` / `_burnAtoken` and `*ToRepay` locals in favor of `_redeemByUnderlying` / `_redeemByShares` (Tropykus/LayerBank) and `*ToRedeem` locals (all three). Sovryn stays one share-sized helper with a recipient overload; stop reusing `stablecoinInterestAmount` for the measured payout; rename `totalErc20InLending` → `totalStablecoinInLending`. Copy Sovryn’s `getAccruedInterest` natspec onto Tropykus/LayerBank. Drop unused `minPurchaseAmount` from Tropykus/Sovryn MoC/Dex constructors (LayerBank already omitted it); fix SovrynDocHandlerMoc’s “Tropykus' iSUSD” natspec. Also rename the shared event to `TokenLending__AmountToRedeemAdjusted` — the relaunch deploys fresh with no live log consumer, and R9 (now PR 23) freezes the event surface, so this is the last cheap moment. See `R25-lending-redeem-naming.md`.
 
 Land before R26 and deploy/CI so neither PR freezes the old helper names.
 
@@ -213,7 +214,7 @@ Land before R26 and deploy/CI so neither PR freezes the old helper names.
 
 Keep `ITokenLending` / `TokenLending` / `LENDING_PROTOCOL` / `LendingProtocol*Failed` — "lending" as a domain word is fine; only "lending **token**" is wrong. Keep `stablecoin` as the asset noun; do not adopt 4626's `assets`.
 
-Land before R22 deploy/CI (PR 21) for the same reason R25 did: that PR splits the harness where 76 of the 295 matching lines live, so renaming afterwards writes them twice. **R9 (PR 22) is the ABI freeze** and already specifies `TokenLending__UserSharesUpdated(…, previousShares, newShares)`; until this PR reworded it, the R9 entry below also required a test asserting `newShares == getUsersLendingTokenBalance(user)` — two names for one quantity. Settle the noun before that lands. See `R26-share-terminology.md`.
+Land before R22 deploy/CI (now PR 22) for the same reason R25 did: that PR splits the harness where 76 of the 295 matching lines live, so renaming afterwards writes them twice. **R9 (now PR 23) is the ABI freeze** and already specifies `TokenLending__UserSharesUpdated(…, previousShares, newShares)`; until this PR reworded it, the R9 entry below also required a test asserting `newShares == getUsersLendingTokenBalance(user)` — two names for one quantity. Settle the noun before that lands. See `R26-share-terminology.md`.
 
 ### PR 18 - R27 Tropykus lending cash guards
 
@@ -231,9 +232,64 @@ Promoted from optional late (human named it for this slot). Collapse the three l
 
 Sovryn and Tropykus still take `exchangeRateDecimals` as a constructor argument; LayerBank already hardcodes `RAY`. The scale is a protocol constant, not a deploy knob — passing `Constants.sol`’s `1e18` into LayerBank would size withdrawals 1e9× too large. Bind `1e18` as `EXCHANGE_RATE_DECIMALS` on the Sovryn and Tropykus adapters (same shape as LayerBank’s `RAY`). Drop the arg from those adapters, their Moc/Dex leaves, and every `new` / script call site. Do not add the arg to LayerBank. `TokenLending` still receives the value from the adapter.
 
-Must land before R22 deploy/CI so that PR does not freeze the extra constructor arg. Stack on R28 (PR 19, GitHub #63). See `R29-hardcode-exchange-rate-scale.md`.
+Must land before R30 and R22 deploy/CI so neither inherits or freezes the extra constructor arg. Stack on R28 (PR 19, GitHub #63). See `R29-hardcode-exchange-rate-scale.md`.
 
-### PR 21 - R22 deploy scripts, constants, harness, and CI matrix
+### PR 21 - R30 shared rBTC purchase pipeline
+
+Promoted from Candidates A+B in the post-R29 full-`src/` review. Move the duplicated MoC/Uniswap single and batch algorithm into `PurchaseRbtc`, with route hooks that continue to return measured native rBTC or WRBTC cash. Add a shared `StablecoinSource` declaration inherited by the purchase and funding bases so the six leaves can delete twelve forwarding resolvers.
+
+This is behavior-preserving architecture work: no ABI, fee, allocation, event, error, constructor, slippage, or deploy changes. It is primarily a maintenance/drift win, not promised bytecode headroom; measure the concrete handlers and keep both Dex handlers below EIP-170. Give the common algorithm base-level tests plus MoC/Uniswap route-adapter coverage. See [`R30-purchase-pipeline.md`](./R30-purchase-pipeline.md).
+
+GitHub [#65](https://github.com/BitChillRSK/dca-contracts/pull/65). Stack on R29 (PR 20, GitHub #64). Land before R22 deploy/CI (now PR 22) so the harness is split around the final purchase shape.
+
+### Unassigned refactoring review checkpoint (after R30)
+
+**Further consideration only — no item below is assigned, authorized, or given a PR number yet.** The human requested that the full-`src/` review after R28 be preserved here before moving on. Candidates A+B were promoted together as R30 (PR 21); Candidates C–F retain their original review labels below. Promote another item only by writing and assigning its own spec. Otherwise `Start with R22 (deploy/CI)` is the next prompt after R30. Keep behavior-preserving architecture work separate from ABI/product decisions and from `OperationsAdmin` security policy.
+
+The R28 review snapshot measured runtime bytecode at 21,081 bytes for `DcaManager`, 24,243 for `SovrynErc20HandlerDex`, and 24,366 for `TropykusErc20HandlerDex` (EIP-170 margins 3,495 / 333 / 210 bytes). An abstract-base extract can remove source drift without reducing a concrete handler's runtime because the compiler inlines it. Selector/API removal is the candidate below that creates real runtime headroom. Re-measure on the eventual base before accepting any size claim.
+
+#### Candidate C — pre-R9 handler ABI and dispatcher trim
+
+This is a product/compatibility decision, not a free refactor. Inventory and consider removing redundant selectors before R9 freezes the shipped surface:
+
+- `i_docToken()` / `i_purchasingToken()` duplicate `i_stableToken()` on concrete handlers;
+- public `s_mocOracle()` duplicates `getMocOracle()`;
+- no-argument `getAccumulatedRbtcBalance()` duplicates the address overload;
+- `FeeHandler` exposes four individual setters and four individual getters alongside the atomic `setFeeRateParams` / aggregate `getFeeSettings` APIs;
+- `MAX_FEE_RATE_CAP()` is an on-chain constant getter whose compatibility value should be weighed against code size.
+
+Removing selectors creates actual runtime headroom on every affected handler, unlike moving code between abstract parents. Before promotion, inventory frontend, script, test, and indexer consumers; explicitly decide which convenience APIs remain. Preserve the linear fee model and 5% cap unless a separate product decision says otherwise. Do not silently undo R3's recorded choice to keep individual setters.
+
+#### Candidate D — `DcaManager` internal cleanup, with ABI pruning kept separate
+
+Behavior-preserving portion to consider:
+
+- change `updateDcaSchedule` from a whole-struct memory copy/write-back to targeted writes through a storage reference; invariant 6 remains mandatory and is what makes the simpler shape safe;
+- extract one storage-based locked-principal sum used by `_withdrawInterest` and `getInterestAccrued` instead of copying the schedules array twice;
+- avoid repeating handler lookup and lending-protocol validation inside `withdrawAllAccumulatedInterest`;
+- replace the two-keccak empty protocol-name test with a direct bytes-length/canonical registry check;
+- make `_exchangeRate()` default to `_viewExchangeRate()` in `LendingErc20Handler`, with only mutating-rate adapters overriding both, if the final adapter set still benefits.
+
+ABI/product portion to decide separately before R9: consolidate the `getMy*` plus arbitrary-user per-field schedule getters around a single-schedule struct getter; derive `withdrawTokenAndInterest`'s protocol index from the named schedule instead of accepting a redundant caller value; consider whether specialized deposit/purchase-amount/purchase-period entry points still justify duplicating the general update surface. Do not bundle ABI removal into the internal-only cleanup without an explicit gate.
+
+#### Candidate E — unify Uniswap slippage-setting validation
+
+The constructor and `setAmountOutMinimumPercent` enforce `amountOutMinimumPercent >= amountOutMinimumSafetyCheck`, but `setAmountOutMinimumSafetyCheck` can currently raise the safety check above the active percentage. Consider one shared validator used by construction and every update, or one atomic settings setter. Add the missing regression where the owner tries to raise safety above the current percentage. This intentionally tightens owner configuration behavior, so name it in the spec and ABI/cutover notes rather than presenting it as a pure move-only refactor. Keep it separate from R30.
+
+#### Candidate F — `OperationsAdmin` registry/role redesign (coordinate with R13 and replacement policy)
+
+Consider a typed nested `token => protocolIndex => handler` mapping instead of a manually hashed key, and a single canonical protocol registry / `isLendingProtocol(index)` query instead of the mutable string↔index pair. The current `addOrUpdateLendingProtocol` can leave stale forward or reverse aliases when a name or index is reassigned; `DcaManager` should not fetch and hash a protocol name merely to decide whether an index yields interest. A direct `handler.code.length` test can also replace the production import of `Address.isContract`, subject to the chosen handler-attestation policy.
+
+Do not implement this piecemeal. Coordinate it with optional R13 and the still-open handler-replacement problem: role simplification, protocol identity, first assignment vs replacement, and any cooperative migration capability are one security/operations design surface. Anything requiring old-handler cooperation has the existing pre-cutover deadline.
+
+#### Deliberate non-candidates from the review
+
+- Do not merge `TokenLending` into `LendingErc20Handler`; keep conversion math independent as R28 records.
+- Do not absorb Idle into the lending base; it has no shares or exchange rate and deliberately differs on batch shortfalls.
+- Do not add another shared layer over the now-thin Sovryn, Tropykus, and LayerBank adapters unless a future protocol exposes a real repeated seam.
+- Do not introduce proxies, delegatecall, owner rescue, or a `to` parameter as a code-size/refactor shortcut; invariants 1–7 remain unchanged.
+
+### PR 22 - R22 deploy scripts, constants, harness, and CI matrix
 
 Update constants and deploy scripts for the new map:
 
@@ -246,9 +302,9 @@ Split the shared test harness so lending-share assertions live only in lending-p
 
 **Required in this PR:** round-up solvency regression on the LayerBank lane — virtual scaled books must stay ≤ handler `scaledBalanceOf` after odd-amount redeems against Aave-like round-nearest burns; the test must fail if `_stablecoinToShares` rounded down. Shared rule lives on `TokenLending`; do not re-document it only on LayerBank. See `R22-deploy-ci.md`.
 
-Stack on R29 (PR 20). Tropykus is not in this map; R27 already corrected the legacy handler.
+Stack on R30 (PR 21, GitHub [#65](https://github.com/BitChillRSK/dca-contracts/pull/65)). Tropykus is not in this map; R27 already corrected the legacy handler.
 
-### PR 22 - R9 event indexing and ABI cleanup
+### PR 23 - R9 event indexing and ABI cleanup
 
 Index only addresses and `scheduleId`. Do not index amounts, timestamps, periods, rates, strings, bytes, or arrays.
 
@@ -256,7 +312,7 @@ Add `TokenLending__UserSharesUpdated(address indexed user, uint256 previousShare
 
 Do this once the shipped ABI surface is known, including any optional pause or compound-interest events that were approved.
 
-### PR 23 - R10 natspec and comments
+### PR 24 - R10 natspec and comments
 
 Rewrite first-party natspec after ABI, names, handlers, and layout are stable. Put user-facing docs on interfaces and use `@inheritdoc` in implementations.
 

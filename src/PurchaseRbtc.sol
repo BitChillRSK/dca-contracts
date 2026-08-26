@@ -3,12 +3,15 @@ pragma solidity 0.8.36;
 
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {DcaManagerAccessControl} from "./DcaManagerAccessControl.sol";
+import {FeeHandler} from "./FeeHandler.sol";
+import {StablecoinSource} from "./StablecoinSource.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title PurchaseRbtc
- * @notice Base contract for purchasing and handling rBTC
+ * @notice Shared rBTC purchase pipeline, accumulated-balance accounting, and signer withdrawals
  */
-abstract contract PurchaseRbtc is IPurchaseRbtc, DcaManagerAccessControl {
+abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessControl, StablecoinSource {
     //////////////////////
     // State variables ///
     //////////////////////
@@ -18,6 +21,84 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, DcaManagerAccessControl {
      * @notice Allow the contract to receive rBTC
      */
     receive() external payable {}
+
+    /**
+     * @param buyer: the user on behalf of which the contract is making the rBTC purchase
+     * @param scheduleId: the schedule id
+     * @param purchaseAmount: the amount to spend on rBTC
+     * @notice this function will be called periodically through a CRON job running on a web server
+     */
+    function buyRbtc(address buyer, bytes32 scheduleId, uint256 purchaseAmount) external override onlyDcaManager {
+        // Retrieve the stablecoin to spend
+        purchaseAmount = _retrieveStablecoin(buyer, purchaseAmount);
+
+        // Charge fee
+        uint256 fee = _calculateFee(purchaseAmount);
+        uint256 netPurchaseAmount = purchaseAmount - fee;
+        IERC20 purchaseToken = _purchaseToken();
+        _transferFee(purchaseToken, fee);
+
+        uint256 rbtcReceived = _purchaseRbtc(netPurchaseAmount);
+
+        if (rbtcReceived > 0) {
+            s_usersAccumulatedRbtc[buyer] += rbtcReceived;
+            emit PurchaseRbtc__RbtcBought(
+                buyer, address(purchaseToken), rbtcReceived, scheduleId, netPurchaseAmount
+            );
+        } else {
+            revert PurchaseRbtc__RbtcPurchaseFailed(buyer, address(purchaseToken));
+        }
+    }
+
+    /**
+     * @notice batch buy rBTC
+     * @param buyers: the users on behalf of which the contract is making the rBTC purchase
+     * @param scheduleIds: the schedule ids
+     * @param purchaseAmounts: the amounts to spend on rBTC
+     */
+    function batchBuyRbtc(address[] memory buyers, bytes32[] memory scheduleIds, uint256[] memory purchaseAmounts)
+        external
+        override
+        onlyDcaManager
+    {
+        uint256 numOfPurchases = buyers.length;
+
+        // Calculate net amounts
+        (uint256 aggregatedFee, uint256[] memory netStablecoinAmountsToSpend, uint256 totalNetStablecoinPlanned) =
+            _calculateFeeAndNetAmounts(purchaseAmounts);
+
+        // Retrieve the stablecoin to spend
+        // @notice we spend the stablecoin we actually received, never the gross amount we asked the lending protocol for
+        uint256 totalStablecoinAmountToSpend =
+            _batchRetrieveStablecoin(buyers, purchaseAmounts, totalNetStablecoinPlanned + aggregatedFee); // totalNetStablecoinPlanned (to spend on rBTC) + aggregatedFee (charged by BitChill)
+        if (totalStablecoinAmountToSpend <= aggregatedFee) {
+            revert PurchaseRbtc__StablecoinRetrievedBelowFee(totalStablecoinAmountToSpend, aggregatedFee);
+        }
+        totalStablecoinAmountToSpend -= aggregatedFee;
+
+        IERC20 purchaseToken = _purchaseToken();
+        _transferFee(purchaseToken, aggregatedFee);
+
+        uint256 totalPurchasedRbtc = _purchaseRbtc(totalStablecoinAmountToSpend);
+        if (totalPurchasedRbtc == 0) revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(purchaseToken));
+
+        for (uint256 i; i < numOfPurchases; ++i) {
+            // @notice the planned net amounts are only allocation weights: they sum to totalNetStablecoinPlanned,
+            // so the shares below sum to exactly 1 even if the redemption paid less than expected. Both the rBTC credited
+            // and the stablecoin reported as spent are shares of what actually moved.
+            uint256 usersPurchasedRbtc =
+                totalPurchasedRbtc * netStablecoinAmountsToSpend[i] / totalNetStablecoinPlanned;
+            uint256 usersStablecoinSpent =
+                totalStablecoinAmountToSpend * netStablecoinAmountsToSpend[i] / totalNetStablecoinPlanned;
+            s_usersAccumulatedRbtc[buyers[i]] += usersPurchasedRbtc;
+            emit PurchaseRbtc__RbtcBought(
+                buyers[i], address(purchaseToken), usersPurchasedRbtc, scheduleIds[i], usersStablecoinSpent
+            );
+        }
+        emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
+            address(purchaseToken), totalPurchasedRbtc, totalStablecoinAmountToSpend
+        );
+    }
 
     /**
      * @notice the user can at any time withdraw the rBTC that has been accumulated through periodical purchases
@@ -74,28 +155,9 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, DcaManagerAccessControl {
     }
 
     /**
-     * @notice retrieve the buyer's stablecoin onto the handler so the purchase can spend it
-     * @notice define abstract functions to be implemented by child contracts
-     * @dev lending handlers redeem their shares to get the stablecoin here, while the
-     * idle handler only debits its own mapping.
-     * @dev these functions semantically belong to the TokenLending contract,
-     * however, putting them there and changing the inheritance graph made it
-     * impossible to linearize and finding another solution  would have required a major refactor.
-     * @param buyer: the address of the buyer
-     * @param amount: the amount of stablecoin wanted
-     * @return the amount of stablecoin actually available to spend
+     * @notice spend `stablecoinAmount` of net stablecoin and return only measured rBTC or WRBTC received
+     * @param stablecoinAmount the net stablecoin amount to spend after fees
+     * @return rbtcReceived the measured native rBTC or WRBTC this contract actually received
      */
-    function _retrieveStablecoin(address buyer, uint256 amount) internal virtual returns (uint256);
-
-    /**
-     * @notice retrieve several buyers' stablecoin for a batch purchase
-     * @param buyers: the addresses of the buyers
-     * @param purchaseAmounts: the amounts of stablecoin charged to each buyer
-     * @param totalStablecoinToRetrieve: the total amount of stablecoin wanted
-     * @return the total amount of stablecoin actually available to spend
-     */
-    function _batchRetrieveStablecoin(address[] memory buyers, uint256[] memory purchaseAmounts, uint256 totalStablecoinToRetrieve)
-        internal
-        virtual
-        returns (uint256);
-} 
+    function _purchaseRbtc(uint256 stablecoinAmount) internal virtual returns (uint256 rbtcReceived);
+}

@@ -2,7 +2,9 @@
 pragma solidity 0.8.36;
 
 import {TokenHandler} from "src/TokenHandler.sol";
+import {StablecoinSource} from "src/StablecoinSource.sol";
 import {IIdleErc20Handler} from "./IIdleErc20Handler.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title IdleErc20Handler
@@ -11,7 +13,7 @@ import {IIdleErc20Handler} from "./IIdleErc20Handler.sol";
  * accounting bug cannot spend another user's pooled DOC. Batch purchases revert instead
  * of clamping, because PurchaseMoc splits rBTC by the original planned weights.
  */
-abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler {
+abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, StablecoinSource {
     //////////////////////
     // State variables ///
     //////////////////////
@@ -80,6 +82,13 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler {
     //////////////////////////////////////////////////////////////*/
 
     /**
+     * @notice the stablecoin this handler holds idle
+     */
+    function _purchaseToken() internal view override returns (IERC20) {
+        return i_stableToken;
+    }
+
+    /**
      * @notice retrieve `amount` of the user's idle DOC for the purchase path
      * @dev Lending handlers redeem their shares to pull DOC onto the handler; idle DOC is
      * already here, so this only debits the mapping.
@@ -87,7 +96,7 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler {
      * @param amount: the amount of stablecoin to debit
      * @return the amount actually debited
      */
-    function _retrieveStablecoin(address user, uint256 amount) internal virtual returns (uint256) {
+    function _retrieveStablecoin(address user, uint256 amount) internal virtual override returns (uint256) {
         return _debitIdleBalance(user, amount);
     }
 
@@ -103,6 +112,7 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler {
     function _batchRetrieveStablecoin(address[] memory users, uint256[] memory purchaseAmounts, uint256)
         internal
         virtual
+        override
         returns (uint256 totalWithdrawn)
     {
         uint256 numOfPurchases = users.length;

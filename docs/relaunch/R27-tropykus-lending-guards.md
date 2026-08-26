@@ -2,7 +2,7 @@
 
 Status: **PR open** · Assigned: yes · Optional/further-review: no
 
-PR 18 (reordered 2026-08-25 ahead of R22 deploy/CI), GitHub [#62](https://github.com/BitChillRSK/dca-contracts/pull/62). Stack on R26 (PR 17). Land **before** R28 (PR 19), R22 deploy/CI (PR 20), and R9 (PR 21) so the shared-base extract and ABI-freeze tests cover the corrected Tropykus paths. Tropykus is **not** in the new deploy map (PR 20); this PR exists because the legacy handler must still obey invariant 1.
+PR 18 (reordered 2026-08-25 ahead of R22 deploy/CI), GitHub [#62](https://github.com/BitChillRSK/dca-contracts/pull/62). Stack on R26 (PR 17). Land **before** R28 (PR 19), R30 (PR 21), R22 deploy/CI (PR 22), and R9 (PR 23) so the shared-base, purchase-pipeline, and ABI-freeze tests cover the corrected Tropykus paths. Tropykus is **not** in the new deploy map (PR 22); this PR exists because the legacy handler must still obey invariant 1.
 
 Write this spec against the **R26 `shares` vocabulary** (`getUserShares`, `TokenLending__SharesRedeemed(Batch)`, …).
 
@@ -88,4 +88,4 @@ Fork tests: no new fork-specific assertions. `make fork-tropykus` still pins blo
 
 - ABI: none. Existing errors, already on `ITokenLending`.
 - Scripts: none.
-- Cutover: none. Tropykus is not registered after R22 deploy/CI (PR 20). Local `make moc-tropykus` / `make fork-tropykus` are the consumers.
+- Cutover: none. Tropykus is not registered after R22 deploy/CI (now PR 22). Local `make moc-tropykus` / `make fork-tropykus` are the consumers.

@@ -2,9 +2,9 @@
 
 Status: **implemented** · Assigned: yes · Optional/further-review: no
 
-PR 17. Stack on R25 ([#59](https://github.com/BitChillRSK/dca-contracts/pull/59)). Land **before** R22 deploy/CI (PR 18) and well before R9 (PR 20).
+PR 17. Stack on R25 ([#59](https://github.com/BitChillRSK/dca-contracts/pull/59)). Land **before** R22 deploy/CI (now PR 22) and well before R9 (now PR 23).
 
-> Note: PR numbers below predate the 2026-08-25 reorder (R22 deploy/CI is now PR 20; R9 is PR 21). See [`IMPLEMENTATION_ORDER.md`](./IMPLEMENTATION_ORDER.md).
+> Note: PR numbers below predate the 2026-08-25 reorders (R22 deploy/CI is now PR 22; R9 is PR 23). See [`IMPLEMENTATION_ORDER.md`](./IMPLEMENTATION_ORDER.md).
 
 ## Objective
 
@@ -123,6 +123,6 @@ Fork tests: no new fork-specific assertions; run before push per `AGENTS.md`.
 
 ## ABI / deploy / cutover impact
 
-- ABI: **yes, deliberately.** Possibly some event *parameter* names too (`underlyingAmount`), which change the ABI JSON but not `topic0`. One external view (`getUsersLendingTokenBalance` → `getUserShares`), two event names, one error name, and several event parameter names. New `topic0` for the two renamed events; parameter order and indexing unchanged. This is pre-freeze by design — R9 (PR 20) is the freeze, and the relaunch deploys fresh with no live log consumer, so the rename is free now and expensive afterwards.
+- ABI: **yes, deliberately.** Possibly some event *parameter* names too (`underlyingAmount`), which change the ABI JSON but not `topic0`. One external view (`getUsersLendingTokenBalance` → `getUserShares`), two event names, one error name, and several event parameter names. New `topic0` for the two renamed events; parameter order and indexing unchanged. This is pre-freeze by design — R9 (now PR 23) is the freeze, and the relaunch deploys fresh with no live log consumer, so the rename is free now and expensive afterwards.
 - Scripts: helper-config field names only; local/test. Do not `--broadcast`.
 - Cutover: none — new deployments only. Any frontend or indexer built against the pre-relaunch ABI must target `getUserShares` and the new event names; flag it to whoever wires the live market.

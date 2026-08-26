@@ -2,8 +2,6 @@
 pragma solidity 0.8.36;
 
 import {PurchaseUniswap} from "src/PurchaseUniswap.sol";
-import {PurchaseRbtc} from "src/PurchaseRbtc.sol";
-import {LendingErc20Handler} from "src/LendingErc20Handler.sol";
 import {TropykusErc20Handler} from "./TropykusErc20Handler.sol";
 
 /**
@@ -33,31 +31,4 @@ contract TropykusErc20HandlerDex is TropykusErc20Handler, PurchaseUniswap {
         TropykusErc20Handler(dcaManagerAddress, stablecoinAddress, kTokenAddress, feeCollector, feeSettings)
         PurchaseUniswap(stablecoinAddress, uniswapSettings, amountOutMinimumPercent, amountOutMinimumSafetyCheck)
     {}
-
-    /**
-     * @notice Override the _retrieveStablecoin hook to resolve ambiguity between parent contracts
-     * @param user The address of the user whose stablecoin is being retrieved
-     * @param amount The amount of stablecoin wanted
-     */
-    function _retrieveStablecoin(address user, uint256 amount)
-        internal
-        override(LendingErc20Handler, PurchaseRbtc)
-        returns (uint256)
-    {
-        return LendingErc20Handler._retrieveStablecoin(user, amount);
-    }
-
-    /**
-     * @notice Override the _batchRetrieveStablecoin hook to resolve ambiguity between parent contracts
-     * @param users The array of user addresses whose stablecoin is being retrieved
-     * @param purchaseAmounts The array of amounts of stablecoin charged to each user
-     * @param totalStablecoinToRetrieve The total amount of stablecoin wanted
-     */
-    function _batchRetrieveStablecoin(address[] memory users, uint256[] memory purchaseAmounts, uint256 totalStablecoinToRetrieve)
-        internal
-        override(LendingErc20Handler, PurchaseRbtc)
-        returns (uint256)
-    {
-        return LendingErc20Handler._batchRetrieveStablecoin(users, purchaseAmounts, totalStablecoinToRetrieve);
-    }
 }

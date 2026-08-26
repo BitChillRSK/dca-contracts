@@ -4,6 +4,7 @@ pragma solidity 0.8.36;
 import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
 import {TokenHandler} from "src/TokenHandler.sol";
 import {TokenLending} from "src/TokenLending.sol";
+import {StablecoinSource} from "src/StablecoinSource.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -14,7 +15,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
  *         redeem for lending handlers. Protocol adapters implement the exchange-rate and
  *         mint/redeem hooks.
  */
-abstract contract LendingErc20Handler is TokenHandler, TokenLending {
+abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinSource {
     using SafeERC20 for IERC20;
 
     mapping(address user => uint256 balance) internal s_shares;
@@ -134,12 +135,19 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
     //////////////////////////////////////////////////////////////*/
 
     /**
+     * @notice the stablecoin this handler lends out
+     */
+    function _purchaseToken() internal view override returns (IERC20) {
+        return i_stableToken;
+    }
+
+    /**
      * @notice retrieve the user's stablecoin by redeeming shares
      * @param user: the address of the user
      * @param stablecoinAmount: the amount of stablecoin wanted
      * @return the amount of stablecoin this contract actually received
      */
-    function _retrieveStablecoin(address user, uint256 stablecoinAmount) internal virtual returns (uint256) {
+    function _retrieveStablecoin(address user, uint256 stablecoinAmount) internal virtual override returns (uint256) {
         return _redeemShares(user, stablecoinAmount, _exchangeRate());
     }
 
@@ -190,7 +198,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
         address[] memory users,
         uint256[] memory purchaseAmounts,
         uint256 totalStablecoinAmount
-    ) internal virtual returns (uint256) {
+    ) internal virtual override returns (uint256) {
         uint256 exchangeRate = _exchangeRate();
         uint256 totalSharesToRedeem = _stablecoinToShares(totalStablecoinAmount, exchangeRate);
 
