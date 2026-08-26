@@ -70,7 +70,7 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
         return ITokenHandler(address(sovrynDexHandler));
     }
     
-    function getLendingProtocolIndex() internal pure override returns (uint256) {
+    function getRouteIndex() internal pure override returns (uint256) {
         return SOVRYN_INDEX;
     }
     

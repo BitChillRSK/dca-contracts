@@ -28,7 +28,7 @@ contract IdleErc20HandlerTest is HandlerTestHarness {
         return ITokenHandler(address(idleHandler));
     }
 
-    function getLendingProtocolIndex() internal pure override returns (uint256) {
+    function getRouteIndex() internal pure override returns (uint256) {
         return IDLE_INDEX;
     }
 

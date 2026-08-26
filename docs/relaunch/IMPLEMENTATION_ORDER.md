@@ -64,10 +64,11 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R13 | 24 | one-shot user migration: manual exit without future cooperative migration, or ship fully specified user-initiated migration now |
 | R31 | 25 | individual fee setters or atomic-only fee mutation |
 | R34 | 26 | schedule mutation surface; frontend/backend consumer cutover |
-| R32 | 27 | none |
-| R22 (deploy/CI) | 28 | none |
-| R9 | 29 | R18/R19 if not recorded (ABI freeze) |
-| R10 | 30 | none |
+| R35 | 27 | none |
+| R32 | 28 | none |
+| R22 (deploy/CI) | 29 | none |
+| R9 | 30 | R18/R19 if not recorded (ABI freeze) |
+| R10 | 31 | none |
 | R12, R18, R19, OZ 5.x, Ownable2Step, `setOperationsAdmin` hardening/restriction | optional late | only if the human named that item |
 
 ### PR 1 - R23 toolchain and dependency baseline
@@ -275,11 +276,17 @@ Also close the R13 class↔handler hole: `assignTokenHandler` must match `RouteC
 
 Consolidate duplicated schedule/read APIs, derive `withdrawTokenAndInterest` routing from the validated schedule, and decide the public schedule-mutation surface with the relaunch consumer. Keep schedule storage, purchase behavior, and invariant 6 unchanged. See [`R34-dca-manager-abi.md`](./R34-dca-manager-abi.md).
 
-### PR 27 - R32 internal cleanup
+### PR 27 - R35 route-index terminology
 
-Only after R13 and R34 settle the surrounding surfaces, remove redundant DcaManager memory copies/lookups/loops and identical exchange-rate overrides. No external selector, event, error, storage, or cash-accounting change. See [`R32-internal-cleanup.md`](./R32-internal-cleanup.md).
+Inserted after R34 (PR 26, GitHub [#70](https://github.com/BitChillRSK/dca-contracts/pull/70)). GitHub [#71](https://github.com/BitChillRSK/dca-contracts/pull/71). Rename DcaManager's leftover `lendingProtocolIndex` to `routeIndex` so the schedule-routing noun matches `OperationsAdmin` and remains accurate for idle (non-lending) handlers. Rename-only: storage layout and remaining function selectors unchanged; the mismatch error name (and its selector) changes. See [`R35-route-index-terminology.md`](./R35-route-index-terminology.md).
 
-### PR 28 - R22 deploy scripts, constants, harness, and CI matrix
+Stack on R34. Land before R32 so internal cleanup is written against the final names.
+
+### PR 28 - R32 internal cleanup
+
+Only after R13, R34, and R35 settle the surrounding surfaces, remove redundant DcaManager memory copies/lookups/loops and identical exchange-rate overrides. No external selector, event, error, storage, or cash-accounting change. See [`R32-internal-cleanup.md`](./R32-internal-cleanup.md).
+
+### PR 29 - R22 deploy scripts, constants, harness, and CI matrix
 
 Update constants and deploy scripts for the new map:
 
@@ -292,9 +299,9 @@ Split the shared test harness so lending-share assertions live only in lending-p
 
 **Required in this PR:** round-up solvency regression on the LayerBank lane — virtual scaled books must stay ≤ handler `scaledBalanceOf` after odd-amount redeems against Aave-like round-nearest burns; the test must fail if `_stablecoinToShares` rounded down. Shared rule lives on `TokenLending`; do not re-document it only on LayerBank. See `R22-deploy-ci.md`.
 
-Stack on R32 (PR 27). Tropykus is not in this map; R27 already corrected the legacy handler.
+Stack on R32 (PR 28). Tropykus is not in this map; R27 already corrected the legacy handler.
 
-### PR 29 - R9 event indexing and ABI cleanup
+### PR 30 - R9 event indexing and ABI cleanup
 
 Index only addresses and `scheduleId`. Do not index amounts, timestamps, periods, rates, strings, bytes, or arrays.
 
@@ -302,7 +309,7 @@ Add `TokenLending__UserSharesUpdated(address indexed user, uint256 previousShare
 
 Do this once the shipped ABI surface is known, including any optional pause or compound-interest events that were approved.
 
-### PR 30 - R10 natspec and comments
+### PR 31 - R10 natspec and comments
 
 Rewrite first-party natspec after ABI, names, handlers, and layout are stable. Put user-facing docs on interfaces and use `@inheritdoc` in implementations.
 

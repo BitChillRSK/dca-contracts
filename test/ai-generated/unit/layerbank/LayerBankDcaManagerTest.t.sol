@@ -75,7 +75,7 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, LAYERBANK_INDEX);
 
         IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(docToken))[0];
-        assertEq(schedule.lendingProtocolIndex, LAYERBANK_INDEX);
+        assertEq(schedule.routeIndex, LAYERBANK_INDEX);
         assertEq(schedule.tokenBalance, DEPOSIT);
         assertGt(handler.getUserShares(USER), 0);
         assertEq(docToken.balanceOf(address(handler)), 0);

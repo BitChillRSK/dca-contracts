@@ -110,7 +110,7 @@ contract DcaConfigurationTest is DcaDappTest {
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), onePurchaseAmount);
         dcaManager.createDcaSchedule(
-            address(stablecoin), onePurchaseAmount, onePurchaseAmount, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
+            address(stablecoin), onePurchaseAmount, onePurchaseAmount, MIN_PURCHASE_PERIOD, s_routeIndex
         );
         uint256 scheduleIndex = 1; // setUp already created schedule 0
         bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).scheduleId;
@@ -156,7 +156,7 @@ contract DcaConfigurationTest is DcaDappTest {
                 vm.expectRevert(encodedRevert);
             }
             dcaManager.createDcaSchedule(
-                address(stablecoin), AMOUNT_TO_DEPOSIT / 2, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
+                address(stablecoin), AMOUNT_TO_DEPOSIT / 2, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_routeIndex
             );
             vm.stopPrank();
         }
@@ -169,7 +169,7 @@ contract DcaConfigurationTest is DcaDappTest {
             vm.startPrank(USER);
             stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
             dcaManager.createDcaSchedule(
-                address(stablecoin), AMOUNT_TO_DEPOSIT / 2, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
+                address(stablecoin), AMOUNT_TO_DEPOSIT / 2, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_routeIndex
             );
             vm.stopPrank();
         }
@@ -187,7 +187,7 @@ contract DcaConfigurationTest is DcaDappTest {
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
         vm.expectRevert(encodedRevert);
         dcaManager.createDcaSchedule(
-            address(stablecoin), AMOUNT_TO_DEPOSIT / 2, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
+            address(stablecoin), AMOUNT_TO_DEPOSIT / 2, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_routeIndex
         );
         vm.stopPrank();
     }

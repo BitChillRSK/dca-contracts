@@ -22,9 +22,9 @@ contract HarnessLaneTest is DcaDappTest {
     function test_harness_constructedIndexMatchesLane() public {
         string memory protocol = vm.envString("LENDING_PROTOCOL");
         if (keccak256(abi.encodePacked(protocol)) == keccak256(abi.encodePacked(SOVRYN_STRING))) {
-            assertEq(s_lendingProtocolIndex, SOVRYN_INDEX, "sovryn lane constructed a tropykus harness");
+            assertEq(s_routeIndex, SOVRYN_INDEX, "sovryn lane constructed a tropykus harness");
         } else {
-            assertEq(s_lendingProtocolIndex, TROPYKUS_INDEX, "tropykus lane constructed a sovryn harness");
+            assertEq(s_routeIndex, TROPYKUS_INDEX, "tropykus lane constructed a sovryn harness");
         }
     }
 }

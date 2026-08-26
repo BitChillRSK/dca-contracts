@@ -70,7 +70,7 @@ contract DcaDappTest is Test {
     bool isDexSwaps = keccak256(abi.encodePacked(swapType)) == keccak256(abi.encodePacked("dexSwaps"));
     string lendingProtocol = vm.envString("LENDING_PROTOCOL");
     address stablecoinHandlerAddress;
-    uint256 s_lendingProtocolIndex;
+    uint256 s_routeIndex;
     uint256 s_btcPrice;
     ICoinPairPrice mocOracle;
     address constant MOC_ORACLE_MAINNET = 0xe2927A0620b82A66D67F678FC9b826B0E01B1bFD;
@@ -94,7 +94,7 @@ contract DcaDappTest is Test {
         uint256 depositAmount,
         uint256 purchaseAmount,
         uint256 purchasePeriod,
-        uint256 lendingProtocolIndex
+        uint256 routeIndex
     );
     event DcaManager__LastPurchaseTimestampUpdated(address indexed token, bytes32 indexed scheduleId, uint256 indexed timestamp);
 
@@ -183,9 +183,9 @@ contract DcaDappTest is Test {
         }
         
         if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(TROPYKUS_STRING))) {
-            s_lendingProtocolIndex = TROPYKUS_INDEX;
+            s_routeIndex = TROPYKUS_INDEX;
         } else if (isSovryn) {
-            s_lendingProtocolIndex = SOVRYN_INDEX;
+            s_routeIndex = SOVRYN_INDEX;
         } else {
             revert("Lending protocol not allowed");
         }
@@ -330,7 +330,7 @@ contract DcaDappTest is Test {
         }
 
         // Set the shares based on protocol and current stablecoin
-        shareToken = IShareToken(getShareTokenAddress(stablecoinType, s_lendingProtocolIndex));
+        shareToken = IShareToken(getShareTokenAddress(stablecoinType, s_routeIndex));
 
         if (address(shareToken) == address(0)) {
             // Skip this test instead of letting it fail
@@ -350,15 +350,15 @@ contract DcaDappTest is Test {
 
         // Add tokenHandler
         vm.expectEmit(true, true, true, false);
-        emit OperationsAdmin__TokenHandlerAssigned(address(stablecoin), s_lendingProtocolIndex, address(stablecoinHandler));
+        emit OperationsAdmin__TokenHandlerAssigned(address(stablecoin), s_routeIndex, address(stablecoinHandler));
         vm.prank(OWNER);
-        operationsAdmin.assignTokenHandler(address(stablecoin), s_lendingProtocolIndex, address(stablecoinHandler));
+        operationsAdmin.assignTokenHandler(address(stablecoin), s_routeIndex, address(stablecoinHandler));
 
         // The starting point of the tests is that the user has already deposited stablecoin (so withdrawals can also be tested without much hassle)
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
         dcaManager.createDcaSchedule(
-            address(stablecoin), AMOUNT_TO_DEPOSIT, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
+            address(stablecoin), AMOUNT_TO_DEPOSIT, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_routeIndex
         );
         vm.stopPrank();
     }
@@ -440,11 +440,11 @@ contract DcaDappTest is Test {
             // Check user/token/data and skip the scheduleId topic; uniqueness is asserted separately.
             vm.expectEmit(true, true, false, true);
             emit DcaManager__DcaScheduleCreated(
-                USER, address(stablecoin), bytes32(0), stablecoinToDeposit, purchaseAmount, purchasePeriod, s_lendingProtocolIndex
+                USER, address(stablecoin), bytes32(0), stablecoinToDeposit, purchaseAmount, purchasePeriod, s_routeIndex
             );
             vm.recordLogs();
             dcaManager.createDcaSchedule(
-                address(stablecoin), stablecoinToDeposit, purchaseAmount, purchasePeriod, s_lendingProtocolIndex
+                address(stablecoin), stablecoinToDeposit, purchaseAmount, purchasePeriod, s_routeIndex
             );
             _assertCreatedEventIdMatchesStorage();
             uint256 userBalanceAfterDeposit = dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).tokenBalance;
@@ -624,7 +624,7 @@ contract DcaDappTest is Test {
             scheduleIndexes,
             scheduleIds,
             purchaseAmounts,
-            s_lendingProtocolIndex
+            s_routeIndex
         );
 
         _assertBatchRedemptionReported(totalNetPurchaseAmount + totalFee);
@@ -661,7 +661,7 @@ contract DcaDappTest is Test {
             scheduleIndexes,
             scheduleIds,
             purchaseAmounts,
-            s_lendingProtocolIndex
+            s_routeIndex
         );
         
         uint256 postStablecoinHandlerBalance2;
@@ -704,7 +704,7 @@ contract DcaDappTest is Test {
     function updateExchangeRate(uint256 secondsPassed) internal {
         vm.warp(block.timestamp + secondsPassed);
 
-        if (s_lendingProtocolIndex == TROPYKUS_INDEX) {
+        if (s_routeIndex == TROPYKUS_INDEX) {
             console2.log("Exchange rate before update:", shareToken.exchangeRateStored());
             vm.roll(block.number + secondsPassed / 30); // Jump to secondsPassed seconds (30 seconds per block) into the future so that some interest has been generated.
             console2.log("Exchange rate after update:", shareToken.exchangeRateCurrent()); // This is the one that should be used
@@ -751,12 +751,12 @@ contract DcaDappTest is Test {
                       HELPER FUNCTIONS FOR STABLECOINS
     //////////////////////////////////////////////////////////////*/
 
-    // Helper function to get shares address based on stablecoin type and lending protocol
-    function getShareTokenAddress(string memory _stablecoinType, uint256 lendingProtocolIndex) internal view returns (address) {
+    // Helper function to get shares address based on stablecoin type and route index
+    function getShareTokenAddress(string memory _stablecoinType, uint256 routeIndex) internal view returns (address) {
         bool isUSDRIF = keccak256(abi.encodePacked(_stablecoinType)) == keccak256(abi.encodePacked("USDRIF"));
         
         // Check if this stablecoin is supported by Sovryn
-        if (lendingProtocolIndex == SOVRYN_INDEX && isUSDRIF) {
+        if (routeIndex == SOVRYN_INDEX && isUSDRIF) {
             revert("Share token not available for the selected combination");
         }
         
@@ -766,26 +766,26 @@ contract DcaDappTest is Test {
         if (isMocSwaps && address(mocHelperConfig) != address(0)) {
             MocHelperConfig.NetworkConfig memory networkConfig = mocHelperConfig.getActiveNetworkConfig();
             
-            if (lendingProtocolIndex == TROPYKUS_INDEX) {
+            if (routeIndex == TROPYKUS_INDEX) {
                 shareTokenAddress = networkConfig.kDocAddress;
-            } else if (lendingProtocolIndex == SOVRYN_INDEX) {
+            } else if (routeIndex == SOVRYN_INDEX) {
                 shareTokenAddress = networkConfig.iSusdAddress;
             }
         } else if (isDexSwaps && address(dexHelperConfig) != address(0)) {
-            if (lendingProtocolIndex == TROPYKUS_INDEX || lendingProtocolIndex == SOVRYN_INDEX) {
+            if (routeIndex == TROPYKUS_INDEX || routeIndex == SOVRYN_INDEX) {
                 shareTokenAddress = dexHelperConfig.getShareTokenAddress();
             }
         }
         
         // If we couldn't get the shares address from the helper configs, try to get it from the handler
         if (shareTokenAddress == address(0) && address(stablecoinHandler) != address(0)) {
-            if (lendingProtocolIndex == TROPYKUS_INDEX) {
+            if (routeIndex == TROPYKUS_INDEX) {
                 try TropykusDocHandlerMoc(payable(address(stablecoinHandler))).i_kToken() returns (IkToken kToken) {
                     shareTokenAddress = address(kToken);
                 } catch {
                     revert("Failed to get Tropykus shares from handler");
                 }
-            } else if (lendingProtocolIndex == SOVRYN_INDEX) {
+            } else if (routeIndex == SOVRYN_INDEX) {
                 try SovrynDocHandlerMoc(payable(address(stablecoinHandler))).i_iSusdToken() returns (IiSusdToken iSusdToken) {
                     shareTokenAddress = address(iSusdToken);
                 } catch {

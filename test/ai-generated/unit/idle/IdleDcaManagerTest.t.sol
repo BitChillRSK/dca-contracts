@@ -58,7 +58,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
 
         IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(docToken))[0];
-        assertEq(schedule.lendingProtocolIndex, IDLE_INDEX);
+        assertEq(schedule.routeIndex, IDLE_INDEX);
         assertEq(schedule.tokenBalance, DEPOSIT);
         assertEq(handler.getUsersIdleTokenBalance(USER), DEPOSIT);
         assertEq(docToken.balanceOf(address(handler)), DEPOSIT);
@@ -152,8 +152,8 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
 
         IDcaManager.DcaDetails memory idleSchedule = dcaManager.getDcaSchedule(USER, address(docToken), 0);
         IDcaManager.DcaDetails memory lendingSchedule = dcaManager.getDcaSchedule(USER, address(docToken), 1);
-        assertEq(idleSchedule.lendingProtocolIndex, IDLE_INDEX);
-        assertEq(lendingSchedule.lendingProtocolIndex, lendingIndex);
+        assertEq(idleSchedule.routeIndex, IDLE_INDEX);
+        assertEq(lendingSchedule.routeIndex, lendingIndex);
 
         bytes memory encodedRevert =
             abi.encodeWithSelector(IDcaManager.DcaManager__TokenDoesNotYieldInterest.selector, address(docToken));

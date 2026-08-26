@@ -60,13 +60,13 @@ contract GettersTest is DcaDappTest {
         assertEq(asUser.purchaseAmount, AMOUNT_TO_SPEND);
         assertEq(asUser.purchasePeriod, MIN_PURCHASE_PERIOD);
         assertNotEq(asUser.scheduleId, bytes32(0));
-        assertEq(asUser.lendingProtocolIndex, s_lendingProtocolIndex);
+        assertEq(asUser.routeIndex, s_routeIndex);
 
         assertEq(asThirdParty.tokenBalance, asUser.tokenBalance);
         assertEq(asThirdParty.purchaseAmount, asUser.purchaseAmount);
         assertEq(asThirdParty.purchasePeriod, asUser.purchasePeriod);
         assertEq(asThirdParty.scheduleId, asUser.scheduleId);
-        assertEq(asThirdParty.lendingProtocolIndex, asUser.lendingProtocolIndex);
+        assertEq(asThirdParty.routeIndex, asUser.routeIndex);
         assertEq(asThirdParty.lastPurchaseTimestamp, asUser.lastPurchaseTimestamp);
 
         assertEq(enumerated.length, 1);
@@ -74,7 +74,7 @@ contract GettersTest is DcaDappTest {
         assertEq(enumerated[0].purchaseAmount, asUser.purchaseAmount);
         assertEq(enumerated[0].purchasePeriod, asUser.purchasePeriod);
         assertEq(enumerated[0].scheduleId, asUser.scheduleId);
-        assertEq(enumerated[0].lendingProtocolIndex, asUser.lendingProtocolIndex);
+        assertEq(enumerated[0].routeIndex, asUser.routeIndex);
         assertEq(enumerated[0].lastPurchaseTimestamp, asUser.lastPurchaseTimestamp);
     }
 
@@ -96,7 +96,7 @@ contract GettersTest is DcaDappTest {
     function test_dcaManager_getAccumulatedRbtcBalance_matchesHandler() public {
         super.makeSinglePurchase();
         uint256 fromManager =
-            dcaManager.getAccumulatedRbtcBalance(USER, address(stablecoin), s_lendingProtocolIndex);
+            dcaManager.getAccumulatedRbtcBalance(USER, address(stablecoin), s_routeIndex);
         uint256 fromHandler = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
         assertEq(fromManager, fromHandler);
         assertGt(fromManager, 0);
@@ -105,15 +105,15 @@ contract GettersTest is DcaDappTest {
     function test_dcaManager_getAccumulatedRbtcBalance_reverts_unknownTokenProtocol() public {
         address unknownToken = makeAddr("unknownToken");
         bytes memory encodedRevert = abi.encodeWithSelector(
-            IDcaManager.DcaManager__TokenNotAccepted.selector, unknownToken, s_lendingProtocolIndex
+            IDcaManager.DcaManager__TokenNotAccepted.selector, unknownToken, s_routeIndex
         );
         vm.expectRevert(encodedRevert);
-        dcaManager.getAccumulatedRbtcBalance(USER, unknownToken, s_lendingProtocolIndex);
+        dcaManager.getAccumulatedRbtcBalance(USER, unknownToken, s_routeIndex);
     }
 
     function test_dcaManager_getInterestAccrued_whenSupported() public {
-        if (s_lendingProtocolIndex > 0) {
-            uint256 interest = dcaManager.getInterestAccrued(USER, address(stablecoin), s_lendingProtocolIndex);
+        if (s_routeIndex > 0) {
+            uint256 interest = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
             assertGe(interest, 0);
         }
     }
@@ -133,7 +133,7 @@ contract GettersTest is DcaDappTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_operationsAdmin_getTokenHandler() public {
-        address handler = operationsAdmin.getTokenHandler(address(stablecoin), s_lendingProtocolIndex);
+        address handler = operationsAdmin.getTokenHandler(address(stablecoin), s_routeIndex);
         assertEq(handler, address(stablecoinHandler));
         
         // Test non-existent handler
@@ -271,14 +271,14 @@ contract GettersTest is DcaDappTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_tokenLending_getUserShares() public {
-        if (s_lendingProtocolIndex > 0) {
+        if (s_routeIndex > 0) {
             uint256 balance = ITokenLending(address(stablecoinHandler)).getUserShares(USER);
             assertGe(balance, 0);
         }
     }
 
     function test_tokenLending_getAccruedInterest() public {
-        if (s_lendingProtocolIndex > 0) {
+        if (s_routeIndex > 0) {
             vm.prank(address(dcaManager));
             uint256 interest = ITokenLending(address(stablecoinHandler)).getAccruedInterest(USER, AMOUNT_TO_DEPOSIT);
             assertGe(interest, 0);
@@ -292,7 +292,7 @@ contract GettersTest is DcaDappTest {
     function test_dcaManagerAccessControl_immutableGetter() public {
         // Test that the docHandler has the correct DCA manager address
         // The public immutable creates an automatic getter
-        if (s_lendingProtocolIndex == TROPYKUS_INDEX) {
+        if (s_routeIndex == TROPYKUS_INDEX) {
             try TropykusErc20Handler(payable(address(stablecoinHandler))).i_dcaManager() returns (address dcaManagerAddr) {
                 assertEq(dcaManagerAddr, address(dcaManager));
             } catch {
@@ -303,7 +303,7 @@ contract GettersTest is DcaDappTest {
                     // Handler might not expose this getter
                 }
             }
-        } else if (s_lendingProtocolIndex == SOVRYN_INDEX) {
+        } else if (s_routeIndex == SOVRYN_INDEX) {
             try SovrynErc20Handler(payable(address(stablecoinHandler))).i_dcaManager() returns (address dcaManagerAddr) {
                 assertEq(dcaManagerAddr, address(dcaManager));
             } catch {
@@ -348,7 +348,7 @@ contract GettersTest is DcaDappTest {
         assertEq(single.purchaseAmount, enumerated[0].purchaseAmount);
         assertEq(single.purchasePeriod, enumerated[0].purchasePeriod);
         assertEq(single.scheduleId, enumerated[0].scheduleId);
-        assertEq(single.lendingProtocolIndex, enumerated[0].lendingProtocolIndex);
+        assertEq(single.routeIndex, enumerated[0].routeIndex);
         assertEq(single.lastPurchaseTimestamp, enumerated[0].lastPurchaseTimestamp);
     }
 

@@ -16,7 +16,7 @@ interface IDcaManager {
         uint256 purchasePeriod; // Time between purchases in seconds
         uint256 lastPurchaseTimestamp; // Timestamp of the latest purchase
         bytes32 scheduleId; // Unique identifier of each DCA schedule
-        uint256 lendingProtocolIndex;
+        uint256 routeIndex; // OperationsAdmin route that holds this schedule's funds (idle or lending)
     }
 
     //////////////////////
@@ -36,7 +36,7 @@ interface IDcaManager {
         uint256 depositAmount,
         uint256 purchaseAmount,
         uint256 purchasePeriod,
-        uint256 lendingProtocolIndex
+        uint256 routeIndex
     );
     event DcaManager__DcaScheduleDeleted(address user, address token, bytes32 scheduleId, uint256 refundedAmount);
     event DcaManager__MaxSchedulesPerTokenModified(uint256 indexed newMaxSchedulesPerToken);
@@ -49,7 +49,7 @@ interface IDcaManager {
     //////////////////////
     // Errors ////////////
     //////////////////////
-    error DcaManager__TokenNotAccepted(address token, uint256 lendingProtocolIndex);
+    error DcaManager__TokenNotAccepted(address token, uint256 routeIndex);
     error DcaManager__DepositAmountMustBeGreaterThanZero();
     error DcaManager__WithdrawalAmountMustBeGreaterThanZero();
     error DcaManager__WithdrawalAmountExceedsBalance(address token, uint256 amount, uint256 balance);
@@ -67,7 +67,7 @@ interface IDcaManager {
     error DcaManager__TokenDoesNotYieldInterest(address token);
     error DcaManager__UnauthorizedSwapper(address sender);
     error DcaManager__PurchaseAmountMismatch(address user, address token, bytes32 scheduleId, uint256 scheduleIndex, uint256 actualPurchaseAmount, uint256 expectedPurchaseAmount);
-    error DcaManager__LendingProtocolIndexMismatch(address user, address token, bytes32 scheduleId, uint256 scheduleIndex, uint256 actualLendingProtocolIndex, uint256 expectedLendingProtocolIndex);
+    error DcaManager__RouteIndexMismatch(address user, address token, bytes32 scheduleId, uint256 scheduleIndex, uint256 actualRouteIndex, uint256 expectedRouteIndex);
 
     /*//////////////////////////////////////////////////////////////
                                FUNCTIONS
@@ -97,14 +97,14 @@ interface IDcaManager {
      * @param depositAmount The amount of the stablecoin requested from the user. The schedule is credited with the amount the handler actually received.
      * @param purchaseAmount The amount of to spend periodically in buying rBTC. Validated against the credited token balance, not the requested deposit.
      * @param purchasePeriod The period for recurrent purchases
-     * @param lendingProtocolIndex: the index in the OperationsAdmin contract of the lending protocol, if any, where the token will be deposited to generate yield
+     * @param routeIndex The OperationsAdmin route index for this schedule (idle or lending)
      */
     function createDcaSchedule(
         address token,
         uint256 depositAmount,
         uint256 purchaseAmount,
         uint256 purchasePeriod,
-        uint256 lendingProtocolIndex
+        uint256 routeIndex
     ) external;
 
     /**
@@ -155,7 +155,7 @@ interface IDcaManager {
      * @param scheduleIndexes the indexes of the DCA schedules that correspond to each user's purchase
      * @param scheduleIds the IDs of the DCA schedules that correspond to each user's purchase
      * @param purchaseAmounts the purchase amount that corresponds to each user's purchase
-     * @param lendingProtocolIndex the lending protocol to withdraw the tokens from before purchasing
+     * @param routeIndex the route all schedules in this batch must share
      */
     function batchBuyRbtc(
         address[] calldata buyers,
@@ -163,15 +163,15 @@ interface IDcaManager {
         uint256[] calldata scheduleIndexes,
         bytes32[] calldata scheduleIds,
         uint256[] calldata purchaseAmounts,
-        uint256 lendingProtocolIndex
+        uint256 routeIndex
     ) external;
 
     /**
      * @notice Withdraw the token accumulated by a user as interest through all the DCA strategies using that token
      * @param tokens Array of token addresses which the user has deposited
-     * @param lendingProtocolIndexes Array of lending protocol indexes to withdraw interest from
+     * @param routeIndexes Route indexes to withdraw interest from. Idle routes are skipped.
      */
-    function withdrawAllAccumulatedInterest(address[] calldata tokens, uint256[] calldata lendingProtocolIndexes) external;
+    function withdrawAllAccumulatedInterest(address[] calldata tokens, uint256[] calldata routeIndexes) external;
 
     /**
      * @notice Withdraw a specified amount of a stablecoin from the contract as well as all the yield generated with it across all DCA schedules
@@ -191,16 +191,16 @@ interface IDcaManager {
     /**
      * @notice Withdraw the rBtc accumulated by a user through all the DCA strategies created using a given stablecoin
      * @param token The token address of the stablecoin
-     * @param lendingProtocolIndex The index of the lending protocol where the stablecoin is lent (0 if it is not lent)
+     * @param routeIndex The route whose handler holds the user's accumulated rBTC
      */
-    function withdrawRbtcFromTokenHandler(address token, uint256 lendingProtocolIndex) external;
+    function withdrawRbtcFromTokenHandler(address token, uint256 routeIndex) external;
 
     /**
      * @notice Withdraw all of the rBTC accumulated by a user through their various DCA strategies
      * @param tokens Array of token addresses which the user has deposited
-     * @param lendingProtocolIndexes Array of lending protocol indexes where the user has positions
+     * @param routeIndexes Route indexes whose handlers may hold the user's accumulated rBTC
      */
-    function withdrawAllAccumulatedRbtc(address[] calldata tokens, uint256[] calldata lendingProtocolIndexes) external;
+    function withdrawAllAccumulatedRbtc(address[] calldata tokens, uint256[] calldata routeIndexes) external;
 
     /**
      * @dev modifies the minimum period that can be set for purchases
@@ -250,25 +250,25 @@ interface IDcaManager {
     function getOperationsAdminAddress() external view returns (address);
 
     /**
-     * @notice get the interest accrued by a user for a token and a lending protocol index
+     * @notice get the interest accrued by a user for a token and a route index
      * @param user the user address
      * @param token the token address
-     * @param lendingProtocolIndex the lending protocol index
-     * @return the interest accrued by the user for the token and the lending protocol index
+     * @param routeIndex the route index
+     * @return the interest accrued by the user for the token and the route index
      */
-    function getInterestAccrued(address user, address token, uint256 lendingProtocolIndex)
+    function getInterestAccrued(address user, address token, uint256 routeIndex)
         external
         view
         returns (uint256);
 
     /**
-     * @notice get the rBTC accumulated by a user on the handler for a token and lending protocol index
+     * @notice get the rBTC accumulated by a user on the handler for a token and route index
      * @param user the user address
      * @param token the token address
-     * @param lendingProtocolIndex the lending protocol index
+     * @param routeIndex the route index
      * @return the accumulated rBTC balance
      */
-    function getAccumulatedRbtcBalance(address user, address token, uint256 lendingProtocolIndex)
+    function getAccumulatedRbtcBalance(address user, address token, uint256 routeIndex)
         external
         view
         returns (uint256);

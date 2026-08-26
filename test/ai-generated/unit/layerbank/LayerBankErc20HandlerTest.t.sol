@@ -39,7 +39,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         return ITokenHandler(address(layerbankHandler));
     }
 
-    function getLendingProtocolIndex() internal pure override returns (uint256) {
+    function getRouteIndex() internal pure override returns (uint256) {
         return LAYERBANK_INDEX;
     }
 

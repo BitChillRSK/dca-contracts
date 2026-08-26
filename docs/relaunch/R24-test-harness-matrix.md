@@ -75,7 +75,7 @@ Fork tests with RPC: **not required** for the done-gate, but verify them when an
 Behaviours:
 
 - After `BaseDeploymentTest.setUp`, `LENDING_PROTOCOL` equals `EXPECTED_LENDING_PROTOCOL`.
-- `make moc-sovryn` constructs `DcaDappTest` with `s_lendingProtocolIndex == SOVRYN_INDEX` and does not skip `NetRedemptionTest` for protocol mismatch.
+- `make moc-sovryn` constructs `DcaDappTest` with `s_routeIndex == SOVRYN_INDEX` and does not skip `NetRedemptionTest` for protocol mismatch.
 - The four `RbtcPurchaseTest` deplete / run-out tests pass on Sovryn mocks.
 - `make fork-sovryn` no longer errors `the argument '--no-match-path <GLOB>' cannot be used multiple times`.
 
