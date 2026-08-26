@@ -153,10 +153,29 @@ contract InvariantTest is StdInvariant, Test {
             ITokenHandler(address(handler)),
             handler,
             stablecoin,
-            s_users
+            s_users,
+            s_lendingProtocolIndex
         );
         
         targetContract(address(fuzzHandler));
+    }
+
+    function test_invariantHandlerCreatesScheduleAtSelectedRoute() public {
+        fuzzHandler.createDcaSchedule(
+            0,
+            MIN_PURCHASE_AMOUNT,
+            MIN_PURCHASE_AMOUNT,
+            MIN_PURCHASE_PERIOD
+        );
+        assertEq(
+            fuzzHandler.createScheduleSuccesses(),
+            1,
+            "Handler never created a schedule at the selected route"
+        );
+        IDcaManager.DcaDetails[] memory schedules =
+            dcaManager.getDcaSchedules(s_users[0], address(stablecoin));
+        assertEq(schedules.length, 1);
+        assertEq(schedules[0].lendingProtocolIndex, s_lendingProtocolIndex);
     }
     
     /*//////////////////////////////////////////////////////////////
