@@ -165,7 +165,7 @@ contract DeployDexSwaps is DeployBase {
             operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
             operationsAdmin.registerRoute(SOVRYN_INDEX, true);
 
-            address tropykusShareToken = helperConfig.getShareTokenAddress();
+            address tropykusShareToken = networkConfig.tropykusShareToken;
             
             if (tropykusShareToken == address(0)) {
                 console.log("Warning: Tropykus shares not available for this stablecoin");
@@ -192,7 +192,7 @@ contract DeployDexSwaps is DeployBase {
             }
 
             if (!isUSDRIF) {
-                address sovrynShareToken = helperConfig.getShareTokenAddress();
+                address sovrynShareToken = networkConfig.sovrynShareToken;
                 
                 if (sovrynShareToken == address(0)) {
                     console.log("Warning: Sovryn shares not available for this stablecoin");

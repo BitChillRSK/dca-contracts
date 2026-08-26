@@ -29,10 +29,12 @@ contract OperationsAdmin is IOperationsAdmin, Ownable {
 
     /**
      * @dev Index 0 is the default idle route. Additional idle or lending indexes are
-     *      registered through `registerRoute`.
+     *      registered through `registerRoute`. Emits `RouteRegistered` so indexers see
+     *      the same class write as every later `registerRoute` call.
      */
     constructor() Ownable() {
         s_routeClass[0] = RouteClass.Idle;
+        emit OperationsAdmin__RouteRegistered(0, false);
     }
 
     /**
@@ -40,7 +42,7 @@ contract OperationsAdmin is IOperationsAdmin, Ownable {
      *         owner would freeze `registerRoute`, `assignTokenHandler`, and swapper
      *         management with no recovery.
      */
-    function renounceOwnership() public view override onlyOwner {
+    function renounceOwnership() public pure override {
         revert OperationsAdmin__OwnershipCannotBeRenounced();
     }
 

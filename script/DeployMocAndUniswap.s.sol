@@ -14,6 +14,7 @@ import {OperationsAdmin} from "../src/OperationsAdmin.sol";
 import {IWRBTC} from "../src/interfaces/IWRBTC.sol";
 import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces/ISwapRouter02.sol";
 import {ICoinPairPrice} from "../src/interfaces/ICoinPairPrice.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {console} from "forge-std/Test.sol";
 import "./Constants.sol";
 
@@ -123,6 +124,7 @@ contract DeployMocAndUniswap is DeployBase {
         // Transfer ownership of contracts
         adOpsMoc.transferOwnership(owner);
         dcaManMoc.transferOwnership(owner);
+        Ownable(handlerMoc).transferOwnership(owner);
         
         vm.stopBroadcast();
     }
@@ -213,6 +215,7 @@ contract DeployMocAndUniswap is DeployBase {
         // Transfer ownership of contracts
         adOpsUni.transferOwnership(owner);
         dcaManUni.transferOwnership(owner);
+        Ownable(handlerUni).transferOwnership(owner);
         
         vm.stopBroadcast();
     }

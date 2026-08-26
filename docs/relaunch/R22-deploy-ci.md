@@ -14,6 +14,8 @@ PR 15 shipped `LayerBankDocHandlerMoc` behind an add-on deploy script. PR 16 (R2
 
 R13 left `LAYERBANK_INDEX = 1` colliding with `TROPYKUS_INDEX = 1`. After a live `DeployMocSwaps` DOC run, `DeployLayerBankHandler` reverts `HandlerAlreadyAssigned` rather than silently skipping; the add-on is not a second assignment onto Tropykus's slot. The final map (`0` idle, `1` LayerBank, `2` Sovryn) is what retires that collision.
 
+R13 also fixed live `DeployDexSwaps`: the TESTNET/MAINNET branch now reads `networkConfig.tropykusShareToken` and `networkConfig.sovrynShareToken` separately (same as MoC's `kDocAddress` / `iSusdAddress`). Do not wire both indexes through `getShareTokenAddress()`, which returns only the `LENDING_PROTOCOL` env token and would permanently assign a Sovryn handler constructed against a Tropykus kToken.
+
 **Round-up solvency (required in this PR, not deferred).** `_stablecoinToShares` documents `Math.Rounding.Up` for all lending handlers (Tropykus / Sovryn / LayerBank). Aave `withdraw` burns scaled shares with `amount.rayDiv(index)` (round nearest), so LayerBank is the sharpest place to regression-test: debiting ≥ what Aave burns keeps `sum(s_aTokenBalances) <= aToken.scaledBalanceOf(handler)`. Flipping TokenLending to round **down** would let virtual books drift above reality; happy-path suites still pass. Ship a test that fails under round-down sizing — do not leave this as a handler comment.
 
 Related: [R22-layerbank-handler.md](./R22-layerbank-handler.md), [R25-lending-redeem-naming.md](./R25-lending-redeem-naming.md), [R22-idle-handler.md](./R22-idle-handler.md).

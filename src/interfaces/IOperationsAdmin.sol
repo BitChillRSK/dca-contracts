@@ -43,7 +43,7 @@ interface IOperationsAdmin {
 
     /**
      * @notice Register a route index as idle or lending. One-shot: the class is never changed or deleted.
-     * @param index The route index to register. Index 0 is pre-registered as idle by the constructor.
+     * @param index The route index to register. Index 0 is pre-registered as idle by the constructor, which also emits `RouteRegistered(0, false)`.
      * @param lends True to classify the route as lending; false to classify it as idle.
      */
     function registerRoute(uint256 index, bool lends) external;
