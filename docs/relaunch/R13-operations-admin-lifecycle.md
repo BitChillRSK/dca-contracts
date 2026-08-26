@@ -169,6 +169,8 @@ With AccessControl gone there is no second authority. OpenZeppelin 4.9.3 `transf
 - `script/DeployLayerBankHandler.s.sol`
 - `script/DeployUsdrifHandler.s.sol`
 - Every additional checked-in caller of the removed registry functions, selected through compiler errors. This includes `test/unit/deployment/BaseDeploymentTest.t.sol`, `test/ai-generated/unit/HandlerTestHarness.t.sol`, `test/ai-generated/fuzz/Invariants.t.sol`, `test/ComparePurchaseMethods.t.sol`, and all six per-handler suites; updating them is required scope, not a drive-by expansion.
+- `script/DeployMocAndUniswap.s.sol` — local ComparePurchaseMethods harness only. Do **not** transfer handler ownership here: handlers are `new`ed by nested `DeployMocSwaps` / `DeployDexSwaps` helper instances, which become the Ownable owner. Live `DeployMocSwaps.run()` / `DeployDexSwaps.run()` still transfer after an internal `new`.
+- `Makefile`, `.github/workflows/test.yml`, `AGENTS.md` — dedicated `make invariants-sovryn` CI lane so `InvariantTest` is no longer excluded from every gate. `ComparePurchaseMethods` stays excluded (Anvil early-return / `block.chainid == RSK_MAINNET_CHAIN_ID`).
 
 ## Required tests
 
@@ -179,6 +181,7 @@ forge test --match-contract GettersTest
 forge test --match-contract DcaManagerEdgeCasesTest
 forge test --match-contract "IdleHandlerDeploymentTest|LayerBankHandlerDeploymentTest"
 make check
+make invariants-sovryn
 make fork-sovryn
 make fork-tropykus
 ```
@@ -230,4 +233,4 @@ Fork tests add no new fork-specific assertions unless the selected migration des
 - Cutover: register every route index with its class before assigning handlers to it. Index `0` is pre-registered as idle by the constructor; `IDLE_INDEX` in `script/Constants.sol` stays `0` for the relaunch map, but nothing may assume idle implies index `0`.
 - Cutover: **never assign a lending handler at an idle index**, especially the constructor's index `0`. Class↔handler capability is not checked on-chain (see **Noted, not in scope: class↔handler ERC-165**). Recovery is a new idle index plus user exit/re-entry; interest on the mistaken route is stranded.
 - Cutover: `DeployIdleHandler` / `DeployUsdrifHandler` / `DeployLayerBankHandler` revert on `HandlerAlreadyAssigned` rather than logging and skipping. `LAYERBANK_INDEX` currently equals `TROPYKUS_INDEX` (`1`); after a live `DeployMocSwaps` DOC run the LayerBank add-on is expected to collide. **R22** owns the final index map.
-- Cutover: live Dex and MoC scripts transfer handler ownership to the configured governance address at assignment, not only `OperationsAdmin` and `DcaManager`. Confirm `FeeHandler` and Uniswap slippage setters are not left on the broadcaster EOA.
+- Cutover: live Dex and MoC scripts transfer handler ownership to the configured governance address at assignment, not only `OperationsAdmin` and `DcaManager`. Confirm `FeeHandler` and Uniswap slippage setters are not left on the broadcaster EOA. `DeployMocAndUniswap` is not a live path and must not call handler `transferOwnership` (nested-helper ownership).
