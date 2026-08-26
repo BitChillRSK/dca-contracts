@@ -40,6 +40,7 @@ check: build
 	$(MAKE) moc-tropykus
 	$(MAKE) moc-sovryn
 	STABLECOIN_TYPE=USDRIF $(MAKE) dex-sovryn
+	$(MAKE) invariants-sovryn
 
 ci:
 	FOUNDRY_PROFILE=ci $(MAKE) build

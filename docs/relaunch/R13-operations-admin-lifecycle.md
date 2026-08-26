@@ -181,7 +181,6 @@ forge test --match-contract GettersTest
 forge test --match-contract DcaManagerEdgeCasesTest
 forge test --match-contract "IdleHandlerDeploymentTest|LayerBankHandlerDeploymentTest"
 make check
-make invariants-sovryn
 make fork-sovryn
 make fork-tropykus
 ```
