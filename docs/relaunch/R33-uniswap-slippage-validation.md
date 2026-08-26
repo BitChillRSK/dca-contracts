@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: yes · Optional/further-review: no
 
-PR 24. Stack on R13 (PR 23). Keep this behavior fix separate from R31 selector pruning.
+PR 23. Stack on the post-R30 planning PR (PR 22, GitHub #66). It has no product gate or file overlap with R13, so land it first rather than blocking this independent fix on R13's one-shot migration decision. Keep it separate from R31 selector pruning.
 
 ## Objective
 

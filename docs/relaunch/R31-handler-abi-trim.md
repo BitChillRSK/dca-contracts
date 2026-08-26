@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: yes · Optional/further-review: no
 
-PR 25. Stack on R33 (PR 24). Land before R9: R30 left only 329–452 bytes of EIP-170 margin on the two Dex handlers, and R9 must add share-transition emissions to the shared lending path.
+PR 25. Stack on R13 (PR 24). Land before R9: R30 left only 329–452 bytes of EIP-170 margin on the two Dex handlers, and R9 must add share-transition emissions to the shared lending path.
 
 ## Objective
 
@@ -10,7 +10,9 @@ Remove redundant concrete-handler selectors and duplicate immutable aliases so t
 
 ## Background
 
-R30 made the handler's `i_stableToken` the canonical purchase token, but the route bases still expose `i_docToken()` or `i_purchasingToken()`. Uniswap exposes both the automatic `s_mocOracle()` getter and `getMocOracle()`. `PurchaseRbtc` exposes both address-taking and caller-only accumulated-balance getters. `FeeHandler` exposes aggregate settings alongside four individual getters, four individual setters, and a public constant getter.
+R30 made `StablecoinSource._purchaseToken()` the canonical seam tying a purchase route to the token held by its concrete handler, but the route bases still store and expose `i_docToken()` or `i_purchasingToken()`. Uniswap exposes both the automatic `s_mocOracle()` getter and `getMocOracle()`. `PurchaseRbtc` exposes both address-taking and caller-only accumulated-balance getters. `FeeHandler` exposes aggregate settings alongside four individual getters, four individual setters, and a public constant getter.
+
+The route-token constructor parameters become dead when those duplicate immutables disappear. Remove the parameters from the abstract `PurchaseMoc` / `PurchaseUniswap` constructors while preserving every concrete handler's constructor ABI: each leaf already receives the stablecoin for its funding base and no deploy caller needs a second copy. Uniswap's constructor calls `setPurchasePath`, so using `_purchaseToken()` there relies on the concrete inheritance order initializing the funding base's stablecoin immutable first. Keep that ordering explicit and regression-tested rather than introducing `TokenHandler` into the purchase inheritance chain.
 
 This is a fresh relaunch, so the ABI should be settled before R9 rather than carrying aliases indefinitely. R3 intentionally retained the individual fee setters; removing them requires an explicit decision, not an incidental cleanup.
 
@@ -22,7 +24,9 @@ The duplicate route-token getters, automatic oracle getter, caller-only accumula
 
 ## Scope
 
-- [ ] Remove `i_docToken` and `i_purchasingToken`; use inherited `i_stableToken` in MoC/Uniswap route logic and keep constructor signatures unchanged.
+- [ ] Remove the write-only `i_docToken` and the duplicated `i_purchasingToken`; use `StablecoinSource._purchaseToken()` wherever a purchase route needs the token (currently Uniswap path construction and router approval). Do not add `TokenHandler` to either purchase base.
+- [ ] Drop the now-dead stablecoin parameters from the abstract `PurchaseMoc` and `PurchaseUniswap` constructors and their leaf base-constructor calls. Preserve all six concrete handler constructor ABIs and every deploy-script call signature.
+- [ ] Keep and test the constructor-ordering requirement: when `PurchaseUniswap` builds the initial path through `_purchaseToken()`, the concrete funding base's stablecoin immutable is already initialized and the path starts with that exact token.
 - [ ] Make the Uniswap oracle storage non-public and retain `getMocOracle()` as the canonical getter.
 - [ ] Remove `IPurchaseRbtc.getAccumulatedRbtcBalance()` with no arguments; retain `getAccumulatedRbtcBalance(address)` and DcaManager's user-facing getter.
 - [ ] Remove the four individual fee getters in favor of `getFeeSettings()`.
@@ -35,7 +39,7 @@ The duplicate route-token getters, automatic oracle getter, caller-only accumula
 
 - [ ] Fee formula, bounds, collector policy, cap value, or event semantics.
 - [ ] R33 slippage behavior, R34 DcaManager ABI, R9 event indexing, or further code-size work.
-- [ ] Constructor changes, storage-layout changes, protocol adapters, deploy-index changes, or live broadcasts.
+- [ ] Concrete handler constructor-ABI changes, storage-layout changes, protocol adapters, deploy-index changes, or live broadcasts. The two abstract purchase-base constructor cleanups assigned above are in scope.
 
 ## Files likely touched
 
@@ -46,6 +50,12 @@ The duplicate route-token getters, automatic oracle getter, caller-only accumula
 - `src/interfaces/IPurchaseUniswap.sol`
 - `src/interfaces/IPurchaseRbtc.sol`
 - `src/interfaces/IFeeHandler.sol`
+- `src/sovryn/SovrynDocHandlerMoc.sol`
+- `src/sovryn/SovrynErc20HandlerDex.sol`
+- `src/tropykus-legacy/TropykusDocHandlerMoc.sol`
+- `src/tropykus-legacy/TropykusErc20HandlerDex.sol`
+- `src/idle/IdleDocHandlerMoc.sol`
+- `src/layerbank/LayerBankDocHandlerMoc.sol`
 - Matching deployment, unit, fuzz-wrapper, and handler tests named by compiler errors or direct selector usage
 
 ## Required tests
@@ -64,15 +74,15 @@ make fork-sovryn
 make fork-tropykus
 ```
 
-Run the inspection loop against the actual base and head. Assert that only assigned selectors disappear, constructor ABIs and storage slots remain unchanged, fee validation is identical, and all concrete handlers stay below EIP-170 with increased margin.
+Run the inspection loop against the actual base and head. Assert that only assigned selectors disappear, concrete constructor ABIs and storage slots remain unchanged, the initial and updated Uniswap paths both start with `_purchaseToken()`, fee validation is identical, and all concrete handlers stay below EIP-170 with increased margin.
 
 ## Success criteria
 
 - [ ] Each exposed value has one canonical getter.
-- [ ] Purchase routes use `i_stableToken`; no duplicate route-token immutable remains.
+- [ ] Purchase routes use `_purchaseToken()`; no duplicate route-token immutable or dead abstract-base stablecoin parameter remains.
 - [ ] Fee behavior and the 5% cap are unchanged.
 - [ ] The decided fee mutation surface is reflected consistently in implementation, interface, tests, and docs.
-- [ ] Constructor ABI and storage layout are unchanged.
+- [ ] Concrete handler constructor ABIs and storage layouts are unchanged; only abstract base-constructor plumbing is reduced.
 - [ ] Concrete-handler runtime margins are measured and improve.
 - [ ] Targeted, done-gate, and both fork tests pass.
 
@@ -86,6 +96,6 @@ Run the inspection loop against the actual base and head. Assert that only assig
 
 ## ABI / deploy / cutover impact
 
-- ABI: intentional selector removal before R9; exact list recorded in the PR. No constructor/event/storage change.
+- ABI: intentional selector removal before R9; exact list recorded in the PR. No concrete constructor, event, or storage-layout change.
 - Scripts: local/test call sites move to canonical getters; deployment behavior is unchanged.
 - Cutover: frontend/backend/indexer consumers must use canonical getters and the recorded fee mutation API before relaunch.

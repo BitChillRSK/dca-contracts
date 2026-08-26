@@ -60,8 +60,8 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R29 | 20 | none |
 | R30 | 21 | none |
 | Post-R30 architecture plan | 22 (docs only) | none; records the later gates |
-| R13 | 23 | user-authorized migration: versioned routes/manual exit or fully specified user-initiated migration |
-| R33 | 24 | none |
+| R33 | 23 | none |
+| R13 | 24 | one-shot user migration: manual exit without future cooperative migration, or ship fully specified user-initiated migration now |
 | R31 | 25 | individual fee setters or atomic-only fee mutation |
 | R34 | 26 | schedule mutation surface; frontend/backend consumer cutover |
 | R32 | 27 | none |
@@ -140,7 +140,7 @@ So, for an idle-funds handler:
 
 R13 owns the complete `OperationsAdmin` security and lifecycle surface. A live `(token, routeIndex)` becomes add-only: governance upgrades by registering a new versioned route, while old schedules keep resolving to the old handler that holds their funds. Same-index overwrite, owner rescue, and owner-selected migration destinations are prohibited.
 
-The remaining product gate is whether relaunch also ships a fully specified **user-initiated** migration or uses versioned routes with manual user exit/re-entry. That decision must be answered when starting R13; it is no longer an unassigned checkpoint. See [`R13-operations-admin-lifecycle.md`](./R13-operations-admin-lifecycle.md).
+The remaining product gate is whether relaunch also ships a fully specified **user-initiated** migration or uses versioned routes with manual user exit/re-entry. This is a one-shot cutover decision: cooperative migration must be callable on the old immutable handler, so choosing manual exit means the handlers deployed by the relaunch cannot acquire that capability later. See [`R13-operations-admin-lifecycle.md`](./R13-operations-admin-lifecycle.md).
 
 ### PR 9 - R24 test harness matrix
 
@@ -167,7 +167,7 @@ Keep behavior unchanged where possible. Tropykus remains legacy code and tests, 
 
 Ship the index-0 idle DOC + MoC handler. Deposits stay on the handler; no lending token is minted; buys and withdrawals spend idle DOC.
 
-Interest calls for index 0 should continue to revert because no protocol name is registered for index 0.
+Interest calls for index 0 should continue to revert. R13 later replaces the absence-of-name test with a direct lending-route flag that is always false for index 0.
 
 ### PR 13 - R21 fee-on-transfer deposits
 
@@ -248,19 +248,21 @@ The R28 snapshot measured runtime bytecode at 21,081 bytes for `DcaManager`, 24,
 
 Deliberate non-candidates remain excluded: do not merge `TokenLending` into `LendingErc20Handler`, absorb Idle into the lending base, add speculative adapter layers, or introduce proxies, delegatecall, owner rescue, or a withdrawal `to` parameter.
 
-### PR 23 - R13 operations authority and handler lifecycle
+### PR 23 - R33 Uniswap slippage validation
 
-Remove the unused owner/admin split: production has assigned both powers to the same multisig for a year, so one owner-governance boundary is clearer than parallel `Ownable` and `AccessControl` systems. Keep the real operational separation by authorizing multiple swapper addresses through a narrow typed mapping.
+Use the same settings invariant in construction and both existing setters. Raising the safety floor above the active minimum must revert without changing state. This is a small intentional owner-configuration tightening, kept separate from selector pruning. It has no gate or file overlap with R13, so landing it first keeps the rest of the stack moving while R13's migration decision is answered. See [`R33-uniswap-slippage-validation.md`](./R33-uniswap-slippage-validation.md).
 
-At the same time, make protocol identity canonical and handler routes add-only. Governance deploys upgrades at new route indexes; old schedules continue to resolve to the handlers holding their funds. Ask the user-migration gate in the spec, but do not allow governance to move another user's funds. See [`R13-operations-admin-lifecycle.md`](./R13-operations-admin-lifecycle.md).
+### PR 24 - R13 operations authority and handler lifecycle
 
-### PR 24 - R33 Uniswap slippage validation
+Remove the unused owner/admin split: production has assigned both powers to the same multisig for a year, so one owner-governance boundary is clearer than parallel `Ownable` and `AccessControl` systems. Keep the real operational separation by representing the existing multi-swapper allowlist through a narrow typed mapping.
 
-Use the same settings invariant in construction and both existing setters. Raising the safety floor above the active minimum must revert without changing state. This is a small intentional owner-configuration tightening, kept separate from selector pruning. See [`R33-uniswap-slippage-validation.md`](./R33-uniswap-slippage-validation.md).
+At the same time, remove the unused string protocol registry, classify lending routes directly, and make `(token, routeIndex)` assignments add-only. An index identifies an immutable route/version, not a unique external provider. Governance deploys upgrades at new indexes; old schedules continue to resolve to the handlers holding their funds. A wrong assignment consumes its index even before use because governance cannot prove globally that a handler is empty.
+
+Ask the migration gate as a one-shot cutover decision: cooperative migration must exist on the old immutable handler, so choosing manual exit now means the relaunch handlers cannot gain that capability later. Never allow governance to move another user's funds. See [`R13-operations-admin-lifecycle.md`](./R13-operations-admin-lifecycle.md).
 
 ### PR 25 - R31 handler ABI trim
 
-Remove redundant handler getters and aliases before R9 freezes the shipped surface, and decide whether fee-band mutation remains available through individual setters or only the atomic setter. Preserve fee math, the 5% cap, constructor ABI, storage layout, and purchase behavior. Re-measure every concrete handler's selectors and runtime margin. See [`R31-handler-abi-trim.md`](./R31-handler-abi-trim.md).
+Remove redundant handler getters and aliases before R9 freezes the shipped surface, and decide whether fee-band mutation remains available through individual setters or only the atomic setter. Preserve fee math, the 5% cap, every concrete handler constructor ABI, storage layout, and purchase behavior; remove dead stablecoin parameters only from the abstract purchase bases. Re-measure every concrete handler's selectors and runtime margin. See [`R31-handler-abi-trim.md`](./R31-handler-abi-trim.md).
 
 ### PR 26 - R34 DcaManager ABI
 
