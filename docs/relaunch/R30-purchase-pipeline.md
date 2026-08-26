@@ -2,7 +2,7 @@
 
 Status: **implemented** · Assigned: yes · Optional/further-review: no
 
-PR 21, GitHub [#65](https://github.com/BitChillRSK/dca-contracts/pull/65). Stack on R29 (PR 20, GitHub [#64](https://github.com/BitChillRSK/dca-contracts/pull/64)). Land **before** the remaining R22 deploy/CI work (now PR 22) so the harness is split around the final purchase inheritance shape.
+PR 21, GitHub [#65](https://github.com/BitChillRSK/dca-contracts/pull/65). Stack on R29 (PR 20, GitHub [#64](https://github.com/BitChillRSK/dca-contracts/pull/64)). Land **before** the remaining R22 deploy/CI work (now PR 28) so the harness is split around the final purchase inheritance shape.
 
 ## Objective
 
@@ -20,7 +20,7 @@ Collapse the duplicated MoC/Uniswap single- and batch-purchase algorithm into `P
 
 The two purchase bases also declare the funding hooks independently of the funding branches that implement them. Each lending/idle + MoC/Uniswap leaf therefore forwards `_retrieveStablecoin` and `_batchRetrieveStablecoin` solely to resolve the inheritance graph. A small shared declaration seam removes that boilerplate; a forwarding bridge would merely move it.
 
-This combines Candidates A and B from the post-R29 full-`src/` review. Candidates C–F remain unassigned in [`IMPLEMENTATION_ORDER.md`](./IMPLEMENTATION_ORDER.md).
+This combines Candidates A and B from the post-R29 full-`src/` review. The later planning PR promoted Candidates C–F into R13 and R31–R34; see [`IMPLEMENTATION_ORDER.md`](./IMPLEMENTATION_ORDER.md).
 
 R28's size snapshot put the Dex handlers close to EIP-170. Abstract extraction is a source-maintenance win and may be inlined rather than reducing runtime. Do not claim bytecode savings without measuring the concrete handlers on this branch.
 

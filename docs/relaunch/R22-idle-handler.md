@@ -4,7 +4,7 @@ Status: **in review** · Assigned: yes · Optional/further-review: no
 
 PR 12 of R22. LayerBank, deploy/constants/harness/CI index-map work are later PRs.
 
-> Note: PR numbers below predate the 2026-08-25 reorders (R22 deploy/CI is now PR 22; R9 is PR 23). See [`IMPLEMENTATION_ORDER.md`](./IMPLEMENTATION_ORDER.md).
+> Note: PR numbers below predate later reorders (R22 deploy/CI is now PR 28; R9 is PR 29). See [`IMPLEMENTATION_ORDER.md`](./IMPLEMENTATION_ORDER.md).
 
 ## Objective
 

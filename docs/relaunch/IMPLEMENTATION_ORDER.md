@@ -15,16 +15,16 @@ Status: **planning guide**. Orders PRs. Not an implementation spec. Human prompt
 
 **Passed (2026-08-15).** Rootstock testnet (chain 31) accepted first-party bytecode compiled with solc **0.8.36** / `cancun`. Blockscout verified `OperationsAdmin`, `DcaManager`, and `TropykusDocHandlerMoc` at those settings. Anvil/`forge test --fork-url` is still not rskj; this testnet tx is the consensus proof. PR 3+ may merge on this pin. Do not set `prague` / `osaka` / `amsterdam`. Do not use blob opcodes.
 
-## Product gates (PR 2)
+## Product gates
 
-Record these **before the first PR that changes fee logic, `DcaDetails`, handler per-user storage, or event ABI** (not before R2). If the human starts that later PR and PR 2 is not merged, ask **only** the gates that PR needs.
+PR 2 was the original decision-record slot. Record each still-open decision **before the first PR that changes its surface**. Ask **only** the gates named for the assigned PR in the table below.
 
 - Fee model: keep linear / flatten to one rate / leave as-is for now.
 - R18 packing: skip / `DcaDetails` only / `DcaDetails` plus handler per-user state.
 - R19 pause: this relaunch or defer.
-- Optional: R12 compound, R13 admin, owner sweep, on-chain deposit pause.
+- Optional: R12 compound, owner sweep, on-chain deposit pause.
 
-Defaults if the human says “use defaults”: keep OZ `v4.9.3`; skip packing (still `calldata` on handler batch arrays); defer R12, R13, R19, owner sweep, deposit pause. Do not apply defaults unless they say so.
+Defaults if the human says “use defaults”: keep OZ `v4.9.3`; skip packing (still `calldata` on handler batch arrays); defer R12, R19, owner sweep, deposit pause. Do not apply defaults unless they say so. R13 is now required and has its own migration-policy gate; R31 and R34 own their API gates.
 
 ## External lending incentives
 
@@ -59,10 +59,16 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R28 | 19 | none |
 | R29 | 20 | none |
 | R30 | 21 | none |
-| R22 (deploy/CI) | 22 | none |
-| R9 | 23 | R18/R19 if not recorded (ABI freeze) |
-| R10 | 24 | none |
-| R12, R13, R18, R19, OZ 5.x | optional late | only if the human named that item |
+| Post-R30 architecture plan | 22 (docs only) | none; records the later gates |
+| R33 | 23 | none |
+| R13 | 24 | one-shot user migration: manual exit without future cooperative migration, or ship fully specified user-initiated migration now |
+| R31 | 25 | individual fee setters or atomic-only fee mutation |
+| R34 | 26 | schedule mutation surface; frontend/backend consumer cutover |
+| R32 | 27 | none |
+| R22 (deploy/CI) | 28 | none |
+| R9 | 29 | R18/R19 if not recorded (ABI freeze) |
+| R10 | 30 | none |
+| R12, R18, R19, OZ 5.x | optional late | only if the human named that item |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -130,26 +136,11 @@ So, for an idle-funds handler:
 - Invariant 6 in `AGENTS.md` (comprehensive `nonReentrant` on schedule mutators) stops being cheap insurance and becomes load-bearing. Do not relax it in the same relaunch that introduces pooled idle funds.
 - The R20 balance-delta work above matters more, not less: with no clamp, `DcaManager.tokenBalance` is the only thing standing between a user and the pool.
 
-### Open question — handler replacement in `OperationsAdmin`
+### Handler replacement — assigned to R13
 
-**Not assigned to a PR. Decide before the relaunch cutover; see the deadline note below.**
+R13 owns the complete `OperationsAdmin` security and lifecycle surface. A live `(token, routeIndex)` becomes add-only: governance upgrades by registering a new versioned route, while old schedules keep resolving to the old handler that holds their funds. Same-index overwrite, owner rescue, and owner-selected migration destinations are prohibited.
 
-`OperationsAdmin.assignOrUpdateTokenHandler` gives the same ceremony to two very different operations: assigning a handler where none exists, and overwriting one that is already live and holding user funds. Only the first is safe. After a replacement, `DcaManager` routes to the new handler while the old one still holds every user's position (kDOC, iSUSD, or idle stablecoin) with no way to get it out — the new handler's per-user mappings are empty, so withdrawals clamp to zero or revert.
-
-This is **not specific to the idle handler**. Stranded kDOC is user principal on exactly the same terms as stranded DOC; the idle handler was just where the question surfaced. Any note or fix should be written against handlers in general.
-
-Two constraints make this harder than it looks, and they pull in opposite directions:
-
-- **Remediation is deliberately unavailable.** R8 removed the owner's power over another account's funds to satisfy invariant 3. A rescue or admin-driven migration entry point that drains the old handler reintroduces precisely that privilege. Do not solve it that way.
-- **Prohibition is unavailable too.** Handlers are immutable and unproxied (see R8), so replacing the contract *is* the only upgrade path. `assignOrUpdate` cannot simply become assign-once.
-
-So the fix has to be preventive and has to preserve replacement. Options worth weighing when this gets picked up:
-
-- Split the entry point: `assignTokenHandler` reverts when a handler is already set, and a separate `replaceTokenHandler` carries the risk in its name. This is only fat-finger protection — it does **not** stop funds being stranded by an intentional replacement — but it is cheap and removes the silent-overwrite footgun.
-- Give handlers a cooperative migration path (old handler pushes positions to the new one on its own authority, no owner destination). This actually solves stranding, but it requires the capability to exist in the *old* handler, so it only protects handlers deployed after the change.
-- Accept the current behavior and write the operational procedure down instead: users withdraw, then the handler is swapped, with a documented drain-first sequence.
-
-**Deadline, and it is asymmetric** (same argument as R8): anything needing handler cooperation must ship before the relaunch cutover, because afterwards it means new handler contracts and a user migration. The `assignTokenHandler` / `replaceTokenHandler` split is admin-side only and stays cheap indefinitely. If only one thing gets done, the ordering follows from that.
+The remaining product gate is whether relaunch also ships a fully specified **user-initiated** migration or uses versioned routes with manual user exit/re-entry. This is a one-shot cutover decision: cooperative migration must be callable on the old immutable handler, so choosing manual exit means the handlers deployed by the relaunch cannot acquire that capability later. See [`R13-operations-admin-lifecycle.md`](./R13-operations-admin-lifecycle.md).
 
 ### PR 9 - R24 test harness matrix
 
@@ -176,7 +167,7 @@ Keep behavior unchanged where possible. Tropykus remains legacy code and tests, 
 
 Ship the index-0 idle DOC + MoC handler. Deposits stay on the handler; no lending token is minted; buys and withdrawals spend idle DOC.
 
-Interest calls for index 0 should continue to revert because no protocol name is registered for index 0.
+Interest calls for index 0 should continue to revert. R13 later replaces the absence-of-name test with a direct lending-route flag that is always false for index 0.
 
 ### PR 13 - R21 fee-on-transfer deposits
 
@@ -204,7 +195,7 @@ Do not rename Tropykus in place and do not deploy USDRIF/Uniswap handlers for th
 
 ### PR 16 - R25 lending redeem helper naming
 
-Leftover from R16 (PR 14): that glossary pass still left `_burnKtoken` and a “repay” alias. Rename-only (plus tiny leaf cleanup), after LayerBank exists so all three lending handlers match. Drop `_burnKtoken` / `_burnAtoken` and `*ToRepay` locals in favor of `_redeemByUnderlying` / `_redeemByShares` (Tropykus/LayerBank) and `*ToRedeem` locals (all three). Sovryn stays one share-sized helper with a recipient overload; stop reusing `stablecoinInterestAmount` for the measured payout; rename `totalErc20InLending` → `totalStablecoinInLending`. Copy Sovryn’s `getAccruedInterest` natspec onto Tropykus/LayerBank. Drop unused `minPurchaseAmount` from Tropykus/Sovryn MoC/Dex constructors (LayerBank already omitted it); fix SovrynDocHandlerMoc’s “Tropykus' iSUSD” natspec. Also rename the shared event to `TokenLending__AmountToRedeemAdjusted` — the relaunch deploys fresh with no live log consumer, and R9 (now PR 23) freezes the event surface, so this is the last cheap moment. See `R25-lending-redeem-naming.md`.
+Leftover from R16 (PR 14): that glossary pass still left `_burnKtoken` and a “repay” alias. Rename-only (plus tiny leaf cleanup), after LayerBank exists so all three lending handlers match. Drop `_burnKtoken` / `_burnAtoken` and `*ToRepay` locals in favor of `_redeemByUnderlying` / `_redeemByShares` (Tropykus/LayerBank) and `*ToRedeem` locals (all three). Sovryn stays one share-sized helper with a recipient overload; stop reusing `stablecoinInterestAmount` for the measured payout; rename `totalErc20InLending` → `totalStablecoinInLending`. Copy Sovryn’s `getAccruedInterest` natspec onto Tropykus/LayerBank. Drop unused `minPurchaseAmount` from Tropykus/Sovryn MoC/Dex constructors (LayerBank already omitted it); fix SovrynDocHandlerMoc’s “Tropykus' iSUSD” natspec. Also rename the shared event to `TokenLending__AmountToRedeemAdjusted` — the relaunch deploys fresh with no live log consumer, and R9 (now PR 29) freezes the event surface, so this is the last cheap moment. See `R25-lending-redeem-naming.md`.
 
 Land before R26 and deploy/CI so neither PR freezes the old helper names.
 
@@ -214,7 +205,7 @@ Land before R26 and deploy/CI so neither PR freezes the old helper names.
 
 Keep `ITokenLending` / `TokenLending` / `LENDING_PROTOCOL` / `LendingProtocol*Failed` — "lending" as a domain word is fine; only "lending **token**" is wrong. Keep `stablecoin` as the asset noun; do not adopt 4626's `assets`.
 
-Land before R22 deploy/CI (now PR 22) for the same reason R25 did: that PR splits the harness where 76 of the 295 matching lines live, so renaming afterwards writes them twice. **R9 (now PR 23) is the ABI freeze** and already specifies `TokenLending__UserSharesUpdated(…, previousShares, newShares)`; until this PR reworded it, the R9 entry below also required a test asserting `newShares == getUsersLendingTokenBalance(user)` — two names for one quantity. Settle the noun before that lands. See `R26-share-terminology.md`.
+Land before R22 deploy/CI (now PR 28) for the same reason R25 did: that PR splits the harness where 76 of the 295 matching lines live, so renaming afterwards writes them twice. **R9 (now PR 29) is the ABI freeze** and already specifies `TokenLending__UserSharesUpdated(…, previousShares, newShares)`; until this PR reworded it, the R9 entry below also required a test asserting `newShares == getUsersLendingTokenBalance(user)` — two names for one quantity. Settle the noun before that lands. See `R26-share-terminology.md`.
 
 ### PR 18 - R27 Tropykus lending cash guards
 
@@ -240,56 +231,48 @@ Promoted from Candidates A+B in the post-R29 full-`src/` review. Move the duplic
 
 This is behavior-preserving architecture work: no ABI, fee, allocation, event, error, constructor, slippage, or deploy changes. It is primarily a maintenance/drift win, not promised bytecode headroom; measure the concrete handlers and keep both Dex handlers below EIP-170. Give the common algorithm base-level tests plus MoC/Uniswap route-adapter coverage. See [`R30-purchase-pipeline.md`](./R30-purchase-pipeline.md).
 
-GitHub [#65](https://github.com/BitChillRSK/dca-contracts/pull/65). Stack on R29 (PR 20, GitHub #64). Land before R22 deploy/CI (now PR 22) so the harness is split around the final purchase shape.
+GitHub [#65](https://github.com/BitChillRSK/dca-contracts/pull/65). Stack on R29 (PR 20, GitHub #64). Land before R22 deploy/CI (now PR 28) so the harness is split around the final purchase shape.
 
-### Unassigned refactoring review checkpoint (after R30)
+### PR 22 - Post-R30 architecture plan (docs only)
 
-**Further consideration only — no item below is assigned, authorized, or given a PR number yet.** The human requested that the full-`src/` review after R28 be preserved here before moving on. Candidates A+B were promoted together as R30 (PR 21); Candidates C–F retain their original review labels below. Promote another item only by writing and assigning its own spec. Otherwise `Start with R22 (deploy/CI)` is the next prompt after R30. Keep behavior-preserving architecture work separate from ABI/product decisions and from `OperationsAdmin` security policy.
+Resolve the former unassigned checkpoint into implementation specs and order. No Solidity or behavior changes:
 
-The R28 review snapshot measured runtime bytecode at 21,081 bytes for `DcaManager`, 24,243 for `SovrynErc20HandlerDex`, and 24,366 for `TropykusErc20HandlerDex` (EIP-170 margins 3,495 / 333 / 210 bytes). An abstract-base extract can remove source drift without reducing a concrete handler's runtime because the compiler inlines it. Selector/API removal is the candidate below that creates real runtime headroom. Re-measure on the eventual base before accepting any size claim.
+- Candidate F plus the handler-replacement question becomes required [R13](./R13-operations-admin-lifecycle.md).
+- Candidate E becomes [R33](./R33-uniswap-slippage-validation.md).
+- Candidate C becomes [R31](./R31-handler-abi-trim.md).
+- Candidate D is split into public-ABI [R34](./R34-dca-manager-abi.md) and behavior-preserving [R32](./R32-internal-cleanup.md).
 
-#### Candidate C — pre-R9 handler ABI and dispatcher trim
+The split is intentional: authority/fund lifecycle, configuration behavior, handler ABI, DcaManager ABI, and internal cleanup each receive their own review boundary. The old checkpoint is closed; none of Candidates C–F remains in limbo.
 
-This is a product/compatibility decision, not a free refactor. Inventory and consider removing redundant selectors before R9 freezes the shipped surface:
+The R28 snapshot measured runtime bytecode at 21,081 bytes for `DcaManager`, 24,243 for `SovrynErc20HandlerDex`, and 24,366 for `TropykusErc20HandlerDex`. R30 changed those numbers; R31 must re-measure actual base/head sizes rather than carrying the snapshot forward as a promise.
 
-- `i_docToken()` / `i_purchasingToken()` duplicate `i_stableToken()` on concrete handlers;
-- public `s_mocOracle()` duplicates `getMocOracle()`;
-- no-argument `getAccumulatedRbtcBalance()` duplicates the address overload;
-- `FeeHandler` exposes four individual setters and four individual getters alongside the atomic `setFeeRateParams` / aggregate `getFeeSettings` APIs;
-- `MAX_FEE_RATE_CAP()` is an on-chain constant getter whose compatibility value should be weighed against code size.
+Deliberate non-candidates remain excluded: do not merge `TokenLending` into `LendingErc20Handler`, absorb Idle into the lending base, add speculative adapter layers, or introduce proxies, delegatecall, owner rescue, or a withdrawal `to` parameter.
 
-Removing selectors creates actual runtime headroom on every affected handler, unlike moving code between abstract parents. Before promotion, inventory frontend, script, test, and indexer consumers; explicitly decide which convenience APIs remain. Preserve the linear fee model and 5% cap unless a separate product decision says otherwise. Do not silently undo R3's recorded choice to keep individual setters.
+### PR 23 - R33 Uniswap slippage validation
 
-#### Candidate D — `DcaManager` internal cleanup, with ABI pruning kept separate
+Use the same settings invariant in construction and both existing setters. Raising the safety floor above the active minimum must revert without changing state. This is a small intentional owner-configuration tightening, kept separate from selector pruning. It has no gate or file overlap with R13, so landing it first keeps the rest of the stack moving while R13's migration decision is answered. See [`R33-uniswap-slippage-validation.md`](./R33-uniswap-slippage-validation.md).
 
-Behavior-preserving portion to consider:
+### PR 24 - R13 operations authority and handler lifecycle
 
-- change `updateDcaSchedule` from a whole-struct memory copy/write-back to targeted writes through a storage reference; invariant 6 remains mandatory and is what makes the simpler shape safe;
-- extract one storage-based locked-principal sum used by `_withdrawInterest` and `getInterestAccrued` instead of copying the schedules array twice;
-- avoid repeating handler lookup and lending-protocol validation inside `withdrawAllAccumulatedInterest`;
-- replace the two-keccak empty protocol-name test with a direct bytes-length/canonical registry check;
-- make `_exchangeRate()` default to `_viewExchangeRate()` in `LendingErc20Handler`, with only mutating-rate adapters overriding both, if the final adapter set still benefits.
+Remove the unused owner/admin split: production has assigned both powers to the same multisig for a year, so one owner-governance boundary is clearer than parallel `Ownable` and `AccessControl` systems. Keep the real operational separation by representing the existing multi-swapper allowlist through a narrow typed mapping.
 
-ABI/product portion to decide separately before R9: consolidate the `getMy*` plus arbitrary-user per-field schedule getters around a single-schedule struct getter; derive `withdrawTokenAndInterest`'s protocol index from the named schedule instead of accepting a redundant caller value; consider whether specialized deposit/purchase-amount/purchase-period entry points still justify duplicating the general update surface. Do not bundle ABI removal into the internal-only cleanup without an explicit gate.
+At the same time, remove the unused string protocol registry, classify lending routes directly, and make `(token, routeIndex)` assignments add-only. An index identifies an immutable route/version, not a unique external provider. Governance deploys upgrades at new indexes; old schedules continue to resolve to the handlers holding their funds. A wrong assignment consumes its index even before use because governance cannot prove globally that a handler is empty.
 
-#### Candidate E — unify Uniswap slippage-setting validation
+Ask the migration gate as a one-shot cutover decision: cooperative migration must exist on the old immutable handler, so choosing manual exit now means the relaunch handlers cannot gain that capability later. Never allow governance to move another user's funds. See [`R13-operations-admin-lifecycle.md`](./R13-operations-admin-lifecycle.md).
 
-The constructor and `setAmountOutMinimumPercent` enforce `amountOutMinimumPercent >= amountOutMinimumSafetyCheck`, but `setAmountOutMinimumSafetyCheck` can currently raise the safety check above the active percentage. Consider one shared validator used by construction and every update, or one atomic settings setter. Add the missing regression where the owner tries to raise safety above the current percentage. This intentionally tightens owner configuration behavior, so name it in the spec and ABI/cutover notes rather than presenting it as a pure move-only refactor. Keep it separate from R30.
+### PR 25 - R31 handler ABI trim
 
-#### Candidate F — `OperationsAdmin` registry/role redesign (coordinate with R13 and replacement policy)
+Remove redundant handler getters and aliases before R9 freezes the shipped surface, and decide whether fee-band mutation remains available through individual setters or only the atomic setter. Preserve fee math, the 5% cap, every concrete handler constructor ABI, storage layout, and purchase behavior; remove dead stablecoin parameters only from the abstract purchase bases. Re-measure every concrete handler's selectors and runtime margin. See [`R31-handler-abi-trim.md`](./R31-handler-abi-trim.md).
 
-Consider a typed nested `token => protocolIndex => handler` mapping instead of a manually hashed key, and a single canonical protocol registry / `isLendingProtocol(index)` query instead of the mutable string↔index pair. The current `addOrUpdateLendingProtocol` can leave stale forward or reverse aliases when a name or index is reassigned; `DcaManager` should not fetch and hash a protocol name merely to decide whether an index yields interest. A direct `handler.code.length` test can also replace the production import of `Address.isContract`, subject to the chosen handler-attestation policy.
+### PR 26 - R34 DcaManager ABI
 
-Do not implement this piecemeal. Coordinate it with optional R13 and the still-open handler-replacement problem: role simplification, protocol identity, first assignment vs replacement, and any cooperative migration capability are one security/operations design surface. Anything requiring old-handler cooperation has the existing pre-cutover deadline.
+Consolidate duplicated schedule/read APIs, derive `withdrawTokenAndInterest` routing from the validated schedule, and decide the public schedule-mutation surface with the relaunch consumer. Keep schedule storage, purchase behavior, and invariant 6 unchanged. See [`R34-dca-manager-abi.md`](./R34-dca-manager-abi.md).
 
-#### Deliberate non-candidates from the review
+### PR 27 - R32 internal cleanup
 
-- Do not merge `TokenLending` into `LendingErc20Handler`; keep conversion math independent as R28 records.
-- Do not absorb Idle into the lending base; it has no shares or exchange rate and deliberately differs on batch shortfalls.
-- Do not add another shared layer over the now-thin Sovryn, Tropykus, and LayerBank adapters unless a future protocol exposes a real repeated seam.
-- Do not introduce proxies, delegatecall, owner rescue, or a `to` parameter as a code-size/refactor shortcut; invariants 1–7 remain unchanged.
+Only after R13 and R34 settle the surrounding surfaces, remove redundant DcaManager memory copies/lookups/loops and identical exchange-rate overrides. No external selector, event, error, storage, or cash-accounting change. See [`R32-internal-cleanup.md`](./R32-internal-cleanup.md).
 
-### PR 22 - R22 deploy scripts, constants, harness, and CI matrix
+### PR 28 - R22 deploy scripts, constants, harness, and CI matrix
 
 Update constants and deploy scripts for the new map:
 
@@ -302,9 +285,9 @@ Split the shared test harness so lending-share assertions live only in lending-p
 
 **Required in this PR:** round-up solvency regression on the LayerBank lane — virtual scaled books must stay ≤ handler `scaledBalanceOf` after odd-amount redeems against Aave-like round-nearest burns; the test must fail if `_stablecoinToShares` rounded down. Shared rule lives on `TokenLending`; do not re-document it only on LayerBank. See `R22-deploy-ci.md`.
 
-Stack on R30 (PR 21, GitHub [#65](https://github.com/BitChillRSK/dca-contracts/pull/65)). Tropykus is not in this map; R27 already corrected the legacy handler.
+Stack on R32 (PR 27). Tropykus is not in this map; R27 already corrected the legacy handler.
 
-### PR 23 - R9 event indexing and ABI cleanup
+### PR 29 - R9 event indexing and ABI cleanup
 
 Index only addresses and `scheduleId`. Do not index amounts, timestamps, periods, rates, strings, bytes, or arrays.
 
@@ -312,7 +295,7 @@ Add `TokenLending__UserSharesUpdated(address indexed user, uint256 previousShare
 
 Do this once the shipped ABI surface is known, including any optional pause or compound-interest events that were approved.
 
-### PR 24 - R10 natspec and comments
+### PR 30 - R10 natspec and comments
 
 Rewrite first-party natspec after ABI, names, handlers, and layout are stable. Put user-facing docs on interfaces and use `@inheritdoc` in implementations.
 
@@ -323,7 +306,6 @@ Do not make behavior changes in this PR.
 These are deliberately after the core relaunch path:
 
 - R12: compound accrued interest into a chosen schedule.
-- R13: simplify or redesign `OperationsAdmin` owner/admin/swapper roles.
 - R18: storage packing, only if not already chosen and implemented before layout froze.
 - R19: per-schedule pause, only if not already included before event ABI froze.
 - OpenZeppelin major upgrade: evaluate `v4.9.3` to latest audited `5.x` in a standalone PR.
