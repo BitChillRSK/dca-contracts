@@ -44,17 +44,9 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         i_swapRouter02 = uniswapSettings.swapRouter02;
         i_wrBtcToken = uniswapSettings.wrBtcToken;
         s_mocOracle = uniswapSettings.mocOracle;
-        
-        if (amountOutMinimumPercent > HUNDRED_PERCENT) {
-            revert PurchaseUniswap__AmountOutMinimumPercentTooHigh();
-        }
-        if (amountOutMinimumSafetyCheck > HUNDRED_PERCENT) {
-            revert PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh();
-        }
-        if (amountOutMinimumPercent < amountOutMinimumSafetyCheck) {
-            revert PurchaseUniswap__AmountOutMinimumPercentTooLow();
-        }
-        
+
+        _validateSlippageSettings(amountOutMinimumPercent, amountOutMinimumSafetyCheck);
+
         s_amountOutMinimumPercent = amountOutMinimumPercent;
         s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck;
         
@@ -108,12 +100,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      * @param amountOutMinimumPercent The minimum percentage of rBTC that must be received from the swap.
      */
     function setAmountOutMinimumPercent(uint256 amountOutMinimumPercent) external onlyOwner {
-        if (amountOutMinimumPercent > HUNDRED_PERCENT) {
-            revert PurchaseUniswap__AmountOutMinimumPercentTooHigh();
-        }
-        if (amountOutMinimumPercent < s_amountOutMinimumSafetyCheck) {
-            revert PurchaseUniswap__AmountOutMinimumPercentTooLow();
-        }
+        _validateSlippageSettings(amountOutMinimumPercent, s_amountOutMinimumSafetyCheck);
         emit PurchaseUniswap_AmountOutMinimumPercentUpdated(s_amountOutMinimumPercent, amountOutMinimumPercent);
         s_amountOutMinimumPercent = amountOutMinimumPercent;
     }
@@ -123,9 +110,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      * @param amountOutMinimumSafetyCheck The minimum percentage of rBTC that must be received from the swap.
      */
     function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external onlyOwner {
-        if (amountOutMinimumSafetyCheck > HUNDRED_PERCENT) {
-            revert PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh();
-        }
+        _validateSlippageSettings(s_amountOutMinimumPercent, amountOutMinimumSafetyCheck);
         emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(s_amountOutMinimumSafetyCheck, amountOutMinimumSafetyCheck);
         s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck;
     }
@@ -177,6 +162,21 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     /*//////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    function _validateSlippageSettings(uint256 amountOutMinimumPercent, uint256 amountOutMinimumSafetyCheck)
+        private
+        pure
+    {
+        if (amountOutMinimumPercent > HUNDRED_PERCENT) {
+            revert PurchaseUniswap__AmountOutMinimumPercentTooHigh();
+        }
+        if (amountOutMinimumSafetyCheck > HUNDRED_PERCENT) {
+            revert PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh();
+        }
+        if (amountOutMinimumPercent < amountOutMinimumSafetyCheck) {
+            revert PurchaseUniswap__AmountOutMinimumPercentTooLow();
+        }
+    }
 
     /**
      * @notice swap net stablecoin for WRBTC and return the handler's WRBTC-balance delta

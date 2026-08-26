@@ -6,7 +6,12 @@ import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IPurchaseUniswap} from "../../src/interfaces/IPurchaseUniswap.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import {ICoinPairPrice} from "../../src/interfaces/ICoinPairPrice.sol";
+import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
+import {IWRBTC} from "../../src/interfaces/IWRBTC.sol";
+import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces/ISwapRouter02.sol";
+import {TropykusErc20HandlerDex} from "../../src/tropykus-legacy/TropykusErc20HandlerDex.sol";
 import {MockMocOracle} from "../mocks/MockMocOracle.sol";
+import {DexHelperConfig} from "../../script/DexHelperConfig.s.sol";
 import "../../script/Constants.sol";
 
 contract PurchaseUniswapSettingsTest is DcaDappTest {
@@ -117,6 +122,137 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh.selector);
         vm.prank(OWNER);
         IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumSafetyCheck(1.01e18);
+    }
+
+    function testSetAmountOutMinimumSafetyCheckRevertsIfAboveCurrentPercent() public onlyDexSwaps {
+        IPurchaseUniswap dex = IPurchaseUniswap(address(stablecoinHandler));
+        uint256 percent = dex.getAmountOutMinimumPercent();
+        uint256 safetyBefore = dex.getAmountOutMinimumSafetyCheck();
+
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
+        vm.prank(OWNER);
+        dex.setAmountOutMinimumSafetyCheck(percent + 1);
+
+        assertEq(dex.getAmountOutMinimumSafetyCheck(), safetyBefore, "Safety check must be unchanged on revert");
+        assertEq(dex.getAmountOutMinimumPercent(), percent, "Percent must be unchanged on revert");
+    }
+
+    function testSetAmountOutMinimumPercentAllowsEqualityWithSafety() public onlyDexSwaps {
+        IPurchaseUniswap dex = IPurchaseUniswap(address(stablecoinHandler));
+        uint256 safetyCheck = dex.getAmountOutMinimumSafetyCheck();
+        uint256 percentBefore = dex.getAmountOutMinimumPercent();
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(percentBefore, safetyCheck);
+
+        vm.prank(OWNER);
+        dex.setAmountOutMinimumPercent(safetyCheck);
+
+        assertEq(dex.getAmountOutMinimumPercent(), safetyCheck);
+        assertEq(dex.getAmountOutMinimumSafetyCheck(), safetyCheck);
+    }
+
+    function testSetAmountOutMinimumSafetyCheckAllowsEqualityWithPercent() public onlyDexSwaps {
+        IPurchaseUniswap dex = IPurchaseUniswap(address(stablecoinHandler));
+        uint256 percent = dex.getAmountOutMinimumPercent();
+        uint256 safetyBefore = dex.getAmountOutMinimumSafetyCheck();
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(safetyBefore, percent);
+
+        vm.prank(OWNER);
+        dex.setAmountOutMinimumSafetyCheck(percent);
+
+        assertEq(dex.getAmountOutMinimumSafetyCheck(), percent);
+        assertEq(dex.getAmountOutMinimumPercent(), percent);
+    }
+
+    function testSetSlippageSettingsBothAtHundredPercent() public onlyDexSwaps {
+        IPurchaseUniswap dex = IPurchaseUniswap(address(stablecoinHandler));
+        uint256 percentBefore = dex.getAmountOutMinimumPercent();
+        uint256 safetyBefore = dex.getAmountOutMinimumSafetyCheck();
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(percentBefore, 1 ether);
+        vm.prank(OWNER);
+        dex.setAmountOutMinimumPercent(1 ether);
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(safetyBefore, 1 ether);
+        vm.prank(OWNER);
+        dex.setAmountOutMinimumSafetyCheck(1 ether);
+
+        assertEq(dex.getAmountOutMinimumPercent(), 1 ether);
+        assertEq(dex.getAmountOutMinimumSafetyCheck(), 1 ether);
+    }
+
+    function testSetSlippageSettingsRaiseThenLower() public onlyDexSwaps {
+        IPurchaseUniswap dex = IPurchaseUniswap(address(stablecoinHandler));
+        uint256 initialPercent = dex.getAmountOutMinimumPercent();
+        uint256 initialSafety = dex.getAmountOutMinimumSafetyCheck();
+        uint256 raisedPercent = (initialPercent + 1 ether) / 2;
+        uint256 raisedSafety = (initialSafety + raisedPercent) / 2;
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(initialPercent, raisedPercent);
+        vm.prank(OWNER);
+        dex.setAmountOutMinimumPercent(raisedPercent);
+        assertEq(dex.getAmountOutMinimumPercent(), raisedPercent);
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(initialSafety, raisedSafety);
+        vm.prank(OWNER);
+        dex.setAmountOutMinimumSafetyCheck(raisedSafety);
+        assertEq(dex.getAmountOutMinimumSafetyCheck(), raisedSafety);
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(raisedPercent, raisedSafety);
+        vm.prank(OWNER);
+        dex.setAmountOutMinimumPercent(raisedSafety);
+        assertEq(dex.getAmountOutMinimumPercent(), raisedSafety);
+
+        uint256 loweredSafety = raisedSafety / 2;
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(raisedSafety, loweredSafety);
+        vm.prank(OWNER);
+        dex.setAmountOutMinimumSafetyCheck(loweredSafety);
+        assertEq(dex.getAmountOutMinimumSafetyCheck(), loweredSafety);
+    }
+
+    function testConstructorAllowsEqualPercentAndSafety() public onlyDexSwaps {
+        IPurchaseUniswap dex = _deployDexHandlerWithSlippage(0.99 ether, 0.99 ether);
+        assertEq(dex.getAmountOutMinimumPercent(), 0.99 ether);
+        assertEq(dex.getAmountOutMinimumSafetyCheck(), 0.99 ether);
+    }
+
+    function testConstructorAllowsBothAtHundredPercent() public onlyDexSwaps {
+        IPurchaseUniswap dex = _deployDexHandlerWithSlippage(1 ether, 1 ether);
+        assertEq(dex.getAmountOutMinimumPercent(), 1 ether);
+        assertEq(dex.getAmountOutMinimumSafetyCheck(), 1 ether);
+    }
+
+    function testConstructorRevertsIfPercentTooHigh() public onlyDexSwaps {
+        _expectDexConstructorRevert(
+            IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooHigh.selector,
+            1.01 ether,
+            0.99 ether
+        );
+    }
+
+    function testConstructorRevertsIfSafetyTooHigh() public onlyDexSwaps {
+        _expectDexConstructorRevert(
+            IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh.selector,
+            1 ether,
+            1.01 ether
+        );
+    }
+
+    function testConstructorRevertsIfPercentBelowSafety() public onlyDexSwaps {
+        _expectDexConstructorRevert(
+            IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector,
+            0.98 ether,
+            0.99 ether
+        );
     }
     
     function testOnlyOwnerCanSetSlippageSettings() public onlyDexSwaps {
@@ -263,5 +399,65 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(USER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(intermediateTokens, poolFeeRates);
+    }
+
+    function _deployDexHandlerWithSlippage(uint256 amountOutMinimumPercent, uint256 amountOutMinimumSafetyCheck)
+        private
+        returns (IPurchaseUniswap)
+    {
+        return IPurchaseUniswap(
+            address(
+                new TropykusErc20HandlerDex(
+                    address(dcaManager),
+                    address(stablecoin),
+                    address(shareToken),
+                    _uniswapSettings(),
+                    FEE_COLLECTOR,
+                    _feeSettings(),
+                    amountOutMinimumPercent,
+                    amountOutMinimumSafetyCheck
+                )
+            )
+        );
+    }
+
+    function _expectDexConstructorRevert(
+        bytes4 selector,
+        uint256 amountOutMinimumPercent,
+        uint256 amountOutMinimumSafetyCheck
+    ) private {
+        IPurchaseUniswap.UniswapSettings memory uniswapSettings = _uniswapSettings();
+        IFeeHandler.FeeSettings memory feeSettings = _feeSettings();
+        vm.expectRevert(selector);
+        new TropykusErc20HandlerDex(
+            address(dcaManager),
+            address(stablecoin),
+            address(shareToken),
+            uniswapSettings,
+            FEE_COLLECTOR,
+            feeSettings,
+            amountOutMinimumPercent,
+            amountOutMinimumSafetyCheck
+        );
+    }
+
+    function _uniswapSettings() private view returns (IPurchaseUniswap.UniswapSettings memory) {
+        DexHelperConfig.NetworkConfig memory networkConfig = dexHelperConfig.getActiveNetworkConfig();
+        return IPurchaseUniswap.UniswapSettings({
+            wrBtcToken: IWRBTC(networkConfig.wrbtcTokenAddress),
+            swapRouter02: ISwapRouter02(networkConfig.swapRouter02Address),
+            swapIntermediateTokens: networkConfig.swapIntermediateTokens,
+            swapPoolFeeRates: networkConfig.swapPoolFeeRates,
+            mocOracle: ICoinPairPrice(networkConfig.mocOracleAddress)
+        });
+    }
+
+    function _feeSettings() private pure returns (IFeeHandler.FeeSettings memory) {
+        return IFeeHandler.FeeSettings({
+            minFeeRate: MIN_FEE_RATE,
+            maxFeeRate: MAX_FEE_RATE_TEST,
+            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
+            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+        });
     }
 }

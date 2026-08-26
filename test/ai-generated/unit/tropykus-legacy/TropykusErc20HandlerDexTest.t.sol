@@ -145,9 +145,38 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
     }
     
     function test_tropykusDex_setAmountOutMinimumSafetyCheck_reverts_invalidRange() public {
-        vm.expectRevert();
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh.selector);
         vm.prank(OWNER);
         tropykusDexHandler.setAmountOutMinimumSafetyCheck(1.01 ether); // 101% in ether scale
+    }
+
+    function test_tropykusDex_setAmountOutMinimumSafetyCheck_reverts_aboveCurrentPercent() public {
+        uint256 percent = tropykusDexHandler.getAmountOutMinimumPercent();
+        uint256 safetyBefore = tropykusDexHandler.getAmountOutMinimumSafetyCheck();
+
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumSafetyCheck(percent + 1);
+
+        assertEq(tropykusDexHandler.getAmountOutMinimumSafetyCheck(), safetyBefore);
+        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), percent);
+    }
+
+    function test_tropykusDex_constructor_allows_equal_percent_and_safety() public {
+        TropykusErc20HandlerDex handler = _deployTropykusDexWithSlippage(9970, 9970);
+        assertEq(handler.getAmountOutMinimumPercent(), 9970);
+        assertEq(handler.getAmountOutMinimumSafetyCheck(), 9970);
+    }
+
+    function test_tropykusDex_constructor_allows_both_at_hundred_percent() public {
+        TropykusErc20HandlerDex handler = _deployTropykusDexWithSlippage(1 ether, 1 ether);
+        assertEq(handler.getAmountOutMinimumPercent(), 1 ether);
+        assertEq(handler.getAmountOutMinimumSafetyCheck(), 1 ether);
+    }
+
+    function test_tropykusDex_constructor_reverts_when_percent_below_safety() public {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
+        _deployTropykusDexWithSlippage(9900, 9970);
     }
     
     function test_tropykusDex_setPurchasePath_success() public {
@@ -409,5 +438,40 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         uint256 rbtcBalance2 = tropykusDexHandler.getAccumulatedRbtcBalance(user2);
         assertGt(rbtcBalance1, 0);
         assertGt(rbtcBalance2, 0);
+    }
+
+    function _deployTropykusDexWithSlippage(uint256 amountOutMinimumPercent, uint256 amountOutMinimumSafetyCheck)
+        private
+        returns (TropykusErc20HandlerDex)
+    {
+        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+            minFeeRate: MIN_FEE_RATE,
+            maxFeeRate: MAX_FEE_RATE_TEST,
+            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
+            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+        });
+
+        address[] memory intermediateTokens = new address[](0);
+        uint24[] memory poolFeeRates = new uint24[](1);
+        poolFeeRates[0] = 3000;
+
+        IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
+            wrBtcToken: IWRBTC(address(wrbtcToken)),
+            swapRouter02: ISwapRouter02(address(mockRouter)),
+            swapIntermediateTokens: intermediateTokens,
+            swapPoolFeeRates: poolFeeRates,
+            mocOracle: ICoinPairPrice(address(mocOracle))
+        });
+
+        return new TropykusErc20HandlerDex(
+            address(dcaManager),
+            address(stablecoin),
+            address(kToken),
+            uniswapSettings,
+            FEE_COLLECTOR,
+            feeSettings,
+            amountOutMinimumPercent,
+            amountOutMinimumSafetyCheck
+        );
     }
 } 
