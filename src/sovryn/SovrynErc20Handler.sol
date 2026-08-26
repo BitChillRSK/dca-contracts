@@ -32,10 +32,6 @@ abstract contract SovrynErc20Handler is LendingErc20Handler {
         i_iSusdToken = IiSusdToken(iSusdTokenAddress);
     }
 
-    function _exchangeRate() internal view override returns (uint256) {
-        return i_iSusdToken.tokenPrice();
-    }
-
     function _viewExchangeRate() internal view override returns (uint256) {
         return i_iSusdToken.tokenPrice();
     }

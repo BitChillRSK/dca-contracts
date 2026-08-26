@@ -230,8 +230,12 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
 
     /**
      * @notice mutating-ok exchange rate used on write paths
+     * @dev Defaults to the view rate. Override when the live call mutates
+     *      (Tropykus `exchangeRateCurrent` vs `exchangeRateStored`).
      */
-    function _exchangeRate() internal virtual returns (uint256);
+    function _exchangeRate() internal virtual returns (uint256) {
+        return _viewExchangeRate();
+    }
 
     /**
      * @notice view exchange rate used by `getAccruedInterest`

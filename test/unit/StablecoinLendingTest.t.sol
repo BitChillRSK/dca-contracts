@@ -255,6 +255,17 @@ contract StablecoinLendingTest is DcaDappTest {
         assertEq(withdrawableInterest, 0);
     }
 
+    /// @notice Locked principal is the sum of every schedule on that route, not one of them.
+    function testInterestLockedPrincipalSumsAllSchedulesOnRoute() external {
+        super.createSeveralDcaSchedules();
+        updateExchangeRate(10 days);
+
+        uint256 interest = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        assertGt(interest, 0);
+        // One missed schedule would treat that principal as yield (~AMOUNT_TO_DEPOSIT / NUM_OF_SCHEDULES).
+        assertLt(interest, AMOUNT_TO_DEPOSIT / NUM_OF_SCHEDULES);
+    }
+
     // @notice: This is difficult to test, because the withdrawal amount is adjusted to the balance
     // in the lending protocol, which only happenes in edge cases on mainnet or a live testnet
     // function testWithdrawalAmountAdjustedToBalance() external {

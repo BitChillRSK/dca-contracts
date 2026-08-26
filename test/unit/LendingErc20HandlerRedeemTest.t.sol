@@ -113,6 +113,16 @@ contract LendingErc20HandlerRedeemTest is Test {
         assertEq(harness.protocolShares(), protocolBefore);
     }
 
+    function test_exchangeRate_defaultsToViewExchangeRate() public {
+        uint256 viewRate = 2e18;
+        harness.setExchangeRate(viewRate);
+        harness.depositToken(userA, USER_A_DEPOSIT);
+
+        uint256 expectedShares = _stablecoinToSharesUp(USER_A_DEPOSIT, viewRate);
+        assertEq(harness.getUserShares(userA), expectedShares);
+        assertEq(harness.getAccruedInterest(userA, USER_A_DEPOSIT), 0);
+    }
+
     function _stablecoinToSharesUp(uint256 amount, uint256 rate) private pure returns (uint256) {
         return (amount * RATE_SCALE + rate - 1) / rate;
     }
@@ -161,10 +171,6 @@ contract LendingErc20HandlerHarness is LendingErc20Handler {
 
     function redeemShares(address user, uint256 stablecoinAmount) external returns (uint256) {
         return _redeemShares(user, stablecoinAmount, _exchangeRate());
-    }
-
-    function _exchangeRate() internal view override returns (uint256) {
-        return exchangeRate;
     }
 
     function _viewExchangeRate() internal view override returns (uint256) {

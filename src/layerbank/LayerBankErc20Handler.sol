@@ -44,10 +44,6 @@ abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20H
         i_pool = ILayerBankPool(pool);
     }
 
-    function _exchangeRate() internal view override returns (uint256) {
-        return _normalizedIncome();
-    }
-
     function _viewExchangeRate() internal view override returns (uint256) {
         return _normalizedIncome();
     }
