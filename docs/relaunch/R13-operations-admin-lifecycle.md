@@ -34,11 +34,12 @@ The owner/admin simplification, direct swapper authorization, removal of the str
 - [ ] Replace the role hash with a direct swapper allowlist (`mapping(address => bool)` plus `isSwapper(address)`), preserving the existing ability for multiple swappers to coexist. Rename the grant operation so it does not imply replacement; retain explicit revoke.
 - [ ] Update `DcaManager.onlySwapper` to use the typed `isSwapper` query; remove its cached role hash.
 - [ ] Replace the manually hashed handler key with a typed nested `token => routeIndex => handler` mapping.
-- [ ] Remove the string↔index registry, `addOrUpdateLendingProtocol`, `getLendingProtocolIndex`, and `getLendingProtocolName`. Register a yielding route index directly, once; reject index zero and duplicate indexes. Expose `isLendingProtocol(index)` as route classification, not provider identity; index `0` remains the initial idle route and always returns false.
+- [ ] Remove the string↔index registry, `addOrUpdateLendingProtocol`, `getLendingProtocolIndex`, and `getLendingProtocolName`. Register a yielding route index directly, once; reject index zero and duplicate indexes. Expose `isLendingRoute(index)`; index `0` remains the initial idle route and always returns false.
 - [ ] Keep provider labels in deployment configuration and off-chain metadata; do not rebuild an on-chain string registry solely for readability.
-- [ ] Update DcaManager's interest eligibility check to call `isLendingProtocol(index)` directly; no production path fetches or hashes a protocol name.
+- [ ] Update DcaManager's interest eligibility check to call `isLendingRoute(index)` directly; no production path fetches or hashes a protocol name.
 - [ ] Make handler assignment add-only for each `(token, routeIndex)`. Reassignment at the same pair reverts.
 - [ ] Document and test the upgrade rule: deploy and register a new route index; old schedules and withdrawals keep resolving through the old route. Never delete the old route as part of activation.
+- [ ] Treat an incorrectly classified route registration as consuming that index. Recovery is registration at a new index, not mutation of the one-shot lending classification.
 - [ ] Treat an incorrectly assigned handler as consuming that route index even when it has never held funds. Recovery is registration at a new index, not a special same-index replacement path: governance cannot prove from `OperationsAdmin` that an apparently empty handler has no user position.
 - [ ] Preserve contract-code and ERC-165 handler attestation, using `handler.code.length` instead of importing `Address` if the final implementation does not need that library.
 - [ ] Apply the recorded migration decision without weakening balance-delta cash accounting or signer-only rBTC withdrawal.
@@ -69,6 +70,7 @@ The owner/admin simplification, direct swapper authorization, removal of the str
 - `script/DeployIdleHandler.s.sol`
 - `script/DeployLayerBankHandler.s.sol`
 - `script/DeployUsdrifHandler.s.sol`
+- Every additional checked-in caller of the removed registry functions, selected through compiler errors. This includes `test/unit/deployment/BaseDeploymentTest.t.sol`, `test/ai-generated/unit/HandlerTestHarness.t.sol`, `test/ai-generated/fuzz/Invariants.t.sol`, `test/ComparePurchaseMethods.t.sol`, and all six per-handler suites; updating them is required scope, not a drive-by expansion.
 
 ## Required tests
 
@@ -83,7 +85,7 @@ make fork-sovryn
 make fork-tropykus
 ```
 
-Assert that only the owner can register lending routes and administer swappers; the existing multi-swapper behavior is preserved; revoked swappers cannot purchase; deployment transfers final ownership to the configured governance address; index zero and duplicate lending-route registrations revert; duplicate handler routes revert even before use; a mistaken assignment is recovered only at a new index; old and new versioned routes remain independently resolvable; and the selected user-migration policy cannot redirect funds to governance.
+Assert that only the owner can register lending routes and administer swappers; the existing multi-swapper behavior is preserved; revoked swappers cannot purchase; deployment transfers final ownership to the configured governance address; index zero and duplicate lending-route registrations revert; mistaken route classification and mistaken handler assignment are both recovered only at new indexes; duplicate handler routes revert even before use; old and new versioned routes remain independently resolvable; and the selected user-migration policy cannot redirect funds to governance.
 
 Fork tests add no new fork-specific assertions unless the selected migration design requires a live-protocol redemption proof.
 
@@ -92,7 +94,7 @@ Fork tests add no new fork-specific assertions unless the selected migration des
 - [ ] One governance authority exists: `owner`; there is no `ADMIN_ROLE` or generic `hasRole` surface.
 - [ ] Swapper authority is a narrow explicit allowlist, supports multiple addresses, and is independently revocable.
 - [ ] No protocol-name registry or stale forward/reverse alias can exist; lending eligibility is a direct route property.
-- [ ] A live `(token, routeIndex)` cannot be overwritten.
+- [ ] Lending classification and `(token, routeIndex)` handler assignment are both immutable once registered.
 - [ ] Handler upgrades preserve access to the old handler and its user accounting.
 - [ ] The one-shot migration gate is answered: cooperative user migration ships now, or the relaunch explicitly commits these handler versions to manual user exit/re-entry.
 - [ ] No protocol invariant changes.
