@@ -256,9 +256,14 @@ Use the same settings invariant in construction and both existing setters. Raisi
 
 Remove the unused owner/admin split: production has assigned both powers to the same multisig for a year, so one owner-governance boundary is clearer than parallel `Ownable` and `AccessControl` systems. Keep the real operational separation by representing the existing multi-swapper allowlist through a narrow typed mapping.
 
-At the same time, remove the unused string protocol registry, classify lending routes directly, and make `(token, routeIndex)` assignments add-only. An index identifies an immutable route/version, not a unique external provider. Governance deploys upgrades at new indexes; old schedules continue to resolve to the handlers holding their funds. A wrong assignment consumes its index even before use because governance cannot prove globally that a handler is empty.
+At the same time, remove the unused string protocol registry, replace it with an explicit one-shot route-class registry, and make `(token, routeIndex)` assignments add-only. An index identifies an immutable route/version, not a unique external provider. Governance deploys upgrades at new indexes; old schedules continue to resolve to the handlers holding their funds. A wrong assignment consumes its index even before use because governance cannot prove globally that a handler is empty.
 
-Ask the migration gate as a one-shot cutover decision: cooperative migration must exist on the old immutable handler, so choosing manual exit now means the relaunch handlers cannot gain that capability later. Never allow governance to move another user's funds. See [`R13-operations-admin-lifecycle.md`](./R13-operations-admin-lifecycle.md).
+**No open product gates — do not ask.** Both decisions were recorded in the spec on 2026-08-26:
+
+- **Migration gate: option (a), manual exit/re-entry.** No cooperative migration ships; these handler versions will never gain the hook. Migration would not survive the bug scenarios that motivate it (it redeems through the same path), `SovrynErc20HandlerDex` has 426 bytes of runtime margin, and a position-moving function on immutable unaudited contracts is the worst place for a bug. The work is the four conditions attached to the decision, not new code. Never allow governance to move another user's funds.
+- **Idle is a route class, not index zero.** Each index registers once as idle or lending, the constructor pre-registers `0` as idle, and handler assignment requires a registered class. Without this, add-only assignment would make a buggy idle handler unrecoverable for new users on that token — because `(token, 0)` is the only idle slot and no non-zero index accepts a non-lending handler.
+
+`DcaManager.setOperationsAdmin` is recorded in the spec as a known governance surface but is explicitly **out of scope** here. See [`R13-operations-admin-lifecycle.md`](./R13-operations-admin-lifecycle.md).
 
 ### PR 25 - R31 handler ABI trim
 
