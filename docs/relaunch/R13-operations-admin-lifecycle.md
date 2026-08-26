@@ -2,7 +2,7 @@
 
 Status: **implemented** · Assigned: yes · Optional/further-review: no
 
-PR 24. Stack on R33 (PR 23). Land before R22 deploy/CI so the final index map and deployment scripts target the final registry and authorization surface.
+PR 24, GitHub [#68](https://github.com/BitChillRSK/dca-contracts/pull/68). Stack on R33 (PR 23). Land before R22 deploy/CI so the final index map and deployment scripts target the final registry and authorization surface.
 
 ## Objective
 
