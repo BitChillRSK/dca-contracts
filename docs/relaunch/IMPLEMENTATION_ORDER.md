@@ -315,6 +315,26 @@ Rewrite first-party natspec after ABI, names, handlers, and layout are stable. P
 
 Do not make behavior changes in this PR.
 
+### PR 32 - R36 LayerBank USDRIF dex handler
+
+Ship `LayerBankErc20HandlerDex` (`LayerBankErc20Handler` + `PurchaseUniswap`, constructor-only, modelled on `SovrynErc20HandlerDex`) and point the live USDRIF dex deploy at it instead of `TropykusErc20HandlerDex`. Add a `dex-layerbank` lane to the Makefile and CI.
+
+R22 (PR 29) took Tropykus off the production **MoC** map but it is still live on the **dex** map: `DeployUsdrifHandler` and the `DeployDexSwaps` live branch both deploy Tropykus dex handlers. LayerBank supports USDRIF, so this is the replacement. R22 listed "LayerBank Uniswap / USDRIF" as out of scope; this is that deferred item.
+
+Lands after the ABI-freeze PRs on purpose: R9's `TokenLending__UserSharesUpdated` is emitted from the shared `LendingErc20Handler` base, so a new handler inherits it with no ABI re-freeze. This PR writes its own natspec in the R10 style rather than assuming a later sweep.
+
+**Product gates to ask:** which dex-map index LayerBank takes (the dex `OperationsAdmin` is a separate instance from the MoC one, so it need not match `LAYERBANK_INDEX = 1`, but matching is far less confusing); whether the dex map keeps a Sovryn arm alongside LayerBank; and whether kUSDRIF mint is currently paused on Tropykus mainnet (the kDOC pause at blocks 8739512–8740674 is measured, the USDRIF status is not). See `R36-layerbank-usdrif-dex.md`.
+
+### PR 33 - R37 retire Tropykus from every live path
+
+Remove Tropykus from every live deploy branch, move its deploy scripts under `script/tropykus-legacy/`, and move `TROPYKUS_INDEX` from `script/Constants.sol` to `test/Constants.sol` so a future `script/` file naming it fails to compile. `TROPYKUS_STRING` stays in `script/Constants.sol` — `MocHelperConfig` / `DexHelperConfig` need it to select mocks for the local lane, and neither uses the index.
+
+**Blocked on PR 32.** Removing the Tropykus dex arm before a LayerBank USDRIF handler exists deletes USDRIF DCA.
+
+Handler contracts and their tests stay; `make moc-tropykus` / `dex-tropykus` / `fork-tropykus` keep their mock and live coverage of `LendingErc20Handler` through a second adapter. A sentinel "unreachable" index was considered and rejected: `routeIndex` is an unpacked `uint256`, `s_routeClass` is a sparse mapping, and nothing in `src/` enumerates indexes, so a large number enforces nothing. Compilation scope is the enforcement. Completes the `src/` / `script/` split that R22-repo-layout (PR 11) started.
+
+**Product gates to ask:** whether the local Tropykus lanes survive (recommend yes), and whether index 4 is released for reuse. See `R37-retire-tropykus-live-paths.md`.
+
 ## Optional late PRs
 
 These are deliberately after the core relaunch path:

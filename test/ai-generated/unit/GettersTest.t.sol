@@ -16,7 +16,7 @@ import {TropykusErc20Handler} from "../../../src/tropykus-legacy/TropykusErc20Ha
 import {SovrynErc20Handler} from "../../../src/sovryn/SovrynErc20Handler.sol";
 import {TropykusErc20HandlerDex} from "../../../src/tropykus-legacy/TropykusErc20HandlerDex.sol";
 import {SovrynErc20HandlerDex} from "../../../src/sovryn/SovrynErc20HandlerDex.sol";
-import {console2} from "forge-std/console2.sol";
+import {DcaManagerAccessControl} from "../../../src/DcaManagerAccessControl.sol";
 import "../../../script/Constants.sol";
 
 /**
@@ -144,6 +144,7 @@ contract GettersTest is DcaDappTest {
     function test_operationsAdmin_isLendingRoute() public {
         assertTrue(operationsAdmin.isLendingRoute(TROPYKUS_INDEX));
         assertTrue(operationsAdmin.isLendingRoute(SOVRYN_INDEX));
+        assertTrue(operationsAdmin.isLendingRoute(LAYERBANK_INDEX));
         assertFalse(operationsAdmin.isLendingRoute(IDLE_INDEX));
         assertFalse(operationsAdmin.isLendingRoute(999));
     }
@@ -152,6 +153,7 @@ contract GettersTest is DcaDappTest {
         assertEq(uint256(operationsAdmin.getRouteClass(IDLE_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle));
         assertEq(uint256(operationsAdmin.getRouteClass(TROPYKUS_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
         assertEq(uint256(operationsAdmin.getRouteClass(SOVRYN_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
+        assertEq(uint256(operationsAdmin.getRouteClass(LAYERBANK_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
         assertEq(uint256(operationsAdmin.getRouteClass(999)), uint256(IOperationsAdmin.RouteClass.Unregistered));
     }
 
@@ -218,10 +220,7 @@ contract GettersTest is DcaDappTest {
         assertTrue(supportsTokenHandler);
 
         bool supportsLending = IERC165(address(stablecoinHandler)).supportsInterface(type(ITokenLending).interfaceId);
-        // This suite only deploys tropykus/sovryn handlers (`DcaDappTest.setUp`). Idle
-        // `ITokenLending == false` is covered by `HandlerTestHarness.test_handler_supportsInterface`
-        // (`IdleErc20HandlerTest`) and `OperationsAdminTest` idle-stub assignments.
-        assertTrue(supportsLending);
+        assertEq(supportsLending, isLendingLane, "lending handlers advertise ITokenLending; idle must not");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -313,6 +312,8 @@ contract GettersTest is DcaDappTest {
                     // Handler might not expose this getter
                 }
             }
+        } else {
+            assertEq(DcaManagerAccessControl(address(stablecoinHandler)).i_dcaManager(), address(dcaManager));
         }
     }
 
@@ -381,6 +382,7 @@ contract GettersTest is DcaDappTest {
         
         assertTrue(operationsAdmin.isLendingRoute(TROPYKUS_INDEX));
         assertTrue(operationsAdmin.isLendingRoute(SOVRYN_INDEX));
+        assertTrue(operationsAdmin.isLendingRoute(LAYERBANK_INDEX));
         assertFalse(operationsAdmin.isLendingRoute(IDLE_INDEX));
 
         // Test fee bounds consistency

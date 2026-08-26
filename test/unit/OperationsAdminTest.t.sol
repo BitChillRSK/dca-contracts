@@ -167,6 +167,7 @@ contract OperationsAdminTest is DcaDappTest {
         );
         assertTrue(operationsAdmin.isLendingRoute(TROPYKUS_INDEX));
         assertTrue(operationsAdmin.isLendingRoute(SOVRYN_INDEX));
+        assertTrue(operationsAdmin.isLendingRoute(LAYERBANK_INDEX));
         assertFalse(operationsAdmin.isLendingRoute(999));
         assertEq(
             uint256(operationsAdmin.getRouteClass(999)), uint256(IOperationsAdmin.RouteClass.Unregistered)
@@ -235,7 +236,9 @@ contract OperationsAdminTest is DcaDappTest {
         DummyTokenHandler idleAtTen = new DummyTokenHandler();
 
         vm.startPrank(OWNER);
-        operationsAdmin.assignTokenHandler(address(stablecoin), IDLE_INDEX, address(idleAtZero));
+        if (operationsAdmin.getTokenHandler(address(stablecoin), IDLE_INDEX) == address(0)) {
+            operationsAdmin.assignTokenHandler(address(stablecoin), IDLE_INDEX, address(idleAtZero));
+        }
         operationsAdmin.registerRoute(SECOND_IDLE_INDEX, false);
         operationsAdmin.assignTokenHandler(address(stablecoin), SECOND_IDLE_INDEX, address(idleAtTen));
 
@@ -250,7 +253,7 @@ contract OperationsAdminTest is DcaDappTest {
         operationsAdmin.assignTokenHandler(address(stablecoin), SECOND_IDLE_INDEX, address(extra));
         vm.stopPrank();
 
-        assertEq(operationsAdmin.getTokenHandler(address(stablecoin), IDLE_INDEX), address(idleAtZero));
+        assertTrue(operationsAdmin.getTokenHandler(address(stablecoin), IDLE_INDEX) != address(0));
         assertEq(operationsAdmin.getTokenHandler(address(stablecoin), SECOND_IDLE_INDEX), address(idleAtTen));
         assertFalse(operationsAdmin.isLendingRoute(IDLE_INDEX));
         assertFalse(operationsAdmin.isLendingRoute(SECOND_IDLE_INDEX));

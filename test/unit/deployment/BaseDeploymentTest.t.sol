@@ -8,6 +8,7 @@ import {DcaManager} from "../../../src/DcaManager.sol";
 import {TropykusDocHandlerMoc} from "../../../src/tropykus-legacy/TropykusDocHandlerMoc.sol";
 import {SovrynDocHandlerMoc} from "../../../src/sovryn/SovrynDocHandlerMoc.sol";
 import {MocHelperConfig} from "../../../script/MocHelperConfig.s.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import "../../Constants.sol";
 
 contract BaseDeploymentTest is Test {
@@ -40,16 +41,16 @@ contract BaseDeploymentTest is Test {
         (operationsAdmin, docHandlerMocAddress, dcaManager, helperConfig) = deployer.run();
 
         string memory lendingProtocol = vm.envString("LENDING_PROTOCOL");
-        bool isSovryn = keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(SOVRYN_STRING));
-        if (isSovryn) {
+        if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(SOVRYN_STRING))) {
             sovrynHandler = SovrynDocHandlerMoc(payable(docHandlerMocAddress));
-        } else {
+        } else if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(TROPYKUS_STRING))) {
             tropykusHandler = TropykusDocHandlerMoc(payable(docHandlerMocAddress));
         }
 
         vm.startPrank(OWNER);
-        operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
+        operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
         operationsAdmin.registerRoute(SOVRYN_INDEX, true);
+        operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
         vm.stopPrank();
     }
     
@@ -72,9 +73,11 @@ contract BaseDeploymentTest is Test {
         if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(TROPYKUS_STRING))) {
             assertEq(tropykusHandler.i_dcaManager(), address(dcaManager), "TropykusHandler doesn't reference DcaManager");
             assertEq(TropykusDocHandlerMoc(payable(docHandlerMocAddress)).owner(), makeAddr(OWNER_STRING), "Handler owner not set correctly");
-        } else {
+        } else if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(SOVRYN_STRING))) {
             assertEq(sovrynHandler.i_dcaManager(), address(dcaManager), "SovrynHandler doesn't reference DcaManager");
             assertEq(SovrynDocHandlerMoc(payable(docHandlerMocAddress)).owner(), makeAddr(OWNER_STRING), "Handler owner not set correctly");
+        } else {
+            assertEq(Ownable(docHandlerMocAddress).owner(), makeAddr(OWNER_STRING), "Handler owner not set correctly");
         }
     }
 }

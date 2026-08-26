@@ -18,7 +18,6 @@ import "script/Constants.sol";
  * @notice Unit tests for LayerBankErc20Handler using the shared handler harness.
  */
 contract LayerBankErc20HandlerTest is HandlerTestHarness {
-    uint256 internal constant LAYERBANK_INDEX = 1;
 
     MockLayerBankAToken public aToken;
     MockLayerBankPool public pool;
@@ -359,6 +358,59 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         layerbankHandler.testBatchRetrieveStablecoin(users, amounts, amounts[0]);
 
         assertEq(layerbankHandler.getUserShares(user1), aTokenBalanceBefore);
+    }
+
+    /**
+     * @notice Virtual scaled books must stay ≤ handler `scaledBalanceOf` after odd-amount
+     *         redeems against Aave-like round-nearest `rayDiv` burns.
+     * @dev `_stablecoinToShares` documents `Math.Rounding.Up` so the virtual debit is never
+     *      below what Aave may burn for the same DOC. Flipping that to `Rounding.Down` lets
+     *      `sum(getUserShares)` drift above `aToken.scaledBalanceOf(handler)` and fails this test.
+     */
+    function test_layerbank_virtualSharesRoundUp_keepsBooksSolvent() public {
+        uint256 awkwardIndex = 1_070_000_000_000_000_000_000_000_123;
+        aToken.setNormalizedIncome(awkwardIndex, true);
+
+        address user2 = address(0xBEEF);
+        stablecoin.mint(user2, USER_INITIAL_BALANCE);
+        vm.prank(user2);
+        stablecoin.approve(address(handler), type(uint256).max);
+
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, 5_000 ether);
+        vm.prank(address(dcaManager));
+        handler.depositToken(user2, 5_000 ether);
+
+        uint256[] memory oddAmounts = new uint256[](12);
+        oddAmounts[0] = 1;
+        oddAmounts[1] = 3;
+        oddAmounts[2] = 7;
+        oddAmounts[3] = 11;
+        oddAmounts[4] = 13;
+        oddAmounts[5] = 17;
+        oddAmounts[6] = 1 ether + 1;
+        oddAmounts[7] = 1 ether + 3;
+        oddAmounts[8] = 3 ether + 7;
+        oddAmounts[9] = 7 ether + 1;
+        oddAmounts[10] = 25 ether + 1;
+        oddAmounts[11] = 100 ether + 13;
+
+        for (uint256 i; i < oddAmounts.length; ++i) {
+            vm.prank(address(dcaManager));
+            handler.withdrawToken(USER, oddAmounts[i]);
+            vm.prank(address(dcaManager));
+            handler.withdrawToken(user2, oddAmounts[i] + 2);
+        }
+
+        uint256 virtualBooks =
+            layerbankHandler.getUserShares(USER) + layerbankHandler.getUserShares(user2);
+        uint256 actualScaled = aToken.scaledBalanceOf(address(handler));
+        assertLe(
+            virtualBooks,
+            actualScaled,
+            "round-up sizing must keep virtual scaled shares <= aToken.scaledBalanceOf(handler)"
+        );
+        assertGt(virtualBooks, 0, "solvency test must leave a live position");
     }
 }
 

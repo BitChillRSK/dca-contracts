@@ -14,12 +14,8 @@ import "script/Constants.sol";
  * @title LayerBankDcaManagerTest
  * @notice DcaManager paths against a LayerBank handler assigned at index 1 on this test's admin.
  * @dev Goes through DeployMocSwaps (via BaseDeploymentTest) and DeployLayerBankHandler.
- *      Registers `LAYERBANK_INDEX` as lending if this admin has not already classified
- *      it (today it equals `TROPYKUS_INDEX`, which BaseDeploymentTest registers). R22
- *      may move LayerBank off index 1; do not rely on that coincidence.
  */
 contract LayerBankDcaManagerTest is BaseDeploymentTest {
-    uint256 internal constant LAYERBANK_INDEX = 1;
 
     address internal constant USER = address(0x4444);
     address internal constant SWAPPER = address(0x3333);

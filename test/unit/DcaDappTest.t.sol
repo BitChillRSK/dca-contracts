@@ -10,6 +10,8 @@ import {IStablecoinHandler} from "../../test/interfaces/IStablecoinHandler.sol";
 import {ICoinPairPrice} from "../../src/interfaces/ICoinPairPrice.sol";
 import {TropykusDocHandlerMoc} from "../../src/tropykus-legacy/TropykusDocHandlerMoc.sol";
 import {SovrynDocHandlerMoc} from "../../src/sovryn/SovrynDocHandlerMoc.sol";
+import {LayerBankDocHandlerMoc} from "../../src/layerbank/LayerBankDocHandlerMoc.sol";
+import {ILayerBankAToken} from "../../src/layerbank/ILayerBankAToken.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import {OperationsAdmin} from "../../src/OperationsAdmin.sol";
@@ -69,6 +71,14 @@ contract DcaDappTest is Test {
     bool isMocSwaps = keccak256(abi.encodePacked(swapType)) == keccak256(abi.encodePacked("mocSwaps"));
     bool isDexSwaps = keccak256(abi.encodePacked(swapType)) == keccak256(abi.encodePacked("dexSwaps"));
     string lendingProtocol = vm.envString("LENDING_PROTOCOL");
+    bool isTropykus = keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(TROPYKUS_STRING));
+    bool isSovryn = keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(SOVRYN_STRING));
+    bool isLayerbank = keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(LAYERBANK_STRING));
+    bool isNone = keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(NONE_STRING));
+    bool isLendingLane = isTropykus || isSovryn || isLayerbank;
+    // LayerBank aToken is not IShareToken (scaled vs rebasing). Share-math for index 1 lives in
+    // test/ai-generated/unit/layerbank/ (24 tests + solvency), not StablecoinLendingTest.
+    bool isShareTokenLane = isTropykus || isSovryn;
     address stablecoinHandlerAddress;
     uint256 s_routeIndex;
     uint256 s_btcPrice;
@@ -149,6 +159,22 @@ contract DcaDappTest is Test {
         _;
     }
 
+    modifier onlyLendingLane() {
+        if (!isLendingLane) {
+            console2.log("Skipping test: lending-only");
+            return;
+        }
+        _;
+    }
+
+    modifier onlyShareTokenLane() {
+        if (!isShareTokenLane) {
+            console2.log("Skipping test: tropykus/sovryn share-token math");
+            return;
+        }
+        _;
+    }
+
     /*//////////////////////////////////////////////////////////////
                             UNIT TESTS SETUP
     //////////////////////////////////////////////////////////////*/
@@ -160,7 +186,6 @@ contract DcaDappTest is Test {
             stablecoinType = DEFAULT_STABLECOIN;
         }
         
-        bool isSovryn = keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(SOVRYN_STRING));
         bool isUSDRIF = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked("USDRIF"));
         
         // Skip test if Sovryn + USDRIF combination (not supported)
@@ -181,11 +206,21 @@ contract DcaDappTest is Test {
             vm.skip(true);
             return;
         }
-        
-        if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(TROPYKUS_STRING))) {
-            s_routeIndex = TROPYKUS_INDEX;
+        // Dex is tropykus/sovryn only (no LayerBank Uniswap / idle dex in this relaunch)
+        if (isDexSwaps && (isNone || isLayerbank)) {
+            console2.log("Skipping test: dexSwaps is tropykus/sovryn only");
+            vm.skip(true);
+            return;
+        }
+
+        if (isNone) {
+            s_routeIndex = IDLE_INDEX;
+        } else if (isLayerbank) {
+            s_routeIndex = LAYERBANK_INDEX;
         } else if (isSovryn) {
             s_routeIndex = SOVRYN_INDEX;
+        } else if (isTropykus) {
+            s_routeIndex = TROPYKUS_INDEX;
         } else {
             revert("Lending protocol not allowed");
         }
@@ -329,23 +364,25 @@ contract DcaDappTest is Test {
             revert("Invalid deploy environment");
         }
 
-        // Set the shares based on protocol and current stablecoin
-        shareToken = IShareToken(getShareTokenAddress(stablecoinType, s_routeIndex));
-
-        if (address(shareToken) == address(0)) {
-            // Skip this test instead of letting it fail
-            vm.skip(true);
-            return;
+        // Set the shares based on protocol and current stablecoin. Idle has none.
+        // LayerBank's aToken is not IShareToken (kToken/iToken); lending-share math lives in layerbank tests.
+        if (isShareTokenLane) {
+            shareToken = IShareToken(getShareTokenAddress(stablecoinType, s_routeIndex));
+            if (address(shareToken) == address(0)) {
+                vm.skip(true);
+                return;
+            }
         }
 
         // FeeCalculator helper test contract
         feeCalculator = new FeeCalculator();
 
-        // Set swapper and register lending routes
+        // Set swapper and register production + legacy lending routes (idle 0 is constructor-registered)
         vm.startPrank(OWNER);
         operationsAdmin.addSwapper(SWAPPER);
-        operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
+        operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
         operationsAdmin.registerRoute(SOVRYN_INDEX, true);
+        operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
         vm.stopPrank();
 
         // Add tokenHandler
@@ -468,8 +505,10 @@ contract DcaDappTest is Test {
         vm.expectEmit(true, true, true, true);
         uint256 lastPurchaseTimestamp = dcaDetails[SCHEDULE_INDEX].lastPurchaseTimestamp == 0 ? block.timestamp : dcaDetails[SCHEDULE_INDEX].lastPurchaseTimestamp + dcaDetails[SCHEDULE_INDEX].purchasePeriod;
         emit DcaManager__LastPurchaseTimestampUpdated(address(stablecoin), dcaDetails[SCHEDULE_INDEX].scheduleId, lastPurchaseTimestamp);
-        vm.expectEmit(true, false, false, false);
-        emit TokenLending__SharesRedeemed(USER, 0, 0);
+        if (isLendingLane) {
+            vm.expectEmit(true, false, false, false);
+            emit TokenLending__SharesRedeemed(USER, 0, 0);
+        }
         if (block.chainid == ANVIL_CHAIN_ID && isMocSwaps) {
             vm.expectEmit(true, true, true, true);
         } else {
@@ -627,7 +666,9 @@ contract DcaDappTest is Test {
             s_routeIndex
         );
 
-        _assertBatchRedemptionReported(totalNetPurchaseAmount + totalFee);
+        if (isLendingLane) {
+            _assertBatchRedemptionReported(totalNetPurchaseAmount + totalFee);
+        }
 
         uint256 postStablecoinHandlerBalance;
 
@@ -678,7 +719,9 @@ contract DcaDappTest is Test {
             MAX_SLIPPAGE_PERCENT // Allow a maximum difference of 0.5% (on fork tests we saw this was necessary for both MoC and Uniswap purchases)
         );
 
-        _assertBatchRedemptionReported(totalNetPurchaseAmount + totalFee);
+        if (isLendingLane) {
+            _assertBatchRedemptionReported(totalNetPurchaseAmount + totalFee);
+        }
     }
 
     /**
@@ -770,6 +813,8 @@ contract DcaDappTest is Test {
                 shareTokenAddress = networkConfig.kDocAddress;
             } else if (routeIndex == SOVRYN_INDEX) {
                 shareTokenAddress = networkConfig.iSusdAddress;
+            } else if (routeIndex == LAYERBANK_INDEX) {
+                shareTokenAddress = networkConfig.layerbankATokenAddress;
             }
         } else if (isDexSwaps && address(dexHelperConfig) != address(0)) {
             if (routeIndex == TROPYKUS_INDEX || routeIndex == SOVRYN_INDEX) {
@@ -790,6 +835,12 @@ contract DcaDappTest is Test {
                     shareTokenAddress = address(iSusdToken);
                 } catch {
                     revert("Failed to get Sovryn shares from handler");
+                }
+            } else if (routeIndex == LAYERBANK_INDEX) {
+                try LayerBankDocHandlerMoc(payable(address(stablecoinHandler))).i_aToken() returns (ILayerBankAToken aToken) {
+                    shareTokenAddress = address(aToken);
+                } catch {
+                    revert("Failed to get LayerBank aToken from handler");
                 }
             }
         }

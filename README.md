@@ -145,14 +145,20 @@ git checkout smart-contracts
 
 ### Testing
 ```bash
-# Local done-gate (build + default moc-tropykus suite)
+# Local done-gate (build + moc-none + moc-layerbank + moc-sovryn + dex-sovryn + invariants-sovryn)
 make check
 
-# Run tests with DOC and Tropykus
-make moc-tropykus 
+# Run tests with DOC and idle funds (index 0)
+make moc-none
 
-# Run tests with DOC and Sovryn
-make moc-sovryn 
+# Run tests with DOC and LayerBank (index 1)
+make moc-layerbank
+
+# Run tests with DOC and Sovryn (index 2)
+make moc-sovryn
+
+# Legacy Tropykus mocks (not on the production map)
+make moc-tropykus
 
 # Run tests with USDRIF and Tropykus
 STABLECOIN_TYPE=USDRIF make dex-tropykus

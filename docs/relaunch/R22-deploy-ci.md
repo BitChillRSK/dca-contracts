@@ -1,8 +1,8 @@
 # R22 — Deploy scripts, constants, harness, and CI matrix
 
-Status: **not started** · Assigned: yes · Optional/further-review: no
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
-PR 29 of R22 (reordered after the post-R30 architecture sequence; R35 inserted as PR 27 after #70). Stack on R32 (PR 28). Last required R22 PR; R9 follows as PR 30.
+PR 29 of R22 (reordered after the post-R30 architecture sequence; R35 inserted as PR 27 after #70), GitHub [#73](https://github.com/BitChillRSK/dca-contracts/pull/73). Stack on R32 (PR 28, GitHub [#72](https://github.com/BitChillRSK/dca-contracts/pull/72)). Last required R22 PR; R9 follows as PR 30.
 
 ## Objective
 
@@ -26,12 +26,12 @@ Related: [R22-layerbank-handler.md](./R22-layerbank-handler.md), [R25-lending-re
 
 ## Scope
 
-- [ ] `script/Constants.sol` index map: `0` idle, `1` LayerBank, `2` Sovryn, `3` reserved for future MoC lending. Drop Tropykus from the new deploy path.
-- [ ] `DeployMocSwaps` / `DeployDexSwaps` (as applicable), `MocHelperConfig` live Pool/aToken fields, register LayerBank at index 1.
-- [ ] Split `DcaDappTest` / shared harness so lending-share assertions live only in lending-protocol-specific tests. `LENDING_PROTOCOL=layerbank` is a first-class lane.
-- [ ] CI / Makefile: cover `none`, `layerbank`, and `sovryn` with `SWAP_TYPE=mocSwaps` (and existing dex lane policy unchanged unless this PR must touch it). Keep the R13 `invariants-sovryn` CI job; do not fold `InvariantTest` back into `TEST_CMD`.
-- [ ] Ops note already recorded: illiquid LayerBank DOC cash aborts whole `batchBuyRbtc` — document in PR body if not already; no new product behavior.
-- [ ] **Round-up solvency regression (LayerBank):**
+- [x] `script/Constants.sol` index map: `0` idle, `1` LayerBank, `2` Sovryn, `3` reserved for future MoC lending. Drop Tropykus from the new deploy path.
+- [x] `DeployMocSwaps` / `DeployDexSwaps` (as applicable), `MocHelperConfig` live Pool/aToken fields, register LayerBank at index 1.
+- [x] Split `DcaDappTest` / shared harness so lending-share assertions live only in lending-protocol-specific tests. `LENDING_PROTOCOL=layerbank` is a first-class lane.
+- [x] CI / Makefile: cover `none`, `layerbank`, and `sovryn` with `SWAP_TYPE=mocSwaps` (and existing dex lane policy unchanged unless this PR must touch it). Keep the R13 `invariants-sovryn` CI job; do not fold `InvariantTest` back into `TEST_CMD`.
+- [x] Ops note already recorded: illiquid LayerBank DOC cash aborts whole `batchBuyRbtc` — document in PR body if not already; no new product behavior.
+- [x] **Round-up solvency regression (LayerBank):**
   - Add a dedicated test (prefer `test/ai-generated/unit/layerbank/`) that deposits, then redeems many **odd** DOC amounts under a non-`RAY` index (or fuzz), with the mock burning scaled shares via Aave-like **round-nearest** `rayDiv`.
   - After the sequence, assert `sum` of per-user `getUserShares` (or the handler’s tracked mapping exposed in the test subclass) **≤** `aToken.scaledBalanceOf(handler)`.
   - The test must be written so that replacing `_stablecoinToShares`’s `Rounding.Up` with `Rounding.Down` would fail it (document that in the test comment). Extend `MockLayerBank` if it does not yet expose nearest-rayDiv burn behavior matching live Aave.
@@ -88,11 +88,11 @@ Fork: live LayerBank probe still runs on `make fork-sovryn` at tip; no new fork-
 
 ## Success criteria
 
-- [ ] Constants and deploy scripts implement the new index map; CI covers `none` / `layerbank` / `sovryn`.
-- [ ] Harness no longer assumes Tropykus lending tokens on every lane.
-- [ ] Round-up solvency regression exists, is named in the PR test plan, and runs on the layerbank lane.
-- [ ] `make check`, `make fork-sovryn`, and `make fork-tropykus` pass.
-- [ ] No unrelated refactors.
+- [x] Constants and deploy scripts implement the new index map; CI covers `none` / `layerbank` / `sovryn`.
+- [x] Harness no longer assumes Tropykus lending tokens on every lane.
+- [x] Round-up solvency regression exists, is named in the PR test plan, and runs on the layerbank lane.
+- [x] `make check`, `make fork-sovryn`, and `make fork-tropykus` pass.
+- [x] No unrelated refactors.
 
 ## Reviewer checklist
 

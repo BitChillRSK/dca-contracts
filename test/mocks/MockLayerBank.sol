@@ -24,6 +24,8 @@ contract MockLayerBankAToken is ERC20 {
     uint256 private s_mintOverride;
     bool private s_usePayoutCap;
     uint256 private s_payoutCap;
+    bool private s_useIncomeOverride;
+    uint256 private s_incomeOverride;
 
     error MockLayerBankAToken__OnlyPool();
     error MockLayerBankAToken__PoolAlreadySet();
@@ -71,6 +73,12 @@ contract MockLayerBankAToken is ERC20 {
         s_usePayoutCap = enabled;
     }
 
+    /// @notice Pin the liquidity index so solvency tests can use a non-RAY rate without warping.
+    function setNormalizedIncome(uint256 income, bool enabled) external {
+        s_incomeOverride = income;
+        s_useIncomeOverride = enabled;
+    }
+
     function POOL() external view returns (address) {
         return pool;
     }
@@ -89,6 +97,7 @@ contract MockLayerBankAToken is ERC20 {
     }
 
     function getNormalizedIncome() public view returns (uint256) {
+        if (s_useIncomeOverride) return s_incomeOverride;
         uint256 timeElapsed = block.timestamp - i_deploymentTimestamp;
         uint256 yearsElapsed = (timeElapsed * RAY) / YEAR_IN_SECONDS;
         uint256 increase = (RAY * ANNUAL_INCREASE * yearsElapsed) / (100 * RAY);
@@ -100,7 +109,7 @@ contract MockLayerBankAToken is ERC20 {
         if (s_useMintOverride) {
             scaled = s_mintOverride;
         } else {
-            scaled = underlyingReceived * RAY / getNormalizedIncome();
+            scaled = _rayDiv(underlyingReceived, getNormalizedIncome());
         }
         if (scaled == 0) revert MockLayerBankAToken__InvalidScaledAmount();
         _mint(onBehalfOf, scaled);
@@ -108,10 +117,15 @@ contract MockLayerBankAToken is ERC20 {
 
     function burnScaled(address from, address to, uint256 underlyingAmount) external onlyPool returns (uint256 paid) {
         uint256 rate = getNormalizedIncome();
-        uint256 scaled = (underlyingAmount * RAY + rate - 1) / rate;
+        uint256 scaled = _rayDiv(underlyingAmount, rate);
         _burn(from, scaled);
         if (s_silentZeroPayout) return 0;
         return _payout(to, underlyingAmount);
+    }
+
+    /// @dev Aave WadRayMath.rayDiv: round nearest. Used for both mint and burn.
+    function _rayDiv(uint256 a, uint256 rayIndex) private pure returns (uint256) {
+        return (a * RAY + rayIndex / 2) / rayIndex;
     }
 
     function _payout(address to, uint256 amount) private returns (uint256) {

@@ -18,7 +18,7 @@ PROBE_VERBOSITY ?= -vv
 PROBE_MATCH ?=
 
 # Targets
-.PHONY: all test moc dex help check ci build patch-deps slither moc-tropykus moc-sovryn dex-tropykus dex-sovryn invariants invariants-sovryn fork fork-tropykus fork-sovryn probe-sovryn-exit-fee coverage
+.PHONY: all test moc dex help check ci build patch-deps slither moc-none moc-layerbank moc-tropykus moc-sovryn dex-tropykus dex-sovryn invariants invariants-sovryn fork fork-tropykus fork-sovryn probe-sovryn-exit-fee coverage
 
 all: help
 
@@ -37,13 +37,16 @@ test:
 # Local "am I done" gate. Mirrors required CI lanes and includes the local Tropykus mock lane.
 # Does not run forge fmt --check (src is not fmt-clean). Run `make slither` explicitly when needed.
 check: build
-	$(MAKE) moc-tropykus
+	$(MAKE) moc-none
+	$(MAKE) moc-layerbank
 	$(MAKE) moc-sovryn
 	STABLECOIN_TYPE=USDRIF $(MAKE) dex-sovryn
 	$(MAKE) invariants-sovryn
 
 ci:
 	FOUNDRY_PROFILE=ci $(MAKE) build
+	FOUNDRY_PROFILE=ci $(MAKE) moc-none
+	FOUNDRY_PROFILE=ci $(MAKE) moc-layerbank
 	FOUNDRY_PROFILE=ci $(MAKE) moc-sovryn
 	FOUNDRY_PROFILE=ci STABLECOIN_TYPE=USDRIF $(MAKE) dex-sovryn
 	FOUNDRY_PROFILE=ci $(MAKE) invariants-sovryn
@@ -69,6 +72,12 @@ slither:
 moc:
 	@echo "Executing MocSwaps tests with $(LENDING_PROTOCOL) and $(STABLECOIN_TYPE)..."
 	SWAP_TYPE=mocSwaps LENDING_PROTOCOL=$(LENDING_PROTOCOL) EXPECTED_LENDING_PROTOCOL=$(LENDING_PROTOCOL) STABLECOIN_TYPE=DOC $(TEST_CMD)
+moc-none:
+	@echo "Executing MocSwaps idle (none) tests with $(STABLECOIN_TYPE)..."
+	SWAP_TYPE=mocSwaps LENDING_PROTOCOL=none EXPECTED_LENDING_PROTOCOL=none STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
+moc-layerbank:
+	@echo "Executing MocSwaps LayerBank tests with $(STABLECOIN_TYPE)..."
+	SWAP_TYPE=mocSwaps LENDING_PROTOCOL=layerbank EXPECTED_LENDING_PROTOCOL=layerbank STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
 moc-tropykus:
 	@echo "Executing MocSwaps Tropykus tests with $(STABLECOIN_TYPE)..."
 	SWAP_TYPE=mocSwaps LENDING_PROTOCOL=tropykus EXPECTED_LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
@@ -144,15 +153,17 @@ coverage:
 # Help target
 help:
 	@echo "Available targets:"
-	@echo "  make check                     # Build + moc-tropykus + required CI lanes"
-	@echo "  make ci                        # Build + required CI lanes (moc-sovryn, dex-sovryn, invariants-sovryn)"
+	@echo "  make check                     # Build + moc-none + moc-layerbank + required CI lanes"
+	@echo "  make ci                        # Build + required CI lanes (moc-none, moc-layerbank, moc-sovryn, dex-sovryn, invariants-sovryn)"
 	@echo "  make patch-deps                # Apply vendored Uniswap pragma compatibility patch"
 	@echo "  make slither                   # Run slither (must be installed)"
-	@echo "  make test SWAP_TYPE=mocSwaps LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=DOC"
+	@echo "  make test SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=DOC"
 	@echo ""
 	@echo "  make moc                       # MocSwaps local tests (LENDING_PROTOCOL from env, default tropykus)"
-	@echo "  make moc-tropykus              # MocSwaps + Tropykus"
-	@echo "  make moc-sovryn                # MocSwaps + Sovryn"
+	@echo "  make moc-none                  # MocSwaps + idle handler (index 0)"
+	@echo "  make moc-layerbank             # MocSwaps + LayerBank (index 1)"
+	@echo "  make moc-tropykus              # MocSwaps + Tropykus (legacy mocks; not in the production map)"
+	@echo "  make moc-sovryn                # MocSwaps + Sovryn (index 2)"
 	@echo "  make dex                       # DexSwaps local tests (LENDING_PROTOCOL from env, default tropykus)"
 	@echo "  make dex-tropykus              # DexSwaps + Tropykus"
 	@echo "  make dex-sovryn                # DexSwaps + Sovryn"
@@ -166,7 +177,7 @@ help:
 	@echo ""
 	@echo "Environment variables:"
 	@echo "  SWAP_TYPE: mocSwaps (default) or dexSwaps"
-	@echo "  LENDING_PROTOCOL: tropykus (default) or sovryn"
+	@echo "  LENDING_PROTOCOL: tropykus (default, legacy), none, layerbank, or sovryn"
 	@echo "  STABLECOIN_TYPE: DOC (default) or USDRIF"
 	@echo ""
 	@echo "Example:"

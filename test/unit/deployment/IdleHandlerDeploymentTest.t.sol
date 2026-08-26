@@ -26,8 +26,10 @@ contract IdleHandlerDeploymentTest is BaseDeploymentTest {
         idleHandler = IdleDocHandlerMoc(payable(idleHandlerAddress));
         address docTokenAddress = helperConfig.getStablecoinAddress();
 
-        vm.prank(OWNER);
-        operationsAdmin.assignTokenHandler(docTokenAddress, IDLE_INDEX, idleHandlerAddress);
+        if (operationsAdmin.getTokenHandler(docTokenAddress, IDLE_INDEX) == address(0)) {
+            vm.prank(OWNER);
+            operationsAdmin.assignTokenHandler(docTokenAddress, IDLE_INDEX, idleHandlerAddress);
+        }
     }
 
     function testIdleHandlerDeployment() public {

@@ -19,14 +19,17 @@ contract StablecoinLendingTest is DcaDappTest {
     // Events
     event TokenLending__InterestWithdrawn(address indexed user, address indexed token, uint256 indexed amount);
 
-    function setUp() public override {
-        super.setUp();
-    }
+    // No `setUp` override: `vm.skip(true)` at the end of a `setUp` that already ran `super.setUp()`
+    // is reported as `FAIL: FOUNDRY::SKIP` by some Foundry builds (CI pins `version: stable`, which
+    // drifts from local). Every test below gates on a lane modifier instead — same coverage, no
+    // cheatcode in `setUp`.
 
     /////////////////////////////////////
     ///// Stablecoin Lending tests /////
     /////////////////////////////////////
-    function testDepositedStablecoinIsLent() external {
+    // onlyShareTokenLane cases skip LayerBank: aToken is not IShareToken. Index-1 share math is
+    // test/ai-generated/unit/layerbank/. Interest tests below still run on the layerbank lane.
+    function testDepositedStablecoinIsLent() external onlyShareTokenLane {
         // Check initial balances
         uint256 ltStablecoinBalanceBeforeDeposit = stablecoin.balanceOf(address(shareToken));
         
@@ -42,7 +45,7 @@ contract StablecoinLendingTest is DcaDappTest {
         assertEq(ltStablecoinBalanceAfterDeposit - ltStablecoinBalanceBeforeDeposit, AMOUNT_TO_DEPOSIT, "Incorrect amount deposited in shares");
     }
 
-    function testStablecoinDepositIncreasesSharesBalance() external {
+    function testStablecoinDepositIncreasesSharesBalance() external onlyShareTokenLane {
         uint256 prevSharesBalance = stablecoinHandler.getUserShares(USER);
         super.depositStablecoin();
         uint256 postSharesBalance = stablecoinHandler.getUserShares(USER);
@@ -61,7 +64,7 @@ contract StablecoinLendingTest is DcaDappTest {
         assertEq(postSharesBalance - prevSharesBalance, AMOUNT_TO_DEPOSIT * 1e18 / exchangeRate);
     }
 
-    function testStablecoinWithdrawalBurnsShares() external {
+    function testStablecoinWithdrawalBurnsShares() external onlyShareTokenLane {
         uint256 prevSharesBalance = stablecoinHandler.getUserShares(USER);
         super.withdrawStablecoin();
         uint256 postSharesBalance = stablecoinHandler.getUserShares(USER);
@@ -80,7 +83,7 @@ contract StablecoinLendingTest is DcaDappTest {
         );
     }
 
-    function testRbtcPurchaseBurnsShares() external {
+    function testRbtcPurchaseBurnsShares() external onlyShareTokenLane {
         uint256 prevSharesBalance = stablecoinHandler.getUserShares(USER);
         super.makeSinglePurchase();
         uint256 postSharesBalance = stablecoinHandler.getUserShares(USER);
@@ -109,7 +112,7 @@ contract StablecoinLendingTest is DcaDappTest {
         );
     }
 
-    function testSeveralRbtcPurchasesBurnShares() external {
+    function testSeveralRbtcPurchasesBurnShares() external onlyShareTokenLane {
         // This just for one user, for many users this will get tested in invariant tests
         super.createSeveralDcaSchedules();
         uint256 prevSharesBalance = stablecoinHandler.getUserShares(USER);
@@ -155,7 +158,7 @@ contract StablecoinLendingTest is DcaDappTest {
         );
     }
 
-    function testRbtcBatchPurchaseBurnsShares() external {
+    function testRbtcBatchPurchaseBurnsShares() external onlyShareTokenLane {
         // This just for one user, for many users this will get tested in invariant tests
         super.createSeveralDcaSchedules(); // This creates NUM_OF_SCHEDULES schedules with purchaseAmount = AMOUNT_TO_SPEND / NUM_OF_SCHEDULES
         uint256 prevSharesBalance = stablecoinHandler.getUserShares(USER);
@@ -198,7 +201,7 @@ contract StablecoinLendingTest is DcaDappTest {
         }
     }
 
-    function testWithdrawInterest() external {
+    function testWithdrawInterest() external onlyLendingLane {
         updateExchangeRate(10 days);
 
         uint256 withdrawableInterest =
@@ -228,7 +231,7 @@ contract StablecoinLendingTest is DcaDappTest {
 
     /// @notice Combined withdraw derives the lending route from the validated schedule.
     /// The caller cannot target a different index (the previous fifth argument is gone).
-    function testWithdrawTokenAndInterest() external {
+    function testWithdrawTokenAndInterest() external onlyLendingLane {
         vm.warp(block.timestamp + 10 days);
 
         // On fork tests we need to simulate some operation on Tropykus so that the exchange rate gets updated
@@ -256,7 +259,7 @@ contract StablecoinLendingTest is DcaDappTest {
     }
 
     /// @notice Locked principal is the sum of every schedule on that route, not one of them.
-    function testInterestLockedPrincipalSumsAllSchedulesOnRoute() external {
+    function testInterestLockedPrincipalSumsAllSchedulesOnRoute() external onlyLendingLane {
         super.createSeveralDcaSchedules();
         updateExchangeRate(10 days);
 

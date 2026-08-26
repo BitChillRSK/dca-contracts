@@ -16,15 +16,14 @@ import "./Constants.sol";
 /**
  * @title DeployLayerBankHandler
  * @notice Add-on deploy for the index-1 LayerBank DOC + MoC handler, same shape as DeployIdleHandler.
- * @dev `run()` is Anvil-only. `DeployBase` reports FORK (not MAINNET) for a real RSK RPC
- *      unless `REAL_DEPLOYMENT=true`, so gating on TESTNET/MAINNET would still broadcast
- *      mocks onto chain 30. Live Pool/aToken addresses and DeployMocSwaps registration are
- *      PR 16. `LAYERBANK_INDEX` currently equals `TROPYKUS_INDEX` (1); after a live
- *      `DeployMocSwaps` DOC run, `assignTokenHandler` reverts `HandlerAlreadyAssigned`
- *      rather than skipping. R22 owns the final index map.
+ * @dev Local/Anvil deploys Pool/aToken mocks. Live TESTNET/MAINNET (`REAL_DEPLOYMENT=true`) bind
+ *      `MocHelperConfig.layerbankATokenAddress` (handler reads Pool from `aToken.POOL()`).
+ *      `getEnvironment()` returns FORK for a real RSK RPC unless that env var is set — FORK must
+ *      not take the live path (test `feeCollector` / 2% cap would permanently occupy `(DOC, 1)`).
+ *      Fork tests use `deployMocksAndHandler` (no broadcast). Occupied `(token, LAYERBANK_INDEX)`
+ *      reverts `HandlerAlreadyAssigned` — do not skip. Map: idle=0 / LayerBank=1 / Sovryn=2.
  */
 contract DeployLayerBankHandler is DeployBase {
-    uint256 public constant LAYERBANK_INDEX = 1;
 
     struct DeployParams {
         address dcaManager;
@@ -56,8 +55,7 @@ contract DeployLayerBankHandler is DeployBase {
 
     /**
      * @notice Deploy Pool/aToken mocks and the handler. Used by tests on Anvil and on a fork.
-     * @dev Does not `broadcast` or call `assignTokenHandler`. `run()` is the
-     *      Anvil-only broadcast entry.
+     * @dev Does not `broadcast` or call `assignTokenHandler`. `run()` broadcasts.
      */
     function deployMocksAndHandler(
         address dcaManager,
@@ -85,10 +83,6 @@ contract DeployLayerBankHandler is DeployBase {
         external
         returns (address)
     {
-        if (environment != Environment.LOCAL) {
-            revert("Live LayerBank Pool/aToken addresses are PR 16");
-        }
-
         MocHelperConfig helperConfig =
             address(existingConfig) != address(0) ? existingConfig : new MocHelperConfig();
 
@@ -108,15 +102,47 @@ contract DeployLayerBankHandler is DeployBase {
         vm.startBroadcast();
 
         OperationsAdmin operationsAdmin = OperationsAdmin(operationsAdminAddress);
-        address layerbankHandler = deployMocksAndHandler(
-            dcaManagerAddress,
-            docTokenAddress,
-            mocProxyAddress,
-            getFeeCollector(environment),
-            operationsAdmin.owner()
-        );
-        console.log("LayerBank DOC handler deployed at:", layerbankHandler);
+        address layerbankHandler;
 
+        if (environment == Environment.LOCAL) {
+            layerbankHandler = deployMocksAndHandler(
+                dcaManagerAddress,
+                docTokenAddress,
+                mocProxyAddress,
+                getFeeCollector(environment),
+                operationsAdmin.owner()
+            );
+        } else if (environment == Environment.TESTNET || environment == Environment.MAINNET) {
+            address aToken = networkConfig.layerbankATokenAddress;
+            if (aToken == address(0)) {
+                revert("LayerBank aToken address is not configured for this network");
+            }
+            layerbankHandler = deployLayerBankDocHandlerMoc(
+                DeployParams({
+                    dcaManager: dcaManagerAddress,
+                    tokenAddress: docTokenAddress,
+                    aToken: aToken,
+                    mocProxy: mocProxyAddress,
+                    feeCollector: getFeeCollector(environment)
+                })
+            );
+            Ownable(layerbankHandler).transferOwnership(operationsAdmin.owner());
+        } else {
+            // FORK: `--broadcast` against a real RPC without REAL_DEPLOYMENT=true.
+            revert("DeployLayerBankHandler live path requires REAL_DEPLOYMENT=true");
+        }
+
+        console.log("LayerBank DOC handler deployed at:", layerbankHandler);
+        _maybeAssign(operationsAdmin, docTokenAddress, layerbankHandler);
+
+        vm.stopBroadcast();
+
+        return layerbankHandler;
+    }
+
+    function _maybeAssign(OperationsAdmin operationsAdmin, address docTokenAddress, address layerbankHandler)
+        internal
+    {
         bool isOwner = msg.sender == operationsAdmin.owner();
 
         if (!isOwner) {
@@ -125,16 +151,12 @@ contract DeployLayerBankHandler is DeployBase {
             console.log("tokenAddress:", docTokenAddress);
             console.log("index:", LAYERBANK_INDEX);
             console.log("handlerAddress:", layerbankHandler);
-        } else {
-            if (operationsAdmin.getRouteClass(LAYERBANK_INDEX) == IOperationsAdmin.RouteClass.Unregistered) {
-                operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
-            }
-            operationsAdmin.assignTokenHandler(docTokenAddress, LAYERBANK_INDEX, layerbankHandler);
-            console.log("LayerBank DOC handler registered with OperationsAdmin at index", LAYERBANK_INDEX);
+            return;
         }
-
-        vm.stopBroadcast();
-
-        return layerbankHandler;
+        if (operationsAdmin.getRouteClass(LAYERBANK_INDEX) == IOperationsAdmin.RouteClass.Unregistered) {
+            operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
+        }
+        operationsAdmin.assignTokenHandler(docTokenAddress, LAYERBANK_INDEX, layerbankHandler);
+        console.log("LayerBank DOC handler registered with OperationsAdmin at index", LAYERBANK_INDEX);
     }
 }
