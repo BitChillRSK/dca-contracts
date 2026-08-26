@@ -39,10 +39,10 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         docToken = MockStablecoin(helperConfig.getStablecoinAddress());
         mocProxy = MockMocProxy(helperConfig.getActiveNetworkConfig().mocProxyAddress);
 
-        vm.prank(ADMIN);
-        operationsAdmin.setSwapperRole(SWAPPER);
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(address(docToken), IDLE_INDEX, address(handler));
+        vm.startPrank(OWNER);
+        operationsAdmin.addSwapper(SWAPPER);
+        operationsAdmin.assignTokenHandler(address(docToken), IDLE_INDEX, address(handler));
+        vm.stopPrank();
 
         vm.deal(address(mocProxy), 100 ether);
         vm.prank(address(handler));
@@ -62,7 +62,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         assertEq(schedule.tokenBalance, DEPOSIT);
         assertEq(handler.getUsersIdleTokenBalance(USER), DEPOSIT);
         assertEq(docToken.balanceOf(address(handler)), DEPOSIT);
-        assertEq(bytes(operationsAdmin.getLendingProtocolName(IDLE_INDEX)).length, 0);
+        assertFalse(operationsAdmin.isLendingRoute(IDLE_INDEX));
     }
 
     function test_buyAndWithdraw_spendIdleDoc() public {
@@ -124,8 +124,8 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
 
         uint256 lendingIndex = address(sovrynHandler) != address(0) ? SOVRYN_INDEX : TROPYKUS_INDEX;
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(address(docToken), lendingIndex, docHandlerMocAddress);
+        vm.prank(OWNER);
+        operationsAdmin.assignTokenHandler(address(docToken), lendingIndex, docHandlerMocAddress);
 
         vm.prank(USER);
         docToken.approve(docHandlerMocAddress, type(uint256).max);

@@ -84,10 +84,9 @@ contract DepositSwapPopReentrancyTest is Test {
         kToken = new MockKdocToken(address(token));
         MockMocProxy mocProxy = new MockMocProxy(address(token));
 
-        vm.prank(OWNER);
-        operationsAdmin.setAdminRole(ADMIN);
-        vm.prank(ADMIN);
-        operationsAdmin.addOrUpdateLendingProtocol("Tropykus", TROPYKUS_INDEX);
+        vm.startPrank(OWNER);
+        operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
+        vm.stopPrank();
 
         handler = new TropykusDocHandlerMoc(
             address(dcaManager),
@@ -103,8 +102,8 @@ contract DepositSwapPopReentrancyTest is Test {
             })
         );
 
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(address(token), TROPYKUS_INDEX, address(handler));
+        vm.prank(OWNER);
+        operationsAdmin.assignTokenHandler(address(token), TROPYKUS_INDEX, address(handler));
 
         user = new ReentrantDepositor(dcaManager, address(token));
         token.mint(address(user), 10_000 ether);

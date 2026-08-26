@@ -47,14 +47,10 @@ contract BaseDeploymentTest is Test {
             tropykusHandler = TropykusDocHandlerMoc(payable(docHandlerMocAddress));
         }
 
-        vm.prank(OWNER);
-        operationsAdmin.setAdminRole(ADMIN);
-        // Both names must exist: NewHandlerDeploymentTest assigns USDRIF to TROPYKUS_INDEX
-        // even when this suite deployed a Sovryn DOC handler for the lane.
-        vm.prank(ADMIN);
-        operationsAdmin.addOrUpdateLendingProtocol(TROPYKUS_STRING, TROPYKUS_INDEX);
-        vm.prank(ADMIN);
-        operationsAdmin.addOrUpdateLendingProtocol(SOVRYN_STRING, SOVRYN_INDEX);
+        vm.startPrank(OWNER);
+        operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
+        operationsAdmin.registerRoute(SOVRYN_INDEX, true);
+        vm.stopPrank();
     }
     
     function testCoreProtocolDeployment() public {

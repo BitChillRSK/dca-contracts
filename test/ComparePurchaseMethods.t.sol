@@ -166,21 +166,16 @@ contract ComparePurchaseMethods is Test {
             );
         }
         
-        // Set up roles for both implementations
+        // Set up swappers and routes for both implementations
         vm.startPrank(OWNER);
-        deployedContracts.adOpsMoc.setAdminRole(ADMIN);
-        deployedContracts.adOpsUni.setAdminRole(ADMIN);
-        vm.stopPrank();
-        
-        vm.startPrank(ADMIN);
-        deployedContracts.adOpsMoc.setSwapperRole(SWAPPER);
-        deployedContracts.adOpsUni.setSwapperRole(SWAPPER);
-        deployedContracts.adOpsMoc.addOrUpdateLendingProtocol(TROPYKUS_STRING, 1);
-        deployedContracts.adOpsMoc.addOrUpdateLendingProtocol(SOVRYN_STRING, 2);
-        deployedContracts.adOpsUni.addOrUpdateLendingProtocol(TROPYKUS_STRING, 1);
-        deployedContracts.adOpsUni.addOrUpdateLendingProtocol(SOVRYN_STRING, 2);
-        deployedContracts.adOpsMoc.assignOrUpdateTokenHandler(address(stablecoin), lendingProtocolIndex, handlerMoc);
-        deployedContracts.adOpsUni.assignOrUpdateTokenHandler(address(stablecoin), lendingProtocolIndex, handlerUni);
+        deployedContracts.adOpsMoc.addSwapper(SWAPPER);
+        deployedContracts.adOpsUni.addSwapper(SWAPPER);
+        deployedContracts.adOpsMoc.registerRoute(TROPYKUS_INDEX, true);
+        deployedContracts.adOpsMoc.registerRoute(SOVRYN_INDEX, true);
+        deployedContracts.adOpsUni.registerRoute(TROPYKUS_INDEX, true);
+        deployedContracts.adOpsUni.registerRoute(SOVRYN_INDEX, true);
+        deployedContracts.adOpsMoc.assignTokenHandler(address(stablecoin), lendingProtocolIndex, handlerMoc);
+        deployedContracts.adOpsUni.assignTokenHandler(address(stablecoin), lendingProtocolIndex, handlerUni);
         vm.stopPrank();
 
         // Create initial DCA schedules for each user

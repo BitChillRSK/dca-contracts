@@ -5,6 +5,7 @@ import {BaseDeploymentTest} from "test/unit/deployment/BaseDeploymentTest.t.sol"
 import {DeployLayerBankHandler} from "script/DeployLayerBankHandler.s.sol";
 import {LayerBankDocHandlerMoc} from "src/layerbank/LayerBankDocHandlerMoc.sol";
 import {IDcaManager} from "src/interfaces/IDcaManager.sol";
+import {IOperationsAdmin} from "src/interfaces/IOperationsAdmin.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import "script/Constants.sol";
@@ -12,8 +13,10 @@ import "script/Constants.sol";
 /**
  * @title LayerBankDcaManagerTest
  * @notice DcaManager paths against a LayerBank handler assigned at index 1 on this test's admin.
- * @dev Goes through DeployMocSwaps (via BaseDeploymentTest) and DeployLayerBankHandler. Index 1
- *      overwrites Tropykus on this admin only; the shared harness is unchanged (PR 16).
+ * @dev Goes through DeployMocSwaps (via BaseDeploymentTest) and DeployLayerBankHandler.
+ *      Registers `LAYERBANK_INDEX` as lending if this admin has not already classified
+ *      it (today it equals `TROPYKUS_INDEX`, which BaseDeploymentTest registers). R22
+ *      may move LayerBank off index 1; do not rely on that coincidence.
  */
 contract LayerBankDcaManagerTest is BaseDeploymentTest {
     uint256 internal constant LAYERBANK_INDEX = 1;
@@ -50,12 +53,13 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
         docToken = MockStablecoin(helperConfig.getStablecoinAddress());
         mocProxy = MockMocProxy(helperConfig.getActiveNetworkConfig().mocProxyAddress);
 
-        vm.prank(ADMIN);
-        operationsAdmin.setSwapperRole(SWAPPER);
-        vm.prank(ADMIN);
-        operationsAdmin.addOrUpdateLendingProtocol("layerbank", LAYERBANK_INDEX);
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(address(docToken), LAYERBANK_INDEX, address(handler));
+        vm.startPrank(OWNER);
+        if (operationsAdmin.getRouteClass(LAYERBANK_INDEX) == IOperationsAdmin.RouteClass.Unregistered) {
+            operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
+        }
+        operationsAdmin.addSwapper(SWAPPER);
+        operationsAdmin.assignTokenHandler(address(docToken), LAYERBANK_INDEX, address(handler));
+        vm.stopPrank();
 
         vm.deal(address(mocProxy), 100 ether);
         vm.prank(address(handler));
@@ -75,9 +79,7 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
         assertEq(schedule.tokenBalance, DEPOSIT);
         assertGt(handler.getUserShares(USER), 0);
         assertEq(docToken.balanceOf(address(handler)), 0);
-        assertEq(
-            keccak256(bytes(operationsAdmin.getLendingProtocolName(LAYERBANK_INDEX))), keccak256(bytes("layerbank"))
-        );
+        assertTrue(operationsAdmin.isLendingRoute(LAYERBANK_INDEX));
     }
 
     function test_buyAndWithdraw_spendLayerBankDoc() public {

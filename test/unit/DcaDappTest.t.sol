@@ -128,7 +128,7 @@ contract DcaDappTest is Test {
     );
 
     // OperationsAdmin
-    event OperationsAdmin__TokenHandlerUpdated(
+    event OperationsAdmin__TokenHandlerAssigned(
         address indexed token, uint256 indexed lendinProtocolIndex, address indexed newHandler
     );
 
@@ -349,21 +349,18 @@ contract DcaDappTest is Test {
         // FeeCalculator helper test contract
         feeCalculator = new FeeCalculator();
 
-        // Set roles
-        vm.prank(OWNER);
-        operationsAdmin.setAdminRole(ADMIN);
-        vm.startPrank(ADMIN);
-        operationsAdmin.setSwapperRole(SWAPPER);
-        // Add Troypkus and Sovryn as allowed lending protocols
-        operationsAdmin.addOrUpdateLendingProtocol(TROPYKUS_STRING, 1);
-        operationsAdmin.addOrUpdateLendingProtocol(SOVRYN_STRING, 2);
+        // Set swapper and register lending routes
+        vm.startPrank(OWNER);
+        operationsAdmin.addSwapper(SWAPPER);
+        operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
+        operationsAdmin.registerRoute(SOVRYN_INDEX, true);
         vm.stopPrank();
 
         // Add tokenHandler
         vm.expectEmit(true, true, true, false);
-        emit OperationsAdmin__TokenHandlerUpdated(address(stablecoin), s_lendingProtocolIndex, address(stablecoinHandler));
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(address(stablecoin), s_lendingProtocolIndex, address(stablecoinHandler));
+        emit OperationsAdmin__TokenHandlerAssigned(address(stablecoin), s_lendingProtocolIndex, address(stablecoinHandler));
+        vm.prank(OWNER);
+        operationsAdmin.assignTokenHandler(address(stablecoin), s_lendingProtocolIndex, address(stablecoinHandler));
 
         // The starting point of the tests is that the user has already deposited stablecoin (so withdrawals can also be tested without much hassle)
         vm.startPrank(USER);

@@ -77,16 +77,15 @@ contract DeployIdleHandler is DeployBase {
         console.log("Idle DOC handler deployed at:", idleHandler);
 
         OperationsAdmin operationsAdmin = OperationsAdmin(operationsAdminAddress);
-        bool isAdmin = operationsAdmin.hasRole(keccak256("ADMIN"), msg.sender);
-
-        if (!isAdmin) {
-            console.log("Warning: Deployer is not an admin. Cannot register handler.");
-            console.log("Please call operationsAdmin.assignOrUpdateTokenHandler() manually with an admin account and parameters:");
+        if (msg.sender != operationsAdmin.owner()) {
+            console.log("Warning: Deployer is not the owner. Cannot register handler.");
+            console.log("Please call operationsAdmin.assignTokenHandler() as owner with:");
             console.log("tokenAddress:", docTokenAddress);
             console.log("index: 0");
             console.log("handlerAddress:", idleHandler);
         } else {
-            operationsAdmin.assignOrUpdateTokenHandler(docTokenAddress, IDLE_INDEX, idleHandler);
+            // Occupied `(token, IDLE_INDEX)` reverts `HandlerAlreadyAssigned` — do not skip.
+            operationsAdmin.assignTokenHandler(docTokenAddress, IDLE_INDEX, idleHandler);
             console.log("Idle DOC handler registered with OperationsAdmin at index", IDLE_INDEX);
         }
 

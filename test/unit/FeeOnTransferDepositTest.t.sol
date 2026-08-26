@@ -62,13 +62,6 @@ contract FeeOnTransferDepositTest is Test {
             feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
         });
 
-        vm.prank(OWNER);
-        operationsAdmin.setAdminRole(ADMIN);
-        vm.prank(ADMIN);
-        operationsAdmin.setSwapperRole(SWAPPER);
-        vm.prank(ADMIN);
-        operationsAdmin.addOrUpdateLendingProtocol("Tropykus", TROPYKUS_INDEX);
-
         idleHandler = new IdleDocHandlerMoc(
             address(dcaManager), address(token), FEE_COLLECTOR, address(mocProxy), feeSettings
         );
@@ -82,10 +75,12 @@ contract FeeOnTransferDepositTest is Test {
             feeSettings
         );
 
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(address(token), IDLE_INDEX, address(idleHandler));
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(address(token), TROPYKUS_INDEX, address(tropykusHandler));
+        vm.startPrank(OWNER);
+        operationsAdmin.addSwapper(SWAPPER);
+        operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
+        operationsAdmin.assignTokenHandler(address(token), IDLE_INDEX, address(idleHandler));
+        operationsAdmin.assignTokenHandler(address(token), TROPYKUS_INDEX, address(tropykusHandler));
+        vm.stopPrank();
 
         vm.prank(address(idleHandler));
         token.approve(address(mocProxy), type(uint256).max);

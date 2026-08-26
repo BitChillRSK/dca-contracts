@@ -26,6 +26,7 @@ contract Handler is Test {
     ITokenHandler public tokenHandler;
     IPurchaseRbtc public handler; // For rBTC balance checks and provisioning
     MockStablecoin public stablecoin;
+    uint256 public lendingProtocolIndex;
     
     // Test role addresses (should match the invariant test setup)
     address public constant OWNER = address(0x1111);
@@ -52,6 +53,7 @@ contract Handler is Test {
     uint256 public depositCalls;
     uint256 public withdrawCalls;
     uint256 public createScheduleCalls;
+    uint256 public createScheduleSuccesses;
     uint256 public updateScheduleCalls;
     uint256 public buyRbtcCalls;
     
@@ -65,7 +67,8 @@ contract Handler is Test {
         ITokenHandler _tokenHandler,
         IPurchaseRbtc _handler,
         MockStablecoin _stablecoin,
-        address[] memory _users
+        address[] memory _users,
+        uint256 _lendingProtocolIndex
     ) {
         dcaManager = _dcaManager;
         operationsAdmin = _operationsAdmin;
@@ -73,6 +76,7 @@ contract Handler is Test {
         handler = _handler;
         stablecoin = _stablecoin;
         s_users = _users;
+        lendingProtocolIndex = _lendingProtocolIndex;
     }
     
     /*//////////////////////////////////////////////////////////////
@@ -119,9 +123,9 @@ contract Handler is Test {
             depositAmount,
             purchaseAmount,
             purchasePeriod,
-            TROPYKUS_INDEX
+            lendingProtocolIndex
         ) {
-            // Success
+            createScheduleSuccesses++;
         } catch {
             // Ignore failures (might be due to max schedules reached, etc.)
         }
@@ -358,14 +362,11 @@ contract Handler is Test {
      */
     function batchBuyRbtc(
         uint256[] memory userSeeds,
-        uint256[] memory scheduleIndexes,
-        uint256 lendingProtocolIndex
+        uint256[] memory scheduleIndexes
     ) external {
         vm.assume(userSeeds.length > 0);
         vm.assume(userSeeds.length == scheduleIndexes.length);
         vm.assume(userSeeds.length <= s_users.length); // Prevent array bounds issues
-        
-        lendingProtocolIndex = bound(lendingProtocolIndex, 1, 2); // TROPYKUS_INDEX or SOVRYN_INDEX
         
         address[] memory buyers = new address[](userSeeds.length);
         uint256[] memory boundedScheduleIndexes = new uint256[](userSeeds.length);
@@ -427,12 +428,8 @@ contract Handler is Test {
     /**
      * @notice Withdraw accumulated rBTC for a random user
      */
-    function withdrawRbtcFromTokenHandler(
-        uint256 userSeed,
-        uint256 lendingProtocolIndex
-    ) external {
+    function withdrawRbtcFromTokenHandler(uint256 userSeed) external {
         address user = s_users[userSeed % s_users.length];
-        lendingProtocolIndex = bound(lendingProtocolIndex, 1, 2);
         
         vm.startPrank(user);
         try dcaManager.withdrawRbtcFromTokenHandler(address(stablecoin), lendingProtocolIndex) {
@@ -446,16 +443,10 @@ contract Handler is Test {
     /**
      * @notice Withdraw all accumulated rBTC across all protocols
      */
-    function withdrawAllAccumulatedRbtc(
-        uint256 userSeed,
-        uint256[] memory lendingProtocolIndexes
-    ) external {
+    function withdrawAllAccumulatedRbtc(uint256 userSeed) external {
         address user = s_users[userSeed % s_users.length];
-        
-        // Bound and filter lending protocol indexes
-        for (uint256 i = 0; i < lendingProtocolIndexes.length; i++) {
-            lendingProtocolIndexes[i] = bound(lendingProtocolIndexes[i], 1, 2);
-        }
+        uint256[] memory lendingProtocolIndexes = new uint256[](1);
+        lendingProtocolIndexes[0] = lendingProtocolIndex;
         
         vm.startPrank(user);
         address[] memory tokens = new address[](1);
@@ -474,11 +465,9 @@ contract Handler is Test {
     function withdrawTokenAndInterest(
         uint256 userSeed,
         uint256 scheduleIndex,
-        uint256 withdrawalAmount,
-        uint256 lendingProtocolIndex
+        uint256 withdrawalAmount
     ) external {
         address user = s_users[userSeed % s_users.length];
-        lendingProtocolIndex = bound(lendingProtocolIndex, 1, 2);
         
         vm.startPrank(user);
         
@@ -509,16 +498,10 @@ contract Handler is Test {
     /**
      * @notice Withdraw all accumulated interest for a token
      */
-    function withdrawAllAccumulatedInterest(
-        uint256 userSeed,
-        uint256[] memory lendingProtocolIndexes
-    ) external {
+    function withdrawAllAccumulatedInterest(uint256 userSeed) external {
         address user = s_users[userSeed % s_users.length];
-        
-        // Bound lending protocol indexes
-        for (uint256 i = 0; i < lendingProtocolIndexes.length; i++) {
-            lendingProtocolIndexes[i] = bound(lendingProtocolIndexes[i], 1, 2);
-        }
+        uint256[] memory lendingProtocolIndexes = new uint256[](1);
+        lendingProtocolIndexes[0] = lendingProtocolIndex;
         
         vm.startPrank(user);
         address[] memory tokens = new address[](1);
@@ -568,12 +551,8 @@ contract Handler is Test {
     /**
      * @notice Test modifying minimum purchase amount on DCA manager (owner-only)
      */
-    function modifyMinPurchaseAmount(
-        uint256 newMinPurchaseAmount,
-        uint256 lendingProtocolIndex
-    ) external {
+    function modifyMinPurchaseAmount(uint256 newMinPurchaseAmount) external {
         newMinPurchaseAmount = bound(newMinPurchaseAmount, 1 ether, 1000 ether);
-        lendingProtocolIndex = bound(lendingProtocolIndex, 1, 2);
         
         vm.startPrank(OWNER);
         try dcaManager.modifyDefaultMinPurchaseAmount(newMinPurchaseAmount) {

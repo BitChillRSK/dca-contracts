@@ -12,6 +12,10 @@ Wire LayerBank into the live index map (idle=0, LayerBank=1, Sovryn=2), split th
 
 PR 15 shipped `LayerBankDocHandlerMoc` behind an add-on deploy script. PR 16 (R25) finishes redeem-helper naming, PR 17 (R26) swaps the “lending token” noun for `shares`, and PR 21 (R30) centralizes the purchase pipeline and stablecoin-source seam — build the harness split against those final names and inheritance. This PR is the cutover: constants, `DeployMocSwaps` / harness / Makefile / CI.
 
+R13 left `LAYERBANK_INDEX = 1` colliding with `TROPYKUS_INDEX = 1`. After a live `DeployMocSwaps` DOC run, `DeployLayerBankHandler` reverts `HandlerAlreadyAssigned` rather than silently skipping; the add-on is not a second assignment onto Tropykus's slot. The final map (`0` idle, `1` LayerBank, `2` Sovryn) is what retires that collision.
+
+R13 also fixed live `DeployDexSwaps`: the TESTNET/MAINNET branch now reads `networkConfig.tropykusShareToken` and `networkConfig.sovrynShareToken` separately (same as MoC's `kDocAddress` / `iSusdAddress`). Do not wire both indexes through `getShareTokenAddress()`, which returns only the `LENDING_PROTOCOL` env token and would permanently assign a Sovryn handler constructed against a Tropykus kToken.
+
 **Round-up solvency (required in this PR, not deferred).** `_stablecoinToShares` documents `Math.Rounding.Up` for all lending handlers (Tropykus / Sovryn / LayerBank). Aave `withdraw` burns scaled shares with `amount.rayDiv(index)` (round nearest), so LayerBank is the sharpest place to regression-test: debiting ≥ what Aave burns keeps `sum(s_aTokenBalances) <= aToken.scaledBalanceOf(handler)`. Flipping TokenLending to round **down** would let virtual books drift above reality; happy-path suites still pass. Ship a test that fails under round-down sizing — do not leave this as a handler comment.
 
 Related: [R22-layerbank-handler.md](./R22-layerbank-handler.md), [R25-lending-redeem-naming.md](./R25-lending-redeem-naming.md), [R22-idle-handler.md](./R22-idle-handler.md).
@@ -25,7 +29,7 @@ Related: [R22-layerbank-handler.md](./R22-layerbank-handler.md), [R25-lending-re
 - [ ] `script/Constants.sol` index map: `0` idle, `1` LayerBank, `2` Sovryn, `3` reserved for future MoC lending. Drop Tropykus from the new deploy path.
 - [ ] `DeployMocSwaps` / `DeployDexSwaps` (as applicable), `MocHelperConfig` live Pool/aToken fields, register LayerBank at index 1.
 - [ ] Split `DcaDappTest` / shared harness so lending-share assertions live only in lending-protocol-specific tests. `LENDING_PROTOCOL=layerbank` is a first-class lane.
-- [ ] CI / Makefile: cover `none`, `layerbank`, and `sovryn` with `SWAP_TYPE=mocSwaps` (and existing dex lane policy unchanged unless this PR must touch it).
+- [ ] CI / Makefile: cover `none`, `layerbank`, and `sovryn` with `SWAP_TYPE=mocSwaps` (and existing dex lane policy unchanged unless this PR must touch it). Keep the R13 `invariants-sovryn` CI job; do not fold `InvariantTest` back into `TEST_CMD`.
 - [ ] Ops note already recorded: illiquid LayerBank DOC cash aborts whole `batchBuyRbtc` — document in PR body if not already; no new product behavior.
 - [ ] **Round-up solvency regression (LayerBank):**
   - Add a dedicated test (prefer `test/ai-generated/unit/layerbank/`) that deposits, then redeems many **odd** DOC amounts under a non-`RAY` index (or fuzz), with the mock burning scaled shares via Aave-like **round-nearest** `rayDiv`.

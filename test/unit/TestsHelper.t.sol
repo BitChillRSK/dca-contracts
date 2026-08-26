@@ -3,11 +3,19 @@
 pragma solidity 0.8.36;
 
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
+import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
 import "../Constants.sol";
 
 contract DummyERC165Contract {
     function supportsInterface(bytes4 interfaceID) external pure returns (bool) {
         return interfaceID == type(IDcaManager).interfaceId; // Check against an interface different from TokenHandler's
+    }
+}
+
+/// @dev ERC-165 `ITokenHandler` stub for OperationsAdmin assignment tests. Not a funded handler.
+contract DummyTokenHandler {
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return interfaceId == type(ITokenHandler).interfaceId;
     }
 }
 

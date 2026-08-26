@@ -123,6 +123,8 @@ contract DeployMocAndUniswap is DeployBase {
         // Transfer ownership of contracts
         adOpsMoc.transferOwnership(owner);
         dcaManMoc.transferOwnership(owner);
+        // Handler was deployed by a nested DeployMocSwaps instance, which is its
+        // Ownable owner — not the broadcaster. Do not transferOwnership here.
         
         vm.stopBroadcast();
     }
@@ -213,6 +215,8 @@ contract DeployMocAndUniswap is DeployBase {
         // Transfer ownership of contracts
         adOpsUni.transferOwnership(owner);
         dcaManUni.transferOwnership(owner);
+        // Handler was deployed by a nested DeployDexSwaps instance, which is its
+        // Ownable owner — not the broadcaster. Do not transferOwnership here.
         
         vm.stopBroadcast();
     }

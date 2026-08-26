@@ -4,6 +4,8 @@ LENDING_PROTOCOL ?= tropykus
 STABLECOIN_TYPE ?= DOC
 # Forge clap allows only one --no-match-path. Local/CI skip mainnet-debug; forks also skip ai-generated
 # (mocks + vm.prank with raw addresses → RPC 429 and revert-depth failures).
+# Invariants are a dedicated `make invariants*` lane (64×512 calls) — do not fold them into every unit run.
+# ComparePurchaseMethods is Anvil-noop / mainnet-only and is not a CI gate.
 TEST_CMD := forge test --no-match-test invariant --no-match-contract ComparePurchaseMethods --no-match-path "test/mainnet-debug/**" -j 1
 FORK_TEST_CMD := forge test --no-match-test invariant --no-match-contract ComparePurchaseMethods --no-match-path "test/{mainnet-debug,ai-generated}/**" -j 1
 # Rootstock mainnet 2026-04-05, comfortably before Tropykus paused kDOC mint. Measured by bisecting
@@ -16,7 +18,7 @@ PROBE_VERBOSITY ?= -vv
 PROBE_MATCH ?=
 
 # Targets
-.PHONY: all test moc dex help check ci build patch-deps slither moc-tropykus moc-sovryn dex-tropykus dex-sovryn fork fork-tropykus fork-sovryn probe-sovryn-exit-fee coverage
+.PHONY: all test moc dex help check ci build patch-deps slither moc-tropykus moc-sovryn dex-tropykus dex-sovryn invariants invariants-sovryn fork fork-tropykus fork-sovryn probe-sovryn-exit-fee coverage
 
 all: help
 
@@ -38,11 +40,13 @@ check: build
 	$(MAKE) moc-tropykus
 	$(MAKE) moc-sovryn
 	STABLECOIN_TYPE=USDRIF $(MAKE) dex-sovryn
+	$(MAKE) invariants-sovryn
 
 ci:
 	FOUNDRY_PROFILE=ci $(MAKE) build
 	FOUNDRY_PROFILE=ci $(MAKE) moc-sovryn
 	FOUNDRY_PROFILE=ci STABLECOIN_TYPE=USDRIF $(MAKE) dex-sovryn
+	FOUNDRY_PROFILE=ci $(MAKE) invariants-sovryn
 
 build: patch-deps
 	forge --version
@@ -125,6 +129,14 @@ dex-sovryn:
 	@echo "Executing DexSwaps Sovryn tests with $(STABLECOIN_TYPE)..."
 	SWAP_TYPE=dexSwaps LENDING_PROTOCOL=sovryn EXPECTED_LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
 
+# Stateful invariant suite (test/ai-generated/fuzz). Not part of TEST_CMD: 64 runs × 512
+# depth is ~32k calls and would multiply every unit lane. ComparePurchaseMethods stays excluded.
+invariants:
+	@echo "Executing invariant tests with LENDING_PROTOCOL=$(LENDING_PROTOCOL)..."
+	SWAP_TYPE=mocSwaps LENDING_PROTOCOL=$(LENDING_PROTOCOL) EXPECTED_LENDING_PROTOCOL=$(LENDING_PROTOCOL) STABLECOIN_TYPE=$(STABLECOIN_TYPE) forge test --match-contract InvariantTest -j 1
+invariants-sovryn:
+	$(MAKE) invariants LENDING_PROTOCOL=sovryn EXPECTED_LENDING_PROTOCOL=sovryn
+
 coverage:
 	@echo "Calculating coverage excluding invariant tests..."
 	forge coverage --no-match-test invariant
@@ -133,7 +145,7 @@ coverage:
 help:
 	@echo "Available targets:"
 	@echo "  make check                     # Build + moc-tropykus + required CI lanes"
-	@echo "  make ci                        # Build + required CI lanes"
+	@echo "  make ci                        # Build + required CI lanes (moc-sovryn, dex-sovryn, invariants-sovryn)"
 	@echo "  make patch-deps                # Apply vendored Uniswap pragma compatibility patch"
 	@echo "  make slither                   # Run slither (must be installed)"
 	@echo "  make test SWAP_TYPE=mocSwaps LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=DOC"
@@ -144,6 +156,8 @@ help:
 	@echo "  make dex                       # DexSwaps local tests (LENDING_PROTOCOL from env, default tropykus)"
 	@echo "  make dex-tropykus              # DexSwaps + Tropykus"
 	@echo "  make dex-sovryn                # DexSwaps + Sovryn"
+	@echo "  make invariants                # Stateful InvariantTest (LENDING_PROTOCOL from env, default tropykus)"
+	@echo "  make invariants-sovryn         # InvariantTest + Sovryn (CI lane)"
 	@echo ""
 	@echo "  make fork                      # Fork tests (reads RSK_MAINNET_RPC_URL from env/.env); tropykus pins block $(FORK_BLOCK_TROPYKUS)"
 	@echo "  make fork-tropykus             # Tropykus fork tests (pinned: kDOC mint paused 2026-04-27)"

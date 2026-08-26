@@ -4,6 +4,7 @@ pragma solidity 0.8.36;
 import {BaseDeploymentTest} from "./BaseDeploymentTest.t.sol";
 import {DeployLayerBankHandler} from "../../../script/DeployLayerBankHandler.s.sol";
 import {LayerBankDocHandlerMoc} from "../../../src/layerbank/LayerBankDocHandlerMoc.sol";
+import {IOperationsAdmin} from "../../../src/interfaces/IOperationsAdmin.sol";
 import {console} from "forge-std/Test.sol";
 import "../../Constants.sol";
 
@@ -34,10 +35,12 @@ contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
         );
         layerbankHandler = LayerBankDocHandlerMoc(payable(layerbankHandlerAddress));
 
-        vm.prank(ADMIN);
-        operationsAdmin.addOrUpdateLendingProtocol("layerbank", LAYERBANK_INDEX);
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(docTokenAddress, LAYERBANK_INDEX, layerbankHandlerAddress);
+        vm.startPrank(OWNER);
+        if (operationsAdmin.getRouteClass(LAYERBANK_INDEX) == IOperationsAdmin.RouteClass.Unregistered) {
+            operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
+        }
+        operationsAdmin.assignTokenHandler(docTokenAddress, LAYERBANK_INDEX, layerbankHandlerAddress);
+        vm.stopPrank();
     }
 
     function testLayerBankHandlerDeployment() public {
@@ -57,9 +60,7 @@ contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
 
         address registeredHandler = operationsAdmin.getTokenHandler(helperConfig.getStablecoinAddress(), LAYERBANK_INDEX);
         assertEq(registeredHandler, layerbankHandlerAddress, "LayerBank handler not registered in OperationsAdmin");
-        assertEq(
-            keccak256(bytes(operationsAdmin.getLendingProtocolName(LAYERBANK_INDEX))), keccak256(bytes("layerbank"))
-        );
+        assertTrue(operationsAdmin.isLendingRoute(LAYERBANK_INDEX));
         assertEq(layerbankHandler.EXCHANGE_RATE_DECIMALS(), 1e27);
     }
 

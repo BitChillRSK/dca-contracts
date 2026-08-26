@@ -26,8 +26,8 @@ contract IdleHandlerDeploymentTest is BaseDeploymentTest {
         idleHandler = IdleDocHandlerMoc(payable(idleHandlerAddress));
         address docTokenAddress = helperConfig.getStablecoinAddress();
 
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(docTokenAddress, IDLE_INDEX, idleHandlerAddress);
+        vm.prank(OWNER);
+        operationsAdmin.assignTokenHandler(docTokenAddress, IDLE_INDEX, idleHandlerAddress);
     }
 
     function testIdleHandlerDeployment() public {
@@ -39,6 +39,6 @@ contract IdleHandlerDeploymentTest is BaseDeploymentTest {
 
         address registeredHandler = operationsAdmin.getTokenHandler(helperConfig.getStablecoinAddress(), IDLE_INDEX);
         assertEq(registeredHandler, idleHandlerAddress, "Idle handler not registered in OperationsAdmin");
-        assertEq(bytes(operationsAdmin.getLendingProtocolName(IDLE_INDEX)).length, 0, "Index 0 must have no protocol name");
+        assertFalse(operationsAdmin.isLendingRoute(IDLE_INDEX), "Index 0 must be idle");
     }
 }

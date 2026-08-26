@@ -65,9 +65,9 @@ Unless the assigned spec explicitly changes one:
 ## Tests and done-gate
 
 - Targeted tests for the spec first. Document exact commands in the PR.
-- **Done-gate:** `make check` (`forge build`, `make moc-tropykus`, `make moc-sovryn`, and `STABLECOIN_TYPE=USDRIF make dex-sovryn`).
+- **Done-gate:** `make check` (`forge build`, `make moc-tropykus`, `make moc-sovryn`, `STABLECOIN_TYPE=USDRIF make dex-sovryn`, and `make invariants-sovryn`).
 - **Before push (every relaunch PR):** `make check` is not enough. Also run `make fork-sovryn` and `make fork-tropykus` (need `RSK_MAINNET_RPC_URL` in `.env`). Fork tests are not in CI; Anvil lanes will not catch live-protocol mismatches (for example R1's batch event reports net DOC, while `makeBatchPurchasesOneUser` used to expect the requested gross). If the RPC is unset, stop and ask the human — do not push. Document the exact fork commands in the PR.
-- **CI (every PR):** `make moc-sovryn` and `STABLECOIN_TYPE=USDRIF make dex-sovryn`. Locally, `make ci` runs those lanes under `FOUNDRY_PROFILE=ci`. Local Tropykus targets remain useful for mock-based coverage. Tropykus fork tests pin a pre-pause block; see the fork-tests bullet below.
+- **CI (every PR):** `make moc-sovryn`, `STABLECOIN_TYPE=USDRIF make dex-sovryn`, and `make invariants-sovryn`. Locally, `make ci` runs those lanes under `FOUNDRY_PROFILE=ci`. The unit lanes still `--no-match-test invariant` so the 64×512 stateful suite is not multiplied across every target. `ComparePurchaseMethods` stays excluded (Anvil early-return / mainnet-only). Local Tropykus targets remain useful for mock-based coverage. Tropykus fork tests pin a pre-pause block; see the fork-tests bullet below.
 - Defaults: `SWAP_TYPE=mocSwaps`, `LENDING_PROTOCOL=tropykus`, `STABLECOIN_TYPE=DOC`. Dex paths often use `STABLECOIN_TYPE=USDRIF`.
 - `make patch-deps` applies the vendored Uniswap pragma compatibility patch used by local builds and CI. It mutates `lib/` submodules; do not commit those submodule dirties.
 - `make slither` if slither is installed; not part of `make check` (no clean baseline yet).
