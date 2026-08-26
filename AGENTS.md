@@ -7,7 +7,7 @@ Foundry Solidity repo for BitChill DCA-in contracts on Rootstock (`0.8.36`, EVM 
 1. This file.
 2. `docs/relaunch/IMPLEMENTATION_ORDER.md` when choosing the next relaunch PR or checking dependency gates.
 3. The assigned spec under `docs/relaunch/` (required before Solidity changes).
-4. Start from the spec’s file list. Expand only through imports, inheritance, interfaces, mocks, failing tests, and compiler errors. Name extra files in the PR.
+4. Start from the spec’s file list. Expand only through imports, inheritance, interfaces, mocks, failing tests, and compiler errors. Name extra files in the PR. If a later commit adds or re-purposes a path, update the open PR body in the same turn — the first description is not a one-shot.
 
 Do not implement optional/further-review items unless the spec assigns them. Sibling repo `dca-out-contracts` is out of scope unless named.
 
@@ -83,9 +83,10 @@ Do this even if a user-level rule says “don’t commit until asked.” An assi
 3. **Push and open a PR** only after `make check`, `make fork-sovryn`, and `make fork-tropykus` pass. Use `.github/PULL_REQUEST_TEMPLATE.md`. Point at the spec. Do not commit `lib/` dirt from `make patch-deps`, secrets, or `.env`.
 4. **One implementer per PR.** Parallel review (Cursor/Codex/Claude/Bugbot) is expected. Parallel implementation on overlapping Solidity is not. Skip git worktrees for this relaunch except a docs-only PR that does not share files.
 5. After the PR is open, set `docs/relaunch/README.md` **Status** to this PR (full GitHub link) and “next unassigned: …” (the one-line prompt for the following chat). If the URL is only known after opening, add that Status update in a follow-up commit and push, then stop. Do not start the next R-item in this chat. The human merges in order. In the closing message, remind the human of that next prompt so they can spin up the following agent.
+6. **Keep the PR body current.** After any review or audit follow-up that changes the diff, edit the GitHub description in the same turn (`gh pr edit`) before you stop. **Files beyond the spec** must name every path in `gh pr diff --name-only` that the spec’s file list does not, with a one-line why. Update an existing entry when its reason changed (checkbox flips vs a new out-of-scope bullet). Do not leave the body describing only the first push.
 
 ## PRs
 
-Small, behavior-scoped, reviewable history. No drive-by refactors. Use the template. Do not restate the invariants — say whether they still hold.
+Small, behavior-scoped, reviewable history. No drive-by refactors. Use the template. Do not restate the invariants — say whether they still hold. After review follow-ups, refresh the body so **Files beyond the spec** matches the current diff.
 
 When reviewing a PR by number, fetch its actual diff (e.g. `gh pr diff <N>` or `gh pr view <N> --json files`) and confirm the changed files match before trusting any findings — don't assume the locally checked-out branch is that PR's diff.
