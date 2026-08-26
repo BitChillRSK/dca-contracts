@@ -32,6 +32,8 @@ interface IOperationsAdmin {
     //////////////////////
     error OperationsAdmin__EoaCannotBeHandler(address newHandler);
     error OperationsAdmin__ContractIsNotTokenHandler(address newHandler);
+    error OperationsAdmin__ContractIsNotTokenLending(address handler);
+    error OperationsAdmin__LendingHandlerOnIdleRoute(address handler);
     error OperationsAdmin__RouteAlreadyRegistered(uint256 index);
     error OperationsAdmin__RouteNotRegistered(uint256 index);
     error OperationsAdmin__HandlerAlreadyAssigned(address token, uint256 routeIndex);
@@ -53,9 +55,9 @@ interface IOperationsAdmin {
      * @param token The stablecoin whose handler is being assigned.
      * @param routeIndex The registered route index (idle or lending).
      * @param handler The TokenHandler for that token and route.
-     * @dev Does not check that the handler implements `ITokenLending` when `routeIndex`
-     *      is lending, or that it does not when idle. A lending handler at an idle
-     *      index strands accrued interest with no recovery on that route.
+     * @dev Requires ERC-165 `ITokenHandler`. Lending routes also require `ITokenLending`;
+     *      idle routes reject it. A lending handler at an idle index would strand
+     *      `withdrawInterest` (`DcaManager` gates it on `isLendingRoute`).
      */
     function assignTokenHandler(address token, uint256 routeIndex, address handler) external;
 

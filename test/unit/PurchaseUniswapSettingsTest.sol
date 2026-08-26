@@ -359,4 +359,30 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         vm.prank(USER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(intermediateTokens, poolFeeRates);
     }
+
+    function testSwapPathStartsWithPurchaseToken() public onlyDexSwaps {
+        bytes memory initialPath = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
+        assertEq(_firstTokenInPath(initialPath), address(stablecoin), "initial path must start with _purchaseToken()");
+
+        address[] memory intermediateTokens = new address[](1);
+        intermediateTokens[0] = makeAddr("r31Intermediate");
+        uint24[] memory poolFeeRates = new uint24[](2);
+        poolFeeRates[0] = 100;
+        poolFeeRates[1] = 300;
+
+        vm.prank(OWNER);
+        IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(intermediateTokens, poolFeeRates);
+
+        bytes memory updatedPath = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
+        assertEq(_firstTokenInPath(updatedPath), address(stablecoin), "updated path must start with _purchaseToken()");
+    }
+
+    function _firstTokenInPath(bytes memory path) private pure returns (address token) {
+        require(path.length >= 20, "path too short");
+        uint256 packed;
+        for (uint256 i; i < 20; ++i) {
+            packed = (packed << 8) | uint8(path[i]);
+        }
+        return address(uint160(packed));
+    }
 }

@@ -8,7 +8,6 @@ import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces
 import {IV3SwapRouter} from "@uniswap/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol";
 import {ICoinPairPrice} from "./interfaces/ICoinPairPrice.sol";
 import {IPurchaseUniswap} from "./interfaces/IPurchaseUniswap.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title PurchaseUniswap
@@ -18,29 +17,29 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     //////////////////////
     // State variables ///
     //////////////////////
-    IERC20 public immutable i_purchasingToken;
     IWRBTC public immutable i_wrBtcToken;
     ISwapRouter02 public immutable i_swapRouter02;
-    ICoinPairPrice public s_mocOracle;
+    ICoinPairPrice internal s_mocOracle;
     uint256 constant HUNDRED_PERCENT = 1 ether;
     uint256 internal s_amountOutMinimumPercent;
     uint256 internal s_amountOutMinimumSafetyCheck;
     bytes internal s_swapPath;
 
     /**
-     * @param stableTokenAddress the address of the stablecoin token on the blockchain of deployment
      * @param uniswapSettings the settings for the uniswap router
      * @param amountOutMinimumPercent The minimum percentage of rBTC that must be received from the swap (default: 99.7%)
      * @param amountOutMinimumSafetyCheck The safety check percentage for minimum rBTC output (default: 99%)
+     * @dev Builds the initial path through `_purchaseToken()`. The concrete funding base
+     *      (TokenHandler via LendingErc20Handler / IdleErc20Handler) must initialize
+     *      `i_stableToken` before this constructor body runs — the leaf `is` order lists
+     *      the funding base before `PurchaseUniswap`.
      */
     constructor(
-        address stableTokenAddress,
         UniswapSettings memory uniswapSettings,
         uint256 amountOutMinimumPercent,
         uint256 amountOutMinimumSafetyCheck
     ) 
     {
-        i_purchasingToken = IERC20(stableTokenAddress);
         i_swapRouter02 = uniswapSettings.swapRouter02;
         i_wrBtcToken = uniswapSettings.wrBtcToken;
         s_mocOracle = uniswapSettings.mocOracle;
@@ -84,7 +83,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
             revert PurchaseUniswap__WrongNumberOfTokensOrFeeRates(intermediateTokens.length, poolFeeRates.length);
         }
 
-        bytes memory newPath = abi.encodePacked(address(i_purchasingToken));
+        bytes memory newPath = abi.encodePacked(address(_purchaseToken()));
         for (uint256 i = 0; i < intermediateTokens.length; i++) {
             newPath = abi.encodePacked(newPath, poolFeeRates[i], intermediateTokens[i]);
         }
@@ -193,7 +192,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      */
     function _swapStablecoinForWrbtc(uint256 stablecoinAmountToSpend) internal returns (uint256 amountOut) {
         // Approve the router to spend stablecoin.
-        TransferHelper.safeApprove(address(i_purchasingToken), address(i_swapRouter02), stablecoinAmountToSpend);
+        TransferHelper.safeApprove(address(_purchaseToken()), address(i_swapRouter02), stablecoinAmountToSpend);
 
         // Set up the swap parameters
         IV3SwapRouter.ExactInputParams memory params = IV3SwapRouter.ExactInputParams({

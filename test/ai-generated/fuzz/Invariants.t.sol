@@ -401,13 +401,6 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
     function getAccumulatedRbtcBalance(address user) external view returns (uint256) {
         return s_usersAccumulatedRbtc[user];
     }
-
-    /**
-     * @notice Get the accumulated rBTC balance for the caller
-     */
-    function getAccumulatedRbtcBalance() external view returns (uint256) {
-        return s_usersAccumulatedRbtc[msg.sender];
-    }
     
     /**
      * @notice Withdraw accumulated rBTC - transfers rBTC from handler to user
@@ -525,13 +518,6 @@ contract SovrynHandlerWrapper is SovrynErc20Handler {
      */
     function getAccumulatedRbtcBalance(address user) external view returns (uint256) {
         return s_usersAccumulatedRbtc[user];
-    }
-
-    /**
-     * @notice Get the accumulated rBTC balance for the caller
-     */
-    function getAccumulatedRbtcBalance() external view returns (uint256) {
-        return s_usersAccumulatedRbtc[msg.sender];
     }
     
     /**

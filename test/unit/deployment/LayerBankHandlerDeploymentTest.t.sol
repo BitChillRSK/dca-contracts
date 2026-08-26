@@ -47,7 +47,7 @@ contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
         assertNotEq(layerbankHandlerAddress, address(0), "LayerBank handler not deployed");
 
         assertEq(layerbankHandler.i_dcaManager(), address(dcaManager), "LayerBank handler doesn't reference DcaManager");
-        assertEq(address(layerbankHandler.i_docToken()), helperConfig.getStablecoinAddress(), "LayerBank handler DOC mismatch");
+        assertEq(address(layerbankHandler.i_stableToken()), helperConfig.getStablecoinAddress(), "LayerBank handler DOC mismatch");
         assertNotEq(address(layerbankHandler.i_aToken()), address(0), "LayerBank aToken not set");
         assertNotEq(address(layerbankHandler.i_pool()), address(0), "LayerBank Pool not set");
         assertEq(layerbankHandler.i_aToken().POOL(), address(layerbankHandler.i_pool()), "aToken.POOL must match handler Pool");

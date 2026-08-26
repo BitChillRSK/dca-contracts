@@ -34,7 +34,7 @@ contract IdleHandlerDeploymentTest is BaseDeploymentTest {
         assertNotEq(idleHandlerAddress, address(0), "Idle handler not deployed");
 
         assertEq(idleHandler.i_dcaManager(), address(dcaManager), "Idle handler doesn't reference DcaManager");
-        assertEq(address(idleHandler.i_docToken()), helperConfig.getStablecoinAddress(), "Idle handler DOC mismatch");
+        assertEq(address(idleHandler.i_stableToken()), helperConfig.getStablecoinAddress(), "Idle handler DOC mismatch");
         assertEq(idleHandler.owner(), makeAddr(OWNER_STRING), "Idle handler owner not set correctly");
 
         address registeredHandler = operationsAdmin.getTokenHandler(helperConfig.getStablecoinAddress(), IDLE_INDEX);

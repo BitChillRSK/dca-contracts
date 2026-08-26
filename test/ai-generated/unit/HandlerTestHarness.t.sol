@@ -221,10 +221,12 @@ abstract contract HandlerTestHarness is Test {
     function test_handler_feeSettings() public {
         IFeeHandler feeHandler = IFeeHandler(address(handler));
         
-        uint256 minFeeRate = feeHandler.getMinFeeRate();
-        uint256 maxFeeRate = feeHandler.getMaxFeeRate();
-        uint256 lowerBound = feeHandler.getFeePurchaseLowerBound();
-        uint256 upperBound = feeHandler.getFeePurchaseUpperBound();
+        IFeeHandler.FeeSettings memory settings = feeHandler.getFeeSettings();
+        
+        uint256 minFeeRate = settings.minFeeRate;
+        uint256 maxFeeRate = settings.maxFeeRate;
+        uint256 lowerBound = settings.feePurchaseLowerBound;
+        uint256 upperBound = settings.feePurchaseUpperBound;
         address feeCollector = feeHandler.getFeeCollectorAddress();
         
         assertGt(minFeeRate, 0);
@@ -240,10 +242,11 @@ abstract contract HandlerTestHarness is Test {
         vm.prank(OWNER);
         feeHandler.setFeeRateParams(50, 150, 200 ether, 2000 ether);
         
-        assertEq(feeHandler.getMinFeeRate(), 50);
-        assertEq(feeHandler.getMaxFeeRate(), 150);
-        assertEq(feeHandler.getFeePurchaseLowerBound(), 200 ether);
-        assertEq(feeHandler.getFeePurchaseUpperBound(), 2000 ether);
+        IFeeHandler.FeeSettings memory settings = feeHandler.getFeeSettings();
+        assertEq(settings.minFeeRate, 50);
+        assertEq(settings.maxFeeRate, 150);
+        assertEq(settings.feePurchaseLowerBound, 200 ether);
+        assertEq(settings.feePurchaseUpperBound, 2000 ether);
     }
     
     function test_handler_modifyFeeSettings_reverts_invalidParams() public {
@@ -364,6 +367,11 @@ abstract contract HandlerTestHarness is Test {
         assertLe(minPercent, 10000); // Should be reasonable percentage
         assertGt(safetyCheck, 0);
         assertGt(swapPath.length, 0);
+        uint256 packed;
+        for (uint256 i; i < 20; ++i) {
+            packed = (packed << 8) | uint8(swapPath[i]);
+        }
+        assertEq(address(uint160(packed)), address(stablecoin));
     }
     
     function test_handler_dex_setAmountOutMinimumPercent() public {
@@ -406,10 +414,6 @@ abstract contract HandlerTestHarness is Test {
         
         uint256 balance = rbtcHandler.getAccumulatedRbtcBalance(USER);
         assertEq(balance, 0); // Should start at 0
-        
-        vm.prank(USER);
-        uint256 callerBalance = rbtcHandler.getAccumulatedRbtcBalance();
-        assertEq(callerBalance, 0);
     }
     
     /*//////////////////////////////////////////////////////////////
@@ -427,12 +431,12 @@ abstract contract HandlerTestHarness is Test {
     //////////////////////////////////////////////////////////////*/
     
     function test_handler_supportsInterface() public {
-        // Note: supportsInterface might not be accessible through ITokenHandler interface
-        // We can test this through IERC165 interface if the handler supports it
-        try IERC165(address(handler)).supportsInterface(type(ITokenHandler).interfaceId) returns (bool supported) {
-            assertTrue(supported);
-        } catch {
-            // Handler might not expose ERC165 interface
+        assertTrue(IERC165(address(handler)).supportsInterface(type(ITokenHandler).interfaceId));
+        bool lending = IERC165(address(handler)).supportsInterface(type(ITokenLending).interfaceId);
+        if (supportsLending) {
+            assertTrue(lending);
+        } else {
+            assertFalse(lending);
         }
     }
     

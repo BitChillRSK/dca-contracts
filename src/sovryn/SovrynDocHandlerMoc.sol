@@ -25,6 +25,6 @@ contract SovrynDocHandlerMoc is SovrynErc20Handler, PurchaseMoc {
         FeeSettings memory feeSettings
     )
         SovrynErc20Handler(dcaManagerAddress, docTokenAddress, iSusdTokenAddress, feeCollector, feeSettings)
-        PurchaseMoc(docTokenAddress, mocProxyAddress)
+        PurchaseMoc(mocProxyAddress)
     {}
 }

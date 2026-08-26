@@ -322,16 +322,16 @@ contract RoleSecurityTest is Test {
         // Test fee settings modification
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(UNAUTHORIZED_USER);
-        handler.setMinFeeRate(150);
+        handler.setFeeRateParams(150, MAX_FEE_RATE_TEST, FEE_PURCHASE_LOWER_BOUND, FEE_PURCHASE_UPPER_BOUND);
         
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(ADMIN);
-        handler.setMaxFeeRate(250);
+        handler.setFeeRateParams(MIN_FEE_RATE, 250, FEE_PURCHASE_LOWER_BOUND, FEE_PURCHASE_UPPER_BOUND);
         
         // Owner can modify
         vm.prank(OWNER);
-        handler.setMinFeeRate(150);
-        assertEq(handler.getMinFeeRate(), 150);
+        handler.setFeeRateParams(150, MAX_FEE_RATE_TEST, FEE_PURCHASE_LOWER_BOUND, FEE_PURCHASE_UPPER_BOUND);
+        assertEq(handler.getFeeSettings().minFeeRate, 150);
         
         // Test minimum purchase amount
         // Removed test for setMinPurchaseAmount as method name varies
@@ -388,7 +388,7 @@ contract RoleSecurityTest is Test {
         // Handler functions should fail
         vm.expectRevert();
         vm.prank(randomUser);
-        handler.setMinFeeRate(200);
+        handler.setFeeRateParams(200, MAX_FEE_RATE_TEST, FEE_PURCHASE_LOWER_BOUND, FEE_PURCHASE_UPPER_BOUND);
         
         vm.expectRevert();
         vm.prank(randomUser);
@@ -401,8 +401,8 @@ contract RoleSecurityTest is Test {
         
         // Owner should always succeed on owner-only functions
         vm.prank(OWNER);
-        handler.setMinFeeRate(newMinFee);
-        assertEq(handler.getMinFeeRate(), newMinFee);
+        handler.setFeeRateParams(newMinFee, MAX_FEE_RATE_TEST, FEE_PURCHASE_LOWER_BOUND, FEE_PURCHASE_UPPER_BOUND);
+        assertEq(handler.getFeeSettings().minFeeRate, newMinFee);
         
         // Owner can set new admin
         address newAdmin = address(uint160(bound(adminSeed, 1, type(uint160).max))); // Ensure non-zero address

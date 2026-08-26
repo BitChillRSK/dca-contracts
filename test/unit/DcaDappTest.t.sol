@@ -466,7 +466,7 @@ contract DcaDappTest is Test {
     function makeSinglePurchase() internal {
         vm.startPrank(USER);
         uint256 stablecoinBalanceBeforePurchase = dcaManager.getMyScheduleTokenBalance(address(stablecoin), SCHEDULE_INDEX);
-        uint256 rbtcBalanceBeforePurchase = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance();
+        uint256 rbtcBalanceBeforePurchase = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
         IDcaManager.DcaDetails[] memory dcaDetails = dcaManager.getMyDcaSchedules(address(stablecoin));
         vm.stopPrank();
 
@@ -495,7 +495,7 @@ contract DcaDappTest is Test {
 
         vm.startPrank(USER);
         uint256 stablecoinBalanceAfterPurchase = dcaManager.getMyScheduleTokenBalance(address(stablecoin), SCHEDULE_INDEX);
-        uint256 rbtcBalanceAfterPurchase = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance();
+        uint256 rbtcBalanceAfterPurchase = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
         vm.stopPrank();
 
         // Check that stablecoin was subtracted and rBTC was added to user's balances
@@ -529,7 +529,7 @@ contract DcaDappTest is Test {
             for (uint8 j; j < numOfPurchases; ++j) {
                 vm.startPrank(USER);
                 uint256 stablecoinBalanceBeforePurchase = dcaManager.getMyScheduleTokenBalance(address(stablecoin), scheduleIndex);
-                uint256 rbtcBalanceBeforePurchase = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance();
+                uint256 rbtcBalanceBeforePurchase = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
                 bytes32 scheduleId = dcaManager.getScheduleId(USER, address(stablecoin), scheduleIndex);
                 vm.stopPrank();
                 
@@ -538,7 +538,7 @@ contract DcaDappTest is Test {
                 
                 vm.startPrank(USER);
                 uint256 stablecoinBalanceAfterPurchase = dcaManager.getMyScheduleTokenBalance(address(stablecoin), scheduleIndex);
-                uint256 RbtcBalanceAfterPurchase = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance();
+                uint256 RbtcBalanceAfterPurchase = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
                 vm.stopPrank();
                 
                 // Check that stablecoin was subtracted and rBTC was added to user's balances
@@ -558,7 +558,7 @@ contract DcaDappTest is Test {
         
         vm.prank(USER);
         assertApproxEqRel(
-            IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(),
+            IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER),
             totalStablecoinSpent / s_btcPrice,
             MAX_SLIPPAGE_PERCENT // Allow a maximum difference of 0.75% (on fork tests we saw this was necessary for both MoC and Uniswap swaps)
         );
@@ -576,7 +576,7 @@ contract DcaDappTest is Test {
         }
 
         vm.prank(USER);
-        uint256 userAccumulatedRbtcPrev = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance();
+        uint256 userAccumulatedRbtcPrev = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
         address[] memory users = new address[](NUM_OF_SCHEDULES);
         uint256[] memory scheduleIndexes = new uint256[](NUM_OF_SCHEDULES);
         uint256[] memory purchaseAmounts = new uint256[](NUM_OF_SCHEDULES);
@@ -652,7 +652,7 @@ contract DcaDappTest is Test {
         );
 
         vm.prank(USER);
-        uint256 userAccumulatedRbtcPost = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance();
+        uint256 userAccumulatedRbtcPost = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
 
         assertApproxEqRel(
             userAccumulatedRbtcPost - userAccumulatedRbtcPrev,
