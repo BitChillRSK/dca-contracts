@@ -278,7 +278,7 @@ Consolidate duplicated schedule/read APIs, derive `withdrawTokenAndInterest` rou
 
 ### PR 27 - R35 route-index terminology
 
-Inserted after R34 (PR 26, GitHub [#70](https://github.com/BitChillRSK/dca-contracts/pull/70)). Rename DcaManager's leftover `lendingProtocolIndex` to `routeIndex` so the schedule-routing noun matches `OperationsAdmin` and remains accurate for idle (non-lending) handlers. Rename-only: storage layout and remaining function selectors unchanged; the mismatch error name (and its selector) changes. See [`R35-route-index-terminology.md`](./R35-route-index-terminology.md).
+Inserted after R34 (PR 26, GitHub [#70](https://github.com/BitChillRSK/dca-contracts/pull/70)). GitHub [#71](https://github.com/BitChillRSK/dca-contracts/pull/71). Rename DcaManager's leftover `lendingProtocolIndex` to `routeIndex` so the schedule-routing noun matches `OperationsAdmin` and remains accurate for idle (non-lending) handlers. Rename-only: storage layout and remaining function selectors unchanged; the mismatch error name (and its selector) changes. See [`R35-route-index-terminology.md`](./R35-route-index-terminology.md).
 
 Stack on R34. Land before R32 so internal cleanup is written against the final names.
 

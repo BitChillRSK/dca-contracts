@@ -2,7 +2,7 @@
 
 Status: **implemented** · Assigned: yes · Optional/further-review: no
 
-PR 27. Stack on R34 (PR 26, GitHub [#70](https://github.com/BitChillRSK/dca-contracts/pull/70)). Land before R32 internal cleanup. Inserted after #70 because R13 already made the index a route (idle or lending), but DcaManager still named it as if every handler lent funds.
+PR 27, GitHub [#71](https://github.com/BitChillRSK/dca-contracts/pull/71). Stack on R34 (PR 26, GitHub [#70](https://github.com/BitChillRSK/dca-contracts/pull/70)). Land before R32 internal cleanup. Inserted after #70 because R13 already made the index a route (idle or lending), but DcaManager still named it as if every handler lent funds.
 
 ## Objective
 
