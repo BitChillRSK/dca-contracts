@@ -21,6 +21,9 @@ import "../../../../script/Constants.sol";
  * @notice Unit tests for TropykusErc20HandlerDex (DEX variant) using shared test harness
  */
 contract TropykusErc20HandlerDexTest is HandlerTestHarness {
+
+    event PurchaseUniswap_AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
+    event PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(uint256 oldValue, uint256 newValue);
     
     // Tropykus DEX-specific contracts
     MockKToken public kToken;
@@ -145,9 +148,133 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
     }
     
     function test_tropykusDex_setAmountOutMinimumSafetyCheck_reverts_invalidRange() public {
-        vm.expectRevert();
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh.selector);
         vm.prank(OWNER);
         tropykusDexHandler.setAmountOutMinimumSafetyCheck(1.01 ether); // 101% in ether scale
+    }
+
+    function test_tropykusDex_setAmountOutMinimumSafetyCheck_reverts_aboveCurrentPercent() public {
+        uint256 percent = tropykusDexHandler.getAmountOutMinimumPercent();
+        uint256 safetyBefore = tropykusDexHandler.getAmountOutMinimumSafetyCheck();
+
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumSafetyCheck(percent + 1);
+
+        assertEq(tropykusDexHandler.getAmountOutMinimumSafetyCheck(), safetyBefore);
+        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), percent);
+    }
+
+    function test_tropykusDex_setAmountOutMinimumPercent_allowsEqualityWithSafety() public {
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumPercent(0.99 ether);
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumSafetyCheck(0.95 ether);
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(0.99 ether, 0.95 ether);
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumPercent(0.95 ether);
+
+        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), 0.95 ether);
+        assertEq(tropykusDexHandler.getAmountOutMinimumSafetyCheck(), 0.95 ether);
+    }
+
+    function test_tropykusDex_setAmountOutMinimumSafetyCheck_allowsEqualityWithPercent() public {
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumPercent(0.99 ether);
+
+        uint256 safetyBefore = tropykusDexHandler.getAmountOutMinimumSafetyCheck();
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(safetyBefore, 0.99 ether);
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumSafetyCheck(0.99 ether);
+
+        assertEq(tropykusDexHandler.getAmountOutMinimumSafetyCheck(), 0.99 ether);
+        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), 0.99 ether);
+    }
+
+    function test_tropykusDex_setSlippageSettings_bothAtHundredPercent() public {
+        uint256 percentBefore = tropykusDexHandler.getAmountOutMinimumPercent();
+        uint256 safetyBefore = tropykusDexHandler.getAmountOutMinimumSafetyCheck();
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(percentBefore, 1 ether);
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumPercent(1 ether);
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(safetyBefore, 1 ether);
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumSafetyCheck(1 ether);
+
+        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), 1 ether);
+        assertEq(tropykusDexHandler.getAmountOutMinimumSafetyCheck(), 1 ether);
+    }
+
+    function test_tropykusDex_setSlippageSettings_raiseThenLower() public {
+        uint256 percentBefore = tropykusDexHandler.getAmountOutMinimumPercent();
+        uint256 safetyBefore = tropykusDexHandler.getAmountOutMinimumSafetyCheck();
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(percentBefore, 0.995 ether);
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumPercent(0.995 ether);
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(safetyBefore, 0.95 ether);
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumSafetyCheck(0.95 ether);
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(0.995 ether, 0.997 ether);
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumPercent(0.997 ether);
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(0.95 ether, 0.96 ether);
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumSafetyCheck(0.96 ether);
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(0.997 ether, 0.96 ether);
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumPercent(0.96 ether);
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(0.96 ether, 0.90 ether);
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumSafetyCheck(0.90 ether);
+
+        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), 0.96 ether);
+        assertEq(tropykusDexHandler.getAmountOutMinimumSafetyCheck(), 0.90 ether);
+    }
+
+    function test_tropykusDex_constructor_allows_equal_percent_and_safety() public {
+        TropykusErc20HandlerDex handler = _deployTropykusDexWithSlippage(0.99 ether, 0.99 ether);
+        assertEq(handler.getAmountOutMinimumPercent(), 0.99 ether);
+        assertEq(handler.getAmountOutMinimumSafetyCheck(), 0.99 ether);
+    }
+
+    function test_tropykusDex_constructor_allows_both_at_hundred_percent() public {
+        TropykusErc20HandlerDex handler = _deployTropykusDexWithSlippage(1 ether, 1 ether);
+        assertEq(handler.getAmountOutMinimumPercent(), 1 ether);
+        assertEq(handler.getAmountOutMinimumSafetyCheck(), 1 ether);
+    }
+
+    function test_tropykusDex_constructor_reverts_when_percent_too_high() public {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooHigh.selector);
+        _deployTropykusDexWithSlippage(1.01 ether, 0.99 ether);
+    }
+
+    function test_tropykusDex_constructor_reverts_when_safety_too_high() public {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh.selector);
+        _deployTropykusDexWithSlippage(1 ether, 1.01 ether);
+    }
+
+    function test_tropykusDex_constructor_reverts_when_percent_below_safety() public {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
+        _deployTropykusDexWithSlippage(0.98 ether, 0.99 ether);
     }
     
     function test_tropykusDex_setPurchasePath_success() public {
@@ -409,5 +536,40 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         uint256 rbtcBalance2 = tropykusDexHandler.getAccumulatedRbtcBalance(user2);
         assertGt(rbtcBalance1, 0);
         assertGt(rbtcBalance2, 0);
+    }
+
+    function _deployTropykusDexWithSlippage(uint256 amountOutMinimumPercent, uint256 amountOutMinimumSafetyCheck)
+        private
+        returns (TropykusErc20HandlerDex)
+    {
+        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+            minFeeRate: MIN_FEE_RATE,
+            maxFeeRate: MAX_FEE_RATE_TEST,
+            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
+            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+        });
+
+        address[] memory intermediateTokens = new address[](0);
+        uint24[] memory poolFeeRates = new uint24[](1);
+        poolFeeRates[0] = 3000;
+
+        IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
+            wrBtcToken: IWRBTC(address(wrbtcToken)),
+            swapRouter02: ISwapRouter02(address(mockRouter)),
+            swapIntermediateTokens: intermediateTokens,
+            swapPoolFeeRates: poolFeeRates,
+            mocOracle: ICoinPairPrice(address(mocOracle))
+        });
+
+        return new TropykusErc20HandlerDex(
+            address(dcaManager),
+            address(stablecoin),
+            address(kToken),
+            uniswapSettings,
+            FEE_COLLECTOR,
+            feeSettings,
+            amountOutMinimumPercent,
+            amountOutMinimumSafetyCheck
+        );
     }
 } 

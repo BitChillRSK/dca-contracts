@@ -21,6 +21,9 @@ import "../../../../script/Constants.sol";
  * @notice Unit tests for SovrynErc20HandlerDex (DEX variant) using shared test harness
  */
 contract SovrynErc20HandlerDexTest is HandlerTestHarness {
+
+    event PurchaseUniswap_AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
+    event PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(uint256 oldValue, uint256 newValue);
     
     // Sovryn DEX-specific contracts
     MockIsusdToken public iSusdToken;
@@ -191,9 +194,133 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
     }
     
     function test_sovrynDex_setAmountOutMinimumSafetyCheck_reverts_invalidRange() public {
-        vm.expectRevert();
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh.selector);
         vm.prank(OWNER);
         sovrynDexHandler.setAmountOutMinimumSafetyCheck(1.01 ether); // 101% in ether scale
+    }
+
+    function test_sovrynDex_setAmountOutMinimumSafetyCheck_reverts_aboveCurrentPercent() public {
+        uint256 percent = sovrynDexHandler.getAmountOutMinimumPercent();
+        uint256 safetyBefore = sovrynDexHandler.getAmountOutMinimumSafetyCheck();
+
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumSafetyCheck(percent + 1);
+
+        assertEq(sovrynDexHandler.getAmountOutMinimumSafetyCheck(), safetyBefore);
+        assertEq(sovrynDexHandler.getAmountOutMinimumPercent(), percent);
+    }
+
+    function test_sovrynDex_setAmountOutMinimumPercent_allowsEqualityWithSafety() public {
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumPercent(0.99 ether);
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumSafetyCheck(0.95 ether);
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(0.99 ether, 0.95 ether);
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumPercent(0.95 ether);
+
+        assertEq(sovrynDexHandler.getAmountOutMinimumPercent(), 0.95 ether);
+        assertEq(sovrynDexHandler.getAmountOutMinimumSafetyCheck(), 0.95 ether);
+    }
+
+    function test_sovrynDex_setAmountOutMinimumSafetyCheck_allowsEqualityWithPercent() public {
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumPercent(0.99 ether);
+
+        uint256 safetyBefore = sovrynDexHandler.getAmountOutMinimumSafetyCheck();
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(safetyBefore, 0.99 ether);
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumSafetyCheck(0.99 ether);
+
+        assertEq(sovrynDexHandler.getAmountOutMinimumSafetyCheck(), 0.99 ether);
+        assertEq(sovrynDexHandler.getAmountOutMinimumPercent(), 0.99 ether);
+    }
+
+    function test_sovrynDex_setSlippageSettings_bothAtHundredPercent() public {
+        uint256 percentBefore = sovrynDexHandler.getAmountOutMinimumPercent();
+        uint256 safetyBefore = sovrynDexHandler.getAmountOutMinimumSafetyCheck();
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(percentBefore, 1 ether);
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumPercent(1 ether);
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(safetyBefore, 1 ether);
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumSafetyCheck(1 ether);
+
+        assertEq(sovrynDexHandler.getAmountOutMinimumPercent(), 1 ether);
+        assertEq(sovrynDexHandler.getAmountOutMinimumSafetyCheck(), 1 ether);
+    }
+
+    function test_sovrynDex_setSlippageSettings_raiseThenLower() public {
+        uint256 percentBefore = sovrynDexHandler.getAmountOutMinimumPercent();
+        uint256 safetyBefore = sovrynDexHandler.getAmountOutMinimumSafetyCheck();
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(percentBefore, 0.995 ether);
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumPercent(0.995 ether);
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(safetyBefore, 0.95 ether);
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumSafetyCheck(0.95 ether);
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(0.995 ether, 0.997 ether);
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumPercent(0.997 ether);
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(0.95 ether, 0.96 ether);
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumSafetyCheck(0.96 ether);
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(0.997 ether, 0.96 ether);
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumPercent(0.96 ether);
+
+        vm.expectEmit(true, true, true, true);
+        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(0.96 ether, 0.90 ether);
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumSafetyCheck(0.90 ether);
+
+        assertEq(sovrynDexHandler.getAmountOutMinimumPercent(), 0.96 ether);
+        assertEq(sovrynDexHandler.getAmountOutMinimumSafetyCheck(), 0.90 ether);
+    }
+
+    function test_sovrynDex_constructor_allows_equal_percent_and_safety() public {
+        SovrynErc20HandlerDex handler = _deploySovrynDexWithSlippage(0.99 ether, 0.99 ether);
+        assertEq(handler.getAmountOutMinimumPercent(), 0.99 ether);
+        assertEq(handler.getAmountOutMinimumSafetyCheck(), 0.99 ether);
+    }
+
+    function test_sovrynDex_constructor_allows_both_at_hundred_percent() public {
+        SovrynErc20HandlerDex handler = _deploySovrynDexWithSlippage(1 ether, 1 ether);
+        assertEq(handler.getAmountOutMinimumPercent(), 1 ether);
+        assertEq(handler.getAmountOutMinimumSafetyCheck(), 1 ether);
+    }
+
+    function test_sovrynDex_constructor_reverts_when_percent_too_high() public {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooHigh.selector);
+        _deploySovrynDexWithSlippage(1.01 ether, 0.99 ether);
+    }
+
+    function test_sovrynDex_constructor_reverts_when_safety_too_high() public {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh.selector);
+        _deploySovrynDexWithSlippage(1 ether, 1.01 ether);
+    }
+
+    function test_sovrynDex_constructor_reverts_when_percent_below_safety() public {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
+        _deploySovrynDexWithSlippage(0.98 ether, 0.99 ether);
     }
     
     function test_sovrynDex_setPurchasePath_success() public {
@@ -497,5 +624,40 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
         uint256 rbtcBalance2 = sovrynDexHandler.getAccumulatedRbtcBalance(user2);
         assertGt(rbtcBalance1, 0);
         assertGt(rbtcBalance2, 0);
+    }
+
+    function _deploySovrynDexWithSlippage(uint256 amountOutMinimumPercent, uint256 amountOutMinimumSafetyCheck)
+        private
+        returns (SovrynErc20HandlerDex)
+    {
+        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+            minFeeRate: MIN_FEE_RATE,
+            maxFeeRate: MAX_FEE_RATE_TEST,
+            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
+            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+        });
+
+        address[] memory intermediateTokens = new address[](0);
+        uint24[] memory poolFeeRates = new uint24[](1);
+        poolFeeRates[0] = 3000;
+
+        IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
+            wrBtcToken: IWRBTC(address(wrbtcToken)),
+            swapRouter02: ISwapRouter02(address(mockRouter)),
+            swapIntermediateTokens: intermediateTokens,
+            swapPoolFeeRates: poolFeeRates,
+            mocOracle: ICoinPairPrice(address(mocOracle))
+        });
+
+        return new SovrynErc20HandlerDex(
+            address(dcaManager),
+            address(stablecoin),
+            address(iSusdToken),
+            uniswapSettings,
+            FEE_COLLECTOR,
+            feeSettings,
+            amountOutMinimumPercent,
+            amountOutMinimumSafetyCheck
+        );
     }
 } 
