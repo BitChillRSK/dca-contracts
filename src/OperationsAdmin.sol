@@ -36,6 +36,15 @@ contract OperationsAdmin is IOperationsAdmin, Ownable {
     }
 
     /**
+     * @notice Ownership cannot be renounced. Routes are add-only, so address(0) as
+     *         owner would freeze `registerRoute`, `assignTokenHandler`, and swapper
+     *         management with no recovery.
+     */
+    function renounceOwnership() public view override onlyOwner {
+        revert OperationsAdmin__OwnershipCannotBeRenounced();
+    }
+
+    /**
      * @inheritdoc IOperationsAdmin
      * @dev Recovery from a mistaken class is a new index, not a mutation of this one.
      */
@@ -51,6 +60,10 @@ contract OperationsAdmin is IOperationsAdmin, Ownable {
      * @inheritdoc IOperationsAdmin
      * @dev Recovery from a mistaken assignment is a new `(token, index)`, even when this
      *      handler has never held funds: this contract cannot prove a handler is empty.
+     *      Class is not matched to handler capability. A lending handler at an idle
+     *      index (including the constructor's index 0) makes `withdrawInterest`
+     *      unreachable: DcaManager gates it on `isLendingRoute`, and
+     *      `LendingErc20Handler.withdrawInterest` is `onlyDcaManager`.
      */
     function assignTokenHandler(address token, uint256 routeIndex, address handler) external onlyOwner {
         if (handler.code.length == 0) revert OperationsAdmin__EoaCannotBeHandler(handler);

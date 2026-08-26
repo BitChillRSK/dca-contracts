@@ -100,15 +100,14 @@ contract DeployUsdrifHandler is DeployBase {
             console.log("tokenAddress:", networkConfig.usdrifTokenAddress);
             console.log("index:", TROPYKUS_INDEX);
             console.log("handlerAddress:", address(usdrifHandler));
-        } else if (operationsAdmin.getTokenHandler(networkConfig.usdrifTokenAddress, TROPYKUS_INDEX) != address(0)) {
-            console.log("USDRIF Tropykus route already has a handler; skipping assignment.");
         } else {
+            // Occupied `(token, TROPYKUS_INDEX)` reverts `HandlerAlreadyAssigned` — do not skip.
             operationsAdmin.assignTokenHandler(
                 networkConfig.usdrifTokenAddress,
                 TROPYKUS_INDEX,
                 address(usdrifHandler)
             );
-            
+
             console.log("USDRIF handler registered with OperationsAdmin using Tropykus index", TROPYKUS_INDEX);
         }
         

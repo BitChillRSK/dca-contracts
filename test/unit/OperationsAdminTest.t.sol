@@ -5,10 +5,7 @@ pragma solidity 0.8.36;
 import {Test, console} from "forge-std/Test.sol";
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
-import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
-import {TropykusDocHandlerMoc} from "../../src/tropykus-legacy/TropykusDocHandlerMoc.sol";
 import {IOperationsAdmin} from "../../src/interfaces/IOperationsAdmin.sol";
-import {IdleDocHandlerMoc} from "../../src/idle/IdleDocHandlerMoc.sol";
 import "./TestsHelper.t.sol";
 
 contract OperationsAdminTest is DcaDappTest {
@@ -89,6 +86,13 @@ contract OperationsAdminTest is DcaDappTest {
         vm.prank(OWNER);
         operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
         assertTrue(operationsAdmin.isLendingRoute(SECOND_LENDING_INDEX));
+    }
+
+    function testOwnerCannotRenounceOwnership() external {
+        vm.prank(OWNER);
+        vm.expectRevert(IOperationsAdmin.OperationsAdmin__OwnershipCannotBeRenounced.selector);
+        operationsAdmin.renounceOwnership();
+        assertEq(operationsAdmin.owner(), OWNER);
     }
 
     function testAddAndRevokeSwapper() external {
@@ -190,7 +194,7 @@ contract OperationsAdminTest is DcaDappTest {
 
     function testMistakenHandlerAssignmentRecoveredAtNewIndex() external {
         address oldHandler = operationsAdmin.getTokenHandler(address(stablecoin), s_lendingProtocolIndex);
-        TropykusDocHandlerMoc unusedHandler = _newTropykusHandler();
+        DummyTokenHandler unusedHandler = new DummyTokenHandler();
 
         vm.startPrank(OWNER);
         vm.expectRevert(
@@ -211,8 +215,8 @@ contract OperationsAdminTest is DcaDappTest {
     }
 
     function testIdleHandlerAtNonZeroIndexLeavesOriginalIdleResolvable() external {
-        IdleDocHandlerMoc idleAtZero = _newIdleHandler();
-        IdleDocHandlerMoc idleAtTen = _newIdleHandler();
+        DummyTokenHandler idleAtZero = new DummyTokenHandler();
+        DummyTokenHandler idleAtTen = new DummyTokenHandler();
 
         vm.startPrank(OWNER);
         operationsAdmin.assignTokenHandler(address(stablecoin), IDLE_INDEX, address(idleAtZero));
@@ -228,7 +232,7 @@ contract OperationsAdminTest is DcaDappTest {
 
     function testOldRouteStillPaysUserAfterNewHandlerRegistered() external {
         address oldHandler = operationsAdmin.getTokenHandler(address(stablecoin), s_lendingProtocolIndex);
-        TropykusDocHandlerMoc newHandler = _newTropykusHandler();
+        DummyTokenHandler newHandler = new DummyTokenHandler();
 
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
@@ -261,36 +265,5 @@ contract OperationsAdminTest is DcaDappTest {
         vm.prank(OWNER);
         vm.expectRevert();
         dcaManager.withdrawToken(address(stablecoin), 0, scheduleId, remaining);
-    }
-
-    function _newTropykusHandler() private returns (TropykusDocHandlerMoc) {
-        return new TropykusDocHandlerMoc(
-            address(dcaManager),
-            address(stablecoin),
-            address(shareToken),
-            FEE_COLLECTOR,
-            address(mocProxy),
-            IFeeHandler.FeeSettings({
-                minFeeRate: MIN_FEE_RATE,
-                maxFeeRate: MAX_FEE_RATE_TEST,
-                feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-                feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
-            })
-        );
-    }
-
-    function _newIdleHandler() private returns (IdleDocHandlerMoc) {
-        return new IdleDocHandlerMoc(
-            address(dcaManager),
-            address(stablecoin),
-            FEE_COLLECTOR,
-            address(mocProxy),
-            IFeeHandler.FeeSettings({
-                minFeeRate: MIN_FEE_RATE,
-                maxFeeRate: MAX_FEE_RATE_TEST,
-                feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-                feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
-            })
-        );
     }
 }

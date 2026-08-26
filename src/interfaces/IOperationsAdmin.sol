@@ -35,6 +35,7 @@ interface IOperationsAdmin {
     error OperationsAdmin__RouteAlreadyRegistered(uint256 index);
     error OperationsAdmin__RouteNotRegistered(uint256 index);
     error OperationsAdmin__HandlerAlreadyAssigned(address token, uint256 routeIndex);
+    error OperationsAdmin__OwnershipCannotBeRenounced();
 
     ///////////////////////////////
     // External functions /////////
@@ -52,6 +53,9 @@ interface IOperationsAdmin {
      * @param token The stablecoin whose handler is being assigned.
      * @param routeIndex The registered route index (idle or lending).
      * @param handler The TokenHandler for that token and route.
+     * @dev Does not check that the handler implements `ITokenLending` when `routeIndex`
+     *      is lending, or that it does not when idle. A lending handler at an idle
+     *      index strands accrued interest with no recovery on that route.
      */
     function assignTokenHandler(address token, uint256 routeIndex, address handler) external;
 

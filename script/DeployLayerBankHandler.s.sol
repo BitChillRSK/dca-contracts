@@ -19,8 +19,9 @@ import "./Constants.sol";
  * @dev `run()` is Anvil-only. `DeployBase` reports FORK (not MAINNET) for a real RSK RPC
  *      unless `REAL_DEPLOYMENT=true`, so gating on TESTNET/MAINNET would still broadcast
  *      mocks onto chain 30. Live Pool/aToken addresses and DeployMocSwaps registration are
- *      PR 16. Index 1 currently belongs to Tropykus on the shared admin; dedicated tests
- *      may overwrite it via `deployMocksAndHandler`.
+ *      PR 16. `LAYERBANK_INDEX` currently equals `TROPYKUS_INDEX` (1); after a live
+ *      `DeployMocSwaps` DOC run, `assignTokenHandler` reverts `HandlerAlreadyAssigned`
+ *      rather than skipping. R22 owns the final index map.
  */
 contract DeployLayerBankHandler is DeployBase {
     uint256 public constant LAYERBANK_INDEX = 1;
@@ -128,12 +129,8 @@ contract DeployLayerBankHandler is DeployBase {
             if (operationsAdmin.getRouteClass(LAYERBANK_INDEX) == IOperationsAdmin.RouteClass.Unregistered) {
                 operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
             }
-            if (operationsAdmin.getTokenHandler(docTokenAddress, LAYERBANK_INDEX) != address(0)) {
-                console.log("LayerBank route already has a handler; skipping assignment.");
-            } else {
-                operationsAdmin.assignTokenHandler(docTokenAddress, LAYERBANK_INDEX, layerbankHandler);
-                console.log("LayerBank DOC handler registered with OperationsAdmin at index", LAYERBANK_INDEX);
-            }
+            operationsAdmin.assignTokenHandler(docTokenAddress, LAYERBANK_INDEX, layerbankHandler);
+            console.log("LayerBank DOC handler registered with OperationsAdmin at index", LAYERBANK_INDEX);
         }
 
         vm.stopBroadcast();

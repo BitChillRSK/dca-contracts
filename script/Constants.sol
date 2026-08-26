@@ -17,15 +17,12 @@ uint256 constant ANVIL_CHAIN_ID = 31337;
 uint256 constant RSK_MAINNET_CHAIN_ID = 30;
 uint256 constant RSK_TESTNET_CHAIN_ID = 31;
 
-// Lending protocols
-uint256 constant IDLE_INDEX = 0; // no lending
+// Route indexes and LENDING_PROTOCOL env strings
+uint256 constant IDLE_INDEX = 0; // constructor pre-registers this as idle
 string constant TROPYKUS_STRING = "tropykus";
 uint256 constant TROPYKUS_INDEX = 1;
 string constant SOVRYN_STRING = "sovryn";
 uint256 constant SOVRYN_INDEX = 2;
-// No lending -> 0
-// "tropykus" -> 1
-// "sovryn" -> 2
 
 // Default configurations
 string constant DEFAULT_STABLECOIN = "DOC"; // Default stablecoin to use if not specified

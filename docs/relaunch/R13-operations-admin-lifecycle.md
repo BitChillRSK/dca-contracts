@@ -108,6 +108,18 @@ The exact names (`registerRoute`, `RouteClass`, the enum-versus-two-booleans cho
 
 Do not change, constrain, or remove it in R13. It is recorded here so the next planning pass can decide whether it becomes one-shot or is dropped after deployment.
 
+## Noted, not in scope: class↔handler ERC-165
+
+`assignTokenHandler` attests only `ITokenHandler`. Nothing checks that the handler's capability matches the recorded `RouteClass`. Assigning a `LendingErc20Handler` at an idle index is accepted — and index `0` is idle by construction and needs no `registerRoute` call, so this is a single mistyped argument.
+
+The consequence is permanent under add-only assignment: deposits still lend and mint shares, principal withdrawal still works via `ITokenHandler.withdrawToken`, but `withdrawTokenAndInterest` / `withdrawAllAccumulatedInterest` are gated by `isLendingRoute` (false), and `LendingErc20Handler.withdrawInterest` is `onlyDcaManager`. Yield on that route is unreachable forever. The mirror case (idle handler at a lending index) only bricks the interest path, which is harmless for a handler with no interest.
+
+A real fix needs an ERC-165 id for `ITokenLending` on `assignTokenHandler`. That is a handler `supportsInterface` change, not this PR. **R31** is the next ABI pass — pick the check up there if it fits the bytecode budget; otherwise a follow-up. Until then, the cutover runbook must treat a lending handler at an idle index as a terminal operator error.
+
+## Noted, not in scope: Ownable2Step
+
+With AccessControl gone there is no second authority. OpenZeppelin 4.9.3 `transferOwnership` has no acceptance step. A wrong governance address permanently freezes `registerRoute`, `assignTokenHandler`, and swapper management, and because routes are add-only there is no recovery (pre-R13, `ADMIN_ROLE` holders were a fallback). This PR overrides `renounceOwnership` to revert so an accidental renounce cannot do the same. Two-step ownership is deferred the same way as `setOperationsAdmin`: a later planning pass, not this consolidation.
+
 ## Scope
 
 - [x] Remove `AccessControl`, `ADMIN_ROLE`, `setAdminRole`, and `revokeAdminRole` from `OperationsAdmin`.
@@ -216,3 +228,6 @@ Fork tests add no new fork-specific assertions unless the selected migration des
 - Cutover: fresh relaunch deployment. Governance must use a new route index for every later handler version and **must never deregister an old route** — old entries are what let users exit the handler holding their funds.
 - Cutover: cooperative migration is **not** shipped. The handlers deployed at this cutover will never gain a migration hook, so every route change is a user-performed withdraw and re-entry. This is not a permanent protocol commitment: a future handler generation may ship the source-side hook, enabling migration from that generation onwards.
 - Cutover: register every route index with its class before assigning handlers to it. Index `0` is pre-registered as idle by the constructor; `IDLE_INDEX` in `script/Constants.sol` stays `0` for the relaunch map, but nothing may assume idle implies index `0`.
+- Cutover: **never assign a lending handler at an idle index**, especially the constructor's index `0`. Class↔handler capability is not checked on-chain (see **Noted, not in scope: class↔handler ERC-165**). Recovery is a new idle index plus user exit/re-entry; interest on the mistaken route is stranded.
+- Cutover: `DeployIdleHandler` / `DeployUsdrifHandler` / `DeployLayerBankHandler` revert on `HandlerAlreadyAssigned` rather than logging and skipping. `LAYERBANK_INDEX` currently equals `TROPYKUS_INDEX` (`1`); after a live `DeployMocSwaps` DOC run the LayerBank add-on is expected to collide. **R22** owns the final index map.
+- Cutover: live Dex and MoC scripts transfer handler ownership to the configured governance address at assignment, not only `OperationsAdmin` and `DcaManager`. Confirm `FeeHandler` and Uniswap slippage setters are not left on the broadcaster EOA.

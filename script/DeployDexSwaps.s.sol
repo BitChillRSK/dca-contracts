@@ -67,6 +67,20 @@ contract DeployDexSwaps is DeployBase {
         }
     }
 
+    function _transferHandlerOwnership(address handler) internal {
+        Ownable(handler).transferOwnership(adminAddresses[environment]);
+    }
+
+    function _assignAndTransferHandler(
+        OperationsAdmin operationsAdmin,
+        address token,
+        uint256 routeIndex,
+        address handler
+    ) internal {
+        operationsAdmin.assignTokenHandler(token, routeIndex, handler);
+        _transferHandlerOwnership(handler);
+    }
+
     function _transferGovernance(OperationsAdmin operationsAdmin, DcaManager dcaManager) internal {
         address owner = adminAddresses[environment];
         operationsAdmin.transferOwnership(owner);
@@ -141,10 +155,8 @@ contract DeployDexSwaps is DeployBase {
             
             docHandlerDexAddress = deployDocHandlerDex(params);
 
-            address owner = adminAddresses[environment];
-            operationsAdmin.transferOwnership(owner);
-            dcaManager.transferOwnership(owner);
-            Ownable(docHandlerDexAddress).transferOwnership(owner);
+            _transferGovernance(operationsAdmin, dcaManager);
+            _transferHandlerOwnership(docHandlerDexAddress);
         }
         // For live networks (testnet/mainnet), deploy handlers for both lending protocols
         else if (environment == Environment.TESTNET || environment == Environment.MAINNET) {
@@ -171,9 +183,9 @@ contract DeployDexSwaps is DeployBase {
                     })
                 );
                 console.log("Tropykus handler deployed at:", tropykusHandler);
-                
-                operationsAdmin.assignTokenHandler(stablecoinAddress, TROPYKUS_INDEX, tropykusHandler);
-                
+
+                _assignAndTransferHandler(operationsAdmin, stablecoinAddress, TROPYKUS_INDEX, tropykusHandler);
+
                 if (protocol == Protocol.TROPYKUS) {
                     docHandlerDexAddress = tropykusHandler;
                 }
@@ -198,9 +210,9 @@ contract DeployDexSwaps is DeployBase {
                         })
                     );
                     console.log("Sovryn handler deployed at:", sovrynHandler);
-                    
-                    operationsAdmin.assignTokenHandler(stablecoinAddress, SOVRYN_INDEX, sovrynHandler);
-                    
+
+                    _assignAndTransferHandler(operationsAdmin, stablecoinAddress, SOVRYN_INDEX, sovrynHandler);
+
                     if (protocol == Protocol.SOVRYN) {
                         docHandlerDexAddress = sovrynHandler;
                     }

@@ -83,9 +83,8 @@ contract DeployIdleHandler is DeployBase {
             console.log("tokenAddress:", docTokenAddress);
             console.log("index: 0");
             console.log("handlerAddress:", idleHandler);
-        } else if (operationsAdmin.getTokenHandler(docTokenAddress, IDLE_INDEX) != address(0)) {
-            console.log("Idle route already has a handler; skipping assignment.");
         } else {
+            // Occupied `(token, IDLE_INDEX)` reverts `HandlerAlreadyAssigned` — do not skip.
             operationsAdmin.assignTokenHandler(docTokenAddress, IDLE_INDEX, idleHandler);
             console.log("Idle DOC handler registered with OperationsAdmin at index", IDLE_INDEX);
         }

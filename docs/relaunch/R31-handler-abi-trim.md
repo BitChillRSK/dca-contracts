@@ -40,6 +40,7 @@ The duplicate route-token getters, automatic oracle getter, caller-only accumula
 - [ ] Fee formula, bounds, collector policy, cap value, or event semantics.
 - [ ] R33 slippage behavior, R34 DcaManager ABI, R9 event indexing, or further code-size work.
 - [ ] Concrete handler constructor-ABI changes, storage-layout changes, protocol adapters, deploy-index changes, or live broadcasts. The two abstract purchase-base constructor cleanups assigned above are in scope.
+- [ ] R13 class↔handler ERC-165 (`assignTokenHandler` checking `ITokenLending` against `RouteClass`). That is a `supportsInterface` addition, not selector pruning. Pick it up in this ABI pass only if it fits the bytecode budget; otherwise a follow-up. Until then the R13 cutover runbook forbids assigning a lending handler at an idle index.
 
 ## Files likely touched
 

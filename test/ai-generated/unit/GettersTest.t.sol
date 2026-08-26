@@ -519,6 +519,6 @@ contract GettersTest is DcaDappTest {
         gasBefore = gasleft();
         operationsAdmin.isLendingRoute(1);
         gasAfter = gasleft();
-        assertLt(gasBefore - gasAfter, 15000); // String operations slightly more expensive
+        assertLt(gasBefore - gasAfter, 10000);
     }
 } 
