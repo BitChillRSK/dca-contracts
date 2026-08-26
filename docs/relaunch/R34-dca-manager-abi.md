@@ -2,7 +2,7 @@
 
 Status: **implemented** · Assigned: yes · Optional/further-review: no
 
-PR 26. Stack on R31 (PR 25). Land before R32 internal cleanup and R9's ABI/event freeze.
+PR 26, GitHub [#70](https://github.com/BitChillRSK/dca-contracts/pull/70). Stack on R31 (PR 25). Land before R32 internal cleanup and R9's ABI/event freeze.
 
 ## Objective
 
