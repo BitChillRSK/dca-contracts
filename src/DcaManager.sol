@@ -351,7 +351,8 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         uint256 withdrawalAmount
     ) external override nonReentrant {
         uint256 routeIndex = _withdrawToken(token, scheduleIndex, scheduleId, withdrawalAmount);
-        _withdrawInterest(token, routeIndex);
+        _checkTokenYieldsInterest(token, routeIndex);
+        _withdrawInterest(ITokenLending(address(_handler(token, routeIndex))), token, routeIndex);
     }
 
     /**
@@ -371,7 +372,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
                 // Skip idle and unregistered routes so a mixed idle+lending call still
                 // withdraws interest from the indexes that yield.
                 if (!_tokenYieldsInterest(routeIndexes[j])) continue;
-                _withdrawInterest(tokens[i], routeIndexes[j]);
+                _withdrawInterest(ITokenLending(tokenHandlerAddress), tokens[i], routeIndexes[j]);
             }
         }
     }
@@ -577,21 +578,36 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice withdraw interest from a lending route
-     * @param token: the token to withdraw interest from
-     * @param routeIndex: the route index
+     * @notice sum locked principal for one user, token, and route without copying the schedule array
+     * @param user: the user whose schedules to read
+     * @param token: the token to read schedules for
+     * @param routeIndex: only balances on this route are included
+     * @return lockedTokenAmount the sum of matching `tokenBalance`s
      */
-    function _withdrawInterest(address token, uint256 routeIndex) private {
-        _checkTokenYieldsInterest(token, routeIndex);
-        ITokenHandler tokenHandler = _handler(token, routeIndex);
-        DcaDetails[] memory dcaSchedules = s_dcaSchedules[msg.sender][token];
-        uint256 lockedTokenAmount;
-        for (uint256 i; i < dcaSchedules.length; ++i) {
-            if (dcaSchedules[i].routeIndex == routeIndex) {
-                lockedTokenAmount += dcaSchedules[i].tokenBalance;
+    function _lockedPrincipal(address user, address token, uint256 routeIndex)
+        private
+        view
+        returns (uint256 lockedTokenAmount)
+    {
+        DcaDetails[] storage schedules = s_dcaSchedules[user][token];
+        for (uint256 i; i < schedules.length; ++i) {
+            if (schedules[i].routeIndex == routeIndex) {
+                lockedTokenAmount += schedules[i].tokenBalance;
             }
         }
-        ITokenLending(address(tokenHandler)).withdrawInterest(msg.sender, lockedTokenAmount);
+    }
+
+    /**
+     * @notice withdraw interest from an already-resolved lending handler
+     * @param tokenLending: the lending handler that holds this route's funds
+     * @param token: the token to withdraw interest from
+     * @param routeIndex: the route whose locked principal to subtract
+     * @dev Callers must already have established that `routeIndex` is a lending
+     *      route (`_checkTokenYieldsInterest` to revert, or `_tokenYieldsInterest`
+     *      to skip). This helper does not re-check.
+     */
+    function _withdrawInterest(ITokenLending tokenLending, address token, uint256 routeIndex) private {
+        tokenLending.withdrawInterest(msg.sender, _lockedPrincipal(msg.sender, token, routeIndex));
     }
 
     /**
@@ -726,14 +742,8 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         returns (uint256)
     {
         _checkTokenYieldsInterest(token, routeIndex);
-        ITokenHandler tokenHandler = _handler(token, routeIndex);
-        DcaDetails[] memory dcaSchedules = s_dcaSchedules[user][token];
-        uint256 lockedTokenAmount;
-        for (uint256 i; i < dcaSchedules.length; ++i) {
-            if (dcaSchedules[i].routeIndex == routeIndex) {
-                lockedTokenAmount += dcaSchedules[i].tokenBalance;
-            }
-        }
-        return ITokenLending(address(tokenHandler)).getAccruedInterest(user, lockedTokenAmount);
+        return ITokenLending(address(_handler(token, routeIndex))).getAccruedInterest(
+            user, _lockedPrincipal(user, token, routeIndex)
+        );
     }
 }

@@ -107,6 +107,25 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
         uint256 accruedInterest = tropykusHandler.getAccruedInterest(USER, DEPOSIT_AMOUNT);
         assertGt(accruedInterest, 0);
     }
+
+    /// @notice Write paths call `exchangeRateCurrent` (mutates stored); views call `exchangeRateStored`.
+    function test_tropykus_writeUsesCurrentRate_viewUsesStored() public {
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        uint256 storedAtDeposit = kToken.exchangeRateStored();
+        vm.warp(block.timestamp + 365 days);
+
+        vm.prank(address(dcaManager));
+        assertEq(tropykusHandler.getAccruedInterest(USER, DEPOSIT_AMOUNT), 0);
+
+        uint256 userBefore = stablecoin.balanceOf(USER);
+        vm.expectCall(address(kToken), abi.encodeWithSelector(kToken.exchangeRateCurrent.selector));
+        vm.prank(address(dcaManager));
+        tropykusHandler.withdrawInterest(USER, DEPOSIT_AMOUNT);
+        assertGt(stablecoin.balanceOf(USER), userBefore);
+        assertGt(kToken.exchangeRateStored(), storedAtDeposit);
+    }
     
     function test_tropykus_redemption_adjustsForAvailableBalance() public {
         // Deposit tokens

@@ -230,8 +230,14 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
 
     /**
      * @notice mutating-ok exchange rate used on write paths
+     * @dev Defaults to the view rate. Override when the live call mutates
+     *      (like in Compound's `exchangeRateCurrent()` vs `exchangeRateStored()`). A new
+     *      adapter that needs an accrual poke compiles against this default
+     *      and uses a stale view rate until it overrides.
      */
-    function _exchangeRate() internal virtual returns (uint256);
+    function _exchangeRate() internal virtual returns (uint256) {
+        return _viewExchangeRate();
+    }
 
     /**
      * @notice view exchange rate used by `getAccruedInterest`

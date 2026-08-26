@@ -1,8 +1,8 @@
 # R32 — Clean up final DcaManager and lending internals
 
-Status: **not started** · Assigned: yes · Optional/further-review: no
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
-PR 28. Stack on R35 (PR 27). This is the last behavior-preserving Solidity cleanup before R22 deploy/CI freezes the final harness shape.
+PR 28, GitHub [#72](https://github.com/BitChillRSK/dca-contracts/pull/72). Stack on R35 (PR 27, GitHub [#71](https://github.com/BitChillRSK/dca-contracts/pull/71)). This is the last behavior-preserving Solidity cleanup before R22 deploy/CI freezes the final harness shape.
 
 ## Objective
 
@@ -20,16 +20,17 @@ R13 already removes protocol-name fetching and installs the direct lending-route
 
 ## Scope
 
-- [ ] Extract one storage-array helper that sums locked principal for `(user, token, routeIndex)` and use it from both interest withdrawal and accrued-interest views.
-- [ ] Let bulk interest withdrawal pass an already-resolved handler into the internal withdrawal path instead of looking it up twice.
-- [ ] Give `LendingErc20Handler._exchangeRate()` a default implementation that calls `_viewExchangeRate()`. Remove identical Sovryn/LayerBank overrides; Tropykus retains both because `exchangeRateCurrent()` mutates while `exchangeRateStored()` is a view.
-- [ ] Preserve all external selectors, events, errors, storage slots, cash measurement, and schedule accounting left by R35.
+- [x] Extract one storage-array helper that sums locked principal for `(user, token, routeIndex)` and use it from both interest withdrawal and accrued-interest views.
+- [x] Let bulk interest withdrawal pass an already-resolved handler into the internal withdrawal path instead of looking it up twice.
+- [x] Give `LendingErc20Handler._exchangeRate()` a default implementation that calls `_viewExchangeRate()`. Remove identical Sovryn/LayerBank overrides; Tropykus retains both because `exchangeRateCurrent()` mutates while `exchangeRateStored()` is a view.
+- [x] Preserve all external selectors, events, errors, storage slots, cash measurement, and schedule accounting left by R35.
 
 ## Out of scope
 
 - [ ] R34 ABI decisions, schedule-struct packing, pause, compound interest, fee changes, or handler registry changes.
 - [ ] Assembly, unchecked-loop changes, calldata rewrites, or gas-driven removal of `nonReentrant` from schedule mutators.
 - [ ] Protocol adapter behavior or new shared inheritance layers.
+- [ ] Enforcing one handler address per token across lending route indexes (later-review: locked principal is per-route, `s_shares` is per-handler).
 
 ## Files likely touched
 
@@ -56,12 +57,12 @@ Add or retain tests proving mixed-route locked-principal sums, idle-index reject
 
 ## Success criteria
 
-- [ ] One locked-principal summation implementation exists.
-- [ ] Bulk interest withdrawal does not resolve the same handler twice.
-- [ ] R13's direct lending-route check remains unchanged; no protocol-name registry or lookup is reintroduced.
-- [ ] Only adapters with genuinely different mutating/view rates override both hooks.
-- [ ] ABI, storage layout, events, errors, and behavior match the R35 base.
-- [ ] Targeted, done-gate, and both fork tests pass.
+- [x] One locked-principal summation implementation exists.
+- [x] Bulk interest withdrawal does not resolve the same handler twice.
+- [x] R13's direct lending-route check remains unchanged; no protocol-name registry or lookup is reintroduced.
+- [x] Only adapters with genuinely different mutating/view rates override both hooks.
+- [x] ABI, storage layout, events, errors, and behavior match the R35 base.
+- [x] Targeted, done-gate, and both fork tests pass.
 
 ## Reviewer checklist
 

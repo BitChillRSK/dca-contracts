@@ -128,6 +128,14 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, lendingIndex);
 
+        vm.warp(block.timestamp + 365 days);
+        _accrueLendingViewRate();
+
+        uint256 interest = dcaManager.getInterestAccrued(USER, address(docToken), lendingIndex);
+        assertGt(interest, 0);
+
+        uint256 userDocBefore = docToken.balanceOf(USER);
+        uint256 idleBalanceBefore = handler.getUsersIdleTokenBalance(USER);
         address[] memory tokens = new address[](1);
         tokens[0] = address(docToken);
         uint256[] memory indexes = new uint256[](2);
@@ -135,6 +143,42 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         indexes[1] = lendingIndex;
         vm.prank(USER);
         dcaManager.withdrawAllAccumulatedInterest(tokens, indexes);
+
+        assertEq(handler.getUsersIdleTokenBalance(USER), idleBalanceBefore);
+        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 0).tokenBalance, DEPOSIT);
+        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 1).tokenBalance, DEPOSIT);
+        assertGt(docToken.balanceOf(USER), userDocBefore);
+        assertLt(dcaManager.getInterestAccrued(USER, address(docToken), lendingIndex), interest);
+    }
+
+    /// @notice Interest locks only this route's principal: idle is excluded, same-route schedules are summed.
+    function test_getInterestAccrued_sumsSameRouteAndIgnoresIdle() public {
+        vm.prank(USER);
+        dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
+
+        uint256 lendingIndex = address(sovrynHandler) != address(0) ? SOVRYN_INDEX : TROPYKUS_INDEX;
+        vm.prank(OWNER);
+        operationsAdmin.assignTokenHandler(address(docToken), lendingIndex, docHandlerMocAddress);
+
+        vm.startPrank(USER);
+        docToken.approve(docHandlerMocAddress, type(uint256).max);
+        dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, lendingIndex);
+        dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, lendingIndex);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 365 days);
+        _accrueLendingViewRate();
+
+        uint256 interest = dcaManager.getInterestAccrued(USER, address(docToken), lendingIndex);
+        assertGt(interest, 0);
+        // Counting only one lending schedule treats the other as yield (~DEPOSIT).
+        // Counting idle as well locks 3*DEPOSIT against ~2*DEPOSIT lent → 0 interest.
+        assertLt(interest, DEPOSIT);
+        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 0).tokenBalance, DEPOSIT);
+        vm.expectRevert(
+            abi.encodeWithSelector(IDcaManager.DcaManager__TokenDoesNotYieldInterest.selector, address(docToken))
+        );
+        dcaManager.getInterestAccrued(USER, address(docToken), IDLE_INDEX);
     }
 
     function test_withdrawTokenAndInterest_usesThatScheduleRoute() public {
@@ -167,5 +211,12 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         dcaManager.withdrawTokenAndInterest(address(docToken), 1, lendingSchedule.scheduleId, MIN_PURCHASE_AMOUNT);
         assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 0).tokenBalance, DEPOSIT);
         assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 1).tokenBalance, DEPOSIT - MIN_PURCHASE_AMOUNT);
+    }
+
+    /// @dev Tropykus views read `exchangeRateStored`; accrue so `getInterestAccrued` sees the warp.
+    function _accrueLendingViewRate() internal {
+        if (address(tropykusHandler) != address(0)) {
+            tropykusHandler.i_kToken().exchangeRateCurrent();
+        }
     }
 }
