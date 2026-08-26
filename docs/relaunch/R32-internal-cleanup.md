@@ -2,7 +2,7 @@
 
 Status: **implemented** · Assigned: yes · Optional/further-review: no
 
-PR 28. Stack on R35 (PR 27). This is the last behavior-preserving Solidity cleanup before R22 deploy/CI freezes the final harness shape.
+PR 28, GitHub [#72](https://github.com/BitChillRSK/dca-contracts/pull/72). Stack on R35 (PR 27, GitHub [#71](https://github.com/BitChillRSK/dca-contracts/pull/71)). This is the last behavior-preserving Solidity cleanup before R22 deploy/CI freezes the final harness shape.
 
 ## Objective
 
