@@ -169,7 +169,7 @@ With AccessControl gone there is no second authority. OpenZeppelin 4.9.3 `transf
 - `script/DeployLayerBankHandler.s.sol`
 - `script/DeployUsdrifHandler.s.sol`
 - Every additional checked-in caller of the removed registry functions, selected through compiler errors. This includes `test/unit/deployment/BaseDeploymentTest.t.sol`, `test/ai-generated/unit/HandlerTestHarness.t.sol`, `test/ai-generated/fuzz/Invariants.t.sol`, `test/ComparePurchaseMethods.t.sol`, and all six per-handler suites; updating them is required scope, not a drive-by expansion.
-- `test/ai-generated/fuzz/Handler.t.sol` — fuzz handler must create schedules at `s_lendingProtocolIndex`, not a hardcoded `TROPYKUS_INDEX`. `test_invariantHandlerCreatesScheduleAtSelectedRoute` asserts a create succeeds so a Sovryn (or future) lane cannot go vacuous.
+- `test/ai-generated/fuzz/Handler.t.sol` — fuzz handler must create schedules at `s_routeIndex`, not a hardcoded `TROPYKUS_INDEX`. `test_invariantHandlerCreatesScheduleAtSelectedRoute` asserts a create succeeds so a Sovryn (or future) lane cannot go vacuous.
 - `script/DeployMocAndUniswap.s.sol` — local ComparePurchaseMethods harness only. Do **not** transfer handler ownership here: handlers are `new`ed by nested `DeployMocSwaps` / `DeployDexSwaps` helper instances, which become the Ownable owner. Live `DeployMocSwaps.run()` / `DeployDexSwaps.run()` still transfer after an internal `new`.
 - `Makefile`, `.github/workflows/test.yml`, `AGENTS.md` — dedicated `make invariants-sovryn` CI lane so `InvariantTest` is no longer excluded from every gate. `ComparePurchaseMethods` stays excluded (Anvil early-return / `block.chainid == RSK_MAINNET_CHAIN_ID`).
 

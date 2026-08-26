@@ -54,7 +54,7 @@ Keep **stablecoin** as the asset noun. Do not adopt ERC-4626's `assets` — that
 
 - `ITokenLending`, `TokenLending`, `TokenLending__` event prefix
 - `TokenLending__LendingProtocolDepositFailed` / `…RedeemFailed`
-- `LENDING_PROTOCOL`, `EXPECTED_LENDING_PROTOCOL`, `lendingProtocolIndex`, `s_lendingProtocolIndex`, `make moc-*` / `fork-*` lane names
+- `LENDING_PROTOCOL`, `EXPECTED_LENDING_PROTOCOL`, `make moc-*` / `fork-*` lane names. (R35 later renamed DcaManager/test `lendingProtocolIndex` / `s_lendingProtocolIndex` to `routeIndex` / `s_routeIndex`; the env-var lane names stay.)
 
 ## Out of scope
 
