@@ -279,11 +279,10 @@ contract GettersTest is DcaDappTest {
         assertTrue(supportsTokenHandler);
 
         bool supportsLending = IERC165(address(stablecoinHandler)).supportsInterface(type(ITokenLending).interfaceId);
-        if (s_lendingProtocolIndex == IDLE_INDEX) {
-            assertFalse(supportsLending);
-        } else {
-            assertTrue(supportsLending);
-        }
+        // This suite only deploys tropykus/sovryn handlers (`DcaDappTest.setUp`). Idle
+        // `ITokenLending == false` is covered by `HandlerTestHarness.test_handler_supportsInterface`
+        // (`IdleErc20HandlerTest`) and `OperationsAdminTest` idle-stub assignments.
+        assertTrue(supportsLending);
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -43,6 +43,7 @@ interface IPurchaseUniswap {
     error PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh();
     error PurchaseUniswap__InvalidOracleAddress();
     error PurchaseUniswap__OutdatedPrice();
+    error PurchaseUniswap__ZeroPurchaseToken();
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
