@@ -2,7 +2,7 @@
 
 Status: **implemented** · Assigned: yes · Optional/further-review: no
 
-PR 25. Stack on R13 (PR 24). Land before R9: R30 left only 329–452 bytes of EIP-170 margin on the two Dex handlers, and R9 must add share-transition emissions to the shared lending path.
+PR 25, GitHub [#69](https://github.com/BitChillRSK/dca-contracts/pull/69). Stack on R13 (PR 24). Land before R9: R30 left only 329–452 bytes of EIP-170 margin on the two Dex handlers, and R9 must add share-transition emissions to the shared lending path.
 
 ## Objective
 
