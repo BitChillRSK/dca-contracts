@@ -53,7 +53,7 @@ make fork-sovryn
 make fork-tropykus
 ```
 
-Assert all equality boundaries, both values at 100%, minimum below safety, safety above current minimum, unchanged state on revert, and successful updates in both valid directions. Fork tests add no new fork-specific assertions.
+Assert all equality boundaries, both values at 100%, minimum below safety, safety above current minimum, unchanged state on revert, and successful updates in both valid directions. Constructor and setter boundary cases live in the Sovryn/Tropykus Dex handler suites: `PurchaseUniswapSettingsTest` is `onlyDexSwaps` and DcaDappTest skips the USDRIF+Sovryn check/CI lane, so those assertions would not run in `make check`. Fork tests add no new fork-specific assertions.
 
 ## Success criteria
 
