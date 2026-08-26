@@ -2,7 +2,7 @@
 
 Status: **implemented** · Assigned: yes · Optional/further-review: no
 
-PR 20, GitHub [#64](https://github.com/BitChillRSK/dca-contracts/pull/64). Stack on R28 (PR 19, GitHub [#63](https://github.com/BitChillRSK/dca-contracts/pull/63)). Land **before** R30 (PR 21) and R22 deploy/CI (now PR 22) so neither inherits or freezes a constructor arg that is a protocol constant.
+PR 20, GitHub [#64](https://github.com/BitChillRSK/dca-contracts/pull/64). Stack on R28 (PR 19, GitHub [#63](https://github.com/BitChillRSK/dca-contracts/pull/63)). Land **before** R30 (PR 21) and R22 deploy/CI (now PR 28) so neither inherits or freezes a constructor arg that is a protocol constant.
 
 ## Objective
 

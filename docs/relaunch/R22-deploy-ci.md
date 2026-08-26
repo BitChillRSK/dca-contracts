@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: yes · Optional/further-review: no
 
-PR 22 of R22 (reordered after R30). Stack on R30 (PR 21). Last required R22 PR; R9 follows as PR 23.
+PR 28 of R22 (reordered after the post-R30 architecture sequence). Stack on R32 (PR 27). Last required R22 PR; R9 follows as PR 29.
 
 ## Objective
 
@@ -18,7 +18,7 @@ Related: [R22-layerbank-handler.md](./R22-layerbank-handler.md), [R25-lending-re
 
 ## Open product decisions
 
-**none** — `IMPLEMENTATION_ORDER.md` lists no gates for PR 22. Implement without asking.
+**none** — `IMPLEMENTATION_ORDER.md` lists no gates for PR 28. Implement without asking.
 
 ## Scope
 
