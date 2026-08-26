@@ -68,14 +68,14 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
     function test_buyAndWithdraw_spendIdleDoc() public {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
-        bytes32 scheduleId = dcaManager.getScheduleId(USER, address(docToken), 0);
+        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(docToken), 0).scheduleId;
 
         vm.prank(SWAPPER);
         dcaManager.buyRbtc(USER, address(docToken), 0, scheduleId);
 
         assertGt(dcaManager.getAccumulatedRbtcBalance(USER, address(docToken), IDLE_INDEX), 0);
         assertEq(handler.getUsersIdleTokenBalance(USER), DEPOSIT - PURCHASE);
-        assertEq(dcaManager.getScheduleTokenBalance(USER, address(docToken), 0), DEPOSIT - PURCHASE);
+        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 0).tokenBalance, DEPOSIT - PURCHASE);
 
         uint256 userDocBefore = docToken.balanceOf(USER);
         vm.prank(USER);
@@ -83,7 +83,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
 
         assertEq(docToken.balanceOf(USER), userDocBefore + DEPOSIT - PURCHASE);
         assertEq(handler.getUsersIdleTokenBalance(USER), 0);
-        assertEq(dcaManager.getScheduleTokenBalance(USER, address(docToken), 0), 0);
+        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 0).tokenBalance, 0);
 
         uint256 userRbtcBefore = USER.balance;
         vm.prank(USER);
@@ -95,17 +95,13 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
     function test_interestCalls_atIndexZero_revert() public {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
-        bytes32 scheduleId = dcaManager.getScheduleId(USER, address(docToken), 0);
+        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(docToken), 0).scheduleId;
 
         bytes memory encodedRevert =
             abi.encodeWithSelector(IDcaManager.DcaManager__TokenDoesNotYieldInterest.selector, address(docToken));
 
         vm.expectRevert(encodedRevert);
         dcaManager.getInterestAccrued(USER, address(docToken), IDLE_INDEX);
-
-        vm.prank(USER);
-        vm.expectRevert(encodedRevert);
-        dcaManager.getMyInterestAccrued(address(docToken), IDLE_INDEX);
 
         address[] memory tokens = new address[](1);
         tokens[0] = address(docToken);
@@ -116,7 +112,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
 
         vm.prank(USER);
         vm.expectRevert(encodedRevert);
-        dcaManager.withdrawTokenAndInterest(address(docToken), 0, scheduleId, MIN_PURCHASE_AMOUNT, IDLE_INDEX);
+        dcaManager.withdrawTokenAndInterest(address(docToken), 0, scheduleId, MIN_PURCHASE_AMOUNT);
     }
 
     function test_withdrawAllAccumulatedInterest_skipsIdleAndWithdrawsLending() public {
@@ -139,5 +135,37 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         indexes[1] = lendingIndex;
         vm.prank(USER);
         dcaManager.withdrawAllAccumulatedInterest(tokens, indexes);
+    }
+
+    function test_withdrawTokenAndInterest_usesThatScheduleRoute() public {
+        vm.prank(USER);
+        dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
+
+        uint256 lendingIndex = address(sovrynHandler) != address(0) ? SOVRYN_INDEX : TROPYKUS_INDEX;
+        vm.prank(OWNER);
+        operationsAdmin.assignTokenHandler(address(docToken), lendingIndex, docHandlerMocAddress);
+
+        vm.prank(USER);
+        docToken.approve(docHandlerMocAddress, type(uint256).max);
+        vm.prank(USER);
+        dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, lendingIndex);
+
+        IDcaManager.DcaDetails memory idleSchedule = dcaManager.getDcaSchedule(USER, address(docToken), 0);
+        IDcaManager.DcaDetails memory lendingSchedule = dcaManager.getDcaSchedule(USER, address(docToken), 1);
+        assertEq(idleSchedule.lendingProtocolIndex, IDLE_INDEX);
+        assertEq(lendingSchedule.lendingProtocolIndex, lendingIndex);
+
+        bytes memory encodedRevert =
+            abi.encodeWithSelector(IDcaManager.DcaManager__TokenDoesNotYieldInterest.selector, address(docToken));
+        vm.prank(USER);
+        vm.expectRevert(encodedRevert);
+        dcaManager.withdrawTokenAndInterest(address(docToken), 0, idleSchedule.scheduleId, MIN_PURCHASE_AMOUNT);
+        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 0).tokenBalance, DEPOSIT);
+        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 1).tokenBalance, DEPOSIT);
+
+        vm.prank(USER);
+        dcaManager.withdrawTokenAndInterest(address(docToken), 1, lendingSchedule.scheduleId, MIN_PURCHASE_AMOUNT);
+        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 0).tokenBalance, DEPOSIT);
+        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 1).tokenBalance, DEPOSIT - MIN_PURCHASE_AMOUNT);
     }
 }

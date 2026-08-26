@@ -127,19 +127,6 @@ contract FeeOnTransferDepositTest is Test {
         assertEq(idleHandler.getUsersIdleTokenBalance(USER), RECEIVED * 2);
     }
 
-    function test_updateDcaSchedule_creditsReceived_notRequested() public {
-        vm.prank(USER);
-        dcaManager.createDcaSchedule(address(token), REQUESTED, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, IDLE_INDEX);
-        bytes32 scheduleId = dcaManager.getDcaSchedules(USER, address(token))[0].scheduleId;
-
-        vm.prank(USER);
-        dcaManager.updateDcaSchedule(address(token), 0, scheduleId, REQUESTED, 0, 0);
-
-        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(token))[0];
-        assertEq(schedule.tokenBalance, RECEIVED * 2);
-        assertEq(idleHandler.getUsersIdleTokenBalance(USER), RECEIVED * 2);
-    }
-
     function test_create_reverts_whenPurchaseAmountGreaterThanReceived() public {
         vm.prank(USER);
         vm.expectRevert(
@@ -159,7 +146,7 @@ contract FeeOnTransferDepositTest is Test {
         assertEq(schedule.purchaseAmount, RECEIVED);
     }
 
-    function test_update_reverts_whenPurchaseAmountGreaterThanReceived() public {
+    function test_setPurchaseAmount_reverts_whenGreaterThanReceived() public {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(token), REQUESTED, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, IDLE_INDEX);
         bytes32 scheduleId = dcaManager.getDcaSchedules(USER, address(token))[0].scheduleId;
@@ -170,7 +157,7 @@ contract FeeOnTransferDepositTest is Test {
                 IDcaManager.DcaManager__PurchaseAmountExceedsBalance.selector, address(token), REQUESTED, RECEIVED
             )
         );
-        dcaManager.updateDcaSchedule(address(token), 0, scheduleId, 0, REQUESTED, 0);
+        dcaManager.setPurchaseAmount(address(token), 0, scheduleId, REQUESTED);
     }
 
     function test_buyAndWithdraw_keepIdleBooksInLockstep() public {
@@ -225,7 +212,7 @@ contract FeeOnTransferDepositTest is Test {
         assertEq(dcaManager.getDcaSchedules(OTHER, address(token))[0].tokenBalance, RECEIVED);
     }
 
-    function test_depositAndUpdate_tropykus_hop1Sums_underlyingLags() public {
+    function test_depositTwice_tropykus_hop1Sums_underlyingLags() public {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(token), REQUESTED, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
         bytes32 scheduleId = dcaManager.getDcaSchedules(USER, address(token))[0].scheduleId;
@@ -233,7 +220,7 @@ contract FeeOnTransferDepositTest is Test {
         vm.prank(USER);
         dcaManager.depositToken(address(token), 0, scheduleId, REQUESTED);
         vm.prank(USER);
-        dcaManager.updateDcaSchedule(address(token), 0, scheduleId, REQUESTED, 0, 0);
+        dcaManager.depositToken(address(token), 0, scheduleId, REQUESTED);
 
         IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(token))[0];
         assertEq(schedule.tokenBalance, RECEIVED * 3);

@@ -167,7 +167,7 @@ contract Handler is Test {
         
         stablecoin.approve(address(tokenHandler), depositAmount);
         
-        bytes32 scheduleId = dcaManager.getScheduleId(user, address(stablecoin), scheduleIndex);
+        bytes32 scheduleId = dcaManager.getDcaSchedule(user, address(stablecoin), scheduleIndex).scheduleId;
         try dcaManager.depositToken(address(stablecoin), scheduleIndex, scheduleId, depositAmount) {
             // Success
         } catch {
@@ -201,7 +201,7 @@ contract Handler is Test {
 
         withdrawalAmount = bound(withdrawalAmount, 1, currentBalance);
         
-        bytes32 scheduleId = dcaManager.getScheduleId(user, address(stablecoin), scheduleIndex);
+        bytes32 scheduleId = dcaManager.getDcaSchedule(user, address(stablecoin), scheduleIndex).scheduleId;
         try dcaManager.withdrawToken(address(stablecoin), scheduleIndex, scheduleId, withdrawalAmount) {
             // Success
         } catch {
@@ -212,7 +212,7 @@ contract Handler is Test {
     }
     
     /**
-     * @notice Update an existing DCA schedule
+     * @notice Apply intent-specific schedule edits. Combined updates take two or three calls.
      */
     function updateDcaSchedule(
         uint256 userSeed,
@@ -227,7 +227,6 @@ contract Handler is Test {
         
         vm.startPrank(user);
         
-        // Check if user has any schedules
         IDcaManager.DcaDetails[] memory schedules;
         try dcaManager.getDcaSchedules(user, address(stablecoin)) returns (IDcaManager.DcaDetails[] memory _schedules) {
             schedules = _schedules;
@@ -242,17 +241,19 @@ contract Handler is Test {
         }
         
         scheduleIndex = bound(scheduleIndex, 0, schedules.length - 1);
-        
-        // -------------------- ASSUMPTIONS ---------------------------
+        bytes32 scheduleId = schedules[scheduleIndex].scheduleId;
+        uint256 currentBalance = schedules[scheduleIndex].tokenBalance;
+
         if (depositAmount > 0) {
             vm.assume(depositAmount >= MIN_PURCHASE_AMOUNT);
             depositAmount = bound(depositAmount, MIN_PURCHASE_AMOUNT, INTERNAL_UPPER_AMOUNT);
         }
 
         if (purchaseAmount > 0) {
+            uint256 maxPurchase = currentBalance + (depositAmount > 0 ? depositAmount : 0);
             vm.assume(purchaseAmount >= MIN_PURCHASE_AMOUNT);
-            // Must also satisfy _validatePurchaseAmount
-            vm.assume(purchaseAmount <= schedules[scheduleIndex].tokenBalance + depositAmount);
+            vm.assume(maxPurchase >= MIN_PURCHASE_AMOUNT);
+            vm.assume(purchaseAmount <= maxPurchase);
             purchaseAmount = bound(purchaseAmount, MIN_PURCHASE_AMOUNT, INTERNAL_UPPER_AMOUNT);
         }
 
@@ -261,27 +262,33 @@ contract Handler is Test {
             purchasePeriod = bound(purchasePeriod, MIN_PURCHASE_PERIOD, INTERNAL_UPPER_PERIOD);
         }
 
-        // Mint tokens for additional deposit if needed
         if (depositAmount > 0) {
             uint256 userBalance = stablecoin.balanceOf(user);
             if (userBalance < depositAmount) {
                 stablecoin.mint(user, depositAmount - userBalance);
             }
             stablecoin.approve(address(tokenHandler), depositAmount);
+            try dcaManager.depositToken(address(stablecoin), scheduleIndex, scheduleId, depositAmount) {
+                // Success
+            } catch {
+                // Ignore failures
+            }
         }
-        
-        bytes32 scheduleId = dcaManager.getScheduleId(user, address(stablecoin), scheduleIndex);
-        try dcaManager.updateDcaSchedule(
-            address(stablecoin),
-            scheduleIndex,
-            scheduleId,
-            depositAmount,
-            purchaseAmount,
-            purchasePeriod
-        ) {
-            // Success
-        } catch {
-            // Ignore failures
+
+        if (purchaseAmount > 0) {
+            try dcaManager.setPurchaseAmount(address(stablecoin), scheduleIndex, scheduleId, purchaseAmount) {
+                // Success
+            } catch {
+                // Ignore failures
+            }
+        }
+
+        if (purchasePeriod > 0) {
+            try dcaManager.setPurchasePeriod(address(stablecoin), scheduleIndex, scheduleId, purchasePeriod) {
+                // Success
+            } catch {
+                // Ignore failures
+            }
         }
         
         vm.stopPrank();
@@ -480,13 +487,12 @@ contract Handler is Test {
         
         withdrawalAmount = bound(withdrawalAmount, 1, currentBalance);
         
-        bytes32 scheduleId = dcaManager.getScheduleId(user, address(stablecoin), scheduleIndex);
+        bytes32 scheduleId = dcaManager.getDcaSchedule(user, address(stablecoin), scheduleIndex).scheduleId;
         try dcaManager.withdrawTokenAndInterest(
             address(stablecoin),
             scheduleIndex,
             scheduleId,
-            withdrawalAmount,
-            lendingProtocolIndex
+            withdrawalAmount
         ) {
             // Success
         } catch {

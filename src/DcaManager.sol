@@ -204,53 +204,6 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice deposit the full stablecoin amount for DCA on the contract, set the period and the amount for purchases
-     * @notice if the purchase or deposit amounts, or the purchase period are set to 0, they don't get updated
-     * @param token: the token address of stablecoin to deposit
-     * @param scheduleIndex: the index of the schedule to create or update
-     * @param scheduleId: the schedule id for validation
-     * @param depositAmount: the amount of stablecoin requested from the user (final token balance is the previous balance plus what the handler received)
-     * @param purchaseAmount: the amount of stablecoin to swap periodically for rBTC (validated against the post-deposit token balance)
-     * @param purchasePeriod: the time (in seconds) between rBTC purchases for each user
-     */
-    function updateDcaSchedule(
-        address token,
-        uint256 scheduleIndex,
-        bytes32 scheduleId,
-        uint256 depositAmount,
-        uint256 purchaseAmount,
-        uint256 purchasePeriod
-    ) external override nonReentrant validateScheduleIndex(msg.sender, token, scheduleIndex) {
-        DcaDetails[] storage schedules = s_dcaSchedules[msg.sender][token];
-        DcaDetails memory dcaSchedule = schedules[scheduleIndex];
-        _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
-
-        if (purchasePeriod > 0) {
-            _validatePurchasePeriod(purchasePeriod);
-            dcaSchedule.purchasePeriod = purchasePeriod;
-        }
-        if (depositAmount > 0) {
-            uint256 received = _handler(token, dcaSchedule.lendingProtocolIndex).depositToken(msg.sender, depositAmount);
-            dcaSchedule.tokenBalance += received;
-        }
-        if (purchaseAmount > 0) {
-            _validatePurchaseAmount(token, purchaseAmount, dcaSchedule.tokenBalance);
-            dcaSchedule.purchaseAmount = purchaseAmount;
-        }
-
-        schedules[scheduleIndex] = dcaSchedule;
-
-        emit DcaManager__DcaScheduleUpdated(
-            msg.sender,
-            token,
-            dcaSchedule.scheduleId,
-            dcaSchedule.tokenBalance,
-            dcaSchedule.purchaseAmount,
-            dcaSchedule.purchasePeriod
-        );
-    }
-
-    /**
      * @notice delete a DCA schedule
      * @param token: the token of the schedule to delete
      * @param scheduleIndex: the index of the schedule to delete
@@ -387,16 +340,17 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      * @param scheduleIndex: the index of the schedule to withdraw from
      * @param scheduleId: the schedule id for validation
      * @param withdrawalAmount: the amount to withdraw
-     * @param lendingProtocolIndex: the lending protocol index
+     * @dev Interest is withdrawn from the same stored route used to pay this schedule's principal.
+     *      That index is captured from the schedule before the handler call. An idle schedule reverts
+     *      because that route does not yield.
      */
     function withdrawTokenAndInterest(
         address token,
         uint256 scheduleIndex,
         bytes32 scheduleId,
-        uint256 withdrawalAmount,
-        uint256 lendingProtocolIndex
+        uint256 withdrawalAmount
     ) external override nonReentrant {
-        _withdrawToken(token, scheduleIndex, scheduleId, withdrawalAmount);
+        uint256 lendingProtocolIndex = _withdrawToken(token, scheduleIndex, scheduleId, withdrawalAmount);
         _withdrawInterest(token, lendingProtocolIndex);
     }
 
@@ -598,10 +552,12 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      * @param scheduleIndex: the index of the schedule
      * @param scheduleId: the schedule id for validation
      * @param withdrawalAmount: the amount to withdraw, or type(uint256).max for this schedule's whole token balance
+     * @return lendingProtocolIndex the schedule's stored route, captured before the handler call
      */
     function _withdrawToken(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 withdrawalAmount)
         private
         validateScheduleIndex(msg.sender, token, scheduleIndex)
+        returns (uint256 lendingProtocolIndex)
     {
         DcaDetails storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
@@ -612,10 +568,11 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
             revert DcaManager__WithdrawalAmountExceedsBalance(token, withdrawalAmount, tokenBalance);
         }
         // @notice subtract the requested withdrawal amount from the token balance, not the amount the lending protocol paid
-        uint256 newTokenBalance = tokenBalance - withdrawalAmount; 
+        uint256 newTokenBalance = tokenBalance - withdrawalAmount;
+        lendingProtocolIndex = dcaSchedule.lendingProtocolIndex;
         dcaSchedule.tokenBalance = newTokenBalance;
         // @notice ignore `withdrawToken()`'s return value (amount actually paid back by the lending protocol)
-        _handler(token, dcaSchedule.lendingProtocolIndex).withdrawToken(msg.sender, withdrawalAmount);
+        _handler(token, lendingProtocolIndex).withdrawToken(msg.sender, withdrawalAmount);
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
     }
 
@@ -659,12 +616,20 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice get all DCA schedules for the caller
-     * @param token: the token to get schedules for
-     * @return the DCA schedules
+     * @notice get one DCA schedule for a user and token
+     * @param user: the user to get the schedule for
+     * @param token: the token to get the schedule for
+     * @param scheduleIndex: the index of the schedule
+     * @return the DCA schedule
      */
-    function getMyDcaSchedules(address token) external view override returns (DcaDetails[] memory) {
-        return getDcaSchedules(msg.sender, token);
+    function getDcaSchedule(address user, address token, uint256 scheduleIndex)
+        external
+        view
+        override
+        validateScheduleIndex(user, token, scheduleIndex)
+        returns (DcaDetails memory)
+    {
+        return s_dcaSchedules[user][token][scheduleIndex];
     }
 
     /**
@@ -673,131 +638,8 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      * @param token: the token to get schedules for
      * @return the DCA schedules
      */
-    function getDcaSchedules(address user, address token) public view override returns (DcaDetails[] memory) {
+    function getDcaSchedules(address user, address token) external view override returns (DcaDetails[] memory) {
         return s_dcaSchedules[user][token];
-    }
-
-    /**
-     * @notice get the token balance for a DCA schedule (caller's schedule)
-     * @param token: the token to get the balance for
-     * @param scheduleIndex: the index of the schedule
-     * @return the token balance
-     */
-    function getMyScheduleTokenBalance(address token, uint256 scheduleIndex)
-        external
-        view
-        override
-        returns (uint256)
-    {
-        return getScheduleTokenBalance(msg.sender, token, scheduleIndex);
-    }
-
-    /**
-     * @notice get the token balance for a DCA schedule
-     * @param user: the user to get the balance for
-     * @param token: the token to get the balance for
-     * @param scheduleIndex: the index of the schedule
-     * @return the token balance
-     */
-    function getScheduleTokenBalance(address user, address token, uint256 scheduleIndex)
-        public
-        view
-        override
-        validateScheduleIndex(user, token, scheduleIndex)
-        returns (uint256)
-    {
-        return s_dcaSchedules[user][token][scheduleIndex].tokenBalance;
-    }
-
-    /**
-     * @notice get the purchase amount for a DCA schedule (caller's schedule)
-     * @param token: the token to get the purchase amount for
-     * @param scheduleIndex: the index of the schedule
-     * @return the purchase amount
-     */
-    function getMySchedulePurchaseAmount(address token, uint256 scheduleIndex)
-        external
-        view
-        override
-        returns (uint256)
-    {
-        return getSchedulePurchaseAmount(msg.sender, token, scheduleIndex);
-    }
-
-    /**
-     * @notice get the purchase amount for a DCA schedule
-     * @param user: the user to get the purchase amount for
-     * @param token: the token to get the purchase amount for
-     * @param scheduleIndex: the index of the schedule
-     * @return the purchase amount
-     */
-    function getSchedulePurchaseAmount(address user, address token, uint256 scheduleIndex)
-        public
-        view
-        override
-        validateScheduleIndex(user, token, scheduleIndex)
-        returns (uint256)
-    {
-        return s_dcaSchedules[user][token][scheduleIndex].purchaseAmount;
-    }
-
-    /**
-     * @notice get the purchase period for a DCA schedule (caller's schedule)
-     * @param token: the token to get the purchase period for
-     * @param scheduleIndex: the index of the schedule
-     * @return the purchase period
-     */
-    function getMySchedulePurchasePeriod(address token, uint256 scheduleIndex)
-        external
-        view
-        override
-        returns (uint256)
-    {
-        return getSchedulePurchasePeriod(msg.sender, token, scheduleIndex);
-    }
-
-    /**
-     * @notice get the purchase period for a DCA schedule
-     * @param user: the user to get the purchase period for
-     * @param token: the token to get the purchase period for
-     * @param scheduleIndex: the index of the schedule
-     * @return the purchase period
-     */
-    function getSchedulePurchasePeriod(address user, address token, uint256 scheduleIndex)
-        public
-        view
-        override
-        validateScheduleIndex(user, token, scheduleIndex)
-        returns (uint256)
-    {
-        return s_dcaSchedules[user][token][scheduleIndex].purchasePeriod;
-    }
-
-    /**
-     * @notice get the schedule id for a DCA schedule (caller's schedule)
-     * @param token: the token to get the schedule id for
-     * @param scheduleIndex: the index of the schedule
-     * @return the schedule id
-     */
-    function getMyScheduleId(address token, uint256 scheduleIndex) external view override returns (bytes32) {
-        return getScheduleId(msg.sender, token, scheduleIndex);
-    }
-
-    /**
-     * @notice get the schedule id for a DCA schedule
-     * @param user: the user to get the schedule id for
-     * @param token: the token to get the schedule id for
-     * @param scheduleIndex: the index of the schedule
-     * @return the schedule id
-     */
-    function getScheduleId(address user, address token, uint256 scheduleIndex)
-        public
-        view
-        override
-        validateScheduleIndex(user, token, scheduleIndex)
-        returns (bytes32)
-    {
-        return s_dcaSchedules[user][token][scheduleIndex].scheduleId;
     }
 
     /**
@@ -855,16 +697,6 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice get the interest accrued by the caller with a given stablecoin in a given lending protocol
-     * @param token: the token to get the interest for
-     * @param lendingProtocolIndex: the lending protocol index to get the interest for
-     * @return the interest accrued
-     */
-    function getMyInterestAccrued(address token, uint256 lendingProtocolIndex) external view override returns (uint256) {
-        return getInterestAccrued(msg.sender, token, lendingProtocolIndex);
-    }
-
-    /**
      * @notice get the rBTC accumulated by a user on the handler for a token and lending protocol
      * @param user: the user to get the accumulated rBTC for
      * @param token: the token
@@ -872,7 +704,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      * @return the accumulated rBTC balance
      */
     function getAccumulatedRbtcBalance(address user, address token, uint256 lendingProtocolIndex)
-        public
+        external
         view
         override
         returns (uint256)
@@ -881,29 +713,14 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice get the rBTC accumulated by the caller on the handler for a token and lending protocol
-     * @param token: the token
-     * @param lendingProtocolIndex: the lending protocol index
-     * @return the accumulated rBTC balance
-     */
-    function getMyAccumulatedRbtcBalance(address token, uint256 lendingProtocolIndex)
-        external
-        view
-        override
-        returns (uint256)
-    {
-        return getAccumulatedRbtcBalance(msg.sender, token, lendingProtocolIndex);
-    }
-
-    /**
-     * @notice get the interest accrued by the caller with a given stablecoin in a given lending protocol
+     * @notice get the interest accrued by a user with a given stablecoin in a given lending protocol
      * @param user: the user to get the interest for
      * @param token: the token to get the interest for
      * @param lendingProtocolIndex: the lending protocol index to get the interest for
      * @return the interest accrued
      */
     function getInterestAccrued(address user, address token, uint256 lendingProtocolIndex)
-        public
+        external
         view
         override
         returns (uint256)
