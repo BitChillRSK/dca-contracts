@@ -429,7 +429,7 @@ contract RbtcPurchaseTest is DcaDappTest {
     // @notice: this test won't pass for Tropykus on forked chains because updating
     // the exchange rate requires to roll to a future block, which makes the MoC oracle
     // throw an "Oracle have no Bitcoin Price" error.
-    function testDepleteHandlerBalanceDoesNotRevert() external {
+    function testDepleteHandlerBalanceDoesNotRevert() external onlyLendingLane {
         // Prepare a second user
         address SECOND_USER = makeAddr("SECOND_USER");
 
@@ -548,7 +548,7 @@ contract RbtcPurchaseTest is DcaDappTest {
     }
 
     /// @dev Similar to testDepleteHandlerBalanceDoesNotRevert but uses individual buyRbtc calls instead of batchBuyRbtc
-    function testDepleteHandlerBalanceDoesNotRevertIndividual() external {
+    function testDepleteHandlerBalanceDoesNotRevertIndividual() external onlyLendingLane {
         // Prepare a second user
         address SECOND_USER = makeAddr("SECOND_USER");
 
@@ -644,7 +644,7 @@ contract RbtcPurchaseTest is DcaDappTest {
     // @notice: this test won't pass for Tropykus on forked chains because updating
     // the exchange rate requires to roll to a future block, which makes the MoC oracle
     // throw an "Oracle have no Bitcoin Price" error.
-    function testDepleteHandlerBalanceWithInterestWithdrawalsDoesNotRevert() external {
+    function testDepleteHandlerBalanceWithInterestWithdrawalsDoesNotRevert() external onlyLendingLane {
         // Prepare a second user
         address SECOND_USER = makeAddr("SECOND_USER");
 

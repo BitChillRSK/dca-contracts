@@ -133,15 +133,17 @@ contract FullWithdrawalTest is DcaDappTest {
         for (uint256 i = 1; i < NUM_OF_SCHEDULES; ++i) {
             assertEq(_scheduleBalance(i), scheduleBalance, "another schedule's principal was touched");
         }
-        assertGt(
-            stablecoinHandler.getUserShares(USER),
-            0,
-            "the shares backing the remaining schedules were burnt"
-        );
+        if (isLendingLane) {
+            assertGt(
+                stablecoinHandler.getUserShares(USER),
+                0,
+                "the shares backing the remaining schedules were burnt"
+            );
+        }
     }
 
     /// @notice the sentinel plus the pre-existing interest path still pays principal + interest in one call
-    function test_withdrawTokenAndInterestWithTheSentinelExitsThePosition() external {
+    function test_withdrawTokenAndInterestWithTheSentinelExitsThePosition() external onlyLendingLane {
         updateExchangeRate(INTEREST_ACCRUAL_PERIOD);
         uint256 principal = _scheduleBalance(SCHEDULE_INDEX);
         uint256 interest = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);

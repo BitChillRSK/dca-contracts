@@ -18,6 +18,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - target: moc-none
+            stablecoin: DOC
+          - target: moc-layerbank
+            stablecoin: DOC
           - target: moc-sovryn
             stablecoin: DOC
           - target: dex-sovryn

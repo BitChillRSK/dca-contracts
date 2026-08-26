@@ -15,8 +15,10 @@ contract DeployBase is Script {
     }
 
     enum Protocol {
-        TROPYKUS,
-        SOVRYN
+        NONE,
+        LAYERBANK,
+        SOVRYN,
+        TROPYKUS
     }
 
     struct DeploymentConfig {
@@ -49,7 +51,7 @@ contract DeployBase is Script {
         protocol = getProtocol();
 
         console.log("Environment:", uint256(environment)); // 0=LOCAL, 1=FORK, 2=TESTNET, 3=MAINNET
-        console.log("Protocol:", uint256(protocol)); // 0=TROPYKUS, 1=SOVRYN
+        console.log("Protocol:", uint256(protocol)); // 0=NONE, 1=LAYERBANK, 2=SOVRYN, 3=TROPYKUS
         console.log("Chain ID:", block.chainid);
     }
 
@@ -73,11 +75,17 @@ contract DeployBase is Script {
 
     function getProtocol() internal view returns (Protocol) {
         string memory lendingProtocol = vm.envString("LENDING_PROTOCOL");
-        if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(TROPYKUS_STRING))) {
-            return Protocol.TROPYKUS;
+        if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(NONE_STRING))) {
+            return Protocol.NONE;
+        }
+        if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(LAYERBANK_STRING))) {
+            return Protocol.LAYERBANK;
         }
         if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(SOVRYN_STRING))) {
             return Protocol.SOVRYN;
+        }
+        if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(TROPYKUS_STRING))) {
+            return Protocol.TROPYKUS;
         }
         revert("Invalid lending protocol");
     }

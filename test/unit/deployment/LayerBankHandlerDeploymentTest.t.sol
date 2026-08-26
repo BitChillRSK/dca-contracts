@@ -9,7 +9,6 @@ import {console} from "forge-std/Test.sol";
 import "../../Constants.sol";
 
 contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
-    uint256 internal constant LAYERBANK_INDEX = 1;
 
     address public layerbankHandlerAddress;
     LayerBankDocHandlerMoc public layerbankHandler;
@@ -22,10 +21,16 @@ contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
         }
         super.setUp();
 
+        address docTokenAddress = helperConfig.getStablecoinAddress();
+        if (operationsAdmin.getTokenHandler(docTokenAddress, LAYERBANK_INDEX) != address(0)) {
+            layerbankHandlerAddress = operationsAdmin.getTokenHandler(docTokenAddress, LAYERBANK_INDEX);
+            layerbankHandler = LayerBankDocHandlerMoc(payable(layerbankHandlerAddress));
+            return;
+        }
+
         DeployLayerBankHandler layerbankDeployer = new DeployLayerBankHandler();
         console.log("LayerBank handler deployer:", address(layerbankDeployer));
 
-        address docTokenAddress = helperConfig.getStablecoinAddress();
         layerbankHandlerAddress = layerbankDeployer.deployMocksAndHandler(
             address(dcaManager),
             docTokenAddress,
@@ -64,10 +69,11 @@ contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
         assertEq(layerbankHandler.EXCHANGE_RATE_DECIMALS(), 1e27);
     }
 
-    function test_run_revertsWhenNotLocal() public {
+    function test_run_revertsWhenATokenUnsetOnFork() public {
         if (block.chainid == ANVIL_CHAIN_ID) vm.skip(true);
+        if (helperConfig.getActiveNetworkConfig().layerbankATokenAddress != address(0)) vm.skip(true);
         DeployLayerBankHandler deployer = new DeployLayerBankHandler();
-        vm.expectRevert(bytes("Live LayerBank Pool/aToken addresses are PR 16"));
+        vm.expectRevert(bytes("LayerBank aToken address is not configured for this network"));
         deployer.run(helperConfig, address(operationsAdmin), address(dcaManager));
     }
 

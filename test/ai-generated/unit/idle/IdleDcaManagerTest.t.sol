@@ -7,6 +7,8 @@ import {IdleDocHandlerMoc} from "src/idle/IdleDocHandlerMoc.sol";
 import {IDcaManager} from "src/interfaces/IDcaManager.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
+import {ITokenLending} from "src/interfaces/ITokenLending.sol";
+import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "script/Constants.sol";
 
 /**
@@ -41,7 +43,11 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
 
         vm.startPrank(OWNER);
         operationsAdmin.addSwapper(SWAPPER);
-        operationsAdmin.assignTokenHandler(address(docToken), IDLE_INDEX, address(handler));
+        if (operationsAdmin.getTokenHandler(address(docToken), IDLE_INDEX) == address(0)) {
+            operationsAdmin.assignTokenHandler(address(docToken), IDLE_INDEX, address(handler));
+        } else {
+            handler = IdleDocHandlerMoc(payable(operationsAdmin.getTokenHandler(address(docToken), IDLE_INDEX)));
+        }
         vm.stopPrank();
 
         vm.deal(address(mocProxy), 100 ether);
@@ -116,15 +122,16 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
     }
 
     function test_withdrawAllAccumulatedInterest_skipsIdleAndWithdrawsLending() public {
+        (address lendingHandler, uint256 lendingIndex) = _requireLendingHandler();
+
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
 
-        uint256 lendingIndex = address(sovrynHandler) != address(0) ? SOVRYN_INDEX : TROPYKUS_INDEX;
         vm.prank(OWNER);
-        operationsAdmin.assignTokenHandler(address(docToken), lendingIndex, docHandlerMocAddress);
+        operationsAdmin.assignTokenHandler(address(docToken), lendingIndex, lendingHandler);
 
         vm.prank(USER);
-        docToken.approve(docHandlerMocAddress, type(uint256).max);
+        docToken.approve(lendingHandler, type(uint256).max);
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, lendingIndex);
 
@@ -153,15 +160,16 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
 
     /// @notice Interest locks only this route's principal: idle is excluded, same-route schedules are summed.
     function test_getInterestAccrued_sumsSameRouteAndIgnoresIdle() public {
+        (address lendingHandler, uint256 lendingIndex) = _requireLendingHandler();
+
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
 
-        uint256 lendingIndex = address(sovrynHandler) != address(0) ? SOVRYN_INDEX : TROPYKUS_INDEX;
         vm.prank(OWNER);
-        operationsAdmin.assignTokenHandler(address(docToken), lendingIndex, docHandlerMocAddress);
+        operationsAdmin.assignTokenHandler(address(docToken), lendingIndex, lendingHandler);
 
         vm.startPrank(USER);
-        docToken.approve(docHandlerMocAddress, type(uint256).max);
+        docToken.approve(lendingHandler, type(uint256).max);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, lendingIndex);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, lendingIndex);
         vm.stopPrank();
@@ -182,15 +190,16 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
     }
 
     function test_withdrawTokenAndInterest_usesThatScheduleRoute() public {
+        (address lendingHandler, uint256 lendingIndex) = _requireLendingHandler();
+
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
 
-        uint256 lendingIndex = address(sovrynHandler) != address(0) ? SOVRYN_INDEX : TROPYKUS_INDEX;
         vm.prank(OWNER);
-        operationsAdmin.assignTokenHandler(address(docToken), lendingIndex, docHandlerMocAddress);
+        operationsAdmin.assignTokenHandler(address(docToken), lendingIndex, lendingHandler);
 
         vm.prank(USER);
-        docToken.approve(docHandlerMocAddress, type(uint256).max);
+        docToken.approve(lendingHandler, type(uint256).max);
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, lendingIndex);
 
@@ -218,5 +227,21 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         if (address(tropykusHandler) != address(0)) {
             tropykusHandler.i_kToken().exchangeRateCurrent();
         }
+    }
+
+    function _requireLendingHandler() internal returns (address lendingHandler, uint256 lendingIndex) {
+        if (address(sovrynHandler) != address(0)) {
+            return (address(sovrynHandler), SOVRYN_INDEX);
+        }
+        if (address(tropykusHandler) != address(0)) {
+            return (address(tropykusHandler), TROPYKUS_INDEX);
+        }
+        if (
+            docHandlerMocAddress != address(0)
+                && IERC165(docHandlerMocAddress).supportsInterface(type(ITokenLending).interfaceId)
+        ) {
+            return (docHandlerMocAddress, LAYERBANK_INDEX);
+        }
+        vm.skip(true);
     }
 }

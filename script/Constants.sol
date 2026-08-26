@@ -17,12 +17,18 @@ uint256 constant ANVIL_CHAIN_ID = 31337;
 uint256 constant RSK_MAINNET_CHAIN_ID = 30;
 uint256 constant RSK_TESTNET_CHAIN_ID = 31;
 
-// Route indexes and LENDING_PROTOCOL env strings
+// Production route indexes (fresh relaunch map) and LENDING_PROTOCOL env strings
 uint256 constant IDLE_INDEX = 0; // constructor pre-registers this as idle
-string constant TROPYKUS_STRING = "tropykus";
-uint256 constant TROPYKUS_INDEX = 1;
+string constant NONE_STRING = "none";
+string constant LAYERBANK_STRING = "layerbank";
+uint256 constant LAYERBANK_INDEX = 1;
 string constant SOVRYN_STRING = "sovryn";
 uint256 constant SOVRYN_INDEX = 2;
+uint256 constant RESERVED_MOC_LENDING_INDEX = 3; // reserved for future MoC lending; not assigned in this PR
+
+// Legacy Tropykus — not on the production map. Local mock / fork tests and the USDRIF dex add-on only.
+string constant TROPYKUS_STRING = "tropykus";
+uint256 constant TROPYKUS_INDEX = 4;
 
 // Default configurations
 string constant DEFAULT_STABLECOIN = "DOC"; // Default stablecoin to use if not specified

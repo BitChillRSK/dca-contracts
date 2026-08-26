@@ -51,7 +51,8 @@ contract DeployDexSwaps is DeployBase {
                     params.amountOutMinimumSafetyCheck
                 )
             );
-        } else {
+        }
+        if (params.protocol == Protocol.SOVRYN) {
             return address(
                 new SovrynErc20HandlerDex(
                     params.dcaManager, 
@@ -65,6 +66,7 @@ contract DeployDexSwaps is DeployBase {
                 )
             );
         }
+        revert("Dex path is tropykus/sovryn only");
     }
 
     function _transferHandlerOwnership(address handler) internal {

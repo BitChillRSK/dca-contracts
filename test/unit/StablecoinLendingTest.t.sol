@@ -21,12 +21,15 @@ contract StablecoinLendingTest is DcaDappTest {
 
     function setUp() public override {
         super.setUp();
+        if (!isLendingLane) {
+            vm.skip(true);
+        }
     }
 
     /////////////////////////////////////
     ///// Stablecoin Lending tests /////
     /////////////////////////////////////
-    function testDepositedStablecoinIsLent() external {
+    function testDepositedStablecoinIsLent() external onlyShareTokenLane {
         // Check initial balances
         uint256 ltStablecoinBalanceBeforeDeposit = stablecoin.balanceOf(address(shareToken));
         
@@ -42,7 +45,7 @@ contract StablecoinLendingTest is DcaDappTest {
         assertEq(ltStablecoinBalanceAfterDeposit - ltStablecoinBalanceBeforeDeposit, AMOUNT_TO_DEPOSIT, "Incorrect amount deposited in shares");
     }
 
-    function testStablecoinDepositIncreasesSharesBalance() external {
+    function testStablecoinDepositIncreasesSharesBalance() external onlyShareTokenLane {
         uint256 prevSharesBalance = stablecoinHandler.getUserShares(USER);
         super.depositStablecoin();
         uint256 postSharesBalance = stablecoinHandler.getUserShares(USER);
@@ -61,7 +64,7 @@ contract StablecoinLendingTest is DcaDappTest {
         assertEq(postSharesBalance - prevSharesBalance, AMOUNT_TO_DEPOSIT * 1e18 / exchangeRate);
     }
 
-    function testStablecoinWithdrawalBurnsShares() external {
+    function testStablecoinWithdrawalBurnsShares() external onlyShareTokenLane {
         uint256 prevSharesBalance = stablecoinHandler.getUserShares(USER);
         super.withdrawStablecoin();
         uint256 postSharesBalance = stablecoinHandler.getUserShares(USER);
@@ -80,7 +83,7 @@ contract StablecoinLendingTest is DcaDappTest {
         );
     }
 
-    function testRbtcPurchaseBurnsShares() external {
+    function testRbtcPurchaseBurnsShares() external onlyShareTokenLane {
         uint256 prevSharesBalance = stablecoinHandler.getUserShares(USER);
         super.makeSinglePurchase();
         uint256 postSharesBalance = stablecoinHandler.getUserShares(USER);
@@ -109,7 +112,7 @@ contract StablecoinLendingTest is DcaDappTest {
         );
     }
 
-    function testSeveralRbtcPurchasesBurnShares() external {
+    function testSeveralRbtcPurchasesBurnShares() external onlyShareTokenLane {
         // This just for one user, for many users this will get tested in invariant tests
         super.createSeveralDcaSchedules();
         uint256 prevSharesBalance = stablecoinHandler.getUserShares(USER);
@@ -155,7 +158,7 @@ contract StablecoinLendingTest is DcaDappTest {
         );
     }
 
-    function testRbtcBatchPurchaseBurnsShares() external {
+    function testRbtcBatchPurchaseBurnsShares() external onlyShareTokenLane {
         // This just for one user, for many users this will get tested in invariant tests
         super.createSeveralDcaSchedules(); // This creates NUM_OF_SCHEDULES schedules with purchaseAmount = AMOUNT_TO_SPEND / NUM_OF_SCHEDULES
         uint256 prevSharesBalance = stablecoinHandler.getUserShares(USER);

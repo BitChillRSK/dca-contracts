@@ -24,6 +24,8 @@ contract MockLayerBankAToken is ERC20 {
     uint256 private s_mintOverride;
     bool private s_usePayoutCap;
     uint256 private s_payoutCap;
+    bool private s_useIncomeOverride;
+    uint256 private s_incomeOverride;
 
     error MockLayerBankAToken__OnlyPool();
     error MockLayerBankAToken__PoolAlreadySet();
@@ -71,6 +73,12 @@ contract MockLayerBankAToken is ERC20 {
         s_usePayoutCap = enabled;
     }
 
+    /// @notice Pin the liquidity index so solvency tests can use a non-RAY rate without warping.
+    function setNormalizedIncome(uint256 income, bool enabled) external {
+        s_incomeOverride = income;
+        s_useIncomeOverride = enabled;
+    }
+
     function POOL() external view returns (address) {
         return pool;
     }
@@ -89,6 +97,7 @@ contract MockLayerBankAToken is ERC20 {
     }
 
     function getNormalizedIncome() public view returns (uint256) {
+        if (s_useIncomeOverride) return s_incomeOverride;
         uint256 timeElapsed = block.timestamp - i_deploymentTimestamp;
         uint256 yearsElapsed = (timeElapsed * RAY) / YEAR_IN_SECONDS;
         uint256 increase = (RAY * ANNUAL_INCREASE * yearsElapsed) / (100 * RAY);
@@ -108,7 +117,9 @@ contract MockLayerBankAToken is ERC20 {
 
     function burnScaled(address from, address to, uint256 underlyingAmount) external onlyPool returns (uint256 paid) {
         uint256 rate = getNormalizedIncome();
-        uint256 scaled = (underlyingAmount * RAY + rate - 1) / rate;
+        // Aave WadRayMath.rayDiv: round nearest. Round-up here would hide a TokenLending
+        // round-down solvency bug; round-down would overstate the handler's safety margin.
+        uint256 scaled = (underlyingAmount * RAY + rate / 2) / rate;
         _burn(from, scaled);
         if (s_silentZeroPayout) return 0;
         return _payout(to, underlyingAmount);
