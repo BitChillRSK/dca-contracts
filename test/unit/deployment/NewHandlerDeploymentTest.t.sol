@@ -35,8 +35,8 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
         usdrifHandler = TropykusErc20HandlerDex(payable(usdrifHandlerAddress));
         address usdrifTokenAddress = usdrifHelperConfig.getNetworkConfig().usdrifTokenAddress;
 
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(
+        vm.prank(OWNER);
+        operationsAdmin.assignTokenHandler(
             usdrifTokenAddress,
             TROPYKUS_INDEX,
             usdrifHandlerAddress

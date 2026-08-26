@@ -67,6 +67,12 @@ contract DeployDexSwaps is DeployBase {
         }
     }
 
+    function _transferGovernance(OperationsAdmin operationsAdmin, DcaManager dcaManager) internal {
+        address owner = adminAddresses[environment];
+        operationsAdmin.transferOwnership(owner);
+        dcaManager.transferOwnership(owner);
+    }
+
     function run() external returns (OperationsAdmin, address, DcaManager, DexHelperConfig) {
         // Initialize DexHelperConfig which reads the STABLECOIN_TYPE env var
         DexHelperConfig helperConfig = new DexHelperConfig();
@@ -144,18 +150,14 @@ contract DeployDexSwaps is DeployBase {
         else if (environment == Environment.TESTNET || environment == Environment.MAINNET) {
             console.log("Deploying handlers for lending protocols for live network");
 
-            // First register the lending protocols
-            operationsAdmin.setAdminRole(tx.origin);
-            operationsAdmin.addOrUpdateLendingProtocol(TROPYKUS_STRING, TROPYKUS_INDEX); // index 1
-            operationsAdmin.addOrUpdateLendingProtocol(SOVRYN_STRING, SOVRYN_INDEX); // index 2
+            operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
+            operationsAdmin.registerRoute(SOVRYN_INDEX, true);
 
-            // Deploy Tropykus handler if there's a valid shares
             address tropykusShareToken = helperConfig.getShareTokenAddress();
             
             if (tropykusShareToken == address(0)) {
                 console.log("Warning: Tropykus shares not available for this stablecoin");
             } else {
-                // Deploy Tropykus handler
                 address tropykusHandler = deployDocHandlerDex(
                     DeployParams({
                         protocol: Protocol.TROPYKUS,
@@ -170,24 +172,19 @@ contract DeployDexSwaps is DeployBase {
                 );
                 console.log("Tropykus handler deployed at:", tropykusHandler);
                 
-                // Assign the Tropykus handler to the DCA manager
-                operationsAdmin.assignOrUpdateTokenHandler(stablecoinAddress, TROPYKUS_INDEX, tropykusHandler);
+                operationsAdmin.assignTokenHandler(stablecoinAddress, TROPYKUS_INDEX, tropykusHandler);
                 
-                // If we're deploying for Tropykus, set this as our main handler
                 if (protocol == Protocol.TROPYKUS) {
                     docHandlerDexAddress = tropykusHandler;
                 }
             }
 
-            // Only deploy Sovryn handler if the stablecoin is supported by Sovryn
             if (!isUSDRIF) {
-                // Get Sovryn shares address
                 address sovrynShareToken = helperConfig.getShareTokenAddress();
                 
                 if (sovrynShareToken == address(0)) {
                     console.log("Warning: Sovryn shares not available for this stablecoin");
                 } else {
-                    // Deploy Sovryn handler
                     address sovrynHandler = deployDocHandlerDex(
                         DeployParams({
                             protocol: Protocol.SOVRYN,
@@ -202,10 +199,8 @@ contract DeployDexSwaps is DeployBase {
                     );
                     console.log("Sovryn handler deployed at:", sovrynHandler);
                     
-                    // Assign the Sovryn handler to the DCA manager
-                    operationsAdmin.assignOrUpdateTokenHandler(stablecoinAddress, SOVRYN_INDEX, sovrynHandler);
+                    operationsAdmin.assignTokenHandler(stablecoinAddress, SOVRYN_INDEX, sovrynHandler);
                     
-                    // If we're deploying for Sovryn, set this as our main handler
                     if (protocol == Protocol.SOVRYN) {
                         docHandlerDexAddress = sovrynHandler;
                     }
@@ -214,9 +209,7 @@ contract DeployDexSwaps is DeployBase {
                 console.log("Skipping Sovryn handler deployment for USDRIF as it's not supported");
             }
 
-            if (environment == Environment.TESTNET) {
-                operationsAdmin.setAdminRole(adminAddresses[Environment.TESTNET]);
-            }
+            _transferGovernance(operationsAdmin, dcaManager);
         }
 
         vm.stopBroadcast();

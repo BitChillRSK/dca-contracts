@@ -50,12 +50,10 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
         docToken = MockStablecoin(helperConfig.getStablecoinAddress());
         mocProxy = MockMocProxy(helperConfig.getActiveNetworkConfig().mocProxyAddress);
 
-        vm.prank(ADMIN);
-        operationsAdmin.setSwapperRole(SWAPPER);
-        vm.prank(ADMIN);
-        operationsAdmin.addOrUpdateLendingProtocol("layerbank", LAYERBANK_INDEX);
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(address(docToken), LAYERBANK_INDEX, address(handler));
+        vm.startPrank(OWNER);
+        operationsAdmin.addSwapper(SWAPPER);
+        operationsAdmin.assignTokenHandler(address(docToken), LAYERBANK_INDEX, address(handler));
+        vm.stopPrank();
 
         vm.deal(address(mocProxy), 100 ether);
         vm.prank(address(handler));
@@ -75,9 +73,7 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
         assertEq(schedule.tokenBalance, DEPOSIT);
         assertGt(handler.getUserShares(USER), 0);
         assertEq(docToken.balanceOf(address(handler)), 0);
-        assertEq(
-            keccak256(bytes(operationsAdmin.getLendingProtocolName(LAYERBANK_INDEX))), keccak256(bytes("layerbank"))
-        );
+        assertTrue(operationsAdmin.isLendingRoute(LAYERBANK_INDEX));
     }
 
     function test_buyAndWithdraw_spendLayerBankDoc() public {

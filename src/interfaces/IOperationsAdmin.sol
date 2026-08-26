@@ -2,76 +2,92 @@
 pragma solidity 0.8.36;
 
 /**
- * @title IAdminOperation
+ * @title IOperationsAdmin
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @dev Interface for the OperationsAdmin contract.
  */
 interface IOperationsAdmin {
+    /**
+     * @notice Classification recorded when a route index is registered.
+     * @dev `Unregistered` is the mapping default. Once an index is `Idle` or `Lending`, it is never mutated.
+     */
+    enum RouteClass {
+        Unregistered,
+        Idle,
+        Lending
+    }
+
     //////////////////////
     // Events ////////////
     //////////////////////
-    event OperationsAdmin__TokenHandlerUpdated(
-        address indexed token, uint256 indexed lendingProtocolIndex, address indexed newHandler
+    event OperationsAdmin__TokenHandlerAssigned(
+        address indexed token, uint256 indexed routeIndex, address indexed handler
     );
-    event OperationsAdmin__LendingProtocolAdded(uint256 indexed index, string indexed name);
-    event OperationsAdmin__AdminRoleGranted(address indexed admin);
-    event OperationsAdmin__AdminRoleRevoked(address indexed admin);
-    event OperationsAdmin__SwapperRoleGranted(address indexed swapper);
-    event OperationsAdmin__SwapperRoleRevoked(address indexed swapper);
+    event OperationsAdmin__RouteRegistered(uint256 indexed index, bool lends);
+    event OperationsAdmin__SwapperAdded(address indexed swapper);
+    event OperationsAdmin__SwapperRevoked(address indexed swapper);
 
     //////////////////////
     // Errors ////////////
     //////////////////////
     error OperationsAdmin__EoaCannotBeHandler(address newHandler);
     error OperationsAdmin__ContractIsNotTokenHandler(address newHandler);
-    error OperationsAdmin__LendingProtocolIndexCannotBeZero();
-    error OperationsAdmin__LendingProtocolNameNotSet();
-    error OperationsAdmin__LendingProtocolNotAllowed(uint256 index);
+    error OperationsAdmin__RouteAlreadyRegistered(uint256 index);
+    error OperationsAdmin__RouteNotRegistered(uint256 index);
+    error OperationsAdmin__HandlerAlreadyAssigned(address token, uint256 routeIndex);
 
     ///////////////////////////////
     // External functions /////////
     ///////////////////////////////
 
     /**
-     * @notice Registers token handler for a given stablecoin token address
-     * @param token The address of the stablecoin for which the token handler is created.
-     * @param lendingProtocolIndex The index of the lending protocol (empty string if token will not be lent)
-     * @param handler The handler corresponding to the token and lending protocol (if any)
+     * @notice Register a route index as idle or lending. One-shot: the class is never changed or deleted.
+     * @param index The route index to register. Index 0 is pre-registered as idle by the constructor.
+     * @param lends True to classify the route as lending; false to classify it as idle.
      */
-    function assignOrUpdateTokenHandler(address token, uint256 lendingProtocolIndex, address handler) external;
+    function registerRoute(uint256 index, bool lends) external;
 
     /**
-     * @dev Retrieves the handler for a given token and lending protocol.
-     * @param token The address of the token.
-     * @param lendingProtocolIndex The name of the lending protocol (empty string if token will not be lent)
-     * @return handler The address of the TokenHandler. If address(0) is returned, the tuple token-protocol is not correct
+     * @notice Assign the token handler for a `(token, routeIndex)` pair. Add-only: reassignment reverts.
+     * @param token The stablecoin whose handler is being assigned.
+     * @param routeIndex The registered route index (idle or lending).
+     * @param handler The TokenHandler for that token and route.
      */
-    function getTokenHandler(address token, uint256 lendingProtocolIndex) external view returns (address handler);
+    function assignTokenHandler(address token, uint256 routeIndex, address handler) external;
 
     /**
-     * @dev Assigns a new address to the swapper role.
+     * @notice Handler registered for a token and route index.
+     * @param token The stablecoin.
+     * @param routeIndex The route index.
+     * @return handler The TokenHandler, or `address(0)` if none is assigned.
+     */
+    function getTokenHandler(address token, uint256 routeIndex) external view returns (address handler);
+
+    /**
+     * @notice Add `swapper` to the swapper allowlist. Idempotent; does not replace other swappers.
      * @param swapper The swapper address.
      */
-    function setSwapperRole(address swapper) external;
+    function addSwapper(address swapper) external;
 
     /**
-     * @dev Assigns a new address to the admin role.
-     * @param admin The admin address.
+     * @notice Remove `swapper` from the swapper allowlist.
+     * @param swapper The swapper address.
      */
-    function setAdminRole(address admin) external;
+    function revokeSwapper(address swapper) external;
 
     /**
-     * @dev Adds a lending protocol to the system by assigining an index to its name
-     * @param lowerCaseName The name of the lending protocol in lower case
-     * @param index The index to be assigned to it
-     * @notice The index cannot be zero, since all elements in a mapping map to 0 by default
+     * @notice Whether `account` is an authorized swapper.
      */
-    function addOrUpdateLendingProtocol(string calldata lowerCaseName, uint256 index) external;
+    function isSwapper(address account) external view returns (bool);
 
     /**
-     * @dev Retrieves the index of the lending protocol
-     * @param lowerCaseName The name of the lending protocol in lower case
-     * @return The address index of the lending protocol
+     * @notice Whether `index` was registered as a lending route.
+     * @dev False for idle routes (including the constructor's index 0) and for unregistered indexes.
      */
-    function getLendingProtocolIndex(string calldata lowerCaseName) external returns (uint256);
+    function isLendingRoute(uint256 index) external view returns (bool);
+
+    /**
+     * @notice Recorded class of `index`.
+     */
+    function getRouteClass(uint256 index) external view returns (RouteClass);
 }

@@ -21,7 +21,6 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     //////////////////////////////////////////////////////////////*/
 
     OperationsAdmin private s_operationsAdmin;
-    bytes32 private constant SWAPPER_ROLE = keccak256("SWAPPER");
 
     /**
      * @notice Each user may create different schedules with one or more stablecoins
@@ -64,10 +63,10 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice only allow swapper role
+     * @notice only allow addresses on the OperationsAdmin swapper allowlist
      */
     modifier onlySwapper() {
-        if (!s_operationsAdmin.hasRole(SWAPPER_ROLE, msg.sender)) {
+        if (!s_operationsAdmin.isSwapper(msg.sender)) {
             revert DcaManager__UnauthorizedSwapper(msg.sender);
         }
         _;
@@ -415,8 +414,8 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
             for (uint256 j; j < lendingProtocolIndexes.length; ++j) {
                 address tokenHandlerAddress = s_operationsAdmin.getTokenHandler(tokens[i], lendingProtocolIndexes[j]);
                 if (tokenHandlerAddress == address(0)) continue;
-                // Index 0 is idle (no protocol name). Skip it so a mixed idle+lending
-                // call still withdraws interest from the indexes that yield.
+                // Skip idle and unregistered routes so a mixed idle+lending call still
+                // withdraws interest from the indexes that yield.
                 if (!_tokenYieldsInterest(lendingProtocolIndexes[j])) continue;
                 _withdrawInterest(tokens[i], lendingProtocolIndexes[j]);
             }
@@ -639,12 +638,11 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice whether a lending-protocol index has a registered name (index 0 never does)
-     * @param lendingProtocolIndex: the lending protocol index
+     * @notice whether a route index was registered as lending
+     * @param lendingProtocolIndex: the route index
      */
     function _tokenYieldsInterest(uint256 lendingProtocolIndex) private view returns (bool) {
-        return keccak256(abi.encodePacked(s_operationsAdmin.getLendingProtocolName(lendingProtocolIndex)))
-            != keccak256(abi.encodePacked(""));
+        return s_operationsAdmin.isLendingRoute(lendingProtocolIndex);
     }
 
     /**

@@ -129,12 +129,10 @@ abstract contract HandlerTestHarness is Test {
         vm.prank(OWNER);
         handler = deployHandler();
         
-        // Setup roles and permissions
         setupRolesAndPermissions();
         
-        // Register handler with operations admin
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(
+        vm.prank(OWNER);
+        operationsAdmin.assignTokenHandler(
             address(stablecoin), 
             lendingProtocolIndex, 
             address(handler)
@@ -147,14 +145,10 @@ abstract contract HandlerTestHarness is Test {
     }
     
     function setupRolesAndPermissions() internal {
-        vm.prank(OWNER);
-        operationsAdmin.setAdminRole(ADMIN);
-
-        // Index 0 is "not lent": OperationsAdmin forbids a protocol name there, but still
-        // allows assignOrUpdateTokenHandler(..., 0, handler).
+        // Index 0 is pre-registered as idle. Lending indexes must be classified before assignment.
         if (lendingProtocolIndex != 0) {
-            vm.prank(ADMIN);
-            operationsAdmin.addOrUpdateLendingProtocol("testProtocol", lendingProtocolIndex);
+            vm.prank(OWNER);
+            operationsAdmin.registerRoute(lendingProtocolIndex, true);
         }
     }
     

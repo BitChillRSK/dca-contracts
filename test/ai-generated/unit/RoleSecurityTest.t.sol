@@ -65,14 +65,10 @@ contract RoleSecurityTest is Test {
         mocOracle = new MockMocOracle();
         
         // Setup proper roles
-        vm.prank(OWNER);
-        operationsAdmin.setAdminRole(ADMIN);
-        
-        vm.prank(ADMIN);
-        operationsAdmin.setSwapperRole(SWAPPER);
-        
-        vm.prank(ADMIN);
-        operationsAdmin.addOrUpdateLendingProtocol("Tropykus", TROPYKUS_INDEX);
+        vm.startPrank(OWNER);
+        operationsAdmin.addSwapper(SWAPPER);
+        operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
+        vm.stopPrank();
         
         // Deploy handler
         IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
@@ -107,8 +103,8 @@ contract RoleSecurityTest is Test {
         );
         
         // Register handler
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(
+        vm.prank(OWNER);
+        operationsAdmin.assignTokenHandler(
             address(stablecoin),
             TROPYKUS_INDEX,
             address(handler)
@@ -119,48 +115,29 @@ contract RoleSecurityTest is Test {
                            OPERATIONS ADMIN ROLE TESTS
     //////////////////////////////////////////////////////////////*/
     
-    function test_onlyOwnerCanSetAdminRole() public {
-        address newAdmin = address(0x9999);
-        
-        // Unauthorized user should fail
-        vm.expectRevert("Ownable: caller is not the owner");
-        vm.prank(UNAUTHORIZED_USER);
-        operationsAdmin.setAdminRole(newAdmin);
-        
-        // Admin cannot set new admin
-        vm.expectRevert("Ownable: caller is not the owner");
-        vm.prank(ADMIN);
-        operationsAdmin.setAdminRole(newAdmin);
-        
-        // Only owner can set admin
-        vm.prank(OWNER);
-        operationsAdmin.setAdminRole(newAdmin);
-        
-        assertTrue(operationsAdmin.hasRole(operationsAdmin.ADMIN_ROLE(), newAdmin));
-    }
-    
-    function test_onlyAdminCanSetSwapperRole() public {
+    function test_onlyOwnerCanAddSwapper() public {
         address newSwapper = address(0x8888);
         
-        // Unauthorized user should fail
-        vm.expectRevert();
+        vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(UNAUTHORIZED_USER);
-        operationsAdmin.setSwapperRole(newSwapper);
+        operationsAdmin.addSwapper(newSwapper);
         
-        // Owner cannot set swapper (only admin can)
-        vm.expectRevert();
-        vm.prank(OWNER);
-        operationsAdmin.setSwapperRole(newSwapper);
-        
-        // Admin can set swapper
+        vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(ADMIN);
-        operationsAdmin.setSwapperRole(newSwapper);
+        operationsAdmin.addSwapper(newSwapper);
         
-        assertTrue(operationsAdmin.hasRole(operationsAdmin.SWAPPER_ROLE(), newSwapper));
+        vm.prank(OWNER);
+        operationsAdmin.addSwapper(newSwapper);
+        
+        assertTrue(operationsAdmin.isSwapper(newSwapper));
+        assertTrue(operationsAdmin.isSwapper(SWAPPER));
     }
     
-    function test_onlyAdminCanAssignTokenHandler() public {
-        // Deploy a second handler contract to use as the new handler
+    function test_onlyOwnerCanAssignTokenHandler() public {
+        uint256 newIndex = 99;
+        vm.prank(OWNER);
+        operationsAdmin.registerRoute(newIndex, true);
+
         TropykusErc20HandlerDex newHandler = new TropykusErc20HandlerDex(
             address(dcaManager),
             address(stablecoin),
@@ -183,52 +160,43 @@ contract RoleSecurityTest is Test {
             9900
         );
         
-        // Unauthorized user should fail
-        vm.expectRevert();
+        vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(UNAUTHORIZED_USER);
-        operationsAdmin.assignOrUpdateTokenHandler(address(stablecoin), TROPYKUS_INDEX, address(newHandler));
+        operationsAdmin.assignTokenHandler(address(stablecoin), newIndex, address(newHandler));
         
-        // Owner cannot assign handler (only admin can)
-        vm.expectRevert();
-        vm.prank(OWNER);
-        operationsAdmin.assignOrUpdateTokenHandler(address(stablecoin), TROPYKUS_INDEX, address(newHandler));
-        
-        // Swapper cannot assign handler
-        vm.expectRevert();
-        vm.prank(SWAPPER);
-        operationsAdmin.assignOrUpdateTokenHandler(address(stablecoin), TROPYKUS_INDEX, address(newHandler));
-        
-        // Admin can assign handler
+        vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(address(stablecoin), TROPYKUS_INDEX, address(newHandler));
+        operationsAdmin.assignTokenHandler(address(stablecoin), newIndex, address(newHandler));
         
-        assertEq(operationsAdmin.getTokenHandler(address(stablecoin), TROPYKUS_INDEX), address(newHandler));
+        vm.expectRevert("Ownable: caller is not the owner");
+        vm.prank(SWAPPER);
+        operationsAdmin.assignTokenHandler(address(stablecoin), newIndex, address(newHandler));
+        
+        vm.prank(OWNER);
+        operationsAdmin.assignTokenHandler(address(stablecoin), newIndex, address(newHandler));
+        
+        assertEq(operationsAdmin.getTokenHandler(address(stablecoin), newIndex), address(newHandler));
+        assertEq(operationsAdmin.getTokenHandler(address(stablecoin), TROPYKUS_INDEX), address(handler));
     }
     
-    function test_onlyAdminCanAddLendingProtocol() public {
-        string memory newProtocol = "NewProtocol";
+    function test_onlyOwnerCanRegisterRoute() public {
         uint256 newIndex = 99;
         
-        // Unauthorized user should fail
-        vm.expectRevert();
+        vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(UNAUTHORIZED_USER);
-        operationsAdmin.addOrUpdateLendingProtocol(newProtocol, newIndex);
+        operationsAdmin.registerRoute(newIndex, true);
         
-        // Owner cannot add protocol (only admin can)
-        vm.expectRevert();
-        vm.prank(OWNER);
-        operationsAdmin.addOrUpdateLendingProtocol(newProtocol, newIndex);
-        
-        // Swapper cannot add protocol
-        vm.expectRevert();
-        vm.prank(SWAPPER);
-        operationsAdmin.addOrUpdateLendingProtocol(newProtocol, newIndex);
-        
-        // Admin can add protocol
+        vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(ADMIN);
-        operationsAdmin.addOrUpdateLendingProtocol(newProtocol, newIndex);
+        operationsAdmin.registerRoute(newIndex, true);
         
-        // Admin can add protocol - verified by no revert above
+        vm.expectRevert("Ownable: caller is not the owner");
+        vm.prank(SWAPPER);
+        operationsAdmin.registerRoute(newIndex, true);
+        
+        vm.prank(OWNER);
+        operationsAdmin.registerRoute(newIndex, true);
+        assertTrue(operationsAdmin.isLendingRoute(newIndex));
     }
     
     /*//////////////////////////////////////////////////////////////
@@ -409,17 +377,13 @@ contract RoleSecurityTest is Test {
         vm.assume(randomUser != address(0) && randomUser != address(dcaManager));
         
         // Operations Admin functions should fail
-        vm.expectRevert();
+        vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(randomUser);
-        operationsAdmin.setAdminRole(randomUser);
+        operationsAdmin.addSwapper(randomUser);
         
-        vm.expectRevert();
+        vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(randomUser);
-        operationsAdmin.setSwapperRole(randomUser);
-        
-        vm.expectRevert();
-        vm.prank(randomUser);
-        operationsAdmin.assignOrUpdateTokenHandler(address(stablecoin), TROPYKUS_INDEX, randomUser);
+        operationsAdmin.assignTokenHandler(address(stablecoin), TROPYKUS_INDEX, randomUser);
         
         // Handler functions should fail
         vm.expectRevert();
@@ -444,7 +408,7 @@ contract RoleSecurityTest is Test {
         address newAdmin = address(uint160(bound(adminSeed, 1, type(uint160).max))); // Ensure non-zero address
         
         vm.prank(OWNER);
-        operationsAdmin.setAdminRole(newAdmin);
-        assertTrue(operationsAdmin.hasRole(operationsAdmin.ADMIN_ROLE(), newAdmin));
+        operationsAdmin.addSwapper(newAdmin);
+        assertTrue(operationsAdmin.isSwapper(newAdmin));
     }
 } 

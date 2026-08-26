@@ -202,28 +202,23 @@ contract GettersTest is DcaDappTest {
         assertEq(nonExistentHandler, address(0));
     }
 
-    function test_operationsAdmin_getLendingProtocolIndex() public {
-        uint256 tropykusIndex = operationsAdmin.getLendingProtocolIndex(TROPYKUS_STRING);
-        assertEq(tropykusIndex, 1);
-
-        uint256 sovrynIndex = operationsAdmin.getLendingProtocolIndex(SOVRYN_STRING);
-        assertEq(sovrynIndex, 2);
-
-        // Test non-existent protocol
-        uint256 nonExistentIndex = operationsAdmin.getLendingProtocolIndex("nonexistent");
-        assertEq(nonExistentIndex, 0);
+    function test_operationsAdmin_isLendingRoute() public {
+        assertTrue(operationsAdmin.isLendingRoute(TROPYKUS_INDEX));
+        assertTrue(operationsAdmin.isLendingRoute(SOVRYN_INDEX));
+        assertFalse(operationsAdmin.isLendingRoute(IDLE_INDEX));
+        assertFalse(operationsAdmin.isLendingRoute(999));
     }
 
-    function test_operationsAdmin_getLendingProtocolName() public {
-        string memory tropykusName = operationsAdmin.getLendingProtocolName(1);
-        assertEq(tropykusName, TROPYKUS_STRING);
+    function test_operationsAdmin_getRouteClass() public {
+        assertEq(uint256(operationsAdmin.getRouteClass(IDLE_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle));
+        assertEq(uint256(operationsAdmin.getRouteClass(TROPYKUS_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
+        assertEq(uint256(operationsAdmin.getRouteClass(SOVRYN_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
+        assertEq(uint256(operationsAdmin.getRouteClass(999)), uint256(IOperationsAdmin.RouteClass.Unregistered));
+    }
 
-        string memory sovrynName = operationsAdmin.getLendingProtocolName(2);
-        assertEq(sovrynName, SOVRYN_STRING);
-
-        // Test non-existent index
-        string memory emptyName = operationsAdmin.getLendingProtocolName(999);
-        assertEq(bytes(emptyName).length, 0);
+    function test_operationsAdmin_isSwapper() public {
+        assertTrue(operationsAdmin.isSwapper(SWAPPER));
+        assertFalse(operationsAdmin.isSwapper(USER));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -463,12 +458,9 @@ contract GettersTest is DcaDappTest {
         assertEq(dcaManager.getMinPurchasePeriod(), MIN_PURCHASE_PERIOD);
         assertEq(dcaManager.getMaxSchedulesPerToken(), MAX_SCHEDULES_PER_TOKEN);
         
-        // Test protocol mappings are bidirectional
-        assertEq(operationsAdmin.getLendingProtocolIndex(TROPYKUS_STRING), 1);
-        assertEq(operationsAdmin.getLendingProtocolName(1), TROPYKUS_STRING);
-        
-        assertEq(operationsAdmin.getLendingProtocolIndex(SOVRYN_STRING), 2);
-        assertEq(operationsAdmin.getLendingProtocolName(2), SOVRYN_STRING);
+        assertTrue(operationsAdmin.isLendingRoute(TROPYKUS_INDEX));
+        assertTrue(operationsAdmin.isLendingRoute(SOVRYN_INDEX));
+        assertFalse(operationsAdmin.isLendingRoute(IDLE_INDEX));
 
         // Test fee bounds consistency
         uint256 lowerBound = IFeeHandler(address(stablecoinHandler)).getFeePurchaseLowerBound();
@@ -483,13 +475,9 @@ contract GettersTest is DcaDappTest {
         IDcaManager.DcaDetails[] memory schedules = dcaManager.getDcaSchedules(USER, address(0));
         assertEq(schedules.length, 0);
         
-        // Test protocol index 0 (should return empty name)
-        string memory emptyProtocol = operationsAdmin.getLendingProtocolName(0);
-        assertEq(bytes(emptyProtocol).length, 0);
-        
-        // Test empty protocol name (should return 0)
-        uint256 emptyIndex = operationsAdmin.getLendingProtocolIndex("");
-        assertEq(emptyIndex, 0);
+        assertFalse(operationsAdmin.isLendingRoute(IDLE_INDEX));
+        assertEq(uint256(operationsAdmin.getRouteClass(IDLE_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle));
+        assertFalse(operationsAdmin.isLendingRoute(999));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -529,7 +517,7 @@ contract GettersTest is DcaDappTest {
         assertLt(gasBefore - gasAfter, 10000);
         
         gasBefore = gasleft();
-        operationsAdmin.getLendingProtocolName(1);
+        operationsAdmin.isLendingRoute(1);
         gasAfter = gasleft();
         assertLt(gasBefore - gasAfter, 15000); // String operations slightly more expensive
     }

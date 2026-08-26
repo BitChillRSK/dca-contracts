@@ -6,6 +6,7 @@ import {DeployBase} from "./DeployBase.s.sol";
 import {MocHelperConfig} from "./MocHelperConfig.s.sol";
 import {LayerBankDocHandlerMoc} from "../src/layerbank/LayerBankDocHandlerMoc.sol";
 import {OperationsAdmin} from "../src/OperationsAdmin.sol";
+import {IOperationsAdmin} from "../src/interfaces/IOperationsAdmin.sol";
 import {IFeeHandler} from "../src/interfaces/IFeeHandler.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {MockLayerBankAToken, MockLayerBankPool} from "../test/mocks/MockLayerBank.sol";
@@ -23,7 +24,6 @@ import "./Constants.sol";
  */
 contract DeployLayerBankHandler is DeployBase {
     uint256 public constant LAYERBANK_INDEX = 1;
-    string public constant LAYERBANK_STRING = "layerbank";
 
     struct DeployParams {
         address dcaManager;
@@ -55,7 +55,7 @@ contract DeployLayerBankHandler is DeployBase {
 
     /**
      * @notice Deploy Pool/aToken mocks and the handler. Used by tests on Anvil and on a fork.
-     * @dev Does not `broadcast` or call `assignOrUpdateTokenHandler`. `run()` is the
+     * @dev Does not `broadcast` or call `assignTokenHandler`. `run()` is the
      *      Anvil-only broadcast entry.
      */
     function deployMocksAndHandler(
@@ -116,18 +116,24 @@ contract DeployLayerBankHandler is DeployBase {
         );
         console.log("LayerBank DOC handler deployed at:", layerbankHandler);
 
-        bool isAdmin = operationsAdmin.hasRole(keccak256("ADMIN"), msg.sender);
+        bool isOwner = msg.sender == operationsAdmin.owner();
 
-        if (!isAdmin) {
-            console.log("Warning: Deployer is not an admin. Cannot register handler.");
-            console.log("Please call operationsAdmin.addOrUpdateLendingProtocol + assignOrUpdateTokenHandler with:");
+        if (!isOwner) {
+            console.log("Warning: Deployer is not the owner. Cannot register handler.");
+            console.log("Please call operationsAdmin.registerRoute + assignTokenHandler as owner with:");
             console.log("tokenAddress:", docTokenAddress);
             console.log("index:", LAYERBANK_INDEX);
             console.log("handlerAddress:", layerbankHandler);
         } else {
-            operationsAdmin.addOrUpdateLendingProtocol(LAYERBANK_STRING, LAYERBANK_INDEX);
-            operationsAdmin.assignOrUpdateTokenHandler(docTokenAddress, LAYERBANK_INDEX, layerbankHandler);
-            console.log("LayerBank DOC handler registered with OperationsAdmin at index", LAYERBANK_INDEX);
+            if (operationsAdmin.getRouteClass(LAYERBANK_INDEX) == IOperationsAdmin.RouteClass.Unregistered) {
+                operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
+            }
+            if (operationsAdmin.getTokenHandler(docTokenAddress, LAYERBANK_INDEX) != address(0)) {
+                console.log("LayerBank route already has a handler; skipping assignment.");
+            } else {
+                operationsAdmin.assignTokenHandler(docTokenAddress, LAYERBANK_INDEX, layerbankHandler);
+                console.log("LayerBank DOC handler registered with OperationsAdmin at index", LAYERBANK_INDEX);
+            }
         }
 
         vm.stopBroadcast();

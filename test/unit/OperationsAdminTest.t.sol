@@ -8,20 +8,20 @@ import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
 import {TropykusDocHandlerMoc} from "../../src/tropykus-legacy/TropykusDocHandlerMoc.sol";
 import {IOperationsAdmin} from "../../src/interfaces/IOperationsAdmin.sol";
+import {IdleDocHandlerMoc} from "../../src/idle/IdleDocHandlerMoc.sol";
 import "./TestsHelper.t.sol";
 
 contract OperationsAdminTest is DcaDappTest {
-    // Events
-    event OperationsAdmin__AdminRoleGranted(address indexed admin);
-    event OperationsAdmin__SwapperRoleGranted(address indexed swapper);
-    event OperationsAdmin__AdminRoleRevoked(address indexed admin);
-    event OperationsAdmin__SwapperRoleRevoked(address indexed swapper);
-    
+    event OperationsAdmin__SwapperAdded(address indexed swapper);
+    event OperationsAdmin__SwapperRevoked(address indexed swapper);
+    event OperationsAdmin__RouteRegistered(uint256 indexed index, bool lends);
+
+    uint256 private constant SECOND_IDLE_INDEX = 10;
+    uint256 private constant SECOND_LENDING_INDEX = 11;
+
     function setUp() public override {
         super.setUp();
     }
-
-    event OperationsAdmin__LendingProtocolAdded(uint256 indexed index, string indexed name);
 
     /*//////////////////////////////////////////////////////////////
                          ADMIN OPERATIONS TESTS
@@ -30,19 +30,23 @@ contract OperationsAdminTest is DcaDappTest {
         vm.startBroadcast();
         DummyERC165Contract dummyERC165Contract = new DummyERC165Contract();
         vm.stopBroadcast();
+
+        vm.prank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+
         bytes memory encodedRevert = abi.encodeWithSelector(
             IOperationsAdmin.OperationsAdmin__ContractIsNotTokenHandler.selector, address(dummyERC165Contract)
         );
 
         vm.expectRevert(encodedRevert);
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(
-            address(stablecoin), s_lendingProtocolIndex, address(dummyERC165Contract)
+        vm.prank(OWNER);
+        operationsAdmin.assignTokenHandler(
+            address(stablecoin), SECOND_LENDING_INDEX, address(dummyERC165Contract)
         );
 
         vm.expectRevert();
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(address(stablecoin), s_lendingProtocolIndex, address(dcaManager));
+        vm.prank(OWNER);
+        operationsAdmin.assignTokenHandler(address(stablecoin), SECOND_LENDING_INDEX, address(dcaManager));
     }
 
     function testUpdateTokenHandlerFailsIfAddressIsEoa() external {
@@ -50,14 +54,217 @@ contract OperationsAdminTest is DcaDappTest {
         bytes memory encodedRevert =
             abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__EoaCannotBeHandler.selector, dummyAddress);
         vm.expectRevert(encodedRevert);
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(address(stablecoin), s_lendingProtocolIndex, dummyAddress);
+        vm.prank(OWNER);
+        operationsAdmin.assignTokenHandler(address(stablecoin), s_lendingProtocolIndex, dummyAddress);
     }
 
-    function testTokenHandlerUpdated() external {
-        address prevTropykusDocHandlerMoc = operationsAdmin.getTokenHandler(address(stablecoin), s_lendingProtocolIndex);
-        vm.startBroadcast();
-        TropykusDocHandlerMoc newTropykusDocHandlerMoc = new TropykusDocHandlerMoc(
+    function testAssignTokenHandlerFailsIfRouteUnregistered() external {
+        bytes memory encodedRevert =
+            abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__RouteNotRegistered.selector, 3);
+        vm.expectRevert(encodedRevert);
+        vm.prank(OWNER);
+        operationsAdmin.assignTokenHandler(address(stablecoin), 3, address(stablecoinHandler));
+    }
+
+    function testDuplicateHandlerAssignmentReverts() external {
+        bytes memory encodedRevert = abi.encodeWithSelector(
+            IOperationsAdmin.OperationsAdmin__HandlerAlreadyAssigned.selector,
+            address(stablecoin),
+            s_lendingProtocolIndex
+        );
+        vm.expectRevert(encodedRevert);
+        vm.prank(OWNER);
+        operationsAdmin.assignTokenHandler(address(stablecoin), s_lendingProtocolIndex, address(stablecoinHandler));
+    }
+
+    function testOnlyOwnerCanRegisterRoutesAndSwappers() external {
+        vm.prank(ADMIN);
+        vm.expectRevert("Ownable: caller is not the owner");
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+
+        vm.prank(SWAPPER);
+        vm.expectRevert("Ownable: caller is not the owner");
+        operationsAdmin.addSwapper(address(2));
+
+        vm.prank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        assertTrue(operationsAdmin.isLendingRoute(SECOND_LENDING_INDEX));
+    }
+
+    function testAddAndRevokeSwapper() external {
+        address extraSwapper = address(2);
+        vm.prank(OWNER);
+        vm.expectEmit(true, true, true, true);
+        emit OperationsAdmin__SwapperAdded(extraSwapper);
+        operationsAdmin.addSwapper(extraSwapper);
+        assertTrue(operationsAdmin.isSwapper(SWAPPER));
+        assertTrue(operationsAdmin.isSwapper(extraSwapper));
+
+        vm.expectEmit(true, true, true, true);
+        emit OperationsAdmin__SwapperRevoked(SWAPPER);
+        vm.prank(OWNER);
+        operationsAdmin.revokeSwapper(SWAPPER);
+        assertFalse(operationsAdmin.isSwapper(SWAPPER));
+        assertTrue(operationsAdmin.isSwapper(extraSwapper));
+    }
+
+    function testRevokeSwapperFailsIfNotOwner() external {
+        vm.prank(makeAddr("notOwner"));
+        vm.expectRevert("Ownable: caller is not the owner");
+        operationsAdmin.revokeSwapper(SWAPPER);
+    }
+
+    function testRevokedSwapperCannotPurchase() external {
+        bytes32 scheduleId = dcaManager.getScheduleId(USER, address(stablecoin), 0);
+        vm.prank(OWNER);
+        operationsAdmin.revokeSwapper(SWAPPER);
+
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__UnauthorizedSwapper.selector, SWAPPER));
+        vm.prank(SWAPPER);
+        dcaManager.buyRbtc(USER, address(stablecoin), 0, scheduleId);
+    }
+
+    function testReregisteringAnyIndexReverts() external {
+        vm.startPrank(OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__RouteAlreadyRegistered.selector, 0)
+        );
+        operationsAdmin.registerRoute(0, false);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__RouteAlreadyRegistered.selector, s_lendingProtocolIndex
+            )
+        );
+        operationsAdmin.registerRoute(s_lendingProtocolIndex, true);
+        vm.stopPrank();
+    }
+
+    function testIsLendingRouteReadsRecordedClass() external {
+        assertFalse(operationsAdmin.isLendingRoute(0));
+        assertEq(
+            uint256(operationsAdmin.getRouteClass(0)), uint256(IOperationsAdmin.RouteClass.Idle)
+        );
+        assertTrue(operationsAdmin.isLendingRoute(TROPYKUS_INDEX));
+        assertTrue(operationsAdmin.isLendingRoute(SOVRYN_INDEX));
+        assertFalse(operationsAdmin.isLendingRoute(999));
+        assertEq(
+            uint256(operationsAdmin.getRouteClass(999)), uint256(IOperationsAdmin.RouteClass.Unregistered)
+        );
+    }
+
+    function testRegisterRouteEmitsAndClassifies() external {
+        vm.expectEmit(true, true, true, true);
+        emit OperationsAdmin__RouteRegistered(SECOND_LENDING_INDEX, true);
+        vm.prank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        assertTrue(operationsAdmin.isLendingRoute(SECOND_LENDING_INDEX));
+
+        vm.expectEmit(true, true, true, true);
+        emit OperationsAdmin__RouteRegistered(SECOND_IDLE_INDEX, false);
+        vm.prank(OWNER);
+        operationsAdmin.registerRoute(SECOND_IDLE_INDEX, false);
+        assertFalse(operationsAdmin.isLendingRoute(SECOND_IDLE_INDEX));
+        assertEq(
+            uint256(operationsAdmin.getRouteClass(SECOND_IDLE_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle)
+        );
+    }
+
+    function testMistakenClassificationRecoveredAtNewIndex() external {
+        vm.startPrank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, false);
+        assertFalse(operationsAdmin.isLendingRoute(SECOND_LENDING_INDEX));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__RouteAlreadyRegistered.selector, SECOND_LENDING_INDEX
+            )
+        );
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX + 1, true);
+        vm.stopPrank();
+        assertTrue(operationsAdmin.isLendingRoute(SECOND_LENDING_INDEX + 1));
+        assertFalse(operationsAdmin.isLendingRoute(SECOND_LENDING_INDEX));
+    }
+
+    function testMistakenHandlerAssignmentRecoveredAtNewIndex() external {
+        address oldHandler = operationsAdmin.getTokenHandler(address(stablecoin), s_lendingProtocolIndex);
+        TropykusDocHandlerMoc unusedHandler = _newTropykusHandler();
+
+        vm.startPrank(OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__HandlerAlreadyAssigned.selector,
+                address(stablecoin),
+                s_lendingProtocolIndex
+            )
+        );
+        operationsAdmin.assignTokenHandler(address(stablecoin), s_lendingProtocolIndex, address(unusedHandler));
+
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        operationsAdmin.assignTokenHandler(address(stablecoin), SECOND_LENDING_INDEX, address(unusedHandler));
+        vm.stopPrank();
+
+        assertEq(operationsAdmin.getTokenHandler(address(stablecoin), s_lendingProtocolIndex), oldHandler);
+        assertEq(operationsAdmin.getTokenHandler(address(stablecoin), SECOND_LENDING_INDEX), address(unusedHandler));
+    }
+
+    function testIdleHandlerAtNonZeroIndexLeavesOriginalIdleResolvable() external {
+        IdleDocHandlerMoc idleAtZero = _newIdleHandler();
+        IdleDocHandlerMoc idleAtTen = _newIdleHandler();
+
+        vm.startPrank(OWNER);
+        operationsAdmin.assignTokenHandler(address(stablecoin), IDLE_INDEX, address(idleAtZero));
+        operationsAdmin.registerRoute(SECOND_IDLE_INDEX, false);
+        operationsAdmin.assignTokenHandler(address(stablecoin), SECOND_IDLE_INDEX, address(idleAtTen));
+        vm.stopPrank();
+
+        assertEq(operationsAdmin.getTokenHandler(address(stablecoin), IDLE_INDEX), address(idleAtZero));
+        assertEq(operationsAdmin.getTokenHandler(address(stablecoin), SECOND_IDLE_INDEX), address(idleAtTen));
+        assertFalse(operationsAdmin.isLendingRoute(IDLE_INDEX));
+        assertFalse(operationsAdmin.isLendingRoute(SECOND_IDLE_INDEX));
+    }
+
+    function testOldRouteStillPaysUserAfterNewHandlerRegistered() external {
+        address oldHandler = operationsAdmin.getTokenHandler(address(stablecoin), s_lendingProtocolIndex);
+        TropykusDocHandlerMoc newHandler = _newTropykusHandler();
+
+        vm.startPrank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        vm.expectEmit(true, true, true, true);
+        emit OperationsAdmin__TokenHandlerAssigned(
+            address(stablecoin), SECOND_LENDING_INDEX, address(newHandler)
+        );
+        operationsAdmin.assignTokenHandler(address(stablecoin), SECOND_LENDING_INDEX, address(newHandler));
+        vm.stopPrank();
+
+        assertEq(operationsAdmin.getTokenHandler(address(stablecoin), s_lendingProtocolIndex), oldHandler);
+        assertEq(operationsAdmin.getTokenHandler(address(stablecoin), SECOND_LENDING_INDEX), address(newHandler));
+
+        bytes32 scheduleId = dcaManager.getScheduleId(USER, address(stablecoin), 0);
+        uint256 remaining = dcaManager.getScheduleTokenBalance(USER, address(stablecoin), 0);
+        uint256 userBalanceBefore = stablecoin.balanceOf(USER);
+
+        vm.prank(USER);
+        dcaManager.withdrawToken(address(stablecoin), 0, scheduleId, remaining);
+
+        assertGt(stablecoin.balanceOf(USER), userBalanceBefore);
+        assertEq(dcaManager.getScheduleTokenBalance(USER, address(stablecoin), 0), 0);
+        assertEq(operationsAdmin.getTokenHandler(address(stablecoin), s_lendingProtocolIndex), oldHandler);
+    }
+
+    function testOwnerCannotMoveAnotherUsersTokens() external {
+        bytes32 scheduleId = dcaManager.getScheduleId(USER, address(stablecoin), 0);
+        uint256 remaining = dcaManager.getScheduleTokenBalance(USER, address(stablecoin), 0);
+
+        vm.prank(OWNER);
+        vm.expectRevert();
+        dcaManager.withdrawToken(address(stablecoin), 0, scheduleId, remaining);
+    }
+
+    function _newTropykusHandler() private returns (TropykusDocHandlerMoc) {
+        return new TropykusDocHandlerMoc(
             address(dcaManager),
             address(stablecoin),
             address(shareToken),
@@ -70,85 +277,20 @@ contract OperationsAdminTest is DcaDappTest {
                 feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
             })
         );
-        vm.stopBroadcast();
-        assert(prevTropykusDocHandlerMoc != address(newTropykusDocHandlerMoc));
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(
-            address(stablecoin), s_lendingProtocolIndex, address(newTropykusDocHandlerMoc)
+    }
+
+    function _newIdleHandler() private returns (IdleDocHandlerMoc) {
+        return new IdleDocHandlerMoc(
+            address(dcaManager),
+            address(stablecoin),
+            FEE_COLLECTOR,
+            address(mocProxy),
+            IFeeHandler.FeeSettings({
+                minFeeRate: MIN_FEE_RATE,
+                maxFeeRate: MAX_FEE_RATE_TEST,
+                feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
+                feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+            })
         );
-        assertEq(
-            operationsAdmin.getTokenHandler(address(stablecoin), s_lendingProtocolIndex),
-            address(newTropykusDocHandlerMoc)
-        );
-    }
-
-    function testSetRoles() external {
-        vm.prank(OWNER);
-        vm.expectEmit(true, true, true, true);
-        emit OperationsAdmin__AdminRoleGranted(address(1));
-        operationsAdmin.setAdminRole(address(1));
-        assert(operationsAdmin.hasRole(operationsAdmin.ADMIN_ROLE(), address(1)));
-        vm.prank(ADMIN);
-        vm.expectEmit(true, true, true, true);
-        emit OperationsAdmin__SwapperRoleGranted(address(2));
-        operationsAdmin.setSwapperRole(address(2));
-        assert(operationsAdmin.hasRole(operationsAdmin.SWAPPER_ROLE(), address(2)));
-    }
-
-    function testRevokeAdminRole() external {
-        vm.expectEmit(true, true, true, true);
-        emit OperationsAdmin__AdminRoleRevoked(ADMIN);
-        vm.prank(OWNER);
-        operationsAdmin.revokeAdminRole(ADMIN);
-        assertFalse(operationsAdmin.hasRole(operationsAdmin.ADMIN_ROLE(), ADMIN));
-    }
-
-    function testRevokeSwapperRole() external {
-        vm.expectEmit(true, true, true, true);
-        emit OperationsAdmin__SwapperRoleRevoked(SWAPPER);
-        vm.prank(ADMIN);
-        operationsAdmin.revokeSwapperRole(SWAPPER);
-        assertFalse(operationsAdmin.hasRole(operationsAdmin.SWAPPER_ROLE(), address(2)));
-    }
-
-    function testRevokeAdminRoleFailsIfNotOwner() external {
-        vm.prank(ADMIN);
-        vm.expectRevert("Ownable: caller is not the owner");
-        operationsAdmin.revokeAdminRole(ADMIN);
-    }
-
-    function testRevokeSwapperRoleFailsIfNotAdmin() external {
-        vm.prank(makeAddr("notAdmin"));
-        vm.expectRevert();
-        operationsAdmin.revokeSwapperRole(address(2));
-    }
-
-    function testAssignTokenHandlerFailsIfLendingProtocolNotAdded() external {
-        bytes memory encodedRevert =
-            abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__LendingProtocolNotAllowed.selector, 3);
-        vm.expectRevert(encodedRevert);
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(address(stablecoin), 3, address(stablecoinHandler));
-    }
-
-    function testAddOrUpdateLendingProtocol() external {
-        vm.expectEmit(true, true, true, false);
-        emit OperationsAdmin__LendingProtocolAdded(3, "dummyProtocol");
-        vm.prank(ADMIN);
-        operationsAdmin.addOrUpdateLendingProtocol("dummyProtocol", 3);
-        assertEq(operationsAdmin.getLendingProtocolIndex("dummyProtocol"), 3);
-        assertEq(operationsAdmin.getLendingProtocolName(3), "dummyProtocol");
-    }
-
-    function testLendingProtocolIndexCannotBeZero() external {
-        vm.expectRevert(IOperationsAdmin.OperationsAdmin__LendingProtocolIndexCannotBeZero.selector);
-        vm.prank(ADMIN);
-        operationsAdmin.addOrUpdateLendingProtocol("dummyProtocol", 0);
-    }
-
-    function testLendingProtocolStringNonEmpty() external {
-        vm.expectRevert(IOperationsAdmin.OperationsAdmin__LendingProtocolNameNotSet.selector);
-        vm.prank(ADMIN);
-        operationsAdmin.addOrUpdateLendingProtocol("", 3);
     }
 }

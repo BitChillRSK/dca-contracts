@@ -90,18 +90,12 @@ contract InvariantTest is StdInvariant, Test {
         
         stablecoin = new MockStablecoin(address(this));
         
-        // Setup roles
-        vm.prank(OWNER);
-        operationsAdmin.setAdminRole(ADMIN);
-        
-        vm.prank(ADMIN);
-        operationsAdmin.setSwapperRole(SWAPPER);
-        
-        vm.prank(ADMIN);
-        operationsAdmin.addOrUpdateLendingProtocol(TROPYKUS_STRING, TROPYKUS_INDEX);
-        
-        vm.prank(ADMIN);
-        operationsAdmin.addOrUpdateLendingProtocol(SOVRYN_STRING, SOVRYN_INDEX);
+        // Setup swappers and lending routes
+        vm.startPrank(OWNER);
+        operationsAdmin.addSwapper(SWAPPER);
+        operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
+        operationsAdmin.registerRoute(SOVRYN_INDEX, true);
+        vm.stopPrank();
         
         // Deploy appropriate handler wrapper based on lending protocol
         IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
@@ -135,8 +129,8 @@ contract InvariantTest is StdInvariant, Test {
             stablecoin.mint(address(iSusdToken), HANDLER_INITIAL_BALANCE);
         }
         
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(
+        vm.prank(OWNER);
+        operationsAdmin.assignTokenHandler(
             address(stablecoin),
             s_lendingProtocolIndex,
             address(handler)

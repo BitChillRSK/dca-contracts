@@ -5,120 +5,85 @@ import {IOperationsAdmin} from "./interfaces/IOperationsAdmin.sol";
 import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
 import {IERC165} from "lib/forge-std/src/interfaces/IERC165.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 /**
  * @title OperationsAdmin
- * @dev Contract to manage administrative tasks and token handlers
+ * @notice Governance registry for route classes, token handlers, and swappers.
+ * @dev One owner. Route indexes are add-only: a class is recorded once and is never
+ *      mutated or deregistered. Old routes stay resolvable so users can exit the handler
+ *      that holds their funds. `(token, routeIndex)` handler assignment is likewise
+ *      add-only. There is no cooperative migration on these handler versions.
  */
-contract OperationsAdmin is IOperationsAdmin, Ownable, AccessControl {
-    using Address for address;
+contract OperationsAdmin is IOperationsAdmin, Ownable {
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN");
-    bytes32 public constant SWAPPER_ROLE = keccak256("SWAPPER");
-
-    mapping(bytes32 tokenProtocolHash => address tokenHandlerContract) private s_tokenHandler;
-    mapping(string lowerCaseProtocolName => uint256 protocolIndex) private s_protocolIndexes;
-    mapping(uint256 protocolIndex => string lowerCaseProtocolName) private s_protocolNames;
+    mapping(address token => mapping(uint256 routeIndex => address handler)) private s_tokenHandler;
+    mapping(uint256 routeIndex => RouteClass) private s_routeClass;
+    mapping(address swapper => bool) private s_swappers;
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    constructor() Ownable() {}
+    /**
+     * @dev Index 0 is the default idle route. Additional idle or lending indexes are
+     *      registered through `registerRoute`.
+     */
+    constructor() Ownable() {
+        s_routeClass[0] = RouteClass.Idle;
+    }
 
     /**
-     * @dev Assigns a new TokenHandler to a token.
-     * @param token The address of the token.
-     * @param lendingProtocolIndex The index of the protocol where (if) the token is lent
-     * @param handler The address of the TokenHandler.
-     * @notice lendingProtocolIndex == 0 means the token is not lent
+     * @inheritdoc IOperationsAdmin
+     * @dev Recovery from a mistaken class is a new index, not a mutation of this one.
      */
-    function assignOrUpdateTokenHandler(address token, uint256 lendingProtocolIndex, address handler)
-        external
-        onlyRole(ADMIN_ROLE)
-    {
-        if (!address(handler).isContract()) revert OperationsAdmin__EoaCannotBeHandler(handler);
-        if (lendingProtocolIndex != 0 && bytes(s_protocolNames[lendingProtocolIndex]).length == 0) {
-            revert OperationsAdmin__LendingProtocolNotAllowed(lendingProtocolIndex);
+    function registerRoute(uint256 index, bool lends) external onlyOwner {
+        if (s_routeClass[index] != RouteClass.Unregistered) {
+            revert OperationsAdmin__RouteAlreadyRegistered(index);
+        }
+        s_routeClass[index] = lends ? RouteClass.Lending : RouteClass.Idle;
+        emit OperationsAdmin__RouteRegistered(index, lends);
+    }
+
+    /**
+     * @inheritdoc IOperationsAdmin
+     * @dev Recovery from a mistaken assignment is a new `(token, index)`, even when this
+     *      handler has never held funds: this contract cannot prove a handler is empty.
+     */
+    function assignTokenHandler(address token, uint256 routeIndex, address handler) external onlyOwner {
+        if (handler.code.length == 0) revert OperationsAdmin__EoaCannotBeHandler(handler);
+        if (s_routeClass[routeIndex] == RouteClass.Unregistered) {
+            revert OperationsAdmin__RouteNotRegistered(routeIndex);
+        }
+        if (s_tokenHandler[token][routeIndex] != address(0)) {
+            revert OperationsAdmin__HandlerAlreadyAssigned(token, routeIndex);
         }
 
         IERC165 tokenHandler = IERC165(handler);
-
-        if (tokenHandler.supportsInterface(type(ITokenHandler).interfaceId)) {
-            bytes32 key = _encodeKey(token, lendingProtocolIndex);
-            s_tokenHandler[key] = handler;
-            emit OperationsAdmin__TokenHandlerUpdated(token, lendingProtocolIndex, handler);
-        } else {
+        if (!tokenHandler.supportsInterface(type(ITokenHandler).interfaceId)) {
             revert OperationsAdmin__ContractIsNotTokenHandler(handler);
         }
+
+        s_tokenHandler[token][routeIndex] = handler;
+        emit OperationsAdmin__TokenHandlerAssigned(token, routeIndex, handler);
     }
 
     /**
-     * @dev Adds a lending protocol to the system by assigning an index to its name
-     * @param lowerCaseName The name of the lending protocol in lower case
-     * @param index The index to be assigned to it
-     * @notice The index cannot be zero, since all elements in a mapping map to 0 by default
+     * @inheritdoc IOperationsAdmin
      */
-    function addOrUpdateLendingProtocol(string calldata lowerCaseName, uint256 index) external onlyRole(ADMIN_ROLE) {
-        if (index == 0) revert OperationsAdmin__LendingProtocolIndexCannotBeZero();
-        if (bytes(lowerCaseName).length == 0) revert OperationsAdmin__LendingProtocolNameNotSet();
-        s_protocolIndexes[lowerCaseName] = index;
-        s_protocolNames[index] = lowerCaseName;
-        emit OperationsAdmin__LendingProtocolAdded(index, lowerCaseName);
+    function addSwapper(address swapper) external onlyOwner {
+        s_swappers[swapper] = true;
+        emit OperationsAdmin__SwapperAdded(swapper);
     }
 
     /**
-     * @dev Assigns a new address to the swapper role.
-     * @param swapper The swapper address.
+     * @inheritdoc IOperationsAdmin
      */
-    function setSwapperRole(address swapper) external onlyRole(ADMIN_ROLE) {
-        _grantRole(SWAPPER_ROLE, swapper);
-        emit OperationsAdmin__SwapperRoleGranted(swapper);
-    }
-
-    /**
-     * @dev Revokes the swapper role from an address.
-     * @param swapper The address to revoke the swapper role from.
-     */
-    function revokeSwapperRole(address swapper) external onlyRole(ADMIN_ROLE) {
-        _revokeRole(SWAPPER_ROLE, swapper);
-        emit OperationsAdmin__SwapperRoleRevoked(swapper);
-    }
-
-    /**
-     * @dev Assigns a new address to the admin role.
-     * @param admin The admin address.
-     */
-    function setAdminRole(address admin) external onlyOwner {
-        _grantRole(ADMIN_ROLE, admin);
-        emit OperationsAdmin__AdminRoleGranted(admin);
-    }
-
-    /**
-     * @dev Revokes the admin role from an address.
-     * @param admin The address to revoke the admin role from.
-     */
-    function revokeAdminRole(address admin) external onlyOwner {
-        _revokeRole(ADMIN_ROLE, admin);
-        emit OperationsAdmin__AdminRoleRevoked(admin);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                           PRIVATE FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @dev Encodes the token and lending protocol
-     * @param token The address of the token.
-     * @param lendingProtocolIndex The name of the lending protocol (empty string if token will not be lent)
-     */
-    function _encodeKey(address token, uint256 lendingProtocolIndex) private pure returns (bytes32) {
-        return keccak256(abi.encodePacked(token, lendingProtocolIndex));
+    function revokeSwapper(address swapper) external onlyOwner {
+        s_swappers[swapper] = false;
+        emit OperationsAdmin__SwapperRevoked(swapper);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -126,31 +91,30 @@ contract OperationsAdmin is IOperationsAdmin, Ownable, AccessControl {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Retrieves the index of the lending protocol
-     * @param lowerCaseName The name of the lending protocol in lower case
-     * @return The index of the lending protocol
+     * @inheritdoc IOperationsAdmin
      */
-    function getLendingProtocolIndex(string calldata lowerCaseName) external view returns (uint256) {
-        return s_protocolIndexes[lowerCaseName];
+    function isSwapper(address account) external view returns (bool) {
+        return s_swappers[account];
     }
 
     /**
-     * @dev Retrieves the index of the lending protocol
-     * @param index The index of the lending protocol in lower case
-     * @return The name of the lending protocol
+     * @inheritdoc IOperationsAdmin
      */
-    function getLendingProtocolName(uint256 index) external view returns (string memory) {
-        return s_protocolNames[index];
+    function isLendingRoute(uint256 index) external view returns (bool) {
+        return s_routeClass[index] == RouteClass.Lending;
     }
 
     /**
-     * @dev Retrieves the handler for a given token.
-     * @param token The address of the token.
-     * @param lendingProtocolIndex The index of the lending protocol (empty string if token will not be lent)
-     * @return The address of the TokenHandler. If address(0) is returned, the tuple token-protocol is not correct
+     * @inheritdoc IOperationsAdmin
      */
-    function getTokenHandler(address token, uint256 lendingProtocolIndex) external view returns (address) {
-        bytes32 key = _encodeKey(token, lendingProtocolIndex);
-        return s_tokenHandler[key];
+    function getRouteClass(uint256 index) external view returns (RouteClass) {
+        return s_routeClass[index];
+    }
+
+    /**
+     * @inheritdoc IOperationsAdmin
+     */
+    function getTokenHandler(address token, uint256 routeIndex) external view returns (address) {
+        return s_tokenHandler[token][routeIndex];
     }
 }

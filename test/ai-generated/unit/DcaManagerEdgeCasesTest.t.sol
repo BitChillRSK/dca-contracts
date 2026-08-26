@@ -64,14 +64,10 @@ contract DcaManagerEdgeCasesTest is Test {
         mocOracle = new MockMocOracle();
         
         // Setup roles
-        vm.prank(OWNER);
-        operationsAdmin.setAdminRole(ADMIN);
-        
-        vm.prank(ADMIN);
-        operationsAdmin.setSwapperRole(SWAPPER);
-        
-        vm.prank(ADMIN);
-        operationsAdmin.addOrUpdateLendingProtocol("Tropykus", TROPYKUS_INDEX);
+        vm.startPrank(OWNER);
+        operationsAdmin.addSwapper(SWAPPER);
+        operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
+        vm.stopPrank();
         
         // Deploy and register handler
         IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
@@ -105,8 +101,8 @@ contract DcaManagerEdgeCasesTest is Test {
             9900
         );
         
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(
+        vm.prank(OWNER);
+        operationsAdmin.assignTokenHandler(
             address(stablecoin),
             TROPYKUS_INDEX,
             address(handler)

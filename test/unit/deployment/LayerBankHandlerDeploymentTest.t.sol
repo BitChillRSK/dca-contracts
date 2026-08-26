@@ -34,10 +34,8 @@ contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
         );
         layerbankHandler = LayerBankDocHandlerMoc(payable(layerbankHandlerAddress));
 
-        vm.prank(ADMIN);
-        operationsAdmin.addOrUpdateLendingProtocol("layerbank", LAYERBANK_INDEX);
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(docTokenAddress, LAYERBANK_INDEX, layerbankHandlerAddress);
+        vm.prank(OWNER);
+        operationsAdmin.assignTokenHandler(docTokenAddress, LAYERBANK_INDEX, layerbankHandlerAddress);
     }
 
     function testLayerBankHandlerDeployment() public {
@@ -57,9 +55,7 @@ contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
 
         address registeredHandler = operationsAdmin.getTokenHandler(helperConfig.getStablecoinAddress(), LAYERBANK_INDEX);
         assertEq(registeredHandler, layerbankHandlerAddress, "LayerBank handler not registered in OperationsAdmin");
-        assertEq(
-            keccak256(bytes(operationsAdmin.getLendingProtocolName(LAYERBANK_INDEX))), keccak256(bytes("layerbank"))
-        );
+        assertTrue(operationsAdmin.isLendingRoute(LAYERBANK_INDEX));
         assertEq(layerbankHandler.EXCHANGE_RATE_DECIMALS(), 1e27);
     }
 

@@ -145,10 +145,10 @@ contract DeployMocSwaps is DeployBase {
         else if (environment == Environment.TESTNET || environment == Environment.MAINNET) {
             console.log("Deploying handlers for lending protocols for live network");
 
-            // First register the lending protocols
-            operationsAdmin.setAdminRole(tx.origin);
-            operationsAdmin.addOrUpdateLendingProtocol(TROPYKUS_STRING, TROPYKUS_INDEX); // index 1
-            operationsAdmin.addOrUpdateLendingProtocol(SOVRYN_STRING, SOVRYN_INDEX); // index 2
+            operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
+            operationsAdmin.registerRoute(SOVRYN_INDEX, true);
+
+            address owner = adminAddresses[environment];
 
             // Deploy Tropykus handler if there's a valid shares
             address tropykusShareToken = networkConfig.kDocAddress;
@@ -156,7 +156,6 @@ contract DeployMocSwaps is DeployBase {
             if (tropykusShareToken == address(0)) {
                 console.log("Warning: Tropykus shares not available for this stablecoin");
             } else {
-                // Deploy Tropykus handler
                 DeployParams memory tropykusParams = DeployParams({
                     protocol: Protocol.TROPYKUS,
                     dcaManager: address(dcaManager),
@@ -169,8 +168,8 @@ contract DeployMocSwaps is DeployBase {
                 address tropykusHandler = deployDocHandlerMoc(tropykusParams);
                 console.log("Tropykus handler deployed at:", tropykusHandler);
                 
-                // Assign the Tropykus handler
-                operationsAdmin.assignOrUpdateTokenHandler(docTokenAddress, TROPYKUS_INDEX, tropykusHandler);
+                operationsAdmin.assignTokenHandler(docTokenAddress, TROPYKUS_INDEX, tropykusHandler);
+                Ownable(tropykusHandler).transferOwnership(owner);
                 
                 // If we're deploying for Tropykus, set this as our return handler
                 if (protocol == Protocol.TROPYKUS) {
@@ -180,13 +179,11 @@ contract DeployMocSwaps is DeployBase {
 
             // Only deploy Sovryn handler if the stablecoin is supported
             if (!isUSDRIF) {
-                // Get Sovryn shares address
                 address sovrynShareToken = networkConfig.iSusdAddress;
                 
                 if (sovrynShareToken == address(0)) {
                     console.log("Warning: Sovryn shares not available for this stablecoin");
                 } else {
-                    // Deploy Sovryn handler
                     DeployParams memory sovrynParams = DeployParams({
                         protocol: Protocol.SOVRYN,
                         dcaManager: address(dcaManager),
@@ -199,8 +196,8 @@ contract DeployMocSwaps is DeployBase {
                     address sovrynHandler = deployDocHandlerMoc(sovrynParams);
                     console.log("Sovryn handler deployed at:", sovrynHandler);
                     
-                    // Assign the Sovryn handler
-                    operationsAdmin.assignOrUpdateTokenHandler(docTokenAddress, SOVRYN_INDEX, sovrynHandler);
+                    operationsAdmin.assignTokenHandler(docTokenAddress, SOVRYN_INDEX, sovrynHandler);
+                    Ownable(sovrynHandler).transferOwnership(owner);
                     
                     // If we're deploying for Sovryn, set this as our return handler
                     if (protocol == Protocol.SOVRYN) {
@@ -211,9 +208,8 @@ contract DeployMocSwaps is DeployBase {
                 console.log("Skipping Sovryn handler deployment for USDRIF as it's not supported");
             }
 
-            if (environment == Environment.TESTNET) {
-                operationsAdmin.setAdminRole(adminAddresses[Environment.TESTNET]);
-            }
+            operationsAdmin.transferOwnership(owner);
+            dcaManager.transferOwnership(owner);
         }
 
         vm.stopBroadcast();
