@@ -19,12 +19,10 @@ contract StablecoinLendingTest is DcaDappTest {
     // Events
     event TokenLending__InterestWithdrawn(address indexed user, address indexed token, uint256 indexed amount);
 
-    function setUp() public override {
-        super.setUp();
-        if (!isLendingLane) {
-            vm.skip(true);
-        }
-    }
+    // No `setUp` override: `vm.skip(true)` at the end of a `setUp` that already ran `super.setUp()`
+    // is reported as `FAIL: FOUNDRY::SKIP` by some Foundry builds (CI pins `version: stable`, which
+    // drifts from local). Every test below gates on a lane modifier instead — same coverage, no
+    // cheatcode in `setUp`.
 
     /////////////////////////////////////
     ///// Stablecoin Lending tests /////
@@ -203,7 +201,7 @@ contract StablecoinLendingTest is DcaDappTest {
         }
     }
 
-    function testWithdrawInterest() external {
+    function testWithdrawInterest() external onlyLendingLane {
         updateExchangeRate(10 days);
 
         uint256 withdrawableInterest =
@@ -233,7 +231,7 @@ contract StablecoinLendingTest is DcaDappTest {
 
     /// @notice Combined withdraw derives the lending route from the validated schedule.
     /// The caller cannot target a different index (the previous fifth argument is gone).
-    function testWithdrawTokenAndInterest() external {
+    function testWithdrawTokenAndInterest() external onlyLendingLane {
         vm.warp(block.timestamp + 10 days);
 
         // On fork tests we need to simulate some operation on Tropykus so that the exchange rate gets updated
@@ -261,7 +259,7 @@ contract StablecoinLendingTest is DcaDappTest {
     }
 
     /// @notice Locked principal is the sum of every schedule on that route, not one of them.
-    function testInterestLockedPrincipalSumsAllSchedulesOnRoute() external {
+    function testInterestLockedPrincipalSumsAllSchedulesOnRoute() external onlyLendingLane {
         super.createSeveralDcaSchedules();
         updateExchangeRate(10 days);
 
