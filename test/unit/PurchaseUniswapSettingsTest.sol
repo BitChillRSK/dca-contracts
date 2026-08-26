@@ -395,8 +395,8 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
 }
 
 /**
- * @notice Proves a reversed `is PurchaseUniswap, FundingBase` list cannot deploy: `_purchaseToken()`
- *         is still `address(0)` when the Uniswap constructor builds the path.
+ * @notice Proves a reversed `is PurchaseUniswap, LendingErc20Handler` (or Idle) list cannot deploy:
+ *         `_purchaseToken()` is still `address(0)` when the Uniswap constructor builds the path.
  */
 contract ZeroTokenPurchaseUniswap is PurchaseUniswap {
     constructor(
