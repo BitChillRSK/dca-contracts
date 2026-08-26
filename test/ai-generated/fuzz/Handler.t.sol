@@ -242,10 +242,27 @@ contract Handler is Test {
         
         scheduleIndex = bound(scheduleIndex, 0, schedules.length - 1);
         bytes32 scheduleId = schedules[scheduleIndex].scheduleId;
+        uint256 currentBalance = schedules[scheduleIndex].tokenBalance;
 
         if (depositAmount > 0) {
             vm.assume(depositAmount >= MIN_PURCHASE_AMOUNT);
             depositAmount = bound(depositAmount, MIN_PURCHASE_AMOUNT, INTERNAL_UPPER_AMOUNT);
+        }
+
+        if (purchaseAmount > 0) {
+            uint256 maxPurchase = currentBalance + (depositAmount > 0 ? depositAmount : 0);
+            vm.assume(purchaseAmount >= MIN_PURCHASE_AMOUNT);
+            vm.assume(maxPurchase >= MIN_PURCHASE_AMOUNT);
+            vm.assume(purchaseAmount <= maxPurchase);
+            purchaseAmount = bound(purchaseAmount, MIN_PURCHASE_AMOUNT, INTERNAL_UPPER_AMOUNT);
+        }
+
+        if (purchasePeriod > 0) {
+            vm.assume(purchasePeriod >= MIN_PURCHASE_PERIOD);
+            purchasePeriod = bound(purchasePeriod, MIN_PURCHASE_PERIOD, INTERNAL_UPPER_PERIOD);
+        }
+
+        if (depositAmount > 0) {
             uint256 userBalance = stablecoin.balanceOf(user);
             if (userBalance < depositAmount) {
                 stablecoin.mint(user, depositAmount - userBalance);
@@ -259,10 +276,6 @@ contract Handler is Test {
         }
 
         if (purchaseAmount > 0) {
-            uint256 currentBalance = dcaManager.getDcaSchedule(user, address(stablecoin), scheduleIndex).tokenBalance;
-            vm.assume(purchaseAmount >= MIN_PURCHASE_AMOUNT);
-            vm.assume(purchaseAmount <= currentBalance);
-            purchaseAmount = bound(purchaseAmount, MIN_PURCHASE_AMOUNT, INTERNAL_UPPER_AMOUNT);
             try dcaManager.setPurchaseAmount(address(stablecoin), scheduleIndex, scheduleId, purchaseAmount) {
                 // Success
             } catch {
@@ -271,8 +284,6 @@ contract Handler is Test {
         }
 
         if (purchasePeriod > 0) {
-            vm.assume(purchasePeriod >= MIN_PURCHASE_PERIOD);
-            purchasePeriod = bound(purchasePeriod, MIN_PURCHASE_PERIOD, INTERNAL_UPPER_PERIOD);
             try dcaManager.setPurchasePeriod(address(stablecoin), scheduleIndex, scheduleId, purchasePeriod) {
                 // Success
             } catch {

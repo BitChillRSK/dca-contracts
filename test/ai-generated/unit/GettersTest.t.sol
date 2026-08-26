@@ -49,10 +49,10 @@ contract GettersTest is DcaDappTest {
     }
 
     function test_dcaManager_getDcaSchedule_selfAndArbitraryUser() public {
-        IDcaManager.DcaDetails memory asUser;
         vm.prank(USER);
-        asUser = dcaManager.getDcaSchedule(USER, address(stablecoin), 0);
+        IDcaManager.DcaDetails memory asUser = dcaManager.getDcaSchedule(USER, address(stablecoin), 0);
 
+        vm.prank(OWNER);
         IDcaManager.DcaDetails memory asThirdParty = dcaManager.getDcaSchedule(USER, address(stablecoin), 0);
         IDcaManager.DcaDetails[] memory enumerated = dcaManager.getDcaSchedules(USER, address(stablecoin));
 

@@ -136,4 +136,36 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         vm.prank(USER);
         dcaManager.withdrawAllAccumulatedInterest(tokens, indexes);
     }
+
+    function test_withdrawTokenAndInterest_usesThatScheduleRoute() public {
+        vm.prank(USER);
+        dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
+
+        uint256 lendingIndex = address(sovrynHandler) != address(0) ? SOVRYN_INDEX : TROPYKUS_INDEX;
+        vm.prank(OWNER);
+        operationsAdmin.assignTokenHandler(address(docToken), lendingIndex, docHandlerMocAddress);
+
+        vm.prank(USER);
+        docToken.approve(docHandlerMocAddress, type(uint256).max);
+        vm.prank(USER);
+        dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, lendingIndex);
+
+        IDcaManager.DcaDetails memory idleSchedule = dcaManager.getDcaSchedule(USER, address(docToken), 0);
+        IDcaManager.DcaDetails memory lendingSchedule = dcaManager.getDcaSchedule(USER, address(docToken), 1);
+        assertEq(idleSchedule.lendingProtocolIndex, IDLE_INDEX);
+        assertEq(lendingSchedule.lendingProtocolIndex, lendingIndex);
+
+        bytes memory encodedRevert =
+            abi.encodeWithSelector(IDcaManager.DcaManager__TokenDoesNotYieldInterest.selector, address(docToken));
+        vm.prank(USER);
+        vm.expectRevert(encodedRevert);
+        dcaManager.withdrawTokenAndInterest(address(docToken), 0, idleSchedule.scheduleId, MIN_PURCHASE_AMOUNT);
+        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 0).tokenBalance, DEPOSIT);
+        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 1).tokenBalance, DEPOSIT);
+
+        vm.prank(USER);
+        dcaManager.withdrawTokenAndInterest(address(docToken), 1, lendingSchedule.scheduleId, MIN_PURCHASE_AMOUNT);
+        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 0).tokenBalance, DEPOSIT);
+        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 1).tokenBalance, DEPOSIT - MIN_PURCHASE_AMOUNT);
+    }
 }

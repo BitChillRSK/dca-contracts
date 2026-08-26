@@ -277,7 +277,7 @@ contract DcaManagerEdgeCasesTest is Test {
         dcaManager.withdrawToken(address(stablecoin), 0, scheduleId, 0);
     }
 
-    function test_withdrawTokenAndInterest_usesStoredScheduleRoute() public {
+    function test_withdrawTokenAndInterest_succeedsOnLendingScheduleWithoutCallerIndex() public {
         vm.prank(USER);
         dcaManager.createDcaSchedule(
             address(stablecoin),

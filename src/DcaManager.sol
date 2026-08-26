@@ -340,8 +340,9 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      * @param scheduleIndex: the index of the schedule to withdraw from
      * @param scheduleId: the schedule id for validation
      * @param withdrawalAmount: the amount to withdraw
-     * @dev Interest is withdrawn from this schedule's stored lending route after index/id validation.
-     *      An idle schedule reverts because that route does not yield.
+     * @dev Interest is withdrawn from the same stored route used to pay this schedule's principal.
+     *      That index is captured from the schedule before the handler call. An idle schedule reverts
+     *      because that route does not yield.
      */
     function withdrawTokenAndInterest(
         address token,
@@ -349,8 +350,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         bytes32 scheduleId,
         uint256 withdrawalAmount
     ) external override nonReentrant {
-        _withdrawToken(token, scheduleIndex, scheduleId, withdrawalAmount);
-        uint256 lendingProtocolIndex = s_dcaSchedules[msg.sender][token][scheduleIndex].lendingProtocolIndex;
+        uint256 lendingProtocolIndex = _withdrawToken(token, scheduleIndex, scheduleId, withdrawalAmount);
         _withdrawInterest(token, lendingProtocolIndex);
     }
 
@@ -552,10 +552,12 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      * @param scheduleIndex: the index of the schedule
      * @param scheduleId: the schedule id for validation
      * @param withdrawalAmount: the amount to withdraw, or type(uint256).max for this schedule's whole token balance
+     * @return lendingProtocolIndex the schedule's stored route, captured before the handler call
      */
     function _withdrawToken(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 withdrawalAmount)
         private
         validateScheduleIndex(msg.sender, token, scheduleIndex)
+        returns (uint256 lendingProtocolIndex)
     {
         DcaDetails storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
@@ -566,10 +568,11 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
             revert DcaManager__WithdrawalAmountExceedsBalance(token, withdrawalAmount, tokenBalance);
         }
         // @notice subtract the requested withdrawal amount from the token balance, not the amount the lending protocol paid
-        uint256 newTokenBalance = tokenBalance - withdrawalAmount; 
+        uint256 newTokenBalance = tokenBalance - withdrawalAmount;
+        lendingProtocolIndex = dcaSchedule.lendingProtocolIndex;
         dcaSchedule.tokenBalance = newTokenBalance;
         // @notice ignore `withdrawToken()`'s return value (amount actually paid back by the lending protocol)
-        _handler(token, dcaSchedule.lendingProtocolIndex).withdrawToken(msg.sender, withdrawalAmount);
+        _handler(token, lendingProtocolIndex).withdrawToken(msg.sender, withdrawalAmount);
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
     }
 
