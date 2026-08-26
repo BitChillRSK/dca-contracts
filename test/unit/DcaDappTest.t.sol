@@ -76,6 +76,8 @@ contract DcaDappTest is Test {
     bool isLayerbank = keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(LAYERBANK_STRING));
     bool isNone = keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(NONE_STRING));
     bool isLendingLane = isTropykus || isSovryn || isLayerbank;
+    // LayerBank aToken is not IShareToken (scaled vs rebasing). Share-math for index 1 lives in
+    // test/ai-generated/unit/layerbank/ (24 tests + solvency), not StablecoinLendingTest.
     bool isShareTokenLane = isTropykus || isSovryn;
     address stablecoinHandlerAddress;
     uint256 s_routeIndex;

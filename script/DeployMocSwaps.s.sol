@@ -154,8 +154,15 @@ contract DeployMocSwaps is DeployBase {
         }
         // Live networks: production map is idle=0, LayerBank=1, Sovryn=2. Tropykus is not registered.
         else if (environment == Environment.TESTNET || environment == Environment.MAINNET) {
+            if (protocol == Protocol.TROPYKUS) {
+                revert("Tropykus is not on the production MoC map");
+            }
+
             console.log("Deploying production handlers (idle / LayerBank / Sovryn)");
 
+            // Register lending classes first. Route class is add-only; a missing aToken on this
+            // network skips the LayerBank handler but leaves index 1 as Lending so a later
+            // REAL_DEPLOYMENT add-on can assign without re-registering.
             operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
             operationsAdmin.registerRoute(SOVRYN_INDEX, true);
 
@@ -180,7 +187,12 @@ contract DeployMocSwaps is DeployBase {
 
             address layerbankAToken = networkConfig.layerbankATokenAddress;
             if (layerbankAToken == address(0)) {
-                console.log("Warning: LayerBank aToken not available on this network");
+                if (protocol == Protocol.LAYERBANK) {
+                    revert("LayerBank aToken not available on this network");
+                }
+                console.log(
+                    "Warning: LayerBank aToken not available; index 1 is now immutable Lending with no handler"
+                );
             } else {
                 address layerbankHandler = deployDocHandlerMoc(
                     DeployParams({
@@ -203,6 +215,9 @@ contract DeployMocSwaps is DeployBase {
             if (!isUSDRIF) {
                 address sovrynShareToken = networkConfig.iSusdAddress;
                 if (sovrynShareToken == address(0)) {
+                    if (protocol == Protocol.SOVRYN) {
+                        revert("Sovryn shares not available for this stablecoin");
+                    }
                     console.log("Warning: Sovryn shares not available for this stablecoin");
                 } else {
                     address sovrynHandler = deployDocHandlerMoc(
@@ -228,6 +243,10 @@ contract DeployMocSwaps is DeployBase {
 
             operationsAdmin.transferOwnership(owner);
             dcaManager.transferOwnership(owner);
+        }
+
+        if (docHandlerMocAddress == address(0)) {
+            revert("Selected protocol handler was not deployed");
         }
 
         vm.stopBroadcast();

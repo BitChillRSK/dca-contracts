@@ -29,6 +29,8 @@ contract StablecoinLendingTest is DcaDappTest {
     /////////////////////////////////////
     ///// Stablecoin Lending tests /////
     /////////////////////////////////////
+    // onlyShareTokenLane cases skip LayerBank: aToken is not IShareToken. Index-1 share math is
+    // test/ai-generated/unit/layerbank/. Interest tests below still run on the layerbank lane.
     function testDepositedStablecoinIsLent() external onlyShareTokenLane {
         // Check initial balances
         uint256 ltStablecoinBalanceBeforeDeposit = stablecoin.balanceOf(address(shareToken));

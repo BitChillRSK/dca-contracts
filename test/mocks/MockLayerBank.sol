@@ -109,7 +109,7 @@ contract MockLayerBankAToken is ERC20 {
         if (s_useMintOverride) {
             scaled = s_mintOverride;
         } else {
-            scaled = underlyingReceived * RAY / getNormalizedIncome();
+            scaled = _rayDiv(underlyingReceived, getNormalizedIncome());
         }
         if (scaled == 0) revert MockLayerBankAToken__InvalidScaledAmount();
         _mint(onBehalfOf, scaled);
@@ -117,12 +117,15 @@ contract MockLayerBankAToken is ERC20 {
 
     function burnScaled(address from, address to, uint256 underlyingAmount) external onlyPool returns (uint256 paid) {
         uint256 rate = getNormalizedIncome();
-        // Aave WadRayMath.rayDiv: round nearest. Round-up here would hide a TokenLending
-        // round-down solvency bug; round-down would overstate the handler's safety margin.
-        uint256 scaled = (underlyingAmount * RAY + rate / 2) / rate;
+        uint256 scaled = _rayDiv(underlyingAmount, rate);
         _burn(from, scaled);
         if (s_silentZeroPayout) return 0;
         return _payout(to, underlyingAmount);
+    }
+
+    /// @dev Aave WadRayMath.rayDiv: round nearest. Used for both mint and burn.
+    function _rayDiv(uint256 a, uint256 rayIndex) private pure returns (uint256) {
+        return (a * RAY + rayIndex / 2) / rayIndex;
     }
 
     function _payout(address to, uint256 amount) private returns (uint256) {

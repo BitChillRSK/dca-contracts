@@ -16,9 +16,12 @@ import "./Constants.sol";
 /**
  * @title DeployLayerBankHandler
  * @notice Add-on deploy for the index-1 LayerBank DOC + MoC handler, same shape as DeployIdleHandler.
- * @dev Local/Anvil deploys Pool/aToken mocks. Fork and live use `MocHelperConfig.layerbankATokenAddress`
- *      (handler reads Pool from `aToken.POOL()`). Occupied `(token, LAYERBANK_INDEX)` reverts
- *      `HandlerAlreadyAssigned` — do not skip. The production map is idle=0 / LayerBank=1 / Sovryn=2.
+ * @dev Local/Anvil deploys Pool/aToken mocks. Live TESTNET/MAINNET (`REAL_DEPLOYMENT=true`) bind
+ *      `MocHelperConfig.layerbankATokenAddress` (handler reads Pool from `aToken.POOL()`).
+ *      `getEnvironment()` returns FORK for a real RSK RPC unless that env var is set — FORK must
+ *      not take the live path (test `feeCollector` / 2% cap would permanently occupy `(DOC, 1)`).
+ *      Fork tests use `deployMocksAndHandler` (no broadcast). Occupied `(token, LAYERBANK_INDEX)`
+ *      reverts `HandlerAlreadyAssigned` — do not skip. Map: idle=0 / LayerBank=1 / Sovryn=2.
  */
 contract DeployLayerBankHandler is DeployBase {
 
@@ -109,7 +112,7 @@ contract DeployLayerBankHandler is DeployBase {
                 getFeeCollector(environment),
                 operationsAdmin.owner()
             );
-        } else {
+        } else if (environment == Environment.TESTNET || environment == Environment.MAINNET) {
             address aToken = networkConfig.layerbankATokenAddress;
             if (aToken == address(0)) {
                 revert("LayerBank aToken address is not configured for this network");
@@ -124,6 +127,9 @@ contract DeployLayerBankHandler is DeployBase {
                 })
             );
             Ownable(layerbankHandler).transferOwnership(operationsAdmin.owner());
+        } else {
+            // FORK: `--broadcast` against a real RPC without REAL_DEPLOYMENT=true.
+            revert("DeployLayerBankHandler live path requires REAL_DEPLOYMENT=true");
         }
 
         console.log("LayerBank DOC handler deployed at:", layerbankHandler);

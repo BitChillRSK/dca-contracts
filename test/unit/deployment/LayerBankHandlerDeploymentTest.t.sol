@@ -69,11 +69,10 @@ contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
         assertEq(layerbankHandler.EXCHANGE_RATE_DECIMALS(), 1e27);
     }
 
-    function test_run_revertsWhenATokenUnsetOnFork() public {
+    function test_run_revertsOnForkWithoutRealDeployment() public {
         if (block.chainid == ANVIL_CHAIN_ID) vm.skip(true);
-        if (helperConfig.getActiveNetworkConfig().layerbankATokenAddress != address(0)) vm.skip(true);
         DeployLayerBankHandler deployer = new DeployLayerBankHandler();
-        vm.expectRevert(bytes("LayerBank aToken address is not configured for this network"));
+        vm.expectRevert(bytes("DeployLayerBankHandler live path requires REAL_DEPLOYMENT=true"));
         deployer.run(helperConfig, address(operationsAdmin), address(dcaManager));
     }
 
