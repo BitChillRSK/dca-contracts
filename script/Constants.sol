@@ -17,7 +17,9 @@ uint256 constant ANVIL_CHAIN_ID = 31337;
 uint256 constant RSK_MAINNET_CHAIN_ID = 30;
 uint256 constant RSK_TESTNET_CHAIN_ID = 31;
 
-// Production route indexes (fresh relaunch map) and LENDING_PROTOCOL env strings
+// Production MoC route indexes (fresh relaunch map) and LENDING_PROTOCOL env strings.
+// `DeployMocSwaps` and `DeployDexSwaps` each deploy their own `OperationsAdmin`, so the MoC
+// map below and the dex map are independent; an index means nothing across the two admins.
 uint256 constant IDLE_INDEX = 0; // constructor pre-registers this as idle
 string constant NONE_STRING = "none";
 string constant LAYERBANK_STRING = "layerbank";
@@ -26,7 +28,14 @@ string constant SOVRYN_STRING = "sovryn";
 uint256 constant SOVRYN_INDEX = 2;
 uint256 constant RESERVED_MOC_LENDING_INDEX = 3; // reserved for future MoC lending; not assigned in this PR
 
-// Legacy Tropykus — not on the production map. Local mock / fork tests and the USDRIF dex add-on only.
+// Legacy Tropykus. Off the production MoC map above, but still LIVE on the dex map:
+// `DeployDexSwaps` and `DeployUsdrifHandler` register `TROPYKUS_INDEX` on their own
+// `OperationsAdmin`. R22 moved it 1 -> 4 so the shared test harness, which registers every
+// index on one admin, has no collision with `LAYERBANK_INDEX`. Nothing is deployed on the
+// old dex map, so 4 is a free choice, not a migration.
+// R37 retires Tropykus from every live path and moves `TROPYKUS_INDEX` to `test/Constants.sol`,
+// after R36 ships a LayerBank USDRIF dex handler to replace it. `TROPYKUS_STRING` stays here:
+// `MocHelperConfig` / `DexHelperConfig` need it to select mocks for the local lane.
 string constant TROPYKUS_STRING = "tropykus";
 uint256 constant TROPYKUS_INDEX = 4;
 
