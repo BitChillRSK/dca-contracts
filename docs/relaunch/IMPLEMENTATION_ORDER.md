@@ -69,7 +69,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R22 (deploy/CI) | 29 | none |
 | R9 | 30 | R18/R19 if not recorded (ABI freeze) |
 | R10 | 31 | none |
-| R12, R18, R19, OZ 5.x, Ownable2Step, `setOperationsAdmin` hardening/restriction | optional late | only if the human named that item |
+| R12, R18, R19, OZ 5.x, Ownable2Step, `setOperationsAdmin` hardening/restriction, one handler per token across lending routes | optional late | only if the human named that item |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -284,7 +284,7 @@ Stack on R34. Land before R32 so internal cleanup is written against the final n
 
 ### PR 28 - R32 internal cleanup
 
-Only after R13, R34, and R35 settle the surrounding surfaces, remove redundant DcaManager memory copies/lookups/loops and identical exchange-rate overrides. No external selector, event, error, storage, or cash-accounting change. See [`R32-internal-cleanup.md`](./R32-internal-cleanup.md).
+Only after R13, R34, and R35 settle the surrounding surfaces, remove redundant DcaManager memory copies/lookups/loops and identical exchange-rate overrides. No external selector, event, error, storage, or cash-accounting change. See [`R32-internal-cleanup.md`](./R32-internal-cleanup.md). The two-lending-routes-one-handler uniqueness hole is pre-existing and stays on the optional-late queue, not this PR.
 
 ### PR 29 - R22 deploy scripts, constants, harness, and CI matrix
 
@@ -323,6 +323,7 @@ These are deliberately after the core relaunch path:
 - R18: storage packing, only if not already chosen and implemented before layout froze.
 - R19: per-schedule pause, only if not already included before event ABI froze.
 - OpenZeppelin major upgrade: evaluate `v4.9.3` to latest audited `5.x` in a standalone PR.
+- One handler address per token across lending routes: `assignTokenHandler` blocks reassignment of the same `(token, routeIndex)` but not two lending indexes sharing one handler. Locked principal is per-route; `LendingErc20Handler.s_shares[user]` is per-handler. Bulk interest over both indexes would lock only one route's schedules and pay the other's principal out as interest. Same shape before R32 (PR 28 / [#72](https://github.com/BitChillRSK/dca-contracts/pull/72)). Enforce uniqueness at assignment, or sum locked principal across every route that resolves to that handler. Do not start unless the human names it.
 
 ## OpenZeppelin policy
 

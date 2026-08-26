@@ -602,6 +602,9 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      * @param tokenLending: the lending handler that holds this route's funds
      * @param token: the token to withdraw interest from
      * @param routeIndex: the route whose locked principal to subtract
+     * @dev Callers must already have established that `routeIndex` is a lending
+     *      route (`_checkTokenYieldsInterest` to revert, or `_tokenYieldsInterest`
+     *      to skip). This helper does not re-check.
      */
     function _withdrawInterest(ITokenLending tokenLending, address token, uint256 routeIndex) private {
         tokenLending.withdrawInterest(msg.sender, _lockedPrincipal(msg.sender, token, routeIndex));
