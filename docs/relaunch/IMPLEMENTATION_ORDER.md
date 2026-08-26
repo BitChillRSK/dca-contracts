@@ -68,7 +68,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R22 (deploy/CI) | 28 | none |
 | R9 | 29 | R18/R19 if not recorded (ABI freeze) |
 | R10 | 30 | none |
-| R12, R18, R19, OZ 5.x, Ownable2Step | optional late | only if the human named that item |
+| R12, R18, R19, OZ 5.x, Ownable2Step, `setOperationsAdmin` hardening/restriction | optional late | only if the human named that item |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -263,7 +263,7 @@ At the same time, remove the unused string protocol registry, replace it with an
 - **Migration gate: option (a), manual exit/re-entry.** No cooperative migration ships; these handler versions will never gain the hook. Migration would not survive the bug scenarios that motivate it (it redeems through the same path), `SovrynErc20HandlerDex` has 426 bytes of runtime margin, and a position-moving function on immutable unaudited contracts is the worst place for a bug. The work is the four conditions attached to the decision, not new code. Never allow governance to move another user's funds.
 - **Idle is a route class, not index zero.** Each index registers once as idle or lending, the constructor pre-registers `0` as idle, and handler assignment requires a registered class. Without this, add-only assignment would make a buggy idle handler unrecoverable for new users on that token — because `(token, 0)` is the only idle slot and no non-zero index accepts a non-lending handler.
 
-`DcaManager.setOperationsAdmin` is recorded in the spec as a known governance surface but is explicitly **out of scope** here. Class↔handler ERC-165 (`ITokenLending` on `assignTokenHandler`) is the same error class as a mistyped index and is **required on R31**, not optional. Ownable2Step sits on the optional-late list. See [`R13-operations-admin-lifecycle.md`](./R13-operations-admin-lifecycle.md).
+`DcaManager.setOperationsAdmin` is recorded in the spec as a known governance surface but is explicitly **out of scope** here. Put its later review on the same optional-late queue as ownership-transfer hardening: decide whether `setOperationsAdmin` becomes one-shot, deploy-time-only, or is removed after deployment, and whether ownership transfer moves to `Ownable2Step` or an equivalent acceptance flow. Class↔handler ERC-165 (`ITokenLending` on `assignTokenHandler`) is the same error class as a mistyped index and is **required on R31**, not optional. See [`R13-operations-admin-lifecycle.md`](./R13-operations-admin-lifecycle.md).
 
 ### PR 25 - R31 handler ABI trim
 
