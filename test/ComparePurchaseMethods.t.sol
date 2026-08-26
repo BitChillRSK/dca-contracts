@@ -57,7 +57,7 @@ contract ComparePurchaseMethods is Test {
     address handlerUni;
     
     // Protocol settings
-    uint256 lendingProtocolIndex;
+    uint256 routeIndex;
     uint256 btcPrice;
     string stablecoinType;
 
@@ -70,12 +70,12 @@ contract ComparePurchaseMethods is Test {
         // Initialize arrays for users and amounts
         initializeArrays();
         
-        // Set lending protocol index based on environment variable
+        // Set route index from the lending-protocol env lane
         string memory lendingProtocol = vm.envString("LENDING_PROTOCOL");
         if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(TROPYKUS_STRING))) {
-            lendingProtocolIndex = TROPYKUS_INDEX;
+            routeIndex = TROPYKUS_INDEX;
         } else if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(SOVRYN_STRING))) {
-            lendingProtocolIndex = SOVRYN_INDEX;
+            routeIndex = SOVRYN_INDEX;
         } else {
             revert("Lending protocol not allowed");
         }
@@ -174,8 +174,8 @@ contract ComparePurchaseMethods is Test {
         deployedContracts.adOpsMoc.registerRoute(SOVRYN_INDEX, true);
         deployedContracts.adOpsUni.registerRoute(TROPYKUS_INDEX, true);
         deployedContracts.adOpsUni.registerRoute(SOVRYN_INDEX, true);
-        deployedContracts.adOpsMoc.assignTokenHandler(address(stablecoin), lendingProtocolIndex, handlerMoc);
-        deployedContracts.adOpsUni.assignTokenHandler(address(stablecoin), lendingProtocolIndex, handlerUni);
+        deployedContracts.adOpsMoc.assignTokenHandler(address(stablecoin), routeIndex, handlerMoc);
+        deployedContracts.adOpsUni.assignTokenHandler(address(stablecoin), routeIndex, handlerUni);
         vm.stopPrank();
 
         // Create initial DCA schedules for each user
@@ -191,13 +191,13 @@ contract ComparePurchaseMethods is Test {
             // For MoC implementation
             stablecoin.approve(handlerMoc, docToDepositArray[i]);
             dcaManMoc.createDcaSchedule(
-                address(stablecoin), docToDepositArray[i], docToSpendArray[i], MIN_PURCHASE_PERIOD, lendingProtocolIndex
+                address(stablecoin), docToDepositArray[i], docToSpendArray[i], MIN_PURCHASE_PERIOD, routeIndex
             );
             
             // For Uniswap implementation
             stablecoin.approve(handlerUni, docToDepositArray[i]);
             dcaManUni.createDcaSchedule(
-                address(stablecoin), docToDepositArray[i], docToSpendArray[i], MIN_PURCHASE_PERIOD, lendingProtocolIndex
+                address(stablecoin), docToDepositArray[i], docToSpendArray[i], MIN_PURCHASE_PERIOD, routeIndex
             );
             
             vm.stopPrank();
@@ -600,7 +600,7 @@ contract ComparePurchaseMethods is Test {
             scheduleIndexes,
             scheduleIds,
             purchaseAmounts,
-            lendingProtocolIndex
+            routeIndex
         );
         uint256 gasUsed = gasStart - gasleft();
         uint256 gasCost = gasUsed * tx.gasprice;
@@ -657,7 +657,7 @@ contract ComparePurchaseMethods is Test {
             scheduleIndexes,
             scheduleIds,
             purchaseAmounts,
-            lendingProtocolIndex
+            routeIndex
         );
         uint256 gasUsed = gasStart - gasleft();
         uint256 gasCost = gasUsed * tx.gasprice;

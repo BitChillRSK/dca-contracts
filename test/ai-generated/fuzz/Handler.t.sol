@@ -26,7 +26,7 @@ contract Handler is Test {
     ITokenHandler public tokenHandler;
     IPurchaseRbtc public handler; // For rBTC balance checks and provisioning
     MockStablecoin public stablecoin;
-    uint256 public lendingProtocolIndex;
+    uint256 public routeIndex;
     
     // Test role addresses (should match the invariant test setup)
     address public constant OWNER = address(0x1111);
@@ -68,7 +68,7 @@ contract Handler is Test {
         IPurchaseRbtc _handler,
         MockStablecoin _stablecoin,
         address[] memory _users,
-        uint256 _lendingProtocolIndex
+        uint256 _routeIndex
     ) {
         dcaManager = _dcaManager;
         operationsAdmin = _operationsAdmin;
@@ -76,7 +76,7 @@ contract Handler is Test {
         handler = _handler;
         stablecoin = _stablecoin;
         s_users = _users;
-        lendingProtocolIndex = _lendingProtocolIndex;
+        routeIndex = _routeIndex;
     }
     
     /*//////////////////////////////////////////////////////////////
@@ -123,7 +123,7 @@ contract Handler is Test {
             depositAmount,
             purchaseAmount,
             purchasePeriod,
-            lendingProtocolIndex
+            routeIndex
         ) {
             createScheduleSuccesses++;
         } catch {
@@ -393,7 +393,7 @@ contract Handler is Test {
             IDcaManager.DcaDetails memory schedule = schedules[boundedScheduleIndexes[i]];
             
             vm.assume(schedule.tokenBalance >= schedule.purchaseAmount);
-            vm.assume(schedule.lendingProtocolIndex == lendingProtocolIndex);
+            vm.assume(schedule.routeIndex == routeIndex);
             
             scheduleIds[i] = schedule.scheduleId;
             purchaseAmounts[i] = schedule.purchaseAmount;
@@ -423,7 +423,7 @@ contract Handler is Test {
             boundedScheduleIndexes,
             scheduleIds,
             purchaseAmounts,
-            lendingProtocolIndex
+            routeIndex
         ) {
             // Success
         } catch {
@@ -439,7 +439,7 @@ contract Handler is Test {
         address user = s_users[userSeed % s_users.length];
         
         vm.startPrank(user);
-        try dcaManager.withdrawRbtcFromTokenHandler(address(stablecoin), lendingProtocolIndex) {
+        try dcaManager.withdrawRbtcFromTokenHandler(address(stablecoin), routeIndex) {
             // Success
         } catch {
             // Ignore failures
@@ -452,13 +452,13 @@ contract Handler is Test {
      */
     function withdrawAllAccumulatedRbtc(uint256 userSeed) external {
         address user = s_users[userSeed % s_users.length];
-        uint256[] memory lendingProtocolIndexes = new uint256[](1);
-        lendingProtocolIndexes[0] = lendingProtocolIndex;
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = routeIndex;
         
         vm.startPrank(user);
         address[] memory tokens = new address[](1);
         tokens[0] = address(stablecoin);
-        try dcaManager.withdrawAllAccumulatedRbtc(tokens, lendingProtocolIndexes) {
+        try dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes) {
             // Success  
         } catch {
             // Ignore failures
@@ -506,13 +506,13 @@ contract Handler is Test {
      */
     function withdrawAllAccumulatedInterest(uint256 userSeed) external {
         address user = s_users[userSeed % s_users.length];
-        uint256[] memory lendingProtocolIndexes = new uint256[](1);
-        lendingProtocolIndexes[0] = lendingProtocolIndex;
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = routeIndex;
         
         vm.startPrank(user);
         address[] memory tokens = new address[](1);
         tokens[0] = address(stablecoin);
-        try dcaManager.withdrawAllAccumulatedInterest(tokens, lendingProtocolIndexes) {
+        try dcaManager.withdrawAllAccumulatedInterest(tokens, routeIndexes) {
             // Success
         } catch {
             // Ignore failures

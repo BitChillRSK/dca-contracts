@@ -30,11 +30,11 @@ contract RbtcWithdrawalTest is DcaDappTest {
 
         uint256 rbtcBalanceBeforeWithdrawal = USER.balance;
         vm.prank(USER);
-        uint256[] memory lendingProtocolIndexes = new uint256[](1);
-        lendingProtocolIndexes[0] = s_lendingProtocolIndex;
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = s_routeIndex;
         address[] memory tokens = new address[](1);
         tokens[0] = address(stablecoin);
-        dcaManager.withdrawAllAccumulatedRbtc(tokens, lendingProtocolIndexes);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
         uint256 rbtcBalanceAfterWithdrawal = USER.balance;
 
         if (keccak256(abi.encodePacked(swapType)) == keccak256(abi.encodePacked("mocSwaps"))) {
@@ -58,11 +58,11 @@ contract RbtcWithdrawalTest is DcaDappTest {
         uint256 totalStablecoinSpent = super.makeSeveralPurchasesWithSeveralSchedules(); // 5 purchases
         uint256 rbtcBalanceBeforeWithdrawal = USER.balance;
         vm.prank(USER);
-        uint256[] memory lendingProtocolIndexes = new uint256[](1);
-        lendingProtocolIndexes[0] = s_lendingProtocolIndex;
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = s_routeIndex;
         address[] memory tokens = new address[](1);
         tokens[0] = address(stablecoin);
-        dcaManager.withdrawAllAccumulatedRbtc(tokens, lendingProtocolIndexes);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
         uint256 rbtcBalanceAfterWithdrawal = USER.balance;
         // assertEq(rbtcBalanceAfterWithdrawal - rbtcBalanceBeforeWithdrawal, totalStablecoinSpent / s_btcPrice);
 
@@ -81,11 +81,11 @@ contract RbtcWithdrawalTest is DcaDappTest {
         uint256 rbtcBalanceBeforeWithdrawal = USER.balance;
         // vm.expectRevert(IPurchaseRbtc.PurchaseRbtc__NoAccumulatedRbtcToWithdraw.selector);
         vm.prank(USER);
-        uint256[] memory lendingProtocolIndexes = new uint256[](1);
-        lendingProtocolIndexes[0] = s_lendingProtocolIndex;
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = s_routeIndex;
         address[] memory tokens = new address[](1);
         tokens[0] = address(stablecoin);
-        dcaManager.withdrawAllAccumulatedRbtc(tokens, lendingProtocolIndexes);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
         uint256 rbtcBalanceAfterWithdrawal = USER.balance;
         assertEq(rbtcBalanceAfterWithdrawal, rbtcBalanceBeforeWithdrawal);
     }
@@ -103,7 +103,7 @@ contract RbtcWithdrawalTest is DcaDappTest {
         vm.startPrank(attacker);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
         dcaManager.createDcaSchedule(
-            address(stablecoin), AMOUNT_TO_DEPOSIT, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_lendingProtocolIndex
+            address(stablecoin), AMOUNT_TO_DEPOSIT, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_routeIndex
         );
         vm.stopPrank();
 
@@ -123,7 +123,7 @@ contract RbtcWithdrawalTest is DcaDappTest {
         uint256 ownerBalanceBefore = OWNER.balance;
 
         vm.prank(attacker);
-        dcaManager.withdrawRbtcFromTokenHandler(address(stablecoin), s_lendingProtocolIndex);
+        dcaManager.withdrawRbtcFromTokenHandler(address(stablecoin), s_routeIndex);
 
         assertEq(attacker.balance, attackerBalanceBefore + attackerAccrued, "attacker did not receive only their rBTC");
         assertEq(USER.balance, userBalanceBefore, "USER native balance moved on attacker withdraw");
@@ -132,7 +132,7 @@ contract RbtcWithdrawalTest is DcaDappTest {
         assertEq(IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(attacker), 0);
 
         vm.prank(USER);
-        dcaManager.withdrawRbtcFromTokenHandler(address(stablecoin), s_lendingProtocolIndex);
+        dcaManager.withdrawRbtcFromTokenHandler(address(stablecoin), s_routeIndex);
 
         assertEq(USER.balance, userBalanceBefore + userAccrued, "USER did not receive only their rBTC");
         assertEq(attacker.balance, attackerBalanceBefore + attackerAccrued, "attacker balance changed on USER withdraw");

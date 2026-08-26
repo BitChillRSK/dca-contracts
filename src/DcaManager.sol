@@ -108,7 +108,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         _validateDeposit(depositAmount);
         DcaDetails storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
-        uint256 received = _handler(token, dcaSchedule.lendingProtocolIndex).depositToken(msg.sender, depositAmount);
+        uint256 received = _handler(token, dcaSchedule.routeIndex).depositToken(msg.sender, depositAmount);
         uint256 newTokenBalance = dcaSchedule.tokenBalance + received;
         dcaSchedule.tokenBalance = newTokenBalance;
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
@@ -160,18 +160,18 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      * @param depositAmount: the amount of stablecoin requested from the user; the schedule is credited with what the handler received
      * @param purchaseAmount: the amount of stablecoin to swap periodically for rBTC (validated against the credited balance)
      * @param purchasePeriod: the time (in seconds) between rBTC purchases for each user
-     * @param lendingProtocolIndex: the lending protocol, if any, where the token will be deposited to generate yield
+     * @param routeIndex: the OperationsAdmin route index for this schedule (idle or lending)
      */
     function createDcaSchedule(
         address token,
         uint256 depositAmount,
         uint256 purchaseAmount,
         uint256 purchasePeriod,
-        uint256 lendingProtocolIndex
+        uint256 routeIndex
     ) external override nonReentrant {
         _validatePurchasePeriod(purchasePeriod);
         _validateDeposit(depositAmount);
-        uint256 received = _handler(token, lendingProtocolIndex).depositToken(msg.sender, depositAmount);
+        uint256 received = _handler(token, routeIndex).depositToken(msg.sender, depositAmount);
         _validatePurchaseAmount(token, purchaseAmount, received);
 
         DcaDetails[] storage schedules = s_dcaSchedules[msg.sender][token];
@@ -188,7 +188,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
             purchasePeriod,
             0, // lastPurchaseTimestamp
             scheduleId,
-            lendingProtocolIndex
+            routeIndex
         );
 
         schedules.push(dcaSchedule);
@@ -199,7 +199,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
             received, 
             purchaseAmount, 
             purchasePeriod, 
-            lendingProtocolIndex
+            routeIndex
         );
     }
 
@@ -219,7 +219,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
 
         uint256 tokenBalance = dcaSchedule.tokenBalance;
-        uint256 lendingProtocolIndex = dcaSchedule.lendingProtocolIndex;
+        uint256 routeIndex = dcaSchedule.routeIndex;
 
         // Remove the schedule by poping the last one and overwriting the one to delete with it
         uint256 lastIndex = schedules.length - 1;
@@ -230,7 +230,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
 
         uint256 amountWithdrawn;
         if (tokenBalance > 0) {
-            amountWithdrawn = _handler(token, lendingProtocolIndex).withdrawToken(msg.sender, tokenBalance);
+            amountWithdrawn = _handler(token, routeIndex).withdrawToken(msg.sender, tokenBalance);
         }
 
         // @notice the event reports what left the handler, which may be less than the schedule's tokenBalance
@@ -264,10 +264,10 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         override
         onlySwapper
     {
-        (uint256 purchaseAmount, uint256 lendingProtocolIndex) =
+        (uint256 purchaseAmount, uint256 routeIndex) =
             _rBtcPurchaseChecksEffects(buyer, token, scheduleIndex, scheduleId);
 
-        IPurchaseRbtc(address(_handler(token, lendingProtocolIndex))).buyRbtc(
+        IPurchaseRbtc(address(_handler(token, routeIndex))).buyRbtc(
             buyer, scheduleId, purchaseAmount
         );
     }
@@ -279,9 +279,9 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      * @param token the stablecoin that all users in the array will spend to purchase rBTC
      * @param scheduleIndexes the indexes of the DCA schedules that correspond to each user's purchase
      * @param purchaseAmounts the purchase amount that corresponds to each user's purchase
-     * @param lendingProtocolIndex the lending protocol to withdraw the tokens from before purchasing
-     * @notice the token and lending protocol are the same for all dca schedules in the batch.
-     * @notice SWAPPER MUST NOT MIX SCHEDULES WITH DIFFERENT TOKENS OR LENDING PROTOCOLS IN THE SAME BATCH
+     * @param routeIndex the route all schedules in this batch must share
+     * @notice the token and route are the same for all dca schedules in the batch.
+     * @notice SWAPPER MUST NOT MIX SCHEDULES WITH DIFFERENT TOKENS OR ROUTES IN THE SAME BATCH
      * @notice This is unchecked to save gas because access to this function is controlled by the onlySwapper modifier
      */
     function batchBuyRbtc(
@@ -290,7 +290,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         uint256[] calldata scheduleIndexes,
         bytes32[] calldata scheduleIds,
         uint256[] calldata purchaseAmounts,
-        uint256 lendingProtocolIndex
+        uint256 routeIndex
     ) external override onlySwapper {
         uint256 numOfPurchases = buyers.length;
         if (numOfPurchases == 0) revert DcaManager__EmptyBatchPurchaseArrays();
@@ -299,11 +299,11 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
                 || numOfPurchases != purchaseAmounts.length
         ) revert DcaManager__BatchPurchaseArraysLengthMismatch();
         for (uint256 i; i < numOfPurchases; ++i) {
-            (uint256 scheudulePurchaseAmount, uint256 scheduleLendingProtocolIndex) = _rBtcPurchaseChecksEffects(buyers[i], token, scheduleIndexes[i], scheduleIds[i]);
+            (uint256 scheudulePurchaseAmount, uint256 scheduleRouteIndex) = _rBtcPurchaseChecksEffects(buyers[i], token, scheduleIndexes[i], scheduleIds[i]);
             if (scheudulePurchaseAmount != purchaseAmounts[i]) revert DcaManager__PurchaseAmountMismatch(buyers[i], token, scheduleIds[i], scheduleIndexes[i], scheudulePurchaseAmount, purchaseAmounts[i]);
-            if (scheduleLendingProtocolIndex != lendingProtocolIndex) revert DcaManager__LendingProtocolIndexMismatch(buyers[i], token, scheduleIds[i], scheduleIndexes[i], scheduleLendingProtocolIndex, lendingProtocolIndex);
+            if (scheduleRouteIndex != routeIndex) revert DcaManager__RouteIndexMismatch(buyers[i], token, scheduleIds[i], scheduleIndexes[i], scheduleRouteIndex, routeIndex);
         }
-        IPurchaseRbtc(address(_handler(token, lendingProtocolIndex))).batchBuyRbtc(
+        IPurchaseRbtc(address(_handler(token, routeIndex))).batchBuyRbtc(
             buyers, scheduleIds, purchaseAmounts
         );
     }
@@ -311,21 +311,21 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     /**
      * @notice Users can withdraw the rBtc accumulated through all the DCA strategies created using a given stablecoin
      * @param token The token address of the stablecoin
-     * @param lendingProtocolIndex The index of the lending protocol where the stablecoin is lent (0 if it is not lent)
+     * @param routeIndex The route whose handler holds the user's accumulated rBTC
      */
-    function withdrawRbtcFromTokenHandler(address token, uint256 lendingProtocolIndex) external override nonReentrant {
-        IPurchaseRbtc(address(_handler(token, lendingProtocolIndex))).withdrawAccumulatedRbtc(msg.sender);
+    function withdrawRbtcFromTokenHandler(address token, uint256 routeIndex) external override nonReentrant {
+        IPurchaseRbtc(address(_handler(token, routeIndex))).withdrawAccumulatedRbtc(msg.sender);
     }
 
     /**
      * @notice Withdraw all of the rBTC accumulated by a user through their various DCA strategies
      * @param tokens Array of token addresses to withdraw rBTC from
-     * @param lendingProtocolIndexes Array of lending protocol indexes where the user has positions
+     * @param routeIndexes Route indexes whose handlers may hold the user's accumulated rBTC
      */
-    function withdrawAllAccumulatedRbtc(address[] calldata tokens, uint256[] calldata lendingProtocolIndexes) external override nonReentrant {
+    function withdrawAllAccumulatedRbtc(address[] calldata tokens, uint256[] calldata routeIndexes) external override nonReentrant {
         for (uint256 i; i < tokens.length; ++i) {
-            for (uint256 j; j < lendingProtocolIndexes.length; ++j) {
-                address tokenHandlerAddress = s_operationsAdmin.getTokenHandler(tokens[i], lendingProtocolIndexes[j]);
+            for (uint256 j; j < routeIndexes.length; ++j) {
+                address tokenHandlerAddress = s_operationsAdmin.getTokenHandler(tokens[i], routeIndexes[j]);
                 if (tokenHandlerAddress == address(0)) continue;
                 IPurchaseRbtc handler = IPurchaseRbtc(tokenHandlerAddress);
                 if (handler.getAccumulatedRbtcBalance(msg.sender) == 0) continue;
@@ -350,28 +350,28 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         bytes32 scheduleId,
         uint256 withdrawalAmount
     ) external override nonReentrant {
-        uint256 lendingProtocolIndex = _withdrawToken(token, scheduleIndex, scheduleId, withdrawalAmount);
-        _withdrawInterest(token, lendingProtocolIndex);
+        uint256 routeIndex = _withdrawToken(token, scheduleIndex, scheduleId, withdrawalAmount);
+        _withdrawInterest(token, routeIndex);
     }
 
     /**
      * @dev Users can withdraw the stablecoin interests accrued by the deposits they made
      * @param tokens Array of token addresses to withdraw interest from
-     * @param lendingProtocolIndexes Array of lending protocol indexes to withdraw interest from
+     * @param routeIndexes Route indexes to withdraw interest from. Idle routes are skipped.
      */
-    function withdrawAllAccumulatedInterest(address[] calldata tokens, uint256[] calldata lendingProtocolIndexes)
+    function withdrawAllAccumulatedInterest(address[] calldata tokens, uint256[] calldata routeIndexes)
         external
         override
         nonReentrant
     {
         for (uint256 i; i < tokens.length; ++i) {
-            for (uint256 j; j < lendingProtocolIndexes.length; ++j) {
-                address tokenHandlerAddress = s_operationsAdmin.getTokenHandler(tokens[i], lendingProtocolIndexes[j]);
+            for (uint256 j; j < routeIndexes.length; ++j) {
+                address tokenHandlerAddress = s_operationsAdmin.getTokenHandler(tokens[i], routeIndexes[j]);
                 if (tokenHandlerAddress == address(0)) continue;
                 // Skip idle and unregistered routes so a mixed idle+lending call still
                 // withdraws interest from the indexes that yield.
-                if (!_tokenYieldsInterest(lendingProtocolIndexes[j])) continue;
-                _withdrawInterest(tokens[i], lendingProtocolIndexes[j]);
+                if (!_tokenYieldsInterest(routeIndexes[j])) continue;
+                _withdrawInterest(tokens[i], routeIndexes[j]);
             }
         }
     }
@@ -481,14 +481,14 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice get the token handler for a token and lending protocol index
+     * @notice get the token handler for a token and route index
      * @param token: the token
-     * @param lendingProtocolIndex: the lending protocol index
+     * @param routeIndex: the route index
      * @return the token handler
      */
-    function _handler(address token, uint256 lendingProtocolIndex) private view returns (ITokenHandler) {
-        address tokenHandlerAddress = s_operationsAdmin.getTokenHandler(token, lendingProtocolIndex);
-        if (tokenHandlerAddress == address(0)) revert DcaManager__TokenNotAccepted(token, lendingProtocolIndex);
+    function _handler(address token, uint256 routeIndex) private view returns (ITokenHandler) {
+        address tokenHandlerAddress = s_operationsAdmin.getTokenHandler(token, routeIndex);
+        if (tokenHandlerAddress == address(0)) revert DcaManager__TokenNotAccepted(token, routeIndex);
         return ITokenHandler(tokenHandlerAddress);
     }
 
@@ -498,7 +498,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      * @param token: the token
      * @param scheduleIndex: the index of the schedule
      * @param scheduleId: the id of the schedule
-     * @return the purchase amount and lending protocol index
+     * @return the purchase amount and route index
      */
     function _rBtcPurchaseChecksEffects(address buyer, address token, uint256 scheduleIndex, bytes32 scheduleId)
         private
@@ -543,7 +543,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         dcaScheduleStorage.lastPurchaseTimestamp = dcaSchedule.lastPurchaseTimestamp;
         emit DcaManager__LastPurchaseTimestampUpdated(token, scheduleId, dcaSchedule.lastPurchaseTimestamp);
 
-        return (dcaSchedule.purchaseAmount, dcaSchedule.lendingProtocolIndex);
+        return (dcaSchedule.purchaseAmount, dcaSchedule.routeIndex);
     }
 
     /**
@@ -552,12 +552,12 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      * @param scheduleIndex: the index of the schedule
      * @param scheduleId: the schedule id for validation
      * @param withdrawalAmount: the amount to withdraw, or type(uint256).max for this schedule's whole token balance
-     * @return lendingProtocolIndex the schedule's stored route, captured before the handler call
+     * @return routeIndex the schedule's stored route, captured before the handler call
      */
     function _withdrawToken(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 withdrawalAmount)
         private
         validateScheduleIndex(msg.sender, token, scheduleIndex)
-        returns (uint256 lendingProtocolIndex)
+        returns (uint256 routeIndex)
     {
         DcaDetails storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
@@ -569,25 +569,25 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
         }
         // @notice subtract the requested withdrawal amount from the token balance, not the amount the lending protocol paid
         uint256 newTokenBalance = tokenBalance - withdrawalAmount;
-        lendingProtocolIndex = dcaSchedule.lendingProtocolIndex;
+        routeIndex = dcaSchedule.routeIndex;
         dcaSchedule.tokenBalance = newTokenBalance;
         // @notice ignore `withdrawToken()`'s return value (amount actually paid back by the lending protocol)
-        _handler(token, lendingProtocolIndex).withdrawToken(msg.sender, withdrawalAmount);
+        _handler(token, routeIndex).withdrawToken(msg.sender, withdrawalAmount);
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
     }
 
     /**
-     * @notice withdraw interest from a lending protocol
+     * @notice withdraw interest from a lending route
      * @param token: the token to withdraw interest from
-     * @param lendingProtocolIndex: the lending protocol index
+     * @param routeIndex: the route index
      */
-    function _withdrawInterest(address token, uint256 lendingProtocolIndex) private {
-        _checkTokenYieldsInterest(token, lendingProtocolIndex);
-        ITokenHandler tokenHandler = _handler(token, lendingProtocolIndex);
+    function _withdrawInterest(address token, uint256 routeIndex) private {
+        _checkTokenYieldsInterest(token, routeIndex);
+        ITokenHandler tokenHandler = _handler(token, routeIndex);
         DcaDetails[] memory dcaSchedules = s_dcaSchedules[msg.sender][token];
         uint256 lockedTokenAmount;
         for (uint256 i; i < dcaSchedules.length; ++i) {
-            if (dcaSchedules[i].lendingProtocolIndex == lendingProtocolIndex) {
+            if (dcaSchedules[i].routeIndex == routeIndex) {
                 lockedTokenAmount += dcaSchedules[i].tokenBalance;
             }
         }
@@ -596,19 +596,19 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
 
     /**
      * @notice whether a route index was registered as lending
-     * @param lendingProtocolIndex: the route index
+     * @param routeIndex: the route index
      */
-    function _tokenYieldsInterest(uint256 lendingProtocolIndex) private view returns (bool) {
-        return s_operationsAdmin.isLendingRoute(lendingProtocolIndex);
+    function _tokenYieldsInterest(uint256 routeIndex) private view returns (bool) {
+        return s_operationsAdmin.isLendingRoute(routeIndex);
     }
 
     /**
      * @notice check if a token yields interest
      * @param token: the token to check
-     * @param lendingProtocolIndex: the lending protocol index
+     * @param routeIndex: the route index
      */
-    function _checkTokenYieldsInterest(address token, uint256 lendingProtocolIndex) private view {
-        if (!_tokenYieldsInterest(lendingProtocolIndex)) revert DcaManager__TokenDoesNotYieldInterest(token);
+    function _checkTokenYieldsInterest(address token, uint256 routeIndex) private view {
+        if (!_tokenYieldsInterest(routeIndex)) revert DcaManager__TokenDoesNotYieldInterest(token);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -697,40 +697,40 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice get the rBTC accumulated by a user on the handler for a token and lending protocol
+     * @notice get the rBTC accumulated by a user on the handler for a token and route
      * @param user: the user to get the accumulated rBTC for
      * @param token: the token
-     * @param lendingProtocolIndex: the lending protocol index
+     * @param routeIndex: the route index
      * @return the accumulated rBTC balance
      */
-    function getAccumulatedRbtcBalance(address user, address token, uint256 lendingProtocolIndex)
+    function getAccumulatedRbtcBalance(address user, address token, uint256 routeIndex)
         external
         view
         override
         returns (uint256)
     {
-        return IPurchaseRbtc(address(_handler(token, lendingProtocolIndex))).getAccumulatedRbtcBalance(user);
+        return IPurchaseRbtc(address(_handler(token, routeIndex))).getAccumulatedRbtcBalance(user);
     }
 
     /**
-     * @notice get the interest accrued by a user with a given stablecoin in a given lending protocol
+     * @notice get the interest accrued by a user with a given stablecoin on a given lending route
      * @param user: the user to get the interest for
      * @param token: the token to get the interest for
-     * @param lendingProtocolIndex: the lending protocol index to get the interest for
+     * @param routeIndex: the route index to get the interest for
      * @return the interest accrued
      */
-    function getInterestAccrued(address user, address token, uint256 lendingProtocolIndex)
+    function getInterestAccrued(address user, address token, uint256 routeIndex)
         external
         view
         override
         returns (uint256)
     {
-        _checkTokenYieldsInterest(token, lendingProtocolIndex);
-        ITokenHandler tokenHandler = _handler(token, lendingProtocolIndex);
+        _checkTokenYieldsInterest(token, routeIndex);
+        ITokenHandler tokenHandler = _handler(token, routeIndex);
         DcaDetails[] memory dcaSchedules = s_dcaSchedules[user][token];
         uint256 lockedTokenAmount;
         for (uint256 i; i < dcaSchedules.length; ++i) {
-            if (dcaSchedules[i].lendingProtocolIndex == lendingProtocolIndex) {
+            if (dcaSchedules[i].routeIndex == routeIndex) {
                 lockedTokenAmount += dcaSchedules[i].tokenBalance;
             }
         }

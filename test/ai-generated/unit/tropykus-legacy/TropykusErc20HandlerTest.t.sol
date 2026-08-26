@@ -46,7 +46,7 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
         return ITokenHandler(address(tropykusHandler));
     }
     
-    function getLendingProtocolIndex() internal pure override returns (uint256) {
+    function getRouteIndex() internal pure override returns (uint256) {
         return TROPYKUS_INDEX;
     }
     

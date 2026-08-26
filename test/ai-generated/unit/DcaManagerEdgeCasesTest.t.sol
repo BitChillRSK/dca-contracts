@@ -126,7 +126,7 @@ contract DcaManagerEdgeCasesTest is Test {
             500 ether,           // depositAmount
             100 ether,           // purchaseAmount (less than half of deposit)
             MIN_PURCHASE_PERIOD, // purchasePeriod
-            TROPYKUS_INDEX       // lendingProtocolIndex
+            TROPYKUS_INDEX       // routeIndex
         );
         
         // Try to delete with wrong ID
@@ -145,7 +145,7 @@ contract DcaManagerEdgeCasesTest is Test {
             500 ether,           // depositAmount
             100 ether,           // purchaseAmount (less than half of deposit)
             MIN_PURCHASE_PERIOD, // purchasePeriod
-            TROPYKUS_INDEX       // lendingProtocolIndex
+            TROPYKUS_INDEX       // routeIndex
         );
         
         // Try to delete with wrong index (index that doesn't exist)
@@ -162,7 +162,7 @@ contract DcaManagerEdgeCasesTest is Test {
             500 ether,           // depositAmount
             100 ether,           // purchaseAmount (less than half of deposit)
             MIN_PURCHASE_PERIOD, // purchasePeriod
-            TROPYKUS_INDEX       // lendingProtocolIndex
+            TROPYKUS_INDEX       // routeIndex
         );
         
         bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
@@ -189,7 +189,7 @@ contract DcaManagerEdgeCasesTest is Test {
             500 ether,           // depositAmount
             100 ether,           // purchaseAmount (less than half of deposit)
             MIN_PURCHASE_PERIOD, // purchasePeriod
-            TROPYKUS_INDEX       // lendingProtocolIndex
+            TROPYKUS_INDEX       // routeIndex
         );
         
         // This test would require a successful first purchase to set lastPurchaseTimestamp
@@ -206,7 +206,7 @@ contract DcaManagerEdgeCasesTest is Test {
             500 ether,           // depositAmount
             100 ether,           // purchaseAmount (less than half of deposit)
             MIN_PURCHASE_PERIOD, // purchasePeriod
-            TROPYKUS_INDEX       // lendingProtocolIndex
+            TROPYKUS_INDEX       // routeIndex
         );
         
         bytes32 wrongId = keccak256("invalid_id");
@@ -288,7 +288,7 @@ contract DcaManagerEdgeCasesTest is Test {
         );
 
         IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedule(USER, address(stablecoin), 0);
-        assertEq(schedule.lendingProtocolIndex, TROPYKUS_INDEX);
+        assertEq(schedule.routeIndex, TROPYKUS_INDEX);
 
         vm.prank(USER);
         dcaManager.withdrawTokenAndInterest(address(stablecoin), 0, schedule.scheduleId, 100 ether);
@@ -361,8 +361,8 @@ contract DcaManagerEdgeCasesTest is Test {
         );
     }
     
-    function test_createDcaSchedule_reverts_invalidLendingProtocol() public {
-        uint256 invalidProtocolIndex = 999;
+    function test_createDcaSchedule_reverts_invalidRoute() public {
+        uint256 invalidRouteIndex = 999;
         
         vm.expectRevert();
         vm.prank(USER);
@@ -371,7 +371,7 @@ contract DcaManagerEdgeCasesTest is Test {
             500 ether, // depositAmount
             100 ether, // purchaseAmount
             MIN_PURCHASE_PERIOD,
-            invalidProtocolIndex
+            invalidRouteIndex
         );
     }
     
@@ -482,7 +482,7 @@ contract DcaManagerEdgeCasesTest is Test {
         dcaManager.withdrawAllAccumulatedRbtc(tokens, emptyProtocols);
     }
     
-    function test_withdrawAllAccumulatedRbtc_invalidProtocol_skips() public {
+    function test_withdrawAllAccumulatedRbtc_invalidRoute_skips() public {
         // First create a DCA schedule so user has deposited tokens
         vm.prank(USER);
         dcaManager.createDcaSchedule(

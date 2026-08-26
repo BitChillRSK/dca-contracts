@@ -33,7 +33,7 @@ contract NetRedemptionTest is DcaDappTest {
      * @notice these assertions only mean something against the Sovryn mock on a local chain
      */
     modifier onlySovrynMocMocks() {
-        if (s_lendingProtocolIndex != SOVRYN_INDEX || !isMocSwaps || block.chainid != ANVIL_CHAIN_ID) {
+        if (s_routeIndex != SOVRYN_INDEX || !isMocSwaps || block.chainid != ANVIL_CHAIN_ID) {
             vm.skip(true);
             return;
         }
@@ -85,7 +85,7 @@ contract NetRedemptionTest is DcaDappTest {
 
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_lendingProtocolIndex
+            users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_routeIndex
         );
 
         uint256 received = address(stablecoinHandler).balance - handlerRbtcBefore;
@@ -168,14 +168,14 @@ contract NetRedemptionTest is DcaDappTest {
 
         address[] memory tokens = new address[](1);
         tokens[0] = address(stablecoin);
-        uint256[] memory lendingProtocolIndexes = new uint256[](1);
-        lendingProtocolIndexes[0] = s_lendingProtocolIndex;
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = s_routeIndex;
 
         uint256 userDocBefore = stablecoin.balanceOf(USER);
 
         vm.recordLogs();
         vm.prank(USER);
-        dcaManager.withdrawAllAccumulatedInterest(tokens, lendingProtocolIndexes);
+        dcaManager.withdrawAllAccumulatedInterest(tokens, routeIndexes);
 
         uint256 paid = stablecoin.balanceOf(USER) - userDocBefore;
         assertGt(paid, 0, "no interest was paid");
@@ -206,7 +206,7 @@ contract NetRedemptionTest is DcaDappTest {
         vm.recordLogs();
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_lendingProtocolIndex
+            users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_routeIndex
         );
 
         (uint256 perUserSpentTotal, uint256 batchSpent) = _batchSpendFromLogs();
@@ -259,7 +259,7 @@ contract NetRedemptionTest is DcaDappTest {
         );
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_lendingProtocolIndex
+            users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_routeIndex
         );
     }
 

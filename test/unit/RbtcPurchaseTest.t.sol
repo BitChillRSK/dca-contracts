@@ -270,7 +270,7 @@ contract RbtcPurchaseTest is DcaDappTest {
             emptyUintArray,
             emptyBytes32Array,
             emptyUintArray,
-            s_lendingProtocolIndex
+            s_routeIndex
         );
     }
 
@@ -295,10 +295,10 @@ contract RbtcPurchaseTest is DcaDappTest {
             )
         );
         vm.prank(SWAPPER);
-        dcaManager.batchBuyRbtc(users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_lendingProtocolIndex);
+        dcaManager.batchBuyRbtc(users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_routeIndex);
     }
 
-    function testBatchPurchaseFailsIfLendingProtocolIndexMismatch() external {
+    function testBatchPurchaseFailsIfRouteIndexMismatch() external {
         address[] memory users = new address[](1);
         users[0] = USER;
         uint256[] memory scheduleIndexes = new uint256[](1);
@@ -309,17 +309,17 @@ contract RbtcPurchaseTest is DcaDappTest {
         purchaseAmounts[0] = AMOUNT_TO_SPEND;
         vm.expectRevert(
             abi.encodeWithSelector(
-                IDcaManager.DcaManager__LendingProtocolIndexMismatch.selector,
+                IDcaManager.DcaManager__RouteIndexMismatch.selector,
                 USER,
                 address(stablecoin),
                 scheduleIds[0],
                 SCHEDULE_INDEX,
-                s_lendingProtocolIndex,
-                s_lendingProtocolIndex + 1
+                s_routeIndex,
+                s_routeIndex + 1
             )
         );
         vm.prank(SWAPPER);
-        dcaManager.batchBuyRbtc(users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_lendingProtocolIndex + 1);
+        dcaManager.batchBuyRbtc(users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_routeIndex + 1);
     }
 
     function testBatchPurchaseFailsIfArraysHaveDifferentLenghts() external {
@@ -334,7 +334,7 @@ contract RbtcPurchaseTest is DcaDappTest {
             dummyUintArray,
             dummyBytes32Array,
             dummyUintArray,
-            s_lendingProtocolIndex
+            s_routeIndex
         );
     }
 
@@ -405,7 +405,7 @@ contract RbtcPurchaseTest is DcaDappTest {
             scheduleIndexes,
             scheduleIds,
             purchaseAmounts,
-            s_lendingProtocolIndex
+            s_routeIndex
         );
 
         uint256 postStablecoinHandlerBalance = address(stablecoinHandler).balance;
@@ -463,8 +463,8 @@ contract RbtcPurchaseTest is DcaDappTest {
         uint256 purchasesPerSchedule = AMOUNT_TO_DEPOSIT / AMOUNT_TO_SPEND;
 
         // Store initial interest accrued (should be 0 initially)
-        uint256 initialInterestUser = dcaManager.getInterestAccrued(USER, address(stablecoin), s_lendingProtocolIndex);
-        uint256 initialInterestSecondUser = dcaManager.getInterestAccrued(SECOND_USER, address(stablecoin), s_lendingProtocolIndex);
+        uint256 initialInterestUser = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        uint256 initialInterestSecondUser = dcaManager.getInterestAccrued(SECOND_USER, address(stablecoin), s_routeIndex);
         
         // Both users should have 0 interest initially
         assertEq(initialInterestUser, 0, "USER should have 0 interest initially");
@@ -506,7 +506,7 @@ contract RbtcPurchaseTest is DcaDappTest {
                 batchPurchase.scheduleIndexes,
                 batchPurchase.scheduleIds,
                 batchPurchase.purchaseAmounts,
-                s_lendingProtocolIndex
+                s_routeIndex
             );
 
             // Advance time and update exchange rate so future purchases are allowed and interest accrues
@@ -514,8 +514,8 @@ contract RbtcPurchaseTest is DcaDappTest {
         }
 
         // After time has passed and multiple purchase rounds, check that interest has accrued
-        uint256 finalInterestUser = dcaManager.getInterestAccrued(USER, address(stablecoin), s_lendingProtocolIndex);
-        uint256 finalInterestSecondUser = dcaManager.getInterestAccrued(SECOND_USER, address(stablecoin), s_lendingProtocolIndex);
+        uint256 finalInterestUser = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        uint256 finalInterestSecondUser = dcaManager.getInterestAccrued(SECOND_USER, address(stablecoin), s_routeIndex);
         
         // Both users should have accrued some interest during the test
         assertGt(finalInterestUser, initialInterestUser, "USER should have accrued interest during the test");
@@ -537,14 +537,14 @@ contract RbtcPurchaseTest is DcaDappTest {
         // Withdrawing interest should not revert
         address[] memory tokens = new address[](1);
         tokens[0] = address(stablecoin);
-        uint256[] memory lendingProtocolIndexes = new uint256[](1);
-        lendingProtocolIndexes[0] = s_lendingProtocolIndex;
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = s_routeIndex;
         vm.prank(USER);
-        dcaManager.withdrawAllAccumulatedInterest(tokens, lendingProtocolIndexes);
+        dcaManager.withdrawAllAccumulatedInterest(tokens, routeIndexes);
 
         // Withdrawing interest should not revert
         vm.prank(SECOND_USER);
-        dcaManager.withdrawAllAccumulatedInterest(tokens, lendingProtocolIndexes);
+        dcaManager.withdrawAllAccumulatedInterest(tokens, routeIndexes);
     }
 
     /// @dev Similar to testDepleteHandlerBalanceDoesNotRevert but uses individual buyRbtc calls instead of batchBuyRbtc
@@ -579,8 +579,8 @@ contract RbtcPurchaseTest is DcaDappTest {
         uint256 purchasesPerSchedule = AMOUNT_TO_DEPOSIT / AMOUNT_TO_SPEND;
 
         // Store initial interest accrued (should be 0 initially)
-        uint256 initialInterestUser = dcaManager.getInterestAccrued(USER, address(stablecoin), s_lendingProtocolIndex);
-        uint256 initialInterestSecondUser = dcaManager.getInterestAccrued(SECOND_USER, address(stablecoin), s_lendingProtocolIndex);
+        uint256 initialInterestUser = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        uint256 initialInterestSecondUser = dcaManager.getInterestAccrued(SECOND_USER, address(stablecoin), s_routeIndex);
         
         // Both users should have 0 interest initially
         assertEq(initialInterestUser, 0, "USER should have 0 interest initially");
@@ -607,8 +607,8 @@ contract RbtcPurchaseTest is DcaDappTest {
         }
 
         // After time has passed and multiple purchase rounds, check that interest has accrued
-        uint256 finalInterestUser = dcaManager.getInterestAccrued(USER, address(stablecoin), s_lendingProtocolIndex);
-        uint256 finalInterestSecondUser = dcaManager.getInterestAccrued(SECOND_USER, address(stablecoin), s_lendingProtocolIndex);
+        uint256 finalInterestUser = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        uint256 finalInterestSecondUser = dcaManager.getInterestAccrued(SECOND_USER, address(stablecoin), s_routeIndex);
         
         // Both users should have accrued some interest during the test
         assertGt(finalInterestUser, initialInterestUser, "USER should have accrued interest during the test");
@@ -630,14 +630,14 @@ contract RbtcPurchaseTest is DcaDappTest {
         // Withdrawing interest should not revert
         address[] memory tokens = new address[](1);
         tokens[0] = address(stablecoin);
-        uint256[] memory lendingProtocolIndexes = new uint256[](1);
-        lendingProtocolIndexes[0] = s_lendingProtocolIndex;
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = s_routeIndex;
         vm.prank(USER);
-        dcaManager.withdrawAllAccumulatedInterest(tokens, lendingProtocolIndexes);
+        dcaManager.withdrawAllAccumulatedInterest(tokens, routeIndexes);
 
         // Withdrawing interest should not revert
         vm.prank(SECOND_USER);
-        dcaManager.withdrawAllAccumulatedInterest(tokens, lendingProtocolIndexes);
+        dcaManager.withdrawAllAccumulatedInterest(tokens, routeIndexes);
     }
 
     // New test: exhaust handler balance across multiple users and schedules with interest withdrawals in between batch purchases without revert
@@ -678,8 +678,8 @@ contract RbtcPurchaseTest is DcaDappTest {
         uint256 purchasesPerSchedule = AMOUNT_TO_DEPOSIT / AMOUNT_TO_SPEND;
 
         // Store initial interest accrued (should be 0 initially)
-        uint256 initialInterestUser = dcaManager.getInterestAccrued(USER, address(stablecoin), s_lendingProtocolIndex);
-        uint256 initialInterestSecondUser = dcaManager.getInterestAccrued(SECOND_USER, address(stablecoin), s_lendingProtocolIndex);
+        uint256 initialInterestUser = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        uint256 initialInterestSecondUser = dcaManager.getInterestAccrued(SECOND_USER, address(stablecoin), s_routeIndex);
         
         // Both users should have 0 interest initially
         assertEq(initialInterestUser, 0, "USER should have 0 interest initially");
@@ -687,8 +687,8 @@ contract RbtcPurchaseTest is DcaDappTest {
 
         address[] memory tokens = new address[](1);
         tokens[0] = address(stablecoin);
-        uint256[] memory lendingProtocolIndexes = new uint256[](1);
-        lendingProtocolIndexes[0] = s_lendingProtocolIndex;
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = s_routeIndex;
 
         // Perform the required number of purchase rounds
         for (uint256 round; round < purchasesPerSchedule; ++round) {
@@ -726,23 +726,23 @@ contract RbtcPurchaseTest is DcaDappTest {
                 batchPurchase.scheduleIndexes,
                 batchPurchase.scheduleIds,
                 batchPurchase.purchaseAmounts,
-                s_lendingProtocolIndex
+                s_routeIndex
             );
 
             // Withdrawing interest should not revert
             vm.prank(USER);
-            dcaManager.withdrawAllAccumulatedInterest(tokens, lendingProtocolIndexes);
+            dcaManager.withdrawAllAccumulatedInterest(tokens, routeIndexes);
             // Withdrawing interest should not revert
             vm.prank(SECOND_USER);
-            dcaManager.withdrawAllAccumulatedInterest(tokens, lendingProtocolIndexes);
+            dcaManager.withdrawAllAccumulatedInterest(tokens, routeIndexes);
 
             // Advance time and update exchange rate so future purchases are allowed and interest accrues
             updateExchangeRate(MIN_PURCHASE_PERIOD);
         }
 
         // After time has passed and multiple purchase rounds, check that interest has accrued
-        uint256 finalInterestUser = dcaManager.getInterestAccrued(USER, address(stablecoin), s_lendingProtocolIndex);
-        uint256 finalInterestSecondUser = dcaManager.getInterestAccrued(SECOND_USER, address(stablecoin), s_lendingProtocolIndex);
+        uint256 finalInterestUser = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        uint256 finalInterestSecondUser = dcaManager.getInterestAccrued(SECOND_USER, address(stablecoin), s_routeIndex);
         
         // Both users should have accrued some interest during the test
         assertEq(finalInterestUser, 0, "USER should have already withdrawn all interest");
@@ -769,7 +769,7 @@ contract RbtcPurchaseTest is DcaDappTest {
                 AMOUNT_TO_DEPOSIT,
                 AMOUNT_TO_SPEND,
                 MIN_PURCHASE_PERIOD,
-                s_lendingProtocolIndex
+                s_routeIndex
             );
         }
         vm.stopPrank();

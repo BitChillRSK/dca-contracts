@@ -49,7 +49,7 @@ abstract contract HandlerTestHarness is Test {
     uint256 public constant USER_INITIAL_BALANCE = 10000 ether;
     
     // Handler configuration
-    uint256 public lendingProtocolIndex;
+    uint256 public routeIndex;
     bool public supportsDex;
     bool public supportsLending;
     
@@ -64,9 +64,9 @@ abstract contract HandlerTestHarness is Test {
     function deployHandler() internal virtual returns (ITokenHandler);
     
     /**
-     * @notice Get the lending protocol index for this handler
+     * @notice Get the route index for this handler
      */
-    function getLendingProtocolIndex() internal virtual returns (uint256);
+    function getRouteIndex() internal virtual returns (uint256);
     
     /**
      * @notice Whether this handler supports DEX operations
@@ -112,7 +112,7 @@ abstract contract HandlerTestHarness is Test {
         stablecoin = new MockStablecoin(address(this));
         
         // Get handler configuration
-        lendingProtocolIndex = getLendingProtocolIndex();
+        routeIndex = getRouteIndex();
         supportsDex = isDexHandler();
         supportsLending = isLendingHandler();
         shareToken = getShareToken();
@@ -134,7 +134,7 @@ abstract contract HandlerTestHarness is Test {
         vm.prank(OWNER);
         operationsAdmin.assignTokenHandler(
             address(stablecoin), 
-            lendingProtocolIndex, 
+            routeIndex, 
             address(handler)
         );
         
@@ -146,9 +146,9 @@ abstract contract HandlerTestHarness is Test {
     
     function setupRolesAndPermissions() internal {
         // Index 0 is pre-registered as idle. Lending indexes must be classified before assignment.
-        if (lendingProtocolIndex != 0) {
+        if (routeIndex != 0) {
             vm.prank(OWNER);
-            operationsAdmin.registerRoute(lendingProtocolIndex, true);
+            operationsAdmin.registerRoute(routeIndex, true);
         }
     }
     

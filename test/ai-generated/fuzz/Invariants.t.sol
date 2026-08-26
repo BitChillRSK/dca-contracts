@@ -54,7 +54,7 @@ contract InvariantTest is StdInvariant, Test {
     
     address[] public s_users;
     uint256 public deploymentTimestamp;
-    uint256 public s_lendingProtocolIndex;
+    uint256 public s_routeIndex;
     
     /*//////////////////////////////////////////////////////////////
                            TEST CONSTANTS
@@ -72,11 +72,11 @@ contract InvariantTest is StdInvariant, Test {
             lendingProtocol = TROPYKUS_STRING; // Default to Tropykus
         }
         
-        // Set lending protocol index
+        // Set route index from the lending-protocol env lane
         if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(TROPYKUS_STRING))) {
-            s_lendingProtocolIndex = TROPYKUS_INDEX;
+            s_routeIndex = TROPYKUS_INDEX;
         } else if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(SOVRYN_STRING))) {
-            s_lendingProtocolIndex = SOVRYN_INDEX;
+            s_routeIndex = SOVRYN_INDEX;
         } else {
             revert("Invalid lending protocol");
         }
@@ -105,7 +105,7 @@ contract InvariantTest is StdInvariant, Test {
             feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
         });
         
-        if (s_lendingProtocolIndex == TROPYKUS_INDEX) {
+        if (s_routeIndex == TROPYKUS_INDEX) {
             kToken = new MockKdocToken(address(stablecoin));
             handler = IPurchaseRbtc(address(new TropykusHandlerWrapper(
                 address(dcaManager),
@@ -132,7 +132,7 @@ contract InvariantTest is StdInvariant, Test {
         vm.prank(OWNER);
         operationsAdmin.assignTokenHandler(
             address(stablecoin),
-            s_lendingProtocolIndex,
+            s_routeIndex,
             address(handler)
         );
         
@@ -154,7 +154,7 @@ contract InvariantTest is StdInvariant, Test {
             handler,
             stablecoin,
             s_users,
-            s_lendingProtocolIndex
+            s_routeIndex
         );
         
         targetContract(address(fuzzHandler));
@@ -175,7 +175,7 @@ contract InvariantTest is StdInvariant, Test {
         IDcaManager.DcaDetails[] memory schedules =
             dcaManager.getDcaSchedules(s_users[0], address(stablecoin));
         assertEq(schedules.length, 1);
-        assertEq(schedules[0].lendingProtocolIndex, s_lendingProtocolIndex);
+        assertEq(schedules[0].routeIndex, s_routeIndex);
     }
     
     /*//////////////////////////////////////////////////////////////
@@ -210,7 +210,7 @@ contract InvariantTest is StdInvariant, Test {
         // Convert shares balances to stablecoin equivalent
         uint256 totalStablecoinInLendingProtocol = 0;
         if (totalLendingBalances > 0) {
-            if (s_lendingProtocolIndex == TROPYKUS_INDEX) {
+            if (s_routeIndex == TROPYKUS_INDEX) {
                 totalStablecoinInLendingProtocol = totalLendingBalances * kToken.exchangeRateCurrent() / 1e18;
             } else {
                 totalStablecoinInLendingProtocol = totalLendingBalances * iSusdToken.tokenPrice() / 1e18;
@@ -291,7 +291,7 @@ contract InvariantTest is StdInvariant, Test {
      * @notice The lending protocol exchange rate should only increase over time (interest accrual)
      */
     function invariant_exchangeRateOnlyIncreases() public {
-        if (s_lendingProtocolIndex == TROPYKUS_INDEX) {
+        if (s_routeIndex == TROPYKUS_INDEX) {
             uint256 previousRate = kToken.exchangeRateStored();
             uint256 currentRate = kToken.exchangeRateCurrent();
             assertGe(currentRate, previousRate);
@@ -325,7 +325,7 @@ contract InvariantTest is StdInvariant, Test {
                 if (schedules.length > 0) {
                     uint256 totalDeposited = 0;
                     for (uint256 j = 0; j < schedules.length; j++) {
-                        if (schedules[j].lendingProtocolIndex == s_lendingProtocolIndex) {
+                        if (schedules[j].routeIndex == s_routeIndex) {
                             totalDeposited += schedules[j].tokenBalance;
                         }
                     }

@@ -144,7 +144,7 @@ contract FullWithdrawalTest is DcaDappTest {
     function test_withdrawTokenAndInterestWithTheSentinelExitsThePosition() external {
         updateExchangeRate(INTEREST_ACCRUAL_PERIOD);
         uint256 principal = _scheduleBalance(SCHEDULE_INDEX);
-        uint256 interest = dcaManager.getInterestAccrued(USER, address(stablecoin), s_lendingProtocolIndex);
+        uint256 interest = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
         bytes32 scheduleId = _scheduleId(SCHEDULE_INDEX);
 
