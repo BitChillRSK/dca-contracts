@@ -33,16 +33,19 @@ jobs:
         uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
         with:
           # Observed 2026-08-27: `stable` rolled forge 1.7.1 -> 1.8.0 (released 2026-08-26)
-          # between two CI runs 45 minutes apart, with no repo change in between. Under 1.8.0
-          # these 10 suites fail at `setUp()` with
-          # "vm.prank: cannot overwrite a prank until it is applied at least once":
-          #   DcaManagerEdgeCasesTest, RoleSecurityTest, DepositSwapPopReentrancyTest,
-          #   FeeOnTransferDepositTest, and the 6 HandlerTestHarness subclasses
-          #   (Idle/LayerBank/Sovryn/SovrynDex/Tropykus/TropykusDex Erc20HandlerTest).
-          # Reproduced on an unmodified pre-upgrade commit, so it is the toolchain, not a PR.
-          # The trigger is NOT simply "prank before `new` stops being consumed": InvariantTest
-          # runs the same two statements and passes on 1.8.0. Diagnosing it is the migration's
-          # job. Until then, pin. Raise this deliberately; do not put `stable` back.
+          # between two CI runs 45 minutes apart, with no repo change in between. Under 1.8.0,
+          # suites that build their own fixtures with `vm.prank(OWNER); new OperationsAdmin();`
+          # fail at `setUp()` with:
+          #   "vm.prank: cannot overwrite a prank until it is applied at least once"
+          # Measured on the relaunch stack head (PR #76): 10 suites affected -- 6 HandlerTestHarness
+          # subclasses plus DcaManagerEdgeCasesTest, RoleSecurityTest, DepositSwapPopReentrancyTest
+          # and FeeOnTransferDepositTest. `main` carries a subset of those today; the stack adds the
+          # rest, so this bites harder as the relaunch merges. `DcaDappTest` is unaffected (it builds
+          # through the deploy scripts). Reproduced on an unmodified pre-upgrade commit, so it is the
+          # toolchain, not a PR.
+          # The trigger is NOT simply "prank before `new` stops being consumed": InvariantTest runs
+          # the same two statements and passes on 1.8.0. Diagnosing it is the migration's job.
+          # Until then, pin. Raise this deliberately; do not put `stable` back.
           version: v1.7.1
 
       - name: Run ${{ matrix.target }}
