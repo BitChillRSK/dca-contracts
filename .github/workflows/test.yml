@@ -36,7 +36,14 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: stable
+          # Pinned, not `stable`. `stable` is a moving tag: it rolled 1.7.1 -> 1.8.0 on
+          # 2026-08-26 and turned every lane red mid-stack, with no repo change behind it.
+          # Under 1.8.0 a `vm.prank(OWNER); new OperationsAdmin();` no longer consumes the
+          # prank, so the next `vm.prank` reverts and 10 `setUp()`s fail. That is a real
+          # migration this repo still owes, but it must be its own PR, not an ambush on
+          # whichever PR happens to run after a Foundry release.
+          # Raise this deliberately; do not put `stable` back.
+          version: v1.7.1
 
       - name: Run ${{ matrix.target }}
         env:
