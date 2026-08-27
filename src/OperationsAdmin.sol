@@ -13,7 +13,10 @@ import {BitChillOwnable} from "./BitChillOwnable.sol";
  * @dev One owner. Route indexes are add-only: a class is recorded once and is never
  *      mutated or deregistered. Old routes stay resolvable so users can exit the handler
  *      that holds their funds. `(token, routeIndex)` handler assignment is likewise
- *      add-only. There is no cooperative migration on these handler versions.
+ *      add-only, and a handler address may be assigned at most once: none of a handler's
+ *      per-user accounting is route-keyed, so sharing one instance across two pairs would let
+ *      one route's principal be read as another's yield. There is no cooperative migration on
+ *      these handler versions.
  */
 contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
     /*//////////////////////////////////////////////////////////////
@@ -23,6 +26,7 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
     mapping(address token => mapping(uint256 routeIndex => address handler)) private s_tokenHandler;
     mapping(uint256 routeIndex => RouteClass) private s_routeClass;
     mapping(address swapper => bool) private s_swappers;
+    mapping(address handler => bool assigned) private s_handlerAssigned;
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
@@ -57,6 +61,10 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
      *      handler has never held funds: this contract cannot prove a handler is empty.
      *      Lending routes require ERC-165 `ITokenLending`; idle routes reject it so a
      *      lending handler cannot be parked at an idle index (including constructor index 0).
+     *      A handler address that already backs a pair is rejected before the interface checks:
+     *      it passed them on its first assignment, and re-running them would not make the second
+     *      pair safe. Only a successful assignment marks the address as used, so a handler whose
+     *      assignment reverted stays available.
      */
     function assignTokenHandler(address token, uint256 routeIndex, address handler) external onlyOwner {
         if (handler.code.length == 0) revert OperationsAdmin__EoaCannotBeHandler(handler);
@@ -66,6 +74,7 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
         if (s_tokenHandler[token][routeIndex] != address(0)) {
             revert OperationsAdmin__HandlerAlreadyAssigned(token, routeIndex);
         }
+        if (s_handlerAssigned[handler]) revert OperationsAdmin__HandlerAddressAlreadyInUse(handler);
 
         IERC165 tokenHandler = IERC165(handler);
         if (!tokenHandler.supportsInterface(type(ITokenHandler).interfaceId)) {
@@ -81,6 +90,7 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
         }
 
         s_tokenHandler[token][routeIndex] = handler;
+        s_handlerAssigned[handler] = true;
         emit OperationsAdmin__TokenHandlerAssigned(token, routeIndex, handler);
     }
 

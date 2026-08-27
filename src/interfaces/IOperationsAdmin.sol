@@ -37,6 +37,7 @@ interface IOperationsAdmin {
     error OperationsAdmin__RouteAlreadyRegistered(uint256 index);
     error OperationsAdmin__RouteNotRegistered(uint256 index);
     error OperationsAdmin__HandlerAlreadyAssigned(address token, uint256 routeIndex);
+    error OperationsAdmin__HandlerAddressAlreadyInUse(address handler);
 
     ///////////////////////////////
     // External functions /////////
@@ -53,10 +54,13 @@ interface IOperationsAdmin {
      * @notice Assign the token handler for a `(token, routeIndex)` pair. Add-only: reassignment reverts.
      * @param token The stablecoin whose handler is being assigned.
      * @param routeIndex The registered route index (idle or lending).
-     * @param handler The TokenHandler for that token and route.
+     * @param handler The TokenHandler for that token and route, not yet assigned anywhere in this admin.
      * @dev Requires ERC-165 `ITokenHandler`. Lending routes also require `ITokenLending`;
      *      idle routes reject it. A lending handler at an idle index would strand
-     *      `withdrawInterest` (`DcaManager` gates it on `isLendingRoute`).
+     *      `withdrawInterest` (`DcaManager` gates it on `isLendingRoute`). One handler address
+     *      backs at most one pair: a handler is built for one stablecoin and keys its per-user
+     *      accounting by user alone, so a second pair sharing it reverts with
+     *      `OperationsAdmin__HandlerAddressAlreadyInUse` whatever its token or route class.
      */
     function assignTokenHandler(address token, uint256 routeIndex, address handler) external;
 
