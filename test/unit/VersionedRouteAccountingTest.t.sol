@@ -4,19 +4,25 @@ pragma solidity 0.8.36;
 import {BaseDeploymentTest} from "./deployment/BaseDeploymentTest.t.sol";
 import {DeployLayerBankHandler} from "../../script/DeployLayerBankHandler.s.sol";
 import {LayerBankDocHandlerMoc} from "../../src/layerbank/LayerBankDocHandlerMoc.sol";
-import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
-import {IOperationsAdmin} from "../../src/interfaces/IOperationsAdmin.sol";
 import {MockStablecoin} from "../mocks/MockStablecoin.sol";
 import "../Constants.sol";
 
 /**
  * @title VersionedRouteAccountingTest
- * @notice R47 regression: two versioned lending routes backed by two distinct handlers keep
- *         independent principal and share accounting.
- * @dev This is the hole R47 closes from the other side. DcaManager locks principal per route,
- *      while a lending handler keys `s_shares` by user alone. One handler at both routes would
- *      make route A's principal look like route B's yield; two handlers must not. Handlers come
- *      from `DeployLayerBankHandler`, which also deploys each route its own Pool/aToken mocks.
+ * @notice Two versioned lending routes backed by two distinct handlers keep independent
+ *         principal and share accounting.
+ * @dev **This is not a guard on R47's uniqueness check.** It passes with that check removed,
+ *      because R47 makes the shared-handler state unconstructible through `assignTokenHandler`:
+ *      once one address cannot back two pairs, no test driving the public API can reach the bug.
+ *      The guards on the check itself are the `testHandlerAddressCannotBe*` cases in
+ *      `OperationsAdminTest`, which do fail without it.
+ *
+ *      What this file covers is the remedy R47 forces on ops: when one handler per pair is the
+ *      only legal shape, a fresh instance per route must still account correctly. DcaManager
+ *      locks principal per route while a lending handler keys `s_shares` by user alone, so
+ *      route v1's 400 DOC must never surface as route v2's yield against 100 DOC of locked
+ *      principal. Handlers come from `DeployLayerBankHandler`, which gives each route its own
+ *      Pool/aToken mocks.
  */
 contract VersionedRouteAccountingTest is BaseDeploymentTest {
     uint256 internal constant ROUTE_V1 = 21;
@@ -92,8 +98,8 @@ contract VersionedRouteAccountingTest is BaseDeploymentTest {
         assertTrue(address(handlerV1) != address(handlerV2), "R47 forbids one address at both routes");
     }
 
-    /// @notice Interest on each route is bounded by that route's own deposit. A shared handler would
-    ///         report route v1's 400 DOC principal as route v2's yield against 100 DOC of locked principal.
+    /// @notice Interest on each route is bounded by that route's own deposit — the property that
+    ///         makes one-handler-per-pair a usable shape rather than just a restrictive one.
     function testInterestOnOneRouteExcludesTheOtherRoutesPrincipal() external {
         vm.warp(block.timestamp + 365 days);
 
