@@ -44,6 +44,7 @@ interface IPurchaseUniswap {
     error PurchaseUniswap__InvalidOracleAddress();
     error PurchaseUniswap__OutdatedPrice();
     error PurchaseUniswap__ZeroPurchaseToken();
+    error PurchaseUniswap__UnsupportedStablecoinDecimals(uint8 stablecoinDecimals);
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/

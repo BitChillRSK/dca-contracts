@@ -1,0 +1,269 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.36;
+
+import {Test} from "forge-std/Test.sol";
+import {PurchaseUniswap} from "../../src/PurchaseUniswap.sol";
+import {FeeHandler} from "../../src/FeeHandler.sol";
+import {DcaManagerAccessControl} from "../../src/DcaManagerAccessControl.sol";
+import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
+import {IPurchaseUniswap} from "../../src/interfaces/IPurchaseUniswap.sol";
+import {ICoinPairPrice} from "../../src/interfaces/ICoinPairPrice.sol";
+import {IWRBTC} from "../../src/interfaces/IWRBTC.sol";
+import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces/ISwapRouter02.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {MockMocOracle} from "../mocks/MockMocOracle.sol";
+import {MockWrbtcToken} from "../mocks/MockWrbtcToken.sol";
+import {MockStablecoinWithDecimals} from "../mocks/MockStablecoinWithDecimals.sol";
+import "../Constants.sol";
+
+/**
+ * @notice R43: `amountOutMinimum` must denominate the swap in the stablecoin's own units.
+ * @dev The formula before R43 was `amount * percent / btcUsdPrice`, which only lines up when the
+ *      stablecoin has the oracle's 18 decimals. USDT0 has 6, so the floor came out 1e12 times too
+ *      small — a swap could return a millionth of the rBTC it owed and still clear it.
+ */
+contract PurchaseUniswapMinOutTest is Test {
+    uint256 private constant PERCENT = DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT; // 0.995e18
+    uint256 private constant SAFETY = DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK;
+    uint256 private constant BTC_PRICE_18 = BTC_PRICE * 1e18; // what MockMocOracle publishes
+    uint256 private constant USD_NOTIONAL = 25; // $25, the minimum purchase
+
+    MockWrbtcToken private wrBtcToken;
+    MockFloorSwapRouter private swapRouter;
+    MockMocOracle private mocOracle;
+
+    function setUp() public {
+        wrBtcToken = new MockWrbtcToken();
+        swapRouter = new MockFloorSwapRouter(wrBtcToken);
+        mocOracle = new MockMocOracle();
+        vm.deal(address(swapRouter), 100 ether);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          THE $1 PEG, IN UNITS
+    //////////////////////////////////////////////////////////////*/
+
+    function testMinOutIsTheSameRbtcForTheSameUsdWhateverTheDecimals() public {
+        MinOutHarness eighteen = _deployHarness(18);
+        MinOutHarness six = _deployHarness(6);
+
+        uint256 expected = (USD_NOTIONAL * 1e18 * PERCENT) / BTC_PRICE_18;
+
+        assertEq(eighteen.getAmountOutMinimum(USD_NOTIONAL * 1e18), expected, "18-decimal min-out");
+        assertEq(six.getAmountOutMinimum(USD_NOTIONAL * 1e6), expected, "6-decimal min-out");
+    }
+
+    function testSixDecimalMinOutIsNotTheEighteenDecimalFormula() public {
+        MinOutHarness six = _deployHarness(6);
+        uint256 amountIn = USD_NOTIONAL * 1e6;
+
+        uint256 preR43 = (amountIn * PERCENT) / BTC_PRICE_18; // the formula this PR replaces
+        uint256 minOut = six.getAmountOutMinimum(amountIn);
+
+        // 1e12 tighter, up to the rounding the old formula lost by dividing a 6-decimal amount by an 18-decimal price.
+        assertApproxEqRel(preR43 * 1e12, minOut, 0.01e18, "6-decimal floor must be ~1e12 tighter");
+        assertLt(preR43, minOut / 1e11, "the pre-R43 floor bound essentially nothing for a 6-decimal stablecoin");
+    }
+
+    function testMinOutMatchesTheOracleAtEveryStablecoinScale(uint8 tokenDecimals, uint256 usdNotional) public {
+        tokenDecimals = uint8(bound(tokenDecimals, 0, 18));
+        usdNotional = bound(usdNotional, 1, 1_000_000);
+
+        MinOutHarness harness = _deployHarness(tokenDecimals);
+        uint256 amountIn = usdNotional * (10 ** tokenDecimals);
+
+        assertEq(
+            harness.getAmountOutMinimum(amountIn),
+            (usdNotional * 1e18 * PERCENT) / BTC_PRICE_18,
+            "min-out must track the USD notional, not the token's units"
+        );
+    }
+
+    function testMinOutTracksTheOraclePrice() public {
+        MinOutHarness six = _deployHarness(6);
+        uint256 amountIn = USD_NOTIONAL * 1e6;
+        uint256 minOutAtFiftyThousand = six.getAmountOutMinimum(amountIn);
+
+        mocOracle.setPrice(BTC_PRICE_18 * 2);
+
+        assertEq(six.getAmountOutMinimum(amountIn), minOutAtFiftyThousand / 2, "twice the BTC price, half the rBTC");
+    }
+
+    function testMinOutRevertsOnAnInvalidPrice() public {
+        MinOutHarness six = _deployHarness(6);
+        mocOracle.setInvalidPrice();
+
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__OutdatedPrice.selector);
+        six.getAmountOutMinimum(USD_NOTIONAL * 1e6);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        THE FLOOR AT SWAP TIME
+    //////////////////////////////////////////////////////////////*/
+
+    function testSixDecimalSwapRejectsWhatThePreR43FloorWouldHaveAccepted() public {
+        MinOutHarness six = _deployHarness(6);
+        uint256 amountIn = USD_NOTIONAL * 1e6;
+        six.mintStablecoin(amountIn);
+
+        // A router paying the pre-R43 floor is paying a millionth of a millionth of the rBTC owed.
+        swapRouter.setAmountOut((amountIn * PERCENT) / BTC_PRICE_18);
+        vm.expectRevert(bytes("Too little received"));
+        six.purchaseRbtc(amountIn);
+
+        // The fair amount at the oracle price still clears.
+        uint256 fair = (USD_NOTIONAL * 1e18 * 1e18) / BTC_PRICE_18;
+        swapRouter.setAmountOut(fair);
+        assertEq(six.purchaseRbtc(amountIn), fair, "credited amount is the measured WRBTC delta");
+    }
+
+    function testSwapCreditsTheMeasuredWrbtcDeltaNotTheFloor() public {
+        MinOutHarness eighteen = _deployHarness(18);
+        uint256 amountIn = USD_NOTIONAL * 1e18;
+        eighteen.mintStablecoin(amountIn);
+
+        uint256 generous = (USD_NOTIONAL * 1e18 * 1e18) / BTC_PRICE_18 * 2;
+        swapRouter.setAmountOut(generous);
+
+        assertEq(eighteen.purchaseRbtc(amountIn), generous, "invariant 1: cash is the balance delta");
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          UNSUPPORTED TOKENS
+    //////////////////////////////////////////////////////////////*/
+
+    function testDeployRevertsOnAStablecoinWithMoreThanEighteenDecimals() public {
+        MockStablecoinWithDecimals stablecoin = new MockStablecoinWithDecimals(address(this), 19);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IPurchaseUniswap.PurchaseUniswap__UnsupportedStablecoinDecimals.selector, uint8(19))
+        );
+        _deployHarnessFor(stablecoin);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                HELPERS
+    //////////////////////////////////////////////////////////////*/
+
+    function _deployHarness(uint8 tokenDecimals) private returns (MinOutHarness) {
+        return _deployHarnessFor(new MockStablecoinWithDecimals(address(this), tokenDecimals));
+    }
+
+    /// @dev No external call before the `new`, so `vm.expectRevert` lands on the harness deployment.
+    function _deployHarnessFor(MockStablecoinWithDecimals stablecoin) private returns (MinOutHarness) {
+        address[] memory intermediateTokens = new address[](0);
+        uint24[] memory poolFeeRates = new uint24[](1);
+        poolFeeRates[0] = 3000;
+
+        IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
+            wrBtcToken: IWRBTC(address(wrBtcToken)),
+            swapRouter02: ISwapRouter02(address(swapRouter)),
+            swapIntermediateTokens: intermediateTokens,
+            swapPoolFeeRates: poolFeeRates,
+            mocOracle: ICoinPairPrice(address(mocOracle))
+        });
+
+        // Fee bounds are irrelevant here: the harness calls the swap directly, never the fee-charging batch.
+        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+            minFeeRate: MIN_FEE_RATE,
+            maxFeeRate: MAX_FEE_RATE_TEST,
+            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
+            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+        });
+
+        return new MinOutHarness(stablecoin, feeSettings, uniswapSettings, PERCENT, SAFETY);
+    }
+}
+
+/**
+ * @notice Holds the purchase token in a base constructor, the way `TokenHandler` does for the real handlers,
+ *         so `PurchaseUniswap`'s constructor can already read `_purchaseToken()`.
+ */
+abstract contract PurchaseTokenBase {
+    MockStablecoinWithDecimals internal immutable i_token;
+
+    constructor(MockStablecoinWithDecimals token) {
+        i_token = token;
+    }
+}
+
+contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
+    constructor(
+        MockStablecoinWithDecimals token,
+        IFeeHandler.FeeSettings memory feeSettings,
+        UniswapSettings memory uniswapSettings,
+        uint256 amountOutMinimumPercent,
+        uint256 amountOutMinimumSafetyCheck
+    )
+        PurchaseTokenBase(token)
+        FeeHandler(address(0xFEE), feeSettings, msg.sender)
+        DcaManagerAccessControl(msg.sender)
+        PurchaseUniswap(uniswapSettings, amountOutMinimumPercent, amountOutMinimumSafetyCheck)
+    {}
+
+    function getAmountOutMinimum(uint256 stablecoinAmountToSpend) external view returns (uint256) {
+        return _getAmountOutMinimum(stablecoinAmountToSpend);
+    }
+
+    function purchaseRbtc(uint256 stablecoinAmountToSpend) external returns (uint256) {
+        return _purchaseRbtc(stablecoinAmountToSpend);
+    }
+
+    function mintStablecoin(uint256 amount) external {
+        i_token.mint(address(this), amount);
+    }
+
+    function _purchaseToken() internal view override returns (IERC20) {
+        return IERC20(address(i_token));
+    }
+
+    function _retrieveStablecoin(address, uint256) internal pure override returns (uint256) {
+        return 0;
+    }
+
+    function _batchRetrieveStablecoin(address[] memory, uint256[] memory, uint256)
+        internal
+        pure
+        override
+        returns (uint256)
+    {
+        return 0;
+    }
+}
+
+/**
+ * @notice A router that pays a settable amount of WRBTC and enforces `amountOutMinimum`, so a test can ask
+ *         whether a given payout clears the handler's floor. `MockSwapRouter02` prices its own output, which
+ *         cannot express "pay what the pre-R43 formula would have allowed".
+ */
+contract MockFloorSwapRouter {
+    struct ExactInputParams {
+        bytes path;
+        address recipient;
+        uint256 amountIn;
+        uint256 amountOutMinimum;
+    }
+
+    MockWrbtcToken private immutable i_wrBtcToken;
+    uint256 private s_amountOut;
+
+    constructor(MockWrbtcToken wrBtcToken) {
+        i_wrBtcToken = wrBtcToken;
+    }
+
+    function setAmountOut(uint256 amountOut) external {
+        s_amountOut = amountOut;
+    }
+
+    function exactInput(ExactInputParams calldata params) external payable returns (uint256 amountOut) {
+        amountOut = s_amountOut;
+        require(params.amountOutMinimum <= amountOut, "Too little received");
+
+        address tokenIn = address(uint160(bytes20(params.path[:20])));
+        require(IERC20(tokenIn).transferFrom(msg.sender, address(this), params.amountIn), "transferFrom failed");
+
+        i_wrBtcToken.deposit{value: amountOut}(msg.sender);
+    }
+
+    receive() external payable {}
+}
