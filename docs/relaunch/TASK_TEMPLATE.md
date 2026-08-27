@@ -52,4 +52,4 @@ The implementer may follow imports, inheritance, mocks, failing tests, and compi
 
 - ABI: none / describe event or function changes.
 - Scripts: none / which `script/` files and whether they are local-only.
-- Cutover: none / what ops or frontend must know. Do not include broadcast steps or live addresses as instructions to execute.
+- Cutover: none / what ops or frontend must know. If a consumer must change, the implementer opens or updates an issue on each affected sibling repo (`AGENTS.md` **Consumer follow-up**). Do not include broadcast steps or live addresses as instructions to execute.

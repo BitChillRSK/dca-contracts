@@ -85,9 +85,43 @@ Do this even if a user-level rule says “don’t commit until asked.” An assi
 4. **One implementer per PR.** Parallel review (Cursor/Codex/Claude/Bugbot) is expected. Parallel implementation on overlapping Solidity is not. Skip git worktrees for this relaunch except a docs-only PR that does not share files.
 5. After the PR is open, set `docs/relaunch/README.md` **Status** to this PR (full GitHub link) and “next unassigned: …” (the one-line prompt for the following chat). If the URL is only known after opening, add that Status update in a follow-up commit and push, then stop. Do not start the next R-item in this chat. The human merges in order. In the closing message, remind the human of that next prompt so they can spin up the following agent.
 6. **Keep the PR body current.** After any review or audit follow-up that changes the diff, edit the GitHub description in the same turn (`gh pr edit`) before you stop. **Files beyond the spec** must name every path in `gh pr diff --name-only` that the spec’s file list does not, with a one-line why. Update an existing entry when its reason changed (checkbox flips vs a new out-of-scope bullet). Do not leave the body describing only the first push.
+7. **Consumer follow-up** (see below): if this PR changes anything a consumer repo reads, sends, or indexes, open or update an issue on each affected repo in the same turn and paste the URLs in the PR **Cutover / frontend note**.
 
 ## PRs
 
 Small, behavior-scoped, reviewable history. No drive-by refactors. Use the template. Do not restate the invariants — say whether they still hold. After review follow-ups, refresh the body so **Files beyond the spec** matches the current diff.
 
 When reviewing a PR by number, fetch its actual diff (e.g. `gh pr diff <N>` or `gh pr view <N> --json files`) and confirm the changed files match before trusting any findings — don't assume the locally checked-out branch is that PR's diff.
+
+## Consumer follow-up
+
+The contracts have five sibling consumers. Do not implement consumer changes in this repo — open an issue there.
+
+| Repo | Consumes | Owns |
+|---|---|---|
+| [`front-end`](https://github.com/BitChillRSK/front-end) | `DcaManager` user surface | user calls, hardcoded ABIs, route indexes, venue names |
+| [`swapper-bot`](https://github.com/BitChillRSK/swapper-bot) | `batchBuyRbtc`, swapper allowlist | tick composition, gas splitting, per-handler cron targets |
+| [`bitchill-monitoring`](https://github.com/BitChillRSK/bitchill-monitoring) | events and custom errors | alerting, backfill, `abi.json` |
+| [`data-api`](https://github.com/BitChillRSK/data-api) | schedule and purchase state | the schedule model the bot and dashboard read |
+| [`metrics-dashboard`](https://github.com/BitChillRSK/metrics-dashboard) | `data-api` output, venue labels | reporting, venue naming |
+
+When a contracts PR changes anything a consumer must handle after relaunch, **search that repo's existing issues first**, then **open a new issue or comment on the matching one** in the same turn as opening or updating the contracts PR. Paste every issue URL in the contracts PR **Cutover / frontend note**. Do not wait for merge.
+
+```
+gh issue list --repo BitChillRSK/<repo> --state all --limit 50
+gh issue create --repo BitChillRSK/<repo> --title "…" --body "…"
+```
+
+`data-api` sits upstream of both `swapper-bot` and `metrics-dashboard`. A change to the schedule model usually needs an issue on `data-api` **and** on each downstream repo — do not assume the API change propagates on its own.
+
+**Open or update an issue when the PR:**
+
+- **front-end** — adds, removes, or changes a public selector, argument list, event, or custom error on `DcaManager`, `OperationsAdmin`, or any contract the UI calls (handlers, fee reads, purchase-rBTC getters); accepts a new argument value the UI cannot send (for example `type(uint256).max` as withdraw-all); adds or remaps a route index or venue; or breaks a behavior the UI assumes (caller-only `getMy*` getters, hardcoded `1 = Tropykus` / `2 = Sovryn`, interest on every index).
+- **swapper-bot** — changes `batchBuyRbtc`'s selector, argument list, or grouping rules; adds state the bot must filter on before batching (a paused schedule reverts the whole batch); changes which addresses are allowlisted swappers or adds a contract the bot should call instead; changes route indexes, the live handler set, or per-handler cron targets; or changes token decimals, minimum purchase amounts, or min-out math the bot reproduces off-chain.
+- **bitchill-monitoring** — adds, removes, renames, or re-indexes any event or custom error; changes the deployed handler set it watches; or changes an event's field meaning even when the signature is stable. Assume `abi.json` needs regenerating.
+- **data-api** — changes the schedule struct, its field names or types, a getter it reads, or the set of tokens and routes it must serve. Storage packing counts if a field's type changes.
+- **metrics-dashboard** — changes venue naming, the route index map, or any `data-api` field it renders.
+
+**Do not open an issue for:** internal-only renames with no ABI effect, tests, Makefile, deploy scripts no consumer calls, owner-only surfaces no consumer exposes, or natspec.
+
+The issue body should name the contracts PR, the old vs new surface (selector and args, or event and fields), the consumer files that still use the old one, and whether it is a small ABI edit or a product change (new venue, new flow). If an existing issue already covers it, comment there instead of duplicating.

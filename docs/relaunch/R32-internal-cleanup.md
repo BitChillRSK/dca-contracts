@@ -30,7 +30,7 @@ R13 already removes protocol-name fetching and installs the direct lending-route
 - [ ] R34 ABI decisions, schedule-struct packing, pause, compound interest, fee changes, or handler registry changes.
 - [ ] Assembly, unchecked-loop changes, calldata rewrites, or gas-driven removal of `nonReentrant` from schedule mutators.
 - [ ] Protocol adapter behavior or new shared inheritance layers.
-- [ ] Enforcing one handler address per token across lending route indexes (later-review: locked principal is per-route, `s_shares` is per-handler).
+- [ ] Enforcing one assignment per handler address (assigned later to R47: locked principal is per-route, `s_shares` is per-handler).
 
 ## Files likely touched
 

@@ -1,0 +1,84 @@
+# R42 — Swapper batcher (one tx, many `batchBuyRbtc`)
+
+Status: **not started** · Assigned: no · Optional/further-review: no
+
+PR 44 of the relaunch stack. Stack on R38 (PR 43). Lands **before** R9/R10 so the event/ABI review and final natspec pass see every first-party contract that ships. It does not change `DcaManager`’s surface.
+
+## Objective
+
+Add a thin contract that the swapper allowlist can call once per cron tick to run several `DcaManager.batchBuyRbtc` calls (one per token×route handler) in a single transaction.
+
+## Background
+
+`batchBuyRbtc` already requires every row to share one `token` and one `routeIndex`. After idle + LayerBank + Sovryn + USDRIF/USDT0 dex, a tick is several of those calls. Ethereum/Rootstock still has one top-level call per tx, so the bot cannot bundle them without an intermediate contract or a `multicall` on `DcaManager`.
+
+Do **not** add `multicall` to `DcaManager`. A dedicated batcher:
+
+- leaves the manager ABI unchanged for the subsequent freeze;
+- is `addSwapper`’d on `OperationsAdmin` (`DcaManager.onlySwapper` already keys off that allowlist);
+- holds no user funds;
+- can be replaced without touching handlers.
+
+R36/R37 land first so the batcher tests and cutover notes can use the final production route set rather
+than describing handlers that have not been wired yet.
+
+**Atomicity.** One revert rolls back every venue in the bundle. Today a failed LayerBank batch does not roll back Sovryn. That isolation is operationally useful (an illiquid reserve aborts one handler, not the tick). Bundling trades isolation for one tx. That is the product choice this spec records, not an accident.
+
+Decided 2026-08-27: **ship the batcher** as a relaunch item, not optional-late.
+
+## Open product decisions
+
+**none** — decided 2026-08-27: calls are all-or-nothing, with no `try/catch`; the bot EOA remains allowlisted as a break-glass/single-handler retry path alongside the batcher.
+
+## Scope
+
+- [ ] `src/SwapperBatcher.sol` (name may vary): immutable `dcaManager`, no token custody, no `receive` that holds rBTC.
+- [ ] One external function that takes an array of `batchBuyRbtc` argument groups (token, routeIndex, parallel buyer/index/id/amount arrays) and forwards each group to `DcaManager.batchBuyRbtc`. Empty top-level array reverts. Per-group empty/length checks stay on `DcaManager`.
+- [ ] No `onlySwapper` on the batcher itself unless you also want to stop random EOAs from driving it — `DcaManager` already reverts `UnauthorizedSwapper` unless `msg.sender` is allowlisted. The batcher **is** `msg.sender` for those calls, so it must be `addSwapper`’d. An extra allowlist on the batcher is optional and must not duplicate a second source of truth; default is none.
+- [ ] Add-on `script/DeploySwapperBatcher.s.sol` (local/test). Live `addSwapper` is ops, not this PR’s broadcast.
+- [ ] Tests: two handlers (e.g. idle DOC + Sovryn DOC, or two route indexes on one admin) succeed in one `batcher` call; a revert in the second group rolls back the first; an address that is not a swapper cannot use the batcher to purchase (DcaManager revert) unless the batcher itself is allowlisted in the test fixture.
+
+## Out of scope
+
+- [ ] `multicall` / `delegatecall` on `DcaManager`.
+- [ ] Changing `batchBuyRbtc` to accept mixed tokens or routes.
+- [ ] Telegram / monitoring. Per-user amounts already live in `PurchaseRbtc__RbtcBought`.
+- [ ] Removing the bot EOA from the allowlist.
+- [ ] `--broadcast`.
+
+## Files likely touched
+
+- `src/SwapperBatcher.sol` (new), matching interface if you split one
+- `script/DeploySwapperBatcher.s.sol` (new)
+- New unit test under `test/unit/`
+- `AGENTS.md` layout one-liner if a new `src/` file needs it
+
+## Required tests
+
+Targeted new test file, then `make check`.
+
+- One batcher tx, two `batchBuyRbtc` groups, two handlers: both purchase.
+- Second group reverts (e.g. empty buyers if decision 1 is all-or-nothing): first group’s schedule `lastPurchaseTimestamp` / balances unchanged.
+- Batcher not on the allowlist: revert `DcaManager__UnauthorizedSwapper`.
+- Fork: no new assertions. Still run both fork lanes before push.
+
+## Success criteria
+
+- [ ] Cron can drive every due handler in one tx through the batcher.
+- [ ] Failure policy matches decision 1, tested.
+- [ ] No DcaManager selector/event/error change.
+- [ ] No open product decisions.
+
+## Reviewer checklist
+
+- [ ] Matches **Scope**; nothing from **Out of scope**.
+- [ ] Batcher cannot withdraw user funds or rBTC.
+- [ ] Tests in the PR match **Required tests**.
+- [ ] Files beyond this list are limited to direct dependencies and are named in the PR.
+- [ ] No unrelated refactors; history is reviewable.
+
+## ABI / deploy / cutover impact
+
+- ABI: new contract only. DcaManager frozen surface unchanged.
+- Scripts: local deploy add-on. Ops `addSwapper(batcher)` after deploy (document, do not broadcast).
+- Cutover: swapper bot points at the batcher. **Frontend follow-up:** none unless the UI ever sent `batchBuyRbtc` (it should not). Monitoring already sees the same handler events.
