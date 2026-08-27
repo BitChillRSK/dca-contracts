@@ -151,7 +151,7 @@ Assert:
   dex-layerbank lane **and** the USDT0 dex-layerbank lane.
 - The round-up solvency property R22 established for the MoC lane also holds here: virtual scaled
   books stay `<=` handler `scaledBalanceOf` after odd-amount redeems against Aave-like round-nearest
-  burns. The test must fail if `_stablecoinToShares` were flipped to `Rounding.Down`. Run it on at
+  burns. The test must fail if `_stablecoinToShares` were flipped to `Rounding.Floor`. Run it on at
   least one of the two dex stables (the handler is shared).
 - `DeployUsdrifHandler.run()` (or the generalized dex-stable script) reverts on `FORK` without
   `REAL_DEPLOYMENT=true` (mirror `test_run_revertsOnForkWithoutRealDeployment`).

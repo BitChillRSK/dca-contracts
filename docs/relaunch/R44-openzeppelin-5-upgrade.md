@@ -1,6 +1,6 @@
 # R44 — OpenZeppelin 5.7 upgrade
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
 PR 31 of the relaunch stack. Stack on R39 (PR 30). Land before every remaining authority, storage, handler, and ABI PR.
 
@@ -20,12 +20,12 @@ R39 lands first so the size comparison reflects the batch-only purchase surface.
 
 ## Scope
 
-- [ ] Update the `lib/openzeppelin-contracts` submodule pin and any remapping/import path required by v5.7.0.
-- [ ] Migrate first-party contracts and test mocks to v5 constructors and APIs while preserving the current owner at construction (`msg.sender`) in this PR.
-- [ ] Update tests that intentionally assert OZ revert data to v5 custom errors. Do not weaken them to generic `expectRevert()`.
-- [ ] Record before/after runtime sizes and gas snapshots for `DcaManager`, `OperationsAdmin`, and every concrete handler.
-- [ ] Inspect storage layouts. There is no proxy migration, but unexpected BitChill state reordering is still a review failure.
-- [ ] Exercise every OZ surface the repo uses: ownership, reentrancy guard, SafeERC20, ERC20/permit mocks, ERC165, and Math.
+- [x] Update the `lib/openzeppelin-contracts` submodule pin and any remapping/import path required by v5.7.0.
+- [x] Migrate first-party contracts and test mocks to v5 constructors and APIs while preserving the current owner at construction (`msg.sender`) in this PR.
+- [x] Update tests that intentionally assert OZ revert data to v5 custom errors. Do not weaken them to generic `expectRevert()`.
+- [x] Record before/after runtime sizes and gas snapshots for `DcaManager`, `OperationsAdmin`, and every concrete handler.
+- [x] Inspect storage layouts. There is no proxy migration, but unexpected BitChill state reordering is still a review failure.
+- [x] Exercise every OZ surface the repo uses: ownership, reentrancy guard, SafeERC20, ERC20/permit mocks, ERC165, and Math.
 
 ## Out of scope
 
@@ -48,11 +48,62 @@ Run focused ownership/reentrancy/handler suites, `forge build --sizes`, `forge i
 
 ## Success criteria
 
-- [ ] The repository is pinned exactly to OpenZeppelin Contracts `v5.7.0`.
-- [ ] Existing BitChill behavior is unchanged and v5 error assertions remain exact.
-- [ ] Every concrete contract remains below EIP-170 with recorded margin.
-- [ ] No unplanned BitChill storage-layout change.
-- [ ] No open product decisions.
+- [x] The repository is pinned exactly to OpenZeppelin Contracts `v5.7.0`.
+- [x] Existing BitChill behavior is unchanged and v5 error assertions remain exact.
+- [x] Every concrete contract remains below EIP-170 with recorded margin.
+- [x] No unplanned BitChill storage-layout change.
+- [x] No open product decisions.
+
+## Measured results
+
+Pinned to tag `v5.7.0` (`cab19933c33c2ad1d4c7a84864a3601dddfd16f3`), not a moving ref.
+
+**Runtime bytecode (EIP-170 limit 24,576) — every contract shrank; v5 replaced OZ's revert strings with custom errors:**
+
+| contract | v4.9.3 | v5.7.0 | freed | margin after |
+|---|---|---|---|---|
+| `DcaManager` | 16,547 | 16,307 | 240 | 8,269 |
+| `OperationsAdmin` | 4,528 | 4,277 | 251 | 20,299 |
+| `IdleDocHandlerMoc` | 12,219 | 10,668 | 1,551 | 13,908 |
+| `LayerBankDocHandlerMoc` | 17,111 | 15,364 | 1,747 | 9,212 |
+| `SovrynDocHandlerMoc` | 16,638 | 14,930 | 1,708 | 9,646 |
+| `TropykusDocHandlerMoc` | 16,894 | 15,147 | 1,747 | 9,429 |
+| `SovrynErc20HandlerDex` | 22,173 | 20,660 | 1,513 | 3,916 |
+| `TropykusErc20HandlerDex` | 22,429 | 20,916 | 1,513 | 3,660 |
+
+The two Dex handlers are the binding constraint before R9. Their margin grows 2,403 → 3,916 and 2,147 → 3,660 (+63% and +71%).
+
+**Gas (`forge snapshot`, MoC / Sovryn / DOC lane, same tests both sides):**
+
+| operation | v4.9.3 | v5.7.0 | delta |
+|---|---|---|---|
+| deposit stablecoin | 182,056 | 175,350 | -6,706 |
+| withdraw stablecoin | 123,716 | 122,836 | -880 |
+| create schedule | 340,946 | 326,770 | -14,176 |
+| length-1 batch purchase | 307,344 | 306,471 | -873 |
+| 5-schedule batch purchase | 2,434,189 | 2,360,023 | -74,166 |
+| withdraw accumulated rBTC | 4,653,258 | 4,573,041 | -80,217 |
+
+Across the 578 shared tests no production path got more expensive. The only increases are ~+500 gas inside `*_reverts_notOwner` tests, which is the test building `abi.encodeWithSelector(OwnableUnauthorizedAccount, caller)` — test-side memory, not contract runtime.
+
+**Storage layout.** Only `DcaManager` changed, and no BitChill variable moved relative to another. OZ 5.x `ReentrancyGuard` keeps `_status` at a fixed ERC-7201 namespaced slot instead of the next sequential slot, so `_status` leaves the sequential layout and every BitChill variable shifts down exactly one slot (`s_operationsAdmin` 2 → 1 … `s_scheduleNonce` 8 → 7). Every handler layout is byte-identical. The relaunch is a fresh deployment, so there is nothing to migrate; R18 (storage packing) inherits one more free slot than it was scoped against.
+
+## Migration notes
+
+The v5 API changes that actually touched this repo:
+
+| v4.9.3 | v5.7.0 | where |
+|---|---|---|
+| `security/ReentrancyGuard.sol` | `utils/ReentrancyGuard.sol` | `DcaManager` |
+| `Ownable()` | `Ownable(msg.sender)` | `DcaManager`, `OperationsAdmin`, `FeeHandler`, four mocks |
+| `SafeERC20.safeApprove` | `SafeERC20.forceApprove` | `LendingErc20Handler.depositToken` |
+| `Math.Rounding.Up` | `Math.Rounding.Ceil` | `TokenLending`, `LendingErc20Handler`, three handler tests |
+| `"Ownable: caller is not the owner"` | `OwnableUnauthorizedAccount(address)` | 27 assertions |
+| `"ReentrancyGuard: reentrant call"` | `ReentrancyGuardReentrantCall()` | 3 assertions |
+
+`safeApprove` is the only one that changes behavior rather than spelling. v4 refused any non-zero → non-zero allowance change, so a stale partial allowance below the next deposit would have reverted every later deposit of that token; `forceApprove` zeroes first and succeeds. Pinned by `test_sovryn_depositSucceedsWithStaleNonZeroAllowance`, which was verified to fail when the v4 precondition is reinstated.
+
+Ownership stays single-step and owned by the deployer. `Ownable2Step` is R45.
 
 ## Reviewer checklist
 
