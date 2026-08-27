@@ -13,7 +13,13 @@ Rootstock executes `PUSH0` since Arrowhead (2024-04-03) and Cancun memory / tran
 
 Anvil and `forge test --fork-url` execute on revm, not rskj. Prove the pin on Rootstock **testnet** before merging relaunch behavior PRs (see `docs/relaunch/IMPLEMENTATION_ORDER.md`).
 
-OpenZeppelin stays **v4.9.3**. Do not re-run any `sed` on `lib/openzeppelin-contracts`. A 5.x upgrade is a separate optional PR. Compiling OZ 4.9.3 with 0.8.36 emits warning 6335 (`error` will become a keyword in `ECDSA._throwError`); that is expected and not a reason to bump OZ in this PR.
+OpenZeppelin is pinned to **v5.7.0** (tag `cab19933c33c2ad1d4c7a84864a3601dddfd16f3`), migrated from `v4.9.3` in R44 — see [`docs/relaunch/R44-openzeppelin-5-upgrade.md`](./docs/relaunch/R44-openzeppelin-5-upgrade.md) for the API deltas, sizes, gas, and the `DcaManager` storage-slot shift. Track the stable tag; do not follow `master`, a release candidate, or a floating `5.x` ref.
+
+Do not run any `sed` on `lib/openzeppelin-contracts`. The Uniswap pragma patch below does not apply to it — OZ ships pragmas that 0.8.36 already accepts, and `make patch-deps` is a no-op there because it only rewrites `pragma solidity =0.7.6;`.
+
+The old warning 6335 note (`error` becoming a keyword in `ECDSA._throwError`) applied to 4.9.3 and no longer fires: 0.8.36 compiles v5.7.0 without it.
+
+`lib/openzeppelin-contracts` carries its own nested submodules (`forge-std`, `erc4626-tests`, `halmos-cheatcodes`) for OpenZeppelin's own test suite. First-party builds never compile them, but CI checks out `submodules: recursive`, and switching the OZ pin can leave their gitlinks drifted — which shows up as `modified: lib/openzeppelin-contracts (modified content)` with no `.sol` diff behind it. That is not the pragma patch. Resync with `git submodule update --init --recursive --force lib/openzeppelin-contracts`; never stage it.
 
 Rootstock does **not** require Solidity 0.8.19. That pin was a blunt way to stay off `PUSH0` before Arrowhead; `evm_version = "london"` on a newer solc would have been enough at the time.
 
