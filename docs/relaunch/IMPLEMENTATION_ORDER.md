@@ -68,16 +68,16 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R35 | 27 | none |
 | R32 | 28 | none |
 | R22 (deploy/CI) | 29 | none |
-| R38 | 30 | replace vs. add zipped withdraw-all; R36 dex-map reachability |
-| R39 | 31 | none (delete `buyRbtc`) |
-| R40 | 32 | none (`updatePurchasePeriod`) |
-| R41 | 33 | none (reject FOT hop-1 shortfall) |
-| R43 | 34 | $1 peg; min-out design; Rootstock MEV posture |
-| R9 | 35 | R18/R19 if not recorded; extra purchase-event fields (default none) |
-| R10 | 36 | none |
+| R39 | 30 | none (delete `buyRbtc`) |
+| R43 | 31 | $1 peg; min-out design; Rootstock MEV posture |
+| R41 | 32 | none (reject FOT hop-1 shortfall) |
+| R40 | 33 | none (`updatePurchasePeriod`) |
+| R36 | 34 | dex-map index, Sovryn arm, kUSDRIF pause, USDT0 min/fee units |
+| R37 | 35 | local tropykus lanes, index 4 reuse |
+| R38 | 36 | replace vs. add zipped withdraw-all; keep names vs rename |
 | R42 | 37 | all-or-nothing vs continue-on-fail; keep bot EOA on allowlist |
-| R36 | 38 | dex-map index, Sovryn arm, kUSDRIF pause, USDT0 min/fee units |
-| R37 | 39 | local tropykus lanes, index 4 reuse |
+| R9 | 38 | R18/R19 if not recorded; extra purchase-event fields (default none) |
+| R10 | 39 | none |
 | R12, R18, R19, OZ 5.x, Ownable2Step, `setOperationsAdmin` hardening/restriction, one handler per token across lending routes, SPDX license once chosen | optional late | only if the human named that item |
 
 ### PR 1 - R23 toolchain and dependency baseline
@@ -310,63 +310,35 @@ Split the shared test harness so lending-share assertions live only in lending-p
 
 Stack on R32 (PR 28). Tropykus is not in this map; R27 already corrected the legacy handler.
 
-### PR 30 - R38 zip withdraw-all route pairs
-
-Replace the `tokens × routeIndexes` cartesian product in `withdrawAllAccumulatedInterest` and `withdrawAllAccumulatedRbtc` with positional `(token, routeIndex)` pairs, so a caller can name exactly the routes it holds a balance on. A user with balances on two different tokens *and* two different routes (USDRIF×LayerBank plus DOC×Sovryn) currently has no way to avoid calling DOC×LayerBank. See [`R38-withdraw-all-route-pairs.md`](./R38-withdraw-all-route-pairs.md).
-
-Not a live defect after R37: the only handler whose no-op call does real work is Tropykus, whose `_exchangeRate()` override is the state-changing `exchangeRateCurrent()`; everything else inherits the view default. This is here because a cartesian API cannot express a set of pairs and R9 freezes the signature for the life of the deployment.
-
-**Must land before R9 (PR 35).** Landing it after the freeze means re-freezing. R39–R41 and R43 also change ABI before that freeze.
-
-**Product gates to ask:** replace the cartesian semantics or add a zipped function alongside (recommend replace — R34 recorded no live dual-ABI window); and whether R36's dex map keeps USDRIF/USDT0 on the same `OperationsAdmin` instance as DOC, which is what makes the mixed case reachable on a shipped map. R36 is scheduled after the freeze, so ask its decision 1 early or land this on the add-only-route-map argument.
-
-### PR 31 - R39 remove `buyRbtc`
+### PR 30 - R39 remove `buyRbtc`
 
 Delete `DcaManager.buyRbtc` and `PurchaseRbtc.buyRbtc`. Production uses `batchBuyRbtc`; a length-1 batch is the remaining one-schedule path. Frees Dex bytecode before R9 spends it on share events. See [`R39-remove-single-buy.md`](./R39-remove-single-buy.md).
 
-**Must land before R9 (PR 35).**
+This goes first because it removes the dead purchase branch and creates bytecode headroom before R43 changes `PurchaseUniswap` and before R36 adds the final Dex handler.
 
-### PR 32 - R40 `updatePurchasePeriod`
+**Must land before R9 (PR 38).**
 
-Rename `setPurchasePeriod` → `updatePurchasePeriod`. Event becomes `PurchasePeriodUpdated(user, scheduleId, previousPeriod, newPeriod)` with neither period indexed (R9 rule). `setPurchaseAmount` stays. See [`R40-update-purchase-period.md`](./R40-update-purchase-period.md).
+### PR 31 - R43 dex path review (peg, slippage, MEV)
 
-**Must land before R9 (PR 35).** Frontend follow-up required.
+Dex becomes a production venue (USDRIF + USDT0 on LayerBank). Review `PurchaseUniswap` before R36 copies it and before R9 freezes it: the $1-stable assumption against the MoC BTC/USD oracle, how `amountOutMinimum` is built, the unused-at-swap-time safety-check, SwapRouter02’s missing deadline, and Rootstock MEV. The current min-out formula is 18-decimal; **USDT0 is 6 decimals** and cannot ship on it. Implement the recorded decisions in this PR (minimum: decimal scaling if the peg is kept). See [`R43-dex-path-review.md`](./R43-dex-path-review.md).
 
-### PR 33 - R41 reject fee-on-transfer deposits
+This deliberately follows R39 so the reviewed Dex bytecode no longer contains the single-buy branch, and it deliberately precedes R36 so the new handler consumes settled shared swap behavior.
 
-Keep R21’s hop-1 measurement; revert `TokenHandler__DepositAmountMismatch` if `received != requested`. Listed stables are 1:1; a surprise transfer fee fails closed instead of crediting a shortfall. New custom error is ABI, so this is still pre-freeze. See [`R41-reject-fot-deposits.md`](./R41-reject-fot-deposits.md).
-
-### PR 34 - R43 dex path review (peg, slippage, MEV)
-
-Dex becomes a production venue (USDRIF + USDT0 on LayerBank). Review `PurchaseUniswap` before R9 freezes it and before R36 copies it: the $1-stable assumption against the MoC BTC/USD oracle, how `amountOutMinimum` is built, the unused-at-swap-time safety-check, SwapRouter02’s missing deadline, and Rootstock MEV. The current min-out formula is 18-decimal; **USDT0 is 6 decimals** and cannot ship on it. Implement the recorded decisions in this PR (minimum: decimal scaling if the peg is kept). See [`R43-dex-path-review.md`](./R43-dex-path-review.md).
-
-**Must land before R9 (PR 35) and before R36 (PR 38).**
+**Must land before R36 (PR 34) and R9 (PR 38).**
 
 **Product gates to ask:** keep $1 + MoC BTC/USD (recommend yes); min-out design (recommend on-chain oracle floor, optional off-chain tighten); MEV posture (recommend floor + document no deadline, extra protection on the bot not the handler).
 
-### PR 35 - R9 event indexing and ABI freeze
+### PR 32 - R41 reject fee-on-transfer deposits
 
-Index only addresses and `scheduleId`. Do not index amounts, timestamps, periods, rates, strings, bytes, or arrays. Do not shorten diagnostic custom-error argument lists (R6).
+Keep R21’s hop-1 measurement; revert `TokenHandler__DepositAmountMismatch` if `received != requested`. Listed stables are 1:1; a surprise transfer fee fails closed instead of crediting a shortfall. New custom error is ABI, so this is pre-freeze. Land it before R36 so the new USDT0/USDRIF deployments start with the settled deposit policy. See [`R41-reject-fot-deposits.md`](./R41-reject-fot-deposits.md).
 
-Add `TokenLending__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares)` to the shared lending interface and emit it after every successful per-user virtual lending-share mutation in the shipped lending handlers. Deposits report the exact measured lending-token mint, not the stablecoin input. Withdrawals, interest, and every buyer debit in a batch are covered; repeated users in one batch produce sequential transitions. Tests must show each `newShares` equals `getUserShares(user)` and that replay from a fresh deployment reconstructs current balances. See [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md) and [`R9-event-indexing.md`](./R9-event-indexing.md).
+### PR 33 - R40 `updatePurchasePeriod`
 
-Add `FeeHandler__FeeTransferred(token, collector, amount)` from `_transferFee` when the fee is non-zero (one event per batch for the aggregated fee). Per-user rBTC in a batch is already `PurchaseRbtc__RbtcBought` — that is a monitoring consumer, not a new event.
+Rename `setPurchasePeriod` → `updatePurchasePeriod`. Event becomes `PurchasePeriodUpdated(user, scheduleId, previousPeriod, newPeriod)` with neither period indexed (R9 rule). `setPurchaseAmount` stays. See [`R40-update-purchase-period.md`](./R40-update-purchase-period.md).
 
-**Product gates to ask:** R18/R19 if not recorded; any extra purchase-event fields for ops (default none).
+**Must land before R9 (PR 38).** Frontend follow-up required.
 
-### PR 36 - R10 natspec and comments
-
-Rewrite first-party natspec after ABI, names, handlers, and layout are stable. Put user-facing docs on interfaces and use `@inheritdoc` in implementations.
-
-Do not make behavior changes in this PR.
-
-### PR 37 - R42 swapper batcher
-
-A dedicated contract, allowlisted as a swapper, that forwards several `DcaManager.batchBuyRbtc` calls in one tx (one group per token×route). No `multicall` on `DcaManager`. Holds no user funds. Lands after the freeze on purpose. See [`R42-swapper-batcher.md`](./R42-swapper-batcher.md).
-
-**Product gates to ask:** all-or-nothing vs continue-on-fail (recommend all-or-nothing); whether the bot EOA stays on the allowlist (recommend yes).
-
-### PR 38 - R36 LayerBank dex stables (USDRIF + USDT0)
+### PR 34 - R36 LayerBank dex stables (USDRIF + USDT0)
 
 Ship `LayerBankErc20HandlerDex` (`LayerBankErc20Handler` + `PurchaseUniswap`, constructor-only, modelled on `SovrynErc20HandlerDex`) and deploy it twice: USDRIF (replacing `TropykusErc20HandlerDex`) and USDT0 (new listing). Same bytecode; config differs. Add a `dex-layerbank` lane to the Makefile and CI for both `STABLECOIN_TYPE=USDRIF` and `STABLECOIN_TYPE=USDT0`.
 
@@ -374,19 +346,53 @@ R22 (PR 29) took Tropykus off the production **MoC** map but it is still live on
 
 USDT0 is 6 decimals (`0x779Ded0c9e1022225f8E0630b35a9b54bE713736`). Do not pass `Constants.sol`'s 18-decimal `MIN_PURCHASE_AMOUNT` / `FEE_PURCHASE_*` into the USDT0 handler. Fee bounds are per-handler constructor args; the min is `DcaManager.setTokenMinPurchaseAmount`. **Blocked on R43:** `_getAmountOutMinimum` currently treats stablecoin units as 18-decimal USD.
 
-Lands after the ABI-freeze PRs on purpose: R9's `TokenLending__UserSharesUpdated` is emitted from the shared `LendingErc20Handler` base, so a new handler inherits it with no ABI re-freeze. This PR writes its own natspec in the R10 style rather than assuming a later sweep.
+Lands before R9 and R10 on purpose: the event freeze must exercise the final shipped lending-handler set, including both LayerBank Dex deployments, and the natspec pass must include the new handler and deploy surface instead of requiring a one-off style exception.
 
 **Product gates to ask:** which dex-map index LayerBank takes (the dex `OperationsAdmin` is a separate instance from the MoC one, so it need not match `LAYERBANK_INDEX = 1`, but matching is far less confusing; USDRIF and USDT0 share that index); whether the dex map keeps a Sovryn arm alongside LayerBank; whether kUSDRIF mint is currently paused on Tropykus mainnet (the kDOC pause at blocks 8739512–8740674 is measured, the USDRIF status is not); and USDT0 min/fee magnitudes (recommend `25e6` / `1000e6` / `100_000e6`). See `R36-layerbank-usdrif-dex.md`.
 
-### PR 39 - R37 retire Tropykus from every live path
+### PR 35 - R37 retire Tropykus from every live path
 
 Remove Tropykus from every live deploy branch, move its deploy scripts under `script/tropykus-legacy/`, and move `TROPYKUS_INDEX` from `script/Constants.sol` to `test/Constants.sol` so a future `script/` file naming it fails to compile. `TROPYKUS_STRING` stays in `script/Constants.sol` — `MocHelperConfig` / `DexHelperConfig` need it to select mocks for the local lane, and neither uses the index.
 
-**Blocked on PR 38.** Removing the Tropykus dex arm before a LayerBank USDRIF handler exists deletes USDRIF DCA. USDT0 is new and is not on Tropykus; it does not change this block.
+**Blocked on PR 34.** Removing the Tropykus dex arm before a LayerBank USDRIF handler exists deletes USDRIF DCA. USDT0 is new and is not on Tropykus; it does not change this block.
 
 Handler contracts and their tests stay; `make moc-tropykus` / `dex-tropykus` / `fork-tropykus` keep their mock and live coverage of `LendingErc20Handler` through a second adapter. A sentinel "unreachable" index was considered and rejected: `routeIndex` is an unpacked `uint256`, `s_routeClass` is a sparse mapping, and nothing in `src/` enumerates indexes, so a large number enforces nothing. Compilation scope is the enforcement. Completes the `src/` / `script/` split that R22-repo-layout (PR 11) started.
 
 **Product gates to ask:** whether the local Tropykus lanes survive (recommend yes), and whether index 4 is released for reuse. See `R37-retire-tropykus-live-paths.md`.
+
+### PR 36 - R38 zip withdraw-all route pairs
+
+Replace the `tokens × routeIndexes` cartesian product in `withdrawAllAccumulatedInterest` and `withdrawAllAccumulatedRbtc` with positional `(token, routeIndex)` pairs, so a caller can name exactly the routes it holds a balance on. See [`R38-withdraw-all-route-pairs.md`](./R38-withdraw-all-route-pairs.md).
+
+R36 and R37 now land first, so this PR is written and tested against the final production route topology rather than asking an implementation decision from a later PR. Even if the shipped maps do not contain a mixed-token/mixed-route partial grid, the add-only route registry can acquire one later and the cartesian API still cannot express a set of pairs.
+
+Not a live cash defect after R37: the only handler whose no-op call does real work is Tropykus, whose `_exchangeRate()` override is the state-changing `exchangeRateCurrent()`; everything else inherits the view default. This remains required because R9 freezes the signature for the life of the deployment.
+
+**Must land before R9 (PR 38).**
+
+**Product gates to ask:** replace the cartesian semantics or add a zipped function alongside (recommend replace — R34 recorded no live dual-ABI window); and keep the `withdrawAllAccumulated*` names or rename them (recommend keep).
+
+### PR 37 - R42 swapper batcher
+
+A dedicated contract, allowlisted as a swapper, that forwards several `DcaManager.batchBuyRbtc` calls in one tx (one group per token×route). No `multicall` on `DcaManager`. Holds no user funds. Land it after the final route map and before the freeze so R9 audits the complete first-party surface and R10 documents it. See [`R42-swapper-batcher.md`](./R42-swapper-batcher.md).
+
+**Product gates to ask:** all-or-nothing vs continue-on-fail (recommend all-or-nothing); whether the bot EOA stays on the allowlist (recommend yes).
+
+### PR 38 - R9 event indexing and ABI freeze
+
+Index only addresses and `scheduleId`. Do not index amounts, timestamps, periods, rates, strings, bytes, or arrays. Do not shorten diagnostic custom-error argument lists (R6).
+
+Add `TokenLending__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares)` to the shared lending interface and emit it after every successful per-user virtual lending-share mutation in the shipped lending handlers. Deposits report the exact measured lending-token mint, not the stablecoin input. Withdrawals, interest, and every buyer debit in a batch are covered; repeated users in one batch produce sequential transitions. Tests must show each `newShares` equals `getUserShares(user)` and that replay from a fresh deployment reconstructs current balances. The shipped set now includes the LayerBank Dex handler added by R36. See [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md) and [`R9-event-indexing.md`](./R9-event-indexing.md).
+
+Add `FeeHandler__FeeTransferred(token, collector, amount)` from `_transferFee` when the fee is non-zero (one event per batch for the aggregated fee). Per-user rBTC in a batch is already `PurchaseRbtc__RbtcBought` — that is a monitoring consumer, not a new event.
+
+**Product gates to ask:** R18/R19 if not recorded; any extra purchase-event fields for ops (default none).
+
+### PR 39 - R10 natspec and comments
+
+Rewrite first-party natspec only after ABI, names, handlers, route maps, and the batcher are stable. Put user-facing docs on interfaces and use `@inheritdoc` in implementations.
+
+Do not make behavior changes in this PR.
 
 ## Optional late PRs
 

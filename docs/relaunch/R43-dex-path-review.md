@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: no · Optional/further-review: no
 
-**Must land before R9 (ABI freeze) and before R36** (LayerBank USDRIF/USDT0 dex copies this path). R33 only closed the settings-invariant hole; it explicitly left oracle math, price freshness, and `amountOutMinimum` construction out of scope.
+PR 31 of the relaunch stack. Stack on R39 (PR 30). **Must land before R36 and R9 (ABI freeze)** because LayerBank USDRIF/USDT0 Dex consumes this path. R33 only closed the settings-invariant hole; it explicitly left oracle math, price freshness, and `amountOutMinimum` construction out of scope.
 
 ## Objective
 
@@ -31,6 +31,8 @@ SwapRouter02 `ExactInputParams` has **no `deadline`**. A stale tx can sit in the
 **USDT0 is 6 decimals.** The current formula is silently 18-decimal. `25e6 * 0.995e18 / btcUsd18` is not “25 dollars of BTC.” R36 cannot ship until this PR either scales by token decimals or records a different min-out design that does. Do not leave that as a comment on R36.
 
 R33 stays: one validator, `safety <= percent <= 100%`. Do not reopen that invariant except to delete `safety` if the review finds it unused on purpose.
+
+R39 lands first so this review measures and reasons about the batch-only purchase path that will actually ship, with the single-buy bytecode already removed.
 
 ## Open product decisions
 

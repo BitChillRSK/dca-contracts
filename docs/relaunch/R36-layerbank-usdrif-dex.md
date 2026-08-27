@@ -2,6 +2,8 @@
 
 Status: **not started** · Assigned: no · Optional/further-review: no
 
+PR 34 of the relaunch stack. Stack on R40 (PR 33).
+
 **Blocked on [R43](./R43-dex-path-review.md):** `PurchaseUniswap._getAmountOutMinimum` treats stablecoin units as 18-decimal USD against the MoC BTC/USD oracle. USDT0 is 6 decimals. Do not implement this PR on the unscaled formula.
 
 ## Objective
@@ -35,10 +37,10 @@ logic of its own. `LayerBankErc20Handler` already extends `LendingErc20Handler`,
 inherits share accounting, the withdraw clamp, and interest for free. The contract is token-agnostic:
 USDRIF and USDT0 are two deployments of that same bytecode, not two contracts.
 
-This lands after the ABI-freeze PRs (R9 event indexing, R10 natspec). That is deliberate and cheap:
-R9's `TokenLending__UserSharesUpdated` is emitted from the shared `LendingErc20Handler` base, so a
-new handler inherits it without an ABI re-freeze. This PR must write its own natspec in the R10 style
-rather than assume a later sweep will cover it.
+This lands before R9 and R10 deliberately. R9 must freeze and test the event surface against the final
+shipped lending-handler set, including both deployments of `LayerBankErc20HandlerDex`; R10 must document
+that final handler and deploy surface instead of requiring this PR to imitate a natspec pass that already
+closed.
 
 ### USDT0 is config, with one real catch (6 decimals)
 
@@ -79,10 +81,9 @@ Ask the human before implementing:
    confusing for ops and the frontend. Recommend `1`. Route classes are add-only and schedules store
    `routeIndex` forever, so this cannot be changed after a live deploy. USDRIF and USDT0 share that
    index (different tokens, two handler instances).
-   **Answer this early even though this PR is late.** Whether the dex map is a separate instance decides
-   whether a single `withdrawAll*` call can span USDRIF/USDT0 and DOC, which is the premise of
-   [`R38-withdraw-all-route-pairs.md`](./R38-withdraw-all-route-pairs.md) (PR 30) — and R38 must land
-   before R9 freezes the ABI.
+   R38 now follows R36, so that PR will consume the final dex-map topology rather than asking this gate
+   early. Whether the live dex map keeps a DOC/Sovryn arm (decision 2) determines whether its mixed-grid
+   example is immediately reachable; the zipped API remains durable even if the first map is simpler.
 2. **Does the dex map keep a Sovryn arm alongside LayerBank, or does LayerBank replace it?**
    `DeployDexSwaps` currently deploys both Tropykus and Sovryn on live networks. Sovryn lists neither
    USDRIF nor USDT0; a remaining Sovryn arm is a DOC-dex question, not a USDT0 question.
@@ -196,8 +197,8 @@ Fork: adds a fork-specific assertion only if decision 3 turns up a live kUSDRIF 
 
 ## ABI / deploy / cutover impact
 
-- ABI: new handler contract; no change to shared interfaces. Confirm the R9 share event is inherited
-  from `LendingErc20Handler` and actually emitted on both dex stables.
+- ABI: new handler contract; no change to shared interfaces. R9 follows this PR and must confirm its share
+  event is emitted from `LendingErc20Handler` on both dex stables before the event surface freezes.
 - Scripts: `DeployUsdrifHandler` / `DeployDexSwaps` (and helper config) change which handler the live
   dex path deploys, and add a USDT0 registration.
 - Cutover: the USDRIF dex route index and its lending backend both change; USDT0 is a new listed

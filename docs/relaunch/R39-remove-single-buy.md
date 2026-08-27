@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: no · Optional/further-review: no
 
-**Must land before R9 (ABI freeze).**
+PR 30 of the relaunch stack. Stack on the planning PR, GitHub [#74](https://github.com/BitChillRSK/dca-contracts/pull/74). **Must land before R43, R36, and R9 (ABI freeze).**
 
 ## Objective
 
@@ -13,6 +13,8 @@ Delete the single-schedule `buyRbtc` entry points on `DcaManager` and `PurchaseR
 `DcaManager.buyRbtc` and `PurchaseRbtc.buyRbtc` are swapper-only. The bot always builds batches. Keeping both paths doubles the purchase pipeline, the tests, and Dex bytecode (R31 left a few hundred bytes of EIP-170 margin before R9 adds share-transition events).
 
 A length-1 `batchBuyRbtc` is not a perfect clone of the old single path (array checks, aggregated fee, `PurchaseRbtc__SuccessfulRbtcBatchPurchase`), but it is the same cash motion: one retrieve, one fee transfer, one MoC/Uniswap spend, one `PurchaseRbtc__RbtcBought`. That is enough for debug and retries.
+
+This is first in the remaining queue so R43 reviews the purchase path after the dead branch is gone and R36 measures the new LayerBank Dex handler against the reduced runtime.
 
 Decided 2026-08-27: **delete**. Do not keep it as a hidden debug selector.
 

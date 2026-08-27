@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: no · Optional/further-review: no
 
-**Must land before R9** (new custom error is ABI). Stack on R21 (PR 13 / [#54](https://github.com/BitChillRSK/dca-contracts/pull/54)).
+PR 32 of the relaunch stack. Stack on R43 (PR 31); behavior builds on R21 (PR 13 / [#54](https://github.com/BitChillRSK/dca-contracts/pull/54)). **Must land before R36 and R9** because the new custom error is ABI and the new Dex stable deployments should inherit the settled fail-closed deposit policy.
 
 ## Objective
 

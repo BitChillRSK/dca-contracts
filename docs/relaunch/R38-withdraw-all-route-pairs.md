@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: no · Optional/further-review: no
 
-**Must land before R9 (ABI freeze).** R39–R41 also change DcaManager/handler ABI before that freeze; this is not the last signature PR.
+PR 36 of the relaunch stack. Stack on R37 (PR 35). **Must land before R9 (ABI freeze).** R39–R41 and R43 already settled the other DcaManager/handler ABI changes by this point.
 
 ## Objective
 
@@ -17,9 +17,11 @@ tokens and two different route indexes** forces combinations they do not hold:
 
 | positive routes | call must be | product also hits |
 |---|---|---|
-| USDRIF×LayerBank, DOC×Sovryn | `[USDRIF, DOC] × [1, 2]` | DOC×LayerBank (registered — real handler call), USDRIF×Sovryn (unregistered — skipped) |
+| USDRIF×LayerBank, DOC×Sovryn | `[USDRIF, DOC] × [1, 2]` | DOC×LayerBank and USDRIF×Sovryn, whether registered or skipped |
 
-R36 adds USDT0 as a second LayerBank dex stable on the same map. That is another token a mixed-grid caller would include, and it does not make the cartesian form any more precise.
+R36 adds USDT0 as a second LayerBank dex stable. If decision 2 keeps a DOC/Sovryn arm on that same dex
+map, the mixed grid is immediately shipped; if not, the add-only registry can still acquire partial
+multi-token/multi-route coverage later. Neither case makes the cartesian form capable of expressing pairs.
 
 Same-token/multi-route (`[DOC] × [1, 2]`) and multi-token/same-route (`[DOC, USDRIF] × [1]`) expand cleanly.
 Only the mixed case produces no-ops.
@@ -47,21 +49,18 @@ cannot be told the truth.
 caller over-specify, and the only nested loops. This PR makes them consistent with the pattern the
 codebase already chose everywhere else.
 
-### Reachability depends on R36 — settle its map decision before assigning this
+### Reachability follows the final R36/R37 map
 
 The mixed case needs **one `OperationsAdmin` map serving ≥2 tokens across ≥2 lending routes with partial
-coverage**. That is true of the live map today (DOC on Tropykus and Sovryn, USDRIF on Tropykus, one
-`DcaManager`; `DeployUsdrifHandler` registers the USDRIF handler onto an existing
-`operationsAdminAddress` / `dcaManagerAddress` rather than standing up its own). Whether it stays true is
-R36 open decision 1: if the dex map is a genuinely separate `OperationsAdmin` instance, no single
-call spans DOC and USDRIF/USDT0 and the no-op is unreachable on the shipped maps. R36 also adds USDT0
-as a second LayerBank dex stable on that map — another token a mixed-grid caller would include.
+coverage**. `DeployMocSwaps` and `DeployDexSwaps` create separate admins/managers, so a MoC route and a Dex
+route do not mix merely because both exist. R36 now lands before this PR and decides whether the dex map
+itself keeps DOC/Sovryn alongside USDRIF/USDT0 on LayerBank; R37 then removes the live Tropykus arm. This
+PR therefore tests the topology that actually ships instead of asking a future deployment gate early.
 
-Do not treat that as a reason to skip this. R36 is scheduled *after* the freeze (PR 38), so the decision
-that determines reachability lands after the last chance to change the signature. Either ask R36 decision 1
-early, or land this on the durable argument: route maps are add-only and schedules store `routeIndex`
-forever, so a two-token/two-route map added at any later point reintroduces the no-ops with no way to fix
-them short of another redeploy.
+Even if that final map has only LayerBank-backed USDRIF/USDT0, do not treat simpler initial reachability as
+a reason to skip the API correction. Route maps are add-only and schedules store `routeIndex` forever, so
+a two-token/two-route partial map added later reintroduces the no-ops with no way to express the desired
+pairs short of another redeploy.
 
 ## Open product decisions
 

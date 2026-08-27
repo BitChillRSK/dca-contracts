@@ -2,6 +2,8 @@
 
 Status: **not started** · Assigned: no · Optional/further-review: no · **Blocked on R36**
 
+PR 35 of the relaunch stack. Stack on R36 (PR 34).
+
 ## Objective
 
 Make "Tropykus is never deployed again" a property the build enforces rather than a comment: remove

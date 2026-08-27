@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: no · Optional/further-review: no
 
-PR 35 of the relaunch stack. **ABI freeze** for events, errors, and remaining indexed fields. Stack on R43 (PR 34). See [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md).
+PR 38 of the relaunch stack. **ABI freeze** for events, errors, and remaining indexed fields. Stack on R42 (PR 37), after the final production handlers/routes and batcher exist. See [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md).
 
 ## Objective
 
@@ -42,7 +42,7 @@ Fee-transfer event: **yes**, decided 2026-08-27. Shape below.
       );
       ```
 
-      Deposits: measured share mint, not stablecoin in. Withdrawals, interest, single-schedule debit (if any remains after R39), every buyer in a batch, sequential updates when the same user appears twice. `newShares == getUserShares(user)`. Reverts emit nothing lasting. Idle has no shares — do not emit there.
+      Deposits: measured share mint, not stablecoin in. Withdrawals, interest, every buyer in a batch, sequential updates when the same user appears twice. `newShares == getUserShares(user)`. Reverts emit nothing lasting. Idle has no shares — do not emit there. Cover both deployments of the LayerBank Dex handler added by R36.
 - [ ] Tests: each emit site; replay from a fresh deploy reconstructs balances from the event stream.
 - [ ] `FeeHandler__FeeTransferred(address indexed token, address indexed collector, uint256 amount)` from `_transferFee` when `fee > 0`. Skip a zero-fee transfer if `_transferFee` is not called; if it is called with 0, do not emit. Batch = one event for the aggregated fee. Do not index `amount`.
 - [ ] Do not shorten custom-error argument lists. Do not rename errors for brevity.
@@ -52,7 +52,7 @@ Fee-transfer event: **yes**, decided 2026-08-27. Shape below.
 - [ ] On-chain Merkl / harvest / reward index (`EXTERNAL_REWARDS.md`).
 - [ ] Telegram, monitoring, or frontend copy. Wire consumers to existing `RbtcBought` + the new fee event.
 - [ ] R39/R40/R41 behavior (already landed).
-- [ ] R42 batcher.
+- [ ] Changing R42 batcher behavior. Its first-party ABI already exists and is included in the freeze audit.
 - [ ] License / SPDX.
 - [ ] Packing, pause, compound (unless decision 1 says they ship in this freeze — then their events are in scope here and nowhere else).
 

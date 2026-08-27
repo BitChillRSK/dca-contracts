@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: no · Optional/further-review: no
 
-Lands **after** R9/R10. New contract; does not change `DcaManager`’s frozen ABI.
+PR 37 of the relaunch stack. Stack on R38 (PR 36). Lands **before** R9/R10 so the event/ABI review and final natspec pass see every first-party contract that ships. It does not change `DcaManager`’s surface.
 
 ## Objective
 
@@ -14,10 +14,13 @@ Add a thin contract that the swapper allowlist can call once per cron tick to ru
 
 Do **not** add `multicall` to `DcaManager`. A dedicated batcher:
 
-- keeps the frozen manager ABI;
+- leaves the manager ABI unchanged for the subsequent freeze;
 - is `addSwapper`’d on `OperationsAdmin` (`DcaManager.onlySwapper` already keys off that allowlist);
 - holds no user funds;
 - can be replaced without touching handlers.
+
+R36/R37 land first so the batcher tests and cutover notes can use the final production route set rather
+than describing handlers that have not been wired yet.
 
 **Atomicity.** One revert rolls back every venue in the bundle. Today a failed LayerBank batch does not roll back Sovryn. That isolation is operationally useful (an illiquid reserve aborts one handler, not the tick). Bundling trades isolation for one tx. That is the product choice this spec records, not an accident.
 

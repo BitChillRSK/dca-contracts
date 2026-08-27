@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: no · Optional/further-review: no
 
-**Must land before R9 (ABI freeze).**
+PR 33 of the relaunch stack. Stack on R41 (PR 32). **Must land before R9 (ABI freeze).**
 
 ## Objective
 
