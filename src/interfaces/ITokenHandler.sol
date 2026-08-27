@@ -16,8 +16,12 @@ interface ITokenHandler {
     //////////////////////
     // Errors ////////////
     //////////////////////
-    /// @notice A positive deposit request credited nothing after transferFrom (fee-on-transfer took the whole amount).
-    error TokenHandler__ZeroStablecoinReceived();
+    /// @notice The handler measured something other than the requested amount after `transferFrom`.
+    /// @dev Fee-on-transfer is not a supported token class, so any shortfall (including a zero receipt) reverts
+    /// instead of crediting the schedule less than the user asked to deposit.
+    /// @param requested The amount the DCA manager asked this handler to pull from the user.
+    /// @param received The `balanceOf(address(this))` delta measured around `transferFrom`.
+    error TokenHandler__DepositAmountMismatch(uint256 requested, uint256 received);
 
     ///////////////////////////////
     // External functions /////////
@@ -27,8 +31,9 @@ interface ITokenHandler {
      * @notice Deposit a specified amount of a stablecoin into the contract for DCA operations.
      * @param user The user making the deposit.
      * @param amount The amount of the stablecoin requested from the user.
-     * @return depositedAmount The amount this contract actually received, measured as a `balanceOf` delta around `transferFrom`.
-     * Credit this amount, not `amount`. A fee-on-transfer token may deliver less than requested.
+     * @return depositedAmount The amount this contract actually received, measured as a `balanceOf` delta around
+     * `transferFrom`. The measurement is kept, but the call reverts `TokenHandler__DepositAmountMismatch` unless it
+     * equals `amount`, so callers always credit the requested amount.
      */
     function depositToken(address user, uint256 amount) external returns (uint256 depositedAmount);
 

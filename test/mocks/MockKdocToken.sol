@@ -36,6 +36,13 @@ contract MockKdocToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
     bool private s_silentZeroPayout;
     /// @notice mint succeeds (code 0) but mints no kDOC, so the handler's zero-delta guard can fire.
     bool private s_forceZeroMint;
+    /**
+     * @notice When set, mint keeps all the cash it pulled but credits shares for only part of it.
+     * @dev Models the hop-2 lag: a 1:1 stablecoin arrives in full, then the market mints shares worth less than
+     * the deposit. DcaManager's book then sits ahead of the share-backed underlying, which is what the per-user
+     * share clamp exists for. Hop 1 is fee-free, so `TokenHandler` never sees a mismatch.
+     */
+    uint256 private s_mintShortfallBps;
 
     function setSilentZeroPayout(bool silentZeroPayout) external {
         s_silentZeroPayout = silentZeroPayout;
@@ -43,6 +50,11 @@ contract MockKdocToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
 
     function setForceZeroMint(bool forceZeroMint) external {
         s_forceZeroMint = forceZeroMint;
+    }
+
+    function setMintShortfallBps(uint256 mintShortfallBps) external {
+        require(mintShortfallBps <= 10_000, "Shortfall above 100%");
+        s_mintShortfallBps = mintShortfallBps;
     }
 
     function mint(uint256 amount) public returns (uint256) {
@@ -53,7 +65,8 @@ contract MockKdocToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
         i_docToken.transferFrom(msg.sender, address(this), amount);
         if (s_forceZeroMint) return 0;
         uint256 received = i_docToken.balanceOf(address(this)) - balanceBefore;
-        _mint(msg.sender, received * DECIMALS / exchangeRateCurrent());
+        uint256 credited = received * (10_000 - s_mintShortfallBps) / 10_000;
+        _mint(msg.sender, credited * DECIMALS / exchangeRateCurrent());
         return 0;
     }
 
