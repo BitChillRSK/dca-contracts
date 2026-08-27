@@ -32,8 +32,9 @@ jobs:
         # so was `version: stable`, so CI resolved two moving refs at job time.
         uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
         with:
-          # Observed 2026-08-27: `stable` rolled forge 1.7.1 -> 1.8.0 (released 2026-08-26)
-          # between two CI runs 45 minutes apart, with no repo change in between. Under 1.8.0,
+          # Observed 2026-08-27: forge v1.8.0 was published at 12:30:54Z. The CI run at 12:23Z
+          # installed 1.7.1 and was green; the next run at 13:08Z installed 1.8.0 and went red.
+          # Same stack, no repo change in between -- `stable` simply moved under it. Under 1.8.0,
           # suites that build their own fixtures with `vm.prank(OWNER); new OperationsAdmin();`
           # fail at `setUp()` with:
           #   "vm.prank: cannot overwrite a prank until it is applied at least once"
