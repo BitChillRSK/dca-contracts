@@ -15,7 +15,7 @@ import "script/Constants.sol";
  * @title BatchTailScheduleTest
  * @notice Pins today's behavior when a schedule spends its exact remaining balance on a lending route.
  *
- * @dev **This documents a known rough edge, not a desired property. R43 owns the decision.**
+ * @dev **This documents a known rough edge, not a desired property. R43 decided to keep it.**
  *
  * `TokenLending._stablecoinToShares` rounds the share debit **up** (deliberately: the per-user share
  * book must never drift above the shares the handler actually holds), while `depositToken` credits the
@@ -33,7 +33,10 @@ import "script/Constants.sol";
  * the only path that could clear a tail schedule, so these tests are the record of what replaced it.
  * Idle is unaffected: its balances are 1:1, with no rate and no rounding.
  *
- * If R43 makes the batch clamp, these tests should be flipped, not deleted.
+ * R43 kept the revert: clamping would debit fewer shares than the schedule's `purchaseAmounts[i]` says was
+ * spent, diverging the DcaManager balance from the share book over dust, and it would change every lending
+ * route. A tail schedule is a state the swapper bot filters before batching, like a paused one, and the user's
+ * own exit is the withdraw-all sentinel. If that is ever revisited, these tests should be flipped, not deleted.
  */
 contract BatchTailScheduleTest is Test {
     address internal ALICE = address(0xA11CE);

@@ -15,8 +15,10 @@ contract TropykusErc20HandlerDex is TropykusErc20Handler, PurchaseUniswap {
      * @param kTokenAddress the address of Tropykus' kToken contract
      * @param feeCollector the address of to which fees will sent on every purchase
      * @param feeSettings struct with the settings for fee calculations
-     * @param amountOutMinimumPercent The minimum percentage of rBTC that must be received from the swap (default: 99.7%)
-     * @param amountOutMinimumSafetyCheck The safety check percentage for minimum rBTC output (default: 99%)
+     * @param amountOutMinimumPercent The minimum percentage of rBTC that must be received from the swap
+     *        (deploy default: `DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT`, 99.5%)
+     * @param amountOutMinimumSafetyCheck The lowest percent the owner may later configure
+     *        (deploy default: `DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK`, 95%)
      */
     constructor(
         address dcaManagerAddress,

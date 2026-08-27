@@ -8,10 +8,16 @@ import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces
 import {IV3SwapRouter} from "@uniswap/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol";
 import {ICoinPairPrice} from "./interfaces/ICoinPairPrice.sol";
 import {IPurchaseUniswap} from "./interfaces/IPurchaseUniswap.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 /**
  * @title PurchaseUniswap
  * @notice This contract handles swaps of stablecoin for rBTC using Uniswap V3
+ * @dev Min-out is built from the MoC BTC/USD oracle under a $1 peg assumption: one unit of the handler's
+ *      stablecoin is taken to be one USD. BitChill only lists 1:1 stables (DOC, USDRIF, USDT0) and does not
+ *      run a per-stablecoin USD feed. If a listed stablecoin depegs downwards, the pool prices it below the
+ *      oracle-implied floor and the swap reverts; nothing here redeems a depegged stablecoin at $1, and a
+ *      persistent depeg is handled by delisting the token, not by the purchase path.
  */
 abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     //////////////////////
@@ -21,14 +27,30 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     ISwapRouter02 public immutable i_swapRouter02;
     ICoinPairPrice internal s_mocOracle;
     uint256 constant HUNDRED_PERCENT = 1 ether;
+    /// @notice decimals of the MoC BTC/USD price. Hardcoded in the R29 style; the oracle exposes no `decimals()`.
+    uint256 internal constant USD_DECIMALS = 18;
+    /// @notice decimals of the token min-out is denominated in. Must stay equal to `HUNDRED_PERCENT`'s scale:
+    /// the oracle's decimals cancel against the stablecoin scale-up, so the quotient lands in units of
+    /// 1e-18 BTC because `s_amountOutMinimumPercent` carries 1e18. Those are WRBTC wei only at 18 decimals.
+    uint256 internal constant WRBTC_DECIMALS = 18;
+    /// @notice `10 ** (USD_DECIMALS - stablecoin decimals)`, which lifts a stablecoin amount into 18-decimal USD
+    /// @dev Fixed at deploy because the handler's stablecoin is immutable. USDT0 is 6 decimals, DOC and USDRIF 18.
+    uint256 internal immutable i_stablecoinToUsdScale;
     uint256 internal s_amountOutMinimumPercent;
+    /// @notice Config-only floor: the lowest `s_amountOutMinimumPercent` the owner may set. Never used at swap time.
     uint256 internal s_amountOutMinimumSafetyCheck;
     bytes internal s_swapPath;
 
     /**
      * @param uniswapSettings the settings for the uniswap router
-     * @param amountOutMinimumPercent The minimum percentage of rBTC that must be received from the swap (default: 99.7%)
-     * @param amountOutMinimumSafetyCheck The safety check percentage for minimum rBTC output (default: 99%)
+     * @param amountOutMinimumPercent The minimum percentage of rBTC that must be received from the swap
+     *        (deploy default: `DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT`, 99.5%)
+     * @param amountOutMinimumSafetyCheck The lowest percent the owner may later configure
+     *        (deploy default: `DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK`, 95%)
+     * @dev Reads the stablecoin's `decimals()` once and stores the scaling factor min-out needs, so a
+     *      6-decimal stablecoin is not read as an 18-decimal one. Tokens with more than 18 decimals are
+     *      rejected rather than rounded down to a weaker floor, and a WRBTC that is not 18 decimals is
+     *      rejected because the quotient would no longer be denominated in its wei.
      * @dev Builds the initial path through `_purchaseToken()`. The concrete funding base
      *      (TokenHandler via LendingErc20Handler / IdleErc20Handler) must initialize
      *      `i_stableToken` before this constructor body runs — the leaf `is` order lists
@@ -52,7 +74,19 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck;
         
         // Direct initial owner is not the deployer, so the constructor cannot call the onlyOwner setter.
+        // This also rejects a zero purchase token before the `decimals()` calls below reach an empty address.
         _setPurchasePath(uniswapSettings.swapIntermediateTokens, uniswapSettings.swapPoolFeeRates);
+
+        // Both sides of the min-out quotient are pinned here rather than assumed: the output unit first,
+        // then the input scale.
+        uint8 wrBtcDecimals = i_wrBtcToken.decimals();
+        if (wrBtcDecimals != WRBTC_DECIMALS) revert PurchaseUniswap__UnsupportedWrbtcDecimals(wrBtcDecimals);
+
+        uint8 stablecoinDecimals = IERC20Metadata(address(_purchaseToken())).decimals();
+        if (stablecoinDecimals > USD_DECIMALS) {
+            revert PurchaseUniswap__UnsupportedStablecoinDecimals(stablecoinDecimals);
+        }
+        i_stablecoinToUsdScale = 10 ** (USD_DECIMALS - stablecoinDecimals);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -115,8 +149,11 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     /**
-     * @notice Set the minimum percentage of rBTC that must be received from the swap.
-     * @param amountOutMinimumSafetyCheck The minimum percentage of rBTC that must be received from the swap.
+     * @notice Set the lowest slippage tolerance the owner is allowed to configure.
+     * @param amountOutMinimumSafetyCheck The floor `setAmountOutMinimumPercent` is validated against.
+     * @dev Config-only, by design: it bounds `s_amountOutMinimumPercent` and never enters the swap math.
+     * Widening slippage tolerance therefore takes two owner transactions — lower this floor first, then the
+     * percent — which is the point of keeping it now that the owner is a Safe (R45).
      */
     function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external onlyOwner {
         _validateSlippageSettings(s_amountOutMinimumPercent, amountOutMinimumSafetyCheck);
@@ -145,8 +182,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     /**
-     * @notice Get the minimum percentage of rBTC that must be received from the swap.
-     * @return The minimum percentage of rBTC that must be received from the swap.
+     * @notice Get the configuration floor for the slippage percent.
+     * @return The lowest value `setAmountOutMinimumPercent` accepts. Not used when a swap is priced.
      */
     function getAmountOutMinimumSafetyCheck() external view returns (uint256) {
         return s_amountOutMinimumSafetyCheck;
@@ -220,12 +257,22 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     /**
      * @param stablecoinAmountToSpend the amount of stablecoin to swap for rBTC
      * @return minimumRbtcAmount the minimum amount of rBTC that must be received
-     * @dev Verifies that the oracle price is valid and up-to-date before using it
+     * @dev `stablecoinAmountToSpend * i_stablecoinToUsdScale` is the USD notional in the oracle's 18 decimals
+     * under the $1 peg assumption; dividing by the BTC/USD price turns it into WRBTC wei, and
+     * `s_amountOutMinimumPercent` is the slippage the swap may give up against that oracle price.
+     * @dev The oracle `isValid` bit is checked at execution, not at signing: a transaction that sits in the
+     * mempool is priced by the oracle of the block that mines it. This floor is the only bound on a stale or
+     * sandwiched swap. `ExactInputParams` carries no deadline, and the one mechanism SwapRouter02 does offer
+     * — `IMulticallExtended.multicall(uint256 deadline, bytes[])` — cannot help here: a deadline this contract
+     * derives from `block.timestamp` while executing is satisfied by construction. Only a deadline supplied by
+     * the caller bounds anything, and that means a `batchBuyRbtc` argument (R42), not a handler change.
+     * @dev This is a revert bound, not an accounting input: what the handler credits is the measured WRBTC
+     * balance delta in `_swapStablecoinForWrbtc`.
      */
     function _getAmountOutMinimum(uint256 stablecoinAmountToSpend) internal view returns (uint256 minimumRbtcAmount) {
         (uint256 currentPrice, bool isValid, ) = s_mocOracle.getPriceInfo();
         if (!isValid) revert PurchaseUniswap__OutdatedPrice();
-        minimumRbtcAmount = (stablecoinAmountToSpend * s_amountOutMinimumPercent) / currentPrice;
+        minimumRbtcAmount = (stablecoinAmountToSpend * i_stablecoinToUsdScale * s_amountOutMinimumPercent) / currentPrice;
     }
 
 }
