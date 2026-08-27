@@ -1,6 +1,6 @@
 # R45 — Two-step ownership and safe initial ownership
 
-Status: **implemented** · Assigned: this PR · Optional/further-review: no
+Status: **PR [#82](https://github.com/BitChillRSK/dca-contracts/pull/82)** · Assigned: yes · Optional/further-review: no
 
 PR 32 of the relaunch stack. Stack on R44 (PR 31). Must precede authority hardening and the ABI freeze.
 
