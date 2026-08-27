@@ -86,7 +86,7 @@ The two Dex handlers are the binding constraint before R9. Their margin grows 2,
 
 Across the 578 shared tests no production path got more expensive. The only increases are ~+500 gas inside `*_reverts_notOwner` tests, which is the test building `abi.encodeWithSelector(OwnableUnauthorizedAccount, caller)` — test-side memory, not contract runtime.
 
-**Storage layout.** Only `DcaManager` changed, and no BitChill variable moved relative to another. OZ 5.x `ReentrancyGuard` keeps `_status` at a fixed ERC-7201 namespaced slot instead of the next sequential slot, so `_status` leaves the sequential layout and every BitChill variable shifts down exactly one slot (`s_operationsAdmin` 2 → 1 … `s_scheduleNonce` 8 → 7). Every handler layout is byte-identical. The relaunch is a fresh deployment, so there is nothing to migrate; R18 (storage packing) inherits one more free slot than it was scoped against.
+**Storage layout.** Only `DcaManager` changed, and no BitChill variable moved relative to another. OZ 5.x `ReentrancyGuard` keeps `_status` at a fixed ERC-7201 namespaced slot instead of the next sequential slot, so `_status` leaves the sequential layout and every BitChill variable shifts down exactly one slot (`s_operationsAdmin` 2 → 1 … `s_scheduleNonce` 8 → 7). Every handler layout is byte-identical. The relaunch is a fresh deployment, so there is nothing to migrate. `DcaManager` now uses one fewer sequential slot, and the guard word sits at a collision-resistant namespaced slot rather than adjacent to BitChill state. This does not affect R18, which packs the `DcaDetails` struct inside `s_dcaSchedules` rather than DcaManager's own slots.
 
 ## Migration notes
 
