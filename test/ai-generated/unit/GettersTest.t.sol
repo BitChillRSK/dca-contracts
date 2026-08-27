@@ -81,6 +81,7 @@ contract GettersTest is DcaDappTest {
     function test_dcaManager_getOperationsAdminAddress() public {
         address adminAddress = dcaManager.getOperationsAdminAddress();
         assertEq(adminAddress, address(operationsAdmin));
+        assertTrue(adminAddress.code.length > 0);
     }
 
     function test_dcaManager_getMinPurchasePeriod() public {

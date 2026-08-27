@@ -20,7 +20,9 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    OperationsAdmin private s_operationsAdmin;
+    /// @dev Constructor-pinned registry. There is no setter: swapping this address
+    ///      would redirect every live schedule and bypass add-only route assignment.
+    OperationsAdmin private immutable i_operationsAdmin;
 
     /**
      * @notice Each user may create different schedules with one or more stablecoins
@@ -66,7 +68,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @notice only allow addresses on the OperationsAdmin swapper allowlist
      */
     modifier onlySwapper() {
-        if (!s_operationsAdmin.isSwapper(msg.sender)) {
+        if (!i_operationsAdmin.isSwapper(msg.sender)) {
             revert DcaManager__UnauthorizedSwapper(msg.sender);
         }
         _;
@@ -77,7 +79,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @param operationsAdminAddress the address of the admin operations contract
+     * @param operationsAdminAddress the OperationsAdmin this manager is permanently pinned to
      * @param minPurchasePeriod the minimum time between purchases (in seconds)
      * @param maxSchedulesPerToken the maximum number of schedules allowed per token
      * @param defaultMinPurchaseAmount the default minimum purchase amount for all tokens
@@ -90,7 +92,10 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         uint256 defaultMinPurchaseAmount,
         address initialOwner
     ) BitChillOwnable(initialOwner) validateMinPurchasePeriod(minPurchasePeriod) {
-        s_operationsAdmin = OperationsAdmin(operationsAdminAddress);
+        if (operationsAdminAddress.code.length == 0) {
+            revert DcaManager__OperationsAdminIsNotAContract(operationsAdminAddress);
+        }
+        i_operationsAdmin = OperationsAdmin(operationsAdminAddress);
         s_minPurchasePeriod = minPurchasePeriod;
         s_maxSchedulesPerToken = maxSchedulesPerToken;
         s_defaultMinPurchaseAmount = defaultMinPurchaseAmount;
@@ -309,7 +314,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     function withdrawAllAccumulatedRbtc(address[] calldata tokens, uint256[] calldata routeIndexes) external override nonReentrant {
         for (uint256 i; i < tokens.length; ++i) {
             for (uint256 j; j < routeIndexes.length; ++j) {
-                address tokenHandlerAddress = s_operationsAdmin.getTokenHandler(tokens[i], routeIndexes[j]);
+                address tokenHandlerAddress = i_operationsAdmin.getTokenHandler(tokens[i], routeIndexes[j]);
                 if (tokenHandlerAddress == address(0)) continue;
                 IPurchaseRbtc handler = IPurchaseRbtc(tokenHandlerAddress);
                 if (handler.getAccumulatedRbtcBalance(msg.sender) == 0) continue;
@@ -351,7 +356,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     {
         for (uint256 i; i < tokens.length; ++i) {
             for (uint256 j; j < routeIndexes.length; ++j) {
-                address tokenHandlerAddress = s_operationsAdmin.getTokenHandler(tokens[i], routeIndexes[j]);
+                address tokenHandlerAddress = i_operationsAdmin.getTokenHandler(tokens[i], routeIndexes[j]);
                 if (tokenHandlerAddress == address(0)) continue;
                 // Skip idle and unregistered routes so a mixed idle+lending call still
                 // withdraws interest from the indexes that yield.
@@ -359,15 +364,6 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
                 _withdrawInterest(ITokenLending(tokenHandlerAddress), tokens[i], routeIndexes[j]);
             }
         }
-    }
-
-    /**
-     * @notice update the admin operations contract
-     * @param operationsAdminAddress: the address of admin operations
-     */
-    function setOperationsAdmin(address operationsAdminAddress) external override onlyOwner {
-        s_operationsAdmin = OperationsAdmin(operationsAdminAddress);
-        emit DcaManager__OperationsAdminUpdated(operationsAdminAddress);
     }
 
     /**
@@ -472,7 +468,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @return the token handler
      */
     function _handler(address token, uint256 routeIndex) private view returns (ITokenHandler) {
-        address tokenHandlerAddress = s_operationsAdmin.getTokenHandler(token, routeIndex);
+        address tokenHandlerAddress = i_operationsAdmin.getTokenHandler(token, routeIndex);
         if (tokenHandlerAddress == address(0)) revert DcaManager__TokenNotAccepted(token, routeIndex);
         return ITokenHandler(tokenHandlerAddress);
     }
@@ -599,7 +595,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @param routeIndex: the route index
      */
     function _tokenYieldsInterest(uint256 routeIndex) private view returns (bool) {
-        return s_operationsAdmin.isLendingRoute(routeIndex);
+        return i_operationsAdmin.isLendingRoute(routeIndex);
     }
 
     /**
@@ -643,11 +639,11 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     }
 
     /**
-     * @notice get the admin operations address
-     * @return the admin operations address
+     * @notice get the OperationsAdmin this manager is permanently pinned to
+     * @return the constructor-supplied OperationsAdmin address
      */
     function getOperationsAdminAddress() external view override returns (address) {
-        return address(s_operationsAdmin);
+        return address(i_operationsAdmin);
     }
 
     /**

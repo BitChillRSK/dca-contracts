@@ -70,6 +70,11 @@ contract BaseDeploymentTest is Test {
         assertEq(operationsAdmin.pendingOwner(), address(0), "OperationsAdmin pending owner must be zero after deploy");
         assertEq(dcaManager.owner(), makeAddr(OWNER_STRING), "DcaManager owner not set correctly");
         assertEq(dcaManager.pendingOwner(), address(0), "DcaManager pending owner must be zero after deploy");
+        assertEq(
+            dcaManager.getOperationsAdminAddress(),
+            address(operationsAdmin),
+            "DcaManager OperationsAdmin must be the constructor registry"
+        );
         
         // Verify DcaManager reference in handler
         string memory lendingProtocol = vm.envString("LENDING_PROTOCOL");

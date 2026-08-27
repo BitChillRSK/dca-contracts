@@ -1,6 +1,6 @@
 # R46 — Pin DcaManager to its OperationsAdmin
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **PR [#83](https://github.com/BitChillRSK/dca-contracts/pull/83)** · Assigned: yes · Optional/further-review: no
 
 PR 33 of the relaunch stack. Stack on R45 (PR 32). Must precede handler-registry hardening and R9.
 
@@ -20,11 +20,11 @@ One-shot setters still leave a dangerous deployment state and a permanent select
 
 ## Scope
 
-- [ ] Change `s_operationsAdmin` to an immutable constructor value and reject a zero/non-contract address.
-- [ ] Remove `setOperationsAdmin` and `DcaManager__OperationsAdminUpdated` from implementation and interface.
-- [ ] Keep `getOperationsAdminAddress()` as the canonical read.
-- [ ] Update tests that exercised owner-only mutation to assert the selector is absent and the constructor value never changes.
-- [ ] Re-measure DcaManager runtime and storage layout; record the removed storage slot.
+- [x] Change `s_operationsAdmin` to an immutable constructor value and reject a zero/non-contract address.
+- [x] Remove `setOperationsAdmin` and `DcaManager__OperationsAdminUpdated` from implementation and interface.
+- [x] Keep `getOperationsAdminAddress()` as the canonical read.
+- [x] Update tests that exercised owner-only mutation to assert the selector is absent and the constructor value never changes.
+- [x] Re-measure DcaManager runtime and storage layout; record the removed storage slot.
 
 ## Out of scope
 
@@ -43,10 +43,38 @@ Target DcaManager modifiers/getters/deployment tests, inspect method identifiers
 
 ## Success criteria
 
-- [ ] No `setOperationsAdmin` selector or update event remains.
-- [ ] Every handler/swapper lookup uses the immutable constructor admin.
-- [ ] Deployment rejects an unusable admin address.
-- [ ] No open product decisions.
+- [x] No `setOperationsAdmin` selector or update event remains.
+- [x] Every handler/swapper lookup uses the immutable constructor admin.
+- [x] Deployment rejects an unusable admin address.
+- [x] No open product decisions.
+
+## Measured results
+
+`s_operationsAdmin` is now `i_operationsAdmin` (immutable). Constructor reverts `DcaManager__OperationsAdminIsNotAContract` when `code.length == 0` (zero and EOA). `getOperationsAdminAddress()` is unchanged as the read. `setOperationsAdmin(address)` (`0x32742d59`) and `DcaManager__OperationsAdminUpdated` are gone.
+
+**Runtime bytecode (EIP-170 limit 24,576) vs R45:**
+
+| contract | R45 | R46 | delta | margin after |
+|---|---|---|---|---|
+| `DcaManager` | 16,670 | 16,483 | −187 | 8,093 |
+| `OperationsAdmin` | 4,625 | 4,625 | 0 | 19,951 |
+| Handlers | unchanged | unchanged | 0 | same as R45 |
+
+Only `DcaManager` changed. Removing the setter and storing the admin in bytecode, not a slot, is the shrink.
+
+**Storage.** Slot `2` was `s_operationsAdmin`. It is gone; every later BitChill variable shifts up one slot. Ownable `_owner` / `_pendingOwner` stay in `0` / `1`. ReentrancyGuard stays in its ERC-7201 namespaced slot. Fresh deployment; nothing to migrate. R18 still packs `DcaDetails` inside `s_dcaSchedules`.
+
+| slot | R45 | R46 |
+|---|---|---|
+| 0 | `_owner` | `_owner` |
+| 1 | `_pendingOwner` | `_pendingOwner` |
+| 2 | `s_operationsAdmin` | `s_dcaSchedules` |
+| 3 | `s_dcaSchedules` | `s_minPurchasePeriod` |
+| 4 | `s_minPurchasePeriod` | `s_maxSchedulesPerToken` |
+| 5 | `s_maxSchedulesPerToken` | `s_defaultMinPurchaseAmount` |
+| 6 | `s_defaultMinPurchaseAmount` | `s_tokenMinPurchaseAmounts` |
+| 7 | `s_tokenMinPurchaseAmounts` | `s_scheduleNonce` |
+| 8 | `s_scheduleNonce` | — |
 
 ## Reviewer checklist
 
