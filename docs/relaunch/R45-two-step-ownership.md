@@ -16,7 +16,7 @@ OpenZeppelin v5 is already present from R44. A small shared governance base is p
 
 ## Open product decisions
 
-**none** — two-step future transfers, direct final owner at construction, and no renunciation on every production first-party Ownable contract.
+**Deploy vs final owner (follow-up on #82):** Foundry broadcasts from an EOA. Live contracts are constructed with that EOA as owner so `registerRoute` / `assignTokenHandler` can run in the same script. Testnet's EOA (`TESTNET_OWNER`) is the intended owner (no handoff). Mainnet proposes `MAINNET_OWNER` (the Safe) at the end of the script; the Safe must `acceptOwnership` on each contract. Direct-to-Safe construction is not used — a Safe cannot sign `forge script`.
 
 ## Scope
 
@@ -47,14 +47,14 @@ Run targeted ownership and deployment suites, every handler lane needed by const
 ## Success criteria
 
 - [x] No production first-party contract uses single-step `Ownable` directly.
-- [x] Initial ownership is correct in the deployment transaction; future transfers require acceptance.
+- [x] Initial ownership is the Foundry broadcaster so live `onlyOwner` setup cannot orphan CREATEs; testnet that *is* the final owner, mainnet proposes the Safe.
 - [x] Renunciation is impossible across manager, admin, and handlers.
 - [x] Every concrete contract remains below EIP-170.
 - [x] No open product decisions.
 
 ## Measured results
 
-`BitChillOwnable` wraps OZ `Ownable2Step`, rejects `address(0)` via OZ `OwnableInvalidOwner`, and reverts `renounceOwnership` with `BitChillOwnable__OwnershipCannotBeRenounced`. Deploy scripts pass `adminAddresses[environment]` (or `operationsAdmin.owner()` on add-ons) at construction; `pendingOwner` is zero afterwards.
+`BitChillOwnable` wraps OZ `Ownable2Step`, rejects `address(0)` via OZ `OwnableInvalidOwner`, and reverts `renounceOwnership` with `BitChillOwnable__OwnershipCannotBeRenounced`. Live scripts construct with the Foundry broadcaster as owner, then propose `MAINNET_OWNER` when that address differs. Testnet (`TESTNET_OWNER`) needs no accept. Governance and fee-collector addresses live in `script/Constants.sol`.
 
 Dex constructors used to call `onlyOwner setPurchasePath` while `Ownable(msg.sender)` still made the deployer the owner. Direct initial ownership breaks that, so `PurchaseUniswap` now initializes the path through an internal helper; the public setter stays `onlyOwner`.
 
@@ -75,12 +75,12 @@ Handlers pick up Ownable2Step plus the canonical renounce override (~387 bytes).
 
 **Storage.** Ownable2Step's `_pendingOwner` is a sequential slot (OZ v5 Ownable's `_owner` is also sequential in this pin). Every first-party contract shifts BitChill variables down one slot (`s_operationsAdmin` 1 → 2 on DcaManager; fee fields 1 → 2 on handlers). Relative order is unchanged. Fresh deployment; nothing to migrate. R18 still packs `DcaDetails` inside `s_dcaSchedules`, not these slots.
 
-Live `registerRoute` / `assignTokenHandler` in `DeployMocSwaps` / `DeployDexSwaps` now run as `onlyOwner` after construction, so the broadcaster must already be `adminAddresses[environment]`. Add-on scripts still deploy a handler owned by `operationsAdmin.owner()` even when the broadcaster cannot assign.
+Live `registerRoute` / `assignTokenHandler` run as `onlyOwner` after construction, so they use the Foundry broadcaster as owner for that transaction. `_assertLiveBroadcastSender` reverts *before* any protocol `CREATE` if testnet is not `TESTNET_OWNER` or if mainnet tries to broadcast as the Safe. After setup, `_proposeFinalOwner` no-ops on testnet and proposes the Safe on mainnet. Add-on scripts revert on a non-zero `pendingOwner` so a mid-handoff handler cannot land on the outgoing EOA.
 
 ## Reviewer checklist
 
 - [ ] Matches **Scope**; nothing from **Out of scope**.
-- [ ] Ownership is neither transiently left on the broadcaster nor silently pending after deploy.
+- [ ] Ownership: testnet finishes with the broadcasting EOA as owner and zero pending; mainnet finishes with that EOA as owner and the Safe as pending until `acceptOwnership`.
 - [ ] Protocol invariants in `AGENTS.md` still hold.
 - [ ] Tests in the PR match **Required tests**.
 - [ ] Constructor changes and every extra file are named in the PR.
@@ -88,5 +88,5 @@ Live `registerRoute` / `assignTokenHandler` in `DeployMocSwaps` / `DeployDexSwap
 ## ABI / deploy / cutover impact
 
 - ABI: new `pendingOwner` / `acceptOwnership` surface and constructor `initialOwner` arguments; renounce reverts canonically.
-- Scripts: all production deploy paths pass the intended governance owner directly.
-- Cutover: ops must use propose/accept for later ownership changes. Frontend issue only if the app exposes owner transfer (not expected).
+- Scripts: live Foundry broadcasts from an EOA; testnet that EOA is owner, mainnet proposes the Safe. Add-ons refuse a pending admin/manager owner.
+- Cutover: ops must `acceptOwnership` from the Safe after a mainnet script, one call per contract. Later ownership changes use propose/accept. Frontend issue only if the app exposes owner transfer (not expected).

@@ -282,6 +282,30 @@ forge script script/DeployMocSwaps.s.sol \
   --legacy
 ```
 
+#### Ownership after deploy
+
+Foundry always broadcasts from an EOA (`--account` / `--ledger`). A Safe cannot sign that transaction.
+
+Live owner and fee-collector addresses live in `script/Constants.sol`:
+
+| Network | Owner | Fee collector |
+|---|---|---|
+| Testnet | `TESTNET_OWNER` (the funded EOA that broadcasts) | same EOA |
+| Mainnet | `MAINNET_OWNER` (the BitChill Safe) | `MAINNET_FEE_COLLECTOR` |
+
+**Testnet.** Broadcast from `TESTNET_OWNER`. The script reverts *before* any `CREATE` if a different key is used. After the script, that EOA already owns every contract and `pendingOwner` is zero. No `acceptOwnership`.
+
+**Mainnet.** Broadcast from an EOA, **not** the Safe. The script:
+
+1. Constructs `OperationsAdmin`, `DcaManager`, and every handler with the EOA as owner (so `registerRoute` / `assignTokenHandler` succeed in the same broadcast).
+2. Calls `transferOwnership(MAINNET_OWNER)` on each of those contracts. That only *proposes*.
+
+Then, from the Safe UI (one call per contract), send `acceptOwnership()`. Until those accepts land, the deploying EOA can still govern and can propose a different address if the Safe hex was wrong. After accept, the Safe owns `OperationsAdmin`, `DcaManager`, and every handler.
+
+Add-on scripts (`DeployIdleHandler`, `DeployLayerBankHandler`, `DeployUsdrifHandler`) revert if `pendingOwner` is set on `OperationsAdmin` or `DcaManager` — wait until the Safe has accepted, then run them.
+
+Later ownership changes (new Safe, recovered wallet) are the same two steps: current owner `transferOwnership(new)`, incoming owner `acceptOwnership()`. `renounceOwnership` always reverts.
+
 ### Compilation profile for deployment
 Before deploying on-chain, compile using the dedicated `deploy` profile that activates the Yul Intermediate Representation (via_IR) pipeline (see `foundry.toml`).
 
