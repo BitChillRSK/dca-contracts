@@ -11,6 +11,7 @@ import {MockReentrantStablecoin, ITransferFromHook} from "../mocks/MockReentrant
 import {MockKdocToken} from "../mocks/MockKdocToken.sol";
 import {MockMocProxy} from "../mocks/MockMocProxy.sol";
 import "../../script/Constants.sol";
+import {reentrantCall} from "../utils/OzRevert.sol";
 
 contract ReentrantDepositor is ITransferFromHook {
     DcaManager public dca;
@@ -115,7 +116,7 @@ contract DepositSwapPopReentrancyTest is Test {
         user.armDelete(0, idA);
         token.setHook(address(user), true);
 
-        vm.expectRevert("ReentrancyGuard: reentrant call");
+        vm.expectRevert(reentrantCall());
         user.deposit(0, idA, EXTRA);
 
         IDcaManager.DcaDetails[] memory afterSchedules = dcaManager.getDcaSchedules(address(user), address(token));
@@ -134,7 +135,7 @@ contract DepositSwapPopReentrancyTest is Test {
         user.armDelete(0, idA);
         token.setHook(address(user), true);
 
-        vm.expectRevert("ReentrancyGuard: reentrant call");
+        vm.expectRevert(reentrantCall());
         user.deposit(0, idA, EXTRA);
 
         IDcaManager.DcaDetails[] memory afterSchedules = dcaManager.getDcaSchedules(address(user), address(token));
@@ -185,7 +186,7 @@ contract DepositSwapPopReentrancyTest is Test {
         token.setHook(address(user), true);
 
         // The deposit/delete mutex stops the nested delete before any swap-pop can happen.
-        vm.expectRevert("ReentrancyGuard: reentrant call");
+        vm.expectRevert(reentrantCall());
         user.deposit(0, idB, EXTRA);
 
         IDcaManager.DcaDetails[] memory afterSchedules = dcaManager.getDcaSchedules(address(user), address(token));

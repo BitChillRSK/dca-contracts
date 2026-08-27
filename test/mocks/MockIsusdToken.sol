@@ -32,7 +32,7 @@ contract MockIsusdToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
      */
     bool private s_silentZeroPayout;
 
-    constructor(address docTokenAddress) ERC20("Tropykus iSUSD", "iSUSD") Ownable() ERC20Permit("Tropykus iSUSD") {
+    constructor(address docTokenAddress) ERC20("Tropykus iSUSD", "iSUSD") Ownable(msg.sender) ERC20Permit("Tropykus iSUSD") {
         i_docToken = IStablecoin(docTokenAddress);
         i_deploymentTimestamp = block.timestamp;
     }

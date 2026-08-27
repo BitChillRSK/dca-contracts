@@ -10,6 +10,7 @@ import {IDcaManagerAccessControl} from "../../src/interfaces/IDcaManagerAccessCo
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
 import {IOperationsAdmin} from "../../src/interfaces/IOperationsAdmin.sol";
 import "./TestsHelper.t.sol";
+import {ownableUnauthorized} from "../utils/OzRevert.sol";
 
 contract OperationsAdminTest is DcaDappTest {
     event OperationsAdmin__SwapperAdded(address indexed swapper);
@@ -79,11 +80,11 @@ contract OperationsAdminTest is DcaDappTest {
 
     function testOnlyOwnerCanRegisterRoutesAndSwappers() external {
         vm.prank(ADMIN);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ownableUnauthorized(ADMIN));
         operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
 
         vm.prank(SWAPPER);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ownableUnauthorized(SWAPPER));
         operationsAdmin.addSwapper(address(2));
 
         vm.prank(OWNER);
@@ -129,8 +130,9 @@ contract OperationsAdminTest is DcaDappTest {
     }
 
     function testRevokeSwapperFailsIfNotOwner() external {
-        vm.prank(makeAddr("notOwner"));
-        vm.expectRevert("Ownable: caller is not the owner");
+        address notOwner = makeAddr("notOwner");
+        vm.prank(notOwner);
+        vm.expectRevert(ownableUnauthorized(notOwner));
         operationsAdmin.revokeSwapper(SWAPPER);
     }
 

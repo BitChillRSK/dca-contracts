@@ -341,8 +341,8 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
         uint256 excessiveAmount = DEPOSIT_AMOUNT * 2;
         uint256 available = sovrynHandler.getUserShares(user1);
         uint256 price = iSusdToken.tokenPrice();
-        uint256 totalIsusdToRedeem = Math.mulDiv(excessiveAmount, EXCHANGE_RATE_DECIMALS, price, Math.Rounding.Up);
-        uint256 requested = Math.mulDiv(totalIsusdToRedeem, amounts[0], excessiveAmount, Math.Rounding.Up);
+        uint256 totalIsusdToRedeem = Math.mulDiv(excessiveAmount, EXCHANGE_RATE_DECIMALS, price, Math.Rounding.Ceil);
+        uint256 requested = Math.mulDiv(totalIsusdToRedeem, amounts[0], excessiveAmount, Math.Rounding.Ceil);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -350,6 +350,28 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
             )
         );
         sovrynHandler.testBatchRetrieveStablecoin(users, amounts, excessiveAmount);
+    }
+
+    /**
+     * @notice A stale non-zero allowance below the next deposit must not brick deposits (R44).
+     * @dev `depositToken` re-approves the lending spender whenever the standing allowance is too
+     *      small. OpenZeppelin v4 `safeApprove` refused any non-zero -> non-zero change, so a
+     *      partial leftover allowance permanently reverted every later deposit for that token.
+     *      v5 removed `safeApprove`; `forceApprove` zeroes first, so the deposit goes through.
+     *      Reverting this to a v4-style approve makes this test fail.
+     */
+    function test_sovryn_depositSucceedsWithStaleNonZeroAllowance() public {
+        // Leave a residual allowance that is non-zero but below the next deposit.
+        vm.prank(address(sovrynHandler));
+        stablecoin.approve(address(iSusdToken), DEPOSIT_AMOUNT / 2);
+        assertEq(stablecoin.allowance(address(sovrynHandler), address(iSusdToken)), DEPOSIT_AMOUNT / 2);
+
+        uint256 sharesBefore = sovrynHandler.getUserShares(USER);
+
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        assertGt(sovrynHandler.getUserShares(USER), sharesBefore, "deposit did not mint shares");
     }
 }
 

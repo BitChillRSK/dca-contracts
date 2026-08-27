@@ -51,7 +51,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
         depositedAmount = super.depositToken(user, depositAmount);
         address spender = _lendingSpender();
         if (i_stableToken.allowance(address(this), spender) < depositedAmount) {
-            i_stableToken.safeApprove(spender, depositedAmount);
+            i_stableToken.forceApprove(spender, depositedAmount);
         }
         uint256 mintedAmount = _protocolDeposit(depositedAmount);
         if (mintedAmount == 0) revert TokenLending__LendingProtocolDepositFailed();
@@ -214,7 +214,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
         for (uint256 i; i < numOfPurchases; ++i) {
             // round up so we never underestimate the debit against this user
             uint256 usersSharesToRedeem =
-                Math.mulDiv(totalSharesToRedeem, purchaseAmounts[i], totalStablecoinAmount, Math.Rounding.Up);
+                Math.mulDiv(totalSharesToRedeem, purchaseAmounts[i], totalStablecoinAmount, Math.Rounding.Ceil);
             uint256 usersShares = s_shares[users[i]];
             if (usersSharesToRedeem > usersShares) {
                 revert TokenLending__InsufficientShares(users[i], usersSharesToRedeem, usersShares);

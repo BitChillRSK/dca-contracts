@@ -3,7 +3,7 @@ pragma solidity 0.8.36;
 
 import {IDcaManager} from "./interfaces/IDcaManager.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
 import {ITokenLending} from "./interfaces/ITokenLending.sol";
 import {OperationsAdmin} from "./OperationsAdmin.sol";
@@ -83,7 +83,7 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      * @param defaultMinPurchaseAmount the default minimum purchase amount for all tokens
      */
     constructor(address operationsAdminAddress, uint256 minPurchasePeriod, uint256 maxSchedulesPerToken, uint256 defaultMinPurchaseAmount)
-        Ownable()
+        Ownable(msg.sender)
         validateMinPurchasePeriod(minPurchasePeriod)
     {
         s_operationsAdmin = OperationsAdmin(operationsAdminAddress);

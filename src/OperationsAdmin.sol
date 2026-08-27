@@ -33,7 +33,7 @@ contract OperationsAdmin is IOperationsAdmin, Ownable {
      *      registered through `registerRoute`. Emits `RouteRegistered` so indexers see
      *      the same class write as every later `registerRoute` call.
      */
-    constructor() Ownable() {
+    constructor() Ownable(msg.sender) {
         s_routeClass[0] = RouteClass.Idle;
         emit OperationsAdmin__RouteRegistered(0, false);
     }

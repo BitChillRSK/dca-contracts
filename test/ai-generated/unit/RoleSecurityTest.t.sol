@@ -18,6 +18,7 @@ import {ITokenHandler} from "../../../src/interfaces/ITokenHandler.sol";
 import {IDcaManager} from "../../../src/interfaces/IDcaManager.sol";
 import "../../../script/Constants.sol";
 import {batchBuyOne} from "../../utils/BatchBuyOne.sol";
+import {ownableUnauthorized} from "../../utils/OzRevert.sol";
 
 /**
  * @title RoleSecurityTest
@@ -119,11 +120,11 @@ contract RoleSecurityTest is Test {
     function test_onlyOwnerCanAddSwapper() public {
         address newSwapper = address(0x8888);
         
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ownableUnauthorized(UNAUTHORIZED_USER));
         vm.prank(UNAUTHORIZED_USER);
         operationsAdmin.addSwapper(newSwapper);
         
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ownableUnauthorized(ADMIN));
         vm.prank(ADMIN);
         operationsAdmin.addSwapper(newSwapper);
         
@@ -161,15 +162,15 @@ contract RoleSecurityTest is Test {
             9900
         );
         
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ownableUnauthorized(UNAUTHORIZED_USER));
         vm.prank(UNAUTHORIZED_USER);
         operationsAdmin.assignTokenHandler(address(stablecoin), newIndex, address(newHandler));
         
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ownableUnauthorized(ADMIN));
         vm.prank(ADMIN);
         operationsAdmin.assignTokenHandler(address(stablecoin), newIndex, address(newHandler));
         
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ownableUnauthorized(SWAPPER));
         vm.prank(SWAPPER);
         operationsAdmin.assignTokenHandler(address(stablecoin), newIndex, address(newHandler));
         
@@ -183,15 +184,15 @@ contract RoleSecurityTest is Test {
     function test_onlyOwnerCanRegisterRoute() public {
         uint256 newIndex = 99;
         
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ownableUnauthorized(UNAUTHORIZED_USER));
         vm.prank(UNAUTHORIZED_USER);
         operationsAdmin.registerRoute(newIndex, true);
         
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ownableUnauthorized(ADMIN));
         vm.prank(ADMIN);
         operationsAdmin.registerRoute(newIndex, true);
         
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ownableUnauthorized(SWAPPER));
         vm.prank(SWAPPER);
         operationsAdmin.registerRoute(newIndex, true);
         
@@ -328,11 +329,11 @@ contract RoleSecurityTest is Test {
     
     function test_onlyOwnerCanModifyHandlerSettings() public {
         // Test fee settings modification
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ownableUnauthorized(UNAUTHORIZED_USER));
         vm.prank(UNAUTHORIZED_USER);
         handler.setFeeRateParams(150, MAX_FEE_RATE_TEST, FEE_PURCHASE_LOWER_BOUND, FEE_PURCHASE_UPPER_BOUND);
         
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ownableUnauthorized(ADMIN));
         vm.prank(ADMIN);
         handler.setFeeRateParams(MIN_FEE_RATE, 250, FEE_PURCHASE_LOWER_BOUND, FEE_PURCHASE_UPPER_BOUND);
         
@@ -385,11 +386,11 @@ contract RoleSecurityTest is Test {
         vm.assume(randomUser != address(0) && randomUser != address(dcaManager));
         
         // Operations Admin functions should fail
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ownableUnauthorized(randomUser));
         vm.prank(randomUser);
         operationsAdmin.addSwapper(randomUser);
         
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ownableUnauthorized(randomUser));
         vm.prank(randomUser);
         operationsAdmin.assignTokenHandler(address(stablecoin), TROPYKUS_INDEX, randomUser);
         

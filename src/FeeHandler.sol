@@ -26,7 +26,7 @@ abstract contract FeeHandler is IFeeHandler, Ownable {
     /// @notice Hard ceiling on fee rates (5%). Owner cannot set max (or a flat min==max) above this.
     uint256 internal constant MAX_FEE_RATE_CAP = 500;
 
-    constructor(address feeCollector, FeeSettings memory feeSettings) Ownable() {
+    constructor(address feeCollector, FeeSettings memory feeSettings) Ownable(msg.sender) {
         if (feeCollector == address(0)) revert FeeHandler__InvalidFeeCollector();
         _validateFeeSettings(
             feeSettings.minFeeRate,

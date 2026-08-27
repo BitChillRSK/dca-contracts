@@ -16,6 +16,7 @@ import {MockStablecoin} from "../../mocks/MockStablecoin.sol";
 import {MockKdocToken} from "../../mocks/MockKdocToken.sol";
 import {MockIsusdToken} from "../../mocks/MockIsusdToken.sol";
 import "../../../script/Constants.sol";
+import {ownableUnauthorized} from "../../utils/OzRevert.sol";
 
 /**
  * @title HandlerTestHarness
@@ -266,7 +267,7 @@ abstract contract HandlerTestHarness is Test {
     function test_handler_modifyFeeSettings_reverts_notOwner() public {
         IFeeHandler feeHandler = IFeeHandler(address(handler));
         
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ownableUnauthorized(USER));
         vm.prank(USER);
         feeHandler.setFeeRateParams(50, 150, 200 ether, 2000 ether);
     }
@@ -461,7 +462,7 @@ abstract contract HandlerTestHarness is Test {
     }
     
     function test_dcaManager_modifyMinPurchaseAmount_reverts_notOwner() public {
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ownableUnauthorized(USER));
         vm.prank(USER);
         dcaManager.modifyDefaultMinPurchaseAmount(500 ether);
     }
