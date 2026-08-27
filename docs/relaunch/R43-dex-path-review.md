@@ -98,8 +98,14 @@ minimumRbtcAmount = (stablecoinAmountToSpend * i_stablecoinToUsdScale * s_amount
 `i_stablecoinToUsdScale` is `10 ** (18 - stablecoin decimals)`, read once from `decimals()` in the
 `PurchaseUniswap` constructor because the handler's stablecoin is immutable. Above 18 decimals the
 constructor reverts `PurchaseUniswap__UnsupportedStablecoinDecimals` rather than round the floor down.
-The `decimals()` read sits after `_setPurchasePath`, which already rejects a zero purchase token, so a
+The `decimals()` reads sit after `_setPurchasePath`, which already rejects a zero purchase token, so a
 reversed `is` list still fails with `PurchaseUniswap__ZeroPurchaseToken` instead of an empty-address call.
+
+Both sides of the quotient are pinned, not just the input. The oracle's decimals cancel against the
+stablecoin scale-up, so the result is in units of 1e-18 BTC purely because `HUNDRED_PERCENT` carries 1e18 —
+and those are WRBTC wei only while WRBTC is 18 decimals. `WRBTC_DECIMALS` names that second assumption and
+the constructor rejects a WRBTC that breaks it (`PurchaseUniswap__UnsupportedWrbtcDecimals`). Constructor-only:
+runtime size is unchanged, initcode grows 188 bytes.
 
 At the live oracle price (80,061.57 USD/BTC, `isValid` true, block 9,188,727), $25 of USDT0 asks for
 310,699,573,584,930 wei of WRBTC at 99.5%. The old formula asked for 310 wei — a floor that bounded nothing.
@@ -123,6 +129,11 @@ mempool make sandwiching possible but not routine; the loss is bounded by `1 - s
 (0.5% at the default), re-evaluated against a live oracle price at execution. Tightening that percent is the
 owner's lever.
 
+**3b. Deadline mechanism, stated precisely.** `ExactInputParams` carries no deadline, but SwapRouter02 does
+expose `IMulticallExtended.multicall(uint256 deadline, bytes[])`, so the natspec no longer claims there is no
+mechanism. The reason it does not help is the recorded one: a deadline the handler derives from
+`block.timestamp` while executing is satisfied by construction.
+
 **4. Safety check.** Kept and documented as config-only. It bounds `s_amountOutMinimumPercent` and never enters
 swap math, so widening slippage tolerance costs two owner transactions — lower the floor, then the percent.
 With the owner a Safe (R45) that speed bump is worth its 32 bytes of storage; deleting it would also break the
@@ -141,8 +152,14 @@ not silent, so no extra guard was added for a broken-oracle case that already ca
 still ignores the router's return value. `amountOutMinimum` is a revert bound only.
 
 **Size and gas.** `SovrynErc20HandlerDex` 21,061 → 21,104 runtime bytes (margin 3,515 → 3,472);
-`TropykusErc20HandlerDex` 21,317 → 21,360 (margin 3,259 → 3,216). Both far under EIP-170. A batch purchase
-costs ~200 more gas (one immutable read and one multiplication), on the protocol-paid path.
+`TropykusErc20HandlerDex` 21,317 → 21,360 (margin 3,259 → 3,216). Both far under EIP-170; initcode margins
+stay above 21,000. A batch purchase costs ~200 more gas (one immutable read and one multiplication), on the
+protocol-paid path. The two constructor decimals guards cost initcode only.
+
+**Deploy-time `@param` defaults corrected.** `PurchaseUniswap`, `SovrynErc20HandlerDex`, and
+`TropykusErc20HandlerDex` documented 99.7% / 99%; `script/Constants.sol` has deployed 99.5% / 95% since
+before this spec. They now name `DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT` and
+`DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK` so the next drift is visible where it happens.
 
 ## R39 handoff questions
 
@@ -173,7 +190,8 @@ pro-rata pass over buyers to the protocol-paid path. A retrieval short enough to
 
 ## ABI / deploy / cutover impact
 
-- ABI: one new custom error, `PurchaseUniswap__UnsupportedStablecoinDecimals(uint8)`. No selector, event, or
+- ABI: two new custom errors, `PurchaseUniswap__UnsupportedStablecoinDecimals(uint8)` and
+  `PurchaseUniswap__UnsupportedWrbtcDecimals(uint8)`, both reachable only at deploy. No selector, event, or
   getter changed; the safety check stayed, so nothing was removed.
 - Scripts: no change. Constructor args are unchanged — decimals are read from the token.
 - Cutover: owner still sets percent and safety. No frontend follow-up (no user-facing selector moved). The
