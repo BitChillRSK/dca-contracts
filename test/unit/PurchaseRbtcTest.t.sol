@@ -12,7 +12,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title PurchaseRbtcTest
- * @notice Base-level coverage for the shared single/batch purchase algorithm, independent of
+ * @notice Base-level coverage for the shared batch purchase algorithm, independent of
  *         MoC/Uniswap cash measurement.
  */
 contract PurchaseRbtcTest is Test {
@@ -54,30 +54,32 @@ contract PurchaseRbtcTest is Test {
         harness.setRbtcOut(RBTC_OUT);
     }
 
-    function test_singlePurchase_usesActualRetrievedWhenBelowRequest() public {
+    /// @dev R39 removed `buyRbtc`; a length-1 batch is the one-schedule path. The batch charges the fee
+    ///      on the planned amount, so a short retrieval eats into the net spend rather than the fee.
+    function test_lengthOneBatch_usesActualRetrievedWhenBelowRequest() public {
         uint256 requested = 100 ether;
         uint256 retrieved = 50 ether;
         harness.setRetrieveOverride(retrieved);
 
-        uint256 fee = _fee(retrieved);
-        uint256 net = retrieved - fee;
+        uint256 fee = _fee(requested);
+        uint256 spent = retrieved - fee;
 
         vm.expectEmit(true, true, true, true, address(harness));
-        emit PurchaseRbtc__RbtcBought(buyerA, address(token), RBTC_OUT, scheduleA, net);
+        emit PurchaseRbtc__RbtcBought(buyerA, address(token), RBTC_OUT, scheduleA, spent);
 
-        harness.buyRbtc(buyerA, scheduleA, requested);
+        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested));
 
-        assertEq(harness.lastPurchaseAmount(), net);
+        assertEq(harness.lastPurchaseAmount(), spent);
         assertEq(token.balanceOf(feeCollector), fee);
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), RBTC_OUT);
     }
 
-    function test_singlePurchase_transfersFeeBeforeRouteAndPassesNet() public {
+    function test_lengthOneBatch_transfersFeeBeforeRouteAndPassesNet() public {
         uint256 requested = 100 ether;
         uint256 fee = _fee(requested);
         uint256 net = requested - fee;
 
-        harness.buyRbtc(buyerA, scheduleA, requested);
+        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested));
 
         assertEq(harness.purchaseCalls(), 1);
         assertEq(harness.lastPurchaseAmount(), net);
@@ -85,27 +87,27 @@ contract PurchaseRbtcTest is Test {
         assertEq(token.balanceOf(feeCollector), fee);
     }
 
-    function test_singlePurchase_creditsBuyerAndEmitsOnSuccess() public {
+    function test_lengthOneBatch_creditsBuyerAndEmitsOnSuccess() public {
         uint256 requested = 100 ether;
         uint256 net = requested - _fee(requested);
 
         vm.expectEmit(true, true, true, true, address(harness));
         emit PurchaseRbtc__RbtcBought(buyerA, address(token), RBTC_OUT, scheduleA, net);
+        vm.expectEmit(true, true, true, true, address(harness));
+        emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(address(token), RBTC_OUT, net);
 
-        harness.buyRbtc(buyerA, scheduleA, requested);
+        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested));
 
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), RBTC_OUT);
     }
 
-    function test_singlePurchase_zeroOutputRevertsTokenSpecificError() public {
+    function test_lengthOneBatch_zeroOutputRevertsBatchError() public {
         harness.setRbtcOut(0);
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IPurchaseRbtc.PurchaseRbtc__RbtcPurchaseFailed.selector, buyerA, address(token)
-            )
+            abi.encodeWithSelector(IPurchaseRbtc.PurchaseRbtc__RbtcBatchPurchaseFailed.selector, address(token))
         );
-        harness.buyRbtc(buyerA, scheduleA, 100 ether);
+        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(100 ether));
 
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), 0);
     }
@@ -229,6 +231,21 @@ contract PurchaseRbtcTest is Test {
 
     function _fee(uint256 amount) private pure returns (uint256) {
         return amount * FLAT_FEE_RATE / FEE_DIVISOR;
+    }
+
+    function _oneBuyerBatchBuyers() private view returns (address[] memory buyers) {
+        buyers = new address[](1);
+        buyers[0] = buyerA;
+    }
+
+    function _oneBuyerBatchIds() private view returns (bytes32[] memory scheduleIds) {
+        scheduleIds = new bytes32[](1);
+        scheduleIds[0] = scheduleA;
+    }
+
+    function _oneBuyerBatchAmounts(uint256 amount) private pure returns (uint256[] memory amounts) {
+        amounts = new uint256[](1);
+        amounts[0] = amount;
     }
 
     function _twoBuyerBatch()

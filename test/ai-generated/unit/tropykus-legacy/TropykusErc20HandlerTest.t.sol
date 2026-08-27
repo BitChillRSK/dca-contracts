@@ -385,15 +385,6 @@ contract TropykusTestHandler is TropykusErc20Handler {
         feeSettings
     ) {}
     
-    // Implementation required by IPurchaseRbtc interface
-    function buyRbtc(
-        address /* buyer */,
-        bytes32 /* scheduleId */,
-        uint256 /* purchaseAmount */
-    ) external pure returns (uint256) {
-        return 0; // Minimal implementation for testing
-    }
-
     function testBatchRetrieveStablecoin(
         address[] memory users,
         uint256[] memory purchaseAmounts,

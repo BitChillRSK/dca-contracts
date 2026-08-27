@@ -8,6 +8,8 @@ import {MockIsusdToken} from "test/mocks/MockIsusdToken.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import "script/Constants.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {handlerBatchBuyOne} from "test/utils/BatchBuyOne.sol";
+import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 
 contract SovrynDocHandlerMocTest is Test {
     address internal USER = address(0xBBB2);
@@ -49,13 +51,13 @@ contract SovrynDocHandlerMocTest is Test {
         docToken.mint(address(iSusdToken), 10000 ether);
     }
 
-    function test_buyRbtc_flow() public {
+    function test_lengthOneBatch_flow() public {
         uint256 depositAmount = 600 ether;
         uint256 purchaseAmount = 120 ether;
         bytes32 scheduleId = keccak256("schedule");
 
         handler.depositToken(USER, depositAmount);
-        handler.buyRbtc(USER, scheduleId, purchaseAmount);
+        handlerBatchBuyOne(IPurchaseRbtc(address(handler)), USER, scheduleId, purchaseAmount);
 
         uint256 rbtcAccrued = handler.getAccumulatedRbtcBalance(USER);
         assertGt(rbtcAccrued, 0);

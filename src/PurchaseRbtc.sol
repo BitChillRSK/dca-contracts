@@ -23,34 +23,6 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
     receive() external payable {}
 
     /**
-     * @param buyer: the user on behalf of which the contract is making the rBTC purchase
-     * @param scheduleId: the schedule id
-     * @param purchaseAmount: the amount to spend on rBTC
-     * @notice this function will be called periodically through a CRON job running on a web server
-     */
-    function buyRbtc(address buyer, bytes32 scheduleId, uint256 purchaseAmount) external override onlyDcaManager {
-        // Retrieve the stablecoin to spend
-        purchaseAmount = _retrieveStablecoin(buyer, purchaseAmount);
-
-        // Charge fee
-        uint256 fee = _calculateFee(purchaseAmount);
-        uint256 netPurchaseAmount = purchaseAmount - fee;
-        IERC20 purchaseToken = _purchaseToken();
-        _transferFee(purchaseToken, fee);
-
-        uint256 rbtcReceived = _purchaseRbtc(netPurchaseAmount);
-
-        if (rbtcReceived > 0) {
-            s_usersAccumulatedRbtc[buyer] += rbtcReceived;
-            emit PurchaseRbtc__RbtcBought(
-                buyer, address(purchaseToken), rbtcReceived, scheduleId, netPurchaseAmount
-            );
-        } else {
-            revert PurchaseRbtc__RbtcPurchaseFailed(buyer, address(purchaseToken));
-        }
-    }
-
-    /**
      * @notice batch buy rBTC
      * @param buyers: the users on behalf of which the contract is making the rBTC purchase
      * @param scheduleIds: the schedule ids

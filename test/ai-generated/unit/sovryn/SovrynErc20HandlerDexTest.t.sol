@@ -15,6 +15,8 @@ import {MockMocOracle} from "../../../mocks/MockMocOracle.sol";
 import {MockSwapRouter02} from "../../../mocks/MockSwapRouter02.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../../../../script/Constants.sol";
+import {handlerBatchBuyOne} from "test/utils/BatchBuyOne.sol";
+import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 
 /**
  * @title SovrynErc20HandlerDexTest 
@@ -537,10 +539,10 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
     //////////////////////////////////////////////////////////////*/
     
     /**
-     * @notice Test that buyRbtc funds the purchase by redeeming the buyer's lending shares
+     * @notice Test that batchBuyRbtc funds the purchase by redeeming the buyer's lending shares
      * @dev Covers the shared PurchaseRbtc pipeline resolving _retrieveStablecoin to LendingErc20Handler
      */
-    function test_sovrynDex_buyRbtcRedeemsSharesForPurchase() public {
+    function test_sovrynDex_lengthOneBatchRedeemsSharesForPurchase() public {
         // Setup: User deposits tokens first
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);
@@ -552,9 +554,9 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
         uint256 purchaseAmount = 100 ether;
         bytes32 mockScheduleId = keccak256("test_schedule");
         
-        // Call buyRbtc, which redeems shares through _retrieveStablecoin
+        // Call batchBuyRbtc, which redeems shares through _retrieveStablecoin
         vm.prank(address(dcaManager));
-        sovrynDexHandler.buyRbtc(USER, mockScheduleId, purchaseAmount);
+        handlerBatchBuyOne(IPurchaseRbtc(address(sovrynDexHandler)), USER, mockScheduleId, purchaseAmount);
         
         // Verify the shares were redeemed - lending balance should be reduced
         uint256 finalLendingBalance = sovrynDexHandler.getUserShares(USER);

@@ -14,6 +14,7 @@ import {MockFeeOnTransferStablecoin} from "../mocks/MockFeeOnTransferStablecoin.
 import {MockKdocToken} from "../mocks/MockKdocToken.sol";
 import {MockMocProxy} from "../mocks/MockMocProxy.sol";
 import "../../script/Constants.sol";
+import {batchBuyOne} from "../utils/BatchBuyOne.sol";
 
 contract FeeOnTransferDepositTest is Test {
     address internal constant OWNER = address(0x1111);
@@ -168,7 +169,7 @@ contract FeeOnTransferDepositTest is Test {
         bytes32 scheduleId = dcaManager.getDcaSchedules(USER, address(token))[0].scheduleId;
 
         vm.prank(SWAPPER);
-        dcaManager.buyRbtc(USER, address(token), 0, scheduleId);
+        batchBuyOne(dcaManager, USER, address(token), 0, scheduleId, MIN_PURCHASE_AMOUNT, IDLE_INDEX);
 
         uint256 afterBuy = RECEIVED - MIN_PURCHASE_AMOUNT;
         assertEq(dcaManager.getDcaSchedules(USER, address(token))[0].tokenBalance, afterBuy);

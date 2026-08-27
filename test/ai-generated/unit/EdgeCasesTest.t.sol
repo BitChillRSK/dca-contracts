@@ -18,6 +18,8 @@ import "script/Constants.sol";
 import {IWRBTC} from "src/interfaces/IWRBTC.sol";
 import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces/ISwapRouter02.sol";
 import {ICoinPairPrice} from "src/interfaces/ICoinPairPrice.sol";
+import {handlerBatchBuyOne} from "../../utils/BatchBuyOne.sol";
+import {IPurchaseRbtc} from "../../../src/interfaces/IPurchaseRbtc.sol";
 
 contract EdgeCasesTest is Test {
     /*//////////////////////////////////////////////////////////////
@@ -54,18 +56,20 @@ contract EdgeCasesTest is Test {
     /*//////////////////////////////////////////////////////////////
                 PurchaseMoc – failure branch (no rBTC)
     //////////////////////////////////////////////////////////////*/
-    function test_PurchaseMoc_buyRbtc_reverts_when_noRbtcReturned() public {
+    function test_PurchaseMoc_batchBuyRbtc_reverts_when_noRbtcReturned() public {
         (TropykusDocHandlerMoc handler, MockStablecoin doc,,) = _deployTropykusMocHandler(false); // proxy not funded
         address USER = address(0xA0);
         doc.mint(USER, 1000 ether);
         vm.prank(USER);
         doc.approve(address(handler), type(uint256).max);
 
-        // Deposit so the handler owns kDOC → needed for redemption inside buyRbtc
+        // Deposit so the handler owns kDOC → needed for redemption inside batchBuyRbtc
         handler.depositToken(USER, 500 ether);
 
-        vm.expectRevert();
-        handler.buyRbtc(USER, bytes32("schedule"), 100 ether);
+        vm.expectRevert(
+            abi.encodeWithSelector(IPurchaseRbtc.PurchaseRbtc__RbtcBatchPurchaseFailed.selector, address(doc))
+        );
+        handlerBatchBuyOne(IPurchaseRbtc(address(handler)), USER, bytes32("schedule"), 100 ether);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -137,7 +141,7 @@ contract EdgeCasesTest is Test {
         dex.updateMocOracle(address(0));
     }
 
-    function test_buyRbtc_reverts_on_outdated_oracle() public {
+    function test_batchBuyRbtc_reverts_on_outdated_oracle() public {
         (TropykusErc20HandlerDex dex, MockStablecoin doc,,,, MockMocOracle oracle) = _deployDexHandler();
         // Invalidate oracle price
         oracle.setInvalidPrice();
@@ -148,8 +152,8 @@ contract EdgeCasesTest is Test {
         doc.approve(address(dex), type(uint256).max);
         dex.depositToken(USER, 600 ether);
 
-        vm.expectRevert();
-        dex.buyRbtc(USER, bytes32("sched"), 100 ether);
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__OutdatedPrice.selector);
+        handlerBatchBuyOne(IPurchaseRbtc(address(dex)), USER, bytes32("sched"), 100 ether);
     }
 
     /*//////////////////////////////////////////////////////////////

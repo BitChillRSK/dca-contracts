@@ -7,6 +7,8 @@ import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import "script/Constants.sol";
+import {handlerBatchBuyOne} from "test/utils/BatchBuyOne.sol";
+import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 
 /**
  * @title IdleDocHandlerMocTest
@@ -46,7 +48,7 @@ contract IdleDocHandlerMocTest is Test {
         docToken.approve(address(mocProxy), type(uint256).max);
     }
 
-    function test_buyRbtc_flow() public {
+    function test_lengthOneBatch_flow() public {
         uint256 depositAmount = 500 ether;
         uint256 purchaseAmount = 100 ether;
         bytes32 scheduleId = keccak256("schedule");
@@ -55,7 +57,7 @@ contract IdleDocHandlerMocTest is Test {
         assertEq(docToken.balanceOf(address(handler)), depositAmount);
         assertEq(handler.getUsersIdleTokenBalance(USER), depositAmount);
 
-        handler.buyRbtc(USER, scheduleId, purchaseAmount);
+        handlerBatchBuyOne(IPurchaseRbtc(address(handler)), USER, scheduleId, purchaseAmount);
 
         uint256 rbtcAccrued = handler.getAccumulatedRbtcBalance(USER);
         assertGt(rbtcAccrued, 0);
@@ -107,9 +109,9 @@ contract IdleDocHandlerMocTest is Test {
         assertEq(docToken.balanceOf(address(handler)), deposit1 + deposit2 - purchaseAmounts[0] - purchaseAmounts[1]);
     }
 
-    function test_buyRbtc_doesNotMintShareToken() public {
+    function test_lengthOneBatch_doesNotMintShareToken() public {
         handler.depositToken(USER, 500 ether);
-        handler.buyRbtc(USER, keccak256("schedule"), 100 ether);
+        handlerBatchBuyOne(IPurchaseRbtc(address(handler)), USER, keccak256("schedule"), 100 ether);
 
         // The only ERC20 this test deployed is DOC; it stays on the handler minus the purchase.
         assertEq(docToken.balanceOf(address(handler)), 400 ether);

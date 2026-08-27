@@ -10,6 +10,7 @@ import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import {ITokenLending} from "src/interfaces/ITokenLending.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "script/Constants.sol";
+import {batchBuyOne} from "test/utils/BatchBuyOne.sol";
 
 /**
  * @title IdleDcaManagerTest
@@ -77,7 +78,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(docToken), 0).scheduleId;
 
         vm.prank(SWAPPER);
-        dcaManager.buyRbtc(USER, address(docToken), 0, scheduleId);
+        batchBuyOne(dcaManager, USER, address(docToken), 0, scheduleId, PURCHASE, IDLE_INDEX);
 
         assertGt(dcaManager.getAccumulatedRbtcBalance(USER, address(docToken), IDLE_INDEX), 0);
         assertEq(handler.getUsersIdleTokenBalance(USER), DEPOSIT - PURCHASE);

@@ -33,6 +33,7 @@ import "./TestsHelper.t.sol";
 import {IkToken} from "../../src/tropykus-legacy/IkToken.sol";
 import {IiSusdToken} from "../../src/sovryn/IiSusdToken.sol";
 import {IPurchaseUniswap} from "../../src/interfaces/IPurchaseUniswap.sol";
+import {batchBuyOne} from "../utils/BatchBuyOne.sol";
 
 contract DcaDappTest is Test {
     DcaManager dcaManager;
@@ -492,6 +493,16 @@ contract DcaDappTest is Test {
         vm.stopPrank();
     }
 
+    /**
+     * @notice the one-schedule purchase path after R39 removed `buyRbtc`: a length-1 `batchBuyRbtc`.
+     * @dev takes the purchase amount explicitly and makes no call before the prank, so a caller's
+     *      `vm.expectEmit` / `vm.expectRevert` still lands on the batch call itself.
+     */
+    function buyRbtcOne(address buyer, uint256 scheduleIndex, bytes32 scheduleId, uint256 purchaseAmount) internal {
+        vm.prank(SWAPPER);
+        batchBuyOne(dcaManager, buyer, address(stablecoin), scheduleIndex, scheduleId, purchaseAmount, s_routeIndex);
+    }
+
     function makeSinglePurchase() internal {
         vm.startPrank(USER);
         uint256 stablecoinBalanceBeforePurchase = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
@@ -521,8 +532,7 @@ contract DcaDappTest is Test {
             dcaDetails[SCHEDULE_INDEX].scheduleId,
             netPurchaseAmount
         );
-        vm.prank(SWAPPER);
-        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, dcaDetails[SCHEDULE_INDEX].scheduleId);
+        buyRbtcOne(USER, SCHEDULE_INDEX, dcaDetails[SCHEDULE_INDEX].scheduleId, AMOUNT_TO_SPEND);
 
         vm.startPrank(USER);
         uint256 stablecoinBalanceAfterPurchase = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
@@ -564,8 +574,7 @@ contract DcaDappTest is Test {
                 bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).scheduleId;
                 vm.stopPrank();
                 
-                vm.prank(SWAPPER);
-                dcaManager.buyRbtc(USER, address(stablecoin), scheduleIndex, scheduleId);
+                buyRbtcOne(USER, scheduleIndex, scheduleId, schedulePurchaseAmount);
                 
                 vm.startPrank(USER);
                 uint256 stablecoinBalanceAfterPurchase = dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).tokenBalance;

@@ -8,6 +8,8 @@ import {MockLayerBankAToken, MockLayerBankPool} from "test/mocks/MockLayerBank.s
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import "script/Constants.sol";
+import {handlerBatchBuyOne} from "test/utils/BatchBuyOne.sol";
+import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 
 /**
  * @title LayerBankDocHandlerMocTest
@@ -56,7 +58,7 @@ contract LayerBankDocHandlerMocTest is Test {
         docToken.mint(address(aToken), 10000 ether);
     }
 
-    function test_buyRbtc_flow() public {
+    function test_lengthOneBatch_flow() public {
         uint256 depositAmount = 500 ether;
         uint256 purchaseAmount = 100 ether;
         bytes32 scheduleId = keccak256("schedule");
@@ -65,7 +67,7 @@ contract LayerBankDocHandlerMocTest is Test {
         uint256 sharesBefore = handler.getUserShares(USER);
         assertGt(sharesBefore, 0);
 
-        handler.buyRbtc(USER, scheduleId, purchaseAmount);
+        handlerBatchBuyOne(IPurchaseRbtc(address(handler)), USER, scheduleId, purchaseAmount);
 
         uint256 rbtcAccrued = handler.getAccumulatedRbtcBalance(USER);
         assertGt(rbtcAccrued, 0);

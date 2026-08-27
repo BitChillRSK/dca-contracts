@@ -431,10 +431,6 @@ contract LayerBankTestHandler is LayerBankErc20Handler {
         )
     {}
 
-    function buyRbtc(address, bytes32, uint256) external pure returns (uint256) {
-        return 0;
-    }
-
     function testBatchRetrieveStablecoin(
         address[] memory users,
         uint256[] memory purchaseAmounts,

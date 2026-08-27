@@ -34,6 +34,11 @@ R33 stays: one validator, `safety <= percent <= 100%`. Do not reopen that invari
 
 R39 lands first so this review measures and reasons about the batch-only purchase path that will actually ship, with the single-buy bytecode already removed.
 
+R39 also hands this review two concrete questions about the surviving batch path, both pre-existing and both documented in [`R39-remove-single-buy.md`](./R39-remove-single-buy.md):
+
+1. **Should `_batchRetrieveStablecoin` clamp a share shortfall instead of reverting?** Because `_stablecoinToShares` rounds up while deposits credit the protocol's floor-rounded mint, spending a schedule's exact remaining balance is short by exactly one share, and the revert inside the per-buyer loop takes down every other buyer in the tick. R39 removed `buyRbtc`, which was the only path that clamped, so there is no longer an operational way to clear a tail schedule other than the user withdrawing. Pinned by `test/unit/BatchTailScheduleTest.t.sol` — flip those tests if the behavior changes. Idle is unaffected.
+2. **Should the fee be charged on the planned gross or on the stablecoin actually retrieved?** The batch computes the aggregated fee up front from `purchaseAmounts`, so a short retrieval reduces the user's spend and leaves the fee whole. The removed single path charged on the retrieved amount.
+
 ## Open product decisions
 
 **none** — decided 2026-08-27:

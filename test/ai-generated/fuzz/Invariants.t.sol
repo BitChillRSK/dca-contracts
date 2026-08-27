@@ -371,18 +371,6 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
     receive() external payable {}
     
     /**
-     * @notice Mock implementation of buyRbtc for testing
-     * @dev Properly simulates rBTC flow: retrieves stablecoin, converts to rBTC, updates balances
-     */
-    function buyRbtc(
-        address buyer,
-        bytes32 scheduleId,
-        uint256 purchaseAmount
-    ) external onlyDcaManager {
-        _buyRbtcInternal(buyer, scheduleId, purchaseAmount);
-    }
-    
-    /**
      * @notice Mock implementation of batchBuyRbtc for testing
      */
     function batchBuyRbtc(
@@ -488,17 +476,6 @@ contract SovrynHandlerWrapper is SovrynErc20Handler {
      * @notice Allow the contract to receive and hold rBTC
      */
     receive() external payable {}
-    
-    /**
-     * @notice Mock implementation of buyRbtc for testing
-     */
-    function buyRbtc(
-        address buyer,
-        bytes32 scheduleId,
-        uint256 purchaseAmount
-    ) external onlyDcaManager {
-        _buyRbtcInternal(buyer, scheduleId, purchaseAmount);
-    }
     
     /**
      * @notice Mock implementation of batchBuyRbtc for testing  
