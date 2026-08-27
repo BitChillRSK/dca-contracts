@@ -1,6 +1,6 @@
 # R47 — One assignment per handler address
 
-Status: **assigned** · Assigned: yes · Optional/further-review: no
+Status: **PR [#84](https://github.com/BitChillRSK/dca-contracts/pull/84)** · Assigned: yes · Optional/further-review: no
 
 PR 34 of the relaunch stack. Stack on R46 (PR 33). Land before any new LayerBank Dex assignment and before R38 withdraw-all.
 
