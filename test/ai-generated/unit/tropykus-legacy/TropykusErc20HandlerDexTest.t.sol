@@ -17,6 +17,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../../../../script/Constants.sol";
 import {handlerBatchBuyOne} from "test/utils/BatchBuyOne.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
+import {ownableUnauthorized} from "../../../utils/OzRevert.sol";
 
 /**
  * @title TropykusErc20HandlerDexTest 
@@ -137,7 +138,7 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
     }
     
     function test_tropykusDex_setAmountOutMinimumPercent_reverts_notOwner() public {
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ownableUnauthorized(USER));
         vm.prank(USER);
         tropykusDexHandler.setAmountOutMinimumPercent(9500);
     }
@@ -311,7 +312,7 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         uint24[] memory poolFeeRates = new uint24[](1);
         poolFeeRates[0] = 3000;
         
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ownableUnauthorized(USER));
         vm.prank(USER);
         tropykusDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
     }

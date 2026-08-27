@@ -20,7 +20,7 @@ contract MockKdocToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
     uint256 private s_exchangeRateStored;
     uint256 private s_lastAccrualTimestamp;
 
-    constructor(address docTokenAddress) ERC20("Tropykus kDOC", "kDOC") Ownable() ERC20Permit("Tropykus kDOC") {
+    constructor(address docTokenAddress) ERC20("Tropykus kDOC", "kDOC") Ownable(msg.sender) ERC20Permit("Tropykus kDOC") {
         i_docToken = IStablecoin(docTokenAddress);
         i_deploymentTimestamp = block.timestamp;
 

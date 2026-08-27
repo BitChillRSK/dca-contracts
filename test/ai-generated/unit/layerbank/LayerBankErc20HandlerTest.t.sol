@@ -322,8 +322,8 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         uint256 available = layerbankHandler.getUserShares(user1);
         uint256 exchangeRate = aToken.getNormalizedIncome();
         uint256 totalAtokenToRedeem =
-            Math.mulDiv(excessiveAmount, aToken.RAY(), exchangeRate, Math.Rounding.Up);
-        uint256 requested = Math.mulDiv(totalAtokenToRedeem, amounts[0], excessiveAmount, Math.Rounding.Up);
+            Math.mulDiv(excessiveAmount, aToken.RAY(), exchangeRate, Math.Rounding.Ceil);
+        uint256 requested = Math.mulDiv(totalAtokenToRedeem, amounts[0], excessiveAmount, Math.Rounding.Ceil);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -363,8 +363,8 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
     /**
      * @notice Virtual scaled books must stay ≤ handler `scaledBalanceOf` after odd-amount
      *         redeems against Aave-like round-nearest `rayDiv` burns.
-     * @dev `_stablecoinToShares` documents `Math.Rounding.Up` so the virtual debit is never
-     *      below what Aave may burn for the same DOC. Flipping that to `Rounding.Down` lets
+     * @dev `_stablecoinToShares` documents `Math.Rounding.Ceil` so the virtual debit is never
+     *      below what Aave may burn for the same DOC. Flipping that to `Rounding.Floor` lets
      *      `sum(getUserShares)` drift above `aToken.scaledBalanceOf(handler)` and fails this test.
      */
     function test_layerbank_virtualSharesRoundUp_keepsBooksSolvent() public {

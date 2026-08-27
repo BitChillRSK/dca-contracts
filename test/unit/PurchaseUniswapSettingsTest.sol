@@ -15,6 +15,7 @@ import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {MockMocOracle} from "../mocks/MockMocOracle.sol";
 import "../../script/Constants.sol";
+import {ownableUnauthorized} from "../utils/OzRevert.sol";
 
 contract PurchaseUniswapSettingsTest is DcaDappTest {
 
@@ -223,12 +224,12 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
     
     function testOnlyOwnerCanSetSlippageSettings() public onlyDexSwaps {
         // Try to set slippage as non-owner
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ownableUnauthorized(USER));
         vm.prank(USER);
         IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumPercent(0.98e18);
         
         // Try to set safety check as non-owner
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ownableUnauthorized(USER));
         vm.prank(USER);
         IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumSafetyCheck(0.95e18);
     }
@@ -271,7 +272,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         MockMocOracle newMocOracle = new MockMocOracle();
         
         // Try to update oracle as non-owner
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ownableUnauthorized(USER));
         vm.prank(USER);
         IPurchaseUniswap(address(stablecoinHandler)).updateMocOracle(address(newMocOracle));
     }
@@ -361,7 +362,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         poolFeeRates[1] = 300;
         
         // Try to set path as non-owner
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ownableUnauthorized(USER));
         vm.prank(USER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(intermediateTokens, poolFeeRates);
     }

@@ -7,6 +7,7 @@ import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {DcaManager} from "../../src/DcaManager.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
+import {ownableUnauthorized} from "../utils/OzRevert.sol";
 import "../../script/Constants.sol";
 
 contract ModifiersTest is DcaDappTest {
@@ -23,7 +24,7 @@ contract ModifiersTest is DcaDappTest {
     //////////////////////////////////////////////////////////////*/
     function testonlyOwnerCanSetOperationsAdmin() external {
         address operationsAdminBefore = dcaManager.getOperationsAdminAddress();
-        vm.expectRevert("Ownable: caller is not the owner"); // Adapt to v4.9.3 Ownable contract
+        vm.expectRevert(ownableUnauthorized(USER));
         vm.prank(USER); // User can't
         dcaManager.setOperationsAdmin(address(dcaManager)); // dummy address, e.g. that of DcaManager
         address operationsAdminAfter = dcaManager.getOperationsAdminAddress();
@@ -39,7 +40,7 @@ contract ModifiersTest is DcaDappTest {
     function testonlyOwnerCanModifyMinPurchasePeriod() external {
         uint256 newMinPurchasePeriod = 2 days;
         uint256 minPurchasePeriodBefore = dcaManager.getMinPurchasePeriod();
-        vm.expectRevert("Ownable: caller is not the owner"); // Adapt to v4.9.3 Ownable contract
+        vm.expectRevert(ownableUnauthorized(USER));
         vm.prank(USER); // User can't
         dcaManager.modifyMinPurchasePeriod(newMinPurchasePeriod); // dummy address, e.g. that of DcaManager
         uint256 minPurchasePeriodAfter = dcaManager.getMinPurchasePeriod();

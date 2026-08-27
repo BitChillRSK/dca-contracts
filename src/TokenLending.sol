@@ -29,7 +29,7 @@ abstract contract TokenLending is ITokenLending {
         view
         returns (uint256 sharesAmount)
     {
-        sharesAmount = Math.mulDiv(stablecoinAmount, i_exchangeRateDecimals, exchangeRate, Math.Rounding.Up);
+        sharesAmount = Math.mulDiv(stablecoinAmount, i_exchangeRateDecimals, exchangeRate, Math.Rounding.Ceil);
     }
 
     /**
