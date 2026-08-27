@@ -5,6 +5,7 @@ pragma solidity 0.8.36;
 import {Test, console} from "forge-std/Test.sol";
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {OperationsAdmin} from "../../src/OperationsAdmin.sol";
+import {BitChillOwnable} from "../../src/BitChillOwnable.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {IDcaManagerAccessControl} from "../../src/interfaces/IDcaManagerAccessControl.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
@@ -93,11 +94,11 @@ contract OperationsAdminTest is DcaDappTest {
     }
 
     function testOwnerCannotRenounceOwnership() external {
-        vm.expectRevert(IOperationsAdmin.OperationsAdmin__OwnershipCannotBeRenounced.selector);
+        vm.expectRevert(BitChillOwnable.BitChillOwnable__OwnershipCannotBeRenounced.selector);
         vm.prank(OWNER);
         operationsAdmin.renounceOwnership();
 
-        vm.expectRevert(IOperationsAdmin.OperationsAdmin__OwnershipCannotBeRenounced.selector);
+        vm.expectRevert(BitChillOwnable.BitChillOwnable__OwnershipCannotBeRenounced.selector);
         vm.prank(USER);
         operationsAdmin.renounceOwnership();
 
@@ -107,9 +108,11 @@ contract OperationsAdminTest is DcaDappTest {
     function testConstructorEmitsIdleRouteRegistered() external {
         vm.expectEmit(true, true, true, true);
         emit OperationsAdmin__RouteRegistered(0, false);
-        OperationsAdmin freshAdmin = new OperationsAdmin();
+        OperationsAdmin freshAdmin = new OperationsAdmin(OWNER);
         assertEq(uint256(freshAdmin.getRouteClass(0)), uint256(IOperationsAdmin.RouteClass.Idle));
         assertFalse(freshAdmin.isLendingRoute(0));
+        assertEq(freshAdmin.owner(), OWNER);
+        assertEq(freshAdmin.pendingOwner(), address(0));
     }
 
     function testAddAndRevokeSwapper() external {

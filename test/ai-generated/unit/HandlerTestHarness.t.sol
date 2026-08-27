@@ -105,10 +105,10 @@ abstract contract HandlerTestHarness is Test {
     function setUp() public virtual {
         // Deploy core infrastructure with proper ownership
         vm.prank(OWNER);
-        operationsAdmin = new OperationsAdmin();
+        operationsAdmin = new OperationsAdmin(OWNER);
         
         vm.prank(OWNER);
-        dcaManager = new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT);
+        dcaManager = new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, OWNER);
         
         stablecoin = new MockStablecoin(address(this));
         

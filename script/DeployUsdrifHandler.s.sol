@@ -26,6 +26,7 @@ contract DeployUsdrifHandler is DeployBase {
         IFeeHandler.FeeSettings feeSettings;
         uint256 amountOutMinimumPercent;
         uint256 amountOutMinimumSafetyCheck;
+        address initialOwner;
     }
 
     function run(UsdrifHelperConfig existingConfig) external returns (address) {
@@ -75,7 +76,8 @@ contract DeployUsdrifHandler is DeployBase {
             feeCollector: feeCollector,
             feeSettings: feeSettings,
             amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
-            amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
+            amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck,
+            initialOwner: OperationsAdmin(networkConfig.operationsAdminAddress).owner()
         });
         
         // Deploy the USDRIF handler
@@ -87,7 +89,8 @@ contract DeployUsdrifHandler is DeployBase {
             params.feeCollector,
             params.feeSettings,
             params.amountOutMinimumPercent,
-            params.amountOutMinimumSafetyCheck
+            params.amountOutMinimumSafetyCheck,
+            params.initialOwner
         );
         
         console.log("USDRIF handler deployed at:", address(usdrifHandler));
@@ -110,11 +113,8 @@ contract DeployUsdrifHandler is DeployBase {
 
             console.log("USDRIF handler registered with OperationsAdmin using Tropykus index", TROPYKUS_INDEX);
         }
-        
-        // Transfer ownership of the handler to the protocol owner
-        address currentOwner = operationsAdmin.owner();
-        usdrifHandler.transferOwnership(currentOwner);
-        console.log("Handler ownership transferred to:", currentOwner);
+
+        console.log("Handler owner:", params.initialOwner);
         
         vm.stopBroadcast();
         

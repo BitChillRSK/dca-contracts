@@ -7,7 +7,6 @@ import {MocHelperConfig} from "./MocHelperConfig.s.sol";
 import {IdleDocHandlerMoc} from "../src/idle/IdleDocHandlerMoc.sol";
 import {OperationsAdmin} from "../src/OperationsAdmin.sol";
 import {IFeeHandler} from "../src/interfaces/IFeeHandler.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {console} from "forge-std/Test.sol";
 import "./Constants.sol";
 
@@ -23,6 +22,7 @@ contract DeployIdleHandler is DeployBase {
         address tokenAddress;
         address mocProxy;
         address feeCollector;
+        address initialOwner;
     }
 
     function deployIdleDocHandlerMoc(DeployParams memory params) public returns (address) {
@@ -39,7 +39,8 @@ contract DeployIdleHandler is DeployBase {
                 params.tokenAddress,
                 params.feeCollector,
                 params.mocProxy,
-                feeSettings
+                feeSettings,
+                params.initialOwner
             )
         );
     }
@@ -70,7 +71,8 @@ contract DeployIdleHandler is DeployBase {
             dcaManager: dcaManagerAddress,
             tokenAddress: docTokenAddress,
             mocProxy: mocProxyAddress,
-            feeCollector: getFeeCollector(environment)
+            feeCollector: getFeeCollector(environment),
+            initialOwner: OperationsAdmin(operationsAdminAddress).owner()
         });
 
         address idleHandler = deployIdleDocHandlerMoc(params);
@@ -89,9 +91,7 @@ contract DeployIdleHandler is DeployBase {
             console.log("Idle DOC handler registered with OperationsAdmin at index", IDLE_INDEX);
         }
 
-        address currentOwner = operationsAdmin.owner();
-        Ownable(idleHandler).transferOwnership(currentOwner);
-        console.log("Handler ownership transferred to:", currentOwner);
+        console.log("Handler owner:", params.initialOwner);
 
         vm.stopBroadcast();
 

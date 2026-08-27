@@ -46,7 +46,7 @@ contract LendingErc20HandlerRedeemTest is Test {
             feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
         });
         // dcaManager = this, so tests can call onlyDcaManager entry points directly
-        harness = new LendingErc20HandlerHarness(address(this), address(stablecoin), address(0xFEE), feeSettings);
+        harness = new LendingErc20HandlerHarness(address(this), address(stablecoin), address(0xFEE), feeSettings, address(this));
 
         stablecoin.mint(userA, USER_A_DEPOSIT);
         stablecoin.mint(userB, USER_B_DEPOSIT);
@@ -153,8 +153,9 @@ contract LendingErc20HandlerHarness is LendingErc20Handler {
         address dcaManagerAddress,
         address stableTokenAddress,
         address feeCollector,
-        FeeSettings memory feeSettings
-    ) LendingErc20Handler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, 1e18) {}
+        FeeSettings memory feeSettings,
+        address initialOwner
+    ) LendingErc20Handler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, 1e18, initialOwner) {}
 
     function setExchangeRate(uint256 rate) external {
         exchangeRate = rate;

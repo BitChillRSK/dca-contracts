@@ -27,14 +27,19 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
      * @param feeCollector the address of to which fees will sent on every purchase
      * @param feeSettings struct with the settings for fee calculations
      * @param exchangeRateDecimals the scale of the protocol exchange rate
+     * @param initialOwner the address that owns fee configuration immediately after deploy
      */
     constructor(
         address dcaManagerAddress,
         address stableTokenAddress,
         address feeCollector,
         FeeSettings memory feeSettings,
-        uint256 exchangeRateDecimals
-    ) TokenHandler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings) TokenLending(exchangeRateDecimals) {}
+        uint256 exchangeRateDecimals,
+        address initialOwner
+    )
+        TokenHandler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, initialOwner)
+        TokenLending(exchangeRateDecimals)
+    {}
 
     /**
      * @notice deposit the full token amount for DCA on the contract

@@ -2,7 +2,7 @@
 pragma solidity 0.8.36;
 
 import {IDcaManager} from "./interfaces/IDcaManager.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {BitChillOwnable} from "./BitChillOwnable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
 import {ITokenLending} from "./interfaces/ITokenLending.sol";
@@ -14,7 +14,7 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
  * @author BitChill team: Ynyesto (GitHub: @ynyesto)
  * @notice Entry point for the DCA dApp. Create and manage DCA schedules. 
  */
-contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
+contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
@@ -81,11 +81,15 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
      * @param minPurchasePeriod the minimum time between purchases (in seconds)
      * @param maxSchedulesPerToken the maximum number of schedules allowed per token
      * @param defaultMinPurchaseAmount the default minimum purchase amount for all tokens
+     * @param initialOwner the address that owns this contract immediately after deploy
      */
-    constructor(address operationsAdminAddress, uint256 minPurchasePeriod, uint256 maxSchedulesPerToken, uint256 defaultMinPurchaseAmount)
-        Ownable(msg.sender)
-        validateMinPurchasePeriod(minPurchasePeriod)
-    {
+    constructor(
+        address operationsAdminAddress,
+        uint256 minPurchasePeriod,
+        uint256 maxSchedulesPerToken,
+        uint256 defaultMinPurchaseAmount,
+        address initialOwner
+    ) BitChillOwnable(initialOwner) validateMinPurchasePeriod(minPurchasePeriod) {
         s_operationsAdmin = OperationsAdmin(operationsAdminAddress);
         s_minPurchasePeriod = minPurchasePeriod;
         s_maxSchedulesPerToken = maxSchedulesPerToken;

@@ -49,7 +49,7 @@ contract PurchaseRbtcTest is Test {
             feePurchaseUpperBound: 100_000 ether
         });
         // dcaManager = this, so tests can call onlyDcaManager entry points directly
-        harness = new PurchaseRbtcHarness(address(this), address(token), feeCollector, feeSettings);
+        harness = new PurchaseRbtcHarness(address(this), address(token), feeCollector, feeSettings, address(this));
         token.mint(address(harness), 1_000_000 ether);
         harness.setRbtcOut(RBTC_OUT);
     }
@@ -279,8 +279,9 @@ contract PurchaseRbtcHarness is PurchaseRbtc {
         address dcaManagerAddress,
         address tokenAddress,
         address feeCollector,
-        FeeSettings memory feeSettings
-    ) FeeHandler(feeCollector, feeSettings) DcaManagerAccessControl(dcaManagerAddress) {
+        FeeSettings memory feeSettings,
+        address initialOwner
+    ) FeeHandler(feeCollector, feeSettings, initialOwner) DcaManagerAccessControl(dcaManagerAddress) {
         i_token = IERC20(tokenAddress);
     }
 

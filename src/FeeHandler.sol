@@ -4,13 +4,13 @@ pragma solidity 0.8.36;
 import {IFeeHandler} from "./interfaces/IFeeHandler.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {BitChillOwnable} from "./BitChillOwnable.sol";
 
 /**
  * @title TokenHandler
  * @dev Base contract for handling various tokens.
  */
-abstract contract FeeHandler is IFeeHandler, Ownable {
+abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     using SafeERC20 for IERC20;
 
     //////////////////////
@@ -26,7 +26,9 @@ abstract contract FeeHandler is IFeeHandler, Ownable {
     /// @notice Hard ceiling on fee rates (5%). Owner cannot set max (or a flat min==max) above this.
     uint256 internal constant MAX_FEE_RATE_CAP = 500;
 
-    constructor(address feeCollector, FeeSettings memory feeSettings) Ownable(msg.sender) {
+    constructor(address feeCollector, FeeSettings memory feeSettings, address initialOwner)
+        BitChillOwnable(initialOwner)
+    {
         if (feeCollector == address(0)) revert FeeHandler__InvalidFeeCollector();
         _validateFeeSettings(
             feeSettings.minFeeRate,

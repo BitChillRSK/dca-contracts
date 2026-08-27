@@ -54,10 +54,10 @@ contract DcaManagerEdgeCasesTest is Test {
     function setUp() public {
         // Deploy contracts
         vm.prank(OWNER);
-        operationsAdmin = new OperationsAdmin();
+        operationsAdmin = new OperationsAdmin(OWNER);
         
         vm.prank(OWNER);
-        dcaManager = new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT);
+        dcaManager = new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, OWNER);
         
         stablecoin = new MockStablecoin(address(this));
         kToken = new MockKdocToken(address(stablecoin));
@@ -99,7 +99,8 @@ contract DcaManagerEdgeCasesTest is Test {
             FEE_COLLECTOR,
             feeSettings,
             9970,
-            9900
+            9900,
+            OWNER
         );
         
         vm.prank(OWNER);

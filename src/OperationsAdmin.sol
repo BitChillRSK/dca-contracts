@@ -5,7 +5,7 @@ import {IOperationsAdmin} from "./interfaces/IOperationsAdmin.sol";
 import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
 import {ITokenLending} from "./interfaces/ITokenLending.sol";
 import {IERC165} from "lib/forge-std/src/interfaces/IERC165.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {BitChillOwnable} from "./BitChillOwnable.sol";
 
 /**
  * @title OperationsAdmin
@@ -15,7 +15,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
  *      that holds their funds. `(token, routeIndex)` handler assignment is likewise
  *      add-only. There is no cooperative migration on these handler versions.
  */
-contract OperationsAdmin is IOperationsAdmin, Ownable {
+contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
@@ -29,22 +29,14 @@ contract OperationsAdmin is IOperationsAdmin, Ownable {
     //////////////////////////////////////////////////////////////*/
 
     /**
+     * @param initialOwner the address that owns this contract immediately after deploy
      * @dev Index 0 is the default idle route. Additional idle or lending indexes are
      *      registered through `registerRoute`. Emits `RouteRegistered` so indexers see
      *      the same class write as every later `registerRoute` call.
      */
-    constructor() Ownable(msg.sender) {
+    constructor(address initialOwner) BitChillOwnable(initialOwner) {
         s_routeClass[0] = RouteClass.Idle;
         emit OperationsAdmin__RouteRegistered(0, false);
-    }
-
-    /**
-     * @notice Ownership cannot be renounced. Routes are add-only, so address(0) as
-     *         owner would freeze `registerRoute`, `assignTokenHandler`, and swapper
-     *         management with no recovery.
-     */
-    function renounceOwnership() public pure override {
-        revert OperationsAdmin__OwnershipCannotBeRenounced();
     }
 
     /**

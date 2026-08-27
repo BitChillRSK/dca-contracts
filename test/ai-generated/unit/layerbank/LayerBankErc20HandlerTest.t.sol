@@ -32,7 +32,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         });
 
         layerbankHandler = new LayerBankTestHandler(
-            address(dcaManager), address(stablecoin), address(aToken), FEE_COLLECTOR, feeSettings
+            address(dcaManager), address(stablecoin), address(aToken), FEE_COLLECTOR, feeSettings, OWNER
         );
 
         return ITokenHandler(address(layerbankHandler));
@@ -76,7 +76,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         });
 
         vm.expectRevert(ILayerBankErc20Handler.LayerBankErc20Handler__PoolNotSet.selector);
-        new LayerBankTestHandler(address(dcaManager), address(stablecoin), address(unset), FEE_COLLECTOR, feeSettings);
+        new LayerBankTestHandler(address(dcaManager), address(stablecoin), address(unset), FEE_COLLECTOR, feeSettings, OWNER);
     }
 
     function test_layerbank_constructor_revertsIfUnderlyingMismatch() public {
@@ -94,7 +94,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
 
         vm.expectRevert(ILayerBankErc20Handler.LayerBankErc20Handler__UnderlyingMismatch.selector);
         new LayerBankTestHandler(
-            address(dcaManager), address(stablecoin), address(mismatch), FEE_COLLECTOR, feeSettings
+            address(dcaManager), address(stablecoin), address(mismatch), FEE_COLLECTOR, feeSettings, OWNER
         );
     }
 
@@ -420,14 +420,16 @@ contract LayerBankTestHandler is LayerBankErc20Handler {
         address stableTokenAddress,
         address aTokenAddress,
         address feeCollector,
-        FeeSettings memory feeSettings
+        FeeSettings memory feeSettings,
+        address initialOwner
     )
         LayerBankErc20Handler(
             dcaManagerAddress,
             stableTokenAddress,
             aTokenAddress,
             feeCollector,
-            feeSettings
+            feeSettings,
+            initialOwner
         )
     {}
 

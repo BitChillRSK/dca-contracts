@@ -24,13 +24,15 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
      * @param stableTokenAddress the address of the ERC20 stablecoin token on the blockchain of deployment
      * @param feeCollector the address to which fees will be sent on every purchase
      * @param feeSettings struct with the settings for fee calculations
+     * @param initialOwner the address that owns fee configuration immediately after deploy
      */
     constructor(
         address dcaManagerAddress,
         address stableTokenAddress,
         address feeCollector,
-        FeeSettings memory feeSettings
-    ) TokenHandler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings) {}
+        FeeSettings memory feeSettings,
+        address initialOwner
+    ) TokenHandler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, initialOwner) {}
 
     /**
      * @notice deposit the full token amount for DCA on the contract

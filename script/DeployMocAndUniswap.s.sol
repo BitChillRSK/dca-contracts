@@ -70,9 +70,11 @@ contract DeployMocAndUniswap is DeployBase {
         MocHelperConfig.NetworkConfig memory networkConfig = helpConfMoc.getActiveNetworkConfig();
         
         vm.startBroadcast();
-        // Deploy admin operations and DCA manager
-        adOpsMoc = new OperationsAdmin();
-        dcaManMoc = new DcaManager(address(adOpsMoc), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT);
+        address owner = adminAddresses[environment];
+        adOpsMoc = new OperationsAdmin(owner);
+        dcaManMoc = new DcaManager(
+            address(adOpsMoc), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, owner
+        );
         
         // Get fee collector address
         address feeCollector = getFeeCollector(environment);
@@ -114,19 +116,6 @@ contract DeployMocAndUniswap is DeployBase {
         
         handlerMoc = deployMocSwapContracts.deployDocHandlerMoc(params);
         console.log("MoC handler deployed at:", handlerMoc);
-        
-        // Get owner address based on environment
-        address owner = adminAddresses[environment];
-        
-        vm.startBroadcast();
-
-        // Transfer ownership of contracts
-        adOpsMoc.transferOwnership(owner);
-        dcaManMoc.transferOwnership(owner);
-        // Handler was deployed by a nested DeployMocSwaps instance, which is its
-        // Ownable owner — not the broadcaster. Do not transferOwnership here.
-        
-        vm.stopBroadcast();
     }
     
     function deployUniswapContracts() 
@@ -142,9 +131,11 @@ contract DeployMocAndUniswap is DeployBase {
         DexHelperConfig.NetworkConfig memory networkConfig = helpConfUni.getActiveNetworkConfig();
         
         vm.startBroadcast();
-        // Deploy admin operations and DCA manager
-        adOpsUni = new OperationsAdmin();
-        dcaManUni = new DcaManager(address(adOpsUni), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT);
+        address owner = adminAddresses[environment];
+        adOpsUni = new OperationsAdmin(owner);
+        dcaManUni = new DcaManager(
+            address(adOpsUni), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, owner
+        );
         
         // Get fee collector address
         address feeCollector = getFeeCollector(environment);
@@ -206,19 +197,6 @@ contract DeployMocAndUniswap is DeployBase {
             })
         );
         console.log("Uniswap handler deployed at:", handlerUni);
-        
-        // Get owner address based on environment
-        address owner = adminAddresses[environment];
-        
-        vm.startBroadcast();
-
-        // Transfer ownership of contracts
-        adOpsUni.transferOwnership(owner);
-        dcaManUni.transferOwnership(owner);
-        // Handler was deployed by a nested DeployDexSwaps instance, which is its
-        // Ownable owner — not the broadcaster. Do not transferOwnership here.
-        
-        vm.stopBroadcast();
     }
 
     function run()

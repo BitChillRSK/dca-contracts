@@ -64,10 +64,10 @@ contract BatchTailScheduleTest is Test {
 
         // dcaManager = this, so the test can call onlyDcaManager entry points directly
         lendingHandler = new SovrynDocHandlerMoc(
-            address(this), address(docToken), address(iSusdToken), FEE_COLLECTOR, address(mocProxy), feeSettings
+            address(this), address(docToken), address(iSusdToken), FEE_COLLECTOR, address(mocProxy), feeSettings, address(this)
         );
         idleHandler =
-            new IdleDocHandlerMoc(address(this), address(docToken), FEE_COLLECTOR, address(mocProxy), feeSettings);
+            new IdleDocHandlerMoc(address(this), address(docToken), FEE_COLLECTOR, address(mocProxy), feeSettings, address(this));
 
         address[2] memory users = [ALICE, BOB];
         for (uint256 i; i < users.length; ++i) {

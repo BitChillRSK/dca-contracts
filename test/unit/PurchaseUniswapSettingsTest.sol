@@ -407,7 +407,7 @@ contract ZeroTokenPurchaseUniswap is PurchaseUniswap {
         uint256 amountOutMinimumPercent,
         uint256 amountOutMinimumSafetyCheck
     )
-        FeeHandler(feeCollector, feeSettings)
+        FeeHandler(feeCollector, feeSettings, msg.sender)
         DcaManagerAccessControl(dcaManagerAddress)
         PurchaseUniswap(uniswapSettings, amountOutMinimumPercent, amountOutMinimumSafetyCheck)
     {}

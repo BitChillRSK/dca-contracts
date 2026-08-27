@@ -12,7 +12,6 @@ import {LayerBankDocHandlerMoc} from "../src/layerbank/LayerBankDocHandlerMoc.so
 import {OperationsAdmin} from "../src/OperationsAdmin.sol";
 import {ICoinPairPrice} from "../src/interfaces/ICoinPairPrice.sol";
 import {IFeeHandler} from "../src/interfaces/IFeeHandler.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {console} from "forge-std/Test.sol";
 import "./Constants.sol";
 
@@ -43,7 +42,8 @@ contract DeployMocSwaps is DeployBase {
                     params.tokenAddress,
                     params.feeCollector,
                     params.mocProxy,
-                    feeSettings
+                    feeSettings,
+                    adminAddresses[environment]
                 )
             );
         }
@@ -55,7 +55,8 @@ contract DeployMocSwaps is DeployBase {
                     params.shareToken,
                     params.feeCollector,
                     params.mocProxy,
-                    feeSettings
+                    feeSettings,
+                    adminAddresses[environment]
                 )
             );
         }
@@ -67,7 +68,8 @@ contract DeployMocSwaps is DeployBase {
                     params.shareToken,
                     params.feeCollector,
                     params.mocProxy,
-                    feeSettings
+                    feeSettings,
+                    adminAddresses[environment]
                 )
             );
         }
@@ -79,7 +81,8 @@ contract DeployMocSwaps is DeployBase {
                     params.shareToken,
                     params.feeCollector,
                     params.mocProxy,
-                    feeSettings
+                    feeSettings,
+                    adminAddresses[environment]
                 )
             );
         }
@@ -118,8 +121,11 @@ contract DeployMocSwaps is DeployBase {
 
         vm.startBroadcast();
 
-        OperationsAdmin operationsAdmin = new OperationsAdmin();
-        DcaManager dcaManager = new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT);
+        address owner = adminAddresses[environment];
+        OperationsAdmin operationsAdmin = new OperationsAdmin(owner);
+        DcaManager dcaManager = new DcaManager(
+            address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, owner
+        );
         address feeCollector = getFeeCollector(environment);
         address docHandlerMocAddress;
 
@@ -146,11 +152,6 @@ contract DeployMocSwaps is DeployBase {
             });
 
             docHandlerMocAddress = deployDocHandlerMoc(params);
-
-            address owner = adminAddresses[environment];
-            operationsAdmin.transferOwnership(owner);
-            dcaManager.transferOwnership(owner);
-            Ownable(docHandlerMocAddress).transferOwnership(owner);
         }
         // Live networks: production map is idle=0, LayerBank=1, Sovryn=2. Tropykus is not registered.
         else if (environment == Environment.TESTNET || environment == Environment.MAINNET) {
@@ -160,13 +161,10 @@ contract DeployMocSwaps is DeployBase {
 
             console.log("Deploying production handlers (idle / LayerBank / Sovryn)");
 
-            // Register lending classes first. Route class is add-only; a missing aToken on this
-            // network skips the LayerBank handler but leaves index 1 as Lending so a later
-            // REAL_DEPLOYMENT add-on can assign without re-registering.
+            // Owner is already `adminAddresses[environment]`. `registerRoute` / `assignTokenHandler`
+            // in this transaction therefore require the broadcaster to be that address.
             operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
             operationsAdmin.registerRoute(SOVRYN_INDEX, true);
-
-            address owner = adminAddresses[environment];
 
             address idleHandler = deployDocHandlerMoc(
                 DeployParams({
@@ -180,7 +178,6 @@ contract DeployMocSwaps is DeployBase {
             );
             console.log("Idle handler deployed at:", idleHandler);
             operationsAdmin.assignTokenHandler(docTokenAddress, IDLE_INDEX, idleHandler);
-            Ownable(idleHandler).transferOwnership(owner);
             if (protocol == Protocol.NONE) {
                 docHandlerMocAddress = idleHandler;
             }
@@ -206,7 +203,6 @@ contract DeployMocSwaps is DeployBase {
                 );
                 console.log("LayerBank handler deployed at:", layerbankHandler);
                 operationsAdmin.assignTokenHandler(docTokenAddress, LAYERBANK_INDEX, layerbankHandler);
-                Ownable(layerbankHandler).transferOwnership(owner);
                 if (protocol == Protocol.LAYERBANK) {
                     docHandlerMocAddress = layerbankHandler;
                 }
@@ -232,7 +228,6 @@ contract DeployMocSwaps is DeployBase {
                     );
                     console.log("Sovryn handler deployed at:", sovrynHandler);
                     operationsAdmin.assignTokenHandler(docTokenAddress, SOVRYN_INDEX, sovrynHandler);
-                    Ownable(sovrynHandler).transferOwnership(owner);
                     if (protocol == Protocol.SOVRYN) {
                         docHandlerMocAddress = sovrynHandler;
                     }
@@ -240,9 +235,6 @@ contract DeployMocSwaps is DeployBase {
             } else {
                 console.log("Skipping Sovryn handler deployment for USDRIF as it's not supported");
             }
-
-            operationsAdmin.transferOwnership(owner);
-            dcaManager.transferOwnership(owner);
         }
 
         if (docHandlerMocAddress == address(0)) {

@@ -51,7 +51,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         s_amountOutMinimumPercent = amountOutMinimumPercent;
         s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck;
         
-        setPurchasePath(uniswapSettings.swapIntermediateTokens, uniswapSettings.swapPoolFeeRates);
+        // Direct initial owner is not the deployer, so the constructor cannot call the onlyOwner setter.
+        _setPurchasePath(uniswapSettings.swapIntermediateTokens, uniswapSettings.swapPoolFeeRates);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -81,6 +82,10 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         override
         onlyOwner
     {
+        _setPurchasePath(intermediateTokens, poolFeeRates);
+    }
+
+    function _setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates) internal {
         if (poolFeeRates.length != intermediateTokens.length + 1) {
             revert PurchaseUniswap__WrongNumberOfTokensOrFeeRates(intermediateTokens.length, poolFeeRates.length);
         }

@@ -3,7 +3,6 @@ pragma solidity 0.8.36;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
 import {FeeHandler} from "./FeeHandler.sol";
@@ -13,7 +12,7 @@ import {DcaManagerAccessControl} from "./DcaManagerAccessControl.sol";
  * @title TokenHandler
  * @dev Base contract for handling stablecoins.
  */
-abstract contract TokenHandler is ITokenHandler, ERC165, Ownable, FeeHandler, DcaManagerAccessControl {
+abstract contract TokenHandler is ITokenHandler, ERC165, FeeHandler, DcaManagerAccessControl {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable i_stableToken; // The stablecoin token to be deposited
@@ -23,13 +22,15 @@ abstract contract TokenHandler is ITokenHandler, ERC165, Ownable, FeeHandler, Dc
      * @param tokenAddress: the address of the token to be deposited
      * @param feeCollector: the address of the fee collector
      * @param feeSettings: the fee settings
+     * @param initialOwner: the address that owns fee/oracle configuration immediately after deploy
      */
     constructor(
         address dcaManagerAddress,
         address tokenAddress,
         address feeCollector,
-        FeeSettings memory feeSettings
-    ) FeeHandler(feeCollector, feeSettings) DcaManagerAccessControl(dcaManagerAddress) {
+        FeeSettings memory feeSettings,
+        address initialOwner
+    ) FeeHandler(feeCollector, feeSettings, initialOwner) DcaManagerAccessControl(dcaManagerAddress) {
         i_stableToken = IERC20(tokenAddress);
     }
 

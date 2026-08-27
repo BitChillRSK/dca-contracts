@@ -8,7 +8,6 @@ import {LayerBankDocHandlerMoc} from "../src/layerbank/LayerBankDocHandlerMoc.so
 import {OperationsAdmin} from "../src/OperationsAdmin.sol";
 import {IOperationsAdmin} from "../src/interfaces/IOperationsAdmin.sol";
 import {IFeeHandler} from "../src/interfaces/IFeeHandler.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {MockLayerBankAToken, MockLayerBankPool} from "../test/mocks/MockLayerBank.sol";
 import {console} from "forge-std/Test.sol";
 import "./Constants.sol";
@@ -31,6 +30,7 @@ contract DeployLayerBankHandler is DeployBase {
         address aToken;
         address mocProxy;
         address feeCollector;
+        address initialOwner;
     }
 
     function deployLayerBankDocHandlerMoc(DeployParams memory params) public returns (address) {
@@ -48,7 +48,8 @@ contract DeployLayerBankHandler is DeployBase {
                 params.aToken,
                 params.feeCollector,
                 params.mocProxy,
-                feeSettings
+                feeSettings,
+                params.initialOwner
             )
         );
     }
@@ -73,10 +74,11 @@ contract DeployLayerBankHandler is DeployBase {
                 tokenAddress: tokenAddress,
                 aToken: address(aToken),
                 mocProxy: mocProxy,
-                feeCollector: feeCollector
+                feeCollector: feeCollector,
+                initialOwner: owner
             })
         );
-        Ownable(handler).transferOwnership(owner);
+        return handler;
     }
 
     function run(MocHelperConfig existingConfig, address operationsAdminAddress, address dcaManagerAddress)
@@ -123,10 +125,10 @@ contract DeployLayerBankHandler is DeployBase {
                     tokenAddress: docTokenAddress,
                     aToken: aToken,
                     mocProxy: mocProxyAddress,
-                    feeCollector: getFeeCollector(environment)
+                    feeCollector: getFeeCollector(environment),
+                    initialOwner: operationsAdmin.owner()
                 })
             );
-            Ownable(layerbankHandler).transferOwnership(operationsAdmin.owner());
         } else {
             // FORK: `--broadcast` against a real RPC without REAL_DEPLOYMENT=true.
             revert("DeployLayerBankHandler live path requires REAL_DEPLOYMENT=true");
