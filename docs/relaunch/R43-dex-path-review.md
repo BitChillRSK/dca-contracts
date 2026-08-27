@@ -1,6 +1,6 @@
 # R43 — Dex path review (peg, slippage, MEV)
 
-Status: **PR (pending link)** · Assigned: yes · Optional/further-review: no
+Status: **PR [#85](https://github.com/BitChillRSK/dca-contracts/pull/85)** · Assigned: yes · Optional/further-review: no
 
 PR 35 of the relaunch stack. Stack on R47 (PR 34). **Must land before R36 and R9 (ABI freeze)** because LayerBank USDRIF/USDT0 Dex consumes this path. R33 only closed the settings-invariant hole; it explicitly left oracle math, price freshness, and `amountOutMinimum` construction out of scope.
 
