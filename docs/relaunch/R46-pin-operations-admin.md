@@ -1,6 +1,6 @@
 # R46 — Pin DcaManager to its OperationsAdmin
 
-Status: **implemented** · Assigned: yes · Optional/further-review: no
+Status: **PR [#83](https://github.com/BitChillRSK/dca-contracts/pull/83)** · Assigned: yes · Optional/further-review: no
 
 PR 33 of the relaunch stack. Stack on R45 (PR 32). Must precede handler-registry hardening and R9.
 
