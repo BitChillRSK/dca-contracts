@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: no · Optional/further-review: no
 
-PR 33 of the relaunch stack. Stack on R41 (PR 32). **Must land before R9 (ABI freeze).**
+PR 37 of the relaunch stack. Stack on R41 (PR 36). **Must land before R9 (ABI freeze).**
 
 ## Objective
 
@@ -35,7 +35,7 @@ Decided 2026-08-27: **rename + previous/new**. Do not keep the old selector as a
 
 - [ ] Renaming `setPurchaseAmount` or its event.
 - [ ] R9 un-indexing of other events.
-- [ ] Packing, pause, or changing how `_validatePurchasePeriod` works.
+- [ ] Packing, either pause feature, or changing how `_validatePurchasePeriod` works.
 
 ## Files likely touched
 

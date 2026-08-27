@@ -53,7 +53,7 @@ If Dex runtime margin cannot absorb the `supportsInterface` addition **after** t
 - [ ] Fee formula, bounds, collector policy, cap value, or event semantics.
 - [ ] R33 slippage behavior, R34 DcaManager ABI, R9 event indexing, or further code-size work.
 - [ ] Concrete handler constructor-ABI changes, storage-layout changes, protocol adapters, deploy-index changes, or live broadcasts. The two abstract purchase-base constructor cleanups assigned above are in scope. The `supportsInterface` addition in **Carried from R13** is the one assigned ABI-adjacent exception.
-- [ ] Ownable2Step / two-step `OperationsAdmin` ownership (R13 optional-late).
+- [ ] Ownable2Step / two-step ownership (assigned later to R45).
 
 ## Files likely touched
 

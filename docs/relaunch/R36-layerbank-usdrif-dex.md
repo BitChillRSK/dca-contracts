@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: no · Optional/further-review: no
 
-PR 34 of the relaunch stack. Stack on R40 (PR 33).
+PR 41 of the relaunch stack. Stack on R18 (PR 40).
 
 **Blocked on [R43](./R43-dex-path-review.md):** `PurchaseUniswap._getAmountOutMinimum` treats stablecoin units as 18-decimal USD against the MoC BTC/USD oracle. USDT0 is 6 decimals. Do not implement this PR on the unscaled formula.
 
@@ -74,24 +74,12 @@ if that is cheap; do not silently run USDT0 tests against 18-decimal amounts and
 
 ## Open product decisions
 
-Ask the human before implementing:
+**none** — decided 2026-08-27:
 
-1. **Which dex-map index does LayerBank take?** The dex `OperationsAdmin` is a separate instance from
-   the MoC one, so it does not have to match `LAYERBANK_INDEX = 1` — but matching it is far less
-   confusing for ops and the frontend. Recommend `1`. Route classes are add-only and schedules store
-   `routeIndex` forever, so this cannot be changed after a live deploy. USDRIF and USDT0 share that
-   index (different tokens, two handler instances).
-   R38 now follows R36, so that PR will consume the final dex-map topology rather than asking this gate
-   early. Whether the live dex map keeps a DOC/Sovryn arm (decision 2) determines whether its mixed-grid
-   example is immediately reachable; the zipped API remains durable even if the first map is simpler.
-2. **Does the dex map keep a Sovryn arm alongside LayerBank, or does LayerBank replace it?**
-   `DeployDexSwaps` currently deploys both Tropykus and Sovryn on live networks. Sovryn lists neither
-   USDRIF nor USDT0; a remaining Sovryn arm is a DOC-dex question, not a USDT0 question.
-3. **Is kUSDRIF mint currently paused on Tropykus mainnet?** If yes, say so in the PR — it changes
-   the urgency of R37 from cleanup to a live defect.
-4. **USDT0 min purchase and fee bounds.** Recommend the same *token-unit* amounts as DOC: min
-   purchase `25e6`, fee lower `1000e6`, fee upper `100_000e6`. Confirm or give different numbers.
-   USDT0 in this PR is already decided; this gate is only the 6-decimal magnitudes.
+1. LayerBank uses dex route index **1**, matching the MoC map. USDRIF and USDT0 use distinct handler instances at that same index.
+2. Keep the Sovryn DOC Dex arm at route index **2** alongside LayerBank. It remains the DOC route; Sovryn does not back USDRIF or USDT0.
+3. Probe kUSDRIF mint on the mainnet fork and record whether it is paused. This is an implementation fact, not a gate.
+4. USDT0 uses min purchase `25e6`, fee lower bound `1000e6`, and fee upper bound `100_000e6`.
 
 Look up the USDT0 Uniswap path (direct WRBTC vs hop, fee tiers) from live SwapRouter02 pools. That is
 not a product gate. If no liquid WRBTC route exists, stop and ask rather than guessing a path.

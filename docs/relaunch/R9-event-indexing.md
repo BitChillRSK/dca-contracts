@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: no · Optional/further-review: no
 
-PR 38 of the relaunch stack. **ABI freeze** for events, errors, and remaining indexed fields. Stack on R42 (PR 37), after the final production handlers/routes and batcher exist. See [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md).
+PR 45 of the relaunch stack. **ABI freeze** for events, errors, and remaining indexed fields. Stack on R42 (PR 44), after the final production handlers/routes, pause/packing work, and batcher exist. See [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md).
 
 ## Objective
 
@@ -22,12 +22,7 @@ Diagnostic errors such as `DcaManager__PurchaseAmountMismatch` (six args) stay. 
 
 ## Open product decisions
 
-Ask before implementing:
-
-1. **R18 packing / R19 pause** if PR 2 has not recorded them. Extra pause/compound events only if those items were approved for this freeze. Default: no pause/compound events.
-2. **Any extra purchase-event fields for ops?** Default **none**. `RbtcBought` already has user, token, rBTC, scheduleId, stablecoin spent. Do not add remaining balance, route index, or per-buyer fee unless the human names the field. Per-buyer fee is not even exact after batch rounding.
-
-Fee-transfer event: **yes**, decided 2026-08-27. Shape below.
+**none** — R19 pause and R18 packing land in PRs 39–40; their events/tuple are part of this audit. R12 compound is rejected. Add **no** extra purchase-event fields: `RbtcBought` already has user, token, rBTC, scheduleId, and stablecoin spent, while a per-buyer fee is not exact after batch rounding. Fee-transfer event remains required with the shape below.
 
 ## Scope
 
@@ -54,7 +49,7 @@ Fee-transfer event: **yes**, decided 2026-08-27. Shape below.
 - [ ] R39/R40/R41 behavior (already landed).
 - [ ] Changing R42 batcher behavior. Its first-party ABI already exists and is included in the freeze audit.
 - [ ] License / SPDX.
-- [ ] Packing, pause, compound (unless decision 1 says they ship in this freeze — then their events are in scope here and nowhere else).
+- [ ] Packing/pause behavior (already landed in R18/R19) or compound (rejected). This PR only audits their final ABI/events.
 
 ## Files likely touched
 

@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: no · Optional/further-review: no
 
-PR 31 of the relaunch stack. Stack on R39 (PR 30). **Must land before R36 and R9 (ABI freeze)** because LayerBank USDRIF/USDT0 Dex consumes this path. R33 only closed the settings-invariant hole; it explicitly left oracle math, price freshness, and `amountOutMinimum` construction out of scope.
+PR 35 of the relaunch stack. Stack on R47 (PR 34). **Must land before R36 and R9 (ABI freeze)** because LayerBank USDRIF/USDT0 Dex consumes this path. R33 only closed the settings-invariant hole; it explicitly left oracle math, price freshness, and `amountOutMinimum` construction out of scope.
 
 ## Objective
 
@@ -36,13 +36,13 @@ R39 lands first so this review measures and reasons about the batch-only purchas
 
 ## Open product decisions
 
-Ask before writing Solidity (review first in the same chat, then implement):
+**none** — decided 2026-08-27:
 
-1. **Keep the $1 peg + MoC BTC/USD oracle?** Recommend **yes** for listed stables, with an explicit natspec that a depeg is “swap reverts,” not “users get $1 of BTC.” Alternative: a per-stable USD feed (more oracles, more freeze surface). Do not invent a peg-stability module.
-2. **How is `amountOutMinimum` set?** Options to compare in the PR (with a fork quote against a live USDRIF or USDT0 pool): current oracle×percent; Uniswap quoter at send time (off-chain, still need an on-chain floor); pool TWAP; tighter percent. Recommend keeping an **on-chain oracle floor** so a malicious/lagging swapper cannot pass `amountOutMinimum = 0`. Off-chain quotes can only tighten, not replace, that floor.
-3. **MEV / stale-tx posture on Rootstock?** Recommend: keep the on-chain floor; document that there is no router deadline; do not add a custom deadline wrapper unless SwapRouter02 on Rootstock actually exposes one; do not add a private-relay dependency in the handler. If the human wants extra protection, the swapper bot (private tx / shorter cron gap) is the place, not a new handler feature.
+1. Keep the listed-stable **$1 assumption plus MoC BTC/USD oracle**. Natspec must say a depeg makes the pool fail the floor and revert; it does not guarantee redemption at $1.
+2. Keep an **on-chain oracle floor** and scale stablecoin units correctly. An off-chain quote may tighten bot policy but cannot replace the handler floor.
+3. Keep MEV/stale-tx protection at the floor plus bot operations. Do not add a handler deadline that SwapRouter02 does not expose or a private-relay dependency.
 
-Decimals scaling for non-18 stables is **not a gate** — it is required if decision 1 keeps the current formula.
+Decimals scaling for non-18 stables is required, not optional.
 
 ## Scope
 

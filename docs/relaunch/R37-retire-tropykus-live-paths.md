@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: no · Optional/further-review: no · **Blocked on R36**
 
-PR 35 of the relaunch stack. Stack on R36 (PR 34).
+PR 42 of the relaunch stack. Stack on R36 (PR 41).
 
 ## Objective
 
@@ -37,15 +37,7 @@ Only the index ever lands in production storage, so only the index needs to leav
 
 ## Open product decisions
 
-Ask the human before implementing:
-
-1. **Does the local Tropykus lane survive at all?** `make moc-tropykus` / `make dex-tropykus` /
-   `make fork-tropykus` give mock and live coverage of `LendingErc20Handler` through a second adapter,
-   which has caught real bugs. Recommend keeping them; the alternative is deleting
-   `src/tropykus-legacy/` outright, which is a much larger and less reversible change than this spec.
-2. **Does index 4 get released for reuse, or stay burned?** Freeing it means the next production route
-   can take it; leaving it burned costs nothing and avoids ever confusing a new deploy with an old
-   test fixture.
+**none** — decided 2026-08-27: keep `moc-tropykus`, `dex-tropykus`, and `fork-tropykus` as legacy test lanes; keep production index **4 burned** so it is never reinterpreted as a different venue.
 
 ## Scope
 

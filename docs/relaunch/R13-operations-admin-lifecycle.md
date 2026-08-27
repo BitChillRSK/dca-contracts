@@ -118,7 +118,7 @@ A real fix needs an ERC-165 id for `ITokenLending` on `assignTokenHandler`. That
 
 ## Noted, not in scope: Ownable2Step
 
-With AccessControl gone there is no second authority. OpenZeppelin 4.9.3 `transferOwnership` has no acceptance step. A wrong governance address permanently freezes `registerRoute`, `assignTokenHandler`, and swapper management, and because routes are add-only there is no recovery (pre-R13, `ADMIN_ROLE` holders were a fallback). This PR overrides `renounceOwnership` to revert so an accidental renounce cannot do the same. Two-step ownership is on the **optional-late** list in `IMPLEMENTATION_ORDER.md` (with OZ 5.x). R31 does not own it.
+With AccessControl gone there is no second authority. OpenZeppelin 4.9.3 `transferOwnership` has no acceptance step. A wrong governance address permanently freezes `registerRoute`, `assignTokenHandler`, and swapper management, and because routes are add-only there is no recovery (pre-R13, `ADMIN_ROLE` holders were a fallback). This PR overrides `renounceOwnership` to revert so an accidental renounce cannot do the same. R44 now upgrades OZ and R45 adds two-step ownership across the final contracts; R31 does not own it.
 
 ## Scope
 

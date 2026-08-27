@@ -2,7 +2,7 @@
 
 Status: **implemented** · Assigned: yes · Optional/further-review: no
 
-PR 29 of R22 (reordered after the post-R30 architecture sequence; R35 inserted as PR 27 after #70), GitHub [#73](https://github.com/BitChillRSK/dca-contracts/pull/73). Stack on R32 (PR 28, GitHub [#72](https://github.com/BitChillRSK/dca-contracts/pull/72)). Last required R22 PR; R39 follows as PR 30. R9 is now PR 38, after the remaining shared hardening, final production handlers/routes, and swapper batcher.
+PR 29 of R22 (reordered after the post-R30 architecture sequence; R35 inserted as PR 27 after #70), GitHub [#73](https://github.com/BitChillRSK/dca-contracts/pull/73). Stack on R32 (PR 28, GitHub [#72](https://github.com/BitChillRSK/dca-contracts/pull/72)). Last required R22 PR; R39 follows as PR 30. R9 is now PR 45, after the final dependency/authority hardening, pause/packing work, production handlers/routes, and swapper batcher.
 
 ## Objective
 

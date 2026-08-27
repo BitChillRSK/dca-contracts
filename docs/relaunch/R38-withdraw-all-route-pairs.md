@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: no · Optional/further-review: no
 
-PR 36 of the relaunch stack. Stack on R37 (PR 35). **Must land before R9 (ABI freeze).** R39–R41 and R43 already settled the other DcaManager/handler ABI changes by this point.
+PR 43 of the relaunch stack. Stack on R37 (PR 42). **Must land before R9 (ABI freeze).** R18/R19 and R39–R48 already settled the other DcaManager/handler ABI changes by this point.
 
 ## Objective
 
@@ -64,16 +64,7 @@ pairs short of another redeploy.
 
 ## Open product decisions
 
-Ask the human before implementing:
-
-1. **Replace the cartesian semantics, or add a zipped function alongside?** Recommend **replace**. R34
-   recorded that off-chain components migrate with the relaunch and there is no live dual-ABI window, so
-   the cartesian form has no consumer to preserve. Adding costs two selectors before the freeze for an API
-   the relaunch frontend would never call.
-2. **Keep the `withdrawAllAccumulated*` names, or rename?** Recommend **keep** — "all" still reads as "all
-   of the routes I named". Note the risk if kept: the selectors are unchanged while the argument meaning
-   changes, so anyone holding a stale ABI decodes the call without noticing. R34's no-dual-window decision
-   is what makes that acceptable; say so in the PR rather than leaving it implicit.
+**none** — decided 2026-08-27: replace the cartesian semantics (no parallel legacy selector) and keep the `withdrawAllAccumulated*` names. R34's no-dual-window cutover makes the same-selector semantic change acceptable; the PR must call it out explicitly.
 
 ## Scope
 
@@ -104,9 +95,7 @@ Ask the human before implementing:
 
 ## Out of scope
 
-- [ ] The two-lending-routes-one-handler uniqueness hole on the later-review queue in `README.md`. Zipping
-      does not address it — a user with real balances on both indexes still names both pairs, and the
-      handler's per-handler `s_shares` still sees the other route's principal as yield.
+- [ ] Handler-address uniqueness is already enforced by R47. Do not reopen its registry policy here.
 - [ ] Frontend changes. `BitChillRSK/front-end` deletes its `uniqueTokensAndProtocolIndexes` util and passes
       routes straight through, but that is a separate repo and a separate cutover.
 - [ ] R36 dex-map work, R37 Tropykus removal, and any deploy-script change.

@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: no · Optional/further-review: no
 
-PR 37 of the relaunch stack. Stack on R38 (PR 36). Lands **before** R9/R10 so the event/ABI review and final natspec pass see every first-party contract that ships. It does not change `DcaManager`’s surface.
+PR 44 of the relaunch stack. Stack on R38 (PR 43). Lands **before** R9/R10 so the event/ABI review and final natspec pass see every first-party contract that ships. It does not change `DcaManager`’s surface.
 
 ## Objective
 
@@ -28,10 +28,7 @@ Decided 2026-08-27: **ship the batcher** as a relaunch item, not optional-late.
 
 ## Open product decisions
 
-Ask before implementing:
-
-1. **All-or-nothing or continue-on-fail?** Recommend **all-or-nothing** (plain sequential external calls, no `try/catch`). Continue-on-fail needs a results array, still retries the failures, and is easy to get wrong around gas. If isolation matters more than one tx, do not ship this contract — keep one tx per handler.
-2. **Does the bot EOA stay on the swapper allowlist alongside the batcher?** Recommend **yes** (break-glass / single-handler retry). The batcher does not replace `addSwapper` for humans.
+**none** — decided 2026-08-27: calls are all-or-nothing, with no `try/catch`; the bot EOA remains allowlisted as a break-glass/single-handler retry path alongside the batcher.
 
 ## Scope
 
@@ -46,7 +43,7 @@ Ask before implementing:
 - [ ] `multicall` / `delegatecall` on `DcaManager`.
 - [ ] Changing `batchBuyRbtc` to accept mixed tokens or routes.
 - [ ] Telegram / monitoring. Per-user amounts already live in `PurchaseRbtc__RbtcBought`.
-- [ ] Removing the bot EOA from the allowlist unless decision 2 says so.
+- [ ] Removing the bot EOA from the allowlist.
 - [ ] `--broadcast`.
 
 ## Files likely touched
