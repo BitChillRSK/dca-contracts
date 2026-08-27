@@ -48,7 +48,7 @@ contract DeployDexSwaps is DeployBase {
                     feeSettings,
                     params.amountOutMinimumPercent,
                     params.amountOutMinimumSafetyCheck,
-                    adminAddresses[environment]
+                    _initialOwner()
                 )
             );
         }
@@ -63,7 +63,7 @@ contract DeployDexSwaps is DeployBase {
                     feeSettings,
                     params.amountOutMinimumPercent,
                     params.amountOutMinimumSafetyCheck,
-                    adminAddresses[environment]
+                    _initialOwner()
                 )
             );
         }
@@ -81,8 +81,8 @@ contract DeployDexSwaps is DeployBase {
     ) internal returns (address selectedHandler) {
         console.log("Deploying handlers for lending protocols for live network");
 
-        // Owner is already `adminAddresses[environment]`. Route registration in this
-        // transaction therefore requires the broadcaster to be that address.
+        // Owner is the Foundry broadcaster for this transaction so route registration succeeds.
+        // Mainnet proposes MAINNET_OWNER (the Safe) after setup.
         operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
         operationsAdmin.registerRoute(SOVRYN_INDEX, true);
 
@@ -104,6 +104,7 @@ contract DeployDexSwaps is DeployBase {
             );
             console.log("Tropykus handler deployed at:", tropykusHandler);
             operationsAdmin.assignTokenHandler(stablecoinAddress, TROPYKUS_INDEX, tropykusHandler);
+            _proposeFinalOwner(tropykusHandler);
             if (protocol == Protocol.TROPYKUS) {
                 selectedHandler = tropykusHandler;
             }
@@ -134,12 +135,14 @@ contract DeployDexSwaps is DeployBase {
         );
         console.log("Sovryn handler deployed at:", sovrynHandler);
         operationsAdmin.assignTokenHandler(stablecoinAddress, SOVRYN_INDEX, sovrynHandler);
+        _proposeFinalOwner(sovrynHandler);
         if (protocol == Protocol.SOVRYN) {
             selectedHandler = sovrynHandler;
         }
     }
 
     function run() external returns (OperationsAdmin, address, DcaManager, DexHelperConfig) {
+        _assertLiveBroadcastSender(msg.sender);
         // Initialize DexHelperConfig which reads the STABLECOIN_TYPE env var
         DexHelperConfig helperConfig = new DexHelperConfig();
         DexHelperConfig.NetworkConfig memory networkConfig = helperConfig.getActiveNetworkConfig();
@@ -166,15 +169,15 @@ contract DeployDexSwaps is DeployBase {
             revert("USDRIF is not supported by Sovryn");
         }
 
-        vm.startBroadcast();
+        _beginLiveAwareBroadcast(msg.sender);
 
-        OperationsAdmin operationsAdmin = new OperationsAdmin(adminAddresses[environment]);
+        OperationsAdmin operationsAdmin = new OperationsAdmin(deployOwner);
         DcaManager dcaManager = new DcaManager(
             address(operationsAdmin),
             MIN_PURCHASE_PERIOD,
             MAX_SCHEDULES_PER_TOKEN,
             MIN_PURCHASE_AMOUNT,
-            adminAddresses[environment]
+            deployOwner
         );
         address feeCollector = getFeeCollector(environment);
         
@@ -225,6 +228,10 @@ contract DeployDexSwaps is DeployBase {
                 isUSDRIF
             );
         }
+
+        _proposeFinalOwner(address(operationsAdmin));
+        _proposeFinalOwner(address(dcaManager));
+        _proposeFinalOwner(docHandlerDexAddress);
 
         vm.stopBroadcast();
 

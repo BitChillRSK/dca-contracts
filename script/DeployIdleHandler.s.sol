@@ -6,6 +6,7 @@ import {DeployBase} from "./DeployBase.s.sol";
 import {MocHelperConfig} from "./MocHelperConfig.s.sol";
 import {IdleDocHandlerMoc} from "../src/idle/IdleDocHandlerMoc.sol";
 import {OperationsAdmin} from "../src/OperationsAdmin.sol";
+import {DcaManager} from "../src/DcaManager.sol";
 import {IFeeHandler} from "../src/interfaces/IFeeHandler.sol";
 import {console} from "forge-std/Test.sol";
 import "./Constants.sol";
@@ -65,6 +66,10 @@ contract DeployIdleHandler is DeployBase {
         console.log("DOC token address:", docTokenAddress);
         console.log("MoC Proxy address:", mocProxyAddress);
 
+        OperationsAdmin operationsAdmin = OperationsAdmin(operationsAdminAddress);
+        _requireNoPendingOwner(operationsAdmin);
+        _requireNoPendingOwner(DcaManager(dcaManagerAddress));
+
         vm.startBroadcast();
 
         DeployParams memory params = DeployParams({
@@ -72,13 +77,12 @@ contract DeployIdleHandler is DeployBase {
             tokenAddress: docTokenAddress,
             mocProxy: mocProxyAddress,
             feeCollector: getFeeCollector(environment),
-            initialOwner: OperationsAdmin(operationsAdminAddress).owner()
+            initialOwner: operationsAdmin.owner()
         });
 
         address idleHandler = deployIdleDocHandlerMoc(params);
         console.log("Idle DOC handler deployed at:", idleHandler);
 
-        OperationsAdmin operationsAdmin = OperationsAdmin(operationsAdminAddress);
         if (msg.sender != operationsAdmin.owner()) {
             console.log("Warning: Deployer is not the owner. Cannot register handler.");
             console.log("Please call operationsAdmin.assignTokenHandler() as owner with:");

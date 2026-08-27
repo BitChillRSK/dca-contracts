@@ -6,6 +6,7 @@ import {DeployBase} from "./DeployBase.s.sol";
 import {MocHelperConfig} from "./MocHelperConfig.s.sol";
 import {LayerBankDocHandlerMoc} from "../src/layerbank/LayerBankDocHandlerMoc.sol";
 import {OperationsAdmin} from "../src/OperationsAdmin.sol";
+import {DcaManager} from "../src/DcaManager.sol";
 import {IOperationsAdmin} from "../src/interfaces/IOperationsAdmin.sol";
 import {IFeeHandler} from "../src/interfaces/IFeeHandler.sol";
 import {MockLayerBankAToken, MockLayerBankPool} from "../test/mocks/MockLayerBank.sol";
@@ -101,9 +102,12 @@ contract DeployLayerBankHandler is DeployBase {
         console.log("DOC token address:", docTokenAddress);
         console.log("MoC Proxy address:", mocProxyAddress);
 
+        OperationsAdmin operationsAdmin = OperationsAdmin(operationsAdminAddress);
+        _requireNoPendingOwner(operationsAdmin);
+        _requireNoPendingOwner(DcaManager(dcaManagerAddress));
+
         vm.startBroadcast();
 
-        OperationsAdmin operationsAdmin = OperationsAdmin(operationsAdminAddress);
         address layerbankHandler;
 
         if (environment == Environment.LOCAL) {

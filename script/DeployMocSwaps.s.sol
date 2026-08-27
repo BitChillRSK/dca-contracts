@@ -43,7 +43,7 @@ contract DeployMocSwaps is DeployBase {
                     params.feeCollector,
                     params.mocProxy,
                     feeSettings,
-                    adminAddresses[environment]
+                    _initialOwner()
                 )
             );
         }
@@ -56,7 +56,7 @@ contract DeployMocSwaps is DeployBase {
                     params.feeCollector,
                     params.mocProxy,
                     feeSettings,
-                    adminAddresses[environment]
+                    _initialOwner()
                 )
             );
         }
@@ -69,7 +69,7 @@ contract DeployMocSwaps is DeployBase {
                     params.feeCollector,
                     params.mocProxy,
                     feeSettings,
-                    adminAddresses[environment]
+                    _initialOwner()
                 )
             );
         }
@@ -82,7 +82,7 @@ contract DeployMocSwaps is DeployBase {
                     params.feeCollector,
                     params.mocProxy,
                     feeSettings,
-                    adminAddresses[environment]
+                    _initialOwner()
                 )
             );
         }
@@ -90,6 +90,7 @@ contract DeployMocSwaps is DeployBase {
     }
 
     function run() external returns (OperationsAdmin, address, DcaManager, MocHelperConfig) {
+        _assertLiveBroadcastSender(msg.sender);
         console.log("==== DeployMocSwaps.run() called ====");
         console.log("LENDING_PROTOCOL (env var):", vm.envString("LENDING_PROTOCOL"));
         console.log("STABLECOIN_TYPE (env var):", vm.envString("STABLECOIN_TYPE"));
@@ -119,12 +120,11 @@ contract DeployMocSwaps is DeployBase {
             revert("USDRIF is not supported by Sovryn");
         }
 
-        vm.startBroadcast();
+        _beginLiveAwareBroadcast(msg.sender);
 
-        address owner = adminAddresses[environment];
-        OperationsAdmin operationsAdmin = new OperationsAdmin(owner);
+        OperationsAdmin operationsAdmin = new OperationsAdmin(deployOwner);
         DcaManager dcaManager = new DcaManager(
-            address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, owner
+            address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, deployOwner
         );
         address feeCollector = getFeeCollector(environment);
         address docHandlerMocAddress;
@@ -161,8 +161,8 @@ contract DeployMocSwaps is DeployBase {
 
             console.log("Deploying production handlers (idle / LayerBank / Sovryn)");
 
-            // Owner is already `adminAddresses[environment]`. `registerRoute` / `assignTokenHandler`
-            // in this transaction therefore require the broadcaster to be that address.
+            // Owner is the Foundry broadcaster for this transaction so `registerRoute` /
+            // `assignTokenHandler` succeed. Mainnet proposes MAINNET_OWNER (the Safe) after setup.
             operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
             operationsAdmin.registerRoute(SOVRYN_INDEX, true);
 
@@ -178,6 +178,7 @@ contract DeployMocSwaps is DeployBase {
             );
             console.log("Idle handler deployed at:", idleHandler);
             operationsAdmin.assignTokenHandler(docTokenAddress, IDLE_INDEX, idleHandler);
+            _proposeFinalOwner(idleHandler);
             if (protocol == Protocol.NONE) {
                 docHandlerMocAddress = idleHandler;
             }
@@ -203,6 +204,7 @@ contract DeployMocSwaps is DeployBase {
                 );
                 console.log("LayerBank handler deployed at:", layerbankHandler);
                 operationsAdmin.assignTokenHandler(docTokenAddress, LAYERBANK_INDEX, layerbankHandler);
+                _proposeFinalOwner(layerbankHandler);
                 if (protocol == Protocol.LAYERBANK) {
                     docHandlerMocAddress = layerbankHandler;
                 }
@@ -228,6 +230,7 @@ contract DeployMocSwaps is DeployBase {
                     );
                     console.log("Sovryn handler deployed at:", sovrynHandler);
                     operationsAdmin.assignTokenHandler(docTokenAddress, SOVRYN_INDEX, sovrynHandler);
+                    _proposeFinalOwner(sovrynHandler);
                     if (protocol == Protocol.SOVRYN) {
                         docHandlerMocAddress = sovrynHandler;
                     }
@@ -240,6 +243,10 @@ contract DeployMocSwaps is DeployBase {
         if (docHandlerMocAddress == address(0)) {
             revert("Selected protocol handler was not deployed");
         }
+
+        _proposeFinalOwner(address(operationsAdmin));
+        _proposeFinalOwner(address(dcaManager));
+        _proposeFinalOwner(docHandlerMocAddress);
 
         vm.stopBroadcast();
 

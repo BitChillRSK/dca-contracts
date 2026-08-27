@@ -17,6 +17,15 @@ uint256 constant ANVIL_CHAIN_ID = 31337;
 uint256 constant RSK_MAINNET_CHAIN_ID = 30;
 uint256 constant RSK_TESTNET_CHAIN_ID = 31;
 
+// Live governance. Foundry broadcasts from an EOA (`forge script --account` / `--ledger`).
+// Testnet: that EOA is the owner. Mainnet: the EOA deploys and proposes the Safe, which must
+// `acceptOwnership` on each contract. Do not set MAINNET_OWNER as `initialOwner` in the same
+// script that calls `onlyOwner` setup — a Safe cannot sign a Foundry broadcast.
+address constant TESTNET_OWNER = 0x31e0FacEa072EE621f22971DF5bAE3a1317E41A4;
+address constant MAINNET_OWNER = 0xdeAbdc410aB7B0f1Da830A6b355B5b938208315f;
+address constant TESTNET_FEE_COLLECTOR = TESTNET_OWNER;
+address constant MAINNET_FEE_COLLECTOR = 0x3caB92C050514A0368D71815CAc42ad746350F16;
+
 // Production MoC route indexes (fresh relaunch map) and LENDING_PROTOCOL env strings.
 // `DeployMocSwaps` and `DeployDexSwaps` each deploy their own `OperationsAdmin`, so the MoC
 // map below and the dex map are independent; an index means nothing across the two admins.

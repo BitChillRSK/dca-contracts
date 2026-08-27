@@ -69,11 +69,10 @@ contract DeployMocAndUniswap is DeployBase {
         helpConfMoc = new MocHelperConfig();
         MocHelperConfig.NetworkConfig memory networkConfig = helpConfMoc.getActiveNetworkConfig();
         
-        vm.startBroadcast();
-        address owner = adminAddresses[environment];
-        adOpsMoc = new OperationsAdmin(owner);
+        _beginLiveAwareBroadcast(msg.sender);
+        adOpsMoc = new OperationsAdmin(deployOwner);
         dcaManMoc = new DcaManager(
-            address(adOpsMoc), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, owner
+            address(adOpsMoc), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, deployOwner
         );
         
         // Get fee collector address
@@ -130,11 +129,10 @@ contract DeployMocAndUniswap is DeployBase {
         helpConfUni = new DexHelperConfig();
         DexHelperConfig.NetworkConfig memory networkConfig = helpConfUni.getActiveNetworkConfig();
         
-        vm.startBroadcast();
-        address owner = adminAddresses[environment];
-        adOpsUni = new OperationsAdmin(owner);
+        _beginLiveAwareBroadcast(msg.sender);
+        adOpsUni = new OperationsAdmin(deployOwner);
         dcaManUni = new DcaManager(
-            address(adOpsUni), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, owner
+            address(adOpsUni), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, deployOwner
         );
         
         // Get fee collector address

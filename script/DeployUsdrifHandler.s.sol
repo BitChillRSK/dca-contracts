@@ -6,6 +6,7 @@ import {DeployBase} from "./DeployBase.s.sol";
 import {UsdrifHelperConfig} from "./UsdrifHelperConfig.s.sol";
 import {TropykusErc20HandlerDex} from "../src/tropykus-legacy/TropykusErc20HandlerDex.sol";
 import {OperationsAdmin} from "../src/OperationsAdmin.sol";
+import {DcaManager} from "../src/DcaManager.sol";
 import {IPurchaseUniswap} from "../src/interfaces/IPurchaseUniswap.sol";
 import {IFeeHandler} from "../src/interfaces/IFeeHandler.sol";
 import {IWRBTC} from "../src/interfaces/IWRBTC.sol";
@@ -44,6 +45,10 @@ contract DeployUsdrifHandler is DeployBase {
         
         console.log("OperationsAdmin address:", networkConfig.operationsAdminAddress);
         console.log("DcaManager address:", networkConfig.dcaManagerAddress);
+
+        OperationsAdmin operationsAdmin = OperationsAdmin(networkConfig.operationsAdminAddress);
+        _requireNoPendingOwner(operationsAdmin);
+        _requireNoPendingOwner(DcaManager(networkConfig.dcaManagerAddress));
         
         vm.startBroadcast();
         
@@ -77,7 +82,7 @@ contract DeployUsdrifHandler is DeployBase {
             feeSettings: feeSettings,
             amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
             amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck,
-            initialOwner: OperationsAdmin(networkConfig.operationsAdminAddress).owner()
+            initialOwner: operationsAdmin.owner()
         });
         
         // Deploy the USDRIF handler
@@ -95,8 +100,6 @@ contract DeployUsdrifHandler is DeployBase {
         
         console.log("USDRIF handler deployed at:", address(usdrifHandler));
         
-        // Register the handler with OperationsAdmin
-        OperationsAdmin operationsAdmin = OperationsAdmin(networkConfig.operationsAdminAddress);
         if (msg.sender != operationsAdmin.owner()) {
             console.log("Warning: Deployer is not the owner. Cannot register handler.");
             console.log("Please call operationsAdmin.assignTokenHandler() as owner with:");
