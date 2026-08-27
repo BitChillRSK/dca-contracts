@@ -132,6 +132,17 @@ contract PurchaseUniswapMinOutTest is Test {
                           UNSUPPORTED TOKENS
     //////////////////////////////////////////////////////////////*/
 
+    function testDeployRevertsOnAWrbtcThatIsNotEighteenDecimals() public {
+        MockStablecoinWithDecimals stablecoin = new MockStablecoinWithDecimals(address(this), 18);
+        address eightDecimalWrbtc = address(new WrongDecimalsWrbtc());
+
+        // Min-out lands in units of 1e-18 BTC; those are only WRBTC wei while WRBTC is 18 decimals.
+        vm.expectRevert(
+            abi.encodeWithSelector(IPurchaseUniswap.PurchaseUniswap__UnsupportedWrbtcDecimals.selector, uint8(8))
+        );
+        _deployHarnessWith(stablecoin, eightDecimalWrbtc);
+    }
+
     function testDeployRevertsOnAStablecoinWithMoreThanEighteenDecimals() public {
         MockStablecoinWithDecimals stablecoin = new MockStablecoinWithDecimals(address(this), 19);
 
@@ -149,14 +160,18 @@ contract PurchaseUniswapMinOutTest is Test {
         return _deployHarnessFor(new MockStablecoinWithDecimals(address(this), tokenDecimals));
     }
 
-    /// @dev No external call before the `new`, so `vm.expectRevert` lands on the harness deployment.
     function _deployHarnessFor(MockStablecoinWithDecimals stablecoin) private returns (MinOutHarness) {
+        return _deployHarnessWith(stablecoin, address(wrBtcToken));
+    }
+
+    /// @dev No external call before the `new`, so `vm.expectRevert` lands on the harness deployment.
+    function _deployHarnessWith(MockStablecoinWithDecimals stablecoin, address wrBtc) private returns (MinOutHarness) {
         address[] memory intermediateTokens = new address[](0);
         uint24[] memory poolFeeRates = new uint24[](1);
         poolFeeRates[0] = 3000;
 
         IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
-            wrBtcToken: IWRBTC(address(wrBtcToken)),
+            wrBtcToken: IWRBTC(wrBtc),
             swapRouter02: ISwapRouter02(address(swapRouter)),
             swapIntermediateTokens: intermediateTokens,
             swapPoolFeeRates: poolFeeRates,
@@ -228,6 +243,13 @@ contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
         returns (uint256)
     {
         return 0;
+    }
+}
+
+/// @notice Enough of a WRBTC to answer the constructor's decimals check, and nothing else.
+contract WrongDecimalsWrbtc {
+    function decimals() external pure returns (uint8) {
+        return 8;
     }
 }
 
