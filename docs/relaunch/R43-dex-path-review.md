@@ -1,6 +1,6 @@
 # R43 — Dex path review (peg, slippage, MEV)
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **PR (pending link)** · Assigned: yes · Optional/further-review: no
 
 PR 35 of the relaunch stack. Stack on R47 (PR 34). **Must land before R36 and R9 (ABI freeze)** because LayerBank USDRIF/USDT0 Dex consumes this path. R33 only closed the settings-invariant hole; it explicitly left oracle math, price freshness, and `amountOutMinimum` construction out of scope.
 
@@ -51,11 +51,11 @@ Decimals scaling for non-18 stables is required, not optional.
 
 ## Scope
 
-- [ ] Written review in the PR body: peg, min-out formula, unused safety-check, path encoding, oracle `isValid` / freshness, router deadline absence, Rootstock MEV. Point at line-level `PurchaseUniswap` / `IPurchaseUniswap`.
-- [ ] Implement the recorded decisions. Minimum if the peg is kept: scale `stablecoinAmountToSpend` to 18 decimals (or the oracle’s decimals) before dividing by `currentPrice`, using the purchase token’s `decimals()`. Test with a 6-decimal mock (USDT0 shape) and an 18-decimal mock (USDRIF shape).
-- [ ] Either use `s_amountOutMinimumSafetyCheck` in the swap math, document it as a config-only floor (natspec), or delete it (ABI — allowed in this PR, before R9).
-- [ ] Keep invariant 1: measured WRBTC delta is cash; `amountOutMinimum` is a revert bound only.
-- [ ] Re-measure Dex handler runtime vs EIP-170.
+- [x] Written review in the PR body: peg, min-out formula, unused safety-check, path encoding, oracle `isValid` / freshness, router deadline absence, Rootstock MEV. Point at line-level `PurchaseUniswap` / `IPurchaseUniswap`.
+- [x] Implement the recorded decisions. Minimum if the peg is kept: scale `stablecoinAmountToSpend` to 18 decimals (or the oracle’s decimals) before dividing by `currentPrice`, using the purchase token’s `decimals()`. Test with a 6-decimal mock (USDT0 shape) and an 18-decimal mock (USDRIF shape).
+- [x] Either use `s_amountOutMinimumSafetyCheck` in the swap math, document it as a config-only floor (natspec), or delete it (ABI — allowed in this PR, before R9).
+- [x] Keep invariant 1: measured WRBTC delta is cash; `amountOutMinimum` is a revert bound only.
+- [x] Re-measure Dex handler runtime vs EIP-170.
 
 ## Out of scope
 
@@ -81,23 +81,100 @@ Then `make check`, `STABLECOIN_TYPE=USDRIF make dex-sovryn` (and `dex-layerbank`
 
 ## Success criteria
 
-- [ ] PR body records decisions 1–3.
-- [ ] 6-decimal and 18-decimal stables both produce a min-out in WRBTC wei that matches the $1 (or recorded) assumption.
-- [ ] Safety-check is used, documented as config-only, or removed.
-- [ ] Invariant 1 unchanged; Dex handlers still under EIP-170.
-- [ ] No open product decisions.
+- [x] PR body records decisions 1–3.
+- [x] 6-decimal and 18-decimal stables both produce a min-out in WRBTC wei that matches the $1 (or recorded) assumption.
+- [x] Safety-check is used, documented as config-only, or removed.
+- [x] Invariant 1 unchanged; Dex handlers still under EIP-170.
+- [x] No open product decisions.
+
+## Review outcome
+
+**The formula.** `_getAmountOutMinimum` now lifts the spend into the oracle's units before dividing:
+
+```solidity
+minimumRbtcAmount = (stablecoinAmountToSpend * i_stablecoinToUsdScale * s_amountOutMinimumPercent) / currentPrice;
+```
+
+`i_stablecoinToUsdScale` is `10 ** (18 - stablecoin decimals)`, read once from `decimals()` in the
+`PurchaseUniswap` constructor because the handler's stablecoin is immutable. Above 18 decimals the
+constructor reverts `PurchaseUniswap__UnsupportedStablecoinDecimals` rather than round the floor down.
+The `decimals()` read sits after `_setPurchasePath`, which already rejects a zero purchase token, so a
+reversed `is` list still fails with `PurchaseUniswap__ZeroPurchaseToken` instead of an empty-address call.
+
+At the live oracle price (80,061.57 USD/BTC, `isValid` true, block 9,188,727), $25 of USDT0 asks for
+310,699,573,584,930 wei of WRBTC at 99.5%. The old formula asked for 310 wei — a floor that bounded nothing.
+
+**1. Peg.** Kept, and now written into `PurchaseUniswap`'s contract natspec: one unit of a listed stablecoin
+is taken to be one USD, priced against MoC BTC/USD. A downward depeg makes the pool fail the floor and the
+swap reverts; nothing here redeems a depegged stablecoin at $1, and a persistent depeg is a delisting, not a
+purchase-path problem. The oracle's 18 decimals are hardcoded as `USD_DECIMALS`, in the R29 style, and
+confirmed against mainnet.
+
+**2. Oracle floor.** Kept on-chain. `isValid` is checked at execution, not at signing, so a transaction that
+waits in the mempool is bounded by the oracle of the block that mines it — that is the property that makes an
+on-chain floor worth more than an off-chain quote, which would be signed at composition time.
+
+**3. MEV and the missing deadline.** No handler deadline was added. `IV3SwapRouter.ExactInputParams` has no
+deadline field, and `SwapRouter02`'s deadline-carrying `multicall` would not help: a deadline the handler
+computes from `block.timestamp` inside the executing transaction is tautologically satisfied. Only a
+caller-supplied deadline bounds anything, and that would mean a new `batchBuyRbtc` argument — a swapper ABI
+change, out of scope here and R42's ground if it is ever wanted. Rootstock's ~30s merge-mined blocks and public
+mempool make sandwiching possible but not routine; the loss is bounded by `1 - s_amountOutMinimumPercent`
+(0.5% at the default), re-evaluated against a live oracle price at execution. Tightening that percent is the
+owner's lever.
+
+**4. Safety check.** Kept and documented as config-only. It bounds `s_amountOutMinimumPercent` and never enters
+swap math, so widening slippage tolerance costs two owner transactions — lower the floor, then the percent.
+With the owner a Safe (R45) that speed bump is worth its 32 bytes of storage; deleting it would also break the
+`getAmountOutMinimumSafetyCheck` / `setAmountOutMinimumSafetyCheck` surface for no behavioral gain.
+
+**5. Path encoding.** Unchanged. `_setPurchasePath` pins hop 0 to `_purchaseToken()` and the last hop to
+`i_wrBtcToken`; only the intermediates and fee tiers are owner-set, and a wrong tier reverts rather than
+mis-settles, because cash is the measured WRBTC delta and the floor still applies. The live USDRIF path is
+USDRIF →(0.05%)→ USDT →(0.3%)→ WRBTC. USDT is 6-decimal, which does not enter the min-out math: only the
+input token's decimals and WRBTC's 18 do.
+
+**6. Zero price.** A `currentPrice` of 0 with `isValid` true divides by zero and reverts (panic 0x12). Loud,
+not silent, so no extra guard was added for a broken-oracle case that already cannot mis-price a swap.
+
+**Invariant 1** is untouched: `_swapStablecoinForWrbtc` still credits the measured WRBTC balance delta and
+still ignores the router's return value. `amountOutMinimum` is a revert bound only.
+
+**Size and gas.** `SovrynErc20HandlerDex` 21,061 → 21,104 runtime bytes (margin 3,515 → 3,472);
+`TropykusErc20HandlerDex` 21,317 → 21,360 (margin 3,259 → 3,216). Both far under EIP-170. A batch purchase
+costs ~200 more gas (one immutable read and one multiplication), on the protocol-paid path.
+
+## R39 handoff questions
+
+R39 handed this review two questions about the surviving batch path. Both are answered **keep today's
+behavior**, and neither is implemented here — they are lending-side behavior, not the Dex path this PR reviews.
+
+1. **Share shortfall: revert, do not clamp.** `_batchRetrieveStablecoin` still reverts
+`TokenLending__InsufficientShares` when a schedule spends its exact remaining balance and the rounded-up debit
+is one share short. Clamping would make the handler debit fewer shares than the schedule's `purchaseAmounts[i]`
+says was spent, diverging the DcaManager balance from the share book for the sake of dust, and it would touch
+every lending route rather than the Dex path. The tail is a state the swapper bot must filter before batching,
+like a paused schedule; the user's own exit is the withdraw-all sentinel. `BatchTailScheduleTest` keeps its
+tests unflipped and its header records that R43 decided this.
+2. **Fee on the planned gross, not the retrieval.** `batchBuyRbtc` still computes the aggregated fee from
+`purchaseAmounts` before retrieval. The fee band is a function of the purchase the user asked for, the
+aggregate is transferred once before the swap, and re-deriving it from the retrieved amount would add a second
+pro-rata pass over buyers to the protocol-paid path. A retrieval short enough to matter already reverts
+(`PurchaseRbtc__StablecoinRetrievedBelowFee`, or `TokenLending__ZeroStablecoinReceived`).
 
 ## Reviewer checklist
 
-- [ ] Matches **Scope**; nothing from **Out of scope**.
-- [ ] The $1 peg is an explicit recorded choice, not an accidental unit mix-up.
-- [ ] USDT0 cannot ship on the old formula.
-- [ ] Tests in the PR match **Required tests**.
-- [ ] Files beyond this list are limited to direct dependencies and are named in the PR.
-- [ ] No unrelated refactors; history is reviewable.
+- [x] Matches **Scope**; nothing from **Out of scope**.
+- [x] The $1 peg is an explicit recorded choice, not an accidental unit mix-up.
+- [x] USDT0 cannot ship on the old formula.
+- [x] Tests in the PR match **Required tests**.
+- [x] Files beyond this list are limited to direct dependencies and are named in the PR.
+- [x] No unrelated refactors; history is reviewable.
 
 ## ABI / deploy / cutover impact
 
-- ABI: possible (safety-check removal, new errors, natspec-only if the formula stays). Must precede R9.
-- Scripts: only if constructor args change.
-- Cutover: owner still sets percent (and safety, if kept). Frontend follow-up only if a setter/event disappears. Swapper bot may need to know min-out is tighter or decimal-correct — mention in the PR, no bot code here.
+- ABI: one new custom error, `PurchaseUniswap__UnsupportedStablecoinDecimals(uint8)`. No selector, event, or
+  getter changed; the safety check stayed, so nothing was removed.
+- Scripts: no change. Constructor args are unchanged — decimals are read from the token.
+- Cutover: owner still sets percent and safety. No frontend follow-up (no user-facing selector moved). The
+  swapper bot's off-chain min-out reproduction must scale by the token's decimals for USDT0; issue opened.
