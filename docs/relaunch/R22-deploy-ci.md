@@ -2,7 +2,7 @@
 
 Status: **implemented** · Assigned: yes · Optional/further-review: no
 
-PR 29 of R22 (reordered after the post-R30 architecture sequence; R35 inserted as PR 27 after #70), GitHub [#73](https://github.com/BitChillRSK/dca-contracts/pull/73). Stack on R32 (PR 28, GitHub [#72](https://github.com/BitChillRSK/dca-contracts/pull/72)). Last required R22 PR; R9 follows as PR 30.
+PR 29 of R22 (reordered after the post-R30 architecture sequence; R35 inserted as PR 27 after #70), GitHub [#73](https://github.com/BitChillRSK/dca-contracts/pull/73). Stack on R32 (PR 28, GitHub [#72](https://github.com/BitChillRSK/dca-contracts/pull/72)). Last required R22 PR; R38 follows as PR 30. R9 is now PR 35 (R39–R41 and R43 inserted before the freeze).
 
 ## Objective
 

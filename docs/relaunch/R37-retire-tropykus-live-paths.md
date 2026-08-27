@@ -14,9 +14,10 @@ move `TROPYKUS_INDEX` out of `script/Constants.sol` into `test/Constants.sol` so
 R22 (PR 29 / [#73](https://github.com/BitChillRSK/dca-contracts/pull/73)) took Tropykus off the
 production MoC map and relabelled `TROPYKUS_INDEX` as legacy. It is still live on the **dex** map:
 `DeployDexSwaps`' live branch deploys a `TropykusErc20HandlerDex`, and `DeployUsdrifHandler` registers
-one for USDRIF. R36 replaces the USDRIF path with a LayerBank dex handler; this spec removes what R36
-made redundant. **Do not start this before R36 has landed** — removing the Tropykus dex arm without a
-replacement deletes USDRIF DCA.
+one for USDRIF. R36 replaces the USDRIF path with a LayerBank dex handler (and adds USDT0 on the same contract);
+this spec removes what R36 made redundant. **Do not start this before R36 has landed** — removing
+the Tropykus dex arm without a replacement deletes USDRIF DCA. USDT0 is new and was never on
+Tropykus, so it does not change this block.
 
 Why a sentinel index is not the mechanism, having been considered and rejected: `routeIndex` is a plain
 unpacked `uint256` in `DcaDetails`, `s_routeClass` is a sparse mapping, and nothing in `src/` enumerates

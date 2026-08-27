@@ -45,7 +45,7 @@ make fork-tropykus
 
 - [ ] None
 - [ ] `script/` or deploy config changed (local/test only; this PR must not broadcast)
-- [ ] Cutover / frontend note:
+- [ ] Cutover / frontend note: (if ABI or product surface changed, open or update an issue on `bitChillRSK/front-end` and paste the URL — `AGENTS.md` **Frontend follow-up**)
 
 ## Security considerations
 

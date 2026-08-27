@@ -85,9 +85,32 @@ Do this even if a user-level rule says “don’t commit until asked.” An assi
 4. **One implementer per PR.** Parallel review (Cursor/Codex/Claude/Bugbot) is expected. Parallel implementation on overlapping Solidity is not. Skip git worktrees for this relaunch except a docs-only PR that does not share files.
 5. After the PR is open, set `docs/relaunch/README.md` **Status** to this PR (full GitHub link) and “next unassigned: …” (the one-line prompt for the following chat). If the URL is only known after opening, add that Status update in a follow-up commit and push, then stop. Do not start the next R-item in this chat. The human merges in order. In the closing message, remind the human of that next prompt so they can spin up the following agent.
 6. **Keep the PR body current.** After any review or audit follow-up that changes the diff, edit the GitHub description in the same turn (`gh pr edit`) before you stop. **Files beyond the spec** must name every path in `gh pr diff --name-only` that the spec’s file list does not, with a one-line why. Update an existing entry when its reason changed (checkbox flips vs a new out-of-scope bullet). Do not leave the body describing only the first push.
+7. **Frontend follow-up** (see below): if this PR changes the ABI or otherwise requires app work, open or update an issue on `bitChillRSK/front-end` in the same turn and paste the URL in the PR **Cutover / frontend note**.
 
 ## PRs
 
 Small, behavior-scoped, reviewable history. No drive-by refactors. Use the template. Do not restate the invariants — say whether they still hold. After review follow-ups, refresh the body so **Files beyond the spec** matches the current diff.
 
 When reviewing a PR by number, fetch its actual diff (e.g. `gh pr diff <N>` or `gh pr view <N> --json files`) and confirm the changed files match before trusting any findings — don't assume the locally checked-out branch is that PR's diff.
+
+## Frontend follow-up
+
+Sibling repo: [`bitChillRSK/front-end`](https://github.com/bitChillRSK/front-end). Users talk to `DcaManager`; the app hardcodes ABIs, route indexes, and venue names. Do not implement frontend changes in this repo.
+
+When a contracts PR changes anything the UI must handle after relaunch, **search existing issues first**, then **open a new issue or comment on the matching one** in the same turn as opening or updating the contracts PR. Paste the issue URL in the contracts PR **Cutover / frontend note**. Do not wait for merge.
+
+```
+gh issue list --repo bitChillRSK/front-end --state all --limit 50
+gh issue create --repo bitChillRSK/front-end --title "…" --body "…"
+```
+
+**Open or update an issue when the PR:**
+
+- Adds, removes, or changes a public selector, argument list, event, or custom error on `DcaManager`, `OperationsAdmin`, or any contract the UI calls (handlers, fee reads, purchase-rBTC getters).
+- Accepts a new argument value the UI currently cannot send (for example `type(uint256).max` as withdraw-all).
+- Adds or remaps a route index or venue (new handler, idle vs lending, token × route pairs, production index map).
+- Breaks a behavior the UI currently assumes (caller-only `getMy*` getters, hardcoded `1 = Tropykus` / `2 = Sovryn`, interest on every index).
+
+**Do not open an issue for:** internal-only renames, tests, Makefile, deploy scripts the UI never calls, owner-only surfaces the app does not expose, or natspec.
+
+The issue body should name the contracts PR, the old vs new call (selector and args), the frontend files that still use the old surface, and whether the change is a small ABI edit or a product change (new venue, new flow). If an existing issue already covers it, comment there instead of duplicating.

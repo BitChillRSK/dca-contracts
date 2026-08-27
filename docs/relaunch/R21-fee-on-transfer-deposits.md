@@ -10,6 +10,8 @@ Credit hop-1 cash: `DcaManager.tokenBalance` (and idle’s mapping) with the sta
 
 Fee-on-transfer is **not** a supported token class. DOC and USDRIF are 1:1. This PR is hop-1 hygiene, not “BitChill is FOT-proof.” Purchases after a surprise fee are not guaranteed.
 
+**Superseded in part by [R41](./R41-reject-fot-deposits.md):** measurement and the zero-received revert stay; crediting a *partial* hop-1 shortfall is replaced by `TokenHandler__DepositAmountMismatch` (fail closed). Do not re-teach the short-credit path when implementing after R41.
+
 ## Background
 
 R1 / R20 measure cash on lending redemptions, MoC, Uniswap, and withdrawals. Deposit was explicitly out of scope there: `DcaManager` credits `depositAmount` after `transferFrom(depositAmount)`. Idle already credits `s_idleBalances` from a handler `balanceOf` delta, so a FOT token would leave DcaManager ahead of idle.
