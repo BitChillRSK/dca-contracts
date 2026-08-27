@@ -68,6 +68,8 @@ contract OperationsAdminTest is DcaDappTest {
         operationsAdmin.assignTokenHandler(address(stablecoin), 3, address(stablecoinHandler));
     }
 
+    /// @dev Both the pair check and R47's address check would fire here; the pair check runs first,
+    ///      so this error is unchanged by R47.
     function testDuplicateHandlerAssignmentReverts() external {
         bytes memory encodedRevert = abi.encodeWithSelector(
             IOperationsAdmin.OperationsAdmin__HandlerAlreadyAssigned.selector,
@@ -374,6 +376,134 @@ contract OperationsAdminTest is DcaDappTest {
         );
         operationsAdmin.assignTokenHandler(otherToken, SECOND_LENDING_INDEX, address(idleStub));
         vm.stopPrank();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    R47 HANDLER-ADDRESS UNIQUENESS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Same token, two lending indexes: DcaManager locks principal per route while the
+    ///      handler keys shares by user alone, so the second route would read the first's principal as yield.
+    function testHandlerAddressCannotBackTwoLendingRoutes() external {
+        DummyLendingHandler lendingStub = new DummyLendingHandler();
+        address token = makeAddr("r47SameTokenLending");
+
+        vm.startPrank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX + 1, true);
+        operationsAdmin.assignTokenHandler(token, SECOND_LENDING_INDEX, address(lendingStub));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__HandlerAddressAlreadyInUse.selector, address(lendingStub)
+            )
+        );
+        operationsAdmin.assignTokenHandler(token, SECOND_LENDING_INDEX + 1, address(lendingStub));
+        vm.stopPrank();
+
+        assertEq(operationsAdmin.getTokenHandler(token, SECOND_LENDING_INDEX), address(lendingStub));
+        assertEq(operationsAdmin.getTokenHandler(token, SECOND_LENDING_INDEX + 1), address(0));
+    }
+
+    /// @dev Idle handlers hold balances keyed by user only, so the rule is not lending-specific.
+    function testHandlerAddressCannotBackTwoIdleRoutes() external {
+        DummyTokenHandler idleStub = new DummyTokenHandler();
+        address token = makeAddr("r47SameTokenIdle");
+
+        vm.startPrank(OWNER);
+        operationsAdmin.assignTokenHandler(token, IDLE_INDEX, address(idleStub));
+        operationsAdmin.registerRoute(SECOND_IDLE_INDEX, false);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__HandlerAddressAlreadyInUse.selector, address(idleStub)
+            )
+        );
+        operationsAdmin.assignTokenHandler(token, SECOND_IDLE_INDEX, address(idleStub));
+        vm.stopPrank();
+
+        assertEq(operationsAdmin.getTokenHandler(token, IDLE_INDEX), address(idleStub));
+        assertEq(operationsAdmin.getTokenHandler(token, SECOND_IDLE_INDEX), address(0));
+    }
+
+    /// @dev A handler is constructed for one stablecoin, so a second token is never a legitimate reuse.
+    function testHandlerAddressCannotBeReusedForASecondToken() external {
+        DummyLendingHandler lendingStub = new DummyLendingHandler();
+        address firstToken = makeAddr("r47FirstToken");
+        address secondToken = makeAddr("r47SecondToken");
+
+        vm.startPrank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        operationsAdmin.assignTokenHandler(firstToken, SECOND_LENDING_INDEX, address(lendingStub));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__HandlerAddressAlreadyInUse.selector, address(lendingStub)
+            )
+        );
+        operationsAdmin.assignTokenHandler(secondToken, SECOND_LENDING_INDEX, address(lendingStub));
+        vm.stopPrank();
+
+        assertEq(operationsAdmin.getTokenHandler(secondToken, SECOND_LENDING_INDEX), address(0));
+    }
+
+    /// @dev Uniqueness is checked before the class checks, so crossing lending → idle with a second
+    ///      token reports the reuse rather than the class mismatch. Neither path lets the address through.
+    function testHandlerAddressCannotBeReusedAcrossRouteClasses() external {
+        DummyLendingHandler lendingStub = new DummyLendingHandler();
+        address firstToken = makeAddr("r47ClassFirstToken");
+        address secondToken = makeAddr("r47ClassSecondToken");
+
+        vm.startPrank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        operationsAdmin.assignTokenHandler(firstToken, SECOND_LENDING_INDEX, address(lendingStub));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__HandlerAddressAlreadyInUse.selector, address(lendingStub)
+            )
+        );
+        operationsAdmin.assignTokenHandler(secondToken, IDLE_INDEX, address(lendingStub));
+        vm.stopPrank();
+
+        assertEq(operationsAdmin.getTokenHandler(secondToken, IDLE_INDEX), address(0));
+    }
+
+    /// @dev Versioned routes stay usable: distinct instances are what ops must deploy per pair.
+    function testDistinctHandlerInstancesRemainAssignable() external {
+        DummyLendingHandler firstStub = new DummyLendingHandler();
+        DummyLendingHandler secondStub = new DummyLendingHandler();
+        address token = makeAddr("r47DistinctInstances");
+
+        vm.startPrank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX + 1, true);
+        operationsAdmin.assignTokenHandler(token, SECOND_LENDING_INDEX, address(firstStub));
+        operationsAdmin.assignTokenHandler(token, SECOND_LENDING_INDEX + 1, address(secondStub));
+        vm.stopPrank();
+
+        assertEq(operationsAdmin.getTokenHandler(token, SECOND_LENDING_INDEX), address(firstStub));
+        assertEq(operationsAdmin.getTokenHandler(token, SECOND_LENDING_INDEX + 1), address(secondStub));
+    }
+
+    /// @dev Only a successful assignment consumes the address: a class-rejected handler is still assignable.
+    function testRevertedAssignmentDoesNotConsumeHandlerAddress() external {
+        DummyTokenHandler idleStub = new DummyTokenHandler();
+        address token = makeAddr("r47RevertedAssignment");
+
+        vm.startPrank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__ContractIsNotTokenLending.selector, address(idleStub)
+            )
+        );
+        operationsAdmin.assignTokenHandler(token, SECOND_LENDING_INDEX, address(idleStub));
+
+        operationsAdmin.assignTokenHandler(token, IDLE_INDEX, address(idleStub));
+        vm.stopPrank();
+
+        assertEq(operationsAdmin.getTokenHandler(token, IDLE_INDEX), address(idleStub));
     }
 
     function testMatchingClassAssignmentsSucceed() external {
