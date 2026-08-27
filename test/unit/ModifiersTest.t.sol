@@ -65,11 +65,13 @@ contract ModifiersTest is DcaDappTest {
     }
 
     function testOperationsAdminNotInStorage() external {
-        // R45 stored the admin at slot 2. After pinning it is immutable bytecode, and slot 2
-        // is the s_dcaSchedules mapping root (empty → 0), not the admin address.
-        bytes32 slot2 = vm.load(address(dcaManager), bytes32(uint256(2)));
-        assertEq(uint256(slot2), 0);
-        assertTrue(uint160(dcaManager.getOperationsAdminAddress()) != 0);
+        // R45 stored the admin at slot 2. After pinning it lives in immutable bytecode, not
+        // sequential storage — a single-slot check of the mapping root would pass even if
+        // the address had only moved. Sweep the old sequential layout (slots 0–8).
+        uint256 admin = uint256(uint160(address(operationsAdmin)));
+        for (uint256 slot; slot < 9; ++slot) {
+            assertTrue(uint256(vm.load(address(dcaManager), bytes32(slot))) != admin);
+        }
         assertEq(dcaManager.getOperationsAdminAddress(), address(operationsAdmin));
     }
 
