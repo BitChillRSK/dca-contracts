@@ -52,6 +52,7 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
         
         // Verify ownership transferred correctly
         assertEq(usdrifHandler.owner(), makeAddr(OWNER_STRING), "USDRIF handler owner not set correctly");
+        assertEq(usdrifHandler.pendingOwner(), address(0), "USDRIF handler pending owner must be zero after deploy");
         
         // Verify handler is registered in OperationsAdmin
         UsdrifHelperConfig.NetworkConfig memory config = usdrifHelperConfig.getNetworkConfig();

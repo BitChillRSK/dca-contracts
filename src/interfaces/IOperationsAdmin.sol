@@ -37,7 +37,6 @@ interface IOperationsAdmin {
     error OperationsAdmin__RouteAlreadyRegistered(uint256 index);
     error OperationsAdmin__RouteNotRegistered(uint256 index);
     error OperationsAdmin__HandlerAlreadyAssigned(address token, uint256 routeIndex);
-    error OperationsAdmin__OwnershipCannotBeRenounced();
 
     ///////////////////////////////
     // External functions /////////

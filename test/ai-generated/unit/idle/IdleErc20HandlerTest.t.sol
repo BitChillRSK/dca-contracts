@@ -24,7 +24,7 @@ contract IdleErc20HandlerTest is HandlerTestHarness {
             feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
         });
 
-        idleHandler = new IdleTestHandler(address(dcaManager), address(stablecoin), FEE_COLLECTOR, feeSettings);
+        idleHandler = new IdleTestHandler(address(dcaManager), address(stablecoin), FEE_COLLECTOR, feeSettings, OWNER);
         return ITokenHandler(address(idleHandler));
     }
 
@@ -162,8 +162,9 @@ contract IdleTestHandler is IdleErc20Handler {
         address dcaManagerAddress,
         address stableTokenAddress,
         address feeCollector,
-        FeeSettings memory feeSettings
-    ) IdleErc20Handler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings) {}
+        FeeSettings memory feeSettings,
+        address initialOwner
+    ) IdleErc20Handler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, initialOwner) {}
 
     function testRetrieveStablecoin(address user, uint256 amount) external returns (uint256) {
         return _retrieveStablecoin(user, amount);

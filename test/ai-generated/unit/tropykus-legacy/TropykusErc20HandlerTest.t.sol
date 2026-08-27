@@ -40,7 +40,8 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
             address(stablecoin),
             address(kToken),
             FEE_COLLECTOR,
-            feeSettings
+            feeSettings,
+            OWNER
         );
         
         return ITokenHandler(address(tropykusHandler));
@@ -376,13 +377,15 @@ contract TropykusTestHandler is TropykusErc20Handler {
         address stableTokenAddress,
         address kTokenAddress,
         address feeCollector,
-        FeeSettings memory feeSettings
+        FeeSettings memory feeSettings,
+        address initialOwner
     ) TropykusErc20Handler(
         dcaManagerAddress,
         stableTokenAddress, 
         kTokenAddress,
         feeCollector,
-        feeSettings
+        feeSettings,
+        initialOwner
     ) {}
     
     function testBatchRetrieveStablecoin(

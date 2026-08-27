@@ -27,14 +27,20 @@ abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20H
      * @param aTokenAddress the address of LayerBank's aToken for this stablecoin
      * @param feeCollector the address of to which fees will sent on every purchase
      * @param feeSettings struct with the settings for fee calculations
+     * @param initialOwner the address that owns fee configuration immediately after deploy
      */
     constructor(
         address dcaManagerAddress,
         address stableTokenAddress,
         address aTokenAddress,
         address feeCollector,
-        FeeSettings memory feeSettings
-    ) LendingErc20Handler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, EXCHANGE_RATE_DECIMALS) {
+        FeeSettings memory feeSettings,
+        address initialOwner
+    )
+        LendingErc20Handler(
+            dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, EXCHANGE_RATE_DECIMALS, initialOwner
+        )
+    {
         i_aToken = ILayerBankAToken(aTokenAddress);
         if (i_aToken.UNDERLYING_ASSET_ADDRESS() != stableTokenAddress) {
             revert LayerBankErc20Handler__UnderlyingMismatch();

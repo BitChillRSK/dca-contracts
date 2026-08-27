@@ -34,9 +34,27 @@ jobs:
           submodules: recursive
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        # Both pins are deliberate. `foundry-rs/foundry-toolchain@v1` is a moving tag, and
+        # so was `version: stable`, so CI resolved two moving refs at job time.
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
         with:
-          version: stable
+          # Observed 2026-08-27: forge v1.8.0 was published at 12:30:54Z. The CI run at 12:23Z
+          # installed 1.7.1 and was green; the next run at 13:08Z installed 1.8.0 and went red.
+          # Same stack, no repo change in between -- `stable` simply moved under it. Under 1.8.0,
+          # suites that build their own fixtures with `vm.prank(OWNER); new OperationsAdmin();`
+          # fail at `setUp()` with:
+          #   "vm.prank: cannot overwrite a prank until it is applied at least once"
+          # Measured on the relaunch stack head (PR #76): 10 suites affected -- 6 HandlerTestHarness
+          # subclasses plus DcaManagerEdgeCasesTest, RoleSecurityTest, DepositSwapPopReentrancyTest
+          # and FeeOnTransferDepositTest. `main` carries a subset of those today; the stack adds the
+          # rest, so this bites harder as the relaunch merges. `DcaDappTest` is unaffected (it builds
+          # through the deploy scripts). Reproduced on an unmodified pre-upgrade commit, so it is the
+          # toolchain, not a PR.
+          # The trigger is NOT simply "prank before `new` stops being consumed": InvariantTest runs
+          # the same two statements and passes on 1.8.0. Full write-up, reproduction, and the
+          # hypotheses already ruled out: https://github.com/BitChillRSK/dca-contracts/issues/79
+          # To move to 1.8.0, fix that issue and raise this number. Do not put `stable` back.
+          version: v1.7.1
 
       - name: Run ${{ matrix.target }}
         env:

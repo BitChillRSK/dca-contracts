@@ -56,10 +56,10 @@ contract RoleSecurityTest is Test {
     function setUp() public {
         // Deploy contracts with proper ownership
         vm.prank(OWNER);
-        operationsAdmin = new OperationsAdmin();
+        operationsAdmin = new OperationsAdmin(OWNER);
         
         vm.prank(OWNER);
-        dcaManager = new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT);
+        dcaManager = new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, OWNER);
         
         stablecoin = new MockStablecoin(address(this));
         kToken = new MockKdocToken(address(stablecoin));
@@ -101,7 +101,8 @@ contract RoleSecurityTest is Test {
             FEE_COLLECTOR,
             feeSettings,
             9970,
-            9900
+            9900,
+            OWNER
         );
         
         // Register handler
@@ -159,7 +160,8 @@ contract RoleSecurityTest is Test {
                 feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
             }),
             9970,
-            9900
+            9900,
+            OWNER
         );
         
         vm.expectRevert(ownableUnauthorized(UNAUTHORIZED_USER));

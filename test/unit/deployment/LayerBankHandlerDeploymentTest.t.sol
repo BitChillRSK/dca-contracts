@@ -62,6 +62,7 @@ contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
             "aToken underlying must be DOC"
         );
         assertEq(layerbankHandler.owner(), makeAddr(OWNER_STRING), "LayerBank handler owner not set correctly");
+        assertEq(layerbankHandler.pendingOwner(), address(0), "LayerBank handler pending owner must be zero after deploy");
 
         address registeredHandler = operationsAdmin.getTokenHandler(helperConfig.getStablecoinAddress(), LAYERBANK_INDEX);
         assertEq(registeredHandler, layerbankHandlerAddress, "LayerBank handler not registered in OperationsAdmin");
@@ -82,5 +83,6 @@ contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
             new DeployLayerBankHandler().run(helperConfig, address(operationsAdmin), address(dcaManager));
         assertNotEq(deployed, address(0));
         assertEq(LayerBankDocHandlerMoc(payable(deployed)).owner(), makeAddr(OWNER_STRING));
+        assertEq(LayerBankDocHandlerMoc(payable(deployed)).pendingOwner(), address(0));
     }
 }

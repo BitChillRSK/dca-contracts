@@ -15,12 +15,17 @@ contract IdleDocHandlerMoc is IdleErc20Handler, PurchaseMoc {
      * @param feeCollector the address to which fees will be sent on every purchase
      * @param mocProxyAddress the address of the MoC proxy contract on the blockchain of deployment
      * @param feeSettings the settings to calculate the fees charged by the protocol
+     * @param initialOwner the address that owns fee configuration immediately after deploy
      */
     constructor(
         address dcaManagerAddress,
         address docTokenAddress,
         address feeCollector,
         address mocProxyAddress,
-        FeeSettings memory feeSettings
-    ) IdleErc20Handler(dcaManagerAddress, docTokenAddress, feeCollector, feeSettings) PurchaseMoc(mocProxyAddress) {}
+        FeeSettings memory feeSettings,
+        address initialOwner
+    )
+        IdleErc20Handler(dcaManagerAddress, docTokenAddress, feeCollector, feeSettings, initialOwner)
+        PurchaseMoc(mocProxyAddress)
+    {}
 }

@@ -38,7 +38,8 @@ contract SovrynDocHandlerMocTest is Test {
                 maxFeeRate: MAX_FEE_RATE_TEST,
                 feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
                 feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
-            })
+            }),
+            address(this)
         );
 
         docToken.mint(USER, 1000 ether);

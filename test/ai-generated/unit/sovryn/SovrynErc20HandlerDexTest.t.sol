@@ -67,7 +67,8 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
             FEE_COLLECTOR,
             feeSettings,
             9970, // 99.7% minimum output
-            9900 // 99% safety check
+            9900, // 99% safety check
+            OWNER
         );
         
         return ITokenHandler(address(sovrynDexHandler));
@@ -660,7 +661,8 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
             FEE_COLLECTOR,
             feeSettings,
             amountOutMinimumPercent,
-            amountOutMinimumSafetyCheck
+            amountOutMinimumSafetyCheck,
+            OWNER
         );
     }
 } 

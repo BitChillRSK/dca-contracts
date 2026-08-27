@@ -13,7 +13,6 @@ import {IWRBTC} from "../src/interfaces/IWRBTC.sol";
 import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces/ISwapRouter02.sol";
 import {ICoinPairPrice} from "../src/interfaces/ICoinPairPrice.sol";
 import {IFeeHandler} from "../src/interfaces/IFeeHandler.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {console} from "forge-std/Test.sol";
 import "./Constants.sol";
 
@@ -48,7 +47,8 @@ contract DeployDexSwaps is DeployBase {
                     params.feeCollector, 
                     feeSettings,
                     params.amountOutMinimumPercent,
-                    params.amountOutMinimumSafetyCheck
+                    params.amountOutMinimumSafetyCheck,
+                    _initialOwner()
                 )
             );
         }
@@ -62,34 +62,87 @@ contract DeployDexSwaps is DeployBase {
                     params.feeCollector, 
                     feeSettings,
                     params.amountOutMinimumPercent,
-                    params.amountOutMinimumSafetyCheck
+                    params.amountOutMinimumSafetyCheck,
+                    _initialOwner()
                 )
             );
         }
         revert("Dex path is tropykus/sovryn only");
     }
 
-    function _transferHandlerOwnership(address handler) internal {
-        Ownable(handler).transferOwnership(adminAddresses[environment]);
-    }
-
-    function _assignAndTransferHandler(
+    function _deployLiveDexHandlers(
         OperationsAdmin operationsAdmin,
-        address token,
-        uint256 routeIndex,
-        address handler
-    ) internal {
-        operationsAdmin.assignTokenHandler(token, routeIndex, handler);
-        _transferHandlerOwnership(handler);
-    }
+        DcaManager dcaManager,
+        address stablecoinAddress,
+        DexHelperConfig.NetworkConfig memory networkConfig,
+        IPurchaseUniswap.UniswapSettings memory uniswapSettings,
+        address feeCollector,
+        bool isUSDRIF
+    ) internal returns (address selectedHandler) {
+        console.log("Deploying handlers for lending protocols for live network");
 
-    function _transferGovernance(OperationsAdmin operationsAdmin, DcaManager dcaManager) internal {
-        address owner = adminAddresses[environment];
-        operationsAdmin.transferOwnership(owner);
-        dcaManager.transferOwnership(owner);
+        // Owner is the Foundry broadcaster for this transaction so route registration succeeds.
+        // Mainnet proposes MAINNET_OWNER (the Safe) after setup.
+        operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
+        operationsAdmin.registerRoute(SOVRYN_INDEX, true);
+
+        address tropykusShareToken = networkConfig.tropykusShareToken;
+        if (tropykusShareToken == address(0)) {
+            console.log("Warning: Tropykus shares not available for this stablecoin");
+        } else {
+            address tropykusHandler = deployDocHandlerDex(
+                DeployParams({
+                    protocol: Protocol.TROPYKUS,
+                    dcaManager: address(dcaManager),
+                    tokenAddress: stablecoinAddress,
+                    shareToken: tropykusShareToken,
+                    uniswapSettings: uniswapSettings,
+                    feeCollector: feeCollector,
+                    amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
+                    amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
+                })
+            );
+            console.log("Tropykus handler deployed at:", tropykusHandler);
+            operationsAdmin.assignTokenHandler(stablecoinAddress, TROPYKUS_INDEX, tropykusHandler);
+            _proposeFinalOwner(tropykusHandler);
+            if (protocol == Protocol.TROPYKUS) {
+                selectedHandler = tropykusHandler;
+            }
+        }
+
+        if (isUSDRIF) {
+            console.log("Skipping Sovryn handler deployment for USDRIF as it's not supported");
+            return selectedHandler;
+        }
+
+        address sovrynShareToken = networkConfig.sovrynShareToken;
+        if (sovrynShareToken == address(0)) {
+            console.log("Warning: Sovryn shares not available for this stablecoin");
+            return selectedHandler;
+        }
+
+        address sovrynHandler = deployDocHandlerDex(
+            DeployParams({
+                protocol: Protocol.SOVRYN,
+                dcaManager: address(dcaManager),
+                tokenAddress: stablecoinAddress,
+                shareToken: sovrynShareToken,
+                uniswapSettings: uniswapSettings,
+                feeCollector: feeCollector,
+                amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
+                amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
+            })
+        );
+        console.log("Sovryn handler deployed at:", sovrynHandler);
+        operationsAdmin.assignTokenHandler(stablecoinAddress, SOVRYN_INDEX, sovrynHandler);
+        _proposeFinalOwner(sovrynHandler);
+        if (protocol == Protocol.SOVRYN) {
+            selectedHandler = sovrynHandler;
+        }
     }
 
     function run() external returns (OperationsAdmin, address, DcaManager, DexHelperConfig) {
+        _assertLiveBroadcastSender(msg.sender);
         // Initialize DexHelperConfig which reads the STABLECOIN_TYPE env var
         DexHelperConfig helperConfig = new DexHelperConfig();
         DexHelperConfig.NetworkConfig memory networkConfig = helperConfig.getActiveNetworkConfig();
@@ -116,10 +169,16 @@ contract DeployDexSwaps is DeployBase {
             revert("USDRIF is not supported by Sovryn");
         }
 
-        vm.startBroadcast();
+        _beginLiveAwareBroadcast(msg.sender);
 
-        OperationsAdmin operationsAdmin = new OperationsAdmin();
-        DcaManager dcaManager = new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT);
+        OperationsAdmin operationsAdmin = new OperationsAdmin(deployOwner);
+        DcaManager dcaManager = new DcaManager(
+            address(operationsAdmin),
+            MIN_PURCHASE_PERIOD,
+            MAX_SCHEDULES_PER_TOKEN,
+            MIN_PURCHASE_AMOUNT,
+            deployOwner
+        );
         address feeCollector = getFeeCollector(environment);
         
         address docHandlerDexAddress;
@@ -156,75 +215,23 @@ contract DeployDexSwaps is DeployBase {
             });
             
             docHandlerDexAddress = deployDocHandlerDex(params);
-
-            _transferGovernance(operationsAdmin, dcaManager);
-            _transferHandlerOwnership(docHandlerDexAddress);
         }
         // For live networks (testnet/mainnet), deploy handlers for both lending protocols
         else if (environment == Environment.TESTNET || environment == Environment.MAINNET) {
-            console.log("Deploying handlers for lending protocols for live network");
-
-            operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
-            operationsAdmin.registerRoute(SOVRYN_INDEX, true);
-
-            address tropykusShareToken = networkConfig.tropykusShareToken;
-            
-            if (tropykusShareToken == address(0)) {
-                console.log("Warning: Tropykus shares not available for this stablecoin");
-            } else {
-                address tropykusHandler = deployDocHandlerDex(
-                    DeployParams({
-                        protocol: Protocol.TROPYKUS,
-                        dcaManager: address(dcaManager),
-                        tokenAddress: stablecoinAddress,
-                        shareToken: tropykusShareToken,
-                        uniswapSettings: uniswapSettings,
-                        feeCollector: feeCollector,
-                        amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
-                        amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
-                    })
-                );
-                console.log("Tropykus handler deployed at:", tropykusHandler);
-
-                _assignAndTransferHandler(operationsAdmin, stablecoinAddress, TROPYKUS_INDEX, tropykusHandler);
-
-                if (protocol == Protocol.TROPYKUS) {
-                    docHandlerDexAddress = tropykusHandler;
-                }
-            }
-
-            if (!isUSDRIF) {
-                address sovrynShareToken = networkConfig.sovrynShareToken;
-                
-                if (sovrynShareToken == address(0)) {
-                    console.log("Warning: Sovryn shares not available for this stablecoin");
-                } else {
-                    address sovrynHandler = deployDocHandlerDex(
-                        DeployParams({
-                            protocol: Protocol.SOVRYN,
-                            dcaManager: address(dcaManager),
-                            tokenAddress: stablecoinAddress,
-                            shareToken: sovrynShareToken,
-                            uniswapSettings: uniswapSettings,
-                            feeCollector: feeCollector,
-                            amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
-                            amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
-                        })
-                    );
-                    console.log("Sovryn handler deployed at:", sovrynHandler);
-
-                    _assignAndTransferHandler(operationsAdmin, stablecoinAddress, SOVRYN_INDEX, sovrynHandler);
-
-                    if (protocol == Protocol.SOVRYN) {
-                        docHandlerDexAddress = sovrynHandler;
-                    }
-                }
-            } else {
-                console.log("Skipping Sovryn handler deployment for USDRIF as it's not supported");
-            }
-
-            _transferGovernance(operationsAdmin, dcaManager);
+            docHandlerDexAddress = _deployLiveDexHandlers(
+                operationsAdmin,
+                dcaManager,
+                stablecoinAddress,
+                networkConfig,
+                uniswapSettings,
+                feeCollector,
+                isUSDRIF
+            );
         }
+
+        _proposeFinalOwner(address(operationsAdmin));
+        _proposeFinalOwner(address(dcaManager));
+        _proposeFinalOwner(docHandlerDexAddress);
 
         vm.stopBroadcast();
 

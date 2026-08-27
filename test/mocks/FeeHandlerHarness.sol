@@ -5,7 +5,9 @@ import {FeeHandler} from "../../src/FeeHandler.sol";
 import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
 
 contract FeeHandlerHarness is FeeHandler {
-    constructor(address feeCollector, IFeeHandler.FeeSettings memory settings) FeeHandler(feeCollector, settings) {}
+    constructor(address feeCollector, IFeeHandler.FeeSettings memory settings, address initialOwner)
+        FeeHandler(feeCollector, settings, initialOwner)
+    {}
 
     function exposedCalculateFee(uint256 amount) external view returns (uint256) {
         return _calculateFee(amount);

@@ -32,7 +32,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      * @dev Builds the initial path through `_purchaseToken()`. The concrete funding base
      *      (TokenHandler via LendingErc20Handler / IdleErc20Handler) must initialize
      *      `i_stableToken` before this constructor body runs — the leaf `is` order lists
-     *      the funding base before `PurchaseUniswap`. `setPurchasePath` reverts if that
+     *      the funding base before `PurchaseUniswap`. `_setPurchasePath` reverts if that
      *      token is still `address(0)`, so a reversed `is` list fails at deploy rather
      *      than writing a path that cannot be bought or repaired.
      */
@@ -51,7 +51,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         s_amountOutMinimumPercent = amountOutMinimumPercent;
         s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck;
         
-        setPurchasePath(uniswapSettings.swapIntermediateTokens, uniswapSettings.swapPoolFeeRates);
+        // Direct initial owner is not the deployer, so the constructor cannot call the onlyOwner setter.
+        _setPurchasePath(uniswapSettings.swapIntermediateTokens, uniswapSettings.swapPoolFeeRates);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -81,6 +82,10 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         override
         onlyOwner
     {
+        _setPurchasePath(intermediateTokens, poolFeeRates);
+    }
+
+    function _setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates) internal {
         if (poolFeeRates.length != intermediateTokens.length + 1) {
             revert PurchaseUniswap__WrongNumberOfTokensOrFeeRates(intermediateTokens.length, poolFeeRates.length);
         }

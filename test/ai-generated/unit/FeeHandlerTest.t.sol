@@ -31,7 +31,7 @@ contract FeeHandlerTest is Test {
             feePurchaseLowerBound: LOWER_BOUND,
             feePurchaseUpperBound: UPPER_BOUND
         });
-        feeHandler = new FeeHandlerHarness(FEE_COLLECTOR, settings);
+        feeHandler = new FeeHandlerHarness(FEE_COLLECTOR, settings, address(this));
     }
 
     function test_constructor_reverts_invalidRates() public {
@@ -43,7 +43,7 @@ contract FeeHandlerTest is Test {
         });
 
         vm.expectRevert(IFeeHandler.FeeHandler__MinFeeRateCannotBeHigherThanMax.selector);
-        new FeeHandlerHarness(FEE_COLLECTOR, settings);
+        new FeeHandlerHarness(FEE_COLLECTOR, settings, address(this));
     }
 
     function test_constructor_reverts_invalidBounds() public {
@@ -55,7 +55,7 @@ contract FeeHandlerTest is Test {
         });
 
         vm.expectRevert(IFeeHandler.FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound.selector);
-        new FeeHandlerHarness(FEE_COLLECTOR, settings);
+        new FeeHandlerHarness(FEE_COLLECTOR, settings, address(this));
     }
 
     function test_constructor_reverts_zeroFeeCollector() public {
@@ -67,7 +67,7 @@ contract FeeHandlerTest is Test {
         });
 
         vm.expectRevert(IFeeHandler.FeeHandler__InvalidFeeCollector.selector);
-        new FeeHandlerHarness(address(0), settings);
+        new FeeHandlerHarness(address(0), settings, address(this));
     }
 
     function test_constructor_reverts_maxFeeRateAboveCap() public {
@@ -79,7 +79,7 @@ contract FeeHandlerTest is Test {
         });
 
         vm.expectRevert(IFeeHandler.FeeHandler__MaxFeeRateExceedsCap.selector);
-        new FeeHandlerHarness(FEE_COLLECTOR, settings);
+        new FeeHandlerHarness(FEE_COLLECTOR, settings, address(this));
     }
 
     function test_calculateFee_belowLowerBound() public {

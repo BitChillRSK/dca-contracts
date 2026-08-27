@@ -83,10 +83,10 @@ contract InvariantTest is StdInvariant, Test {
         
         // Deploy core contracts
         vm.prank(OWNER);
-        operationsAdmin = new OperationsAdmin();
+        operationsAdmin = new OperationsAdmin(OWNER);
         
         vm.prank(OWNER);
-        dcaManager = new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT);
+        dcaManager = new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, OWNER);
         
         stablecoin = new MockStablecoin(address(this));
         
@@ -112,7 +112,8 @@ contract InvariantTest is StdInvariant, Test {
                 address(stablecoin),
                 address(kToken),
                 FEE_COLLECTOR,
-                feeSettings
+                feeSettings,
+                OWNER
             )));
             // Give kToken sufficient balance for operations
             stablecoin.mint(address(kToken), HANDLER_INITIAL_BALANCE);
@@ -123,7 +124,8 @@ contract InvariantTest is StdInvariant, Test {
                 address(stablecoin),
                 address(iSusdToken),
                 FEE_COLLECTOR,
-                feeSettings
+                feeSettings,
+                OWNER
             )));
             // Give iSusdToken sufficient balance for operations
             stablecoin.mint(address(iSusdToken), HANDLER_INITIAL_BALANCE);
@@ -356,13 +358,15 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
         address stableTokenAddress,
         address kTokenAddress,
         address feeCollector,
-        FeeSettings memory feeSettings
+        FeeSettings memory feeSettings,
+        address initialOwner
     ) TropykusErc20Handler(
         dcaManagerAddress,
         stableTokenAddress,
         kTokenAddress,
         feeCollector,
-        feeSettings
+        feeSettings,
+        initialOwner
     ) {}
     
     /**
@@ -463,13 +467,15 @@ contract SovrynHandlerWrapper is SovrynErc20Handler {
         address stableTokenAddress,
         address iSusdTokenAddress,
         address feeCollector,
-        FeeSettings memory feeSettings
+        FeeSettings memory feeSettings,
+        address initialOwner
     ) SovrynErc20Handler(
         dcaManagerAddress,
         stableTokenAddress,
         iSusdTokenAddress,
         feeCollector,
-        feeSettings
+        feeSettings,
+        initialOwner
     ) {}
     
     /**

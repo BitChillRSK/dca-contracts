@@ -16,6 +16,10 @@ function ownableUnauthorized(address caller) pure returns (bytes memory) {
     return abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, caller);
 }
 
+function ownableInvalidOwner(address owner) pure returns (bytes memory) {
+    return abi.encodeWithSelector(Ownable.OwnableInvalidOwner.selector, owner);
+}
+
 function reentrantCall() pure returns (bytes memory) {
     return abi.encodeWithSelector(ReentrancyGuard.ReentrancyGuardReentrantCall.selector);
 }

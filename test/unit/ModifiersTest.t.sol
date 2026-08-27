@@ -70,6 +70,6 @@ contract ModifiersTest is DcaDappTest {
 
     function testConstructorRevertsIfMinPurchasePeriodBelowOneDay() external {
         vm.expectRevert(IDcaManager.DcaManager__MinPurchasePeriodMustBeAtLeastOneDay.selector);
-        new DcaManager(address(operationsAdmin), 1 days - 1, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT);
+        new DcaManager(address(operationsAdmin), 1 days - 1, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, OWNER);
     }
 }

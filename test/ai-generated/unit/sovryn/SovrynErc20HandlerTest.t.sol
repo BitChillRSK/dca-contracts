@@ -39,7 +39,8 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
             address(stablecoin),
             address(iSusdToken),
             FEE_COLLECTOR,
-            feeSettings
+            feeSettings,
+            OWNER
         );
         
         return ITokenHandler(address(sovrynHandler));
@@ -386,13 +387,15 @@ contract SovrynTestHandler is SovrynErc20Handler {
         address stableTokenAddress,
         address iSusdTokenAddress,
         address feeCollector,
-        FeeSettings memory feeSettings
+        FeeSettings memory feeSettings,
+        address initialOwner
     ) SovrynErc20Handler(
         dcaManagerAddress,
         stableTokenAddress, 
         iSusdTokenAddress,
         feeCollector,
-        feeSettings
+        feeSettings,
+        initialOwner
     ) {}
     
     /**

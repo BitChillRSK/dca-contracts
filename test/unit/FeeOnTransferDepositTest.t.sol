@@ -42,11 +42,11 @@ contract FeeOnTransferDepositTest is Test {
 
     function setUp() public {
         vm.prank(OWNER);
-        operationsAdmin = new OperationsAdmin();
+        operationsAdmin = new OperationsAdmin(OWNER);
 
         vm.prank(OWNER);
         dcaManager = new DcaManager(
-            address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT
+            address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, OWNER
         );
 
         token = new MockFeeOnTransferStablecoin();
@@ -64,7 +64,7 @@ contract FeeOnTransferDepositTest is Test {
         });
 
         idleHandler = new IdleDocHandlerMoc(
-            address(dcaManager), address(token), FEE_COLLECTOR, address(mocProxy), feeSettings
+            address(dcaManager), address(token), FEE_COLLECTOR, address(mocProxy), feeSettings, OWNER
         );
         kToken = new MockKdocToken(address(token));
         tropykusHandler = new TropykusDocHandlerMoc(
@@ -73,7 +73,8 @@ contract FeeOnTransferDepositTest is Test {
             address(kToken),
             FEE_COLLECTOR,
             address(mocProxy),
-            feeSettings
+            feeSettings,
+            OWNER
         );
 
         vm.startPrank(OWNER);

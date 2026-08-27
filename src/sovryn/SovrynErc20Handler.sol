@@ -19,15 +19,19 @@ abstract contract SovrynErc20Handler is LendingErc20Handler {
      * @param iSusdTokenAddress the address of Sovryn' iSusd token contract
      * @param feeCollector the address of to which fees will sent on every purchase
      * @param feeSettings struct with the settings for fee calculations
+     * @param initialOwner the address that owns fee configuration immediately after deploy
      */
     constructor(
         address dcaManagerAddress,
         address stableTokenAddress,
         address iSusdTokenAddress,
         address feeCollector,
-        FeeSettings memory feeSettings
+        FeeSettings memory feeSettings,
+        address initialOwner
     )
-        LendingErc20Handler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, EXCHANGE_RATE_DECIMALS)
+        LendingErc20Handler(
+            dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, EXCHANGE_RATE_DECIMALS, initialOwner
+        )
     {
         i_iSusdToken = IiSusdToken(iSusdTokenAddress);
     }
