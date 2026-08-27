@@ -28,7 +28,6 @@ interface IPurchaseRbtc {
 
     error PurchaseRbtc__NoAccumulatedRbtcToWithdraw();
     error PurchaseRbtc__rBtcWithdrawalFailed();
-    error PurchaseRbtc__RbtcPurchaseFailed(address user, address tokenSpent);
     error PurchaseRbtc__RbtcBatchPurchaseFailed(address tokenSpent);
     /// @notice the batch retrieved less stablecoin than the fee it owes, so there is nothing left to spend
     error PurchaseRbtc__StablecoinRetrievedBelowFee(uint256 stablecoinRetrieved, uint256 aggregatedFee);
@@ -36,14 +35,6 @@ interface IPurchaseRbtc {
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @param buyer: the user on behalf of which the contract is making the rBTC purchase
-     * @param scheduleId: the ID of the DCA schedule to which the purchase belongs
-     * @param purchaseAmount: the amount of the token to be spent on BTC
-     * @notice this function will be called periodically through a CRON job running on a web server
-     */
-    function buyRbtc(address buyer, bytes32 scheduleId, uint256 purchaseAmount) external;
 
     /**
      * @param buyers: the users on behalf of which the contract is making the rBTC purchases

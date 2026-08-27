@@ -299,8 +299,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         
         // Try to make a purchase, which should revert due to invalid price
         vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__OutdatedPrice.selector);
-        vm.prank(SWAPPER);
-        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
+        buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
     }
 
     ////////////////////////////

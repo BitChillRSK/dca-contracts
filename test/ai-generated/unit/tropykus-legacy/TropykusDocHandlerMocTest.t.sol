@@ -10,6 +10,7 @@ import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import "script/Constants.sol";
+import {handlerBatchBuyOne} from "test/utils/BatchBuyOne.sol";
 
 /**
  * @title TropykusDocHandlerMocTest
@@ -66,7 +67,7 @@ contract TropykusDocHandlerMocTest is Test {
         docToken.mint(address(kDocToken), 10000 ether);
     }
 
-    function test_buyRbtc_flow() public {
+    function test_lengthOneBatch_flow() public {
         uint256 depositAmount = 500 ether;
         uint256 purchaseAmount = 100 ether;
         bytes32 scheduleId = keccak256("schedule");
@@ -75,7 +76,7 @@ contract TropykusDocHandlerMocTest is Test {
         handler.depositToken(USER, depositAmount);
 
         // Perform rBTC purchase – redeems the buyer's shares, then redeems DOC at MoC
-        handler.buyRbtc(USER, scheduleId, purchaseAmount);
+        handlerBatchBuyOne(IPurchaseRbtc(address(handler)), USER, scheduleId, purchaseAmount);
 
         // Verify rBTC was accounted
         uint256 rbtcAccrued = handler.getAccumulatedRbtcBalance(USER);

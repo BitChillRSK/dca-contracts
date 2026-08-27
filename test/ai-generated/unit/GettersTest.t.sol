@@ -411,8 +411,7 @@ contract GettersTest is DcaDappTest {
 
         bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
 
-        vm.prank(SWAPPER);
-        dcaManager.buyRbtc(USER, address(stablecoin), 0, scheduleId);
+        buyRbtcOne(USER, 0, scheduleId, AMOUNT_TO_SPEND);
 
         uint256 newBalance = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).tokenBalance;
         assertLt(newBalance, initialBalance);

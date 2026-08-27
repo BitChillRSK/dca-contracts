@@ -140,14 +140,6 @@ interface IDcaManager {
     function setOperationsAdmin(address tokenHandlerFactoryAddress) external;
 
     /**
-     * @param buyer The address of the user on behalf of whom rBTC is going to be bought
-     * @param token the stablecoin that all users in the array will spend to purchase rBTC
-     * @param scheduleIndex the index of the DCA schedule
-     * @param scheduleId the ID of the schedule to which the purchase corresponds
-     */
-    function buyRbtc(address buyer, address token, uint256 scheduleIndex, bytes32 scheduleId) external;
-
-    /**
      * @param buyers the array of addresses of the users on behalf of whom rBTC is going to be bought
      * @notice a buyer may be featured more than once in the buyers array if two or more their schedules are due for a purchase
      * @notice we need to take extra care in the back end to not mismatch a user's address with a wrong DCA schedule

@@ -25,8 +25,7 @@ contract RbtcWithdrawalTest is DcaDappTest {
         vm.prank(USER);
         IDcaManager.DcaDetails[] memory dcaDetails = dcaManager.getDcaSchedules(USER, address(stablecoin));
 
-        vm.prank(SWAPPER);
-        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, dcaDetails[SCHEDULE_INDEX].scheduleId);
+        buyRbtcOne(USER, SCHEDULE_INDEX, dcaDetails[SCHEDULE_INDEX].scheduleId, AMOUNT_TO_SPEND);
 
         uint256 rbtcBalanceBeforeWithdrawal = USER.balance;
         vm.prank(USER);
@@ -110,8 +109,7 @@ contract RbtcWithdrawalTest is DcaDappTest {
         super.makeSinglePurchase();
 
         bytes32 attackerScheduleId = dcaManager.getDcaSchedule(attacker, address(stablecoin), SCHEDULE_INDEX).scheduleId;
-        vm.prank(SWAPPER);
-        dcaManager.buyRbtc(attacker, address(stablecoin), SCHEDULE_INDEX, attackerScheduleId);
+        buyRbtcOne(attacker, SCHEDULE_INDEX, attackerScheduleId, AMOUNT_TO_SPEND);
 
         uint256 userAccrued = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
         uint256 attackerAccrued = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(attacker);

@@ -48,8 +48,7 @@ contract FullWithdrawalTest is DcaDappTest {
         bytes32 scheduleId = _scheduleId(SCHEDULE_INDEX);
         uint256 staleBalance = _scheduleBalance(SCHEDULE_INDEX);
 
-        vm.prank(SWAPPER);
-        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
+        buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
 
         uint256 liveBalance = _scheduleBalance(SCHEDULE_INDEX);
         assertLt(liveBalance, staleBalance, "the purchase did not move the balance");

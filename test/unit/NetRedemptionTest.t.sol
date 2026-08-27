@@ -47,14 +47,13 @@ contract NetRedemptionTest is DcaDappTest {
     /**
      * @notice The single-purchase break: the handler received net DOC and used to spend the gross return.
      */
-    function test_sovryn_buyRbtcSpendsTheNetRedeemedAmount() public onlySovrynMocMocks {
+    function test_sovryn_singleScheduleBatchSpendsTheNetRedeemedAmount() public onlySovrynMocMocks {
         _enableExitFee();
 
         bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         uint256 rbtcBefore = _accumulatedRbtc();
 
-        vm.prank(SWAPPER);
-        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
+        buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
 
         uint256 rbtcBought = _accumulatedRbtc() - rbtcBefore;
         uint256 netRedeemed = _afterExitFee(AMOUNT_TO_SPEND);
@@ -297,8 +296,7 @@ contract NetRedemptionTest is DcaDappTest {
         bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         uint256 rbtcBefore = _accumulatedRbtc();
 
-        vm.prank(SWAPPER);
-        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
+        buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
 
         uint256 netPurchaseAmount = AMOUNT_TO_SPEND - feeCalculator.calculateFee(AMOUNT_TO_SPEND);
         assertApproxEqRel(_accumulatedRbtc() - rbtcBefore, netPurchaseAmount / s_btcPrice, MAX_SLIPPAGE_PERCENT);

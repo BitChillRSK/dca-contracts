@@ -373,15 +373,6 @@ contract SovrynTestHandler is SovrynErc20Handler {
         feeSettings
     ) {}
     
-    // Implementation required by IPurchaseRbtc interface
-    function buyRbtc(
-        address /* buyer */,
-        bytes32 /* scheduleId */,
-        uint256 /* purchaseAmount */
-    ) external pure returns (uint256) {
-        return 0; // Minimal implementation for testing
-    }
-    
     /**
      * @notice Expose _batchRetrieveStablecoin for testing
      * @dev This allows us to test the internal batch redemption logic

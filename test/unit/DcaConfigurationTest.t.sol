@@ -118,8 +118,7 @@ contract DcaConfigurationTest is DcaDappTest {
         assertEq(onePurchaseAmount, dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).purchaseAmount);
         vm.stopPrank();
 
-        vm.prank(SWAPPER);
-        dcaManager.buyRbtc(USER, address(stablecoin), scheduleIndex, scheduleId);
+        buyRbtcOne(USER, scheduleIndex, scheduleId, AMOUNT_TO_SPEND);
 
         vm.prank(USER);
         assertEq(0, dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).tokenBalance);

@@ -253,26 +253,6 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice buy rBTC for a user
-     * @param buyer: the address of the user
-     * @param token: the token to buy rBTC with
-     * @param scheduleIndex: the index of the schedule to buy rBTC from
-     * @param scheduleId: the id of the schedule to buy rBTC from
-     */
-    function buyRbtc(address buyer, address token, uint256 scheduleIndex, bytes32 scheduleId)
-        external
-        override
-        onlySwapper
-    {
-        (uint256 purchaseAmount, uint256 routeIndex) =
-            _rBtcPurchaseChecksEffects(buyer, token, scheduleIndex, scheduleId);
-
-        IPurchaseRbtc(address(_handler(token, routeIndex))).buyRbtc(
-            buyer, scheduleId, purchaseAmount
-        );
-    }
-
-    /**
      * @param buyers the array of addresses of the users on behalf of whom rBTC is going to be bought
      * @notice a buyer may be featured more than once in the buyers array if two or more their schedules are due for a purchase
      * @notice we need to take extra care in the back end to not mismatch a user's address with a wrong DCA schedule

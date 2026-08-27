@@ -320,9 +320,10 @@ contract Handler is Test {
     }
     
     /**
-     * @notice Simulate buying rBTC for a user (mock implementation)
+     * @notice Simulate buying rBTC for one schedule via a length-1 batch (mock implementation)
+     * @dev R39 removed the single-schedule `buyRbtc` selector; a length-1 `batchBuyRbtc` is that path.
      */
-    function buyRbtc(
+    function buyRbtcOneSchedule(
         uint256 userSeed,
         uint256 scheduleIndex
     ) external {
@@ -352,10 +353,21 @@ contract Handler is Test {
             vm.deal(address(handler), currentHandlerBalance + rbtcNeeded);
         }
         
-        // Simulate the swapper role making the purchase using DcaManager's buyRbtc
+        // Simulate the swapper role making the purchase using a length-1 batchBuyRbtc
         vm.startPrank(SWAPPER);
         
-        try dcaManager.buyRbtc(user, address(stablecoin), scheduleIndex, schedule.scheduleId) {
+        address[] memory buyers = new address[](1);
+        uint256[] memory scheduleIndexes = new uint256[](1);
+        bytes32[] memory scheduleIds = new bytes32[](1);
+        uint256[] memory purchaseAmounts = new uint256[](1);
+        buyers[0] = user;
+        scheduleIndexes[0] = scheduleIndex;
+        scheduleIds[0] = schedule.scheduleId;
+        purchaseAmounts[0] = schedule.purchaseAmount;
+
+        try dcaManager.batchBuyRbtc(
+            buyers, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, schedule.routeIndex
+        ) {
             // Success
         } catch {
             // Ignore failures

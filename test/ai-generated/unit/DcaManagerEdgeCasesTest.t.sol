@@ -16,6 +16,7 @@ import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces
 import {IDcaManager} from "../../../src/interfaces/IDcaManager.sol";
 import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
 import "../../../script/Constants.sol";
+import {batchBuyOne} from "../../utils/BatchBuyOne.sol";
 
 /**
  * @title DcaManagerEdgeCasesTest
@@ -181,7 +182,7 @@ contract DcaManagerEdgeCasesTest is Test {
     // NOTE: This test is disabled because it requires a complete swap execution
     // which depends on proper Uniswap mock setup that's complex in this test environment.
     // The time period validation is already tested in the integration tests in DcaDappTest.
-    function skip_test_buyRbtc_reverts_beforePeriodElapsed() public {
+    function skip_test_singleScheduleBatch_reverts_beforePeriodElapsed() public {
         // Create schedule 
         vm.prank(USER);
         dcaManager.createDcaSchedule(
@@ -198,7 +199,7 @@ contract DcaManagerEdgeCasesTest is Test {
         // in the DcaDappTest integration tests where the full environment is set up properly
     }
     
-    function test_buyRbtc_reverts_invalidScheduleId() public {
+    function test_singleScheduleBatch_reverts_invalidScheduleId() public {
         // Create schedule
         vm.prank(USER);
         dcaManager.createDcaSchedule(
@@ -213,10 +214,10 @@ contract DcaManagerEdgeCasesTest is Test {
         
         vm.expectRevert(IDcaManager.DcaManager__ScheduleIdAndIndexMismatch.selector);
         vm.prank(SWAPPER);
-        dcaManager.buyRbtc(USER, address(stablecoin), 0, wrongId);
+        batchBuyOne(dcaManager, USER, address(stablecoin), 0, wrongId, 100 ether, TROPYKUS_INDEX);
     }
     
-    function test_buyRbtc_reverts_insufficientBalance() public {
+    function test_createSchedule_reverts_insufficientBalance() public {
         // Create schedule with purchase amount above the deposit (should fail validation)
         bytes memory encodedRevert = abi.encodeWithSelector(
             IDcaManager.DcaManager__PurchaseAmountExceedsBalance.selector,
