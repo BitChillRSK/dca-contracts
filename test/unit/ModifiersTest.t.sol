@@ -12,9 +12,12 @@ import "../../script/Constants.sol";
 
 contract ModifiersTest is DcaDappTest {
     // Events
-    event DcaManager__OperationsAdminUpdated(address indexed newOperationsAdmin);
     event DcaManager__MinPurchasePeriodModified(uint256 indexed newMinPurchasePeriod);
-    
+
+    /// @dev Pre-R46 `setOperationsAdmin(address)` selector. Kept as a literal so the test
+    ///      still compiles after the function is deleted.
+    bytes4 private constant SET_OPERATIONS_ADMIN_SELECTOR = 0x32742d59;
+
     function setUp() public override {
         super.setUp();
     }
@@ -22,19 +25,52 @@ contract ModifiersTest is DcaDappTest {
     /*//////////////////////////////////////////////////////////////
                             ONLYOWNER TESTS
     //////////////////////////////////////////////////////////////*/
-    function testonlyOwnerCanSetOperationsAdmin() external {
-        address operationsAdminBefore = dcaManager.getOperationsAdminAddress();
-        vm.expectRevert(ownableUnauthorized(USER));
-        vm.prank(USER); // User can't
-        dcaManager.setOperationsAdmin(address(dcaManager)); // dummy address, e.g. that of DcaManager
-        address operationsAdminAfter = dcaManager.getOperationsAdminAddress();
-        assertEq(operationsAdminBefore, operationsAdminAfter);
-        vm.prank(OWNER); // Owner can
-        vm.expectEmit(true, true, true, true);
-        emit DcaManager__OperationsAdminUpdated(address(dcaManager));
-        dcaManager.setOperationsAdmin(address(dcaManager));
-        operationsAdminAfter = dcaManager.getOperationsAdminAddress();
-        assertEq(operationsAdminAfter, address(dcaManager));
+    function testSetOperationsAdminSelectorIsAbsent() external {
+        assertEq(SET_OPERATIONS_ADMIN_SELECTOR, bytes4(keccak256("setOperationsAdmin(address)")));
+
+        (bool callSucceeded, bytes memory returnData) = address(dcaManager).call(
+            abi.encodeWithSelector(SET_OPERATIONS_ADMIN_SELECTOR, address(dcaManager))
+        );
+        assertFalse(callSucceeded);
+        assertEq(returnData.length, 0);
+
+        vm.prank(OWNER);
+        (bool ownerCallSucceeded, bytes memory ownerReturnData) = address(dcaManager).call(
+            abi.encodeWithSelector(SET_OPERATIONS_ADMIN_SELECTOR, address(dcaManager))
+        );
+        assertFalse(ownerCallSucceeded);
+        assertEq(ownerReturnData.length, 0);
+
+        assertEq(dcaManager.getOperationsAdminAddress(), address(operationsAdmin));
+    }
+
+    function testOperationsAdminPinnedAtConstruction() external {
+        assertEq(dcaManager.getOperationsAdminAddress(), address(operationsAdmin));
+        assertTrue(address(operationsAdmin).code.length > 0);
+    }
+
+    function testConstructorRevertsIfOperationsAdminIsZero() external {
+        vm.expectRevert(
+            abi.encodeWithSelector(IDcaManager.DcaManager__OperationsAdminIsNotAContract.selector, address(0))
+        );
+        new DcaManager(address(0), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, OWNER);
+    }
+
+    function testConstructorRevertsIfOperationsAdminIsEoa() external {
+        address eoa = makeAddr("notAContract");
+        vm.expectRevert(
+            abi.encodeWithSelector(IDcaManager.DcaManager__OperationsAdminIsNotAContract.selector, eoa)
+        );
+        new DcaManager(eoa, MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, OWNER);
+    }
+
+    function testOperationsAdminNotInStorage() external {
+        // R45 stored the admin at slot 2. After pinning it is immutable bytecode, and slot 2
+        // is the s_dcaSchedules mapping root (empty → 0), not the admin address.
+        bytes32 slot2 = vm.load(address(dcaManager), bytes32(uint256(2)));
+        assertEq(uint256(slot2), 0);
+        assertTrue(uint160(dcaManager.getOperationsAdminAddress()) != 0);
+        assertEq(dcaManager.getOperationsAdminAddress(), address(operationsAdmin));
     }
 
     function testonlyOwnerCanModifyMinPurchasePeriod() external {

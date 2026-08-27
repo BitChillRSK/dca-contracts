@@ -40,7 +40,6 @@ interface IDcaManager {
     );
     event DcaManager__DcaScheduleDeleted(address user, address token, bytes32 scheduleId, uint256 refundedAmount);
     event DcaManager__MaxSchedulesPerTokenModified(uint256 indexed newMaxSchedulesPerToken);
-    event DcaManager__OperationsAdminUpdated(address indexed newOperationsAdmin);
     event DcaManager__MinPurchasePeriodModified(uint256 indexed newMinPurchasePeriod);
     event DcaManager__LastPurchaseTimestampUpdated(address indexed token, bytes32 indexed scheduleId, uint256 indexed lastPurchaseTimestamp);
     event DcaManager__DefaultMinPurchaseAmountModified(uint256 indexed newDefaultMinPurchaseAmount);
@@ -68,6 +67,7 @@ interface IDcaManager {
     error DcaManager__UnauthorizedSwapper(address sender);
     error DcaManager__PurchaseAmountMismatch(address user, address token, bytes32 scheduleId, uint256 scheduleIndex, uint256 actualPurchaseAmount, uint256 expectedPurchaseAmount);
     error DcaManager__RouteIndexMismatch(address user, address token, bytes32 scheduleId, uint256 scheduleIndex, uint256 actualRouteIndex, uint256 expectedRouteIndex);
+    error DcaManager__OperationsAdminIsNotAContract(address operationsAdmin);
 
     /*//////////////////////////////////////////////////////////////
                                FUNCTIONS
@@ -132,12 +132,6 @@ interface IDcaManager {
      * @param purchasePeriod The period for recurrent purchases
      */
     function setPurchasePeriod(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 purchasePeriod) external;
-
-    /**
-     * @notice Withdraw a specified amount of a stablecoin from the contract.
-     * @param tokenHandlerFactoryAddress The address of the new token handler factory contract
-     */
-    function setOperationsAdmin(address tokenHandlerFactoryAddress) external;
 
     /**
      * @param buyers the array of addresses of the users on behalf of whom rBTC is going to be bought
@@ -236,8 +230,8 @@ interface IDcaManager {
     function getDcaSchedules(address user, address token) external view returns (DcaDetails[] memory);
 
     /**
-     * @notice get the admin operations contract's address
-     * @return the admin operations contract's address
+     * @notice get the OperationsAdmin this manager is permanently pinned to
+     * @return the constructor-supplied OperationsAdmin address
      */
     function getOperationsAdminAddress() external view returns (address);
 
