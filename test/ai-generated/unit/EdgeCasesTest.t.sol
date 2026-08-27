@@ -66,7 +66,9 @@ contract EdgeCasesTest is Test {
         // Deposit so the handler owns kDOC → needed for redemption inside batchBuyRbtc
         handler.depositToken(USER, 500 ether);
 
-        vm.expectRevert();
+        vm.expectRevert(
+            abi.encodeWithSelector(IPurchaseRbtc.PurchaseRbtc__RbtcBatchPurchaseFailed.selector, address(doc))
+        );
         handlerBatchBuyOne(IPurchaseRbtc(address(handler)), USER, bytes32("schedule"), 100 ether);
     }
 
@@ -150,7 +152,7 @@ contract EdgeCasesTest is Test {
         doc.approve(address(dex), type(uint256).max);
         dex.depositToken(USER, 600 ether);
 
-        vm.expectRevert();
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__OutdatedPrice.selector);
         handlerBatchBuyOne(IPurchaseRbtc(address(dex)), USER, bytes32("sched"), 100 ether);
     }
 

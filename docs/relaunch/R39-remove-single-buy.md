@@ -90,14 +90,32 @@ Accepted per the decision above: ~13–15k gas on the rare one-schedule tick, pa
 
 Dex margin grows ~38–44%; that is the headroom R9 spends on share-transition events.
 
-## Behavioral difference found while converting the tests
+## Behavioral differences between the removed path and the length-1 batch
 
-The length-1 batch is **not** a clamping equivalent of the removed single path on lending routes:
+Two, both pre-existing properties of `batchBuyRbtc` rather than anything R39 introduces — production has always batched. R39 matters because it removes the only path that behaved differently. Both are inputs to R43.
+
+### 1. Share shortfall: the batch reverts where the single path clamped
 
 - `_retrieveStablecoin` → `_redeemShares` (single) **clamped** a share shortfall down to the shares held and emitted `TokenLending__AmountToRedeemAdjusted`.
-- `_batchRetrieveStablecoin` (batch) debits each buyer's shares **rounded up** and **reverts** with `TokenLending__InsufficientShares` on any shortfall.
+- `_batchRetrieveStablecoin` (batch) debits each buyer's shares **rounded up** (`TokenLending._stablecoinToShares`, so the per-user book never drifts above the shares the handler holds) and **reverts** with `TokenLending__InsufficientShares` on any shortfall.
 
-On a live lending fork with a static exchange rate the round-up costs ~1 wei of shares per purchase, so a schedule drained purchase-by-purchase can be a few wei of shares short on its final purchase while its token balance is still non-zero. This is the behavior production already had — the bot has always used `batchBuyRbtc` — so R39 does not change it; it only removes the lenient path nobody called. `testRevertPurchasetIfStablecoinRunsOut` was written against the single path and now withdraws the tail instead of spending it, so it still asserts the `DcaManager` balance guard on every lane. Whether the batch path should clamp is left to R43 (shared purchase path review); changing `batchBuyRbtc` semantics is out of scope here.
+`depositToken` credits the floor-rounded amount the protocol actually minted, so whenever the exchange rate does not divide the deposit evenly — essentially always in production — spending a schedule's **exact remaining balance** asks for exactly one share more than the user owns. Two consequences:
+
+1. **No draining loop is needed.** A single purchase of the full remaining balance is already short by one share.
+2. **The whole batch dies with it.** The revert is inside the per-buyer loop, so one schedule at its tail rolls back every healthy buyer in the same tick.
+
+Idle is unaffected (1:1 balances, no rate, no rounding). Sovryn, LayerBank and Tropykus all carry it.
+
+Pinned by `test/unit/BatchTailScheduleTest.t.sol`, which asserts the exact one-share shortfall and the batch-wide blast radius. **If R43 makes the batch clamp, flip those tests rather than deleting them.** `testRevertPurchasetIfStablecoinRunsOut` was written against the single path and now withdraws the tail instead of spending it, so it still asserts the `DcaManager` balance guard on every lane.
+
+### 2. Fee basis: planned gross vs. amount actually retrieved
+
+- Single: retrieved stablecoin **first**, then charged the fee on what actually arrived (`fee = _calculateFee(purchaseAmount)` after `purchaseAmount = _retrieveStablecoin(...)`).
+- Batch: `_calculateFeeAndNetAmounts` computes the aggregated fee up front from the **planned gross** `purchaseAmounts`, then subtracts it from whatever was retrieved.
+
+So a short retrieval is absorbed entirely by the user's rBTC spend while the fee stays whole. Visible in `test/unit/PurchaseRbtcTest.t.sol::test_lengthOneBatch_usesActualRetrievedWhenBelowRequest`, which asserts `fee = _fee(requested)` and `spent = retrieved - fee`.
+
+Changing `batchBuyRbtc` fee aggregation or share handling is explicitly out of scope for R39.
 
 Left orphaned by this deletion and deliberately **not** removed (no ABI effect; unreachable internals are stripped from runtime bytecode by the compiler, and both are still exercised by handler-level tests): the single `_retrieveStablecoin` seam on `StablecoinSource` / `LendingErc20Handler` / `IdleErc20Handler`, and `FeeHandler._calculateFee`. Flagged for R43.
 
