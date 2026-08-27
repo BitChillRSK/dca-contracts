@@ -321,7 +321,7 @@ Stack on R32 (PR 28). Tropykus is not in this map; R27 already corrected the leg
 
 ### PR 30 - R39 remove `buyRbtc`
 
-Delete `DcaManager.buyRbtc` and `PurchaseRbtc.buyRbtc`. Production uses `batchBuyRbtc`; a length-1 batch is the remaining one-schedule path. Frees Dex bytecode before R9 spends it on share events. See [`R39-remove-single-buy.md`](./R39-remove-single-buy.md).
+Delete `DcaManager.buyRbtc` and `PurchaseRbtc.buyRbtc`. Production uses `batchBuyRbtc`; a length-1 batch is the remaining one-schedule path. The single selector is cheaper for one schedule, so R39 must record an apples-to-apples gas delta before deletion; the plan knowingly accepts that rare overhead in exchange for one cash path and freed DcaManager/Dex bytecode before R9 spends it on share events. See [`R39-remove-single-buy.md`](./R39-remove-single-buy.md).
 
 This goes first because it removes the dead purchase branch and creates bytecode headroom before R43 changes `PurchaseUniswap` and before R36 adds the final Dex handler.
 

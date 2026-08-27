@@ -14,6 +14,8 @@ Delete the single-schedule `buyRbtc` entry points on `DcaManager` and `PurchaseR
 
 A length-1 `batchBuyRbtc` is not a perfect clone of the old single path (array checks, aggregated fee, `PurchaseRbtc__SuccessfulRbtcBatchPurchase`), but it is the same cash motion: one retrieve, one fee transfer, one MoC/Uniswap spend, one `PurchaseRbtc__RbtcBought`. That is enough for debug and retries.
 
+**Gas tradeoff:** the old single selector is cheaper for exactly one schedule. A length-1 batch pays for larger dynamic-array calldata, DcaManager length/amount/route checks and a loop, handler-side array allocation/allocation math, and the batch-total event. This PR does not claim otherwise. The decision accepts that rare bot-paid overhead because production normally groups schedules, while retaining the single path would permanently spend handler/manager bytecode and maintain a second cash-moving implementation.
+
 This is first in the remaining queue so R43 reviews the purchase path after the dead branch is gone and R36 measures the new LayerBank Dex handler against the reduced runtime.
 
 Decided 2026-08-27: **delete**. Do not keep it as a hidden debug selector.
@@ -28,6 +30,7 @@ Decided 2026-08-27: **delete**. Do not keep it as a hidden debug selector.
 - [ ] Remove `PurchaseRbtc.buyRbtc` and `IPurchaseRbtc.buyRbtc`.
 - [ ] Convert every test that called the single path to `batchBuyRbtc` of length 1 (or drop it if it only existed to compare the two). `ComparePurchaseMethods` is mainnet-only and already excluded from CI; delete its single-path arm or the file if nothing remains.
 - [ ] Re-measure Dex handler runtime sizes vs EIP-170. Record before/after in the PR. This is the bytecode that R9 spends.
+- [ ] Before deleting the selector, record an apples-to-apples gas comparison between `buyRbtc` and a length-1 `batchBuyRbtc` on the same lane/setup. Preserve the number in the PR as the explicit cost of the simplification; it is not a gate to keeping the selector.
 
 ## Out of scope
 
@@ -46,6 +49,7 @@ Decided 2026-08-27: **delete**. Do not keep it as a hidden debug selector.
 Targeted first, then `make check`.
 
 - A length-1 `batchBuyRbtc` still purchases, credits rBTC, emits `PurchaseRbtc__RbtcBought`, and deducts the schedule.
+- The PR records the measured one-schedule gas premium of the batch path; do not compare the existing five-schedule batch test to the single test.
 - `dcaManager.buyRbtc` / `handler.buyRbtc` are gone (no selector).
 - Existing batch tests unchanged.
 - Fork: no new assertions. Still run `make fork-sovryn` and `make fork-tropykus` before push.
@@ -55,6 +59,7 @@ Targeted first, then `make check`.
 - [ ] No first-party `buyRbtc` selector remains.
 - [ ] Length-1 batch covers the old single-schedule happy path.
 - [ ] Dex runtime sizes recorded; still under EIP-170.
+- [ ] The length-1 batch gas premium is measured and accepted explicitly.
 - [ ] No open product decisions.
 
 ## Reviewer checklist
