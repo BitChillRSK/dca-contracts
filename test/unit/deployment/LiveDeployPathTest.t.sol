@@ -6,6 +6,10 @@ import {DeployBase} from "../../../script/DeployBase.s.sol";
 import {DeployMocSwaps} from "../../../script/DeployMocSwaps.s.sol";
 import {DeployDexSwaps} from "../../../script/DeployDexSwaps.s.sol";
 import {DeployIdleHandler} from "../../../script/DeployIdleHandler.s.sol";
+import {DeployLayerBankHandler} from "../../../script/DeployLayerBankHandler.s.sol";
+import {DeployUsdrifHandler} from "../../../script/DeployUsdrifHandler.s.sol";
+import {DeployMocAndUniswap} from "../../../script/DeployMocAndUniswap.s.sol";
+import {UsdrifHelperConfig} from "../../../script/UsdrifHelperConfig.s.sol";
 import {OperationsAdmin} from "../../../src/OperationsAdmin.sol";
 import {DcaManager} from "../../../src/DcaManager.sol";
 import {IOperationsAdmin} from "../../../src/interfaces/IOperationsAdmin.sol";
@@ -22,6 +26,10 @@ contract DeployBaseHarness is DeployBase {
 
     function assertBroadcast(address broadcaster) external view {
         _assertLiveBroadcastSender(broadcaster);
+    }
+
+    function propose(address governed) external {
+        _proposeFinalOwner(governed);
     }
 }
 
@@ -41,7 +49,15 @@ contract DeployDexSwapsHarness is DeployDexSwaps {
     }
 }
 
+contract DeployMocAndUniswapHarness is DeployMocAndUniswap {
+    constructor(Environment env) {
+        environment = env;
+    }
+}
+
 contract LiveDeployPathTest is Test {
+    event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner);
+
     address internal constant SAFE = address(0x5AFE);
 
     function setUp() public {
@@ -71,6 +87,31 @@ contract LiveDeployPathTest is Test {
     function test_mainnet_broadcastFromEoaPasses() public {
         DeployBaseHarness harness = new DeployBaseHarness(DeployBase.Environment.MAINNET, MAINNET_OWNER);
         harness.assertBroadcast(makeAddr("deployer"));
+    }
+
+    function test_proposeFinalOwner_secondCallDoesNotReemit() public {
+        DeployBaseHarness harness = new DeployBaseHarness(DeployBase.Environment.MAINNET, SAFE);
+        OperationsAdmin admin = new OperationsAdmin(address(harness));
+
+        vm.expectEmit(true, true, true, true, address(admin));
+        emit OwnershipTransferStarted(address(harness), SAFE);
+        harness.propose(address(admin));
+        assertEq(admin.owner(), address(harness));
+        assertEq(admin.pendingOwner(), SAFE);
+
+        vm.recordLogs();
+        harness.propose(address(admin));
+        assertEq(vm.getRecordedLogs().length, 0, "identical pending owner must not re-emit");
+        assertEq(admin.pendingOwner(), SAFE);
+    }
+
+    function test_compareHarness_revertsOnLive() public {
+        DeployMocAndUniswapHarness harness = new DeployMocAndUniswapHarness(DeployBase.Environment.TESTNET);
+        vm.expectRevert(DeployMocAndUniswap.DeployMocAndUniswap__NotALivePath.selector);
+        harness.run();
+        harness = new DeployMocAndUniswapHarness(DeployBase.Environment.MAINNET);
+        vm.expectRevert(DeployMocAndUniswap.DeployMocAndUniswap__NotALivePath.selector);
+        harness.run();
     }
 
     function test_mocLive_testnetStyle_registersRoutesAndKeepsOwner() public {
@@ -185,5 +226,33 @@ contract AddonPendingOwnerTest is BaseDeploymentTest {
             )
         );
         idleDeployer.run(helperConfig, address(operationsAdmin), address(dcaManager));
+    }
+
+    function test_layerBankAddOn_revertsWhenAdminOwnershipPending() public {
+        vm.prank(OWNER);
+        operationsAdmin.transferOwnership(makeAddr("incoming"));
+
+        DeployLayerBankHandler layerbankDeployer = new DeployLayerBankHandler();
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DeployBase.DeployBase__OwnershipTransferPending.selector, makeAddr("incoming")
+            )
+        );
+        layerbankDeployer.run(helperConfig, address(operationsAdmin), address(dcaManager));
+    }
+
+    function test_usdrifAddOn_revertsWhenAdminOwnershipPending() public {
+        vm.prank(OWNER);
+        operationsAdmin.transferOwnership(makeAddr("incoming"));
+
+        UsdrifHelperConfig usdrifHelperConfig = new UsdrifHelperConfig();
+        usdrifHelperConfig.updateProtocolAddresses(address(operationsAdmin), address(dcaManager));
+        DeployUsdrifHandler usdrifDeployer = new DeployUsdrifHandler();
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DeployBase.DeployBase__OwnershipTransferPending.selector, makeAddr("incoming")
+            )
+        );
+        usdrifDeployer.run(usdrifHelperConfig);
     }
 }

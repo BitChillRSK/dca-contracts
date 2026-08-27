@@ -304,6 +304,8 @@ Then, from the Safe UI (one call per contract), send `acceptOwnership()`. Until 
 
 Add-on scripts (`DeployIdleHandler`, `DeployLayerBankHandler`, `DeployUsdrifHandler`) revert if `pendingOwner` is set on `OperationsAdmin` or `DcaManager` — wait until the Safe has accepted, then run them.
 
+`DeployMocAndUniswap` is a local/fork comparison harness (two independent stacks) and **reverts** on `REAL_DEPLOYMENT=true`. It is not the live deploy. A later one-shot live script — idle, Sovryn DOC, LayerBank DOC, LayerBank USDRIF, LayerBank USDT0 on a single `OperationsAdmin` / `DcaManager` — belongs after the production map is final (R36 / R37). Until then use `DeployMocSwaps` / `DeployDexSwaps` plus the add-ons.
+
 Later ownership changes (new Safe, recovered wallet) are the same two steps: current owner `transferOwnership(new)`, incoming owner `acceptOwnership()`. `renounceOwnership` always reverts.
 
 ### Compilation profile for deployment

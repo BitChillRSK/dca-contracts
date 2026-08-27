@@ -17,7 +17,18 @@ import {ICoinPairPrice} from "../src/interfaces/ICoinPairPrice.sol";
 import {console} from "forge-std/Test.sol";
 import "./Constants.sol";
 
+/**
+ * @title DeployMocAndUniswap
+ * @notice Local/fork comparison harness: two independent stacks (MoC + Dex) for
+ *         `ComparePurchaseMethods`. Not a live deploy path.
+ * @dev Reverts when `REAL_DEPLOYMENT=true`. Do not add Safe handoff here — nested
+ *      `DeployMocSwaps` / `DeployDexSwaps` helper instances would split ownership.
+ *      A one-shot live script (idle, Sovryn DOC, LayerBank DOC, LayerBank USDRIF,
+ *      LayerBank USDT0 on one admin/manager) belongs after the production map is
+ *      final (R36 / R37), as an extension of `DeployMocSwaps` / `DeployDexSwaps`.
+ */
 contract DeployMocAndUniswap is DeployBase {
+    error DeployMocAndUniswap__NotALivePath();
     // Define a struct to hold all deployment results
     struct DeployedContracts {
         // MoC contracts
@@ -69,10 +80,11 @@ contract DeployMocAndUniswap is DeployBase {
         helpConfMoc = new MocHelperConfig();
         MocHelperConfig.NetworkConfig memory networkConfig = helpConfMoc.getActiveNetworkConfig();
         
-        _beginLiveAwareBroadcast(msg.sender);
-        adOpsMoc = new OperationsAdmin(deployOwner);
+        vm.startBroadcast();
+        address owner = adminAddresses[environment];
+        adOpsMoc = new OperationsAdmin(owner);
         dcaManMoc = new DcaManager(
-            address(adOpsMoc), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, deployOwner
+            address(adOpsMoc), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, owner
         );
         
         // Get fee collector address
@@ -129,10 +141,11 @@ contract DeployMocAndUniswap is DeployBase {
         helpConfUni = new DexHelperConfig();
         DexHelperConfig.NetworkConfig memory networkConfig = helpConfUni.getActiveNetworkConfig();
         
-        _beginLiveAwareBroadcast(msg.sender);
-        adOpsUni = new OperationsAdmin(deployOwner);
+        vm.startBroadcast();
+        address owner = adminAddresses[environment];
+        adOpsUni = new OperationsAdmin(owner);
         dcaManUni = new DcaManager(
-            address(adOpsUni), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, deployOwner
+            address(adOpsUni), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, owner
         );
         
         // Get fee collector address
@@ -201,6 +214,8 @@ contract DeployMocAndUniswap is DeployBase {
         external
         returns (DeployedContracts memory contracts)
     {
+        if (_isLiveEnvironment()) revert DeployMocAndUniswap__NotALivePath();
+
         console.log("Deploying both MoC and Uniswap handlers for comparison");
         console.log("Using stablecoin type:", stablecoinType);
         

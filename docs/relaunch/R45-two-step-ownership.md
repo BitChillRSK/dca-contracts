@@ -88,5 +88,5 @@ Live `registerRoute` / `assignTokenHandler` run as `onlyOwner` after constructio
 ## ABI / deploy / cutover impact
 
 - ABI: new `pendingOwner` / `acceptOwnership` surface and constructor `initialOwner` arguments; renounce reverts canonically.
-- Scripts: live Foundry broadcasts from an EOA; testnet that EOA is owner, mainnet proposes the Safe. Add-ons refuse a pending admin/manager owner.
+- Scripts: live Foundry broadcasts from an EOA; testnet that EOA is owner, mainnet proposes the Safe. Add-ons refuse a pending admin/manager owner. `DeployMocAndUniswap` reverts on live (comparison harness only). A one-shot live script covering idle / Sovryn DOC / LayerBank DOC / LayerBank USDRIF / LayerBank USDT0 is cutover work after R36 / R37, not this PR.
 - Cutover: ops must `acceptOwnership` from the Safe after a mainnet script, one call per contract. Later ownership changes use propose/accept. Frontend issue only if the app exposes owner transfer (not expected).

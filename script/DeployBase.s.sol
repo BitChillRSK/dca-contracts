@@ -115,6 +115,9 @@ contract DeployBase is Script {
     }
 
     /// @dev Call before `startBroadcast` so a wrong key cannot CREATE then revert on `registerRoute`.
+    ///      Testnet requires the exact `TESTNET_OWNER` EOA because that address *is* the owner.
+    ///      Mainnet only rejects the Safe: Foundry cannot sign as a Safe, and the deployer EOA is
+    ///      not pinned (keystore, Ledger, or a one-off key). Any other EOA becomes owner-until-accept.
     function _assertLiveBroadcastSender(address broadcaster) internal view {
         if (!_isLiveEnvironment()) return;
 
@@ -154,6 +157,7 @@ contract DeployBase is Script {
         address intendedOwner = adminAddresses[environment];
         Ownable2Step ownable = Ownable2Step(governed);
         if (ownable.owner() == intendedOwner) return;
+        if (ownable.pendingOwner() == intendedOwner) return;
         ownable.transferOwnership(intendedOwner);
         console.log("Proposed owner for", governed, "->", intendedOwner);
         console.log("Call acceptOwnership() from that address to complete the transfer");
