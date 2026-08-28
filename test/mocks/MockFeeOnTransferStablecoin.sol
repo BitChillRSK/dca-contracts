@@ -12,6 +12,8 @@ contract MockFeeOnTransferStablecoin is ERC20, ERC20Burnable, ERC20Permit {
 
     uint256 public feeBps;
     address public feeRecipient;
+    /// @notice Extra tokens minted to the recipient on each transfer, so hop-1 over-delivery can be tested.
+    uint256 public extraCredit;
 
     constructor() ERC20("FeeOnTransferStablecoin", "FOT") ERC20Permit("FeeOnTransferStablecoin") {}
 
@@ -26,6 +28,10 @@ contract MockFeeOnTransferStablecoin is ERC20, ERC20Burnable, ERC20Permit {
 
     function setFeeRecipient(address feeRecipient_) external {
         feeRecipient = feeRecipient_;
+    }
+
+    function setExtraCredit(uint256 extraCredit_) external {
+        extraCredit = extraCredit_;
     }
 
     function transfer(address to, uint256 amount) public override returns (bool) {
@@ -46,5 +52,6 @@ contract MockFeeOnTransferStablecoin is ERC20, ERC20Burnable, ERC20Permit {
             if (feeRecipient == address(0)) _burn(from, fee);
             else _transfer(from, feeRecipient, fee);
         }
+        if (extraCredit > 0) _mint(to, extraCredit);
     }
 }

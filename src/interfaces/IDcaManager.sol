@@ -78,7 +78,7 @@ interface IDcaManager {
      * @param token The token address of the stablecoin to deposit.
      * @param scheduleIndex The index of the DCA schedule
      * @param scheduleId The schedule id for validation
-     * @param depositAmount The amount of the stablecoin requested from the user. The schedule is credited with the amount the handler actually received.
+     * @param depositAmount The amount of the stablecoin requested from the user. The handler reverts unless it receives exactly this amount, so the schedule is credited with the full request.
      */
     function depositToken(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 depositAmount) external;
 
@@ -94,8 +94,8 @@ interface IDcaManager {
     /**
      * @notice Create a new DCA schedule depositing a specified amount of a stablecoin into the contract.
      * @param token The token address of the stablecoin to deposit.
-     * @param depositAmount The amount of the stablecoin requested from the user. The schedule is credited with the amount the handler actually received.
-     * @param purchaseAmount The amount of to spend periodically in buying rBTC. Validated against the credited token balance, not the requested deposit.
+     * @param depositAmount The amount of the stablecoin requested from the user. The handler reverts unless it receives exactly this amount, so the schedule is credited with the full request.
+     * @param purchaseAmount The amount to spend periodically in buying rBTC. Validated against the credited token balance, which equals the requested deposit once the handler returns.
      * @param purchasePeriod The period for recurrent purchases
      * @param routeIndex The OperationsAdmin route index for this schedule (idle or lending)
      */

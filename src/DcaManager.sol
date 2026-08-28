@@ -106,7 +106,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @param token the token address
      * @param scheduleIndex the schedule index
      * @param scheduleId the schedule id for validation
-     * @param depositAmount the amount of stablecoin requested from the user; the schedule is credited with what the handler received
+     * @param depositAmount the amount of stablecoin requested from the user; the handler reverts unless it receives exactly this, so the schedule is credited with the full request
      */
     function depositToken(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 depositAmount)
         external
@@ -166,8 +166,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     /**
      * @notice deposit the full stablecoin amount for DCA on the contract, set the period and the amount for purchases
      * @param token: the token address of stablecoin to deposit
-     * @param depositAmount: the amount of stablecoin requested from the user; the schedule is credited with what the handler received
-     * @param purchaseAmount: the amount of stablecoin to swap periodically for rBTC (validated against the credited balance)
+     * @param depositAmount: the amount of stablecoin requested from the user; the handler reverts unless it receives exactly this, so the schedule is credited with the full request
+     * @param purchaseAmount: the amount of stablecoin to swap periodically for rBTC (validated against the credited balance, which equals the requested deposit)
      * @param purchasePeriod: the time (in seconds) between rBTC purchases for each user
      * @param routeIndex: the OperationsAdmin route index for this schedule (idle or lending)
      */

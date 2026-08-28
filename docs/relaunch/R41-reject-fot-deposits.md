@@ -1,6 +1,6 @@
 # R41 — Reject fee-on-transfer deposits
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **done** · Assigned: yes (PR 36) · Optional/further-review: no
 
 PR 36 of the relaunch stack. Stack on R43 (PR 35); behavior builds on R21 (PR 13 / [#54](https://github.com/BitChillRSK/dca-contracts/pull/54)). **Must land before R36 and R9** because the new custom error is ABI and the new Dex stable deployments should inherit the settled fail-closed deposit policy.
 
@@ -28,13 +28,13 @@ Decided 2026-08-27: **revert on any hop-1 mismatch**.
 
 ## Scope
 
-- [ ] `TokenHandler.depositToken`: after measuring `depositedAmount`, revert
+- [x] `TokenHandler.depositToken`: after measuring `depositedAmount`, revert
       `TokenHandler__DepositAmountMismatch(uint256 requested, uint256 received)` if
       `depositedAmount != depositAmount`. Drop `TokenHandler__ZeroStablecoinReceived`.
-- [ ] Event still reports received, and only emits on success (so it always equals requested).
-- [ ] `DcaManager` create / extra-deposit still credit the handler return (now guaranteed equal to the request). Do not add a second check there.
-- [ ] Rewrite `FeeOnTransferDepositTest`: a FOT `transferFrom` on deposit/create **reverts** and leaves no schedule credit; the user’s wallet is unchanged (full rollback). Keep “another user’s funds untouched.”
-- [ ] Keep the named insufficient-balance guards on buy/withdraw (R21: they are not FOT defenses).
+- [x] Event still reports received, and only emits on success (so it always equals requested).
+- [x] `DcaManager` create / extra-deposit still credit the handler return (now guaranteed equal to the request). Do not add a second check there.
+- [x] Rewrite `FeeOnTransferDepositTest`: a FOT `transferFrom` on deposit/create **reverts** and leaves no schedule credit; the user’s wallet is unchanged (full rollback). Keep “another user’s funds untouched.”
+- [x] Keep the named insufficient-balance guards on buy/withdraw (R21: they are not FOT defenses).
 
 ## Out of scope
 
@@ -61,16 +61,49 @@ Then `make check`.
 - 1:1 deposit still credits the requested amount (existing lanes).
 - FOT `transferFrom` on `createDcaSchedule` and `depositToken` reverts `TokenHandler__DepositAmountMismatch`; no `TokenBalanceUpdated` / `TokenDeposited`; user balance restored.
 - Zero-received still reverts (same error, `received == 0`).
+- Over-delivery (`received > requested`) reverts the same error.
 - Withdraw of a 1:1 deposit is unchanged.
 
 Fork: no new assertions. Still run both fork lanes before push.
 
 ## Success criteria
 
-- [ ] Hop-1 `received != requested` reverts; 1:1 deposits unchanged.
-- [ ] `TokenHandler__ZeroStablecoinReceived` is gone.
-- [ ] FOT tests expect revert, not a short credit.
-- [ ] No open product decisions.
+- [x] Hop-1 `received != requested` reverts; 1:1 deposits unchanged.
+- [x] `TokenHandler__ZeroStablecoinReceived` is gone. `TokenLending__ZeroStablecoinReceived` is a different error on the redeem side and stays.
+- [x] FOT tests expect revert, not a short credit.
+- [x] No open product decisions.
+
+## Decisions taken while implementing
+
+**Hop-2 coverage kept, moved off the FOT stablecoin (2026-08-28).** The spec left this open ("if hop-2 coverage
+is still wanted"). It is: the four Tropykus cases assert that `DcaManager`'s book can sit ahead of the
+share-backed underlying, which is what R28's per-user share clamp and `TokenLending__InsufficientShares` exist
+for. They are now driven by a 1:1 stablecoin plus `MockKdocToken.setMintShortfallBps`, a market that keeps all
+the cash it pulled and mints shares for only part of it. Hop 1 stays fee-free there, so `TokenHandler` never
+sees a mismatch and the lag is purely hop 2. That is one knob on an existing mock rather than a new fee-taking
+lending mock.
+
+**One stablecoin mock, fee off by default.** `MockFeeOnTransferStablecoin` now starts at `feeBps == 0` — DOC,
+USDRIF, and USDT0 are 1:1 — and each test opts into the fee. Turning it on *before* a deposit is the new
+fail-closed case; turning it on *after* one landed models a listed token that starts charging, and keeps R21's
+"withdraw still works" and R20's "principal falls by the requested amount" coverage alive.
+
+**Three purchase-amount cases dropped.** `test_create_reverts_whenPurchaseAmountGreaterThanReceived`,
+`test_create_allowsPurchaseAmountEqualToReceived`, and `test_setPurchaseAmount_reverts_whenGreaterThanReceived`
+only existed to check `purchaseAmount` against a FOT-shortened credit. With no short credit they are generic
+balance checks already covered by `DcaConfigurationTest` and `DcaManagerEdgeCasesTest`.
+
+**No `vm.recordLogs` assertion for the "no event" bullet.** The deposit reverts, so the whole transaction rolls
+back and neither `TokenHandler__TokenDeposited` nor `DcaManager__TokenBalanceUpdated` can be observed. The tests
+assert the post-revert state instead: no schedule, no handler credit, no shares, unchanged wallet, and a zero
+balance at the token's fee recipient.
+
+**Over-delivery covered; a falling `balanceOf` is left as a panic (audit follow-up).** Over-delivery
+(`received > requested`) is the same `!=` predicate and now has a test via `MockFeeOnTransferStablecoin.setExtraCredit`.
+A deposit cannot be negative: if `balanceOf` falls during `transferFrom`, the subtraction panics. That is an
+invariant break (the token drained the handler), not a mismatch amount, so it is not folded into
+`TokenHandler__DepositAmountMismatch(requested, 0)`. `createDcaSchedule` natspec no longer says purchase amount is
+validated against a credited balance that can differ from the request.
 
 ## Reviewer checklist
 

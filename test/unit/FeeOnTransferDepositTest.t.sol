@@ -16,6 +16,14 @@ import {MockMocProxy} from "../mocks/MockMocProxy.sol";
 import "../../script/Constants.sol";
 import {batchBuyOne} from "../utils/BatchBuyOne.sol";
 
+/**
+ * @notice R41: hop 1 must deliver exactly what was requested or the whole deposit reverts.
+ * @dev The stablecoin mock starts 1:1 (`feeBps == 0`) because DOC, USDRIF, and USDT0 are 1:1. A test turns the
+ * transfer fee on to model a listed token that starts taking a cut, either before a deposit (which must now fail
+ * closed) or after one already landed (where R20 withdraw accounting is unchanged). Hop-2 lag — a 1:1 stablecoin
+ * that arrives in full and a lending market that mints shares worth less — is modelled on the kDOC mock instead,
+ * because it no longer reaches mint through a fee-on-transfer stablecoin.
+ */
 contract FeeOnTransferDepositTest is Test {
     address internal constant OWNER = address(0x1111);
     address internal constant ADMIN = address(0x2222);
@@ -28,7 +36,7 @@ contract FeeOnTransferDepositTest is Test {
     uint256 internal constant FEE_BPS = 100; // 1%
     uint256 internal constant BPS_DIVISOR = 10_000;
     uint256 internal constant REQUESTED = 100 ether;
-    uint256 internal constant RECEIVED = 99 ether; // hop 1: user → handler
+    uint256 internal constant RECEIVED = 99 ether; // what hop 1 would deliver under FEE_BPS
     uint256 internal constant LENDING_ROUNDING_SLACK = 100;
 
     DcaManager internal dcaManager;
@@ -49,8 +57,8 @@ contract FeeOnTransferDepositTest is Test {
             address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, OWNER
         );
 
+        // Starts 1:1; each test opts into the transfer fee where it wants one.
         token = new MockFeeOnTransferStablecoin();
-        token.setFeeBps(FEE_BPS);
         token.setFeeRecipient(FOT_FEE_RECIPIENT);
 
         mocProxy = new MockMocProxy(address(token));
@@ -101,78 +109,148 @@ contract FeeOnTransferDepositTest is Test {
         token.approve(address(tropykusHandler), type(uint256).max);
     }
 
-    function test_create_creditsReceived_idleBooksMatch() public {
+    /*//////////////////////////////////////////////////////////////
+                   HOP 1 MISMATCH REVERTS THE DEPOSIT
+    //////////////////////////////////////////////////////////////*/
+
+    function test_create_revertsWhenTransferFeeTakesACut() public {
         uint256 otherIdleBefore = _createIdle(OTHER, MIN_PURCHASE_AMOUNT);
-        uint256 userSpentBefore = token.balanceOf(USER);
+        token.setFeeBps(FEE_BPS);
+        uint256 userBefore = token.balanceOf(USER);
 
         vm.prank(USER);
+        vm.expectRevert(
+            abi.encodeWithSelector(ITokenHandler.TokenHandler__DepositAmountMismatch.selector, REQUESTED, RECEIVED)
+        );
         dcaManager.createDcaSchedule(address(token), REQUESTED, RECEIVED, MIN_PURCHASE_PERIOD, IDLE_INDEX);
 
-        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(token))[0];
-        assertEq(schedule.tokenBalance, RECEIVED);
-        assertEq(idleHandler.getUsersIdleTokenBalance(USER), RECEIVED);
-        assertEq(token.balanceOf(USER), userSpentBefore - REQUESTED);
+        // Full rollback: no schedule, no idle credit, no cash moved, no transfer fee paid.
+        assertEq(dcaManager.getDcaSchedules(USER, address(token)).length, 0);
+        assertEq(idleHandler.getUsersIdleTokenBalance(USER), 0);
+        assertEq(token.balanceOf(USER), userBefore);
+        assertEq(token.balanceOf(FOT_FEE_RECIPIENT), 0);
+
+        // Another user's funds are untouched.
         assertEq(idleHandler.getUsersIdleTokenBalance(OTHER), otherIdleBefore);
         assertEq(dcaManager.getDcaSchedules(OTHER, address(token))[0].tokenBalance, otherIdleBefore);
     }
 
-    function test_depositToken_creditsReceived_notRequested() public {
+    function test_depositToken_revertsWhenTransferFeeTakesACut() public {
+        uint256 otherIdleBefore = _createIdle(OTHER, MIN_PURCHASE_AMOUNT);
+        bytes32 scheduleId = _createIdleSchedule(USER, MIN_PURCHASE_AMOUNT, IDLE_INDEX);
+
+        token.setFeeBps(FEE_BPS);
+        uint256 userBefore = token.balanceOf(USER);
+
         vm.prank(USER);
+        vm.expectRevert(
+            abi.encodeWithSelector(ITokenHandler.TokenHandler__DepositAmountMismatch.selector, REQUESTED, RECEIVED)
+        );
+        dcaManager.depositToken(address(token), 0, scheduleId, REQUESTED);
+
+        // The first, fee-free deposit survives; the second one credits nothing at all.
+        assertEq(dcaManager.getDcaSchedules(USER, address(token))[0].tokenBalance, REQUESTED);
+        assertEq(idleHandler.getUsersIdleTokenBalance(USER), REQUESTED);
+        assertEq(token.balanceOf(USER), userBefore);
+        assertEq(token.balanceOf(FOT_FEE_RECIPIENT), 0);
+        assertEq(idleHandler.getUsersIdleTokenBalance(OTHER), otherIdleBefore);
+    }
+
+    function test_zeroReceivedDeposit_revertsWithTheSameError() public {
+        token.setFeeBps(BPS_DIVISOR);
+        uint256 userBefore = token.balanceOf(USER);
+
+        vm.prank(USER);
+        vm.expectRevert(
+            abi.encodeWithSelector(ITokenHandler.TokenHandler__DepositAmountMismatch.selector, REQUESTED, 0)
+        );
         dcaManager.createDcaSchedule(address(token), REQUESTED, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, IDLE_INDEX);
-        bytes32 scheduleId = dcaManager.getDcaSchedules(USER, address(token))[0].scheduleId;
+
+        assertEq(dcaManager.getDcaSchedules(USER, address(token)).length, 0);
+        assertEq(token.balanceOf(USER), userBefore);
+    }
+
+    function test_create_revertsWhenTransferCreditsMoreThanRequested() public {
+        uint256 extra = 1 ether;
+        token.setExtraCredit(extra);
+        uint256 userBefore = token.balanceOf(USER);
+
+        vm.prank(USER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ITokenHandler.TokenHandler__DepositAmountMismatch.selector, REQUESTED, REQUESTED + extra
+            )
+        );
+        dcaManager.createDcaSchedule(address(token), REQUESTED, REQUESTED, MIN_PURCHASE_PERIOD, IDLE_INDEX);
+
+        assertEq(dcaManager.getDcaSchedules(USER, address(token)).length, 0);
+        assertEq(idleHandler.getUsersIdleTokenBalance(USER), 0);
+        assertEq(token.balanceOf(USER), userBefore);
+    }
+
+    function test_create_lending_revertsBeforeMintingAnyShares() public {
+        token.setFeeBps(FEE_BPS);
+        uint256 userBefore = token.balanceOf(USER);
+
+        vm.prank(USER);
+        vm.expectRevert(
+            abi.encodeWithSelector(ITokenHandler.TokenHandler__DepositAmountMismatch.selector, REQUESTED, RECEIVED)
+        );
+        dcaManager.createDcaSchedule(address(token), REQUESTED, RECEIVED, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
+
+        // Hop 2 never runs, so the lending market sees neither cash nor a share mint.
+        assertEq(dcaManager.getDcaSchedules(USER, address(token)).length, 0);
+        assertEq(tropykusHandler.getUserShares(USER), 0);
+        assertEq(token.balanceOf(address(kToken)), 0);
+        assertEq(token.balanceOf(USER), userBefore);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        1:1 DEPOSITS ARE UNCHANGED
+    //////////////////////////////////////////////////////////////*/
+
+    function test_create_creditsRequested_whenTokenIsOneToOne() public {
+        uint256 otherIdleBefore = _createIdle(OTHER, MIN_PURCHASE_AMOUNT);
+        uint256 userBefore = token.balanceOf(USER);
+
+        vm.prank(USER);
+        dcaManager.createDcaSchedule(address(token), REQUESTED, REQUESTED, MIN_PURCHASE_PERIOD, IDLE_INDEX);
+
+        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(token))[0];
+        assertEq(schedule.tokenBalance, REQUESTED);
+        assertEq(schedule.purchaseAmount, REQUESTED);
+        assertEq(idleHandler.getUsersIdleTokenBalance(USER), REQUESTED);
+        assertEq(token.balanceOf(USER), userBefore - REQUESTED);
+        assertEq(idleHandler.getUsersIdleTokenBalance(OTHER), otherIdleBefore);
+    }
+
+    function test_depositToken_creditsRequested_whenTokenIsOneToOne() public {
+        bytes32 scheduleId = _createIdleSchedule(USER, MIN_PURCHASE_AMOUNT, IDLE_INDEX);
+        uint256 userBefore = token.balanceOf(USER);
 
         vm.prank(USER);
         dcaManager.depositToken(address(token), 0, scheduleId, REQUESTED);
 
-        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(token))[0];
-        assertEq(schedule.tokenBalance, RECEIVED * 2);
-        assertEq(idleHandler.getUsersIdleTokenBalance(USER), RECEIVED * 2);
+        assertEq(dcaManager.getDcaSchedules(USER, address(token))[0].tokenBalance, REQUESTED * 2);
+        assertEq(idleHandler.getUsersIdleTokenBalance(USER), REQUESTED * 2);
+        assertEq(token.balanceOf(USER), userBefore - REQUESTED);
     }
 
-    function test_create_reverts_whenPurchaseAmountGreaterThanReceived() public {
-        vm.prank(USER);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IDcaManager.DcaManager__PurchaseAmountExceedsBalance.selector, address(token), REQUESTED, RECEIVED
-            )
-        );
-        dcaManager.createDcaSchedule(address(token), REQUESTED, REQUESTED, MIN_PURCHASE_PERIOD, IDLE_INDEX);
-    }
-
-    function test_create_allowsPurchaseAmountEqualToReceived() public {
-        vm.prank(USER);
-        dcaManager.createDcaSchedule(address(token), REQUESTED, RECEIVED, MIN_PURCHASE_PERIOD, IDLE_INDEX);
-
-        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(token))[0];
-        assertEq(schedule.tokenBalance, RECEIVED);
-        assertEq(schedule.purchaseAmount, RECEIVED);
-    }
-
-    function test_setPurchaseAmount_reverts_whenGreaterThanReceived() public {
-        vm.prank(USER);
-        dcaManager.createDcaSchedule(address(token), REQUESTED, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, IDLE_INDEX);
-        bytes32 scheduleId = dcaManager.getDcaSchedules(USER, address(token))[0].scheduleId;
-
-        vm.prank(USER);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IDcaManager.DcaManager__PurchaseAmountExceedsBalance.selector, address(token), REQUESTED, RECEIVED
-            )
-        );
-        dcaManager.setPurchaseAmount(address(token), 0, scheduleId, REQUESTED);
-    }
+    /*//////////////////////////////////////////////////////////////
+              A LISTED TOKEN THAT TURNS ITS FEE ON LATER
+    //////////////////////////////////////////////////////////////*/
 
     function test_buyAndWithdraw_keepIdleBooksInLockstep() public {
         uint256 otherIdleBefore = _createIdle(OTHER, MIN_PURCHASE_AMOUNT);
+        bytes32 scheduleId = _createIdleSchedule(USER, MIN_PURCHASE_AMOUNT, IDLE_INDEX);
 
-        vm.prank(USER);
-        dcaManager.createDcaSchedule(address(token), REQUESTED, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, IDLE_INDEX);
-        bytes32 scheduleId = dcaManager.getDcaSchedules(USER, address(token))[0].scheduleId;
+        // The deposit already landed 1:1; the token only starts charging afterwards.
+        token.setFeeBps(FEE_BPS);
 
         vm.prank(SWAPPER);
         batchBuyOne(dcaManager, USER, address(token), 0, scheduleId, MIN_PURCHASE_AMOUNT, IDLE_INDEX);
 
-        uint256 afterBuy = RECEIVED - MIN_PURCHASE_AMOUNT;
+        uint256 afterBuy = REQUESTED - MIN_PURCHASE_AMOUNT;
         assertEq(dcaManager.getDcaSchedules(USER, address(token))[0].tokenBalance, afterBuy);
         assertEq(idleHandler.getUsersIdleTokenBalance(USER), afterBuy);
         assertGt(dcaManager.getAccumulatedRbtcBalance(USER, address(token), IDLE_INDEX), 0);
@@ -189,66 +267,79 @@ contract FeeOnTransferDepositTest is Test {
         assertEq(idleHandler.getUsersIdleTokenBalance(OTHER), otherIdleBefore);
     }
 
-    function test_zeroReceivedDeposit_reverts() public {
-        token.setFeeBps(10_000);
+    function test_deleteDcaSchedule_reportsHandlerSpent_notUserReceived() public {
+        bytes32 scheduleId = _createIdleSchedule(USER, MIN_PURCHASE_AMOUNT, IDLE_INDEX);
+        token.setFeeBps(FEE_BPS);
 
+        uint256 userBefore = token.balanceOf(USER);
+        vm.expectEmit(true, true, true, true, address(idleHandler));
+        emit ITokenHandler.TokenHandler__TokenWithdrawn(address(token), USER, REQUESTED);
+        vm.expectEmit(false, false, false, true, address(dcaManager));
+        emit IDcaManager.DcaManager__DcaScheduleDeleted(USER, address(token), scheduleId, REQUESTED);
         vm.prank(USER);
-        vm.expectRevert(ITokenHandler.TokenHandler__ZeroStablecoinReceived.selector);
-        dcaManager.createDcaSchedule(address(token), REQUESTED, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, IDLE_INDEX);
+        dcaManager.deleteDcaSchedule(address(token), 0, scheduleId);
+
+        assertEq(idleHandler.getUsersIdleTokenBalance(USER), 0);
+        uint256 userGained = token.balanceOf(USER) - userBefore;
+        assertLt(userGained, REQUESTED);
+        assertGt(userGained, 0);
     }
 
+    /*//////////////////////////////////////////////////////////////
+             HOP 2: A LENDING MARKET THAT CREDITS LESS CASH
+    //////////////////////////////////////////////////////////////*/
+
     function test_create_tropykus_creditsHop1_shareBookIsSecondHop() public {
+        kToken.setMintShortfallBps(FEE_BPS);
         uint256 otherUnderlyingBefore = _createTropykus(OTHER, MIN_PURCHASE_AMOUNT);
-        uint256 userSpentBefore = token.balanceOf(USER);
+        uint256 userBefore = token.balanceOf(USER);
 
         vm.prank(USER);
-        dcaManager.createDcaSchedule(address(token), REQUESTED, RECEIVED, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
+        dcaManager.createDcaSchedule(address(token), REQUESTED, REQUESTED, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
 
         IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(token))[0];
-        assertEq(schedule.tokenBalance, RECEIVED);
+        assertEq(schedule.tokenBalance, REQUESTED);
         uint256 userUnderlying = _tropykusUnderlying(USER);
-        assertApproxEqAbs(userUnderlying, _afterFee(RECEIVED), LENDING_ROUNDING_SLACK);
-        assertLt(userUnderlying, RECEIVED);
-        assertEq(token.balanceOf(USER), userSpentBefore - REQUESTED);
+        assertApproxEqAbs(userUnderlying, _afterShortfall(REQUESTED), LENDING_ROUNDING_SLACK);
+        assertLt(userUnderlying, REQUESTED);
+        assertEq(token.balanceOf(USER), userBefore - REQUESTED);
         assertApproxEqAbs(_tropykusUnderlying(OTHER), otherUnderlyingBefore, LENDING_ROUNDING_SLACK);
-        assertEq(dcaManager.getDcaSchedules(OTHER, address(token))[0].tokenBalance, RECEIVED);
+        assertEq(dcaManager.getDcaSchedules(OTHER, address(token))[0].tokenBalance, REQUESTED);
     }
 
     function test_depositTwice_tropykus_hop1Sums_underlyingLags() public {
-        vm.prank(USER);
-        dcaManager.createDcaSchedule(address(token), REQUESTED, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
-        bytes32 scheduleId = dcaManager.getDcaSchedules(USER, address(token))[0].scheduleId;
+        kToken.setMintShortfallBps(FEE_BPS);
+        bytes32 scheduleId = _createTropykusSchedule(USER, MIN_PURCHASE_AMOUNT);
 
         vm.prank(USER);
         dcaManager.depositToken(address(token), 0, scheduleId, REQUESTED);
         vm.prank(USER);
         dcaManager.depositToken(address(token), 0, scheduleId, REQUESTED);
 
-        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(token))[0];
-        assertEq(schedule.tokenBalance, RECEIVED * 3);
+        assertEq(dcaManager.getDcaSchedules(USER, address(token))[0].tokenBalance, REQUESTED * 3);
         uint256 userUnderlying = _tropykusUnderlying(USER);
-        assertApproxEqAbs(userUnderlying, _afterFee(RECEIVED) * 3, LENDING_ROUNDING_SLACK);
-        assertLt(userUnderlying, RECEIVED * 3);
+        assertApproxEqAbs(userUnderlying, _afterShortfall(REQUESTED) * 3, LENDING_ROUNDING_SLACK);
+        assertLt(userUnderlying, REQUESTED * 3);
     }
 
     function test_tropykus_withdraw_stillWorksWhenShareBookLags() public {
-        vm.prank(USER);
-        dcaManager.createDcaSchedule(address(token), REQUESTED, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
-        bytes32 scheduleId = dcaManager.getDcaSchedules(USER, address(token))[0].scheduleId;
+        kToken.setMintShortfallBps(FEE_BPS);
+        bytes32 scheduleId = _createTropykusSchedule(USER, MIN_PURCHASE_AMOUNT);
 
         uint256 userBefore = token.balanceOf(USER);
         vm.prank(USER);
-        dcaManager.withdrawToken(address(token), 0, scheduleId, RECEIVED);
+        dcaManager.withdrawToken(address(token), 0, scheduleId, REQUESTED);
 
         assertEq(dcaManager.getDcaSchedules(USER, address(token))[0].tokenBalance, 0);
         assertApproxEqAbs(_tropykusUnderlying(USER), 0, LENDING_ROUNDING_SLACK);
-        assertGt(token.balanceOf(USER), userBefore);
+        uint256 userGained = token.balanceOf(USER) - userBefore;
+        assertApproxEqAbs(userGained, _afterShortfall(REQUESTED), LENDING_ROUNDING_SLACK);
+        assertLt(userGained, REQUESTED);
     }
 
     function test_tropykus_batchBuy_ofOverstatedBalance_reverts() public {
-        vm.prank(USER);
-        dcaManager.createDcaSchedule(address(token), REQUESTED, RECEIVED, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
-        bytes32 scheduleId = dcaManager.getDcaSchedules(USER, address(token))[0].scheduleId;
+        kToken.setMintShortfallBps(FEE_BPS);
+        bytes32 scheduleId = _createTropykusSchedule(USER, REQUESTED);
 
         address[] memory buyers = new address[](1);
         buyers[0] = USER;
@@ -257,68 +348,63 @@ contract FeeOnTransferDepositTest is Test {
         bytes32[] memory ids = new bytes32[](1);
         ids[0] = scheduleId;
         uint256[] memory amounts = new uint256[](1);
-        amounts[0] = RECEIVED;
+        amounts[0] = REQUESTED;
 
         uint256 availableShares = tropykusHandler.getUserShares(USER);
         uint256 rate = kToken.exchangeRateStored();
-        uint256 requestedShares = (RECEIVED * EXCHANGE_RATE_DECIMALS + rate - 1) / rate;
+        uint256 requestedShares = (REQUESTED * EXCHANGE_RATE_DECIMALS + rate - 1) / rate;
         vm.prank(SWAPPER);
         vm.expectRevert(
             abi.encodeWithSelector(
-                ITokenLending.TokenLending__InsufficientShares.selector,
-                USER,
-                requestedShares,
-                availableShares
+                ITokenLending.TokenLending__InsufficientShares.selector, USER, requestedShares, availableShares
             )
         );
         dcaManager.batchBuyRbtc(buyers, address(token), indexes, ids, amounts, TROPYKUS_INDEX);
 
         // Revert leaves the schedule intact; the lending clamp still lets the user withdraw.
-        assertEq(dcaManager.getDcaSchedules(USER, address(token))[0].tokenBalance, RECEIVED);
+        assertEq(dcaManager.getDcaSchedules(USER, address(token))[0].tokenBalance, REQUESTED);
         uint256 userBefore = token.balanceOf(USER);
         vm.prank(USER);
-        dcaManager.withdrawToken(address(token), 0, scheduleId, RECEIVED);
+        dcaManager.withdrawToken(address(token), 0, scheduleId, REQUESTED);
         assertEq(dcaManager.getDcaSchedules(USER, address(token))[0].tokenBalance, 0);
         assertGt(token.balanceOf(USER), userBefore);
     }
 
-    function test_deleteDcaSchedule_reportsHandlerSpent_notUserReceived() public {
-        vm.prank(USER);
-        dcaManager.createDcaSchedule(address(token), REQUESTED, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, IDLE_INDEX);
-        bytes32 scheduleId = dcaManager.getDcaSchedules(USER, address(token))[0].scheduleId;
+    /*//////////////////////////////////////////////////////////////
+                                HELPERS
+    //////////////////////////////////////////////////////////////*/
 
-        uint256 userBefore = token.balanceOf(USER);
-        vm.expectEmit(true, true, true, true, address(idleHandler));
-        emit ITokenHandler.TokenHandler__TokenWithdrawn(address(token), USER, RECEIVED);
-        vm.expectEmit(false, false, false, true, address(dcaManager));
-        emit IDcaManager.DcaManager__DcaScheduleDeleted(USER, address(token), scheduleId, RECEIVED);
-        vm.prank(USER);
-        dcaManager.deleteDcaSchedule(address(token), 0, scheduleId);
-
-        assertEq(idleHandler.getUsersIdleTokenBalance(USER), 0);
-        uint256 userGained = token.balanceOf(USER) - userBefore;
-        assertLt(userGained, RECEIVED);
-        assertGt(userGained, 0);
+    function _createIdleSchedule(address who, uint256 purchaseAmount, uint256 routeIndex)
+        private
+        returns (bytes32 scheduleId)
+    {
+        vm.prank(who);
+        dcaManager.createDcaSchedule(address(token), REQUESTED, purchaseAmount, MIN_PURCHASE_PERIOD, routeIndex);
+        scheduleId = dcaManager.getDcaSchedules(who, address(token))[0].scheduleId;
     }
 
-    function _createIdle(address who, uint256 purchaseAmount) private returns (uint256 received) {
+    function _createTropykusSchedule(address who, uint256 purchaseAmount) private returns (bytes32 scheduleId) {
         vm.prank(who);
-        dcaManager.createDcaSchedule(address(token), REQUESTED, purchaseAmount, MIN_PURCHASE_PERIOD, IDLE_INDEX);
-        received = dcaManager.getDcaSchedules(who, address(token))[0].tokenBalance;
-        assertEq(received, RECEIVED);
-        assertEq(idleHandler.getUsersIdleTokenBalance(who), RECEIVED);
+        dcaManager.createDcaSchedule(address(token), REQUESTED, purchaseAmount, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
+        scheduleId = dcaManager.getDcaSchedules(who, address(token))[0].scheduleId;
+    }
+
+    function _createIdle(address who, uint256 purchaseAmount) private returns (uint256 credited) {
+        _createIdleSchedule(who, purchaseAmount, IDLE_INDEX);
+        credited = dcaManager.getDcaSchedules(who, address(token))[0].tokenBalance;
+        assertEq(credited, REQUESTED);
+        assertEq(idleHandler.getUsersIdleTokenBalance(who), REQUESTED);
     }
 
     function _createTropykus(address who, uint256 purchaseAmount) private returns (uint256 underlying) {
-        vm.prank(who);
-        dcaManager.createDcaSchedule(address(token), REQUESTED, purchaseAmount, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
-        assertEq(dcaManager.getDcaSchedules(who, address(token))[0].tokenBalance, RECEIVED);
+        _createTropykusSchedule(who, purchaseAmount);
+        assertEq(dcaManager.getDcaSchedules(who, address(token))[0].tokenBalance, REQUESTED);
         underlying = _tropykusUnderlying(who);
-        assertApproxEqAbs(underlying, _afterFee(RECEIVED), LENDING_ROUNDING_SLACK);
-        assertLt(underlying, RECEIVED);
+        assertApproxEqAbs(underlying, _afterShortfall(REQUESTED), LENDING_ROUNDING_SLACK);
+        assertLt(underlying, REQUESTED);
     }
 
-    function _afterFee(uint256 amount) private pure returns (uint256) {
+    function _afterShortfall(uint256 amount) private pure returns (uint256) {
         return amount * (BPS_DIVISOR - FEE_BPS) / BPS_DIVISOR;
     }
 

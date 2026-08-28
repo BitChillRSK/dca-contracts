@@ -45,7 +45,8 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
      * @notice deposit the full token amount for DCA on the contract
      * @param user: the address of the user making the deposit
      * @param depositAmount: the amount requested from the user
-     * @return depositedAmount the stablecoin amount actually received before minting shares
+     * @return depositedAmount the stablecoin amount actually received before minting shares; TokenHandler reverts
+     * unless it equals depositAmount, so the mint always uses the full request
      */
     function depositToken(address user, uint256 depositAmount)
         public
