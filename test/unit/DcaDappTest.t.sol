@@ -514,7 +514,9 @@ contract DcaDappTest is Test {
         uint256 netPurchaseAmount = AMOUNT_TO_SPEND - fee;
 
         vm.expectEmit(true, true, true, true);
-        uint256 lastPurchaseTimestamp = dcaDetails[SCHEDULE_INDEX].lastPurchaseTimestamp == 0 ? block.timestamp : dcaDetails[SCHEDULE_INDEX].lastPurchaseTimestamp + dcaDetails[SCHEDULE_INDEX].purchasePeriod;
+        uint256 lastTs = dcaDetails[SCHEDULE_INDEX].lastPurchaseTimestamp;
+        uint256 period = dcaDetails[SCHEDULE_INDEX].purchasePeriod;
+        uint256 lastPurchaseTimestamp = lastTs == 0 ? block.timestamp : lastTs + period;
         emit DcaManager__LastPurchaseTimestampUpdated(address(stablecoin), dcaDetails[SCHEDULE_INDEX].scheduleId, lastPurchaseTimestamp);
         if (isLendingLane) {
             vm.expectEmit(true, false, false, false);

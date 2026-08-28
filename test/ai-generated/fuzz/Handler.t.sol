@@ -426,15 +426,16 @@ contract Handler is Test {
         IDcaManager.DcaSchedule memory schedule = schedules[scheduleIndex];
         vm.assume(schedule.tokenBalance >= schedule.purchaseAmount);
         
-        // Advance time if needed to make purchase possible
-        uint256 nextValidTime = schedule.lastPurchaseTimestamp + schedule.purchasePeriod;
+        // Advance time if needed to make purchase possible. Widen first: the packed
+        // uint48 timestamp + uint32 period would overflow the packed type, not uint256.
+        uint256 nextValidTime = uint256(schedule.lastPurchaseTimestamp) + uint256(schedule.purchasePeriod);
         if (block.timestamp < nextValidTime) {
             vm.warp(nextValidTime);
         }
         
         // Calculate rBTC needed and ensure handler has enough (just-in-time provisioning)
         // Mock conversion rate: 1 stablecoin = 0.00003 rBTC (from wrapper implementation)
-        uint256 rbtcNeeded = (schedule.purchaseAmount * 3e16) / 1e18; // 0.03 rBTC per token
+        uint256 rbtcNeeded = (uint256(schedule.purchaseAmount) * 3e16) / 1e18; // 0.03 rBTC per token
         uint256 currentHandlerBalance = address(handler).balance;
         if (currentHandlerBalance < rbtcNeeded) {
             vm.deal(address(handler), currentHandlerBalance + rbtcNeeded);
@@ -498,11 +499,11 @@ contract Handler is Test {
             purchaseAmounts[i] = schedule.purchaseAmount;
             
             // Calculate rBTC needed for this purchase
-            uint256 rbtcForThisPurchase = (schedule.purchaseAmount * 3e16) / 1e18;
+            uint256 rbtcForThisPurchase = (uint256(schedule.purchaseAmount) * 3e16) / 1e18;
             totalRbtcNeeded += rbtcForThisPurchase;
             
             // Advance time if needed
-            uint256 nextValidTime = schedule.lastPurchaseTimestamp + schedule.purchasePeriod;
+            uint256 nextValidTime = uint256(schedule.lastPurchaseTimestamp) + uint256(schedule.purchasePeriod);
             if (block.timestamp < nextValidTime) {
                 vm.warp(nextValidTime);
             }

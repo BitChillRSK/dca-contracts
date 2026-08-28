@@ -6,6 +6,7 @@ import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
 import {ITokenLending} from "./interfaces/ITokenLending.sol";
 import {IERC165} from "lib/forge-std/src/interfaces/IERC165.sol";
 import {BitChillOwnable} from "./BitChillOwnable.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 /**
  * @title OperationsAdmin
@@ -20,6 +21,8 @@ import {BitChillOwnable} from "./BitChillOwnable.sol";
  *      breaker that blocks new inflows without touching purchases or any exit path.
  */
 contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
+    using SafeCast for uint256;
+
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
@@ -50,11 +53,12 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
      * @dev Recovery from a mistaken class is a new index, not a mutation of this one.
      */
     function registerRoute(uint256 index, bool lends) external onlyOwner {
-        if (s_routeClass[index] != RouteClass.Unregistered) {
+        uint32 routeIndex = index.toUint32();
+        if (s_routeClass[routeIndex] != RouteClass.Unregistered) {
             revert OperationsAdmin__RouteAlreadyRegistered(index);
         }
-        s_routeClass[index] = lends ? RouteClass.Lending : RouteClass.Idle;
-        emit OperationsAdmin__RouteRegistered(index, lends);
+        s_routeClass[routeIndex] = lends ? RouteClass.Lending : RouteClass.Idle;
+        emit OperationsAdmin__RouteRegistered(routeIndex, lends);
     }
 
     /**
@@ -69,11 +73,12 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
      *      assignment reverted stays available.
      */
     function assignTokenHandler(address token, uint256 routeIndex, address handler) external onlyOwner {
+        uint32 route = routeIndex.toUint32();
         if (handler.code.length == 0) revert OperationsAdmin__EoaCannotBeHandler(handler);
-        if (s_routeClass[routeIndex] == RouteClass.Unregistered) {
+        if (s_routeClass[route] == RouteClass.Unregistered) {
             revert OperationsAdmin__RouteNotRegistered(routeIndex);
         }
-        if (s_tokenHandler[token][routeIndex] != address(0)) {
+        if (s_tokenHandler[token][route] != address(0)) {
             revert OperationsAdmin__HandlerAlreadyAssigned(token, routeIndex);
         }
         if (s_handlerAssigned[handler]) revert OperationsAdmin__HandlerAddressAlreadyInUse(handler);
@@ -83,7 +88,7 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
             revert OperationsAdmin__ContractIsNotTokenHandler(handler);
         }
 
-        bool isLending = s_routeClass[routeIndex] == RouteClass.Lending;
+        bool isLending = s_routeClass[route] == RouteClass.Lending;
         bool supportsLending = tokenHandler.supportsInterface(type(ITokenLending).interfaceId);
         if (isLending) {
             if (!supportsLending) revert OperationsAdmin__ContractIsNotTokenLending(handler);
@@ -91,9 +96,9 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
             revert OperationsAdmin__LendingHandlerOnIdleRoute(handler);
         }
 
-        s_tokenHandler[token][routeIndex] = handler;
+        s_tokenHandler[token][route] = handler;
         s_handlerAssigned[handler] = true;
-        emit OperationsAdmin__TokenHandlerAssigned(token, routeIndex, handler);
+        emit OperationsAdmin__TokenHandlerAssigned(token, route, handler);
     }
 
     /**
