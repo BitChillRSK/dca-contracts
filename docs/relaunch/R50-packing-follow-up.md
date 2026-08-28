@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: no · Optional/further-review: no
 
-PR 43 of the relaunch stack. Stack on R36 (PR 42, GitHub [#92](https://github.com/BitChillRSK/dca-contracts/pull/92)). Land immediately after R36, before R37 and well before R9.
+PR 43 of the relaunch stack. Spec assigned in GitHub [#93](https://github.com/BitChillRSK/dca-contracts/pull/93). Implement stacked on that planning PR (which sits on R36, PR 42, [#92](https://github.com/BitChillRSK/dca-contracts/pull/92)). Land immediately after R36, before R37 and well before R9.
 
 ## Objective
 
