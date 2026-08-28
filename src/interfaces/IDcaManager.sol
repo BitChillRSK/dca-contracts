@@ -10,7 +10,7 @@ interface IDcaManager {
     ////////////////////////
     // Type declarations ///
     ////////////////////////
-    struct DcaDetails {
+    struct DcaSchedule {
         uint256 tokenBalance; // Stablecoin amount deposited by the user
         uint256 purchaseAmount; // Stablecoin amount to spend periodically on rBTC
         uint256 purchasePeriod; // Time between purchases in seconds
@@ -241,7 +241,7 @@ interface IDcaManager {
      * @param scheduleIndex the index of the schedule
      * @return the DCA schedule
      */
-    function getDcaSchedule(address user, address token, uint256 scheduleIndex) external view returns (DcaDetails memory);
+    function getDcaSchedule(address user, address token, uint256 scheduleIndex) external view returns (DcaSchedule memory);
 
     /**
      * @notice get the DCA schedules for a specific user and token
@@ -249,7 +249,7 @@ interface IDcaManager {
      * @param token the token address
      * @return the DCA schedules for the user and the token
      */
-    function getDcaSchedules(address user, address token) external view returns (DcaDetails[] memory);
+    function getDcaSchedules(address user, address token) external view returns (DcaSchedule[] memory);
 
     /**
      * @notice get the OperationsAdmin this manager is permanently pinned to

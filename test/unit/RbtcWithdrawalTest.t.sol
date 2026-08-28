@@ -23,7 +23,7 @@ contract RbtcWithdrawalTest is DcaDappTest {
         uint256 netPurchaseAmount = AMOUNT_TO_SPEND - fee;
 
         vm.prank(USER);
-        IDcaManager.DcaDetails[] memory dcaDetails = dcaManager.getDcaSchedules(USER, address(stablecoin));
+        IDcaManager.DcaSchedule[] memory dcaDetails = dcaManager.getDcaSchedules(USER, address(stablecoin));
 
         buyRbtcOne(USER, SCHEDULE_INDEX, dcaDetails[SCHEDULE_INDEX].scheduleId, AMOUNT_TO_SPEND);
 

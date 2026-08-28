@@ -172,7 +172,7 @@ contract Handler is Test {
         vm.startPrank(user);
         
         // Fetch schedules – must exist so we assume
-        IDcaManager.DcaDetails[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
+        IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
         vm.assume(schedules.length > 0);
 
         scheduleIndex = bound(scheduleIndex, 0, schedules.length - 1);
@@ -209,7 +209,7 @@ contract Handler is Test {
         
         vm.startPrank(user);
         
-        IDcaManager.DcaDetails[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
+        IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
         vm.assume(schedules.length > 0);
 
         scheduleIndex = bound(scheduleIndex, 0, schedules.length - 1);
@@ -245,8 +245,8 @@ contract Handler is Test {
         
         vm.startPrank(user);
         
-        IDcaManager.DcaDetails[] memory schedules;
-        try dcaManager.getDcaSchedules(user, address(stablecoin)) returns (IDcaManager.DcaDetails[] memory _schedules) {
+        IDcaManager.DcaSchedule[] memory schedules;
+        try dcaManager.getDcaSchedules(user, address(stablecoin)) returns (IDcaManager.DcaSchedule[] memory _schedules) {
             schedules = _schedules;
         } catch {
             vm.stopPrank();
@@ -346,7 +346,7 @@ contract Handler is Test {
             // type(uint256).max, and `userSeed + k` on one of those panics with an overflow.
             address user = s_users[(userSeed % numOfUsers + k) % numOfUsers];
 
-            IDcaManager.DcaDetails[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
+            IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
             if (schedules.length == 0) continue;
 
             uint256 index = bound(scheduleIndex, 0, schedules.length - 1);
@@ -392,7 +392,7 @@ contract Handler is Test {
         
         vm.startPrank(user);
         
-        IDcaManager.DcaDetails[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
+        IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
         vm.assume(schedules.length > 0);
 
         scheduleIndex = bound(scheduleIndex, 0, schedules.length - 1);
@@ -418,12 +418,12 @@ contract Handler is Test {
         
         address user = s_users[userSeed % s_users.length];
         
-        IDcaManager.DcaDetails[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
+        IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
         vm.assume(schedules.length > 0);
 
         scheduleIndex = bound(scheduleIndex, 0, schedules.length - 1);
 
-        IDcaManager.DcaDetails memory schedule = schedules[scheduleIndex];
+        IDcaManager.DcaSchedule memory schedule = schedules[scheduleIndex];
         vm.assume(schedule.tokenBalance >= schedule.purchaseAmount);
         
         // Advance time if needed to make purchase possible
@@ -485,11 +485,11 @@ contract Handler is Test {
             address user = s_users[userSeeds[i] % s_users.length];
             buyers[i] = user;
             
-            IDcaManager.DcaDetails[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
+            IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
             vm.assume(schedules.length > 0);
             
             boundedScheduleIndexes[i] = bound(scheduleIndexes[i], 0, schedules.length - 1);
-            IDcaManager.DcaDetails memory schedule = schedules[boundedScheduleIndexes[i]];
+            IDcaManager.DcaSchedule memory schedule = schedules[boundedScheduleIndexes[i]];
             
             vm.assume(schedule.tokenBalance >= schedule.purchaseAmount);
             vm.assume(schedule.routeIndex == routeIndex);
@@ -577,7 +577,7 @@ contract Handler is Test {
         
         vm.startPrank(user);
         
-        IDcaManager.DcaDetails[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
+        IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
         vm.assume(schedules.length > 0);
         
         scheduleIndex = bound(scheduleIndex, 0, schedules.length - 1);

@@ -289,7 +289,7 @@ contract DcaManagerEdgeCasesTest is Test {
             TROPYKUS_INDEX
         );
 
-        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedule(USER, address(stablecoin), 0);
+        IDcaManager.DcaSchedule memory schedule = dcaManager.getDcaSchedule(USER, address(stablecoin), 0);
         assertEq(schedule.routeIndex, TROPYKUS_INDEX);
 
         vm.prank(USER);

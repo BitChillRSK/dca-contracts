@@ -27,7 +27,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     /**
      * @notice Each user may create different schedules with one or more stablecoins
      */
-    mapping(address user => mapping(address tokenDeposited => DcaDetails[] usersDcaSchedules)) private s_dcaSchedules;
+    mapping(address user => mapping(address tokenDeposited => DcaSchedule[] usersDcaSchedules)) private s_dcaSchedules;
     uint256 private s_minPurchasePeriod; // Minimum time between purchases
     uint256 private s_maxSchedulesPerToken; // Maximum number of schedules per stablecoin
     uint256 private s_defaultMinPurchaseAmount; // Default minimum purchase amount for all tokens
@@ -116,7 +116,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         validateScheduleIndex(msg.sender, token, scheduleIndex)
     {
         _validateDeposit(depositAmount);
-        DcaDetails storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
+        DcaSchedule storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
         uint256 received = _handlerForDeposit(token, dcaSchedule.routeIndex).depositToken(msg.sender, depositAmount);
         uint256 newTokenBalance = dcaSchedule.tokenBalance + received;
@@ -138,7 +138,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         nonReentrant
         validateScheduleIndex(msg.sender, token, scheduleIndex)
     {
-        DcaDetails storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
+        DcaSchedule storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
         _validatePurchaseAmount(token, newPurchaseAmount, dcaSchedule.tokenBalance);
         uint256 previousPurchaseAmount = dcaSchedule.purchaseAmount;
@@ -160,7 +160,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         nonReentrant
         validateScheduleIndex(msg.sender, token, scheduleIndex)
     {
-        DcaDetails storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
+        DcaSchedule storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
         _validatePurchasePeriod(newPurchasePeriod);
         uint256 previousPurchasePeriod = dcaSchedule.purchasePeriod;
@@ -183,7 +183,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         nonReentrant
         validateScheduleIndex(msg.sender, token, scheduleIndex)
     {
-        DcaDetails storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
+        DcaSchedule storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
         if (dcaSchedule.paused == paused) return;
         dcaSchedule.paused = paused;
@@ -211,7 +211,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         uint256 received = _handlerForDeposit(token, routeIndex).depositToken(msg.sender, depositAmount);
         _validatePurchaseAmount(token, purchaseAmount, received);
 
-        DcaDetails[] storage schedules = s_dcaSchedules[msg.sender][token];
+        DcaSchedule[] storage schedules = s_dcaSchedules[msg.sender][token];
         uint256 numOfSchedules = schedules.length;
         if (numOfSchedules >= s_maxSchedulesPerToken) {
             revert DcaManager__MaxSchedulesPerTokenReached(token);
@@ -219,7 +219,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
 
         bytes32 scheduleId = keccak256(abi.encodePacked(msg.sender, token, ++s_scheduleNonce));
 
-        DcaDetails memory dcaSchedule = DcaDetails(
+        DcaSchedule memory dcaSchedule = DcaSchedule(
             received,
             purchaseAmount,
             purchasePeriod,
@@ -251,9 +251,9 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         validateScheduleIndex(msg.sender, token, scheduleIndex)
         nonReentrant
     {
-        DcaDetails[] storage schedules = s_dcaSchedules[msg.sender][token];
+        DcaSchedule[] storage schedules = s_dcaSchedules[msg.sender][token];
         
-        DcaDetails memory dcaSchedule = schedules[scheduleIndex];
+        DcaSchedule memory dcaSchedule = schedules[scheduleIndex];
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
 
         uint256 tokenBalance = dcaSchedule.tokenBalance;
@@ -534,8 +534,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         validateScheduleIndex(buyer, token, scheduleIndex)
         returns (uint256, uint256)
     {
-        DcaDetails storage dcaScheduleStorage = s_dcaSchedules[buyer][token][scheduleIndex];
-        DcaDetails memory dcaSchedule = dcaScheduleStorage;
+        DcaSchedule storage dcaScheduleStorage = s_dcaSchedules[buyer][token][scheduleIndex];
+        DcaSchedule memory dcaSchedule = dcaScheduleStorage;
 
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
 
@@ -590,7 +590,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         validateScheduleIndex(msg.sender, token, scheduleIndex)
         returns (uint256 routeIndex)
     {
-        DcaDetails storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
+        DcaSchedule storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
         uint256 tokenBalance = dcaSchedule.tokenBalance;
         if (withdrawalAmount == type(uint256).max) withdrawalAmount = tokenBalance;
@@ -619,7 +619,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         view
         returns (uint256 lockedTokenAmount)
     {
-        DcaDetails[] storage schedules = s_dcaSchedules[user][token];
+        DcaSchedule[] storage schedules = s_dcaSchedules[user][token];
         for (uint256 i; i < schedules.length; ++i) {
             if (schedules[i].routeIndex == routeIndex) {
                 lockedTokenAmount += schedules[i].tokenBalance;
@@ -673,7 +673,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         view
         override
         validateScheduleIndex(user, token, scheduleIndex)
-        returns (DcaDetails memory)
+        returns (DcaSchedule memory)
     {
         return s_dcaSchedules[user][token][scheduleIndex];
     }
@@ -684,7 +684,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @param token: the token to get schedules for
      * @return the DCA schedules
      */
-    function getDcaSchedules(address user, address token) external view override returns (DcaDetails[] memory) {
+    function getDcaSchedules(address user, address token) external view override returns (DcaSchedule[] memory) {
         return s_dcaSchedules[user][token];
     }
 
