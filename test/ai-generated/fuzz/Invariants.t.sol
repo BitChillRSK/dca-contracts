@@ -180,6 +180,24 @@ contract InvariantTest is StdInvariant, Test {
         assertEq(schedules[0].routeIndex, s_routeIndex);
     }
     
+    /// @dev The pause action reaches the chain and records its ghost entry, so a failure of
+    ///      `invariant_pausedSchedulesNeverPurchase` means the protocol moved, not the harness.
+    function test_invariantHandlerPausesAndRecordsGhost() public {
+        fuzzHandler.createDcaSchedule(0, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD);
+        assertEq(fuzzHandler.createScheduleSuccesses(), 1, "Handler never created a schedule to pause");
+
+        fuzzHandler.pauseSchedule(0, 0);
+        assertTrue(
+            dcaManager.getDcaSchedule(s_users[0], address(stablecoin), 0).paused, "Handler did not pause on-chain"
+        );
+        assertEq(fuzzHandler.everPausedScheduleIdsLength(), 1, "Handler did not record the pause ghost");
+
+        fuzzHandler.unpauseSchedule(0, 0);
+        assertFalse(
+            dcaManager.getDcaSchedule(s_users[0], address(stablecoin), 0).paused, "Handler did not resume on-chain"
+        );
+    }
+
     /*//////////////////////////////////////////////////////////////
                             INVARIANT TESTS
     //////////////////////////////////////////////////////////////*/
@@ -316,6 +334,65 @@ contract InvariantTest is StdInvariant, Test {
         console2.log("Handler token balance:", handlerBalance);
     }
     
+    /**
+     * @notice Coverage guard: the pause invariant below must not be silently vacuous.
+     * @dev It was, when it first landed. The pause action originally took a fuzzed `bool`, and the
+     *      paused branch was never reached across 64 runs × 512 calls, so
+     *      `invariant_pausedSchedulesNeverPurchase` passed against a set it never populated.
+     *
+     *      Stated as an implication rather than "some schedule got paused": whether the run ever has
+     *      a live schedule to pause is up to the fuzzer's seed, and asserting on that directly is
+     *      flaky (observed failing under `make check` while passing standalone). What must always
+     *      hold is that a pause *attempted against a live schedule* actually took effect — which is
+     *      exactly what the `bool` regression broke.
+     */
+    function afterInvariant() public view {
+        if (fuzzHandler.pauseAttemptsOnLiveSchedule() == 0) return;
+        require(
+            fuzzHandler.everPausedScheduleIdsLength() > 0,
+            "pause invariant is vacuous: pauses were attempted on live schedules but none took effect"
+        );
+    }
+
+    /**
+     * @notice A paused schedule never buys (R19)
+     * @dev Only a purchase writes `lastPurchaseTimestamp` — deposits, withdrawals, and both edit
+     *      mutators leave it alone — so an unchanged timestamp across a pause window is the
+     *      accounting-independent statement of "this schedule did not buy while paused".
+     *      Ids, not indexes: `deleteDcaSchedule` swap-pops, so a paused schedule can legitimately
+     *      move. A schedule whose id is gone was deleted, which is an allowed exit while paused.
+     */
+    function invariant_pausedSchedulesNeverPurchase() public {
+        uint256 trackedCount = fuzzHandler.everPausedScheduleIdsLength();
+
+        for (uint256 i = 0; i < trackedCount; i++) {
+            bytes32 scheduleId = fuzzHandler.s_everPausedScheduleIds(i);
+            (address user, uint256 timestampAtPause, bool pausedNow) = fuzzHandler.s_pauseGhost(scheduleId);
+            if (!pausedNow) continue;
+
+            IDcaManager.DcaDetails[] memory schedules;
+            try dcaManager.getDcaSchedules(user, address(stablecoin)) returns (
+                IDcaManager.DcaDetails[] memory _schedules
+            ) {
+                schedules = _schedules;
+            } catch {
+                continue;
+            }
+
+            for (uint256 j = 0; j < schedules.length; j++) {
+                if (schedules[j].scheduleId != scheduleId) continue;
+
+                assertTrue(schedules[j].paused, "a schedule the ghost holds paused is active on-chain");
+                assertEq(
+                    schedules[j].lastPurchaseTimestamp,
+                    timestampAtPause,
+                    "a paused schedule advanced its purchase timestamp"
+                );
+                break;
+            }
+        }
+    }
+
     /**
      * @notice Interest should never decrease for users
      */

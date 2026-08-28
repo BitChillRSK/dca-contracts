@@ -282,6 +282,43 @@ contract SchedulePauseTest is DcaDappTest {
         assertGt(stablecoin.balanceOf(USER), userStablecoinBefore, "no interest was paid on a paused schedule");
     }
 
+    function testPausedScheduleStillWithdrawsTokenAndInterest() external onlyLendingLane {
+        updateExchangeRate(10 days);
+        _setPaused(SCHEDULE_INDEX, true);
+
+        bytes32 scheduleId = _scheduleId(SCHEDULE_INDEX);
+        uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
+
+        vm.prank(USER);
+        dcaManager.withdrawTokenAndInterest(address(stablecoin), SCHEDULE_INDEX, scheduleId, AMOUNT_TO_DEPOSIT);
+
+        // Principal plus interest, so strictly more than the principal alone left the handler.
+        assertGt(
+            stablecoin.balanceOf(USER) - userStablecoinBefore,
+            AMOUNT_TO_DEPOSIT,
+            "the combined exit did not pay principal and interest on a paused schedule"
+        );
+        assertEq(dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance, 0);
+    }
+
+    function testPausedScheduleStillPaysAllAccumulatedRbtc() external {
+        super.makeSinglePurchase();
+        _setPaused(SCHEDULE_INDEX, true);
+
+        uint256 rbtcAccumulated = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
+        assertGt(rbtcAccumulated, 0, "nothing was bought to withdraw");
+
+        address[] memory tokens = new address[](1);
+        tokens[0] = address(stablecoin);
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = s_routeIndex;
+
+        uint256 userRbtcBefore = USER.balance;
+        vm.prank(USER);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
+        assertEq(USER.balance - userRbtcBefore, rbtcAccumulated, "the sweep did not pay rBTC on a paused schedule");
+    }
+
     function testPausedScheduleStillAllowsDeletion() external {
         _setPaused(SCHEDULE_INDEX, true);
 
