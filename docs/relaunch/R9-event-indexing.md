@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: no · Optional/further-review: no
 
-PR 45 of the relaunch stack. **ABI freeze** for events, errors, and remaining indexed fields. Stack on R42 (PR 44), after the final production handlers/routes, pause/packing work, and batcher exist. See [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md).
+PR 47 of the relaunch stack. **ABI freeze** for events, errors, and remaining indexed fields. Stack on R42 (PR 46), after the final production handlers/routes, pause/packing work, and batcher exist. See [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md).
 
 ## Objective
 
@@ -22,11 +22,11 @@ Diagnostic errors such as `DcaManager__PurchaseAmountMismatch` (six args) stay. 
 
 ## Open product decisions
 
-**none** — R19 pause and R18 packing land in PRs 39–40; their events/tuple are part of this audit. R12 compound is rejected. Add **no** extra purchase-event fields: `RbtcBought` already has user, token, rBTC, scheduleId, and stablecoin spent, while a per-buyer fee is not exact after batch rounding. Fee-transfer event remains required with the shape below.
+**none** — R19 pause, R18 packing, and R50’s `uint64` scheduleId / fee-struct widths land before this PR; their events/tuple are part of this audit. R12 compound is rejected. Add **no** extra purchase-event fields: `RbtcBought` already has user, token, rBTC, scheduleId, and stablecoin spent, while a per-buyer fee is not exact after batch rounding. Fee-transfer event remains required with the shape below.
 
 ## Scope
 
-- [ ] First-party events: `indexed` only on `address` and `bytes32 scheduleId` (and the `user` on `UserSharesUpdated`). Un-index amounts, timestamps, periods, rates, token amounts, and totals. Do not index strings, bytes, or arrays (none should be indexed today).
+- [ ] First-party events: `indexed` only on `address` and `scheduleId` (`uint64` after R50; still one topic, zero-padded) and the `user` on `UserSharesUpdated`. Un-index amounts, timestamps, periods, rates, token amounts, and totals. Do not index strings, bytes, or arrays (none should be indexed today).
 - [ ] Add to `ITokenLending` and emit after every successful per-user virtual share mutation in `LendingErc20Handler` (and any leftover override):
 
       ```solidity
@@ -41,7 +41,7 @@ Diagnostic errors such as `DcaManager__PurchaseAmountMismatch` (six args) stay. 
 - [ ] Tests: each emit site; replay from a fresh deploy reconstructs balances from the event stream.
 - [ ] `FeeHandler__FeeTransferred(address indexed token, address indexed collector, uint256 amount)` from `_transferFee` when `fee > 0`. Skip a zero-fee transfer if `_transferFee` is not called; if it is called with 0, do not emit. Batch = one event for the aggregated fee. Do not index `amount`.
 - [ ] Do not shorten custom-error argument lists. Do not rename errors for brevity.
-- [ ] Decide whether `DcaManager__SchedulePauseSet(address indexed user, bytes32 indexed scheduleId, bool paused)` (R19) should also carry `token`. It does not today, deliberately: it matches `PurchaseAmountUpdated` / `PurchasePeriodUpdated`, which are also user+scheduleId only. The consequence is that no consumer can filter pause transitions by token on-chain — an indexer has to join on `scheduleId` to learn which token a pause affected. That is the right trade for R19 in isolation; this is the last PR that can revisit it, so confirm or change it here rather than discovering it after the freeze.
+- [ ] Decide whether `DcaManager__SchedulePauseSet(address indexed user, uint64 indexed scheduleId, bool paused)` (R19, id width from R50) should also carry `token`. It does not today, deliberately: it matches `PurchaseAmountUpdated` / `PurchasePeriodUpdated`, which are also user+scheduleId only. The consequence is that no consumer can filter pause transitions by token on-chain — an indexer has to join on `scheduleId` to learn which token a pause affected. That is the right trade for R19 in isolation; this is the last PR that can revisit it, so confirm or change it here rather than discovering it after the freeze.
 
 ## Out of scope
 
@@ -50,7 +50,7 @@ Diagnostic errors such as `DcaManager__PurchaseAmountMismatch` (six args) stay. 
 - [ ] R39/R40/R41 behavior (already landed).
 - [ ] Changing R42 batcher behavior. Its first-party ABI already exists and is included in the freeze audit.
 - [ ] License / SPDX.
-- [ ] Packing/pause behavior (already landed in R18/R19) or compound (rejected). This PR only audits their final ABI/events.
+- [ ] Packing/pause behavior (already landed in R18/R19/R50) or compound (rejected). This PR only audits their final ABI/events.
 
 ## Files likely touched
 

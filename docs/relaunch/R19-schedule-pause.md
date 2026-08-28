@@ -92,7 +92,7 @@ Two consequences worth stating rather than discovering later:
   time; a pause landing between compose and execution still takes the tick down. Nothing on-chain
   prevents it, and R19 does not try to — per-row skipping would mean partial batches, which the
   batch design deliberately rejects.
-- **R42 widens the blast radius.** The swapper batcher (PR 44) bundles several `batchBuyRbtc` calls
+- **R42 widens the blast radius.** The swapper batcher (PR 46) bundles several `batchBuyRbtc` calls
   all-or-nothing, so after R42 a single paused row takes down *every venue in the bundle*, not just
   its own token×route. [`R42-swapper-batcher.md`](./R42-swapper-batcher.md) records that atomicity as
   a deliberate trade; R19 raises its cost, so R42 should re-confirm the trade with pause in mind.

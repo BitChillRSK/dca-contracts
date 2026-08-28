@@ -24,7 +24,7 @@ PR 2 was the original decision-record placeholder. GitHub PR [#74](https://githu
 - Upgrade to pinned OpenZeppelin `v5.7.0` (R44), then ship two-step ownership with direct initial ownership and no renunciation (R45).
 - Remove `setOperationsAdmin` and pin the constructor admin (R46). Enforce one assignment per handler address (R47).
 - Ship a per-token×route deposit pause (R48) and per-schedule purchase pause (R19).
-- Rename the schedule struct `DcaDetails` → `DcaSchedule` (R49), then pack that struct only (R18). Do not narrow handler balance/share mappings.
+- Rename the schedule struct `DcaDetails` → `DcaSchedule` (R49), pack it to three slots (R18), then finish packing in R50 (`uint64` nonce as `scheduleId`, fees, admin handler+pause, DcaManager scalars, Dex percents, `uint32` route keys on every OperationsAdmin entry). Do not narrow handler balance/share mappings.
 - Do **not** ship R12 interest compounding: users can withdraw interest and deposit it explicitly, while an in-handler compound path couples principal/share accounting to a chosen schedule and expands the most sensitive cash surface.
 - Do **not** add an owner sweep: pooled stablecoin and rBTC cannot be safely distinguished from liabilities, and signer-only withdrawal remains the custody boundary.
 - Keep SPDX **MIT** for the relaunch. A future licensing change is a legal/product project, not latent Solidity work.
@@ -86,11 +86,12 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R49 | 40 | none (`DcaDetails` → `DcaSchedule`, rename-only) |
 | R18 | 41 | none (`DcaSchedule` only) |
 | R36 | 42 | none (decisions recorded above; kUSDRIF pause is a fork fact to measure) |
-| R37 | 43 | none (keep legacy lanes; burn index 4) |
-| R38 | 44 | none (replace semantics; keep names) |
-| R42 | 45 | none (atomic; keep bot EOA) |
-| R9 | 46 | none (no extra purchase-event fields) |
-| R10 | 47 | none |
+| R50 | 43 | none (`uint64` nonce id; pack fees/admin/scalars/dex; `uint32` pause keys) |
+| R37 | 44 | none (keep legacy lanes; burn index 4) |
+| R38 | 45 | none (replace semantics; keep names) |
+| R42 | 46 | none (atomic; keep bot EOA) |
+| R9 | 47 | none (no extra purchase-event fields) |
+| R10 | 48 | none |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -215,7 +216,7 @@ Do not rename Tropykus in place and do not deploy USDRIF/Uniswap handlers for th
 
 ### PR 16 - R25 lending redeem helper naming
 
-Leftover from R16 (PR 14): that glossary pass still left `_burnKtoken` and a “repay” alias. Rename-only (plus tiny leaf cleanup), after LayerBank exists so all three lending handlers match. Drop `_burnKtoken` / `_burnAtoken` and `*ToRepay` locals in favor of `_redeemByUnderlying` / `_redeemByShares` (Tropykus/LayerBank) and `*ToRedeem` locals (all three). Sovryn stays one share-sized helper with a recipient overload; stop reusing `stablecoinInterestAmount` for the measured payout; rename `totalErc20InLending` → `totalStablecoinInLending`. Copy Sovryn’s `getAccruedInterest` natspec onto Tropykus/LayerBank. Drop unused `minPurchaseAmount` from Tropykus/Sovryn MoC/Dex constructors (LayerBank already omitted it); fix SovrynDocHandlerMoc’s “Tropykus' iSUSD” natspec. Also rename the shared event to `TokenLending__AmountToRedeemAdjusted` — the relaunch deploys fresh with no live log consumer, and R9 (now PR 46) freezes the event surface, so this is the last cheap moment. See `R25-lending-redeem-naming.md`.
+Leftover from R16 (PR 14): that glossary pass still left `_burnKtoken` and a “repay” alias. Rename-only (plus tiny leaf cleanup), after LayerBank exists so all three lending handlers match. Drop `_burnKtoken` / `_burnAtoken` and `*ToRepay` locals in favor of `_redeemByUnderlying` / `_redeemByShares` (Tropykus/LayerBank) and `*ToRedeem` locals (all three). Sovryn stays one share-sized helper with a recipient overload; stop reusing `stablecoinInterestAmount` for the measured payout; rename `totalErc20InLending` → `totalStablecoinInLending`. Copy Sovryn’s `getAccruedInterest` natspec onto Tropykus/LayerBank. Drop unused `minPurchaseAmount` from Tropykus/Sovryn MoC/Dex constructors (LayerBank already omitted it); fix SovrynDocHandlerMoc’s “Tropykus' iSUSD” natspec. Also rename the shared event to `TokenLending__AmountToRedeemAdjusted` — the relaunch deploys fresh with no live log consumer, and R9 (now PR 47) freezes the event surface, so this is the last cheap moment. See `R25-lending-redeem-naming.md`.
 
 Land before R26 and deploy/CI so neither PR freezes the old helper names.
 
@@ -326,7 +327,7 @@ Delete `DcaManager.buyRbtc` and `PurchaseRbtc.buyRbtc`. Production uses `batchBu
 
 This goes first because it removes the dead purchase branch and creates bytecode headroom before R43 changes `PurchaseUniswap` and before R36 adds the final Dex handler.
 
-**Must land before R9 (PR 46).**
+**Must land before R9 (PR 47).**
 
 ### PR 31 - R44 OpenZeppelin 5.7 upgrade
 
@@ -352,7 +353,7 @@ Dex becomes a production venue (USDRIF + USDT0 on LayerBank). Review `PurchaseUn
 
 This deliberately follows R39 so the reviewed Dex bytecode no longer contains the single-buy branch, and it deliberately precedes R36 so the new handler consumes settled shared swap behavior.
 
-**Must land before R36 (PR 42) and R9 (PR 46).**
+**Must land before R36 (PR 42) and R9 (PR 47).**
 
 **Decided:** keep the listed-stable $1 assumption plus MoC BTC/USD; keep a decimal-correct on-chain oracle floor; do not add a handler deadline/private-relay dependency. Bot policy may tighten the floor operationally.
 
@@ -364,7 +365,7 @@ Keep R21’s hop-1 measurement; revert `TokenHandler__DepositAmountMismatch` if 
 
 Rename `setPurchaseAmount` → `updatePurchaseAmount` and `setPurchasePeriod` → `updatePurchasePeriod`. Events become `PurchaseAmountUpdated(user, scheduleId, previousAmount, newAmount)` and `PurchasePeriodUpdated(user, scheduleId, previousPeriod, newPeriod)`, with neither amount nor period indexed (R9 rule). Both mutators only ever edit a schedule `createDcaSchedule` already wrote, so both read as updates; doing them together breaks the ABI once instead of twice. Combined amount+period edits remain two transactions. See [`R40-update-purchase-period.md`](./R40-update-purchase-period.md).
 
-**Must land before R9 (PR 46).** Frontend follow-up required.
+**Must land before R9 (PR 47).** Frontend follow-up required.
 
 ### PR 38 - R48 deposit pause
 
@@ -392,7 +393,7 @@ same lines twice, and well before R9's freeze. See [`R49-schedule-struct-name.md
 
 ### PR 41 - R18 DcaSchedule storage packing
 
-Pack `DcaSchedule` into three slots with checked widths: two `uint128` amounts; `uint32` period, `uint48` timestamp, `uint32` route, and `bool paused`; then `bytes32 scheduleId`. External function inputs remain `uint256`; casts are checked before cash/state mutation. Handler balance/share mappings stay `uint256` because narrowing them saves no slot and increases financial risk. See [`R18-storage-packing.md`](./R18-storage-packing.md).
+Pack `DcaSchedule` into three slots with checked widths: two `uint128` amounts; `uint32` period, `uint48` timestamp, `uint32` route, and `bool paused`; then `bytes32 scheduleId`. External function inputs remain `uint256`; casts are checked before cash/state mutation. Handler balance/share mappings stay `uint256` because narrowing them saves no slot and increases financial risk. Further packing (nonce as `uint64` id, fees, admin, scalars, dex percents, remaining `uint32` route keys) is R50. See [`R18-storage-packing.md`](./R18-storage-packing.md).
 
 ### PR 42 - R36 LayerBank dex stables (USDRIF + USDT0)
 
@@ -406,17 +407,23 @@ Lands before R9 and R10 on purpose: the event freeze must exercise the final shi
 
 **Decided:** LayerBank is index 1 for USDRIF and USDT0; keep the Sovryn DOC arm at index 2; USDT0 min/fee magnitudes are `25e6` / `1000e6` / `100_000e6`. Probe and record kUSDRIF's live pause status; that is a fact, not a product gate. See `R36-layerbank-usdrif-dex.md`.
 
-### PR 43 - R37 retire Tropykus from every live path
+### PR 43 - R50 packing follow-up
+
+Two-slot `DcaSchedule` with a public `uint64 scheduleId` equal to the monotonic nonce (no keccak). Pack `FeeHandler` (rates + collector; two `uint128` bounds), OperationsAdmin handler+pause into one `TokenRoute` value, DcaManager protocol scalars + nonce into one slot, and the two Uniswap slippage percents into one slot. Apply R18’s `toUint32()` bound to `setDepositsPaused` and every other OperationsAdmin route-index argument (R18 review: pause still keyed the mapping with raw `uint256`). Keep `s_scheduleNonce`; do not bitmap-pack address flags; do not narrow handler financial mappings. See [`R50-packing-follow-up.md`](./R50-packing-follow-up.md).
+
+**Must land before R9 (PR 47).** ABI: `bytes32 scheduleId` → `uint64` on every function, event, and error that carries it.
+
+### PR 44 - R37 retire Tropykus from every live path
 
 Remove Tropykus from every live deploy branch, move its deploy scripts under `script/tropykus-legacy/`, and move `TROPYKUS_INDEX` from `script/Constants.sol` to `test/Constants.sol` so a future `script/` file naming it fails to compile. `TROPYKUS_STRING` stays in `script/Constants.sol` — `MocHelperConfig` / `DexHelperConfig` need it to select mocks for the local lane, and neither uses the index.
 
-**Blocked on PR 41.** Removing the Tropykus dex arm before a LayerBank USDRIF handler exists deletes USDRIF DCA. USDT0 is new and is not on Tropykus; it does not change this block.
+**Blocked on R36 (PR 42).** Removing the Tropykus dex arm before a LayerBank USDRIF handler exists deletes USDRIF DCA. USDT0 is new and is not on Tropykus; it does not change this block. Git-stack on R50 (PR 43) so packing lands first.
 
 Handler contracts and their tests stay; `make moc-tropykus` / `dex-tropykus` / `fork-tropykus` keep their mock and live coverage of `LendingErc20Handler` through a second adapter. A sentinel "unreachable" index was considered and rejected: `routeIndex` is an unpacked `uint256`, `s_routeClass` is a sparse mapping, and nothing in `src/` enumerates indexes, so a large number enforces nothing. Compilation scope is the enforcement. Completes the `src/` / `script/` split that R22-repo-layout (PR 11) started.
 
 **Decided:** keep the local/fork Tropykus lanes and keep index 4 burned. See `R37-retire-tropykus-live-paths.md`.
 
-### PR 44 - R38 zip withdraw-all route pairs
+### PR 45 - R38 zip withdraw-all route pairs
 
 Replace the `tokens × routeIndexes` cartesian product in `withdrawAllAccumulatedInterest` and `withdrawAllAccumulatedRbtc` with positional `(token, routeIndex)` pairs, so a caller can name exactly the routes it holds a balance on. See [`R38-withdraw-all-route-pairs.md`](./R38-withdraw-all-route-pairs.md).
 
@@ -424,17 +431,17 @@ R36 and R37 now land first, so this PR is written and tested against the final p
 
 Not a live cash defect after R37: the only handler whose no-op call does real work is Tropykus, whose `_exchangeRate()` override is the state-changing `exchangeRateCurrent()`; everything else inherits the view default. This remains required because R9 freezes the signature for the life of the deployment.
 
-**Must land before R9 (PR 46).**
+**Must land before R9 (PR 47).**
 
 **Decided:** replace the cartesian semantics without a legacy alias and keep the `withdrawAllAccumulated*` names.
 
-### PR 45 - R42 swapper batcher
+### PR 46 - R42 swapper batcher
 
 A dedicated contract, allowlisted as a swapper, that forwards several `DcaManager.batchBuyRbtc` calls in one tx (one group per token×route). No `multicall` on `DcaManager`. Holds no user funds. Land it after the final route map and before the freeze so R9 audits the complete first-party surface and R10 documents it. See [`R42-swapper-batcher.md`](./R42-swapper-batcher.md).
 
 **Decided:** all-or-nothing, and keep the bot EOA allowlisted for break-glass/single-handler retries.
 
-### PR 46 - R9 event indexing and ABI freeze
+### PR 47 - R9 event indexing and ABI freeze
 
 Index only addresses and `scheduleId`. Do not index amounts, timestamps, periods, rates, strings, bytes, or arrays. Do not shorten diagnostic custom-error argument lists (R6).
 
@@ -442,9 +449,9 @@ Add `TokenLending__UserSharesUpdated(address indexed user, uint256 previousShare
 
 Add `FeeHandler__FeeTransferred(token, collector, amount)` from `_transferFee` when the fee is non-zero (one event per batch for the aggregated fee). Per-user rBTC in a batch is already `PurchaseRbtc__RbtcBought` — that is a monitoring consumer, not a new event.
 
-R18/R19/R49 already landed. Add no extra purchase-event fields.
+R18/R19/R49/R50 already landed. Add no extra purchase-event fields.
 
-### PR 47 - R10 natspec and comments
+### PR 48 - R10 natspec and comments
 
 Rewrite first-party natspec only after ABI, names, handlers, route maps, and the batcher are stable. Put user-facing docs on interfaces and use `@inheritdoc` in implementations.
 
@@ -457,6 +464,7 @@ There is no optional-late queue. Items either have an ordered spec above or are 
 - **R12 compound interest into a chosen schedule — rejected.** The existing explicit withdraw-interest then deposit flow is legible and user-controlled. An atomic compound path must reconcile per-handler shares with per-route/per-schedule principal and adds a new cash-moving entry point to immutable handlers for convenience, not solvency.
 - **Owner sweep — rejected.** A pooled balance cannot prove which tokens are harmless dust versus user liabilities. Governance must not gain a path around signer-only withdrawals.
 - **Handler per-user storage packing — rejected.** Each mapping value is already one slot and contains a financial amount. Narrowing it saves no slot across mapping entries.
+- **Address-keyed bool bitmaps — rejected.** `s_swappers` and `s_handlerAssigned` are sparse address keys; they never share a word, so a bitmap is extra math for the same SLOAD. R50 packs the `(token, routeIndex)` handler+pause pair instead.
 - **SPDX change — rejected for this relaunch.** Keep the repository's existing MIT license. Re-licensing requires an explicit legal/product process outside the contract implementation stack.
 
 ## OpenZeppelin policy

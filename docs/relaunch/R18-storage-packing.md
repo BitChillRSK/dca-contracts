@@ -92,6 +92,10 @@ R19's unpacked `paused` had cost the protocol-paid purchase path +3,585 / +76,49
 
 Timestamp arithmetic in the purchase path is done in `uint256` then `toUint48`, so a `uint48.max` last-purchase plus a period does not panic in the packed type before the named overflow revert.
 
+## Follow-up
+
+Further packing is [R50](./R50-packing-follow-up.md) (PR 43), not a reopening of this PR: `uint64` nonce as `scheduleId` (two-slot struct), `FeeHandler`, OperationsAdmin handler+pause, DcaManager scalars, Dex percents, and the R18 review note that `setDepositsPaused` still keys with raw `uint256`.
+
 ## ABI / deploy / cutover impact
 
 - ABI: `DcaSchedule` component types/order change. Getter tuple is now `(uint128 tokenBalance, uint128 purchaseAmount, uint32 purchasePeriod, uint48 lastPurchaseTimestamp, uint32 routeIndex, bool paused, bytes32 scheduleId)`. Function **inputs** stay `uint256`. Events still emit `uint256` amounts/periods. `scheduleId` moves from position 5 to last so positional ABI decoding must be regenerated — named-field consumers only need the new widths.
