@@ -1,6 +1,6 @@
 # R9 — Event indexing, share transitions, and fee transfer
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
 PR 47 of the relaunch stack. **ABI freeze** for events, errors, and remaining indexed fields. Stack on R42 (PR 46), after the final production handlers/routes, pause/packing work, and batcher exist. See [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md).
 
@@ -26,8 +26,8 @@ Diagnostic errors such as `DcaManager__PurchaseAmountMismatch` (six args) stay. 
 
 ## Scope
 
-- [ ] First-party events: `indexed` only on `address` and `scheduleId` (`uint64` after R50; still one topic, zero-padded) and the `user` on `UserSharesUpdated`. Un-index amounts, timestamps, periods, rates, token amounts, and totals. Do not index strings, bytes, or arrays (none should be indexed today).
-- [ ] Add to `ITokenLending` and emit after every successful per-user virtual share mutation in `LendingErc20Handler` (and any leftover override):
+- [x] First-party events: `indexed` only on `address` and `scheduleId` (`uint64` after R50; still one topic, zero-padded) and the `user` on `UserSharesUpdated`. Un-index amounts, timestamps, periods, rates, token amounts, and totals. Do not index strings, bytes, or arrays (`PurchaseUniswap_NewPathSet` had all three indexed; they are data now).
+- [x] Add to `ITokenLending` and emit after every successful per-user virtual share mutation in `LendingErc20Handler` (and any leftover override):
 
       ```solidity
       event TokenLending__UserSharesUpdated(
@@ -38,19 +38,19 @@ Diagnostic errors such as `DcaManager__PurchaseAmountMismatch` (six args) stay. 
       ```
 
       Deposits: measured share mint, not stablecoin in. Withdrawals, interest, every buyer in a batch, sequential updates when the same user appears twice. `newShares == getUserShares(user)`. Reverts emit nothing lasting. Idle has no shares — do not emit there. Cover both deployments of the LayerBank Dex handler added by R36.
-- [ ] Tests: each emit site; replay from a fresh deploy reconstructs balances from the event stream.
-- [ ] `FeeHandler__FeeTransferred(address indexed token, address indexed collector, uint256 amount)` from `_transferFee` when `fee > 0`. Skip a zero-fee transfer if `_transferFee` is not called; if it is called with 0, do not emit. Batch = one event for the aggregated fee. Do not index `amount`.
-- [ ] Do not shorten custom-error argument lists. Do not rename errors for brevity.
-- [ ] Decide whether `DcaManager__SchedulePauseSet(address indexed user, uint64 indexed scheduleId, bool paused)` (R19, id width from R50) should also carry `token`. It does not today, deliberately: it matches `PurchaseAmountUpdated` / `PurchasePeriodUpdated`, which are also user+scheduleId only. The consequence is that no consumer can filter pause transitions by token on-chain — an indexer has to join on `scheduleId` to learn which token a pause affected. That is the right trade for R19 in isolation; this is the last PR that can revisit it, so confirm or change it here rather than discovering it after the freeze.
+- [x] Tests: each emit site; replay from a fresh deploy reconstructs balances from the event stream.
+- [x] `FeeHandler__FeeTransferred(address indexed token, address indexed collector, uint256 amount)` from `_transferFee` when `fee > 0`. Skip a zero-fee transfer if `_transferFee` is not called; if it is called with 0, do not emit. Batch = one event for the aggregated fee. Do not index `amount`.
+- [x] Do not shorten custom-error argument lists. Do not rename errors for brevity.
+- [x] Keep `DcaManager__SchedulePauseSet(address indexed user, uint64 indexed scheduleId, bool paused)` without `token`. It matches `PurchaseAmountUpdated` / `PurchasePeriodUpdated`: filter by user and scheduleId, join on `scheduleId` for the token. Adding `token` would spend the last topic and break that family for a filter that indexers already perform off-chain.
 
 ## Out of scope
 
-- [ ] On-chain Merkl / harvest / reward index (`EXTERNAL_REWARDS.md`).
-- [ ] Telegram, monitoring, or frontend copy. Wire consumers to existing `RbtcBought` + the new fee event.
-- [ ] R39/R40/R41 behavior (already landed).
-- [ ] Changing R42 batcher behavior. Its first-party ABI already exists and is included in the freeze audit.
-- [ ] License / SPDX.
-- [ ] Packing/pause behavior (already landed in R18/R19/R50) or compound (rejected). This PR only audits their final ABI/events.
+- [x] On-chain Merkl / harvest / reward index (`EXTERNAL_REWARDS.md`).
+- [x] Telegram, monitoring, or frontend copy. Wire consumers to existing `RbtcBought` + the new fee event.
+- [x] R39/R40/R41 behavior (already landed).
+- [x] Changing R42 batcher behavior. Its first-party ABI already exists and is included in the freeze audit.
+- [x] License / SPDX.
+- [x] Packing/pause behavior (already landed in R18/R19/R50) or compound (rejected). This PR only audits their final ABI/events.
 
 ## Files likely touched
 
@@ -67,11 +67,11 @@ Then `make check`. Fork: no new assertions beyond what `EXTERNAL_REWARDS.md` nee
 
 ## Success criteria
 
-- [ ] No first-party event indexes a non-address, non-`scheduleId` field.
-- [ ] `UserSharesUpdated` covers every lending share mutation; replay matches `getUserShares`.
-- [ ] `FeeTransferred` fires on non-zero `_transferFee`.
-- [ ] Diagnostic error args unchanged.
-- [ ] No open product decisions.
+- [x] No first-party event indexes a non-address, non-`scheduleId` field.
+- [x] `UserSharesUpdated` covers every lending share mutation; replay matches `getUserShares`.
+- [x] `FeeTransferred` fires on non-zero `_transferFee`.
+- [x] Diagnostic error args unchanged.
+- [x] No open product decisions.
 
 ## Reviewer checklist
 
@@ -85,4 +85,5 @@ Then `make check`. Fork: no new assertions beyond what `EXTERNAL_REWARDS.md` nee
 
 - ABI: freeze. Topic0 changes wherever `indexed` moves. New `UserSharesUpdated` and `FeeTransferred`. Indexers must resubscribe.
 - Scripts: none.
+- Runtime (no IR): `DcaManager` 22,647 (margin 1,929); `SovrynErc20HandlerDex` 22,925 (margin 1,651); `LayerBankErc20HandlerDex` 23,385 (margin 1,191). The new logs live on the shared lending/fee bases, so every lending handler grew; Dex remains under EIP-170.
 - Cutover: **Frontend follow-up** if the app decodes these logs (likely monitoring more than the UI). Search `bitChillRSK/front-end` and the monitoring repo; comment or open issues. Do not implement Telegram here.
