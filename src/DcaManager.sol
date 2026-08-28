@@ -235,6 +235,10 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         _checkPurchasePeriod(purchasePeriod, settings.minPurchasePeriod);
         _validateDeposit(depositAmount);
         uint256 received = _handlerForDeposit(token, route).depositToken(msg.sender, depositAmount);
+        // The remaining two checks follow the pull by construction or by history: the minimum
+        // purchase amount is validated against what the handler actually credited, and the
+        // max-schedules bound has sat here since the count check was fixed. Both revert the whole
+        // call, so a failure returns the deposit with it.
         _validatePurchaseAmount(token, purchaseAmount, received);
 
         DcaSchedule[] storage schedules = s_dcaSchedules[msg.sender][token];

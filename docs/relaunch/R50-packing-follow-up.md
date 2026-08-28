@@ -48,9 +48,9 @@ Gas, `SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=DOC`, vs R36:
 
 | Test | R36 | R50 | Δ |
 |---|---|---|---|
-| `testCreateDcaSchedule` | 285,004 | 254,545 | −30,459 |
+| `testCreateDcaSchedule` | 285,004 | 254,579 | −30,425 |
 | `testSinglePurchase` | 285,295 | 279,088 | −6,207 |
-| `testBatchPurchasesOneUser` | 2,229,154 | 2,150,566 | −78,588 |
+| `testBatchPurchasesOneUser` | 2,229,154 | 2,150,736 | −78,418 |
 
 **Runtime size is the cost, and it is not small.** Narrow fields mean mask/shift code on every read
 and write, and the default (non-`via_ir`) profile does not optimise that away. Default profile,
@@ -58,7 +58,7 @@ EIP-170 24,576:
 
 | Contract | R36 | R50 | Margin after |
 |---|---|---|---|
-| `DcaManager` | 21,151 | 22,585 | 1,991 |
+| `DcaManager` | 21,151 | 22,551 | 2,025 |
 | `LayerBankErc20HandlerDex` | 21,578 | 23,032 | 1,544 |
 | `SovrynErc20HandlerDex` | 21,105 | 22,572 | 2,004 |
 | `LayerBankDocHandlerMoc` | 15,752 | 16,707 | 7,869 |
