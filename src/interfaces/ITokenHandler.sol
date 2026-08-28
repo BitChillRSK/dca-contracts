@@ -31,11 +31,10 @@ interface ITokenHandler {
      * @notice Deposit a specified amount of a stablecoin into the contract for DCA operations.
      * @param user The user making the deposit.
      * @param amount The amount of the stablecoin requested from the user.
-     * @return depositedAmount The amount this contract actually received, measured as a `balanceOf` delta around
-     * `transferFrom`. The measurement is kept, but the call reverts `TokenHandler__DepositAmountMismatch` unless it
-     * equals `amount`, so callers always credit the requested amount.
+     * @dev Measures a `balanceOf` delta around `transferFrom` and reverts `TokenHandler__DepositAmountMismatch`
+     * unless it equals `amount`. Callers credit `amount`; a successful call never received something else.
      */
-    function depositToken(address user, uint256 amount) external returns (uint256 depositedAmount);
+    function depositToken(address user, uint256 amount) external;
 
     /**
      * @notice Withdraw a specified amount of a stablecoin from the contract.

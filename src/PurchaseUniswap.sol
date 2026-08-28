@@ -31,12 +31,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     ICoinPairPrice internal s_mocOracle;
     uint256 constant HUNDRED_PERCENT = 1 ether;
     /// @notice decimals of the MoC BTC/USD price. Hardcoded because the oracle exposes no `decimals()`.
-    uint256 internal constant USD_DECIMALS = 18;
-    /// @notice decimals of the token min-out is denominated in. Must stay equal to `HUNDRED_PERCENT`'s scale:
-    /// the oracle's decimals cancel against the stablecoin scale-up, so the quotient lands in units of
-    /// 1e-18 BTC because `s_amountOutMinimumPercent` carries 1e18. Those are WRBTC wei only at 18 decimals.
-    uint256 internal constant WRBTC_DECIMALS = 18;
-    /// @notice `10 ** (USD_DECIMALS - stablecoin decimals)`, which lifts a stablecoin amount into 18-decimal USD
+    uint256 internal constant ORACLE_DECIMALS = 18;
+    /// @notice `10 ** (ORACLE_DECIMALS - stablecoin decimals)`, which lifts a stablecoin amount into the oracle's USD units
     /// @dev Fixed at deploy because the handler's stablecoin is immutable. USDT0 is 6 decimals, DOC and USDRIF 18.
     uint256 internal immutable i_stablecoinToUsdScale;
     /// @notice The swap-time slippage fraction, 1e18-scaled like `HUNDRED_PERCENT`. uint128 is ample
@@ -54,8 +50,9 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      *        (deploy default: `DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK`, 95%)
      * @dev Reads the stablecoin's `decimals()` once and stores the scaling factor min-out needs, so a
      *      6-decimal stablecoin is not read as an 18-decimal one. Tokens with more than 18 decimals are
-     *      rejected rather than rounded down to a weaker floor, and a WRBTC that is not 18 decimals is
-     *      rejected because the quotient would no longer be denominated in its wei.
+     *      rejected rather than rounded down to a weaker floor. The quotient is WRBTC wei because
+     *      `s_amountOutMinimumPercent` is 1e18-scaled (`HUNDRED_PERCENT`) and WRBTC is 18 decimals — the
+     *      same known-token assumption as hardcoding the oracle at `ORACLE_DECIMALS`.
      * @dev Builds the initial path through `_purchaseToken()`. The concrete funding base
      *      (TokenHandler via LendingErc20Handler / IdleErc20Handler) must initialize
      *      `i_stableToken` before this constructor body runs — the leaf `is` order lists
@@ -79,19 +76,14 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint128();
         
         // Direct initial owner is not the deployer, so the constructor cannot call the onlyOwner setter.
-        // This also rejects a zero purchase token before the `decimals()` calls below reach an empty address.
+        // This also rejects a zero purchase token before the `decimals()` call below reaches an empty address.
         _setPurchasePath(uniswapSettings.swapIntermediateTokens, uniswapSettings.swapPoolFeeRates);
 
-        // Both sides of the min-out quotient are pinned here rather than assumed: the output unit first,
-        // then the input scale.
-        uint8 wrBtcDecimals = i_wrBtcToken.decimals();
-        if (wrBtcDecimals != WRBTC_DECIMALS) revert PurchaseUniswap__UnsupportedWrbtcDecimals(wrBtcDecimals);
-
         uint8 stablecoinDecimals = IERC20Metadata(address(_purchaseToken())).decimals();
-        if (stablecoinDecimals > USD_DECIMALS) {
+        if (stablecoinDecimals > ORACLE_DECIMALS) {
             revert PurchaseUniswap__UnsupportedStablecoinDecimals(stablecoinDecimals);
         }
-        i_stablecoinToUsdScale = 10 ** (USD_DECIMALS - stablecoinDecimals);
+        i_stablecoinToUsdScale = 10 ** (ORACLE_DECIMALS - stablecoinDecimals);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -262,9 +254,10 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     /**
      * @param stablecoinAmountToSpend the amount of stablecoin to swap for rBTC
      * @return minimumRbtcAmount the minimum amount of rBTC that must be received
-     * @dev `stablecoinAmountToSpend * i_stablecoinToUsdScale` is the USD notional in the oracle's 18 decimals
-     * under the $1 peg assumption; dividing by the BTC/USD price turns it into WRBTC wei, and
-     * `s_amountOutMinimumPercent` is the slippage the swap may give up against that oracle price.
+     * @dev `stablecoinAmountToSpend * i_stablecoinToUsdScale` is the USD notional in the oracle's decimals
+     * under the $1 peg assumption. Oracle decimals cancel in the division, leaving BTC as a 0.xxx integer;
+     * multiplying by `s_amountOutMinimumPercent` (1e18-scaled) both applies slippage and converts to wei.
+     * Those wei are WRBTC's units because WRBTC is 18 decimals.
      * @dev The oracle `isValid` bit is checked at execution, not at signing: a transaction that sits in the
      * mempool is priced by the oracle of the block that mines it. This floor is the only bound on a stale or
      * sandwiched swap. `ExactInputParams` carries no deadline, and the one mechanism SwapRouter02 does offer

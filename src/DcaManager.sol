@@ -194,7 +194,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @notice deposit the full stablecoin amount for DCA on the contract, set the period and the amount for purchases
      * @param token: the token address of stablecoin to deposit
      * @param depositAmount: the amount of stablecoin requested from the user; the handler reverts unless it receives exactly this, so the schedule is credited with the full request
-     * @param purchaseAmount: the amount of stablecoin to swap periodically for rBTC (validated against the credited balance, which equals the requested deposit)
+     * @param purchaseAmount: the amount of stablecoin to swap periodically for rBTC (validated against the credited request)
      * @param purchasePeriod: the time (in seconds) between rBTC purchases for each user
      * @param routeIndex: the OperationsAdmin route index for this schedule (idle or lending)
      * @notice reverts before any transfer if governance paused deposits on this token and route
@@ -207,7 +207,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         uint256 routeIndex
     ) external override nonReentrant {
         // Checked widths first: overflow reverts with SafeCast data before any token moves.
-        depositAmount.toUint128();
+        uint128 deposit = depositAmount.toUint128();
         uint128 purchase = purchaseAmount.toUint128();
         uint32 period = purchasePeriod.toUint32();
         uint32 route = routeIndex.toUint32();
@@ -219,12 +219,12 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
 
         _validatePurchasePeriod(purchasePeriod);
         _validateDeposit(depositAmount);
-        uint256 received = _handlerForDeposit(token, route).depositToken(msg.sender, depositAmount);
+        _handlerForDeposit(token, route).depositToken(msg.sender, depositAmount);
         // The remaining two checks follow the pull by construction or by history: the minimum
-        // purchase amount is validated against what the handler actually credited, and the
-        // max-schedules bound has sat here since the count check was fixed. Both revert the whole
-        // call, so a failure returns the deposit with it.
-        _validatePurchaseAmount(token, purchaseAmount, received);
+        // purchase amount is validated against the credited request (the handler reverts unless
+        // the pull matches), and the max-schedules bound has sat here since the count check was
+        // fixed. Both revert the whole call, so a failure returns the deposit with it.
+        _validatePurchaseAmount(token, purchaseAmount, depositAmount);
 
         DcaSchedule[] storage schedules = s_dcaSchedules[msg.sender][token];
         uint256 numOfSchedules = schedules.length;
@@ -236,7 +236,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
 
         schedules.push(
             DcaSchedule({
-                tokenBalance: received.toUint128(),
+                tokenBalance: deposit,
                 lastPurchaseTimestamp: 0,
                 paused: false,
                 purchaseAmount: purchase,
@@ -249,7 +249,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
             msg.sender,
             token,
             scheduleId,
-            received,
+            depositAmount,
             purchaseAmount,
             purchasePeriod,
             routeIndex
