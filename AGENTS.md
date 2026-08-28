@@ -64,6 +64,10 @@ Unless the assigned spec explicitly changes one:
 6. **Every external function that writes `s_dcaSchedules` carries `nonReentrant`** — the only exceptions are views and the swapper-only purchase path (`batchBuyRbtc`), which is CEI-clean and writes nothing after its handler call. Checkable with grep, deliberately not a per-function judgement call. OZ's guard only blocks *other guarded* functions, so a partial set protects nothing: a mutator left unguarded is both an unblocked re-entry point and an entry point that engages no lock. Do not narrow this set for gas — the measured saving is ~2,300 gas on user-paid transactions (~1.4 cents), and the protocol-side win lives entirely on the purchase path, which this invariant does not touch. See `docs/relaunch/R6-hot-path-cleanup.md`.
 7. **Schedule ids come from `s_scheduleNonce`, never from array state** — `deleteDcaSchedule` swap-pops, which can restore a previous array shape inside one block, so any id derived from array contents (length, last element's id, a hash of the array) can be reminted while the original schedule is still live. Only a strictly increasing counter is safe.
 
+## Onchain comments
+
+Verified `src/` source (including NatSpec) lives on explorers for the life of the deployment. Do not mention relaunch ticket IDs (`R29`, `R42`, …) in `src/` comments. Write the durable reason instead. Specs, tests, PRs, deploy-script comments, and this file may use R-ids.
+
 ## Tests and done-gate
 
 - Targeted tests for the spec first. Document exact commands in the PR.

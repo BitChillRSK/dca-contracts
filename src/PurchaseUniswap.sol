@@ -27,7 +27,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     ISwapRouter02 public immutable i_swapRouter02;
     ICoinPairPrice internal s_mocOracle;
     uint256 constant HUNDRED_PERCENT = 1 ether;
-    /// @notice decimals of the MoC BTC/USD price. Hardcoded in the R29 style; the oracle exposes no `decimals()`.
+    /// @notice decimals of the MoC BTC/USD price. Hardcoded because the oracle exposes no `decimals()`.
     uint256 internal constant USD_DECIMALS = 18;
     /// @notice decimals of the token min-out is denominated in. Must stay equal to `HUNDRED_PERCENT`'s scale:
     /// the oracle's decimals cancel against the stablecoin scale-up, so the quotient lands in units of
@@ -153,7 +153,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      * @param amountOutMinimumSafetyCheck The floor `setAmountOutMinimumPercent` is validated against.
      * @dev Config-only, by design: it bounds `s_amountOutMinimumPercent` and never enters the swap math.
      * Widening slippage tolerance therefore takes two owner transactions — lower this floor first, then the
-     * percent — which is the point of keeping it now that the owner is a Safe (R45).
+     * percent — which is the point of keeping it now that the owner is a Safe.
      */
     function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external onlyOwner {
         _validateSlippageSettings(s_amountOutMinimumPercent, amountOutMinimumSafetyCheck);
@@ -265,7 +265,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      * sandwiched swap. `ExactInputParams` carries no deadline, and the one mechanism SwapRouter02 does offer
      * — `IMulticallExtended.multicall(uint256 deadline, bytes[])` — cannot help here: a deadline this contract
      * derives from `block.timestamp` while executing is satisfied by construction. Only a deadline supplied by
-     * the caller bounds anything, and that means a `batchBuyRbtc` argument (R42), not a handler change.
+     * the caller bounds anything, and that means a `batchBuyRbtc` argument, not a handler change.
      * @dev This is a revert bound, not an accounting input: what the handler credits is the measured WRBTC
      * balance delta in `_swapStablecoinForWrbtc`.
      */
