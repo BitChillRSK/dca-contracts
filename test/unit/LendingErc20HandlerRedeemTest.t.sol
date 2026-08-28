@@ -166,7 +166,7 @@ contract LendingErc20HandlerHarness is LendingErc20Handler {
     }
 
     function creditShares(address user, uint256 shares) external {
-        s_shares[user] += shares;
+        s_userPositions[user].fundedBalance += uint128(shares);
         protocolShares += shares;
     }
 

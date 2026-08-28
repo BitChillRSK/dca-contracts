@@ -5,17 +5,16 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {DcaManagerAccessControl} from "./DcaManagerAccessControl.sol";
 import {FeeHandler} from "./FeeHandler.sol";
 import {StablecoinSource} from "./StablecoinSource.sol";
+import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 /**
  * @title PurchaseRbtc
  * @notice Shared rBTC purchase pipeline, accumulated-balance accounting, and signer withdrawals
  */
 abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessControl, StablecoinSource {
-    //////////////////////
-    // State variables ///
-    //////////////////////
-    mapping(address user => uint256 amount) internal s_usersAccumulatedRbtc;
+    using SafeCast for uint256;
 
     /**
      * @notice Allow the contract to receive rBTC
@@ -62,7 +61,8 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
                 totalPurchasedRbtc * netStablecoinAmountsToSpend[i] / totalNetStablecoinPlanned;
             uint256 usersStablecoinSpent =
                 totalStablecoinAmountToSpend * netStablecoinAmountsToSpend[i] / totalNetStablecoinPlanned;
-            s_usersAccumulatedRbtc[buyers[i]] += usersPurchasedRbtc;
+            ITokenHandler.UserPosition storage position = s_userPositions[buyers[i]];
+            position.accumulatedRbtc = (uint256(position.accumulatedRbtc) + usersPurchasedRbtc).toUint128();
             emit PurchaseRbtc__RbtcBought(
                 buyers[i], address(purchaseToken), usersPurchasedRbtc, scheduleIds[i], usersStablecoinSpent
             );
@@ -87,7 +87,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
      * @return the accumulated rBTC balance
      */
     function getAccumulatedRbtcBalance(address user) external view override returns (uint256) {
-        return s_usersAccumulatedRbtc[user];
+        return s_userPositions[user].accumulatedRbtc;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -100,10 +100,11 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
      * @return the amount of rBTC to withdraw
      */
     function _withdrawRbtcChecksEffects(address user) internal returns (uint256) {
-        uint256 rbtcBalance = s_usersAccumulatedRbtc[user];
+        ITokenHandler.UserPosition storage position = s_userPositions[user];
+        uint256 rbtcBalance = position.accumulatedRbtc;
         if (rbtcBalance == 0) revert PurchaseRbtc__NoAccumulatedRbtcToWithdraw();
 
-        s_usersAccumulatedRbtc[user] = 0;
+        position.accumulatedRbtc = 0;
         return rbtcBalance;
     }
 

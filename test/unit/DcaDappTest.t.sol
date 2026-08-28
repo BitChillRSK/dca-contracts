@@ -168,6 +168,17 @@ contract DcaDappTest is Test {
         _;
     }
 
+    /// @dev The idle route funds a position with the stablecoin itself, so a uint128 position cap is
+    /// exactly a uint128 stablecoin cap. Lending routes fund it with shares, whose scale is the venue's
+    /// exchange rate, so the same cap binds at a different — and venue-dependent — token amount.
+    modifier onlyIdleLane() {
+        if (isLendingLane) {
+            console2.log("Skipping test: position-cap arithmetic is 1:1 only on the idle route");
+            return;
+        }
+        _;
+    }
+
     modifier onlyShareTokenLane() {
         if (!isShareTokenLane) {
             console2.log("Skipping test: tropykus/sovryn share-token math");

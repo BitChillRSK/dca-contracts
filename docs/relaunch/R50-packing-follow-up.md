@@ -28,9 +28,11 @@ R18 review (not exploitable, owner-only): `registerRoute` / `assignTokenHandler`
 
 Layouts, from `forge inspect <contract> storageLayout` before and after.
 
-- `IDcaManager.DcaSchedule` is **64 bytes**: slot 0 `tokenBalance|purchaseAmount`; slot 1
-  `purchasePeriod` (offset 0), `lastPurchaseTimestamp` (4), `routeIndex` (10), `paused` (14),
-  `scheduleId` (15) — 23 of 32 bytes used.
+- `IDcaManager.DcaSchedule` is **64 bytes**, ordered by *what a purchase writes* rather than by width:
+  slot 0 is `tokenBalance` (offset 0), `lastPurchaseTimestamp` (16), `paused` (22) — exactly the fields
+  `_rBtcPurchaseChecksEffects` mutates, so the whole update is one SSTORE instead of two. Slot 1 is the
+  read-only half: `purchaseAmount` (0), `purchasePeriod` (16), `routeIndex` (20), `scheduleId` (24),
+  full to the byte. `scheduleId` is still the last field.
 - `DcaManager` roots go from 8 to 5: `_owner`, `_pendingOwner`, `s_dcaSchedules` (2),
   `s_protocolSettings` (3), `s_tokenMinPurchaseAmounts` (4). The settings word is
   `minPurchasePeriod` (0), `maxSchedulesPerToken` (4), `defaultMinPurchaseAmount` (6),
@@ -41,35 +43,50 @@ Layouts, from `forge inspect <contract> storageLayout` before and after.
   on purpose**: declared after, the two `uint16`s fall into the 12 bytes Ownable2Step leaves free
   beside `_pendingOwner` and the collector is pushed into a slot of its own, which is the opposite of
   what `_transferFee` wants.
-- Dex handlers: `s_mocOracle` (6), then `s_amountOutMinimumPercent` + `s_amountOutMinimumSafetyCheck`
-  packed in slot 7, then `s_swapPath`.
+- Handlers: `s_shares` / `s_idleBalances` and `s_usersAccumulatedRbtc` become one
+  `mapping(address => ITokenHandler.UserPosition)` at slot 4, `{uint128 fundedBalance, uint128 accumulatedRbtc}`.
+  Handler roots go from 6 to 5, and the two halves share a slot, which is where most of the purchase-path
+  gas below comes from.
+- Dex handlers: `s_mocOracle` (5), then `s_amountOutMinimumPercent` + `s_amountOutMinimumSafetyCheck`
+  packed in slot 6, then `s_swapPath`.
 
 Gas, `SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=DOC`, vs R36:
 
 | Test | R36 | R50 | Δ |
 |---|---|---|---|
-| `testCreateDcaSchedule` | 285,004 | 254,579 | −30,425 |
-| `testSinglePurchase` | 285,295 | 279,088 | −6,207 |
-| `testBatchPurchasesOneUser` | 2,229,154 | 2,150,736 | −78,418 |
+| `testCreateDcaSchedule` | 285,004 | 254,975 | −30,029 |
+| `testSinglePurchase` | 285,295 | 255,108 | −30,187 |
+| `testBatchPurchasesOneUser` | 2,229,154 | 2,136,498 | −92,656 |
 
-**Runtime size is the cost, and it is not small.** Narrow fields mean mask/shift code on every read
+`testBatchPurchasesOneUser` **understates** the per-row win: it creates its schedules inside the same
+transaction, so their slots are already dirty and a second SSTORE to one costs 100 gas. A real
+`batchBuyRbtc` tick is its own transaction with clean slots, which is what `testSinglePurchase` shows.
+Benchmarked against cold slots, merging the two per-user mappings alone is worth ~4,500 gas per buyer
+in steady state and ~21,600 on a buyer's first purchase, when the rBTC half no longer pays the
+zero-to-non-zero SSTORE.
+
+**Runtime size is the cost, and it is now tight.** Narrow fields mean mask/shift code on every read
 and write, and the default (non-`via_ir`) profile does not optimise that away. Default profile,
 EIP-170 24,576:
 
 | Contract | R36 | R50 | Margin after |
 |---|---|---|---|
-| `DcaManager` | 21,151 | 22,551 | 2,025 |
-| `LayerBankErc20HandlerDex` | 21,578 | 23,032 | 1,544 |
-| `SovrynErc20HandlerDex` | 21,105 | 22,572 | 2,004 |
-| `LayerBankDocHandlerMoc` | 15,752 | 16,707 | 7,869 |
-| `SovrynDocHandlerMoc` | 15,318 | 16,286 | 8,290 |
-| `IdleDocHandlerMoc` | 11,056 | 12,036 | 12,540 |
+| `DcaManager` | 21,151 | 22,518 | 2,058 |
+| `LayerBankErc20HandlerDex` | 21,578 | 23,696 | **880** |
+| `SovrynErc20HandlerDex` | 21,105 | 23,236 | 1,340 |
+| `LayerBankDocHandlerMoc` | 15,752 | 17,371 | 7,205 |
+| `SovrynDocHandlerMoc` | 15,318 | 16,950 | 7,626 |
+| `IdleDocHandlerMoc` | 11,056 | 12,466 | 12,110 |
 | `OperationsAdmin` | 6,049 | 6,002 | 18,574 |
 
-R38, R42, R9, and R10 still have to fit inside those margins. `FOUNDRY_PROFILE=deploy` (via IR)
-compiles the same sources to roughly half these sizes — `DcaManager` 11,062, the LayerBank dex
-handler 11,454 — so the ceiling is a default-profile problem, not a deploy blocker, but the next PR
-that adds a few hundred bytes to a dex handler should check `forge build --sizes` before pushing.
+**880 bytes on `LayerBankErc20HandlerDex` is the binding constraint for the rest of the stack**, and
+R38, R42, and R9 all still have to fit. Storage pointers (one `UserPosition storage` per function that
+touches a position twice, instead of repeating `s_userPositions[user].field`) already bought ~190 bytes
+back; without them the margin was 668. `FOUNDRY_PROFILE=deploy` (via IR) compiles the same sources to
+roughly half these sizes — `DcaManager` 11,062, the LayerBank dex handler 11,454 — so this is a
+default-profile ceiling rather than a deploy blocker, but **the next PR touching a dex handler must run
+`forge build --sizes` before pushing**, and if the margin runs out the choice is either moving CI to the
+IR pipeline or dropping the mapping merge.
 
 ## Scope
 
@@ -83,7 +100,8 @@ that adds a few hundred bytes to a dex handler should check `forge build --sizes
           + uint32 routeIndex + bool paused + uint64 scheduleId
   ```
 
-  `scheduleId` is the last field so swap-pop and `vm.load` tests stay obvious. 4+6+4+1+8 = 23 bytes in slot 1.
+  Superseded during implementation by the write-locality order below, which is also two slots and also
+  ends with `scheduleId`, but puts the two fields a purchase writes in the same slot.
 
 - [x] Remove `keccak256(abi.encodePacked(msg.sender, token, ++s_scheduleNonce))`. On create, `uint64 scheduleId = (++s_scheduleNonce).toUint64()` and store that value. No hash anywhere (create, validate, events, errors, `PurchaseRbtc.batchBuyRbtc`, getters).
 
@@ -94,6 +112,28 @@ that adds a few hundred bytes to a dex handler should check `forge build --sizes
 - [x] External function arguments that are amounts, periods, or route indexes stay `uint256` with OZ `SafeCast` at the storage boundary (R18). `scheduleId` is the exception: it is `uint64` in the ABI (calldata, events, errors, `DcaSchedule` tuple, `bytes32[]` → `uint64[]` on `batchBuyRbtc`). Calldata still ABI-pads to 32 bytes; the win is storage, not calldata.
 
 - [x] Overflow on `++s_scheduleNonce` uses `SafeCast` (`toUint64`) before the struct write. `type(uint64).max` creates are not a practical test; bound the increment in a unit test that sets the counter near the cap via `vm.store`.
+
+### Purchase-path write locality and the merged user position
+
+- [x] Order `DcaSchedule` by what a purchase writes, not by width: `tokenBalance`,
+  `lastPurchaseTimestamp`, and `paused` share slot 0, so `_rBtcPurchaseChecksEffects` does one SSTORE
+  instead of two; `purchaseAmount`, `purchasePeriod`, `routeIndex`, `scheduleId` fill slot 1 exactly.
+  `scheduleId` stays the last field.
+
+- [x] Merge `LendingErc20Handler.s_shares` / `IdleErc20Handler.s_idleBalances` and
+  `PurchaseRbtc.s_usersAccumulatedRbtc` into one `mapping(address => ITokenHandler.UserPosition)`
+  declared in `StablecoinSource`, the single contract both sides of a handler inherit. Both halves are
+  `uint128` and both are written for every buyer in a batch, so the batch pays one cold SLOAD and one
+  SSTORE per buyer instead of two of each.
+
+- [x] Accumulating writes SafeCast the **sum**, not the addend, so an overflowing position reverts
+  `SafeCastOverflowedUintDowncast` like every other width bound rather than an arithmetic panic.
+
+- [x] Record the new bound: a user's funded balance on one handler is capped at `uint128`. On the idle
+  route that is a `uint128` stablecoin cap. On a lending route the position holds **shares**, whose
+  scale is the venue's exchange rate, so the same cap binds at a different token amount — under the
+  mock rate, shares run ~50x the token amount, putting the cap near 6.8e18 whole tokens per user per
+  handler. Neither is reachable, but the lending bound is venue-dependent and must not be assumed 1:1.
 
 ### FeeHandler
 
@@ -155,7 +195,12 @@ that adds a few hundred bytes to a dex handler should check `forge build --sizes
 
 ## Out of scope
 
-- [ ] Narrowing `LendingErc20Handler.s_shares`, `IdleErc20Handler` balances, or `PurchaseRbtc` accumulated rBTC.
+- [ ] ~~Narrowing `LendingErc20Handler.s_shares`, `IdleErc20Handler` balances, or `PurchaseRbtc`
+  accumulated rBTC.~~ **Brought into scope on 2026-08-28 by explicit decision.** The recorded reason for
+  closing it — "one word per user, narrowing saves no slot" — holds for narrowing each mapping in place,
+  but does not cover *merging two mappings under the same key*, which does free a slot per user and is
+  worth ~4,500 gas per buyer per batch. The financial-risk half of the original reason is addressed by
+  the `uint128` bound recorded above, not dismissed.
 - [ ] Bitmap-packing `s_swappers` / `s_handlerAssigned`.
 - [ ] Storing a hash (full or truncated) or a dual nonce-in-storage / hash-in-ABI id.
 - [ ] Dropping `s_scheduleNonce` or deriving ids from timestamps, array length, or last-element state.

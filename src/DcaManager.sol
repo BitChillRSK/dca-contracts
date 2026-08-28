@@ -31,21 +31,6 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      */
     mapping(address user => mapping(address tokenDeposited => DcaSchedule[] usersDcaSchedules)) private s_dcaSchedules;
 
-    /**
-     * @notice The protocol scalars every create reads, plus the id counter it writes.
-     * @dev One slot (30 of 32 bytes): `createDcaSchedule` loads all four together and stores the
-     * bumped nonce back into the same word. Owner setters take `uint256` and SafeCast here.
-     * @dev `scheduleNonce` is a strictly increasing counter and is the schedule id itself.
-     * Ids must not be derived from array state: swap-pop on delete can restore a previous
-     * array shape within a block, which would let two live schedules share an id.
-     */
-    struct ProtocolSettings {
-        uint32 minPurchasePeriod; // Minimum time between purchases
-        uint16 maxSchedulesPerToken; // Maximum number of schedules per stablecoin
-        uint128 defaultMinPurchaseAmount; // Default minimum purchase amount for all tokens
-        uint64 scheduleNonce; // Last assigned schedule id; 0 before the first schedule is created
-    }
-
     ProtocolSettings private s_protocolSettings;
     mapping(address token => uint256) private s_tokenMinPurchaseAmounts; // Custom minimum purchase amounts per token
 
@@ -232,7 +217,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         ProtocolSettings memory settings = s_protocolSettings;
         uint64 scheduleId = (uint256(settings.scheduleNonce) + 1).toUint64();
 
-        _checkPurchasePeriod(purchasePeriod, settings.minPurchasePeriod);
+        _validatePurchasePeriod(purchasePeriod);
         _validateDeposit(depositAmount);
         uint256 received = _handlerForDeposit(token, route).depositToken(msg.sender, depositAmount);
         // The remaining two checks follow the pull by construction or by history: the minimum
@@ -252,11 +237,11 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         schedules.push(
             DcaSchedule({
                 tokenBalance: received.toUint128(),
+                lastPurchaseTimestamp: 0,
+                paused: false,
                 purchaseAmount: purchase,
                 purchasePeriod: period,
-                lastPurchaseTimestamp: 0,
                 routeIndex: route,
-                paused: false,
                 scheduleId: scheduleId
             })
         );
@@ -510,18 +495,9 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @param purchasePeriod the purchase period to validate
      */
     function _validatePurchasePeriod(uint256 purchasePeriod) private view {
-        _checkPurchasePeriod(purchasePeriod, s_protocolSettings.minPurchasePeriod);
-    }
-
-    /**
-     * @notice the one purchase-period rule, against an already-loaded minimum
-     * @param purchasePeriod the purchase period to validate
-     * @param minPurchasePeriod the protocol minimum this period must reach
-     * @dev `createDcaSchedule` reads the packed scalars once and passes the minimum in; every other
-     *      caller goes through `_validatePurchasePeriod`, which loads it.
-     */
-    function _checkPurchasePeriod(uint256 purchasePeriod, uint256 minPurchasePeriod) private pure {
-        if (purchasePeriod < minPurchasePeriod) revert DcaManager__PurchasePeriodMustBeGreaterThanMinimum();
+        if (purchasePeriod < s_protocolSettings.minPurchasePeriod) {
+            revert DcaManager__PurchasePeriodMustBeGreaterThanMinimum();
+        }
     }
 
     /**

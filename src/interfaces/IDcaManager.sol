@@ -10,17 +10,36 @@ interface IDcaManager {
     ////////////////////////
     // Type declarations ///
     ////////////////////////
-    /// @dev Two storage slots: two uint128 amounts; then uint32 period + uint48 timestamp +
-    ///      uint32 route + bool paused + uint64 scheduleId (23 of 32 bytes). External inputs stay
-    ///      uint256 and are checked at the storage boundary; `scheduleId` is uint64 in the ABI.
+    /// @dev Two storage slots, ordered so that the only two fields a purchase writes share slot 0
+    ///      and one SSTORE: `tokenBalance` + `lastPurchaseTimestamp` + `paused` (23 of 32 bytes).
+    ///      Slot 1 holds the fields a purchase only reads: `purchaseAmount` + `purchasePeriod` +
+    ///      `routeIndex` + `scheduleId`, filling all 32 bytes exactly. External inputs stay uint256
+    ///      and are checked at the storage boundary; `scheduleId` is uint64 in the ABI and stays the
+    ///      last field, so swap-pop and `vm.load` assertions read the same way as before.
     struct DcaSchedule {
         uint128 tokenBalance; // Stablecoin amount deposited by the user
+        uint48 lastPurchaseTimestamp; // Timestamp of the latest purchase
+        bool paused; // Owner-set: purchases are refused while true; every other path stays open
         uint128 purchaseAmount; // Stablecoin amount to spend periodically on rBTC
         uint32 purchasePeriod; // Time between purchases in seconds
-        uint48 lastPurchaseTimestamp; // Timestamp of the latest purchase
         uint32 routeIndex; // OperationsAdmin route that holds this schedule's funds (idle or lending)
-        bool paused; // Owner-set: purchases are refused while true; every other path stays open
         uint64 scheduleId; // Unique identifier of each DCA schedule: the value of the creation nonce
+    }
+
+    /**
+     * @notice The protocol scalars every create reads, plus the id counter it writes.
+     * @dev One slot (30 of 32 bytes): `createDcaSchedule` loads all four together and stores the
+     *      bumped nonce back into the same word. Owner setters take `uint256` and SafeCast at the write.
+     * @dev `scheduleNonce` is a strictly increasing counter and is the schedule id itself. Ids must not
+     *      be derived from array state: swap-pop on delete can restore a previous array shape within a
+     *      block, which would let two live schedules share an id.
+     * @dev Internal storage shape, not an ABI type: the scalars are read through their own getters.
+     */
+    struct ProtocolSettings {
+        uint32 minPurchasePeriod; // Minimum time between purchases
+        uint16 maxSchedulesPerToken; // Maximum number of schedules per stablecoin
+        uint128 defaultMinPurchaseAmount; // Default minimum purchase amount for all tokens
+        uint64 scheduleNonce; // Last assigned schedule id; 0 before the first schedule is created
     }
 
     //////////////////////
