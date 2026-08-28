@@ -11,6 +11,10 @@ import "../script/Constants.sol";
 // which is why this is 4 rather than colliding with `LAYERBANK_INDEX`.
 uint256 constant TROPYKUS_INDEX = 4;
 
+// A route index no lane ever registers, so `getTokenHandler` returns `address(0)` for every token
+// on it. Used to prove the withdraw-all pair loops skip an unassigned pair instead of reverting.
+uint256 constant UNREGISTERED_ROUTE_INDEX = 999;
+
 
 // Token holders on testnet with significant balances (for fork testing)
 address constant DOC_HOLDER_TEST = 0x53Ec0aF115619c536480C95Dec4a065e27E6419F; // Large DOC holder on RSK testnet

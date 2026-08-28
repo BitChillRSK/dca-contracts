@@ -83,8 +83,9 @@ interface IDcaManager {
     error DcaManager__InexistentScheduleIndex();
     error DcaManager__ScheduleIdAndIndexMismatch();
     error DcaManager__ScheduleBalanceNotEnoughForPurchase(uint256 scheduleIndex, uint64 scheduleId, address token, uint256 remainingBalance);
-    error DcaManager__BatchPurchaseArraysLengthMismatch();
+    error DcaManager__ArraysLengthMismatch();
     error DcaManager__EmptyBatchPurchaseArrays();
+    error DcaManager__EmptyWithdrawalArrays();
     error DcaManager__MaxSchedulesPerTokenReached(address token);
     error DcaManager__TokenDoesNotYieldInterest(address token);
     error DcaManager__UnauthorizedSwapper(address sender);
@@ -197,8 +198,10 @@ interface IDcaManager {
 
     /**
      * @notice Withdraw the token accumulated by a user as interest through all the DCA strategies using that token
-     * @param tokens Array of token addresses which the user has deposited
-     * @param routeIndexes Route indexes to withdraw interest from. Idle routes are skipped.
+     * @param tokens The token of each route to withdraw interest from
+     * @param routeIndexes The route index of each route to withdraw interest from. Idle routes are skipped.
+     * @dev the two arrays are positional pairs: `tokens[i]` is only withdrawn from `routeIndexes[i]`.
+     *      The arrays must be the same length and non-empty; an unassigned or non-lending pair is skipped.
      */
     function withdrawAllAccumulatedInterest(address[] calldata tokens, uint256[] calldata routeIndexes) external;
 
@@ -226,8 +229,10 @@ interface IDcaManager {
 
     /**
      * @notice Withdraw all of the rBTC accumulated by a user through their various DCA strategies
-     * @param tokens Array of token addresses which the user has deposited
-     * @param routeIndexes Route indexes whose handlers may hold the user's accumulated rBTC
+     * @param tokens The token of each route to withdraw rBTC from
+     * @param routeIndexes The route index of each route to withdraw rBTC from
+     * @dev the two arrays are positional pairs: `tokens[i]` is only withdrawn from `routeIndexes[i]`.
+     *      The arrays must be the same length and non-empty; an unassigned or zero-balance pair is skipped.
      */
     function withdrawAllAccumulatedRbtc(address[] calldata tokens, uint256[] calldata routeIndexes) external;
 

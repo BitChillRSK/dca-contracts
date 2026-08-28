@@ -144,8 +144,9 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
 
         uint256 userDocBefore = docToken.balanceOf(USER);
         uint256 idleBalanceBefore = handler.getUsersIdleTokenBalance(USER);
-        address[] memory tokens = new address[](1);
+        address[] memory tokens = new address[](2);
         tokens[0] = address(docToken);
+        tokens[1] = address(docToken);
         uint256[] memory indexes = new uint256[](2);
         indexes[0] = IDLE_INDEX;
         indexes[1] = lendingIndex;

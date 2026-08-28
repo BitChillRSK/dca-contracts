@@ -320,7 +320,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         address[] memory users = new address[](1);
         uint256[] memory dummyUintArray = new uint256[](3);
         uint64[] memory dummyScheduleIdArray = new uint64[](3);
-        vm.expectRevert(IDcaManager.DcaManager__BatchPurchaseArraysLengthMismatch.selector);
+        vm.expectRevert(IDcaManager.DcaManager__ArraysLengthMismatch.selector);
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
             users,

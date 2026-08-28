@@ -1,6 +1,6 @@
 # R38 — Zip withdraw-all route pairs
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
 PR 45 of the relaunch stack. Stack on R37 (PR 44). **Must land before R9 (ABI freeze).** R18/R19/R50 and R39–R48 already settled the other DcaManager/handler ABI changes by this point.
 
@@ -68,30 +68,40 @@ pairs short of another redeploy.
 
 ## Scope
 
-- [ ] `DcaManager.withdrawAllAccumulatedInterest`: single loop over zipped `(tokens[i], routeIndexes[i])`.
-- [ ] `DcaManager.withdrawAllAccumulatedRbtc`: same.
-- [ ] Length check on both, reverting with a new `DcaManager__WithdrawalArraysLengthMismatch()`, named to
-      match the existing `DcaManager__BatchPurchaseArraysLengthMismatch()`.
-- [ ] Keep every existing skip unchanged: `address(0)` handler, `!_tokenYieldsInterest(routeIndex)` on the
+- [x] `DcaManager.withdrawAllAccumulatedInterest`: single loop over zipped `(tokens[i], routeIndexes[i])`.
+- [x] `DcaManager.withdrawAllAccumulatedRbtc`: same.
+- [x] Length check on both, reverting with `DcaManager__ArraysLengthMismatch()` — the same error
+      `batchBuyRbtc` uses. Review follow-up: one selector instead of a withdrawal-specific twin named
+      after `BatchPurchaseArraysLengthMismatch`. Empty/length checks live in
+      `_requirePairedWithdrawalArrays`, shared by both withdraw-alls.
+- [x] Keep every existing skip unchanged: `address(0)` handler, `!_tokenYieldsInterest(routeIndex)` on the
       interest path, and `getAccumulatedRbtcBalance == 0` on the rBTC path. A caller naming an unregistered
       or idle pair must still be skipped, not reverted.
-- [ ] `IDcaManager` signatures and natspec, stating that arguments are positional pairs.
-- [ ] Revert on empty arrays with a new `DcaManager__EmptyWithdrawalArrays()`, matching the existing
+- [x] `IDcaManager` signatures and natspec, stating that arguments are positional pairs. The parameter
+      docs now read "the token of each route" / "the route index of each route" rather than describing
+      two independent sets, so the calldata shape is legible from the ABI alone.
+- [x] Revert on empty arrays with a new `DcaManager__EmptyWithdrawalArrays()`, matching the existing
       `DcaManager__EmptyBatchPurchaseArrays()` on `batchBuyRbtc`. Both withdraw-alls currently succeed
       silently on empty input, so a caller whose route filter returned nothing gets a green transaction
       that did nothing. The frontend already guards `tokens.length === 0` before sending, so nothing
       legitimate is broken by making it explicit.
-- [ ] Confirm `_tokenYieldsInterest` is no longer called per combination. It is an external staticcall to
-      `OperationsAdmin.isLendingRoute` that depends only on the route index, so the current nested form
-      makes `tokens.length × routeIndexes.length` calls where one per pair suffices. This falls out of the
-      zip rather than needing its own change — assert it rather than implement it.
-- [ ] Rename the misspelled `scheudulePurchaseAmount` local in `batchBuyRbtc` (`DcaManager.sol`, two
+- [x] Confirmed: `_tokenYieldsInterest` is now called once per pair. Asserted, not assumed —
+      `testWithdrawAllInterestOnlyCallsTheNamedPairs` pins `isLendingRoute(ROUTE_ONE)` and
+      `isLendingRoute(ROUTE_TWO)` at exactly one call each with `vm.expectCall`. Re-running that test
+      against the pre-change nested loop fails with "expected 1 time, but was called 2 times", so the
+      assertion is a real guard rather than a restatement of the new shape.
+- [x] Renamed the misspelled `scheudulePurchaseAmount` local in `batchBuyRbtc` (`DcaManager.sol`, two
       occurrences) to `schedulePurchaseAmount`. Local variable only — no selector, event, error, or
       behavior change. **This spec explicitly authorizes it as an exception to the "No drive-by refactors"
       rule in `AGENTS.md`**, because it sits in a function this PR does not otherwise touch: R10's natspec
       pass does not reach local names, R32 is closed, and nothing else is scheduled to open this file
-      before the freeze. Name it in **Files beyond the spec** in the PR body.
-- [ ] Update tests, fuzz wrappers, and checked-in consumers to the paired form.
+      before the freeze. Named in **Files beyond the spec** in the PR body.
+- [x] Updated tests and checked-in consumers to the paired form. The fuzz wrappers in
+      `test/ai-generated/fuzz/Handler.t.sol` already sent one token and one route index, so they were
+      valid pairs unchanged; the two call sites that were genuinely cartesian were
+      `DcaManagerEdgeCasesTest.test_withdrawAllAccumulatedRbtcAndInterest_mixedValidInvalidCombinations`
+      (one token × three routes) and `IdleDcaManagerTest.test_withdrawAllAccumulatedInterest_skipsIdleAndWithdrawsLending`
+      (one token × two routes), both now repeating the token once per route.
 
 ## Out of scope
 
@@ -129,7 +139,7 @@ Behaviors:
   `(DOC, sovryn)`, the paired call produces exactly two handler calls and none on `(DOC, layerbank)`.
   Assert on the third handler directly — `vm.expectCall` with count `0`, or the absence of its
   interest-withdrawn event — not merely on the user's resulting balance, which is equal either way.
-- `tokens.length != routeIndexes.length` reverts `DcaManager__WithdrawalArraysLengthMismatch`.
+- `tokens.length != routeIndexes.length` reverts `DcaManager__ArraysLengthMismatch`.
 - An unregistered pair in the middle of a valid list is skipped, and the pairs after it still execute.
 - An idle route is skipped on the interest path; a zero rBTC balance is skipped on the rBTC path.
 - A duplicated pair is harmless (the second pass finds nothing left to withdraw).
@@ -145,15 +155,43 @@ Fork tests: this item adds no fork-specific assertions. `AGENTS.md` still requir
 
 ## Success criteria
 
-- [ ] Both functions consume positional `(token, routeIndex)` pairs; no nested loop remains.
-- [ ] The mixed-route case calls only the handlers the user holds a position on, proven by a call-count or
-      event assertion rather than a balance assertion.
-- [ ] Mismatched lengths revert; unregistered, idle, and zero-balance pairs are still skipped rather than
+- [x] Both functions consume positional `(token, routeIndex)` pairs; no nested loop remains.
+- [x] The mixed-route case calls only the handlers the user holds a position on, proven by call counts
+      rather than balances. `WithdrawAllRoutePairsTest` registers a real handler on the cross pair
+      `(tokenOne, ROUTE_TWO)` — an unassigned one would be skipped on the zero-address check and prove
+      nothing — and asserts zero calls to it, plus zero `getTokenHandler(tokenOne, ROUTE_TWO)` lookups.
+      The rBTC path is proven the same way without needing a purchase: the per-pair
+      `getAccumulatedRbtcBalance` read is itself a handler call, so its count identifies which handlers
+      the loop reached.
+- [x] Mismatched lengths revert; unregistered, idle, and zero-balance pairs are still skipped rather than
       reverting.
-- [ ] Empty arrays revert on both functions, matching `batchBuyRbtc`.
-- [ ] `isLendingRoute` is called once per pair, asserted by call count rather than assumed from the shape.
-- [ ] No `scheudule` spelling remains in `src/`.
-- [ ] Done-gate (`make check`) passes, and both fork lanes pass before push.
+- [x] Empty arrays revert on both functions, matching `batchBuyRbtc`.
+- [x] `isLendingRoute` is called once per pair, asserted by call count rather than assumed from the shape.
+- [x] `grep -rn "scheudule" src/ test/ script/` returns nothing.
+- [x] Done-gate (`make check`) passes, and both fork lanes pass before push.
+
+Test counts per lane (before → after). The DOC MoC lanes gain all 16 new cases; the USDRIF/USDT0 dex
+lanes gain the 9 that are lane-agnostic plus one skipped suite, because `WithdrawAllRoutePairsTest`
+mints its own second stablecoin and needs the LayerBank mocks, so it is Anvil-and-DOC only like
+`VersionedRouteAccountingTest`.
+
+| lane | before (pass / skip / total) | after |
+|---|---|---|
+| `make moc-none` | 712 / 19 / 731 | 728 / 19 / 747 |
+| `make moc-layerbank` | 715 / 16 / 731 | 731 / 16 / 747 |
+| `make moc-sovryn` | 726 / 5 / 731 | 742 / 5 / 747 |
+| `STABLECOIN_TYPE=USDRIF make dex-sovryn` | 435 / 33 / 468 | 436 / 34 / 470 |
+| `STABLECOIN_TYPE=USDRIF make dex-layerbank` | 686 / 23 / 709 | 695 / 24 / 719 |
+| `STABLECOIN_TYPE=USDT0 make dex-layerbank` | 686 / 23 / 709 | 695 / 24 / 719 |
+| `make invariants-sovryn` | 9 / 0 / 9 | 9 / 0 / 9 |
+| `make fork-sovryn` | 299 / 14 / 313 | 307 / 15 / 322 |
+| `make fork-tropykus` | 292 / 18 / 310 | 300 / 19 / 319 |
+
+`DcaManager` runtime 22,470 → 22,578 bytes (EIP-170 margin 2,106 → 1,998): the empty-array
+guards cost more than the removed inner loop saves; a review follow-up then shared
+`_requirePairedWithdrawalArrays` and folded both length-mismatch errors into
+`DcaManager__ArraysLengthMismatch`, which clawed 86 bytes back from the 22,664 first-push size.
+No handler changed.
 
 ## Reviewer checklist
 
@@ -166,8 +204,12 @@ Fork tests: this item adds no fork-specific assertions. `AGENTS.md` still requir
 ## ABI / deploy / cutover impact
 
 - ABI: argument semantics change on `withdrawAllAccumulatedInterest` / `withdrawAllAccumulatedRbtc`
-  (or two new selectors, per decision 1), plus two new errors —
-  `DcaManager__WithdrawalArraysLengthMismatch()` and `DcaManager__EmptyWithdrawalArrays()`. No event
+  — the selectors are unchanged, so an un-updated caller compiles and sends successfully while meaning
+  something different; this is the same-selector semantic change decision 1 accepted, and it is called
+  out here and in the PR body rather than softened with a legacy alias. Plus `DcaManager__EmptyWithdrawalArrays()`,
+  and `DcaManager__ArraysLengthMismatch()` which also replaces `DcaManager__BatchPurchaseArraysLengthMismatch()`
+  on `batchBuyRbtc` (same check, one selector). Empty errors stay split (`EmptyBatchPurchaseArrays` /
+  `EmptyWithdrawalArrays`) so a revert still names the entry point. No event
   change. The local-variable rename has no ABI surface.
 - Scripts: none.
 - Cutover: the frontend must send explicit pairs — one `tokens[i]` per `routeIndexes[i]` — and drops the
@@ -175,11 +217,14 @@ Fork tests: this item adds no fork-specific assertions. `AGENTS.md` still requir
   `data-api`'s `InterestWithdrawal` entity and `bitchill-monitoring`'s backfill both consume handler events
   and neither decodes the withdraw-all calldata arrays.
 - **Frontend follow-up required** (`AGENTS.md` **Frontend follow-up**). This PR changes an argument list
-  and adds two custom errors on `DcaManager`, so the implementer opens or updates an issue on
-  `bitChillRSK/front-end` in the same turn as opening the contracts PR and pastes the URL in the PR
-  **Cutover / frontend note**. Search first: BitChillRSK/front-end#13 already scopes the cartesian API out
-  to `dca-contracts` and is the natural place to comment rather than opening a duplicate. The issue body
-  should name the old vs new call, and the files that still assume the cartesian form —
+  and adds `DcaManager__EmptyWithdrawalArrays` plus `DcaManager__ArraysLengthMismatch` (the latter also
+  replaces `BatchPurchaseArraysLengthMismatch` on `batchBuyRbtc`), so the implementer opens or updates
+  an issue on `bitChillRSK/front-end` in the same turn as opening the contracts PR and pastes the URL in
+  the PR **Cutover / frontend note**. Search first: BitChillRSK/front-end#13 already scopes the cartesian
+  API out to `dca-contracts`. Done at implementation time as
+  [front-end#21](https://github.com/BitChillRSK/front-end/issues/21) — a new issue rather than a comment
+  on #13, which was already closed. Review follow-up comments on #21 for the error rename. The issue
+  body names the old vs new call, and the files that still assume the cartesian form —
   `src/features/interest/utils/uniqueTokensAndProtocolIndexes.ts` (deleted), `InterestDashboard.tsx`, and
   `AccumulatedRbtcCard.tsx`.
 - Behavior change beyond the signature: an empty-array call now reverts instead of succeeding as a no-op.
