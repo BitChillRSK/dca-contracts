@@ -1,8 +1,8 @@
 # R10 — First-party natspec and comments
 
-Status: **implemented** · Assigned: yes · Optional/further-review: no
+Status: **PR [#100](https://github.com/BitChillRSK/dca-contracts/pull/100)** · Assigned: yes · Optional/further-review: no
 
-PR 48 of the relaunch stack. Final item. Stack on R9 (PR 47). ABI, names, handlers, route maps, packing, pauses, and the swapper batcher are already frozen. This PR only documents that surface.
+PR 48 of the relaunch stack. GitHub [#100](https://github.com/BitChillRSK/dca-contracts/pull/100). Final item. Stack on R9 (PR 47). ABI, names, handlers, route maps, packing, pauses, and the swapper batcher are already frozen. This PR only documents that surface.
 
 ## Objective
 
