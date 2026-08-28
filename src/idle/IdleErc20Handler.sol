@@ -38,18 +38,16 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
      * @notice deposit the full token amount for DCA on the contract
      * @param user: the address of the user making the deposit
      * @param depositAmount: the amount requested from the user
-     * @return depositedAmount the amount actually credited to the user's idle balance, equal to depositAmount
      * @dev TokenHandler owns the balance-delta measurement and reverts unless the delta equals the request,
-     * so a fee-on-transfer token never reaches the idle balance.
+     * so a fee-on-transfer token never reaches the idle balance. The idle mapping is credited with the request.
      */
     function depositToken(address user, uint256 depositAmount)
         public
         override
         onlyDcaManager
-        returns (uint256 depositedAmount)
     {
-        depositedAmount = super.depositToken(user, depositAmount);
-        s_idleBalances[user] += depositedAmount;
+        super.depositToken(user, depositAmount);
+        s_idleBalances[user] += depositAmount;
     }
 
     /**

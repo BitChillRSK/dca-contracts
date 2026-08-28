@@ -45,7 +45,7 @@ interface IPurchaseUniswap {
     error PurchaseUniswap__OutdatedPrice();
     error PurchaseUniswap__ZeroPurchaseToken();
     error PurchaseUniswap__UnsupportedStablecoinDecimals(uint8 stablecoinDecimals);
-    error PurchaseUniswap__UnsupportedWrbtcDecimals(uint8 wrBtcDecimals);
+
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/

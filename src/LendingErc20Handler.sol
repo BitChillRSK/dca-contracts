@@ -45,21 +45,19 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
      * @notice deposit the full token amount for DCA on the contract
      * @param user: the address of the user making the deposit
      * @param depositAmount: the amount requested from the user
-     * @return depositedAmount the stablecoin amount actually received before minting shares; TokenHandler reverts
-     * unless it equals depositAmount, so the mint always uses the full request
+     * @dev TokenHandler reverts unless the pull matches `depositAmount`, so the mint always uses the full request
      */
     function depositToken(address user, uint256 depositAmount)
         public
         override(TokenHandler, ITokenHandler)
         onlyDcaManager
-        returns (uint256 depositedAmount)
     {
-        depositedAmount = super.depositToken(user, depositAmount);
+        super.depositToken(user, depositAmount);
         address spender = _lendingSpender();
-        if (i_stableToken.allowance(address(this), spender) < depositedAmount) {
-            i_stableToken.forceApprove(spender, depositedAmount);
+        if (i_stableToken.allowance(address(this), spender) < depositAmount) {
+            i_stableToken.forceApprove(spender, depositAmount);
         }
-        uint256 mintedAmount = _protocolDeposit(depositedAmount);
+        uint256 mintedAmount = _protocolDeposit(depositAmount);
         if (mintedAmount == 0) revert TokenLending__LendingProtocolDepositFailed();
         s_shares[user] += mintedAmount;
     }
