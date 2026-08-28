@@ -46,14 +46,16 @@ abstract contract TokenHandler is ITokenHandler, ERC165, FeeHandler, DcaManagerA
      * @param depositAmount: the amount requested from the user
      * @return depositedAmount the amount this contract actually received (balance delta around transferFrom),
      * which this function guarantees equals depositAmount
-     * @dev The listed stablecoins are 1:1, so a delta below the request means the token started taking a transfer
-     * fee. That fails closed: the transferFrom rolls back with the rest of the transaction rather than crediting
-     * the user a schedule balance smaller than the one they asked for.
+     * @dev The listed stablecoins are 1:1, so a delta other than the request means the token started taking a
+     * transfer fee (or a hook minted extra). That fails closed: the transferFrom rolls back with the rest of the
+     * transaction rather than crediting the user a schedule balance they did not ask for. A drop in
+     * `balanceOf` is reported as received 0 rather than underflowing.
      */
     function depositToken(address user, uint256 depositAmount) public virtual override onlyDcaManager returns (uint256 depositedAmount) {
         uint256 balanceBefore = i_stableToken.balanceOf(address(this));
         i_stableToken.safeTransferFrom(user, address(this), depositAmount);
-        depositedAmount = i_stableToken.balanceOf(address(this)) - balanceBefore;
+        uint256 balanceAfter = i_stableToken.balanceOf(address(this));
+        depositedAmount = balanceAfter < balanceBefore ? 0 : balanceAfter - balanceBefore;
         if (depositedAmount != depositAmount) revert TokenHandler__DepositAmountMismatch(depositAmount, depositedAmount);
         emit TokenHandler__TokenDeposited(address(i_stableToken), user, depositedAmount);
     }

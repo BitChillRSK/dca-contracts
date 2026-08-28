@@ -170,6 +170,43 @@ contract FeeOnTransferDepositTest is Test {
         assertEq(token.balanceOf(USER), userBefore);
     }
 
+    function test_create_revertsWhenTransferCreditsMoreThanRequested() public {
+        uint256 extra = 1 ether;
+        token.setExtraCredit(extra);
+        uint256 userBefore = token.balanceOf(USER);
+
+        vm.prank(USER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ITokenHandler.TokenHandler__DepositAmountMismatch.selector, REQUESTED, REQUESTED + extra
+            )
+        );
+        dcaManager.createDcaSchedule(address(token), REQUESTED, REQUESTED, MIN_PURCHASE_PERIOD, IDLE_INDEX);
+
+        assertEq(dcaManager.getDcaSchedules(USER, address(token)).length, 0);
+        assertEq(idleHandler.getUsersIdleTokenBalance(USER), 0);
+        assertEq(token.balanceOf(USER), userBefore);
+    }
+
+    function test_create_revertsWhenHandlerBalanceFalls() public {
+        uint256 otherIdleBefore = _createIdle(OTHER, MIN_PURCHASE_AMOUNT);
+        // Incoming REQUESTED then burn REQUESTED+1 so the handler's balanceOf drops below balanceBefore.
+        token.setRecipientBurn(REQUESTED + 1);
+        uint256 userBefore = token.balanceOf(USER);
+
+        vm.prank(USER);
+        vm.expectRevert(
+            abi.encodeWithSelector(ITokenHandler.TokenHandler__DepositAmountMismatch.selector, REQUESTED, 0)
+        );
+        dcaManager.createDcaSchedule(address(token), REQUESTED, REQUESTED, MIN_PURCHASE_PERIOD, IDLE_INDEX);
+
+        assertEq(dcaManager.getDcaSchedules(USER, address(token)).length, 0);
+        assertEq(idleHandler.getUsersIdleTokenBalance(USER), 0);
+        assertEq(token.balanceOf(USER), userBefore);
+        assertEq(idleHandler.getUsersIdleTokenBalance(OTHER), otherIdleBefore);
+        assertEq(dcaManager.getDcaSchedules(OTHER, address(token))[0].tokenBalance, otherIdleBefore);
+    }
+
     function test_create_lending_revertsBeforeMintingAnyShares() public {
         token.setFeeBps(FEE_BPS);
         uint256 userBefore = token.balanceOf(USER);

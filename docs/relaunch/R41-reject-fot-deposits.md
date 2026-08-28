@@ -61,6 +61,8 @@ Then `make check`.
 - 1:1 deposit still credits the requested amount (existing lanes).
 - FOT `transferFrom` on `createDcaSchedule` and `depositToken` reverts `TokenHandler__DepositAmountMismatch`; no `TokenBalanceUpdated` / `TokenDeposited`; user balance restored.
 - Zero-received still reverts (same error, `received == 0`).
+- Over-delivery (`received > requested`) reverts the same error.
+- A drop in handler `balanceOf` during `transferFrom` reverts `TokenHandler__DepositAmountMismatch(requested, 0)`, not a panic; other users' funds roll back.
 - Withdraw of a 1:1 deposit is unchanged.
 
 Fork: no new assertions. Still run both fork lanes before push.
@@ -96,6 +98,13 @@ balance checks already covered by `DcaConfigurationTest` and `DcaManagerEdgeCase
 back and neither `TokenHandler__TokenDeposited` nor `DcaManager__TokenBalanceUpdated` can be observed. The tests
 assert the post-revert state instead: no schedule, no handler credit, no shares, unchanged wallet, and a zero
 balance at the token's fee recipient.
+
+**Saturating hop-1 delta (audit follow-up).** A `balanceOf` that falls during `transferFrom` used to underflow the
+subtraction and panic. The delta is now `0` when `balanceAfter < balanceBefore`, so that path reverts
+`TokenHandler__DepositAmountMismatch(requested, 0)` like a zero receipt. Over-delivery (`received > requested`)
+is the same `!=` predicate; both branches now have tests. `MockFeeOnTransferStablecoin` gained `setExtraCredit`
+and `setRecipientBurn` knobs for those cases. `createDcaSchedule` natspec no longer says purchase amount is
+validated against a credited balance that can differ from the request.
 
 ## Reviewer checklist
 
