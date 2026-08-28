@@ -1,6 +1,6 @@
 # R48 — Per-route deposit intake pause
 
-Status: **assigned** · Assigned: yes · Optional/further-review: no
+Status: **PR [#88](https://github.com/BitChillRSK/dca-contracts/pull/88)** · Assigned: yes · Optional/further-review: no
 
 PR 38 of the relaunch stack. Stack on R40 (PR 37). Land before user schedule pausing, packing, and R9.
 
