@@ -1,6 +1,6 @@
 # R42 — Swapper batcher (one tx, many `batchBuyRbtc`)
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
 PR 46 of the relaunch stack. Stack on R38 (PR 45). Lands **before** R9/R10 so the event/ABI review and final natspec pass see every first-party contract that ships. It does not change `DcaManager`’s surface.
 
@@ -30,22 +30,22 @@ Decided 2026-08-27: **ship the batcher** as a relaunch item, not optional-late.
 
 **none** — decided 2026-08-27: calls are all-or-nothing, with no `try/catch`; the bot EOA remains allowlisted as a break-glass/single-handler retry path alongside the batcher.
 
-**Re-confirm that trade against R19 before implementing.** R19 (PR 39) shipped a free, instant,
-reversible per-schedule purchase pause, and a paused row reverts its whole `batchBuyRbtc`. Bundling
-means one paused schedule now takes down **every venue in the bundle**, not just its own
-token×route, and the only mitigation is the bot's off-chain filter, which races the pause. The
-all-or-nothing decision predates that and still looks right — partial bundles reintroduce exactly
-the partial-failure accounting this design avoids, and the allowlisted bot EOA is the break-glass —
-but this PR should say so explicitly rather than inherit the decision silently. See
+**Re-confirmed against R19 (2026-08-28).** A paused row still reverts its own `batchBuyRbtc`, and
+because the batcher has no `try/catch`, that revert now rolls back every other venue in the same
+transaction. `testPausedScheduleInSecondGroupRollsBackTheFirst` pins that blast radius. Partial
+bundles would reintroduce the partial-failure accounting this design exists to avoid: some
+handlers purchased, others not, from a single receipt the bot cannot split. The off-chain pause
+filter remains the only mitigation and still races the pause; the allowlisted bot EOA is the
+per-handler retry when a bundle reverts. Keep all-or-nothing. See
 [`R19-schedule-pause.md`](./R19-schedule-pause.md).
 
 ## Scope
 
-- [ ] `src/SwapperBatcher.sol` (name may vary): immutable `dcaManager`, no token custody, no `receive` that holds rBTC.
-- [ ] One external function that takes an array of `batchBuyRbtc` argument groups (token, routeIndex, parallel buyer/index/id/amount arrays) and forwards each group to `DcaManager.batchBuyRbtc`. Empty top-level array reverts. Per-group empty/length checks stay on `DcaManager`.
-- [ ] No `onlySwapper` on the batcher itself unless you also want to stop random EOAs from driving it — `DcaManager` already reverts `UnauthorizedSwapper` unless `msg.sender` is allowlisted. The batcher **is** `msg.sender` for those calls, so it must be `addSwapper`’d. An extra allowlist on the batcher is optional and must not duplicate a second source of truth; default is none.
-- [ ] Add-on `script/DeploySwapperBatcher.s.sol` (local/test). Live `addSwapper` is ops, not this PR’s broadcast.
-- [ ] Tests: two handlers (e.g. idle DOC + Sovryn DOC, or two route indexes on one admin) succeed in one `batcher` call; a revert in the second group rolls back the first; an address that is not a swapper cannot use the batcher to purchase (DcaManager revert) unless the batcher itself is allowlisted in the test fixture.
+- [x] `src/SwapperBatcher.sol` (name may vary): immutable `dcaManager`, no token custody, no `receive` that holds rBTC.
+- [x] One external function that takes an array of `batchBuyRbtc` argument groups (token, routeIndex, parallel buyer/index/id/amount arrays) and forwards each group to `DcaManager.batchBuyRbtc`. Empty top-level array reverts. Per-group empty/length checks stay on `DcaManager`.
+- [x] No `onlySwapper` on the batcher itself unless you also want to stop random EOAs from driving it — `DcaManager` already reverts `UnauthorizedSwapper` unless `msg.sender` is allowlisted. The batcher **is** `msg.sender` for those calls, so it must be `addSwapper`’d. An extra allowlist on the batcher is optional and must not duplicate a second source of truth; default is none.
+- [x] Add-on `script/DeploySwapperBatcher.s.sol` (local/test). Live `addSwapper` is ops, not this PR’s broadcast.
+- [x] Tests: two handlers (e.g. idle DOC + Sovryn DOC, or two route indexes on one admin) succeed in one `batcher` call; a revert in the second group rolls back the first; an address that is not a swapper cannot use the batcher to purchase (DcaManager revert) unless the batcher itself is allowlisted in the test fixture.
 
 ## Out of scope
 
@@ -73,10 +73,10 @@ Targeted new test file, then `make check`.
 
 ## Success criteria
 
-- [ ] Cron can drive every due handler in one tx through the batcher.
-- [ ] Failure policy matches decision 1, tested.
-- [ ] No DcaManager selector/event/error change.
-- [ ] No open product decisions.
+- [x] Cron can drive every due handler in one tx through the batcher.
+- [x] Failure policy matches decision 1, tested.
+- [x] No DcaManager selector/event/error change.
+- [x] No open product decisions.
 
 ## Reviewer checklist
 

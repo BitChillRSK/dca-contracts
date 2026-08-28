@@ -26,6 +26,7 @@ Do not Grep/`Glob` `out/`, `cache/`, or `lib/` (see `.cursorignore`). Open a `li
 
 ```
 DcaManager          user + swapper entry; schedules
+SwapperBatcher      allowlisted swapper; one tx forwards several batchBuyRbtc groups (holds no funds)
 OperationsAdmin     roles; token × lending-index → handler
 FeeHandler          fee math (inherited by TokenHandler and PurchaseRbtc)
 TokenHandler        deposit/withdraw stablecoin (owns FeeHandler)
