@@ -83,7 +83,7 @@ Then `make check`. Fork: no new assertions beyond what `EXTERNAL_REWARDS.md` nee
 
 ## ABI / deploy / cutover impact
 
-- ABI: freeze. Topic0 changes wherever `indexed` moves. New `UserSharesUpdated` and `FeeTransferred`. Indexers must resubscribe.
+- ABI: freeze. Topic0 is `keccak256` of the event name and parameter types; `indexed` is not part of that hash, so existing events keep their topic0 and only move un-indexed values from topics into data. New topic0s are only `UserSharesUpdated` and `FeeTransferred`. Indexers update the ABI/decoder for the layout change and subscribe to those two new signatures; they do not migrate existing topic0 filters.
 - Scripts: none.
 - Runtime (no IR): `DcaManager` 22,647 (margin 1,929); `SovrynErc20HandlerDex` 22,925 (margin 1,651); `LayerBankErc20HandlerDex` 23,385 (margin 1,191). The new logs live on the shared lending/fee bases, so every lending handler grew; Dex remains under EIP-170.
 - Cutover: **Frontend follow-up** if the app decodes these logs (likely monitoring more than the UI). Search `bitChillRSK/front-end` and the monitoring repo; comment or open issues. Do not implement Telegram here.
