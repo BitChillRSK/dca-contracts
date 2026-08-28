@@ -224,11 +224,11 @@ contract RoleSecurityTest is Test {
             TROPYKUS_INDEX
         );
         
-        bytes32 scheduleId = dcaManager.getDcaSchedule(user, address(stablecoin), 0).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(user, address(stablecoin), 0).scheduleId;
 
         address[] memory buyers = new address[](1);
         uint256[] memory scheduleIndexes = new uint256[](1);
-        bytes32[] memory scheduleIds = new bytes32[](1);
+        uint64[] memory scheduleIds = new uint64[](1);
         uint256[] memory purchaseAmounts = new uint256[](1);
         buyers[0] = user;
         scheduleIds[0] = scheduleId;
@@ -273,7 +273,7 @@ contract RoleSecurityTest is Test {
         users[0] = address(0x6666);
         uint256[] memory scheduleIndexes = new uint256[](1);
         scheduleIndexes[0] = 0;
-        bytes32[] memory scheduleIds = new bytes32[](1);
+        uint64[] memory scheduleIds = new uint64[](1);
         uint256[] memory purchaseAmounts = new uint256[](1);
         purchaseAmounts[0] = 100 ether;
         

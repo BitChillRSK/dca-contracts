@@ -242,7 +242,7 @@ contract StablecoinLendingTest is DcaDappTest {
         uint256 userStablecoinBalanceBeforeInterestWithdrawal = stablecoin.balanceOf(USER);
         assertGt(withdrawableInterest, 0);
 
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
         vm.prank(USER);
         dcaManager.withdrawTokenAndInterest(address(stablecoin), 0, scheduleId, AMOUNT_TO_SPEND);
 

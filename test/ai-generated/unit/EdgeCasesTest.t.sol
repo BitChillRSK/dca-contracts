@@ -18,7 +18,7 @@ import "script/Constants.sol";
 import {IWRBTC} from "src/interfaces/IWRBTC.sol";
 import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces/ISwapRouter02.sol";
 import {ICoinPairPrice} from "src/interfaces/ICoinPairPrice.sol";
-import {handlerBatchBuyOne} from "../../utils/BatchBuyOne.sol";
+import {handlerBatchBuyOne, UNUSED_SCHEDULE_ID} from "../../utils/BatchBuyOne.sol";
 import {IPurchaseRbtc} from "../../../src/interfaces/IPurchaseRbtc.sol";
 
 contract EdgeCasesTest is Test {
@@ -70,7 +70,7 @@ contract EdgeCasesTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(IPurchaseRbtc.PurchaseRbtc__RbtcBatchPurchaseFailed.selector, address(doc))
         );
-        handlerBatchBuyOne(IPurchaseRbtc(address(handler)), USER, bytes32("schedule"), 100 ether);
+        handlerBatchBuyOne(IPurchaseRbtc(address(handler)), USER, UNUSED_SCHEDULE_ID, 100 ether);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -155,7 +155,7 @@ contract EdgeCasesTest is Test {
         dex.depositToken(USER, 600 ether);
 
         vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__OutdatedPrice.selector);
-        handlerBatchBuyOne(IPurchaseRbtc(address(dex)), USER, bytes32("sched"), 100 ether);
+        handlerBatchBuyOne(IPurchaseRbtc(address(dex)), USER, UNUSED_SCHEDULE_ID, 100 ether);
     }
 
     /*//////////////////////////////////////////////////////////////

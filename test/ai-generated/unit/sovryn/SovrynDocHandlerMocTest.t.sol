@@ -55,7 +55,7 @@ contract SovrynDocHandlerMocTest is Test {
     function test_lengthOneBatch_flow() public {
         uint256 depositAmount = 600 ether;
         uint256 purchaseAmount = 120 ether;
-        bytes32 scheduleId = keccak256("schedule");
+        uint64 scheduleId = 1;
 
         handler.depositToken(USER, depositAmount);
         handlerBatchBuyOne(IPurchaseRbtc(address(handler)), USER, scheduleId, purchaseAmount);
@@ -87,12 +87,12 @@ contract SovrynDocHandlerMocTest is Test {
 
         // Batch buy arrays
         address[] memory buyers = new address[](2);
-        bytes32[] memory scheduleIds = new bytes32[](2);
+        uint64[] memory scheduleIds = new uint64[](2);
         uint256[] memory purchaseAmounts = new uint256[](2);
         buyers[0] = user1;
         buyers[1] = user2;
-        scheduleIds[0] = keccak256("sche0");
-        scheduleIds[1] = keccak256("sche1");
+        scheduleIds[0] = 1;
+        scheduleIds[1] = 2;
         purchaseAmounts[0] = 60 ether;
         purchaseAmounts[1] = 140 ether;
 

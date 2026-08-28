@@ -50,7 +50,7 @@ contract NetRedemptionTest is DcaDappTest {
     function test_sovryn_singleScheduleBatchSpendsTheNetRedeemedAmount() public onlySovrynMocMocks {
         _enableExitFee();
 
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         uint256 rbtcBefore = _accumulatedRbtc();
 
         buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
@@ -75,7 +75,7 @@ contract NetRedemptionTest is DcaDappTest {
         (
             address[] memory users,
             uint256[] memory scheduleIndexes,
-            bytes32[] memory scheduleIds,
+            uint64[] memory scheduleIds,
             uint256[] memory purchaseAmounts
         ) = _batchArrays();
 
@@ -103,7 +103,7 @@ contract NetRedemptionTest is DcaDappTest {
     function test_sovryn_withdrawTokenDebitsTheRequestedAmount() public onlySovrynMocMocks {
         _enableExitFee();
 
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         uint256 scheduleBalanceBefore = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
         uint256 userDocBefore = stablecoin.balanceOf(USER);
 
@@ -126,7 +126,7 @@ contract NetRedemptionTest is DcaDappTest {
     function test_sovryn_remainderIsWhatWasNotRequestedAndStaysWithdrawable() public onlySovrynMocMocks {
         _enableExitFee();
 
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         vm.prank(USER);
         dcaManager.withdrawToken(address(stablecoin), SCHEDULE_INDEX, scheduleId, WITHDRAWAL_AMOUNT);
 
@@ -146,7 +146,7 @@ contract NetRedemptionTest is DcaDappTest {
     function test_sovryn_deleteDcaScheduleReportsTheAmountActuallyPaid() public onlySovrynMocMocks {
         _enableExitFee();
 
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         uint256 userDocBefore = stablecoin.balanceOf(USER);
 
         vm.recordLogs();
@@ -193,7 +193,7 @@ contract NetRedemptionTest is DcaDappTest {
         (
             address[] memory users,
             uint256[] memory scheduleIndexes,
-            bytes32[] memory scheduleIds,
+            uint64[] memory scheduleIds,
             uint256[] memory purchaseAmounts
         ) = _batchArrays();
 
@@ -236,7 +236,7 @@ contract NetRedemptionTest is DcaDappTest {
         (
             address[] memory users,
             uint256[] memory scheduleIndexes,
-            bytes32[] memory scheduleIds,
+            uint64[] memory scheduleIds,
             uint256[] memory purchaseAmounts
         ) = _batchArrays();
 
@@ -273,7 +273,7 @@ contract NetRedemptionTest is DcaDappTest {
     function test_sovryn_withoutExitFeeWithdrawalStaysOneToOne() public onlySovrynMocMocks {
         assertEq(MockIsusdToken(address(shareToken)).getExitFeeBps(), 0);
 
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         uint256 scheduleBalanceBefore = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
         uint256 userDocBefore = stablecoin.balanceOf(USER);
 
@@ -293,7 +293,7 @@ contract NetRedemptionTest is DcaDappTest {
      * @notice Same purchase, no fee: the rBTC bought matches the fee-free expectation exactly.
      */
     function test_sovryn_withoutExitFeeBuyRbtcIsUnchanged() public onlySovrynMocMocks {
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         uint256 rbtcBefore = _accumulatedRbtc();
 
         buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
@@ -324,13 +324,13 @@ contract NetRedemptionTest is DcaDappTest {
         returns (
             address[] memory users,
             uint256[] memory scheduleIndexes,
-            bytes32[] memory scheduleIds,
+            uint64[] memory scheduleIds,
             uint256[] memory purchaseAmounts
         )
     {
         users = new address[](NUM_OF_SCHEDULES);
         scheduleIndexes = new uint256[](NUM_OF_SCHEDULES);
-        scheduleIds = new bytes32[](NUM_OF_SCHEDULES);
+        scheduleIds = new uint64[](NUM_OF_SCHEDULES);
         purchaseAmounts = new uint256[](NUM_OF_SCHEDULES);
 
         for (uint256 i; i < NUM_OF_SCHEDULES; ++i) {
@@ -347,7 +347,7 @@ contract NetRedemptionTest is DcaDappTest {
      * SuccessfulRbtcBatchPurchase indexes everything, so its spend is the last topic.
      */
     function _batchSpendFromLogs() internal returns (uint256 perUserSpentTotal, uint256 batchSpent) {
-        bytes32 boughtSig = keccak256("PurchaseRbtc__RbtcBought(address,address,uint256,bytes32,uint256)");
+        bytes32 boughtSig = keccak256("PurchaseRbtc__RbtcBought(address,address,uint256,uint64,uint256)");
         bytes32 batchSig = keccak256("PurchaseRbtc__SuccessfulRbtcBatchPurchase(address,uint256,uint256)");
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bool foundBatch;
@@ -366,12 +366,12 @@ contract NetRedemptionTest is DcaDappTest {
 
     /// @dev refundedAmount is the only non-indexed field of DcaManager__DcaScheduleDeleted
     function _deletedEventAmount() internal returns (uint256 amount) {
-        bytes32 sig = keccak256("DcaManager__DcaScheduleDeleted(address,address,bytes32,uint256)");
+        bytes32 sig = keccak256("DcaManager__DcaScheduleDeleted(address,address,uint64,uint256)");
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bool found;
         for (uint256 i; i < logs.length; ++i) {
             if (logs[i].topics[0] == sig) {
-                (,,, amount) = abi.decode(logs[i].data, (address, address, bytes32, uint256));
+                (,,, amount) = abi.decode(logs[i].data, (address, address, uint64, uint256));
                 found = true;
             }
         }

@@ -10,43 +10,62 @@ interface IDcaManager {
     ////////////////////////
     // Type declarations ///
     ////////////////////////
-    /// @dev Three storage slots: two uint128 amounts; uint32 period + uint48 timestamp +
-    ///      uint32 route + bool paused; then bytes32 scheduleId. External inputs stay uint256
-    ///      and are checked at the storage boundary.
+    /// @dev Two storage slots, ordered so that the only two fields a purchase writes share slot 0
+    ///      and one SSTORE: `tokenBalance` + `lastPurchaseTimestamp` + `paused` (23 of 32 bytes).
+    ///      Slot 1 holds the fields a purchase only reads: `purchaseAmount` + `purchasePeriod` +
+    ///      `routeIndex` + `scheduleId`, filling all 32 bytes exactly. External inputs stay uint256
+    ///      and are checked at the storage boundary; `scheduleId` is uint64 in the ABI and stays the
+    ///      last field, so swap-pop and `vm.load` assertions read the same way as before.
     struct DcaSchedule {
         uint128 tokenBalance; // Stablecoin amount deposited by the user
+        uint48 lastPurchaseTimestamp; // Timestamp of the latest purchase
+        bool paused; // Owner-set: purchases are refused while true; every other path stays open
         uint128 purchaseAmount; // Stablecoin amount to spend periodically on rBTC
         uint32 purchasePeriod; // Time between purchases in seconds
-        uint48 lastPurchaseTimestamp; // Timestamp of the latest purchase
         uint32 routeIndex; // OperationsAdmin route that holds this schedule's funds (idle or lending)
-        bool paused; // Owner-set: purchases are refused while true; every other path stays open
-        bytes32 scheduleId; // Unique identifier of each DCA schedule
+        uint64 scheduleId; // Unique identifier of each DCA schedule: the value of the creation nonce
+    }
+
+    /**
+     * @notice The protocol scalars every create reads, plus the id counter it writes.
+     * @dev One slot (30 of 32 bytes): `createDcaSchedule` loads all four together and stores the
+     *      bumped nonce back into the same word. Owner setters take `uint256` and SafeCast at the write.
+     * @dev `scheduleNonce` is a strictly increasing counter and is the schedule id itself. Ids must not
+     *      be derived from array state: swap-pop on delete can restore a previous array shape within a
+     *      block, which would let two live schedules share an id.
+     * @dev Internal storage shape, not an ABI type: the scalars are read through their own getters.
+     */
+    struct ProtocolSettings {
+        uint32 minPurchasePeriod; // Minimum time between purchases
+        uint16 maxSchedulesPerToken; // Maximum number of schedules per stablecoin
+        uint128 defaultMinPurchaseAmount; // Default minimum purchase amount for all tokens
+        uint64 scheduleNonce; // Last assigned schedule id; 0 before the first schedule is created
     }
 
     //////////////////////
     // Events ////////////
     //////////////////////
-    event DcaManager__TokenBalanceUpdated(address indexed token, bytes32 indexed scheduleId, uint256 indexed amount);
+    event DcaManager__TokenBalanceUpdated(address indexed token, uint64 indexed scheduleId, uint256 indexed amount);
     event DcaManager__PurchaseAmountUpdated(
-        address indexed user, bytes32 indexed scheduleId, uint256 previousAmount, uint256 newAmount
+        address indexed user, uint64 indexed scheduleId, uint256 previousAmount, uint256 newAmount
     );
     event DcaManager__PurchasePeriodUpdated(
-        address indexed user, bytes32 indexed scheduleId, uint256 previousPeriod, uint256 newPeriod
+        address indexed user, uint64 indexed scheduleId, uint256 previousPeriod, uint256 newPeriod
     );
     event DcaManager__DcaScheduleCreated(
         address indexed user,
         address indexed token,
-        bytes32 indexed scheduleId,
+        uint64 indexed scheduleId,
         uint256 depositAmount,
         uint256 purchaseAmount,
         uint256 purchasePeriod,
         uint256 routeIndex
     );
-    event DcaManager__SchedulePauseSet(address indexed user, bytes32 indexed scheduleId, bool paused);
-    event DcaManager__DcaScheduleDeleted(address user, address token, bytes32 scheduleId, uint256 refundedAmount);
+    event DcaManager__SchedulePauseSet(address indexed user, uint64 indexed scheduleId, bool paused);
+    event DcaManager__DcaScheduleDeleted(address user, address token, uint64 scheduleId, uint256 refundedAmount);
     event DcaManager__MaxSchedulesPerTokenModified(uint256 indexed newMaxSchedulesPerToken);
     event DcaManager__MinPurchasePeriodModified(uint256 indexed newMinPurchasePeriod);
-    event DcaManager__LastPurchaseTimestampUpdated(address indexed token, bytes32 indexed scheduleId, uint256 indexed lastPurchaseTimestamp);
+    event DcaManager__LastPurchaseTimestampUpdated(address indexed token, uint64 indexed scheduleId, uint256 indexed lastPurchaseTimestamp);
     event DcaManager__DefaultMinPurchaseAmountModified(uint256 indexed newDefaultMinPurchaseAmount);
     event DcaManager__TokenMinPurchaseAmountSet(address indexed token, uint256 indexed minPurchaseAmount);
 
@@ -64,17 +83,17 @@ interface IDcaManager {
     error DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed(uint256 timeRemaining);
     error DcaManager__InexistentScheduleIndex();
     error DcaManager__ScheduleIdAndIndexMismatch();
-    error DcaManager__ScheduleBalanceNotEnoughForPurchase(uint256 scheduleIndex, bytes32 scheduleId, address token, uint256 remainingBalance);
+    error DcaManager__ScheduleBalanceNotEnoughForPurchase(uint256 scheduleIndex, uint64 scheduleId, address token, uint256 remainingBalance);
     error DcaManager__BatchPurchaseArraysLengthMismatch();
     error DcaManager__EmptyBatchPurchaseArrays();
     error DcaManager__MaxSchedulesPerTokenReached(address token);
     error DcaManager__TokenDoesNotYieldInterest(address token);
     error DcaManager__UnauthorizedSwapper(address sender);
-    error DcaManager__PurchaseAmountMismatch(address user, address token, bytes32 scheduleId, uint256 scheduleIndex, uint256 actualPurchaseAmount, uint256 expectedPurchaseAmount);
-    error DcaManager__RouteIndexMismatch(address user, address token, bytes32 scheduleId, uint256 scheduleIndex, uint256 actualRouteIndex, uint256 expectedRouteIndex);
+    error DcaManager__PurchaseAmountMismatch(address user, address token, uint64 scheduleId, uint256 scheduleIndex, uint256 actualPurchaseAmount, uint256 expectedPurchaseAmount);
+    error DcaManager__RouteIndexMismatch(address user, address token, uint64 scheduleId, uint256 scheduleIndex, uint256 actualRouteIndex, uint256 expectedRouteIndex);
     error DcaManager__OperationsAdminIsNotAContract(address operationsAdmin);
     error DcaManager__DepositsPaused(address token, uint256 routeIndex);
-    error DcaManager__SchedulePaused(address user, address token, bytes32 scheduleId, uint256 scheduleIndex);
+    error DcaManager__SchedulePaused(address user, address token, uint64 scheduleId, uint256 scheduleIndex);
 
     /*//////////////////////////////////////////////////////////////
                                FUNCTIONS
@@ -87,7 +106,7 @@ interface IDcaManager {
      * @param scheduleId The schedule id for validation
      * @param depositAmount The amount of the stablecoin requested from the user. The handler reverts unless it receives exactly this amount, so the schedule is credited with the full request.
      */
-    function depositToken(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 depositAmount) external;
+    function depositToken(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 depositAmount) external;
 
     /**
      * @notice Withdraw a specified amount of a stablecoin from the contract.
@@ -96,7 +115,7 @@ interface IDcaManager {
      * @param scheduleId The schedule id for validation
      * @param withdrawalAmount The amount of the stablecoin to withdraw. Pass type(uint256).max to withdraw this schedule’s whole token balance.
      */
-    function withdrawToken(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 withdrawalAmount) external;
+    function withdrawToken(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 withdrawalAmount) external;
 
     /**
      * @notice Create a new DCA schedule depositing a specified amount of a stablecoin into the contract.
@@ -120,7 +139,7 @@ interface IDcaManager {
      * @param scheduleIndex the index of the schedule to delete
      * @param scheduleId the unique identifier of the schedule to be deleted for validation
      */
-    function deleteDcaSchedule(address token, uint256 scheduleIndex, bytes32 scheduleId) external;
+    function deleteDcaSchedule(address token, uint256 scheduleIndex, uint64 scheduleId) external;
 
     /**
      * @notice Update the purchase amount of an existing DCA schedule.
@@ -130,7 +149,7 @@ interface IDcaManager {
      * @param newPurchaseAmount The new amount to spend periodically in buying rBTC
      * @dev emits DcaManager__PurchaseAmountUpdated with the replaced amount and the new one
      */
-    function updatePurchaseAmount(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 newPurchaseAmount)
+    function updatePurchaseAmount(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 newPurchaseAmount)
         external;
 
     /**
@@ -141,7 +160,7 @@ interface IDcaManager {
      * @param newPurchasePeriod The new period for recurrent purchases
      * @dev emits DcaManager__PurchasePeriodUpdated with the replaced period and the new one
      */
-    function updatePurchasePeriod(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 newPurchasePeriod)
+    function updatePurchasePeriod(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 newPurchasePeriod)
         external;
 
     /**
@@ -154,7 +173,7 @@ interface IDcaManager {
      *      period edits, withdrawals, interest and rBTC claims, and deletion. Setting the state it
      *      already holds is a no-op and emits nothing, so every emitted event is a real transition.
      */
-    function setSchedulePaused(address token, uint256 scheduleIndex, bytes32 scheduleId, bool paused) external;
+    function setSchedulePaused(address token, uint256 scheduleIndex, uint64 scheduleId, bool paused) external;
 
     /**
      * @param buyers the array of addresses of the users on behalf of whom rBTC is going to be bought
@@ -172,7 +191,7 @@ interface IDcaManager {
         address[] calldata buyers,
         address token,
         uint256[] calldata scheduleIndexes,
-        bytes32[] calldata scheduleIds,
+        uint64[] calldata scheduleIds,
         uint256[] calldata purchaseAmounts,
         uint256 routeIndex
     ) external;
@@ -195,7 +214,7 @@ interface IDcaManager {
     function withdrawTokenAndInterest(
         address token,
         uint256 scheduleIndex,
-        bytes32 scheduleId,
+        uint64 scheduleId,
         uint256 withdrawalAmount
     ) external;
 
@@ -296,7 +315,8 @@ interface IDcaManager {
 
     /**
      * @dev returns the lifetime count of DCA schedules created across all users and tokens.
-     * Never decreases; deletions do not decrement it.
+     * Equals the last `scheduleId` assigned, since ids are that counter. Never decreases;
+     * deletions do not decrement it.
      */
     function getSchedulesCreatedCount() external view returns (uint256);
 

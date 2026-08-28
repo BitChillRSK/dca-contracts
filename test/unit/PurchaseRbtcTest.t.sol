@@ -20,22 +20,22 @@ contract PurchaseRbtcTest is Test {
         address indexed user,
         address indexed tokenSpent,
         uint256 rBtcBought,
-        bytes32 indexed scheduleId,
+        uint64 indexed scheduleId,
         uint256 amountSpent
     );
     event PurchaseRbtc__SuccessfulRbtcBatchPurchase(
         address indexed token, uint256 indexed totalPurchasedRbtc, uint256 indexed totalStablecoinAmountSpent
     );
 
-    uint256 internal constant FLAT_FEE_RATE = 100; // 1%
+    uint16 internal constant FLAT_FEE_RATE = 100; // 1%
     uint256 internal constant FEE_DIVISOR = 10_000;
     uint256 internal constant RBTC_OUT = 1 ether;
 
     address internal buyerA = address(0xA11CE);
     address internal buyerB = address(0xB0B);
     address internal feeCollector = address(0xFEE);
-    bytes32 internal scheduleA = keccak256("schedule-a");
-    bytes32 internal scheduleB = keccak256("schedule-b");
+    uint64 internal scheduleA = 1;
+    uint64 internal scheduleB = 2;
 
     MockStablecoin internal token;
     PurchaseRbtcHarness internal harness;
@@ -113,7 +113,7 @@ contract PurchaseRbtcTest is Test {
     }
 
     function test_batchPurchase_revertsWhenRetrievedAtFee() public {
-        (address[] memory buyers, bytes32[] memory scheduleIds, uint256[] memory amounts) = _twoBuyerBatch();
+        (address[] memory buyers, uint64[] memory scheduleIds, uint256[] memory amounts) = _twoBuyerBatch();
         uint256 aggregatedFee = _fee(amounts[0]) + _fee(amounts[1]);
         harness.setRetrieveOverride(aggregatedFee);
         harness.setRevertOnPurchase(true);
@@ -130,7 +130,7 @@ contract PurchaseRbtcTest is Test {
     }
 
     function test_batchPurchase_revertsWhenRetrievedBelowFee() public {
-        (address[] memory buyers, bytes32[] memory scheduleIds, uint256[] memory amounts) = _twoBuyerBatch();
+        (address[] memory buyers, uint64[] memory scheduleIds, uint256[] memory amounts) = _twoBuyerBatch();
         uint256 aggregatedFee = _fee(amounts[0]) + _fee(amounts[1]);
         uint256 retrieved = aggregatedFee - 1;
         harness.setRetrieveOverride(retrieved);
@@ -149,7 +149,7 @@ contract PurchaseRbtcTest is Test {
     }
 
     function test_batchPurchase_allocatesByPlannedNetsUsingActualCash() public {
-        (address[] memory buyers, bytes32[] memory scheduleIds, uint256[] memory amounts) = _twoBuyerBatch();
+        (address[] memory buyers, uint64[] memory scheduleIds, uint256[] memory amounts) = _twoBuyerBatch();
         uint256 aggregatedFee = _fee(amounts[0]) + _fee(amounts[1]);
         uint256 net0 = amounts[0] - _fee(amounts[0]);
         uint256 net1 = amounts[1] - _fee(amounts[1]);
@@ -173,7 +173,7 @@ contract PurchaseRbtcTest is Test {
         address[] memory buyers = new address[](2);
         buyers[0] = buyerA;
         buyers[1] = buyerA;
-        bytes32[] memory scheduleIds = new bytes32[](2);
+        uint64[] memory scheduleIds = new uint64[](2);
         scheduleIds[0] = scheduleA;
         scheduleIds[1] = scheduleB;
         uint256[] memory amounts = new uint256[](2);
@@ -201,8 +201,8 @@ contract PurchaseRbtcTest is Test {
         uint256 net1,
         uint256 totalNetPlanned,
         uint256 actualSpent,
-        bytes32 id0,
-        bytes32 id1
+        uint64 id0,
+        uint64 id1
     ) private {
         vm.expectEmit(true, true, true, true, address(harness));
         emit PurchaseRbtc__RbtcBought(
@@ -217,7 +217,7 @@ contract PurchaseRbtcTest is Test {
     }
 
     function test_batchPurchase_zeroOutputRevertsBatchError() public {
-        (address[] memory buyers, bytes32[] memory scheduleIds, uint256[] memory amounts) = _twoBuyerBatch();
+        (address[] memory buyers, uint64[] memory scheduleIds, uint256[] memory amounts) = _twoBuyerBatch();
         harness.setRbtcOut(0);
 
         vm.expectRevert(
@@ -238,8 +238,8 @@ contract PurchaseRbtcTest is Test {
         buyers[0] = buyerA;
     }
 
-    function _oneBuyerBatchIds() private view returns (bytes32[] memory scheduleIds) {
-        scheduleIds = new bytes32[](1);
+    function _oneBuyerBatchIds() private view returns (uint64[] memory scheduleIds) {
+        scheduleIds = new uint64[](1);
         scheduleIds[0] = scheduleA;
     }
 
@@ -251,12 +251,12 @@ contract PurchaseRbtcTest is Test {
     function _twoBuyerBatch()
         private
         view
-        returns (address[] memory buyers, bytes32[] memory scheduleIds, uint256[] memory amounts)
+        returns (address[] memory buyers, uint64[] memory scheduleIds, uint256[] memory amounts)
     {
         buyers = new address[](2);
         buyers[0] = buyerA;
         buyers[1] = buyerB;
-        scheduleIds = new bytes32[](2);
+        scheduleIds = new uint64[](2);
         scheduleIds[0] = scheduleA;
         scheduleIds[1] = scheduleB;
         amounts = new uint256[](2);

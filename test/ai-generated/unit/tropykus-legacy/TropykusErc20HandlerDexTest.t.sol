@@ -466,7 +466,7 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         assertGt(initialLendingBalance, 0);
         
         uint256 purchaseAmount = 100 ether;
-        bytes32 mockScheduleId = keccak256("test_schedule");
+        uint64 mockScheduleId = 1;
         
         // Call batchBuyRbtc, which redeems shares through _retrieveStablecoin
         vm.prank(address(dcaManager));
@@ -517,9 +517,9 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         buyers[0] = user1;
         buyers[1] = user2;
         
-        bytes32[] memory scheduleIds = new bytes32[](2);
-        scheduleIds[0] = keccak256("schedule1");
-        scheduleIds[1] = keccak256("schedule2");
+        uint64[] memory scheduleIds = new uint64[](2);
+        scheduleIds[0] = 1;
+        scheduleIds[1] = 2;
         
         uint256[] memory purchaseAmounts = new uint256[](2);
         purchaseAmounts[0] = 100 ether;

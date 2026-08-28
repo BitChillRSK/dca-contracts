@@ -44,7 +44,7 @@ contract DepositsPauseTest is DcaDappTest {
 
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
         uint256 handlerStablecoinBefore = stablecoin.balanceOf(address(stablecoinHandler));
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         uint256 scheduleBalanceBefore =
             dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
 
@@ -89,7 +89,7 @@ contract DepositsPauseTest is DcaDappTest {
     function testPauseIsCheckedBeforeTheTokenIsTouched() external {
         _pauseDeposits(true);
 
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
 
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), 0);
@@ -195,7 +195,7 @@ contract DepositsPauseTest is DcaDappTest {
     function testPausedRouteStillAllowsScheduleEdits() external {
         _pauseDeposits(true);
 
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         uint256 newPurchaseAmount = AMOUNT_TO_SPEND / 2;
         uint256 newPurchasePeriod = MIN_PURCHASE_PERIOD * 2;
 
@@ -213,7 +213,7 @@ contract DepositsPauseTest is DcaDappTest {
     function testPausedRouteStillAllowsDeletion() external {
         _pauseDeposits(true);
 
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
 
         vm.prank(USER);

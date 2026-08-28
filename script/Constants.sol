@@ -2,12 +2,14 @@
 pragma solidity 0.8.36;
 
 // Protocol configuration
+// @notice the fee rate and bound constants carry IFeeHandler.FeeSettings' widths so deploy scripts
+// and tests can build that struct without a cast.
 uint256 constant MIN_PURCHASE_AMOUNT = 25 ether; // at least 25 DOC on each purchase
-uint256 constant MIN_FEE_RATE = 100;
-uint256 constant MAX_FEE_RATE_TEST = 200; // 2% for testing - allows for better fee range testing
-uint256 constant MAX_FEE_RATE_PRODUCTION = 100; // 1% flat rate for production (same as MIN_FEE_RATE for flat fee)
-uint256 constant FEE_PURCHASE_LOWER_BOUND = 1000 ether; // 1000 DOC
-uint256 constant FEE_PURCHASE_UPPER_BOUND = 100_000 ether; // 100,000 DOC
+uint16 constant MIN_FEE_RATE = 100;
+uint16 constant MAX_FEE_RATE_TEST = 200; // 2% for testing - allows for better fee range testing
+uint16 constant MAX_FEE_RATE_PRODUCTION = 100; // 1% flat rate for production (same as MIN_FEE_RATE for flat fee)
+uint128 constant FEE_PURCHASE_LOWER_BOUND = 1000 ether; // 1000 DOC
+uint128 constant FEE_PURCHASE_UPPER_BOUND = 100_000 ether; // 100,000 DOC
 uint256 constant FEE_PERCENTAGE_DIVISOR = 10_000;
 uint256 constant MIN_PURCHASE_PERIOD = 1 days; // Default to at most one purchase each day
 uint256 constant MAX_SCHEDULES_PER_TOKEN = 10; // Default to a maximum of 10 DCA schedules per token
@@ -60,8 +62,8 @@ uint256 constant EXCHANGE_RATE_DECIMALS = 1e18; // Valid for DOC and USDRIF in b
 // units) into a USDT0 handler — that would make the min ~25 trillion USDT0 and put every real
 // purchase at the max fee band. Live/mainnet USDT0 deploy paths use these magnitudes.
 uint256 constant USDT0_MIN_PURCHASE_AMOUNT = 25e6;
-uint256 constant USDT0_FEE_PURCHASE_LOWER_BOUND = 1000e6;
-uint256 constant USDT0_FEE_PURCHASE_UPPER_BOUND = 100_000e6;
+uint128 constant USDT0_FEE_PURCHASE_LOWER_BOUND = 1000e6;
+uint128 constant USDT0_FEE_PURCHASE_UPPER_BOUND = 100_000e6;
 
 // Mainnet LayerBank aTokens on Pool `0x526D06c65777eA6D56d7a1Dd47cD79230dDf72E9` (looked up 2026-08-28).
 address constant USDT0_MAINNET = 0x779Ded0c9e1022225f8E0630b35a9b54bE713736;

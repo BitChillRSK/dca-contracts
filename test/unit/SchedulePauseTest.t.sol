@@ -6,7 +6,7 @@ import {Test, console} from "forge-std/Test.sol";
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
-import {batchBuyOne} from "../utils/BatchBuyOne.sol";
+import {batchBuyOne, UNUSED_SCHEDULE_ID} from "../utils/BatchBuyOne.sol";
 import "./TestsHelper.t.sol";
 
 /**
@@ -15,7 +15,7 @@ import "./TestsHelper.t.sol";
  *      schedule, or takes money out has to keep working, or a pause becomes a way to strand funds.
  */
 contract SchedulePauseTest is DcaDappTest {
-    event DcaManager__SchedulePauseSet(address indexed user, bytes32 indexed scheduleId, bool paused);
+    event DcaManager__SchedulePauseSet(address indexed user, uint64 indexed scheduleId, bool paused);
 
     /// @dev A live lending share round-trip loses a few wei to rounding, and how many depends on the
     ///      forked block. These tests assert that the exit paid while paused, not the share math.
@@ -25,7 +25,7 @@ contract SchedulePauseTest is DcaDappTest {
         super.setUp();
     }
 
-    function _scheduleId(uint256 scheduleIndex) private view returns (bytes32) {
+    function _scheduleId(uint256 scheduleIndex) private view returns (uint64) {
         return dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).scheduleId;
     }
 
@@ -34,7 +34,7 @@ contract SchedulePauseTest is DcaDappTest {
     }
 
     function _setPaused(uint256 scheduleIndex, bool paused) private {
-        bytes32 scheduleId = _scheduleId(scheduleIndex);
+        uint64 scheduleId = _scheduleId(scheduleIndex);
         vm.prank(USER);
         dcaManager.setSchedulePaused(address(stablecoin), scheduleIndex, scheduleId, paused);
     }
@@ -58,7 +58,7 @@ contract SchedulePauseTest is DcaDappTest {
     }
 
     function testOwnerPausesAndResumesTheirSchedule() external {
-        bytes32 scheduleId = _scheduleId(SCHEDULE_INDEX);
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
 
         vm.expectEmit(true, true, false, true);
         emit DcaManager__SchedulePauseSet(USER, scheduleId, true);
@@ -89,7 +89,7 @@ contract SchedulePauseTest is DcaDappTest {
 
     /// @dev The mutator keys off `msg.sender`, so a stranger addresses their own empty schedule list.
     function testAnotherUserCannotPauseThisSchedule() external {
-        bytes32 scheduleId = _scheduleId(SCHEDULE_INDEX);
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
 
         vm.prank(makeAddr("r19Stranger"));
         vm.expectRevert(IDcaManager.DcaManager__InexistentScheduleIndex.selector);
@@ -99,7 +99,7 @@ contract SchedulePauseTest is DcaDappTest {
     }
 
     function testPausingAnInexistentScheduleReverts() external {
-        bytes32 scheduleId = _scheduleId(SCHEDULE_INDEX);
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
 
         vm.prank(USER);
         vm.expectRevert(IDcaManager.DcaManager__InexistentScheduleIndex.selector);
@@ -109,7 +109,7 @@ contract SchedulePauseTest is DcaDappTest {
     function testPausingWithAMismatchedIdReverts() external {
         vm.prank(USER);
         vm.expectRevert(IDcaManager.DcaManager__ScheduleIdAndIndexMismatch.selector);
-        dcaManager.setSchedulePaused(address(stablecoin), SCHEDULE_INDEX, bytes32("wrong id"), true);
+        dcaManager.setSchedulePaused(address(stablecoin), SCHEDULE_INDEX, UNUSED_SCHEDULE_ID, true);
 
         assertFalse(_isPaused(SCHEDULE_INDEX));
     }
@@ -120,10 +120,10 @@ contract SchedulePauseTest is DcaDappTest {
         super.createSeveralDcaSchedules();
 
         uint256 lastIndex = dcaManager.getDcaSchedules(USER, address(stablecoin)).length - 1;
-        bytes32 movedScheduleId = _scheduleId(lastIndex);
+        uint64 movedScheduleId = _scheduleId(lastIndex);
         _setPaused(lastIndex, true);
 
-        bytes32 deletedScheduleId = _scheduleId(SCHEDULE_INDEX);
+        uint64 deletedScheduleId = _scheduleId(SCHEDULE_INDEX);
         vm.prank(USER);
         dcaManager.deleteDcaSchedule(address(stablecoin), SCHEDULE_INDEX, deletedScheduleId);
 
@@ -172,7 +172,7 @@ contract SchedulePauseTest is DcaDappTest {
 
         address[] memory buyers = new address[](NUM_OF_SCHEDULES);
         uint256[] memory scheduleIndexes = new uint256[](NUM_OF_SCHEDULES);
-        bytes32[] memory scheduleIds = new bytes32[](NUM_OF_SCHEDULES);
+        uint64[] memory scheduleIds = new uint64[](NUM_OF_SCHEDULES);
         uint256[] memory purchaseAmounts = new uint256[](NUM_OF_SCHEDULES);
         for (uint256 i; i < NUM_OF_SCHEDULES; ++i) {
             buyers[i] = USER;
@@ -226,7 +226,7 @@ contract SchedulePauseTest is DcaDappTest {
     function testPausedScheduleStillAllowsEdits() external {
         _setPaused(SCHEDULE_INDEX, true);
 
-        bytes32 scheduleId = _scheduleId(SCHEDULE_INDEX);
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
         uint256 newPurchaseAmount = AMOUNT_TO_SPEND / 2;
         uint256 newPurchasePeriod = MIN_PURCHASE_PERIOD * 2;
 
@@ -286,7 +286,7 @@ contract SchedulePauseTest is DcaDappTest {
         updateExchangeRate(10 days);
         _setPaused(SCHEDULE_INDEX, true);
 
-        bytes32 scheduleId = _scheduleId(SCHEDULE_INDEX);
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
 
         vm.prank(USER);
@@ -322,7 +322,7 @@ contract SchedulePauseTest is DcaDappTest {
     function testPausedScheduleStillAllowsDeletion() external {
         _setPaused(SCHEDULE_INDEX, true);
 
-        bytes32 scheduleId = _scheduleId(SCHEDULE_INDEX);
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
 
         vm.prank(USER);

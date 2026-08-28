@@ -5,6 +5,7 @@ pragma solidity 0.8.36;
 import {Test, console} from "forge-std/Test.sol";
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
+import {UNUSED_SCHEDULE_ID} from "../utils/BatchBuyOne.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
 
 contract StablecoinWithdrawalTest is DcaDappTest {
@@ -21,7 +22,7 @@ contract StablecoinWithdrawalTest is DcaDappTest {
 
     function testCannotWithdrawZeroStablecoin() external {
         vm.startPrank(USER);
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         vm.expectRevert(IDcaManager.DcaManager__WithdrawalAmountMustBeGreaterThanZero.selector);
         dcaManager.withdrawToken(address(stablecoin), SCHEDULE_INDEX, scheduleId, 0);
         vm.stopPrank();
@@ -29,7 +30,7 @@ contract StablecoinWithdrawalTest is DcaDappTest {
 
     function testTokenWithdrawalRevertsIfAmountExceedsBalance() external {
         vm.startPrank(USER);
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         bytes memory encodedRevert = abi.encodeWithSelector(
             IDcaManager.DcaManager__WithdrawalAmountExceedsBalance.selector,
             address(stablecoin),
@@ -43,7 +44,7 @@ contract StablecoinWithdrawalTest is DcaDappTest {
 
     function testCannotWithdrawFromInexistentSchedule() external {
         vm.startPrank(USER);
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         vm.expectRevert(IDcaManager.DcaManager__InexistentScheduleIndex.selector);
         dcaManager.withdrawToken(address(stablecoin), SCHEDULE_INDEX + 1, scheduleId, AMOUNT_TO_DEPOSIT);
         vm.stopPrank();
@@ -51,7 +52,7 @@ contract StablecoinWithdrawalTest is DcaDappTest {
 
     function testCannotWithdrawIfScheduleIdAndIndexMismatch() external {
         vm.startPrank(USER);
-        bytes32 wrongScheduleId = keccak256(abi.encodePacked(USER, address(stablecoin), block.timestamp, uint256(999)));
+        uint64 wrongScheduleId = UNUSED_SCHEDULE_ID;
         vm.expectRevert(IDcaManager.DcaManager__ScheduleIdAndIndexMismatch.selector);
         dcaManager.withdrawToken(address(stablecoin), 0, wrongScheduleId, AMOUNT_TO_DEPOSIT);
         vm.stopPrank();

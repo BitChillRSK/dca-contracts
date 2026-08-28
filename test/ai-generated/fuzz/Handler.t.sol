@@ -50,8 +50,8 @@ contract Handler is Test {
         bool pausedNow;
     }
 
-    mapping(bytes32 scheduleId => PausedSchedule) public s_pauseGhost;
-    bytes32[] public s_everPausedScheduleIds;
+    mapping(uint64 scheduleId => PausedSchedule) public s_pauseGhost;
+    uint64[] public s_everPausedScheduleIds;
 
 
     // ----------------------------------------------------------------------------
@@ -185,7 +185,7 @@ contract Handler is Test {
         
         stablecoin.approve(address(tokenHandler), depositAmount);
         
-        bytes32 scheduleId = dcaManager.getDcaSchedule(user, address(stablecoin), scheduleIndex).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(user, address(stablecoin), scheduleIndex).scheduleId;
         try dcaManager.depositToken(address(stablecoin), scheduleIndex, scheduleId, depositAmount) {
             // Success
         } catch {
@@ -219,7 +219,7 @@ contract Handler is Test {
 
         withdrawalAmount = bound(withdrawalAmount, 1, currentBalance);
         
-        bytes32 scheduleId = dcaManager.getDcaSchedule(user, address(stablecoin), scheduleIndex).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(user, address(stablecoin), scheduleIndex).scheduleId;
         try dcaManager.withdrawToken(address(stablecoin), scheduleIndex, scheduleId, withdrawalAmount) {
             // Success
         } catch {
@@ -259,7 +259,7 @@ contract Handler is Test {
         }
         
         scheduleIndex = bound(scheduleIndex, 0, schedules.length - 1);
-        bytes32 scheduleId = schedules[scheduleIndex].scheduleId;
+        uint64 scheduleId = schedules[scheduleIndex].scheduleId;
         uint256 currentBalance = schedules[scheduleIndex].tokenBalance;
 
         if (depositAmount > 0) {
@@ -350,7 +350,7 @@ contract Handler is Test {
             if (schedules.length == 0) continue;
 
             uint256 index = bound(scheduleIndex, 0, schedules.length - 1);
-            bytes32 scheduleId = schedules[index].scheduleId;
+            uint64 scheduleId = schedules[index].scheduleId;
 
             if (paused) pauseAttemptsOnLiveSchedule++;
 
@@ -446,7 +446,7 @@ contract Handler is Test {
         
         address[] memory buyers = new address[](1);
         uint256[] memory scheduleIndexes = new uint256[](1);
-        bytes32[] memory scheduleIds = new bytes32[](1);
+        uint64[] memory scheduleIds = new uint64[](1);
         uint256[] memory purchaseAmounts = new uint256[](1);
         buyers[0] = user;
         scheduleIndexes[0] = scheduleIndex;
@@ -477,7 +477,7 @@ contract Handler is Test {
         
         address[] memory buyers = new address[](userSeeds.length);
         uint256[] memory boundedScheduleIndexes = new uint256[](userSeeds.length);
-        bytes32[] memory scheduleIds = new bytes32[](userSeeds.length);
+        uint64[] memory scheduleIds = new uint64[](userSeeds.length);
         uint256[] memory purchaseAmounts = new uint256[](userSeeds.length);
         uint256 totalRbtcNeeded = 0;
         
@@ -587,7 +587,7 @@ contract Handler is Test {
         
         withdrawalAmount = bound(withdrawalAmount, 1, currentBalance);
         
-        bytes32 scheduleId = dcaManager.getDcaSchedule(user, address(stablecoin), scheduleIndex).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(user, address(stablecoin), scheduleIndex).scheduleId;
         try dcaManager.withdrawTokenAndInterest(
             address(stablecoin),
             scheduleIndex,

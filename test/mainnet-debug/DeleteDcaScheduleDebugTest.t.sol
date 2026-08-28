@@ -57,14 +57,20 @@ contract DeleteDcaScheduleDebugTest is Test {
             console2.log("Failed to get schedules");
         }
         
-        // Now attempt to reproduce the exact transaction that failed
-        try dcaManager.deleteDcaSchedule(TOKEN_ADDRESS, SCHEDULE_INDEX, SCHEDULE_ID) {
+        // Now attempt to reproduce the exact transaction that failed.
+        // @dev The deployed contract still takes a bytes32 scheduleId; the relaunch narrowed that
+        // argument to the uint64 creation nonce (R50), so the historical call is encoded by hand
+        // rather than through the current interface.
+        (bool ok, bytes memory returnData) = DCA_MANAGER_ADDRESS.call(
+            abi.encodeWithSignature(
+                "deleteDcaSchedule(address,uint256,bytes32)", TOKEN_ADDRESS, SCHEDULE_INDEX, SCHEDULE_ID
+            )
+        );
+        if (ok) {
             console2.log("deleteDcaSchedule succeeded (unexpected!)");
-        } catch Error(string memory reason) {
-            console2.log("deleteDcaSchedule failed with reason:", reason);
-        } catch (bytes memory lowLevelData) {
+        } else {
             console2.log("deleteDcaSchedule failed with low-level error");
-            console2.logBytes(lowLevelData);
+            console2.logBytes(returnData);
         }
     }
 }

@@ -25,7 +25,7 @@ contract FullWithdrawalTest is DcaDappTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_sentinelWithdrawsTheWholeScheduleBalance() external {
-        bytes32 scheduleId = _scheduleId(SCHEDULE_INDEX);
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
 
         vm.prank(USER);
@@ -45,7 +45,7 @@ contract FullWithdrawalTest is DcaDappTest {
      * and the withdrawal for the stale figure reverts. The sentinel reads storage inside the transaction.
      */
     function test_sentinelResolvesAgainstTheLiveBalance() external {
-        bytes32 scheduleId = _scheduleId(SCHEDULE_INDEX);
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
         uint256 staleBalance = _scheduleBalance(SCHEDULE_INDEX);
 
         buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
@@ -79,7 +79,7 @@ contract FullWithdrawalTest is DcaDappTest {
 
     /// @notice the sentinel does not turn an empty schedule into a no-op withdrawal
     function test_sentinelStillRevertsOnAnEmptySchedule() external {
-        bytes32 scheduleId = _scheduleId(SCHEDULE_INDEX);
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
         vm.prank(USER);
         dcaManager.withdrawToken(address(stablecoin), SCHEDULE_INDEX, scheduleId, type(uint256).max);
 
@@ -90,7 +90,7 @@ contract FullWithdrawalTest is DcaDappTest {
 
     /// @notice only the sentinel is special: every other oversized amount is still a revert
     function test_amountsAboveTheBalanceStillRevert() external {
-        bytes32 scheduleId = _scheduleId(SCHEDULE_INDEX);
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
         uint256 tokenBalance = _scheduleBalance(SCHEDULE_INDEX);
 
         vm.expectRevert(
@@ -123,7 +123,7 @@ contract FullWithdrawalTest is DcaDappTest {
     function test_sentinelLeavesTheOtherSchedulesUntouched() external {
         createSeveralDcaSchedules();
         uint256 scheduleBalance = _scheduleBalance(SCHEDULE_INDEX);
-        bytes32 scheduleId = _scheduleId(SCHEDULE_INDEX);
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
 
         vm.prank(USER);
         dcaManager.withdrawToken(address(stablecoin), SCHEDULE_INDEX, scheduleId, type(uint256).max);
@@ -147,7 +147,7 @@ contract FullWithdrawalTest is DcaDappTest {
         uint256 principal = _scheduleBalance(SCHEDULE_INDEX);
         uint256 interest = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
-        bytes32 scheduleId = _scheduleId(SCHEDULE_INDEX);
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
 
         vm.prank(USER);
         dcaManager.withdrawTokenAndInterest(
@@ -167,7 +167,7 @@ contract FullWithdrawalTest is DcaDappTest {
                                 HELPERS
     //////////////////////////////////////////////////////////////*/
 
-    function _scheduleId(uint256 scheduleIndex) internal view returns (bytes32) {
+    function _scheduleId(uint256 scheduleIndex) internal view returns (uint64) {
         return dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).scheduleId;
     }
 

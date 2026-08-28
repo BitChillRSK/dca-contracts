@@ -3,6 +3,7 @@ pragma solidity 0.8.36;
 
 import {Test, console2} from "forge-std/Test.sol";
 import {FeeHandlerHarness} from "../../mocks/FeeHandlerHarness.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
 
 contract FeeHandlerTest is Test {
@@ -11,11 +12,11 @@ contract FeeHandlerTest is Test {
     address constant FEE_COLLECTOR = address(0xBEEF);
 
     // Default settings used across tests
-    uint256 constant MIN_FEE_RATE = 100; // 1%
-    uint256 constant MAX_FEE_RATE = 200; // 2%
-    uint256 constant FEE_RATE_CAP = 500;
-    uint256 constant LOWER_BOUND = 100 ether; // below this gets max fee
-    uint256 constant UPPER_BOUND = 1000 ether; // above this gets min fee
+    uint16 constant MIN_FEE_RATE = 100; // 1%
+    uint16 constant MAX_FEE_RATE = 200; // 2%
+    uint16 constant FEE_RATE_CAP = 500;
+    uint128 constant LOWER_BOUND = 100 ether; // below this gets max fee
+    uint128 constant UPPER_BOUND = 1000 ether; // above this gets min fee
 
     // Events
     event FeeHandler__MinFeeRateSet(uint256 indexed minFeeRate);
@@ -186,7 +187,7 @@ contract FeeHandlerTest is Test {
     }
 
     function test_calculateFee_flatMinEqualsMax() public {
-        uint256 flatRate = 100;
+        uint16 flatRate = 100;
         feeHandler.testSetMinFeeRate(flatRate);
         feeHandler.testSetMaxFeeRate(flatRate);
 
@@ -269,5 +270,55 @@ contract FeeHandlerTest is Test {
             
             assertGe(rate1, rate2, "Fee rate should decrease or stay equal with higher amounts");
         }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            STORAGE PACKING
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev R50: the five logical fee fields live in two slots. Ownable2Step owns slots 0 and 1,
+    ///      so the collector starts slot 2 with both rates beside it, and the bounds share slot 3.
+    function test_feeSettingsOccupyTwoSlots() public {
+        uint256 rateSlot = uint256(vm.load(address(feeHandler), bytes32(uint256(2))));
+        assertEq(address(uint160(rateSlot)), FEE_COLLECTOR, "the collector is not the low 20 bytes of slot 2");
+        assertEq(uint16(rateSlot >> 160), MIN_FEE_RATE, "minFeeRate does not follow the collector");
+        assertEq(uint16(rateSlot >> 176), MAX_FEE_RATE, "maxFeeRate does not follow minFeeRate");
+        assertEq(rateSlot >> 192, 0, "something else was written into the rate slot");
+
+        uint256 boundSlot = uint256(vm.load(address(feeHandler), bytes32(uint256(3))));
+        assertEq(uint128(boundSlot), LOWER_BOUND, "the lower bound is not the low half of slot 3");
+        assertEq(uint128(boundSlot >> 128), UPPER_BOUND, "the upper bound is not the high half of slot 3");
+
+        assertEq(uint256(vm.load(address(feeHandler), bytes32(uint256(4)))), 0, "fee state spilled into a third slot");
+    }
+
+    function test_setFeeRateParams_castsIntoThePackedWidths() public {
+        uint256 newLower = 200 ether;
+        uint256 newUpper = 2000 ether;
+        feeHandler.setFeeRateParams(150, 300, newLower, newUpper);
+
+        IFeeHandler.FeeSettings memory settings = feeHandler.getFeeSettings();
+        assertEq(settings.minFeeRate, 150);
+        assertEq(settings.maxFeeRate, 300);
+        assertEq(settings.feePurchaseLowerBound, newLower);
+        assertEq(settings.feePurchaseUpperBound, newUpper);
+
+        uint256 rateSlot = uint256(vm.load(address(feeHandler), bytes32(uint256(2))));
+        assertEq(address(uint160(rateSlot)), FEE_COLLECTOR, "writing rates disturbed the collector");
+    }
+
+    function test_setFeeRateParams_revertsOnUncastableRate() public {
+        uint256 overflowing = uint256(type(uint16).max) + 1;
+        // The cap check fires first: nothing above 500 can reach the uint16 write.
+        vm.expectRevert(IFeeHandler.FeeHandler__MaxFeeRateExceedsCap.selector);
+        feeHandler.setFeeRateParams(MIN_FEE_RATE, overflowing, LOWER_BOUND, UPPER_BOUND);
+    }
+
+    function test_setFeeRateParams_revertsOnUncastableBound() public {
+        uint256 overflowing = uint256(type(uint128).max) + 1;
+        vm.expectRevert(
+            abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 128, overflowing)
+        );
+        feeHandler.setFeeRateParams(MIN_FEE_RATE, MAX_FEE_RATE, LOWER_BOUND, overflowing);
     }
 }

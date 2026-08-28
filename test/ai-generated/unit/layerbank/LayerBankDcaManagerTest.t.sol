@@ -82,7 +82,7 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
     function test_buyAndWithdraw_spendLayerBankDoc() public {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, LAYERBANK_INDEX);
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(docToken), 0).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(docToken), 0).scheduleId;
 
         uint256 lTokensBefore = handler.getUserShares(USER);
 

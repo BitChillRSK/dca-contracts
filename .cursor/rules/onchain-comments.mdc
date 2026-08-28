@@ -1,0 +1,19 @@
+---
+description: Keep relaunch R-ticket IDs out of verified src/ comments and NatSpec
+globs: src/**/*.sol
+alwaysApply: false
+---
+
+# No relaunch IDs in onchain comments
+
+Verified `src/` source lives on explorers for the life of the deployment. Do not mention relaunch ticket IDs (`R29`, `R42`, `R45`, …) in comments or NatSpec. Write the durable reason instead.
+
+Specs, tests, PRs, `script/` comments, and `AGENTS.md` may use R-ids.
+
+```solidity
+// BAD — ticket jargon frozen into verified source
+/// @notice Hardcoded in the R29 style; the oracle exposes no `decimals()`.
+
+// GOOD — the reason, not the ticket
+/// @notice Hardcoded because the oracle exposes no `decimals()`.
+```

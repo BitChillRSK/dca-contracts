@@ -6,15 +6,16 @@ import {Test, console} from "forge-std/Test.sol";
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
+import {UNUSED_SCHEDULE_ID} from "../utils/BatchBuyOne.sol";
 import "../../script/Constants.sol";
 
 contract DcaConfigurationTest is DcaDappTest {
     // Events
     event DcaManager__PurchaseAmountUpdated(
-        address indexed user, bytes32 indexed scheduleId, uint256 previousAmount, uint256 newAmount
+        address indexed user, uint64 indexed scheduleId, uint256 previousAmount, uint256 newAmount
     );
     event DcaManager__PurchasePeriodUpdated(
-        address indexed user, bytes32 indexed scheduleId, uint256 previousPeriod, uint256 newPeriod
+        address indexed user, uint64 indexed scheduleId, uint256 previousPeriod, uint256 newPeriod
     );
     event DcaManager__MaxSchedulesPerTokenModified(uint256 indexed maxSchedulesPerToken);
     event DcaManager__DefaultMinPurchaseAmountModified(uint256 indexed newDefaultAmount);
@@ -30,7 +31,7 @@ contract DcaConfigurationTest is DcaDappTest {
     function testUpdatePurchaseAmount() external {
         uint256 newPurchaseAmount = AMOUNT_TO_SPEND / 2;
         vm.startPrank(USER);
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         // The first edit after createDcaSchedule reports the amount that call wrote
         vm.expectEmit(true, true, true, true);
         emit DcaManager__PurchaseAmountUpdated(USER, scheduleId, AMOUNT_TO_SPEND, newPurchaseAmount);
@@ -46,7 +47,7 @@ contract DcaConfigurationTest is DcaDappTest {
 
     function testUpdatePurchaseAmountRevertsIfScheduleIdAndIndexMismatch() external {
         vm.startPrank(USER);
-        bytes32 wrongScheduleId = keccak256(abi.encodePacked(USER, address(stablecoin), block.timestamp, uint256(999)));
+        uint64 wrongScheduleId = UNUSED_SCHEDULE_ID;
         vm.expectRevert(IDcaManager.DcaManager__ScheduleIdAndIndexMismatch.selector);
         dcaManager.updatePurchaseAmount(address(stablecoin), SCHEDULE_INDEX, wrongScheduleId, AMOUNT_TO_SPEND);
         vm.stopPrank();
@@ -54,7 +55,7 @@ contract DcaConfigurationTest is DcaDappTest {
 
     function testUpdatePurchaseAmountRevertsIfInexistentSchedule() external {
         vm.startPrank(USER);
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         vm.expectRevert(IDcaManager.DcaManager__InexistentScheduleIndex.selector);
         dcaManager.updatePurchaseAmount(address(stablecoin), SCHEDULE_INDEX + 1, scheduleId, AMOUNT_TO_SPEND);
         vm.stopPrank();
@@ -63,7 +64,7 @@ contract DcaConfigurationTest is DcaDappTest {
     function testUpdatePurchasePeriod() external {
         uint256 newPurchasePeriod = MIN_PURCHASE_PERIOD * 7;
         vm.startPrank(USER);
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         // The first edit after createDcaSchedule reports the period that call wrote
         vm.expectEmit(true, true, true, true);
         emit DcaManager__PurchasePeriodUpdated(USER, scheduleId, MIN_PURCHASE_PERIOD, newPurchasePeriod);
@@ -79,7 +80,7 @@ contract DcaConfigurationTest is DcaDappTest {
 
     function testUpdatePurchasePeriodRevertsIfScheduleIdAndIndexMismatch() external {
         vm.startPrank(USER);
-        bytes32 wrongScheduleId = keccak256(abi.encodePacked(USER, address(stablecoin), block.timestamp, uint256(999)));
+        uint64 wrongScheduleId = UNUSED_SCHEDULE_ID;
         vm.expectRevert(IDcaManager.DcaManager__ScheduleIdAndIndexMismatch.selector);
         dcaManager.updatePurchasePeriod(address(stablecoin), SCHEDULE_INDEX, wrongScheduleId, MIN_PURCHASE_PERIOD);
         vm.stopPrank();
@@ -87,7 +88,7 @@ contract DcaConfigurationTest is DcaDappTest {
 
     function testUpdatePurchasePeriodRevertsIfInexistentSchedule() external {
         vm.startPrank(USER);
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         vm.expectRevert(IDcaManager.DcaManager__InexistentScheduleIndex.selector);
         dcaManager.updatePurchasePeriod(address(stablecoin), SCHEDULE_INDEX + 1, scheduleId, MIN_PURCHASE_PERIOD);
         vm.stopPrank();
@@ -103,7 +104,7 @@ contract DcaConfigurationTest is DcaDappTest {
 
     function testPurchaseAmountEqualToBalanceSucceeds() external {
         vm.startPrank(USER);
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         dcaManager.updatePurchaseAmount(address(stablecoin), SCHEDULE_INDEX, scheduleId, AMOUNT_TO_DEPOSIT);
         assertEq(AMOUNT_TO_DEPOSIT, dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).purchaseAmount);
         vm.stopPrank();
@@ -111,7 +112,7 @@ contract DcaConfigurationTest is DcaDappTest {
 
     function testPurchaseAmountCannotExceedBalance() external {
         vm.prank(USER);
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         bytes memory encodedRevert = abi.encodeWithSelector(
             IDcaManager.DcaManager__PurchaseAmountExceedsBalance.selector,
             address(stablecoin),
@@ -131,7 +132,7 @@ contract DcaConfigurationTest is DcaDappTest {
             address(stablecoin), onePurchaseAmount, onePurchaseAmount, MIN_PURCHASE_PERIOD, s_routeIndex
         );
         uint256 scheduleIndex = 1; // setUp already created schedule 0
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).scheduleId;
         assertEq(onePurchaseAmount, dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).tokenBalance);
         assertEq(onePurchaseAmount, dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).purchaseAmount);
         vm.stopPrank();
@@ -144,7 +145,7 @@ contract DcaConfigurationTest is DcaDappTest {
 
     function testPurchaseAmountMustBeGreaterThanMin() external {
         vm.prank(USER);
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         bytes memory encodedRevert = abi.encodeWithSelector(
             IDcaManager.DcaManager__PurchaseAmountMustBeGreaterThanMinimum.selector, address(stablecoin), MIN_PURCHASE_AMOUNT
         );
@@ -155,7 +156,7 @@ contract DcaConfigurationTest is DcaDappTest {
 
     function testPurchasePeriodMustBeGreaterThanMin() external {
         vm.prank(USER);
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         vm.expectRevert(IDcaManager.DcaManager__PurchasePeriodMustBeGreaterThanMinimum.selector);
         vm.prank(USER);
         dcaManager.updatePurchasePeriod(address(stablecoin), SCHEDULE_INDEX, scheduleId, MIN_PURCHASE_PERIOD - 1);
@@ -266,7 +267,7 @@ contract DcaConfigurationTest is DcaDappTest {
         vm.stopPrank();
         
         vm.startPrank(USER);
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         
         // Should revert with the custom amount, not the default
         bytes memory encodedRevert = abi.encodeWithSelector(

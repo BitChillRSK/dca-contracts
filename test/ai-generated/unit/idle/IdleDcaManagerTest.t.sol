@@ -75,7 +75,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
     function test_buyAndWithdraw_spendIdleDoc() public {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(docToken), 0).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(docToken), 0).scheduleId;
 
         vm.prank(SWAPPER);
         batchBuyOne(dcaManager, USER, address(docToken), 0, scheduleId, PURCHASE, IDLE_INDEX);
@@ -102,7 +102,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
     function test_interestCalls_atIndexZero_revert() public {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(docToken), 0).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(docToken), 0).scheduleId;
 
         bytes memory encodedRevert =
             abi.encodeWithSelector(IDcaManager.DcaManager__TokenDoesNotYieldInterest.selector, address(docToken));

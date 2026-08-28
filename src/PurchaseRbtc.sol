@@ -28,7 +28,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
      * @param scheduleIds: the schedule ids
      * @param purchaseAmounts: the amounts to spend on rBTC
      */
-    function batchBuyRbtc(address[] memory buyers, bytes32[] memory scheduleIds, uint256[] memory purchaseAmounts)
+    function batchBuyRbtc(address[] memory buyers, uint64[] memory scheduleIds, uint256[] memory purchaseAmounts)
         external
         override
         onlyDcaManager

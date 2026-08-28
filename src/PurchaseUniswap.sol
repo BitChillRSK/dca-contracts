@@ -9,6 +9,7 @@ import {IV3SwapRouter} from "@uniswap/swap-router-contracts/contracts/interfaces
 import {ICoinPairPrice} from "./interfaces/ICoinPairPrice.sol";
 import {IPurchaseUniswap} from "./interfaces/IPurchaseUniswap.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 /**
  * @title PurchaseUniswap
@@ -20,6 +21,8 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
  *      persistent depeg is handled by delisting the token, not by the purchase path.
  */
 abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
+    using SafeCast for uint256;
+
     //////////////////////
     // State variables ///
     //////////////////////
@@ -27,7 +30,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     ISwapRouter02 public immutable i_swapRouter02;
     ICoinPairPrice internal s_mocOracle;
     uint256 constant HUNDRED_PERCENT = 1 ether;
-    /// @notice decimals of the MoC BTC/USD price. Hardcoded in the R29 style; the oracle exposes no `decimals()`.
+    /// @notice decimals of the MoC BTC/USD price. Hardcoded because the oracle exposes no `decimals()`.
     uint256 internal constant USD_DECIMALS = 18;
     /// @notice decimals of the token min-out is denominated in. Must stay equal to `HUNDRED_PERCENT`'s scale:
     /// the oracle's decimals cancel against the stablecoin scale-up, so the quotient lands in units of
@@ -36,9 +39,11 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     /// @notice `10 ** (USD_DECIMALS - stablecoin decimals)`, which lifts a stablecoin amount into 18-decimal USD
     /// @dev Fixed at deploy because the handler's stablecoin is immutable. USDT0 is 6 decimals, DOC and USDRIF 18.
     uint256 internal immutable i_stablecoinToUsdScale;
-    uint256 internal s_amountOutMinimumPercent;
+    /// @notice The swap-time slippage fraction, 1e18-scaled like `HUNDRED_PERCENT`. uint128 is ample
+    /// for a value that can never exceed 1e18, and pairs it with the safety check in one slot.
+    uint128 internal s_amountOutMinimumPercent;
     /// @notice Config-only floor: the lowest `s_amountOutMinimumPercent` the owner may set. Never used at swap time.
-    uint256 internal s_amountOutMinimumSafetyCheck;
+    uint128 internal s_amountOutMinimumSafetyCheck;
     bytes internal s_swapPath;
 
     /**
@@ -70,8 +75,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
 
         _validateSlippageSettings(amountOutMinimumPercent, amountOutMinimumSafetyCheck);
 
-        s_amountOutMinimumPercent = amountOutMinimumPercent;
-        s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck;
+        s_amountOutMinimumPercent = amountOutMinimumPercent.toUint128();
+        s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint128();
         
         // Direct initial owner is not the deployer, so the constructor cannot call the onlyOwner setter.
         // This also rejects a zero purchase token before the `decimals()` calls below reach an empty address.
@@ -145,7 +150,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     function setAmountOutMinimumPercent(uint256 amountOutMinimumPercent) external onlyOwner {
         _validateSlippageSettings(amountOutMinimumPercent, s_amountOutMinimumSafetyCheck);
         emit PurchaseUniswap_AmountOutMinimumPercentUpdated(s_amountOutMinimumPercent, amountOutMinimumPercent);
-        s_amountOutMinimumPercent = amountOutMinimumPercent;
+        s_amountOutMinimumPercent = amountOutMinimumPercent.toUint128();
     }
 
     /**
@@ -153,12 +158,12 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      * @param amountOutMinimumSafetyCheck The floor `setAmountOutMinimumPercent` is validated against.
      * @dev Config-only, by design: it bounds `s_amountOutMinimumPercent` and never enters the swap math.
      * Widening slippage tolerance therefore takes two owner transactions — lower this floor first, then the
-     * percent — which is the point of keeping it now that the owner is a Safe (R45).
+     * percent — which is the point of keeping it now that the owner is a Safe.
      */
     function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external onlyOwner {
         _validateSlippageSettings(s_amountOutMinimumPercent, amountOutMinimumSafetyCheck);
         emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(s_amountOutMinimumSafetyCheck, amountOutMinimumSafetyCheck);
-        s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck;
+        s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint128();
     }
 
     /**
@@ -265,7 +270,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      * sandwiched swap. `ExactInputParams` carries no deadline, and the one mechanism SwapRouter02 does offer
      * — `IMulticallExtended.multicall(uint256 deadline, bytes[])` — cannot help here: a deadline this contract
      * derives from `block.timestamp` while executing is satisfied by construction. Only a deadline supplied by
-     * the caller bounds anything, and that means a `batchBuyRbtc` argument (R42), not a handler change.
+     * the caller bounds anything, and that means a `batchBuyRbtc` argument, not a handler change.
      * @dev This is a revert bound, not an accounting input: what the handler credits is the measured WRBTC
      * balance delta in `_swapStablecoinForWrbtc`.
      */
