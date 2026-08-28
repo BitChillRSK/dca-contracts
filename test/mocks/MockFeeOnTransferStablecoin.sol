@@ -14,8 +14,6 @@ contract MockFeeOnTransferStablecoin is ERC20, ERC20Burnable, ERC20Permit {
     address public feeRecipient;
     /// @notice Extra tokens minted to the recipient on each transfer, so hop-1 over-delivery can be tested.
     uint256 public extraCredit;
-    /// @notice Tokens burnt from the recipient after the transfer, so a falling handler `balanceOf` can be tested.
-    uint256 public recipientBurn;
 
     constructor() ERC20("FeeOnTransferStablecoin", "FOT") ERC20Permit("FeeOnTransferStablecoin") {}
 
@@ -34,10 +32,6 @@ contract MockFeeOnTransferStablecoin is ERC20, ERC20Burnable, ERC20Permit {
 
     function setExtraCredit(uint256 extraCredit_) external {
         extraCredit = extraCredit_;
-    }
-
-    function setRecipientBurn(uint256 recipientBurn_) external {
-        recipientBurn = recipientBurn_;
     }
 
     function transfer(address to, uint256 amount) public override returns (bool) {
@@ -59,11 +53,5 @@ contract MockFeeOnTransferStablecoin is ERC20, ERC20Burnable, ERC20Permit {
             else _transfer(from, feeRecipient, fee);
         }
         if (extraCredit > 0) _mint(to, extraCredit);
-        if (recipientBurn > 0) {
-            uint256 burnAmt = recipientBurn;
-            uint256 bal = balanceOf(to);
-            if (burnAmt > bal) burnAmt = bal;
-            if (burnAmt > 0) _burn(to, burnAmt);
-        }
     }
 }

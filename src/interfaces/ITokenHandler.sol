@@ -18,10 +18,9 @@ interface ITokenHandler {
     //////////////////////
     /// @notice The handler measured something other than the requested amount after `transferFrom`.
     /// @dev Fee-on-transfer is not a supported token class, so any shortfall (including a zero receipt) or
-    /// over-delivery reverts instead of crediting a schedule the user did not ask for. A drop in `balanceOf`
-    /// is reported as `received == 0` rather than underflowing.
+    /// over-delivery reverts instead of crediting a schedule the user did not ask for.
     /// @param requested The amount the DCA manager asked this handler to pull from the user.
-    /// @param received The `balanceOf(address(this))` delta measured around `transferFrom`, or 0 if it fell.
+    /// @param received The `balanceOf(address(this))` delta measured around `transferFrom`.
     error TokenHandler__DepositAmountMismatch(uint256 requested, uint256 received);
 
     ///////////////////////////////

@@ -62,7 +62,6 @@ Then `make check`.
 - FOT `transferFrom` on `createDcaSchedule` and `depositToken` reverts `TokenHandler__DepositAmountMismatch`; no `TokenBalanceUpdated` / `TokenDeposited`; user balance restored.
 - Zero-received still reverts (same error, `received == 0`).
 - Over-delivery (`received > requested`) reverts the same error.
-- A drop in handler `balanceOf` during `transferFrom` reverts `TokenHandler__DepositAmountMismatch(requested, 0)`, not a panic; other users' funds roll back.
 - Withdraw of a 1:1 deposit is unchanged.
 
 Fork: no new assertions. Still run both fork lanes before push.
@@ -99,11 +98,11 @@ back and neither `TokenHandler__TokenDeposited` nor `DcaManager__TokenBalanceUpd
 assert the post-revert state instead: no schedule, no handler credit, no shares, unchanged wallet, and a zero
 balance at the token's fee recipient.
 
-**Saturating hop-1 delta (audit follow-up).** A `balanceOf` that falls during `transferFrom` used to underflow the
-subtraction and panic. The delta is now `0` when `balanceAfter < balanceBefore`, so that path reverts
-`TokenHandler__DepositAmountMismatch(requested, 0)` like a zero receipt. Over-delivery (`received > requested`)
-is the same `!=` predicate; both branches now have tests. `MockFeeOnTransferStablecoin` gained `setExtraCredit`
-and `setRecipientBurn` knobs for those cases. `createDcaSchedule` natspec no longer says purchase amount is
+**Over-delivery covered; a falling `balanceOf` is left as a panic (audit follow-up).** Over-delivery
+(`received > requested`) is the same `!=` predicate and now has a test via `MockFeeOnTransferStablecoin.setExtraCredit`.
+A deposit cannot be negative: if `balanceOf` falls during `transferFrom`, the subtraction panics. That is an
+invariant break (the token drained the handler), not a mismatch amount, so it is not folded into
+`TokenHandler__DepositAmountMismatch(requested, 0)`. `createDcaSchedule` natspec no longer says purchase amount is
 validated against a credited balance that can differ from the request.
 
 ## Reviewer checklist
