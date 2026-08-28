@@ -12,7 +12,7 @@ Let a user pause and resume purchases for one DCA schedule without withdrawing i
 
 Withdrawal/deletion is an exit, not a pause. A DCA user may want to keep funds in the selected route while temporarily stopping buys. The state belongs to the schedule and must be part of the layout before R18 packs the final struct.
 
-This pause is user-owned and affects purchases only. R48 is the separate governance-owned intake circuit breaker.
+This pause is user-owned and affects purchases only. R48 is the separate governance-owned deposit circuit breaker (`setDepositsPaused`, per `(token, routeIndex)`).
 
 ## Open product decisions
 
