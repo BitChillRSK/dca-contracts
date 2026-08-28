@@ -1,6 +1,6 @@
 # R37 — Retire Tropykus from every live path
 
-Status: **not started** · Assigned: no · Optional/further-review: no · **Blocked on R36**
+Status: **implemented** · Assigned: yes · Optional/further-review: no · R36 landed as PR [#92](https://github.com/BitChillRSK/dca-contracts/pull/92)
 
 PR 44 of the relaunch stack. Stack on R50 (PR 43).
 
@@ -41,19 +41,31 @@ Only the index ever lands in production storage, so only the index needs to leav
 
 ## Scope
 
-- [ ] `script/tropykus-legacy/` — move the Tropykus-only deploy scripts there (at minimum
-      `DeployUsdrifHandler.s.sol` if it still exists after R36; delete it instead if R36 replaced it
-      wholesale). Fix imports; do not `forge fmt` the moved files.
-- [ ] `script/DeployDexSwaps.s.sol` — remove the Tropykus arm from the **live** (`TESTNET`/`MAINNET`)
-      branch, including its `registerRoute(TROPYKUS_INDEX, true)`. The `LOCAL`/`FORK` branch keeps
-      building a Tropykus handler so `make dex-tropykus` and `make fork-tropykus` still work.
-- [ ] Move `uint256 constant TROPYKUS_INDEX` from `script/Constants.sol` to `test/Constants.sol`.
-      Leave `TROPYKUS_STRING` in `script/Constants.sol`.
-- [ ] Verify the enforcement holds: `grep -rn "TROPYKUS_INDEX" script/` returns nothing, and the build
-      would break if it did not.
-- [ ] Update the index-map comment block in `script/Constants.sol` — after this PR, Tropykus really is
-      test-only and the comment R22 had to correct becomes true.
-- [ ] `AGENTS.md` — the layout tree and the Tropykus bullets, so the next agent reads the enforced rule.
+- [x] `script/tropykus-legacy/` — **not created: there is nothing Tropykus-only left to move.** R36
+      repurposed `DeployUsdrifHandler.s.sol` wholesale into a `LayerBankErc20HandlerDex` add-on, so it
+      stays in `script/`. Every other script (`DeployDexSwaps`, `DeployMocSwaps`,
+      `DeployMocAndUniswap`, both helper configs) is shared and keeps a Tropykus branch for the
+      local/fork lanes; moving any of them would break the live paths they also serve. Git cannot
+      track an empty folder, so the `src/` ↔ `script/` symmetry R22 started is completed by the
+      compile-scope rule below instead: `script/` cannot name a Tropykus route at all.
+- [x] `script/DeployDexSwaps.s.sol` — the Tropykus arm is gone from the **live**
+      (`TESTNET`/`MAINNET`) branch, `registerRoute(TROPYKUS_INDEX, true)` included, and
+      `_deployLiveDexHandlers` now rejects `Protocol.TROPYKUS` the way `DeployMocSwaps` already
+      rejects it on the MoC map — a live Tropykus dex run reverts instead of silently returning a
+      zero handler. The `LOCAL`/`FORK` branch still builds a Tropykus handler, so `make dex-tropykus`
+      and `make fork-tropykus` are unaffected.
+- [x] `uint256 constant TROPYKUS_INDEX` moved from `script/Constants.sol` to `test/Constants.sol`.
+      `TROPYKUS_STRING` stayed. Twelve test files that imported `script/Constants.sol` directly now
+      import `test/Constants.sol`, which re-exports it.
+- [x] `grep -rn "TROPYKUS_INDEX" script/` returns nothing, and any script that reintroduced it would
+      fail to compile — `script/` never imports `test/Constants.sol`.
+- [x] The index-map comment block in `script/Constants.sol` says what is now true: test-only on both
+      maps, index 4 burned, and *why* the constant lives under `test/`.
+- [x] `AGENTS.md` — layout tree, the `script/` bullet (the compile-scope rule), and the CI/lanes
+      bullet.
+- [x] Beyond the spec's list: `UsdrifHelperConfig`'s `kUsdrifTokenAddress` field, its mainnet/testnet
+      values, and the Anvil `MockKToken` it built are removed. R36 left them with the comment "kept
+      until R37 removes the Tropykus dex arm"; nothing ever read the field.
 
 ## Out of scope
 
@@ -93,10 +105,26 @@ Assert:
 
 ## Success criteria
 
-- [ ] No `script/` file can name a Tropykus route index — enforced by the compiler, not by review.
-- [ ] No live deploy branch constructs a Tropykus handler.
-- [ ] Local and fork Tropykus lanes still pass with unchanged counts.
-- [ ] No open product decisions.
+- [x] No `script/` file can name a Tropykus route index — enforced by the compiler, not by review.
+- [x] No live deploy branch constructs a Tropykus handler; both live branches revert on
+      `Protocol.TROPYKUS`.
+- [x] Local and fork Tropykus lanes still pass. **Passing counts are identical in every lane**; each
+      lane's total and skip count rise by exactly one, from the one test this PR adds
+      (`test_dexLive_revertsForTropykus`, which runs only on the Tropykus lanes and skips elsewhere).
+      In the `dex-tropykus` lane the two trade places: `test_dexLive_mainnetStyle_registersRoutesThenProposes`
+      is now skipped there (a live Tropykus dex deploy is no longer a supported configuration, exactly
+      as `_skipIfMocLiveUnsupported` has always skipped it on the MoC side) and the new revert test
+      passes in its place.
+
+      | lane | before (pass / skip / total) | after |
+      |---|---|---|
+      | `STABLECOIN_TYPE=USDRIF make dex-tropykus` | 686 / 22 / 708 | 686 / 23 / 709 |
+      | `make moc-tropykus` | 714 / 16 / 730 | 714 / 17 / 731 |
+      | `STABLECOIN_TYPE=USDRIF make dex-layerbank` | 686 / 22 / 708 | 686 / 23 / 709 |
+      | `make moc-sovryn` | 726 / 4 / 730 | 726 / 5 / 731 |
+      | `make fork-tropykus` | 292 / 17 / 309 | 292 / 18 / 310 |
+      | `make fork-sovryn` | 299 / 13 / 312 | 299 / 14 / 313 |
+- [x] No open product decisions.
 
 ## Reviewer checklist
 
@@ -112,5 +140,7 @@ Assert:
 - Scripts: `DeployDexSwaps` stops deploying Tropykus on live networks; Tropykus deploy scripts move
   under `script/tropykus-legacy/`.
 - Cutover: the dex map loses its Tropykus route. Anything still pointing at that index must have been
-  migrated by R36 first. Nothing is deployed on the current dex map, so this is a map change on paper
-  rather than a migration — confirm that is still true when this lands.
+  migrated by R36 first. Confirmed at implementation time: nothing is deployed on the relaunch dex map,
+  so this is a map change on paper rather than a migration. The five consumer tracking issues R36
+  opened already state that Tropykus leaves every live path and that index 4 is burned, naming R37 —
+  so this PR comments on them rather than opening duplicates.
