@@ -37,7 +37,23 @@ contract Handler is Test {
     //////////////////////////////////////////////////////////////*/
     
     address[] public s_users;
-    
+
+    /*//////////////////////////////////////////////////////////////
+                        PAUSE GHOST STATE (R19)
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Keyed by `scheduleId`, not by index: `deleteDcaSchedule` swap-pops, so an index does not
+    ///      identify a schedule across calls while an id does (`AGENTS.md` invariant 7).
+    struct PausedSchedule {
+        address user;
+        uint256 lastPurchaseTimestampAtPause;
+        bool pausedNow;
+    }
+
+    mapping(bytes32 scheduleId => PausedSchedule) public s_pauseGhost;
+    bytes32[] public s_everPausedScheduleIds;
+
+
     // ----------------------------------------------------------------------------
     //  NOTE: We intentionally keep *only* lower-bounds that mirror on-chain
     //  require() checks so that handler calls never revert when `fail_on_revert`
@@ -56,6 +72,8 @@ contract Handler is Test {
     uint256 public createScheduleSuccesses;
     uint256 public updateScheduleCalls;
     uint256 public buyRbtcCalls;
+    uint256 public pauseCalls;
+    uint256 public pauseAttemptsOnLiveSchedule;
     
     /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR
@@ -294,6 +312,75 @@ contract Handler is Test {
         vm.stopPrank();
     }
     
+    /**
+     * @notice Pause purchases on a random schedule (R19)
+     * @dev Pause and resume are two selectors rather than one taking a flag. The invariant fuzzer
+     *      explores *which function* it calls far better than it explores argument values: with a
+     *      `bool` (or a parity-derived seed) the paused branch was never once reached across
+     *      64 runs × 512 calls, which made the pause invariant silently vacuous. Selector choice is
+     *      the lever that actually varies, so the flag is encoded in the selector.
+     *      Resume must stay reachable — a one-way pause would starve the purchase actions of
+     *      eligible rows and quietly hollow out the rest of the suite.
+     */
+    function pauseSchedule(uint256 userSeed, uint256 scheduleIndex) external {
+        _setSchedulePaused(userSeed, scheduleIndex, true);
+    }
+
+    /**
+     * @notice Resume purchases on a random schedule (R19)
+     */
+    function unpauseSchedule(uint256 userSeed, uint256 scheduleIndex) external {
+        _setSchedulePaused(userSeed, scheduleIndex, false);
+    }
+
+    /**
+     * @dev Scans from the seeded user for one that actually holds a schedule instead of returning
+     *      empty-handed. Picking blind wasted most calls early in a run, when few users have any.
+     */
+    function _setSchedulePaused(uint256 userSeed, uint256 scheduleIndex, bool paused) private {
+        pauseCalls++;
+
+        uint256 numOfUsers = s_users.length;
+        for (uint256 k; k < numOfUsers; ++k) {
+            // Reduce the seed before adding the offset: the fuzzer hands out words near
+            // type(uint256).max, and `userSeed + k` on one of those panics with an overflow.
+            address user = s_users[(userSeed % numOfUsers + k) % numOfUsers];
+
+            IDcaManager.DcaDetails[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
+            if (schedules.length == 0) continue;
+
+            uint256 index = bound(scheduleIndex, 0, schedules.length - 1);
+            bytes32 scheduleId = schedules[index].scheduleId;
+
+            if (paused) pauseAttemptsOnLiveSchedule++;
+
+            vm.prank(user);
+            try dcaManager.setSchedulePaused(address(stablecoin), index, scheduleId, paused) {
+                if (paused) {
+                    if (s_pauseGhost[scheduleId].user == address(0)) s_everPausedScheduleIds.push(scheduleId);
+                    // Re-snapshot on every pause: the schedule may have bought legitimately while active.
+                    s_pauseGhost[scheduleId] = PausedSchedule({
+                        user: user,
+                        lastPurchaseTimestampAtPause: schedules[index].lastPurchaseTimestamp,
+                        pausedNow: true
+                    });
+                } else {
+                    s_pauseGhost[scheduleId].pausedNow = false;
+                }
+            } catch {
+                // Ignore failures
+            }
+            return;
+        }
+    }
+
+    /**
+     * @notice Every schedule that has ever been paused, for the pause invariant to walk.
+     */
+    function everPausedScheduleIdsLength() external view returns (uint256) {
+        return s_everPausedScheduleIds.length;
+    }
+
     /**
      * @notice Delete a DCA schedule
      */
