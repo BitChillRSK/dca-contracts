@@ -37,23 +37,36 @@ string constant SOVRYN_STRING = "sovryn";
 uint256 constant SOVRYN_INDEX = 2;
 uint256 constant RESERVED_MOC_LENDING_INDEX = 3; // reserved for future MoC lending; not assigned in this PR
 
-// Legacy Tropykus. Off the production MoC map above, but still LIVE on the dex map:
-// `DeployDexSwaps` and `DeployUsdrifHandler` register `TROPYKUS_INDEX` on their own
-// `OperationsAdmin`. R22 moved it 1 -> 4 so the shared test harness, which registers every
-// index on one admin, has no collision with `LAYERBANK_INDEX`. Nothing is deployed on the
-// old dex map, so 4 is a free choice, not a migration.
-// R37 retires Tropykus from every live path and moves `TROPYKUS_INDEX` to `test/Constants.sol`,
-// after R36 ships a LayerBank USDRIF dex handler to replace it. `TROPYKUS_STRING` stays here:
-// `MocHelperConfig` / `DexHelperConfig` need it to select mocks for the local lane.
+// Legacy Tropykus. Off the production MoC map above. R36 still leaves the Tropykus dex arm
+// registered on live `DeployDexSwaps` (USDRIF/DOC) so R37 can retire it without a gap;
+// `DeployUsdrifHandler` now deploys `LayerBankErc20HandlerDex` at `LAYERBANK_INDEX`.
+// R22 moved the index 1 -> 4 so the shared test harness, which registers every index on one
+// admin, has no collision with `LAYERBANK_INDEX`. R37 moves `TROPYKUS_INDEX` to
+// `test/Constants.sol`. `TROPYKUS_STRING` stays here: `MocHelperConfig` / `DexHelperConfig`
+// need it to select mocks for the local lane.
 string constant TROPYKUS_STRING = "tropykus";
 uint256 constant TROPYKUS_INDEX = 4;
 
 // Default configurations
 string constant DEFAULT_STABLECOIN = "DOC"; // Default stablecoin to use if not specified
+string constant USDRIF_STRING = "USDRIF";
+string constant USDT0_STRING = "USDT0";
 uint256 constant DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT = 0.995 ether; // 99.5% -> 0.5% slippage
 uint256 constant DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK = 0.95 ether; // 95%
 uint256 constant MAX_SLIPPAGE_PERCENT = 1 ether - DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT; 
 uint256 constant EXCHANGE_RATE_DECIMALS = 1e18; // Valid for DOC and USDRIF in both Tropykus and Sovryn
+
+// USDT0 is 6 decimals. Do not pass MIN_PURCHASE_AMOUNT / FEE_PURCHASE_* (18-decimal DOC/USDRIF
+// units) into a USDT0 handler — that would make the min ~25 trillion USDT0 and put every real
+// purchase at the max fee band. Live/mainnet USDT0 deploy paths use these magnitudes.
+uint256 constant USDT0_MIN_PURCHASE_AMOUNT = 25e6;
+uint256 constant USDT0_FEE_PURCHASE_LOWER_BOUND = 1000e6;
+uint256 constant USDT0_FEE_PURCHASE_UPPER_BOUND = 100_000e6;
+
+// Mainnet LayerBank aTokens on Pool `0x526D06c65777eA6D56d7a1Dd47cD79230dDf72E9` (looked up 2026-08-28).
+address constant USDT0_MAINNET = 0x779Ded0c9e1022225f8E0630b35a9b54bE713736;
+address constant LAYERBANK_USDRIF_ATOKEN = 0xc96fBD12bE56Dd565b258d243344bCf792A51128; // lRooUSDRIF
+address constant LAYERBANK_USDT0_ATOKEN = 0x6bE7d4cfCe825b106aa88F6916A412c5af230Ec0; // lRooUSDT0
 
 
 /*//////////////////////////////////////////////////////////////

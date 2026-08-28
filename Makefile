@@ -18,7 +18,7 @@ PROBE_VERBOSITY ?= -vv
 PROBE_MATCH ?=
 
 # Targets
-.PHONY: all test moc dex help check ci build patch-deps slither moc-none moc-layerbank moc-tropykus moc-sovryn dex-tropykus dex-sovryn invariants invariants-sovryn fork fork-tropykus fork-sovryn probe-sovryn-exit-fee coverage
+.PHONY: all test moc dex help check ci build patch-deps slither moc-none moc-layerbank moc-tropykus moc-sovryn dex-tropykus dex-sovryn dex-layerbank invariants invariants-sovryn fork fork-tropykus fork-sovryn probe-sovryn-exit-fee coverage
 
 all: help
 
@@ -41,6 +41,8 @@ check: build
 	$(MAKE) moc-layerbank
 	$(MAKE) moc-sovryn
 	STABLECOIN_TYPE=USDRIF $(MAKE) dex-sovryn
+	STABLECOIN_TYPE=USDRIF $(MAKE) dex-layerbank
+	STABLECOIN_TYPE=USDT0 $(MAKE) dex-layerbank
 	$(MAKE) invariants-sovryn
 
 ci:
@@ -49,6 +51,8 @@ ci:
 	FOUNDRY_PROFILE=ci $(MAKE) moc-layerbank
 	FOUNDRY_PROFILE=ci $(MAKE) moc-sovryn
 	FOUNDRY_PROFILE=ci STABLECOIN_TYPE=USDRIF $(MAKE) dex-sovryn
+	FOUNDRY_PROFILE=ci STABLECOIN_TYPE=USDRIF $(MAKE) dex-layerbank
+	FOUNDRY_PROFILE=ci STABLECOIN_TYPE=USDT0 $(MAKE) dex-layerbank
 	FOUNDRY_PROFILE=ci $(MAKE) invariants-sovryn
 
 build: patch-deps
@@ -137,6 +141,9 @@ dex-tropykus:
 dex-sovryn:
 	@echo "Executing DexSwaps Sovryn tests with $(STABLECOIN_TYPE)..."
 	SWAP_TYPE=dexSwaps LENDING_PROTOCOL=sovryn EXPECTED_LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
+dex-layerbank:
+	@echo "Executing DexSwaps LayerBank tests with $(STABLECOIN_TYPE)..."
+	SWAP_TYPE=dexSwaps LENDING_PROTOCOL=layerbank EXPECTED_LENDING_PROTOCOL=layerbank STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
 
 # Stateful invariant suite (test/ai-generated/fuzz). Not part of TEST_CMD: 64 runs × 512
 # depth is ~32k calls and would multiply every unit lane. ComparePurchaseMethods stays excluded.
@@ -153,8 +160,8 @@ coverage:
 # Help target
 help:
 	@echo "Available targets:"
-	@echo "  make check                     # Build + moc-none + moc-layerbank + required CI lanes"
-	@echo "  make ci                        # Build + required CI lanes (moc-none, moc-layerbank, moc-sovryn, dex-sovryn, invariants-sovryn)"
+	@echo "  make check                     # Build + moc-none + moc-layerbank + moc-sovryn + dex-sovryn + dex-layerbank + invariants-sovryn"
+	@echo "  make ci                        # Build + required CI lanes (including dex-layerbank USDRIF and USDT0)"
 	@echo "  make patch-deps                # Apply vendored Uniswap pragma compatibility patch"
 	@echo "  make slither                   # Run slither (must be installed)"
 	@echo "  make test SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=DOC"
@@ -167,6 +174,7 @@ help:
 	@echo "  make dex                       # DexSwaps local tests (LENDING_PROTOCOL from env, default tropykus)"
 	@echo "  make dex-tropykus              # DexSwaps + Tropykus"
 	@echo "  make dex-sovryn                # DexSwaps + Sovryn"
+	@echo "  make dex-layerbank             # DexSwaps + LayerBank (USDRIF or USDT0)"
 	@echo "  make invariants                # Stateful InvariantTest (LENDING_PROTOCOL from env, default tropykus)"
 	@echo "  make invariants-sovryn         # InvariantTest + Sovryn (CI lane)"
 	@echo ""
@@ -178,7 +186,7 @@ help:
 	@echo "Environment variables:"
 	@echo "  SWAP_TYPE: mocSwaps (default) or dexSwaps"
 	@echo "  LENDING_PROTOCOL: tropykus (default, legacy), none, layerbank, or sovryn"
-	@echo "  STABLECOIN_TYPE: DOC (default) or USDRIF"
+	@echo "  STABLECOIN_TYPE: DOC (default), USDRIF, or USDT0"
 	@echo ""
 	@echo "Example:"
 	@echo "  STABLECOIN_TYPE=USDRIF make dex-tropykus"

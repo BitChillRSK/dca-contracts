@@ -17,8 +17,13 @@ import "script/Constants.sol";
  */
 contract LayerBankLivePoolProbe is Test {
     address internal constant ATOKEN = 0x3F04280C66314b78E9712A41BF8C1A214460cAa2;
+    address internal constant ATOKEN_USDRIF = 0xc96fBD12bE56Dd565b258d243344bCf792A51128;
+    address internal constant ATOKEN_USDT0 = 0x6bE7d4cfCe825b106aa88F6916A412c5af230Ec0;
     address internal constant POOL = 0x526D06c65777eA6D56d7a1Dd47cD79230dDf72E9;
     address internal constant DOC = 0xe700691dA7b9851F2F35f8b8182c69c53CcaD9Db;
+    address internal constant USDRIF = 0x3A15461d8aE0F0Fb5Fa2629e9DA7D66A794a6e37;
+    address internal constant USDT0 = 0x779Ded0c9e1022225f8E0630b35a9b54bE713736;
+    address internal constant RUSDT_HOP = 0xAf368c91793CB22739386DFCbBb2F1A9e4bCBeBf;
     address internal constant ADDRESSES_PROVIDER = 0x0c32000a7d7d4454a3CC3B700a8b12678ade7052;
 
     function setUp() public {
@@ -66,5 +71,23 @@ contract LayerBankLivePoolProbe is Test {
         assertEq(address(handler.i_aToken()), ATOKEN);
         assertEq(address(handler.i_pool()), POOL);
         assertEq(handler.i_aToken().UNDERLYING_ASSET_ADDRESS(), DOC);
+    }
+
+    function test_liveUsdrifAToken_underlyingIsUsdrifNotRusdt() public {
+        if (ATOKEN_USDRIF.code.length == 0) vm.skip(true);
+        ILayerBankAToken aToken = ILayerBankAToken(ATOKEN_USDRIF);
+        assertEq(aToken.POOL(), POOL);
+        assertEq(aToken.UNDERLYING_ASSET_ADDRESS(), USDRIF);
+        assertTrue(aToken.UNDERLYING_ASSET_ADDRESS() != RUSDT_HOP);
+    }
+
+    function test_liveUsdt0AToken_underlyingIsUsdt0NotRusdt() public {
+        if (ATOKEN_USDT0.code.length == 0) vm.skip(true);
+        ILayerBankAToken aToken = ILayerBankAToken(ATOKEN_USDT0);
+        assertEq(aToken.POOL(), POOL);
+        assertEq(aToken.UNDERLYING_ASSET_ADDRESS(), USDT0);
+        assertTrue(aToken.UNDERLYING_ASSET_ADDRESS() != RUSDT_HOP);
+        uint256 income = ILayerBankPool(POOL).getReserveNormalizedIncome(USDT0);
+        assertGe(income, 1e27, "USDT0 normalized income is RAY-scale");
     }
 }

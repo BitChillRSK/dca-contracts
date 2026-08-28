@@ -174,6 +174,21 @@ contract LiveDeployPathTest is Test {
             uint256(operationsAdmin.getRouteClass(TROPYKUS_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending)
         );
         assertEq(uint256(operationsAdmin.getRouteClass(SOVRYN_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
+        string memory coinType = vm.envOr("STABLECOIN_TYPE", DEFAULT_STABLECOIN);
+        bytes32 coinHash = keccak256(abi.encodePacked(coinType));
+        if (
+            keccak256(abi.encodePacked(vm.envString("LENDING_PROTOCOL")))
+                == keccak256(abi.encodePacked(LAYERBANK_STRING))
+                && (
+                    coinHash == keccak256(abi.encodePacked(USDRIF_STRING))
+                        || coinHash == keccak256(abi.encodePacked(USDT0_STRING))
+                )
+        ) {
+            assertEq(
+                uint256(operationsAdmin.getRouteClass(LAYERBANK_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending)
+            );
+            assertNotEq(handler, address(0), "live dex path must deploy the LayerBank handler for this stable");
+        }
     }
 
     function _skipIfMocLiveUnsupported() internal {
@@ -191,17 +206,27 @@ contract LiveDeployPathTest is Test {
     function _skipIfDexLiveUnsupported() internal {
         string memory lendingProtocol = vm.envString("LENDING_PROTOCOL");
         bytes32 protocolHash = keccak256(abi.encodePacked(lendingProtocol));
-        if (
-            protocolHash == keccak256(abi.encodePacked(NONE_STRING))
-                || protocolHash == keccak256(abi.encodePacked(LAYERBANK_STRING))
-        ) {
+        if (protocolHash == keccak256(abi.encodePacked(NONE_STRING))) {
             vm.skip(true);
+            return;
         }
         string memory coinType = vm.envOr("STABLECOIN_TYPE", DEFAULT_STABLECOIN);
+        bytes32 coinHash = keccak256(abi.encodePacked(coinType));
+        bool isUSDRIF = coinHash == keccak256(abi.encodePacked(USDRIF_STRING));
+        bool isUSDT0 = coinHash == keccak256(abi.encodePacked(USDT0_STRING));
+        bool isDOC = coinHash == keccak256(abi.encodePacked(DEFAULT_STABLECOIN));
+        if (protocolHash == keccak256(abi.encodePacked(LAYERBANK_STRING)) && isDOC) {
+            vm.skip(true); // LayerBank DOC dex is out of scope
+            return;
+        }
         if (
             protocolHash == keccak256(abi.encodePacked(SOVRYN_STRING))
-                && keccak256(abi.encodePacked(coinType)) == keccak256(abi.encodePacked("USDRIF"))
+                && (isUSDRIF || isUSDT0)
         ) {
+            vm.skip(true);
+            return;
+        }
+        if (protocolHash == keccak256(abi.encodePacked(TROPYKUS_STRING)) && isUSDT0) {
             vm.skip(true);
         }
     }

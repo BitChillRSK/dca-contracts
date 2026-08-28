@@ -187,29 +187,37 @@ contract DcaDappTest is Test {
             stablecoinType = DEFAULT_STABLECOIN;
         }
         
-        bool isUSDRIF = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked("USDRIF"));
+        bool isUSDRIF = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING));
+        bool isUSDT0 = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDT0_STRING));
+        bool isDexStable = isUSDRIF || isUSDT0;
         
-        // Skip test if Sovryn + USDRIF combination (not supported)
-        if (isSovryn && isUSDRIF) {
-            console2.log("Skipping test: USDRIF is not supported by Sovryn");
+        // Skip test if Sovryn + USDRIF/USDT0 combination (not supported)
+        if (isSovryn && isDexStable) {
+            console2.log("Skipping test: this stablecoin is not supported by Sovryn");
             vm.skip(true);
             return;
         }
-        // Skip test if MoC Swaps + USDRIF combination (not supported)
-        if (isMocSwaps && isUSDRIF) {
-            console2.log("Skipping test: USDRIF is not supported by MoC Swaps");
+        // Skip test if MoC Swaps + USDRIF/USDT0 combination (not supported)
+        if (isMocSwaps && isDexStable) {
+            console2.log("Skipping test: this stablecoin is not supported by MoC Swaps");
             vm.skip(true);
             return;
         }
-        // Skip test if Dex Swaps + DOC combination (not supported)
-        if (isDexSwaps && !isUSDRIF) {
+        // Skip Tropykus + USDT0 (never listed)
+        if (isTropykus && isUSDT0) {
+            console2.log("Skipping test: USDT0 is not supported by Tropykus");
+            vm.skip(true);
+            return;
+        }
+        // Skip test if Dex Swaps + DOC combination (DcaDappTest dex lanes are USDRIF/USDT0)
+        if (isDexSwaps && !isDexStable) {
             console2.log("Skipping test: DOC is not supported by Dex Swaps");
             vm.skip(true);
             return;
         }
-        // Dex is tropykus/sovryn only (no LayerBank Uniswap / idle dex in this relaunch)
-        if (isDexSwaps && (isNone || isLayerbank)) {
-            console2.log("Skipping test: dexSwaps is tropykus/sovryn only");
+        // No idle dex in this relaunch
+        if (isDexSwaps && isNone) {
+            console2.log("Skipping test: dexSwaps has no idle handler");
             vm.skip(true);
             return;
         }
@@ -268,7 +276,7 @@ contract DcaDappTest is Test {
                 if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked("DOC"))) {
                     // Set USER to DOC holder address
                     USER = DOC_HOLDER;
-                } else if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked("USDRIF"))) {
+                } else if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING))) {
                     // Set USER to USDRIF holder address
                     USER = USDRIF_HOLDER;
                 }
@@ -288,7 +296,7 @@ contract DcaDappTest is Test {
                 if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked("DOC"))) {
                     // Set USER to DOC holder address
                     USER = DOC_HOLDER_TESTNET;
-                } else if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked("USDRIF"))) {
+                } else if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING))) {
                     // Set USER to USDRIF holder address
                     USER = USDRIF_HOLDER;
                 }
@@ -335,7 +343,7 @@ contract DcaDappTest is Test {
                 if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked("DOC"))) {
                     // Set USER to DOC holder address
                     USER = DOC_HOLDER;
-                } else if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked("USDRIF"))) {
+                } else if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING))) {
                     // Set USER to USDRIF holder address
                     USER = USDRIF_HOLDER;
                 }
@@ -807,10 +815,11 @@ contract DcaDappTest is Test {
 
     // Helper function to get shares address based on stablecoin type and route index
     function getShareTokenAddress(string memory _stablecoinType, uint256 routeIndex) internal view returns (address) {
-        bool isUSDRIF = keccak256(abi.encodePacked(_stablecoinType)) == keccak256(abi.encodePacked("USDRIF"));
+        bool isUSDRIF = keccak256(abi.encodePacked(_stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING));
+        bool isUSDT0 = keccak256(abi.encodePacked(_stablecoinType)) == keccak256(abi.encodePacked(USDT0_STRING));
         
         // Check if this stablecoin is supported by Sovryn
-        if (routeIndex == SOVRYN_INDEX && isUSDRIF) {
+        if (routeIndex == SOVRYN_INDEX && (isUSDRIF || isUSDT0)) {
             revert("Share token not available for the selected combination");
         }
         
@@ -828,7 +837,7 @@ contract DcaDappTest is Test {
                 shareTokenAddress = networkConfig.layerbankATokenAddress;
             }
         } else if (isDexSwaps && address(dexHelperConfig) != address(0)) {
-            if (routeIndex == TROPYKUS_INDEX || routeIndex == SOVRYN_INDEX) {
+            if (routeIndex == TROPYKUS_INDEX || routeIndex == SOVRYN_INDEX || routeIndex == LAYERBANK_INDEX) {
                 shareTokenAddress = dexHelperConfig.getShareTokenAddress();
             }
         }

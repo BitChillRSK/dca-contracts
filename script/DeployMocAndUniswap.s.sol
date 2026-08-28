@@ -101,9 +101,10 @@ contract DeployMocAndUniswap is DeployBase {
             shareToken = networkConfig.kDocAddress;
         } else if (protocol == Protocol.SOVRYN) {
             // Check if this stablecoin is supported by Sovryn
-            bool isUSDRIF = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked("USDRIF"));
-            if (isUSDRIF) {
-                revert("USDRIF is not supported by Sovryn");
+            bool isUSDRIF = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING));
+            bool isUSDT0 = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDT0_STRING));
+            if (isUSDRIF || isUSDT0) {
+                revert("Sovryn does not list this stablecoin");
             }
             shareToken = networkConfig.iSusdAddress;
         } else {
@@ -161,9 +162,10 @@ contract DeployMocAndUniswap is DeployBase {
             shareToken = networkConfig.tropykusShareToken;
         } else if (protocol == Protocol.SOVRYN) {
             // Check if this stablecoin is supported by Sovryn
-            bool isUSDRIF = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked("USDRIF"));
-            if (isUSDRIF) {
-                revert("USDRIF is not supported by Sovryn");
+            bool isUSDRIF = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING));
+            bool isUSDT0 = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDT0_STRING));
+            if (isUSDRIF || isUSDT0) {
+                revert("Sovryn does not list this stablecoin");
             }
             shareToken = networkConfig.sovrynShareToken;
         } else {
