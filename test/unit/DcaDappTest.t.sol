@@ -346,6 +346,11 @@ contract DcaDappTest is Test {
                 } else if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING))) {
                     // Set USER to USDRIF holder address
                     USER = USDRIF_HOLDER;
+                } else if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDT0_STRING))) {
+                    // No impersonated whale yet. Required make fork-* lanes skip USDT0
+                    // (Sovryn/Tropykus). Add USDT0_HOLDER before a dex-layerbank fork E2E.
+                    vm.skip(true);
+                    return;
                 }
 
                 mocOracle = ICoinPairPrice(MOC_ORACLE_MAINNET);

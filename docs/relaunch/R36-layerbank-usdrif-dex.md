@@ -200,6 +200,8 @@ Fork: adds a fork-specific assertion only if decision 3 turns up a live kUSDRIF 
   token. Ops and the frontend need the new index, that USDRIF yield now comes from LayerBank not
   Tropykus, and that USDT0 exists at all. An illiquid LayerBank reserve aborts the whole
   `batchBuyRbtc` (live Aave `withdraw` reverts on insufficient aToken cash) — drop the row, do not
-  retry as a partial batch.
+  retry as a partial batch. **USDT0 add-on:** the Foundry EOA cannot assign on mainnet (Safe owns
+  `OperationsAdmin`); the Safe must `assignTokenHandler` **and** `setTokenMinPurchaseAmount(usdt0, 25e6)`.
+  Default min is 25 ether. See root README "Ownership after deploy".
 - **Frontend follow-up required** (`AGENTS.md` **Frontend follow-up**). New token + remapped USDRIF
   venue. Open or update an issue on `bitChillRSK/front-end` in the same turn as the contracts PR.

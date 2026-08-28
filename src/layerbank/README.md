@@ -5,6 +5,8 @@ LayerBank aToken handler (lending index 1). `LayerBankErc20Handler` supplies and
 
 Deploy DOC + MoC with `script/DeployLayerBankHandler.s.sol`. Deploy the dex stables with `script/DeployUsdrifHandler.s.sol` (keyed off `STABLECOIN_TYPE`) or `script/DeployDexSwaps.s.sol`. Anvil deploys Pool/aToken mocks. Live aToken addresses are in `script/Constants.sol`.
 
+USDT0 add-on on mainnet: the Foundry EOA cannot `assignTokenHandler` (Safe owns `OperationsAdmin`). The Safe must assign the handler **and** `setTokenMinPurchaseAmount(usdt0, 25e6)` — the DcaManager default is 25 ether. See root README "Ownership after deploy".
+
 External LayerBank incentives (LAB / Merkl) are not claimed. Native aToken interest is the only yield this handler distributes.
 
 ## Verified against live LayerBank (Rootstock, 2026-08-24)

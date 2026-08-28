@@ -304,6 +304,14 @@ Then, from the Safe UI (one call per contract), send `acceptOwnership()`. Until 
 
 Add-on scripts (`DeployIdleHandler`, `DeployLayerBankHandler`, `DeployUsdrifHandler`) revert if `pendingOwner` is set on `OperationsAdmin` or `DcaManager` — wait until the Safe has accepted, then run them.
 
+**USDT0 add-on (`STABLECOIN_TYPE=USDT0` `DeployUsdrifHandler`).** This is the live path R36 uses against an existing `DcaManager`. On mainnet the Safe already owns `OperationsAdmin`, so the Foundry EOA hits the non-owner branch: it deploys the handler, logs, and returns **without** `assignTokenHandler` and **without** `setTokenMinPurchaseAmount`. That is fail-closed for USDRIF (default min `25 ether` is correct). For USDT0 the default min is `25e18` atomic units — about 25 trillion USDT0 — so users cannot create real schedules until the Safe also sets the 6-decimal min. After the script, from the Safe, in order:
+
+1. `operationsAdmin.registerRoute(1, true)` **only if** `getRouteClass(1)` is still `Unregistered`. A second `registerRoute` reverts `RouteAlreadyRegistered` (LayerBank is already on the dex map after the USDRIF add-on).
+2. `operationsAdmin.assignTokenHandler(usdt0, 1, handler)`.
+3. **`dcaManager.setTokenMinPurchaseAmount(usdt0, 25000000)`** (`25e6`). Do not skip this step.
+
+`DeployDexSwaps` live full-stack sets that min in the same broadcast because that script owns the new admin. The add-on does not.
+
 `DeployMocAndUniswap` is a local/fork comparison harness (two independent stacks) and **reverts** on `REAL_DEPLOYMENT=true`. It is not the live deploy. A later one-shot live script — idle, Sovryn DOC, LayerBank DOC, LayerBank USDRIF, LayerBank USDT0 on a single `OperationsAdmin` / `DcaManager` — belongs after the production map is final (R36 / R37). Until then use `DeployMocSwaps` / `DeployDexSwaps` plus the add-ons.
 
 Later ownership changes (new Safe, recovered wallet) are the same two steps: current owner `transferOwnership(new)`, incoming owner `acceptOwnership()`. `renounceOwnership` always reverts.
