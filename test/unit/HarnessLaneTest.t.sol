@@ -3,7 +3,7 @@ pragma solidity 0.8.36;
 
 import {Test} from "forge-std/Test.sol";
 import {DcaDappTest} from "./DcaDappTest.t.sol";
-import "../../script/Constants.sol";
+import "../Constants.sol";
 
 /**
  * @title HarnessLaneTest

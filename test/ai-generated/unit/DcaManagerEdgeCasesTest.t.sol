@@ -15,7 +15,7 @@ import {IWRBTC} from "../../../src/interfaces/IWRBTC.sol";
 import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces/ISwapRouter02.sol";
 import {IDcaManager} from "../../../src/interfaces/IDcaManager.sol";
 import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
-import "../../../script/Constants.sol";
+import "../../Constants.sol";
 import {batchBuyOne, UNUSED_SCHEDULE_ID} from "../../utils/BatchBuyOne.sol";
 
 /**

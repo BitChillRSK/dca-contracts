@@ -157,10 +157,11 @@ make moc-layerbank
 # Run tests with DOC and Sovryn (index 2)
 make moc-sovryn
 
-# Legacy Tropykus mocks (not on the production map)
+# Legacy Tropykus mocks. Tropykus is on neither live map (index 4 is burned); these lanes
+# exercise LendingErc20Handler through a second adapter.
 make moc-tropykus
 
-# Run tests with USDRIF and Tropykus
+# Run tests with USDRIF and Tropykus (legacy lane)
 STABLECOIN_TYPE=USDRIF make dex-tropykus
 
 # Run tests with USDRIF and Sovryn
@@ -312,7 +313,7 @@ Add-on scripts (`DeployIdleHandler`, `DeployLayerBankHandler`, `DeployUsdrifHand
 
 `DeployDexSwaps` live full-stack sets that min in the same broadcast because that script owns the new admin. The add-on does not.
 
-`DeployMocAndUniswap` is a local/fork comparison harness (two independent stacks) and **reverts** on `REAL_DEPLOYMENT=true`. It is not the live deploy. A later one-shot live script — idle, Sovryn DOC, LayerBank DOC, LayerBank USDRIF, LayerBank USDT0 on a single `OperationsAdmin` / `DcaManager` — belongs after the production map is final (R36 / R37). Until then use `DeployMocSwaps` / `DeployDexSwaps` plus the add-ons.
+`DeployMocAndUniswap` is a local/fork comparison harness (two independent stacks) and **reverts** on `REAL_DEPLOYMENT=true`. It is not the live deploy. A later one-shot live script — idle, Sovryn DOC, LayerBank DOC, LayerBank USDRIF, LayerBank USDT0 on a single `OperationsAdmin` / `DcaManager` — belongs as a follow-up now that the production map is final. Until then use `DeployMocSwaps` / `DeployDexSwaps` plus the add-ons.
 
 Later ownership changes (new Safe, recovered wallet) are the same two steps: current owner `transferOwnership(new)`, incoming owner `acceptOwnership()`. `renounceOwnership` always reverts.
 

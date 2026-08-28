@@ -24,8 +24,8 @@ import "./Constants.sol";
  * @dev Reverts when `REAL_DEPLOYMENT=true`. Do not add Safe handoff here — nested
  *      `DeployMocSwaps` / `DeployDexSwaps` helper instances would split ownership.
  *      A one-shot live script (idle, Sovryn DOC, LayerBank DOC, LayerBank USDRIF,
- *      LayerBank USDT0 on one admin/manager) belongs after the production map is
- *      final (R36 / R37), as an extension of `DeployMocSwaps` / `DeployDexSwaps`.
+ *      LayerBank USDT0 on one admin/manager) belongs as an extension of
+ *      `DeployMocSwaps` / `DeployDexSwaps`, now that the production map is final.
  */
 contract DeployMocAndUniswap is DeployBase {
     error DeployMocAndUniswap__NotALivePath();

@@ -9,7 +9,7 @@ import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import {ITokenLending} from "src/interfaces/ITokenLending.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-import "script/Constants.sol";
+import "test/Constants.sol";
 import {batchBuyOne} from "test/utils/BatchBuyOne.sol";
 
 /**

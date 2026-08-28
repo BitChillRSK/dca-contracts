@@ -110,11 +110,16 @@ contract DeployDexSwaps is DeployBase {
         bool isUSDRIF,
         bool isUSDT0
     ) internal returns (address selectedHandler) {
+        // Live dex map is LayerBank (USDRIF / USDT0) and Sovryn (DOC). Tropykus is test-only:
+        // its route index is not even in scope here, so this is the only place that can say so.
+        if (protocol == Protocol.TROPYKUS) {
+            revert("Tropykus is not on the production dex map");
+        }
+
         console.log("Deploying handlers for lending protocols for live network");
 
         // Owner is the Foundry broadcaster for this transaction so route registration succeeds.
         // Mainnet proposes MAINNET_OWNER (the Safe) after setup.
-        operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
         operationsAdmin.registerRoute(SOVRYN_INDEX, true);
 
         if (isUSDRIF || isUSDT0) {
@@ -147,33 +152,6 @@ contract DeployDexSwaps is DeployBase {
                 }
                 if (protocol == Protocol.LAYERBANK) {
                     selectedHandler = layerbankHandler;
-                }
-            }
-        }
-
-        // Tropykus stays on the live dex map until R37. USDT0 was never listed there.
-        if (!isUSDT0) {
-            address tropykusShareToken = networkConfig.tropykusShareToken;
-            if (tropykusShareToken == address(0)) {
-                console.log("Warning: Tropykus shares not available for this stablecoin");
-            } else {
-                address tropykusHandler = deployDocHandlerDex(
-                    DeployParams({
-                        protocol: Protocol.TROPYKUS,
-                        dcaManager: address(dcaManager),
-                        tokenAddress: stablecoinAddress,
-                        shareToken: tropykusShareToken,
-                        uniswapSettings: uniswapSettings,
-                        feeCollector: feeCollector,
-                        amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
-                        amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
-                    })
-                );
-                console.log("Tropykus handler deployed at:", tropykusHandler);
-                operationsAdmin.assignTokenHandler(stablecoinAddress, TROPYKUS_INDEX, tropykusHandler);
-                _proposeFinalOwner(tropykusHandler);
-                if (protocol == Protocol.TROPYKUS) {
-                    selectedHandler = tropykusHandler;
                 }
             }
         }

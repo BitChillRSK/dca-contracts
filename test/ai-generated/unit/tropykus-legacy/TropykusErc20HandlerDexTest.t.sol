@@ -14,7 +14,7 @@ import {MockWrbtcToken} from "../../../mocks/MockWrbtcToken.sol";
 import {MockMocOracle} from "../../../mocks/MockMocOracle.sol";
 import {MockSwapRouter02} from "../../../mocks/MockSwapRouter02.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../../../../script/Constants.sol";
+import "../../../Constants.sol";
 import {handlerBatchBuyOne} from "test/utils/BatchBuyOne.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {ownableUnauthorized} from "../../../utils/OzRevert.sol";
