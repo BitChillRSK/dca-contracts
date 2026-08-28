@@ -10,10 +10,10 @@ import {console} from "forge-std/Test.sol";
 /**
  * @title DeploySwapperBatcher
  * @notice Add-on deploy for the swapper batcher. Local/test only in this PR.
- * @dev Does not `addSwapper`. Live allowlisting is ops after deploy: the batcher is `msg.sender`
- *      on `DcaManager.batchBuyRbtc`, so purchases revert `UnauthorizedSwapper` until the owner
- *      calls `OperationsAdmin.addSwapper(batcher)`. Keep the bot EOA on that allowlist as the
- *      per-handler retry path; do not revoke it in the same transaction as this deploy.
+ * @dev Does not `addSwapper`. Live allowlisting is ops after deploy: the owner must
+ *      `OperationsAdmin.addSwapper(batcher)` (the batcher is `msg.sender` on the inner
+ *      `DcaManager.batchBuyRbtc`) and keep the bot EOA on that same list (the EOA is `msg.sender`
+ *      on the batcher). Do not revoke the bot EOA in the same transaction as this deploy.
  */
 contract DeploySwapperBatcher is DeployBase {
     function run(address dcaManagerAddress) external returns (address) {
@@ -33,7 +33,7 @@ contract DeploySwapperBatcher is DeployBase {
         console.log("SwapperBatcher deployed at:", address(batcher));
         console.log("Ops (do not broadcast from this script):");
         console.log("  operationsAdmin.addSwapper(batcher)");
-        console.log("  Keep the bot EOA allowlisted for per-handler retries");
+        console.log("  Keep the bot EOA allowlisted (it must be a swapper to call the batcher)");
 
         return address(batcher);
     }

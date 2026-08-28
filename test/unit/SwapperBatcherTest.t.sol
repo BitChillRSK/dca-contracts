@@ -14,7 +14,7 @@ import "../Constants.sol";
 
 /**
  * @title SwapperBatcherTest
- * @notice R42: one cron tick forwards several `batchBuyRbtc` groups through a dedicated contract.
+ * @notice R42: one cron tick forwards several `batchBuyRbtc` groups through `batchBuyRbtcGroups`.
  * @dev Two-handler cases need a second MoC route on Anvil (idle + LayerBank). Access-control,
  *      empty-input, and custody tests run on every harness lane.
  */
@@ -104,6 +104,11 @@ contract SwapperBatcherTest is DcaDappTest {
         batches[1] = _oneRow(SECOND_SCHEDULE_INDEX, secondRouteIndex);
     }
 
+    function _batchBuy(ISwapperBatcher.Batch[] memory batches) private {
+        vm.prank(SWAPPER);
+        batcher.batchBuyRbtcGroups(batches);
+    }
+
     /*//////////////////////////////////////////////////////////////
                          TWO HANDLERS, ONE TX
     //////////////////////////////////////////////////////////////*/
@@ -120,7 +125,7 @@ contract SwapperBatcherTest is DcaDappTest {
         uint256 secondBalanceBefore =
             dcaManager.getDcaSchedule(USER, address(stablecoin), SECOND_SCHEDULE_INDEX).tokenBalance;
 
-        batcher.batchBuyRbtc(_twoGroups());
+        _batchBuy(_twoGroups());
 
         assertEq(
             dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance,
@@ -162,7 +167,7 @@ contract SwapperBatcherTest is DcaDappTest {
         batches[1].routeIndex = secondRouteIndex;
 
         vm.expectRevert(IDcaManager.DcaManager__EmptyBatchPurchaseArrays.selector);
-        batcher.batchBuyRbtc(batches);
+        _batchBuy(batches);
 
         IDcaManager.DcaSchedule memory firstAfter =
             dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX);
@@ -212,7 +217,7 @@ contract SwapperBatcherTest is DcaDappTest {
                 SECOND_SCHEDULE_INDEX
             )
         );
-        batcher.batchBuyRbtc(batches);
+        _batchBuy(batches);
 
         IDcaManager.DcaSchedule memory firstAfter =
             dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX);
@@ -231,10 +236,11 @@ contract SwapperBatcherTest is DcaDappTest {
         ISwapperBatcher.Batch[] memory batches = new ISwapperBatcher.Batch[](1);
         batches[0] = _oneRow(SCHEDULE_INDEX, s_routeIndex);
 
+        vm.prank(SWAPPER);
         vm.expectRevert(
             abi.encodeWithSelector(IDcaManager.DcaManager__UnauthorizedSwapper.selector, address(unlisted))
         );
-        unlisted.batchBuyRbtc(batches);
+        unlisted.batchBuyRbtcGroups(batches);
 
         IDcaManager.DcaSchedule memory schedule =
             dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX);
@@ -244,21 +250,35 @@ contract SwapperBatcherTest is DcaDappTest {
     function testEmptyBatchesRevert() external {
         ISwapperBatcher.Batch[] memory batches = new ISwapperBatcher.Batch[](0);
         vm.expectRevert(ISwapperBatcher.SwapperBatcher__EmptyBatches.selector);
-        batcher.batchBuyRbtc(batches);
+        _batchBuy(batches);
     }
 
-    function testAnyoneCanDriveAnAllowlistedBatcher() external {
-        address randomCaller = makeAddr("random-batcher-caller");
+    function testNonSwapperCannotDriveTheBatcher() external {
+        address attacker = makeAddr("bundle-frontrunner");
         ISwapperBatcher.Batch[] memory batches = new ISwapperBatcher.Batch[](1);
         batches[0] = _oneRow(SCHEDULE_INDEX, s_routeIndex);
 
-        vm.prank(randomCaller);
-        batcher.batchBuyRbtc(batches);
+        vm.prank(attacker);
+        vm.expectRevert(
+            abi.encodeWithSelector(ISwapperBatcher.SwapperBatcher__UnauthorizedSwapper.selector, attacker)
+        );
+        batcher.batchBuyRbtcGroups(batches);
 
+        assertEq(
+            dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).lastPurchaseTimestamp,
+            0,
+            "a public caller must not be able to consume a due schedule"
+        );
+    }
+
+    function testAllowlistedSwapperCanDriveTheBatcher() external {
+        ISwapperBatcher.Batch[] memory batches = new ISwapperBatcher.Batch[](1);
+        batches[0] = _oneRow(SCHEDULE_INDEX, s_routeIndex);
+        _batchBuy(batches);
         assertGt(
             dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).lastPurchaseTimestamp,
             0,
-            "allowlisted batcher has no second caller allowlist"
+            "the bot EOA must be able to call the allowlisted batcher"
         );
     }
 
@@ -286,13 +306,7 @@ contract SwapperBatcherTest is DcaDappTest {
 
     function testBatcherPinsDcaManager() external {
         assertEq(batcher.i_dcaManager(), address(dcaManager));
-    }
-
-    function testBatcherRejectsNativeValue() external {
-        vm.deal(address(this), 1 ether);
-        (bool success,) = address(batcher).call{value: 1 ether}("");
-        assertFalse(success, "batcher accepted native rBTC");
-        assertEq(address(batcher).balance, 0);
+        assertEq(batcher.i_operationsAdmin(), address(operationsAdmin));
     }
 
     function testDeployScriptDeploysOnAnvil() external {
@@ -300,6 +314,14 @@ contract SwapperBatcherTest is DcaDappTest {
         address deployed = new DeploySwapperBatcher().run(address(dcaManager));
         assertNotEq(deployed, address(0));
         assertEq(SwapperBatcher(deployed).i_dcaManager(), address(dcaManager));
+        assertEq(SwapperBatcher(deployed).i_operationsAdmin(), address(operationsAdmin));
         assertFalse(operationsAdmin.isSwapper(deployed), "deploy script must not addSwapper");
+    }
+
+    function testBatcherRejectsNativeValue() external {
+        vm.deal(address(this), 1 ether);
+        (bool success,) = address(batcher).call{value: 1 ether}("");
+        assertFalse(success, "batcher accepted native rBTC");
+        assertEq(address(batcher).balance, 0);
     }
 }

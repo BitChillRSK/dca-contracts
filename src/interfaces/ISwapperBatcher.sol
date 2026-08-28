@@ -5,8 +5,8 @@ pragma solidity 0.8.36;
  * @title ISwapperBatcher
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice One transaction, several `DcaManager.batchBuyRbtc` calls (one group per token×route).
- * @dev Holds no user funds. `DcaManager` authenticates the batcher through the OperationsAdmin
- *      swapper allowlist; this contract does not keep a second list. A revert in any group rolls
+ * @dev Holds no user funds. Callers and this contract itself are both authenticated against the
+ *      same OperationsAdmin swapper allowlist `DcaManager` uses. A revert in any group rolls
  *      back every group in the same transaction.
  */
 interface ISwapperBatcher {
@@ -28,20 +28,29 @@ interface ISwapperBatcher {
     //////////////////////
     error SwapperBatcher__EmptyBatches();
     error SwapperBatcher__DcaManagerIsNotAContract(address dcaManager);
+    error SwapperBatcher__UnauthorizedSwapper(address sender);
 
     /**
      * @notice Forward each group to `DcaManager.batchBuyRbtc`. Empty input reverts; per-group
      *         empty and length checks stay on `DcaManager`.
      * @param batches One group per token×route handler that is due this tick.
-     * @dev No `try/catch`: one revert rolls back every venue in the bundle. A paused schedule
-     *      reverts its own `batchBuyRbtc`, which therefore also rolls back every other group in
-     *      this call. The swapper must filter paused rows before composing. The bot EOA stays on
-     *      the swapper allowlist so a failed bundle can be retried one handler at a time.
+     * @dev Caller must be on the OperationsAdmin swapper allowlist. No `try/catch`: one revert
+     *      rolls back every venue in the bundle. A paused schedule reverts its own
+     *      `batchBuyRbtc`, which therefore also rolls back every other group in this call. The
+     *      swapper must filter paused rows before composing. The bot EOA stays on the allowlist
+     *      so a failed bundle can be retried one handler at a time.
      */
-    function batchBuyRbtc(Batch[] calldata batches) external;
+    function batchBuyRbtcGroups(Batch[] calldata batches) external;
 
     /**
      * @notice The `DcaManager` this batcher is permanently pinned to.
      */
     function i_dcaManager() external view returns (address);
+
+    /**
+     * @notice The OperationsAdmin whose swapper allowlist this batcher reads.
+     * @dev Taken from the pinned `DcaManager` at construction, so it cannot drift from the
+     *      manager's own list.
+     */
+    function i_operationsAdmin() external view returns (address);
 }

@@ -42,8 +42,8 @@ per-handler retry when a bundle reverts. Keep all-or-nothing. See
 ## Scope
 
 - [x] `src/SwapperBatcher.sol` (name may vary): immutable `dcaManager`, no token custody, no `receive` that holds rBTC.
-- [x] One external function that takes an array of `batchBuyRbtc` argument groups (token, routeIndex, parallel buyer/index/id/amount arrays) and forwards each group to `DcaManager.batchBuyRbtc`. Empty top-level array reverts. Per-group empty/length checks stay on `DcaManager`.
-- [x] No `onlySwapper` on the batcher itself unless you also want to stop random EOAs from driving it — `DcaManager` already reverts `UnauthorizedSwapper` unless `msg.sender` is allowlisted. The batcher **is** `msg.sender` for those calls, so it must be `addSwapper`’d. An extra allowlist on the batcher is optional and must not duplicate a second source of truth; default is none.
+- [x] One external function `batchBuyRbtcGroups` that takes an array of `batchBuyRbtc` argument groups (token, routeIndex, parallel buyer/index/id/amount arrays) and forwards each group to `DcaManager.batchBuyRbtc`. Named differently from the inner call so the compose cannot be confused with one token×route group after the ABI freeze. Empty top-level array reverts. Per-group empty/length checks stay on `DcaManager`.
+- [x] `onlySwapper` on the batcher, reading the **same** `OperationsAdmin.isSwapper` list `DcaManager` uses (pinned from `dcaManager.getOperationsAdminAddress()` at construction). Review follow-up: without the outer check, a random EOA can consume one due schedule and revert the bot's atomic bundle. This is not a second mapping. The batcher **is** `msg.sender` on the inner calls, so it must still be `addSwapper`’d, and the bot EOA must stay on the list to call the batcher.
 - [x] Add-on `script/DeploySwapperBatcher.s.sol` (local/test). Live `addSwapper` is ops, not this PR’s broadcast.
 - [x] Tests: two handlers (e.g. idle DOC + Sovryn DOC, or two route indexes on one admin) succeed in one `batcher` call; a revert in the second group rolls back the first; an address that is not a swapper cannot use the batcher to purchase (DcaManager revert) unless the batcher itself is allowlisted in the test fixture.
 
@@ -68,7 +68,7 @@ Targeted new test file, then `make check`.
 
 - One batcher tx, two `batchBuyRbtc` groups, two handlers: both purchase.
 - Second group reverts (e.g. empty buyers if decision 1 is all-or-nothing): first group’s schedule `lastPurchaseTimestamp` / balances unchanged.
-- Batcher not on the allowlist: revert `DcaManager__UnauthorizedSwapper`.
+- Batcher not on the allowlist: revert `DcaManager__UnauthorizedSwapper`. Caller not on the allowlist: revert `SwapperBatcher__UnauthorizedSwapper`.
 - Fork: no new assertions. Still run both fork lanes before push.
 
 ## Success criteria
