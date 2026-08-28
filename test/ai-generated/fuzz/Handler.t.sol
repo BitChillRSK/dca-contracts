@@ -214,7 +214,7 @@ contract Handler is Test {
     /**
      * @notice Apply intent-specific schedule edits. Combined updates take two or three calls.
      */
-    function updateDcaSchedule(
+    function applyScheduleEdits(
         uint256 userSeed,
         uint256 scheduleIndex,
         uint256 depositAmount,

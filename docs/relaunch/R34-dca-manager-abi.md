@@ -83,7 +83,7 @@ make fork-sovryn
 make fork-tropykus
 ```
 
-Assert canonical struct reads for self and arbitrary users, invalid-index behavior, schedule-id validation on every remaining mutator, intent-specific `depositToken` / `setPurchaseAmount` / `setPurchasePeriod` edits, and `withdrawTokenAndInterest` using the schedule's route without caller input. Fork tests add no new fork-specific assertions.
+Assert canonical struct reads for self and arbitrary users, invalid-index behavior, schedule-id validation on every remaining mutator, intent-specific `depositToken` / `setPurchaseAmount` / `setPurchasePeriod` edits (renamed to `updatePurchaseAmount` / `updatePurchasePeriod` by R40), and `withdrawTokenAndInterest` using the schedule's route without caller input. Fork tests add no new fork-specific assertions.
 
 ## Success criteria
 
@@ -107,4 +107,4 @@ Assert canonical struct reads for self and arbitrary users, invalid-index behavi
 
 - ABI: intentional DcaManager selector additions/removals. `DcaManager__DcaScheduleUpdated` is removed with `updateDcaSchedule` (it had no other emitter). Remaining events and storage layout are unchanged.
 - Scripts: checked-in callers update to the canonical API; no broadcast.
-- Cutover: relaunch frontend/backend must migrate atomically with this ABI. There is no live-contract migration because relaunch deployment is fresh. Reads go through `getDcaSchedule` / `getDcaSchedules`. Schedule edits use `depositToken`, `setPurchaseAmount`, and `setPurchasePeriod` (two transactions if both amount and period change). `withdrawTokenAndInterest` no longer takes a lending-protocol index.
+- Cutover: relaunch frontend/backend must migrate atomically with this ABI. There is no live-contract migration because relaunch deployment is fresh. Reads go through `getDcaSchedule` / `getDcaSchedules`. Schedule edits use `depositToken`, `updatePurchaseAmount`, and `updatePurchasePeriod` (two transactions if both amount and period change). **The last two were `setPurchaseAmount` / `setPurchasePeriod` when this spec was written; [R40](./R40-update-purchase-period.md) renamed them and moved the changed value out of the topics. Integrate against the R40 names.** `withdrawTokenAndInterest` no longer takes a lending-protocol index.
