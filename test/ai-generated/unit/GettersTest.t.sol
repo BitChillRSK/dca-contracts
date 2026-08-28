@@ -46,6 +46,7 @@ contract GettersTest is DcaDappTest {
         assertEq(schedules[0].tokenBalance, AMOUNT_TO_DEPOSIT);
         assertEq(schedules[0].purchaseAmount, AMOUNT_TO_SPEND);
         assertEq(schedules[0].purchasePeriod, MIN_PURCHASE_PERIOD);
+        assertFalse(schedules[0].paused);
     }
 
     function test_dcaManager_getDcaSchedule_selfAndArbitraryUser() public {

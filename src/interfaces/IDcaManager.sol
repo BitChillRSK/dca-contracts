@@ -10,14 +10,17 @@ interface IDcaManager {
     ////////////////////////
     // Type declarations ///
     ////////////////////////
+    /// @dev Three storage slots: two uint128 amounts; uint32 period + uint48 timestamp +
+    ///      uint32 route + bool paused; then bytes32 scheduleId. External inputs stay uint256
+    ///      and are checked at the storage boundary.
     struct DcaSchedule {
-        uint256 tokenBalance; // Stablecoin amount deposited by the user
-        uint256 purchaseAmount; // Stablecoin amount to spend periodically on rBTC
-        uint256 purchasePeriod; // Time between purchases in seconds
-        uint256 lastPurchaseTimestamp; // Timestamp of the latest purchase
-        bytes32 scheduleId; // Unique identifier of each DCA schedule
-        uint256 routeIndex; // OperationsAdmin route that holds this schedule's funds (idle or lending)
+        uint128 tokenBalance; // Stablecoin amount deposited by the user
+        uint128 purchaseAmount; // Stablecoin amount to spend periodically on rBTC
+        uint32 purchasePeriod; // Time between purchases in seconds
+        uint48 lastPurchaseTimestamp; // Timestamp of the latest purchase
+        uint32 routeIndex; // OperationsAdmin route that holds this schedule's funds (idle or lending)
         bool paused; // Owner-set: purchases are refused while true; every other path stays open
+        bytes32 scheduleId; // Unique identifier of each DCA schedule
     }
 
     //////////////////////

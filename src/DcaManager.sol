@@ -4,6 +4,7 @@ pragma solidity 0.8.36;
 import {IDcaManager} from "./interfaces/IDcaManager.sol";
 import {BitChillOwnable} from "./BitChillOwnable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
 import {ITokenLending} from "./interfaces/ITokenLending.sol";
 import {OperationsAdmin} from "./OperationsAdmin.sol";
@@ -15,7 +16,8 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
  * @notice Entry point for the DCA dApp. Create and manage DCA schedules. 
  */
 contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
-    
+    using SafeCast for uint256;
+
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
@@ -118,8 +120,9 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         _validateDeposit(depositAmount);
         DcaSchedule storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
-        uint256 received = _handlerForDeposit(token, dcaSchedule.routeIndex).depositToken(msg.sender, depositAmount);
-        uint256 newTokenBalance = dcaSchedule.tokenBalance + received;
+        // Widths are checked before the handler pull so an overflowing credit cannot move tokens.
+        uint128 newTokenBalance = (uint256(dcaSchedule.tokenBalance) + depositAmount.toUint128()).toUint128();
+        _handlerForDeposit(token, dcaSchedule.routeIndex).depositToken(msg.sender, depositAmount);
         dcaSchedule.tokenBalance = newTokenBalance;
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
     }
@@ -140,9 +143,10 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     {
         DcaSchedule storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
-        _validatePurchaseAmount(token, newPurchaseAmount, dcaSchedule.tokenBalance);
+        uint128 newAmount = newPurchaseAmount.toUint128();
+        _validatePurchaseAmount(token, newAmount, dcaSchedule.tokenBalance);
         uint256 previousPurchaseAmount = dcaSchedule.purchaseAmount;
-        dcaSchedule.purchaseAmount = newPurchaseAmount;
+        dcaSchedule.purchaseAmount = newAmount;
         emit DcaManager__PurchaseAmountUpdated(msg.sender, scheduleId, previousPurchaseAmount, newPurchaseAmount);
     }
 
@@ -164,7 +168,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
         _validatePurchasePeriod(newPurchasePeriod);
         uint256 previousPurchasePeriod = dcaSchedule.purchasePeriod;
-        dcaSchedule.purchasePeriod = newPurchasePeriod;
+        dcaSchedule.purchasePeriod = newPurchasePeriod.toUint32();
         emit DcaManager__PurchasePeriodUpdated(msg.sender, scheduleId, previousPurchasePeriod, newPurchasePeriod);
     }
 
@@ -206,9 +210,15 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         uint256 purchasePeriod,
         uint256 routeIndex
     ) external override nonReentrant {
+        // Checked widths first: overflow reverts with SafeCast data before any token moves.
+        depositAmount.toUint128();
+        uint128 purchase = purchaseAmount.toUint128();
+        uint32 period = purchasePeriod.toUint32();
+        uint32 route = routeIndex.toUint32();
+
         _validatePurchasePeriod(purchasePeriod);
         _validateDeposit(depositAmount);
-        uint256 received = _handlerForDeposit(token, routeIndex).depositToken(msg.sender, depositAmount);
+        uint256 received = _handlerForDeposit(token, route).depositToken(msg.sender, depositAmount);
         _validatePurchaseAmount(token, purchaseAmount, received);
 
         DcaSchedule[] storage schedules = s_dcaSchedules[msg.sender][token];
@@ -219,24 +229,24 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
 
         bytes32 scheduleId = keccak256(abi.encodePacked(msg.sender, token, ++s_scheduleNonce));
 
-        DcaSchedule memory dcaSchedule = DcaSchedule(
+        schedules.push(
+            DcaSchedule({
+                tokenBalance: received.toUint128(),
+                purchaseAmount: purchase,
+                purchasePeriod: period,
+                lastPurchaseTimestamp: 0,
+                routeIndex: route,
+                paused: false,
+                scheduleId: scheduleId
+            })
+        );
+        emit DcaManager__DcaScheduleCreated(
+            msg.sender,
+            token,
+            scheduleId,
             received,
             purchaseAmount,
             purchasePeriod,
-            0, // lastPurchaseTimestamp
-            scheduleId,
-            routeIndex,
-            false // paused
-        );
-
-        schedules.push(dcaSchedule);
-        emit DcaManager__DcaScheduleCreated(
-            msg.sender, 
-            token,
-            scheduleId, 
-            received, 
-            purchaseAmount, 
-            purchasePeriod, 
             routeIndex
         );
     }
@@ -541,10 +551,13 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
 
         if (dcaSchedule.paused) revert DcaManager__SchedulePaused(buyer, token, scheduleId, scheduleIndex);
 
+        uint256 lastPurchaseTimestamp = dcaSchedule.lastPurchaseTimestamp;
+        uint256 purchasePeriod = dcaSchedule.purchasePeriod;
+
         // @notice: After the first purchase, the schedule is eligible once the UTC day of last + period has started
-        if (dcaSchedule.lastPurchaseTimestamp != 0) {
+        if (lastPurchaseTimestamp != 0) {
             uint256 currentDayStart = block.timestamp - (block.timestamp % 1 days);
-            uint256 nextDueTimestamp = dcaSchedule.lastPurchaseTimestamp + dcaSchedule.purchasePeriod;
+            uint256 nextDueTimestamp = lastPurchaseTimestamp + purchasePeriod;
             uint256 nextPurchaseDayStart = nextDueTimestamp - (nextDueTimestamp % 1 days);
             if (currentDayStart < nextPurchaseDayStart) {
                 revert DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed(nextPurchaseDayStart - block.timestamp);
@@ -562,17 +575,16 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         // - a previous purchase was delayed
         // - the schedule run out of stablecoin and was resumed later with a new deposit
         // Floor periodsElapsed at 1 so an early UTC-day buy still consumes a slot
-        if (dcaSchedule.lastPurchaseTimestamp == 0) {
-            dcaSchedule.lastPurchaseTimestamp = block.timestamp;
+        uint256 newTimestamp;
+        if (lastPurchaseTimestamp == 0) {
+            newTimestamp = block.timestamp;
         } else {
-            uint256 periodsElapsed = (block.timestamp - dcaSchedule.lastPurchaseTimestamp) / dcaSchedule.purchasePeriod;
+            uint256 periodsElapsed = (block.timestamp - lastPurchaseTimestamp) / purchasePeriod;
             if (periodsElapsed == 0) periodsElapsed = 1;
-            unchecked {
-                dcaSchedule.lastPurchaseTimestamp += periodsElapsed * dcaSchedule.purchasePeriod;
-            }
+            newTimestamp = lastPurchaseTimestamp + periodsElapsed * purchasePeriod;
         }
-        dcaScheduleStorage.lastPurchaseTimestamp = dcaSchedule.lastPurchaseTimestamp;
-        emit DcaManager__LastPurchaseTimestampUpdated(token, scheduleId, dcaSchedule.lastPurchaseTimestamp);
+        dcaScheduleStorage.lastPurchaseTimestamp = newTimestamp.toUint48();
+        emit DcaManager__LastPurchaseTimestampUpdated(token, scheduleId, newTimestamp);
 
         return (dcaSchedule.purchaseAmount, dcaSchedule.routeIndex);
     }
@@ -601,7 +613,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         // @notice subtract the requested withdrawal amount from the token balance, not the amount the lending protocol paid
         uint256 newTokenBalance = tokenBalance - withdrawalAmount;
         routeIndex = dcaSchedule.routeIndex;
-        dcaSchedule.tokenBalance = newTokenBalance;
+        dcaSchedule.tokenBalance = newTokenBalance.toUint128();
         // @notice ignore `withdrawToken()`'s return value (amount actually paid back by the lending protocol)
         _handler(token, routeIndex).withdrawToken(msg.sender, withdrawalAmount);
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);

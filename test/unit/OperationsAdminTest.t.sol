@@ -12,6 +12,7 @@ import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
 import {IOperationsAdmin} from "../../src/interfaces/IOperationsAdmin.sol";
 import "./TestsHelper.t.sol";
 import {ownableUnauthorized} from "../utils/OzRevert.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 contract OperationsAdminTest is DcaDappTest {
     event OperationsAdmin__SwapperAdded(address indexed swapper);
@@ -620,5 +621,31 @@ contract OperationsAdminTest is DcaDappTest {
         assertTrue(operationsAdmin.areDepositsPaused(address(stablecoin), s_routeIndex));
         assertFalse(operationsAdmin.areDepositsPaused(otherToken, IDLE_INDEX));
         assertFalse(operationsAdmin.areDepositsPaused(address(stablecoin), SECOND_IDLE_INDEX));
+    }
+
+    function testRegisterRouteAcceptsUint32Max() external {
+        uint256 maxRoute = type(uint32).max;
+        vm.prank(OWNER);
+        operationsAdmin.registerRoute(maxRoute, false);
+        assertEq(uint256(operationsAdmin.getRouteClass(maxRoute)), uint256(IOperationsAdmin.RouteClass.Idle));
+    }
+
+    function testRegisterRouteRevertsUint32MaxPlusOne() external {
+        uint256 overflowing = uint256(type(uint32).max) + 1;
+        vm.prank(OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 32, overflowing)
+        );
+        operationsAdmin.registerRoute(overflowing, true);
+    }
+
+    function testAssignTokenHandlerRevertsUint32MaxPlusOne() external {
+        uint256 overflowing = uint256(type(uint32).max) + 1;
+        DummyTokenHandler stub = new DummyTokenHandler();
+        vm.prank(OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 32, overflowing)
+        );
+        operationsAdmin.assignTokenHandler(address(stablecoin), overflowing, address(stub));
     }
 }
