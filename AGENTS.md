@@ -31,9 +31,7 @@ FeeHandler          fee math (inherited by TokenHandler and PurchaseRbtc)
 TokenHandler        deposit/withdraw stablecoin (owns FeeHandler)
 TokenLending        share ↔ underlying conversion (no TokenHandler inherit)
 LendingErc20Handler TokenHandler + TokenLending; per-user shares, withdraw clamp, interest, batch pro-rata
-StablecoinSource    funding-hook + _purchaseToken declarations (PurchaseRbtc consumes; lending/idle
-                    implement); also owns s_userPositions, the packed per-user {fundedBalance,
-                    accumulatedRbtc} slot both sides of a handler write on every batch purchase
+StablecoinSource    funding-hook + _purchaseToken declarations (PurchaseRbtc consumes; lending/idle implement)
 PurchaseRbtc        shared buy/batch pipeline; accumulated rBTC; withdraw to signer
 PurchaseMoc         MoC redeem DOC → rBTC (_purchaseRbtc only)
 PurchaseUniswap     Uniswap V3 → WRBTC (_purchaseRbtc + WRBTC unwrap on withdraw)

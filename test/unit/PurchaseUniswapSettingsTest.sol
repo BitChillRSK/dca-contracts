@@ -18,7 +18,7 @@ import "../../script/Constants.sol";
 import {ownableUnauthorized} from "../utils/OzRevert.sol";
 
 contract PurchaseUniswapSettingsTest is DcaDappTest {
-    uint256 private constant SLIPPAGE_SLOT = 6;
+    uint256 private constant SLIPPAGE_SLOT = 7;
 
     event PurchaseUniswap_AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
     event PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(uint256 oldValue, uint256 newValue);
@@ -34,8 +34,8 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
     ///////////////////////////////
 
     /// @dev The two 1e18-scaled percents are uint128s in one slot. The Dex handler's storage is
-    ///      Ownable2Step (0, 1), the fee word and bounds (2, 3), the packed user positions (4),
-    ///      the oracle (5), then this pair.
+    ///      Ownable2Step (0, 1), the fee word and bounds (2, 3), shares (4), accumulated rBTC (5),
+    ///      the oracle (6), then this pair.
     function testSlippagePercentsShareOneSlot() public onlyDexSwaps {
         uint256 percent = IPurchaseUniswap(address(stablecoinHandler)).getAmountOutMinimumPercent();
         uint256 safetyCheck = IPurchaseUniswap(address(stablecoinHandler)).getAmountOutMinimumSafetyCheck();

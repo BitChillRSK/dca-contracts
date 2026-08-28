@@ -7,24 +7,6 @@ pragma solidity 0.8.36;
  * @dev Interface for the TokenHandler contract.
  */
 interface ITokenHandler {
-    ////////////////////////
-    // Type declarations ///
-    ////////////////////////
-    /**
-     * @notice One user's position on a handler: the funds that back their purchases, and what those
-     *         purchases have bought and not yet withdrawn.
-     * @dev One slot, because every batch purchase writes both halves for every buyer: the batch pays
-     *      one cold SLOAD and one SSTORE per buyer instead of two of each, and a user's first purchase
-     *      does not pay the zero-to-non-zero SSTORE for rBTC, since the funded half already made the
-     *      slot non-zero. `fundedBalance` is lending shares on a lending handler and held stablecoin on
-     *      the idle handler; each exposes it under its own name (`getUserShares`, `getUsersIdleTokenBalance`).
-     *      Internal storage shape, not an ABI type: both halves are read through getters returning uint256.
-     */
-    struct UserPosition {
-        uint128 fundedBalance;
-        uint128 accumulatedRbtc;
-    }
-
     //////////////////////
     // Events ////////////
     //////////////////////

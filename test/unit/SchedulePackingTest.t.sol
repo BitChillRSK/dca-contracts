@@ -6,7 +6,6 @@ import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
 import {IdleDocHandlerMoc} from "../../src/idle/IdleDocHandlerMoc.sol";
-import {IIdleErc20Handler} from "../../src/idle/IIdleErc20Handler.sol";
 import {MockMocProxy} from "../mocks/MockMocProxy.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "./TestsHelper.t.sol";
@@ -103,13 +102,10 @@ contract SchedulePackingTest is DcaDappTest {
                          WIDTH BOUNDARIES
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev The schedule field is uint128, and so is the handler's per-user funded balance, so the
-    /// largest create a user can add is uint128.max minus what their other schedules already funded.
-    function testCreateAcceptsTheLargestAmountTheHandlerPositionCanHold() external onlyIdleLane {
+    function testCreateAcceptsUint128MaxAmounts() external {
         if (block.chainid != ANVIL_CHAIN_ID) return; // live DOC has no public mint for this size
 
-        uint256 alreadyFunded = _fundedBalance(USER);
-        uint256 maxAmount = type(uint128).max - alreadyFunded;
+        uint256 maxAmount = type(uint128).max;
         stablecoin.mint(USER, maxAmount);
 
         vm.startPrank(USER);
@@ -122,35 +118,7 @@ contract SchedulePackingTest is DcaDappTest {
         IDcaManager.DcaSchedule memory schedule = dcaManager.getDcaSchedule(USER, address(stablecoin), 1);
         assertEq(schedule.tokenBalance, maxAmount);
         assertEq(schedule.purchaseAmount, maxAmount);
-        assertEq(_fundedBalance(USER), type(uint128).max, "the position did not absorb the whole deposit");
         _assertPackedAgainstGetter(1);
-    }
-
-    /// @dev One wei past that cap reverts with the protocol's width error, not an arithmetic panic,
-    /// and takes no tokens with it.
-    function testCreateRevertsWhenTheHandlerPositionWouldOverflowUint128() external onlyIdleLane {
-        if (block.chainid != ANVIL_CHAIN_ID) return;
-
-        uint256 alreadyFunded = _fundedBalance(USER);
-        uint256 overflowingAmount = type(uint128).max - alreadyFunded + 1;
-        stablecoin.mint(USER, overflowingAmount);
-        uint256 userBefore = stablecoin.balanceOf(USER);
-
-        vm.startPrank(USER);
-        stablecoin.approve(address(stablecoinHandler), overflowingAmount);
-        vm.expectRevert(_safeCastOverflow(128, alreadyFunded + overflowingAmount));
-        dcaManager.createDcaSchedule(
-            address(stablecoin), overflowingAmount, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, s_routeIndex
-        );
-        vm.stopPrank();
-
-        assertEq(stablecoin.balanceOf(USER), userBefore, "an overflowing position kept the deposit");
-        assertEq(_fundedBalance(USER), alreadyFunded);
-    }
-
-    /// @dev Idle only, per `onlyIdleLane`: the position holds the stablecoin itself, 1:1.
-    function _fundedBalance(address user) private view returns (uint256) {
-        return IIdleErc20Handler(address(stablecoinHandler)).getUsersIdleTokenBalance(user);
     }
 
     function testCreateRevertsUint128MaxPlusOneDepositBeforeTokensMove() external {
@@ -299,7 +267,7 @@ contract SchedulePackingTest is DcaDappTest {
         assertEq(stablecoin.balanceOf(USER), userBefore);
     }
 
-    function testUpdatePurchaseAmountAcceptsUint128MaxWhenBalanceAllows() external onlyIdleLane {
+    function testUpdatePurchaseAmountAcceptsUint128MaxWhenBalanceAllows() external {
         if (block.chainid != ANVIL_CHAIN_ID) return; // live DOC has no public mint for this size
 
         uint256 maxAmount = type(uint128).max;

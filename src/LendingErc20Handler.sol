@@ -9,7 +9,6 @@ import {StablecoinSource} from "src/StablecoinSource.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 /**
  * @title LendingErc20Handler
@@ -19,7 +18,8 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
  */
 abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinSource {
     using SafeERC20 for IERC20;
-    using SafeCast for uint256;
+
+    mapping(address user => uint256 balance) internal s_shares;
 
     /**
      * @param dcaManagerAddress the address of the DCA Manager contract
@@ -61,10 +61,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
         }
         uint256 mintedAmount = _protocolDeposit(depositedAmount);
         if (mintedAmount == 0) revert TokenLending__LendingProtocolDepositFailed();
-        // SafeCast the sum, not the addend: an overflowing position reverts with the same typed
-        // error as every other width bound in the protocol rather than a bare arithmetic panic.
-        ITokenHandler.UserPosition storage position = s_userPositions[user];
-        position.fundedBalance = (uint256(position.fundedBalance) + mintedAmount).toUint128();
+        s_shares[user] += mintedAmount;
     }
 
     /**
@@ -80,7 +77,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
         returns (uint256)
     {
         uint256 exchangeRate = _exchangeRate();
-        uint256 totalStablecoinInLending = _sharesToStablecoin(s_userPositions[user].fundedBalance, exchangeRate);
+        uint256 totalStablecoinInLending = _sharesToStablecoin(s_shares[user], exchangeRate);
 
         if (totalStablecoinInLending < withdrawalAmount) {
             emit TokenLending__WithdrawalAmountAdjusted(user, withdrawalAmount, totalStablecoinInLending);
@@ -98,7 +95,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
      * @return the users shares balance
      */
     function getUserShares(address user) external view override returns (uint256) {
-        return s_userPositions[user].fundedBalance;
+        return s_shares[user];
     }
 
     /**
@@ -115,7 +112,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
      */
     function withdrawInterest(address user, uint256 stablecoinLockedInDcaSchedules) external override onlyDcaManager {
         uint256 exchangeRate = _exchangeRate();
-        uint256 totalStablecoinInLending = _sharesToStablecoin(s_userPositions[user].fundedBalance, exchangeRate);
+        uint256 totalStablecoinInLending = _sharesToStablecoin(s_shares[user], exchangeRate);
         if (totalStablecoinInLending <= stablecoinLockedInDcaSchedules) {
             return; // No interest to withdraw
         }
@@ -140,7 +137,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
         onlyDcaManager
         returns (uint256 stablecoinInterestAmount)
     {
-        uint256 totalStablecoinInLending = _sharesToStablecoin(s_userPositions[user].fundedBalance, _viewExchangeRate());
+        uint256 totalStablecoinInLending = _sharesToStablecoin(s_shares[user], _viewExchangeRate());
         stablecoinInterestAmount =
             totalStablecoinInLending > stablecoinLockedInDcaSchedules
                 ? totalStablecoinInLending - stablecoinLockedInDcaSchedules
@@ -182,8 +179,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
         internal
         returns (uint256 stablecoinReceived)
     {
-        ITokenHandler.UserPosition storage position = s_userPositions[user];
-        uint256 usersShares = position.fundedBalance;
+        uint256 usersShares = s_shares[user];
         uint256 sharesToRedeem = _stablecoinToShares(stablecoinAmount, exchangeRate);
         if (sharesToRedeem > usersShares) {
             uint256 oldSharesToRedeem = sharesToRedeem;
@@ -197,7 +193,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
         if (sharesToRedeem == 0) {
             return 0;
         }
-        position.fundedBalance -= sharesToRedeem.toUint128();
+        s_shares[user] -= sharesToRedeem;
         stablecoinReceived = _measuredProtocolRedeem(sharesToRedeem, exchangeRate);
         if (stablecoinReceived == 0) {
             revert TokenLending__ZeroStablecoinReceived(stablecoinAmount);
@@ -225,12 +221,11 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
             // round up so we never underestimate the debit against this user
             uint256 usersSharesToRedeem =
                 Math.mulDiv(totalSharesToRedeem, purchaseAmounts[i], totalStablecoinAmount, Math.Rounding.Ceil);
-            ITokenHandler.UserPosition storage position = s_userPositions[users[i]];
-            uint256 usersShares = position.fundedBalance;
+            uint256 usersShares = s_shares[users[i]];
             if (usersSharesToRedeem > usersShares) {
                 revert TokenLending__InsufficientShares(users[i], usersSharesToRedeem, usersShares);
             }
-            position.fundedBalance = (usersShares - usersSharesToRedeem).toUint128();
+            s_shares[users[i]] = usersShares - usersSharesToRedeem;
             emit TokenLending__SharesRedeemed(users[i], purchaseAmounts[i], usersSharesToRedeem);
         }
         uint256 stablecoinReceived = _measuredProtocolRedeem(totalSharesToRedeem, exchangeRate);

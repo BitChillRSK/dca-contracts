@@ -2,7 +2,6 @@
 pragma solidity 0.8.36;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
 
 /**
  * @title StablecoinSource
@@ -12,15 +11,6 @@ import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
  *      token the purchase reports as spent tied to the token the handler actually holds.
  */
 abstract contract StablecoinSource {
-    /**
-     * @notice Per-user funded balance and accumulated rBTC, packed into one slot.
-     * @dev Declared here because this is the one contract both sides of a handler inherit: the funding
-     *      base (LendingErc20Handler / IdleErc20Handler) owns `fundedBalance`, and PurchaseRbtc owns
-     *      `accumulatedRbtc`. Neither is narrowed below uint128, which holds 3.4e20 whole tokens at 18
-     *      decimals — far above any share or rBTC balance a handler can hold.
-     */
-    mapping(address user => ITokenHandler.UserPosition position) internal s_userPositions;
-
     /**
      * @notice the stablecoin handled (held or lent out), spent by the purchase and reported in fees, errors, and events
      * @dev Implemented against the handler's own stablecoin so the purchase route cannot name a different token.

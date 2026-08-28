@@ -2,11 +2,9 @@
 pragma solidity 0.8.36;
 
 import {TokenHandler} from "src/TokenHandler.sol";
-import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
 import {StablecoinSource} from "src/StablecoinSource.sol";
 import {IIdleErc20Handler} from "./IIdleErc20Handler.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 /**
  * @title IdleErc20Handler
@@ -16,11 +14,10 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
  * of clamping, because PurchaseMoc splits rBTC by the original planned weights.
  */
 abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, StablecoinSource {
-    using SafeCast for uint256;
-
     //////////////////////
     // State variables ///
     //////////////////////
+    mapping(address user => uint256 balance) internal s_idleBalances;
 
     /**
      * @param dcaManagerAddress the address of the DCA Manager contract
@@ -52,9 +49,7 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
         returns (uint256 depositedAmount)
     {
         depositedAmount = super.depositToken(user, depositAmount);
-        // SafeCast the sum, not the addend: see LendingErc20Handler.depositToken.
-        ITokenHandler.UserPosition storage position = s_userPositions[user];
-        position.fundedBalance = (uint256(position.fundedBalance) + depositedAmount).toUint128();
+        s_idleBalances[user] += depositedAmount;
     }
 
     /**
@@ -81,7 +76,7 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
      * @return the users idle token balance
      */
     function getUsersIdleTokenBalance(address user) external view override returns (uint256) {
-        return s_userPositions[user].fundedBalance;
+        return s_idleBalances[user];
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -125,12 +120,11 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
         uint256 numOfPurchases = users.length;
         for (uint256 i; i < numOfPurchases; ++i) {
             uint256 amount = purchaseAmounts[i];
-            ITokenHandler.UserPosition storage position = s_userPositions[users[i]];
-            uint256 idleBalance = position.fundedBalance;
+            uint256 idleBalance = s_idleBalances[users[i]];
             if (amount > idleBalance) {
                 revert IdleErc20Handler__InsufficientIdleBalance(users[i], amount, idleBalance);
             }
-            position.fundedBalance = (idleBalance - amount).toUint128();
+            s_idleBalances[users[i]] = idleBalance - amount;
             totalWithdrawn += amount;
         }
     }
@@ -142,13 +136,12 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
      * @return the amount actually debited
      */
     function _debitIdleBalance(address user, uint256 amount) internal returns (uint256) {
-        ITokenHandler.UserPosition storage position = s_userPositions[user];
-        uint256 idleBalance = position.fundedBalance;
+        uint256 idleBalance = s_idleBalances[user];
         if (idleBalance < amount) {
             emit IdleErc20Handler__AmountAdjusted(user, amount, idleBalance);
             amount = idleBalance;
         }
-        position.fundedBalance = (idleBalance - amount).toUint128();
+        s_idleBalances[user] = idleBalance - amount;
         return amount;
     }
 }
