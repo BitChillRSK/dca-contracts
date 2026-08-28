@@ -13,6 +13,7 @@ import {UsdrifHelperConfig} from "../../../script/UsdrifHelperConfig.s.sol";
 import {OperationsAdmin} from "../../../src/OperationsAdmin.sol";
 import {DcaManager} from "../../../src/DcaManager.sol";
 import {IOperationsAdmin} from "../../../src/interfaces/IOperationsAdmin.sol";
+import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
 import {BitChillOwnable} from "../../../src/BitChillOwnable.sol";
 import {BaseDeploymentTest} from "./BaseDeploymentTest.t.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
@@ -174,6 +175,30 @@ contract LiveDeployPathTest is Test {
             uint256(operationsAdmin.getRouteClass(TROPYKUS_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending)
         );
         assertEq(uint256(operationsAdmin.getRouteClass(SOVRYN_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
+        string memory coinType = vm.envOr("STABLECOIN_TYPE", DEFAULT_STABLECOIN);
+        bytes32 coinHash = keccak256(abi.encodePacked(coinType));
+        if (
+            keccak256(abi.encodePacked(vm.envString("LENDING_PROTOCOL")))
+                == keccak256(abi.encodePacked(LAYERBANK_STRING))
+                && (
+                    coinHash == keccak256(abi.encodePacked(USDRIF_STRING))
+                        || coinHash == keccak256(abi.encodePacked(USDT0_STRING))
+                )
+        ) {
+            assertEq(
+                uint256(operationsAdmin.getRouteClass(LAYERBANK_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending)
+            );
+            assertNotEq(handler, address(0), "live dex path must deploy the LayerBank handler for this stable");
+            if (coinHash == keccak256(abi.encodePacked(USDT0_STRING))) {
+                IFeeHandler.FeeSettings memory stored = IFeeHandler(handler).getFeeSettings();
+                assertEq(stored.feePurchaseLowerBound, USDT0_FEE_PURCHASE_LOWER_BOUND);
+                assertEq(stored.feePurchaseUpperBound, USDT0_FEE_PURCHASE_UPPER_BOUND);
+                address token = _docTokenFromHandler(handler);
+                (uint256 minPurchase, bool custom) = dcaManager.getTokenMinPurchaseAmount(token);
+                assertTrue(custom, "DeployDexSwaps live USDT0 path must set the 6-decimal min");
+                assertEq(minPurchase, USDT0_MIN_PURCHASE_AMOUNT);
+            }
+        }
     }
 
     function _skipIfMocLiveUnsupported() internal {
@@ -191,17 +216,27 @@ contract LiveDeployPathTest is Test {
     function _skipIfDexLiveUnsupported() internal {
         string memory lendingProtocol = vm.envString("LENDING_PROTOCOL");
         bytes32 protocolHash = keccak256(abi.encodePacked(lendingProtocol));
-        if (
-            protocolHash == keccak256(abi.encodePacked(NONE_STRING))
-                || protocolHash == keccak256(abi.encodePacked(LAYERBANK_STRING))
-        ) {
+        if (protocolHash == keccak256(abi.encodePacked(NONE_STRING))) {
             vm.skip(true);
+            return;
         }
         string memory coinType = vm.envOr("STABLECOIN_TYPE", DEFAULT_STABLECOIN);
+        bytes32 coinHash = keccak256(abi.encodePacked(coinType));
+        bool isUSDRIF = coinHash == keccak256(abi.encodePacked(USDRIF_STRING));
+        bool isUSDT0 = coinHash == keccak256(abi.encodePacked(USDT0_STRING));
+        bool isDOC = coinHash == keccak256(abi.encodePacked(DEFAULT_STABLECOIN));
+        if (protocolHash == keccak256(abi.encodePacked(LAYERBANK_STRING)) && isDOC) {
+            vm.skip(true); // LayerBank DOC dex is out of scope
+            return;
+        }
         if (
             protocolHash == keccak256(abi.encodePacked(SOVRYN_STRING))
-                && keccak256(abi.encodePacked(coinType)) == keccak256(abi.encodePacked("USDRIF"))
+                && (isUSDRIF || isUSDT0)
         ) {
+            vm.skip(true);
+            return;
+        }
+        if (protocolHash == keccak256(abi.encodePacked(TROPYKUS_STRING)) && isUSDT0) {
             vm.skip(true);
         }
     }

@@ -7,6 +7,7 @@ import {DexHelperConfig} from "./DexHelperConfig.s.sol";
 import {DcaManager} from "../src/DcaManager.sol";
 import {TropykusErc20HandlerDex} from "../src/tropykus-legacy/TropykusErc20HandlerDex.sol";
 import {SovrynErc20HandlerDex} from "../src/sovryn/SovrynErc20HandlerDex.sol";
+import {LayerBankErc20HandlerDex} from "../src/layerbank/LayerBankErc20HandlerDex.sol";
 import {IPurchaseUniswap} from "../src/interfaces/IPurchaseUniswap.sol";
 import {OperationsAdmin} from "../src/OperationsAdmin.sol";
 import {IWRBTC} from "../src/interfaces/IWRBTC.sol";
@@ -29,13 +30,27 @@ contract DeployDexSwaps is DeployBase {
         uint256 amountOutMinimumSafetyCheck;
     }
 
-    function deployDocHandlerDex(DeployParams memory params) public returns (address) {
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+    function _isUsdt0(string memory stablecoinType) internal pure returns (bool) {
+        return keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDT0_STRING));
+    }
+
+    function _isUsdrif(string memory stablecoinType) internal pure returns (bool) {
+        return keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING));
+    }
+
+    /// @notice Live USDT0 uses 6-decimal bounds; local/fork mocks stay 18-decimal.
+    function feeSettingsForToken(bool isUsdt0Live) public view returns (IFeeHandler.FeeSettings memory) {
+        return IFeeHandler.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: getMaxFeeRate(),
-            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+            feePurchaseLowerBound: isUsdt0Live ? USDT0_FEE_PURCHASE_LOWER_BOUND : FEE_PURCHASE_LOWER_BOUND,
+            feePurchaseUpperBound: isUsdt0Live ? USDT0_FEE_PURCHASE_UPPER_BOUND : FEE_PURCHASE_UPPER_BOUND
         });
+    }
+
+    function deployDocHandlerDex(DeployParams memory params) public returns (address) {
+        bool isUsdt0Live = _isLiveEnvironment() && _isUsdt0(_stablecoinType());
+        IFeeHandler.FeeSettings memory feeSettings = feeSettingsForToken(isUsdt0Live);
 
         if (params.protocol == Protocol.TROPYKUS) {
             return address(
@@ -67,7 +82,22 @@ contract DeployDexSwaps is DeployBase {
                 )
             );
         }
-        revert("Dex path is tropykus/sovryn only");
+        if (params.protocol == Protocol.LAYERBANK) {
+            return address(
+                new LayerBankErc20HandlerDex(
+                    params.dcaManager,
+                    params.tokenAddress,
+                    params.shareToken,
+                    params.uniswapSettings,
+                    params.feeCollector,
+                    feeSettings,
+                    params.amountOutMinimumPercent,
+                    params.amountOutMinimumSafetyCheck,
+                    _initialOwner()
+                )
+            );
+        }
+        revert("Dex path is tropykus/sovryn/layerbank");
     }
 
     function _deployLiveDexHandlers(
@@ -77,7 +107,8 @@ contract DeployDexSwaps is DeployBase {
         DexHelperConfig.NetworkConfig memory networkConfig,
         IPurchaseUniswap.UniswapSettings memory uniswapSettings,
         address feeCollector,
-        bool isUSDRIF
+        bool isUSDRIF,
+        bool isUSDT0
     ) internal returns (address selectedHandler) {
         console.log("Deploying handlers for lending protocols for live network");
 
@@ -86,32 +117,69 @@ contract DeployDexSwaps is DeployBase {
         operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
         operationsAdmin.registerRoute(SOVRYN_INDEX, true);
 
-        address tropykusShareToken = networkConfig.tropykusShareToken;
-        if (tropykusShareToken == address(0)) {
-            console.log("Warning: Tropykus shares not available for this stablecoin");
-        } else {
-            address tropykusHandler = deployDocHandlerDex(
-                DeployParams({
-                    protocol: Protocol.TROPYKUS,
-                    dcaManager: address(dcaManager),
-                    tokenAddress: stablecoinAddress,
-                    shareToken: tropykusShareToken,
-                    uniswapSettings: uniswapSettings,
-                    feeCollector: feeCollector,
-                    amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
-                    amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
-                })
-            );
-            console.log("Tropykus handler deployed at:", tropykusHandler);
-            operationsAdmin.assignTokenHandler(stablecoinAddress, TROPYKUS_INDEX, tropykusHandler);
-            _proposeFinalOwner(tropykusHandler);
-            if (protocol == Protocol.TROPYKUS) {
-                selectedHandler = tropykusHandler;
+        if (isUSDRIF || isUSDT0) {
+            operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
+            address layerbankAToken = networkConfig.layerbankAToken;
+            if (layerbankAToken == address(0)) {
+                if (protocol == Protocol.LAYERBANK) {
+                    revert("LayerBank aToken not available on this network");
+                }
+                console.log("Warning: LayerBank aToken not available for this dex stable");
+            } else {
+                address layerbankHandler = deployDocHandlerDex(
+                    DeployParams({
+                        protocol: Protocol.LAYERBANK,
+                        dcaManager: address(dcaManager),
+                        tokenAddress: stablecoinAddress,
+                        shareToken: layerbankAToken,
+                        uniswapSettings: uniswapSettings,
+                        feeCollector: feeCollector,
+                        amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
+                        amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
+                    })
+                );
+                console.log("LayerBank dex handler deployed at:", layerbankHandler);
+                operationsAdmin.assignTokenHandler(stablecoinAddress, LAYERBANK_INDEX, layerbankHandler);
+                _proposeFinalOwner(layerbankHandler);
+                if (isUSDT0) {
+                    dcaManager.setTokenMinPurchaseAmount(stablecoinAddress, USDT0_MIN_PURCHASE_AMOUNT);
+                    console.log("USDT0 min purchase amount set to", USDT0_MIN_PURCHASE_AMOUNT);
+                }
+                if (protocol == Protocol.LAYERBANK) {
+                    selectedHandler = layerbankHandler;
+                }
             }
         }
 
-        if (isUSDRIF) {
-            console.log("Skipping Sovryn handler deployment for USDRIF as it's not supported");
+        // Tropykus stays on the live dex map until R37. USDT0 was never listed there.
+        if (!isUSDT0) {
+            address tropykusShareToken = networkConfig.tropykusShareToken;
+            if (tropykusShareToken == address(0)) {
+                console.log("Warning: Tropykus shares not available for this stablecoin");
+            } else {
+                address tropykusHandler = deployDocHandlerDex(
+                    DeployParams({
+                        protocol: Protocol.TROPYKUS,
+                        dcaManager: address(dcaManager),
+                        tokenAddress: stablecoinAddress,
+                        shareToken: tropykusShareToken,
+                        uniswapSettings: uniswapSettings,
+                        feeCollector: feeCollector,
+                        amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
+                        amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
+                    })
+                );
+                console.log("Tropykus handler deployed at:", tropykusHandler);
+                operationsAdmin.assignTokenHandler(stablecoinAddress, TROPYKUS_INDEX, tropykusHandler);
+                _proposeFinalOwner(tropykusHandler);
+                if (protocol == Protocol.TROPYKUS) {
+                    selectedHandler = tropykusHandler;
+                }
+            }
+        }
+
+        if (isUSDRIF || isUSDT0) {
+            console.log("Skipping Sovryn handler deployment: Sovryn does not list this stablecoin");
             return selectedHandler;
         }
 
@@ -147,26 +215,19 @@ contract DeployDexSwaps is DeployBase {
         DexHelperConfig helperConfig = new DexHelperConfig();
         DexHelperConfig.NetworkConfig memory networkConfig = helperConfig.getActiveNetworkConfig();
 
-        // Get stablecoin type (or use default if not specified)
-        string memory stablecoinType;
-        try vm.envString("STABLECOIN_TYPE") returns (string memory coinType) {
-            stablecoinType = coinType;
-        } catch {
-            stablecoinType = DEFAULT_STABLECOIN;
-        }
+        string memory stablecoinType = _stablecoinType();
         
         console.log("Using stablecoin type:", stablecoinType);
-        bool isUSDRIF = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked("USDRIF"));
+        bool isUSDRIF = _isUsdrif(stablecoinType);
+        bool isUSDT0 = _isUsdt0(stablecoinType);
         
-        // Get tokens based on current stablecoin type
         address stablecoinAddress = helperConfig.getStablecoinAddress();
         console.log("Stablecoin address:", stablecoinAddress);
         
-        // Check if stablecoin is supported by the selected protocol
         bool isSovryn = protocol == Protocol.SOVRYN;
         
-        if (isSovryn && isUSDRIF) {
-            revert("USDRIF is not supported by Sovryn");
+        if (isSovryn && (isUSDRIF || isUSDT0)) {
+            revert("Sovryn does not list this stablecoin");
         }
 
         _beginLiveAwareBroadcast(msg.sender);
@@ -195,7 +256,6 @@ contract DeployDexSwaps is DeployBase {
         if (environment == Environment.LOCAL || environment == Environment.FORK) {
             console.log("Deploying single handler for local/fork environment");
             
-            // Get the appropriate shares address based on protocol
             address shareTokenAddress = helperConfig.getShareTokenAddress();
             if (shareTokenAddress == address(0)) {
                 revert("Share token not available for the selected combination");
@@ -225,7 +285,8 @@ contract DeployDexSwaps is DeployBase {
                 networkConfig,
                 uniswapSettings,
                 feeCollector,
-                isUSDRIF
+                isUSDRIF,
+                isUSDT0
             );
         }
 
@@ -236,5 +297,13 @@ contract DeployDexSwaps is DeployBase {
         vm.stopBroadcast();
 
         return (operationsAdmin, docHandlerDexAddress, dcaManager, helperConfig);
+    }
+
+    function _stablecoinType() internal view returns (string memory stablecoinType) {
+        try vm.envString("STABLECOIN_TYPE") returns (string memory coinType) {
+            stablecoinType = coinType;
+        } catch {
+            stablecoinType = DEFAULT_STABLECOIN;
+        }
     }
 }

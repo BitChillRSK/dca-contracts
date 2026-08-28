@@ -26,6 +26,10 @@ jobs:
             stablecoin: DOC
           - target: dex-sovryn
             stablecoin: USDRIF
+          - target: dex-layerbank
+            stablecoin: USDRIF
+          - target: dex-layerbank
+            stablecoin: USDT0
           - target: invariants-sovryn
             stablecoin: DOC
     steps:

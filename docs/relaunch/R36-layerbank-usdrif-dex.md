@@ -1,8 +1,8 @@
 # R36 — LayerBank dex stables (USDRIF + USDT0)
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **PR [#92](https://github.com/BitChillRSK/dca-contracts/pull/92)** · Assigned: yes · Optional/further-review: no
 
-PR 41 of the relaunch stack. Stack on R18 (PR 40).
+PR 42 of the relaunch stack. Stack on R18 (PR 41, [#91](https://github.com/BitChillRSK/dca-contracts/pull/91)).
 
 **Blocked on [R43](./R43-dex-path-review.md):** `PurchaseUniswap._getAmountOutMinimum` treats stablecoin units as 18-decimal USD against the MoC BTC/USD oracle. USDT0 is 6 decimals. Do not implement this PR on the unscaled formula.
 
@@ -84,33 +84,40 @@ if that is cheap; do not silently run USDT0 tests against 18-decimal amounts and
 Look up the USDT0 Uniswap path (direct WRBTC vs hop, fee tiers) from live SwapRouter02 pools. That is
 not a product gate. If no liquid WRBTC route exists, stop and ask rather than guessing a path.
 
+**Recorded 2026-08-28 (chain tip):**
+
+- kUSDRIF (`0xDdf3CE45fcf080DF61ee61dac5Ddefef7ED4F46C`) `mintGuardianPaused == true` and `mintAllowed` reverts `Error(string) "C2"`, same as kDOC. Comptroller `0x962308fEf8edFaDD705384840e7701F8f39eD0c0`. At the Tropykus pin (`8700000`) both flags are false.
+- USDT0 Uniswap: **direct WRBTC at fee 3000**. Pool `0xaeF6fABf3b0C9e5F9d6D5170AfC703A633479Bbd`. The 500-fee USDT0/WRBTC pool exists but is empty. Do not hop through rUSDT (`0xAf368c91793CB22739386DFCbBb2F1A9e4bCBeBf`) as if it were USDT0.
+- LayerBank: Pool `0x526D06c65777eA6D56d7a1Dd47cD79230dDf72E9`; lRooUSDRIF `0xc96fBD12bE56Dd565b258d243344bCf792A51128`; lRooUSDT0 `0x6bE7d4cfCe825b106aa88F6916A412c5af230Ec0`.
+- `LayerBankErc20HandlerDex` runtime 21,578 bytes (EIP-170 margin 2,998). `SovrynErc20HandlerDex` 21,105 for comparison.
+
 ## Scope
 
-- [ ] `src/layerbank/LayerBankErc20HandlerDex.sol` — `LayerBankErc20Handler, PurchaseUniswap`,
+- [x] `src/layerbank/LayerBankErc20HandlerDex.sol` — `LayerBankErc20Handler, PurchaseUniswap`,
       constructor-only, mirroring `SovrynErc20HandlerDex`. No new logic. One contract for both tokens.
-- [ ] Helper config — LayerBank aToken + Uniswap settings per dex stable. Extend `DexHelperConfig` /
+- [x] Helper config — LayerBank aToken + Uniswap settings per dex stable. Extend `DexHelperConfig` /
       `UsdrifHelperConfig` rather than copying a third helper. Mainnet USDRIF: lRooUSDRIF (look up).
       Mainnet USDT0: token `0x779Ded0c9e1022225f8E0630b35a9b54bE713736`, aToken look-up on the same
       Pool as lRooDOC; `address(0)` on testnet if LayerBank USDT0/USDRIF is mainnet-only, matching
       how `MocHelperConfig` handles `layerbankATokenAddress`. Keep `kUsdrifTokenAddress` until R37
       removes it. `STABLECOIN_TYPE=USDT0` is a first-class env value.
-- [ ] Deploy — two `LayerBankErc20HandlerDex` instances (USDRIF and USDT0), each registered at the
+- [x] Deploy — two `LayerBankErc20HandlerDex` instances (USDRIF and USDT0), each registered at the
       index from decision 1. Prefer generalizing `DeployUsdrifHandler` into a dex-stable add-on that
       keys off `STABLECOIN_TYPE` over a second copy-paste script. Carry over R22's live-broadcast
       gate: a real RSK RPC without `REAL_DEPLOYMENT=true` reports `FORK`, and `FORK` must revert
       rather than bind a live aToken with a test `feeCollector` and the 2% test fee cap.
-- [ ] USDT0 6-decimal config on the live/mainnet path: `FeeSettings` lower/upper bounds in 6-decimal
+- [x] USDT0 6-decimal config on the live/mainnet path: `FeeSettings` lower/upper bounds in 6-decimal
       units (decision 4); `dcaManager.setTokenMinPurchaseAmount(usdt0, min)` after the handler is
       registered. Do not pass `MIN_PURCHASE_AMOUNT` / `FEE_PURCHASE_*` from `Constants.sol`.
-- [ ] `DeployDexSwaps` — register the LayerBank dex route and deploy the USDRIF and USDT0 handlers
+- [x] `DeployDexSwaps` — register the LayerBank dex route and deploy the USDRIF and USDT0 handlers
       on the live branch.
-- [ ] `Makefile` / harness — a `dex-layerbank` lane; `DcaDappTest` must stop skipping
+- [x] `Makefile` / harness — a `dex-layerbank` lane; `DcaDappTest` must stop skipping
       `isDexSwaps && isLayerbank` (it currently does, via the R22 "dex is tropykus/sovryn only" guard).
       Treat USDT0 like USDRIF for skip logic: dex yes, MoC no, Sovryn no. The current
       `isDexSwaps && !isUSDRIF` guard must not skip USDT0.
-- [ ] CI — add `dex-layerbank` with `STABLECOIN_TYPE=USDRIF` **and** `STABLECOIN_TYPE=USDT0` to the
+- [x] CI — add `dex-layerbank` with `STABLECOIN_TYPE=USDRIF` **and** `STABLECOIN_TYPE=USDT0` to the
       matrix and to `make check` / `make ci`.
-- [ ] Pin looked-up aToken addresses and Uniswap paths in the PR body (same bar as R22's live DOC
+- [x] Pin looked-up aToken addresses and Uniswap paths in the PR body (same bar as R22's live DOC
       table). Constructor must still revert `LayerBankErc20Handler__UnderlyingMismatch` if the aToken
       underlying is not the stablecoin being configured.
 
@@ -165,13 +172,13 @@ Fork: adds a fork-specific assertion only if decision 3 turns up a live kUSDRIF 
 
 ## Success criteria
 
-- [ ] USDRIF DCA works end-to-end on a LayerBank-backed dex handler with no Tropykus contract involved.
-- [ ] USDT0 DCA works end-to-end on a second deployment of the same `LayerBankErc20HandlerDex`.
-- [ ] `DeployUsdrifHandler` (or its generalized successor) no longer constructs `TropykusErc20HandlerDex`.
-- [ ] `dex-layerbank` is green locally and in CI for `STABLECOIN_TYPE=USDRIF` and `STABLECOIN_TYPE=USDT0`.
-- [ ] USDT0 min purchase and fee bounds are 6-decimal (decision 4), asserted by a test.
-- [ ] The live-broadcast gate is asserted by a test, not only documented.
-- [ ] No open product decisions.
+- [x] USDRIF DCA works end-to-end on a LayerBank-backed dex handler with no Tropykus contract involved.
+- [x] USDT0 DCA works end-to-end on a second deployment of the same `LayerBankErc20HandlerDex`.
+- [x] `DeployUsdrifHandler` (or its generalized successor) no longer constructs `TropykusErc20HandlerDex`.
+- [x] `dex-layerbank` is green locally and in CI for `STABLECOIN_TYPE=USDRIF` and `STABLECOIN_TYPE=USDT0`.
+- [x] USDT0 min purchase and fee bounds are 6-decimal (decision 4), asserted by a test.
+- [x] The live-broadcast gate is asserted by a test, not only documented.
+- [x] No open product decisions.
 
 ## Reviewer checklist
 
@@ -193,6 +200,8 @@ Fork: adds a fork-specific assertion only if decision 3 turns up a live kUSDRIF 
   token. Ops and the frontend need the new index, that USDRIF yield now comes from LayerBank not
   Tropykus, and that USDT0 exists at all. An illiquid LayerBank reserve aborts the whole
   `batchBuyRbtc` (live Aave `withdraw` reverts on insufficient aToken cash) — drop the row, do not
-  retry as a partial batch.
+  retry as a partial batch. **USDT0 add-on:** the Foundry EOA cannot assign on mainnet (Safe owns
+  `OperationsAdmin`); the Safe must `assignTokenHandler` **and** `setTokenMinPurchaseAmount(usdt0, 25e6)`.
+  Default min is 25 ether. See root README "Ownership after deploy".
 - **Frontend follow-up required** (`AGENTS.md` **Frontend follow-up**). New token + remapped USDRIF
   venue. Open or update an issue on `bitChillRSK/front-end` in the same turn as the contracts PR.

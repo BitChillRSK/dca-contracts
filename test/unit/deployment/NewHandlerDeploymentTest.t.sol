@@ -4,18 +4,23 @@ pragma solidity 0.8.36;
 import {BaseDeploymentTest} from "./BaseDeploymentTest.t.sol";
 import {DeployUsdrifHandler} from "../../../script/DeployUsdrifHandler.s.sol";
 import {UsdrifHelperConfig} from "../../../script/UsdrifHelperConfig.s.sol";
-import {TropykusErc20HandlerDex} from "../../../src/tropykus-legacy/TropykusErc20HandlerDex.sol";
+import {LayerBankErc20HandlerDex} from "../../../src/layerbank/LayerBankErc20HandlerDex.sol";
+import {IPurchaseUniswap} from "../../../src/interfaces/IPurchaseUniswap.sol";
+import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
+import {IWRBTC} from "../../../src/interfaces/IWRBTC.sol";
+import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces/ISwapRouter02.sol";
+import {ICoinPairPrice} from "../../../src/interfaces/ICoinPairPrice.sol";
+import {IOperationsAdmin} from "../../../src/interfaces/IOperationsAdmin.sol";
 import {console} from "forge-std/Test.sol";
 import "../../Constants.sol";
 
 contract NewHandlerDeploymentTest is BaseDeploymentTest {
-    // USDRIF handler
     address public usdrifHandlerAddress;
-    TropykusErc20HandlerDex public usdrifHandler;
+    LayerBankErc20HandlerDex public usdrifHandler;
     UsdrifHelperConfig public usdrifHelperConfig;
     
     function setUp() public override {
-        // Parent deploys MoC DOC. Skip on USDRIF lanes (vm.skip in the parent does not stop this setUp).
+        // Parent deploys MoC DOC. Skip on USDRIF/USDT0 lanes (vm.skip in the parent does not stop this setUp).
         string memory coinType = vm.envOr("STABLECOIN_TYPE", DEFAULT_STABLECOIN);
         if (keccak256(abi.encodePacked(coinType)) != keccak256(abi.encodePacked("DOC"))) {
             vm.skip(true);
@@ -23,40 +28,77 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
         }
         super.setUp();
         
-        // Initialize USDRIF helper config and update with protocol addresses
         usdrifHelperConfig = new UsdrifHelperConfig();
         usdrifHelperConfig.updateProtocolAddresses(address(operationsAdmin), address(dcaManager));
         
-        // Deploy USDRIF handler with our configured helper
-        DeployUsdrifHandler usdrifDeployer = new DeployUsdrifHandler();
-        console.log("USDRIF handler deployed:", address(usdrifDeployer));
-        
-        usdrifHandlerAddress = usdrifDeployer.run(usdrifHelperConfig);
-        usdrifHandler = TropykusErc20HandlerDex(payable(usdrifHandlerAddress));
-        address usdrifTokenAddress = usdrifHelperConfig.getNetworkConfig().usdrifTokenAddress;
+        UsdrifHelperConfig.NetworkConfig memory config = usdrifHelperConfig.getNetworkConfig();
+        IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
+            wrBtcToken: IWRBTC(config.wrbtcTokenAddress),
+            swapRouter02: ISwapRouter02(config.swapRouter02Address),
+            swapIntermediateTokens: config.swapIntermediateTokens,
+            swapPoolFeeRates: config.swapPoolFeeRates,
+            mocOracle: ICoinPairPrice(config.mocOracleAddress)
+        });
 
-        vm.prank(OWNER);
-        operationsAdmin.assignTokenHandler(
-            usdrifTokenAddress,
-            TROPYKUS_INDEX,
-            usdrifHandlerAddress
+        DeployUsdrifHandler usdrifDeployer = new DeployUsdrifHandler();
+        console.log("USDRIF handler deployer:", address(usdrifDeployer));
+
+        IFeeHandler.FeeSettings memory feeSettings = usdrifDeployer.feeSettingsForToken(false);
+        usdrifHandlerAddress = usdrifDeployer.deployMocksAndHandler(
+            DeployUsdrifHandler.DeployParams({
+                dcaManagerAddress: address(dcaManager),
+                tokenAddress: config.usdrifTokenAddress,
+                aTokenAddress: address(0),
+                uniswapSettings: uniswapSettings,
+                feeCollector: makeAddr(FEE_COLLECTOR_STRING),
+                feeSettings: feeSettings,
+                amountOutMinimumPercent: config.amountOutMinimumPercent,
+                amountOutMinimumSafetyCheck: config.amountOutMinimumSafetyCheck,
+                initialOwner: operationsAdmin.owner()
+            })
         );
+        usdrifHandler = LayerBankErc20HandlerDex(payable(usdrifHandlerAddress));
+
+        vm.startPrank(OWNER);
+        if (operationsAdmin.getRouteClass(LAYERBANK_INDEX) == IOperationsAdmin.RouteClass.Unregistered) {
+            operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
+        }
+        operationsAdmin.assignTokenHandler(config.usdrifTokenAddress, LAYERBANK_INDEX, usdrifHandlerAddress);
+        vm.stopPrank();
     }
     
     function testUsdrifHandlerDeployment() public {
-        // Verify USDRIF handler deployment
         assertNotEq(usdrifHandlerAddress, address(0), "USDRIF handler not deployed");
         
-        // Verify handler references the correct DcaManager
         assertEq(usdrifHandler.i_dcaManager(), address(dcaManager), "USDRIF handler doesn't reference DcaManager");
+        assertNotEq(address(usdrifHandler.i_aToken()), address(0), "LayerBank aToken not set");
+        assertEq(
+            usdrifHandler.i_aToken().UNDERLYING_ASSET_ADDRESS(),
+            usdrifHelperConfig.getNetworkConfig().usdrifTokenAddress,
+            "aToken underlying must be USDRIF"
+        );
         
-        // Verify ownership transferred correctly
         assertEq(usdrifHandler.owner(), makeAddr(OWNER_STRING), "USDRIF handler owner not set correctly");
         assertEq(usdrifHandler.pendingOwner(), address(0), "USDRIF handler pending owner must be zero after deploy");
         
-        // Verify handler is registered in OperationsAdmin
         UsdrifHelperConfig.NetworkConfig memory config = usdrifHelperConfig.getNetworkConfig();
-        address registeredHandler = operationsAdmin.getTokenHandler(config.usdrifTokenAddress, TROPYKUS_INDEX);
+        address registeredHandler = operationsAdmin.getTokenHandler(config.usdrifTokenAddress, LAYERBANK_INDEX);
         assertEq(registeredHandler, usdrifHandlerAddress, "USDRIF handler not registered in OperationsAdmin");
+        assertTrue(operationsAdmin.isLendingRoute(LAYERBANK_INDEX));
+    }
+
+    function test_run_revertsOnForkWithoutRealDeployment() public {
+        if (block.chainid == ANVIL_CHAIN_ID) vm.skip(true);
+        DeployUsdrifHandler deployer = new DeployUsdrifHandler();
+        vm.expectRevert(bytes("DeployUsdrifHandler live path requires REAL_DEPLOYMENT=true"));
+        deployer.run(usdrifHelperConfig);
+    }
+
+    function test_run_deploysOnAnvil() public {
+        if (block.chainid != ANVIL_CHAIN_ID) vm.skip(true);
+        address deployed = new DeployUsdrifHandler().run(usdrifHelperConfig);
+        assertNotEq(deployed, address(0));
+        assertEq(LayerBankErc20HandlerDex(payable(deployed)).owner(), makeAddr(OWNER_STRING));
+        assertEq(LayerBankErc20HandlerDex(payable(deployed)).pendingOwner(), address(0));
     }
 }

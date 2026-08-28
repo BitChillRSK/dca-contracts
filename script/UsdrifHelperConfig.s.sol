@@ -7,13 +7,17 @@ import {MockKToken} from "../test/mocks/MockKToken.sol";
 import {MockWrbtcToken} from "../test/mocks/MockWrbtcToken.sol";
 import {MockSwapRouter02} from "../test/mocks/MockSwapRouter02.sol";
 import {MockMocOracle} from "../test/mocks/MockMocOracle.sol";
+import {MockLayerBankAToken, MockLayerBankPool} from "../test/mocks/MockLayerBank.sol";
 import "./Constants.sol";
 
 
 contract UsdrifHelperConfig is Script {
     struct NetworkConfig {
         address usdrifTokenAddress;
-        address kUsdrifTokenAddress;
+        address usdt0TokenAddress;
+        address kUsdrifTokenAddress; // kept until R37 removes the Tropykus dex arm
+        address layerbankUsdrifATokenAddress;
+        address layerbankUsdt0ATokenAddress;
         address wrbtcTokenAddress;
         address swapRouter02Address;
         address[] swapIntermediateTokens;
@@ -51,7 +55,10 @@ contract UsdrifHelperConfig is Script {
 
         config = NetworkConfig({
             usdrifTokenAddress: 0x3A15461d8aE0F0Fb5Fa2629e9DA7D66A794a6e37, // USDRIF on mainnet
-            kUsdrifTokenAddress: 0xDdf3CE45fcf080DF61ee61dac5Ddefef7ED4F46C, // kUSDRIF on mainnet
+            usdt0TokenAddress: USDT0_MAINNET,
+            kUsdrifTokenAddress: 0xDdf3CE45fcf080DF61ee61dac5Ddefef7ED4F46C, // kUSDRIF on mainnet (mint paused; kept until R37)
+            layerbankUsdrifATokenAddress: LAYERBANK_USDRIF_ATOKEN,
+            layerbankUsdt0ATokenAddress: LAYERBANK_USDT0_ATOKEN,
             wrbtcTokenAddress: 0x542fDA317318eBF1d3DEAf76E0b632741A7e677d, // WRBTC on mainnet
             swapRouter02Address: 0x0B14ff67f0014046b4b99057Aec4509640b3947A, // SwapRouter02 on mainnet
             swapIntermediateTokens: intermediateTokens,
@@ -74,7 +81,10 @@ contract UsdrifHelperConfig is Script {
 
         config = NetworkConfig({
             usdrifTokenAddress: 0x0000000000000000000000000000000000000000, // Replace with USDRIF on testnet
+            usdt0TokenAddress: 0x5a2256DD0DfbC8cE121d923AC7D6E7A3fc7F9922, // USDT0 on testnet
             kUsdrifTokenAddress: 0x0000000000000000000000000000000000000000, // Replace with kUSDRIF on testnet
+            layerbankUsdrifATokenAddress: address(0), // LayerBank USDRIF is mainnet-only
+            layerbankUsdt0ATokenAddress: address(0), // LayerBank USDT0 is mainnet-only
             wrbtcTokenAddress: 0x69FE5cEC81D5eF92600c1A0dB1F11986AB3758Ab, // WRBTC on testnet
             swapRouter02Address: 0x0000000000000000000000000000000000000000, // Replace if exists on testnet
             swapIntermediateTokens: intermediateTokens,
@@ -122,6 +132,11 @@ contract UsdrifHelperConfig is Script {
         MockKToken mockKUsdrifToken = new MockKToken(address(mockUsdrifToken));
         emit HelperConfig__CreatedMockToken("kUSDRIF", address(mockKUsdrifToken));
 
+        MockLayerBankAToken mockAToken = new MockLayerBankAToken(address(mockUsdrifToken));
+        MockLayerBankPool mockPool = new MockLayerBankPool(mockAToken);
+        mockAToken.setPool(address(mockPool));
+        emit HelperConfig__CreatedMockToken("lRooUSDRIF", address(mockAToken));
+
         MockWrbtcToken mockWrbtcToken = new MockWrbtcToken();
         emit HelperConfig__CreatedMockToken("WRBTC", address(mockWrbtcToken));
 
@@ -145,7 +160,10 @@ contract UsdrifHelperConfig is Script {
 
         config = NetworkConfig({
             usdrifTokenAddress: address(mockUsdrifToken),
+            usdt0TokenAddress: address(mockUsdrifToken), // Anvil reuses the 18-decimal mock; 6-decimal coverage is a dedicated test
             kUsdrifTokenAddress: address(mockKUsdrifToken),
+            layerbankUsdrifATokenAddress: address(mockAToken),
+            layerbankUsdt0ATokenAddress: address(mockAToken),
             wrbtcTokenAddress: address(mockWrbtcToken),
             swapRouter02Address: address(mockSwapRouter),
             swapIntermediateTokens: intermediateTokens,
@@ -168,5 +186,25 @@ contract UsdrifHelperConfig is Script {
 
     function getNetworkConfig() public view returns (NetworkConfig memory) {
         return activeNetworkConfig;
+    }
+
+    function isUsdt0() public view returns (bool) {
+        string memory coinType;
+        try vm.envString("STABLECOIN_TYPE") returns (string memory envType) {
+            coinType = envType;
+        } catch {
+            coinType = USDRIF_STRING;
+        }
+        return keccak256(abi.encodePacked(coinType)) == keccak256(abi.encodePacked(USDT0_STRING));
+    }
+
+    function getTokenAddress() public view returns (address) {
+        return isUsdt0() ? activeNetworkConfig.usdt0TokenAddress : activeNetworkConfig.usdrifTokenAddress;
+    }
+
+    function getATokenAddress() public view returns (address) {
+        return isUsdt0()
+            ? activeNetworkConfig.layerbankUsdt0ATokenAddress
+            : activeNetworkConfig.layerbankUsdrifATokenAddress;
     }
 }

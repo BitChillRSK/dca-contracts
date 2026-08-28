@@ -1,6 +1,11 @@
-LayerBank aToken handler (lending index 1). `LayerBankErc20Handler` supplies and withdraws through the live Aave-v3-style Pool. Per-user virtual balances store **scaled** aToken amounts (`scaledBalanceOf`), not rebasing `balanceOf`. DOC + MoC only this relaunch.
+LayerBank aToken handler (lending index 1). `LayerBankErc20Handler` supplies and withdraws through the live Aave-v3-style Pool. Per-user virtual balances store **scaled** aToken amounts (`scaledBalanceOf`), not rebasing `balanceOf`.
 
-Deploy with `script/DeployLayerBankHandler.s.sol` against an existing `OperationsAdmin` + `DcaManager` (same add-on shape as `DeployIdleHandler`). Anvil deploys Pool/aToken mocks. Wiring into `DeployMocSwaps` / the CI index map, and live Pool/aToken addresses, is a later PR.
+- DOC + MoC: `LayerBankDocHandlerMoc`
+- USDRIF + Uniswap and USDT0 + Uniswap: two deployments of `LayerBankErc20HandlerDex` (same bytecode; USDT0 constructor fees and `DcaManager.setTokenMinPurchaseAmount` are 6-decimal)
+
+Deploy DOC + MoC with `script/DeployLayerBankHandler.s.sol`. Deploy the dex stables with `script/DeployUsdrifHandler.s.sol` (keyed off `STABLECOIN_TYPE`) or `script/DeployDexSwaps.s.sol`. Anvil deploys Pool/aToken mocks. Live aToken addresses are in `script/Constants.sol`.
+
+USDT0 add-on on mainnet: the Foundry EOA cannot `assignTokenHandler` (Safe owns `OperationsAdmin`). The Safe must assign the handler **and** `setTokenMinPurchaseAmount(usdt0, 25e6)` — the DcaManager default is 25 ether. See root README "Ownership after deploy".
 
 External LayerBank incentives (LAB / Merkl) are not claimed. Native aToken interest is the only yield this handler distributes.
 
@@ -11,8 +16,12 @@ The v2-contracts README Core listing is stale and never included DOC. Do not cal
 | | Address |
 | --- | --- |
 | aToken (lRooDOC, `ATokenInstance`) | [`0x3F04280C66314b78E9712A41BF8C1A214460cAa2`](https://rootstock.blockscout.com/address/0x3F04280C66314b78E9712A41BF8C1A214460cAa2) |
+| aToken (lRooUSDRIF) | [`0xc96fBD12bE56Dd565b258d243344bCf792A51128`](https://rootstock.blockscout.com/address/0xc96fBD12bE56Dd565b258d243344bCf792A51128) |
+| aToken (lRooUSDT0) | [`0x6bE7d4cfCe825b106aa88F6916A412c5af230Ec0`](https://rootstock.blockscout.com/address/0x6bE7d4cfCe825b106aa88F6916A412c5af230Ec0) |
 | Pool | [`0x526D06c65777eA6D56d7a1Dd47cD79230dDf72E9`](https://rootstock.blockscout.com/address/0x526D06c65777eA6D56d7a1Dd47cD79230dDf72E9) |
 | Underlying (DOC) | `0xe700691dA7b9851F2F35f8b8182c69c53CcaD9Db` |
+| Underlying (USDRIF) | `0x3A15461d8aE0F0Fb5Fa2629e9DA7D66A794a6e37` |
+| Underlying (USDT0, 6 decimals) | `0x779Ded0c9e1022225f8E0630b35a9b54bE713736` |
 | `ADDRESSES_PROVIDER` | `0x0c32000a7d7d4454a3CC3B700a8b12678ade7052` |
 
 - aToken exposes `POOL()`, `UNDERLYING_ASSET_ADDRESS()`, `scaledBalanceOf`. No `core()`, `accruedExchangeRate()`, or `underlying()`.
