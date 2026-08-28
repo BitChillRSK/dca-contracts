@@ -11,8 +11,12 @@ import "../../script/Constants.sol";
 contract DcaScheduleTest is DcaDappTest {
     // Events
     event DcaManager__DcaScheduleDeleted(address user, address token, bytes32 scheduleId, uint256 refundedAmount);
-    event DcaManager__PurchaseAmountSet(address indexed user, bytes32 indexed scheduleId, uint256 indexed purchaseAmount);
-    event DcaManager__PurchasePeriodSet(address indexed user, bytes32 indexed scheduleId, uint256 indexed purchasePeriod);
+    event DcaManager__PurchaseAmountUpdated(
+        address indexed user, bytes32 indexed scheduleId, uint256 previousAmount, uint256 newAmount
+    );
+    event DcaManager__PurchasePeriodUpdated(
+        address indexed user, bytes32 indexed scheduleId, uint256 previousPeriod, uint256 newPeriod
+    );
 
     /// @dev the refund is what the handler actually paid, and a lending protocol's share conversion rounds
     /// up, so the amount can exceed the schedule's recorded balance by dust
@@ -138,11 +142,11 @@ contract DcaScheduleTest is DcaDappTest {
         emit DcaManager__TokenBalanceUpdated(address(stablecoin), scheduleId, newBalance);
         dcaManager.depositToken(address(stablecoin), SCHEDULE_INDEX, scheduleId, extraStablecoinToDeposit);
         vm.expectEmit(true, true, true, true);
-        emit DcaManager__PurchaseAmountSet(USER, scheduleId, newPurchaseAmount);
-        dcaManager.setPurchaseAmount(address(stablecoin), SCHEDULE_INDEX, scheduleId, newPurchaseAmount);
+        emit DcaManager__PurchaseAmountUpdated(USER, scheduleId, AMOUNT_TO_SPEND, newPurchaseAmount);
+        dcaManager.updatePurchaseAmount(address(stablecoin), SCHEDULE_INDEX, scheduleId, newPurchaseAmount);
         vm.expectEmit(true, true, true, true);
-        emit DcaManager__PurchasePeriodSet(USER, scheduleId, newPurchasePeriod);
-        dcaManager.setPurchasePeriod(address(stablecoin), SCHEDULE_INDEX, scheduleId, newPurchasePeriod);
+        emit DcaManager__PurchasePeriodUpdated(USER, scheduleId, MIN_PURCHASE_PERIOD, newPurchasePeriod);
+        dcaManager.updatePurchasePeriod(address(stablecoin), SCHEDULE_INDEX, scheduleId, newPurchasePeriod);
         uint256 userBalanceAfterDeposit = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
         assertEq(extraStablecoinToDeposit, userBalanceAfterDeposit - userBalanceBeforeDeposit);
         assertEq(newPurchaseAmount, dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).purchaseAmount);
@@ -251,9 +255,9 @@ contract DcaScheduleTest is DcaDappTest {
         vm.expectRevert(IDcaManager.DcaManager__InexistentScheduleIndex.selector);
         dcaManager.depositToken(address(stablecoin), SCHEDULE_INDEX + 1, fakeScheduleId, AMOUNT_TO_DEPOSIT);
         vm.expectRevert(IDcaManager.DcaManager__InexistentScheduleIndex.selector);
-        dcaManager.setPurchaseAmount(address(stablecoin), SCHEDULE_INDEX + 1, fakeScheduleId, AMOUNT_TO_SPEND);
+        dcaManager.updatePurchaseAmount(address(stablecoin), SCHEDULE_INDEX + 1, fakeScheduleId, AMOUNT_TO_SPEND);
         vm.expectRevert(IDcaManager.DcaManager__InexistentScheduleIndex.selector);
-        dcaManager.setPurchasePeriod(address(stablecoin), SCHEDULE_INDEX + 1, fakeScheduleId, MIN_PURCHASE_PERIOD);
+        dcaManager.updatePurchasePeriod(address(stablecoin), SCHEDULE_INDEX + 1, fakeScheduleId, MIN_PURCHASE_PERIOD);
         vm.stopPrank();
     }
 

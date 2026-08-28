@@ -214,7 +214,7 @@ contract Handler is Test {
     /**
      * @notice Apply intent-specific schedule edits. Combined updates take two or three calls.
      */
-    function updateDcaSchedule(
+    function applyScheduleEdits(
         uint256 userSeed,
         uint256 scheduleIndex,
         uint256 depositAmount,
@@ -276,7 +276,7 @@ contract Handler is Test {
         }
 
         if (purchaseAmount > 0) {
-            try dcaManager.setPurchaseAmount(address(stablecoin), scheduleIndex, scheduleId, purchaseAmount) {
+            try dcaManager.updatePurchaseAmount(address(stablecoin), scheduleIndex, scheduleId, purchaseAmount) {
                 // Success
             } catch {
                 // Ignore failures
@@ -284,7 +284,7 @@ contract Handler is Test {
         }
 
         if (purchasePeriod > 0) {
-            try dcaManager.setPurchasePeriod(address(stablecoin), scheduleIndex, scheduleId, purchasePeriod) {
+            try dcaManager.updatePurchasePeriod(address(stablecoin), scheduleIndex, scheduleId, purchasePeriod) {
                 // Success
             } catch {
                 // Ignore failures

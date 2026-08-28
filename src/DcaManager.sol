@@ -127,10 +127,11 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @param token the token address
      * @param scheduleIndex the schedule index
      * @param scheduleId the schedule id for validation
-     * @param purchaseAmount the amount of stablecoin to swap periodically for rBTC
+     * @param newPurchaseAmount the new amount of stablecoin to swap periodically for rBTC
      * @notice the amount cannot exceed the schedule's current token balance
+     * @notice the emitted event carries both the amount replaced and the new one
      */
-    function setPurchaseAmount(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 purchaseAmount)
+    function updatePurchaseAmount(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 newPurchaseAmount)
         external
         override
         nonReentrant
@@ -138,19 +139,21 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     {
         DcaDetails storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
-        _validatePurchaseAmount(token, purchaseAmount, dcaSchedule.tokenBalance);
-        dcaSchedule.purchaseAmount = purchaseAmount;
-        emit DcaManager__PurchaseAmountSet(msg.sender, scheduleId, purchaseAmount);
+        _validatePurchaseAmount(token, newPurchaseAmount, dcaSchedule.tokenBalance);
+        uint256 previousPurchaseAmount = dcaSchedule.purchaseAmount;
+        dcaSchedule.purchaseAmount = newPurchaseAmount;
+        emit DcaManager__PurchaseAmountUpdated(msg.sender, scheduleId, previousPurchaseAmount, newPurchaseAmount);
     }
 
     /**
      * @param token the token address
      * @param scheduleIndex the schedule index
      * @param scheduleId the schedule id for validation
-     * @param purchasePeriod the time (in seconds) between rBTC purchases for each user
-     * @notice the period
+     * @param newPurchasePeriod the new time (in seconds) between rBTC purchases for this schedule
+     * @notice the period cannot be shorter than the minimum purchase period
+     * @notice the emitted event carries both the period replaced and the new one
      */
-    function setPurchasePeriod(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 purchasePeriod)
+    function updatePurchasePeriod(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 newPurchasePeriod)
         external
         override
         nonReentrant
@@ -158,9 +161,10 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     {
         DcaDetails storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
-        _validatePurchasePeriod(purchasePeriod);
-        dcaSchedule.purchasePeriod = purchasePeriod;
-        emit DcaManager__PurchasePeriodSet(msg.sender, scheduleId, purchasePeriod);
+        _validatePurchasePeriod(newPurchasePeriod);
+        uint256 previousPurchasePeriod = dcaSchedule.purchasePeriod;
+        dcaSchedule.purchasePeriod = newPurchasePeriod;
+        emit DcaManager__PurchasePeriodUpdated(msg.sender, scheduleId, previousPurchasePeriod, newPurchasePeriod);
     }
 
     /**

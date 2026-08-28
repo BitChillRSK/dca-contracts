@@ -23,11 +23,11 @@ interface IDcaManager {
     // Events ////////////
     //////////////////////
     event DcaManager__TokenBalanceUpdated(address indexed token, bytes32 indexed scheduleId, uint256 indexed amount);
-    event DcaManager__PurchaseAmountSet(
-        address indexed user, bytes32 indexed scheduleId, uint256 indexed purchaseAmount
+    event DcaManager__PurchaseAmountUpdated(
+        address indexed user, bytes32 indexed scheduleId, uint256 previousAmount, uint256 newAmount
     );
-    event DcaManager__PurchasePeriodSet(
-        address indexed user, bytes32 indexed scheduleId, uint256 indexed purchasePeriod
+    event DcaManager__PurchasePeriodUpdated(
+        address indexed user, bytes32 indexed scheduleId, uint256 previousPeriod, uint256 newPeriod
     );
     event DcaManager__DcaScheduleCreated(
         address indexed user,
@@ -116,22 +116,26 @@ interface IDcaManager {
     function deleteDcaSchedule(address token, uint256 scheduleIndex, bytes32 scheduleId) external;
 
     /**
-     * @notice Set the purchase amount for a DCA schedule.
+     * @notice Update the purchase amount of an existing DCA schedule.
      * @param token The token address of the stablecoin.
      * @param scheduleIndex The index of the DCA schedule
      * @param scheduleId The schedule id for validation
-     * @param purchaseAmount The amount of to spend periodically in buying rBTC
+     * @param newPurchaseAmount The new amount to spend periodically in buying rBTC
+     * @dev emits DcaManager__PurchaseAmountUpdated with the replaced amount and the new one
      */
-    function setPurchaseAmount(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 purchaseAmount) external;
+    function updatePurchaseAmount(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 newPurchaseAmount)
+        external;
 
     /**
-     * @notice Set the purchase period for a DCA schedule.
+     * @notice Update the purchase period of an existing DCA schedule.
      * @param token The token address of the stablecoin.
      * @param scheduleIndex The index of the DCA schedule
      * @param scheduleId The schedule id for validation
-     * @param purchasePeriod The period for recurrent purchases
+     * @param newPurchasePeriod The new period for recurrent purchases
+     * @dev emits DcaManager__PurchasePeriodUpdated with the replaced period and the new one
      */
-    function setPurchasePeriod(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 purchasePeriod) external;
+    function updatePurchasePeriod(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 newPurchasePeriod)
+        external;
 
     /**
      * @param buyers the array of addresses of the users on behalf of whom rBTC is going to be bought

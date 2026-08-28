@@ -16,7 +16,7 @@ DcaManager has substantially more EIP-170 margin than the Dex handlers, so remov
 
 ## Open product decisions
 
-- **Mutation surface:** answered 2026-08-26 — **delete `updateDcaSchedule`.** Keep `depositToken`, `setPurchaseAmount`, and `setPurchasePeriod`. The relaunch frontend uses these intent-specific functions; one-field edits are expected to be substantially more common than combined edits. This removes the zero-sentinel ambiguity and the redundant mutation path without removing user capability. Combined amount+period changes take two transactions. **[R40](./R40-update-purchase-period.md) later renames `setPurchasePeriod` → `updatePurchasePeriod` and adds previous/new to the event; `setPurchaseAmount` stays.**
+- **Mutation surface:** answered 2026-08-26 — **delete `updateDcaSchedule`.** Keep `depositToken`, `setPurchaseAmount`, and `setPurchasePeriod`. The relaunch frontend uses these intent-specific functions; one-field edits are expected to be substantially more common than combined edits. This removes the zero-sentinel ambiguity and the redundant mutation path without removing user capability. Combined amount+period changes take two transactions. **[R40](./R40-update-purchase-period.md) later renames both to `updatePurchaseAmount` / `updatePurchasePeriod` and adds previous/new to their events; the two-transaction rule for combined edits is unchanged.**
 - **Consumer cutover:** answered 2026-08-26 — **delete all redundant getters.** Off-chain components migrate with the relaunch; there is no live dual-ABI window. Remove every `getMy*` wrapper and every per-field schedule getter. Canonical reads are `getDcaSchedules(user, token)`, `getDcaSchedule(user, token, scheduleIndex)`, `getInterestAccrued(user, token, lendingProtocolIndex)`, and `getAccumulatedRbtcBalance(user, token, lendingProtocolIndex)`. **R35 (PR 27, after this PR) renamed the leftover `lendingProtocolIndex` argument/field to `routeIndex`.**
 
 The redundant `withdrawTokenAndInterest` route argument is assigned for removal; it must be derived from the validated schedule.
@@ -83,7 +83,7 @@ make fork-sovryn
 make fork-tropykus
 ```
 
-Assert canonical struct reads for self and arbitrary users, invalid-index behavior, schedule-id validation on every remaining mutator, intent-specific `depositToken` / `setPurchaseAmount` / `setPurchasePeriod` edits, and `withdrawTokenAndInterest` using the schedule's route without caller input. Fork tests add no new fork-specific assertions.
+Assert canonical struct reads for self and arbitrary users, invalid-index behavior, schedule-id validation on every remaining mutator, intent-specific `depositToken` / `setPurchaseAmount` / `setPurchasePeriod` edits (renamed to `updatePurchaseAmount` / `updatePurchasePeriod` by R40), and `withdrawTokenAndInterest` using the schedule's route without caller input. Fork tests add no new fork-specific assertions.
 
 ## Success criteria
 
@@ -107,4 +107,4 @@ Assert canonical struct reads for self and arbitrary users, invalid-index behavi
 
 - ABI: intentional DcaManager selector additions/removals. `DcaManager__DcaScheduleUpdated` is removed with `updateDcaSchedule` (it had no other emitter). Remaining events and storage layout are unchanged.
 - Scripts: checked-in callers update to the canonical API; no broadcast.
-- Cutover: relaunch frontend/backend must migrate atomically with this ABI. There is no live-contract migration because relaunch deployment is fresh. Reads go through `getDcaSchedule` / `getDcaSchedules`. Schedule edits use `depositToken`, `setPurchaseAmount`, and `setPurchasePeriod` (two transactions if both amount and period change). `withdrawTokenAndInterest` no longer takes a lending-protocol index.
+- Cutover: relaunch frontend/backend must migrate atomically with this ABI. There is no live-contract migration because relaunch deployment is fresh. Reads go through `getDcaSchedule` / `getDcaSchedules`. Schedule edits use `depositToken`, `updatePurchaseAmount`, and `updatePurchasePeriod` (two transactions if both amount and period change). **The last two were `setPurchaseAmount` / `setPurchasePeriod` when this spec was written; [R40](./R40-update-purchase-period.md) renamed them and moved the changed value out of the topics. Integrate against the R40 names.** `withdrawTokenAndInterest` no longer takes a lending-protocol index.

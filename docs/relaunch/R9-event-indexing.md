@@ -10,7 +10,7 @@ Index only addresses and `scheduleId`. Emit a canonical per-user lending-share b
 
 ## Background
 
-Several events still index amounts, timestamps, or periods (`TokenBalanceUpdated.amount`, `PurchasePeriod` / `PurchaseAmount` payloads, `SuccessfulRbtcBatchPurchase` totals, `rBtcWithdrawn.amount`, fee-setter rates). That wastes topic slots and is the original Notion item. R40 already ships `PurchasePeriodUpdated` with unindexed previous/new; do not re-index those.
+Several events still index amounts, timestamps, or periods (`TokenBalanceUpdated.amount`, `PurchasePeriod` / `PurchaseAmount` payloads, `SuccessfulRbtcBatchPurchase` totals, `rBtcWithdrawn.amount`, fee-setter rates). That wastes topic slots and is the original Notion item. R40 already ships `PurchaseAmountUpdated` and `PurchasePeriodUpdated` with unindexed previous/new; do not re-index those.
 
 Lending handlers need `TokenLending__UserSharesUpdated` so an off-chain forwarder can reconstruct time-weighted virtual shares without traces. Shape and emit sites are decided in `EXTERNAL_REWARDS.md`. R26 renamed the getter to `getUserShares`.
 

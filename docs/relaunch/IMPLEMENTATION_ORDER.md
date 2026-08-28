@@ -80,7 +80,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R47 | 34 | none (one assignment per handler address) |
 | R43 | 35 | none (decisions recorded above) |
 | R41 | 36 | none (reject FOT hop-1 shortfall) |
-| R40 | 37 | none (`updatePurchasePeriod`) |
+| R40 | 37 | none (`updatePurchaseAmount` / `updatePurchasePeriod`) |
 | R48 | 38 | none (per-token×route deposit-intake pause) |
 | R19 | 39 | none (per-schedule purchase pause) |
 | R18 | 40 | none (`DcaDetails` only) |
@@ -359,9 +359,9 @@ This deliberately follows R39 so the reviewed Dex bytecode no longer contains th
 
 Keep R21’s hop-1 measurement; revert `TokenHandler__DepositAmountMismatch` if `received != requested`. Listed stables are 1:1; a surprise transfer fee fails closed instead of crediting a shortfall. New custom error is ABI, so this is pre-freeze. Land it before R36 so the new USDT0/USDRIF deployments start with the settled deposit policy. See [`R41-reject-fot-deposits.md`](./R41-reject-fot-deposits.md).
 
-### PR 37 - R40 `updatePurchasePeriod`
+### PR 37 - R40 `updatePurchaseAmount` / `updatePurchasePeriod`
 
-Rename `setPurchasePeriod` → `updatePurchasePeriod`. Event becomes `PurchasePeriodUpdated(user, scheduleId, previousPeriod, newPeriod)` with neither period indexed (R9 rule). `setPurchaseAmount` stays. See [`R40-update-purchase-period.md`](./R40-update-purchase-period.md).
+Rename `setPurchaseAmount` → `updatePurchaseAmount` and `setPurchasePeriod` → `updatePurchasePeriod`. Events become `PurchaseAmountUpdated(user, scheduleId, previousAmount, newAmount)` and `PurchasePeriodUpdated(user, scheduleId, previousPeriod, newPeriod)`, with neither amount nor period indexed (R9 rule). Both mutators only ever edit a schedule `createDcaSchedule` already wrote, so both read as updates; doing them together breaks the ABI once instead of twice. Combined amount+period edits remain two transactions. See [`R40-update-purchase-period.md`](./R40-update-purchase-period.md).
 
 **Must land before R9 (PR 45).** Frontend follow-up required.
 
