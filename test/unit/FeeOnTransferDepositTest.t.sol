@@ -216,7 +216,7 @@ contract FeeOnTransferDepositTest is Test {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(token), REQUESTED, REQUESTED, MIN_PURCHASE_PERIOD, IDLE_INDEX);
 
-        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(token))[0];
+        IDcaManager.DcaSchedule memory schedule = dcaManager.getDcaSchedules(USER, address(token))[0];
         assertEq(schedule.tokenBalance, REQUESTED);
         assertEq(schedule.purchaseAmount, REQUESTED);
         assertEq(idleHandler.getUsersIdleTokenBalance(USER), REQUESTED);
@@ -297,7 +297,7 @@ contract FeeOnTransferDepositTest is Test {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(token), REQUESTED, REQUESTED, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
 
-        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(token))[0];
+        IDcaManager.DcaSchedule memory schedule = dcaManager.getDcaSchedules(USER, address(token))[0];
         assertEq(schedule.tokenBalance, REQUESTED);
         uint256 userUnderlying = _tropykusUnderlying(USER);
         assertApproxEqAbs(userUnderlying, _afterShortfall(REQUESTED), LENDING_ROUNDING_SLACK);

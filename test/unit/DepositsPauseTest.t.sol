@@ -204,7 +204,7 @@ contract DepositsPauseTest is DcaDappTest {
         dcaManager.updatePurchasePeriod(address(stablecoin), SCHEDULE_INDEX, scheduleId, newPurchasePeriod);
         vm.stopPrank();
 
-        IDcaManager.DcaDetails memory schedule =
+        IDcaManager.DcaSchedule memory schedule =
             dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX);
         assertEq(schedule.purchaseAmount, newPurchaseAmount);
         assertEq(schedule.purchasePeriod, newPurchasePeriod);

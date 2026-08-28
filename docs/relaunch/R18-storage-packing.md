@@ -1,4 +1,4 @@
-# R18 — Pack DcaDetails storage
+# R18 — Pack DcaSchedule storage
 
 Status: **not started** · Assigned: no · Optional/further-review: no
 
@@ -10,20 +10,20 @@ Reduce each stored DCA schedule from six-plus slots to three slots with explicit
 
 ## Background
 
-This is a fresh deployment with no storage migration. `DcaDetails` currently spends one slot on every `uint256`; R19 adds a boolean. Schedule creation, deposit, purchase, and configuration repeatedly read/write these fields, so packing has durable user and bot gas value.
+This is a fresh deployment with no storage migration. `DcaSchedule` (renamed from `DcaDetails` by R49) currently spends one slot on every `uint256`; R19 adds a boolean. Schedule creation, deposit, purchase, and configuration repeatedly read/write these fields, so packing has durable user and bot gas value.
 
 Handler per-user mappings are deliberately excluded: each entry is a single token/share amount, so there is no adjacent field to pack, and narrowing pooled financial accounting creates overflow risk without saving a slot.
 
 ## Open product decisions
 
-**none** — pack `DcaDetails` only. Do not narrow handler balances/shares.
+**none** — pack `DcaSchedule` only. Do not narrow handler balances/shares.
 
 ## Scope
 
 - [ ] Use checked widths and field order for exactly three slots: `uint128 tokenBalance` + `uint128 purchaseAmount`; `uint32 purchasePeriod` + `uint48 lastPurchaseTimestamp` + `uint32 routeIndex` + `bool paused`; `bytes32 scheduleId`.
 - [ ] Keep all external function amount/period/index arguments as `uint256`; use OZ `SafeCast` at the validated storage boundary so overflow has exact revert data.
 - [ ] Bound route registration/use consistently to `uint32`; bound periods to `uint32`. Timestamp writes use checked `uint48`. Amounts above `uint128` fail before tokens move or schedule state changes.
-- [ ] Update the public `DcaDetails` tuple ordering/types consistently and migrate tests/checked-in consumers.
+- [ ] Update the public `DcaSchedule` tuple ordering/types consistently and migrate tests/checked-in consumers.
 - [ ] Record `forge inspect DcaManager storageLayout` before/after plus measured create/deposit/purchase/update/delete gas.
 - [ ] Prove swap-pop copies every packed field, including `paused` and `scheduleId`.
 
@@ -45,7 +45,7 @@ Boundary tests at max and max+1 for each narrowed field; pre-transfer rollback f
 
 ## Success criteria
 
-- [ ] One DcaDetails element occupies exactly three storage slots.
+- [ ] One DcaSchedule element occupies exactly three storage slots.
 - [ ] No unchecked narrowing or financial overflow path exists.
 - [ ] Handler financial mappings remain `uint256`.
 - [ ] All public tuple consumers are updated before R9.
@@ -60,6 +60,6 @@ Boundary tests at max and max+1 for each narrowed field; pre-transfer rollback f
 
 ## ABI / deploy / cutover impact
 
-- ABI: `DcaDetails` component types/order change and include R19's `paused` field; function input widths stay `uint256`.
+- ABI: `DcaSchedule` component types/order change and include R19's `paused` field; function input widths stay `uint256`.
 - Scripts: route constants fit `uint32`; no address/config change.
 - Cutover: frontend ABI/types must update. Open or update the frontend issue in this PR.

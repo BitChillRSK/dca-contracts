@@ -64,7 +64,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
 
-        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(docToken))[0];
+        IDcaManager.DcaSchedule memory schedule = dcaManager.getDcaSchedules(USER, address(docToken))[0];
         assertEq(schedule.routeIndex, IDLE_INDEX);
         assertEq(schedule.tokenBalance, DEPOSIT);
         assertEq(handler.getUsersIdleTokenBalance(USER), DEPOSIT);
@@ -204,8 +204,8 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, lendingIndex);
 
-        IDcaManager.DcaDetails memory idleSchedule = dcaManager.getDcaSchedule(USER, address(docToken), 0);
-        IDcaManager.DcaDetails memory lendingSchedule = dcaManager.getDcaSchedule(USER, address(docToken), 1);
+        IDcaManager.DcaSchedule memory idleSchedule = dcaManager.getDcaSchedule(USER, address(docToken), 0);
+        IDcaManager.DcaSchedule memory lendingSchedule = dcaManager.getDcaSchedule(USER, address(docToken), 1);
         assertEq(idleSchedule.routeIndex, IDLE_INDEX);
         assertEq(lendingSchedule.routeIndex, lendingIndex);
 

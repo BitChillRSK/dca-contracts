@@ -52,7 +52,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         dcaManager.updatePurchasePeriod(address(stablecoin), SCHEDULE_INDEX, scheduleId, MIN_PURCHASE_PERIOD);
         vm.stopPrank();
         buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND); // first purchase
-        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
+        IDcaManager.DcaSchedule memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
         bytes memory encodedRevert = abi.encodeWithSelector(
             IDcaManager.DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed.selector,
             _secondsUntilDueUtcDayStart(schedule.lastPurchaseTimestamp, schedule.purchasePeriod)
@@ -71,7 +71,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         vm.warp(dueDayStart);
         buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
 
-        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
+        IDcaManager.DcaSchedule memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
         assertEq(schedule.lastPurchaseTimestamp, firstBuy + MIN_PURCHASE_PERIOD);
     }
 
@@ -101,7 +101,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         vm.warp(dueDayStart); // 00:00 UTC of the due day, before last + period wall-clock
         buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
 
-        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
+        IDcaManager.DcaSchedule memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
         assertEq(schedule.lastPurchaseTimestamp, firstBuy + MIN_PURCHASE_PERIOD);
 
         vm.warp(dueDayStart + 9 hours); // still the due UTC day
@@ -126,7 +126,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         vm.warp(dueDayStart); // due UTC day 00:00, 20 hours before last + period
         buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
 
-        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
+        IDcaManager.DcaSchedule memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
         assertEq(schedule.lastPurchaseTimestamp, firstBuy + weeklyPeriod);
     }
 
@@ -173,7 +173,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         
         buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
 
-        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
+        IDcaManager.DcaSchedule memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
         assertLe(schedule.lastPurchaseTimestamp, block.timestamp);
         assertGt(schedule.lastPurchaseTimestamp, block.timestamp - MIN_PURCHASE_PERIOD);
         uint256 periodsElapsed = (block.timestamp - firstPurchaseTimestamp) / MIN_PURCHASE_PERIOD;

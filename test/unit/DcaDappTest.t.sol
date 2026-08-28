@@ -507,7 +507,7 @@ contract DcaDappTest is Test {
         vm.startPrank(USER);
         uint256 stablecoinBalanceBeforePurchase = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
         uint256 rbtcBalanceBeforePurchase = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
-        IDcaManager.DcaDetails[] memory dcaDetails = dcaManager.getDcaSchedules(USER, address(stablecoin));
+        IDcaManager.DcaSchedule[] memory dcaDetails = dcaManager.getDcaSchedules(USER, address(stablecoin));
         vm.stopPrank();
 
         uint256 fee = feeCalculator.calculateFee(AMOUNT_TO_SPEND);

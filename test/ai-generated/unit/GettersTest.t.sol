@@ -41,7 +41,7 @@ contract GettersTest is DcaDappTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_dcaManager_getDcaSchedules() public {
-        IDcaManager.DcaDetails[] memory schedules = dcaManager.getDcaSchedules(USER, address(stablecoin));
+        IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(USER, address(stablecoin));
         assertEq(schedules.length, 1); // Created in setup
         assertEq(schedules[0].tokenBalance, AMOUNT_TO_DEPOSIT);
         assertEq(schedules[0].purchaseAmount, AMOUNT_TO_SPEND);
@@ -50,11 +50,11 @@ contract GettersTest is DcaDappTest {
 
     function test_dcaManager_getDcaSchedule_selfAndArbitraryUser() public {
         vm.prank(USER);
-        IDcaManager.DcaDetails memory asUser = dcaManager.getDcaSchedule(USER, address(stablecoin), 0);
+        IDcaManager.DcaSchedule memory asUser = dcaManager.getDcaSchedule(USER, address(stablecoin), 0);
 
         vm.prank(OWNER);
-        IDcaManager.DcaDetails memory asThirdParty = dcaManager.getDcaSchedule(USER, address(stablecoin), 0);
-        IDcaManager.DcaDetails[] memory enumerated = dcaManager.getDcaSchedules(USER, address(stablecoin));
+        IDcaManager.DcaSchedule memory asThirdParty = dcaManager.getDcaSchedule(USER, address(stablecoin), 0);
+        IDcaManager.DcaSchedule[] memory enumerated = dcaManager.getDcaSchedules(USER, address(stablecoin));
 
         assertEq(asUser.tokenBalance, AMOUNT_TO_DEPOSIT);
         assertEq(asUser.purchaseAmount, AMOUNT_TO_SPEND);
@@ -324,7 +324,7 @@ contract GettersTest is DcaDappTest {
 
     function test_getters_withZeroAddress() public {
         // Test getters with zero address inputs where applicable
-        IDcaManager.DcaDetails[] memory schedules = dcaManager.getDcaSchedules(address(0), address(stablecoin));
+        IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(address(0), address(stablecoin));
         assertEq(schedules.length, 0);
 
         uint256 balance = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(address(0));
@@ -334,7 +334,7 @@ contract GettersTest is DcaDappTest {
     function test_getters_withNonExistentToken() public {
         address fakeToken = address(0x999);
         
-        IDcaManager.DcaDetails[] memory schedules = dcaManager.getDcaSchedules(USER, fakeToken);
+        IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(USER, fakeToken);
         assertEq(schedules.length, 0);
 
         address handler = operationsAdmin.getTokenHandler(fakeToken, 1);
@@ -342,8 +342,8 @@ contract GettersTest is DcaDappTest {
     }
 
     function test_getters_singleScheduleMatchesArray() public {
-        IDcaManager.DcaDetails memory single = dcaManager.getDcaSchedule(USER, address(stablecoin), 0);
-        IDcaManager.DcaDetails[] memory enumerated = dcaManager.getDcaSchedules(USER, address(stablecoin));
+        IDcaManager.DcaSchedule memory single = dcaManager.getDcaSchedule(USER, address(stablecoin), 0);
+        IDcaManager.DcaSchedule[] memory enumerated = dcaManager.getDcaSchedules(USER, address(stablecoin));
 
         assertEq(enumerated.length, 1);
         assertEq(single.tokenBalance, enumerated[0].tokenBalance);
@@ -362,7 +362,7 @@ contract GettersTest is DcaDappTest {
         
         // Test empty arrays for new users
         address newUser = makeAddr("newUser");
-        IDcaManager.DcaDetails[] memory emptySchedules = dcaManager.getDcaSchedules(newUser, address(stablecoin));
+        IDcaManager.DcaSchedule[] memory emptySchedules = dcaManager.getDcaSchedules(newUser, address(stablecoin));
         assertEq(emptySchedules.length, 0);
     }
 
@@ -395,7 +395,7 @@ contract GettersTest is DcaDappTest {
         // Test boundary conditions for various getters
         
         // Test with address(0) as token
-        IDcaManager.DcaDetails[] memory schedules = dcaManager.getDcaSchedules(USER, address(0));
+        IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(USER, address(0));
         assertEq(schedules.length, 0);
         
         assertFalse(operationsAdmin.isLendingRoute(IDLE_INDEX));
