@@ -7,7 +7,7 @@ import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
-import "../../script/Constants.sol";
+import "../Constants.sol";
 
 contract RbtcWithdrawalTest is DcaDappTest {
     function setUp() public override {
@@ -87,6 +87,80 @@ contract RbtcWithdrawalTest is DcaDappTest {
         dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
         uint256 rbtcBalanceAfterWithdrawal = USER.balance;
         assertEq(rbtcBalanceAfterWithdrawal, rbtcBalanceBeforeWithdrawal);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                      WITHDRAW-ALL RBTC ROUTE PAIRS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice The two arrays are positional pairs, so their lengths must match.
+    function testWithdrawAllRbtcRevertsOnLengthMismatch() external {
+        address[] memory tokens = new address[](2);
+        tokens[0] = address(stablecoin);
+        tokens[1] = address(stablecoin);
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = s_routeIndex;
+
+        vm.prank(USER);
+        vm.expectRevert(IDcaManager.DcaManager__WithdrawalArraysLengthMismatch.selector);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
+    }
+
+    /// @notice An empty call reverts instead of succeeding silently, matching `batchBuyRbtc`.
+    function testWithdrawAllRbtcRevertsOnEmptyArrays() external {
+        address[] memory tokens = new address[](0);
+        uint256[] memory routeIndexes = new uint256[](0);
+
+        vm.prank(USER);
+        vm.expectRevert(IDcaManager.DcaManager__EmptyWithdrawalArrays.selector);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
+    }
+
+    /// @notice A pair whose route has no handler is skipped, and the pairs after it still execute.
+    function testWithdrawAllRbtcSkipsUnregisteredPairAndKeepsGoing() external {
+        vm.prank(USER);
+        IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(USER, address(stablecoin));
+        buyRbtcOne(USER, SCHEDULE_INDEX, schedules[SCHEDULE_INDEX].scheduleId, AMOUNT_TO_SPEND);
+
+        uint256 accumulatedRbtc = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
+        assertGt(accumulatedRbtc, 0);
+        uint256 rbtcBalanceBeforeWithdrawal = USER.balance;
+
+        address[] memory tokens = new address[](2);
+        tokens[0] = address(stablecoin);
+        tokens[1] = address(stablecoin);
+        uint256[] memory routeIndexes = new uint256[](2);
+        routeIndexes[0] = UNREGISTERED_ROUTE_INDEX;
+        routeIndexes[1] = s_routeIndex;
+
+        vm.prank(USER);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
+
+        assertEq(USER.balance - rbtcBalanceBeforeWithdrawal, accumulatedRbtc);
+        assertEq(IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER), 0);
+    }
+
+    /// @notice Naming the same pair twice pays once: the second pass finds a zero balance and skips.
+    function testWithdrawAllRbtcWithDuplicatePairPaysOnce() external {
+        vm.prank(USER);
+        IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(USER, address(stablecoin));
+        buyRbtcOne(USER, SCHEDULE_INDEX, schedules[SCHEDULE_INDEX].scheduleId, AMOUNT_TO_SPEND);
+
+        uint256 accumulatedRbtc = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
+        uint256 rbtcBalanceBeforeWithdrawal = USER.balance;
+
+        address[] memory tokens = new address[](2);
+        tokens[0] = address(stablecoin);
+        tokens[1] = address(stablecoin);
+        uint256[] memory routeIndexes = new uint256[](2);
+        routeIndexes[0] = s_routeIndex;
+        routeIndexes[1] = s_routeIndex;
+
+        vm.prank(USER);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
+
+        assertEq(USER.balance - rbtcBalanceBeforeWithdrawal, accumulatedRbtc);
+        assertEq(IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER), 0);
     }
 
     function testWithdrawRbtcFromTokenHandlerCreditsSignerOnly() external {

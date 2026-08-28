@@ -229,6 +229,86 @@ contract StablecoinLendingTest is DcaDappTest {
         assertEq(withdrawableInterest, 0);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                    WITHDRAW-ALL INTEREST ROUTE PAIRS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice The two arrays are positional pairs, so their lengths must match.
+    function testWithdrawAllInterestRevertsOnLengthMismatch() external {
+        address[] memory tokens = new address[](2);
+        tokens[0] = address(stablecoin);
+        tokens[1] = address(stablecoin);
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = s_routeIndex;
+
+        vm.prank(USER);
+        vm.expectRevert(IDcaManager.DcaManager__WithdrawalArraysLengthMismatch.selector);
+        dcaManager.withdrawAllAccumulatedInterest(tokens, routeIndexes);
+    }
+
+    /// @notice An empty call reverts instead of succeeding silently, matching `batchBuyRbtc`.
+    function testWithdrawAllInterestRevertsOnEmptyArrays() external {
+        address[] memory tokens = new address[](0);
+        uint256[] memory routeIndexes = new uint256[](0);
+
+        vm.prank(USER);
+        vm.expectRevert(IDcaManager.DcaManager__EmptyWithdrawalArrays.selector);
+        dcaManager.withdrawAllAccumulatedInterest(tokens, routeIndexes);
+    }
+
+    /// @notice A pair whose route has no handler is skipped, and the pairs after it still execute.
+    function testWithdrawAllInterestSkipsUnregisteredPairAndKeepsGoing() external onlyLendingLane {
+        updateExchangeRate(10 days);
+
+        uint256 withdrawableInterest = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        uint256 userBalanceBeforeWithdrawal = stablecoin.balanceOf(USER);
+
+        address[] memory tokens = new address[](2);
+        tokens[0] = address(stablecoin);
+        tokens[1] = address(stablecoin);
+        uint256[] memory routeIndexes = new uint256[](2);
+        routeIndexes[0] = UNREGISTERED_ROUTE_INDEX;
+        routeIndexes[1] = s_routeIndex;
+
+        vm.prank(USER);
+        vm.expectEmit(true, true, false, false);
+        emit TokenLending__InterestWithdrawn(USER, address(stablecoin), withdrawableInterest);
+        dcaManager.withdrawAllAccumulatedInterest(tokens, routeIndexes);
+
+        assertApproxEqRel(
+            stablecoin.balanceOf(USER) - userBalanceBeforeWithdrawal,
+            withdrawableInterest,
+            1 // Allow a maximum difference of 1e-18%
+        );
+    }
+
+    /// @notice Naming the same pair twice pays once: the second pass finds nothing left to withdraw.
+    function testWithdrawAllInterestWithDuplicatePairPaysOnce() external onlyLendingLane {
+        updateExchangeRate(10 days);
+
+        uint256 withdrawableInterest = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        uint256 userBalanceBeforeWithdrawal = stablecoin.balanceOf(USER);
+
+        address[] memory tokens = new address[](2);
+        tokens[0] = address(stablecoin);
+        tokens[1] = address(stablecoin);
+        uint256[] memory routeIndexes = new uint256[](2);
+        routeIndexes[0] = s_routeIndex;
+        routeIndexes[1] = s_routeIndex;
+
+        vm.prank(USER);
+        dcaManager.withdrawAllAccumulatedInterest(tokens, routeIndexes);
+
+        assertApproxEqRel(
+            stablecoin.balanceOf(USER) - userBalanceBeforeWithdrawal,
+            withdrawableInterest,
+            1 // Allow a maximum difference of 1e-18%
+        );
+        uint256 remainingInterest = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        if (remainingInterest == 1) remainingInterest--; // Handle Sovryn's precision loss
+        assertEq(remainingInterest, 0);
+    }
+
     /// @notice Combined withdraw derives the lending route from the validated schedule.
     /// The caller cannot target a different index (the previous fifth argument is gone).
     function testWithdrawTokenAndInterest() external onlyLendingLane {

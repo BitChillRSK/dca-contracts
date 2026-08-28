@@ -333,8 +333,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
                 || numOfPurchases != purchaseAmounts.length
         ) revert DcaManager__BatchPurchaseArraysLengthMismatch();
         for (uint256 i; i < numOfPurchases; ++i) {
-            (uint256 scheudulePurchaseAmount, uint256 scheduleRouteIndex) = _rBtcPurchaseChecksEffects(buyers[i], token, scheduleIndexes[i], scheduleIds[i]);
-            if (scheudulePurchaseAmount != purchaseAmounts[i]) revert DcaManager__PurchaseAmountMismatch(buyers[i], token, scheduleIds[i], scheduleIndexes[i], scheudulePurchaseAmount, purchaseAmounts[i]);
+            (uint256 schedulePurchaseAmount, uint256 scheduleRouteIndex) = _rBtcPurchaseChecksEffects(buyers[i], token, scheduleIndexes[i], scheduleIds[i]);
+            if (schedulePurchaseAmount != purchaseAmounts[i]) revert DcaManager__PurchaseAmountMismatch(buyers[i], token, scheduleIds[i], scheduleIndexes[i], schedulePurchaseAmount, purchaseAmounts[i]);
             if (scheduleRouteIndex != routeIndex) revert DcaManager__RouteIndexMismatch(buyers[i], token, scheduleIds[i], scheduleIndexes[i], scheduleRouteIndex, routeIndex);
         }
         IPurchaseRbtc(address(_handler(token, routeIndex))).batchBuyRbtc(
@@ -353,18 +353,22 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
 
     /**
      * @notice Withdraw all of the rBTC accumulated by a user through their various DCA strategies
-     * @param tokens Array of token addresses to withdraw rBTC from
-     * @param routeIndexes Route indexes whose handlers may hold the user's accumulated rBTC
+     * @param tokens The token of each route to withdraw rBTC from
+     * @param routeIndexes The route index of each route to withdraw rBTC from
+     * @notice the two arrays are positional pairs: `tokens[i]` is only withdrawn from `routeIndexes[i]`,
+     *         so a caller names the exact routes it holds a balance on and no other handler is called
+     * @dev a pair with no handler assigned, or with no accumulated rBTC, is skipped rather than reverted
      */
     function withdrawAllAccumulatedRbtc(address[] calldata tokens, uint256[] calldata routeIndexes) external override nonReentrant {
-        for (uint256 i; i < tokens.length; ++i) {
-            for (uint256 j; j < routeIndexes.length; ++j) {
-                address tokenHandlerAddress = i_operationsAdmin.getTokenHandler(tokens[i], routeIndexes[j]);
-                if (tokenHandlerAddress == address(0)) continue;
-                IPurchaseRbtc handler = IPurchaseRbtc(tokenHandlerAddress);
-                if (handler.getAccumulatedRbtcBalance(msg.sender) == 0) continue;
-                handler.withdrawAccumulatedRbtc(msg.sender);
-            }
+        uint256 numOfRoutes = tokens.length;
+        if (numOfRoutes == 0) revert DcaManager__EmptyWithdrawalArrays();
+        if (numOfRoutes != routeIndexes.length) revert DcaManager__WithdrawalArraysLengthMismatch();
+        for (uint256 i; i < numOfRoutes; ++i) {
+            address tokenHandlerAddress = i_operationsAdmin.getTokenHandler(tokens[i], routeIndexes[i]);
+            if (tokenHandlerAddress == address(0)) continue;
+            IPurchaseRbtc handler = IPurchaseRbtc(tokenHandlerAddress);
+            if (handler.getAccumulatedRbtcBalance(msg.sender) == 0) continue;
+            handler.withdrawAccumulatedRbtc(msg.sender);
         }
     }
 
@@ -391,23 +395,27 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
 
     /**
      * @dev Users can withdraw the stablecoin interests accrued by the deposits they made
-     * @param tokens Array of token addresses to withdraw interest from
-     * @param routeIndexes Route indexes to withdraw interest from. Idle routes are skipped.
+     * @param tokens The token of each route to withdraw interest from
+     * @param routeIndexes The route index of each route to withdraw interest from. Idle routes are skipped.
+     * @notice the two arrays are positional pairs: `tokens[i]` is only withdrawn from `routeIndexes[i]`,
+     *         so a caller names the exact routes it holds a balance on and no other handler is called
+     * @dev a pair with no handler assigned, or on a route that does not lend, is skipped rather than reverted
      */
     function withdrawAllAccumulatedInterest(address[] calldata tokens, uint256[] calldata routeIndexes)
         external
         override
         nonReentrant
     {
-        for (uint256 i; i < tokens.length; ++i) {
-            for (uint256 j; j < routeIndexes.length; ++j) {
-                address tokenHandlerAddress = i_operationsAdmin.getTokenHandler(tokens[i], routeIndexes[j]);
-                if (tokenHandlerAddress == address(0)) continue;
-                // Skip idle and unregistered routes so a mixed idle+lending call still
-                // withdraws interest from the indexes that yield.
-                if (!_tokenYieldsInterest(routeIndexes[j])) continue;
-                _withdrawInterest(ITokenLending(tokenHandlerAddress), tokens[i], routeIndexes[j]);
-            }
+        uint256 numOfRoutes = tokens.length;
+        if (numOfRoutes == 0) revert DcaManager__EmptyWithdrawalArrays();
+        if (numOfRoutes != routeIndexes.length) revert DcaManager__WithdrawalArraysLengthMismatch();
+        for (uint256 i; i < numOfRoutes; ++i) {
+            address tokenHandlerAddress = i_operationsAdmin.getTokenHandler(tokens[i], routeIndexes[i]);
+            if (tokenHandlerAddress == address(0)) continue;
+            // Skip idle and unregistered routes so a mixed idle+lending call still
+            // withdraws interest from the indexes that yield.
+            if (!_tokenYieldsInterest(routeIndexes[i])) continue;
+            _withdrawInterest(ITokenLending(tokenHandlerAddress), tokens[i], routeIndexes[i]);
         }
     }
 

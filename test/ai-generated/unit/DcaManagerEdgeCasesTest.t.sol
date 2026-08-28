@@ -475,13 +475,22 @@ contract DcaManagerEdgeCasesTest is Test {
                            RBTC WITHDRAWAL EDGE CASES
     //////////////////////////////////////////////////////////////*/
     
-    function test_withdrawAllAccumulatedRbtc_emptyArray() public {
-        uint256[] memory emptyProtocols = new uint256[](0);
-        
-        // Should not revert, just do nothing
+    function test_withdrawAllAccumulatedRbtc_emptyArray_reverts() public {
+        uint256[] memory emptyRoutes = new uint256[](0);
+        address[] memory emptyTokens = new address[](0);
+
+        // An empty call used to succeed silently; it now reverts like batchBuyRbtc does.
+        vm.expectRevert(IDcaManager.DcaManager__EmptyWithdrawalArrays.selector);
+        dcaManager.withdrawAllAccumulatedRbtc(emptyTokens, emptyRoutes);
+    }
+
+    function test_withdrawAllAccumulatedRbtc_lengthMismatch_reverts() public {
         address[] memory tokens = new address[](1);
         tokens[0] = address(stablecoin);
-        dcaManager.withdrawAllAccumulatedRbtc(tokens, emptyProtocols);
+        uint256[] memory emptyRoutes = new uint256[](0);
+
+        vm.expectRevert(IDcaManager.DcaManager__WithdrawalArraysLengthMismatch.selector);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, emptyRoutes);
     }
     
     function test_withdrawAllAccumulatedRbtc_invalidRoute_skips() public {
@@ -505,21 +514,23 @@ contract DcaManagerEdgeCasesTest is Test {
         dcaManager.withdrawAllAccumulatedRbtc(tokens, invalidProtocols);
     }
 
-    function test_withdrawAllAccumulatedRbtcAndInterest_mixedValidInvalidCombinations() public {      
-        address[] memory tokens = new address[](1);
+    function test_withdrawAllAccumulatedRbtcAndInterest_mixedValidInvalidPairs() public {
+        // Positional pairs: the same token is named once per route it may hold a position on.
+        address[] memory tokens = new address[](3);
         tokens[0] = address(stablecoin);
-        
-        uint256[] memory protocols = new uint256[](3);
-        protocols[0] = TROPYKUS_INDEX;
-        protocols[1] = SOVRYN_INDEX;
-        protocols[2] = 0;
+        tokens[1] = address(stablecoin);
+        tokens[2] = address(stablecoin);
+
+        uint256[] memory routes = new uint256[](3);
+        routes[0] = TROPYKUS_INDEX;
+        routes[1] = SOVRYN_INDEX;
+        routes[2] = 0;
         // Unit tests are only run on one protocol at a time, so this array is valid for testing
 
-        
-        // Should not revert, should skip stablecoin + Sovryn combination
+        // Should not revert: the pairs whose route has no handler for this lane are skipped.
         vm.prank(USER);
-        dcaManager.withdrawAllAccumulatedRbtc(tokens, protocols);
-        dcaManager.withdrawAllAccumulatedInterest(tokens, protocols);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routes);
+        dcaManager.withdrawAllAccumulatedInterest(tokens, routes);
     }
     
     /*//////////////////////////////////////////////////////////////
