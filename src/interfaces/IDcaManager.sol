@@ -10,12 +10,11 @@ interface IDcaManager {
     ////////////////////////
     // Type declarations ///
     ////////////////////////
-    /// @dev Two storage slots, ordered so that the only two fields a purchase writes share slot 0
-    ///      and one SSTORE: `tokenBalance` + `lastPurchaseTimestamp` + `paused` (23 of 32 bytes).
-    ///      Slot 1 holds the fields a purchase only reads: `purchaseAmount` + `purchasePeriod` +
-    ///      `routeIndex` + `scheduleId`, filling all 32 bytes exactly. External inputs stay uint256
-    ///      and are checked at the storage boundary; `scheduleId` is uint64 in the ABI and stays the
-    ///      last field, so swap-pop and `vm.load` assertions read the same way as before.
+    /// @dev Two storage slots, ordered so the two fields a purchase writes (`tokenBalance` and
+    ///      `lastPurchaseTimestamp`) share slot 0 with `paused` (23 of 32 bytes). Without IR,
+    ///      those updates remain two `SSTORE`s; the second is a cheap dirty write because both
+    ///      target the same slot. Slot 1 holds `purchaseAmount` + `purchasePeriod` + `routeIndex`
+    ///      + `scheduleId`, filling all 32 bytes. `scheduleId` remains the final ABI field.
     struct DcaSchedule {
         uint128 tokenBalance; // Stablecoin amount deposited by the user
         uint48 lastPurchaseTimestamp; // Timestamp of the latest purchase
