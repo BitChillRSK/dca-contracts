@@ -1,6 +1,6 @@
 # R48 — Per-route deposit intake pause
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **assigned** · Assigned: yes · Optional/further-review: no
 
 PR 38 of the relaunch stack. Stack on R40 (PR 37). Land before user schedule pausing, packing, and R9.
 
@@ -18,11 +18,11 @@ After R46 the manager cannot redirect to another registry, and R13 assignments c
 
 ## Scope
 
-- [ ] Add owner-only `OperationsAdmin` pause state, setter, getter, event, and custom errors for a registered/assigned `(token, routeIndex)`.
-- [ ] `DcaManager.createDcaSchedule` and `depositToken` check the selected route before any token transfer and revert when intake is paused.
-- [ ] Purchases, token/rBTC/interest withdrawals, schedule edits, and deletion do not consult this pause.
-- [ ] Pausing one token or route does not affect another; unpausing restores deposits.
-- [ ] Preserve invariant 6 on both schedule-writing entry points.
+- [x] Add owner-only `OperationsAdmin` pause state, setter, getter, event, and custom errors for a registered/assigned `(token, routeIndex)`.
+- [x] `DcaManager.createDcaSchedule` and `depositToken` check the selected route before any token transfer and revert when intake is paused.
+- [x] Purchases, token/rBTC/interest withdrawals, schedule edits, and deletion do not consult this pause.
+- [x] Pausing one token or route does not affect another; unpausing restores deposits.
+- [x] Preserve invariant 6 on both schedule-writing entry points.
 
 ## Out of scope
 
@@ -42,17 +42,17 @@ Target route-admin and DcaManager deposit/create suites. Assert checks happen be
 
 ## Success criteria
 
-- [ ] Governance can stop only new inflows to one assigned route.
-- [ ] No pause state can block users from exiting or receiving already-purchased rBTC/interest.
-- [ ] Pause events/errors are ready for the later R9 indexing audit.
-- [ ] No open product decisions.
+- [x] Governance can stop only new inflows to one assigned route.
+- [x] No pause state can block users from exiting or receiving already-purchased rBTC/interest.
+- [x] Pause events/errors are ready for the later R9 indexing audit.
+- [x] No open product decisions.
 
 ## Reviewer checklist
 
-- [ ] Matches **Scope**; nothing from **Out of scope**.
-- [ ] The pause is checked before external cash movement.
-- [ ] Protocol invariants in `AGENTS.md` still hold.
-- [ ] Tests in the PR match **Required tests**.
+- [x] Matches **Scope**; nothing from **Out of scope**.
+- [x] The pause is checked before external cash movement.
+- [x] Protocol invariants in `AGENTS.md` still hold.
+- [x] Tests in the PR match **Required tests**.
 
 ## ABI / deploy / cutover impact
 
