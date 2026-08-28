@@ -35,7 +35,7 @@ interface IPurchaseRbtc {
     error PurchaseRbtc__rBtcWithdrawalFailed();
     /// @notice The purchase path returned no rBTC for this batch.
     error PurchaseRbtc__RbtcBatchPurchaseFailed(address tokenSpent);
-    /// @notice The batch retrieved less stablecoin than the fee it owes, so there is nothing left to spend.
+    /// @notice The batch retrieved no more stablecoin than the fee it owes, so there is nothing left to spend.
     error PurchaseRbtc__StablecoinRetrievedBelowFee(uint256 stablecoinRetrieved, uint256 aggregatedFee);
 
     /*//////////////////////////////////////////////////////////////

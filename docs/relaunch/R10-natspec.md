@@ -20,8 +20,9 @@ SwapperBatcher and OperationsAdmin already use `@inheritdoc` on several function
 
 ## Style (this PR’s contract)
 
-- **Interfaces own the ABI docs.** Every first-party external function, event, error, and user-facing struct/enum has `@notice`. `@param` / `@return` on functions. `@dev` only for constraints a caller or indexer must know (pause blast radius, withdraw-all sentinel, positional pairs, share-event `newShares == getUserShares`).
+- **Interfaces own the ABI docs.** Every first-party external function, event, error, and user-facing struct/enum has `@notice`. `@param` / `@return` on functions, including parameterless getters. `@dev` only for constraints a caller or indexer must know (pause blast radius, withdraw-all sentinel, positional pairs, share-event `newShares == getUserShares`).
 - **Implementations inherit.** A function that `override`s a first-party interface uses `@inheritdoc IFoo`. Extra `@dev` is allowed only for implementation-only facts (packing dirty-writes, CEI order, balance-delta measurement, WRBTC unwrap). Do not duplicate `@notice`/`@param` already on the interface.
+- **Public auto-getters.** Compiler-generated getters (`i_dcaManager`, `i_stableToken`, `i_mocProxy`, `i_pool`, `i_aToken`, `i_wrBtcToken`, `i_swapRouter02`, `i_iSusdToken`, `i_kToken`, `EXCHANGE_RATE_DECIMALS`, and SwapperBatcher's immutables) have no function body to `@inheritdoc`. Document the **state variable**; Solidity attaches that NatSpec to the getter. Do not add those getters to an interface (that would change the interface ABI JSON). `@inheritdoc` does not work on state variables.
 - **No interface to inherit from:** constructors, internals, modifiers, `receive`, `supportsInterface` (OZ), adapter hooks. Document those on the implementation with `@dev` / `@param` / `@return`.
 - **`@author BitChill team: Antonio Rodríguez-Ynyesto`** on every first-party contract and interface (DcaManager currently differs).
 - **`@param name` without a trailing colon.** Existing `param:` forms are rewritten when the block is touched.
@@ -31,12 +32,12 @@ SwapperBatcher and OperationsAdmin already use `@inheritdoc` on several function
 
 ## Scope
 
-- [x] First-party interfaces under `src/interfaces/` plus BitChill-owned protocol interfaces (`IIdleErc20Handler`, `ILayerBankErc20Handler`): complete `@notice`/`@param`/`@return` on the public ABI. Fix stale or copy-paste text (idle is a route class, not “lending index 0”; Uniswap safety-check setter is a config floor, not the swap percent).
-- [x] First-party implementations: `@inheritdoc` on interface overrides; contract `@title` + `@notice` that names the real composition (funding base + purchase route); constructors document every parameter including `feeCollector` / `initialOwner` / `uniswapSettings` where missing.
+- [x] First-party interfaces under `src/interfaces/` plus BitChill-owned protocol interfaces (`IIdleErc20Handler`, `ILayerBankErc20Handler`): complete `@notice`/`@param`/`@return` on the public ABI, including parameterless getters. Fix stale or copy-paste text (idle is a route class, not “lending index 0”; Uniswap safety-check setter is a config floor, not the swap percent; `LastPurchaseTimestampUpdated` is the new cadence anchor, not the next-due instant; `PurchaseRbtc__StablecoinRetrievedBelowFee` fires when retrieved is no more than the fee, including equality).
+- [x] First-party implementations: `@inheritdoc` on interface overrides; contract `@title` + `@notice` that names the real composition (funding base + purchase route); constructors document every parameter including `feeCollector` / `initialOwner` / `uniswapSettings` where missing. Public immutable/constant auto-getters documented on the state variable.
 - [x] Stale facts: `IdleDocHandlerMoc` “lending index 0”; `SovrynErc20HandlerDex` “ISovrynErc20HandlerDex interface”; `FeeHandler` `@title TokenHandler`; `src/idle/README.md` still saying index 0 has “no protocol name” and that `DeployMocSwaps` wiring is a later PR.
 - [x] Third-party ABI wrappers (`IMocProxy`, `IWRBTC`, `ICoinPairPrice`, `IkToken`, `IiSusdToken`, `ILayerBankPool`, `ILayerBankAToken`): a short first-party `@notice` of how BitChill uses them. Do **not** rewrite vendor function dumps (`ICoinPairPrice`, Compound-copied `IkToken` bodies). `ILayerBankPool` / `ILayerBankAToken` already had that header and were left as-is.
 - [x] `IStablecoin` is a mock-facing mintable subset used only from `test/mocks`. Mark it as such; do not present it as a production ABI.
-- [x] No selector, event, error, storage, or bytecode change. Prove with `forge inspect` methodIdentifiers and storageLayout on the production contracts before/after.
+- [x] No selector, event, error, or storage change. Metadata-stripped executable runtime unchanged (Solidity's CBOR metadata hash includes source comments, so complete deployed bytecode is expected to differ). Prove with `forge inspect` methodIdentifiers and storageLayout, plus metadata-stripped `deployedBytecode`, on the production contracts before/after.
 
 ## Out of scope
 
@@ -106,19 +107,20 @@ Stale first-party handler note:
 
 ## Required tests
 
-No new behavioral tests. Comments do not change bytecode.
+No new behavioral tests. Comments change Solidity's metadata hash (and therefore complete deployed bytecode) but not the metadata-stripped executable runtime.
 
-1. `forge inspect` `methodIdentifiers` and `storageLayout` for `DcaManager`, `OperationsAdmin`, `SwapperBatcher`, `IdleDocHandlerMoc`, `SovrynDocHandlerMoc`, `SovrynErc20HandlerDex`, `LayerBankDocHandlerMoc`, `LayerBankErc20HandlerDex` — byte-identical to R9 HEAD.
-2. Targeted compile: `forge build`.
-3. `make check`.
-4. Fork: no new assertions. Still run `make fork-sovryn` and `make fork-tropykus` before push.
+1. `forge inspect` `methodIdentifiers` and `storageLayout` for `DcaManager`, `OperationsAdmin`, `SwapperBatcher`, `IdleDocHandlerMoc`, `SovrynDocHandlerMoc`, `SovrynErc20HandlerDex`, `LayerBankDocHandlerMoc`, `LayerBankErc20HandlerDex` — identical to R9 HEAD.
+2. Metadata-stripped executable runtime unchanged vs R9 HEAD for those same contracts: strip the CBOR metadata suffix from `forge inspect <Contract> deployedBytecode` (last two bytes are the metadata length) and compare. Complete `deployedBytecode` is expected to differ.
+3. Targeted compile: `forge build`.
+4. `make check`.
+5. Fork: no new assertions. Still run `make fork-sovryn` and `make fork-tropykus` before push.
 
 ## Success criteria
 
-- [x] User-facing ABI docs live on first-party interfaces; implementing functions use `@inheritdoc` (plus `@dev` only for implementation-only facts).
+- [x] User-facing ABI docs live on first-party interfaces; implementing functions use `@inheritdoc` (plus `@dev` only for implementation-only facts). Parameterless getters have `@return`. Compiler-generated public immutable/constant getters have NatSpec on the state variable.
 - [x] No first-party `src/` comment names a relaunch ticket or a deleted interface.
 - [x] Idle is documented as route class / default index 0, not a lending protocol.
-- [x] `forge inspect` methodIdentifiers and storageLayout unchanged on the production contracts.
+- [x] `forge inspect` methodIdentifiers and storageLayout unchanged on the production contracts. Metadata-stripped executable runtime unchanged; complete deployed bytecode may differ in the CBOR metadata suffix.
 - [x] No open product decisions.
 
 ## Reviewer checklist
@@ -131,6 +133,6 @@ No new behavioral tests. Comments do not change bytecode.
 
 ## ABI / deploy / cutover impact
 
-- ABI: none. NatSpec is not part of the ABI JSON selectors; `forge inspect` must stay identical.
+- ABI: none. NatSpec is not part of the ABI JSON selectors; `forge inspect` methodIdentifiers and storageLayout must stay identical. Metadata-stripped executable runtime must stay unchanged; complete deployed bytecode may differ because the metadata hash includes source comments.
 - Scripts: none.
 - Cutover: none. Explorers will show the new comments after verification. No consumer issue — no selector, event, or field-meaning change.

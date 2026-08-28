@@ -141,19 +141,23 @@ interface IOperationsAdmin {
 
     /**
      * @notice Whether `account` is an authorized swapper.
+     * @param account Address to query.
+     * @return True if `account` is on the swapper allowlist.
      */
     function isSwapper(address account) external view returns (bool);
 
     /**
      * @notice Whether `index` was registered as a lending route.
+     * @param index The route index. Must fit `uint32`.
+     * @return True if the index is classified as lending.
      * @dev False for idle routes (including the constructor's index 0) and for unregistered indexes.
-     *      `index` must fit `uint32`, like every other route-index argument here.
      */
     function isLendingRoute(uint256 index) external view returns (bool);
 
     /**
      * @notice Recorded class of `index`.
-     * @dev `index` must fit `uint32`, like every other route-index argument here.
+     * @param index The route index. Must fit `uint32`.
+     * @return The registered class, or `Unregistered` if it has never been classified.
      */
     function getRouteClass(uint256 index) external view returns (RouteClass);
 }

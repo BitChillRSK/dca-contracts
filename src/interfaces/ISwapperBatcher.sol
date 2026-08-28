@@ -47,11 +47,13 @@ interface ISwapperBatcher {
 
     /**
      * @notice The `DcaManager` this batcher is permanently pinned to.
+     * @return The constructor-supplied DcaManager address.
      */
     function i_dcaManager() external view returns (address);
 
     /**
      * @notice The OperationsAdmin whose swapper allowlist this batcher reads.
+     * @return The admin taken from the pinned DcaManager at construction.
      * @dev Taken from the pinned `DcaManager` at construction, so it cannot drift from the
      *      manager's own list.
      */

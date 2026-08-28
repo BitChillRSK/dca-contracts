@@ -14,6 +14,8 @@ abstract contract PurchaseMoc is PurchaseRbtc, IPurchaseMoc {
     //////////////////////
     // State variables ///
     //////////////////////
+    /// @notice Money on Chain proxy used to redeem DOC for rBTC.
+    /// @return The constructor-supplied MoC proxy.
     IMocProxy public immutable i_mocProxy;
 
     /**

@@ -77,11 +77,13 @@ interface IFeeHandler {
 
     /**
      * @notice Address that currently receives purchase fees.
+     * @return The fee collector.
      */
     function getFeeCollectorAddress() external returns (address);
 
     /**
      * @notice The four fee settings used to interpolate a purchase fee.
+     * @return The current min/max rates and purchase-amount bounds.
      */
     function getFeeSettings() external view returns (FeeSettings memory);
 }

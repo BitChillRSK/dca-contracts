@@ -78,6 +78,7 @@ interface IPurchaseUniswap {
 
     /**
      * @notice Current swap-time slippage fraction, 1e18-scaled.
+     * @return The fraction applied to the oracle-implied rBTC when building `amountOutMinimum`.
      */
     function getAmountOutMinimumPercent() external view returns (uint256);
 
@@ -91,6 +92,7 @@ interface IPurchaseUniswap {
 
     /**
      * @notice The config-only floor that bounds `setAmountOutMinimumPercent`. Not used at swap time.
+     * @return The lowest value `setAmountOutMinimumPercent` accepts.
      */
     function getAmountOutMinimumSafetyCheck() external view returns (uint256);
 
@@ -102,11 +104,13 @@ interface IPurchaseUniswap {
 
     /**
      * @notice Oracle currently used to build `amountOutMinimum`.
+     * @return The MoC BTC/USD feed.
      */
     function getMocOracle() external view returns (ICoinPairPrice);
 
     /**
      * @notice Encoded Uniswap V3 path from this handler's stablecoin to WRBTC.
+     * @return The current path bytes.
      */
     function getSwapPath() external view returns (bytes memory);
 }

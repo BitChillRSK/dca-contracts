@@ -17,9 +17,14 @@ import {ILayerBankPool} from "./ILayerBankPool.sol";
 abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20Handler {
     /// @notice Aave's liquidity-index scale (RAY). Fixed for this protocol; not a constructor
     ///         arg (passing Tropykus/Sovryn's 1e18 would size withdrawals 1e9× too large).
+    /// @return Always `1e27` for this protocol.
     uint256 public constant EXCHANGE_RATE_DECIMALS = 1e27;
 
+    /// @notice LayerBank aToken for this handler's stablecoin.
+    /// @return The constructor-supplied aToken.
     ILayerBankAToken public immutable i_aToken;
+    /// @notice LayerBank Pool this handler supplies to and withdraws from.
+    /// @return The pool read from `aToken.POOL()` at construction.
     ILayerBankPool public immutable i_pool;
 
     /**

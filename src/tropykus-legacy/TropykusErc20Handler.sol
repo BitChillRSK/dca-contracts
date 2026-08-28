@@ -11,8 +11,12 @@ import {IkToken} from "./IkToken.sol";
  * @dev Legacy only: no live deploy path. Local and fork lanes still cover this second lending adapter.
  */
 abstract contract TropykusErc20Handler is LendingErc20Handler {
+    /// @notice Tropykus kToken exchange-rate scale (1e18).
+    /// @return Always `1e18` for this protocol.
     uint256 public constant EXCHANGE_RATE_DECIMALS = 1e18;
 
+    /// @notice Tropykus kToken this handler mints and redeems.
+    /// @return The constructor-supplied kToken.
     IkToken public immutable i_kToken;
 
     /**

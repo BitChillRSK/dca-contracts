@@ -28,7 +28,11 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     //////////////////////
     // State variables ///
     //////////////////////
+    /// @notice Wrapped rBTC token this route swaps into and unwraps on withdraw.
+    /// @return The constructor-supplied WRBTC.
     IWRBTC public immutable i_wrBtcToken;
+    /// @notice Uniswap V3 SwapRouter02 used to buy WRBTC.
+    /// @return The constructor-supplied router.
     ISwapRouter02 public immutable i_swapRouter02;
     ICoinPairPrice internal s_mocOracle;
     uint256 constant HUNDRED_PERCENT = 1 ether;

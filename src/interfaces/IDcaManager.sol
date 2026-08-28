@@ -80,7 +80,9 @@ interface IDcaManager {
     event DcaManager__MaxSchedulesPerTokenModified(uint256 newMaxSchedulesPerToken);
     /// @notice Owner changed the protocol minimum purchase period (never below one UTC day).
     event DcaManager__MinPurchasePeriodModified(uint256 newMinPurchasePeriod);
-    /// @notice A purchase stamped a schedule's next-due timestamp.
+    /// @notice A purchase updated a schedule's `lastPurchaseTimestamp` cadence anchor.
+    /// @dev The next due boundary is the UTC day of `lastPurchaseTimestamp + purchasePeriod`, not
+    ///      this emitted value itself.
     event DcaManager__LastPurchaseTimestampUpdated(address indexed token, uint64 indexed scheduleId, uint256 lastPurchaseTimestamp);
     /// @notice Owner changed the default minimum purchase amount used when a token has no override.
     event DcaManager__DefaultMinPurchaseAmountModified(uint256 newDefaultMinPurchaseAmount);
@@ -378,11 +380,13 @@ interface IDcaManager {
 
     /**
      * @notice Protocol minimum purchase period in seconds.
+     * @return The current minimum, never below one UTC day.
      */
     function getMinPurchasePeriod() external view returns (uint256);
 
     /**
      * @notice Maximum number of schedules a user may hold per token.
+     * @return The current cap.
      */
     function getMaxSchedulesPerToken() external view returns (uint256);
 
@@ -390,11 +394,13 @@ interface IDcaManager {
      * @notice Lifetime count of schedules created across all users and tokens.
      * @dev Equals the last `scheduleId` assigned, since ids are that counter. Never decreases;
      *      deletions do not decrement it.
+     * @return The creation nonce (last assigned id, or 0 before the first create).
      */
     function getSchedulesCreatedCount() external view returns (uint256);
 
     /**
      * @notice Default minimum purchase amount for tokens with no override.
+     * @return The default, in the stablecoin's native units.
      */
     function getDefaultMinPurchaseAmount() external view returns (uint256);
 

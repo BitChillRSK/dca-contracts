@@ -10,8 +10,12 @@ import {IiSusdToken} from "./IiSusdToken.sol";
  * @notice Sovryn adapter: iSUSD mint/burn. Share accounting lives on LendingErc20Handler.
  */
 abstract contract SovrynErc20Handler is LendingErc20Handler {
+    /// @notice Sovryn iToken exchange-rate scale (1e18).
+    /// @return Always `1e18` for this protocol.
     uint256 public constant EXCHANGE_RATE_DECIMALS = 1e18;
 
+    /// @notice Sovryn iSUSD (or equivalent iToken) this handler mints and burns.
+    /// @return The constructor-supplied iToken.
     IiSusdToken public immutable i_iSusdToken;
 
     /**
