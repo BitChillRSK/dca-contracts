@@ -213,8 +213,10 @@ custom errors cost more than the removed inner loop saves. No handler changed.
   and adds two custom errors on `DcaManager`, so the implementer opens or updates an issue on
   `bitChillRSK/front-end` in the same turn as opening the contracts PR and pastes the URL in the PR
   **Cutover / frontend note**. Search first: BitChillRSK/front-end#13 already scopes the cartesian API out
-  to `dca-contracts` and is the natural place to comment rather than opening a duplicate. The issue body
-  should name the old vs new call, and the files that still assume the cartesian form —
+  to `dca-contracts`. Done at implementation time as
+  [front-end#21](https://github.com/BitChillRSK/front-end/issues/21) — a new issue rather than a comment
+  on #13, which was already closed. The issue body names the old vs new call, and the files that still
+  assume the cartesian form —
   `src/features/interest/utils/uniqueTokensAndProtocolIndexes.ts` (deleted), `InterestDashboard.tsx`, and
   `AccumulatedRbtcCard.tsx`.
 - Behavior change beyond the signature: an empty-array call now reverts instead of succeeding as a no-op.
