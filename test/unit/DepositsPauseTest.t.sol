@@ -10,10 +10,10 @@ import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import "./TestsHelper.t.sol";
 
 /**
- * @notice R48: governance can stop new stablecoin intake on one `(token, routeIndex)` pair.
+ * @notice R48: governance can stop new stablecoin deposits on one `(token, routeIndex)` pair.
  * @dev The pause must be a one-way valve: nothing a user needs to get their money out may consult it.
  */
-contract DepositIntakePauseTest is DcaDappTest {
+contract DepositsPauseTest is DcaDappTest {
     uint256 private constant SECOND_IDLE_INDEX = 10;
     /// @dev A live lending share round-trip loses a few wei to rounding, and how many depends on the
     ///      forked block. The point here is that the exit paid out while paused, not the exact share
@@ -24,23 +24,23 @@ contract DepositIntakePauseTest is DcaDappTest {
         super.setUp();
     }
 
-    function _pauseIntake(bool paused) private {
+    function _pauseDeposits(bool paused) private {
         vm.prank(OWNER);
-        operationsAdmin.setDepositIntakePaused(address(stablecoin), s_routeIndex, paused);
+        operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, paused);
     }
 
-    function _intakePausedRevert() private view returns (bytes memory) {
+    function _depositsPausedRevert() private view returns (bytes memory) {
         return abi.encodeWithSelector(
-            IDcaManager.DcaManager__DepositIntakePaused.selector, address(stablecoin), s_routeIndex
+            IDcaManager.DcaManager__DepositsPaused.selector, address(stablecoin), s_routeIndex
         );
     }
 
     /*//////////////////////////////////////////////////////////////
-                              INTAKE BLOCKED
+                             DEPOSITS BLOCKED
     //////////////////////////////////////////////////////////////*/
 
     function testPausedRouteRejectsDeposit() external {
-        _pauseIntake(true);
+        _pauseDeposits(true);
 
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
         uint256 handlerStablecoinBefore = stablecoin.balanceOf(address(stablecoinHandler));
@@ -50,7 +50,7 @@ contract DepositIntakePauseTest is DcaDappTest {
 
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
-        vm.expectRevert(_intakePausedRevert());
+        vm.expectRevert(_depositsPausedRevert());
         dcaManager.depositToken(address(stablecoin), SCHEDULE_INDEX, scheduleId, AMOUNT_TO_DEPOSIT);
         vm.stopPrank();
 
@@ -67,14 +67,14 @@ contract DepositIntakePauseTest is DcaDappTest {
     }
 
     function testPausedRouteRejectsScheduleCreation() external {
-        _pauseIntake(true);
+        _pauseDeposits(true);
 
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
         uint256 numOfSchedulesBefore = dcaManager.getDcaSchedules(USER, address(stablecoin)).length;
 
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
-        vm.expectRevert(_intakePausedRevert());
+        vm.expectRevert(_depositsPausedRevert());
         dcaManager.createDcaSchedule(
             address(stablecoin), AMOUNT_TO_DEPOSIT, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_routeIndex
         );
@@ -87,20 +87,20 @@ contract DepositIntakePauseTest is DcaDappTest {
     /// @dev With no allowance a deposit would revert inside the handler. The pause error is what
     ///      surfaces, so the check provably runs before the token is touched at all.
     function testPauseIsCheckedBeforeTheTokenIsTouched() external {
-        _pauseIntake(true);
+        _pauseDeposits(true);
 
         bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
 
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), 0);
-        vm.expectRevert(_intakePausedRevert());
+        vm.expectRevert(_depositsPausedRevert());
         dcaManager.depositToken(address(stablecoin), SCHEDULE_INDEX, scheduleId, AMOUNT_TO_DEPOSIT);
         vm.stopPrank();
     }
 
-    function testUnpausingRestoresIntake() external {
-        _pauseIntake(true);
-        _pauseIntake(false);
+    function testUnpausingRestoresDeposits() external {
+        _pauseDeposits(true);
+        _pauseDeposits(false);
 
         (uint256 userBalanceAfterDeposit, uint256 userBalanceBeforeDeposit) = super.depositStablecoin();
         assertEq(userBalanceAfterDeposit - userBalanceBeforeDeposit, AMOUNT_TO_DEPOSIT);
@@ -114,14 +114,14 @@ contract DepositIntakePauseTest is DcaDappTest {
         assertEq(dcaManager.getDcaSchedules(USER, address(stablecoin)).length, 2);
     }
 
-    /// @dev An incident on one pair must not stop intake anywhere else.
+    /// @dev An incident on one pair must not stop deposits anywhere else.
     function testPausingAnotherPairLeavesThisOneOpen() external {
         DummyTokenHandler otherTokenStub = new DummyTokenHandler();
         address otherToken = makeAddr("r48DepositOtherToken");
 
         vm.startPrank(OWNER);
         operationsAdmin.assignTokenHandler(otherToken, IDLE_INDEX, address(otherTokenStub));
-        operationsAdmin.setDepositIntakePaused(otherToken, IDLE_INDEX, true);
+        operationsAdmin.setDepositsPaused(otherToken, IDLE_INDEX, true);
         vm.stopPrank();
 
         (uint256 userBalanceAfterDeposit, uint256 userBalanceBeforeDeposit) = super.depositStablecoin();
@@ -135,7 +135,7 @@ contract DepositIntakePauseTest is DcaDappTest {
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(SECOND_IDLE_INDEX, false);
         operationsAdmin.assignTokenHandler(address(stablecoin), SECOND_IDLE_INDEX, address(otherRouteStub));
-        operationsAdmin.setDepositIntakePaused(address(stablecoin), SECOND_IDLE_INDEX, true);
+        operationsAdmin.setDepositsPaused(address(stablecoin), SECOND_IDLE_INDEX, true);
         vm.stopPrank();
 
         (uint256 userBalanceAfterDeposit, uint256 userBalanceBeforeDeposit) = super.depositStablecoin();
@@ -147,12 +147,12 @@ contract DepositIntakePauseTest is DcaDappTest {
     //////////////////////////////////////////////////////////////*/
 
     function testPausedRouteStillPurchases() external {
-        _pauseIntake(true);
+        _pauseDeposits(true);
         super.makeSinglePurchase();
     }
 
     function testPausedRouteStillWithdrawsStablecoin() external {
-        _pauseIntake(true);
+        _pauseDeposits(true);
 
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
         super.withdrawStablecoin();
@@ -166,7 +166,7 @@ contract DepositIntakePauseTest is DcaDappTest {
 
     function testPausedRouteStillPaysAccumulatedRbtc() external {
         super.makeSinglePurchase();
-        _pauseIntake(true);
+        _pauseDeposits(true);
 
         uint256 rbtcAccumulated = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
         assertGt(rbtcAccumulated, 0, "nothing was bought to withdraw");
@@ -179,7 +179,7 @@ contract DepositIntakePauseTest is DcaDappTest {
 
     function testPausedRouteStillPaysInterest() external onlyLendingLane {
         updateExchangeRate(10 days);
-        _pauseIntake(true);
+        _pauseDeposits(true);
 
         address[] memory tokens = new address[](1);
         tokens[0] = address(stablecoin);
@@ -193,7 +193,7 @@ contract DepositIntakePauseTest is DcaDappTest {
     }
 
     function testPausedRouteStillAllowsScheduleEdits() external {
-        _pauseIntake(true);
+        _pauseDeposits(true);
 
         bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         uint256 newPurchaseAmount = AMOUNT_TO_SPEND / 2;
@@ -211,7 +211,7 @@ contract DepositIntakePauseTest is DcaDappTest {
     }
 
     function testPausedRouteStillAllowsDeletion() external {
-        _pauseIntake(true);
+        _pauseDeposits(true);
 
         bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);

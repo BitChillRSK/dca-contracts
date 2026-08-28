@@ -16,7 +16,7 @@ import {BitChillOwnable} from "./BitChillOwnable.sol";
  *      add-only, and a handler address may be assigned at most once: none of a handler's
  *      per-user accounting is route-keyed, so sharing one instance across two pairs would let
  *      one route's principal be read as another's yield. There is no cooperative migration on
- *      these handler versions. The one mutable flag here is per-pair deposit intake, a circuit
+ *      these handler versions. The one mutable flag here is a per-pair deposit pause, a circuit
  *      breaker that blocks new inflows without touching purchases or any exit path.
  */
 contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
@@ -28,7 +28,7 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
     mapping(uint256 routeIndex => RouteClass) private s_routeClass;
     mapping(address swapper => bool) private s_swappers;
     mapping(address handler => bool assigned) private s_handlerAssigned;
-    mapping(address token => mapping(uint256 routeIndex => bool paused)) private s_depositIntakePaused;
+    mapping(address token => mapping(uint256 routeIndex => bool paused)) private s_depositsPaused;
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
@@ -98,21 +98,21 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
 
     /**
      * @inheritdoc IOperationsAdmin
-     * @dev Deposit intake is the only user action this registry can stop. It is a circuit breaker
+     * @dev Deposits are the only user action this registry can stop. It is a circuit breaker
      *      for one lending market going bad, not a protocol pause: existing positions keep
      *      purchasing and can always be withdrawn, and every other `(token, routeIndex)` pair is
-     *      untouched. The flag lives here rather than on the handler so governance can stop intake
+     *      untouched. The flag lives here rather than on the handler so governance can stop deposits
      *      without a handler that must be trusted to unpause itself.
      */
-    function setDepositIntakePaused(address token, uint256 routeIndex, bool paused) external onlyOwner {
+    function setDepositsPaused(address token, uint256 routeIndex, bool paused) external onlyOwner {
         if (s_tokenHandler[token][routeIndex] == address(0)) {
             revert OperationsAdmin__HandlerNotAssigned(token, routeIndex);
         }
-        if (s_depositIntakePaused[token][routeIndex] == paused) {
-            revert OperationsAdmin__DepositIntakePauseUnchanged(token, routeIndex, paused);
+        if (s_depositsPaused[token][routeIndex] == paused) {
+            revert OperationsAdmin__DepositsPauseUnchanged(token, routeIndex, paused);
         }
-        s_depositIntakePaused[token][routeIndex] = paused;
-        emit OperationsAdmin__DepositIntakePauseSet(token, routeIndex, paused);
+        s_depositsPaused[token][routeIndex] = paused;
+        emit OperationsAdmin__DepositsPauseSet(token, routeIndex, paused);
     }
 
     /**
@@ -166,7 +166,7 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
     /**
      * @inheritdoc IOperationsAdmin
      */
-    function isDepositIntakePaused(address token, uint256 routeIndex) external view returns (bool) {
-        return s_depositIntakePaused[token][routeIndex];
+    function areDepositsPaused(address token, uint256 routeIndex) external view returns (bool) {
+        return s_depositsPaused[token][routeIndex];
     }
 }

@@ -68,7 +68,7 @@ interface IDcaManager {
     error DcaManager__PurchaseAmountMismatch(address user, address token, bytes32 scheduleId, uint256 scheduleIndex, uint256 actualPurchaseAmount, uint256 expectedPurchaseAmount);
     error DcaManager__RouteIndexMismatch(address user, address token, bytes32 scheduleId, uint256 scheduleIndex, uint256 actualRouteIndex, uint256 expectedRouteIndex);
     error DcaManager__OperationsAdminIsNotAContract(address operationsAdmin);
-    error DcaManager__DepositIntakePaused(address token, uint256 routeIndex);
+    error DcaManager__DepositsPaused(address token, uint256 routeIndex);
 
     /*//////////////////////////////////////////////////////////////
                                FUNCTIONS

@@ -23,7 +23,7 @@ PR 2 was the original decision-record placeholder. GitHub PR [#74](https://githu
 - Delete `buyRbtc`; a length-1 `batchBuyRbtc` is the single-schedule operational path (R39).
 - Upgrade to pinned OpenZeppelin `v5.7.0` (R44), then ship two-step ownership with direct initial ownership and no renunciation (R45).
 - Remove `setOperationsAdmin` and pin the constructor admin (R46). Enforce one assignment per handler address (R47).
-- Ship a per-token×route deposit-intake pause (R48) and per-schedule purchase pause (R19).
+- Ship a per-token×route deposit pause (R48) and per-schedule purchase pause (R19).
 - Pack `DcaDetails` only (R18). Do not narrow handler balance/share mappings.
 - Do **not** ship R12 interest compounding: users can withdraw interest and deposit it explicitly, while an in-handler compound path couples principal/share accounting to a chosen schedule and expands the most sensitive cash surface.
 - Do **not** add an owner sweep: pooled stablecoin and rBTC cannot be safely distinguished from liabilities, and signer-only withdrawal remains the custody boundary.
@@ -81,7 +81,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R43 | 35 | none (decisions recorded above) |
 | R41 | 36 | none (reject FOT hop-1 shortfall) |
 | R40 | 37 | none (`updatePurchaseAmount` / `updatePurchasePeriod`) |
-| R48 | 38 | none (per-token×route deposit-intake pause) |
+| R48 | 38 | none (per-token×route deposit pause) |
 | R19 | 39 | none (per-schedule purchase pause) |
 | R18 | 40 | none (`DcaDetails` only) |
 | R36 | 41 | none (decisions recorded above; kUSDRIF pause is a fork fact to measure) |
@@ -365,9 +365,9 @@ Rename `setPurchaseAmount` → `updatePurchaseAmount` and `setPurchasePeriod` �
 
 **Must land before R9 (PR 45).** Frontend follow-up required.
 
-### PR 38 - R48 deposit-intake pause
+### PR 38 - R48 deposit pause
 
-Add a governance circuit breaker per `(token, routeIndex)`: block only `createDcaSchedule` and `depositToken` before cash moves. Purchases, configuration, withdrawals, interest/rBTC claims, and deletion remain available. This replaces the vague global "on-chain deposit pause" idea with a narrow incident-control surface. See [`R48-deposit-intake-pause.md`](./R48-deposit-intake-pause.md).
+Add a governance circuit breaker per `(token, routeIndex)`: block only `createDcaSchedule` and `depositToken` before cash moves. Purchases, configuration, withdrawals, interest/rBTC claims, and deletion remain available. This replaces the vague global "on-chain deposit pause" idea with a narrow incident-control surface. The surface is `setDepositsPaused` / `areDepositsPaused`; R19's user-owned `setSchedulePaused` stops purchases, so the two need no extra qualifier. See [`R48-deposit-pause.md`](./R48-deposit-pause.md).
 
 ### PR 39 - R19 per-schedule purchase pause
 

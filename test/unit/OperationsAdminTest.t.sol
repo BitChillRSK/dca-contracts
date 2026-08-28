@@ -17,7 +17,7 @@ contract OperationsAdminTest is DcaDappTest {
     event OperationsAdmin__SwapperAdded(address indexed swapper);
     event OperationsAdmin__SwapperRevoked(address indexed swapper);
     event OperationsAdmin__RouteRegistered(uint256 indexed index, bool lends);
-    event OperationsAdmin__DepositIntakePauseSet(address indexed token, uint256 indexed routeIndex, bool paused);
+    event OperationsAdmin__DepositsPauseSet(address indexed token, uint256 indexed routeIndex, bool paused);
 
     uint256 private constant SECOND_IDLE_INDEX = 10;
     uint256 private constant SECOND_LENDING_INDEX = 11;
@@ -523,36 +523,36 @@ contract OperationsAdminTest is DcaDappTest {
     }
 
     /*//////////////////////////////////////////////////////////////
-                       DEPOSIT INTAKE PAUSE TESTS
+                          DEPOSIT PAUSE TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function testRoutesStartWithIntakeUnpaused() external {
-        assertFalse(operationsAdmin.isDepositIntakePaused(address(stablecoin), s_routeIndex));
+    function testRoutesStartWithDepositsUnpaused() external {
+        assertFalse(operationsAdmin.areDepositsPaused(address(stablecoin), s_routeIndex));
     }
 
-    function testOwnerPausesAndUnpausesIntake() external {
+    function testOwnerPausesAndUnpausesDeposits() external {
         vm.expectEmit(true, true, false, true);
-        emit OperationsAdmin__DepositIntakePauseSet(address(stablecoin), s_routeIndex, true);
+        emit OperationsAdmin__DepositsPauseSet(address(stablecoin), s_routeIndex, true);
         vm.prank(OWNER);
-        operationsAdmin.setDepositIntakePaused(address(stablecoin), s_routeIndex, true);
-        assertTrue(operationsAdmin.isDepositIntakePaused(address(stablecoin), s_routeIndex));
+        operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, true);
+        assertTrue(operationsAdmin.areDepositsPaused(address(stablecoin), s_routeIndex));
 
         vm.expectEmit(true, true, false, true);
-        emit OperationsAdmin__DepositIntakePauseSet(address(stablecoin), s_routeIndex, false);
+        emit OperationsAdmin__DepositsPauseSet(address(stablecoin), s_routeIndex, false);
         vm.prank(OWNER);
-        operationsAdmin.setDepositIntakePaused(address(stablecoin), s_routeIndex, false);
-        assertFalse(operationsAdmin.isDepositIntakePaused(address(stablecoin), s_routeIndex));
+        operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, false);
+        assertFalse(operationsAdmin.areDepositsPaused(address(stablecoin), s_routeIndex));
     }
 
-    function testOnlyOwnerCanPauseIntake() external {
+    function testOnlyOwnerCanPauseDeposits() external {
         address stranger = makeAddr("r48Stranger");
         vm.expectRevert(ownableUnauthorized(stranger));
         vm.prank(stranger);
-        operationsAdmin.setDepositIntakePaused(address(stablecoin), s_routeIndex, true);
-        assertFalse(operationsAdmin.isDepositIntakePaused(address(stablecoin), s_routeIndex));
+        operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, true);
+        assertFalse(operationsAdmin.areDepositsPaused(address(stablecoin), s_routeIndex));
     }
 
-    /// @dev Pausing intake to a pair nobody can deposit into would only mislead an operator.
+    /// @dev Pausing deposits on a pair nobody can deposit into would only mislead an operator.
     function testPausingAnUnassignedPairReverts() external {
         address unassignedToken = makeAddr("r48UnassignedToken");
         vm.expectRevert(
@@ -561,7 +561,7 @@ contract OperationsAdminTest is DcaDappTest {
             )
         );
         vm.prank(OWNER);
-        operationsAdmin.setDepositIntakePaused(unassignedToken, s_routeIndex, true);
+        operationsAdmin.setDepositsPaused(unassignedToken, s_routeIndex, true);
     }
 
     function testPausingAnUnregisteredRouteReverts() external {
@@ -573,35 +573,35 @@ contract OperationsAdminTest is DcaDappTest {
             )
         );
         vm.prank(OWNER);
-        operationsAdmin.setDepositIntakePaused(address(stablecoin), SECOND_LENDING_INDEX, true);
+        operationsAdmin.setDepositsPaused(address(stablecoin), SECOND_LENDING_INDEX, true);
     }
 
     /// @dev Every emitted event is a real transition, so an indexer never sees a repeated state.
     function testRepeatingTheCurrentPauseStateReverts() external {
         vm.expectRevert(
             abi.encodeWithSelector(
-                IOperationsAdmin.OperationsAdmin__DepositIntakePauseUnchanged.selector,
+                IOperationsAdmin.OperationsAdmin__DepositsPauseUnchanged.selector,
                 address(stablecoin),
                 s_routeIndex,
                 false
             )
         );
         vm.prank(OWNER);
-        operationsAdmin.setDepositIntakePaused(address(stablecoin), s_routeIndex, false);
+        operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, false);
 
         vm.prank(OWNER);
-        operationsAdmin.setDepositIntakePaused(address(stablecoin), s_routeIndex, true);
+        operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, true);
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IOperationsAdmin.OperationsAdmin__DepositIntakePauseUnchanged.selector,
+                IOperationsAdmin.OperationsAdmin__DepositsPauseUnchanged.selector,
                 address(stablecoin),
                 s_routeIndex,
                 true
             )
         );
         vm.prank(OWNER);
-        operationsAdmin.setDepositIntakePaused(address(stablecoin), s_routeIndex, true);
+        operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, true);
     }
 
     /// @dev The flag is keyed per pair: a second token and a second route stay open.
@@ -614,11 +614,11 @@ contract OperationsAdminTest is DcaDappTest {
         operationsAdmin.assignTokenHandler(otherToken, IDLE_INDEX, address(otherTokenStub));
         operationsAdmin.registerRoute(SECOND_IDLE_INDEX, false);
         operationsAdmin.assignTokenHandler(address(stablecoin), SECOND_IDLE_INDEX, address(otherRouteStub));
-        operationsAdmin.setDepositIntakePaused(address(stablecoin), s_routeIndex, true);
+        operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, true);
         vm.stopPrank();
 
-        assertTrue(operationsAdmin.isDepositIntakePaused(address(stablecoin), s_routeIndex));
-        assertFalse(operationsAdmin.isDepositIntakePaused(otherToken, IDLE_INDEX));
-        assertFalse(operationsAdmin.isDepositIntakePaused(address(stablecoin), SECOND_IDLE_INDEX));
+        assertTrue(operationsAdmin.areDepositsPaused(address(stablecoin), s_routeIndex));
+        assertFalse(operationsAdmin.areDepositsPaused(otherToken, IDLE_INDEX));
+        assertFalse(operationsAdmin.areDepositsPaused(address(stablecoin), SECOND_IDLE_INDEX));
     }
 }
