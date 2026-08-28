@@ -28,7 +28,7 @@ import {MockMocPriceProvider} from "../mocks/MockMocPriceProvider.sol";
 import {GovernorMock} from "../mocks/MockMocGovernor.sol";
 import {MockWrbtcToken} from "../mocks/MockWrbtcToken.sol";
 import {MockSwapRouter02} from "../mocks/MockSwapRouter02.sol";
-import "../../script/Constants.sol";
+import "../Constants.sol";
 import "./TestsHelper.t.sol";
 import {IkToken} from "../../src/tropykus-legacy/IkToken.sol";
 import {IiSusdToken} from "../../src/sovryn/IiSusdToken.sol";

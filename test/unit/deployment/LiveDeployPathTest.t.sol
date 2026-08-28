@@ -172,7 +172,9 @@ contract LiveDeployPathTest is Test {
             assertEq(BitChillOwnable(handler).pendingOwner(), SAFE);
         }
         assertEq(
-            uint256(operationsAdmin.getRouteClass(TROPYKUS_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending)
+            uint256(operationsAdmin.getRouteClass(TROPYKUS_INDEX)),
+            uint256(IOperationsAdmin.RouteClass.Unregistered),
+            "live dex path must not register the legacy Tropykus route"
         );
         assertEq(uint256(operationsAdmin.getRouteClass(SOVRYN_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
         string memory coinType = vm.envOr("STABLECOIN_TYPE", DEFAULT_STABLECOIN);
@@ -213,6 +215,18 @@ contract LiveDeployPathTest is Test {
         }
     }
 
+    /// @notice The live dex map is LayerBank + Sovryn. Tropykus must fail loudly, not deploy quietly.
+    function test_dexLive_revertsForTropykus() public {
+        if (keccak256(abi.encodePacked(vm.envString("LENDING_PROTOCOL")))
+            != keccak256(abi.encodePacked(TROPYKUS_STRING))) {
+            vm.skip(true);
+            return;
+        }
+        DeployDexSwapsHarness harness = new DeployDexSwapsHarness(DeployBase.Environment.MAINNET, SAFE, address(this));
+        vm.expectRevert(bytes("Tropykus is not on the production dex map"));
+        harness.run();
+    }
+
     function _skipIfDexLiveUnsupported() internal {
         string memory lendingProtocol = vm.envString("LENDING_PROTOCOL");
         bytes32 protocolHash = keccak256(abi.encodePacked(lendingProtocol));
@@ -236,8 +250,8 @@ contract LiveDeployPathTest is Test {
             vm.skip(true);
             return;
         }
-        if (protocolHash == keccak256(abi.encodePacked(TROPYKUS_STRING)) && isUSDT0) {
-            vm.skip(true);
+        if (protocolHash == keccak256(abi.encodePacked(TROPYKUS_STRING))) {
+            vm.skip(true); // Tropykus is off both live maps; the live dex branch reverts for it
         }
     }
 

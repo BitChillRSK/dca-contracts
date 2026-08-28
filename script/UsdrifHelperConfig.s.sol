@@ -3,7 +3,6 @@ pragma solidity 0.8.36;
 
 import {Script} from "forge-std/Script.sol";
 import {MockStablecoin} from "../test/mocks/MockStablecoin.sol";
-import {MockKToken} from "../test/mocks/MockKToken.sol";
 import {MockWrbtcToken} from "../test/mocks/MockWrbtcToken.sol";
 import {MockSwapRouter02} from "../test/mocks/MockSwapRouter02.sol";
 import {MockMocOracle} from "../test/mocks/MockMocOracle.sol";
@@ -15,7 +14,6 @@ contract UsdrifHelperConfig is Script {
     struct NetworkConfig {
         address usdrifTokenAddress;
         address usdt0TokenAddress;
-        address kUsdrifTokenAddress; // kept until R37 removes the Tropykus dex arm
         address layerbankUsdrifATokenAddress;
         address layerbankUsdt0ATokenAddress;
         address wrbtcTokenAddress;
@@ -56,7 +54,6 @@ contract UsdrifHelperConfig is Script {
         config = NetworkConfig({
             usdrifTokenAddress: 0x3A15461d8aE0F0Fb5Fa2629e9DA7D66A794a6e37, // USDRIF on mainnet
             usdt0TokenAddress: USDT0_MAINNET,
-            kUsdrifTokenAddress: 0xDdf3CE45fcf080DF61ee61dac5Ddefef7ED4F46C, // kUSDRIF on mainnet (mint paused; kept until R37)
             layerbankUsdrifATokenAddress: LAYERBANK_USDRIF_ATOKEN,
             layerbankUsdt0ATokenAddress: LAYERBANK_USDT0_ATOKEN,
             wrbtcTokenAddress: 0x542fDA317318eBF1d3DEAf76E0b632741A7e677d, // WRBTC on mainnet
@@ -82,7 +79,6 @@ contract UsdrifHelperConfig is Script {
         config = NetworkConfig({
             usdrifTokenAddress: 0x0000000000000000000000000000000000000000, // Replace with USDRIF on testnet
             usdt0TokenAddress: 0x5a2256DD0DfbC8cE121d923AC7D6E7A3fc7F9922, // USDT0 on testnet
-            kUsdrifTokenAddress: 0x0000000000000000000000000000000000000000, // Replace with kUSDRIF on testnet
             layerbankUsdrifATokenAddress: address(0), // LayerBank USDRIF is mainnet-only
             layerbankUsdt0ATokenAddress: address(0), // LayerBank USDT0 is mainnet-only
             wrbtcTokenAddress: 0x69FE5cEC81D5eF92600c1A0dB1F11986AB3758Ab, // WRBTC on testnet
@@ -129,9 +125,6 @@ contract UsdrifHelperConfig is Script {
         MockStablecoin mockUsdrifToken = new MockStablecoin(msg.sender);
         emit HelperConfig__CreatedMockToken("USDRIF", address(mockUsdrifToken));
         
-        MockKToken mockKUsdrifToken = new MockKToken(address(mockUsdrifToken));
-        emit HelperConfig__CreatedMockToken("kUSDRIF", address(mockKUsdrifToken));
-
         MockLayerBankAToken mockAToken = new MockLayerBankAToken(address(mockUsdrifToken));
         MockLayerBankPool mockPool = new MockLayerBankPool(mockAToken);
         mockAToken.setPool(address(mockPool));
@@ -161,7 +154,6 @@ contract UsdrifHelperConfig is Script {
         config = NetworkConfig({
             usdrifTokenAddress: address(mockUsdrifToken),
             usdt0TokenAddress: address(mockUsdrifToken), // Anvil reuses the 18-decimal mock; 6-decimal coverage is a dedicated test
-            kUsdrifTokenAddress: address(mockKUsdrifToken),
             layerbankUsdrifATokenAddress: address(mockAToken),
             layerbankUsdt0ATokenAddress: address(mockAToken),
             wrbtcTokenAddress: address(mockWrbtcToken),

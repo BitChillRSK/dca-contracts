@@ -28,7 +28,7 @@ contract DexHelperConfig is Script {
         address stablecoinAddress;
         
         // Share token addresses by protocol
-        address tropykusShareToken;  // The share token for Tropykus (e.g., kDOC, kUSDRIF)
+        address tropykusShareToken;  // Legacy Tropykus shares (kDOC, kUSDRIF); local/fork lanes only
         address sovrynShareToken;    // The share token for Sovryn (e.g., iSUSD)
         address layerbankAToken;     // LayerBank aToken; handler reads Pool from aToken.POOL()
         
@@ -150,7 +150,7 @@ contract DexHelperConfig is Script {
             poolFeeRates[0] = 500;
             poolFeeRates[1] = 3000;
             stablecoinAddress = 0x3A15461d8aE0F0Fb5Fa2629e9DA7D66A794a6e37; // USDRIF token on mainnet
-            tropykusShareToken = 0xDdf3CE45fcf080DF61ee61dac5Ddefef7ED4F46C; // kUSDRIF on mainnet (paused; kept until R37)
+            tropykusShareToken = 0xDdf3CE45fcf080DF61ee61dac5Ddefef7ED4F46C; // kUSDRIF on mainnet (mint paused); fork lane only
             sovrynShareToken = address(0); // Sovryn doesn't support USDRIF
             layerbankAToken = LAYERBANK_USDRIF_ATOKEN;
         } else {

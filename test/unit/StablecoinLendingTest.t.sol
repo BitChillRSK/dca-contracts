@@ -11,7 +11,7 @@ import {SovrynDocHandlerMoc} from "../../src/sovryn/SovrynDocHandlerMoc.sol";
 import {IShareToken} from "../interfaces/IShareToken.sol";
 import {IkToken} from "../../src/tropykus-legacy/IkToken.sol";
 import {MocHelperConfig} from "../../script/MocHelperConfig.s.sol";
-import "../../script/Constants.sol";
+import "../Constants.sol";
 
 contract StablecoinLendingTest is DcaDappTest {
     uint256 constant SHARE_TOKEN_STARTING_EXCHANGE_RATE = 2e16;

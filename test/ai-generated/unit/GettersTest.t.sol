@@ -17,7 +17,7 @@ import {SovrynErc20Handler} from "../../../src/sovryn/SovrynErc20Handler.sol";
 import {TropykusErc20HandlerDex} from "../../../src/tropykus-legacy/TropykusErc20HandlerDex.sol";
 import {SovrynErc20HandlerDex} from "../../../src/sovryn/SovrynErc20HandlerDex.sol";
 import {DcaManagerAccessControl} from "../../../src/DcaManagerAccessControl.sol";
-import "../../../script/Constants.sol";
+import "../../Constants.sol";
 
 /**
  * @title GettersTest

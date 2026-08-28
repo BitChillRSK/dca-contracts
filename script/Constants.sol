@@ -28,7 +28,7 @@ address constant MAINNET_OWNER = 0xdeAbdc410aB7B0f1Da830A6b355B5b938208315f;
 address constant TESTNET_FEE_COLLECTOR = TESTNET_OWNER;
 address constant MAINNET_FEE_COLLECTOR = 0x3caB92C050514A0368D71815CAc42ad746350F16;
 
-// Production MoC route indexes (fresh relaunch map) and LENDING_PROTOCOL env strings.
+// Production route indexes (fresh relaunch map) and LENDING_PROTOCOL env strings.
 // `DeployMocSwaps` and `DeployDexSwaps` each deploy their own `OperationsAdmin`, so the MoC
 // map below and the dex map are independent; an index means nothing across the two admins.
 uint256 constant IDLE_INDEX = 0; // constructor pre-registers this as idle
@@ -39,15 +39,14 @@ string constant SOVRYN_STRING = "sovryn";
 uint256 constant SOVRYN_INDEX = 2;
 uint256 constant RESERVED_MOC_LENDING_INDEX = 3; // reserved for future MoC lending; not assigned in this PR
 
-// Legacy Tropykus. Off the production MoC map above. R36 still leaves the Tropykus dex arm
-// registered on live `DeployDexSwaps` (USDRIF/DOC) so R37 can retire it without a gap;
-// `DeployUsdrifHandler` now deploys `LayerBankErc20HandlerDex` at `LAYERBANK_INDEX`.
-// R22 moved the index 1 -> 4 so the shared test harness, which registers every index on one
-// admin, has no collision with `LAYERBANK_INDEX`. R37 moves `TROPYKUS_INDEX` to
-// `test/Constants.sol`. `TROPYKUS_STRING` stays here: `MocHelperConfig` / `DexHelperConfig`
-// need it to select mocks for the local lane.
+// Legacy Tropykus. Test-only: no deploy script builds or registers a Tropykus handler on a live
+// network, on either map, and index 4 is burned so it is never reinterpreted as another venue.
+// The index constant lives in `test/Constants.sol`, which is out of scope for every `script/`
+// file — so a script that tries to name a Tropykus route fails to compile rather than failing
+// review. `TROPYKUS_STRING` stays here: `MocHelperConfig` / `DexHelperConfig` / `DeployBase`
+// read it to select Tropykus mocks for the local `LENDING_PROTOCOL=tropykus` lane, and none of
+// them uses the index. Only the index can land in production storage.
 string constant TROPYKUS_STRING = "tropykus";
-uint256 constant TROPYKUS_INDEX = 4;
 
 // Default configurations
 string constant DEFAULT_STABLECOIN = "DOC"; // Default stablecoin to use if not specified

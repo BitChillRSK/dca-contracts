@@ -13,7 +13,7 @@ import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
 import {MockFeeOnTransferStablecoin} from "../mocks/MockFeeOnTransferStablecoin.sol";
 import {MockKdocToken} from "../mocks/MockKdocToken.sol";
 import {MockMocProxy} from "../mocks/MockMocProxy.sol";
-import "../../script/Constants.sol";
+import "../Constants.sol";
 import {batchBuyOne} from "../utils/BatchBuyOne.sol";
 
 /**

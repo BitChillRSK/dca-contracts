@@ -16,7 +16,7 @@ import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces
 import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
 import {ITokenHandler} from "../../../src/interfaces/ITokenHandler.sol";
 import {IDcaManager} from "../../../src/interfaces/IDcaManager.sol";
-import "../../../script/Constants.sol";
+import "../../Constants.sol";
 import {batchBuyOne} from "../../utils/BatchBuyOne.sol";
 import {ownableUnauthorized} from "../../utils/OzRevert.sol";
 

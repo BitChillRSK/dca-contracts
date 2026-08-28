@@ -10,7 +10,7 @@ import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
 import {MockReentrantStablecoin, ITransferFromHook} from "../mocks/MockReentrantStablecoin.sol";
 import {MockKdocToken} from "../mocks/MockKdocToken.sol";
 import {MockMocProxy} from "../mocks/MockMocProxy.sol";
-import "../../script/Constants.sol";
+import "../Constants.sol";
 import {reentrantCall} from "../utils/OzRevert.sol";
 
 contract ReentrantDepositor is ITransferFromHook {

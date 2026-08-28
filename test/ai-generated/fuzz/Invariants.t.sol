@@ -17,7 +17,7 @@ import {IDcaManager} from "src/interfaces/IDcaManager.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockKdocToken} from "test/mocks/MockKdocToken.sol";
 import {MockIsusdToken} from "test/mocks/MockIsusdToken.sol";
-import "script/Constants.sol";
+import "test/Constants.sol";
 import {Handler} from "./Handler.t.sol";
 
 /**
