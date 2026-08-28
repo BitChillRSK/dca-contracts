@@ -44,7 +44,7 @@ interface IDcaManager {
     //////////////////////
     // Events ////////////
     //////////////////////
-    event DcaManager__TokenBalanceUpdated(address indexed token, uint64 indexed scheduleId, uint256 indexed amount);
+    event DcaManager__TokenBalanceUpdated(address indexed token, uint64 indexed scheduleId, uint256 amount);
     event DcaManager__PurchaseAmountUpdated(
         address indexed user, uint64 indexed scheduleId, uint256 previousAmount, uint256 newAmount
     );
@@ -60,13 +60,15 @@ interface IDcaManager {
         uint256 purchasePeriod,
         uint256 routeIndex
     );
+    /// @dev Filterable by user and scheduleId only, matching PurchaseAmountUpdated / PurchasePeriodUpdated.
+    ///      Token is recovered by joining on scheduleId; it is not a third topic.
     event DcaManager__SchedulePauseSet(address indexed user, uint64 indexed scheduleId, bool paused);
     event DcaManager__DcaScheduleDeleted(address user, address token, uint64 scheduleId, uint256 refundedAmount);
-    event DcaManager__MaxSchedulesPerTokenModified(uint256 indexed newMaxSchedulesPerToken);
-    event DcaManager__MinPurchasePeriodModified(uint256 indexed newMinPurchasePeriod);
-    event DcaManager__LastPurchaseTimestampUpdated(address indexed token, uint64 indexed scheduleId, uint256 indexed lastPurchaseTimestamp);
-    event DcaManager__DefaultMinPurchaseAmountModified(uint256 indexed newDefaultMinPurchaseAmount);
-    event DcaManager__TokenMinPurchaseAmountSet(address indexed token, uint256 indexed minPurchaseAmount);
+    event DcaManager__MaxSchedulesPerTokenModified(uint256 newMaxSchedulesPerToken);
+    event DcaManager__MinPurchasePeriodModified(uint256 newMinPurchasePeriod);
+    event DcaManager__LastPurchaseTimestampUpdated(address indexed token, uint64 indexed scheduleId, uint256 lastPurchaseTimestamp);
+    event DcaManager__DefaultMinPurchaseAmountModified(uint256 newDefaultMinPurchaseAmount);
+    event DcaManager__TokenMinPurchaseAmountSet(address indexed token, uint256 minPurchaseAmount);
 
     //////////////////////
     // Errors ////////////

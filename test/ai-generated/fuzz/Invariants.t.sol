@@ -527,7 +527,7 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
         uint64 indexed scheduleId,
         uint256 amountSpent
     );
-    event PurchaseRbtc__rBtcWithdrawn(address indexed user, uint256 indexed amount);
+    event PurchaseRbtc__rBtcWithdrawn(address indexed user, uint256 amount);
 }
 
 /**
@@ -635,5 +635,5 @@ contract SovrynHandlerWrapper is SovrynErc20Handler {
         uint64 indexed scheduleId,
         uint256 amountSpent
     );
-    event PurchaseRbtc__rBtcWithdrawn(address indexed user, uint256 indexed amount);
+    event PurchaseRbtc__rBtcWithdrawn(address indexed user, uint256 amount);
 }

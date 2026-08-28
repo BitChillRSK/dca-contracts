@@ -17,9 +17,9 @@ contract DcaConfigurationTest is DcaDappTest {
     event DcaManager__PurchasePeriodUpdated(
         address indexed user, uint64 indexed scheduleId, uint256 previousPeriod, uint256 newPeriod
     );
-    event DcaManager__MaxSchedulesPerTokenModified(uint256 indexed maxSchedulesPerToken);
-    event DcaManager__DefaultMinPurchaseAmountModified(uint256 indexed newDefaultAmount);
-    event DcaManager__TokenMinPurchaseAmountSet(address indexed token, uint256 indexed customAmount);
+    event DcaManager__MaxSchedulesPerTokenModified(uint256 maxSchedulesPerToken);
+    event DcaManager__DefaultMinPurchaseAmountModified(uint256 newDefaultAmount);
+    event DcaManager__TokenMinPurchaseAmountSet(address indexed token, uint256 customAmount);
 
     function setUp() public override {
         super.setUp();

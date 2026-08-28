@@ -27,7 +27,7 @@ interface IPurchaseUniswap {
     //////////////////////////////////////////////////////////////*/
 
     event PurchaseUniswap_NewPathSet(
-        address[] indexed intermediateTokens, uint24[] indexed poolFeeRates, bytes indexed newPath
+        address[] intermediateTokens, uint24[] poolFeeRates, bytes newPath
     );
     event PurchaseUniswap_AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
     event PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(uint256 oldValue, uint256 newValue);

@@ -25,11 +25,14 @@ interface IFeeHandler {
     //////////////////////
     // Events ////////////
     //////////////////////
-    event FeeHandler__MinFeeRateSet(uint256 indexed minFeeRate);
-    event FeeHandler__MaxFeeRateSet(uint256 indexed maxFeeRate);
-    event FeeHandler__PurchaseLowerBoundSet(uint256 indexed feePurchaseLowerBound);
-    event FeeHandler__PurchaseUpperBoundSet(uint256 indexed feePurchaseUpperBound);
+    event FeeHandler__MinFeeRateSet(uint256 minFeeRate);
+    event FeeHandler__MaxFeeRateSet(uint256 maxFeeRate);
+    event FeeHandler__PurchaseLowerBoundSet(uint256 feePurchaseLowerBound);
+    event FeeHandler__PurchaseUpperBoundSet(uint256 feePurchaseUpperBound);
     event FeeHandler__FeeCollectorAddressSet(address indexed feeCollector);
+    /// @notice Emitted when a purchase fee is transferred to the collector.
+    /// @dev One log per batch for the aggregated fee. A zero fee is not logged.
+    event FeeHandler__FeeTransferred(address indexed token, address indexed collector, uint256 amount);
 
     //////////////////////
     // Custom errors /////

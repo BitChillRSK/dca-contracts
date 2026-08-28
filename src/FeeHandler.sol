@@ -217,6 +217,9 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
      * @param fee: the fee to transfer
      */
     function _transferFee(IERC20 token, uint256 fee) internal {
-        token.safeTransfer(s_feeCollector, fee);
+        if (fee == 0) return;
+        address collector = s_feeCollector;
+        token.safeTransfer(collector, fee);
+        emit FeeHandler__FeeTransferred(address(token), collector, fee);
     }
 }

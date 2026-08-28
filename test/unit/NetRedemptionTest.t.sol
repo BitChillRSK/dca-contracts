@@ -344,7 +344,7 @@ contract NetRedemptionTest is DcaDappTest {
     /**
      * @dev Sums the amountSpent of every PurchaseRbtc__RbtcBought and reads the batch event's total spend.
      * RbtcBought indexes user, tokenSpent and scheduleId, leaving (rBtcBought, amountSpent) in data;
-     * SuccessfulRbtcBatchPurchase indexes everything, so its spend is the last topic.
+     * SuccessfulRbtcBatchPurchase indexes only the token, so its spend is the second data word.
      */
     function _batchSpendFromLogs() internal returns (uint256 perUserSpentTotal, uint256 batchSpent) {
         bytes32 boughtSig = keccak256("PurchaseRbtc__RbtcBought(address,address,uint256,uint64,uint256)");
@@ -356,7 +356,7 @@ contract NetRedemptionTest is DcaDappTest {
                 (, uint256 amountSpent) = abi.decode(logs[i].data, (uint256, uint256));
                 perUserSpentTotal += amountSpent;
             } else if (logs[i].topics[0] == batchSig) {
-                batchSpent = uint256(logs[i].topics[3]);
+                (, batchSpent) = abi.decode(logs[i].data, (uint256, uint256));
                 foundBatch = true;
             }
         }
@@ -378,14 +378,14 @@ contract NetRedemptionTest is DcaDappTest {
         assertTrue(found, "no DcaManager__DcaScheduleDeleted log recorded");
     }
 
-    /// @dev every field of TokenLending__InterestWithdrawn is indexed, so the amount is the last topic
+    /// @dev user and token are indexed; the amount is the only data word
     function _interestWithdrawnEventAmount() internal returns (uint256 amount) {
         bytes32 sig = keccak256("TokenLending__InterestWithdrawn(address,address,uint256)");
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bool found;
         for (uint256 i; i < logs.length; ++i) {
             if (logs[i].topics[0] == sig) {
-                amount = uint256(logs[i].topics[3]);
+                amount = abi.decode(logs[i].data, (uint256));
                 found = true;
             }
         }

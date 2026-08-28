@@ -17,8 +17,8 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 contract OperationsAdminTest is DcaDappTest {
     event OperationsAdmin__SwapperAdded(address indexed swapper);
     event OperationsAdmin__SwapperRevoked(address indexed swapper);
-    event OperationsAdmin__RouteRegistered(uint256 indexed index, bool lends);
-    event OperationsAdmin__DepositsPauseSet(address indexed token, uint256 indexed routeIndex, bool paused);
+    event OperationsAdmin__RouteRegistered(uint256 index, bool lends);
+    event OperationsAdmin__DepositsPauseSet(address indexed token, uint256 routeIndex, bool paused);
 
     uint256 private constant TOKEN_ROUTE_MAPPING_SLOT = 2;
     uint256 private constant SECOND_IDLE_INDEX = 10;
@@ -111,7 +111,7 @@ contract OperationsAdminTest is DcaDappTest {
     }
 
     function testConstructorEmitsIdleRouteRegistered() external {
-        vm.expectEmit(true, true, true, true);
+        vm.expectEmit(false, false, false, true);
         emit OperationsAdmin__RouteRegistered(0, false);
         OperationsAdmin freshAdmin = new OperationsAdmin(OWNER);
         assertEq(uint256(freshAdmin.getRouteClass(0)), uint256(IOperationsAdmin.RouteClass.Idle));
@@ -184,13 +184,13 @@ contract OperationsAdminTest is DcaDappTest {
     }
 
     function testRegisterRouteEmitsAndClassifies() external {
-        vm.expectEmit(true, true, true, true);
+        vm.expectEmit(false, false, false, true);
         emit OperationsAdmin__RouteRegistered(SECOND_LENDING_INDEX, true);
         vm.prank(OWNER);
         operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
         assertTrue(operationsAdmin.isLendingRoute(SECOND_LENDING_INDEX));
 
-        vm.expectEmit(true, true, true, true);
+        vm.expectEmit(false, false, false, true);
         emit OperationsAdmin__RouteRegistered(SECOND_IDLE_INDEX, false);
         vm.prank(OWNER);
         operationsAdmin.registerRoute(SECOND_IDLE_INDEX, false);
@@ -533,13 +533,13 @@ contract OperationsAdminTest is DcaDappTest {
     }
 
     function testOwnerPausesAndUnpausesDeposits() external {
-        vm.expectEmit(true, true, false, true);
+        vm.expectEmit(true, false, false, true);
         emit OperationsAdmin__DepositsPauseSet(address(stablecoin), s_routeIndex, true);
         vm.prank(OWNER);
         operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, true);
         assertTrue(operationsAdmin.areDepositsPaused(address(stablecoin), s_routeIndex));
 
-        vm.expectEmit(true, true, false, true);
+        vm.expectEmit(true, false, false, true);
         emit OperationsAdmin__DepositsPauseSet(address(stablecoin), s_routeIndex, false);
         vm.prank(OWNER);
         operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, false);

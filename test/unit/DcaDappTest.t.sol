@@ -97,7 +97,7 @@ contract DcaDappTest is Test {
     //////////////////////
 
     // DcaManager
-    event DcaManager__TokenBalanceUpdated(address indexed token, uint64 indexed scheduleId, uint256 indexed amount);
+    event DcaManager__TokenBalanceUpdated(address indexed token, uint64 indexed scheduleId, uint256 amount);
     event DcaManager__DcaScheduleCreated(
         address indexed user,
         address indexed token,
@@ -107,15 +107,15 @@ contract DcaDappTest is Test {
         uint256 purchasePeriod,
         uint256 routeIndex
     );
-    event DcaManager__LastPurchaseTimestampUpdated(address indexed token, uint64 indexed scheduleId, uint256 indexed timestamp);
+    event DcaManager__LastPurchaseTimestampUpdated(address indexed token, uint64 indexed scheduleId, uint256 timestamp);
 
     // TokenHandler
-    event TokenHandler__TokenDeposited(address indexed token, address indexed user, uint256 indexed amount);
-    event TokenHandler__TokenWithdrawn(address indexed token, address indexed user, uint256 indexed amount);
+    event TokenHandler__TokenDeposited(address indexed token, address indexed user, uint256 amount);
+    event TokenHandler__TokenWithdrawn(address indexed token, address indexed user, uint256 amount);
     
     // TokenLending
     event TokenLending__SharesRedeemed(
-        address indexed user, uint256 indexed underlyingAmount, uint256 indexed sharesAmountRedeemed
+        address indexed user, uint256 underlyingAmount, uint256 sharesAmountRedeemed
     );
 
     // IPurchaseRbtc
@@ -127,12 +127,12 @@ contract DcaDappTest is Test {
         uint256 amountSpent
     );
     event PurchaseRbtc__SuccessfulRbtcBatchPurchase(
-        address indexed token, uint256 indexed totalPurchasedRbtc, uint256 indexed totalStablecoinAmountSpent
+        address indexed token, uint256 totalPurchasedRbtc, uint256 totalStablecoinAmountSpent
     );
 
     // OperationsAdmin
     event OperationsAdmin__TokenHandlerAssigned(
-        address indexed token, uint256 indexed lendinProtocolIndex, address indexed newHandler
+        address indexed token, uint256 lendinProtocolIndex, address indexed newHandler
     );
 
     //MockMocProxy
@@ -140,9 +140,9 @@ contract DcaDappTest is Test {
 
     //TokenLending
     event TokenLending__WithdrawalAmountAdjusted(
-        address indexed user, uint256 indexed originalAmount, uint256 indexed adjustedAmount
+        address indexed user, uint256 originalAmount, uint256 adjustedAmount
     );
-    event TokenLending__SharesRedeemedBatch(uint256 indexed underlyingAmount, uint256 indexed sharesAmountRedeemed);
+    event TokenLending__SharesRedeemedBatch(uint256 underlyingAmount, uint256 sharesAmountRedeemed);
 
     modifier onlyDexSwaps() {
         if (!isDexSwaps) {
@@ -657,8 +657,8 @@ contract DcaDappTest is Test {
             scheduleIds[i] = dcaManager.getDcaSchedules(users[0], address(stablecoin))[i].scheduleId;
             vm.stopPrank();
         }
-        // After R1 topic1 is the measured DOC from burn, not the requested amount. expectEmit
-        // cannot check that: indexed topics are exact, and on a live iSUSD fork tokenPrice
+        // After R1 the batch event's measured DOC is in data, not a topic. expectEmit
+        // cannot check that: data is exact, and on a live iSUSD fork tokenPrice
         // rounding is 1 wei off (SIP-0094 is not charging). Per-user redeem logs and the
         // iToken Transfer also fire first, so a selector-only expectEmit for the batch event
         // is order-fragile on a fork. Read the log after the call.
@@ -751,7 +751,7 @@ contract DcaDappTest is Test {
     /**
      * @notice assert that the batch redemption event reports the stablecoin the handler measured
      * @param requestedGross the total stablecoin the purchase path asked the lending protocol for
-     * @dev topic1 is the measured redemption. Live iSUSD / kDOC conversion can be 1 wei off the
+     * @dev data[0] is the measured redemption. Live iSUSD / kDOC conversion can be 1 wei off the
      * request; SIP-0094 is not enabled, so a 0.1% band would hide a wrong emit. If the Perimeter
      * Fee starts charging, this 1-wei check will fail on `make fork-sovryn` — that is the signal.
      */
@@ -759,8 +759,9 @@ contract DcaDappTest is Test {
         Vm.Log[] memory entries = vm.getRecordedLogs();
         bool found;
         for (uint256 i; i < entries.length; ++i) {
-            if (entries[i].topics.length == 3 && entries[i].topics[0] == TokenLending__SharesRedeemedBatch.selector) {
-                assertApproxEqAbs(uint256(entries[i].topics[1]), requestedGross, 1);
+            if (entries[i].topics[0] == TokenLending__SharesRedeemedBatch.selector) {
+                (uint256 underlyingAmount,) = abi.decode(entries[i].data, (uint256, uint256));
+                assertApproxEqAbs(underlyingAmount, requestedGross, 1);
                 found = true;
                 break;
             }
