@@ -6,16 +6,18 @@ import {PurchaseMoc} from "src/PurchaseMoc.sol";
 
 /**
  * @title LayerBankDocHandlerMoc
- * @notice This contract handles swaps of DOC for rBTC, redeeming the DOC at the MoC contract
+ * @author BitChill team: Antonio Rodríguez-Ynyesto
+ * @notice LayerBank-lent DOC + MoC: deposits supply aTokens; buys redeem DOC for rBTC at Money on Chain.
  */
 contract LayerBankDocHandlerMoc is LayerBankErc20Handler, PurchaseMoc {
     /**
-     * @param dcaManagerAddress the address of the DCA Manager contract
-     * @param docTokenAddress the address of the Dollar On Chain token on the blockchain of deployment
-     * @param aTokenAddress the address of LayerBank's aToken for DOC
-     * @param feeCollector the address of to which fees will sent on every purchase
-     * @param mocProxyAddress the address of the MoC proxy contract on the blockchain of deployment
-     * @param feeSettings the settings to calculate the fees charged by the protocol
+     * @param dcaManagerAddress The DcaManager allowed to call this handler.
+     * @param docTokenAddress Dollar On Chain token.
+     * @param aTokenAddress LayerBank aToken for DOC.
+     * @param feeCollector Address that receives purchase fees.
+     * @param mocProxyAddress Money on Chain proxy.
+     * @param feeSettings Linear fee parameters.
+     * @param initialOwner Address that owns fee configuration immediately after deploy.
      */
     constructor(
         address dcaManagerAddress,

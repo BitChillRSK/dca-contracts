@@ -6,7 +6,8 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @title TokenLending
- * @notice Defines functions to convert stablecoin balances to shares and vice versa
+ * @author BitChill team: Antonio Rodríguez-Ynyesto
+ * @notice Share ↔ stablecoin conversion math. No TokenHandler inherit; adapters pass the scale.
  */
 abstract contract TokenLending is ITokenLending {
     uint256 immutable i_exchangeRateDecimals;
@@ -16,13 +17,13 @@ abstract contract TokenLending is ITokenLending {
     }
 
     /**
-     * @notice convert stablecoin to shares
-     * @dev Rounds up so the virtual share debit is never below what the lending protocol may burn for
-     *      the same stablecoin amount (keeps sum of per-user shares <= shares the handler actually holds).
-     *      Round-down would allow the books to drift above reality.
-     * @param stablecoinAmount: the amount of stablecoin to convert
-     * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
-     * @return sharesAmount the amount of shares
+     * @dev Convert stablecoin to shares. Rounds up so the virtual share debit is never below
+     *      what the lending protocol may burn for the same stablecoin amount (keeps sum of
+     *      per-user shares <= shares the handler actually holds). Round-down would allow the
+     *      books to drift above reality.
+     * @param stablecoinAmount Amount of stablecoin to convert.
+     * @param exchangeRate Stablecoin per share, scaled by `i_exchangeRateDecimals`.
+     * @return sharesAmount Corresponding shares, rounded up.
      */
     function _stablecoinToShares(uint256 stablecoinAmount, uint256 exchangeRate)
         internal
@@ -33,10 +34,10 @@ abstract contract TokenLending is ITokenLending {
     }
 
     /**
-     * @notice convert shares to stablecoin
-     * @param sharesAmount: the amount of shares to convert
-     * @param exchangeRate: the exchange rate of shares to stablecoin (stablecoin per share)
-     * @return stablecoinAmount the amount of stablecoin
+     * @dev Convert shares to stablecoin (round down).
+     * @param sharesAmount Amount of shares to convert.
+     * @param exchangeRate Stablecoin per share, scaled by `i_exchangeRateDecimals`.
+     * @return stablecoinAmount Corresponding stablecoin.
      */
     function _sharesToStablecoin(uint256 sharesAmount, uint256 exchangeRate)
         internal

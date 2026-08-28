@@ -2,6 +2,7 @@
 pragma solidity 0.8.36;
 
 import {PurchaseRbtc} from "./PurchaseRbtc.sol";
+import {IPurchaseRbtc} from "./interfaces/IPurchaseRbtc.sol";
 import {IWRBTC} from "./interfaces/IWRBTC.sol";
 import {TransferHelper} from "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
 import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces/ISwapRouter02.sol";
@@ -13,7 +14,8 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 /**
  * @title PurchaseUniswap
- * @notice This contract handles swaps of stablecoin for rBTC using Uniswap V3
+ * @author BitChill team: Antonio Rodríguez-Ynyesto
+ * @notice Uniswap V3 purchase route: swap stablecoin for WRBTC, unwrap on withdraw.
  * @dev Min-out is built from the MoC BTC/USD oracle under a $1 peg assumption: one unit of the handler's
  *      stablecoin is taken to be one USD. BitChill only lists 1:1 stables (DOC, USDRIF, USDT0) and does not
  *      run a per-stablecoin USD feed. If a listed stablecoin depegs downwards, the pool prices it below the
@@ -90,8 +92,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
                                FUNCTIONS
     //////////////////////////////////////////////////////////////*/
     /**
-     * @param user: the user to withdraw the rBTC to
-     * @notice the user can at any time withdraw the rBTC that has been accumulated through periodical purchases
+     * @inheritdoc IPurchaseRbtc
+     * @dev Unwraps WRBTC to native rBTC before paying the signer.
      */
     function withdrawAccumulatedRbtc(address user) external override onlyDcaManager {
         uint256 rbtcBalance = _withdrawRbtcChecksEffects(user);
@@ -104,9 +106,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     /**
-     * @notice Sets a new swap path.
-     *  @param intermediateTokens The array of intermediate token addresses in the path.
-     * @param poolFeeRates The array of pool fees for each swap step.
+     * @inheritdoc IPurchaseUniswap
      */
     function setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
         public
@@ -136,8 +136,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     /**
-     * @notice Set the minimum percentage of rBTC that must be received from the swap.
-     * @param amountOutMinimumPercent The minimum percentage of rBTC that must be received from the swap.
+     * @inheritdoc IPurchaseUniswap
      */
     function setAmountOutMinimumPercent(uint256 amountOutMinimumPercent) external onlyOwner {
         _validateSlippageSettings(amountOutMinimumPercent, s_amountOutMinimumSafetyCheck);
@@ -146,11 +145,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     /**
-     * @notice Set the lowest slippage tolerance the owner is allowed to configure.
-     * @param amountOutMinimumSafetyCheck The floor `setAmountOutMinimumPercent` is validated against.
-     * @dev Config-only, by design: it bounds `s_amountOutMinimumPercent` and never enters the swap math.
-     * Widening slippage tolerance therefore takes two owner transactions — lower this floor first, then the
-     * percent — which is the point of keeping it now that the owner is a Safe.
+     * @inheritdoc IPurchaseUniswap
      */
     function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external onlyOwner {
         _validateSlippageSettings(s_amountOutMinimumPercent, amountOutMinimumSafetyCheck);
@@ -159,8 +154,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     /**
-     * @notice Updates the oracle address to a new one.
-     * @param newOracle The address of the new oracle to use.
+     * @inheritdoc IPurchaseUniswap
      */
     function updateMocOracle(address newOracle) external override onlyOwner {
         if (newOracle == address(0)) {
@@ -171,32 +165,28 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     /**
-     * @notice Get the minimum percentage of rBTC that must be received from the swap.
-     * @return The minimum percentage of rBTC that must be received from the swap.
-     */     
+     * @inheritdoc IPurchaseUniswap
+     */
     function getAmountOutMinimumPercent() external view returns (uint256) {
         return s_amountOutMinimumPercent;
     }
 
     /**
-     * @notice Get the configuration floor for the slippage percent.
-     * @return The lowest value `setAmountOutMinimumPercent` accepts. Not used when a swap is priced.
+     * @inheritdoc IPurchaseUniswap
      */
     function getAmountOutMinimumSafetyCheck() external view returns (uint256) {
         return s_amountOutMinimumSafetyCheck;
     }
 
     /**
-     * @notice Get the oracle used for price checks.
-     * @return The oracle used for price checks.
+     * @inheritdoc IPurchaseUniswap
      */
     function getMocOracle() external view returns (ICoinPairPrice) {
         return s_mocOracle;
     }
 
     /**
-     * @notice Get the current swap path.
-     * @return The current swap path.
+     * @inheritdoc IPurchaseUniswap
      */
     function getSwapPath() external view returns (bytes memory) {
         return s_swapPath;
@@ -222,7 +212,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     /**
-     * @notice swap net stablecoin for WRBTC and return the handler's WRBTC-balance delta
+     * @dev Swap net stablecoin for WRBTC and return the handler's WRBTC-balance delta.
      */
     function _purchaseRbtc(uint256 stablecoinAmount) internal override returns (uint256) {
         return _swapStablecoinForWrbtc(stablecoinAmount);

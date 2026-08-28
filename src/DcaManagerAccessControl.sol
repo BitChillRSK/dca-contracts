@@ -5,7 +5,8 @@ import {IDcaManagerAccessControl} from "src/interfaces/IDcaManagerAccessControl.
 
 /**
  * @title DcaManagerAccessControl
- * @dev Base contract for handling DCA Manager access control
+ * @author BitChill team: Antonio Rodríguez-Ynyesto
+ * @notice Restricts handler entry points to the DcaManager passed at construction.
  */
 abstract contract DcaManagerAccessControl is IDcaManagerAccessControl {
     address public immutable i_dcaManager; // The DCA manager contract
@@ -16,8 +17,7 @@ abstract contract DcaManagerAccessControl is IDcaManagerAccessControl {
     }
 
     /**
-     * @notice constructor for the DcaManagerAccessControl contract
-     * @param dcaManagerAddress: the address of the DCA manager contract
+     * @param dcaManagerAddress The DcaManager allowed to call handler entry points.
      */
     constructor(address dcaManagerAddress) {
         i_dcaManager = dcaManagerAddress;

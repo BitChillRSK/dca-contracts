@@ -6,6 +6,7 @@ import {IiSusdToken} from "./IiSusdToken.sol";
 
 /**
  * @title SovrynErc20Handler
+ * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Sovryn adapter: iSUSD mint/burn. Share accounting lives on LendingErc20Handler.
  */
 abstract contract SovrynErc20Handler is LendingErc20Handler {
@@ -14,12 +15,12 @@ abstract contract SovrynErc20Handler is LendingErc20Handler {
     IiSusdToken public immutable i_iSusdToken;
 
     /**
-     * @param dcaManagerAddress the address of the DCA Manager contract
-     * @param stableTokenAddress the address of the Dollar On Chain token on the blockchain of deployment
-     * @param iSusdTokenAddress the address of Sovryn' iSusd token contract
-     * @param feeCollector the address of to which fees will sent on every purchase
-     * @param feeSettings struct with the settings for fee calculations
-     * @param initialOwner the address that owns fee configuration immediately after deploy
+     * @param dcaManagerAddress The DcaManager allowed to call this handler.
+     * @param stableTokenAddress The stablecoin this handler lends (DOC on the MoC leaf).
+     * @param iSusdTokenAddress Sovryn iSUSD (or equivalent iToken) for that stablecoin.
+     * @param feeCollector Address that receives purchase fees.
+     * @param feeSettings Linear fee parameters.
+     * @param initialOwner Address that owns fee configuration immediately after deploy.
      */
     constructor(
         address dcaManagerAddress,
@@ -45,7 +46,7 @@ abstract contract SovrynErc20Handler is LendingErc20Handler {
     }
 
     /**
-     * @notice the iSusd we credit is the balance we actually gained, never mint()'s return value
+     * @dev The iSUSD credited is the balance actually gained, never `mint()`'s return value.
      */
     function _protocolDeposit(uint256 stablecoinAmount) internal override returns (uint256 mintedShares) {
         uint256 prevIsusdBalance = i_iSusdToken.balanceOf(address(this));
@@ -54,8 +55,8 @@ abstract contract SovrynErc20Handler is LendingErc20Handler {
     }
 
     /**
-     * @notice Redeem iSUSD onto this contract
-     * @dev burn() can return GROSS while paying NET once an exit fee is on; the return is ignored.
+     * @dev Redeem iSUSD onto this contract. `burn()` can return GROSS while paying NET once an
+     *      exit fee is on; the return is ignored and the base measures the token delta.
      */
     function _protocolRedeem(uint256 sharesAmount, uint256) internal override {
         i_iSusdToken.burn(address(this), sharesAmount);

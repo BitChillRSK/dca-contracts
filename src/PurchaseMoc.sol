@@ -7,7 +7,8 @@ import {IPurchaseMoc} from "./interfaces/IPurchaseMoc.sol";
 
 /**
  * @title PurchaseMoc
- * @notice This contract handles swaps of DOC for rBTC, redeeming the DOC at the MoC contract
+ * @author BitChill team: Antonio Rodríguez-Ynyesto
+ * @notice MoC purchase route: redeem DOC for native rBTC and measure the handler's balance delta.
  */
 abstract contract PurchaseMoc is PurchaseRbtc, IPurchaseMoc {
     //////////////////////
@@ -16,7 +17,7 @@ abstract contract PurchaseMoc is PurchaseRbtc, IPurchaseMoc {
     IMocProxy public immutable i_mocProxy;
 
     /**
-     * @param mocProxyAddress the address of the MoC proxy contract on the blockchain of deployment
+     * @param mocProxyAddress Money on Chain proxy that exposes `redeemDocRequest` / `redeemFreeDoc`.
      */
     constructor(address mocProxyAddress) {
         i_mocProxy = IMocProxy(mocProxyAddress);
@@ -27,9 +28,7 @@ abstract contract PurchaseMoc is PurchaseRbtc, IPurchaseMoc {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice redeem DOC for rBTC and return the handler's native-balance delta
-     * @param stablecoinAmount the net DOC amount to redeem
-     * @return rbtcReceived the measured rBTC this contract actually received
+     * @dev Redeem DOC for rBTC and return the handler's native-balance delta.
      */
     function _purchaseRbtc(uint256 stablecoinAmount) internal override returns (uint256 rbtcReceived) {
         (uint256 balancePrev, uint256 balancePost) = _redeemDoc(stablecoinAmount);
@@ -37,10 +36,7 @@ abstract contract PurchaseMoc is PurchaseRbtc, IPurchaseMoc {
     }
 
     /**
-     * @notice redeem DOC for rBTC at Money on Chain
-     * @param docAmountToSpend the amount of DOC to redeem
-     * @return the contract's rBTC balance before the redemption
-     * @return the contract's rBTC balance after the redemption
+     * @dev Redeem DOC for rBTC at Money on Chain. Returns the handler's native balance before and after.
      */
     function _redeemDoc(uint256 docAmountToSpend) internal returns (uint256, uint256) {
         try i_mocProxy.redeemDocRequest(docAmountToSpend) {}

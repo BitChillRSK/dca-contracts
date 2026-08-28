@@ -4,7 +4,8 @@ pragma solidity 0.8.36;
 /**
  * @title IMocProxy
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @dev Interface for the MOC proxy contract.
+ * @notice Money on Chain proxy surface BitChill uses to redeem DOC for rBTC.
+ * @dev Third-party ABI. BitChill measures native balance deltas around these calls.
  */
 interface IMocProxy {
     /**

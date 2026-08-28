@@ -6,7 +6,9 @@ import {IkToken} from "./IkToken.sol";
 
 /**
  * @title TropykusErc20Handler
+ * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Tropykus adapter: Compound-style kToken mint/redeem. Share accounting lives on LendingErc20Handler.
+ * @dev Legacy only: no live deploy path. Local and fork lanes still cover this second lending adapter.
  */
 abstract contract TropykusErc20Handler is LendingErc20Handler {
     uint256 public constant EXCHANGE_RATE_DECIMALS = 1e18;
@@ -14,12 +16,12 @@ abstract contract TropykusErc20Handler is LendingErc20Handler {
     IkToken public immutable i_kToken;
 
     /**
-     * @param dcaManagerAddress the address of the DCA Manager contract
-     * @param stableTokenAddress the address of the ERC20 stablecoin token on the blockchain of deployment
-     * @param kTokenAddress the address of Tropykus'  kToken token contract
-     * @param feeCollector the address of to which fees will sent on every purchase
-     * @param feeSettings struct with the settings for fee calculations
-     * @param initialOwner the address that owns fee configuration immediately after deploy
+     * @param dcaManagerAddress The DcaManager allowed to call this handler.
+     * @param stableTokenAddress The ERC20 stablecoin this handler lends.
+     * @param kTokenAddress Tropykus kToken for that stablecoin.
+     * @param feeCollector Address that receives purchase fees.
+     * @param feeSettings Linear fee parameters.
+     * @param initialOwner Address that owns fee configuration immediately after deploy.
      */
     constructor(
         address dcaManagerAddress,
@@ -49,7 +51,7 @@ abstract contract TropykusErc20Handler is LendingErc20Handler {
     }
 
     /**
-     * @notice the kToken we credit is the balance we actually gained, never mint()'s return value
+     * @dev The kToken credited is the balance actually gained, never `mint()`'s return value.
      */
     function _protocolDeposit(uint256 stablecoinAmount) internal override returns (uint256 mintedShares) {
         uint256 prevKtokenBalance = i_kToken.balanceOf(address(this));
@@ -58,8 +60,8 @@ abstract contract TropykusErc20Handler is LendingErc20Handler {
     }
 
     /**
-     * @notice Redeem kTokens onto this contract
-     * @dev Burns the booked share count. Only the Compound return code is raised here.
+     * @dev Redeem kTokens onto this contract. Burns the booked share count. Only the Compound
+     *      return code is raised here; the base measures the token delta.
      */
     function _protocolRedeem(uint256 sharesAmount, uint256) internal override {
         uint256 result = i_kToken.redeem(sharesAmount);

@@ -21,7 +21,7 @@ contract SwapperBatcher is ISwapperBatcher {
     address public immutable i_operationsAdmin;
 
     /**
-     * @notice only allow addresses on the OperationsAdmin swapper allowlist
+     * @dev Only addresses on the OperationsAdmin swapper allowlist.
      */
     modifier onlySwapper() {
         if (!IOperationsAdmin(i_operationsAdmin).isSwapper(msg.sender)) {

@@ -6,6 +6,9 @@ import {ITokenHandler} from "./ITokenHandler.sol";
 /**
  * @title ITokenLending
  * @author BitChill team: Antonio Rodríguez-Ynyesto
+ * @notice Lending-handler surface: per-user virtual shares, interest, and share-transition events.
+ * @dev Idle handlers do not implement this. OperationsAdmin requires it on lending routes and
+ *      rejects it on idle routes.
  */
 interface ITokenLending is ITokenHandler {
     /*//////////////////////////////////////////////////////////////
@@ -16,18 +19,22 @@ interface ITokenLending is ITokenHandler {
     /// @dev Only `user` is indexed. `newShares` equals `getUserShares(user)` after the call.
     ///      Reverted mutations produce no lasting log. Idle handlers do not emit this.
     event TokenLending__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares);
-    /// @notice in a batch this fires per user with that user's planned share; the batch event
-    /// below carries the total the handler measured
+    /// @notice Shares were redeemed for one user. In a batch this fires per user with that user's
+    ///         planned share; `SharesRedeemedBatch` carries the total the handler measured.
     event TokenLending__SharesRedeemed(
         address indexed user, uint256 underlyingAmount, uint256 sharesAmountRedeemed
     );
+    /// @notice A batch redemption's measured stablecoin and share totals.
     event TokenLending__SharesRedeemedBatch(uint256 underlyingAmount, uint256 sharesAmountRedeemed);
+    /// @notice Interest was paid out to `user` in `token`.
     event TokenLending__InterestWithdrawn(
         address indexed user, address indexed token, uint256 underlyingAmountWithdrawn
     );
+    /// @notice A withdrawal was clamped to the user's share-backed stablecoin.
     event TokenLending__WithdrawalAmountAdjusted(
         address indexed user, uint256 originalAmount, uint256 adjustedAmount
     );
+    /// @notice A single-user redeem was clamped to the shares this handler books for that user.
     event TokenLending__AmountToRedeemAdjusted(
         address indexed user,
         uint256 originalSharesAmount,
@@ -40,13 +47,14 @@ interface ITokenLending is ITokenHandler {
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice The lending protocol accepted a deposit call but this handler gained no shares.
     error TokenLending__LendingProtocolDepositFailed();
-    /// @notice the lending protocol's redemption call reported failure with a non-zero error code
+    /// @notice The lending protocol's redemption call reported failure with a non-zero error code.
     error TokenLending__LendingProtocolRedeemFailed(uint256 errorCode);
-    /// @notice a positive share redemption produced no stablecoin; the call is rolled back
+    /// @notice A positive share redemption produced no stablecoin; the call is rolled back.
     error TokenLending__ZeroStablecoinReceived(uint256 stablecoinAttempted);
-    /// @notice batch redeem asked for more of this user's shares than the handler tracks. Same
-    /// outcome as a 0.8 underflow on `s_*Balances[user] -=`; the named error is for the swapper.
+    /// @notice Batch redeem asked for more of this user's shares than the handler tracks.
+    /// @dev Same outcome as a 0.8 underflow on `s_shares[user] -=`; the named error is for the swapper.
     error TokenLending__InsufficientShares(address user, uint256 requested, uint256 available);
 
     /*//////////////////////////////////////////////////////////////
@@ -54,24 +62,27 @@ interface ITokenLending is ITokenHandler {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Gets the shares balance of the user
-     * @param user The user whose balance is checked
+     * @notice This user's virtual lending-share balance on this handler.
+     * @param user Account to query.
+     * @return The booked share balance. Equals `newShares` on the latest `UserSharesUpdated` for `user`.
      */
     function getUserShares(address user) external view returns (uint256);
 
     /**
-     * @dev Withdraws the interest earned for a user.
-     * @notice This function needs to be in this interface (even though it is not implemented in the TokenHandler abstract contract) because it is called by the DCA Manager contract
-     * @param user The address of the user withdrawing the interest.
-     * @param stablecoinLockedInDcaSchedules The amount of stablecoin locked in DCA schedules by the user.
+     * @notice Pay `user` the stablecoin interest above `stablecoinLockedInDcaSchedules`.
+     * @param user The address receiving the interest.
+     * @param stablecoinLockedInDcaSchedules Principal DcaManager still locks for this user on this
+     *        handler's route. Interest is `share-backed stablecoin - this amount`, or zero.
+     * @dev Called only by DcaManager. No-op when there is no interest.
      */
     function withdrawInterest(address user, uint256 stablecoinLockedInDcaSchedules) external;
 
     /**
-     * @dev Checks the interest earned by a user in total.
-     * @param user The address of the user.
-     * @param stablecoinLockedInDcaSchedules The amount of stablecoin locked in DCA schedules by the user in total.
-     * @return The amount of accrued interest.
+     * @notice Interest `user` has accrued above locked principal, without withdrawing it.
+     * @param user Account to query.
+     * @param stablecoinLockedInDcaSchedules Principal DcaManager still locks for this user on this
+     *        handler's route.
+     * @return Accrued interest in stablecoin units, or zero.
      */
     function getAccruedInterest(address user, uint256 stablecoinLockedInDcaSchedules) external view returns (uint256);
 }

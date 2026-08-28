@@ -6,15 +6,18 @@ import {PurchaseMoc} from "src/PurchaseMoc.sol";
 
 /**
  * @title TropykusDocHandlerMoc
- * @notice This contract handles swaps of DOC for rBTC, redeeming the DOC at the MoC contract
+ * @author BitChill team: Antonio Rodríguez-Ynyesto
+ * @notice Tropykus-lent DOC + MoC. Legacy only: no live deploy path.
  */
 contract TropykusDocHandlerMoc is TropykusErc20Handler, PurchaseMoc {
     /**
-     * @param dcaManagerAddress the address of the DCA Manager contract
-     * @param docTokenAddress the address of the Dollar On Chain token on the blockchain of deployment
-     * @param kDocTokenAddress the address of Tropykus' kDOC token contract
-     * @param mocProxyAddress the address of the MoC proxy contract on the blockchain of deployment
-     * @param feeSettings the settings to calculate the fees charged by the protocol
+     * @param dcaManagerAddress The DcaManager allowed to call this handler.
+     * @param docTokenAddress Dollar On Chain token.
+     * @param kDocTokenAddress Tropykus kDOC token.
+     * @param feeCollector Address that receives purchase fees.
+     * @param mocProxyAddress Money on Chain proxy.
+     * @param feeSettings Linear fee parameters.
+     * @param initialOwner Address that owns fee configuration immediately after deploy.
      */
     constructor(
         address dcaManagerAddress,

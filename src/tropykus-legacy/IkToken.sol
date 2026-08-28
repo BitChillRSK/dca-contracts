@@ -4,7 +4,8 @@ pragma solidity 0.8.36;
 /**
  * @title IKToken
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @dev Interface for the kToken token contract.
+ * @notice Tropykus kToken surface BitChill uses to mint and redeem shares.
+ * @dev Third-party Compound-style ABI. Function-level comments below are the vendor's.
  */
 interface IkToken {
 

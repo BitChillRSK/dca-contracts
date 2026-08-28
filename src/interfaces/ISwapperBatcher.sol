@@ -26,8 +26,11 @@ interface ISwapperBatcher {
     //////////////////////
     // Errors ////////////
     //////////////////////
+    /// @notice `batches` must contain at least one group.
     error SwapperBatcher__EmptyBatches();
+    /// @notice Constructor `dcaManager` has no code.
     error SwapperBatcher__DcaManagerIsNotAContract(address dcaManager);
+    /// @notice Caller is not on the OperationsAdmin swapper allowlist.
     error SwapperBatcher__UnauthorizedSwapper(address sender);
 
     /**

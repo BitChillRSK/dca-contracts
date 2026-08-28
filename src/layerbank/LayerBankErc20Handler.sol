@@ -8,6 +8,7 @@ import {ILayerBankPool} from "./ILayerBankPool.sol";
 
 /**
  * @title LayerBankErc20Handler
+ * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice LayerBank adapter: Aave-v3 Pool supply/withdraw. Share accounting lives on LendingErc20Handler.
  * @dev Live LayerBank DOC is an Aave-v3 aToken. Supply and withdraw go through the Pool.
  *      Shares in this contract are aToken **scaled** amounts; the rebasing `balanceOf` is never
@@ -22,12 +23,12 @@ abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20H
     ILayerBankPool public immutable i_pool;
 
     /**
-     * @param dcaManagerAddress the address of the DCA Manager contract
-     * @param stableTokenAddress the address of the ERC20 stablecoin token on the blockchain of deployment
-     * @param aTokenAddress the address of LayerBank's aToken for this stablecoin
-     * @param feeCollector the address of to which fees will sent on every purchase
-     * @param feeSettings struct with the settings for fee calculations
-     * @param initialOwner the address that owns fee configuration immediately after deploy
+     * @param dcaManagerAddress The DcaManager allowed to call this handler.
+     * @param stableTokenAddress The ERC20 stablecoin this handler lends.
+     * @param aTokenAddress LayerBank aToken for that stablecoin.
+     * @param feeCollector Address that receives purchase fees.
+     * @param feeSettings Linear fee parameters.
+     * @param initialOwner Address that owns fee configuration immediately after deploy.
      */
     constructor(
         address dcaManagerAddress,
@@ -59,14 +60,14 @@ abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20H
     }
 
     /**
-     * @notice Aave liquidity index including pending interest, RAY (1e27) scale.
+     * @dev Aave liquidity index including pending interest, RAY (1e27) scale.
      */
     function _normalizedIncome() internal view returns (uint256) {
         return i_pool.getReserveNormalizedIncome(address(i_stableToken));
     }
 
     /**
-     * @notice the shares we credit are the aTokens we actually gained, never a Pool return
+     * @dev The shares credited are the aTokens actually gained, never a Pool return.
      */
     function _protocolDeposit(uint256 stablecoinAmount) internal override returns (uint256 mintedShares) {
         uint256 prevShares = i_aToken.scaledBalanceOf(address(this));
@@ -75,8 +76,8 @@ abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20H
     }
 
     /**
-     * @notice Convert booked shares to underlying and withdraw onto this contract
-     * @dev Aave has no share-sized withdraw. Skip a zero amount: live Pool.withdraw reverts.
+     * @dev Convert booked shares to underlying and withdraw onto this contract.
+     *      Aave has no share-sized withdraw. Skip a zero amount: live Pool.withdraw reverts.
      */
     function _protocolRedeem(uint256 sharesAmount, uint256 exchangeRate) internal override {
         uint256 amountOut = _sharesToStablecoin(sharesAmount, exchangeRate);
