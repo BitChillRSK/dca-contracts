@@ -26,6 +26,7 @@ interface IOperationsAdmin {
     event OperationsAdmin__RouteRegistered(uint256 indexed index, bool lends);
     event OperationsAdmin__SwapperAdded(address indexed swapper);
     event OperationsAdmin__SwapperRevoked(address indexed swapper);
+    event OperationsAdmin__DepositIntakePauseSet(address indexed token, uint256 indexed routeIndex, bool paused);
 
     //////////////////////
     // Errors ////////////
@@ -38,6 +39,8 @@ interface IOperationsAdmin {
     error OperationsAdmin__RouteNotRegistered(uint256 index);
     error OperationsAdmin__HandlerAlreadyAssigned(address token, uint256 routeIndex);
     error OperationsAdmin__HandlerAddressAlreadyInUse(address handler);
+    error OperationsAdmin__HandlerNotAssigned(address token, uint256 routeIndex);
+    error OperationsAdmin__DepositIntakePauseUnchanged(address token, uint256 routeIndex, bool paused);
 
     ///////////////////////////////
     // External functions /////////
@@ -63,6 +66,29 @@ interface IOperationsAdmin {
      *      `OperationsAdmin__HandlerAddressAlreadyInUse` whatever its token or route class.
      */
     function assignTokenHandler(address token, uint256 routeIndex, address handler) external;
+
+    /**
+     * @notice Pause or unpause new stablecoin intake for one assigned `(token, routeIndex)` pair.
+     * @param token The stablecoin whose intake is being paused.
+     * @param routeIndex The route index whose intake is being paused.
+     * @param paused True to block new deposits, false to allow them again.
+     * @dev Incident control only: `DcaManager` consults this before `createDcaSchedule` and
+     *      `depositToken` move cash, and nowhere else. Purchases, schedule edits, deletion, and
+     *      every withdrawal (stablecoin, rBTC, interest) ignore it, so a paused route can always
+     *      be exited. The pair must already have a handler — pausing intake to a route nobody can
+     *      deposit into is a no-op that would only mislead an operator — and the flag must change,
+     *      so every emitted event is a real transition.
+     */
+    function setDepositIntakePaused(address token, uint256 routeIndex, bool paused) external;
+
+    /**
+     * @notice Whether new deposits to `(token, routeIndex)` are currently blocked.
+     * @param token The stablecoin.
+     * @param routeIndex The route index.
+     * @return paused True when `DcaManager` must reject new intake for this pair.
+     * @dev False for unassigned pairs: only an assigned pair can be paused.
+     */
+    function isDepositIntakePaused(address token, uint256 routeIndex) external view returns (bool paused);
 
     /**
      * @notice Handler registered for a token and route index.

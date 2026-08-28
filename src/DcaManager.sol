@@ -107,6 +107,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @param scheduleIndex the schedule index
      * @param scheduleId the schedule id for validation
      * @param depositAmount the amount of stablecoin requested from the user; the handler reverts unless it receives exactly this, so the schedule is credited with the full request
+     * @notice reverts before any transfer if governance paused deposit intake for this schedule's route
      */
     function depositToken(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 depositAmount)
         external
@@ -117,7 +118,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         _validateDeposit(depositAmount);
         DcaDetails storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
-        uint256 received = _handler(token, dcaSchedule.routeIndex).depositToken(msg.sender, depositAmount);
+        uint256 received = _intakeHandler(token, dcaSchedule.routeIndex).depositToken(msg.sender, depositAmount);
         uint256 newTokenBalance = dcaSchedule.tokenBalance + received;
         dcaSchedule.tokenBalance = newTokenBalance;
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
@@ -174,6 +175,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @param purchaseAmount: the amount of stablecoin to swap periodically for rBTC (validated against the credited balance, which equals the requested deposit)
      * @param purchasePeriod: the time (in seconds) between rBTC purchases for each user
      * @param routeIndex: the OperationsAdmin route index for this schedule (idle or lending)
+     * @notice reverts before any transfer if governance paused deposit intake for this token and route
      */
     function createDcaSchedule(
         address token,
@@ -184,7 +186,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     ) external override nonReentrant {
         _validatePurchasePeriod(purchasePeriod);
         _validateDeposit(depositAmount);
-        uint256 received = _handler(token, routeIndex).depositToken(msg.sender, depositAmount);
+        uint256 received = _intakeHandler(token, routeIndex).depositToken(msg.sender, depositAmount);
         _validatePurchaseAmount(token, purchaseAmount, received);
 
         DcaDetails[] storage schedules = s_dcaSchedules[msg.sender][token];
@@ -475,6 +477,24 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         address tokenHandlerAddress = i_operationsAdmin.getTokenHandler(token, routeIndex);
         if (tokenHandlerAddress == address(0)) revert DcaManager__TokenNotAccepted(token, routeIndex);
         return ITokenHandler(tokenHandlerAddress);
+    }
+
+    /**
+     * @notice get the token handler for a deposit, rejecting the call if governance paused intake
+     * @param token: the token
+     * @param routeIndex: the route index
+     * @return the token handler
+     * @dev Only `depositToken` and `createDcaSchedule` route through here, and both do so before
+     *      any token moves, so a paused pair never takes cash it would have to refund. Every other
+     *      caller keeps using `_handler`: purchases, edits, deletion, and withdrawals must stay
+     *      available on a paused route.
+     */
+    function _intakeHandler(address token, uint256 routeIndex) private view returns (ITokenHandler) {
+        ITokenHandler tokenHandler = _handler(token, routeIndex);
+        if (i_operationsAdmin.isDepositIntakePaused(token, routeIndex)) {
+            revert DcaManager__DepositIntakePaused(token, routeIndex);
+        }
+        return tokenHandler;
     }
 
     /**
