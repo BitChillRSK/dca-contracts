@@ -1,6 +1,6 @@
 # R36 — LayerBank dex stables (USDRIF + USDT0)
 
-Status: **implemented** · Assigned: yes · Optional/further-review: no
+Status: **PR [#92](https://github.com/BitChillRSK/dca-contracts/pull/92)** · Assigned: yes · Optional/further-review: no
 
 PR 42 of the relaunch stack. Stack on R18 (PR 41, [#91](https://github.com/BitChillRSK/dca-contracts/pull/91)).
 
