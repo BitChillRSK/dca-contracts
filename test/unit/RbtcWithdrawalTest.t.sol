@@ -102,7 +102,7 @@ contract RbtcWithdrawalTest is DcaDappTest {
         routeIndexes[0] = s_routeIndex;
 
         vm.prank(USER);
-        vm.expectRevert(IDcaManager.DcaManager__WithdrawalArraysLengthMismatch.selector);
+        vm.expectRevert(IDcaManager.DcaManager__ArraysLengthMismatch.selector);
         dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
     }
 

@@ -410,7 +410,7 @@ contract DcaManagerEdgeCasesTest is Test {
         uint64[] memory ids = new uint64[](2);
         uint256[] memory amounts = new uint256[](2);
         
-        vm.expectRevert(IDcaManager.DcaManager__BatchPurchaseArraysLengthMismatch.selector);
+        vm.expectRevert(IDcaManager.DcaManager__ArraysLengthMismatch.selector);
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
             users,
@@ -489,7 +489,7 @@ contract DcaManagerEdgeCasesTest is Test {
         tokens[0] = address(stablecoin);
         uint256[] memory emptyRoutes = new uint256[](0);
 
-        vm.expectRevert(IDcaManager.DcaManager__WithdrawalArraysLengthMismatch.selector);
+        vm.expectRevert(IDcaManager.DcaManager__ArraysLengthMismatch.selector);
         dcaManager.withdrawAllAccumulatedRbtc(tokens, emptyRoutes);
     }
     

@@ -70,8 +70,10 @@ pairs short of another redeploy.
 
 - [x] `DcaManager.withdrawAllAccumulatedInterest`: single loop over zipped `(tokens[i], routeIndexes[i])`.
 - [x] `DcaManager.withdrawAllAccumulatedRbtc`: same.
-- [x] Length check on both, reverting with a new `DcaManager__WithdrawalArraysLengthMismatch()`, named to
-      match the existing `DcaManager__BatchPurchaseArraysLengthMismatch()`.
+- [x] Length check on both, reverting with `DcaManager__ArraysLengthMismatch()` — the same error
+      `batchBuyRbtc` uses. Review follow-up: one selector instead of a withdrawal-specific twin named
+      after `BatchPurchaseArraysLengthMismatch`. Empty/length checks live in
+      `_requirePairedWithdrawalArrays`, shared by both withdraw-alls.
 - [x] Keep every existing skip unchanged: `address(0)` handler, `!_tokenYieldsInterest(routeIndex)` on the
       interest path, and `getAccumulatedRbtcBalance == 0` on the rBTC path. A caller naming an unregistered
       or idle pair must still be skipped, not reverted.
@@ -137,7 +139,7 @@ Behaviors:
   `(DOC, sovryn)`, the paired call produces exactly two handler calls and none on `(DOC, layerbank)`.
   Assert on the third handler directly — `vm.expectCall` with count `0`, or the absence of its
   interest-withdrawn event — not merely on the user's resulting balance, which is equal either way.
-- `tokens.length != routeIndexes.length` reverts `DcaManager__WithdrawalArraysLengthMismatch`.
+- `tokens.length != routeIndexes.length` reverts `DcaManager__ArraysLengthMismatch`.
 - An unregistered pair in the middle of a valid list is skipped, and the pairs after it still execute.
 - An idle route is skipped on the interest path; a zero rBTC balance is skipped on the rBTC path.
 - A duplicated pair is harmless (the second pass finds nothing left to withdraw).
@@ -185,8 +187,11 @@ mints its own second stablecoin and needs the LayerBank mocks, so it is Anvil-an
 | `make fork-sovryn` | 299 / 14 / 313 | 307 / 15 / 322 |
 | `make fork-tropykus` | 292 / 18 / 310 | 300 / 19 / 319 |
 
-`DcaManager` runtime 22,470 → 22,664 bytes (EIP-170 margin 2,106 → 1,912): the two new guards and their
-custom errors cost more than the removed inner loop saves. No handler changed.
+`DcaManager` runtime 22,470 → 22,578 bytes (EIP-170 margin 2,106 → 1,998): the empty-array
+guards cost more than the removed inner loop saves; a review follow-up then shared
+`_requirePairedWithdrawalArrays` and folded both length-mismatch errors into
+`DcaManager__ArraysLengthMismatch`, which clawed 86 bytes back from the 22,664 first-push size.
+No handler changed.
 
 ## Reviewer checklist
 
@@ -201,8 +206,10 @@ custom errors cost more than the removed inner loop saves. No handler changed.
 - ABI: argument semantics change on `withdrawAllAccumulatedInterest` / `withdrawAllAccumulatedRbtc`
   — the selectors are unchanged, so an un-updated caller compiles and sends successfully while meaning
   something different; this is the same-selector semantic change decision 1 accepted, and it is called
-  out here and in the PR body rather than softened with a legacy alias. Plus two new errors —
-  `DcaManager__WithdrawalArraysLengthMismatch()` and `DcaManager__EmptyWithdrawalArrays()`. No event
+  out here and in the PR body rather than softened with a legacy alias. Plus `DcaManager__EmptyWithdrawalArrays()`,
+  and `DcaManager__ArraysLengthMismatch()` which also replaces `DcaManager__BatchPurchaseArraysLengthMismatch()`
+  on `batchBuyRbtc` (same check, one selector). Empty errors stay split (`EmptyBatchPurchaseArrays` /
+  `EmptyWithdrawalArrays`) so a revert still names the entry point. No event
   change. The local-variable rename has no ABI surface.
 - Scripts: none.
 - Cutover: the frontend must send explicit pairs — one `tokens[i]` per `routeIndexes[i]` — and drops the
@@ -210,13 +217,14 @@ custom errors cost more than the removed inner loop saves. No handler changed.
   `data-api`'s `InterestWithdrawal` entity and `bitchill-monitoring`'s backfill both consume handler events
   and neither decodes the withdraw-all calldata arrays.
 - **Frontend follow-up required** (`AGENTS.md` **Frontend follow-up**). This PR changes an argument list
-  and adds two custom errors on `DcaManager`, so the implementer opens or updates an issue on
-  `bitChillRSK/front-end` in the same turn as opening the contracts PR and pastes the URL in the PR
-  **Cutover / frontend note**. Search first: BitChillRSK/front-end#13 already scopes the cartesian API out
-  to `dca-contracts`. Done at implementation time as
+  and adds `DcaManager__EmptyWithdrawalArrays` plus `DcaManager__ArraysLengthMismatch` (the latter also
+  replaces `BatchPurchaseArraysLengthMismatch` on `batchBuyRbtc`), so the implementer opens or updates
+  an issue on `bitChillRSK/front-end` in the same turn as opening the contracts PR and pastes the URL in
+  the PR **Cutover / frontend note**. Search first: BitChillRSK/front-end#13 already scopes the cartesian
+  API out to `dca-contracts`. Done at implementation time as
   [front-end#21](https://github.com/BitChillRSK/front-end/issues/21) — a new issue rather than a comment
-  on #13, which was already closed. The issue body names the old vs new call, and the files that still
-  assume the cartesian form —
+  on #13, which was already closed. Review follow-up comments on #21 for the error rename. The issue
+  body names the old vs new call, and the files that still assume the cartesian form —
   `src/features/interest/utils/uniqueTokensAndProtocolIndexes.ts` (deleted), `InterestDashboard.tsx`, and
   `AccumulatedRbtcCard.tsx`.
 - Behavior change beyond the signature: an empty-array call now reverts instead of succeeding as a no-op.

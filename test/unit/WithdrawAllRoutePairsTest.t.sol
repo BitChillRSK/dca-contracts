@@ -212,9 +212,9 @@ contract WithdrawAllRoutePairsTest is BaseDeploymentTest {
         routeIndexes[0] = ROUTE_ONE;
 
         vm.startPrank(USER);
-        vm.expectRevert(IDcaManager.DcaManager__WithdrawalArraysLengthMismatch.selector);
+        vm.expectRevert(IDcaManager.DcaManager__ArraysLengthMismatch.selector);
         dcaManager.withdrawAllAccumulatedInterest(tokens, routeIndexes);
-        vm.expectRevert(IDcaManager.DcaManager__WithdrawalArraysLengthMismatch.selector);
+        vm.expectRevert(IDcaManager.DcaManager__ArraysLengthMismatch.selector);
         dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
         vm.stopPrank();
     }
