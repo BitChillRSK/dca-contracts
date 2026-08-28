@@ -1,6 +1,6 @@
 # R10 — First-party natspec and comments
 
-Status: **not started** · Assigned: yes · Optional/further-review: no
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
 PR 48 of the relaunch stack. Final item. Stack on R9 (PR 47). ABI, names, handlers, route maps, packing, pauses, and the swapper batcher are already frozen. This PR only documents that surface.
 
@@ -31,12 +31,12 @@ SwapperBatcher and OperationsAdmin already use `@inheritdoc` on several function
 
 ## Scope
 
-- [ ] First-party interfaces under `src/interfaces/` plus BitChill-owned protocol interfaces (`IIdleErc20Handler`, `ILayerBankErc20Handler`): complete `@notice`/`@param`/`@return` on the public ABI. Fix stale or copy-paste text (idle is a route class, not “lending index 0”; Uniswap safety-check setter is a config floor, not the swap percent).
-- [ ] First-party implementations: `@inheritdoc` on interface overrides; contract `@title` + `@notice` that names the real composition (funding base + purchase route); constructors document every parameter including `feeCollector` / `initialOwner` / `uniswapSettings` where missing.
-- [ ] Stale facts: `IdleDocHandlerMoc` “lending index 0”; `SovrynErc20HandlerDex` “ISovrynErc20HandlerDex interface”; `FeeHandler` `@title TokenHandler`; `src/idle/README.md` still saying index 0 has “no protocol name” and that `DeployMocSwaps` wiring is a later PR.
-- [ ] Third-party ABI wrappers (`IMocProxy`, `IWRBTC`, `ICoinPairPrice`, `IkToken`, `IiSusdToken`, `ILayerBankPool`, `ILayerBankAToken`): a short first-party `@notice` of how BitChill uses them. Do **not** rewrite vendor function dumps (`ICoinPairPrice`, Compound-copied `IkToken` bodies).
-- [ ] `IStablecoin` is a mock-facing mintable subset used only from `test/mocks`. Mark it as such; do not present it as a production ABI.
-- [ ] No selector, event, error, storage, or bytecode change. Prove with `forge inspect` methodIdentifiers and storageLayout on the production contracts before/after.
+- [x] First-party interfaces under `src/interfaces/` plus BitChill-owned protocol interfaces (`IIdleErc20Handler`, `ILayerBankErc20Handler`): complete `@notice`/`@param`/`@return` on the public ABI. Fix stale or copy-paste text (idle is a route class, not “lending index 0”; Uniswap safety-check setter is a config floor, not the swap percent).
+- [x] First-party implementations: `@inheritdoc` on interface overrides; contract `@title` + `@notice` that names the real composition (funding base + purchase route); constructors document every parameter including `feeCollector` / `initialOwner` / `uniswapSettings` where missing.
+- [x] Stale facts: `IdleDocHandlerMoc` “lending index 0”; `SovrynErc20HandlerDex` “ISovrynErc20HandlerDex interface”; `FeeHandler` `@title TokenHandler`; `src/idle/README.md` still saying index 0 has “no protocol name” and that `DeployMocSwaps` wiring is a later PR.
+- [x] Third-party ABI wrappers (`IMocProxy`, `IWRBTC`, `ICoinPairPrice`, `IkToken`, `IiSusdToken`, `ILayerBankPool`, `ILayerBankAToken`): a short first-party `@notice` of how BitChill uses them. Do **not** rewrite vendor function dumps (`ICoinPairPrice`, Compound-copied `IkToken` bodies). `ILayerBankPool` / `ILayerBankAToken` already had that header and were left as-is.
+- [x] `IStablecoin` is a mock-facing mintable subset used only from `test/mocks`. Mark it as such; do not present it as a production ABI.
+- [x] No selector, event, error, storage, or bytecode change. Prove with `forge inspect` methodIdentifiers and storageLayout on the production contracts before/after.
 
 ## Out of scope
 
@@ -115,11 +115,11 @@ No new behavioral tests. Comments do not change bytecode.
 
 ## Success criteria
 
-- [ ] User-facing ABI docs live on first-party interfaces; implementing functions use `@inheritdoc` (plus `@dev` only for implementation-only facts).
-- [ ] No first-party `src/` comment names a relaunch ticket or a deleted interface.
-- [ ] Idle is documented as route class / default index 0, not a lending protocol.
-- [ ] `forge inspect` methodIdentifiers and storageLayout unchanged on the production contracts.
-- [ ] No open product decisions.
+- [x] User-facing ABI docs live on first-party interfaces; implementing functions use `@inheritdoc` (plus `@dev` only for implementation-only facts).
+- [x] No first-party `src/` comment names a relaunch ticket or a deleted interface.
+- [x] Idle is documented as route class / default index 0, not a lending protocol.
+- [x] `forge inspect` methodIdentifiers and storageLayout unchanged on the production contracts.
+- [x] No open product decisions.
 
 ## Reviewer checklist
 
