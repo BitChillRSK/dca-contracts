@@ -426,7 +426,7 @@ contract DcaManagerEdgeCasesTest is Test {
                            SCHEDULE MODIFICATION EDGE CASES
     //////////////////////////////////////////////////////////////*/
     
-    function test_setPurchaseAmount_reverts_zeroAmount() public {
+    function test_updatePurchaseAmount_reverts_zeroAmount() public {
         // Create a schedule first
         vm.prank(USER);
         dcaManager.createDcaSchedule(
@@ -442,17 +442,17 @@ contract DcaManagerEdgeCasesTest is Test {
         bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
         vm.expectRevert();
         vm.prank(USER);
-        dcaManager.setPurchaseAmount(address(stablecoin), 0, scheduleId, 0);
+        dcaManager.updatePurchaseAmount(address(stablecoin), 0, scheduleId, 0);
     }
     
-    function test_setPurchaseAmount_reverts_invalidScheduleIndex() public {
+    function test_updatePurchaseAmount_reverts_invalidScheduleIndex() public {
         bytes32 fakeScheduleId = keccak256("fake");
         vm.expectRevert(); // Should revert due to array bounds
         vm.prank(USER);
-        dcaManager.setPurchaseAmount(address(stablecoin), 999, fakeScheduleId, 100 ether);
+        dcaManager.updatePurchaseAmount(address(stablecoin), 999, fakeScheduleId, 100 ether);
     }
     
-    function test_setPurchasePeriod_reverts_invalidPeriod() public {
+    function test_updatePurchasePeriod_reverts_invalidPeriod() public {
         // Create a schedule first
         vm.prank(USER);
         dcaManager.createDcaSchedule(
@@ -468,7 +468,7 @@ contract DcaManagerEdgeCasesTest is Test {
         bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
         vm.expectRevert(IDcaManager.DcaManager__PurchasePeriodMustBeGreaterThanMinimum.selector);
         vm.prank(USER);
-        dcaManager.setPurchasePeriod(address(stablecoin), 0, scheduleId, MIN_PURCHASE_PERIOD - 1);
+        dcaManager.updatePurchasePeriod(address(stablecoin), 0, scheduleId, MIN_PURCHASE_PERIOD - 1);
     }
     
     /*//////////////////////////////////////////////////////////////
@@ -567,11 +567,11 @@ contract DcaManagerEdgeCasesTest is Test {
         
         vm.expectRevert();
         vm.prank(USER);
-        dcaManager.setPurchaseAmount(address(stablecoin), invalidIndex, fakeScheduleId, 100 ether);
+        dcaManager.updatePurchaseAmount(address(stablecoin), invalidIndex, fakeScheduleId, 100 ether);
         
         vm.expectRevert();
         vm.prank(USER);
-        dcaManager.setPurchasePeriod(address(stablecoin), invalidIndex, fakeScheduleId, MIN_PURCHASE_PERIOD);
+        dcaManager.updatePurchasePeriod(address(stablecoin), invalidIndex, fakeScheduleId, MIN_PURCHASE_PERIOD);
     }
     
     function testFuzz_invalidAmounts(uint256 seed) public {
