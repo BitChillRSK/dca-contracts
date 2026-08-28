@@ -1,6 +1,6 @@
 # R40 — `updatePurchaseAmount` / `updatePurchasePeriod` and previous/new events
 
-Status: **in progress** · Assigned: yes · Optional/further-review: no
+Status: **done** · Assigned: yes (PR 37 / [#87](https://github.com/BitChillRSK/dca-contracts/pull/87)) · Optional/further-review: no
 
 PR 37 of the relaunch stack. Stack on R41 (PR 36). **Must land before R9 (ABI freeze).**
 
@@ -24,16 +24,16 @@ Decided 2026-08-27: rename + previous/new for the period setter. Extended 2026-0
 
 ## Scope
 
-- [ ] `DcaManager.setPurchaseAmount` → `updatePurchaseAmount`. Same args, same checks (`_validatePurchaseAmount` against the schedule's current `tokenBalance`), invariant 6 (`nonReentrant`) unchanged.
-- [ ] `DcaManager.setPurchasePeriod` → `updatePurchasePeriod`. Same args, same checks (`_validatePurchasePeriod`), invariant 6 (`nonReentrant`) unchanged.
-- [ ] Replace `DcaManager__PurchaseAmountSet(user indexed, scheduleId indexed, purchaseAmount indexed)` with
+- [x] `DcaManager.setPurchaseAmount` → `updatePurchaseAmount`. Same args, same checks (`_validatePurchaseAmount` against the schedule's current `tokenBalance`), invariant 6 (`nonReentrant`) unchanged.
+- [x] `DcaManager.setPurchasePeriod` → `updatePurchasePeriod`. Same args, same checks (`_validatePurchasePeriod`), invariant 6 (`nonReentrant`) unchanged.
+- [x] Replace `DcaManager__PurchaseAmountSet(user indexed, scheduleId indexed, purchaseAmount indexed)` with
       `DcaManager__PurchaseAmountUpdated(address indexed user, bytes32 indexed scheduleId, uint256 previousAmount, uint256 newAmount)`.
       Do not index `previousAmount` or `newAmount`.
-- [ ] Replace `DcaManager__PurchasePeriodSet(user indexed, scheduleId indexed, purchasePeriod indexed)` with
+- [x] Replace `DcaManager__PurchasePeriodSet(user indexed, scheduleId indexed, purchasePeriod indexed)` with
       `DcaManager__PurchasePeriodUpdated(address indexed user, bytes32 indexed scheduleId, uint256 previousPeriod, uint256 newPeriod)`.
       Do not index `previousPeriod` or `newPeriod`.
-- [ ] `IDcaManager` natspec: arguments are the new value; each event carries both.
-- [ ] Update tests, fuzz wrappers, and checked-in consumers.
+- [x] `IDcaManager` natspec: arguments are the new value; each event carries both.
+- [x] Update tests, fuzz wrappers, and checked-in consumers.
 
 ## Out of scope
 
@@ -63,9 +63,9 @@ Fork: no new assertions. Still run both fork lanes before push.
 
 ## Success criteria
 
-- [ ] Only `updatePurchaseAmount` and `updatePurchasePeriod` remain; each event has previous and new, neither indexed.
-- [ ] Frontend issue opened (`AGENTS.md` **Frontend follow-up**).
-- [ ] No open product decisions.
+- [x] Only `updatePurchaseAmount` and `updatePurchasePeriod` remain; each event has previous and new, neither indexed.
+- [x] Frontend issue opened (`AGENTS.md` **Frontend follow-up**).
+- [x] No open product decisions.
 
 ## Reviewer checklist
 
