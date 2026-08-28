@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: no · Optional/further-review: no
 
-PR 43 of the relaunch stack. Stack on R37 (PR 42). **Must land before R9 (ABI freeze).** R18/R19 and R39–R48 already settled the other DcaManager/handler ABI changes by this point.
+PR 45 of the relaunch stack. Stack on R37 (PR 44). **Must land before R9 (ABI freeze).** R18/R19/R50 and R39–R48 already settled the other DcaManager/handler ABI changes by this point.
 
 ## Objective
 

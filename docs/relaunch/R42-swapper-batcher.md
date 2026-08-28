@@ -2,7 +2,7 @@
 
 Status: **not started** · Assigned: no · Optional/further-review: no
 
-PR 44 of the relaunch stack. Stack on R38 (PR 43). Lands **before** R9/R10 so the event/ABI review and final natspec pass see every first-party contract that ships. It does not change `DcaManager`’s surface.
+PR 46 of the relaunch stack. Stack on R38 (PR 45). Lands **before** R9/R10 so the event/ABI review and final natspec pass see every first-party contract that ships. It does not change `DcaManager`’s surface.
 
 ## Objective
 
