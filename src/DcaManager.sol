@@ -169,6 +169,28 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     }
 
     /**
+     * @param token the token address
+     * @param scheduleIndex the schedule index
+     * @param scheduleId the schedule id for validation
+     * @param paused true to stop rBTC purchases for this schedule, false to resume them
+     * @notice pausing keeps the funds on the schedule's route: deposits, amount and period edits,
+     * withdrawals, interest and rBTC claims, and deletion all remain available while paused
+     * @notice writing the state the schedule already holds changes nothing and emits nothing
+     */
+    function setSchedulePaused(address token, uint256 scheduleIndex, bytes32 scheduleId, bool paused)
+        external
+        override
+        nonReentrant
+        validateScheduleIndex(msg.sender, token, scheduleIndex)
+    {
+        DcaDetails storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
+        _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
+        if (dcaSchedule.paused == paused) return;
+        dcaSchedule.paused = paused;
+        emit DcaManager__SchedulePauseSet(msg.sender, scheduleId, paused);
+    }
+
+    /**
      * @notice deposit the full stablecoin amount for DCA on the contract, set the period and the amount for purchases
      * @param token: the token address of stablecoin to deposit
      * @param depositAmount: the amount of stablecoin requested from the user; the handler reverts unless it receives exactly this, so the schedule is credited with the full request
@@ -203,7 +225,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
             purchasePeriod,
             0, // lastPurchaseTimestamp
             scheduleId,
-            routeIndex
+            routeIndex,
+            false // paused
         );
 
         schedules.push(dcaSchedule);
@@ -278,6 +301,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @notice the token and route are the same for all dca schedules in the batch.
      * @notice SWAPPER MUST NOT MIX SCHEDULES WITH DIFFERENT TOKENS OR ROUTES IN THE SAME BATCH
      * @notice This is unchecked to save gas because access to this function is controlled by the onlySwapper modifier
+     * @notice a paused schedule reverts the whole batch, so the swapper must drop paused rows before composing it
      */
     function batchBuyRbtc(
         address[] calldata buyers,
@@ -514,6 +538,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         DcaDetails memory dcaSchedule = dcaScheduleStorage;
 
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
+
+        if (dcaSchedule.paused) revert DcaManager__SchedulePaused(buyer, token, scheduleId, scheduleIndex);
 
         // @notice: After the first purchase, the schedule is eligible once the UTC day of last + period has started
         if (dcaSchedule.lastPurchaseTimestamp != 0) {

@@ -1,6 +1,6 @@
 # R19 — Per-schedule purchase pause
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
 PR 39 of the relaunch stack. Stack on R48 (PR 38). Land before R18 packing and R9.
 
@@ -20,11 +20,11 @@ This pause is user-owned and affects purchases only. R48 is the separate governa
 
 ## Scope
 
-- [ ] Add `paused` to `DcaDetails`, defaulting false on creation.
-- [ ] Add a nonReentrant, schedule-id-validated `setSchedulePaused(token, scheduleIndex, scheduleId, paused)` and a canonical event.
-- [ ] `buyRbtc` is already gone. `batchBuyRbtc` reverts a named error if any named schedule is paused; no purchase timestamp/balance/handler state changes survive.
-- [ ] Repeating the current pause state is an idempotent no-op with no event.
-- [ ] Test pause/resume, swapper rejection, stale index/id, unchanged access to every user exit/config path, and swap-pop identity.
+- [x] Add `paused` to `DcaDetails`, defaulting false on creation.
+- [x] Add a nonReentrant, schedule-id-validated `setSchedulePaused(token, scheduleIndex, scheduleId, paused)` and a canonical event.
+- [x] `buyRbtc` is already gone. `batchBuyRbtc` reverts a named error if any named schedule is paused; no purchase timestamp/balance/handler state changes survive.
+- [x] Repeating the current pause state is an idempotent no-op with no event.
+- [x] Test pause/resume, swapper rejection, stale index/id, unchanged access to every user exit/config path, and swap-pop identity.
 
 ## Out of scope
 
@@ -43,18 +43,18 @@ Run DcaSchedule, DcaManager purchase, and invariant suites. A paused row in a le
 
 ## Success criteria
 
-- [ ] Only the schedule owner can change pause state.
-- [ ] A paused schedule cannot be purchased, including through the batcher path.
-- [ ] User exits and management remain available.
-- [ ] The new field/event are present before R18/R9.
-- [ ] No open product decisions.
+- [x] Only the schedule owner can change pause state.
+- [x] A paused schedule cannot be purchased, including through the batcher path.
+- [x] User exits and management remain available.
+- [x] The new field/event are present before R18/R9.
+- [x] No open product decisions.
 
 ## Reviewer checklist
 
-- [ ] Matches **Scope**; nothing from **Out of scope**.
-- [ ] Invariant 6 covers the new mutator.
-- [ ] Batch atomicity and swap-pop identity are tested.
-- [ ] No unrelated schedule behavior changes.
+- [x] Matches **Scope**; nothing from **Out of scope**.
+- [x] Invariant 6 covers the new mutator.
+- [x] Batch atomicity and swap-pop identity are tested.
+- [x] No unrelated schedule behavior changes.
 
 ## ABI / deploy / cutover impact
 

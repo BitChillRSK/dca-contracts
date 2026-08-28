@@ -17,6 +17,7 @@ interface IDcaManager {
         uint256 lastPurchaseTimestamp; // Timestamp of the latest purchase
         bytes32 scheduleId; // Unique identifier of each DCA schedule
         uint256 routeIndex; // OperationsAdmin route that holds this schedule's funds (idle or lending)
+        bool paused; // Owner-set: purchases are refused while true; every other path stays open
     }
 
     //////////////////////
@@ -38,6 +39,7 @@ interface IDcaManager {
         uint256 purchasePeriod,
         uint256 routeIndex
     );
+    event DcaManager__SchedulePauseSet(address indexed user, bytes32 indexed scheduleId, bool paused);
     event DcaManager__DcaScheduleDeleted(address user, address token, bytes32 scheduleId, uint256 refundedAmount);
     event DcaManager__MaxSchedulesPerTokenModified(uint256 indexed newMaxSchedulesPerToken);
     event DcaManager__MinPurchasePeriodModified(uint256 indexed newMinPurchasePeriod);
@@ -69,6 +71,7 @@ interface IDcaManager {
     error DcaManager__RouteIndexMismatch(address user, address token, bytes32 scheduleId, uint256 scheduleIndex, uint256 actualRouteIndex, uint256 expectedRouteIndex);
     error DcaManager__OperationsAdminIsNotAContract(address operationsAdmin);
     error DcaManager__DepositsPaused(address token, uint256 routeIndex);
+    error DcaManager__SchedulePaused(address user, address token, bytes32 scheduleId, uint256 scheduleIndex);
 
     /*//////////////////////////////////////////////////////////////
                                FUNCTIONS
@@ -139,6 +142,18 @@ interface IDcaManager {
         external;
 
     /**
+     * @notice Pause or resume rBTC purchases for one of the caller's DCA schedules.
+     * @param token The token address of the stablecoin.
+     * @param scheduleIndex The index of the DCA schedule
+     * @param scheduleId The schedule id for validation
+     * @param paused True to stop purchases, false to resume them
+     * @dev A paused schedule keeps its funds on its route and stays open to deposits, amount and
+     *      period edits, withdrawals, interest and rBTC claims, and deletion. Setting the state it
+     *      already holds is a no-op and emits nothing, so every emitted event is a real transition.
+     */
+    function setSchedulePaused(address token, uint256 scheduleIndex, bytes32 scheduleId, bool paused) external;
+
+    /**
      * @param buyers the array of addresses of the users on behalf of whom rBTC is going to be bought
      * @notice a buyer may be featured more than once in the buyers array if two or more their schedules are due for a purchase
      * @notice we need to take extra care in the back end to not mismatch a user's address with a wrong DCA schedule
@@ -147,6 +162,8 @@ interface IDcaManager {
      * @param scheduleIds the IDs of the DCA schedules that correspond to each user's purchase
      * @param purchaseAmounts the purchase amount that corresponds to each user's purchase
      * @param routeIndex the route all schedules in this batch must share
+     * @dev reverts DcaManager__SchedulePaused if any named schedule is paused, which fails the whole
+     *      batch: the swapper must filter paused schedules out before composing the call
      */
     function batchBuyRbtc(
         address[] calldata buyers,
