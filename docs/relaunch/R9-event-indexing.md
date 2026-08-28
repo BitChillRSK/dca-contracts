@@ -41,6 +41,7 @@ Diagnostic errors such as `DcaManager__PurchaseAmountMismatch` (six args) stay. 
 - [ ] Tests: each emit site; replay from a fresh deploy reconstructs balances from the event stream.
 - [ ] `FeeHandler__FeeTransferred(address indexed token, address indexed collector, uint256 amount)` from `_transferFee` when `fee > 0`. Skip a zero-fee transfer if `_transferFee` is not called; if it is called with 0, do not emit. Batch = one event for the aggregated fee. Do not index `amount`.
 - [ ] Do not shorten custom-error argument lists. Do not rename errors for brevity.
+- [ ] Decide whether `DcaManager__SchedulePauseSet(address indexed user, bytes32 indexed scheduleId, bool paused)` (R19) should also carry `token`. It does not today, deliberately: it matches `PurchaseAmountUpdated` / `PurchasePeriodUpdated`, which are also user+scheduleId only. The consequence is that no consumer can filter pause transitions by token on-chain — an indexer has to join on `scheduleId` to learn which token a pause affected. That is the right trade for R19 in isolation; this is the last PR that can revisit it, so confirm or change it here rather than discovering it after the freeze.
 
 ## Out of scope
 

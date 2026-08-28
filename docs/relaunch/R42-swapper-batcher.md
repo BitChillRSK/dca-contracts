@@ -30,6 +30,15 @@ Decided 2026-08-27: **ship the batcher** as a relaunch item, not optional-late.
 
 **none** — decided 2026-08-27: calls are all-or-nothing, with no `try/catch`; the bot EOA remains allowlisted as a break-glass/single-handler retry path alongside the batcher.
 
+**Re-confirm that trade against R19 before implementing.** R19 (PR 39) shipped a free, instant,
+reversible per-schedule purchase pause, and a paused row reverts its whole `batchBuyRbtc`. Bundling
+means one paused schedule now takes down **every venue in the bundle**, not just its own
+token×route, and the only mitigation is the bot's off-chain filter, which races the pause. The
+all-or-nothing decision predates that and still looks right — partial bundles reintroduce exactly
+the partial-failure accounting this design avoids, and the allowlisted bot EOA is the break-glass —
+but this PR should say so explicitly rather than inherit the decision silently. See
+[`R19-schedule-pause.md`](./R19-schedule-pause.md).
+
 ## Scope
 
 - [ ] `src/SwapperBatcher.sol` (name may vary): immutable `dcaManager`, no token custody, no `receive` that holds rBTC.

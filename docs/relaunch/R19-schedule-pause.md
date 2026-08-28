@@ -56,6 +56,47 @@ Run DcaSchedule, DcaManager purchase, and invariant suites. A paused row in a le
 - [x] Batch atomicity and swap-pop identity are tested.
 - [x] No unrelated schedule behavior changes.
 
+## Measured cost, and why R18 follows immediately
+
+The `paused` bool is appended to an unpacked `DcaDetails`, so it takes a seventh slot and
+`_rBtcPurchaseChecksEffects` — which copies the whole struct to memory — reads one more cold slot
+per batch row. Measured on `RbtcPurchaseTest` against the R48 base:
+
+| Test | Base | R19 | Delta |
+|---|---|---|---|
+| `testSinglePurchase` | 304,203 | 307,788 | +3,585 |
+| `testBatchPurchasesOneUser` (5 rows) | 2,369,851 | 2,446,343 | +76,492 |
+| `testSeveralPurchasesWithSeveralSchedules` | 4,553,979 | 4,618,819 | +64,840 |
+
+This lands on the **protocol-paid** purchase path, which `AGENTS.md` invariant 6 singles out as the
+one place where a gas win is worth having — and it is roughly the same order as the ~2,300 gas that
+invariant refuses to buy by weakening reentrancy protection. It is accepted here only because it is
+temporary: R18 (PR 40, the next PR) packs `paused` into the slot holding `purchasePeriod`,
+`lastPurchaseTimestamp`, and `routeIndex`, which removes the extra slot read. **The merge order is
+load-bearing, not incidental** — shipping R19 without R18 behind it leaves a permanent per-row cost
+on every batch the swapper pays for.
+
+## Griefing surface: pause makes an existing batch DoS cheaper
+
+One user pausing their own schedule reverts a batch carrying other users' schedules. The victims
+keep their balance and timestamp, so this is a missed tick, not a loss.
+
+This is not a new class. `updatePurchaseAmount` alone already reverts a whole batch identically, via
+`DcaManager__PurchaseAmountMismatch`, and so does any withdrawal that drops a row below its purchase
+amount. What R19 changes is the **price**: withdrawing or deleting costs the griefer their position,
+and an amount edit changes their own DCA, whereas a pause is free, instant, and reversible.
+
+Two consequences worth stating rather than discovering later:
+
+- **The mitigation is entirely off-chain and racy.** The bot filters paused schedules at compose
+  time; a pause landing between compose and execution still takes the tick down. Nothing on-chain
+  prevents it, and R19 does not try to — per-row skipping would mean partial batches, which the
+  batch design deliberately rejects.
+- **R42 widens the blast radius.** The swapper batcher (PR 44) bundles several `batchBuyRbtc` calls
+  all-or-nothing, so after R42 a single paused row takes down *every venue in the bundle*, not just
+  its own token×route. [`R42-swapper-batcher.md`](./R42-swapper-batcher.md) records that atomicity as
+  a deliberate trade; R19 raises its cost, so R42 should re-confirm the trade with pause in mind.
+
 ## ABI / deploy / cutover impact
 
 - ABI: `DcaDetails` gains `paused`; new setter/event/error.
