@@ -30,16 +30,24 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @notice Each user may create different schedules with one or more stablecoins
      */
     mapping(address user => mapping(address tokenDeposited => DcaSchedule[] usersDcaSchedules)) private s_dcaSchedules;
-    uint256 private s_minPurchasePeriod; // Minimum time between purchases
-    uint256 private s_maxSchedulesPerToken; // Maximum number of schedules per stablecoin
-    uint256 private s_defaultMinPurchaseAmount; // Default minimum purchase amount for all tokens
-    mapping(address token => uint256) private s_tokenMinPurchaseAmounts; // Custom minimum purchase amounts per token
+
     /**
-     * @notice Strictly increasing counter used to derive schedule ids.
-     * @dev Ids must not be derived from array state: swap-pop on delete can restore a previous
+     * @notice The protocol scalars every create reads, plus the id counter it writes.
+     * @dev One slot (30 of 32 bytes): `createDcaSchedule` loads all four together and stores the
+     * bumped nonce back into the same word. Owner setters take `uint256` and SafeCast here.
+     * @dev `scheduleNonce` is a strictly increasing counter and is the schedule id itself.
+     * Ids must not be derived from array state: swap-pop on delete can restore a previous
      * array shape within a block, which would let two live schedules share an id.
      */
-    uint256 private s_scheduleNonce = 1;
+    struct ProtocolSettings {
+        uint32 minPurchasePeriod; // Minimum time between purchases
+        uint16 maxSchedulesPerToken; // Maximum number of schedules per stablecoin
+        uint128 defaultMinPurchaseAmount; // Default minimum purchase amount for all tokens
+        uint64 scheduleNonce; // Last assigned schedule id; 0 before the first schedule is created
+    }
+
+    ProtocolSettings private s_protocolSettings;
+    mapping(address token => uint256) private s_tokenMinPurchaseAmounts; // Custom minimum purchase amounts per token
 
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
@@ -98,9 +106,12 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
             revert DcaManager__OperationsAdminIsNotAContract(operationsAdminAddress);
         }
         i_operationsAdmin = OperationsAdmin(operationsAdminAddress);
-        s_minPurchasePeriod = minPurchasePeriod;
-        s_maxSchedulesPerToken = maxSchedulesPerToken;
-        s_defaultMinPurchaseAmount = defaultMinPurchaseAmount;
+        s_protocolSettings = ProtocolSettings({
+            minPurchasePeriod: minPurchasePeriod.toUint32(),
+            maxSchedulesPerToken: maxSchedulesPerToken.toUint16(),
+            defaultMinPurchaseAmount: defaultMinPurchaseAmount.toUint128(),
+            scheduleNonce: 0
+        });
     }
 
     /**
@@ -111,7 +122,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @param depositAmount the amount of stablecoin requested from the user; the handler reverts unless it receives exactly this, so the schedule is credited with the full request
      * @notice reverts before any transfer if governance paused deposits on this schedule's route
      */
-    function depositToken(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 depositAmount)
+    function depositToken(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 depositAmount)
         external
         override
         nonReentrant
@@ -135,7 +146,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @notice the amount cannot exceed the schedule's current token balance
      * @notice the emitted event carries both the amount replaced and the new one
      */
-    function updatePurchaseAmount(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 newPurchaseAmount)
+    function updatePurchaseAmount(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 newPurchaseAmount)
         external
         override
         nonReentrant
@@ -158,7 +169,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @notice the period cannot be shorter than the minimum purchase period
      * @notice the emitted event carries both the period replaced and the new one
      */
-    function updatePurchasePeriod(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 newPurchasePeriod)
+    function updatePurchasePeriod(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 newPurchasePeriod)
         external
         override
         nonReentrant
@@ -181,7 +192,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * withdrawals, interest and rBTC claims, and deletion all remain available while paused
      * @notice writing the state the schedule already holds changes nothing and emits nothing
      */
-    function setSchedulePaused(address token, uint256 scheduleIndex, bytes32 scheduleId, bool paused)
+    function setSchedulePaused(address token, uint256 scheduleIndex, uint64 scheduleId, bool paused)
         external
         override
         nonReentrant
@@ -216,18 +227,23 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         uint32 period = purchasePeriod.toUint32();
         uint32 route = routeIndex.toUint32();
 
-        _validatePurchasePeriod(purchasePeriod);
+        // One load of the packed scalars, and the id this schedule will carry. The nonce is bumped
+        // through SafeCast here so an exhausted counter reverts before the deposit is pulled.
+        ProtocolSettings memory settings = s_protocolSettings;
+        uint64 scheduleId = (uint256(settings.scheduleNonce) + 1).toUint64();
+
+        _checkPurchasePeriod(purchasePeriod, settings.minPurchasePeriod);
         _validateDeposit(depositAmount);
         uint256 received = _handlerForDeposit(token, route).depositToken(msg.sender, depositAmount);
         _validatePurchaseAmount(token, purchaseAmount, received);
 
         DcaSchedule[] storage schedules = s_dcaSchedules[msg.sender][token];
         uint256 numOfSchedules = schedules.length;
-        if (numOfSchedules >= s_maxSchedulesPerToken) {
+        if (numOfSchedules >= settings.maxSchedulesPerToken) {
             revert DcaManager__MaxSchedulesPerTokenReached(token);
         }
 
-        bytes32 scheduleId = keccak256(abi.encodePacked(msg.sender, token, ++s_scheduleNonce));
+        s_protocolSettings.scheduleNonce = scheduleId;
 
         schedules.push(
             DcaSchedule({
@@ -257,7 +273,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @param scheduleIndex: the index of the schedule to delete
      * @param scheduleId: the id of the schedule to delete for validation
      */
-    function deleteDcaSchedule(address token, uint256 scheduleIndex, bytes32 scheduleId) external override 
+    function deleteDcaSchedule(address token, uint256 scheduleIndex, uint64 scheduleId) external override 
         validateScheduleIndex(msg.sender, token, scheduleIndex)
         nonReentrant
     {
@@ -292,7 +308,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @param scheduleId: the schedule id for validation
      * @param withdrawalAmount: the amount to withdraw
      */
-    function withdrawToken(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 withdrawalAmount)
+    function withdrawToken(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 withdrawalAmount)
         external
         override
         nonReentrant
@@ -317,7 +333,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         address[] calldata buyers,
         address token,
         uint256[] calldata scheduleIndexes,
-        bytes32[] calldata scheduleIds,
+        uint64[] calldata scheduleIds,
         uint256[] calldata purchaseAmounts,
         uint256 routeIndex
     ) external override onlySwapper {
@@ -376,7 +392,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     function withdrawTokenAndInterest(
         address token,
         uint256 scheduleIndex,
-        bytes32 scheduleId,
+        uint64 scheduleId,
         uint256 withdrawalAmount
     ) external override nonReentrant {
         uint256 routeIndex = _withdrawToken(token, scheduleIndex, scheduleId, withdrawalAmount);
@@ -416,7 +432,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         onlyOwner
         validateMinPurchasePeriod(minPurchasePeriod)
     {
-        s_minPurchasePeriod = minPurchasePeriod;
+        s_protocolSettings.minPurchasePeriod = minPurchasePeriod.toUint32();
         emit DcaManager__MinPurchasePeriodModified(minPurchasePeriod);
     }
 
@@ -425,7 +441,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @param maxSchedulesPerToken: the new maximum number of schedules per token
      */
     function modifyMaxSchedulesPerToken(uint256 maxSchedulesPerToken) external override onlyOwner {
-        s_maxSchedulesPerToken = maxSchedulesPerToken;
+        s_protocolSettings.maxSchedulesPerToken = maxSchedulesPerToken.toUint16();
         emit DcaManager__MaxSchedulesPerTokenModified(maxSchedulesPerToken);
     }
 
@@ -434,7 +450,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @param defaultMinPurchaseAmount: the new default minimum purchase amount
      */
     function modifyDefaultMinPurchaseAmount(uint256 defaultMinPurchaseAmount) external override onlyOwner {
-        s_defaultMinPurchaseAmount = defaultMinPurchaseAmount;
+        s_protocolSettings.defaultMinPurchaseAmount = defaultMinPurchaseAmount.toUint128();
         emit DcaManager__DefaultMinPurchaseAmountModified(defaultMinPurchaseAmount);
     }
 
@@ -457,7 +473,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @param scheduleId: the schedule id to validate
      * @param dcaScheduleScheduleId: the schedule id to validate against
      */
-    function _validateScheduleId(bytes32 scheduleId, bytes32 dcaScheduleScheduleId) private pure {
+    function _validateScheduleId(uint64 scheduleId, uint64 dcaScheduleScheduleId) private pure {
         if (scheduleId != dcaScheduleScheduleId) revert DcaManager__ScheduleIdAndIndexMismatch();
     }
 
@@ -474,7 +490,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     ) private view {
         uint256 minPurchaseAmount = s_tokenMinPurchaseAmounts[token];
         if (minPurchaseAmount == 0) {
-            minPurchaseAmount = s_defaultMinPurchaseAmount;
+            minPurchaseAmount = s_protocolSettings.defaultMinPurchaseAmount;
         }
         
         if (purchaseAmount < minPurchaseAmount) {
@@ -490,7 +506,18 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @param purchasePeriod the purchase period to validate
      */
     function _validatePurchasePeriod(uint256 purchasePeriod) private view {
-        if (purchasePeriod < s_minPurchasePeriod) revert DcaManager__PurchasePeriodMustBeGreaterThanMinimum();
+        _checkPurchasePeriod(purchasePeriod, s_protocolSettings.minPurchasePeriod);
+    }
+
+    /**
+     * @notice the one purchase-period rule, against an already-loaded minimum
+     * @param purchasePeriod the purchase period to validate
+     * @param minPurchasePeriod the protocol minimum this period must reach
+     * @dev `createDcaSchedule` reads the packed scalars once and passes the minimum in; every other
+     *      caller goes through `_validatePurchasePeriod`, which loads it.
+     */
+    function _checkPurchasePeriod(uint256 purchasePeriod, uint256 minPurchasePeriod) private pure {
+        if (purchasePeriod < minPurchasePeriod) revert DcaManager__PurchasePeriodMustBeGreaterThanMinimum();
     }
 
     /**
@@ -539,7 +566,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @param scheduleId: the id of the schedule
      * @return the purchase amount and route index
      */
-    function _rBtcPurchaseChecksEffects(address buyer, address token, uint256 scheduleIndex, bytes32 scheduleId)
+    function _rBtcPurchaseChecksEffects(address buyer, address token, uint256 scheduleIndex, uint64 scheduleId)
         private
         validateScheduleIndex(buyer, token, scheduleIndex)
         returns (uint256, uint256)
@@ -597,7 +624,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @param withdrawalAmount: the amount to withdraw, or type(uint256).max for this schedule's whole token balance
      * @return routeIndex the schedule's stored route, captured before the handler call
      */
-    function _withdrawToken(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 withdrawalAmount)
+    function _withdrawToken(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 withdrawalAmount)
         private
         validateScheduleIndex(msg.sender, token, scheduleIndex)
         returns (uint256 routeIndex)
@@ -713,7 +740,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @return the minimum purchase period
      */
     function getMinPurchasePeriod() external view override returns (uint256) {
-        return s_minPurchasePeriod;
+        return s_protocolSettings.minPurchasePeriod;
     }
 
     /**
@@ -721,17 +748,18 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @return the maximum number of schedules per token
      */
     function getMaxSchedulesPerToken() external view override returns (uint256) {
-        return s_maxSchedulesPerToken;
+        return s_protocolSettings.maxSchedulesPerToken;
     }
 
     /**
      * @notice get the total number of DCA schedules ever created, across all users and tokens
-     * @dev Never decreases: deleting a schedule does not decrement it. Compare against the number of
+     * @dev This is the id counter itself, so it is also the last `scheduleId` handed out. Never
+     * decreases: deleting a schedule does not decrement it. Compare against the number of
      * DcaManager__DcaScheduleCreated events an indexer has ingested to detect missed events.
      * @return the lifetime count of created schedules
      */
     function getSchedulesCreatedCount() external view override returns (uint256) {
-        return s_scheduleNonce - 1;
+        return s_protocolSettings.scheduleNonce;
     }
 
     /**
@@ -739,7 +767,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @return the default minimum purchase amount
      */
     function getDefaultMinPurchaseAmount() external view override returns (uint256) {
-        return s_defaultMinPurchaseAmount;
+        return s_protocolSettings.defaultMinPurchaseAmount;
     }
 
     /**
@@ -751,7 +779,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     function getTokenMinPurchaseAmount(address token) external view override returns (uint256 minPurchaseAmount, bool customMinAmountSet) {
         uint256 customAmount = s_tokenMinPurchaseAmounts[token];
         customMinAmountSet = customAmount != 0;
-        minPurchaseAmount = customMinAmountSet ? customAmount : s_defaultMinPurchaseAmount;
+        minPurchaseAmount = customMinAmountSet ? customAmount : s_protocolSettings.defaultMinPurchaseAmount;
     }
 
     /**

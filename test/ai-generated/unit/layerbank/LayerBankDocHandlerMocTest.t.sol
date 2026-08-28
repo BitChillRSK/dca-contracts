@@ -62,7 +62,7 @@ contract LayerBankDocHandlerMocTest is Test {
     function test_lengthOneBatch_flow() public {
         uint256 depositAmount = 500 ether;
         uint256 purchaseAmount = 100 ether;
-        bytes32 scheduleId = keccak256("schedule");
+        uint64 scheduleId = 1;
 
         handler.depositToken(USER, depositAmount);
         uint256 sharesBefore = handler.getUserShares(USER);
@@ -98,12 +98,12 @@ contract LayerBankDocHandlerMocTest is Test {
         }
 
         address[] memory buyers = new address[](3);
-        bytes32[] memory scheduleIds = new bytes32[](3);
+        uint64[] memory scheduleIds = new uint64[](3);
         uint256[] memory purchaseAmounts = new uint256[](3);
         uint256 purchaseBase = 50 ether;
         for (uint256 i = 0; i < buyers.length; i++) {
             buyers[i] = users[i];
-            scheduleIds[i] = keccak256(abi.encodePacked("schedule", i));
+            scheduleIds[i] = uint64(i + 1);
             purchaseAmounts[i] = purchaseBase * (i + 1);
         }
 

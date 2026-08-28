@@ -137,7 +137,7 @@ contract FeeOnTransferDepositTest is Test {
 
     function test_depositToken_revertsWhenTransferFeeTakesACut() public {
         uint256 otherIdleBefore = _createIdle(OTHER, MIN_PURCHASE_AMOUNT);
-        bytes32 scheduleId = _createIdleSchedule(USER, MIN_PURCHASE_AMOUNT, IDLE_INDEX);
+        uint64 scheduleId = _createIdleSchedule(USER, MIN_PURCHASE_AMOUNT, IDLE_INDEX);
 
         token.setFeeBps(FEE_BPS);
         uint256 userBefore = token.balanceOf(USER);
@@ -225,7 +225,7 @@ contract FeeOnTransferDepositTest is Test {
     }
 
     function test_depositToken_creditsRequested_whenTokenIsOneToOne() public {
-        bytes32 scheduleId = _createIdleSchedule(USER, MIN_PURCHASE_AMOUNT, IDLE_INDEX);
+        uint64 scheduleId = _createIdleSchedule(USER, MIN_PURCHASE_AMOUNT, IDLE_INDEX);
         uint256 userBefore = token.balanceOf(USER);
 
         vm.prank(USER);
@@ -242,7 +242,7 @@ contract FeeOnTransferDepositTest is Test {
 
     function test_buyAndWithdraw_keepIdleBooksInLockstep() public {
         uint256 otherIdleBefore = _createIdle(OTHER, MIN_PURCHASE_AMOUNT);
-        bytes32 scheduleId = _createIdleSchedule(USER, MIN_PURCHASE_AMOUNT, IDLE_INDEX);
+        uint64 scheduleId = _createIdleSchedule(USER, MIN_PURCHASE_AMOUNT, IDLE_INDEX);
 
         // The deposit already landed 1:1; the token only starts charging afterwards.
         token.setFeeBps(FEE_BPS);
@@ -268,7 +268,7 @@ contract FeeOnTransferDepositTest is Test {
     }
 
     function test_deleteDcaSchedule_reportsHandlerSpent_notUserReceived() public {
-        bytes32 scheduleId = _createIdleSchedule(USER, MIN_PURCHASE_AMOUNT, IDLE_INDEX);
+        uint64 scheduleId = _createIdleSchedule(USER, MIN_PURCHASE_AMOUNT, IDLE_INDEX);
         token.setFeeBps(FEE_BPS);
 
         uint256 userBefore = token.balanceOf(USER);
@@ -309,7 +309,7 @@ contract FeeOnTransferDepositTest is Test {
 
     function test_depositTwice_tropykus_hop1Sums_underlyingLags() public {
         kToken.setMintShortfallBps(FEE_BPS);
-        bytes32 scheduleId = _createTropykusSchedule(USER, MIN_PURCHASE_AMOUNT);
+        uint64 scheduleId = _createTropykusSchedule(USER, MIN_PURCHASE_AMOUNT);
 
         vm.prank(USER);
         dcaManager.depositToken(address(token), 0, scheduleId, REQUESTED);
@@ -324,7 +324,7 @@ contract FeeOnTransferDepositTest is Test {
 
     function test_tropykus_withdraw_stillWorksWhenShareBookLags() public {
         kToken.setMintShortfallBps(FEE_BPS);
-        bytes32 scheduleId = _createTropykusSchedule(USER, MIN_PURCHASE_AMOUNT);
+        uint64 scheduleId = _createTropykusSchedule(USER, MIN_PURCHASE_AMOUNT);
 
         uint256 userBefore = token.balanceOf(USER);
         vm.prank(USER);
@@ -339,13 +339,13 @@ contract FeeOnTransferDepositTest is Test {
 
     function test_tropykus_batchBuy_ofOverstatedBalance_reverts() public {
         kToken.setMintShortfallBps(FEE_BPS);
-        bytes32 scheduleId = _createTropykusSchedule(USER, REQUESTED);
+        uint64 scheduleId = _createTropykusSchedule(USER, REQUESTED);
 
         address[] memory buyers = new address[](1);
         buyers[0] = USER;
         uint256[] memory indexes = new uint256[](1);
         indexes[0] = 0;
-        bytes32[] memory ids = new bytes32[](1);
+        uint64[] memory ids = new uint64[](1);
         ids[0] = scheduleId;
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = REQUESTED;
@@ -376,14 +376,14 @@ contract FeeOnTransferDepositTest is Test {
 
     function _createIdleSchedule(address who, uint256 purchaseAmount, uint256 routeIndex)
         private
-        returns (bytes32 scheduleId)
+        returns (uint64 scheduleId)
     {
         vm.prank(who);
         dcaManager.createDcaSchedule(address(token), REQUESTED, purchaseAmount, MIN_PURCHASE_PERIOD, routeIndex);
         scheduleId = dcaManager.getDcaSchedules(who, address(token))[0].scheduleId;
     }
 
-    function _createTropykusSchedule(address who, uint256 purchaseAmount) private returns (bytes32 scheduleId) {
+    function _createTropykusSchedule(address who, uint256 purchaseAmount) private returns (uint64 scheduleId) {
         vm.prank(who);
         dcaManager.createDcaSchedule(address(token), REQUESTED, purchaseAmount, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
         scheduleId = dcaManager.getDcaSchedules(who, address(token))[0].scheduleId;

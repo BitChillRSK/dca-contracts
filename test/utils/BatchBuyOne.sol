@@ -4,6 +4,10 @@ pragma solidity 0.8.36;
 import {IDcaManager} from "src/interfaces/IDcaManager.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 
+// A schedule id no test schedule can hold: ids are the creation nonce, handed out from 1 upwards
+// (R50), so the top of the range is free for "this id belongs to no schedule" assertions.
+uint64 constant UNUSED_SCHEDULE_ID = type(uint64).max;
+
 /**
  * @notice Build the length-1 `batchBuyRbtc` that replaced the removed single-schedule
  *         `DcaManager.buyRbtc` (R39).
@@ -15,13 +19,13 @@ function batchBuyOne(
     address buyer,
     address token,
     uint256 scheduleIndex,
-    bytes32 scheduleId,
+    uint64 scheduleId,
     uint256 purchaseAmount,
     uint256 routeIndex
 ) {
     address[] memory buyers = new address[](1);
     uint256[] memory scheduleIndexes = new uint256[](1);
-    bytes32[] memory scheduleIds = new bytes32[](1);
+    uint64[] memory scheduleIds = new uint64[](1);
     uint256[] memory purchaseAmounts = new uint256[](1);
     buyers[0] = buyer;
     scheduleIndexes[0] = scheduleIndex;
@@ -33,9 +37,9 @@ function batchBuyOne(
 /**
  * @notice Handler-level counterpart: the length-1 batch that replaced `PurchaseRbtc.buyRbtc`.
  */
-function handlerBatchBuyOne(IPurchaseRbtc handler, address buyer, bytes32 scheduleId, uint256 purchaseAmount) {
+function handlerBatchBuyOne(IPurchaseRbtc handler, address buyer, uint64 scheduleId, uint256 purchaseAmount) {
     address[] memory buyers = new address[](1);
-    bytes32[] memory scheduleIds = new bytes32[](1);
+    uint64[] memory scheduleIds = new uint64[](1);
     uint256[] memory purchaseAmounts = new uint256[](1);
     buyers[0] = buyer;
     scheduleIds[0] = scheduleId;

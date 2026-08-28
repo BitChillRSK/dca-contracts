@@ -9,6 +9,7 @@ import {IV3SwapRouter} from "@uniswap/swap-router-contracts/contracts/interfaces
 import {ICoinPairPrice} from "./interfaces/ICoinPairPrice.sol";
 import {IPurchaseUniswap} from "./interfaces/IPurchaseUniswap.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 /**
  * @title PurchaseUniswap
@@ -20,6 +21,8 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
  *      persistent depeg is handled by delisting the token, not by the purchase path.
  */
 abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
+    using SafeCast for uint256;
+
     //////////////////////
     // State variables ///
     //////////////////////
@@ -36,9 +39,11 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     /// @notice `10 ** (USD_DECIMALS - stablecoin decimals)`, which lifts a stablecoin amount into 18-decimal USD
     /// @dev Fixed at deploy because the handler's stablecoin is immutable. USDT0 is 6 decimals, DOC and USDRIF 18.
     uint256 internal immutable i_stablecoinToUsdScale;
-    uint256 internal s_amountOutMinimumPercent;
+    /// @notice The swap-time slippage fraction, 1e18-scaled like `HUNDRED_PERCENT`. uint128 is ample
+    /// for a value that can never exceed 1e18, and pairs it with the safety check in one slot.
+    uint128 internal s_amountOutMinimumPercent;
     /// @notice Config-only floor: the lowest `s_amountOutMinimumPercent` the owner may set. Never used at swap time.
-    uint256 internal s_amountOutMinimumSafetyCheck;
+    uint128 internal s_amountOutMinimumSafetyCheck;
     bytes internal s_swapPath;
 
     /**
@@ -70,8 +75,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
 
         _validateSlippageSettings(amountOutMinimumPercent, amountOutMinimumSafetyCheck);
 
-        s_amountOutMinimumPercent = amountOutMinimumPercent;
-        s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck;
+        s_amountOutMinimumPercent = amountOutMinimumPercent.toUint128();
+        s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint128();
         
         // Direct initial owner is not the deployer, so the constructor cannot call the onlyOwner setter.
         // This also rejects a zero purchase token before the `decimals()` calls below reach an empty address.
@@ -145,7 +150,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     function setAmountOutMinimumPercent(uint256 amountOutMinimumPercent) external onlyOwner {
         _validateSlippageSettings(amountOutMinimumPercent, s_amountOutMinimumSafetyCheck);
         emit PurchaseUniswap_AmountOutMinimumPercentUpdated(s_amountOutMinimumPercent, amountOutMinimumPercent);
-        s_amountOutMinimumPercent = amountOutMinimumPercent;
+        s_amountOutMinimumPercent = amountOutMinimumPercent.toUint128();
     }
 
     /**
@@ -158,7 +163,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external onlyOwner {
         _validateSlippageSettings(s_amountOutMinimumPercent, amountOutMinimumSafetyCheck);
         emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(s_amountOutMinimumSafetyCheck, amountOutMinimumSafetyCheck);
-        s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck;
+        s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint128();
     }
 
     /**

@@ -60,7 +60,7 @@ contract GettersTest is DcaDappTest {
         assertEq(asUser.tokenBalance, AMOUNT_TO_DEPOSIT);
         assertEq(asUser.purchaseAmount, AMOUNT_TO_SPEND);
         assertEq(asUser.purchasePeriod, MIN_PURCHASE_PERIOD);
-        assertNotEq(asUser.scheduleId, bytes32(0));
+        assertNotEq(asUser.scheduleId, uint64(0));
         assertEq(asUser.routeIndex, s_routeIndex);
 
         assertEq(asThirdParty.tokenBalance, asUser.tokenBalance);
@@ -411,7 +411,7 @@ contract GettersTest is DcaDappTest {
     function test_getters_afterStateChanges() public {
         uint256 initialBalance = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).tokenBalance;
 
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
 
         buyRbtcOne(USER, 0, scheduleId, AMOUNT_TO_SPEND);
 

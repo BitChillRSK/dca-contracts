@@ -1,6 +1,6 @@
 # R50 — Packing follow-up (uint64 scheduleId, fees, admin, scalars, dex)
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
 PR 43 of the relaunch stack. Spec assigned in GitHub [#93](https://github.com/BitChillRSK/dca-contracts/pull/93). Implement stacked on that planning PR (which sits on R36, PR 42, [#92](https://github.com/BitChillRSK/dca-contracts/pull/92)). Land immediately after R36, before R37 and well before R9.
 
@@ -24,11 +24,58 @@ R18 review (not exploitable, owner-only): `registerRoute` / `assignTokenHandler`
 
 **none** — decided 2026-08-28 in the R18 follow-up discussion. Implement this spec as written.
 
+## Measured (2026-08-28)
+
+Layouts, from `forge inspect <contract> storageLayout` before and after.
+
+- `IDcaManager.DcaSchedule` is **64 bytes**: slot 0 `tokenBalance|purchaseAmount`; slot 1
+  `purchasePeriod` (offset 0), `lastPurchaseTimestamp` (4), `routeIndex` (10), `paused` (14),
+  `scheduleId` (15) — 23 of 32 bytes used.
+- `DcaManager` roots go from 8 to 5: `_owner`, `_pendingOwner`, `s_dcaSchedules` (2),
+  `s_protocolSettings` (3), `s_tokenMinPurchaseAmounts` (4). The settings word is
+  `minPurchasePeriod` (0), `maxSchedulesPerToken` (4), `defaultMinPurchaseAmount` (6),
+  `scheduleNonce` (22) — 30 of 32 bytes.
+- `OperationsAdmin` roots go from 6 to 5; `s_tokenRoute` (2) holds `handler` (0) + `depositsPaused` (20).
+- Handlers: fee state is two slots — slot 2 `s_feeCollector` (0) + `s_minFeeRate` (20) +
+  `s_maxFeeRate` (22), slot 3 the two `uint128` bounds. **The collector is declared before the rates
+  on purpose**: declared after, the two `uint16`s fall into the 12 bytes Ownable2Step leaves free
+  beside `_pendingOwner` and the collector is pushed into a slot of its own, which is the opposite of
+  what `_transferFee` wants.
+- Dex handlers: `s_mocOracle` (6), then `s_amountOutMinimumPercent` + `s_amountOutMinimumSafetyCheck`
+  packed in slot 7, then `s_swapPath`.
+
+Gas, `SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=DOC`, vs R36:
+
+| Test | R36 | R50 | Δ |
+|---|---|---|---|
+| `testCreateDcaSchedule` | 285,004 | 254,545 | −30,459 |
+| `testSinglePurchase` | 285,295 | 279,088 | −6,207 |
+| `testBatchPurchasesOneUser` | 2,229,154 | 2,150,566 | −78,588 |
+
+**Runtime size is the cost, and it is not small.** Narrow fields mean mask/shift code on every read
+and write, and the default (non-`via_ir`) profile does not optimise that away. Default profile,
+EIP-170 24,576:
+
+| Contract | R36 | R50 | Margin after |
+|---|---|---|---|
+| `DcaManager` | 21,151 | 22,585 | 1,991 |
+| `LayerBankErc20HandlerDex` | 21,578 | 23,032 | 1,544 |
+| `SovrynErc20HandlerDex` | 21,105 | 22,572 | 2,004 |
+| `LayerBankDocHandlerMoc` | 15,752 | 16,707 | 7,869 |
+| `SovrynDocHandlerMoc` | 15,318 | 16,286 | 8,290 |
+| `IdleDocHandlerMoc` | 11,056 | 12,036 | 12,540 |
+| `OperationsAdmin` | 6,049 | 6,002 | 18,574 |
+
+R38, R42, R9, and R10 still have to fit inside those margins. `FOUNDRY_PROFILE=deploy` (via IR)
+compiles the same sources to roughly half these sizes — `DcaManager` 11,062, the LayerBank dex
+handler 11,454 — so the ceiling is a default-profile problem, not a deploy blocker, but the next PR
+that adds a few hundred bytes to a dex handler should check `forge build --sizes` before pushing.
+
 ## Scope
 
 ### DcaSchedule: two slots, public nonce id
 
-- [ ] Field order and widths:
+- [x] Field order and widths:
 
   ```
   slot 0: uint128 tokenBalance + uint128 purchaseAmount
@@ -38,19 +85,19 @@ R18 review (not exploitable, owner-only): `registerRoute` / `assignTokenHandler`
 
   `scheduleId` is the last field so swap-pop and `vm.load` tests stay obvious. 4+6+4+1+8 = 23 bytes in slot 1.
 
-- [ ] Remove `keccak256(abi.encodePacked(msg.sender, token, ++s_scheduleNonce))`. On create, `uint64 scheduleId = (++s_scheduleNonce).toUint64()` and store that value. No hash anywhere (create, validate, events, errors, `PurchaseRbtc.batchBuyRbtc`, getters).
+- [x] Remove `keccak256(abi.encodePacked(msg.sender, token, ++s_scheduleNonce))`. On create, `uint64 scheduleId = (++s_scheduleNonce).toUint64()` and store that value. No hash anywhere (create, validate, events, errors, `PurchaseRbtc.batchBuyRbtc`, getters).
 
-- [ ] First live id is **1**. Today the counter starts at 1 and pre-increment hashes with 2, leaving nonce 1 unused. Change the counter so `getSchedulesCreatedCount()` equals the last assigned id: initialise `s_scheduleNonce` at 0, pre-increment on create, return `s_scheduleNonce` from `getSchedulesCreatedCount()`. Indexers that compare that getter to the number of `DcaScheduleCreated` logs keep working.
+- [x] First live id is **1**. Today the counter starts at 1 and pre-increment hashes with 2, leaving nonce 1 unused. Change the counter so `getSchedulesCreatedCount()` equals the last assigned id: initialise `s_scheduleNonce` at 0, pre-increment on create, return `s_scheduleNonce` from `getSchedulesCreatedCount()`. Indexers that compare that getter to the number of `DcaScheduleCreated` logs keep working.
 
-- [ ] `_validateScheduleId` stays a straight `==` on `uint64`. It remains the swap-pop stale-index guard; do not drop the id check or accept index-only calls.
+- [x] `_validateScheduleId` stays a straight `==` on `uint64`. It remains the swap-pop stale-index guard; do not drop the id check or accept index-only calls.
 
-- [ ] External function arguments that are amounts, periods, or route indexes stay `uint256` with OZ `SafeCast` at the storage boundary (R18). `scheduleId` is the exception: it is `uint64` in the ABI (calldata, events, errors, `DcaSchedule` tuple, `bytes32[]` → `uint64[]` on `batchBuyRbtc`). Calldata still ABI-pads to 32 bytes; the win is storage, not calldata.
+- [x] External function arguments that are amounts, periods, or route indexes stay `uint256` with OZ `SafeCast` at the storage boundary (R18). `scheduleId` is the exception: it is `uint64` in the ABI (calldata, events, errors, `DcaSchedule` tuple, `bytes32[]` → `uint64[]` on `batchBuyRbtc`). Calldata still ABI-pads to 32 bytes; the win is storage, not calldata.
 
-- [ ] Overflow on `++s_scheduleNonce` uses `SafeCast` (`toUint64`) before the struct write. `type(uint64).max` creates are not a practical test; bound the increment in a unit test that sets the counter near the cap via `vm.store`.
+- [x] Overflow on `++s_scheduleNonce` uses `SafeCast` (`toUint64`) before the struct write. `type(uint64).max` creates are not a practical test; bound the increment in a unit test that sets the counter near the cap via `vm.store`.
 
 ### FeeHandler
 
-- [ ] Storage, two slots (after Ownable2Step’s `_owner` / `_pendingOwner`):
+- [x] Storage, two slots (after Ownable2Step’s `_owner` / `_pendingOwner`):
 
   ```
   slot A: uint16 minFeeRate + uint16 maxFeeRate + address feeCollector
@@ -59,11 +106,11 @@ R18 review (not exploitable, owner-only): `registerRoute` / `assignTokenHandler`
 
   Rates are already capped at `MAX_FEE_RATE_CAP = 500`. Bounds are purchase amounts, so `uint128` matches the schedule. `_feeSettings()` becomes two SLOADs; if the collector lives in the rate slot it is already warm for `_transferFee`.
 
-- [ ] `IFeeHandler.FeeSettings` matches those widths (`uint16` / `uint16` / `uint128` / `uint128`). `setFeeRateParams` and the constructor keep `uint256` arguments (or untyped literals into the struct) and `SafeCast` at the write. Do not add assembly.
+- [x] `IFeeHandler.FeeSettings` matches those widths (`uint16` / `uint16` / `uint128` / `uint128`). `setFeeRateParams` and the constructor keep `uint256` arguments (or untyped literals into the struct) and `SafeCast` at the write. Do not add assembly.
 
 ### OperationsAdmin `(token, routeIndex)` pair and uint32 keys
 
-- [ ] Replace `s_tokenHandler` and `s_depositsPaused` with one mapping whose value packs in a single slot:
+- [x] Replace `s_tokenHandler` and `s_depositsPaused` with one mapping whose value packs in a single slot:
 
   ```solidity
   struct TokenRoute {
@@ -75,13 +122,13 @@ R18 review (not exploitable, owner-only): `registerRoute` / `assignTokenHandler`
 
   `getTokenHandler` / `areDepositsPaused` / `assignTokenHandler` / `setDepositsPaused` keep their selectors and semantics. A missing handler is still `handler == address(0)` with `depositsPaused == false`.
 
-- [ ] Apply R18’s `toUint32()` bound to **every** OperationsAdmin function that takes a route index, not only `registerRoute` / `assignTokenHandler`. That is `setDepositsPaused`, `areDepositsPaused`, `getTokenHandler`, `isLendingRoute`, and `getRouteClass`. Oversized indexes revert `SafeCastOverflowedUintDowncast` instead of reading or writing a slot no packed schedule can store. This is the R18 review note: the pause path still used a raw `uint256` key.
+- [x] Apply R18’s `toUint32()` bound to **every** OperationsAdmin function that takes a route index, not only `registerRoute` / `assignTokenHandler`. That is `setDepositsPaused`, `areDepositsPaused`, `getTokenHandler`, `isLendingRoute`, and `getRouteClass`. Oversized indexes revert `SafeCastOverflowedUintDowncast` instead of reading or writing a slot no packed schedule can store. This is the R18 review note: the pause path still used a raw `uint256` key.
 
-- [ ] Do not bitmap-pack `s_swappers` or `s_handlerAssigned`. Do not change mapping *key types* (`uint256` in the mapping declaration is fine; the bound is at the ABI boundary).
+- [x] Do not bitmap-pack `s_swappers` or `s_handlerAssigned`. Do not change mapping *key types* (`uint256` in the mapping declaration is fine; the bound is at the ABI boundary).
 
 ### DcaManager protocol scalars
 
-- [ ] Reorder so `s_tokenMinPurchaseAmounts` no longer sits between the scalars. Pack into one slot (internal struct or consecutive value types; not a new public type):
+- [x] Reorder so `s_tokenMinPurchaseAmounts` no longer sits between the scalars. Pack into one slot (internal struct or consecutive value types; not a new public type):
 
   ```
   uint32 minPurchasePeriod + uint16 maxSchedulesPerToken
@@ -90,21 +137,21 @@ R18 review (not exploitable, owner-only): `registerRoute` / `assignTokenHandler`
 
   4+2+16+8 = 30 bytes. Owner setters and `createDcaSchedule` already read these together; packing them with the nonce means one SLOAD / one SSTORE on create. Token-specific mins stay a `mapping(address => uint256)` — **do not** narrow the mapping value type; it saves no slot.
 
-- [ ] `uint16` is enough for `maxSchedulesPerToken`; `SafeCast` on the owner setter. Period already has a `uint32` bound from R18.
+- [x] `uint16` is enough for `maxSchedulesPerToken`; `SafeCast` on the owner setter. Period already has a `uint32` bound from R18.
 
 ### PurchaseUniswap slippage percents
 
-- [ ] Pack `s_amountOutMinimumPercent` and `s_amountOutMinimumSafetyCheck` as two `uint128`s in one slot. They are 1e18-scaled fractions (`HUNDRED_PERCENT = 1 ether`); `uint128` is ample. External setters/getters may stay `uint256` with `SafeCast`. Leave `s_mocOracle` and `s_swapPath` as they are.
+- [x] Pack `s_amountOutMinimumPercent` and `s_amountOutMinimumSafetyCheck` as two `uint128`s in one slot. They are 1e18-scaled fractions (`HUNDRED_PERCENT = 1 ether`); `uint128` is ample. External setters/getters may stay `uint256` with `SafeCast`. Leave `s_mocOracle` and `s_swapPath` as they are.
 
 ### Layout, gas, consumers
 
-- [ ] `forge inspect DcaManager storageLayout`, `FeeHandler` (via a concrete handler), `OperationsAdmin`, and a Dex handler before/after. Record `DcaSchedule` **64 bytes**. Record gas for `testCreateDcaSchedule`, `testSinglePurchase`, `testBatchPurchasesOneUser` vs R36/R18.
+- [x] `forge inspect DcaManager storageLayout`, `FeeHandler` (via a concrete handler), `OperationsAdmin`, and a Dex handler before/after. Record `DcaSchedule` **64 bytes**. Record gas for `testCreateDcaSchedule`, `testSinglePurchase`, `testBatchPurchasesOneUser` vs R36/R18.
 
-- [ ] Swap-pop still copies every packed field, including `uint64 scheduleId` and `paused`.
+- [x] Swap-pop still copies every packed field, including `uint64 scheduleId` and `paused`.
 
-- [ ] Clarify `AGENTS.md` invariant 7: the public `scheduleId` **is** the nonce (`uint64`), never a hash and never array state.
+- [x] Clarify `AGENTS.md` invariant 7: the public `scheduleId` **is** the nonce (`uint64`), never a hash and never array state.
 
-- [ ] Open or update consumer issues (`AGENTS.md` **Consumer follow-up**): every `bytes32 scheduleId` in functions, events, and errors becomes `uint64`; `getDcaSchedule` / `getDcaSchedules` tuple and `getFeeSettings` change; `batchBuyRbtc` takes `uint64[]`. Named-field clients still need the new widths. Selectors and topic0s that mention `scheduleId` all change.
+- [x] Open or update consumer issues (`AGENTS.md` **Consumer follow-up**): every `bytes32 scheduleId` in functions, events, and errors becomes `uint64`; `getDcaSchedule` / `getDcaSchedules` tuple and `getFeeSettings` change; `batchBuyRbtc` takes `uint64[]`. Named-field clients still need the new widths. Selectors and topic0s that mention `scheduleId` all change.
 
 ## Out of scope
 
@@ -143,13 +190,13 @@ R18 review (not exploitable, owner-only): `registerRoute` / `assignTokenHandler`
 
 ## Success criteria
 
-- [ ] One `DcaSchedule` element occupies exactly two storage slots.
-- [ ] No keccak in the schedule-id path; public id is `uint64` nonce starting at 1.
-- [ ] Fee settings occupy two slots; OperationsAdmin handler+pause occupy one mapping value; DcaManager scalars occupy one slot; Dex percents occupy one slot.
-- [ ] Every OperationsAdmin route-index argument is `toUint32()`-bounded, including `setDepositsPaused`.
-- [ ] Handler financial mappings remain `uint256`.
-- [ ] Invariant 7 still holds (counter-derived ids) and is worded as nonce-as-id.
-- [ ] Consumer issues opened or updated; no open product decisions.
+- [x] One `DcaSchedule` element occupies exactly two storage slots.
+- [x] No keccak in the schedule-id path; public id is `uint64` nonce starting at 1.
+- [x] Fee settings occupy two slots; OperationsAdmin handler+pause occupy one mapping value; DcaManager scalars occupy one slot; Dex percents occupy one slot.
+- [x] Every OperationsAdmin route-index argument is `toUint32()`-bounded, including `setDepositsPaused`.
+- [x] Handler financial mappings remain `uint256`.
+- [x] Invariant 7 still holds (counter-derived ids) and is worded as nonce-as-id.
+- [x] Consumer issues opened or updated; no open product decisions.
 
 ## Reviewer checklist
 

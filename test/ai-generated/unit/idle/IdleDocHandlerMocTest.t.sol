@@ -52,7 +52,7 @@ contract IdleDocHandlerMocTest is Test {
     function test_lengthOneBatch_flow() public {
         uint256 depositAmount = 500 ether;
         uint256 purchaseAmount = 100 ether;
-        bytes32 scheduleId = keccak256("schedule");
+        uint64 scheduleId = 1;
 
         handler.depositToken(USER, depositAmount);
         assertEq(docToken.balanceOf(address(handler)), depositAmount);
@@ -86,12 +86,12 @@ contract IdleDocHandlerMocTest is Test {
         }
 
         address[] memory buyers = new address[](2);
-        bytes32[] memory scheduleIds = new bytes32[](2);
+        uint64[] memory scheduleIds = new uint64[](2);
         uint256[] memory purchaseAmounts = new uint256[](2);
         buyers[0] = user1;
         buyers[1] = user2;
-        scheduleIds[0] = keccak256("sche0");
-        scheduleIds[1] = keccak256("sche1");
+        scheduleIds[0] = 1;
+        scheduleIds[1] = 2;
         purchaseAmounts[0] = 60 ether;
         purchaseAmounts[1] = 140 ether;
 
@@ -112,7 +112,7 @@ contract IdleDocHandlerMocTest is Test {
 
     function test_lengthOneBatch_doesNotMintShareToken() public {
         handler.depositToken(USER, 500 ether);
-        handlerBatchBuyOne(IPurchaseRbtc(address(handler)), USER, keccak256("schedule"), 100 ether);
+        handlerBatchBuyOne(IPurchaseRbtc(address(handler)), USER, 1, 100 ether);
 
         // The only ERC20 this test deployed is DOC; it stays on the handler minus the purchase.
         assertEq(docToken.balanceOf(address(handler)), 400 ether);

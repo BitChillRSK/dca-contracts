@@ -17,6 +17,16 @@ interface IOperationsAdmin {
         Lending
     }
 
+    /**
+     * @notice The per-`(token, routeIndex)` pair state: who holds the funds, and whether new
+     *         deposits are accepted.
+     * @dev One slot (21 of 32 bytes). An unassigned pair reads as `(address(0), false)`.
+     */
+    struct TokenRoute {
+        address handler;
+        bool depositsPaused;
+    }
+
     //////////////////////
     // Events ////////////
     //////////////////////
@@ -56,7 +66,7 @@ interface IOperationsAdmin {
     /**
      * @notice Assign the token handler for a `(token, routeIndex)` pair. Add-only: reassignment reverts.
      * @param token The stablecoin whose handler is being assigned.
-     * @param routeIndex The registered route index (idle or lending).
+     * @param routeIndex The registered route index (idle or lending). Must fit `uint32`.
      * @param handler The TokenHandler for that token and route, not yet assigned anywhere in this admin.
      * @dev Requires ERC-165 `ITokenHandler`. Lending routes also require `ITokenLending`;
      *      idle routes reject it. A lending handler at an idle index would strand
@@ -70,7 +80,7 @@ interface IOperationsAdmin {
     /**
      * @notice Pause or unpause new stablecoin deposits for one assigned `(token, routeIndex)` pair.
      * @param token The stablecoin whose deposits are being paused.
-     * @param routeIndex The route index whose deposits are being paused.
+     * @param routeIndex The route index whose deposits are being paused. Must fit `uint32`.
      * @param paused True to block new deposits, false to allow them again.
      * @dev Incident control only: `DcaManager` consults this before `createDcaSchedule` and
      *      `depositToken` move cash, and nowhere else. Purchases, schedule edits, deletion, and
@@ -86,7 +96,7 @@ interface IOperationsAdmin {
     /**
      * @notice Whether new deposits to `(token, routeIndex)` are currently blocked.
      * @param token The stablecoin.
-     * @param routeIndex The route index.
+     * @param routeIndex The route index. Must fit `uint32`.
      * @return paused True when `DcaManager` must reject new deposits for this pair.
      * @dev False for unassigned pairs: only an assigned pair can be paused.
      */
@@ -95,7 +105,7 @@ interface IOperationsAdmin {
     /**
      * @notice Handler registered for a token and route index.
      * @param token The stablecoin.
-     * @param routeIndex The route index.
+     * @param routeIndex The route index. Must fit `uint32`.
      * @return handler The TokenHandler, or `address(0)` if none is assigned.
      */
     function getTokenHandler(address token, uint256 routeIndex) external view returns (address handler);
@@ -120,11 +130,13 @@ interface IOperationsAdmin {
     /**
      * @notice Whether `index` was registered as a lending route.
      * @dev False for idle routes (including the constructor's index 0) and for unregistered indexes.
+     *      `index` must fit `uint32`, like every other route-index argument here.
      */
     function isLendingRoute(uint256 index) external view returns (bool);
 
     /**
      * @notice Recorded class of `index`.
+     * @dev `index` must fit `uint32`, like every other route-index argument here.
      */
     function getRouteClass(uint256 index) external view returns (RouteClass);
 }

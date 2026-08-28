@@ -4,6 +4,7 @@ pragma solidity 0.8.36;
 import {IFeeHandler} from "./interfaces/IFeeHandler.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {BitChillOwnable} from "./BitChillOwnable.sol";
 
 /**
@@ -12,16 +13,22 @@ import {BitChillOwnable} from "./BitChillOwnable.sol";
  */
 abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     using SafeERC20 for IERC20;
+    using SafeCast for uint256;
 
     //////////////////////
     // State variables ///
     //////////////////////
 
-    uint256 internal s_minFeeRate; // Minimum fee rate
-    uint256 internal s_maxFeeRate; // Maximum fee rate
-    uint256 internal s_feePurchaseLowerBound; // Spending below lower bound gets the maximum fee rate
-    uint256 internal s_feePurchaseUpperBound; // Spending above upper bound gets the minimum fee rate
+    /// @dev Two slots. Rates never exceed MAX_FEE_RATE_CAP, so they fit uint16 beside the collector:
+    ///      the word every purchase already loads for the fee rates is the one `_transferFee` needs.
+    ///      The collector is declared first so it starts the word rather than being pushed out of the
+    ///      12 bytes Ownable2Step leaves free next to `_pendingOwner`. Bounds are purchase amounts, so
+    ///      they share the schedule's uint128.
     address internal s_feeCollector; // Address to which the fees charged to the user will be sent
+    uint16 internal s_minFeeRate; // Minimum fee rate
+    uint16 internal s_maxFeeRate; // Maximum fee rate
+    uint128 internal s_feePurchaseLowerBound; // Spending below lower bound gets the maximum fee rate
+    uint128 internal s_feePurchaseUpperBound; // Spending above upper bound gets the minimum fee rate
     uint256 constant FEE_PERCENTAGE_DIVISOR = 10_000; // feeRate will belong to [100, 200], so we need to divide by 10,000 (100 * 100)
     /// @notice Hard ceiling on fee rates (5%). Owner cannot set max (or a flat min==max) above this.
     uint256 internal constant MAX_FEE_RATE_CAP = 500;
@@ -63,19 +70,19 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         _validateFeeSettings(minFeeRate, maxFeeRate, feePurchaseLowerBound, feePurchaseUpperBound);
 
         if (s_minFeeRate != minFeeRate) {
-            s_minFeeRate = minFeeRate;
+            s_minFeeRate = minFeeRate.toUint16();
             emit FeeHandler__MinFeeRateSet(minFeeRate);
         }
         if (s_maxFeeRate != maxFeeRate) {
-            s_maxFeeRate = maxFeeRate;
+            s_maxFeeRate = maxFeeRate.toUint16();
             emit FeeHandler__MaxFeeRateSet(maxFeeRate);
         }
         if (s_feePurchaseLowerBound != feePurchaseLowerBound) {
-            s_feePurchaseLowerBound = feePurchaseLowerBound;
+            s_feePurchaseLowerBound = feePurchaseLowerBound.toUint128();
             emit FeeHandler__PurchaseLowerBoundSet(feePurchaseLowerBound);
         }
         if (s_feePurchaseUpperBound != feePurchaseUpperBound) {
-            s_feePurchaseUpperBound = feePurchaseUpperBound;
+            s_feePurchaseUpperBound = feePurchaseUpperBound.toUint128();
             emit FeeHandler__PurchaseUpperBoundSet(feePurchaseUpperBound);
         }
     }
@@ -161,7 +168,8 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     }
 
     /**
-     * @dev Pack the four fee storage fields for a single load per batch.
+     * @dev Pack the four fee storage fields for two loads per batch: the rate word (already warm for
+     *      `_transferFee`, which reads the collector beside them) and the bounds word.
      */
     function _feeSettings() internal view returns (FeeSettings memory) {
         return FeeSettings({

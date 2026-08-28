@@ -15,7 +15,7 @@ interface IPurchaseRbtc {
         address indexed user,
         address indexed tokenSpent,
         uint256 rBtcBought,
-        bytes32 indexed scheduleId,
+        uint64 indexed scheduleId,
         uint256 amountSpent
     );
     event PurchaseRbtc__SuccessfulRbtcBatchPurchase(
@@ -44,7 +44,7 @@ interface IPurchaseRbtc {
      */
     function batchBuyRbtc(
         address[] memory buyers,
-        bytes32[] memory scheduleIds,
+        uint64[] memory scheduleIds,
         uint256[] memory purchaseAmounts
     ) external;
 

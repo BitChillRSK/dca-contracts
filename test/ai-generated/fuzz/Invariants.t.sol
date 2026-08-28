@@ -299,7 +299,7 @@ contract InvariantTest is StdInvariant, Test {
                         assertGt(schedules[j].purchaseAmount, MIN_PURCHASE_AMOUNT);
                         assertGe(schedules[j].purchasePeriod, MIN_PURCHASE_PERIOD);
                     }
-                    assertNotEq(schedules[j].scheduleId, bytes32(0));
+                    assertNotEq(schedules[j].scheduleId, uint64(0));
                 }
             } catch {
                 // User has no schedules, which is fine
@@ -366,7 +366,7 @@ contract InvariantTest is StdInvariant, Test {
         uint256 trackedCount = fuzzHandler.everPausedScheduleIdsLength();
 
         for (uint256 i = 0; i < trackedCount; i++) {
-            bytes32 scheduleId = fuzzHandler.s_everPausedScheduleIds(i);
+            uint64 scheduleId = fuzzHandler.s_everPausedScheduleIds(i);
             (address user, uint256 timestampAtPause, bool pausedNow) = fuzzHandler.s_pauseGhost(scheduleId);
             if (!pausedNow) continue;
 
@@ -456,7 +456,7 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
      */
     function batchBuyRbtc(
         address[] memory buyers,
-        bytes32[] memory scheduleIds,
+        uint64[] memory scheduleIds,
         uint256[] memory purchaseAmounts
     ) external onlyDcaManager {
         for (uint256 i = 0; i < buyers.length; i++) {
@@ -493,7 +493,7 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
      */
     function _buyRbtcInternal(
         address buyer,
-        bytes32 scheduleId,
+        uint64 scheduleId,
         uint256 purchaseAmount
     ) internal {
         // Retrieve the stablecoin the purchase will spend
@@ -524,7 +524,7 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
         address indexed user,
         address indexed tokenSpent,
         uint256 rBtcBought,
-        bytes32 indexed scheduleId,
+        uint64 indexed scheduleId,
         uint256 amountSpent
     );
     event PurchaseRbtc__rBtcWithdrawn(address indexed user, uint256 indexed amount);
@@ -565,7 +565,7 @@ contract SovrynHandlerWrapper is SovrynErc20Handler {
      */
     function batchBuyRbtc(
         address[] memory buyers,
-        bytes32[] memory scheduleIds,
+        uint64[] memory scheduleIds,
         uint256[] memory purchaseAmounts
     ) external onlyDcaManager {
         for (uint256 i = 0; i < buyers.length; i++) {
@@ -601,7 +601,7 @@ contract SovrynHandlerWrapper is SovrynErc20Handler {
      */
     function _buyRbtcInternal(
         address buyer,
-        bytes32 scheduleId,
+        uint64 scheduleId,
         uint256 purchaseAmount
     ) internal {
         // Retrieve the stablecoin the purchase will spend
@@ -632,7 +632,7 @@ contract SovrynHandlerWrapper is SovrynErc20Handler {
         address indexed user,
         address indexed tokenSpent,
         uint256 rBtcBought,
-        bytes32 indexed scheduleId,
+        uint64 indexed scheduleId,
         uint256 amountSpent
     );
     event PurchaseRbtc__rBtcWithdrawn(address indexed user, uint256 indexed amount);

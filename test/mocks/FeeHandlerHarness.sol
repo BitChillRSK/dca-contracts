@@ -21,27 +21,28 @@ contract FeeHandlerHarness is FeeHandler {
         return _calculateFeeAndNetAmounts(purchaseAmounts);
     }
 
-    // Test-only setters without onlyOwner restriction for convenience
-    function testSetFeeRateParams(uint256 minFee, uint256 maxFee, uint256 lower, uint256 upper) external {
+    // Test-only setters without onlyOwner restriction for convenience.
+    // Widths match FeeHandler storage, so a caller cannot park a value the real setters could not write.
+    function testSetFeeRateParams(uint16 minFee, uint16 maxFee, uint128 lower, uint128 upper) external {
         s_minFeeRate = minFee;
         s_maxFeeRate = maxFee;
         s_feePurchaseLowerBound = lower;
         s_feePurchaseUpperBound = upper;
     }
 
-    function testSetMinFeeRate(uint256 minFee) external {
+    function testSetMinFeeRate(uint16 minFee) external {
         s_minFeeRate = minFee;
     }
 
-    function testSetMaxFeeRate(uint256 maxFee) external {
+    function testSetMaxFeeRate(uint16 maxFee) external {
         s_maxFeeRate = maxFee;
     }
 
-    function testSetFeePurchaseLowerBound(uint256 lower) external {
+    function testSetFeePurchaseLowerBound(uint128 lower) external {
         s_feePurchaseLowerBound = lower;
     }
 
-    function testSetFeePurchaseUpperBound(uint256 upper) external {
+    function testSetFeePurchaseUpperBound(uint128 upper) external {
         s_feePurchaseUpperBound = upper;
     }
 }

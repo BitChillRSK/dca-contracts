@@ -11,12 +11,15 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "./TestsHelper.t.sol";
 
 /**
- * @notice R18: each `DcaSchedule` occupies three slots with checked widths.
- * @dev External arguments stay `uint256`. Overflow reverts with OZ `SafeCast` data before cash
- *      or schedule state changes. Swap-pop must copy every packed field, not just `scheduleId`.
+ * @notice R18 + R50: each `DcaSchedule` occupies two slots with checked widths, and the protocol
+ *         scalars plus the id nonce share one slot of their own.
+ * @dev External arguments stay `uint256`, except `scheduleId`, which is the `uint64` creation nonce.
+ *      Overflow reverts with OZ `SafeCast` data before cash or schedule state changes. Swap-pop must
+ *      copy every packed field, `scheduleId` included.
  */
 contract SchedulePackingTest is DcaDappTest {
     uint256 private constant SCHEDULES_MAPPING_SLOT = 2;
+    uint256 private constant PROTOCOL_SETTINGS_SLOT = 3;
 
     function setUp() public override {
         super.setUp();
@@ -29,7 +32,7 @@ contract SchedulePackingTest is DcaDappTest {
     function _elementBase(address user, address token, uint256 scheduleIndex) private pure returns (uint256) {
         bytes32 inner = keccak256(abi.encode(user, SCHEDULES_MAPPING_SLOT));
         bytes32 arraySlot = keccak256(abi.encode(token, inner));
-        return uint256(keccak256(abi.encode(arraySlot))) + scheduleIndex * 3;
+        return uint256(keccak256(abi.encode(arraySlot))) + scheduleIndex * 2;
     }
 
     function _load(uint256 slot) private view returns (uint256) {
@@ -43,27 +46,37 @@ contract SchedulePackingTest is DcaDappTest {
 
         uint256 slot0 = uint256(uint128(schedule.tokenBalance)) | (uint256(uint128(schedule.purchaseAmount)) << 128);
         uint256 slot1 = uint256(uint32(schedule.purchasePeriod)) | (uint256(uint48(schedule.lastPurchaseTimestamp)) << 32)
-            | (uint256(uint32(schedule.routeIndex)) << 80) | (uint256(schedule.paused ? 1 : 0) << 112);
+            | (uint256(uint32(schedule.routeIndex)) << 80) | (uint256(schedule.paused ? 1 : 0) << 112)
+            | (uint256(schedule.scheduleId) << 120);
 
         assertEq(_load(base), slot0, "slot 0 is not tokenBalance|purchaseAmount");
-        assertEq(_load(base + 1), slot1, "slot 1 is not period|timestamp|route|paused");
-        assertEq(bytes32(_load(base + 2)), schedule.scheduleId, "slot 2 is not scheduleId");
+        assertEq(_load(base + 1), slot1, "slot 1 is not period|timestamp|route|paused|scheduleId");
     }
 
     /*//////////////////////////////////////////////////////////////
                               LAYOUT
     //////////////////////////////////////////////////////////////*/
 
-    function testOneScheduleOccupiesExactlyThreeSlots() external {
+    function testOneScheduleOccupiesExactlyTwoSlots() external {
         assertEq(dcaManager.getDcaSchedules(USER, address(stablecoin)).length, 1);
         _assertPackedAgainstGetter(SCHEDULE_INDEX);
 
         uint256 base = _elementBase(USER, address(stablecoin), SCHEDULE_INDEX);
-        assertEq(_load(base + 3), 0, "a fourth slot was written for a single schedule");
+        assertEq(_load(base + 2), 0, "a third slot was written for a single schedule");
     }
 
-    function testMaxWidthsPackIntoThreeSlots() external {
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+    function testProtocolScalarsAndNonceShareOneSlot() external {
+        uint256 packed = _load(PROTOCOL_SETTINGS_SLOT);
+        uint256 expected = dcaManager.getMinPurchasePeriod() | (dcaManager.getMaxSchedulesPerToken() << 32)
+            | (dcaManager.getDefaultMinPurchaseAmount() << 48) | (dcaManager.getSchedulesCreatedCount() << 176);
+
+        assertEq(packed, expected, "protocol scalars and the nonce are not one packed slot");
+        // The token-specific minimums keep their own mapping root, one slot further down.
+        assertEq(_load(PROTOCOL_SETTINGS_SLOT + 1), 0, "the scalars spilled into the mapping slot");
+    }
+
+    function testMaxWidthsPackIntoTwoSlots() external {
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
 
         vm.startPrank(USER);
         dcaManager.updatePurchasePeriod(address(stablecoin), SCHEDULE_INDEX, scheduleId, type(uint32).max);
@@ -216,7 +229,7 @@ contract SchedulePackingTest is DcaDappTest {
 
     function testDepositRevertsWhenSumExceedsUint128BeforeTokensMove() external {
         uint256 overflowingAdd = uint256(type(uint128).max) - AMOUNT_TO_DEPOSIT + 1;
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         uint256 scheduleBefore = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
         uint256 userBefore = stablecoin.balanceOf(USER);
         uint256 handlerBefore = stablecoin.balanceOf(address(stablecoinHandler));
@@ -238,7 +251,7 @@ contract SchedulePackingTest is DcaDappTest {
 
     function testDepositRevertsUint128MaxPlusOneBeforeTokensMove() external {
         uint256 overflowing = uint256(type(uint128).max) + 1;
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         uint256 scheduleBefore = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
         uint256 userBefore = stablecoin.balanceOf(USER);
 
@@ -257,7 +270,7 @@ contract SchedulePackingTest is DcaDappTest {
 
         uint256 maxAmount = type(uint128).max;
         uint256 extra = maxAmount - AMOUNT_TO_DEPOSIT;
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         stablecoin.mint(USER, extra);
 
         vm.startPrank(USER);
@@ -273,7 +286,7 @@ contract SchedulePackingTest is DcaDappTest {
 
     function testUpdatePurchaseAmountRevertsUint128MaxPlusOne() external {
         uint256 overflowing = uint256(type(uint128).max) + 1;
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         uint256 amountBefore = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).purchaseAmount;
 
         vm.prank(USER);
@@ -286,7 +299,7 @@ contract SchedulePackingTest is DcaDappTest {
     }
 
     function testUpdatePurchasePeriodAcceptsUint32Max() external {
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
 
         vm.prank(USER);
         dcaManager.updatePurchasePeriod(address(stablecoin), SCHEDULE_INDEX, scheduleId, type(uint32).max);
@@ -298,7 +311,7 @@ contract SchedulePackingTest is DcaDappTest {
 
     function testUpdatePurchasePeriodRevertsUint32MaxPlusOne() external {
         uint256 overflowing = uint256(type(uint32).max) + 1;
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         uint256 periodBefore = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).purchasePeriod;
 
         vm.prank(USER);
@@ -312,7 +325,7 @@ contract SchedulePackingTest is DcaDappTest {
 
     function testFirstPurchaseAcceptsUint48MaxTimestamp() external {
         vm.warp(type(uint48).max);
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         super.buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
 
         assertEq(
@@ -323,7 +336,7 @@ contract SchedulePackingTest is DcaDappTest {
 
     function testFirstPurchaseRevertsUint48MaxPlusOneTimestamp() external {
         vm.warp(uint256(type(uint48).max) + 1);
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         uint256 timestampBefore =
             dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).lastPurchaseTimestamp;
         uint256 balanceBefore = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
@@ -339,7 +352,7 @@ contract SchedulePackingTest is DcaDappTest {
 
     function testSubsequentPurchaseRevertsWhenTimestampWouldOverflowUint48() external {
         vm.warp(type(uint48).max);
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         super.buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
 
         vm.warp(uint256(type(uint48).max) + MIN_PURCHASE_PERIOD);
@@ -353,6 +366,75 @@ contract SchedulePackingTest is DcaDappTest {
             dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX);
         assertEq(schedule.lastPurchaseTimestamp, type(uint48).max);
         assertEq(schedule.tokenBalance, balanceBefore);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        NONCE AS PUBLIC ID
+    //////////////////////////////////////////////////////////////*/
+
+    function testFirstScheduleIdIsOneAndIdsCountUp() external {
+        // The harness created one schedule in setUp; it is the first id ever handed out.
+        assertEq(dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId, 1);
+        assertEq(dcaManager.getSchedulesCreatedCount(), 1);
+
+        vm.startPrank(USER);
+        stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
+        dcaManager.createDcaSchedule(
+            address(stablecoin), AMOUNT_TO_DEPOSIT, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_routeIndex
+        );
+        vm.stopPrank();
+
+        assertEq(dcaManager.getDcaSchedule(USER, address(stablecoin), 1).scheduleId, 2);
+        assertEq(dcaManager.getSchedulesCreatedCount(), 2, "the created count is not the last assigned id");
+    }
+
+    function testStaleIdIsRejectedAfterSwapPop() external {
+        super.createSeveralDcaSchedules();
+
+        uint256 lastIndex = NUM_OF_SCHEDULES - 1;
+        uint64 deletedId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 survivorId = dcaManager.getDcaSchedule(USER, address(stablecoin), lastIndex).scheduleId;
+
+        vm.prank(USER);
+        dcaManager.deleteDcaSchedule(address(stablecoin), SCHEDULE_INDEX, deletedId);
+
+        // The survivor now sits at index 0 carrying its own nonce; the deleted id must not open it.
+        assertEq(dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId, survivorId);
+        vm.prank(USER);
+        vm.expectRevert(IDcaManager.DcaManager__ScheduleIdAndIndexMismatch.selector);
+        dcaManager.updatePurchaseAmount(address(stablecoin), SCHEDULE_INDEX, deletedId, MIN_PURCHASE_AMOUNT);
+
+        vm.prank(USER);
+        dcaManager.updatePurchaseAmount(address(stablecoin), SCHEDULE_INDEX, survivorId, MIN_PURCHASE_AMOUNT);
+        assertEq(dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).purchaseAmount, MIN_PURCHASE_AMOUNT);
+    }
+
+    function testCreateRevertsWhenTheNonceIsExhaustedBeforeTokensMove() external {
+        // Park the counter one create short of the cap, keeping the scalars beside it intact.
+        uint256 packed = _load(PROTOCOL_SETTINGS_SLOT);
+        uint256 nonceMask = uint256(type(uint64).max) << 176;
+        vm.store(
+            address(dcaManager),
+            bytes32(PROTOCOL_SETTINGS_SLOT),
+            bytes32((packed & ~nonceMask) | (uint256(type(uint64).max) << 176))
+        );
+        assertEq(dcaManager.getMinPurchasePeriod(), MIN_PURCHASE_PERIOD, "vm.store clobbered a neighbouring scalar");
+
+        uint256 userBefore = stablecoin.balanceOf(USER);
+        uint256 handlerBefore = stablecoin.balanceOf(address(stablecoinHandler));
+        uint256 schedulesBefore = dcaManager.getDcaSchedules(USER, address(stablecoin)).length;
+
+        vm.startPrank(USER);
+        stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
+        vm.expectRevert(_safeCastOverflow(64, uint256(type(uint64).max) + 1));
+        dcaManager.createDcaSchedule(
+            address(stablecoin), AMOUNT_TO_DEPOSIT, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_routeIndex
+        );
+        vm.stopPrank();
+
+        assertEq(stablecoin.balanceOf(USER), userBefore, "an exhausted nonce still pulled tokens");
+        assertEq(stablecoin.balanceOf(address(stablecoinHandler)), handlerBefore);
+        assertEq(dcaManager.getDcaSchedules(USER, address(stablecoin)).length, schedulesBefore);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -376,7 +458,7 @@ contract SchedulePackingTest is DcaDappTest {
         dcaManager.setSchedulePaused(address(stablecoin), lastIndex, last.scheduleId, true);
 
         IDcaManager.DcaSchedule memory expected = dcaManager.getDcaSchedule(USER, address(stablecoin), lastIndex);
-        bytes32 deletedId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 deletedId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
 
         vm.prank(USER);
         dcaManager.deleteDcaSchedule(address(stablecoin), SCHEDULE_INDEX, deletedId);

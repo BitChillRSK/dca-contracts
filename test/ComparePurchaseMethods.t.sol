@@ -377,7 +377,7 @@ contract ComparePurchaseMethods is Test {
         // Prepare batch data
         address[] memory userArray = new address[](NUM_OF_USERS);
         uint256[] memory scheduleIndexes = new uint256[](NUM_OF_USERS);
-        bytes32[] memory scheduleIds = new bytes32[](NUM_OF_USERS);
+        uint64[] memory scheduleIds = new uint64[](NUM_OF_USERS);
         uint256[] memory purchaseAmounts = new uint256[](NUM_OF_USERS);
         uint256[] memory purchasePeriods = new uint256[](NUM_OF_USERS);
         
@@ -434,7 +434,7 @@ contract ComparePurchaseMethods is Test {
         // Prepare batch data
         address[] memory userArray = new address[](NUM_OF_USERS);
         uint256[] memory scheduleIndexes = new uint256[](NUM_OF_USERS);
-        bytes32[] memory scheduleIds = new bytes32[](NUM_OF_USERS);
+        uint64[] memory scheduleIds = new uint64[](NUM_OF_USERS);
         uint256[] memory purchaseAmounts = new uint256[](NUM_OF_USERS);
         uint256[] memory purchasePeriods = new uint256[](NUM_OF_USERS);
         

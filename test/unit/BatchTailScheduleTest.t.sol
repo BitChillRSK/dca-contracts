@@ -102,7 +102,7 @@ contract BatchTailScheduleTest is Test {
                 ITokenLending.TokenLending__InsufficientShares.selector, ALICE, aliceShares + 1, aliceShares
             )
         );
-        lendingHandler.batchBuyRbtc(_one(ALICE), _one(keccak256("alice")), _one(ALICE_DEPOSIT));
+        lendingHandler.batchBuyRbtc(_one(ALICE), _oneId(1), _one(ALICE_DEPOSIT));
 
         // Nothing moved: the shortfall is rejected, not clamped.
         assertEq(lendingHandler.getUserShares(ALICE), aliceShares);
@@ -114,12 +114,12 @@ contract BatchTailScheduleTest is Test {
         lendingHandler.depositToken(BOB, 5_000 ether);
 
         address[] memory buyers = new address[](2);
-        bytes32[] memory scheduleIds = new bytes32[](2);
+        uint64[] memory scheduleIds = new uint64[](2);
         uint256[] memory purchaseAmounts = new uint256[](2);
         buyers[0] = ALICE;
         buyers[1] = BOB;
-        scheduleIds[0] = keccak256("alice");
-        scheduleIds[1] = keccak256("bob");
+        scheduleIds[0] = 1;
+        scheduleIds[1] = 2;
         purchaseAmounts[0] = ALICE_DEPOSIT; // tail schedule
         purchaseAmounts[1] = 100 ether; // perfectly healthy
 
@@ -141,7 +141,7 @@ contract BatchTailScheduleTest is Test {
         idleHandler.depositToken(ALICE, ALICE_DEPOSIT);
 
         // Idle books are 1:1, so the exact-balance purchase the lending route rejects goes through.
-        idleHandler.batchBuyRbtc(_one(ALICE), _one(keccak256("alice")), _one(ALICE_DEPOSIT));
+        idleHandler.batchBuyRbtc(_one(ALICE), _oneId(1), _one(ALICE_DEPOSIT));
 
         assertEq(idleHandler.getUsersIdleTokenBalance(ALICE), 0);
         assertGt(idleHandler.getAccumulatedRbtcBalance(ALICE), 0);
@@ -152,8 +152,8 @@ contract BatchTailScheduleTest is Test {
         arr[0] = value;
     }
 
-    function _one(bytes32 value) private pure returns (bytes32[] memory arr) {
-        arr = new bytes32[](1);
+    function _oneId(uint64 value) private pure returns (uint64[] memory arr) {
+        arr = new uint64[](1);
         arr[0] = value;
     }
 

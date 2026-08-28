@@ -103,7 +103,7 @@ contract LayerBankErc20HandlerDexTest is HandlerTestHarness {
         assertGt(sharesBefore, 0);
         assertEq(stablecoin.balanceOf(address(handler)), 0);
 
-        bytes32 scheduleId = keccak256("schedule");
+        uint64 scheduleId = 1;
         vm.prank(address(dcaManager));
         handlerBatchBuyOne(IPurchaseRbtc(address(handler)), USER, scheduleId, PURCHASE_AMOUNT);
 

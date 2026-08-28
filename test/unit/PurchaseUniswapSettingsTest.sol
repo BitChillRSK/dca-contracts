@@ -18,6 +18,7 @@ import "../../script/Constants.sol";
 import {ownableUnauthorized} from "../utils/OzRevert.sol";
 
 contract PurchaseUniswapSettingsTest is DcaDappTest {
+    uint256 private constant SLIPPAGE_SLOT = 7;
 
     event PurchaseUniswap_AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
     event PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(uint256 oldValue, uint256 newValue);
@@ -31,6 +32,26 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
     ///////////////////////////////
     /// Slippage Settings Tests ///
     ///////////////////////////////
+
+    /// @dev R50: the two 1e18-scaled percents are uint128s in one slot. The Dex handler's storage is
+    ///      Ownable2Step (0, 1), the fee word and bounds (2, 3), shares (4), accumulated rBTC (5),
+    ///      the oracle (6), then this pair.
+    function testSlippagePercentsShareOneSlot() public onlyDexSwaps {
+        uint256 percent = IPurchaseUniswap(address(stablecoinHandler)).getAmountOutMinimumPercent();
+        uint256 safetyCheck = IPurchaseUniswap(address(stablecoinHandler)).getAmountOutMinimumSafetyCheck();
+
+        uint256 packed = uint256(vm.load(address(stablecoinHandler), bytes32(SLIPPAGE_SLOT)));
+        assertEq(uint128(packed), percent, "the swap-time percent is not the low half of the slot");
+        assertEq(uint128(packed >> 128), safetyCheck, "the safety check is not the high half of the slot");
+
+        // A write through the setter lands in the same word.
+        vm.prank(OWNER);
+        IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumPercent(0.996 ether);
+
+        packed = uint256(vm.load(address(stablecoinHandler), bytes32(SLIPPAGE_SLOT)));
+        assertEq(uint128(packed), 0.996 ether, "the setter did not write the low half");
+        assertEq(uint128(packed >> 128), safetyCheck, "the setter disturbed the safety check");
+    }
 
     function testSlippageSettings() public onlyDexSwaps {
         // Get the initial values
@@ -285,7 +306,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         // Setup: First perform the necessary setup for the test
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         dcaManager.updatePurchaseAmount(address(stablecoin), SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
         vm.stopPrank();
         

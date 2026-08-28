@@ -20,6 +20,7 @@ contract OperationsAdminTest is DcaDappTest {
     event OperationsAdmin__RouteRegistered(uint256 indexed index, bool lends);
     event OperationsAdmin__DepositsPauseSet(address indexed token, uint256 indexed routeIndex, bool paused);
 
+    uint256 private constant TOKEN_ROUTE_MAPPING_SLOT = 2;
     uint256 private constant SECOND_IDLE_INDEX = 10;
     uint256 private constant SECOND_LENDING_INDEX = 11;
 
@@ -144,7 +145,7 @@ contract OperationsAdminTest is DcaDappTest {
     }
 
     function testRevokedSwapperCannotPurchase() external {
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
         vm.prank(OWNER);
         operationsAdmin.revokeSwapper(SWAPPER);
 
@@ -283,7 +284,7 @@ contract OperationsAdminTest is DcaDappTest {
         assertEq(operationsAdmin.getTokenHandler(address(stablecoin), s_routeIndex), oldHandler);
         assertEq(operationsAdmin.getTokenHandler(address(stablecoin), SECOND_LENDING_INDEX), address(newHandler));
 
-        bytes32 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
         uint256 remaining = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).tokenBalance;
         uint256 userBalanceBefore = stablecoin.balanceOf(USER);
 
@@ -296,7 +297,7 @@ contract OperationsAdminTest is DcaDappTest {
     }
 
     function testOwnerCannotMoveAnotherUsersTokens() external {
-        bytes32 userScheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
+        uint64 userScheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
         uint256 userRemaining = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).tokenBalance;
         uint256 userWalletBefore = stablecoin.balanceOf(USER);
 
@@ -308,7 +309,7 @@ contract OperationsAdminTest is DcaDappTest {
         );
         vm.stopPrank();
 
-        bytes32 ownerScheduleId = dcaManager.getDcaSchedule(OWNER, address(stablecoin), 0).scheduleId;
+        uint64 ownerScheduleId = dcaManager.getDcaSchedule(OWNER, address(stablecoin), 0).scheduleId;
         uint256 ownerRemaining = dcaManager.getDcaSchedule(OWNER, address(stablecoin), 0).tokenBalance;
         uint256 ownerWalletBefore = stablecoin.balanceOf(OWNER);
 
@@ -647,5 +648,71 @@ contract OperationsAdminTest is DcaDappTest {
             abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 32, overflowing)
         );
         operationsAdmin.assignTokenHandler(address(stablecoin), overflowing, address(stub));
+    }
+
+    function testSetDepositsPausedRevertsUint32MaxPlusOne() external {
+        uint256 overflowing = uint256(type(uint32).max) + 1;
+        vm.prank(OWNER);
+        vm.expectRevert(_routeIndexOverflow(overflowing));
+        operationsAdmin.setDepositsPaused(address(stablecoin), overflowing, true);
+    }
+
+    function testRouteIndexGettersRevertUint32MaxPlusOne() external {
+        uint256 overflowing = uint256(type(uint32).max) + 1;
+
+        vm.expectRevert(_routeIndexOverflow(overflowing));
+        operationsAdmin.areDepositsPaused(address(stablecoin), overflowing);
+
+        vm.expectRevert(_routeIndexOverflow(overflowing));
+        operationsAdmin.getTokenHandler(address(stablecoin), overflowing);
+
+        vm.expectRevert(_routeIndexOverflow(overflowing));
+        operationsAdmin.isLendingRoute(overflowing);
+
+        vm.expectRevert(_routeIndexOverflow(overflowing));
+        operationsAdmin.getRouteClass(overflowing);
+    }
+
+    function testInRangeRouteIndexGettersAreUnchanged() external {
+        assertEq(operationsAdmin.getTokenHandler(address(stablecoin), s_routeIndex), address(stablecoinHandler));
+        assertFalse(operationsAdmin.areDepositsPaused(address(stablecoin), s_routeIndex));
+        assertEq(operationsAdmin.getTokenHandler(address(stablecoin), SECOND_IDLE_INDEX), address(0));
+        assertFalse(operationsAdmin.areDepositsPaused(address(stablecoin), SECOND_IDLE_INDEX));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        HANDLER + PAUSE PACKING
+    //////////////////////////////////////////////////////////////*/
+
+    function testHandlerAndPauseShareOneMappingValue() external {
+        bytes32 valueSlot = _tokenRouteSlot(address(stablecoin), s_routeIndex);
+        uint256 packed = uint256(vm.load(address(operationsAdmin), valueSlot));
+
+        assertEq(address(uint160(packed)), address(stablecoinHandler), "the handler is not the low 20 bytes");
+        assertEq(packed >> 160, 0, "deposits read as paused before any pause");
+
+        vm.prank(OWNER);
+        operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, true);
+
+        packed = uint256(vm.load(address(operationsAdmin), valueSlot));
+        assertEq(address(uint160(packed)), address(stablecoinHandler), "pausing moved the handler");
+        assertEq(packed >> 160, 1, "the pause flag is not the byte above the handler");
+    }
+
+    function testUnassignedPairReadsAsZeroAndUnpaused() external {
+        bytes32 valueSlot = _tokenRouteSlot(address(stablecoin), SECOND_LENDING_INDEX);
+        assertEq(uint256(vm.load(address(operationsAdmin), valueSlot)), 0);
+        assertEq(operationsAdmin.getTokenHandler(address(stablecoin), SECOND_LENDING_INDEX), address(0));
+        assertFalse(operationsAdmin.areDepositsPaused(address(stablecoin), SECOND_LENDING_INDEX));
+    }
+
+    function _routeIndexOverflow(uint256 value) private pure returns (bytes memory) {
+        return abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 32, value);
+    }
+
+    /// @dev `s_tokenRoute` is the first BitChill variable, at slot 2 (Ownable2Step takes 0 and 1).
+    function _tokenRouteSlot(address token, uint256 routeIndex) private pure returns (bytes32) {
+        bytes32 inner = keccak256(abi.encode(token, uint256(TOKEN_ROUTE_MAPPING_SLOT)));
+        return keccak256(abi.encode(routeIndex, inner));
     }
 }

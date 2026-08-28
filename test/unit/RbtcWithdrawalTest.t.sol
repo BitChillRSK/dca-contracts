@@ -108,7 +108,7 @@ contract RbtcWithdrawalTest is DcaDappTest {
 
         super.makeSinglePurchase();
 
-        bytes32 attackerScheduleId = dcaManager.getDcaSchedule(attacker, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 attackerScheduleId = dcaManager.getDcaSchedule(attacker, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         buyRbtcOne(attacker, SCHEDULE_INDEX, attackerScheduleId, AMOUNT_TO_SPEND);
 
         uint256 userAccrued = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
