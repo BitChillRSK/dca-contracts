@@ -1,4 +1,4 @@
-# R42 — Grouped swapper purchases (one tx, many `batchBuyRbtc` groups)
+# R42 — Multi-handler swapper purchases (one tx, many handlers' batches)
 
 Status: **implemented** · GitHub [#101](https://github.com/BitChillRSK/dca-contracts/pull/101) · Assigned: yes · Optional/further-review: no
 
@@ -6,7 +6,7 @@ PR 46 of the relaunch stack originally shipped the standalone `SwapperBatcher` i
 [#98](https://github.com/BitChillRSK/dca-contracts/pull/98), stacked on R38 (PR 45). After R9 and
 R10 completed the ordered stack, the grouped entry point was re-evaluated against the final
 `DcaManager` bytecode and measured hot path. The follow-up stacks on R10 (PR 48) and replaces the
-standalone contract with an integrated `DcaManager.batchBuyRbtcGroups` entry point in GitHub
+standalone contract with an integrated `DcaManager.batchBuyRbtcHandlers` entry point in GitHub
 [#101](https://github.com/BitChillRSK/dca-contracts/pull/101). Cutover:
 [swapper-bot#6](https://github.com/BitChillRSK/swapper-bot/issues/6),
 [front-end#22](https://github.com/BitChillRSK/front-end/issues/22), and
@@ -14,7 +14,7 @@ standalone contract with an integrated `DcaManager.batchBuyRbtcGroups` entry poi
 
 ## Objective
 
-Let one allowlisted swapper call drive several token×route purchase groups atomically while paying
+Let one allowlisted swapper call drive several handlers' purchase batches atomically while paying
 the allowlist and cross-contract overhead only once for the whole bundle.
 
 ## Background
@@ -39,26 +39,27 @@ handler failure therefore reverts the entire call. The bot filters rows off-chai
 allowlisted so it can retry one handler through `batchBuyRbtc` after a grouped call fails.
 
 Decided 2026-08-29: integrate the grouped entry point in `DcaManager`; remove the standalone
-batcher, its interface, and its deploy add-on.
+batcher, its interface, and its deploy add-on. The integrated selector is `batchBuyRbtcHandlers`
+(`Batch[]` of one handler's purchase batches), not the standalone's `batchBuyRbtcGroups`.
 
 ## Open product decisions
 
 **none** — calls remain all-or-nothing, the bot EOA remains allowlisted, and the existing
-single-group selector remains available.
+one-handler selector remains available.
 
 ## Scope
 
-- [x] Add `IDcaManager.Batch`, one argument group containing token, route, and the parallel
+- [x] Add `IDcaManager.Batch`, one handler's purchase batch containing token, route, and the parallel
   buyer/index/id/amount arrays.
-- [x] Add swapper-only `DcaManager.batchBuyRbtcGroups(Batch[] calldata)`. Empty top-level input
-  reverts; each group keeps the existing empty/length/amount/route/schedule checks.
-- [x] Extract `batchBuyRbtc` into a private `_batchBuyRbtc` helper. The grouped entry point
-  authenticates only once and loops that helper so each group finishes its checks, effects, and
+- [x] Add swapper-only `DcaManager.batchBuyRbtcHandlers(Batch[] calldata)`. Empty top-level input
+  reverts `DcaManager__EmptyHandlerBatches`; each batch keeps the existing empty/length/amount/route/schedule checks.
+- [x] Extract `batchBuyRbtc` into a private `_batchBuyRbtc` helper. The multi-handler entry point
+  authenticates only once and loops that helper so each handler's batch finishes its checks, effects, and
   handler call before the next. A two-pass (all effects, then all interactions) was measured
   2,463 gas more expensive and was rejected: handlers are BitChill-deployed.
 - [x] Remove `SwapperBatcher`, `ISwapperBatcher`, and `DeploySwapperBatcher`.
 - [x] Adapt the R42 tests to call `DcaManager` directly and preserve the two-handler success,
-  second-group rollback, paused-row rollback, access-control, empty-input, and direct-retry cases.
+  second-handler rollback, paused-row rollback, access-control, empty-input, and direct-retry cases.
 - [x] Record final runtime size and a like-for-like gas comparison.
 - [x] Update the swapper-bot cutover issue. Because this changes the final `DcaManager` ABI after
   R9/R10, also create or update the required frontend and monitoring ABI follow-ups.
@@ -78,24 +79,24 @@ single-group selector remains available.
 - `src/interfaces/IDcaManager.sol`
 - removal of `src/SwapperBatcher.sol` and `src/interfaces/ISwapperBatcher.sol`
 - removal of `script/DeploySwapperBatcher.s.sol`
-- the R42 unit test, renamed for the integrated surface
+- the R42 unit test, renamed `DcaManagerBatchHandlersTest`
 - `AGENTS.md`, this spec, `IMPLEMENTATION_ORDER.md`, and relaunch `README.md`
 
 ## Required tests
 
 Targeted grouped-purchase tests, then the complete repository gates from `AGENTS.md`.
 
-- One DcaManager call, two groups, two handlers: both purchase.
-- A second-group error rolls back the first group’s balance, timestamp, and accumulated rBTC.
-- A paused schedule in the second group rolls back the first.
-- Empty top-level groups revert with the new DcaManager error.
+- One DcaManager call, two handlers: both purchase.
+- A second-handler error rolls back the first handler’s balance, timestamp, and accumulated rBTC.
+- A paused schedule in the second handler's batch rolls back the first.
+- Empty top-level batches revert with the new DcaManager error.
 - A non-swapper cannot call either purchase entry point.
 - The bot EOA can still call the original `batchBuyRbtc` entry point for one-handler retries.
 - Fork: no new assertions; both required fork lanes still pass.
 
 ## Success criteria
 
-- [x] One allowlist check drives every purchase group in one transaction.
+- [x] One allowlist check drives every handler's purchase batch in one transaction.
 - [x] The original `batchBuyRbtc` selector and behavior stay unchanged.
 - [x] Failure policy remains atomic and tested.
 - [x] The integrated manager remains below EIP-170 in the deploy profile.
@@ -105,8 +106,8 @@ Targeted grouped-purchase tests, then the complete repository gates from `AGENTS
 
 ## Reviewer checklist
 
-- [x] The one-group helper preserves the former `batchBuyRbtc` checks/effects/handler call.
-- [x] `onlySwapper` runs once per external entry, not once per inner group.
+- [x] The one-handler helper preserves the former `batchBuyRbtc` checks/effects/handler call.
+- [x] `onlySwapper` runs once per external entry, not once per inner handler.
 - [x] Tests cover success, rollback, pause, malformed input, handler failure, and unauthorized callers.
 - [x] Runtime and gas measurements use the pinned deploy profile.
 - [x] Files beyond the list above are named and justified in the PR.
@@ -114,8 +115,9 @@ Targeted grouped-purchase tests, then the complete repository gates from `AGENTS
 
 ## ABI / deploy / cutover impact
 
-- ABI: `DcaManager` gains `batchBuyRbtcGroups((address[],address,uint256[],uint64[],uint256[],uint256)[])`
-  and an empty-groups custom error. The original `batchBuyRbtc` selector is unchanged.
+- ABI: `DcaManager` gains `batchBuyRbtcHandlers((address[],address,uint256[],uint64[],uint256[],uint256)[])`
+  (`0xf74791ac`) and `DcaManager__EmptyHandlerBatches()`. The original `batchBuyRbtc` selector is
+  unchanged. The standalone used `batchBuyRbtcGroups`; that name does not ship.
 - Deploy: no batcher deployment and no contract-address `addSwapper`; the bot EOA calls
   `DcaManager` directly.
 - Cutover: swapper-bot updates its grouped call target and ABI. Frontend and monitoring regenerate

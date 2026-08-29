@@ -28,8 +28,9 @@ interface IDcaManager {
         uint64 scheduleId; // Unique identifier of each DCA schedule: the value of the creation nonce
     }
 
-    /// @notice One token-and-route purchase group inside a grouped swapper call.
-    /// @dev The four arrays are positional and must have the same nonzero length.
+    /// @notice One handler's purchase batch inside a multi-handler swapper call.
+    /// @dev Every row shares this batch's `token` and `routeIndex`, which resolve to one handler.
+    ///      The four arrays are positional and must have the same nonzero length.
     struct Batch {
         address[] buyers;
         address token;
@@ -131,8 +132,8 @@ interface IDcaManager {
     error DcaManager__ArraysLengthMismatch();
     /// @notice `batchBuyRbtc` was called with empty buyer/index/id/amount arrays.
     error DcaManager__EmptyBatchPurchaseArrays();
-    /// @notice `batchBuyRbtcGroups` was called without any token-and-route groups.
-    error DcaManager__EmptyBatchPurchaseGroups();
+    /// @notice `batchBuyRbtcHandlers` was called without any handler batches.
+    error DcaManager__EmptyHandlerBatches();
     /// @notice A withdraw-all call was given empty token/route arrays.
     error DcaManager__EmptyWithdrawalArrays();
     /// @notice The user already has the maximum number of schedules for this token.
@@ -249,7 +250,7 @@ interface IDcaManager {
     function setSchedulePaused(address token, uint256 scheduleIndex, uint64 scheduleId, bool paused) external;
 
     /**
-     * @notice Buy rBTC for every named due schedule that shares one token and one route.
+     * @notice Buy rBTC for every named due schedule on one handler.
      * @param buyers Users to buy for. The same address may appear more than once when several of
      *        that user's schedules are due.
      * @param token Stablecoin every row in this batch spends.
@@ -273,13 +274,13 @@ interface IDcaManager {
     ) external;
 
     /**
-     * @notice Buy rBTC for several token-and-route groups atomically in one transaction.
-     * @param batches Groups whose rows each share one stablecoin and one route.
-     * @dev Authenticates the caller once, then purchases each group in order through the same
-     *      one-group helper. A failure in any group or handler reverts every group.
-     *      The original `batchBuyRbtc` remains available for one-group retries.
+     * @notice Buy rBTC through several handlers atomically in one transaction.
+     * @param batches Each element is one handler's purchase batch (`token` + `routeIndex`).
+     * @dev Authenticates the caller once, then purchases each handler's batch in order through the
+     *      same one-handler helper. A failure in any batch reverts every handler.
+     *      The original `batchBuyRbtc` remains available for one-handler retries.
      */
-    function batchBuyRbtcGroups(Batch[] calldata batches) external;
+    function batchBuyRbtcHandlers(Batch[] calldata batches) external;
 
     /**
      * @notice Withdraw lending interest the caller has accrued on each named token×route pair.

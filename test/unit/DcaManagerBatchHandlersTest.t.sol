@@ -11,11 +11,11 @@ import {batchBuyOne} from "../utils/BatchBuyOne.sol";
 import "../Constants.sol";
 
 /**
- * @notice Exercises the integrated grouped-purchase entry point across two handlers.
+ * @notice Exercises the integrated multi-handler purchase entry point.
  * @dev Two-handler cases need a second MoC route on Anvil (idle + LayerBank). The portable
- *      access-control, empty-input, one-group, and direct-retry cases run on every harness lane.
+ *      access-control, empty-input, one-handler, and direct-retry cases run on every harness lane.
  */
-contract DcaManagerBatchGroupsTest is DcaDappTest {
+contract DcaManagerBatchHandlersTest is DcaDappTest {
     uint256 internal constant SECOND_SCHEDULE_INDEX = 1;
 
     address internal secondHandler;
@@ -89,7 +89,7 @@ contract DcaManagerBatchGroupsTest is DcaDappTest {
         batch.routeIndex = routeIndex;
     }
 
-    function _twoGroups() private view returns (IDcaManager.Batch[] memory batches) {
+    function _twoHandlers() private view returns (IDcaManager.Batch[] memory batches) {
         batches = new IDcaManager.Batch[](2);
         batches[0] = _oneRow(SCHEDULE_INDEX, s_routeIndex);
         batches[1] = _oneRow(SECOND_SCHEDULE_INDEX, secondRouteIndex);
@@ -97,7 +97,7 @@ contract DcaManagerBatchGroupsTest is DcaDappTest {
 
     function _batchBuy(IDcaManager.Batch[] memory batches) private {
         vm.prank(SWAPPER);
-        dcaManager.batchBuyRbtcGroups(batches);
+        dcaManager.batchBuyRbtcHandlers(batches);
     }
 
     function testGroupedPurchaseBuysThroughBothHandlers() external {
@@ -112,7 +112,7 @@ contract DcaManagerBatchGroupsTest is DcaDappTest {
         uint256 secondBalanceBefore =
             dcaManager.getDcaSchedule(USER, address(stablecoin), SECOND_SCHEDULE_INDEX).tokenBalance;
 
-        _batchBuy(_twoGroups());
+        _batchBuy(_twoHandlers());
 
         assertEq(
             dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance,
@@ -158,7 +158,7 @@ contract DcaManagerBatchGroupsTest is DcaDappTest {
         vm.prank(USER);
         dcaManager.setSchedulePaused(address(stablecoin), SECOND_SCHEDULE_INDEX, secondId, true);
 
-        IDcaManager.Batch[] memory batches = _twoGroups();
+        IDcaManager.Batch[] memory batches = _twoHandlers();
         vm.expectRevert(
             abi.encodeWithSelector(
                 IDcaManager.DcaManager__SchedulePaused.selector,
@@ -187,11 +187,11 @@ contract DcaManagerBatchGroupsTest is DcaDappTest {
         uint256 firstRbtcBefore = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
         uint256 secondRbtcBefore = IPurchaseRbtc(secondHandler).getAccumulatedRbtcBalance(USER);
 
-        // Group one reaches its handler; group two then fails inside the MoC interaction.
+        // The first handler is called; the second then fails inside the MoC interaction.
         vm.prank(secondHandler);
         stablecoin.approve(address(mocProxy), 0);
 
-        IDcaManager.Batch[] memory batches = _twoGroups();
+        IDcaManager.Batch[] memory batches = _twoHandlers();
         vm.expectRevert(IPurchaseMoc.PurchaseMoc__RedeemFreeDocFailed.selector);
         _batchBuy(batches);
 
@@ -207,25 +207,25 @@ contract DcaManagerBatchGroupsTest is DcaDappTest {
         assertEq(IPurchaseRbtc(secondHandler).getAccumulatedRbtcBalance(USER), secondRbtcBefore);
     }
 
-    function testEmptyGroupsRevert() external {
+    function testEmptyHandlersRevert() external {
         IDcaManager.Batch[] memory batches = new IDcaManager.Batch[](0);
-        vm.expectRevert(IDcaManager.DcaManager__EmptyBatchPurchaseGroups.selector);
+        vm.expectRevert(IDcaManager.DcaManager__EmptyHandlerBatches.selector);
         _batchBuy(batches);
     }
 
-    function testNonSwapperCannotBuyGroups() external {
+    function testNonSwapperCannotBuyHandlers() external {
         address attacker = makeAddr("bundle-frontrunner");
         IDcaManager.Batch[] memory batches = new IDcaManager.Batch[](1);
         batches[0] = _oneRow(SCHEDULE_INDEX, s_routeIndex);
 
         vm.prank(attacker);
         vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__UnauthorizedSwapper.selector, attacker));
-        dcaManager.batchBuyRbtcGroups(batches);
+        dcaManager.batchBuyRbtcHandlers(batches);
 
         assertEq(dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).lastPurchaseTimestamp, 0);
     }
 
-    function testAllowlistedSwapperCanBuyOneGroup() external {
+    function testAllowlistedSwapperCanBuyOneHandler() external {
         IDcaManager.Batch[] memory batches = new IDcaManager.Batch[](1);
         batches[0] = _oneRow(SCHEDULE_INDEX, s_routeIndex);
         _batchBuy(batches);

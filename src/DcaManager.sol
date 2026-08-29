@@ -290,9 +290,9 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     /**
      * @inheritdoc IDcaManager
      */
-    function batchBuyRbtcGroups(Batch[] calldata batches) external override onlySwapper {
+    function batchBuyRbtcHandlers(Batch[] calldata batches) external override onlySwapper {
         uint256 numBatches = batches.length;
-        if (numBatches == 0) revert DcaManager__EmptyBatchPurchaseGroups();
+        if (numBatches == 0) revert DcaManager__EmptyHandlerBatches();
 
         for (uint256 i; i < numBatches; ++i) {
             Batch calldata batch = batches[i];
@@ -308,7 +308,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     }
 
     /**
-     * @dev Validate one token-and-route group, debit every named schedule, then call the handler.
+     * @dev Validate one handler's batch, debit every named schedule, then call that handler.
      */
     function _batchBuyRbtc(
         address[] calldata buyers,
