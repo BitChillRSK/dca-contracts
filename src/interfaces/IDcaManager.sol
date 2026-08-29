@@ -4,12 +4,15 @@ pragma solidity 0.8.36;
 /**
  * @title IDcaManager
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @dev Interface for the DcaManager contract.
+ * @notice User and swapper entry point: create and manage dollar-cost-averaging schedules.
+ * @dev Users talk only to this contract. A swapper (EOA or `SwapperBatcher`) triggers purchases.
+ *      Handlers hold the stablecoin and accumulated rBTC; this contract never custody them.
  */
 interface IDcaManager {
     ////////////////////////
     // Type declarations ///
     ////////////////////////
+    /// @notice One user's recurring purchase of rBTC with one stablecoin on one OperationsAdmin route.
     /// @dev Two storage slots, ordered so the two fields a purchase writes (`tokenBalance` and
     ///      `lastPurchaseTimestamp`) share slot 0 with `paused` (23 of 32 bytes). Without IR,
     ///      those updates remain two `SSTORE`s; the second is a cheap dirty write because both
@@ -44,13 +47,17 @@ interface IDcaManager {
     //////////////////////
     // Events ////////////
     //////////////////////
+    /// @notice A schedule's stablecoin principal changed after a deposit, withdrawal, or purchase debit.
     event DcaManager__TokenBalanceUpdated(address indexed token, uint64 indexed scheduleId, uint256 amount);
+    /// @notice The caller replaced a schedule's periodic purchase amount.
     event DcaManager__PurchaseAmountUpdated(
         address indexed user, uint64 indexed scheduleId, uint256 previousAmount, uint256 newAmount
     );
+    /// @notice The caller replaced a schedule's purchase period.
     event DcaManager__PurchasePeriodUpdated(
         address indexed user, uint64 indexed scheduleId, uint256 previousPeriod, uint256 newPeriod
     );
+    /// @notice A new schedule was created and funded. `scheduleId` is the creation nonce (starts at 1).
     event DcaManager__DcaScheduleCreated(
         address indexed user,
         address indexed token,
@@ -60,43 +67,76 @@ interface IDcaManager {
         uint256 purchasePeriod,
         uint256 routeIndex
     );
+    /// @notice The caller paused or resumed purchases on one of their schedules.
     /// @dev Filterable by user and scheduleId only, matching PurchaseAmountUpdated / PurchasePeriodUpdated.
     ///      Token is recovered by joining on scheduleId; it is not a third topic.
     event DcaManager__SchedulePauseSet(address indexed user, uint64 indexed scheduleId, bool paused);
+    /// @notice A schedule was deleted. `refundedAmount` is what left the handler, which may be less than
+    ///         the schedule's `tokenBalance` if the lending protocol haircut the redemption.
     event DcaManager__DcaScheduleDeleted(
         address indexed user, address indexed token, uint64 indexed scheduleId, uint256 refundedAmount
     );
+    /// @notice Owner changed the per-token schedule cap.
     event DcaManager__MaxSchedulesPerTokenModified(uint256 newMaxSchedulesPerToken);
+    /// @notice Owner changed the protocol minimum purchase period (never below one UTC day).
     event DcaManager__MinPurchasePeriodModified(uint256 newMinPurchasePeriod);
+    /// @notice A purchase updated a schedule's `lastPurchaseTimestamp` cadence anchor.
+    /// @dev The next due boundary is the UTC day of `lastPurchaseTimestamp + purchasePeriod`, not
+    ///      this emitted value itself.
     event DcaManager__LastPurchaseTimestampUpdated(address indexed token, uint64 indexed scheduleId, uint256 lastPurchaseTimestamp);
+    /// @notice Owner changed the default minimum purchase amount used when a token has no override.
     event DcaManager__DefaultMinPurchaseAmountModified(uint256 newDefaultMinPurchaseAmount);
+    /// @notice Owner set a per-token minimum purchase amount. Zero clears the override.
     event DcaManager__TokenMinPurchaseAmountSet(address indexed token, uint256 minPurchaseAmount);
 
     //////////////////////
     // Errors ////////////
     //////////////////////
+    /// @notice No handler is assigned for this token and route.
     error DcaManager__TokenNotAccepted(address token, uint256 routeIndex);
+    /// @notice Deposit amount must be greater than zero.
     error DcaManager__DepositAmountMustBeGreaterThanZero();
+    /// @notice Withdrawal amount must be greater than zero (after resolving `type(uint256).max`).
     error DcaManager__WithdrawalAmountMustBeGreaterThanZero();
+    /// @notice Requested withdrawal exceeds this schedule's `tokenBalance`.
     error DcaManager__WithdrawalAmountExceedsBalance(address token, uint256 amount, uint256 balance);
+    /// @notice Purchase amount is below the token's (or default) minimum.
     error DcaManager__PurchaseAmountMustBeGreaterThanMinimum(address token, uint256 minPurchaseAmount);
+    /// @notice Purchase period is below the protocol minimum.
     error DcaManager__PurchasePeriodMustBeGreaterThanMinimum();
+    /// @notice Protocol minimum purchase period cannot be set below one UTC day.
     error DcaManager__MinPurchasePeriodMustBeAtLeastOneDay();
+    /// @notice Purchase amount exceeds the schedule's current `tokenBalance`.
     error DcaManager__PurchaseAmountExceedsBalance(address token, uint256 purchaseAmount, uint256 tokenBalance);
+    /// @notice The UTC day of `lastPurchaseTimestamp + purchasePeriod` has not started.
     error DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed(uint256 timeRemaining);
+    /// @notice `scheduleIndex` is out of range for this user and token.
     error DcaManager__InexistentScheduleIndex();
+    /// @notice `scheduleId` does not match the schedule at `scheduleIndex`.
     error DcaManager__ScheduleIdAndIndexMismatch();
+    /// @notice The schedule's remaining principal cannot cover one purchase.
     error DcaManager__ScheduleBalanceNotEnoughForPurchase(uint256 scheduleIndex, uint64 scheduleId, address token, uint256 remainingBalance);
+    /// @notice Parallel arrays (batch purchase or withdraw-all pairs) have different lengths.
     error DcaManager__ArraysLengthMismatch();
+    /// @notice `batchBuyRbtc` was called with empty buyer/index/id/amount arrays.
     error DcaManager__EmptyBatchPurchaseArrays();
+    /// @notice A withdraw-all call was given empty token/route arrays.
     error DcaManager__EmptyWithdrawalArrays();
+    /// @notice The user already has the maximum number of schedules for this token.
     error DcaManager__MaxSchedulesPerTokenReached(address token);
+    /// @notice Interest was requested on a route that is not registered as lending.
     error DcaManager__TokenDoesNotYieldInterest(address token);
+    /// @notice Caller is not on the OperationsAdmin swapper allowlist.
     error DcaManager__UnauthorizedSwapper(address sender);
+    /// @notice A batch row's `purchaseAmounts[i]` does not match the schedule's stored amount.
     error DcaManager__PurchaseAmountMismatch(address user, address token, uint64 scheduleId, uint256 scheduleIndex, uint256 actualPurchaseAmount, uint256 expectedPurchaseAmount);
+    /// @notice A batch row's schedule is on a different route than this batch's `routeIndex`.
     error DcaManager__RouteIndexMismatch(address user, address token, uint64 scheduleId, uint256 scheduleIndex, uint256 actualRouteIndex, uint256 expectedRouteIndex);
+    /// @notice Constructor `operationsAdmin` has no code.
     error DcaManager__OperationsAdminIsNotAContract(address operationsAdmin);
+    /// @notice Governance paused new deposits for this token and route.
     error DcaManager__DepositsPaused(address token, uint256 routeIndex);
+    /// @notice A named schedule is purchase-paused, so the whole `batchBuyRbtc` reverts.
     error DcaManager__SchedulePaused(address user, address token, uint64 scheduleId, uint256 scheduleIndex);
 
     /*//////////////////////////////////////////////////////////////
@@ -104,30 +144,41 @@ interface IDcaManager {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Deposit a specified amount of a stablecoin into the contract for DCA operations.
-     * @param token The token address of the stablecoin to deposit.
-     * @param scheduleIndex The index of the DCA schedule
-     * @param scheduleId The schedule id for validation
-     * @param depositAmount The amount of the stablecoin requested from the user. The handler reverts unless it receives exactly this amount, so the schedule is credited with the full request.
+     * @notice Deposit more stablecoin into an existing schedule.
+     * @param token The stablecoin of the schedule.
+     * @param scheduleIndex Index of the schedule in the caller's array for `token`.
+     * @param scheduleId Id of that schedule, checked against storage.
+     * @param depositAmount Amount requested from the caller. The handler reverts unless it receives
+     *        exactly this amount, so the schedule is credited with the full request.
+     * @dev Reverts `DcaManager__DepositsPaused` before any transfer if governance paused deposits
+     *      on this schedule's route. Purchases, edits, withdrawals, and deletion ignore that pause.
      */
     function depositToken(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 depositAmount) external;
 
     /**
-     * @notice Withdraw a specified amount of a stablecoin from the contract.
-     * @param token The token address of the stablecoin to deposit.
-     * @param scheduleIndex The index of the DCA schedule
-     * @param scheduleId The schedule id for validation
-     * @param withdrawalAmount The amount of the stablecoin to withdraw. Pass type(uint256).max to withdraw this schedule’s whole token balance.
+     * @notice Withdraw stablecoin principal from one schedule.
+     * @param token The stablecoin of the schedule.
+     * @param scheduleIndex Index of the schedule in the caller's array for `token`.
+     * @param scheduleId Id of that schedule, checked against storage.
+     * @param withdrawalAmount Amount to withdraw. Pass `type(uint256).max` for this schedule's
+     *        whole `tokenBalance`.
+     * @dev Principal is reduced by the requested amount, not by what the lending protocol paid.
+     *      A redemption fee consumes principal rather than leaving it behind.
      */
     function withdrawToken(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 withdrawalAmount) external;
 
     /**
-     * @notice Create a new DCA schedule depositing a specified amount of a stablecoin into the contract.
-     * @param token The token address of the stablecoin to deposit.
-     * @param depositAmount The amount of the stablecoin requested from the user. The handler reverts unless it receives exactly this amount, so the schedule is credited with the full request.
-     * @param purchaseAmount The amount to spend periodically in buying rBTC. Validated against the credited token balance, which equals the requested deposit once the handler pull succeeds.
-     * @param purchasePeriod The period for recurrent purchases
-     * @param routeIndex The OperationsAdmin route index for this schedule (idle or lending)
+     * @notice Create a new schedule and fund it in the same call.
+     * @param token The stablecoin to deposit.
+     * @param depositAmount Amount requested from the caller. The handler reverts unless it receives
+     *        exactly this amount, so the schedule is credited with the full request.
+     * @param purchaseAmount Stablecoin to spend periodically on rBTC. Validated against the credited
+     *        balance, which equals `depositAmount` once the handler pull succeeds.
+     * @param purchasePeriod Seconds between purchases. Must be at least the protocol minimum (one UTC day
+     *        or higher if the owner raised it).
+     * @param routeIndex OperationsAdmin route that will hold the funds (idle or lending).
+     * @dev Ids are the creation nonce, starting at 1. Reverts `DcaManager__DepositsPaused` before any
+     *      transfer if governance paused deposits on `token` × `routeIndex`.
      */
     function createDcaSchedule(
         address token,
@@ -138,58 +189,66 @@ interface IDcaManager {
     ) external;
 
     /**
-     * @dev function to delete a DCA schedule: cancels DCA and retrieves the funds
-     * @param token the token used for DCA in the schedule to be deleted
-     * @param scheduleIndex the index of the schedule to delete
-     * @param scheduleId the unique identifier of the schedule to be deleted for validation
+     * @notice Delete a schedule and return its remaining principal to the caller.
+     * @param token The stablecoin of the schedule.
+     * @param scheduleIndex Index of the schedule in the caller's array for `token`.
+     * @param scheduleId Id of that schedule, checked against storage.
+     * @dev Swap-pops the array. The deleted event reports what left the handler, which may be less
+     *      than `tokenBalance` if the lending protocol haircut the redemption. Accumulated rBTC and
+     *      lending interest are not claimed here — withdraw those first.
      */
     function deleteDcaSchedule(address token, uint256 scheduleIndex, uint64 scheduleId) external;
 
     /**
-     * @notice Update the purchase amount of an existing DCA schedule.
-     * @param token The token address of the stablecoin.
-     * @param scheduleIndex The index of the DCA schedule
-     * @param scheduleId The schedule id for validation
-     * @param newPurchaseAmount The new amount to spend periodically in buying rBTC
-     * @dev emits DcaManager__PurchaseAmountUpdated with the replaced amount and the new one
+     * @notice Replace the periodic purchase amount on an existing schedule.
+     * @param token The stablecoin of the schedule.
+     * @param scheduleIndex Index of the schedule in the caller's array for `token`.
+     * @param scheduleId Id of that schedule, checked against storage.
+     * @param newPurchaseAmount New amount to spend periodically on rBTC. Cannot exceed the schedule's
+     *        current `tokenBalance` or fall below the token minimum.
+     * @dev Emits `DcaManager__PurchaseAmountUpdated` with the replaced amount and the new one.
      */
     function updatePurchaseAmount(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 newPurchaseAmount)
         external;
 
     /**
-     * @notice Update the purchase period of an existing DCA schedule.
-     * @param token The token address of the stablecoin.
-     * @param scheduleIndex The index of the DCA schedule
-     * @param scheduleId The schedule id for validation
-     * @param newPurchasePeriod The new period for recurrent purchases
-     * @dev emits DcaManager__PurchasePeriodUpdated with the replaced period and the new one
+     * @notice Replace the purchase period on an existing schedule.
+     * @param token The stablecoin of the schedule.
+     * @param scheduleIndex Index of the schedule in the caller's array for `token`.
+     * @param scheduleId Id of that schedule, checked against storage.
+     * @param newPurchasePeriod New seconds between purchases. Cannot be shorter than the protocol minimum.
+     * @dev Emits `DcaManager__PurchasePeriodUpdated` with the replaced period and the new one.
      */
     function updatePurchasePeriod(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 newPurchasePeriod)
         external;
 
     /**
-     * @notice Pause or resume rBTC purchases for one of the caller's DCA schedules.
-     * @param token The token address of the stablecoin.
-     * @param scheduleIndex The index of the DCA schedule
-     * @param scheduleId The schedule id for validation
-     * @param paused True to stop purchases, false to resume them
+     * @notice Pause or resume rBTC purchases for one of the caller's schedules.
+     * @param token The stablecoin of the schedule.
+     * @param scheduleIndex Index of the schedule in the caller's array for `token`.
+     * @param scheduleId Id of that schedule, checked against storage.
+     * @param paused True to stop purchases, false to resume them.
      * @dev A paused schedule keeps its funds on its route and stays open to deposits, amount and
      *      period edits, withdrawals, interest and rBTC claims, and deletion. Setting the state it
      *      already holds is a no-op and emits nothing, so every emitted event is a real transition.
+     *      A paused row in `batchBuyRbtc` reverts the whole batch.
      */
     function setSchedulePaused(address token, uint256 scheduleIndex, uint64 scheduleId, bool paused) external;
 
     /**
-     * @param buyers the array of addresses of the users on behalf of whom rBTC is going to be bought
-     * @notice a buyer may be featured more than once in the buyers array if two or more their schedules are due for a purchase
-     * @notice we need to take extra care in the back end to not mismatch a user's address with a wrong DCA schedule
-     * @param token the stablecoin that all users in the array will spend to purchase rBTC
-     * @param scheduleIndexes the indexes of the DCA schedules that correspond to each user's purchase
-     * @param scheduleIds the IDs of the DCA schedules that correspond to each user's purchase
-     * @param purchaseAmounts the purchase amount that corresponds to each user's purchase
-     * @param routeIndex the route all schedules in this batch must share
-     * @dev reverts DcaManager__SchedulePaused if any named schedule is paused, which fails the whole
-     *      batch: the swapper must filter paused schedules out before composing the call
+     * @notice Buy rBTC for every named due schedule that shares one token and one route.
+     * @param buyers Users to buy for. The same address may appear more than once when several of
+     *        that user's schedules are due.
+     * @param token Stablecoin every row in this batch spends.
+     * @param scheduleIndexes Schedule array index for each row, paired with `buyers[i]`.
+     * @param scheduleIds Schedule id for each row, paired with `buyers[i]`.
+     * @param purchaseAmounts Amount each row must spend; must equal that schedule's stored amount.
+     * @param routeIndex Route every named schedule must share.
+     * @dev Only a swapper on the OperationsAdmin allowlist (EOA or `SwapperBatcher`) may call.
+     *      Reverts `DcaManager__SchedulePaused` if any named schedule is paused, which fails the
+     *      whole batch: the swapper must filter paused schedules out before composing the call.
+     *      Mixing tokens or routes in one call is rejected per row (`RouteIndexMismatch`); the
+     *      token is taken from the argument, not from storage, so the swapper must not mix tokens.
      */
     function batchBuyRbtc(
         address[] calldata buyers,
@@ -201,21 +260,23 @@ interface IDcaManager {
     ) external;
 
     /**
-     * @notice Withdraw the token accumulated by a user as interest through all the DCA strategies using that token
-     * @param tokens The token of each route to withdraw interest from
-     * @param routeIndexes The route index of each route to withdraw interest from. Idle routes are skipped.
-     * @dev the two arrays are positional pairs: `tokens[i]` is only withdrawn from `routeIndexes[i]`.
+     * @notice Withdraw lending interest the caller has accrued on each named token×route pair.
+     * @param tokens The token of each pair.
+     * @param routeIndexes The route of each pair. Idle routes are skipped.
+     * @dev The two arrays are positional pairs: `tokens[i]` is only withdrawn from `routeIndexes[i]`.
      *      The arrays must be the same length and non-empty; an unassigned or non-lending pair is skipped.
      */
     function withdrawAllAccumulatedInterest(address[] calldata tokens, uint256[] calldata routeIndexes) external;
 
     /**
-     * @notice Withdraw a specified amount of a stablecoin from the contract as well as all the yield generated with it across all DCA schedules
-     * @param token The token address of the stablecoin to deposit.
-     * @param scheduleIndex The index of the DCA schedule
-     * @param scheduleId The schedule id for validation
-     * @param withdrawalAmount The amount of the stablecoin to withdraw, or type(uint256).max for this schedule's whole token balance.
-     * @dev Interest is withdrawn from the schedule's stored lending route. An idle schedule reverts because that route does not yield.
+     * @notice Withdraw principal from one schedule and all lending interest that token has earned on that route.
+     * @param token The stablecoin of the schedule.
+     * @param scheduleIndex Index of the schedule in the caller's array for `token`.
+     * @param scheduleId Id of that schedule, checked against storage.
+     * @param withdrawalAmount Principal to withdraw, or `type(uint256).max` for this schedule's whole
+     *        `tokenBalance`.
+     * @dev Interest is withdrawn from the schedule's stored lending route. An idle schedule reverts
+     *      because that route does not yield.
      */
     function withdrawTokenAndInterest(
         address token,
@@ -225,38 +286,44 @@ interface IDcaManager {
     ) external;
 
     /**
-     * @notice Withdraw the rBtc accumulated by a user through all the DCA strategies created using a given stablecoin
-     * @param token The token address of the stablecoin
-     * @param routeIndex The route whose handler holds the user's accumulated rBTC
+     * @notice Withdraw all rBTC the caller has accumulated on one token×route handler.
+     * @param token The stablecoin whose handler holds the rBTC.
+     * @param routeIndex The route whose handler holds the rBTC.
      */
     function withdrawRbtcFromTokenHandler(address token, uint256 routeIndex) external;
 
     /**
-     * @notice Withdraw all of the rBTC accumulated by a user through their various DCA strategies
-     * @param tokens The token of each route to withdraw rBTC from
-     * @param routeIndexes The route index of each route to withdraw rBTC from
-     * @dev the two arrays are positional pairs: `tokens[i]` is only withdrawn from `routeIndexes[i]`.
+     * @notice Withdraw all rBTC the caller has accumulated on each named token×route pair.
+     * @param tokens The token of each pair.
+     * @param routeIndexes The route of each pair.
+     * @dev The two arrays are positional pairs: `tokens[i]` is only withdrawn from `routeIndexes[i]`.
      *      The arrays must be the same length and non-empty; an unassigned or zero-balance pair is skipped.
      */
     function withdrawAllAccumulatedRbtc(address[] calldata tokens, uint256[] calldata routeIndexes) external;
 
     /**
-     * @dev modifies the minimum period that can be set for purchases
+     * @notice Set the protocol minimum purchase period. Cannot be below one UTC day.
+     * @param minPurchasePeriod New minimum in seconds.
      */
     function modifyMinPurchasePeriod(uint256 minPurchasePeriod) external;
 
     /**
-     * @dev modifies the maximum number of schedules per token
+     * @notice Set the maximum number of schedules a user may hold per token.
+     * @param maxSchedulesPerToken New cap.
      */
     function modifyMaxSchedulesPerToken(uint256 maxSchedulesPerToken) external;
 
     /**
-     * @dev modifies the default minimum purchase amount for all tokens
+     * @notice Set the default minimum purchase amount used when a token has no override.
+     * @param defaultMinPurchaseAmount New default, in the stablecoin's native units.
      */
     function modifyDefaultMinPurchaseAmount(uint256 defaultMinPurchaseAmount) external;
 
     /**
-     * @dev sets a custom minimum purchase amount for a specific token
+     * @notice Set or clear a per-token minimum purchase amount.
+     * @param token The stablecoin.
+     * @param minPurchaseAmount New minimum in that token's native units. Zero clears the override
+     *        so the default applies.
      */
     function setTokenMinPurchaseAmount(address token, uint256 minPurchaseAmount) external;
 
@@ -265,34 +332,34 @@ interface IDcaManager {
     //////////////////////
 
     /**
-     * @notice get one DCA schedule for a user and token
-     * @param user the user address
-     * @param token the token address
-     * @param scheduleIndex the index of the schedule
-     * @return the DCA schedule
+     * @notice One DCA schedule for a user and token.
+     * @param user Schedule owner.
+     * @param token Stablecoin of the schedule.
+     * @param scheduleIndex Index in that user's array for `token`.
+     * @return The schedule at that index.
      */
     function getDcaSchedule(address user, address token, uint256 scheduleIndex) external view returns (DcaSchedule memory);
 
     /**
-     * @notice get the DCA schedules for a specific user and token
-     * @param user the user address
-     * @param token the token address
-     * @return the DCA schedules for the user and the token
+     * @notice Every DCA schedule a user holds for a token.
+     * @param user Schedule owner.
+     * @param token Stablecoin of the schedules.
+     * @return The user's schedules for `token`.
      */
     function getDcaSchedules(address user, address token) external view returns (DcaSchedule[] memory);
 
     /**
-     * @notice get the OperationsAdmin this manager is permanently pinned to
-     * @return the constructor-supplied OperationsAdmin address
+     * @notice The OperationsAdmin this manager is permanently pinned to.
+     * @return The constructor-supplied OperationsAdmin address.
      */
     function getOperationsAdminAddress() external view returns (address);
 
     /**
-     * @notice get the interest accrued by a user for a token and a route index
-     * @param user the user address
-     * @param token the token address
-     * @param routeIndex the route index
-     * @return the interest accrued by the user for the token and the route index
+     * @notice Lending interest a user has accrued on one token and route, above locked principal.
+     * @param user Account to query.
+     * @param token Stablecoin of the route.
+     * @param routeIndex Route to query. Reverts if the route is not lending.
+     * @return Accrued interest in stablecoin units.
      */
     function getInterestAccrued(address user, address token, uint256 routeIndex)
         external
@@ -300,11 +367,11 @@ interface IDcaManager {
         returns (uint256);
 
     /**
-     * @notice get the rBTC accumulated by a user on the handler for a token and route index
-     * @param user the user address
-     * @param token the token address
-     * @param routeIndex the route index
-     * @return the accumulated rBTC balance
+     * @notice rBTC a user has accumulated on the handler for a token and route.
+     * @param user Account to query.
+     * @param token Stablecoin of the handler.
+     * @param routeIndex Route of the handler.
+     * @return Accumulated rBTC balance in wei.
      */
     function getAccumulatedRbtcBalance(address user, address token, uint256 routeIndex)
         external
@@ -312,29 +379,36 @@ interface IDcaManager {
         returns (uint256);
 
     /**
-     * @dev returns the minimum period that can be set for purchases
+     * @notice Protocol minimum purchase period in seconds.
+     * @return The current minimum, never below one UTC day.
      */
     function getMinPurchasePeriod() external view returns (uint256);
 
     /**
-     * @dev returns the maximum number of schedules per token
+     * @notice Maximum number of schedules a user may hold per token.
+     * @return The current cap.
      */
     function getMaxSchedulesPerToken() external view returns (uint256);
 
     /**
-     * @dev returns the lifetime count of DCA schedules created across all users and tokens.
-     * Equals the last `scheduleId` assigned, since ids are that counter. Never decreases;
-     * deletions do not decrement it.
+     * @notice Lifetime count of schedules created across all users and tokens.
+     * @dev Equals the last `scheduleId` assigned, since ids are that counter. Never decreases;
+     *      deletions do not decrement it.
+     * @return The creation nonce (last assigned id, or 0 before the first create).
      */
     function getSchedulesCreatedCount() external view returns (uint256);
 
     /**
-     * @dev returns the default minimum purchase amount for all tokens
+     * @notice Default minimum purchase amount for tokens with no override.
+     * @return The default, in the stablecoin's native units.
      */
     function getDefaultMinPurchaseAmount() external view returns (uint256);
 
     /**
-     * @dev returns the minimum purchase amount for a specific token (0 if not set)
+     * @notice Minimum purchase amount that applies to `token`.
+     * @param token The stablecoin.
+     * @return minPurchaseAmount The effective minimum (custom if set, otherwise the default).
+     * @return customMinAmountSet True when a per-token override is stored (nonzero).
      */
     function getTokenMinPurchaseAmount(address token) external view returns (uint256 minPurchaseAmount, bool customMinAmountSet);
 }

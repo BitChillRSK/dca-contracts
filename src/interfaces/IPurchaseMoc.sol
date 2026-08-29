@@ -4,13 +4,15 @@ pragma solidity 0.8.36;
 /**
  * @title IPurchaseMoc
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @dev Interface for the Money On Chain specific purchase related errors
+ * @notice Money on Chain specific purchase errors. The redeem wrappers live on `PurchaseMoc`.
  */
 interface IPurchaseMoc {
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice MoC `redeemDocRequest` reverted.
     error PurchaseMoc__RedeemDocRequestFailed();
+    /// @notice MoC `redeemFreeDoc` reverted.
     error PurchaseMoc__RedeemFreeDocFailed();
-} 
+}

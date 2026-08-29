@@ -6,19 +6,20 @@ import {TropykusErc20Handler} from "./TropykusErc20Handler.sol";
 
 /**
  * @title TropykusErc20HandlerDex
- * @notice This contract handles swaps of stablecoin for rBTC using Uniswap V3
+ * @author BitChill team: Antonio Rodríguez-Ynyesto
+ * @notice Tropykus lending + Uniswap V3 purchases. Legacy only: no live deploy path.
  */
 contract TropykusErc20HandlerDex is TropykusErc20Handler, PurchaseUniswap {
     /**
-     * @param dcaManagerAddress the address of the DCA Manager contract
-     * @param stablecoinAddress the address of the stablecoin token
-     * @param kTokenAddress the address of Tropykus' kToken contract
-     * @param feeCollector the address of to which fees will sent on every purchase
-     * @param feeSettings struct with the settings for fee calculations
-     * @param amountOutMinimumPercent The minimum percentage of rBTC that must be received from the swap
-     *        (deploy default: `DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT`, 99.5%)
-     * @param amountOutMinimumSafetyCheck The lowest percent the owner may later configure
-     *        (deploy default: `DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK`, 95%)
+     * @param dcaManagerAddress The DcaManager allowed to call this handler.
+     * @param stablecoinAddress The stablecoin this handler lends.
+     * @param kTokenAddress Tropykus kToken for that stablecoin.
+     * @param uniswapSettings Router, WRBTC, path, and MoC oracle.
+     * @param feeCollector Address that receives purchase fees.
+     * @param feeSettings Linear fee parameters.
+     * @param amountOutMinimumPercent Swap-time slippage fraction, 1e18-scaled.
+     * @param amountOutMinimumSafetyCheck Config-only floor for that percent.
+     * @param initialOwner Address that owns fee/oracle configuration immediately after deploy.
      */
     constructor(
         address dcaManagerAddress,

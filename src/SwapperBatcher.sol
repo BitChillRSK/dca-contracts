@@ -17,11 +17,15 @@ import {IOperationsAdmin} from "./interfaces/IOperationsAdmin.sol";
  *      schedule and revert the bot's atomic bundle.
  */
 contract SwapperBatcher is ISwapperBatcher {
+    /// @notice The `DcaManager` this batcher is permanently pinned to.
+    /// @return The constructor-supplied DcaManager address.
     address public immutable i_dcaManager;
+    /// @notice The OperationsAdmin whose swapper allowlist this batcher reads.
+    /// @return The admin taken from the pinned DcaManager at construction.
     address public immutable i_operationsAdmin;
 
     /**
-     * @notice only allow addresses on the OperationsAdmin swapper allowlist
+     * @dev Only addresses on the OperationsAdmin swapper allowlist.
      */
     modifier onlySwapper() {
         if (!IOperationsAdmin(i_operationsAdmin).isSwapper(msg.sender)) {

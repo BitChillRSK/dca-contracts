@@ -6,16 +6,18 @@ import {PurchaseMoc} from "src/PurchaseMoc.sol";
 
 /**
  * @title IdleDocHandlerMoc
- * @notice DOC stays on the handler (lending index 0). Redeems DOC for rBTC at the MoC contract.
+ * @author BitChill team: Antonio Rodríguez-Ynyesto
+ * @notice Idle DOC + MoC: deposits stay on the handler; buys redeem DOC for rBTC at Money on Chain.
+ * @dev Default OperationsAdmin route index 0 is pre-registered as idle, not as a lending protocol.
  */
 contract IdleDocHandlerMoc is IdleErc20Handler, PurchaseMoc {
     /**
-     * @param dcaManagerAddress the address of the DCA Manager contract
-     * @param docTokenAddress the address of the Dollar On Chain token on the blockchain of deployment
-     * @param feeCollector the address to which fees will be sent on every purchase
-     * @param mocProxyAddress the address of the MoC proxy contract on the blockchain of deployment
-     * @param feeSettings the settings to calculate the fees charged by the protocol
-     * @param initialOwner the address that owns fee configuration immediately after deploy
+     * @param dcaManagerAddress The DcaManager allowed to call this handler.
+     * @param docTokenAddress Dollar On Chain token.
+     * @param feeCollector Address that receives purchase fees.
+     * @param mocProxyAddress Money on Chain proxy.
+     * @param feeSettings Linear fee parameters.
+     * @param initialOwner Address that owns fee configuration immediately after deploy.
      */
     constructor(
         address dcaManagerAddress,

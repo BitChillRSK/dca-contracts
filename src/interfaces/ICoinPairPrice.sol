@@ -3,6 +3,13 @@ pragma solidity 0.8.36;
 
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 
+/**
+ * @title ICoinPairPrice
+ * @author BitChill team: Antonio Rodríguez-Ynyesto
+ * @notice MoC BTC/USD oracle surface. BitChill calls `getPriceInfo` to build Uniswap `amountOutMinimum`.
+ * @dev Third-party ABI copied from Money on Chain. Do not treat this as a BitChill-owned interface;
+ *      function-level comments below are the vendor's.
+ */
 interface ICoinPairPrice {
     // getOracleOwnerAddress: Given an Oracle address return the Oracle Owner address.
     // Used during publication, the servers sign with the oracle address, but the list of selected oracles

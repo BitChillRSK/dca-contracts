@@ -4,7 +4,9 @@ pragma solidity 0.8.36;
 /**
  * @title IiSusdToken
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @dev Interface for the iSusd token contract.
+ * @notice Sovryn iToken surface BitChill uses to mint and burn shares.
+ * @dev Third-party ABI. BitChill measures iToken and stablecoin balance deltas; `mint`/`burn`
+ *      return values are not treated as cash received.
  */
 interface IiSusdToken {
     /**

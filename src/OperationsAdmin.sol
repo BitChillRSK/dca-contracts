@@ -10,6 +10,7 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 /**
  * @title OperationsAdmin
+ * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Governance registry for route classes, token handlers, and swappers.
  * @dev One owner. Route indexes are add-only: a class is recorded once and is never
  *      mutated or deregistered. Old routes stay resolvable so users can exit the handler

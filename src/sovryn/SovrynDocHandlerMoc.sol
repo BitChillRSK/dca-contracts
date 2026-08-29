@@ -6,15 +6,18 @@ import {SovrynErc20Handler} from "./SovrynErc20Handler.sol";
 
 /**
  * @title SovrynDocHandlerMoc
- * @notice This contract handles swaps of DOC for rBTC, redeeming the DOC at the MoC contract
+ * @author BitChill team: Antonio Rodríguez-Ynyesto
+ * @notice Sovryn-lent DOC + MoC: deposits mint iSUSD; buys redeem DOC for rBTC at Money on Chain.
  */
 contract SovrynDocHandlerMoc is SovrynErc20Handler, PurchaseMoc {
     /**
-     * @param dcaManagerAddress the address of the DCA Manager contract
-     * @param docTokenAddress the address of the Dollar On Chain token on the blockchain of deployment
-     * @param iSusdTokenAddress the address of Sovryn's iSUSD token contract
-     * @param mocProxyAddress the address of the MoC proxy contract on the blockchain of deployment
-     * @param feeSettings the settings to calculate the fees charged by the protocol
+     * @param dcaManagerAddress The DcaManager allowed to call this handler.
+     * @param docTokenAddress Dollar On Chain token.
+     * @param iSusdTokenAddress Sovryn iSUSD token.
+     * @param feeCollector Address that receives purchase fees.
+     * @param mocProxyAddress Money on Chain proxy.
+     * @param feeSettings Linear fee parameters.
+     * @param initialOwner Address that owns fee configuration immediately after deploy.
      */
     constructor(
         address dcaManagerAddress,

@@ -4,7 +4,9 @@ pragma solidity 0.8.36;
 /**
  * @title IOperationsAdmin
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @dev Interface for the OperationsAdmin contract.
+ * @notice Governance registry for route classes, token handlers, swappers, and per-pair deposit pause.
+ * @dev One owner. Route indexes and handler assignments are add-only. A handler address may be
+ *      assigned at most once. There is no cooperative migration on these handler versions.
  */
 interface IOperationsAdmin {
     /**
@@ -30,26 +32,41 @@ interface IOperationsAdmin {
     //////////////////////
     // Events ////////////
     //////////////////////
+    /// @notice A handler was assigned to a `(token, routeIndex)` pair. Add-only.
     event OperationsAdmin__TokenHandlerAssigned(
         address indexed token, uint256 routeIndex, address indexed handler
     );
+    /// @notice A route index was classified as idle (`lends == false`) or lending. One-shot.
     event OperationsAdmin__RouteRegistered(uint256 index, bool lends);
+    /// @notice `swapper` was added to the allowlist. Idempotent.
     event OperationsAdmin__SwapperAdded(address indexed swapper);
+    /// @notice `swapper` was removed from the allowlist.
     event OperationsAdmin__SwapperRevoked(address indexed swapper);
+    /// @notice New deposits for this pair were paused or unpaused. Every emit is a real transition.
     event OperationsAdmin__DepositsPauseSet(address indexed token, uint256 routeIndex, bool paused);
 
     //////////////////////
     // Errors ////////////
     //////////////////////
+    /// @notice A handler must be a contract, not an EOA.
     error OperationsAdmin__EoaCannotBeHandler(address newHandler);
+    /// @notice `handler` does not ERC-165 advertise `ITokenHandler`.
     error OperationsAdmin__ContractIsNotTokenHandler(address newHandler);
+    /// @notice A lending route requires ERC-165 `ITokenLending`.
     error OperationsAdmin__ContractIsNotTokenLending(address handler);
+    /// @notice An idle route rejects a handler that advertises `ITokenLending`.
     error OperationsAdmin__LendingHandlerOnIdleRoute(address handler);
+    /// @notice This route index is already classified and cannot be changed.
     error OperationsAdmin__RouteAlreadyRegistered(uint256 index);
+    /// @notice Handler assignment requires a registered route index.
     error OperationsAdmin__RouteNotRegistered(uint256 index);
+    /// @notice This `(token, routeIndex)` already has a handler.
     error OperationsAdmin__HandlerAlreadyAssigned(address token, uint256 routeIndex);
+    /// @notice This handler address already backs another pair.
     error OperationsAdmin__HandlerAddressAlreadyInUse(address handler);
+    /// @notice Deposit pause requires a pair that already has a handler.
     error OperationsAdmin__HandlerNotAssigned(address token, uint256 routeIndex);
+    /// @notice `setDepositsPaused` must change the flag; a repeated write reverts.
     error OperationsAdmin__DepositsPauseUnchanged(address token, uint256 routeIndex, bool paused);
 
     ///////////////////////////////
@@ -124,19 +141,23 @@ interface IOperationsAdmin {
 
     /**
      * @notice Whether `account` is an authorized swapper.
+     * @param account Address to query.
+     * @return True if `account` is on the swapper allowlist.
      */
     function isSwapper(address account) external view returns (bool);
 
     /**
      * @notice Whether `index` was registered as a lending route.
+     * @param index The route index. Must fit `uint32`.
+     * @return True if the index is classified as lending.
      * @dev False for idle routes (including the constructor's index 0) and for unregistered indexes.
-     *      `index` must fit `uint32`, like every other route-index argument here.
      */
     function isLendingRoute(uint256 index) external view returns (bool);
 
     /**
      * @notice Recorded class of `index`.
-     * @dev `index` must fit `uint32`, like every other route-index argument here.
+     * @param index The route index. Must fit `uint32`.
+     * @return The registered class, or `Unregistered` if it has never been classified.
      */
     function getRouteClass(uint256 index) external view returns (RouteClass);
 }

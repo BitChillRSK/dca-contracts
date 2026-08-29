@@ -9,7 +9,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title PurchaseRbtc
- * @notice Shared rBTC purchase pipeline, accumulated-balance accounting, and signer withdrawals
+ * @author BitChill team: Antonio Rodríguez-Ynyesto
+ * @notice Shared rBTC purchase pipeline, accumulated-balance accounting, and signer withdrawals.
  */
 abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessControl, StablecoinSource {
     //////////////////////
@@ -18,15 +19,15 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
     mapping(address user => uint256 amount) internal s_usersAccumulatedRbtc;
 
     /**
-     * @notice Allow the contract to receive rBTC
+     * @dev Allow the contract to receive native rBTC from MoC or from unwrapping WRBTC.
      */
     receive() external payable {}
 
     /**
-     * @notice batch buy rBTC
-     * @param buyers: the users on behalf of which the contract is making the rBTC purchase
-     * @param scheduleIds: the schedule ids
-     * @param purchaseAmounts: the amounts to spend on rBTC
+     * @inheritdoc IPurchaseRbtc
+     * @dev Spends the stablecoin actually received, never the gross amount asked of the lending
+     *      protocol. Planned net amounts are only allocation weights: both the rBTC credited and
+     *      the stablecoin reported as spent are shares of what actually moved.
      */
     function batchBuyRbtc(address[] memory buyers, uint64[] memory scheduleIds, uint256[] memory purchaseAmounts)
         external
@@ -73,8 +74,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
     }
 
     /**
-     * @notice the user can at any time withdraw the rBTC that has been accumulated through periodical purchases
-     * @param user: the user to withdraw the rBTC to
+     * @inheritdoc IPurchaseRbtc
      */
     function withdrawAccumulatedRbtc(address user) external virtual override onlyDcaManager {
         uint256 rbtcBalance = _withdrawRbtcChecksEffects(user);
@@ -82,9 +82,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
     }
 
     /**
-     * @notice get the accumulated rBTC balance for a specific user
-     * @param user the address of the user to check the accumulated rBTC balance for
-     * @return the accumulated rBTC balance
+     * @inheritdoc IPurchaseRbtc
      */
     function getAccumulatedRbtcBalance(address user) external view override returns (uint256) {
         return s_usersAccumulatedRbtc[user];
@@ -95,9 +93,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice checks and effects for the withdrawal of rBTC from the contract
-     * @param user: the user to withdraw the rBTC to
-     * @return the amount of rBTC to withdraw
+     * @dev Zero the user's accumulated balance after checking it is nonzero. Caller then pays.
      */
     function _withdrawRbtcChecksEffects(address user) internal returns (uint256) {
         uint256 rbtcBalance = s_usersAccumulatedRbtc[user];
@@ -108,9 +104,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
     }
 
     /**
-     * @notice withdraw rBTC from the contract
-     * @param user: the user to withdraw the rBTC to
-     * @param rbtcBalance: the amount of rBTC to withdraw
+     * @dev Pay `rbtcBalance` native rBTC to `user`. Reverts if the call fails.
      */
     function _withdrawRbtc(address user, uint256 rbtcBalance) internal {
         (bool sent,) = user.call{value: rbtcBalance}("");
@@ -119,9 +113,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
     }
 
     /**
-     * @notice spend `stablecoinAmount` of net stablecoin and return only measured rBTC or WRBTC received
-     * @param stablecoinAmount the net stablecoin amount to spend after fees
-     * @return rbtcReceived the measured native rBTC or WRBTC this contract actually received
+     * @dev Spend `stablecoinAmount` of net stablecoin and return only measured rBTC or WRBTC received.
      */
     function _purchaseRbtc(uint256 stablecoinAmount) internal virtual returns (uint256 rbtcReceived);
 }

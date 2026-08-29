@@ -8,8 +8,9 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {BitChillOwnable} from "./BitChillOwnable.sol";
 
 /**
- * @title TokenHandler
- * @dev Base contract for handling various tokens.
+ * @title FeeHandler
+ * @author BitChill team: Antonio Rodríguez-Ynyesto
+ * @notice Linear purchase-fee math and collector. Inherited by TokenHandler and PurchaseRbtc.
  */
 abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     using SafeERC20 for IERC20;
@@ -56,11 +57,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice set the fee rate parameters
-     * @param minFeeRate: the minimum fee rate
-     * @param maxFeeRate: the maximum fee rate
-     * @param feePurchaseLowerBound: the purchase lower bound
-     * @param feePurchaseUpperBound: the purchase upper bound
+     * @inheritdoc IFeeHandler
      */
     function setFeeRateParams(uint256 minFeeRate, uint256 maxFeeRate, uint256 feePurchaseLowerBound, uint256 feePurchaseUpperBound)
         external
@@ -88,8 +85,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     }
 
     /**
-     * @notice set the fee collector address
-     * @param feeCollector: the fee collector address
+     * @inheritdoc IFeeHandler
      */
     function setFeeCollectorAddress(address feeCollector) external override onlyOwner {
         if (feeCollector == address(0)) revert FeeHandler__InvalidFeeCollector();
@@ -102,15 +98,14 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice get the fee collector address
-     * @return the fee collector address
+     * @inheritdoc IFeeHandler
      */
     function getFeeCollectorAddress() external view override returns (address) {
         return s_feeCollector;
     }
 
     /**
-     * @notice get the fee settings used for purchase fee calculation
+     * @inheritdoc IFeeHandler
      */
     function getFeeSettings() external view override returns (FeeSettings memory) {
         return _feeSettings();
@@ -212,9 +207,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     }
 
     /**
-     * @notice transfer the fee to the fee collector
-     * @param token: the token to transfer the fee to
-     * @param fee: the fee to transfer
+     * @dev Transfer `fee` of `token` to the collector and emit `FeeTransferred`. No-op when `fee` is 0.
      */
     function _transferFee(IERC20 token, uint256 fee) internal {
         if (fee == 0) return;

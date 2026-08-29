@@ -1,3 +1,3 @@
-Idle DOC handler (lending index 0). Deposits stay on the handler; no shares are minted. Buys and withdrawals spend idle DOC. Interest calls revert because index 0 has no protocol name.
+Idle DOC handler (OperationsAdmin route index 0, class idle). Deposits stay on the handler; no shares are minted. Buys and withdrawals spend idle DOC. Interest calls revert because this route is not lending.
 
-Deploy with `script/DeployIdleHandler.s.sol` against an existing `OperationsAdmin` + `DcaManager` (same add-on shape as `DeployUsdrifHandler`). Wiring into `DeployMocSwaps` / the CI index map is a later PR.
+Deploy with `script/DeployIdleHandler.s.sol` against an existing `OperationsAdmin` + `DcaManager`, or through `DeployMocSwaps` which registers index 0 and assigns this handler on the live MoC map.

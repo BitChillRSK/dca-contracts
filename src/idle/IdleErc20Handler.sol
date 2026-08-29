@@ -4,14 +4,16 @@ pragma solidity 0.8.36;
 import {TokenHandler} from "src/TokenHandler.sol";
 import {StablecoinSource} from "src/StablecoinSource.sol";
 import {IIdleErc20Handler} from "./IIdleErc20Handler.sol";
+import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title IdleErc20Handler
+ * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Holds deposited stablecoin on the handler instead of minting shares.
  * @dev Per-user idle balances clamp withdrawals and single purchases so a DcaManager
- * accounting bug cannot spend another user's pooled DOC. Batch purchases revert instead
- * of clamping, because PurchaseMoc splits rBTC by the original planned weights.
+ *      accounting bug cannot spend another user's pooled DOC. Batch purchases revert instead
+ *      of clamping, because PurchaseRbtc splits rBTC by the original planned weights.
  */
 abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, StablecoinSource {
     //////////////////////
@@ -20,11 +22,11 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
     mapping(address user => uint256 balance) internal s_idleBalances;
 
     /**
-     * @param dcaManagerAddress the address of the DCA Manager contract
-     * @param stableTokenAddress the address of the ERC20 stablecoin token on the blockchain of deployment
-     * @param feeCollector the address to which fees will be sent on every purchase
-     * @param feeSettings struct with the settings for fee calculations
-     * @param initialOwner the address that owns fee configuration immediately after deploy
+     * @param dcaManagerAddress The DcaManager allowed to call deposit and withdraw.
+     * @param stableTokenAddress The ERC20 stablecoin this handler holds idle.
+     * @param feeCollector Address that receives purchase fees.
+     * @param feeSettings Linear fee parameters.
+     * @param initialOwner Address that owns fee configuration immediately after deploy.
      */
     constructor(
         address dcaManagerAddress,
@@ -35,11 +37,10 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
     ) TokenHandler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, initialOwner) {}
 
     /**
-     * @notice deposit the full token amount for DCA on the contract
-     * @param user: the address of the user making the deposit
-     * @param depositAmount: the amount requested from the user
-     * @dev TokenHandler owns the balance-delta measurement and reverts unless the delta equals the request,
-     * so a fee-on-transfer token never reaches the idle balance. The idle mapping is credited with the request.
+     * @inheritdoc ITokenHandler
+     * @dev TokenHandler owns the balance-delta measurement and reverts unless the delta equals the
+     *      request, so a fee-on-transfer token never reaches the idle balance. The idle mapping is
+     *      credited with the request.
      */
     function depositToken(address user, uint256 depositAmount)
         public
@@ -51,10 +52,7 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
     }
 
     /**
-     * @notice withdraw the token amount sending it back to the user's address
-     * @param user: the address of the user making the withdrawal
-     * @param withdrawalAmount: the amount to withdraw
-     * @return withdrawnAmount the amount that left this contract after debiting the idle mapping
+     * @inheritdoc ITokenHandler
      */
     function withdrawToken(address user, uint256 withdrawalAmount)
         public
@@ -69,9 +67,7 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
     }
 
     /**
-     * @notice get the users idle token balance
-     * @param user: the address of the user
-     * @return the users idle token balance
+     * @inheritdoc IIdleErc20Handler
      */
     function getUsersIdleTokenBalance(address user) external view override returns (uint256) {
         return s_idleBalances[user];
@@ -82,32 +78,26 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice the stablecoin this handler holds idle
+     * @dev The stablecoin this handler holds idle.
      */
     function _purchaseToken() internal view override returns (IERC20) {
         return i_stableToken;
     }
 
     /**
-     * @notice retrieve `amount` of the user's idle DOC for the purchase path
-     * @dev Lending handlers redeem their shares to pull DOC onto the handler; idle DOC is
-     * already here, so this only debits the mapping.
-     * @param user: the address of the user
-     * @param amount: the amount of stablecoin to debit
-     * @return the amount actually debited
+     * @dev Retrieve `amount` of the user's idle stablecoin for the purchase path.
+     *      Lending handlers redeem their shares to pull DOC onto the handler; idle DOC is
+     *      already here, so this only debits the mapping.
      */
     function _retrieveStablecoin(address user, uint256 amount) internal virtual override returns (uint256) {
         return _debitIdleBalance(user, amount);
     }
 
     /**
-     * @notice debit each buyer's idle DOC for a batch purchase
-     * @dev Reverts if any buyer cannot cover their purchase amount. Clamping here would
-     * return a short total that PurchaseMoc still splits by the original planned weights,
-     * so one underfunded buyer would dilute every other buyer in the batch.
-     * @param users: the addresses of the users
-     * @param purchaseAmounts: the amounts of stablecoin to debit
-     * @return totalWithdrawn the total amount debited
+     * @dev Debit each buyer's idle balance for a batch purchase. Reverts if any buyer cannot
+     *      cover their purchase amount. Clamping here would return a short total that
+     *      PurchaseRbtc still splits by the original planned weights, so one underfunded
+     *      buyer would dilute every other buyer in the batch.
      */
     function _batchRetrieveStablecoin(address[] memory users, uint256[] memory purchaseAmounts, uint256)
         internal
@@ -128,10 +118,7 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
     }
 
     /**
-     * @notice clamp `amount` to the user's idle balance and debit it
-     * @param user: the address of the user
-     * @param amount: the amount requested
-     * @return the amount actually debited
+     * @dev Clamp `amount` to the user's idle balance and debit it.
      */
     function _debitIdleBalance(address user, uint256 amount) internal returns (uint256) {
         uint256 idleBalance = s_idleBalances[user];
