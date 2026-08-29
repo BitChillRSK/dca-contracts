@@ -6,7 +6,7 @@ PR 46 of the relaunch stack originally shipped the standalone `SwapperBatcher` i
 [#98](https://github.com/BitChillRSK/dca-contracts/pull/98), stacked on R38 (PR 45). After R9 and
 R10 completed the ordered stack, the grouped entry point was re-evaluated against the final
 `DcaManager` bytecode and measured hot path. The follow-up stacks on R10 (PR 48) and replaces the
-standalone contract with an integrated `DcaManager.batchBuyRbtcHandlers` entry point in GitHub
+standalone contract with an integrated `DcaManager.batchBuyRbtcAcrossHandlers` entry point in GitHub
 [#101](https://github.com/BitChillRSK/dca-contracts/pull/101). Cutover:
 [swapper-bot#6](https://github.com/BitChillRSK/swapper-bot/issues/6),
 [front-end#22](https://github.com/BitChillRSK/front-end/issues/22), and
@@ -39,7 +39,7 @@ handler failure therefore reverts the entire call. The bot filters rows off-chai
 allowlisted so it can retry one handler through `batchBuyRbtc` after a grouped call fails.
 
 Decided 2026-08-29: integrate the grouped entry point in `DcaManager`; remove the standalone
-batcher, its interface, and its deploy add-on. The integrated selector is `batchBuyRbtcHandlers`
+batcher, its interface, and its deploy add-on. The integrated selector is `batchBuyRbtcAcrossHandlers`
 (`Batch[]` of one handler's purchase batches), not the standalone's `batchBuyRbtcGroups`.
 
 ## Open product decisions
@@ -51,7 +51,7 @@ one-handler selector remains available.
 
 - [x] Add `IDcaManager.Batch`, one handler's purchase batch containing token, route, and the parallel
   buyer/index/id/amount arrays.
-- [x] Add swapper-only `DcaManager.batchBuyRbtcHandlers(Batch[] calldata)`. Empty top-level input
+- [x] Add swapper-only `DcaManager.batchBuyRbtcAcrossHandlers(Batch[] calldata)`. Empty top-level input
   reverts `DcaManager__EmptyHandlerBatches`; each batch keeps the existing empty/length/amount/route/schedule checks.
 - [x] Extract `batchBuyRbtc` into a private `_batchBuyRbtc` helper. The multi-handler entry point
   authenticates only once and loops that helper so each handler's batch finishes its checks, effects, and
@@ -115,8 +115,8 @@ Targeted grouped-purchase tests, then the complete repository gates from `AGENTS
 
 ## ABI / deploy / cutover impact
 
-- ABI: `DcaManager` gains `batchBuyRbtcHandlers((address[],address,uint256[],uint64[],uint256[],uint256)[])`
-  (`0xf74791ac`) and `DcaManager__EmptyHandlerBatches()`. The original `batchBuyRbtc` selector is
+- ABI: `DcaManager` gains `batchBuyRbtcAcrossHandlers((address[],address,uint256[],uint64[],uint256[],uint256)[])`
+  (`0xc8e26a20`) and `DcaManager__EmptyHandlerBatches()`. The original `batchBuyRbtc` selector is
   unchanged. The standalone used `batchBuyRbtcGroups`; that name does not ship.
 - Deploy: no batcher deployment and no contract-address `addSwapper`; the bot EOA calls
   `DcaManager` directly.

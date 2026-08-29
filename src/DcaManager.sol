@@ -290,7 +290,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     /**
      * @inheritdoc IDcaManager
      */
-    function batchBuyRbtcHandlers(Batch[] calldata batches) external override onlySwapper {
+    function batchBuyRbtcAcrossHandlers(Batch[] calldata batches) external override onlySwapper {
         uint256 numBatches = batches.length;
         if (numBatches == 0) revert DcaManager__EmptyHandlerBatches();
 

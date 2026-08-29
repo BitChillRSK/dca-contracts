@@ -460,7 +460,7 @@ Do not make behavior changes in this PR.
 ### PR 49 - R42 integrate grouped purchases in DcaManager ([#101](https://github.com/BitChillRSK/dca-contracts/pull/101))
 
 Follow up the standalone R42 batcher after measuring the completed manager: move
-`batchBuyRbtcHandlers` into `DcaManager`, authenticate once, and loop the same one-handler helper
+`batchBuyRbtcAcrossHandlers` into `DcaManager`, authenticate once, and loop the same one-handler helper
 so each handler's batch completes its checks, effects, and handler call before the next. Remove
 the standalone contract, interface, and deploy add-on. The original one-handler selector stays
 available for bot retries. See [`R42-swapper-batcher.md`](./R42-swapper-batcher.md).

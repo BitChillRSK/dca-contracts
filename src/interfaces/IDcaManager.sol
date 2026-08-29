@@ -132,7 +132,7 @@ interface IDcaManager {
     error DcaManager__ArraysLengthMismatch();
     /// @notice `batchBuyRbtc` was called with empty buyer/index/id/amount arrays.
     error DcaManager__EmptyBatchPurchaseArrays();
-    /// @notice `batchBuyRbtcHandlers` was called without any handler batches.
+    /// @notice `batchBuyRbtcAcrossHandlers` was called without any handler batches.
     error DcaManager__EmptyHandlerBatches();
     /// @notice A withdraw-all call was given empty token/route arrays.
     error DcaManager__EmptyWithdrawalArrays();
@@ -280,7 +280,7 @@ interface IDcaManager {
      *      same one-handler helper. A failure in any batch reverts every handler.
      *      The original `batchBuyRbtc` remains available for one-handler retries.
      */
-    function batchBuyRbtcHandlers(Batch[] calldata batches) external;
+    function batchBuyRbtcAcrossHandlers(Batch[] calldata batches) external;
 
     /**
      * @notice Withdraw lending interest the caller has accrued on each named token×route pair.

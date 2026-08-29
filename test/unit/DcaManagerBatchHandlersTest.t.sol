@@ -97,7 +97,7 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
 
     function _batchBuy(IDcaManager.Batch[] memory batches) private {
         vm.prank(SWAPPER);
-        dcaManager.batchBuyRbtcHandlers(batches);
+        dcaManager.batchBuyRbtcAcrossHandlers(batches);
     }
 
     function testGroupedPurchaseBuysThroughBothHandlers() external {
@@ -220,7 +220,7 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
 
         vm.prank(attacker);
         vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__UnauthorizedSwapper.selector, attacker));
-        dcaManager.batchBuyRbtcHandlers(batches);
+        dcaManager.batchBuyRbtcAcrossHandlers(batches);
 
         assertEq(dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).lastPurchaseTimestamp, 0);
     }
