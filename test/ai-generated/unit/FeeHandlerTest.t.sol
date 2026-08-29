@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
-import {Test, console2} from "forge-std/Test.sol";
+import {Test, console2, Vm} from "forge-std/Test.sol";
 import {FeeHandlerHarness} from "../../mocks/FeeHandlerHarness.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
+import {MockStablecoin} from "../../mocks/MockStablecoin.sol";
 
 contract FeeHandlerTest is Test {
     FeeHandlerHarness feeHandler;
@@ -19,11 +20,12 @@ contract FeeHandlerTest is Test {
     uint128 constant UPPER_BOUND = 1000 ether; // above this gets min fee
 
     // Events
-    event FeeHandler__MinFeeRateSet(uint256 indexed minFeeRate);
-    event FeeHandler__MaxFeeRateSet(uint256 indexed maxFeeRate);
-    event FeeHandler__PurchaseLowerBoundSet(uint256 indexed feePurchaseLowerBound);
-    event FeeHandler__PurchaseUpperBoundSet(uint256 indexed feePurchaseUpperBound);
+    event FeeHandler__MinFeeRateSet(uint256 minFeeRate);
+    event FeeHandler__MaxFeeRateSet(uint256 maxFeeRate);
+    event FeeHandler__PurchaseLowerBoundSet(uint256 feePurchaseLowerBound);
+    event FeeHandler__PurchaseUpperBoundSet(uint256 feePurchaseUpperBound);
     event FeeHandler__FeeCollectorAddressSet(address indexed feeCollector);
+    event FeeHandler__FeeTransferred(address indexed token, address indexed collector, uint256 amount);
 
     function setUp() public {
         IFeeHandler.FeeSettings memory settings = IFeeHandler.FeeSettings({
@@ -242,6 +244,31 @@ contract FeeHandlerTest is Test {
         emit FeeHandler__FeeCollectorAddressSet(newCollector);
         feeHandler.setFeeCollectorAddress(newCollector);
         assertEq(feeHandler.getFeeCollectorAddress(), newCollector);
+    }
+
+    function test_transferFee_emitsWhenNonZero() public {
+        MockStablecoin token = new MockStablecoin(address(this));
+        uint256 fee = 1 ether;
+        token.mint(address(feeHandler), fee);
+        vm.expectEmit(true, true, false, true, address(feeHandler));
+        emit FeeHandler__FeeTransferred(address(token), FEE_COLLECTOR, fee);
+        feeHandler.exposedTransferFee(token, fee);
+        assertEq(token.balanceOf(FEE_COLLECTOR), fee);
+    }
+
+    function test_transferFee_zeroDoesNotEmitOrTransfer() public {
+        MockStablecoin token = new MockStablecoin(address(this));
+        token.mint(address(feeHandler), 1 ether);
+        uint256 collectorBefore = token.balanceOf(FEE_COLLECTOR);
+        vm.recordLogs();
+        feeHandler.exposedTransferFee(token, 0);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 sig = FeeHandler__FeeTransferred.selector;
+        for (uint256 i; i < logs.length; ++i) {
+            assertTrue(logs[i].topics[0] != sig, "FeeTransferred emitted for a zero fee");
+        }
+        assertEq(token.balanceOf(FEE_COLLECTOR), collectorBefore);
+        assertEq(token.balanceOf(address(feeHandler)), 1 ether);
     }
 
     function test_getFeeSettings_returnsStoredBand() public {

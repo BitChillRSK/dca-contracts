@@ -443,7 +443,7 @@ A dedicated contract, allowlisted as a swapper, that forwards several `DcaManage
 
 ### PR 47 - R9 event indexing and ABI freeze
 
-Index only addresses and `scheduleId`. Do not index amounts, timestamps, periods, rates, strings, bytes, or arrays. Do not shorten diagnostic custom-error argument lists (R6).
+Index every existing scalar `address` and `scheduleId`, and index nothing else. Do not index amounts, timestamps, periods, rates, strings, bytes, arrays, address arrays, or encoded paths. Do not shorten diagnostic custom-error argument lists (R6).
 
 Add `TokenLending__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares)` to the shared lending interface and emit it after every successful per-user virtual lending-share mutation in the shipped lending handlers. Deposits report the exact measured lending-token mint, not the stablecoin input. Withdrawals, interest, and every buyer debit in a batch are covered; repeated users in one batch produce sequential transitions. Tests must show each `newShares` equals `getUserShares(user)` and that replay from a fresh deployment reconstructs current balances. The shipped set now includes the LayerBank Dex handler added by R36. See [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md) and [`R9-event-indexing.md`](./R9-event-indexing.md).
 

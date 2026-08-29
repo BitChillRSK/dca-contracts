@@ -22,8 +22,8 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
 
     event PurchaseUniswap_AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
     event PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(uint256 oldValue, uint256 newValue);
-    event PurchaseUniswap_OracleUpdated(address oldOracle, address newOracle);
-    event PurchaseUniswap_NewPathSet(address[] indexed intermediateTokens, uint24[] indexed poolFeeRates, bytes indexed newPath);
+    event PurchaseUniswap_OracleUpdated(address indexed oldOracle, address indexed newOracle);
+    event PurchaseUniswap_NewPathSet(address[] intermediateTokens, uint24[] poolFeeRates, bytes newPath);
 
     function setUp() public override {
         super.setUp();
@@ -268,7 +268,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         address oldOracleAddress = address(currentOracle);
         
         // Expect the event with the correct parameters
-        vm.expectEmit(false, false, false, true);
+        vm.expectEmit(true, true, false, false);
         emit PurchaseUniswap_OracleUpdated(oldOracleAddress, address(newMocOracle));
 
         // Update the oracle
@@ -341,7 +341,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         bytes memory oldPath = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
         
         // Expect the event with the correct parameters
-        vm.expectEmit(true, true, false, false);
+        vm.expectEmit(false, false, false, false);
         emit PurchaseUniswap_NewPathSet(intermediateTokens, poolFeeRates, oldPath);
 
         // Set the new path

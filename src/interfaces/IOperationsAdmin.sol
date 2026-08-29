@@ -31,12 +31,12 @@ interface IOperationsAdmin {
     // Events ////////////
     //////////////////////
     event OperationsAdmin__TokenHandlerAssigned(
-        address indexed token, uint256 indexed routeIndex, address indexed handler
+        address indexed token, uint256 routeIndex, address indexed handler
     );
-    event OperationsAdmin__RouteRegistered(uint256 indexed index, bool lends);
+    event OperationsAdmin__RouteRegistered(uint256 index, bool lends);
     event OperationsAdmin__SwapperAdded(address indexed swapper);
     event OperationsAdmin__SwapperRevoked(address indexed swapper);
-    event OperationsAdmin__DepositsPauseSet(address indexed token, uint256 indexed routeIndex, bool paused);
+    event OperationsAdmin__DepositsPauseSet(address indexed token, uint256 routeIndex, bool paused);
 
     //////////////////////
     // Errors ////////////

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 import {PurchaseRbtc} from "src/PurchaseRbtc.sol";
 import {FeeHandler} from "src/FeeHandler.sol";
 import {DcaManagerAccessControl} from "src/DcaManagerAccessControl.sol";
@@ -24,8 +24,9 @@ contract PurchaseRbtcTest is Test {
         uint256 amountSpent
     );
     event PurchaseRbtc__SuccessfulRbtcBatchPurchase(
-        address indexed token, uint256 indexed totalPurchasedRbtc, uint256 indexed totalStablecoinAmountSpent
+        address indexed token, uint256 totalPurchasedRbtc, uint256 totalStablecoinAmountSpent
     );
+    event FeeHandler__FeeTransferred(address indexed token, address indexed collector, uint256 amount);
 
     uint16 internal constant FLAT_FEE_RATE = 100; // 1%
     uint256 internal constant FEE_DIVISOR = 10_000;
@@ -89,8 +90,11 @@ contract PurchaseRbtcTest is Test {
 
     function test_lengthOneBatch_creditsBuyerAndEmitsOnSuccess() public {
         uint256 requested = 100 ether;
-        uint256 net = requested - _fee(requested);
+        uint256 fee = _fee(requested);
+        uint256 net = requested - fee;
 
+        vm.expectEmit(true, true, false, true, address(harness));
+        emit FeeHandler__FeeTransferred(address(token), feeCollector, fee);
         vm.expectEmit(true, true, true, true, address(harness));
         emit PurchaseRbtc__RbtcBought(buyerA, address(token), RBTC_OUT, scheduleA, net);
         vm.expectEmit(true, true, true, true, address(harness));
@@ -98,6 +102,22 @@ contract PurchaseRbtcTest is Test {
 
         harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested));
 
+        assertEq(harness.getAccumulatedRbtcBalance(buyerA), RBTC_OUT);
+    }
+
+    function test_lengthOneBatch_zeroFeeDoesNotEmitFeeTransferred() public {
+        harness.setFeeRateParams(0, 0, 1000 ether, 100_000 ether);
+        uint256 requested = 100 ether;
+
+        vm.recordLogs();
+        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested));
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 sig = FeeHandler__FeeTransferred.selector;
+        for (uint256 i; i < logs.length; ++i) {
+            assertTrue(logs[i].topics[0] != sig, "FeeTransferred emitted on a zero-fee purchase");
+        }
+        assertEq(token.balanceOf(feeCollector), 0);
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), RBTC_OUT);
     }
 

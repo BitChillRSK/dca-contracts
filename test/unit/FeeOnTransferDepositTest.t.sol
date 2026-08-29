@@ -274,7 +274,7 @@ contract FeeOnTransferDepositTest is Test {
         uint256 userBefore = token.balanceOf(USER);
         vm.expectEmit(true, true, true, true, address(idleHandler));
         emit ITokenHandler.TokenHandler__TokenWithdrawn(address(token), USER, REQUESTED);
-        vm.expectEmit(false, false, false, true, address(dcaManager));
+        vm.expectEmit(true, true, true, true, address(dcaManager));
         emit IDcaManager.DcaManager__DcaScheduleDeleted(USER, address(token), scheduleId, REQUESTED);
         vm.prank(USER);
         dcaManager.deleteDcaSchedule(address(token), 0, scheduleId);

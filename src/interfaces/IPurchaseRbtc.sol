@@ -10,7 +10,7 @@ interface IPurchaseRbtc {
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
-    event PurchaseRbtc__rBtcWithdrawn(address indexed user, uint256 indexed amount);
+    event PurchaseRbtc__rBtcWithdrawn(address indexed user, uint256 amount);
     event PurchaseRbtc__RbtcBought(
         address indexed user,
         address indexed tokenSpent,
@@ -19,7 +19,7 @@ interface IPurchaseRbtc {
         uint256 amountSpent
     );
     event PurchaseRbtc__SuccessfulRbtcBatchPurchase(
-        address indexed token, uint256 indexed totalPurchasedRbtc, uint256 indexed totalStablecoinAmountSpent
+        address indexed token, uint256 totalPurchasedRbtc, uint256 totalStablecoinAmountSpent
     );
 
     /*//////////////////////////////////////////////////////////////

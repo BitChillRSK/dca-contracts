@@ -12,7 +12,7 @@ import "../../script/Constants.sol";
 
 contract ModifiersTest is DcaDappTest {
     // Events
-    event DcaManager__MinPurchasePeriodModified(uint256 indexed newMinPurchasePeriod);
+    event DcaManager__MinPurchasePeriodModified(uint256 newMinPurchasePeriod);
 
     /// @dev Pre-R46 `setOperationsAdmin(address)` selector. Kept as a literal so the test
     ///      still compiles after the function is deleted.

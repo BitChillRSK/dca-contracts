@@ -10,8 +10,8 @@ interface ITokenHandler {
     //////////////////////
     // Events ////////////
     //////////////////////
-    event TokenHandler__TokenDeposited(address indexed token, address indexed user, uint256 indexed amount);
-    event TokenHandler__TokenWithdrawn(address indexed token, address indexed user, uint256 indexed amount);
+    event TokenHandler__TokenDeposited(address indexed token, address indexed user, uint256 amount);
+    event TokenHandler__TokenWithdrawn(address indexed token, address indexed user, uint256 amount);
 
     //////////////////////
     // Errors ////////////

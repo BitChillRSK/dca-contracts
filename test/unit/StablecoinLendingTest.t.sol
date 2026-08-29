@@ -17,7 +17,7 @@ contract StablecoinLendingTest is DcaDappTest {
     uint256 constant SHARE_TOKEN_STARTING_EXCHANGE_RATE = 2e16;
 
     // Events
-    event TokenLending__InterestWithdrawn(address indexed user, address indexed token, uint256 indexed amount);
+    event TokenLending__InterestWithdrawn(address indexed user, address indexed token, uint256 amount);
 
     // No `setUp` override: `vm.skip(true)` at the end of a `setUp` that already ran `super.setUp()`
     // is reported as `FAIL: FOUNDRY::SKIP` by some Foundry builds (CI pins `version: stable`, which

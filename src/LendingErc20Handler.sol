@@ -59,7 +59,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
         }
         uint256 mintedAmount = _protocolDeposit(depositAmount);
         if (mintedAmount == 0) revert TokenLending__LendingProtocolDepositFailed();
-        s_shares[user] += mintedAmount;
+        _setUserShares(user, s_shares[user] + mintedAmount);
     }
 
     /**
@@ -191,7 +191,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
         if (sharesToRedeem == 0) {
             return 0;
         }
-        s_shares[user] -= sharesToRedeem;
+        _setUserShares(user, usersShares - sharesToRedeem);
         stablecoinReceived = _measuredProtocolRedeem(sharesToRedeem, exchangeRate);
         if (stablecoinReceived == 0) {
             revert TokenLending__ZeroStablecoinReceived(stablecoinAmount);
@@ -223,13 +223,25 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
             if (usersSharesToRedeem > usersShares) {
                 revert TokenLending__InsufficientShares(users[i], usersSharesToRedeem, usersShares);
             }
-            s_shares[users[i]] = usersShares - usersSharesToRedeem;
+            _setUserShares(users[i], usersShares - usersSharesToRedeem);
             emit TokenLending__SharesRedeemed(users[i], purchaseAmounts[i], usersSharesToRedeem);
         }
         uint256 stablecoinReceived = _measuredProtocolRedeem(totalSharesToRedeem, exchangeRate);
         if (stablecoinReceived > 0) emit TokenLending__SharesRedeemedBatch(stablecoinReceived, totalSharesToRedeem);
         else revert TokenLending__ZeroStablecoinReceived(totalStablecoinAmount);
         return stablecoinReceived;
+    }
+
+    /**
+     * @notice Write the user's virtual share balance and emit the canonical transition.
+     * @dev No log when the balance is unchanged, so a zero-share debit is silent.
+     */
+    function _setUserShares(address user, uint256 newShares) private {
+        uint256 previousShares = s_shares[user];
+        s_shares[user] = newShares;
+        if (previousShares != newShares) {
+            emit TokenLending__UserSharesUpdated(user, previousShares, newShares);
+        }
     }
 
     /**
