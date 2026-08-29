@@ -31,7 +31,7 @@ interface IPurchaseUniswap {
     );
     event PurchaseUniswap_AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
     event PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(uint256 oldValue, uint256 newValue);
-    event PurchaseUniswap_OracleUpdated(address oldOracle, address newOracle);
+    event PurchaseUniswap_OracleUpdated(address indexed oldOracle, address indexed newOracle);
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS

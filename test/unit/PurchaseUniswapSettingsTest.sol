@@ -22,7 +22,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
 
     event PurchaseUniswap_AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
     event PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(uint256 oldValue, uint256 newValue);
-    event PurchaseUniswap_OracleUpdated(address oldOracle, address newOracle);
+    event PurchaseUniswap_OracleUpdated(address indexed oldOracle, address indexed newOracle);
     event PurchaseUniswap_NewPathSet(address[] intermediateTokens, uint24[] poolFeeRates, bytes newPath);
 
     function setUp() public override {
@@ -268,7 +268,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         address oldOracleAddress = address(currentOracle);
         
         // Expect the event with the correct parameters
-        vm.expectEmit(false, false, false, true);
+        vm.expectEmit(true, true, false, false);
         emit PurchaseUniswap_OracleUpdated(oldOracleAddress, address(newMocOracle));
 
         // Update the oracle

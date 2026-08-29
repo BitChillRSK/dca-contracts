@@ -11,7 +11,9 @@ import "../../script/Constants.sol";
 
 contract DcaScheduleTest is DcaDappTest {
     // Events
-    event DcaManager__DcaScheduleDeleted(address user, address token, uint64 scheduleId, uint256 refundedAmount);
+    event DcaManager__DcaScheduleDeleted(
+        address indexed user, address indexed token, uint64 indexed scheduleId, uint256 refundedAmount
+    );
     event DcaManager__PurchaseAmountUpdated(
         address indexed user, uint64 indexed scheduleId, uint256 previousAmount, uint256 newAmount
     );
@@ -40,11 +42,11 @@ contract DcaScheduleTest is DcaDappTest {
         bool found;
         for (uint256 i; i < logs.length; ++i) {
             if (logs[i].topics[0] != sig) continue;
-            (address user, address token, uint64 emittedId, uint256 refundedAmount) =
-                abi.decode(logs[i].data, (address, address, uint64, uint256));
-            assertEq(user, USER);
-            assertEq(token, address(stablecoin));
-            assertEq(emittedId, scheduleId);
+            assertEq(logs[i].topics.length, 4, "DcaScheduleDeleted must index user, token, and scheduleId");
+            assertEq(address(uint160(uint256(logs[i].topics[1]))), USER);
+            assertEq(address(uint160(uint256(logs[i].topics[2]))), address(stablecoin));
+            assertEq(uint64(uint256(logs[i].topics[3])), scheduleId);
+            uint256 refundedAmount = abi.decode(logs[i].data, (uint256));
             assertApproxEqAbs(refundedAmount, expectedRefund, REFUND_ROUNDING_TOLERANCE);
             found = true;
         }

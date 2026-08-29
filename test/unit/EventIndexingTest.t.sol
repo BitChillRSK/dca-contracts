@@ -9,7 +9,7 @@ import "../../script/Constants.sol";
 
 /**
  * @title EventIndexingTest
- * @notice ABI-freeze coverage: indexed fields are only addresses and `scheduleId`; lending share
+ * @notice ABI-freeze coverage: every scalar address and `scheduleId` is indexed, and nothing else is; lending share
  *         transitions replay to `getUserShares`; a non-zero purchase fee emits `FeeTransferred`.
  */
 contract EventIndexingTest is DcaDappTest {
@@ -83,7 +83,7 @@ contract EventIndexingTest is DcaDappTest {
         assertTrue(found, "DcaManager__SchedulePauseSet not emitted");
     }
 
-    function testFirstPartyLogsIndexOnlyAddressesAndScheduleId() external {
+    function testFirstPartyLogsIndexEveryAddressAndScheduleIdOnly() external {
         uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         vm.recordLogs();
         depositStablecoin();
@@ -96,7 +96,30 @@ contract EventIndexingTest is DcaDappTest {
         makeSinglePurchase();
         vm.prank(USER);
         dcaManager.withdrawRbtcFromTokenHandler(address(stablecoin), s_routeIndex);
+        vm.prank(USER);
+        dcaManager.deleteDcaSchedule(address(stablecoin), SCHEDULE_INDEX, scheduleId);
         _assertFirstPartyIndexing(vm.getRecordedLogs());
+    }
+
+    function testDcaScheduleDeletedIndexesUserTokenAndScheduleId() external {
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        vm.prank(USER);
+        vm.recordLogs();
+        dcaManager.deleteDcaSchedule(address(stablecoin), SCHEDULE_INDEX, scheduleId);
+
+        bytes32 sig = keccak256("DcaManager__DcaScheduleDeleted(address,address,uint64,uint256)");
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bool found;
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].topics[0] != sig) continue;
+            assertEq(logs[i].topics.length, 4, "DcaScheduleDeleted must index user, token, and scheduleId");
+            assertEq(address(uint160(uint256(logs[i].topics[1]))), USER);
+            assertEq(address(uint160(uint256(logs[i].topics[2]))), address(stablecoin));
+            assertEq(uint64(uint256(logs[i].topics[3])), scheduleId);
+            abi.decode(logs[i].data, (uint256));
+            found = true;
+        }
+        assertTrue(found, "DcaManager__DcaScheduleDeleted not emitted");
     }
 
     function _feeTransferredAmount(Vm.Log[] memory logs) private pure returns (uint256 amount) {
@@ -134,11 +157,11 @@ contract EventIndexingTest is DcaDappTest {
             uint256 extra = logs[i].topics.length - 1;
             (bool known, uint256 expected) = _expectedExtraTopics(logs[i].topics[0]);
             assertTrue(known, "unknown first-party event in the freeze table");
-            assertEq(extra, expected, "first-party event indexed a non-address, non-scheduleId field");
+            assertEq(extra, expected, "first-party event indexing does not match address/scheduleId rule");
         }
     }
 
-    /// @dev Extra topics beyond the signature. Only `address` and `uint64 scheduleId` are indexed.
+    /// @dev Extra topics beyond the signature: every scalar `address` and `uint64 scheduleId`, and nothing else.
     function _expectedExtraTopics(bytes32 sig) private pure returns (bool known, uint256 extra) {
         if (sig == keccak256("DcaManager__TokenBalanceUpdated(address,uint64,uint256)")) return (true, 2);
         if (sig == keccak256("DcaManager__PurchaseAmountUpdated(address,uint64,uint256,uint256)")) return (true, 2);
@@ -147,7 +170,7 @@ contract EventIndexingTest is DcaDappTest {
             return (true, 3);
         }
         if (sig == keccak256("DcaManager__SchedulePauseSet(address,uint64,bool)")) return (true, 2);
-        if (sig == keccak256("DcaManager__DcaScheduleDeleted(address,address,uint64,uint256)")) return (true, 0);
+        if (sig == keccak256("DcaManager__DcaScheduleDeleted(address,address,uint64,uint256)")) return (true, 3);
         if (sig == keccak256("DcaManager__MaxSchedulesPerTokenModified(uint256)")) return (true, 0);
         if (sig == keccak256("DcaManager__MinPurchasePeriodModified(uint256)")) return (true, 0);
         if (sig == keccak256("DcaManager__LastPurchaseTimestampUpdated(address,uint64,uint256)")) return (true, 2);
@@ -180,7 +203,7 @@ contract EventIndexingTest is DcaDappTest {
         if (sig == keccak256("PurchaseUniswap_NewPathSet(address[],uint24[],bytes)")) return (true, 0);
         if (sig == keccak256("PurchaseUniswap_AmountOutMinimumPercentUpdated(uint256,uint256)")) return (true, 0);
         if (sig == keccak256("PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(uint256,uint256)")) return (true, 0);
-        if (sig == keccak256("PurchaseUniswap_OracleUpdated(address,address)")) return (true, 0);
+        if (sig == keccak256("PurchaseUniswap_OracleUpdated(address,address)")) return (true, 2);
         if (sig == keccak256("IdleErc20Handler__AmountAdjusted(address,uint256,uint256)")) return (true, 1);
         if (sig == OWNERSHIP_TRANSFERRED) return (true, 2);
         if (sig == OWNERSHIP_TRANSFER_STARTED) return (true, 2);

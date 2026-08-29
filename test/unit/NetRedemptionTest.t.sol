@@ -371,7 +371,7 @@ contract NetRedemptionTest is DcaDappTest {
         bool found;
         for (uint256 i; i < logs.length; ++i) {
             if (logs[i].topics[0] == sig) {
-                (,,, amount) = abi.decode(logs[i].data, (address, address, uint64, uint256));
+                amount = abi.decode(logs[i].data, (uint256));
                 found = true;
             }
         }
