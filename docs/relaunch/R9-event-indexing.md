@@ -6,7 +6,7 @@ PR 47 of the relaunch stack. **ABI freeze** for events, errors, and remaining in
 
 ## Objective
 
-Index only addresses and `scheduleId`. Emit a canonical per-user lending-share balance transition after every virtual share mint or burn. Emit when a purchase fee actually moves. Do not shrink diagnostic custom-error argument lists.
+Index every existing `address` and `scheduleId` field; index nothing else. Emit a canonical per-user lending-share balance transition after every virtual share mint or burn. Emit when a purchase fee actually moves. Do not shrink diagnostic custom-error argument lists.
 
 ## Background
 
@@ -26,7 +26,7 @@ Diagnostic errors such as `DcaManager__PurchaseAmountMismatch` (six args) stay. 
 
 ## Scope
 
-- [x] First-party events: `indexed` only on `address` and `scheduleId` (`uint64` after R50; still one topic, zero-padded) and the `user` on `UserSharesUpdated`. Un-index amounts, timestamps, periods, rates, token amounts, and totals. Do not index strings, bytes, or arrays (`PurchaseUniswap_NewPathSet` had all three indexed; they are data now).
+- [x] First-party events: `indexed` on every existing `address` and `scheduleId` (`uint64` after R50; still one topic, zero-padded), including `DcaScheduleDeleted`'s `user` / `token` / `scheduleId` and `PurchaseUniswap_OracleUpdated`'s old and new oracles. Un-index amounts, timestamps, periods, rates, `routeIndex`, token amounts, and totals. Do not index strings, bytes, or arrays (`PurchaseUniswap_NewPathSet` had all three indexed; they are data now). Do not add new event fields just to fill a topic (`TokenBalanceUpdated` / `LastPurchaseTimestampUpdated` stay without `user`; `SchedulePauseSet` stays without `token`).
 - [x] Add to `ITokenLending` and emit after every successful per-user virtual share mutation in `LendingErc20Handler` (and any leftover override):
 
       ```solidity
@@ -67,7 +67,7 @@ Then `make check`. Fork: no new assertions beyond what `EXTERNAL_REWARDS.md` nee
 
 ## Success criteria
 
-- [x] No first-party event indexes a non-address, non-`scheduleId` field.
+- [x] No first-party event indexes a non-address, non-`scheduleId` field. Every existing `address` and `scheduleId` field is indexed (arrays/bytes stay data). `routeIndex` stays in data.
 - [x] `UserSharesUpdated` covers every lending share mutation; replay matches `getUserShares`.
 - [x] `FeeTransferred` fires on non-zero `_transferFee`.
 - [x] Diagnostic error args unchanged.
@@ -83,7 +83,7 @@ Then `make check`. Fork: no new assertions beyond what `EXTERNAL_REWARDS.md` nee
 
 ## ABI / deploy / cutover impact
 
-- ABI: freeze. Topic0 is `keccak256` of the event name and parameter types; `indexed` is not part of that hash, so existing events keep their topic0 and only move un-indexed values from topics into data. New topic0s are only `UserSharesUpdated` and `FeeTransferred`. Indexers update the ABI/decoder for the layout change and subscribe to those two new signatures; they do not migrate existing topic0 filters.
+- ABI: freeze. Topic0 is `keccak256` of the event name and parameter types; `indexed` is not part of that hash, so existing events keep their topic0. Un-indexing moves values from topics into data; indexing `DcaScheduleDeleted` and `OracleUpdated` moves `user`/`token`/`scheduleId` and the two oracle addresses from data into topics. `routeIndex` stays in data on `TokenHandlerAssigned`, `DepositsPauseSet`, and `DcaScheduleCreated`. New topic0s are only `UserSharesUpdated` and `FeeTransferred`. Indexers update the ABI/decoder for the layout change and subscribe to those two new signatures; they do not migrate existing topic0 filters.
 - Scripts: none.
-- Runtime (no IR): `DcaManager` 22,647 (margin 1,929); `SovrynErc20HandlerDex` 22,925 (margin 1,651); `LayerBankErc20HandlerDex` 23,385 (margin 1,191). The new logs live on the shared lending/fee bases, so every lending handler grew; Dex remains under EIP-170.
-- Cutover: **Frontend follow-up** if the app decodes these logs (likely monitoring more than the UI). Search `bitChillRSK/front-end` and the monitoring repo; comment or open issues. Do not implement Telegram here.
+- Runtime (no IR): `DcaManager` 22,698 (margin 1,878); `SovrynErc20HandlerDex` 22,958 (margin 1,618); `LayerBankErc20HandlerDex` 23,418 (margin 1,158). The new logs live on the shared lending/fee bases, so every lending handler grew; Dex remains under EIP-170.
+- Cutover: **Frontend follow-up** — [front-end#22](https://github.com/BitChillRSK/front-end/issues/22) owns DcaManager ABI regeneration (event layouts included, even if the UI does not decode logs). [bitchill-monitoring#10](https://github.com/BitChillRSK/bitchill-monitoring/issues/10) owns `abi.json`. Do not implement Telegram here.
