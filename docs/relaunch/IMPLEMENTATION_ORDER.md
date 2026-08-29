@@ -457,7 +457,7 @@ Rewrite first-party natspec only after ABI, names, handlers, route maps, and the
 
 Do not make behavior changes in this PR.
 
-### PR 49 - R42 integrate grouped purchases in DcaManager
+### PR 49 - R42 integrate grouped purchases in DcaManager ([#101](https://github.com/BitChillRSK/dca-contracts/pull/101))
 
 Follow up the standalone R42 batcher after measuring the completed manager: move
 `batchBuyRbtcGroups` into `DcaManager`, authenticate once, and use a two-pass implementation so

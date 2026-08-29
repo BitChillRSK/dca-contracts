@@ -1,13 +1,16 @@
 # R42 — Grouped swapper purchases (one tx, many `batchBuyRbtc` groups)
 
-Status: **implemented; follow-up PR pending** · Assigned: yes · Optional/further-review: no
+Status: **implemented** · GitHub [#101](https://github.com/BitChillRSK/dca-contracts/pull/101) · Assigned: yes · Optional/further-review: no
 
 PR 46 of the relaunch stack originally shipped the standalone `SwapperBatcher` in GitHub
 [#98](https://github.com/BitChillRSK/dca-contracts/pull/98), stacked on R38 (PR 45). After R9 and
 R10 completed the ordered stack, the grouped entry point was re-evaluated against the final
 `DcaManager` bytecode and measured hot path. The follow-up stacks on R10 (PR 48) and replaces the
-standalone contract with an integrated `DcaManager.batchBuyRbtcGroups` entry point. Cutover:
-[swapper-bot#6](https://github.com/BitChillRSK/swapper-bot/issues/6).
+standalone contract with an integrated `DcaManager.batchBuyRbtcGroups` entry point in GitHub
+[#101](https://github.com/BitChillRSK/dca-contracts/pull/101). Cutover:
+[swapper-bot#6](https://github.com/BitChillRSK/swapper-bot/issues/6),
+[front-end#22](https://github.com/BitChillRSK/front-end/issues/22), and
+[bitchill-monitoring#10](https://github.com/BitChillRSK/bitchill-monitoring/issues/10).
 
 ## Objective
 
@@ -52,7 +55,7 @@ single-group selector remains available.
 - [x] Adapt the R42 tests to call `DcaManager` directly and preserve the two-handler success,
   second-group rollback, paused-row rollback, access-control, empty-input, and direct-retry cases.
 - [x] Record final runtime size and a like-for-like gas comparison.
-- [ ] Update the swapper-bot cutover issue. Because this changes the final `DcaManager` ABI after
+- [x] Update the swapper-bot cutover issue. Because this changes the final `DcaManager` ABI after
   R9/R10, also create or update the required frontend and monitoring ABI follow-ups.
 
 ## Out of scope
@@ -92,7 +95,7 @@ Targeted grouped-purchase tests, then the complete repository gates from `AGENTS
 - [x] Failure policy remains atomic and tested.
 - [x] The integrated manager remains below EIP-170 in the deploy profile.
 - [x] The standalone contract and its deployment/allowlist operations are gone.
-- [ ] Consumer follow-ups describe the final manager selector and remove the batcher deployment.
+- [x] Consumer follow-ups describe the final manager selector and remove the batcher deployment.
 - [x] No open product decisions.
 
 ## Reviewer checklist
@@ -101,8 +104,8 @@ Targeted grouped-purchase tests, then the complete repository gates from `AGENTS
 - [x] `onlySwapper` runs once per external entry, not once per inner group.
 - [x] Tests cover success, rollback, pause, malformed input, handler failure, and unauthorized callers.
 - [x] Runtime and gas measurements use the pinned deploy profile.
-- [ ] Files beyond the list above are named and justified in the PR.
-- [ ] No unrelated refactors; history is reviewable.
+- [x] Files beyond the list above are named and justified in the PR.
+- [x] No unrelated refactors; history is reviewable.
 
 ## ABI / deploy / cutover impact
 
