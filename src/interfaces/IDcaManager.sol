@@ -275,8 +275,8 @@ interface IDcaManager {
     /**
      * @notice Buy rBTC for several token-and-route groups atomically in one transaction.
      * @param batches Groups whose rows each share one stablecoin and one route.
-     * @dev Authenticates the caller once, then applies all schedule checks/effects before any
-     *      handler interaction. A failure in any group or handler reverts every group.
+     * @dev Authenticates the caller once, then purchases each group in order through the same
+     *      one-group helper. A failure in any group or handler reverts every group.
      *      The original `batchBuyRbtc` remains available for one-group retries.
      */
     function batchBuyRbtcGroups(Batch[] calldata batches) external;

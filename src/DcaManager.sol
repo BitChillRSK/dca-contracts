@@ -284,23 +284,19 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         uint256[] calldata purchaseAmounts,
         uint256 routeIndex
     ) external override onlySwapper {
-        _batchBuyRbtcChecksEffects(buyers, token, scheduleIndexes, scheduleIds, purchaseAmounts, routeIndex);
-        _batchBuyRbtcInteraction(buyers, token, scheduleIds, purchaseAmounts, routeIndex);
+        _batchBuyRbtc(buyers, token, scheduleIndexes, scheduleIds, purchaseAmounts, routeIndex);
     }
 
     /**
      * @inheritdoc IDcaManager
-     * @dev The two passes keep checks-effects-interactions global across the bundle: no schedule
-     *      state is written after the first handler call, including when a handler reenters.
      */
     function batchBuyRbtcGroups(Batch[] calldata batches) external override onlySwapper {
         uint256 numBatches = batches.length;
         if (numBatches == 0) revert DcaManager__EmptyBatchPurchaseGroups();
 
-        // Finish every schedule check and effect before any untrusted handler interaction.
         for (uint256 i; i < numBatches; ++i) {
             Batch calldata batch = batches[i];
-            _batchBuyRbtcChecksEffects(
+            _batchBuyRbtc(
                 batch.buyers,
                 batch.token,
                 batch.scheduleIndexes,
@@ -309,18 +305,12 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
                 batch.routeIndex
             );
         }
-        for (uint256 i; i < numBatches; ++i) {
-            Batch calldata batch = batches[i];
-            _batchBuyRbtcInteraction(
-                batch.buyers, batch.token, batch.scheduleIds, batch.purchaseAmounts, batch.routeIndex
-            );
-        }
     }
 
     /**
-     * @dev Validate one token-and-route group and debit every named schedule.
+     * @dev Validate one token-and-route group, debit every named schedule, then call the handler.
      */
-    function _batchBuyRbtcChecksEffects(
+    function _batchBuyRbtc(
         address[] calldata buyers,
         address token,
         uint256[] calldata scheduleIndexes,
@@ -339,18 +329,6 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
             if (schedulePurchaseAmount != purchaseAmounts[i]) revert DcaManager__PurchaseAmountMismatch(buyers[i], token, scheduleIds[i], scheduleIndexes[i], schedulePurchaseAmount, purchaseAmounts[i]);
             if (scheduleRouteIndex != routeIndex) revert DcaManager__RouteIndexMismatch(buyers[i], token, scheduleIds[i], scheduleIndexes[i], scheduleRouteIndex, routeIndex);
         }
-    }
-
-    /**
-     * @dev Execute the handler interaction for one already-validated token-and-route group.
-     */
-    function _batchBuyRbtcInteraction(
-        address[] calldata buyers,
-        address token,
-        uint64[] calldata scheduleIds,
-        uint256[] calldata purchaseAmounts,
-        uint256 routeIndex
-    ) private {
         IPurchaseRbtc(address(_handler(token, routeIndex))).batchBuyRbtc(
             buyers, scheduleIds, purchaseAmounts
         );

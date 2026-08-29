@@ -460,13 +460,15 @@ Do not make behavior changes in this PR.
 ### PR 49 - R42 integrate grouped purchases in DcaManager ([#101](https://github.com/BitChillRSK/dca-contracts/pull/101))
 
 Follow up the standalone R42 batcher after measuring the completed manager: move
-`batchBuyRbtcGroups` into `DcaManager`, authenticate once, and use a two-pass implementation so
-every group's schedule effects finish before any handler interaction. Remove the standalone
-contract, interface, and deploy add-on. The original one-group selector stays available for bot
-retries. See [`R42-swapper-batcher.md`](./R42-swapper-batcher.md).
+`batchBuyRbtcGroups` into `DcaManager`, authenticate once, and loop the same one-group helper
+so each group completes its checks, effects, and handler call before the next. Remove the
+standalone contract, interface, and deploy add-on. The original one-group selector stays
+available for bot retries. See [`R42-swapper-batcher.md`](./R42-swapper-batcher.md).
 
 **Decided:** the final manager is not planned to grow further, so the recurring hot-path saving is
 worth the remaining EIP-170 margin. Grouped calls remain atomic and the bot EOA remains allowlisted.
+The cheaper one-loop implementation is preferred over a bundle-wide CEI two-pass: handlers are
+BitChill-deployed, purchase paths stay `onlySwapper`, and the extra pass costs gas on every tick.
 
 ## Closed non-implementation decisions
 

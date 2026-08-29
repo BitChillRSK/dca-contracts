@@ -25,10 +25,13 @@ therefore need several calls for idle, LayerBank, Sovryn, USDRIF, and USDT0 rout
 The original R42 design put the outer loop in a replaceable contract. That preserved manager
 bytecode headroom, but each group crossed back into `DcaManager` and repeated
 `OperationsAdmin.isSwapper`. The final manager is not planned to grow further, so unused bytecode
-headroom has no runtime value. A final deploy-profile measurement on the completed stack measured
-the same two-group mocked MoC purchase at 361,133 gas through `SwapperBatcher` and 347,186 gas
-through the globally CEI-clean integrated implementation: 13,947 gas saved (3.9%). Runtime grew
-from 22,647 to 23,833 bytes, leaving 743 bytes below EIP-170. The recurring protocol-paid saving
+headroom has no runtime value. A like-for-like measurement on the completed stack measured
+the same two-group mocked MoC purchase at 361,133 gas through `SwapperBatcher`, 347,186 gas
+through a two-pass CEI-clean integrated implementation, and 344,723 gas through the one-loop
+helper this PR ships. Decided 2026-08-29: ship the cheaper one-loop. Handlers are BitChill-deployed
+and purchase paths stay `onlySwapper`, so bundle-wide CEI is not worth 2,463 gas on every tick
+(16,410 gas / 4.5% cheaper than the standalone batcher). Runtime is 23,716 bytes, leaving 860
+bytes below EIP-170 (the two-pass version was 23,833 / 743). The recurring protocol-paid saving
 outweighs preserving that unused margin.
 
 **Atomicity.** One revert rolls back every venue in the bundle. A paused row, malformed group, or
@@ -49,8 +52,10 @@ single-group selector remains available.
   buyer/index/id/amount arrays.
 - [x] Add swapper-only `DcaManager.batchBuyRbtcGroups(Batch[] calldata)`. Empty top-level input
   reverts; each group keeps the existing empty/length/amount/route/schedule checks.
-- [x] Extract the checks/effects and interaction halves of `batchBuyRbtc` into calldata helpers.
-  The grouped entry point authenticates only once and runs all effects before any interaction.
+- [x] Extract `batchBuyRbtc` into a private `_batchBuyRbtc` helper. The grouped entry point
+  authenticates only once and loops that helper so each group finishes its checks, effects, and
+  handler call before the next. A two-pass (all effects, then all interactions) was measured
+  2,463 gas more expensive and was rejected: handlers are BitChill-deployed.
 - [x] Remove `SwapperBatcher`, `ISwapperBatcher`, and `DeploySwapperBatcher`.
 - [x] Adapt the R42 tests to call `DcaManager` directly and preserve the two-handler success,
   second-group rollback, paused-row rollback, access-control, empty-input, and direct-retry cases.
@@ -100,7 +105,7 @@ Targeted grouped-purchase tests, then the complete repository gates from `AGENTS
 
 ## Reviewer checklist
 
-- [x] The two helpers preserve the former single-group checks/effects/handler call.
+- [x] The one-group helper preserves the former `batchBuyRbtc` checks/effects/handler call.
 - [x] `onlySwapper` runs once per external entry, not once per inner group.
 - [x] Tests cover success, rollback, pause, malformed input, handler failure, and unauthorized callers.
 - [x] Runtime and gas measurements use the pinned deploy profile.
