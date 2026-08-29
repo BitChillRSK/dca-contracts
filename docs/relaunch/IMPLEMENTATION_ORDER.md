@@ -457,6 +457,17 @@ Rewrite first-party natspec only after ABI, names, handlers, route maps, and the
 
 Do not make behavior changes in this PR.
 
+### PR 49 - R42 integrate grouped purchases in DcaManager
+
+Follow up the standalone R42 batcher after measuring the completed manager: move
+`batchBuyRbtcGroups` into `DcaManager`, authenticate once, and use a two-pass implementation so
+every group's schedule effects finish before any handler interaction. Remove the standalone
+contract, interface, and deploy add-on. The original one-group selector stays available for bot
+retries. See [`R42-swapper-batcher.md`](./R42-swapper-batcher.md).
+
+**Decided:** the final manager is not planned to grow further, so the recurring hot-path saving is
+worth the remaining EIP-170 margin. Grouped calls remain atomic and the bot EOA remains allowlisted.
+
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:

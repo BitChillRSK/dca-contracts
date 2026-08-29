@@ -14,7 +14,7 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
  * @title DcaManager
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice User and swapper entry point: create and manage dollar-cost-averaging schedules.
- * @dev Users talk only to this contract. A swapper (EOA or `SwapperBatcher`) triggers purchases.
+ * @dev Users talk only to this contract. An allowlisted swapper triggers purchases.
  *      Handlers hold the stablecoin and accumulated rBTC.
  */
 contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
@@ -58,7 +58,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     }
 
     /**
-     * @dev Only addresses on the OperationsAdmin swapper allowlist (EOA or SwapperBatcher).
+     * @dev Only addresses on the OperationsAdmin swapper allowlist.
      */
     modifier onlySwapper() {
         if (!i_operationsAdmin.isSwapper(msg.sender)) {
@@ -284,6 +284,50 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         uint256[] calldata purchaseAmounts,
         uint256 routeIndex
     ) external override onlySwapper {
+        _batchBuyRbtcChecksEffects(buyers, token, scheduleIndexes, scheduleIds, purchaseAmounts, routeIndex);
+        _batchBuyRbtcInteraction(buyers, token, scheduleIds, purchaseAmounts, routeIndex);
+    }
+
+    /**
+     * @inheritdoc IDcaManager
+     * @dev The two passes keep checks-effects-interactions global across the bundle: no schedule
+     *      state is written after the first handler call, including when a handler reenters.
+     */
+    function batchBuyRbtcGroups(Batch[] calldata batches) external override onlySwapper {
+        uint256 numBatches = batches.length;
+        if (numBatches == 0) revert DcaManager__EmptyBatchPurchaseGroups();
+
+        // Finish every schedule check and effect before any untrusted handler interaction.
+        for (uint256 i; i < numBatches; ++i) {
+            Batch calldata batch = batches[i];
+            _batchBuyRbtcChecksEffects(
+                batch.buyers,
+                batch.token,
+                batch.scheduleIndexes,
+                batch.scheduleIds,
+                batch.purchaseAmounts,
+                batch.routeIndex
+            );
+        }
+        for (uint256 i; i < numBatches; ++i) {
+            Batch calldata batch = batches[i];
+            _batchBuyRbtcInteraction(
+                batch.buyers, batch.token, batch.scheduleIds, batch.purchaseAmounts, batch.routeIndex
+            );
+        }
+    }
+
+    /**
+     * @dev Validate one token-and-route group and debit every named schedule.
+     */
+    function _batchBuyRbtcChecksEffects(
+        address[] calldata buyers,
+        address token,
+        uint256[] calldata scheduleIndexes,
+        uint64[] calldata scheduleIds,
+        uint256[] calldata purchaseAmounts,
+        uint256 routeIndex
+    ) private {
         uint256 numOfPurchases = buyers.length;
         if (numOfPurchases == 0) revert DcaManager__EmptyBatchPurchaseArrays();
         if (
@@ -295,6 +339,18 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
             if (schedulePurchaseAmount != purchaseAmounts[i]) revert DcaManager__PurchaseAmountMismatch(buyers[i], token, scheduleIds[i], scheduleIndexes[i], schedulePurchaseAmount, purchaseAmounts[i]);
             if (scheduleRouteIndex != routeIndex) revert DcaManager__RouteIndexMismatch(buyers[i], token, scheduleIds[i], scheduleIndexes[i], scheduleRouteIndex, routeIndex);
         }
+    }
+
+    /**
+     * @dev Execute the handler interaction for one already-validated token-and-route group.
+     */
+    function _batchBuyRbtcInteraction(
+        address[] calldata buyers,
+        address token,
+        uint64[] calldata scheduleIds,
+        uint256[] calldata purchaseAmounts,
+        uint256 routeIndex
+    ) private {
         IPurchaseRbtc(address(_handler(token, routeIndex))).batchBuyRbtc(
             buyers, scheduleIds, purchaseAmounts
         );

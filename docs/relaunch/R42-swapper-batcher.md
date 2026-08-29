@@ -1,6 +1,6 @@
 # R42 — Grouped swapper purchases (one tx, many `batchBuyRbtc` groups)
 
-Status: **architecture follow-up in progress** · Assigned: yes · Optional/further-review: no
+Status: **implemented; follow-up PR pending** · Assigned: yes · Optional/further-review: no
 
 PR 46 of the relaunch stack originally shipped the standalone `SwapperBatcher` in GitHub
 [#98](https://github.com/BitChillRSK/dca-contracts/pull/98), stacked on R38 (PR 45). After R9 and
@@ -22,10 +22,11 @@ therefore need several calls for idle, LayerBank, Sovryn, USDRIF, and USDT0 rout
 The original R42 design put the outer loop in a replaceable contract. That preserved manager
 bytecode headroom, but each group crossed back into `DcaManager` and repeated
 `OperationsAdmin.isSwapper`. The final manager is not planned to grow further, so unused bytecode
-headroom has no runtime value. A temporary prototype on the completed stack measured the same
-two-group mocked MoC purchase at 361,133 gas through `SwapperBatcher` and 344,746 gas when
-integrated: 16,387 gas saved (4.5%). Runtime grew from 22,647 to 23,665 bytes, leaving 911 bytes
-below EIP-170. The recurring protocol-paid saving outweighs preserving that unused margin.
+headroom has no runtime value. A final deploy-profile measurement on the completed stack measured
+the same two-group mocked MoC purchase at 361,133 gas through `SwapperBatcher` and 347,186 gas
+through the globally CEI-clean integrated implementation: 13,947 gas saved (3.9%). Runtime grew
+from 22,647 to 23,833 bytes, leaving 743 bytes below EIP-170. The recurring protocol-paid saving
+outweighs preserving that unused margin.
 
 **Atomicity.** One revert rolls back every venue in the bundle. A paused row, malformed group, or
 handler failure therefore reverts the entire call. The bot filters rows off-chain and its EOA stays
@@ -41,16 +42,16 @@ single-group selector remains available.
 
 ## Scope
 
-- [ ] Add `IDcaManager.Batch`, one argument group containing token, route, and the parallel
+- [x] Add `IDcaManager.Batch`, one argument group containing token, route, and the parallel
   buyer/index/id/amount arrays.
-- [ ] Add swapper-only `DcaManager.batchBuyRbtcGroups(Batch[] calldata)`. Empty top-level input
+- [x] Add swapper-only `DcaManager.batchBuyRbtcGroups(Batch[] calldata)`. Empty top-level input
   reverts; each group keeps the existing empty/length/amount/route/schedule checks.
-- [ ] Extract the body of `batchBuyRbtc` into `_batchBuyRbtc` with calldata parameters. Both
-  external entry points call the helper; the grouped entry point authenticates only once.
-- [ ] Remove `SwapperBatcher`, `ISwapperBatcher`, and `DeploySwapperBatcher`.
-- [ ] Adapt the R42 tests to call `DcaManager` directly and preserve the two-handler success,
+- [x] Extract the checks/effects and interaction halves of `batchBuyRbtc` into calldata helpers.
+  The grouped entry point authenticates only once and runs all effects before any interaction.
+- [x] Remove `SwapperBatcher`, `ISwapperBatcher`, and `DeploySwapperBatcher`.
+- [x] Adapt the R42 tests to call `DcaManager` directly and preserve the two-handler success,
   second-group rollback, paused-row rollback, access-control, empty-input, and direct-retry cases.
-- [ ] Record final runtime size and a like-for-like gas comparison.
+- [x] Record final runtime size and a like-for-like gas comparison.
 - [ ] Update the swapper-bot cutover issue. Because this changes the final `DcaManager` ABI after
   R9/R10, also create or update the required frontend and monitoring ABI follow-ups.
 
@@ -86,20 +87,20 @@ Targeted grouped-purchase tests, then the complete repository gates from `AGENTS
 
 ## Success criteria
 
-- [ ] One allowlist check drives every purchase group in one transaction.
-- [ ] The original `batchBuyRbtc` selector and behavior stay unchanged.
-- [ ] Failure policy remains atomic and tested.
-- [ ] The integrated manager remains below EIP-170 in the deploy profile.
-- [ ] The standalone contract and its deployment/allowlist operations are gone.
+- [x] One allowlist check drives every purchase group in one transaction.
+- [x] The original `batchBuyRbtc` selector and behavior stay unchanged.
+- [x] Failure policy remains atomic and tested.
+- [x] The integrated manager remains below EIP-170 in the deploy profile.
+- [x] The standalone contract and its deployment/allowlist operations are gone.
 - [ ] Consumer follow-ups describe the final manager selector and remove the batcher deployment.
-- [ ] No open product decisions.
+- [x] No open product decisions.
 
 ## Reviewer checklist
 
-- [ ] `_batchBuyRbtc` contains the exact former single-group checks/effects/handler call.
-- [ ] `onlySwapper` runs once per external entry, not once per inner group.
-- [ ] Tests cover success, rollback, pause, malformed input, and unauthorized callers.
-- [ ] Runtime and gas measurements use the pinned deploy profile.
+- [x] The two helpers preserve the former single-group checks/effects/handler call.
+- [x] `onlySwapper` runs once per external entry, not once per inner group.
+- [x] Tests cover success, rollback, pause, malformed input, handler failure, and unauthorized callers.
+- [x] Runtime and gas measurements use the pinned deploy profile.
 - [ ] Files beyond the list above are named and justified in the PR.
 - [ ] No unrelated refactors; history is reviewable.
 

@@ -5,7 +5,7 @@ pragma solidity 0.8.36;
  * @title IDcaManager
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice User and swapper entry point: create and manage dollar-cost-averaging schedules.
- * @dev Users talk only to this contract. A swapper (EOA or `SwapperBatcher`) triggers purchases.
+ * @dev Users talk only to this contract. An allowlisted swapper triggers purchases.
  *      Handlers hold the stablecoin and accumulated rBTC; this contract never custody them.
  */
 interface IDcaManager {
@@ -26,6 +26,17 @@ interface IDcaManager {
         uint32 purchasePeriod; // Time between purchases in seconds
         uint32 routeIndex; // OperationsAdmin route that holds this schedule's funds (idle or lending)
         uint64 scheduleId; // Unique identifier of each DCA schedule: the value of the creation nonce
+    }
+
+    /// @notice One token-and-route purchase group inside a grouped swapper call.
+    /// @dev The four arrays are positional and must have the same nonzero length.
+    struct Batch {
+        address[] buyers;
+        address token;
+        uint256[] scheduleIndexes;
+        uint64[] scheduleIds;
+        uint256[] purchaseAmounts;
+        uint256 routeIndex;
     }
 
     /**
@@ -120,6 +131,8 @@ interface IDcaManager {
     error DcaManager__ArraysLengthMismatch();
     /// @notice `batchBuyRbtc` was called with empty buyer/index/id/amount arrays.
     error DcaManager__EmptyBatchPurchaseArrays();
+    /// @notice `batchBuyRbtcGroups` was called without any token-and-route groups.
+    error DcaManager__EmptyBatchPurchaseGroups();
     /// @notice A withdraw-all call was given empty token/route arrays.
     error DcaManager__EmptyWithdrawalArrays();
     /// @notice The user already has the maximum number of schedules for this token.
@@ -244,7 +257,7 @@ interface IDcaManager {
      * @param scheduleIds Schedule id for each row, paired with `buyers[i]`.
      * @param purchaseAmounts Amount each row must spend; must equal that schedule's stored amount.
      * @param routeIndex Route every named schedule must share.
-     * @dev Only a swapper on the OperationsAdmin allowlist (EOA or `SwapperBatcher`) may call.
+     * @dev Only a swapper on the OperationsAdmin allowlist may call.
      *      Reverts `DcaManager__SchedulePaused` if any named schedule is paused, which fails the
      *      whole batch: the swapper must filter paused schedules out before composing the call.
      *      Mixing tokens or routes in one call is rejected per row (`RouteIndexMismatch`); the
@@ -258,6 +271,15 @@ interface IDcaManager {
         uint256[] calldata purchaseAmounts,
         uint256 routeIndex
     ) external;
+
+    /**
+     * @notice Buy rBTC for several token-and-route groups atomically in one transaction.
+     * @param batches Groups whose rows each share one stablecoin and one route.
+     * @dev Authenticates the caller once, then applies all schedule checks/effects before any
+     *      handler interaction. A failure in any group or handler reverts every group.
+     *      The original `batchBuyRbtc` remains available for one-group retries.
+     */
+    function batchBuyRbtcGroups(Batch[] calldata batches) external;
 
     /**
      * @notice Withdraw lending interest the caller has accrued on each named token×route pair.
