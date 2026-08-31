@@ -31,7 +31,26 @@ function batchBuyOne(
     scheduleIndexes[0] = scheduleIndex;
     scheduleIds[0] = scheduleId;
     purchaseAmounts[0] = purchaseAmount;
-    dcaManager.batchBuyRbtc(buyers, token, scheduleIndexes, scheduleIds, purchaseAmounts, routeIndex);
+    dcaManager.batchBuyRbtc(toBatch(buyers, token, scheduleIndexes, scheduleIds, purchaseAmounts, routeIndex));
+}
+
+/**
+ * @notice Pack the parallel arrays `DcaManager.batchBuyRbtc` used to take into one `Batch`.
+ */
+function toBatch(
+    address[] memory buyers,
+    address token,
+    uint256[] memory scheduleIndexes,
+    uint64[] memory scheduleIds,
+    uint256[] memory purchaseAmounts,
+    uint256 routeIndex
+) pure returns (IDcaManager.Batch memory batch) {
+    batch.buyers = buyers;
+    batch.token = token;
+    batch.scheduleIndexes = scheduleIndexes;
+    batch.scheduleIds = scheduleIds;
+    batch.purchaseAmounts = purchaseAmounts;
+    batch.routeIndex = routeIndex;
 }
 
 /**

@@ -9,7 +9,7 @@ import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import {IDcaManagerAccessControl} from "../../src/interfaces/IDcaManagerAccessControl.sol";
-import {batchBuyOne, handlerBatchBuyOne, UNUSED_SCHEDULE_ID} from "../utils/BatchBuyOne.sol";
+import {batchBuyOne, handlerBatchBuyOne, UNUSED_SCHEDULE_ID, toBatch} from "../utils/BatchBuyOne.sol";
 import "../../script/Constants.sol";
 
 contract RbtcPurchaseTest is DcaDappTest {
@@ -259,12 +259,14 @@ contract RbtcPurchaseTest is DcaDappTest {
         vm.expectRevert(IDcaManager.DcaManager__EmptyBatchPurchaseArrays.selector);
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
+            toBatch(
             emptyAddressArray,
             address(stablecoin),
             emptyUintArray,
             emptyScheduleIdArray,
             emptyUintArray,
             s_routeIndex
+            )
         );
     }
 
@@ -289,7 +291,7 @@ contract RbtcPurchaseTest is DcaDappTest {
             )
         );
         vm.prank(SWAPPER);
-        dcaManager.batchBuyRbtc(users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_routeIndex);
+        dcaManager.batchBuyRbtc(toBatch(users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_routeIndex));
     }
 
     function testBatchPurchaseFailsIfRouteIndexMismatch() external {
@@ -313,7 +315,7 @@ contract RbtcPurchaseTest is DcaDappTest {
             )
         );
         vm.prank(SWAPPER);
-        dcaManager.batchBuyRbtc(users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_routeIndex + 1);
+        dcaManager.batchBuyRbtc(toBatch(users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_routeIndex + 1));
     }
 
     function testBatchPurchaseFailsIfArraysHaveDifferentLenghts() external {
@@ -323,12 +325,14 @@ contract RbtcPurchaseTest is DcaDappTest {
         vm.expectRevert(IDcaManager.DcaManager__ArraysLengthMismatch.selector);
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
+            toBatch(
             users,
             address(stablecoin),
             dummyUintArray,
             dummyScheduleIdArray,
             dummyUintArray,
             s_routeIndex
+            )
         );
     }
 
@@ -389,12 +393,14 @@ contract RbtcPurchaseTest is DcaDappTest {
         vm.expectRevert(IDcaManager.DcaManager__ScheduleIdAndIndexMismatch.selector);
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
+            toBatch(
             users,
             address(stablecoin),
             scheduleIndexes,
             scheduleIds,
             purchaseAmounts,
             s_routeIndex
+            )
         );
 
         uint256 postStablecoinHandlerBalance = address(stablecoinHandler).balance;
@@ -490,12 +496,14 @@ contract RbtcPurchaseTest is DcaDappTest {
             // Execute batch purchase as SWAPPER
             vm.prank(SWAPPER);
             dcaManager.batchBuyRbtc(
+                toBatch(
                 batchPurchase.buyers,
                 address(stablecoin),
                 batchPurchase.scheduleIndexes,
                 batchPurchase.scheduleIds,
                 batchPurchase.purchaseAmounts,
                 s_routeIndex
+                )
             );
 
             // Advance time and update exchange rate so future purchases are allowed and interest accrues
@@ -709,12 +717,14 @@ contract RbtcPurchaseTest is DcaDappTest {
             // Execute batch purchase as SWAPPER
             vm.prank(SWAPPER);
             dcaManager.batchBuyRbtc(
+                toBatch(
                 batchPurchase.buyers,
                 address(stablecoin),
                 batchPurchase.scheduleIndexes,
                 batchPurchase.scheduleIds,
                 batchPurchase.purchaseAmounts,
                 s_routeIndex
+                )
             );
 
             // Withdrawing interest should not revert

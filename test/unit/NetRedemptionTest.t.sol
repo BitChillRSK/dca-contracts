@@ -6,6 +6,7 @@ import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {Vm} from "forge-std/Test.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import {MockIsusdToken} from "../mocks/MockIsusdToken.sol";
+import {toBatch} from "../utils/BatchBuyOne.sol";
 import "../../script/Constants.sol";
 
 /**
@@ -84,7 +85,7 @@ contract NetRedemptionTest is DcaDappTest {
 
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_routeIndex
+            toBatch(users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_routeIndex)
         );
 
         uint256 received = address(stablecoinHandler).balance - handlerRbtcBefore;
@@ -205,7 +206,7 @@ contract NetRedemptionTest is DcaDappTest {
         vm.recordLogs();
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_routeIndex
+            toBatch(users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_routeIndex)
         );
 
         (uint256 perUserSpentTotal, uint256 batchSpent) = _batchSpendFromLogs();
@@ -258,7 +259,7 @@ contract NetRedemptionTest is DcaDappTest {
         );
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_routeIndex
+            toBatch(users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_routeIndex)
         );
     }
 

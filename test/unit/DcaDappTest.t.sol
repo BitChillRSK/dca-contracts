@@ -33,7 +33,7 @@ import "./TestsHelper.t.sol";
 import {IkToken} from "../../src/tropykus-legacy/IkToken.sol";
 import {IiSusdToken} from "../../src/sovryn/IiSusdToken.sol";
 import {IPurchaseUniswap} from "../../src/interfaces/IPurchaseUniswap.sol";
-import {batchBuyOne} from "../utils/BatchBuyOne.sol";
+import {batchBuyOne, toBatch} from "../utils/BatchBuyOne.sol";
 
 contract DcaDappTest is Test {
     DcaManager dcaManager;
@@ -682,12 +682,7 @@ contract DcaDappTest is Test {
 
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            users,
-            address(stablecoin),
-            scheduleIndexes,
-            scheduleIds,
-            purchaseAmounts,
-            s_routeIndex
+            toBatch(users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_routeIndex)
         );
 
         if (isLendingLane) {
@@ -721,12 +716,7 @@ contract DcaDappTest is Test {
         vm.recordLogs();
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            users,
-            address(stablecoin),
-            scheduleIndexes,
-            scheduleIds,
-            purchaseAmounts,
-            s_routeIndex
+            toBatch(users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_routeIndex)
         );
         
         uint256 postStablecoinHandlerBalance2;

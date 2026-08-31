@@ -13,6 +13,7 @@ import {DexHelperConfig} from "../script/DexHelperConfig.s.sol";
 import {MockStablecoin} from "../test/mocks/MockStablecoin.sol";
 import {MockMocProxy} from "../test/mocks/MockMocProxy.sol";
 import {MockWrbtcToken} from "../test/mocks/MockWrbtcToken.sol";
+import {toBatch} from "./utils/BatchBuyOne.sol";
 import "./Constants.sol";
 
 
@@ -394,12 +395,14 @@ contract ComparePurchaseMethods is Test {
         uint256 gasStart = gasleft();
         vm.prank(SWAPPER);
         dcaManMoc.batchBuyRbtc(
+            toBatch(
             userArray,
             address(stablecoin),
             scheduleIndexes,
             scheduleIds,
             purchaseAmounts,
             routeIndex
+            )
         );
         uint256 gasUsed = gasStart - gasleft();
         uint256 gasCost = gasUsed * tx.gasprice;
@@ -451,12 +454,14 @@ contract ComparePurchaseMethods is Test {
         uint256 gasStart = gasleft();
         vm.prank(SWAPPER);
         dcaManUni.batchBuyRbtc(
+            toBatch(
             userArray,
             address(stablecoin),
             scheduleIndexes,
             scheduleIds,
             purchaseAmounts,
             routeIndex
+            )
         );
         uint256 gasUsed = gasStart - gasleft();
         uint256 gasCost = gasUsed * tx.gasprice;

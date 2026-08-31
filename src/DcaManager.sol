@@ -14,7 +14,7 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
  * @title DcaManager
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice User and swapper entry point: create and manage dollar-cost-averaging schedules.
- * @dev Users talk only to this contract. A swapper (EOA or `SwapperBatcher`) triggers purchases.
+ * @dev Users talk only to this contract. An allowlisted swapper triggers purchases.
  *      Handlers hold the stablecoin and accumulated rBTC.
  */
 contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
@@ -58,7 +58,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     }
 
     /**
-     * @dev Only addresses on the OperationsAdmin swapper allowlist (EOA or SwapperBatcher).
+     * @dev Only addresses on the OperationsAdmin swapper allowlist.
      */
     modifier onlySwapper() {
         if (!i_operationsAdmin.isSwapper(msg.sender)) {
@@ -276,27 +276,59 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     /**
      * @inheritdoc IDcaManager
      */
-    function batchBuyRbtc(
-        address[] calldata buyers,
-        address token,
-        uint256[] calldata scheduleIndexes,
-        uint64[] calldata scheduleIds,
-        uint256[] calldata purchaseAmounts,
-        uint256 routeIndex
-    ) external override onlySwapper {
-        uint256 numOfPurchases = buyers.length;
+    function batchBuyRbtc(Batch calldata batch) external override onlySwapper {
+        _batchBuyRbtc(batch);
+    }
+
+    /**
+     * @inheritdoc IDcaManager
+     */
+    function batchBuyRbtcAcrossHandlers(Batch[] calldata batches) external override onlySwapper {
+        uint256 numBatches = batches.length;
+        if (numBatches == 0) revert DcaManager__EmptyHandlerBatches();
+
+        for (uint256 i; i < numBatches; ++i) {
+            _batchBuyRbtc(batches[i]);
+        }
+    }
+
+    /**
+     * @dev Validate one handler's batch, debit every named schedule, then call that handler.
+     */
+    function _batchBuyRbtc(Batch calldata batch) private {
+        uint256 numOfPurchases = batch.buyers.length;
         if (numOfPurchases == 0) revert DcaManager__EmptyBatchPurchaseArrays();
         if (
-            numOfPurchases != scheduleIndexes.length || numOfPurchases != scheduleIds.length
-                || numOfPurchases != purchaseAmounts.length
+            numOfPurchases != batch.scheduleIndexes.length || numOfPurchases != batch.scheduleIds.length
+                || numOfPurchases != batch.purchaseAmounts.length
         ) revert DcaManager__ArraysLengthMismatch();
         for (uint256 i; i < numOfPurchases; ++i) {
-            (uint256 schedulePurchaseAmount, uint256 scheduleRouteIndex) = _rBtcPurchaseChecksEffects(buyers[i], token, scheduleIndexes[i], scheduleIds[i]);
-            if (schedulePurchaseAmount != purchaseAmounts[i]) revert DcaManager__PurchaseAmountMismatch(buyers[i], token, scheduleIds[i], scheduleIndexes[i], schedulePurchaseAmount, purchaseAmounts[i]);
-            if (scheduleRouteIndex != routeIndex) revert DcaManager__RouteIndexMismatch(buyers[i], token, scheduleIds[i], scheduleIndexes[i], scheduleRouteIndex, routeIndex);
+            (uint256 schedulePurchaseAmount, uint256 scheduleRouteIndex) = _rBtcPurchaseChecksEffects(
+                batch.buyers[i], batch.token, batch.scheduleIndexes[i], batch.scheduleIds[i]
+            );
+            if (schedulePurchaseAmount != batch.purchaseAmounts[i]) {
+                revert DcaManager__PurchaseAmountMismatch(
+                    batch.buyers[i],
+                    batch.token,
+                    batch.scheduleIds[i],
+                    batch.scheduleIndexes[i],
+                    schedulePurchaseAmount,
+                    batch.purchaseAmounts[i]
+                );
+            }
+            if (scheduleRouteIndex != batch.routeIndex) {
+                revert DcaManager__RouteIndexMismatch(
+                    batch.buyers[i],
+                    batch.token,
+                    batch.scheduleIds[i],
+                    batch.scheduleIndexes[i],
+                    scheduleRouteIndex,
+                    batch.routeIndex
+                );
+            }
         }
-        IPurchaseRbtc(address(_handler(token, routeIndex))).batchBuyRbtc(
-            buyers, scheduleIds, purchaseAmounts
+        IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex))).batchBuyRbtc(
+            batch.buyers, batch.scheduleIds, batch.purchaseAmounts
         );
     }
 

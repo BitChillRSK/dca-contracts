@@ -457,6 +457,19 @@ Rewrite first-party natspec only after ABI, names, handlers, route maps, and the
 
 Do not make behavior changes in this PR.
 
+### PR 49 - R42 integrate grouped purchases in DcaManager ([#101](https://github.com/BitChillRSK/dca-contracts/pull/101))
+
+Follow up the standalone R42 batcher after measuring the completed manager: move
+`batchBuyRbtcAcrossHandlers` into `DcaManager`, authenticate once, and loop the same one-handler helper
+so each handler's batch completes its checks, effects, and handler call before the next. Remove
+the standalone contract, interface, and deploy add-on. The original one-handler selector stays
+available for bot retries. See [`R42-swapper-batcher.md`](./R42-swapper-batcher.md).
+
+**Decided:** the final manager is not planned to grow further, so the recurring hot-path saving is
+worth the remaining EIP-170 margin. Grouped calls remain atomic and the bot EOA remains allowlisted.
+The cheaper one-loop implementation is preferred over a bundle-wide CEI two-pass: handlers are
+BitChill-deployed, purchase paths stay `onlySwapper`, and the extra pass costs gas on every tick.
+
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:
