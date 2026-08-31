@@ -93,10 +93,13 @@ inline *and* the cached `uint256 numOfPurchases = buyers.length`. Measured again
 87 gas cheaper on `testSinglePurchase`, 416 on `testBatchPurchasesOneUser`, and 17 bytes smaller on every Dex
 handler, because it removes an internal call instead of adding one.
 
-Caching the length is worth keeping: isolated, it costs ~34 gas once and saves 3 gas per iteration (one
-avoided `MLOAD` of the memory array's length word), so it pays for itself above ~11 rows and batches are
-expected to exceed that. Dropping the cache also compiles, but is 19 gas worse at one row and 304 worse on
-the five-row batch test, because the scoped block reduces stack shuffling independently of the cache.
+Two separate effects, measured separately so they are not confused. **The block scope is the larger win**:
+with the loop inline and the length uncached either way, scoping `aggregatedFee` is worth −28 gas on
+`testSinglePurchase` and −298 on `testBatchPurchasesOneUser`. **The cache is the smaller one**: measured
+through `PurchaseRbtcHarness` at 1/2/5/20/50 rows it costs ~12 gas once per call and saves 3.00 gas per row
+(one avoided `MLOAD` of the memory array's length word), so it breaks even at ~4 rows — −9 gas at one row,
++3 at five, +138 at fifty. Batches normally exceed four rows, so the cache stays; a one-row retry pays 9 gas
+for it, which is not worth a second code path.
 
 For the record, since it was checked rather than assumed: enabling the **legacy optimizer**
 (`optimizer = true`, `via_ir = false`) does *not* relieve this. `[profile.default]` does leave the optimizer
