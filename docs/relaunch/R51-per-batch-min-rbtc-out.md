@@ -117,8 +117,11 @@ in a Uniswap path solely as an intermediate hop, never as a Dex handler's input 
 development-era legacy kept for tests, in the same position as Tropykus after R37 — no DOC Dex handler is ever
 to be deployed. The shipped Dex set is therefore **LayerBank USDRIF and LayerBank USDT0**. PR 103 measured the
 DOC path anyway and records the result as evidence for deleting it, not as a route awaiting calibration.
-Separately, `DeployDexSwaps`' live branch can still construct that handler when `STABLECOIN_TYPE=DOC`; closing
-that hole is deploy-script work outside R51's Solidity scope and is tracked on its own.
+Separately, `DeployDexSwaps`' live branch can still construct that handler when `STABLECOIN_TYPE=DOC`, and its
+comment at `script/DeployDexSwaps.s.sol:113` still names Sovryn (DOC) as part of the live dex map. Closing that
+hole is deploy-script work outside R51's Solidity scope; it is tracked as the PR 50 follow-up in
+[`IMPLEMENTATION_ORDER.md`](./IMPLEMENTATION_ORDER.md). Until it lands, the never-deploy rule above is
+documentation only and is not enforced by the script.
 
 **What gates PR 103.** The contracts PR must record one reproducible fork-derived measurement table, at a
 named block, for every currently configured shipped handler/path (LayerBank USDRIF and LayerBank USDT0; see
@@ -176,8 +179,9 @@ cross-link an `rsk-uniswap-pools` issue if that repository will supply the reusa
 
 - The swapper bot remains the only component with the signing key. Quote code is an imported module,
   package, or read-only service.
-- Quotes cover every shipped Dex token/path: DOC, USDRIF, and 6-decimal USDT0. Static route files are not
-  assumed complete; the production allowlist/config is the source of candidate routes.
+- Quotes cover every shipped Dex token/path: USDRIF and 6-decimal USDT0 (not DOC; see the correction above).
+  Static route files are not assumed complete; the production allowlist/config is the source of candidate
+  routes.
 - All input/output arithmetic is integer-based. `minRbtcOut` is emitted as raw 18-decimal WRBTC wei, never
   a formatted decimal string.
 - The quoted input is the batch's aggregate post-BitChill-fee stablecoin amount. A lending redemption can

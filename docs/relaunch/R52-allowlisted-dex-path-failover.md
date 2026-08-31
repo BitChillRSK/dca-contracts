@@ -134,7 +134,8 @@ In the same turn as the contracts PR, update the matching swapper-bot issue and 
 
 - one signing boundary: only swapper-bot holds the key;
 - a versioned production list of governance-approved encoded paths and hashes per handler;
-- route discovery/quotes for DOC, USDRIF, and USDT0 using raw integer amounts;
+- route discovery/quotes for USDRIF and USDT0 using raw integer amounts (DOC is not a shipped Dex route; see
+  R51's implementation correction);
 - pool health and quote thresholds that trigger failover, plus hysteresis/cooldown so the bot does not oscillate;
 - normal failover is fully automatic among paths the Safe approved ahead of time; it does not wait for a Safe
   transaction or ask governance to adjust the R51 oracle floor for routine weekly conditions;

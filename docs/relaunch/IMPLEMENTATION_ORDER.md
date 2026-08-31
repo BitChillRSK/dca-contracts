@@ -100,6 +100,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R42 integration | 49 ([#101](https://github.com/BitChillRSK/dca-contracts/pull/101)) | none (`Batch` for both entry points) |
 | R51 | 50 (planned GitHub #103) | none (first fork table in PR; durable live floor is a relaunch gate) |
 | R52 | 51 (planned GitHub #104) | none (same production Safe; explicit split authority if owners diverge) |
+| R51 deploy follow-up | unassigned | none (enforce the DOC-Dex never-deploy rule in `DeployDexSwaps`) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -520,6 +521,23 @@ Current PR 101 baseline: `DcaManager` 23,683 bytes (893 margin) and
 seven-argument manager-stack finding no longer applies. The handler ABI addition has been compiled against
 PR 101 and does fail legacy no-IR codegen without extraction: `_creditBuyers` is required, not conditional.
 Preserve its arithmetic/event order and re-measure every leaf.
+
+**Sovryn DOC is not a shipped Dex route (recorded 2026-08-31, PR 103).** DOC buys rBTC only through MoC
+redemption; it may appear in a Uniswap path as an intermediate hop but never as a Dex handler's input token.
+The shipped Dex set is LayerBank USDRIF and LayerBank USDT0. This supersedes the live-map wording in the R37
+(PR 44) entry, which predates the correction. PR 103's fork probe measured the DOC path anyway and found it
+**starved** — the DOC/rUSDT 0.05% pool held ~1.48 rUSDT — which is evidence for deleting the route, not for
+calibrating it. The `DcaManager`/handler ABI is unaffected; the DOC Dex handler stays as test-only legacy, in
+the same position as Tropykus after R37.
+
+### PR 50 follow-up - close the DOC Dex deploy hole (unassigned, no spec doc)
+
+`DeployDexSwaps`' live branch still registers `SOVRYN_INDEX` and constructs `SovrynErc20HandlerDex` when
+`STABLECOIN_TYPE=DOC`, and its comment at `script/DeployDexSwaps.s.sol:113` still names Sovryn (DOC) as part
+of the live dex map. Deploy-script work is outside R51's Solidity scope, so PR 103 left it alone. The fix
+mirrors what R37 did for Tropykus: revert on the DOC Dex arm in the live branch and correct the comment, then
+re-run the deploy lanes. Until then the never-deploy rule above is documentation only and is not enforced by
+the script. Sequence this before any Dex cutover broadcast; it does not block R52.
 
 ### PR 51 - R52 allowlisted Dex path failover (planned GitHub #104)
 
