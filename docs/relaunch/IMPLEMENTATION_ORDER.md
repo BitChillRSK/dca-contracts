@@ -42,7 +42,7 @@ PR 2 was the original decision-record placeholder. GitHub PR [#74](https://githu
 - Rename the schedule struct `DcaDetails` → `DcaSchedule` (R49), pack it to three slots (R18), then finish packing in R50 (`uint64` nonce as `scheduleId`, fees, admin handler+pause, DcaManager scalars, Dex percents, `uint32` route keys on every OperationsAdmin entry). Do not narrow handler balance/share mappings.
 - Do **not** ship R12 interest compounding: users can withdraw interest and deposit it explicitly, while an in-handler compound path couples principal/share accounting to a chosen schedule and expands the most sensitive cash surface.
 - Do **not** add an owner sweep: pooled stablecoin and rBTC cannot be safely distinguished from liabilities, and signer-only withdrawal remains the custody boundary.
-- Keep SPDX **MIT** for the relaunch. A future licensing change is a legal/product project, not latent Solidity work.
+- Licensing is **reopened** (was: keep MIT). Two questions, both open: whether MIT is the right license for BitChill at all, and a GPL compliance gap that exists today regardless of that answer. See **Licensing — reopened** below.
 - Dex: keep the $1-listed-stable + MoC BTC/USD on-chain floor, decimal-correct it, and leave extra MEV policy to the bot (R43). LayerBank is route 1 for USDRIF/USDT0; keep Sovryn DOC at route 2; USDT0 bounds are `25e6` / `1000e6` / `100_000e6` (R36).
 - Keep Tropykus local/fork lanes but no live deploy path; burn index 4 (R37).
 - Replace cartesian withdraw-all semantics and keep the existing names (R38). Swapper batcher is all-or-nothing; bot EOA stays allowlisted (R42). R9 adds no extra purchase-event fields.
@@ -597,7 +597,37 @@ There is no optional-late queue. Items either have an ordered spec above or are 
 - **Owner sweep — rejected.** A pooled balance cannot prove which tokens are harmless dust versus user liabilities. Governance must not gain a path around signer-only withdrawals.
 - **Handler per-user storage packing — rejected.** Each mapping value is already one slot and contains a financial amount. Narrowing it saves no slot across mapping entries.
 - **Address-keyed bool bitmaps — rejected.** `s_swappers` and `s_handlerAssigned` are sparse address keys; they never share a word, so a bitmap is extra math for the same SLOAD. R50 packs the `(token, routeIndex)` handler+pause pair instead.
-- **SPDX change — rejected for this relaunch.** Keep the repository's existing MIT license. Re-licensing requires an explicit legal/product process outside the contract implementation stack.
+- **SPDX change — reopened 2026-08-31.** The earlier rejection argued that re-licensing "requires an explicit legal/product process outside the contract implementation stack" and then closed the decision on that basis, which is self-defeating: that is a reason to route the question to a human, not to answer it. See **Licensing — reopened**.
+
+## Licensing — reopened
+
+Reopened 2026-08-31. Not latent Solidity work, and not an agent decision: it needs a human and
+probably counsel. Recorded here so the question is not lost, with the findings that motivate it.
+Free to change until the relaunch cutover, since verified source is immortal on explorers.
+
+**1. A compliance gap exists today, independent of any relicensing choice.** All 42 files in `src/`
+declare `MIT`. But `src/PurchaseUniswap.sol` imports `TransferHelper`, `ISwapRouter02`, and
+`IV3SwapRouter`, and `src/interfaces/IPurchaseUniswap.sol` imports `ISwapRouter02` — all four carry
+`SPDX-License-Identifier: GPL-2.0-or-later`. `TransferHelper` is a library whose code compiles into
+the deployed Dex handlers, not merely an interface, so an MIT declaration over that derivative is at
+best contested. Uniswap handle this on their own tree by shipping periphery as GPL-2.0-or-later and
+core as BUSL-1.1. `lib/v3-core` is BUSL-1.1 but nothing in `src/` imports it, so it is moot. The
+mechanism for a fix is per-file SPDX: the Uniswap-importing files take GPL-2.0-or-later, the rest
+take whatever question 2 settles.
+
+**2. Which license.** Four realistic options. MIT (today) is maximally permissive with no patent
+grant. Apache-2.0 is permissive with an explicit patent grant and a trademark clause, and is
+strictly better than MIT for a company that wants to stay permissive. BUSL-1.1 (Uniswap v3, Aave v3)
+is source-available with production use restricted for up to four years, then auto-converting to a
+nominated Change License; it needs Licensor, Change Date, Change License, and an Additional Use
+Grant. GPL-3.0/AGPL-3.0 (Uniswap v2) forces forks to stay open without preventing them.
+
+The deciding question is what is actually being protected. The moat is the Rootstock lending
+integrations, the swapper bot, and deployed liquidity rather than the Solidity, and verified source
+means anyone can copy it whatever the header says — a license buys recourse, not prevention. Against
+that, BUSL is not OSI-approved, is screened out by some integrators and grant programs, and
+complicates the GPL situation in question 1. Lean BUSL only if a specific plausible forker can be
+named; otherwise Apache-2.0.
 
 ## OpenZeppelin policy
 
