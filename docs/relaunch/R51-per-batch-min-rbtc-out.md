@@ -1,8 +1,8 @@
 # R51 — Per-batch minimum rBTC output
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **implemented** · GitHub [#103](https://github.com/BitChillRSK/dca-contracts/pull/103) · Assigned: yes · Optional/further-review: no
 
-PR 50 of the relaunch stack; planned GitHub implementation PR **#103**. Stack on R42's integration
+PR 50 of the relaunch stack; GitHub implementation PR **[#103](https://github.com/BitChillRSK/dca-contracts/pull/103)**. Stack on R42's integration
 follow-up (PR 49, [#101](https://github.com/BitChillRSK/dca-contracts/pull/101)). R52 owns dex-path
 authorization and follows this PR; do not pull that surface into R51.
 
@@ -82,27 +82,53 @@ seven-argument DcaManager stack problem left for R51. Current `[profile.default]
 | `OperationsAdmin` | 6,123 | 18,453 |
 
 `PurchaseRbtc.batchBuyRbtc` is already at the legacy-codegen stack limit: adding `minRbtcOut` was compiled
-against PR 101 and produces `Stack too deep` under `via_ir = false`. Extract the per-buyer
-allocation/credit loop into a private `_creditBuyers` helper as part of R51, without changing its arithmetic,
-ordering, rounding, accumulated-balance writes, or event sequence. The same code happens to compile with
-`via_ir = true`, but that profile is not selected by any deployment command or required test lane and is not
-a reason to skip the extraction. Re-measure every handler and DcaManager; do not copy the obsolete combined
-R51/R52 prototype figures.
+against PR 101 and produces `Stack too deep` under `via_ir = false`. Re-measure every handler and DcaManager;
+do not copy the obsolete combined R51/R52 prototype figures.
+
+**Correction recorded during implementation (2026-08-31).** This section originally required extracting the
+per-buyer allocation/credit loop into a private `_creditBuyers` helper. That is **not** necessary and PR 103
+does not do it. The function is exactly *one* slot over. PR 103 frees that slot by scoping `aggregatedFee` to
+a block that ends once the fee is paid — it is dead from there on — which leaves room to keep both the loop
+inline *and* the cached `uint256 numOfPurchases = buyers.length`. Measured against the helper, that is
+87 gas cheaper on `testSinglePurchase`, 416 on `testBatchPurchasesOneUser`, and 17 bytes smaller on every Dex
+handler, because it removes an internal call instead of adding one.
+
+Three separate effects, measured separately so they are not confused. **Holding the twice-read loop values
+in locals is by far the largest**: `netStablecoinAmountsToSpend[i]` and `buyers[i]` were each read twice per
+row, and a memory-array read costs a bounds check plus the load every time, so caching them saves **74 gas
+per row** and 42 bytes per handler. The other two are small. **The block scope is the larger win**:
+with the loop inline and the length uncached either way, scoping `aggregatedFee` is worth −28 gas on
+`testSinglePurchase` and −298 on `testBatchPurchasesOneUser`. **The cache is the smaller one**: measured
+through `PurchaseRbtcHarness` at 1/2/5/20/50 rows it costs ~12 gas once per call and saves 3.00 gas per row
+(one avoided `MLOAD` of the memory array's length word), so it breaks even at ~4 rows — −9 gas at one row,
++3 at five, +138 at fifty. Batches normally exceed four rows, so the cache stays; a one-row retry pays 9 gas
+for it, which is not worth a second code path.
+
+For the record, since it was checked rather than assumed: enabling the **legacy optimizer**
+(`optimizer = true`, `via_ir = false`) does *not* relieve this. `[profile.default]` does leave the optimizer
+off, but stack-too-deep persists with it on — solc's own message asks for `--via-ir` *while* enabling the
+optimizer, and via-IR remains out of bounds for EIP-170 and deployment decisions under the toolchain rule in
+[`IMPLEMENTATION_ORDER.md`](./IMPLEMENTATION_ORDER.md). Whether to turn the optimizer on at all is a separate
+toolchain decision with its own item; it would change every deployed size (`DcaManager` 23,703 → 13,767 in a
+measurement taken for that discussion) and the settings the Rootstock testnet proof and Blockscout
+verification were made at.
 
 ## Scope
 
-- [ ] `IDcaManager.Batch` appends `uint256 minRbtcOut`, with natspec that fixes its aggregate semantics and
+- [x] `IDcaManager.Batch` appends `uint256 minRbtcOut`, with natspec that fixes its aggregate semantics and
   WRBTC-wei units. `batchBuyRbtc(Batch)` and `batchBuyRbtcAcrossHandlers(Batch[])` keep their PR 101 shapes,
   but both selectors change because the tuple changes.
-- [ ] `DcaManager._batchBuyRbtc` forwards `batch.minRbtcOut` to the resolved handler. Preserve every PR 101
+- [x] `DcaManager._batchBuyRbtc` forwards `batch.minRbtcOut` to the resolved handler. Preserve every PR 101
   check, effect, ordering decision, and one-handler retry path.
-- [ ] `IPurchaseRbtc.batchBuyRbtc` gains `uint256 minRbtcOut`.
-- [ ] `PurchaseRbtc.batchBuyRbtc` reverts
+- [x] `IPurchaseRbtc.batchBuyRbtc` gains `uint256 minRbtcOut`.
+- [x] `PurchaseRbtc.batchBuyRbtc` reverts
   `PurchaseRbtc__BelowSwapperMinimum(uint256 rbtcReceived, uint256 minRbtcOut)` when measured aggregate
   output is below the caller minimum, after the existing zero check and before credits.
-- [ ] Extract the required `_creditBuyers` helper. Planned net amounts remain allocation weights; the
-  denominator, truncation, accumulated-balance writes, and per-row events are unchanged.
-- [ ] Record final method selectors and runtime sizes in the PR.
+- [x] Keep the per-buyer allocation/credit loop inline, freeing the one needed stack slot by scoping
+  `aggregatedFee` to the block that pays the fee. (Originally specified as a `_creditBuyers` extraction; see
+  the correction above.) Planned net amounts remain allocation weights; the denominator, truncation,
+  accumulated-balance writes, per-row events, and the order of every call are unchanged.
+- [x] Record final method selectors and runtime sizes in the PR.
 
 ## Governance-floor evidence and relaunch gate
 
@@ -111,9 +137,21 @@ stack, before price impact, pool/oracle drift, and stablecoin peg drift. USDT0's
 slightly looser. A caller minimum can tighten this floor but cannot make a sound trade pass when the floor
 itself is too tight. R51 therefore surfaces the evidence rather than leaving the question between specs.
 
+**Correction recorded during implementation (2026-08-31).** This spec listed *Sovryn DOC* as a shipped Dex
+path. It is not one, and must never become one: **DOC buys rBTC only through MoC redemption.** DOC may appear
+in a Uniswap path solely as an intermediate hop, never as a Dex handler's input token. The DOC Dex handler is
+development-era legacy kept for tests, in the same position as Tropykus after R37 — no DOC Dex handler is ever
+to be deployed. The shipped Dex set is therefore **LayerBank USDRIF and LayerBank USDT0**. PR 103 measured the
+DOC path anyway and records the result as evidence for deleting it, not as a route awaiting calibration.
+Separately, `DeployDexSwaps`' live branch can still construct that handler when `STABLECOIN_TYPE=DOC`, and its
+comment at `script/DeployDexSwaps.s.sol:113` still names Sovryn (DOC) as part of the live dex map. Closing that
+hole is deploy-script work outside R51's Solidity scope; it is tracked as the PR 50 follow-up in
+[`IMPLEMENTATION_ORDER.md`](./IMPLEMENTATION_ORDER.md). Until it lands, the never-deploy rule above is
+documentation only and is not enforced by the script.
+
 **What gates PR 103.** The contracts PR must record one reproducible fork-derived measurement table, at a
-named block, for every currently configured shipped handler/path (Sovryn DOC, LayerBank USDRIF, and LayerBank
-USDT0). Use the token's deployed minimum purchase and fee lower/upper bounds as the three reproducible input
+named block, for every currently configured shipped handler/path (LayerBank USDRIF and LayerBank USDT0; see
+the correction above for Sovryn DOC). Use the token's deployed minimum purchase and fee lower/upper bounds as the three reproducible input
 points unless current bot data supplies better documented aggregate sizes; this choice must not require a new
 product answer. The table records:
 
@@ -167,8 +205,9 @@ cross-link an `rsk-uniswap-pools` issue if that repository will supply the reusa
 
 - The swapper bot remains the only component with the signing key. Quote code is an imported module,
   package, or read-only service.
-- Quotes cover every shipped Dex token/path: DOC, USDRIF, and 6-decimal USDT0. Static route files are not
-  assumed complete; the production allowlist/config is the source of candidate routes.
+- Quotes cover every shipped Dex token/path: USDRIF and 6-decimal USDT0 (not DOC; see the correction above).
+  Static route files are not assumed complete; the production allowlist/config is the source of candidate
+  routes.
 - All input/output arithmetic is integer-based. `minRbtcOut` is emitted as raw 18-decimal WRBTC wei, never
   a formatted decimal string.
 - The quoted input is the batch's aggregate post-BitChill-fee stablecoin amount. A lending redemption can
@@ -240,16 +279,16 @@ rather than blocking the contracts PR.
 
 ## Success criteria
 
-- [ ] No caller value can loosen the governance floor.
-- [ ] The bound is checked against measured aggregate rBTC on every purchase venue.
-- [ ] PR 101's checks/effects/order and both entry-point shapes are preserved.
-- [ ] Every default-profile runtime remains below EIP-170 and the PR records the final margins.
-- [ ] The PR contains the first named-block fork table for every configured production path and operational
+- [x] No caller value can loosen the governance floor.
+- [x] The bound is checked against measured aggregate rBTC on every purchase venue.
+- [x] PR 101's checks/effects/order and both entry-point shapes are preserved.
+- [x] Every default-profile runtime remains below EIP-170 and the PR records the final margins.
+- [x] The PR contains the first named-block fork table for every configured production path and operational
   size, including negative findings; it does not wait for multi-observation calibration or route enablement.
-- [ ] The off-chain issues are opened/updated with the relaunch acceptance criteria and linked in the contracts
+- [x] The off-chain issues are opened/updated with the relaunch acceptance criteria and linked in the contracts
   PR; their implementation and continuing calibration do not gate merge.
-- [ ] R9 indexing and R10 natspec rules are applied to the new error, field, and parameter.
-- [ ] No open contract product decisions.
+- [x] R9 indexing and R10 natspec rules are applied to the new error, field, and parameter.
+- [x] No open contract product decisions.
 
 ## ABI / deploy / cutover impact
 

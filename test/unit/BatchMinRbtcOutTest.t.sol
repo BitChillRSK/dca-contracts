@@ -1,0 +1,197 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.36;
+
+import {DcaDappTest} from "./DcaDappTest.t.sol";
+import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
+import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
+import {toBatch, NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
+import "../Constants.sol";
+
+/**
+ * @notice R51: the swapper's per-batch minimum rBTC output, on whichever venue the lane is running.
+ * @dev The check lives in the shared `PurchaseRbtc` pipeline, so it must behave identically on MoC redemption
+ *      and on a Uniswap swap, and on an idle or a lending route. Rather than predict the output — which the
+ *      lending lanes only reach approximately — each test reads the measured amount out of the revert the
+ *      contract itself reports, which also proves the failure leaves no trace to clean up.
+ */
+contract BatchMinRbtcOutTest is DcaDappTest {
+    function setUp() public override {
+        super.setUp();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                 TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev `0` is the pre-R51 contract on every venue: the batch buys and credits exactly as before.
+    function testZeroMinimumBuysAsBefore() external {
+        uint256 rbtcBefore = _accumulatedRbtc();
+        uint256 balanceBefore = _schedule().tokenBalance;
+
+        _buy(NO_MIN_RBTC_OUT);
+
+        assertGt(_accumulatedRbtc(), rbtcBefore, "a zero minimum must not stop the purchase");
+        assertEq(_schedule().tokenBalance, balanceBefore - AMOUNT_TO_SPEND);
+        assertGt(_schedule().lastPurchaseTimestamp, 0);
+    }
+
+    /// @dev Equality succeeds: a minimum set to exactly what the batch buys is not a failure.
+    function testMinimumEqualToMeasuredOutputSucceeds() external {
+        uint256 measured = _measuredOutput();
+        uint256 rbtcBefore = _accumulatedRbtc();
+
+        _buy(measured);
+
+        assertEq(_accumulatedRbtc() - rbtcBefore, measured, "the batch credited exactly the minimum it cleared");
+    }
+
+    /// @dev One wei above what the batch buys fails, and the error carries both diagnostic values.
+    function testMinimumOneWeiAboveMeasuredOutputReverts() external {
+        uint256 measured = _measuredOutput();
+
+        IDcaManager.Batch memory batch = _batch(measured + 1);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, measured, measured + 1
+            )
+        );
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(batch);
+    }
+
+    /// @dev A violated minimum unwinds the whole batch: the schedule keeps its balance and its purchase slot,
+    ///      the handler keeps no rBTC and no fee, and the funds never left the route.
+    function testViolatedMinimumRollsBackTheWholeBatch() external {
+        IDcaManager.DcaSchedule memory before = _schedule();
+        uint256 rbtcBefore = _accumulatedRbtc();
+        uint256 feeCollectorBefore = stablecoin.balanceOf(FEE_COLLECTOR);
+        uint256 handlerCashBefore = _handlerRbtcCash();
+        uint256 handlerStablecoinBefore = stablecoin.balanceOf(address(stablecoinHandler));
+
+        IDcaManager.Batch memory batch = _batch(type(uint256).max);
+        vm.prank(SWAPPER);
+        (bool ok,) = address(dcaManager).call(abi.encodeCall(IDcaManager.batchBuyRbtc, (batch)));
+        assertFalse(ok, "an unreachable minimum must revert the batch");
+
+        IDcaManager.DcaSchedule memory afterCall = _schedule();
+        assertEq(afterCall.tokenBalance, before.tokenBalance, "the schedule keeps its deposit");
+        assertEq(
+            afterCall.lastPurchaseTimestamp,
+            before.lastPurchaseTimestamp,
+            "the schedule keeps its purchase slot, so the swapper can retry this period"
+        );
+        assertEq(_accumulatedRbtc(), rbtcBefore, "no buyer was credited");
+        assertEq(stablecoin.balanceOf(FEE_COLLECTOR), feeCollectorBefore, "no fee was kept");
+        assertEq(_handlerRbtcCash(), handlerCashBefore, "the handler bought and kept no rBTC");
+        assertEq(
+            stablecoin.balanceOf(address(stablecoinHandler)),
+            handlerStablecoinBefore,
+            "nothing was redeemed out of the route"
+        );
+
+        // The retry the bot would send next clears the same period.
+        _buy(NO_MIN_RBTC_OUT);
+        assertEq(_schedule().tokenBalance, before.tokenBalance - AMOUNT_TO_SPEND);
+    }
+
+    /// @dev The one-handler entry point is the bot's retry path, and it enforces the same field.
+    function testOneHandlerRetryEnforcesTheSameMinimum() external {
+        uint256 measured = _measuredOutput();
+
+        IDcaManager.Batch[] memory batches = new IDcaManager.Batch[](1);
+        batches[0] = _batch(measured + 1);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, measured, measured + 1
+            )
+        );
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtcAcrossHandlers(batches);
+
+        // The same batch, retried one-handler with a reachable minimum, goes through.
+        _buy(measured);
+        assertEq(_accumulatedRbtc(), measured);
+    }
+
+    /// @dev The bound is on measured rBTC, not on the stablecoin the rows planned to spend: the batch's own
+    ///      gross notional at the oracle price is unreachable, because the fee and the venue both take a cut.
+    function testMinimumIsMeasuredRbtcNotPlannedStablecoin() external {
+        uint256 measured = _measuredOutput();
+        uint256 grossNotional = AMOUNT_TO_SPEND / s_btcPrice;
+
+        assertLt(measured, grossNotional, "the fee alone puts the gross notional out of reach");
+
+        IDcaManager.Batch memory batch = _batch(grossNotional);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, measured, grossNotional
+            )
+        );
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(batch);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                HELPERS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @dev What this batch actually buys, read from the contract rather than predicted. An unreachable
+     *      minimum reverts with the measured output as its first argument, and the revert restores every
+     *      effect the probe had, so the caller can go on to spend the same schedule at the same price.
+     */
+    function _measuredOutput() private returns (uint256 measured) {
+        IDcaManager.Batch memory batch = _batch(type(uint256).max);
+        vm.prank(SWAPPER);
+        (bool ok, bytes memory returnData) = address(dcaManager).call(
+            abi.encodeCall(IDcaManager.batchBuyRbtc, (batch))
+        );
+
+        assertFalse(ok, "an unreachable minimum must revert");
+        assertEq(
+            bytes4(returnData),
+            IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector,
+            "the probe must fail on the caller minimum, not on something else"
+        );
+
+        bytes memory args = new bytes(returnData.length - 4);
+        for (uint256 i; i < args.length; ++i) {
+            args[i] = returnData[i + 4];
+        }
+        (measured,) = abi.decode(args, (uint256, uint256));
+        assertGt(measured, 0, "the batch must buy something for the minimum to be meaningful");
+    }
+
+    function _batch(uint256 minRbtcOut) private view returns (IDcaManager.Batch memory) {
+        address[] memory buyers = new address[](1);
+        uint256[] memory scheduleIndexes = new uint256[](1);
+        uint64[] memory scheduleIds = new uint64[](1);
+        uint256[] memory purchaseAmounts = new uint256[](1);
+        buyers[0] = USER;
+        scheduleIndexes[0] = SCHEDULE_INDEX;
+        scheduleIds[0] = _schedule().scheduleId;
+        purchaseAmounts[0] = AMOUNT_TO_SPEND;
+        return toBatch(
+            buyers, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_routeIndex, minRbtcOut
+        );
+    }
+
+    function _buy(uint256 minRbtcOut) private {
+        IDcaManager.Batch memory batch = _batch(minRbtcOut);
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(batch);
+    }
+
+    function _schedule() private view returns (IDcaManager.DcaSchedule memory) {
+        return dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX);
+    }
+
+    function _accumulatedRbtc() private view returns (uint256) {
+        return IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
+    }
+
+    /// @dev MoC pays native rBTC into the handler; the Uniswap route holds WRBTC until withdrawal.
+    function _handlerRbtcCash() private view returns (uint256) {
+        return isDexSwaps ? wrBtcToken.balanceOf(address(stablecoinHandler)) : address(stablecoinHandler).balance;
+    }
+}

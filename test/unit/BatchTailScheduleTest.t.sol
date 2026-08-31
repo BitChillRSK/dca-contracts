@@ -10,6 +10,7 @@ import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import {ITokenLending} from "src/interfaces/ITokenLending.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import "script/Constants.sol";
+import {NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
 
 /**
  * @title BatchTailScheduleTest
@@ -102,7 +103,7 @@ contract BatchTailScheduleTest is Test {
                 ITokenLending.TokenLending__InsufficientShares.selector, ALICE, aliceShares + 1, aliceShares
             )
         );
-        lendingHandler.batchBuyRbtc(_one(ALICE), _oneId(1), _one(ALICE_DEPOSIT));
+        lendingHandler.batchBuyRbtc(_one(ALICE), _oneId(1), _one(ALICE_DEPOSIT), NO_MIN_RBTC_OUT);
 
         // Nothing moved: the shortfall is rejected, not clamped.
         assertEq(lendingHandler.getUserShares(ALICE), aliceShares);
@@ -130,7 +131,7 @@ contract BatchTailScheduleTest is Test {
                 ITokenLending.TokenLending__InsufficientShares.selector, ALICE, aliceShares + 1, aliceShares
             )
         );
-        lendingHandler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts);
+        lendingHandler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT);
 
         // Bob did nothing wrong and still bought nothing: one tail schedule poisons the whole tick.
         assertEq(lendingHandler.getAccumulatedRbtcBalance(BOB), 0);
@@ -141,7 +142,7 @@ contract BatchTailScheduleTest is Test {
         idleHandler.depositToken(ALICE, ALICE_DEPOSIT);
 
         // Idle books are 1:1, so the exact-balance purchase the lending route rejects goes through.
-        idleHandler.batchBuyRbtc(_one(ALICE), _oneId(1), _one(ALICE_DEPOSIT));
+        idleHandler.batchBuyRbtc(_one(ALICE), _oneId(1), _one(ALICE_DEPOSIT), NO_MIN_RBTC_OUT);
 
         assertEq(idleHandler.getUsersIdleTokenBalance(ALICE), 0);
         assertGt(idleHandler.getAccumulatedRbtcBalance(ALICE), 0);

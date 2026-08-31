@@ -9,6 +9,7 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
 
 /**
  * @title PurchaseRbtcTest
@@ -68,7 +69,7 @@ contract PurchaseRbtcTest is Test {
         vm.expectEmit(true, true, true, true, address(harness));
         emit PurchaseRbtc__RbtcBought(buyerA, address(token), RBTC_OUT, scheduleA, spent);
 
-        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested));
+        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested), NO_MIN_RBTC_OUT);
 
         assertEq(harness.lastPurchaseAmount(), spent);
         assertEq(token.balanceOf(feeCollector), fee);
@@ -80,7 +81,7 @@ contract PurchaseRbtcTest is Test {
         uint256 fee = _fee(requested);
         uint256 net = requested - fee;
 
-        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested));
+        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested), NO_MIN_RBTC_OUT);
 
         assertEq(harness.purchaseCalls(), 1);
         assertEq(harness.lastPurchaseAmount(), net);
@@ -100,7 +101,7 @@ contract PurchaseRbtcTest is Test {
         vm.expectEmit(true, true, true, true, address(harness));
         emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(address(token), RBTC_OUT, net);
 
-        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested));
+        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested), NO_MIN_RBTC_OUT);
 
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), RBTC_OUT);
     }
@@ -110,7 +111,7 @@ contract PurchaseRbtcTest is Test {
         uint256 requested = 100 ether;
 
         vm.recordLogs();
-        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested));
+        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested), NO_MIN_RBTC_OUT);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bytes32 sig = FeeHandler__FeeTransferred.selector;
@@ -127,7 +128,7 @@ contract PurchaseRbtcTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(IPurchaseRbtc.PurchaseRbtc__RbtcBatchPurchaseFailed.selector, address(token))
         );
-        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(100 ether));
+        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(100 ether), NO_MIN_RBTC_OUT);
 
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), 0);
     }
@@ -143,7 +144,7 @@ contract PurchaseRbtcTest is Test {
                 IPurchaseRbtc.PurchaseRbtc__StablecoinRetrievedBelowFee.selector, aggregatedFee, aggregatedFee
             )
         );
-        harness.batchBuyRbtc(buyers, scheduleIds, amounts);
+        harness.batchBuyRbtc(buyers, scheduleIds, amounts, NO_MIN_RBTC_OUT);
 
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), 0);
         assertEq(token.balanceOf(feeCollector), 0);
@@ -161,7 +162,7 @@ contract PurchaseRbtcTest is Test {
                 IPurchaseRbtc.PurchaseRbtc__StablecoinRetrievedBelowFee.selector, retrieved, aggregatedFee
             )
         );
-        harness.batchBuyRbtc(buyers, scheduleIds, amounts);
+        harness.batchBuyRbtc(buyers, scheduleIds, amounts, NO_MIN_RBTC_OUT);
 
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), 0);
         assertEq(harness.getAccumulatedRbtcBalance(buyerB), 0);
@@ -181,7 +182,7 @@ contract PurchaseRbtcTest is Test {
         _expectBatchEvents(
             buyerA, buyerB, net0, net1, totalNetPlanned, actualSpent, scheduleA, scheduleB
         );
-        harness.batchBuyRbtc(buyers, scheduleIds, amounts);
+        harness.batchBuyRbtc(buyers, scheduleIds, amounts, NO_MIN_RBTC_OUT);
 
         assertEq(harness.lastPurchaseAmount(), actualSpent);
         assertEq(harness.feeCollectorBalanceOnPurchase(), aggregatedFee);
@@ -206,7 +207,7 @@ contract PurchaseRbtcTest is Test {
         uint256 actualSpent = amounts[0] + amounts[1] - _fee(amounts[0]) - _fee(amounts[1]);
 
         _expectBatchEvents(buyerA, buyerA, net0, net1, totalNetPlanned, actualSpent, scheduleA, scheduleB);
-        harness.batchBuyRbtc(buyers, scheduleIds, amounts);
+        harness.batchBuyRbtc(buyers, scheduleIds, amounts, NO_MIN_RBTC_OUT);
 
         assertEq(
             harness.getAccumulatedRbtcBalance(buyerA),
@@ -243,10 +244,115 @@ contract PurchaseRbtcTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(IPurchaseRbtc.PurchaseRbtc__RbtcBatchPurchaseFailed.selector, address(token))
         );
-        harness.batchBuyRbtc(buyers, scheduleIds, amounts);
+        harness.batchBuyRbtc(buyers, scheduleIds, amounts, NO_MIN_RBTC_OUT);
 
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), 0);
         assertEq(harness.getAccumulatedRbtcBalance(buyerB), 0);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    R51: THE CALLER'S PER-BATCH MINIMUM
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev `0` is the pre-R51 contract: the venue's own floor stays the only bound.
+    function test_minRbtcOut_zeroIsInert() public {
+        (address[] memory buyers, uint64[] memory scheduleIds, uint256[] memory amounts) = _twoBuyerBatch();
+
+        uint256 net0 = amounts[0] - _fee(amounts[0]);
+        uint256 net1 = amounts[1] - _fee(amounts[1]);
+
+        harness.batchBuyRbtc(buyers, scheduleIds, amounts, NO_MIN_RBTC_OUT);
+
+        assertEq(harness.purchaseCalls(), 1);
+        // The same truncated pro-rata shares R51 must not disturb; they sum a wei short of the measured total.
+        assertEq(harness.getAccumulatedRbtcBalance(buyerA), RBTC_OUT * net0 / (net0 + net1));
+        assertEq(harness.getAccumulatedRbtcBalance(buyerB), RBTC_OUT * net1 / (net0 + net1));
+    }
+
+    function test_minRbtcOut_equalToMeasuredOutputSucceeds() public {
+        (address[] memory buyers, uint64[] memory scheduleIds, uint256[] memory amounts) = _twoBuyerBatch();
+
+        harness.batchBuyRbtc(buyers, scheduleIds, amounts, RBTC_OUT);
+
+        uint256 net0 = amounts[0] - _fee(amounts[0]);
+        uint256 net1 = amounts[1] - _fee(amounts[1]);
+        assertEq(harness.getAccumulatedRbtcBalance(buyerA), RBTC_OUT * net0 / (net0 + net1));
+        assertEq(harness.getAccumulatedRbtcBalance(buyerB), RBTC_OUT * net1 / (net0 + net1));
+    }
+
+    function test_minRbtcOut_oneWeiAboveMeasuredOutputReverts() public {
+        (address[] memory buyers, uint64[] memory scheduleIds, uint256[] memory amounts) = _twoBuyerBatch();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, RBTC_OUT, RBTC_OUT + 1
+            )
+        );
+        harness.batchBuyRbtc(buyers, scheduleIds, amounts, RBTC_OUT + 1);
+    }
+
+    /// @dev A violated minimum must undo the fee transfer, both credits, and every event of the batch.
+    function test_minRbtcOut_violationRollsBackFeeAndCredits() public {
+        (address[] memory buyers, uint64[] memory scheduleIds, uint256[] memory amounts) = _twoBuyerBatch();
+
+        (bool ok,) = address(harness).call(
+            abi.encodeCall(IPurchaseRbtc.batchBuyRbtc, (buyers, scheduleIds, amounts, RBTC_OUT + 1))
+        );
+
+        // `vm.recordLogs` keeps the logs of reverted frames, so the proof that nothing was emitted is
+        // that nothing they report happened: no credit and no fee survive the call.
+        assertFalse(ok, "a batch below the caller minimum must revert");
+        assertEq(harness.getAccumulatedRbtcBalance(buyerA), 0);
+        assertEq(harness.getAccumulatedRbtcBalance(buyerB), 0);
+        assertEq(token.balanceOf(feeCollector), 0, "the fee transfer rolls back with the batch");
+    }
+
+    /// @dev The bound is on the rBTC the handler measured, not on the gross stablecoin the swapper asked for:
+    ///      the same batch clears a minimum set from the measured output and fails one set a wei higher, even
+    ///      though the stablecoin actually retrieved was well below what the rows planned to spend.
+    function test_minRbtcOut_comparesMeasuredOutputNotPlannedStablecoin() public {
+        (address[] memory buyers, uint64[] memory scheduleIds, uint256[] memory amounts) = _twoBuyerBatch();
+        harness.setRetrieveOverride(150 ether); // the rows planned 300 ether of gross spend
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, RBTC_OUT, RBTC_OUT + 1
+            )
+        );
+        harness.batchBuyRbtc(buyers, scheduleIds, amounts, RBTC_OUT + 1);
+
+        harness.batchBuyRbtc(buyers, scheduleIds, amounts, RBTC_OUT);
+        assertEq(harness.lastPurchaseAmount(), 150 ether - _fee(amounts[0]) - _fee(amounts[1]));
+    }
+
+    /// @dev The zero-output check runs first, so a failed purchase reports the venue error rather than a
+    ///      minimum the caller could read as "the swap merely underperformed".
+    function test_minRbtcOut_zeroOutputStillReportsTheVenueFailure() public {
+        (address[] memory buyers, uint64[] memory scheduleIds, uint256[] memory amounts) = _twoBuyerBatch();
+        harness.setRbtcOut(0);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IPurchaseRbtc.PurchaseRbtc__RbtcBatchPurchaseFailed.selector, address(token))
+        );
+        harness.batchBuyRbtc(buyers, scheduleIds, amounts, 1);
+    }
+
+    function testFuzz_minRbtcOut_passesExactlyWhenAtOrBelowMeasuredOutput(uint256 measured, uint256 minRbtcOut)
+        public
+    {
+        measured = bound(measured, 1, 100 ether);
+        minRbtcOut = bound(minRbtcOut, 0, 200 ether);
+        harness.setRbtcOut(measured);
+        (address[] memory buyers, uint64[] memory scheduleIds, uint256[] memory amounts) = _twoBuyerBatch();
+
+        if (minRbtcOut > measured) {
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, measured, minRbtcOut
+                )
+            );
+        }
+        harness.batchBuyRbtc(buyers, scheduleIds, amounts, minRbtcOut);
     }
 
     function _fee(uint256 amount) private pure returns (uint256) {

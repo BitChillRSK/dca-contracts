@@ -7,7 +7,7 @@ import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import "script/Constants.sol";
-import {handlerBatchBuyOne} from "test/utils/BatchBuyOne.sol";
+import {handlerBatchBuyOne, NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 
 /**
@@ -95,7 +95,7 @@ contract IdleDocHandlerMocTest is Test {
         purchaseAmounts[0] = 60 ether;
         purchaseAmounts[1] = 140 ether;
 
-        handler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts);
+        handler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT);
 
         uint256 accrued1 = handler.getAccumulatedRbtcBalance(user1);
         uint256 accrued2 = handler.getAccumulatedRbtcBalance(user2);
