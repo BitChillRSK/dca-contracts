@@ -49,6 +49,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     /// @notice Config-only floor: the lowest `s_amountOutMinimumPercent` the owner may set. Never used at swap time.
     uint128 internal s_amountOutMinimumSafetyCheck;
     bytes internal s_swapPath;
+    /// @dev Exact encoded paths this handler may activate. Purchases read `s_swapPath` only.
+    mapping(bytes32 pathHash => bool allowed) private s_purchasePathAllowed;
 
     /**
      * @param uniswapSettings the settings for the uniswap router
@@ -67,8 +69,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      *      the funding base before `PurchaseUniswap`. `_setPurchasePath` reverts if that
      *      token is still `address(0)`, so a reversed `is` list fails at deploy rather
      *      than writing a path that cannot be bought or repaired. Constructor installation
-     *      does not consult OperationsAdmin; the deploy script allowlists these bytes before
-     *      the handler can receive schedule funds.
+     *      does not write the path allowlist; the deploy script (handler owner) must approve
+     *      these components before the handler can receive schedule funds.
      */
     constructor(
         UniswapSettings memory uniswapSettings,
@@ -116,14 +118,41 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     /**
      * @inheritdoc IPurchaseUniswap
      */
+    function setPurchasePathAllowed(
+        address[] memory intermediateTokens,
+        uint24[] memory poolFeeRates,
+        bool allowed
+    ) external onlyOwner {
+        bytes memory encodedPath = _encodePurchasePath(intermediateTokens, poolFeeRates);
+        bytes32 pathHash = keccak256(encodedPath);
+        if (!allowed && keccak256(s_swapPath) == pathHash) {
+            revert PurchaseUniswap__CannotRevokeActivePurchasePath(pathHash);
+        }
+        if (s_purchasePathAllowed[pathHash] == allowed) {
+            revert PurchaseUniswap__PurchasePathPermissionUnchanged(pathHash, allowed);
+        }
+        s_purchasePathAllowed[pathHash] = allowed;
+        emit PurchaseUniswap_PurchasePathAllowedSet(pathHash, encodedPath, intermediateTokens, poolFeeRates, allowed);
+    }
+
+    /**
+     * @inheritdoc IPurchaseUniswap
+     */
     function setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
         public
         override
     {
         bytes memory newPath = _encodePurchasePath(intermediateTokens, poolFeeRates);
-        IOperationsAdmin(IDcaManager(i_dcaManager).getOperationsAdminAddress()).requirePurchasePathSetter(
-            msg.sender, keccak256(newPath)
-        );
+        bytes32 pathHash = keccak256(newPath);
+        if (!s_purchasePathAllowed[pathHash]) {
+            revert PurchaseUniswap__PurchasePathNotAllowed(pathHash);
+        }
+        if (msg.sender != owner()) {
+            address admin = IDcaManager(i_dcaManager).getOperationsAdminAddress();
+            if (!IOperationsAdmin(admin).isSwapper(msg.sender)) {
+                revert PurchaseUniswap__UnauthorizedPurchasePathSetter(msg.sender);
+            }
+        }
         s_swapPath = newPath;
         emit PurchaseUniswap_NewPathSet(intermediateTokens, poolFeeRates, newPath);
     }
@@ -208,6 +237,13 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      */
     function getSwapPath() external view returns (bytes memory) {
         return s_swapPath;
+    }
+
+    /**
+     * @inheritdoc IPurchaseUniswap
+     */
+    function isPurchasePathAllowed(bytes32 pathHash) external view returns (bool) {
+        return s_purchasePathAllowed[pathHash];
     }
 
     /*//////////////////////////////////////////////////////////////

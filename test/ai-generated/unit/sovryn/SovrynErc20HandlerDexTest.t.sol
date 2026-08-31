@@ -8,7 +8,6 @@ import {IPurchaseUniswap} from "../../../../src/interfaces/IPurchaseUniswap.sol"
 import {IWRBTC} from "../../../../src/interfaces/IWRBTC.sol";
 import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces/ISwapRouter02.sol";
 import {ICoinPairPrice} from "../../../../src/interfaces/ICoinPairPrice.sol";
-import {IOperationsAdmin} from "../../../../src/interfaces/IOperationsAdmin.sol";
 import {SovrynErc20HandlerDex} from "../../../../src/sovryn/SovrynErc20HandlerDex.sol";
 import {MockIsusdToken} from "../../../mocks/MockIsusdToken.sol";
 import {MockWrbtcToken} from "../../../mocks/MockWrbtcToken.sol";
@@ -361,7 +360,7 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
         poolFeeRates[0] = 3000;
         
         vm.expectRevert(
-            abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__UnauthorizedPurchasePathSetter.selector, USER)
+            abi.encodeWithSelector(IPurchaseUniswap.PurchaseUniswap__UnauthorizedPurchasePathSetter.selector, USER)
         );
         vm.prank(USER);
         sovrynDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
@@ -503,7 +502,7 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
             address(wrbtcToken)
         );
         vm.prank(OWNER);
-        operationsAdmin.setPurchasePathAllowed(address(sovrynDexHandler), expectedPath, true);
+        sovrynDexHandler.setPurchasePathAllowed(intermediateTokens, poolFeeRates, true);
         
         vm.prank(OWNER);
         sovrynDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);

@@ -2,22 +2,26 @@
 
 Status: **implemented** · Assigned: yes · Optional/further-review: no
 
-PR 51 of the relaunch stack; planned GitHub implementation PR **#104**. Stack on R51 / GitHub #103.
+PR 51 of the relaunch stack; GitHub implementation PR **#104**. Stack on R51 / GitHub #103.
+This PR also turns on the default-profile optimizer (`optimizer = true`, `optimizer_runs = 200`,
+`via_ir = false`) so handler-local path policy stays under EIP-170. Remaining R53 work (Rootstock
+testnet + Blockscout re-proof of the optimizer pin) is not this PR.
+
 One chat/PR owns only this persistent path-governance change.
 
 ## Objective
 
 Let the swapper recover a Dex handler from a drained, paused, or otherwise unusable active pool without
-waiting for a multisig transaction, while governance remains the only authority that can approve the exact
-encoded paths the handler may activate. The OperationsAdmin owner retains a direct break-glass activation
-path among those same approved routes.
+waiting for a multisig transaction, while the **handler owner** remains the only authority that can approve
+the exact encoded paths the handler may activate. An active OperationsAdmin swapper, or the handler owner,
+may switch among those approved paths.
 
 This is availability failover, not permission for arbitrary routing or per-batch best-route selection.
 
 ## Why this is separate from R51
 
 R51 adds an ephemeral bound to one purchase call and touches the DcaManager/handler batch ABI. R52 changes
-who may mutate persistent handler configuration, adds an OperationsAdmin policy registry, changes deploy
+who may mutate persistent handler configuration, adds a per-handler path allowlist, changes deploy
 sequencing, and requires a route-health runbook. Keeping them separate makes the two trust-boundary changes
 independently reviewable and keeps R51's wide mechanical tuple diff away from path authorization.
 
@@ -29,135 +33,109 @@ transaction. Governance must therefore approve exact complete paths, not compone
 
 **No open product decisions.** Implement these choices:
 
-1. Reuse the existing OperationsAdmin swapper allowlist. BitChill has no separately operated routing key;
-   another role would add storage, rotation, deploy, and monitoring work without least-privilege benefit in
-   the actual operating model.
-2. The `OperationsAdmin` owner is also authorized to activate an approved path directly. This is a genuine
-   break-glass path, not a bypass: even governance cannot activate a path it has not first allowlisted.
-   Requiring the Safe to temporarily add itself as a swapper adds incident steps without reducing power.
-   This authority is specifically the OperationsAdmin owner; slippage, safety-floor, oracle, and fee setters
-   remain controlled by the handler owner. The intended steady-state mainnet owner of both contracts is the
-   same `MAINNET_OWNER` Safe. Full deployments temporarily leave both with the broadcaster until the Safe
-   accepts their two-step transfers; add-on scripts use the current OperationsAdmin owner for the new handler.
-   Deployment tests and runbooks must prove the eventual Safe is the same. If governance later transfers only
-   one contract, the two authorities deliberately diverge rather than one owner silently inheriting the other.
-3. Allowlist the exact canonical Uniswap V3 encoded path per handler. Governance supplies the full `bytes`
-   to `setPurchasePathAllowed`; OperationsAdmin hashes it for storage. Full bytes in calldata/event make the
-   approval auditable and avoid a hash-only runbook, while the mapping stays `handler => pathHash => bool`.
-4. Reject revocation of the active path. Governance or the swapper must activate another allowed path first,
-   then governance may revoke the old one. This preserves the invariant that every active path is allowed
-   without adding an allowlist lookup to every protocol-paid purchase.
+1. Reuse the existing OperationsAdmin swapper allowlist for **activation** only. BitChill has no separately
+   operated routing key. OperationsAdmin continues to own that global list and nothing about purchase paths.
+2. Path **approval and revocation** are handler-owner-only. Path **activation** is the handler owner **or** an
+   active OperationsAdmin swapper. Production expects the same Safe to own OperationsAdmin and every handler.
+   If those owners later diverge, authority diverges with them: the OperationsAdmin owner cannot activate or
+   allowlist paths on a handler they do not own, and there is no extra break-glass for that case.
+3. Allowlist the exact canonical Uniswap V3 encoded path. The owner setter takes `intermediateTokens` and
+   `poolFeeRates` and derives bytes through the same `_encodePurchasePath` used by `setPurchasePath`. The event
+   includes the derived path and `keccak256` hash for auditing. Do not index the hash, bytes, or arrays (R9).
+4. Reject revocation of the active path. Activate another allowed path first, then revoke the old one. This
+   preserves the invariant that every active path is allowed without adding an allowlist lookup to purchases.
 5. A revoked swapper cannot make further changes, but its last activated path persists. Incident recovery
-   order is **mandatory**, not advisory: `revokeSwapper` first, then restore the preferred approved path with
-   the OperationsAdmin owner if needed, then revoke obsolete paths. A still-authorized swapper can front-run
-   each `setPurchasePathAllowed(..., false)` by re-activating that path. Do not call swapper revocation alone
-   a routing kill switch.
-6. Deploy sequence is: construct Dex handler (constructor installs its initial path), read `getSwapPath()`,
-   allowlist those exact bytes, then `assignTokenHandler`. An unassigned handler cannot receive schedule funds,
-   so the initial allowlist can safely be seeded before assignment. Mainnet add-ons put allowlist + assignment
-   in the Safe runbook/batch after the deployer creates the handler.
-7. Resolve OperationsAdmin through the handler's pinned DcaManager when `setPurchasePath` is called. Do not
-   add a separately supplied admin constructor address that could disagree with DcaManager. These are rare
-   configuration calls, so the extra read is preferable to a new configuration seam; re-measure the exact
-   implementation.
+   order is **mandatory**: `revokeSwapper` first, then restore the preferred approved path (handler owner or a
+   remaining swapper), then revoke obsolete paths. A still-authorized swapper can front-run each
+   `setPurchasePathAllowed(..., false)` by re-activating that path.
+6. Deploy sequence: construct Dex handler (constructor installs its initial path **without** writing the
+   allowlist), explicitly allowlist those constructor components, then `assignTokenHandler`. An unassigned
+   handler cannot receive schedule funds.
+7. Resolve OperationsAdmin only to call `isSwapper(msg.sender)` when the caller is not the handler owner.
+   Do not add a separately supplied admin constructor address.
 8. Keep path activation as its own transaction and persistent state. Do not add `pathIndex` to `Batch`, a
    caller-supplied path, or an atomic switch-and-buy entry point in this PR.
 9. The swapper bot remains the only signer. Route discovery/quoting may consume a reusable module or read-only
    service derived from `rsk-uniswap-pools`; that process never receives the swapper private key.
+10. Do not introduce another abstract contract. `PurchaseUniswap` is the boundary; there is no second consumer.
 
 ## Authorization and registry shape
 
-The intended surface is equivalent to:
+Policy storage lives entirely on `PurchaseUniswap`. The intended surface is:
 
 ```solidity
-function setPurchasePathAllowed(address handler, bytes calldata encodedPath, bool allowed) external;
-function isPurchasePathAllowed(address handler, bytes32 pathHash) external view returns (bool);
-function requirePurchasePathSetter(address caller, bytes32 pathHash) external view;
+function setPurchasePathAllowed(
+    address[] memory intermediateTokens,
+    uint24[] memory poolFeeRates,
+    bool allowed
+) external; // onlyOwner
+
+function isPurchasePathAllowed(bytes32 pathHash) external view returns (bool);
+
+function setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates) external;
 ```
 
-- `setPurchasePathAllowed` is owner-only, rejects a non-contract handler, malformed/empty V3 path bytes,
-  unchanged state, and revocation of `keccak256(IPurchaseUniswap(handler).getSwapPath())`. On both approval
-  and revocation it must make the new admin→handler view call and validate that `getSwapPath()` succeeds and
-  returns a canonical non-empty V3 path. A missing, reverting, or malformed getter reverts the named
-  `OperationsAdmin__InvalidDexHandler(address handler)` error rather than leaking an opaque external-call or
-  ABI-decode failure. The call is static/read-only; it validates the target surface and supplies the active
-  path used by the revocation check.
-- `requirePurchasePathSetter` is called by the handler. It keys the path permission by `msg.sender`, so one
-  handler cannot assert against another handler's allowlist. It accepts `caller` only when it is an active
-  swapper or the OperationsAdmin owner, and then requires the hash to be allowed for the calling handler.
-- The permission event includes `address indexed handler`; `pathHash`, `encodedPath`, and `allowed` remain
-  data under R9's indexing rule.
-
-Exact names/error arguments may be shortened only if the final handler-size measurement requires it; preserve
-the semantics and diagnostic values. OperationsAdmin has ample bytecode margin, so do not trade away auditability
-there to save bytes on the wrong contract.
+- `setPurchasePathAllowed` encodes through pinned stablecoin and WRBTC, rejects unchanged permission, and
+  rejects revocation of `keccak256(s_swapPath)`. Wrong hop/fee lengths revert
+  `PurchaseUniswap__WrongNumberOfTokensOrFeeRates` via `_encodePurchasePath`.
+- `setPurchasePath` encodes first, requires the hash to be allowlisted, then requires `msg.sender == owner()`
+  or `IOperationsAdmin(dcaManager.getOperationsAdminAddress()).isSwapper(msg.sender)`.
+- Constructor `_setPurchasePath` writes `s_swapPath` only. It does not write `s_purchasePathAllowed`.
+- Purchases read `s_swapPath` only. No allowlist SLOAD on the purchase path.
+- `OperationsAdmin` has no purchase-path mapping, setter, getter, assertion, event, errors, handler-policy
+  calls, or returndata decoder.
 
 ## Handler behavior
 
-`PurchaseUniswap.setPurchasePath` builds the canonical path first using the same pinned purchase token and
-WRBTC endpoints as today. It then resolves OperationsAdmin from `i_dcaManager`, calls the combined assertion
-with `msg.sender` and `keccak256(newPath)`, and only then writes/emits the new path. The constructor continues
-to use an internal installation path and makes no external authorization call.
-
-The current `PurchaseUniswap_NewPathSet` natspec must stop saying “Owner.” It reports an approved path activated
-by a swapper or the registry owner. Slippage percent, safety floor, and oracle setters remain handler-owner-only.
+`PurchaseUniswap_NewPathSet` natspec reports an approved path activated by a swapper or this handler's owner.
+Slippage percent, safety floor, and oracle setters remain handler-owner-only.
 
 ## Size constraint
 
-The R51 implementer records the new baseline. Measure R52 from that exact commit under `[profile.default]`.
-An earlier combined prototype showed that storing the allowlist on `PurchaseUniswap` can exceed EIP-170 on
-`LayerBankErc20HandlerDex`; do not retry that architecture. Policy storage, errors, and validation belong on
-`OperationsAdmin`, which currently has more than 18k of margin. Keep only path building plus one combined
-authorization call on the handler.
+Measure under `[profile.default]` with the optimizer on and `via_ir = false`. An earlier unoptimized
+prototype exceeded EIP-170 when policy lived on the Dex leaf; that is not a reason to keep a centralized
+admin registry. Full `forge build --sizes` (not `--match-*`) is the record.
 
 ## Scope
 
-- [x] Add the per-handler exact-path allowlist, owner setter, getter, combined assertion view, transition event,
-  and diagnostic errors to `IOperationsAdmin` / `OperationsAdmin`.
-- [x] The owner setter accepts full encoded path bytes, stores their hash, and rejects no-op writes. Validate the
-  generic V3 path shape (`20 + n * 23`, at least one pool); the handler remains responsible for pinned endpoints.
-  Validate the handler's Dex getter on every write and normalize any failed/malformed call to
-  `OperationsAdmin__InvalidDexHandler(handler)`.
-- [x] Active-path revocation queries `getSwapPath`, hashes it, and reverts. A non-active allowed path can be revoked.
-- [x] Change `IPurchaseUniswap` natspec and `PurchaseUniswap.setPurchasePath` authorization as described above.
-  Constructor path installation stays internal and authorization-free.
-- [x] `DeployDexSwaps` and `DeployUsdrifHandler` seed the constructor-installed path before handler assignment.
+- [x] Add the per-handler exact-path allowlist, owner setter, getter, transition event, and diagnostic errors
+  to `IPurchaseUniswap` / `PurchaseUniswap`.
+- [x] The owner setter accepts path components, stores the derived hash, emits path+hash, and rejects no-op
+  writes and active-path revocation.
+- [x] Constructor path installation stays internal and does not write the allowlist.
+- [x] Remove every purchase-path API from `IOperationsAdmin` / `OperationsAdmin`.
+- [x] `DeployDexSwaps` and `DeployUsdrifHandler` seed the constructor components before handler assignment.
   `DeployLayerBankHandler` is MoC-only and must **not** be changed for this Dex feature.
-- [x] Update live/add-on Safe runbooks printed by scripts: read current path, allow it, assign the handler, and then
-  perform token-specific DcaManager setup such as the USDT0 minimum.
-- [x] Assert the production ownership topology: after acceptance, OperationsAdmin and every Dex handler name the
-  same Safe; document the broadcaster/pending-owner transition and the independent behavior if owners later diverge.
+- [x] Update live/add-on Safe runbooks: allowlist constructor components, assign the handler, then
+  token-specific DcaManager setup such as the USDT0 minimum.
+- [x] Enable default-profile optimizer (`optimizer = true`, `optimizer_runs = 200`, `via_ir = false`).
 - [x] Re-measure every Dex leaf and OperationsAdmin, and record configuration gas for allow/activate/revoke.
 
 ## Off-chain relaunch gate
 
-In the same turn as the contracts PR, update the matching swapper-bot issue and open/update a cross-linked
+In the same turn as the contracts PR, update the matching swapper-bot issue and the cross-linked
 `rsk-uniswap-pools` issue if that repo supplies route intelligence. The issues must settle and test:
 
 - one signing boundary: only swapper-bot holds the key;
 - a versioned production list of governance-approved encoded paths and hashes per handler;
-- route discovery/quotes for USDRIF and USDT0 using raw integer amounts (DOC is not a shipped Dex route; see
-  R51's implementation correction);
+- route discovery/quotes for USDRIF and USDT0 using raw integer amounts (DOC is not a shipped Dex route);
 - pool health and quote thresholds that trigger failover, plus hysteresis/cooldown so the bot does not oscillate;
-- normal failover is fully automatic among paths the Safe approved ahead of time; it does not wait for a Safe
-  transaction or ask governance to adjust the R51 oracle floor for routine weekly conditions;
+- normal failover is fully automatic among paths the handler owner approved ahead of time;
 - for every enabled Dex handler advertised as having automatic path failover, at least one alternate exact path
-  is Safe-approved and validated at supported operating sizes against the same re-locked R51 oracle floor before
+  is approved and validated at supported operating sizes against the same re-locked R51 oracle floor before
   relaunch; switching paths must not require a slippage-setting change. If no viable alternate exists, the cutover
-  record must label that handler **single-path / no automated path failover**; it may still use bounded re-quote
-  and split retries, but exhaustion pages governance instead of pretending the allowlist adds redundancy;
+  record must label that handler **single-path / no automated path failover**;
 - transaction order: activate approved path, wait for confirmation, re-read `getSwapPath`, obtain a fresh quote for
   that path, then compose the R51 minimum and purchase;
 - behavior when another authorized operator changes the path between quote and broadcast (re-quote/re-estimate,
   never silently use a quote for a different path);
-- bounded retry/split/path attempts before alerting; governance is paged only when every approved path remains
-  structurally unusable or the signing key is suspected compromised;
+- bounded retry/split/path attempts before alerting;
 - alerts and the owner runbook for compromised-key recovery and active-path restoration;
-- no auto-allowlisting: discovery proposes routes for governance review, but only the Safe calls the allowlist setter.
+- no auto-allowlisting: discovery proposes routes for governance review, but only the handler owner calls the
+  allowlist setter.
 
 The contracts PR can merge before this work, but Dex relaunch is blocked until the route list, bot policy, and
-incident runbook pass their own tests. Alternate-path availability is therefore a relaunch-readiness result,
-not a PR 104 merge condition.
+incident runbook pass their own tests.
 
 ## Out of scope
 
@@ -167,74 +145,66 @@ not a PR 104 merge condition.
 - [ ] Swapper-writable slippage percent, safety floor, oracle, router, WRBTC, or stablecoin.
 - [ ] Automatic revocation/allowlisting from pool health, partial across-handler success, or a second signing service.
 - [ ] Changing `_getAmountOutMinimum`, deploy slippage defaults, or purchase-path reentrancy policy.
+- [ ] OperationsAdmin-owner break-glass activation when handler ownership has diverged.
+- [ ] A new abstract policy contract.
+- [ ] Rootstock testnet / Blockscout re-proof of the optimizer pin (R53 remainder).
 
 ## Files likely touched
 
-- `src/interfaces/IOperationsAdmin.sol`, `src/OperationsAdmin.sol`
 - `src/interfaces/IPurchaseUniswap.sol`, `src/PurchaseUniswap.sol`
+- `foundry.toml` (default optimizer)
 - `script/DeployDexSwaps.s.sol`, `script/DeployUsdrifHandler.s.sol`
 - `README.md` (mainnet add-on Safe runbook + compromised-swapper order)
-- `Makefile` (`fork-layerbank`, `fork-dex-path`)
-- `test/unit/OperationsAdminTest.t.sol`, `test/unit/PurchaseUniswapSettingsTest.sol`
+- `Makefile` (`fork-dex-path`)
+- `test/unit/PurchaseUniswapSettingsTest.sol`, `test/unit/DexPathFailoverTest.t.sol`
 - `test/unit/deployment/LiveDeployPathTest.t.sol`, `NewHandlerDeploymentTest.t.sol`, and
   `Usdt0DexDeploymentTest.t.sol`
-- Dex handler suites that currently assert owner-only path setting
+- Dex handler suites that currently assert path setting
 
 ## Required tests
 
-- Allowlisted paths can be activated by a swapper and the OperationsAdmin owner; arbitrary EOAs cannot.
-- Nobody, including the owner, can activate a non-allowlisted path.
-- Handler A cannot use handler B's path permission.
-- The setter rejects non-contract handlers, malformed encoded paths, and unchanged permission writes.
-- The setter rejects a contract with no `getSwapPath`, a getter that reverts, and malformed getter return data
-  (including a bogus ABI offset or overrunning length) with `OperationsAdmin__InvalidDexHandler(handler)` on both
-  allow and revoke operations — not an empty ABI-decode revert.
+- Allowlisted paths can be activated by a swapper and the handler owner; arbitrary EOAs cannot.
+- The OperationsAdmin owner cannot activate or allowlist when they do not own the handler.
+- Nobody can activate a non-allowlisted path.
+- Isolation is per-handler storage (no shared admin mapping).
+- The setter rejects unchanged permission writes and wrong hop/fee lengths (via encode).
 - A non-active path can be revoked and cannot later be activated.
 - The active path cannot be revoked. After switching to another allowed path, the former path can be revoked.
-- Revoking a swapper stops future path changes but does not mutate the active path; owner recovery works.
-- Constructor installation still works without authorization.
-- Both live Dex deployment scripts allowlist the exact `getSwapPath()` bytes before assignment; mainnet non-owner
-  add-ons print the complete Safe runbook instead of claiming they configured it.
-- Mainnet deployment tests prove OperationsAdmin and handlers converge on the same Safe after ownership acceptance.
-  A focused divergent-owner test proves the OperationsAdmin owner can activate an allowed path but cannot call
-  handler-owner slippage/oracle setters, while the handler owner has the inverse authority unless also allowlisted
-  as a swapper.
+- Revoking a swapper stops future path changes but does not mutate the active path; handler-owner recovery works.
+- Constructor installation still works without writing the allowlist; tests/scripts allowlist explicitly before assignment.
+- Both live Dex deployment scripts allowlist constructor components before assignment; mainnet non-owner
+  add-ons print the complete Safe runbook instead of claiming they assigned the handler.
 - Slippage/oracle setters remain owner-only and purchases still use the active path plus both R43/R51 bounds.
 
 Then run the full `AGENTS.md` done-gate and both required forks (`make fork-sovryn`, `make fork-tropykus`). Those
 lanes default to `SWAP_TYPE=mocSwaps` and skip this suite (`vm.skip` in `setUp`). Dex path evidence on a fork is
-`make fork-dex-path` (LayerBank / USDRIF / dexSwaps, `DexPathFailoverTest` only). A full
-`STABLECOIN_TYPE=USDRIF SWAP_TYPE=dexSwaps make fork-layerbank` still runs purchase tests against live Uniswap
-pools and can revert `Too little received`; that is not this PR's gate. `fork-sovryn` + USDRIF/USDT0 skips
-(Sovryn has no Dex listing for those tokens); `fork-tropykus` + `dexSwaps` at the pinned mint-pause block is not
-a working Dex lane.
+`make fork-dex-path` (LayerBank / USDRIF / dexSwaps, `DexPathFailoverTest` only).
 
 ## Success criteria
 
 - [x] Every active Dex path is governance-allowlisted, including the constructor path before assignment.
-- [x] The swapper and OperationsAdmin owner can switch only among exact approved paths.
+- [x] The swapper and handler owner can switch only among exact approved paths.
 - [x] Active permission cannot be revoked until another approved path is active.
 - [x] A compromised swapper cannot widen slippage or introduce an unapproved token/pool combination.
-- [x] All Dex handlers remain below EIP-170 in the default deploy profile.
+- [x] All Dex handlers remain below EIP-170 in the default (optimized, no-IR) deploy profile.
 - [x] Deployment scripts and off-chain issues contain complete normal/failover/recovery sequencing.
-- [x] Steady-state ownership is the same production Safe, transitional ownership is documented/tested, and path
-  versus handler-configuration authority remains explicit if ownership later diverges.
 - [x] R9 indexing and R10 natspec rules cover all new/repurposed surfaces.
 - [x] No open product decisions.
 
-GitHub [#104](https://github.com/BitChillRSK/dca-contracts/pull/104). Default-profile runtime: `OperationsAdmin`
-9,354 (margin 15,222); `LayerBankErc20HandlerDex` 23,778 (798); `SovrynErc20HandlerDex` 23,318 (1,258);
-`TropykusErc20HandlerDex` 23,574 (1,002); `DcaManager` unchanged at 23,703 (873). Dex leaves +244 bytes vs R51
-for the DcaManager lookup plus one `requirePurchasePathSetter` call. Config gas on Anvil USDRIF dex-layerbank:
-allow ~43k, activate ~30k, revoke ~18k.
+GitHub [#104](https://github.com/BitChillRSK/dca-contracts/pull/104). Default-profile runtime
+(`optimizer = true`, `optimizer_runs = 200`, `via_ir = false`; EIP-170 24,576): `OperationsAdmin`
+3,227 (margin 21,349); `LayerBankErc20HandlerDex` 15,565 (9,011); `SovrynErc20HandlerDex` 15,352
+(9,224); `TropykusErc20HandlerDex` 15,496 (9,080); `DcaManager` 13,767 (10,809). Config gas on Anvil
+USDRIF dex-layerbank: allow ~41k, activate ~35k, revoke ~16k.
 
 ## ABI / deploy / cutover impact
 
-- **ABI:** DcaManager and `IPurchaseRbtc` are unchanged. OperationsAdmin gains the path-policy setter/getter/assertion,
-  event, and errors. `setPurchasePath` keeps its selector but changes authorization semantics.
-- **Deploy:** Dex handlers must have their constructor path allowlisted before assignment. Update only actual Dex deploy
-  paths (`DeployDexSwaps`, `DeployUsdrifHandler`) and their Safe runbooks/tests.
-- **Consumers:** update `swapper-bot#6` (or the matching issue) with routing policy and recovery. Update
-  `bitchill-monitoring#10` for the new event/errors and changed `NewPathSet` actor semantics. Update `front-end#22`
-  for ABI regeneration if its hardcoded handler/admin ABIs include these contracts. No data-api or metrics-dashboard
-  issue is required unless their inspected code consumes path state or route labels.
+- **ABI:** DcaManager and `IPurchaseRbtc` are unchanged. `IPurchaseUniswap` gains the path-policy setter/getter,
+  event, and errors. `setPurchasePath` keeps its selector but changes authorization. OperationsAdmin **loses**
+  any purchase-path APIs (none remain on R51 + this redesign).
+- **Deploy:** Dex handlers must have their constructor components allowlisted before assignment. Update only
+  actual Dex deploy paths (`DeployDexSwaps`, `DeployUsdrifHandler`) and their Safe runbooks/tests.
+- **Consumers:** update `swapper-bot#6` with routing policy and recovery. Update `bitchill-monitoring#10` for
+  the new handler event/errors and changed `NewPathSet` actor semantics. Update `front-end#22` for ABI
+  regeneration if its hardcoded handler ABIs include these contracts. No data-api or metrics-dashboard issue
+  is required unless their inspected code consumes path state or route labels.

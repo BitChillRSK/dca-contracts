@@ -133,9 +133,11 @@ abstract contract HandlerTestHarness is Test {
         setupRolesAndPermissions();
 
         if (supportsDex) {
-            bytes memory constructorPath = IPurchaseUniswap(address(handler)).getSwapPath();
+            address[] memory mids = new address[](0);
+            uint24[] memory fees = new uint24[](1);
+            fees[0] = 3000;
             vm.prank(OWNER);
-            operationsAdmin.setPurchasePathAllowed(address(handler), constructorPath, true);
+            IPurchaseUniswap(address(handler)).setPurchasePathAllowed(mids, fees, true);
         }
         
         vm.prank(OWNER);

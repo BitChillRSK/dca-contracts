@@ -27,9 +27,13 @@ interface IPurchaseUniswap {
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice An approved Uniswap V3 path was activated by a swapper or the OperationsAdmin owner.
+    /// @notice An approved Uniswap V3 path was activated by a swapper or this handler's owner.
     event PurchaseUniswap_NewPathSet(
         address[] intermediateTokens, uint24[] poolFeeRates, bytes newPath
+    );
+    /// @notice Exact encoded path derived from `intermediateTokens` / `poolFeeRates` was allowed or revoked.
+    event PurchaseUniswap_PurchasePathAllowedSet(
+        bytes32 pathHash, bytes encodedPath, address[] intermediateTokens, uint24[] poolFeeRates, bool allowed
     );
     /// @notice Owner changed the swap-time slippage fraction.
     event PurchaseUniswap_AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
@@ -58,18 +62,46 @@ interface IPurchaseUniswap {
     error PurchaseUniswap__ZeroPurchaseToken();
     /// @notice The handler's stablecoin has more than 18 decimals, so min-out cannot be scaled.
     error PurchaseUniswap__UnsupportedStablecoinDecimals(uint8 stablecoinDecimals);
+    /// @notice The allow/revoke write would not change stored permission.
+    error PurchaseUniswap__PurchasePathPermissionUnchanged(bytes32 pathHash, bool allowed);
+    /// @notice The currently active path cannot be revoked; activate another allowed path first.
+    error PurchaseUniswap__CannotRevokeActivePurchasePath(bytes32 pathHash);
+    /// @notice `caller` is neither this handler's owner nor an OperationsAdmin swapper.
+    error PurchaseUniswap__UnauthorizedPurchasePathSetter(address caller);
+    /// @notice `pathHash` is not allowlisted on this handler.
+    error PurchaseUniswap__PurchasePathNotAllowed(bytes32 pathHash);
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /**
+     * @notice Allow or revoke the exact Uniswap V3 path built from these components.
+     * @param intermediateTokens Intermediate token addresses (empty for a direct pair).
+     * @param poolFeeRates Pool fee for each hop. Length must be `intermediateTokens.length + 1`.
+     * @param allowed True to approve the derived path, false to revoke it.
+     * @dev Owner-only. Encodes through the same pinned stablecoin and WRBTC as `setPurchasePath`.
+     *      Emits the derived bytes and hash. The active path cannot be revoked. A repeated write reverts.
+     */
+    function setPurchasePathAllowed(
+        address[] memory intermediateTokens,
+        uint24[] memory poolFeeRates,
+        bool allowed
+    ) external;
+
+    /**
+     * @notice Whether `pathHash` is an approved encoded path on this handler.
+     * @param pathHash `keccak256` of the exact encoded path bytes.
+     */
+    function isPurchasePathAllowed(bytes32 pathHash) external view returns (bool);
+
+    /**
      * @notice Replace the Uniswap V3 path from this handler's stablecoin to WRBTC.
      * @param intermediateTokens Intermediate token addresses in the path (empty for a direct pair).
      * @param poolFeeRates Pool fee for each hop. Length must be `intermediateTokens.length + 1`.
-     * @dev Builds the canonical path from this handler's pinned stablecoin and WRBTC, then requires
-     *      OperationsAdmin (resolved through the pinned DcaManager) to allow `msg.sender` to
-     *      activate that exact encoded path. Constructor installation does not use this function.
+     * @dev Builds the canonical path from this handler's pinned stablecoin and WRBTC. `msg.sender` must
+     *      be this handler's owner or an OperationsAdmin swapper, and the derived path must already be
+     *      allowlisted. Constructor installation does not use this function.
      */
     function setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates) external;
 

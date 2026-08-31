@@ -3,7 +3,6 @@ pragma solidity 0.8.36;
 
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IPurchaseUniswap} from "src/interfaces/IPurchaseUniswap.sol";
-import {IOperationsAdmin} from "src/interfaces/IOperationsAdmin.sol";
 import {BitChillOwnable} from "src/BitChillOwnable.sol";
 import {ownableUnauthorized} from "../utils/OzRevert.sol";
 
@@ -20,10 +19,9 @@ contract DexPathFailoverTest is DcaDappTest {
         super.setUp();
     }
 
-    function testSwapperAndAdminOwnerCanActivateAllowlistedPath() public {
+    function testSwapperAndHandlerOwnerCanActivateAllowlistedPath() public {
         (address[] memory mids, uint24[] memory fees, bytes memory path) = _alternatePath();
-        vm.prank(OWNER);
-        operationsAdmin.setPurchasePathAllowed(address(stablecoinHandler), path, true);
+        _allow(mids, fees, true);
 
         vm.expectEmit(false, false, false, true, address(stablecoinHandler));
         emit PurchaseUniswap_NewPathSet(mids, fees, path);
@@ -41,92 +39,75 @@ contract DexPathFailoverTest is DcaDappTest {
     function testCannotActivatePathThatIsNotAllowlisted() public {
         (address[] memory mids, uint24[] memory fees, bytes memory path) = _alternatePath();
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IOperationsAdmin.OperationsAdmin__PurchasePathNotAllowed.selector,
-                address(stablecoinHandler),
-                keccak256(path)
-            )
+            abi.encodeWithSelector(IPurchaseUniswap.PurchaseUniswap__PurchasePathNotAllowed.selector, keccak256(path))
         );
         vm.prank(OWNER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(mids, fees);
     }
 
     function testArbitraryEoaCannotActivateAllowlistedPath() public {
-        (address[] memory mids, uint24[] memory fees, bytes memory path) = _alternatePath();
-        vm.prank(OWNER);
-        operationsAdmin.setPurchasePathAllowed(address(stablecoinHandler), path, true);
+        (address[] memory mids, uint24[] memory fees,) = _alternatePath();
+        _allow(mids, fees, true);
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IOperationsAdmin.OperationsAdmin__UnauthorizedPurchasePathSetter.selector, USER
-            )
+            abi.encodeWithSelector(IPurchaseUniswap.PurchaseUniswap__UnauthorizedPurchasePathSetter.selector, USER)
         );
         vm.prank(USER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(mids, fees);
     }
 
-    function testHandlerACannotSpendHandlerBAllowlist() public {
-        (,, bytes memory path) = _alternatePath();
-        DummyPathCaller attacker = new DummyPathCaller(address(operationsAdmin));
+    function testOnlyHandlerOwnerCanAllowlist() public {
+        (address[] memory mids, uint24[] memory fees,) = _alternatePath();
+        vm.expectRevert(ownableUnauthorized(USER));
+        vm.prank(USER);
+        IPurchaseUniswap(address(stablecoinHandler)).setPurchasePathAllowed(mids, fees, true);
+    }
+
+    function testSetPurchasePathAllowedRejectsUnchanged() public {
+        (address[] memory ctorMids, uint24[] memory ctorFees) = _constructorComponents();
+        bytes memory ctorPath = _encodePath(ctorMids, ctorFees);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IOperationsAdmin.OperationsAdmin__PurchasePathNotAllowed.selector, address(attacker), keccak256(path)
+                IPurchaseUniswap.PurchaseUniswap__PurchasePathPermissionUnchanged.selector, keccak256(ctorPath), true
             )
         );
-        attacker.claim(OWNER, keccak256(path));
-
-        vm.prank(OWNER);
-        operationsAdmin.setPurchasePathAllowed(address(stablecoinHandler), path, true);
-        vm.prank(address(stablecoinHandler));
-        operationsAdmin.requirePurchasePathSetter(SWAPPER, keccak256(path));
+        _allow(ctorMids, ctorFees, true);
     }
 
     function testRevokedPathCannotBeActivated() public {
         (address[] memory mids, uint24[] memory fees, bytes memory path) = _alternatePath();
-        vm.startPrank(OWNER);
-        operationsAdmin.setPurchasePathAllowed(address(stablecoinHandler), path, true);
-        operationsAdmin.setPurchasePathAllowed(address(stablecoinHandler), path, false);
-        vm.stopPrank();
+        _allow(mids, fees, true);
+        _allow(mids, fees, false);
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IOperationsAdmin.OperationsAdmin__PurchasePathNotAllowed.selector,
-                address(stablecoinHandler),
-                keccak256(path)
-            )
+            abi.encodeWithSelector(IPurchaseUniswap.PurchaseUniswap__PurchasePathNotAllowed.selector, keccak256(path))
         );
         vm.prank(SWAPPER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(mids, fees);
     }
 
     function testActivePathCannotBeRevokedUntilSwitched() public {
+        (address[] memory ctorMids, uint24[] memory ctorFees) = _constructorComponents();
         bytes memory active = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
         vm.expectRevert(
             abi.encodeWithSelector(
-                IOperationsAdmin.OperationsAdmin__CannotRevokeActivePurchasePath.selector,
-                address(stablecoinHandler),
-                keccak256(active)
+                IPurchaseUniswap.PurchaseUniswap__CannotRevokeActivePurchasePath.selector, keccak256(active)
             )
         );
-        vm.prank(OWNER);
-        operationsAdmin.setPurchasePathAllowed(address(stablecoinHandler), active, false);
+        _allow(ctorMids, ctorFees, false);
 
-        (address[] memory mids, uint24[] memory fees, bytes memory path) = _alternatePath();
-        vm.startPrank(OWNER);
-        operationsAdmin.setPurchasePathAllowed(address(stablecoinHandler), path, true);
-        vm.stopPrank();
+        (address[] memory mids, uint24[] memory fees,) = _alternatePath();
+        _allow(mids, fees, true);
         vm.prank(SWAPPER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(mids, fees);
 
-        vm.prank(OWNER);
-        operationsAdmin.setPurchasePathAllowed(address(stablecoinHandler), active, false);
-        assertFalse(operationsAdmin.isPurchasePathAllowed(address(stablecoinHandler), keccak256(active)));
+        _allow(ctorMids, ctorFees, false);
+        assertFalse(IPurchaseUniswap(address(stablecoinHandler)).isPurchasePathAllowed(keccak256(active)));
     }
 
     function testRevokeSwapperDoesNotMutateActivePath() public {
         (address[] memory mids, uint24[] memory fees, bytes memory path) = _alternatePath();
-        vm.prank(OWNER);
-        operationsAdmin.setPurchasePathAllowed(address(stablecoinHandler), path, true);
+        _allow(mids, fees, true);
         vm.prank(SWAPPER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(mids, fees);
 
@@ -135,9 +116,7 @@ contract DexPathFailoverTest is DcaDappTest {
         assertEq(IPurchaseUniswap(address(stablecoinHandler)).getSwapPath(), path);
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IOperationsAdmin.OperationsAdmin__UnauthorizedPurchasePathSetter.selector, SWAPPER
-            )
+            abi.encodeWithSelector(IPurchaseUniswap.PurchaseUniswap__UnauthorizedPurchasePathSetter.selector, SWAPPER)
         );
         vm.prank(SWAPPER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(mids, fees);
@@ -148,17 +127,27 @@ contract DexPathFailoverTest is DcaDappTest {
         assertEq(IPurchaseUniswap(address(stablecoinHandler)).getSwapPath(), _encodePath(ctorMids, ctorFees));
     }
 
-    function testDivergentOwnersSplitPathAndSlippageAuthority() public {
+    function testDivergentOwnersDoNotGiveAdminOwnerPathActivation() public {
         vm.prank(OWNER);
         BitChillOwnable(address(stablecoinHandler)).transferOwnership(HANDLER_OWNER);
         vm.prank(HANDLER_OWNER);
         BitChillOwnable(address(stablecoinHandler)).acceptOwnership();
 
         (address[] memory mids, uint24[] memory fees, bytes memory path) = _alternatePath();
+        vm.expectRevert(ownableUnauthorized(OWNER));
         vm.prank(OWNER);
-        operationsAdmin.setPurchasePathAllowed(address(stablecoinHandler), path, true);
+        IPurchaseUniswap(address(stablecoinHandler)).setPurchasePathAllowed(mids, fees, true);
 
+        vm.prank(HANDLER_OWNER);
+        IPurchaseUniswap(address(stablecoinHandler)).setPurchasePathAllowed(mids, fees, true);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IPurchaseUniswap.PurchaseUniswap__UnauthorizedPurchasePathSetter.selector, OWNER)
+        );
         vm.prank(OWNER);
+        IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(mids, fees);
+
+        vm.prank(SWAPPER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(mids, fees);
         assertEq(IPurchaseUniswap(address(stablecoinHandler)).getSwapPath(), path);
 
@@ -170,11 +159,6 @@ contract DexPathFailoverTest is DcaDappTest {
         IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumPercent(0.996 ether);
         assertEq(IPurchaseUniswap(address(stablecoinHandler)).getAmountOutMinimumPercent(), 0.996 ether);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IOperationsAdmin.OperationsAdmin__UnauthorizedPurchasePathSetter.selector, HANDLER_OWNER
-            )
-        );
         vm.prank(HANDLER_OWNER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(mids, fees);
     }
@@ -191,34 +175,27 @@ contract DexPathFailoverTest is DcaDappTest {
 
     function testConstructorPathIsAllowlistedBeforeAssignment() public {
         bytes memory path = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
-        assertTrue(operationsAdmin.isPurchasePathAllowed(address(stablecoinHandler), keccak256(path)));
-        assertEq(
-            operationsAdmin.getTokenHandler(address(stablecoin), s_routeIndex), address(stablecoinHandler)
-        );
+        assertTrue(IPurchaseUniswap(address(stablecoinHandler)).isPurchasePathAllowed(keccak256(path)));
+        assertEq(operationsAdmin.getTokenHandler(address(stablecoin), s_routeIndex), address(stablecoinHandler));
     }
 
     function testUnauthorizedActivationOfNonAllowlistedPathFails() public {
         bytes memory path = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
-        assertTrue(operationsAdmin.isPurchasePathAllowed(address(stablecoinHandler), keccak256(path)));
+        assertTrue(IPurchaseUniswap(address(stablecoinHandler)).isPurchasePathAllowed(keccak256(path)));
 
         (address[] memory mids, uint24[] memory fees, bytes memory other) = _alternatePath();
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IOperationsAdmin.OperationsAdmin__PurchasePathNotAllowed.selector,
-                address(stablecoinHandler),
-                keccak256(other)
-            )
+            abi.encodeWithSelector(IPurchaseUniswap.PurchaseUniswap__PurchasePathNotAllowed.selector, keccak256(other))
         );
         vm.prank(SWAPPER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(mids, fees);
     }
 
     function testPathPolicyConfigurationGas() public {
-        (address[] memory mids, uint24[] memory fees, bytes memory path) = _alternatePath();
-        bytes memory former = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
+        (address[] memory mids, uint24[] memory fees,) = _alternatePath();
+        (address[] memory ctorMids, uint24[] memory ctorFees) = _constructorComponents();
         uint256 allowStart = gasleft();
-        vm.prank(OWNER);
-        operationsAdmin.setPurchasePathAllowed(address(stablecoinHandler), path, true);
+        _allow(mids, fees, true);
         uint256 allowGas = allowStart - gasleft();
 
         uint256 activateStart = gasleft();
@@ -227,8 +204,7 @@ contract DexPathFailoverTest is DcaDappTest {
         uint256 activateGas = activateStart - gasleft();
 
         uint256 revokeStart = gasleft();
-        vm.prank(OWNER);
-        operationsAdmin.setPurchasePathAllowed(address(stablecoinHandler), former, false);
+        _allow(ctorMids, ctorFees, false);
         uint256 revokeGas = revokeStart - gasleft();
 
         emit log_named_uint("setPurchasePathAllowed(true) gas", allowGas);
@@ -237,6 +213,11 @@ contract DexPathFailoverTest is DcaDappTest {
         assertGt(allowGas, 0);
         assertGt(activateGas, 0);
         assertGt(revokeGas, 0);
+    }
+
+    function _allow(address[] memory mids, uint24[] memory fees, bool allowed) private {
+        vm.prank(OWNER);
+        IPurchaseUniswap(address(stablecoinHandler)).setPurchasePathAllowed(mids, fees, allowed);
     }
 
     function _constructorComponents() private view returns (address[] memory mids, uint24[] memory fees) {
@@ -262,17 +243,5 @@ contract DexPathFailoverTest is DcaDappTest {
             path = abi.encodePacked(path, fees[i], mids[i]);
         }
         path = abi.encodePacked(path, fees[fees.length - 1], address(wrBtcToken));
-    }
-}
-
-contract DummyPathCaller {
-    IOperationsAdmin internal immutable i_admin;
-
-    constructor(address admin) {
-        i_admin = IOperationsAdmin(admin);
-    }
-
-    function claim(address caller, bytes32 pathHash) external view {
-        i_admin.requirePurchasePathSetter(caller, pathHash);
     }
 }

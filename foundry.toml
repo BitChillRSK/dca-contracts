@@ -11,6 +11,9 @@ remappings = [
 
 solc_version = "0.8.36"
 evm_version = "cancun"
+optimizer = true
+optimizer_runs = 200
+via_ir = false
 
 [fuzz]
 runs = 1000

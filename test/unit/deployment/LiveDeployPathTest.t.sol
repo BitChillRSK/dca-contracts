@@ -172,8 +172,8 @@ contract LiveDeployPathTest is Test {
         if (handler != address(0)) {
             assertEq(BitChillOwnable(handler).pendingOwner(), SAFE);
             assertTrue(
-                operationsAdmin.isPurchasePathAllowed(
-                    handler, keccak256(IPurchaseUniswap(handler).getSwapPath())
+                IPurchaseUniswap(handler).isPurchasePathAllowed(
+                    keccak256(IPurchaseUniswap(handler).getSwapPath())
                 ),
                 "constructor path must be allowlisted before assignment"
             );
@@ -199,8 +199,8 @@ contract LiveDeployPathTest is Test {
             );
             assertNotEq(handler, address(0), "live dex path must deploy the LayerBank handler for this stable");
             assertTrue(
-                operationsAdmin.isPurchasePathAllowed(
-                    handler, keccak256(IPurchaseUniswap(handler).getSwapPath())
+                IPurchaseUniswap(handler).isPurchasePathAllowed(
+                    keccak256(IPurchaseUniswap(handler).getSwapPath())
                 ),
                 "constructor path must be allowlisted before assignment"
             );

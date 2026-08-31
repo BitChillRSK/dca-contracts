@@ -16,8 +16,10 @@ Status: **planning guide**. Orders PRs. Not an implementation spec. Human prompt
 **Passed (2026-08-15).** Rootstock testnet (chain 31) accepted first-party bytecode compiled with solc **0.8.36** / `cancun`. Blockscout verified `OperationsAdmin`, `DcaManager`, and `TropykusDocHandlerMoc` at those settings. Anvil/`forge test --fork-url` is still not rskj; this testnet tx is the consensus proof. PR 3+ may merge on this pin. Do not set `prague` / `osaka` / `amsterdam`. Do not use blob opcodes.
 
 The proof, every documented broadcast command, and every required test lane use the default no-IR
-pipeline. `[profile.deploy]` is an experimental via-IR size profile, not an approved deployment escape
-hatch. Until a separate toolchain decision pins it through tests, broadcasts, Rootstock testnet, and
+pipeline. `[profile.default]` enables the legacy optimizer (`optimizer = true`, `optimizer_runs = 200`,
+`via_ir = false`) starting with R52 so Dex handlers can hold their own path allowlist under EIP-170.
+`[profile.deploy]` is an experimental via-IR size profile, not an approved deployment escape hatch.
+Until a separate toolchain decision pins via-IR through tests, broadcasts, Rootstock testnet, and
 Blockscout verification, all EIP-170 decisions use `[profile.default]` and `via_ir = false`.
 
 ## Final scope decisions
@@ -99,7 +101,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R10 | 48 | none |
 | R42 integration | 49 ([#101](https://github.com/BitChillRSK/dca-contracts/pull/101)) | none (`Batch` for both entry points) |
 | R51 | 50 (planned GitHub #103) | none (first fork table in PR; durable live floor is a relaunch gate) |
-| R52 | 51 ([#104](https://github.com/BitChillRSK/dca-contracts/pull/104)) | none (same production Safe; explicit split authority if owners diverge) |
+| R52 | 51 ([#104](https://github.com/BitChillRSK/dca-contracts/pull/104)) | none (same production Safe; divergent owners keep naturally split authority) |
 | R51 deploy follow-up | unassigned | none (enforce the DOC-Dex never-deploy rule in `DeployDexSwaps`) |
 
 ### PR 1 - R23 toolchain and dependency baseline
@@ -550,32 +552,27 @@ the script. Sequence this before any Dex cutover broadcast; it does not block R5
 
 ### PR 51 - R52 allowlisted Dex path failover ([#104](https://github.com/BitChillRSK/dca-contracts/pull/104))
 
-Move exact-path policy to `OperationsAdmin`: governance allowlists full encoded paths per handler, while an
-existing swapper or the OperationsAdmin owner may activate only those paths. The owner is explicit
-break-glass, not an allowlist bypass. Reject revocation of the active path; switch first, then revoke, so
-every active route remains approved without a new lookup on every purchase. This is persistent availability
-failover for a drained/paused pool, not per-batch route selection. See
+Move exact-path policy onto `PurchaseUniswap`: the handler owner allowlists full encoded paths derived from
+`intermediateTokens` / `poolFeeRates`, while an existing swapper or that same handler owner may activate only
+those paths. OperationsAdmin keeps the global swapper allowlist and has no purchase-path mapping. Production
+expects the same Safe on both contracts; if owners diverge, authority diverges with them — there is no
+OperationsAdmin-owner break-glass onto a handler they do not own. Reject revocation of the active path; switch
+first, then revoke, so every active route remains approved without a lookup on every purchase. This is
+persistent availability failover for a drained/paused pool, not per-batch route selection. See
 [`R52-allowlisted-dex-path-failover.md`](./R52-allowlisted-dex-path-failover.md).
 
-Deployment order is construct handler → read/allowlist its constructor path → assign handler. Update
-`DeployDexSwaps` and `DeployUsdrifHandler`; `DeployLayerBankHandler` is MoC-only and stays untouched. Revoking
-a compromised swapper does not mutate the last active path, so the owner recovery runbook also restores the
+Deployment order is construct handler → allowlist its constructor components on the handler → assign handler.
+Update `DeployDexSwaps` and `DeployUsdrifHandler`; `DeployLayerBankHandler` is MoC-only and stays untouched.
+Revoking a compromised swapper does not mutate the last active path, so the recovery runbook also restores the
 preferred path when necessary. The bot remains the sole signer and route intelligence remains read-only.
 Before claiming automatic path failover at relaunch, each enabled Dex handler needs at least one validated,
-Safe-approved alternate path. A handler with no viable alternate is explicitly labeled single-path/no automated
+owner-approved alternate path. A handler with no viable alternate is explicitly labeled single-path/no automated
 path failover and pages governance after bounded quote/split retries instead of claiming redundant automation.
 No DcaManager ABI change. R9 indexing and R10 natspec rules apply. **No contract-PR product gates.**
 
-Path approval and break-glass activation belong to the OperationsAdmin owner; handler fee/slippage/oracle
-settings remain handler-owner-only. Both converge on `MAINNET_OWNER` in the intended steady state, although
-full deployment temporarily uses the broadcaster before the Safe accepts ownership. Test that topology and
-the deliberately independent authorities if governance later transfers only one contract. The new
-admin→handler `getSwapPath()` view call validates every allowlist write; a missing, reverting, or malformed
-Dex getter must revert `OperationsAdmin__InvalidDexHandler(handler)` rather than an opaque external-call error.
-
-The allowlist belongs on `OperationsAdmin`, which has ample margin. An earlier combined prototype exceeded
-EIP-170 when policy lived on the Dex leaf; keep only path building plus one combined authorization assertion
-on `PurchaseUniswap`, and measure from the final R51 baseline.
+Handler-local policy depends on the default-profile optimizer. This PR enables `optimizer = true` /
+`optimizer_runs = 200` / `via_ir = false` on `[profile.default]` rather than keeping a centralized admin
+registry for an unoptimized EIP-170 budget. Measure with full `forge build --sizes`.
 
 ## Closed non-implementation decisions
 

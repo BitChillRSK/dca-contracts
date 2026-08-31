@@ -398,8 +398,11 @@ contract DcaDappTest is Test {
         operationsAdmin.registerRoute(SOVRYN_INDEX, true);
         operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
         if (isDexSwaps) {
-            bytes memory constructorPath = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
-            operationsAdmin.setPurchasePathAllowed(address(stablecoinHandler), constructorPath, true);
+            IPurchaseUniswap(address(stablecoinHandler)).setPurchasePathAllowed(
+                dexHelperConfig.getActiveNetworkConfig().swapIntermediateTokens,
+                dexHelperConfig.getActiveNetworkConfig().swapPoolFeeRates,
+                true
+            );
         }
         vm.stopPrank();
 

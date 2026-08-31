@@ -12,7 +12,6 @@ import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
 import {ICoinPairPrice} from "../../src/interfaces/ICoinPairPrice.sol";
 import {IWRBTC} from "../../src/interfaces/IWRBTC.sol";
 import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces/ISwapRouter02.sol";
-import {IOperationsAdmin} from "../../src/interfaces/IOperationsAdmin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {MockMocOracle} from "../mocks/MockMocOracle.sol";
 import "../../script/Constants.sol";
@@ -340,7 +339,9 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         bytes memory oldPath = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
         bytes memory expectedPath = _encodeSwapPath(intermediateTokens, poolFeeRates);
         vm.prank(OWNER);
-        operationsAdmin.setPurchasePathAllowed(address(stablecoinHandler), expectedPath, true);
+        IPurchaseUniswap(address(stablecoinHandler)).setPurchasePathAllowed(
+            intermediateTokens, poolFeeRates, true
+        );
 
         vm.expectEmit(false, false, false, true);
         emit PurchaseUniswap_NewPathSet(intermediateTokens, poolFeeRates, expectedPath);
@@ -380,10 +381,15 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         uint24[] memory poolFeeRates = new uint24[](2);
         poolFeeRates[0] = 100;
         poolFeeRates[1] = 300;
+
+        vm.prank(OWNER);
+        IPurchaseUniswap(address(stablecoinHandler)).setPurchasePathAllowed(
+            intermediateTokens, poolFeeRates, true
+        );
         
         vm.expectRevert(
             abi.encodeWithSelector(
-                IOperationsAdmin.OperationsAdmin__UnauthorizedPurchasePathSetter.selector, USER
+                IPurchaseUniswap.PurchaseUniswap__UnauthorizedPurchasePathSetter.selector, USER
             )
         );
         vm.prank(USER);
@@ -401,8 +407,8 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         poolFeeRates[1] = 300;
 
         vm.prank(OWNER);
-        operationsAdmin.setPurchasePathAllowed(
-            address(stablecoinHandler), _encodeSwapPath(intermediateTokens, poolFeeRates), true
+        IPurchaseUniswap(address(stablecoinHandler)).setPurchasePathAllowed(
+            intermediateTokens, poolFeeRates, true
         );
         vm.prank(OWNER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(intermediateTokens, poolFeeRates);
