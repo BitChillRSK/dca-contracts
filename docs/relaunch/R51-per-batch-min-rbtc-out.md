@@ -49,9 +49,13 @@ are a measured relaunch/cutover decision, not a reason to stall PR 103.
 3. PR 103 keeps `DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT = 99.5%` and the 95% safety floor as source defaults; it
    does not pretend that 99.5% has already been proven as the right live setting for every route and batch
    size. Before relaunch, governance approves one durable per-handler backstop from the multi-observation
-   calibration below. That is a one-time cutover setting chosen to tolerate normal route fees, price impact,
-   and drift across the supported operating envelope—not a value the Safe or bot adjusts each week. The bot
-   can never lower it; routine execution uses the dynamic caller bound.
+   calibration below. It must be the **highest (tightest) percentage** that clears the measured supported
+   operating envelope after adding only quantified operational headroom for quote age and observed drift.
+   Record that headroom and the resulting maximum oracle-relative loss in basis points; do not round down for
+   convenience. If the required value exceeds the approved loss budget, keep the route disabled and improve
+   its path/batching rather than silently falling back toward 95%. This is a one-time cutover setting—not a
+   value the Safe or bot adjusts each week. The bot can never lower it; routine execution uses the dynamic
+   caller bound.
 4. Compare against the measured aggregate rBTC after the existing zero-output check and before any buyer
    credit or success event. Equality succeeds. A failure reverts the venue call, fee transfer, lending
    redemption, DcaManager schedule debits/timestamps, and every earlier handler in an across-handlers call.
@@ -126,11 +130,24 @@ operational size.” It does not wait for the off-chain implementation, a multi-
 the final enable/disable decision.
 
 **What gates Dex relaunch.** Before enabling a route, the off-chain work extends that first table across
-multiple recent blocks/observations and the supported batch-size envelope. Governance then approves one
-static per-handler oracle backstop, no lower than the configured 95% safety floor, with enough headroom that
-normal execution is not expected to require Safe intervention. This is a maximum-loss boundary for a broken
-or compromised bot, not the normal slippage control. The chosen value and rationale are recorded in the
-cutover runbook; the bot has no permission to change it.
+multiple recent blocks/observations and the supported batch-size envelope. Governance then approves the
+highest static per-handler oracle backstop that clears that envelope with quantified quote-age/drift headroom,
+never lower than the configured 95% safety floor. This is a maximum-loss boundary for a broken or compromised
+bot, not the normal slippage control. The cutover record states the observed worst case, added headroom, chosen
+percentage, maximum oracle-relative loss in basis points, and the Safe's approved loss budget. A route whose
+required setting exceeds that budget stays disabled pending a better path, smaller supported envelope, or an
+explicit product decision; routine liveness is not grounds to keep widening the floor.
+
+The measured envelope includes every R52 path on which that handler's automatic failover claim relies. An
+alternate that cannot clear the same chosen backstop at supported sizes does not qualify as automated failover;
+switching paths must never trigger an automatic or routine Safe slippage change.
+
+Install and re-lock that value while the route is disabled. First the handler owner calls
+`setAmountOutMinimumPercent` with the approved backstop. After confirming `getAmountOutMinimumPercent`, a
+**separate Safe execution** calls `setAmountOutMinimumSafetyCheck` with exactly the same value; do not combine
+the calls in one MultiSend. Enable the route only after both getters match the cutover record. Equality is
+valid, and restoring the safety check preserves R43's deliberate two-action speed bump: any later widening
+must first lower the safety check and then lower the live percentage. The bot has permission to do neither.
 
 Every Dex call still carries the fresh quote-derived `minRbtcOut`. The two predicates are independent and
 the transaction obeys whichever is stricter. The bot does **not** suppress an otherwise viable transaction
@@ -166,9 +183,14 @@ cross-link an `rsk-uniswap-pools` issue if that repository will supply the reusa
   governance floor. A lower quote-derived minimum is allowed—the handler's floor remains authoritative—but
   the quote itself must clear the estimated floor. Quoting failure triggers automatic retry/fallback, never a
   zero Dex minimum.
+- Monitoring decodes both DcaManager purchase entry points, resolves each batch's handler/venue, and alerts on
+  `minRbtcOut == 0` for a Dex batch. This is a high-signal broken-quoting or compromised-bot indicator, not an
+  additional on-chain control (a malicious signer could send `1`). MoC batches deliberately use `0` and must
+  not trigger this alert.
 - The initial PR table and the later multi-observation calibration are attached to the bot/quote-engine issues.
-  The relaunch record names the supported batch envelope, static per-handler floor, approved path set, bounded
-  retry/split/failover policy, and the condition that finally pages governance.
+  The relaunch record names the supported batch envelope, static per-handler floor and re-locked safety value,
+  approved loss budget, approved path set, bounded retry/split/failover policy, and the condition that finally
+  pages governance.
 - MoC batches explicitly send `0` until a separate, tested redemption preview is implemented. Do not
   pretend the Uniswap pool calculator quotes MoC.
 - Gas estimation, across-handler atomic fallback, per-handler retries, and paused/tail filtering continue
@@ -234,8 +256,10 @@ rather than blocking the contracts PR.
 - **ABI:** both DcaManager purchase selectors change because `Batch` appends `minRbtcOut`.
   `IPurchaseRbtc.batchBuyRbtc` gains the same scalar parameter. New error:
   `PurchaseRbtc__BelowSwapperMinimum(uint256,uint256)`.
-- **Deploy:** PR 103 makes no configuration/default change. Relaunch performs one explicit, measured Safe
-  configuration of each handler's durable oracle backstop; there is no per-batch or weekly floor management.
+- **Deploy:** PR 103 makes no configuration/default change. While each Dex route remains disabled, relaunch
+  performs two separately reviewed Safe executions per handler: install the explicit measured oracle backstop,
+  verify it, then raise the safety check to the same value. There is no per-batch or weekly floor management.
 - **Consumers:** update `swapper-bot#6` with the final tuple, raw-WRBTC units, quote/signing architecture,
-  failure policy, and relaunch gate. Update `bitchill-monitoring#10` for the error/ABI and `front-end#22`
-  for the hardcoded ABI. Confirm that `data-api` does not encode `Batch`; no schedule model changes.
+  failure policy, and relaunch gate. Update `bitchill-monitoring#10` for the error/ABI and the Dex-only zero-
+  minimum transaction-input alert; update `front-end#22` for the hardcoded ABI. Confirm that `data-api` does
+  not encode `Batch`; no schedule model changes.

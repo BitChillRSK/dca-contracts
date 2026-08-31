@@ -138,6 +138,11 @@ In the same turn as the contracts PR, update the matching swapper-bot issue and 
 - pool health and quote thresholds that trigger failover, plus hysteresis/cooldown so the bot does not oscillate;
 - normal failover is fully automatic among paths the Safe approved ahead of time; it does not wait for a Safe
   transaction or ask governance to adjust the R51 oracle floor for routine weekly conditions;
+- for every enabled Dex handler advertised as having automatic path failover, at least one alternate exact path
+  is Safe-approved and validated at supported operating sizes against the same re-locked R51 oracle floor before
+  relaunch; switching paths must not require a slippage-setting change. If no viable alternate exists, the cutover
+  record must label that handler **single-path / no automated path failover**; it may still use bounded re-quote
+  and split retries, but exhaustion pages governance instead of pretending the allowlist adds redundancy;
 - transaction order: activate approved path, wait for confirmation, re-read `getSwapPath`, obtain a fresh quote for
   that path, then compose the R51 minimum and purchase;
 - behavior when another authorized operator changes the path between quote and broadcast (re-quote/re-estimate,
@@ -148,7 +153,8 @@ In the same turn as the contracts PR, update the matching swapper-bot issue and 
 - no auto-allowlisting: discovery proposes routes for governance review, but only the Safe calls the allowlist setter.
 
 The contracts PR can merge before this work, but Dex relaunch is blocked until the route list, bot policy, and
-incident runbook pass their own tests.
+incident runbook pass their own tests. Alternate-path availability is therefore a relaunch-readiness result,
+not a PR 104 merge condition.
 
 ## Out of scope
 

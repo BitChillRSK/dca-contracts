@@ -497,13 +497,17 @@ room for impact and pool/oracle drift. Negative findings are valid and do not bl
 only has to record that first evidence and open/update the off-chain issues; multi-observation calibration,
 off-chain implementation, and route enablement gate relaunch instead.
 
-Before relaunch, governance approves one durable per-handler oracle backstop from the wider observation set.
-It is chosen once to cover normal operating conditions and bound a compromised bot, not adjusted every week.
-The bot supplies a fresh quote-derived minimum on every Dex call; the two independent predicates coexist and
-whichever is stricter wins. A caller minimum below the live oracle floor is not itself a reason to skip a viable
-trade. If the pool quote cannot clear the floor, the bot automatically requotes, splits the group, or switches
-to a pre-approved R52 path. Only a structural failure across bounded retries and all approved paths pages
-governance; an indivisible oversized schedule is isolated so it cannot block the rest.
+Before relaunch, governance approves the highest per-handler oracle backstop that clears the wider measured
+operating envelope with quantified headroom, records the resulting maximum-loss budget, and leaves a route
+disabled if that budget is unacceptable. Cutover installs the percentage and then, in a separately reviewed
+Safe execution, raises the safety check to the same value before enabling the route; this preserves R43's
+two-action widening speed bump. It is not adjusted every week. The bot supplies a fresh quote-derived minimum
+on every Dex call; the two independent predicates coexist and whichever is stricter wins. A caller minimum
+below the live oracle floor is not itself a reason to skip a viable trade. If the pool quote cannot clear the
+floor, the bot automatically requotes, splits the group, or switches to a pre-approved R52 path. Only a
+structural failure across bounded retries and all approved paths pages governance; an indivisible oversized
+schedule is isolated so it cannot block the rest. Monitoring alerts on a zero Dex minimum while exempting the
+deliberate zero used by MoC.
 
 The swapper bot stays the sole signing service and consumes reusable, read-only quote logic derived from
 `rsk-uniswap-pools`; do not give a second repository/process the private key. Update/cross-link the off-chain
@@ -530,7 +534,10 @@ Deployment order is construct handler â†’ read/allowlist its constructor path â†
 `DeployDexSwaps` and `DeployUsdrifHandler`; `DeployLayerBankHandler` is MoC-only and stays untouched. Revoking
 a compromised swapper does not mutate the last active path, so the owner recovery runbook also restores the
 preferred path when necessary. The bot remains the sole signer and route intelligence remains read-only.
-No DcaManager ABI change. R9 indexing and R10 natspec rules apply. **No product gates.**
+Before claiming automatic path failover at relaunch, each enabled Dex handler needs at least one validated,
+Safe-approved alternate path. A handler with no viable alternate is explicitly labeled single-path/no automated
+path failover and pages governance after bounded quote/split retries instead of claiming redundant automation.
+No DcaManager ABI change. R9 indexing and R10 natspec rules apply. **No contract-PR product gates.**
 
 Path approval and break-glass activation belong to the OperationsAdmin owner; handler fee/slippage/oracle
 settings remain handler-owner-only. Both converge on `MAINNET_OWNER` in the intended steady state, although
