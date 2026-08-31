@@ -223,7 +223,7 @@ a working Dex lane.
 - [x] No open product decisions.
 
 GitHub [#104](https://github.com/BitChillRSK/dca-contracts/pull/104). Default-profile runtime: `OperationsAdmin`
-9,300 (margin 15,276); `LayerBankErc20HandlerDex` 23,778 (798); `SovrynErc20HandlerDex` 23,318 (1,258);
+9,354 (margin 15,222); `LayerBankErc20HandlerDex` 23,778 (798); `SovrynErc20HandlerDex` 23,318 (1,258);
 `TropykusErc20HandlerDex` 23,574 (1,002); `DcaManager` unchanged at 23,703 (873). Dex leaves +244 bytes vs R51
 for the DcaManager lookup plus one `requirePurchasePathSetter` call. Config gas on Anvil USDRIF dex-layerbank:
 allow ~43k, activate ~30k, revoke ~18k.
