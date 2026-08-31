@@ -8,6 +8,7 @@ import {IPurchaseUniswap} from "../../../../src/interfaces/IPurchaseUniswap.sol"
 import {IWRBTC} from "../../../../src/interfaces/IWRBTC.sol";
 import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces/ISwapRouter02.sol";
 import {ICoinPairPrice} from "../../../../src/interfaces/ICoinPairPrice.sol";
+import {IOperationsAdmin} from "../../../../src/interfaces/IOperationsAdmin.sol";
 import {TropykusErc20HandlerDex} from "../../../../src/tropykus-legacy/TropykusErc20HandlerDex.sol";
 import {MockKToken} from "../../../mocks/MockKToken.sol";
 import {MockWrbtcToken} from "../../../mocks/MockWrbtcToken.sol";
@@ -313,7 +314,9 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         uint24[] memory poolFeeRates = new uint24[](1);
         poolFeeRates[0] = 3000;
         
-        vm.expectRevert(ownableUnauthorized(USER));
+        vm.expectRevert(
+            abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__UnauthorizedPurchasePathSetter.selector, USER)
+        );
         vm.prank(USER);
         tropykusDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
     }
@@ -420,17 +423,20 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         uint24[] memory poolFeeRates = new uint24[](2);
         poolFeeRates[0] = 3000;
         poolFeeRates[1] = 3000;
+
+        bytes memory expectedPath = abi.encodePacked(
+            address(stablecoin),
+            uint24(3000),
+            address(0x123),
+            uint24(3000),
+            address(wrbtcToken)
+        );
+        vm.prank(OWNER);
+        operationsAdmin.setPurchasePathAllowed(address(tropykusDexHandler), expectedPath, true);
         
         vm.prank(OWNER);
         tropykusDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
         
-        bytes memory expectedPath = abi.encodePacked(
-            address(stablecoin),
-            uint24(3000),
-            address(0x123), // Intermediate token
-            uint24(3000), 
-            address(wrbtcToken)
-        );
         assertEq(tropykusDexHandler.getSwapPath(), expectedPath);
         assertEq(tropykusDexHandler.getSwapPath().length, 66); // 3 addresses + 2 fees
     }

@@ -131,6 +131,12 @@ abstract contract HandlerTestHarness is Test {
         handler = deployHandler();
         
         setupRolesAndPermissions();
+
+        if (supportsDex) {
+            bytes memory constructorPath = IPurchaseUniswap(address(handler)).getSwapPath();
+            vm.prank(OWNER);
+            operationsAdmin.setPurchasePathAllowed(address(handler), constructorPath, true);
+        }
         
         vm.prank(OWNER);
         operationsAdmin.assignTokenHandler(

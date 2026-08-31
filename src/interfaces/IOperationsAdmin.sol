@@ -4,9 +4,12 @@ pragma solidity 0.8.36;
 /**
  * @title IOperationsAdmin
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Governance registry for route classes, token handlers, swappers, and per-pair deposit pause.
+ * @notice Governance registry for route classes, token handlers, swappers, per-pair deposit pause,
+ *         and Dex Uniswap path allowlisting.
  * @dev One owner. Route indexes and handler assignments are add-only. A handler address may be
  *      assigned at most once. There is no cooperative migration on these handler versions.
+ *      Exact encoded Uniswap V3 paths are approved per handler; a swapper or this owner may activate
+ *      only an approved path. The active path cannot be revoked until another approved path is active.
  */
 interface IOperationsAdmin {
     /**
@@ -44,6 +47,10 @@ interface IOperationsAdmin {
     event OperationsAdmin__SwapperRevoked(address indexed swapper);
     /// @notice New deposits for this pair were paused or unpaused. Every emit is a real transition.
     event OperationsAdmin__DepositsPauseSet(address indexed token, uint256 routeIndex, bool paused);
+    /// @notice Exact Uniswap V3 path `encodedPath` was allowed or revoked for `handler`. Every emit is a real transition.
+    event OperationsAdmin__PurchasePathAllowedSet(
+        address indexed handler, bytes32 pathHash, bytes encodedPath, bool allowed
+    );
 
     //////////////////////
     // Errors ////////////
@@ -68,6 +75,18 @@ interface IOperationsAdmin {
     error OperationsAdmin__HandlerNotAssigned(address token, uint256 routeIndex);
     /// @notice `setDepositsPaused` must change the flag; a repeated write reverts.
     error OperationsAdmin__DepositsPauseUnchanged(address token, uint256 routeIndex, bool paused);
+    /// @notice `handler` is not a Dex handler with a canonical `getSwapPath()` (missing, reverting, or malformed).
+    error OperationsAdmin__InvalidDexHandler(address handler);
+    /// @notice `encodedPath` is not a canonical Uniswap V3 path (`20 + n * 23` bytes, `n >= 1`).
+    error OperationsAdmin__InvalidPurchasePath(bytes encodedPath);
+    /// @notice The allow/revoke write would not change stored permission.
+    error OperationsAdmin__PurchasePathPermissionUnchanged(address handler, bytes32 pathHash, bool allowed);
+    /// @notice The currently active Dex path cannot be revoked; activate another allowed path first.
+    error OperationsAdmin__CannotRevokeActivePurchasePath(address handler, bytes32 pathHash);
+    /// @notice `caller` is neither an active swapper nor this registry's owner.
+    error OperationsAdmin__UnauthorizedPurchasePathSetter(address caller);
+    /// @notice `pathHash` is not allowlisted for the calling handler.
+    error OperationsAdmin__PurchasePathNotAllowed(address handler, bytes32 pathHash);
 
     ///////////////////////////////
     // External functions /////////
@@ -126,6 +145,37 @@ interface IOperationsAdmin {
      * @return handler The TokenHandler, or `address(0)` if none is assigned.
      */
     function getTokenHandler(address token, uint256 routeIndex) external view returns (address handler);
+
+    /**
+     * @notice Allow or revoke an exact encoded Uniswap V3 path for one Dex handler.
+     * @param handler The Dex handler whose `getSwapPath()` is consulted. Must be a contract.
+     * @param encodedPath Full canonical Uniswap V3 path bytes (`token0 / fee / token1 / …`). Hashed for storage.
+     * @param allowed True to approve the path, false to revoke it.
+     * @dev Owner-only. Validates `handler.getSwapPath()` on every write and names a missing, reverting,
+     *      or malformed getter `InvalidDexHandler` rather than leaking an ABI-decode failure.
+     *      The active path (the getter's current return) cannot be revoked. A repeated write reverts
+     *      so every emitted event is a real transition. The handler still pins its own endpoints;
+     *      this registry only checks the generic V3 length shape.
+     */
+    function setPurchasePathAllowed(address handler, bytes calldata encodedPath, bool allowed) external;
+
+    /**
+     * @notice Whether `pathHash` is an approved Uniswap V3 path for `handler`.
+     * @param handler The Dex handler.
+     * @param pathHash `keccak256` of the exact encoded path bytes.
+     * @return True if governance has allowlisted that path for `handler`.
+     */
+    function isPurchasePathAllowed(address handler, bytes32 pathHash) external view returns (bool);
+
+    /**
+     * @notice Assert that `caller` may activate `pathHash` on the calling Dex handler.
+     * @param caller The address attempting `setPurchasePath` (the handler forwards `msg.sender`).
+     * @param pathHash `keccak256` of the path the handler is about to install.
+     * @dev Keys permission by `msg.sender` (the handler), so one handler cannot spend another's allowlist.
+     *      `caller` must be an active swapper or this registry's owner, and `pathHash` must be allowed
+     *      for the calling handler. Does not write state.
+     */
+    function requirePurchasePathSetter(address caller, bytes32 pathHash) external view;
 
     /**
      * @notice Add `swapper` to the swapper allowlist. Idempotent; does not replace other swappers.

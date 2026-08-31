@@ -77,6 +77,11 @@ contract Usdt0DexDeploymentTest is Test {
         assertEq(minPurchase, 25e6);
         assertTrue(minPurchase != 25 ether);
         assertEq(operationsAdmin.getTokenHandler(usdt0, LAYERBANK_INDEX), handler);
+        assertTrue(
+            operationsAdmin.isPurchasePathAllowed(
+                handler, keccak256(IPurchaseUniswap(handler).getSwapPath())
+            )
+        );
         assertEq(LayerBankErc20HandlerDex(payable(handler)).i_aToken().UNDERLYING_ASSET_ADDRESS(), usdt0);
     }
 

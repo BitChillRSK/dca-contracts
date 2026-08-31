@@ -4,6 +4,7 @@ pragma solidity 0.8.36;
 import {IOperationsAdmin} from "./interfaces/IOperationsAdmin.sol";
 import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
 import {ITokenLending} from "./interfaces/ITokenLending.sol";
+import {IPurchaseUniswap} from "./interfaces/IPurchaseUniswap.sol";
 import {IERC165} from "lib/forge-std/src/interfaces/IERC165.sol";
 import {BitChillOwnable} from "./BitChillOwnable.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
@@ -18,11 +19,15 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
  *      add-only, and a handler address may be assigned at most once: none of a handler's
  *      per-user accounting is route-keyed, so sharing one instance across two pairs would let
  *      one route's principal be read as another's yield. There is no cooperative migration on
- *      these handler versions. The one mutable flag here is a per-pair deposit pause, a circuit
- *      breaker that blocks new inflows without touching purchases or any exit path.
+ *      these handler versions. Mutable flags here are a per-pair deposit pause (circuit breaker
+ *      for new inflows) and per-handler Dex path allowlisting (exact encoded Uniswap V3 paths).
  */
 contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
     using SafeCast for uint256;
+
+    /// @dev Uniswap V3 path: 20-byte token, then n hops of 3-byte fee + 20-byte token (`n >= 1`).
+    uint256 private constant V3_PATH_ADDRESS_SIZE = 20;
+    uint256 private constant V3_PATH_HOP_SIZE = 23;
 
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
@@ -36,6 +41,9 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
     mapping(uint256 routeIndex => RouteClass) private s_routeClass;
     mapping(address swapper => bool) private s_swappers;
     mapping(address handler => bool assigned) private s_handlerAssigned;
+    /// @dev Exact-path allowlist. The purchase path itself is not re-checked on every swap; this
+    ///      mapping is consulted only when activating a path, so the active path must stay allowed.
+    mapping(address handler => mapping(bytes32 pathHash => bool allowed)) private s_purchasePathAllowed;
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
@@ -128,6 +136,28 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
 
     /**
      * @inheritdoc IOperationsAdmin
+     * @dev Always reads `getSwapPath` so a non-Dex contract cannot enter the allowlist, and so
+     *      revocation of the live path is rejected without storing a separate "active hash".
+     */
+    function setPurchasePathAllowed(address handler, bytes calldata encodedPath, bool allowed) external onlyOwner {
+        if (handler.code.length == 0) revert OperationsAdmin__EoaCannotBeHandler(handler);
+        if (!_isCanonicalV3Path(encodedPath)) revert OperationsAdmin__InvalidPurchasePath(encodedPath);
+
+        bytes memory activePath = _readActiveSwapPath(handler);
+        bytes32 pathHash = keccak256(encodedPath);
+        if (!allowed && keccak256(activePath) == pathHash) {
+            revert OperationsAdmin__CannotRevokeActivePurchasePath(handler, pathHash);
+        }
+        if (s_purchasePathAllowed[handler][pathHash] == allowed) {
+            revert OperationsAdmin__PurchasePathPermissionUnchanged(handler, pathHash, allowed);
+        }
+
+        s_purchasePathAllowed[handler][pathHash] = allowed;
+        emit OperationsAdmin__PurchasePathAllowedSet(handler, pathHash, encodedPath, allowed);
+    }
+
+    /**
+     * @inheritdoc IOperationsAdmin
      */
     function addSwapper(address swapper) external onlyOwner {
         s_swappers[swapper] = true;
@@ -179,5 +209,42 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
      */
     function areDepositsPaused(address token, uint256 routeIndex) external view returns (bool) {
         return s_tokenRoute[token][routeIndex.toUint32()].depositsPaused;
+    }
+
+    /**
+     * @inheritdoc IOperationsAdmin
+     */
+    function isPurchasePathAllowed(address handler, bytes32 pathHash) external view returns (bool) {
+        return s_purchasePathAllowed[handler][pathHash];
+    }
+
+    /**
+     * @inheritdoc IOperationsAdmin
+     */
+    function requirePurchasePathSetter(address caller, bytes32 pathHash) external view {
+        if (caller != owner() && !s_swappers[caller]) {
+            revert OperationsAdmin__UnauthorizedPurchasePathSetter(caller);
+        }
+        if (!s_purchasePathAllowed[msg.sender][pathHash]) {
+            revert OperationsAdmin__PurchasePathNotAllowed(msg.sender, pathHash);
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            PRIVATE HELPERS
+    //////////////////////////////////////////////////////////////*/
+
+    function _isCanonicalV3Path(bytes memory encodedPath) private pure returns (bool) {
+        uint256 length = encodedPath.length;
+        if (length < V3_PATH_ADDRESS_SIZE + V3_PATH_HOP_SIZE) return false;
+        return (length - V3_PATH_ADDRESS_SIZE) % V3_PATH_HOP_SIZE == 0;
+    }
+
+    function _readActiveSwapPath(address handler) private view returns (bytes memory path) {
+        (bool success, bytes memory data) =
+            handler.staticcall(abi.encodeWithSelector(IPurchaseUniswap.getSwapPath.selector));
+        if (!success || data.length < 64) revert OperationsAdmin__InvalidDexHandler(handler);
+        path = abi.decode(data, (bytes));
+        if (!_isCanonicalV3Path(path)) revert OperationsAdmin__InvalidDexHandler(handler);
     }
 }

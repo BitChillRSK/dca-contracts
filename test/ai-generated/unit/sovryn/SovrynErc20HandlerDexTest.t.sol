@@ -8,6 +8,7 @@ import {IPurchaseUniswap} from "../../../../src/interfaces/IPurchaseUniswap.sol"
 import {IWRBTC} from "../../../../src/interfaces/IWRBTC.sol";
 import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces/ISwapRouter02.sol";
 import {ICoinPairPrice} from "../../../../src/interfaces/ICoinPairPrice.sol";
+import {IOperationsAdmin} from "../../../../src/interfaces/IOperationsAdmin.sol";
 import {SovrynErc20HandlerDex} from "../../../../src/sovryn/SovrynErc20HandlerDex.sol";
 import {MockIsusdToken} from "../../../mocks/MockIsusdToken.sol";
 import {MockWrbtcToken} from "../../../mocks/MockWrbtcToken.sol";
@@ -359,7 +360,9 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
         uint24[] memory poolFeeRates = new uint24[](1);
         poolFeeRates[0] = 3000;
         
-        vm.expectRevert(ownableUnauthorized(USER));
+        vm.expectRevert(
+            abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__UnauthorizedPurchasePathSetter.selector, USER)
+        );
         vm.prank(USER);
         sovrynDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
     }
@@ -491,17 +494,20 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
         uint24[] memory poolFeeRates = new uint24[](2);
         poolFeeRates[0] = 3000;
         poolFeeRates[1] = 3000;
+
+        bytes memory expectedPath = abi.encodePacked(
+            address(stablecoin),
+            uint24(3000),
+            address(0x456),
+            uint24(3000),
+            address(wrbtcToken)
+        );
+        vm.prank(OWNER);
+        operationsAdmin.setPurchasePathAllowed(address(sovrynDexHandler), expectedPath, true);
         
         vm.prank(OWNER);
         sovrynDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
         
-        bytes memory expectedPath = abi.encodePacked(
-            address(stablecoin),
-            uint24(3000),
-            address(0x456), // Intermediate token  
-            uint24(3000),
-            address(wrbtcToken)
-        );
         assertEq(sovrynDexHandler.getSwapPath(), expectedPath);
         assertEq(sovrynDexHandler.getSwapPath().length, 66); // 3 addresses + 2 fees
     }

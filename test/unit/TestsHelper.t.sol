@@ -28,6 +28,36 @@ contract DummyLendingHandler {
     }
 }
 
+/// @dev Configurable `getSwapPath` target for OperationsAdmin Dex-path tests.
+contract DummyDexPathHandler {
+    bytes internal s_path;
+    bool internal s_revert;
+
+    constructor(bytes memory path) {
+        s_path = path;
+    }
+
+    function getSwapPath() external view returns (bytes memory) {
+        if (s_revert) revert("DummyDexPathHandler: revert");
+        return s_path;
+    }
+
+    function setPath(bytes memory path) external {
+        s_path = path;
+    }
+
+    function setRevert(bool shouldRevert) external {
+        s_revert = shouldRevert;
+    }
+}
+
+/// @dev Selector exists but the return type is not `bytes`, so ABI-decode fails.
+contract DummyDexPathReturnsUint {
+    function getSwapPath() external pure returns (uint256) {
+        return 1;
+    }
+}
+
 contract FeeCalculator {
     uint256 internal s_minFeeRate = MIN_FEE_RATE;
     uint256 internal s_maxFeeRate = MAX_FEE_RATE_TEST; // Use test fee rate for testing

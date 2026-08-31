@@ -9,6 +9,8 @@ import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces
 import {IV3SwapRouter} from "@uniswap/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol";
 import {ICoinPairPrice} from "./interfaces/ICoinPairPrice.sol";
 import {IPurchaseUniswap} from "./interfaces/IPurchaseUniswap.sol";
+import {IDcaManager} from "./interfaces/IDcaManager.sol";
+import {IOperationsAdmin} from "./interfaces/IOperationsAdmin.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
@@ -64,7 +66,9 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      *      `i_stableToken` before this constructor body runs — the leaf `is` order lists
      *      the funding base before `PurchaseUniswap`. `_setPurchasePath` reverts if that
      *      token is still `address(0)`, so a reversed `is` list fails at deploy rather
-     *      than writing a path that cannot be bought or repaired.
+     *      than writing a path that cannot be bought or repaired. Constructor installation
+     *      does not consult OperationsAdmin; the deploy script allowlists these bytes before
+     *      the handler can receive schedule funds.
      */
     constructor(
         UniswapSettings memory uniswapSettings,
@@ -115,12 +119,25 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     function setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
         public
         override
-        onlyOwner
     {
-        _setPurchasePath(intermediateTokens, poolFeeRates);
+        bytes memory newPath = _encodePurchasePath(intermediateTokens, poolFeeRates);
+        IOperationsAdmin(IDcaManager(i_dcaManager).getOperationsAdminAddress()).requirePurchasePathSetter(
+            msg.sender, keccak256(newPath)
+        );
+        s_swapPath = newPath;
+        emit PurchaseUniswap_NewPathSet(intermediateTokens, poolFeeRates, newPath);
     }
 
     function _setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates) internal {
+        s_swapPath = _encodePurchasePath(intermediateTokens, poolFeeRates);
+        emit PurchaseUniswap_NewPathSet(intermediateTokens, poolFeeRates, s_swapPath);
+    }
+
+    function _encodePurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
+        private
+        view
+        returns (bytes memory newPath)
+    {
         if (poolFeeRates.length != intermediateTokens.length + 1) {
             revert PurchaseUniswap__WrongNumberOfTokensOrFeeRates(intermediateTokens.length, poolFeeRates.length);
         }
@@ -128,15 +145,12 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         address purchaseToken = address(_purchaseToken());
         if (purchaseToken == address(0)) revert PurchaseUniswap__ZeroPurchaseToken();
 
-        bytes memory newPath = abi.encodePacked(purchaseToken);
+        newPath = abi.encodePacked(purchaseToken);
         for (uint256 i = 0; i < intermediateTokens.length; i++) {
             newPath = abi.encodePacked(newPath, poolFeeRates[i], intermediateTokens[i]);
         }
 
         newPath = abi.encodePacked(newPath, poolFeeRates[poolFeeRates.length - 1], address(i_wrBtcToken));
-
-        s_swapPath = newPath;
-        emit PurchaseUniswap_NewPathSet(intermediateTokens, poolFeeRates, s_swapPath);
     }
 
     /**

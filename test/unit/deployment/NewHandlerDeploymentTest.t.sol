@@ -63,6 +63,9 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
         if (operationsAdmin.getRouteClass(LAYERBANK_INDEX) == IOperationsAdmin.RouteClass.Unregistered) {
             operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
         }
+        operationsAdmin.setPurchasePathAllowed(
+            usdrifHandlerAddress, IPurchaseUniswap(usdrifHandlerAddress).getSwapPath(), true
+        );
         operationsAdmin.assignTokenHandler(config.usdrifTokenAddress, LAYERBANK_INDEX, usdrifHandlerAddress);
         vm.stopPrank();
     }
@@ -85,6 +88,12 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
         address registeredHandler = operationsAdmin.getTokenHandler(config.usdrifTokenAddress, LAYERBANK_INDEX);
         assertEq(registeredHandler, usdrifHandlerAddress, "USDRIF handler not registered in OperationsAdmin");
         assertTrue(operationsAdmin.isLendingRoute(LAYERBANK_INDEX));
+        assertTrue(
+            operationsAdmin.isPurchasePathAllowed(
+                usdrifHandlerAddress, keccak256(usdrifHandler.getSwapPath())
+            ),
+            "constructor path must be allowlisted before assignment"
+        );
     }
 
     function test_run_revertsOnForkWithoutRealDeployment() public {

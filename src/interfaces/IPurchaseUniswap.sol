@@ -8,7 +8,7 @@ import {ICoinPairPrice} from "./ICoinPairPrice.sol";
 /**
  * @title IPurchaseUniswap
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Owner configuration for Uniswap V3 purchases of WRBTC.
+ * @notice Uniswap V3 purchase configuration: encoded path, slippage percents, and MoC BTC/USD oracle.
  */
 interface IPurchaseUniswap {
     /*//////////////////////////////////////////////////////////////
@@ -27,7 +27,7 @@ interface IPurchaseUniswap {
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Owner set a new encoded Uniswap V3 path.
+    /// @notice An approved Uniswap V3 path was activated by a swapper or the OperationsAdmin owner.
     event PurchaseUniswap_NewPathSet(
         address[] intermediateTokens, uint24[] poolFeeRates, bytes newPath
     );
@@ -67,6 +67,9 @@ interface IPurchaseUniswap {
      * @notice Replace the Uniswap V3 path from this handler's stablecoin to WRBTC.
      * @param intermediateTokens Intermediate token addresses in the path (empty for a direct pair).
      * @param poolFeeRates Pool fee for each hop. Length must be `intermediateTokens.length + 1`.
+     * @dev Builds the canonical path from this handler's pinned stablecoin and WRBTC, then requires
+     *      OperationsAdmin (resolved through the pinned DcaManager) to allow `msg.sender` to
+     *      activate that exact encoded path. Constructor installation does not use this function.
      */
     function setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates) external;
 
