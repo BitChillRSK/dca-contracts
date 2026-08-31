@@ -15,6 +15,11 @@ Status: **planning guide**. Orders PRs. Not an implementation spec. Human prompt
 
 **Passed (2026-08-15).** Rootstock testnet (chain 31) accepted first-party bytecode compiled with solc **0.8.36** / `cancun`. Blockscout verified `OperationsAdmin`, `DcaManager`, and `TropykusDocHandlerMoc` at those settings. Anvil/`forge test --fork-url` is still not rskj; this testnet tx is the consensus proof. PR 3+ may merge on this pin. Do not set `prague` / `osaka` / `amsterdam`. Do not use blob opcodes.
 
+The proof, every documented broadcast command, and every required test lane use the default no-IR
+pipeline. `[profile.deploy]` is an experimental via-IR size profile, not an approved deployment escape
+hatch. Until a separate toolchain decision pins it through tests, broadcasts, Rootstock testnet, and
+Blockscout verification, all EIP-170 decisions use `[profile.default]` and `via_ir = false`.
+
 ## Final scope decisions
 
 PR 2 was the original decision-record placeholder. GitHub PR [#74](https://github.com/BitChillRSK/dca-contracts/pull/74) supersedes it and closes every remaining gate on 2026-08-27. The remaining implementation prompts have **no product questions**.
@@ -92,6 +97,9 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R42 | 46 | none (atomic; keep bot EOA) |
 | R9 | 47 | none (no extra purchase-event fields) |
 | R10 | 48 | none |
+| R42 integration | 49 ([#101](https://github.com/BitChillRSK/dca-contracts/pull/101)) | none (`Batch` for both entry points) |
+| R51 | 50 (planned GitHub #103) | none (retain floor; disable a route that fails measured liveness) |
+| R52 | 51 (planned GitHub #104) | none (same production Safe; explicit split authority if owners diverge) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -462,13 +470,69 @@ Do not make behavior changes in this PR.
 Follow up the standalone R42 batcher after measuring the completed manager: move
 `batchBuyRbtcAcrossHandlers` into `DcaManager`, authenticate once, and loop the same one-handler helper
 so each handler's batch completes its checks, effects, and handler call before the next. Remove
-the standalone contract, interface, and deploy add-on. The original one-handler selector stays
-available for bot retries. See [`R42-swapper-batcher.md`](./R42-swapper-batcher.md).
+the standalone contract, interface, and deploy add-on. The one-handler retry entry remains, but PR 101
+also makes it consume the same `Batch` tuple as each across-handlers element; the former six-argument
+selector does not ship. See [`R42-swapper-batcher.md`](./R42-swapper-batcher.md).
 
 **Decided:** the final manager is not planned to grow further, so the recurring hot-path saving is
 worth the remaining EIP-170 margin. Grouped calls remain atomic and the bot EOA remains allowlisted.
 The cheaper one-loop implementation is preferred over a bundle-wide CEI two-pass: handlers are
 BitChill-deployed, purchase paths stay `onlySwapper`, and the extra pass costs gas on every tick.
+
+### PR 50 - R51 per-batch minimum rBTC output (planned GitHub #103)
+
+Append `minRbtcOut` to the `Batch` tuple PR 101 already uses for both swapper entry points. The shared
+handler pipeline checks it against measured aggregate rBTC before buyer credits, so it works for Dex and
+MoC and cannot loosen the governance-owned Uniswap oracle floor. `0` preserves today's behavior; the
+production off-chain policy requires a meaningful nonzero quote-derived value for Dex and explicitly uses
+`0` for MoC until a tested redemption preview exists. Stablecoin decimals affect the quote input;
+`minRbtcOut` itself is always 18-decimal WRBTC/native-rBTC wei. See
+[`R51-per-batch-min-rbtc-out.md`](./R51-per-batch-min-rbtc-out.md).
+
+Added after R10, so it deliberately changes both DcaManager purchase selectors before relaunch. PR 101
+already settled the struct-shaped one-handler call; R51 does not reopen it. Keep the 99.5% / 95% governance
+defaults. R51 must nevertheless measure every production path at representative batch sizes: after 0.30–0.35%
+of LP fees, the current floor leaves little room for impact and pool/oracle drift. A caller minimum cannot fix
+an over-tight governance floor. The settled policy is not to lower it automatically: retry/rebuild, split, or
+fail over, and leave a route disabled at relaunch if its quote-derived minimum cannot remain strictly above the
+floor. Record the measurement and disabled/enabled result in the PR and off-chain issues.
+
+The swapper bot stays the sole signing service and consumes reusable, read-only quote logic derived from
+`rsk-uniswap-pools`; do not give a second repository/process the private key. Update/cross-link the off-chain
+issues in the same turn as the contracts PR, and treat their quote-policy and floor-liveness acceptance criteria
+as a Dex relaunch gate. R9 indexing and R10 natspec rules apply. **No product gates.**
+
+Current PR 101 baseline: `DcaManager` 23,683 bytes (893 margin) and
+`LayerBankErc20HandlerDex` 23,418 (1,158 margin). DcaManager already takes `Batch`, so the obsolete
+seven-argument manager-stack finding no longer applies. The handler ABI addition has been compiled against
+PR 101 and does fail legacy no-IR codegen without extraction: `_creditBuyers` is required, not conditional.
+Preserve its arithmetic/event order and re-measure every leaf.
+
+### PR 51 - R52 allowlisted Dex path failover (planned GitHub #104)
+
+Move exact-path policy to `OperationsAdmin`: governance allowlists full encoded paths per handler, while an
+existing swapper or the OperationsAdmin owner may activate only those paths. The owner is explicit
+break-glass, not an allowlist bypass. Reject revocation of the active path; switch first, then revoke, so
+every active route remains approved without a new lookup on every purchase. This is persistent availability
+failover for a drained/paused pool, not per-batch route selection. See
+[`R52-allowlisted-dex-path-failover.md`](./R52-allowlisted-dex-path-failover.md).
+
+Deployment order is construct handler → read/allowlist its constructor path → assign handler. Update
+`DeployDexSwaps` and `DeployUsdrifHandler`; `DeployLayerBankHandler` is MoC-only and stays untouched. Revoking
+a compromised swapper does not mutate the last active path, so the owner recovery runbook also restores the
+preferred path when necessary. The bot remains the sole signer and route intelligence remains read-only.
+No DcaManager ABI change. R9 indexing and R10 natspec rules apply. **No product gates.**
+
+Path approval and break-glass activation belong to the OperationsAdmin owner; handler fee/slippage/oracle
+settings remain handler-owner-only. Both converge on `MAINNET_OWNER` in the intended steady state, although
+full deployment temporarily uses the broadcaster before the Safe accepts ownership. Test that topology and
+the deliberately independent authorities if governance later transfers only one contract. The new
+admin→handler `getSwapPath()` view call validates every allowlist write; a missing, reverting, or malformed
+Dex getter must revert `OperationsAdmin__InvalidDexHandler(handler)` rather than an opaque external-call error.
+
+The allowlist belongs on `OperationsAdmin`, which has ample margin. An earlier combined prototype exceeded
+EIP-170 when policy lived on the Dex leaf; keep only path building plus one combined authorization assertion
+on `PurchaseUniswap`, and measure from the final R51 baseline.
 
 ## Closed non-implementation decisions
 

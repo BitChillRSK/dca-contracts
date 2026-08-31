@@ -318,19 +318,20 @@ Add-on scripts (`DeployIdleHandler`, `DeployLayerBankHandler`, `DeployUsdrifHand
 Later ownership changes (new Safe, recovered wallet) are the same two steps: current owner `transferOwnership(new)`, incoming owner `acceptOwnership()`. `renounceOwnership` always reverts.
 
 ### Compilation profile for deployment
-Before deploying on-chain, compile using the dedicated `deploy` profile that activates the Yul Intermediate Representation (via_IR) pipeline (see `foundry.toml`).
 
-```bash
-# One-off compilation
-FOUNDRY_PROFILE=deploy forge build
+The relaunch deployment profile is currently `[profile.default]`: solc `0.8.36`, Cancun, and
+`via_ir = false`. The copy-paste broadcast commands above intentionally use it, as do the required
+local and CI lanes. Treat their EIP-170 margins as the deploy limits.
 
-# Or run any script / test under the deploy profile
-FOUNDRY_PROFILE=deploy forge script ...
-```
+`[profile.deploy]` is an experimental size-measurement profile. It enables the Yul IR pipeline and
+produces substantially smaller bytecode, but it is **not approved for broadcast**: the exact via-IR
+artifacts have not run the complete relaunch matrix or been deployed and verified on Rootstock
+testnet. Do not add `FOUNDRY_PROFILE=deploy` to a live command ad hoc.
 
-This profile sets `via_ir = true` and `optimizer_runs = 200`, producing smaller, cheaper byte-code, under the 24,576-byte limit (as per EIP-170). 
-
-*Warning*: viaIR compilation might cause unexpected results. Be sure to run the full test suite again before deploying the contracts on Rootstock mainnet!
+A future switch must be made as its own reviewed toolchain decision: pin the profile in every deploy
+command, run the full unit/invariant/fork matrix using the exact artifact, repeat the Rootstock testnet
+consensus and Blockscout-verification proof, and decide whether no-IR remains as a secondary compile
+lane. Until then, the no-IR pipeline is authoritative.
 
 ## Dependency Management
 
@@ -351,4 +352,3 @@ For audit-related inquiries or security concerns, please contact:
 
 ## Disclaimer
 This protocol has been audited but could still have bugs. Use at your own risk. Always perform due diligence before interacting with smart contracts.
-

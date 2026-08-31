@@ -32,9 +32,13 @@ helper this PR ships. Decided 2026-08-29: ship the cheaper one-loop. Handlers ar
 and purchase paths stay `onlySwapper`, so bundle-wide CEI is not worth 2,463 gas on every tick
 (16,410 gas / 4.5% cheaper than the standalone batcher). Default-profile (no-IR) runtime, the
 R9/R50 convention, is 23,683 bytes (the two-pass version was 23,833; the one-loop six-argument
-one-handler ABI was 23,716). `[profile.deploy]` (`via_ir`) is ~11,008, so EIP-170 is not a
-binding constraint on that profile. The recurring protocol-paid saving outweighs preserving
-unused no-IR margin.
+one-handler ABI was 23,716). That leaves 893 bytes below EIP-170 and is the real deployment
+constraint: every documented broadcast command and every required test lane uses no-IR. The
+~11,008-byte `[profile.deploy]` (`via_ir`) result is informational only; no deployment runbook
+selects that profile, and the exact via-IR artifact has not passed the full matrix or a Rootstock
+testnet verification. Switching compiler pipelines is a separate decision. R42 accepts the recurring
+protocol-paid saving within the measured no-IR margin because no further DcaManager growth was then
+planned; it does not treat the margin as unused.
 
 **Atomicity.** One revert rolls back every venue in the bundle. A paused row, malformed group, or
 handler failure therefore reverts the entire call. The bot filters rows off-chain and its EOA stays
@@ -105,8 +109,9 @@ Targeted grouped-purchase tests, then the complete repository gates from `AGENTS
 - [x] `batchBuyRbtc` takes `Batch calldata`; checks, effects, and the handler call are unchanged.
   The former six-argument selector (`0x31a1a62c`) is gone.
 - [x] Failure policy remains atomic and tested.
-- [x] Default-profile (no-IR) runtime recorded; `[profile.deploy]` is ~11k and is not the
-  profile these numbers use.
+- [x] Default-profile (no-IR) runtime and real EIP-170 margin recorded. The ~11k
+  `[profile.deploy]` result is explicitly non-operative until a separate compiler-profile decision
+  validates and pins it throughout testing, broadcasting, and verification.
 - [x] The standalone contract and its deployment/allowlist operations are gone.
 - [x] Consumer follow-ups describe the final manager selector and remove the batcher deployment.
 - [x] No open product decisions.
@@ -116,8 +121,8 @@ Targeted grouped-purchase tests, then the complete repository gates from `AGENTS
 - [x] The one-handler helper preserves the former `batchBuyRbtc` checks/effects/handler call.
 - [x] `onlySwapper` runs once per external entry, not once per inner handler.
 - [x] Tests cover success, rollback, pause, malformed input, handler failure, and unauthorized callers.
-- [x] Runtime and gas measurements use the default (no-IR) profile that R9/R50 track, not
-  `[profile.deploy]`.
+- [x] Runtime and gas measurements use the default (no-IR) profile that R9/R50 track and every
+  documented broadcast command currently selects; `[profile.deploy]` does not soften that limit.
 - [x] Files beyond the list above are named and justified in the PR.
 - [x] No unrelated refactors; history is reviewable.
 
