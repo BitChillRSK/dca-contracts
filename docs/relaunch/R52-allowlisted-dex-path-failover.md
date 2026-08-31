@@ -136,10 +136,14 @@ In the same turn as the contracts PR, update the matching swapper-bot issue and 
 - a versioned production list of governance-approved encoded paths and hashes per handler;
 - route discovery/quotes for DOC, USDRIF, and USDT0 using raw integer amounts;
 - pool health and quote thresholds that trigger failover, plus hysteresis/cooldown so the bot does not oscillate;
+- normal failover is fully automatic among paths the Safe approved ahead of time; it does not wait for a Safe
+  transaction or ask governance to adjust the R51 oracle floor for routine weekly conditions;
 - transaction order: activate approved path, wait for confirmation, re-read `getSwapPath`, obtain a fresh quote for
   that path, then compose the R51 minimum and purchase;
 - behavior when another authorized operator changes the path between quote and broadcast (re-quote/re-estimate,
   never silently use a quote for a different path);
+- bounded retry/split/path attempts before alerting; governance is paged only when every approved path remains
+  structurally unusable or the signing key is suspected compromised;
 - alerts and the owner runbook for compromised-key recovery and active-path restoration;
 - no auto-allowlisting: discovery proposes routes for governance review, but only the Safe calls the allowlist setter.
 

@@ -98,7 +98,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R9 | 47 | none (no extra purchase-event fields) |
 | R10 | 48 | none |
 | R42 integration | 49 ([#101](https://github.com/BitChillRSK/dca-contracts/pull/101)) | none (`Batch` for both entry points) |
-| R51 | 50 (planned GitHub #103) | none (retain floor; disable a route that fails measured liveness) |
+| R51 | 50 (planned GitHub #103) | none (first fork table in PR; durable live floor is a relaunch gate) |
 | R52 | 51 (planned GitHub #104) | none (same production Safe; explicit split authority if owners diverge) |
 
 ### PR 1 - R23 toolchain and dependency baseline
@@ -490,17 +490,26 @@ production off-chain policy requires a meaningful nonzero quote-derived value fo
 [`R51-per-batch-min-rbtc-out.md`](./R51-per-batch-min-rbtc-out.md).
 
 Added after R10, so it deliberately changes both DcaManager purchase selectors before relaunch. PR 101
-already settled the struct-shaped one-handler call; R51 does not reopen it. Keep the 99.5% / 95% governance
-defaults. R51 must nevertheless measure every production path at representative batch sizes: after 0.30–0.35%
-of LP fees, the current floor leaves little room for impact and pool/oracle drift. A caller minimum cannot fix
-an over-tight governance floor. The settled policy is not to lower it automatically: retry/rebuild, split, or
-fail over, and leave a route disabled at relaunch if its quote-derived minimum cannot remain strictly above the
-floor. Record the measurement and disabled/enabled result in the PR and off-chain issues.
+already settled the struct-shaped one-handler call; R51 does not reopen it. PR 103 keeps the 99.5% / 95% source
+defaults, but does not assume 99.5% is the final live value. It records one named-block fork table for every
+production path at representative batch sizes: after 0.30–0.35% of LP fees, the current floor leaves little
+room for impact and pool/oracle drift. Negative findings are valid and do not block the contracts PR. PR 103
+only has to record that first evidence and open/update the off-chain issues; multi-observation calibration,
+off-chain implementation, and route enablement gate relaunch instead.
+
+Before relaunch, governance approves one durable per-handler oracle backstop from the wider observation set.
+It is chosen once to cover normal operating conditions and bound a compromised bot, not adjusted every week.
+The bot supplies a fresh quote-derived minimum on every Dex call; the two independent predicates coexist and
+whichever is stricter wins. A caller minimum below the live oracle floor is not itself a reason to skip a viable
+trade. If the pool quote cannot clear the floor, the bot automatically requotes, splits the group, or switches
+to a pre-approved R52 path. Only a structural failure across bounded retries and all approved paths pages
+governance; an indivisible oversized schedule is isolated so it cannot block the rest.
 
 The swapper bot stays the sole signing service and consumes reusable, read-only quote logic derived from
 `rsk-uniswap-pools`; do not give a second repository/process the private key. Update/cross-link the off-chain
 issues in the same turn as the contracts PR, and treat their quote-policy and floor-liveness acceptance criteria
-as a Dex relaunch gate. R9 indexing and R10 natspec rules apply. **No product gates.**
+as a Dex relaunch gate rather than a PR-merge gate. R9 indexing and R10 natspec rules apply. **No contract-PR
+product gates; the Safe approves the measured static live backstops once during cutover.**
 
 Current PR 101 baseline: `DcaManager` 23,683 bytes (893 margin) and
 `LayerBankErc20HandlerDex` 23,418 (1,158 margin). DcaManager already takes `Batch`, so the obsolete

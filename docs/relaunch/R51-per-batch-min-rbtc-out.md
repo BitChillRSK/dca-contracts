@@ -36,18 +36,22 @@ an integrator return value or a view as cash.
 
 ## Settled decisions
 
-**No open product decisions.** Implement these choices:
+**No open contract-implementation decisions.** Implement these choices; the one-time live backstop values
+are a measured relaunch/cutover decision, not a reason to stall PR 103.
 
 1. Append `uint256 minRbtcOut` as the final field of the existing `IDcaManager.Batch`. It is the minimum
    aggregate output for that one handler batch, in **WRBTC/native rBTC wei (18 decimals)**. Stablecoin
    decimals affect the quote input, never the units of this field.
 2. Permit `minRbtcOut == 0`. It exactly preserves the oracle-floor-only behavior and lets MoC ship before
    an off-chain MoC redemption preview exists. The production bot must nevertheless send a meaningful
-   nonzero value for every Dex batch; that is an off-chain relaunch gate below.
-3. Keep `DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT = 99.5%` and the 95% safety floor. The caller bound is optional
-   on-chain and does not justify weakening the last defense against a buggy or compromised swapper. R51 also
-   owns the measurement-backed liveness decision below: a route that cannot clear the governance floor plus
-   the bot's quote tolerance stays disabled at relaunch. Do not silently lower the floor to make a test pass.
+   nonzero quote-derived value for every Dex batch, even when the governance floor happens to be stricter;
+   that is an off-chain relaunch gate below.
+3. PR 103 keeps `DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT = 99.5%` and the 95% safety floor as source defaults; it
+   does not pretend that 99.5% has already been proven as the right live setting for every route and batch
+   size. Before relaunch, governance approves one durable per-handler backstop from the multi-observation
+   calibration below. That is a one-time cutover setting chosen to tolerate normal route fees, price impact,
+   and drift across the supported operating envelope—not a value the Safe or bot adjusts each week. The bot
+   can never lower it; routine execution uses the dynamic caller bound.
 4. Compare against the measured aggregate rBTC after the existing zero-output check and before any buyer
    credit or success event. Equality succeeds. A failure reverts the venue call, fee transfer, lending
    redemption, DcaManager schedule debits/timestamps, and every earlier handler in an across-handlers call.
@@ -96,30 +100,46 @@ R51/R52 prototype figures.
   denominator, truncation, accumulated-balance writes, and per-row events are unchanged.
 - [ ] Record final method selectors and runtime sizes in the PR.
 
-## Governance-floor liveness gate
+## Governance-floor evidence and relaunch gate
 
 The 99.5% floor has only about 0.15 percentage points left after the live USDRIF path's 0.35% LP-fee
 stack, before price impact, pool/oracle drift, and stablecoin peg drift. USDT0's direct 0.30% pool is only
 slightly looser. A caller minimum can tighten this floor but cannot make a sound trade pass when the floor
-itself is too tight. R51 therefore owns this question rather than leaving it between contract specs.
+itself is too tight. R51 therefore surfaces the evidence rather than leaving the question between specs.
 
-Before declaring any Dex route ready for relaunch, the R51 PR and linked off-chain issues must record a
-measurement table for every shipped handler/path (Sovryn DOC, LayerBank USDRIF, and LayerBank USDT0):
+**What gates PR 103.** The contracts PR must record one reproducible fork-derived measurement table, at a
+named block, for every currently configured shipped handler/path (Sovryn DOC, LayerBank USDRIF, and LayerBank
+USDT0). Use the token's deployed minimum purchase and fee lower/upper bounds as the three reproducible input
+points unless current bot data supplies better documented aggregate sizes; this choice must not require a new
+product answer. The table records:
 
 - exact encoded path and fee tiers;
-- raw post-BitChill-fee input at the smallest, normal, and largest proposed operational batch sizes;
+- raw post-BitChill-fee input;
 - pool quote, oracle-derived governance minimum, difference in basis points, block number/time, and the
   bot tolerance needed to turn the quote into `minRbtcOut`;
-- more than one recent block or observation point, so one favorable snapshot is not treated as calibration;
-- whether splitting/rebuilding a batch or switching to another governance-approved R52 path restores enough
-  headroom for the quote-derived minimum to remain strictly above the governance floor.
+- whether the pool quote itself clears the current governance floor, and whether splitting/rebuilding a group
+  or selecting another candidate path changes the result.
 
-The settled failure policy is conservative: retain the 99.5% / 95% source defaults, and do not broadcast a
-Dex batch whose quote-derived minimum cannot be stricter than the governance floor. Retry with a fresh quote,
-split/rebuild the batch, or use an approved failover path. If the smallest operational batch still cannot
-clear both bounds, that route remains disabled at relaunch and the finding is escalated as a separate,
-measurement-backed governance proposal; neither the R51 implementer nor the bot lowers the handler setting
-automatically. This makes availability loss explicit without weakening the compromised-swapper boundary.
+PR 103 must also open/update the swapper-bot and quote-engine issues with the relaunch acceptance criteria.
+It may merge after recording that first table even when the result is “this route does not clear 99.5% at an
+operational size.” It does not wait for the off-chain implementation, a multi-block observation window, or
+the final enable/disable decision.
+
+**What gates Dex relaunch.** Before enabling a route, the off-chain work extends that first table across
+multiple recent blocks/observations and the supported batch-size envelope. Governance then approves one
+static per-handler oracle backstop, no lower than the configured 95% safety floor, with enough headroom that
+normal execution is not expected to require Safe intervention. This is a maximum-loss boundary for a broken
+or compromised bot, not the normal slippage control. The chosen value and rationale are recorded in the
+cutover runbook; the bot has no permission to change it.
+
+Every Dex call still carries the fresh quote-derived `minRbtcOut`. The two predicates are independent and
+the transaction obeys whichever is stricter. The bot does **not** suppress an otherwise viable transaction
+merely because its quote-derived minimum is below the oracle floor: in that case the live oracle floor is the
+stronger check. It avoids a transaction only when the pool quote itself cannot clear the estimated live floor,
+then automatically requotes, splits the group, or activates another pre-approved R52 path. A single schedule's
+purchase amount cannot be split across transactions; isolate an oversized outlier so it cannot block the rest
+of the route. Human intervention is reserved for a structural condition that survives bounded retries and all
+approved paths, not routine weekly price movement.
 
 ## Off-chain relaunch gate
 
@@ -139,12 +159,16 @@ cross-link an `rsk-uniswap-pools` issue if that repository will supply the reusa
   not silently lowering the bound.
 - A quote records the block used and has a configured maximum age. The tolerance is configurable per route
   and calibrated with Rootstock fork/live observations. Do not inherit `rsk-uniswap-pools`' current 0.5%
-  default blindly: after a 0.30–0.35% fee stack it is normally below the 99.5% oracle floor and adds no
-  protection.
-- Before broadcast, the bot proves/logs that its quote-derived minimum is stricter than its estimate of the
-  governance floor. If it is not, or quoting fails, it does not broadcast that Dex batch and alerts/retries.
-- The governance-floor measurement table above is attached to the bot/quote-engine issue. Every enabled route
-  passes at its documented operational sizes; a failing route is explicitly disabled rather than omitted.
+  default blindly. After a 0.30–0.35% fee stack its caller minimum may sit below the 99.5% oracle floor, so
+  the floor—not R51—will be the stronger check; that is acceptable when logged, but the tolerance must still
+  reflect the execution risk the bot intends to bound.
+- Before broadcast, the bot logs the pool quote, its quote-derived minimum, and its estimate of the live
+  governance floor. A lower quote-derived minimum is allowed—the handler's floor remains authoritative—but
+  the quote itself must clear the estimated floor. Quoting failure triggers automatic retry/fallback, never a
+  zero Dex minimum.
+- The initial PR table and the later multi-observation calibration are attached to the bot/quote-engine issues.
+  The relaunch record names the supported batch envelope, static per-handler floor, approved path set, bounded
+  retry/split/failover policy, and the condition that finally pages governance.
 - MoC batches explicitly send `0` until a separate, tested redemption preview is implemented. Do not
   pretend the Uniswap pool calculator quotes MoC.
 - Gas estimation, across-handler atomic fallback, per-handler retries, and paused/tail filtering continue
@@ -153,8 +177,9 @@ cross-link an `rsk-uniswap-pools` issue if that repository will supply the reusa
 ## Out of scope
 
 - [ ] Dex path allowlisting or changing `setPurchasePath` authorization (R52).
-- [ ] Changing `_getAmountOutMinimum`, the $1 peg, oracle, safety floor, or deploy defaults. A measured
-  proposal to lower a live handler setting is a separate governance decision, not an automatic R51 fix.
+- [ ] Changing `_getAmountOutMinimum`, the $1 peg, oracle, safety floor, or deploy defaults in PR 103. The
+  relaunch runbook may use the existing owner setter once to install the approved per-handler backstop; the bot
+  never changes it and routine failures never trigger automatic lowering.
 - [ ] An on-chain Uniswap quoter, TWAP, private-relay dependency, or caller-supplied path.
 - [ ] A mandatory nonzero minimum, deadline, or MoC quote formula.
 - [ ] Changing across-handler atomicity, fee math, redemption/clamp policy, or purchase allocation rounding.
@@ -186,9 +211,10 @@ the PR body, as usual.
 - The one-handler `batchBuyRbtc(Batch)` retry enforces the same field.
 
 Then run the `AGENTS.md` done-gate. Fork coverage must derive the Dex minimum from a live pool quote for the
-exact post-fee input and show it is stricter than the oracle floor; an oracle-derived value alone merely
-retests R43. A no-liquidity or floor-too-tight result must be recorded as a disabled relaunch route, not
-silently skipped as though the liveness decision passed.
+exact post-fee input and compare it with the oracle floor; an oracle-derived value alone merely retests R43.
+The caller minimum need not be stricter in that snapshot: record which predicate dominates and prove they are
+independent. A no-liquidity or floor-too-tight result is valid PR evidence and moves to the relaunch calibration
+rather than blocking the contracts PR.
 
 ## Success criteria
 
@@ -196,9 +222,10 @@ silently skipped as though the liveness decision passed.
 - [ ] The bound is checked against measured aggregate rBTC on every purchase venue.
 - [ ] PR 101's checks/effects/order and both entry-point shapes are preserved.
 - [ ] Every default-profile runtime remains below EIP-170 and the PR records the final margins.
-- [ ] Every enabled production Dex route has the required multi-observation floor/headroom table; any route
-  that cannot support a meaningful stricter caller bound is explicitly disabled for relaunch.
-- [ ] The off-chain issues contain the acceptance criteria above and are linked in the contracts PR.
+- [ ] The PR contains the first named-block fork table for every configured production path and operational
+  size, including negative findings; it does not wait for multi-observation calibration or route enablement.
+- [ ] The off-chain issues are opened/updated with the relaunch acceptance criteria and linked in the contracts
+  PR; their implementation and continuing calibration do not gate merge.
 - [ ] R9 indexing and R10 natspec rules are applied to the new error, field, and parameter.
 - [ ] No open contract product decisions.
 
@@ -207,8 +234,8 @@ silently skipped as though the liveness decision passed.
 - **ABI:** both DcaManager purchase selectors change because `Batch` appends `minRbtcOut`.
   `IPurchaseRbtc.batchBuyRbtc` gains the same scalar parameter. New error:
   `PurchaseRbtc__BelowSwapperMinimum(uint256,uint256)`.
-- **Deploy:** no automatic configuration/default change. The cutover record names enabled and disabled Dex
-  routes from the floor-liveness measurement; lowering a live handler setting requires separate approval.
+- **Deploy:** PR 103 makes no configuration/default change. Relaunch performs one explicit, measured Safe
+  configuration of each handler's durable oracle backstop; there is no per-batch or weekly floor management.
 - **Consumers:** update `swapper-bot#6` with the final tuple, raw-WRBTC units, quote/signing architecture,
   failure policy, and relaunch gate. Update `bitchill-monitoring#10` for the error/ABI and `front-end#22`
   for the hardcoded ABI. Confirm that `data-api` does not encode `Batch`; no schedule model changes.
