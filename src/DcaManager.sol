@@ -276,15 +276,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     /**
      * @inheritdoc IDcaManager
      */
-    function batchBuyRbtc(
-        address[] calldata buyers,
-        address token,
-        uint256[] calldata scheduleIndexes,
-        uint64[] calldata scheduleIds,
-        uint256[] calldata purchaseAmounts,
-        uint256 routeIndex
-    ) external override onlySwapper {
-        _batchBuyRbtc(buyers, token, scheduleIndexes, scheduleIds, purchaseAmounts, routeIndex);
+    function batchBuyRbtc(Batch calldata batch) external override onlySwapper {
+        _batchBuyRbtc(batch);
     }
 
     /**
@@ -295,42 +288,47 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         if (numBatches == 0) revert DcaManager__EmptyHandlerBatches();
 
         for (uint256 i; i < numBatches; ++i) {
-            Batch calldata batch = batches[i];
-            _batchBuyRbtc(
-                batch.buyers,
-                batch.token,
-                batch.scheduleIndexes,
-                batch.scheduleIds,
-                batch.purchaseAmounts,
-                batch.routeIndex
-            );
+            _batchBuyRbtc(batches[i]);
         }
     }
 
     /**
      * @dev Validate one handler's batch, debit every named schedule, then call that handler.
      */
-    function _batchBuyRbtc(
-        address[] calldata buyers,
-        address token,
-        uint256[] calldata scheduleIndexes,
-        uint64[] calldata scheduleIds,
-        uint256[] calldata purchaseAmounts,
-        uint256 routeIndex
-    ) private {
-        uint256 numOfPurchases = buyers.length;
+    function _batchBuyRbtc(Batch calldata batch) private {
+        uint256 numOfPurchases = batch.buyers.length;
         if (numOfPurchases == 0) revert DcaManager__EmptyBatchPurchaseArrays();
         if (
-            numOfPurchases != scheduleIndexes.length || numOfPurchases != scheduleIds.length
-                || numOfPurchases != purchaseAmounts.length
+            numOfPurchases != batch.scheduleIndexes.length || numOfPurchases != batch.scheduleIds.length
+                || numOfPurchases != batch.purchaseAmounts.length
         ) revert DcaManager__ArraysLengthMismatch();
         for (uint256 i; i < numOfPurchases; ++i) {
-            (uint256 schedulePurchaseAmount, uint256 scheduleRouteIndex) = _rBtcPurchaseChecksEffects(buyers[i], token, scheduleIndexes[i], scheduleIds[i]);
-            if (schedulePurchaseAmount != purchaseAmounts[i]) revert DcaManager__PurchaseAmountMismatch(buyers[i], token, scheduleIds[i], scheduleIndexes[i], schedulePurchaseAmount, purchaseAmounts[i]);
-            if (scheduleRouteIndex != routeIndex) revert DcaManager__RouteIndexMismatch(buyers[i], token, scheduleIds[i], scheduleIndexes[i], scheduleRouteIndex, routeIndex);
+            (uint256 schedulePurchaseAmount, uint256 scheduleRouteIndex) = _rBtcPurchaseChecksEffects(
+                batch.buyers[i], batch.token, batch.scheduleIndexes[i], batch.scheduleIds[i]
+            );
+            if (schedulePurchaseAmount != batch.purchaseAmounts[i]) {
+                revert DcaManager__PurchaseAmountMismatch(
+                    batch.buyers[i],
+                    batch.token,
+                    batch.scheduleIds[i],
+                    batch.scheduleIndexes[i],
+                    schedulePurchaseAmount,
+                    batch.purchaseAmounts[i]
+                );
+            }
+            if (scheduleRouteIndex != batch.routeIndex) {
+                revert DcaManager__RouteIndexMismatch(
+                    batch.buyers[i],
+                    batch.token,
+                    batch.scheduleIds[i],
+                    batch.scheduleIndexes[i],
+                    scheduleRouteIndex,
+                    batch.routeIndex
+                );
+            }
         }
-        IPurchaseRbtc(address(_handler(token, routeIndex))).batchBuyRbtc(
-            buyers, scheduleIds, purchaseAmounts
+        IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex))).batchBuyRbtc(
+            batch.buyers, batch.scheduleIds, batch.purchaseAmounts
         );
     }
 

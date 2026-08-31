@@ -30,8 +30,9 @@ the same two-group mocked MoC purchase at 361,133 gas through `SwapperBatcher`, 
 through a two-pass CEI-clean integrated implementation, and 344,723 gas through the one-loop
 helper this PR ships. Decided 2026-08-29: ship the cheaper one-loop. Handlers are BitChill-deployed
 and purchase paths stay `onlySwapper`, so bundle-wide CEI is not worth 2,463 gas on every tick
-(16,410 gas / 4.5% cheaper than the standalone batcher). Runtime is 23,716 bytes, leaving 860
-bytes below EIP-170 (the two-pass version was 23,833 / 743). The recurring protocol-paid saving
+(16,410 gas / 4.5% cheaper than the standalone batcher). Runtime is 23,683 bytes, leaving 893
+bytes below EIP-170 (the two-pass version was 23,833 / 743; the one-loop six-argument one-handler
+ABI was 23,716 / 860). The recurring protocol-paid saving
 outweighs preserving that unused margin.
 
 **Atomicity.** One revert rolls back every venue in the bundle. A paused row, malformed group, or
@@ -44,13 +45,15 @@ batcher, its interface, and its deploy add-on. The integrated selector is `batch
 
 ## Open product decisions
 
-**none** — calls remain all-or-nothing, the bot EOA remains allowlisted, and the existing
-one-handler selector remains available.
+**none** — calls remain all-or-nothing, the bot EOA remains allowlisted, and the one-handler
+entry point remains available as `batchBuyRbtc(Batch)` (same type as each AcrossHandlers element).
 
 ## Scope
 
 - [x] Add `IDcaManager.Batch`, one handler's purchase batch containing token, route, and the parallel
   buyer/index/id/amount arrays.
+- [x] Collapse `batchBuyRbtc` to `batchBuyRbtc(Batch calldata)` so both purchase entries share that type.
+  `IPurchaseRbtc.batchBuyRbtc` stays the three-array handler ABI.
 - [x] Add swapper-only `DcaManager.batchBuyRbtcAcrossHandlers(Batch[] calldata)`. Empty top-level input
   reverts `DcaManager__EmptyHandlerBatches`; each batch keeps the existing empty/length/amount/route/schedule checks.
 - [x] Extract `batchBuyRbtc` into a private `_batchBuyRbtc` helper. The multi-handler entry point
@@ -80,6 +83,7 @@ one-handler selector remains available.
 - removal of `src/SwapperBatcher.sol` and `src/interfaces/ISwapperBatcher.sol`
 - removal of `script/DeploySwapperBatcher.s.sol`
 - the R42 unit test, renamed `DcaManagerBatchHandlersTest`
+- `test/utils/BatchBuyOne.sol` (packs the former six arguments into `Batch`)
 - `AGENTS.md`, this spec, `IMPLEMENTATION_ORDER.md`, and relaunch `README.md`
 
 ## Required tests
@@ -97,7 +101,8 @@ Targeted grouped-purchase tests, then the complete repository gates from `AGENTS
 ## Success criteria
 
 - [x] One allowlist check drives every handler's purchase batch in one transaction.
-- [x] The original `batchBuyRbtc` selector and behavior stay unchanged.
+- [x] `batchBuyRbtc` takes `Batch calldata`; checks, effects, and the handler call are unchanged.
+  The former six-argument selector (`0x31a1a62c`) is gone.
 - [x] Failure policy remains atomic and tested.
 - [x] The integrated manager remains below EIP-170 in the deploy profile.
 - [x] The standalone contract and its deployment/allowlist operations are gone.
@@ -115,9 +120,11 @@ Targeted grouped-purchase tests, then the complete repository gates from `AGENTS
 
 ## ABI / deploy / cutover impact
 
-- ABI: `DcaManager` gains `batchBuyRbtcAcrossHandlers((address[],address,uint256[],uint64[],uint256[],uint256)[])`
-  (`0xc8e26a20`) and `DcaManager__EmptyHandlerBatches()`. The original `batchBuyRbtc` selector is
-  unchanged. The standalone used `batchBuyRbtcGroups`; that name does not ship.
+- ABI: `batchBuyRbtc` is `batchBuyRbtc((address[],address,uint256[],uint64[],uint256[],uint256))`
+  (`0x3680c8da`). `DcaManager` also gains
+  `batchBuyRbtcAcrossHandlers((address[],address,uint256[],uint64[],uint256[],uint256)[])`
+  (`0xc8e26a20`) and `DcaManager__EmptyHandlerBatches()`. The former six-argument `batchBuyRbtc`
+  (`0x31a1a62c`) is gone. The standalone used `batchBuyRbtcGroups`; that name does not ship.
 - Deploy: no batcher deployment and no contract-address `addSwapper`; the bot EOA calls
   `DcaManager` directly.
 - Cutover: swapper-bot updates its grouped call target and ABI. Frontend and monitoring regenerate

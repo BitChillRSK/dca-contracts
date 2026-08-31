@@ -14,7 +14,7 @@ import {MockFeeOnTransferStablecoin} from "../mocks/MockFeeOnTransferStablecoin.
 import {MockKdocToken} from "../mocks/MockKdocToken.sol";
 import {MockMocProxy} from "../mocks/MockMocProxy.sol";
 import "../Constants.sol";
-import {batchBuyOne} from "../utils/BatchBuyOne.sol";
+import {batchBuyOne, toBatch} from "../utils/BatchBuyOne.sol";
 
 /**
  * @notice R41: hop 1 must deliver exactly what was requested or the whole deposit reverts.
@@ -359,7 +359,7 @@ contract FeeOnTransferDepositTest is Test {
                 ITokenLending.TokenLending__InsufficientShares.selector, USER, requestedShares, availableShares
             )
         );
-        dcaManager.batchBuyRbtc(buyers, address(token), indexes, ids, amounts, TROPYKUS_INDEX);
+        dcaManager.batchBuyRbtc(toBatch(buyers, address(token), indexes, ids, amounts, TROPYKUS_INDEX));
 
         // Revert leaves the schedule intact; the lending clamp still lets the user withdraw.
         assertEq(dcaManager.getDcaSchedules(USER, address(token))[0].tokenBalance, REQUESTED);

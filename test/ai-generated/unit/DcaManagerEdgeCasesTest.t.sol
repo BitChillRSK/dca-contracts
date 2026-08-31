@@ -16,7 +16,7 @@ import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces
 import {IDcaManager} from "../../../src/interfaces/IDcaManager.sol";
 import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
 import "../../Constants.sol";
-import {batchBuyOne, UNUSED_SCHEDULE_ID} from "../../utils/BatchBuyOne.sol";
+import {batchBuyOne, UNUSED_SCHEDULE_ID, toBatch} from "../../utils/BatchBuyOne.sol";
 
 /**
  * @title DcaManagerEdgeCasesTest
@@ -390,12 +390,14 @@ contract DcaManagerEdgeCasesTest is Test {
         vm.expectRevert(IDcaManager.DcaManager__EmptyBatchPurchaseArrays.selector);
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
+            toBatch(
             emptyUsers,
             address(stablecoin),
             emptyIndexes,
             emptyIds,
             emptyAmounts,
             TROPYKUS_INDEX
+            )
         );
     }
     
@@ -413,12 +415,14 @@ contract DcaManagerEdgeCasesTest is Test {
         vm.expectRevert(IDcaManager.DcaManager__ArraysLengthMismatch.selector);
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
+            toBatch(
             users,
             address(stablecoin),
             indexes,
             ids,
             amounts,
             TROPYKUS_INDEX
+            )
         );
     }
     

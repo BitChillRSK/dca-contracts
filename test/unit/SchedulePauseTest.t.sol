@@ -6,7 +6,7 @@ import {Test, console} from "forge-std/Test.sol";
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
-import {batchBuyOne, UNUSED_SCHEDULE_ID} from "../utils/BatchBuyOne.sol";
+import {batchBuyOne, UNUSED_SCHEDULE_ID, toBatch} from "../utils/BatchBuyOne.sol";
 import "./TestsHelper.t.sol";
 
 /**
@@ -185,7 +185,9 @@ contract SchedulePauseTest is DcaDappTest {
         vm.prank(SWAPPER);
         vm.expectRevert(pausedRevert);
         dcaManager.batchBuyRbtc(
+            toBatch(
             buyers, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, s_routeIndex
+            )
         );
 
         IDcaManager.DcaSchedule[] memory afterSchedules = dcaManager.getDcaSchedules(USER, address(stablecoin));

@@ -9,6 +9,7 @@ import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {OperationsAdmin} from "src/OperationsAdmin.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
+import {toBatch} from "test/utils/BatchBuyOne.sol";
 import "script/Constants.sol";
 
 /**
@@ -454,7 +455,7 @@ contract Handler is Test {
         purchaseAmounts[0] = schedule.purchaseAmount;
 
         try dcaManager.batchBuyRbtc(
-            buyers, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, schedule.routeIndex
+            toBatch(buyers, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, schedule.routeIndex)
         ) {
             // Success
         } catch {
@@ -518,12 +519,14 @@ contract Handler is Test {
         // Execute batch purchase
         vm.startPrank(SWAPPER);
         try dcaManager.batchBuyRbtc(
+            toBatch(
             buyers,
             address(stablecoin),
             boundedScheduleIndexes,
             scheduleIds,
             purchaseAmounts,
             routeIndex
+            )
         ) {
             // Success
         } catch {

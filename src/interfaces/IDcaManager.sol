@@ -28,9 +28,10 @@ interface IDcaManager {
         uint64 scheduleId; // Unique identifier of each DCA schedule: the value of the creation nonce
     }
 
-    /// @notice One handler's purchase batch inside a multi-handler swapper call.
+    /// @notice One handler's purchase batch.
     /// @dev Every row shares this batch's `token` and `routeIndex`, which resolve to one handler.
     ///      The four arrays are positional and must have the same nonzero length.
+    ///      `batchBuyRbtc` takes one; `batchBuyRbtcAcrossHandlers` takes several.
     struct Batch {
         address[] buyers;
         address token;
@@ -251,34 +252,21 @@ interface IDcaManager {
 
     /**
      * @notice Buy rBTC for every named due schedule on one handler.
-     * @param buyers Users to buy for. The same address may appear more than once when several of
-     *        that user's schedules are due.
-     * @param token Stablecoin every row in this batch spends.
-     * @param scheduleIndexes Schedule array index for each row, paired with `buyers[i]`.
-     * @param scheduleIds Schedule id for each row, paired with `buyers[i]`.
-     * @param purchaseAmounts Amount each row must spend; must equal that schedule's stored amount.
-     * @param routeIndex Route every named schedule must share.
+     * @param batch One handler's purchase batch. Every row must share `token` and `routeIndex`.
      * @dev Only a swapper on the OperationsAdmin allowlist may call.
      *      Reverts `DcaManager__SchedulePaused` if any named schedule is paused, which fails the
      *      whole batch: the swapper must filter paused schedules out before composing the call.
      *      Mixing tokens or routes in one call is rejected per row (`RouteIndexMismatch`); the
      *      token is taken from the argument, not from storage, so the swapper must not mix tokens.
      */
-    function batchBuyRbtc(
-        address[] calldata buyers,
-        address token,
-        uint256[] calldata scheduleIndexes,
-        uint64[] calldata scheduleIds,
-        uint256[] calldata purchaseAmounts,
-        uint256 routeIndex
-    ) external;
+    function batchBuyRbtc(Batch calldata batch) external;
 
     /**
      * @notice Buy rBTC through several handlers atomically in one transaction.
      * @param batches Each element is one handler's purchase batch (`token` + `routeIndex`).
      * @dev Authenticates the caller once, then purchases each handler's batch in order through the
      *      same one-handler helper. A failure in any batch reverts every handler.
-     *      The original `batchBuyRbtc` remains available for one-handler retries.
+     *      The original `batchBuyRbtc` remains available for one-handler retries (same `Batch` type).
      */
     function batchBuyRbtcAcrossHandlers(Batch[] calldata batches) external;
 

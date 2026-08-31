@@ -7,7 +7,6 @@ import {IPurchaseMoc} from "../../src/interfaces/IPurchaseMoc.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import {DeployIdleHandler} from "../../script/DeployIdleHandler.s.sol";
 import {DeployLayerBankHandler} from "../../script/DeployLayerBankHandler.s.sol";
-import {batchBuyOne} from "../utils/BatchBuyOne.sol";
 import "../Constants.sol";
 
 /**
@@ -233,11 +232,9 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
     }
 
     function testBotEoaCanStillCallOriginalBatchBuyRbtc() external {
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        IDcaManager.Batch memory batch = _oneRow(SCHEDULE_INDEX, s_routeIndex);
         vm.prank(SWAPPER);
-        batchBuyOne(
-            dcaManager, USER, address(stablecoin), SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND, s_routeIndex
-        );
+        dcaManager.batchBuyRbtc(batch);
         assertGt(dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).lastPurchaseTimestamp, 0);
     }
 }
