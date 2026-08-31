@@ -523,9 +523,10 @@ PR 101 and does fail legacy no-IR codegen as written. Preserve its arithmetic/ev
 every leaf.
 
 **No `_creditBuyers` extraction (corrected 2026-08-31, PR 103).** This entry previously called that helper
-required rather than conditional. It is neither: the function is one slot over, and dropping the redundant
-`uint256 numOfPurchases = buyers.length` local is enough to compile with the loop inline under
-`via_ir = false`. That is also ~68–112 gas cheaper and 29 bytes smaller per Dex handler than extracting.
+required rather than conditional. It is neither: the function is one slot over, and scoping `aggregatedFee`
+to the block that pays the fee releases that slot, so the loop stays inline *and* keeps its cached
+`buyers.length` under `via_ir = false`. That is 87–416 gas cheaper and 17 bytes smaller per Dex handler than
+extracting.
 Checked rather than assumed: enabling the legacy optimizer (`optimizer = true`, `via_ir = false`) does **not**
 relieve stack-too-deep — solc asks for via-IR *with* the optimizer, and via-IR stays out of bounds for
 EIP-170 and deployment decisions under the Rootstock compiler/EVM proof rule above.

@@ -35,21 +35,31 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
         uint256[] memory purchaseAmounts,
         uint256 minRbtcOut
     ) external override onlyDcaManager {
-        // Calculate net amounts
-        (uint256 aggregatedFee, uint256[] memory netStablecoinAmountsToSpend, uint256 totalNetStablecoinPlanned) =
-            _calculateFeeAndNetAmounts(purchaseAmounts);
+        uint256[] memory netStablecoinAmountsToSpend;
+        uint256 totalNetStablecoinPlanned;
+        uint256 totalStablecoinAmountToSpend;
+        IERC20 purchaseToken;
 
-        // Retrieve the stablecoin to spend
-        // @notice we spend the stablecoin we actually received, never the gross amount we asked the lending protocol for
-        uint256 totalStablecoinAmountToSpend =
-            _batchRetrieveStablecoin(buyers, purchaseAmounts, totalNetStablecoinPlanned + aggregatedFee); // totalNetStablecoinPlanned (to spend on rBTC) + aggregatedFee (charged by BitChill)
-        if (totalStablecoinAmountToSpend <= aggregatedFee) {
-            revert PurchaseRbtc__StablecoinRetrievedBelowFee(totalStablecoinAmountToSpend, aggregatedFee);
+        // @dev `aggregatedFee` is scoped to this block deliberately: it is dead once the fee is paid, and
+        // releasing its stack slot before the credit loop is what leaves room to cache `buyers.length`.
+        {
+            uint256 aggregatedFee;
+            // Calculate net amounts
+            (aggregatedFee, netStablecoinAmountsToSpend, totalNetStablecoinPlanned) =
+                _calculateFeeAndNetAmounts(purchaseAmounts);
+
+            // Retrieve the stablecoin to spend
+            // @notice we spend the stablecoin we actually received, never the gross amount we asked the lending protocol for
+            totalStablecoinAmountToSpend =
+                _batchRetrieveStablecoin(buyers, purchaseAmounts, totalNetStablecoinPlanned + aggregatedFee); // totalNetStablecoinPlanned (to spend on rBTC) + aggregatedFee (charged by BitChill)
+            if (totalStablecoinAmountToSpend <= aggregatedFee) {
+                revert PurchaseRbtc__StablecoinRetrievedBelowFee(totalStablecoinAmountToSpend, aggregatedFee);
+            }
+            totalStablecoinAmountToSpend -= aggregatedFee;
+
+            purchaseToken = _purchaseToken();
+            _transferFee(purchaseToken, aggregatedFee);
         }
-        totalStablecoinAmountToSpend -= aggregatedFee;
-
-        IERC20 purchaseToken = _purchaseToken();
-        _transferFee(purchaseToken, aggregatedFee);
 
         uint256 totalPurchasedRbtc = _purchaseRbtc(totalStablecoinAmountToSpend);
         if (totalPurchasedRbtc == 0) revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(purchaseToken));
@@ -60,11 +70,8 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
             revert PurchaseRbtc__BelowSwapperMinimum(totalPurchasedRbtc, minRbtcOut);
         }
 
-        // @notice `buyers.length` is read per iteration rather than cached in a local on purpose: this
-        // function sits one slot under the limit the non-IR pipeline can address, and the cached length was
-        // the slot that put it over. Re-adding it fails the build with "Stack too deep", it does not save
-        // gas here (measured slightly cheaper without), and the fix is not to split the loop into a helper.
-        for (uint256 i; i < buyers.length; ++i) {
+        uint256 numOfPurchases = buyers.length;
+        for (uint256 i; i < numOfPurchases; ++i) {
             // @notice the planned net amounts are only allocation weights: they sum to totalNetStablecoinPlanned,
             // so the shares below sum to exactly 1 even if the redemption paid less than expected. Both the rBTC credited
             // and the stablecoin reported as spent are shares of what actually moved.

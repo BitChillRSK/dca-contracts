@@ -87,12 +87,16 @@ do not copy the obsolete combined R51/R52 prototype figures.
 
 **Correction recorded during implementation (2026-08-31).** This section originally required extracting the
 per-buyer allocation/credit loop into a private `_creditBuyers` helper. That is **not** necessary and PR 103
-does not do it. The function is exactly *one* slot over, and the slot is the redundant
-`uint256 numOfPurchases = buyers.length` local: reading `buyers.length` in the loop condition instead compiles
-under `via_ir = false` with the loop left inline. Measured, that is also marginally *cheaper*
-(`testSinglePurchase` −68 gas, `testBatchPurchasesOneUser` −112) and 29 bytes smaller on every Dex handler
-than the helper would have been, because it removes an internal call rather than adding one. Keep the length
-uncached — re-adding that local is what fails the build, and `src/PurchaseRbtc.sol` carries a comment saying so.
+does not do it. The function is exactly *one* slot over. PR 103 frees that slot by scoping `aggregatedFee` to
+a block that ends once the fee is paid — it is dead from there on — which leaves room to keep both the loop
+inline *and* the cached `uint256 numOfPurchases = buyers.length`. Measured against the helper, that is
+87 gas cheaper on `testSinglePurchase`, 416 on `testBatchPurchasesOneUser`, and 17 bytes smaller on every Dex
+handler, because it removes an internal call instead of adding one.
+
+Caching the length is worth keeping: isolated, it costs ~34 gas once and saves 3 gas per iteration (one
+avoided `MLOAD` of the memory array's length word), so it pays for itself above ~11 rows and batches are
+expected to exceed that. Dropping the cache also compiles, but is 19 gas worse at one row and 304 worse on
+the five-row batch test, because the scoped block reduces stack shuffling independently of the cache.
 
 For the record, since it was checked rather than assumed: enabling the **legacy optimizer**
 (`optimizer = true`, `via_ir = false`) does *not* relieve this. `[profile.default]` does leave the optimizer
@@ -114,10 +118,10 @@ verification were made at.
 - [x] `PurchaseRbtc.batchBuyRbtc` reverts
   `PurchaseRbtc__BelowSwapperMinimum(uint256 rbtcReceived, uint256 minRbtcOut)` when measured aggregate
   output is below the caller minimum, after the existing zero check and before credits.
-- [x] Keep the per-buyer allocation/credit loop inline and free the one needed stack slot by not caching
-  `buyers.length`. (Originally specified as a `_creditBuyers` extraction; see the correction above.) Planned
-  net amounts remain allocation weights; the denominator, truncation, accumulated-balance writes, and per-row
-  events are unchanged.
+- [x] Keep the per-buyer allocation/credit loop inline, freeing the one needed stack slot by scoping
+  `aggregatedFee` to the block that pays the fee. (Originally specified as a `_creditBuyers` extraction; see
+  the correction above.) Planned net amounts remain allocation weights; the denominator, truncation,
+  accumulated-balance writes, per-row events, and the order of every call are unchanged.
 - [x] Record final method selectors and runtime sizes in the PR.
 
 ## Governance-floor evidence and relaunch gate
