@@ -73,6 +73,9 @@ contract Handler is Test {
     uint256 public createScheduleSuccesses;
     uint256 public updateScheduleCalls;
     uint256 public buyRbtcCalls;
+    /// @dev `buyRbtcCalls` counts attempts, not outcomes. A purchase that never reaches the handler
+    ///      leaves every purchase invariant vacuously true, so the suite must be able to count wins too.
+    uint256 public buyRbtcSuccesses;
     uint256 public pauseCalls;
     uint256 public pauseAttemptsOnLiveSchedule;
     
@@ -457,7 +460,7 @@ contract Handler is Test {
         try dcaManager.batchBuyRbtc(
             toBatch(buyers, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, schedule.routeIndex)
         ) {
-            // Success
+            buyRbtcSuccesses++;
         } catch {
             // Ignore failures
         }
@@ -528,7 +531,7 @@ contract Handler is Test {
             routeIndex
             )
         ) {
-            // Success
+            buyRbtcSuccesses++;
         } catch {
             // Ignore failures
         }

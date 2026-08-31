@@ -196,16 +196,27 @@ contract PurchaseUniswapMinOutTest is Test {
         assertEq(harness.getAccumulatedRbtcBalance(BUYER), floor, "the measured delta is still what is credited");
     }
 
-    /// @dev No caller value can loosen the governance floor: even `minRbtcOut == 0` cannot buy below it.
+    /// @dev No caller value can loosen the governance floor. The interesting case is not `0` — which the
+    ///      test above already covers — but a **nonzero** minimum the payout would satisfy: the swapper says
+    ///      "this much is enough for me", the swap delivers exactly that, and the floor still rejects it.
+    ///      A caller value is only ever an additional constraint; it can never authorize a worse trade.
     function testCallerMinimumCannotLoosenTheOracleFloor() public {
         MinOutHarness harness = _deployHarness(18);
         uint256 gross = _fundedGross(harness, 18);
         uint256 net = gross - harness.calculateFee(gross);
 
-        swapRouter.setAmountOut(harness.getAmountOutMinimum(net) - 1);
+        uint256 belowTheFloor = harness.getAmountOutMinimum(net) - 1;
+        swapRouter.setAmountOut(belowTheFloor);
 
+        // The caller minimum is satisfied by this payout, and is the loosest nonzero value that still is.
         vm.expectRevert(bytes("Too little received"));
-        _buyOne(harness, gross, NO_MIN_RBTC_OUT);
+        _buyOne(harness, gross, belowTheFloor);
+
+        // Even asking for a single wei is not a way under the floor.
+        vm.expectRevert(bytes("Too little received"));
+        _buyOne(harness, gross, 1);
+
+        assertEq(harness.getAccumulatedRbtcBalance(BUYER), 0, "no caller value bought below the floor");
     }
 
     /// @dev `minRbtcOut` is WRBTC wei whatever the stablecoin's decimals: the same USD notional bought at the

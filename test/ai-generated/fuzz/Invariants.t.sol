@@ -198,6 +198,27 @@ contract InvariantTest is StdInvariant, Test {
         );
     }
 
+    /// @dev Coverage guard: a purchase must actually reach the handler and credit rBTC.
+    ///      DcaManager calls the wrappers below through an `IPurchaseRbtc` cast, so a wrapper whose
+    ///      `batchBuyRbtc` signature has drifted from the interface is not a compile error — it is a
+    ///      selector miss that reverts every purchase. `Handler` swallows those in try/catch, and no
+    ///      invariant here asserts a purchase ever happened, so the whole suite would stay green with
+    ///      its purchase invariants vacuous. That is exactly what R51's added `minRbtcOut` parameter
+    ///      caused before this guard existed.
+    function test_invariantHandlerBuysRbtcThroughDcaManager() public {
+        fuzzHandler.createDcaSchedule(0, MIN_PURCHASE_AMOUNT * 10, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD);
+        assertEq(fuzzHandler.createScheduleSuccesses(), 1, "Handler never created a schedule to buy for");
+
+        fuzzHandler.buyRbtcOneSchedule(0, 0);
+
+        assertEq(fuzzHandler.buyRbtcSuccesses(), 1, "the purchase never reached DcaManager");
+        assertGt(
+            handler.getAccumulatedRbtcBalance(s_users[0]),
+            0,
+            "the purchase reverted before crediting: the wrapper ABI has drifted from IPurchaseRbtc"
+        );
+    }
+
     /*//////////////////////////////////////////////////////////////
                             INVARIANT TESTS
     //////////////////////////////////////////////////////////////*/
@@ -347,6 +368,10 @@ contract InvariantTest is StdInvariant, Test {
      *      exactly what the `bool` regression broke.
      */
     function afterInvariant() public view {
+        // Deliberately no equivalent requirement for purchases here. A fuzz run can legitimately land
+        // every purchase attempt on a paused or not-yet-due schedule, so "some purchase succeeded" is a
+        // seed-dependent claim of the same kind this guard already had to abandon for pauses.
+        // `test_invariantHandlerBuysRbtcThroughDcaManager` makes the point deterministically instead.
         if (fuzzHandler.pauseAttemptsOnLiveSchedule() == 0) return;
         require(
             fuzzHandler.everPausedScheduleIdsLength() > 0,
@@ -453,14 +478,26 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
     
     /**
      * @notice Mock implementation of batchBuyRbtc for testing
+     * @dev Must track `IPurchaseRbtc.batchBuyRbtc` exactly. DcaManager reaches these wrappers through an
+     *      interface cast, so a stale signature is not a compile error — it is a selector miss at runtime
+     *      that reverts every purchase while the invariants above still pass, vacuously. R51 added
+     *      `minRbtcOut`; `test_invariantHandlerBuysRbtcThroughDcaManager` is the guard that keeps this
+     *      honest if the signature drifts again.
      */
     function batchBuyRbtc(
         address[] memory buyers,
         uint64[] memory scheduleIds,
-        uint256[] memory purchaseAmounts
+        uint256[] memory purchaseAmounts,
+        uint256 minRbtcOut
     ) external onlyDcaManager {
+        uint256 totalPurchasedRbtc;
         for (uint256 i = 0; i < buyers.length; i++) {
-            _buyRbtcInternal(buyers[i], scheduleIds[i], purchaseAmounts[i]);
+            totalPurchasedRbtc += _buyRbtcInternal(buyers[i], scheduleIds[i], purchaseAmounts[i]);
+        }
+        // The real pipeline checks before crediting; a revert here undoes the credits above, so the
+        // all-or-nothing outcome the caller sees is the same.
+        if (totalPurchasedRbtc < minRbtcOut) {
+            revert IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum(totalPurchasedRbtc, minRbtcOut);
         }
     }
     
@@ -495,7 +532,7 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
         address buyer,
         uint64 scheduleId,
         uint256 purchaseAmount
-    ) internal {
+    ) internal returns (uint256) {
         // Retrieve the stablecoin the purchase will spend
         uint256 retrieved = _retrieveStablecoin(buyer, purchaseAmount);
         
@@ -517,6 +554,8 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
         s_usersAccumulatedRbtc[buyer] += rbtcAmount;
         
         emit PurchaseRbtc__RbtcBought(buyer, address(i_stableToken), rbtcAmount, scheduleId, purchaseAmount);
+
+        return rbtcAmount;
     }
     
     // Events for testing
@@ -561,15 +600,27 @@ contract SovrynHandlerWrapper is SovrynErc20Handler {
     receive() external payable {}
     
     /**
-     * @notice Mock implementation of batchBuyRbtc for testing  
+     * @notice Mock implementation of batchBuyRbtc for testing
+     * @dev Must track `IPurchaseRbtc.batchBuyRbtc` exactly. DcaManager reaches these wrappers through an
+     *      interface cast, so a stale signature is not a compile error — it is a selector miss at runtime
+     *      that reverts every purchase while the invariants above still pass, vacuously. R51 added
+     *      `minRbtcOut`; `test_invariantHandlerBuysRbtcThroughDcaManager` is the guard that keeps this
+     *      honest if the signature drifts again.
      */
     function batchBuyRbtc(
         address[] memory buyers,
         uint64[] memory scheduleIds,
-        uint256[] memory purchaseAmounts
+        uint256[] memory purchaseAmounts,
+        uint256 minRbtcOut
     ) external onlyDcaManager {
+        uint256 totalPurchasedRbtc;
         for (uint256 i = 0; i < buyers.length; i++) {
-            _buyRbtcInternal(buyers[i], scheduleIds[i], purchaseAmounts[i]);
+            totalPurchasedRbtc += _buyRbtcInternal(buyers[i], scheduleIds[i], purchaseAmounts[i]);
+        }
+        // The real pipeline checks before crediting; a revert here undoes the credits above, so the
+        // all-or-nothing outcome the caller sees is the same.
+        if (totalPurchasedRbtc < minRbtcOut) {
+            revert IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum(totalPurchasedRbtc, minRbtcOut);
         }
     }
     
@@ -603,7 +654,7 @@ contract SovrynHandlerWrapper is SovrynErc20Handler {
         address buyer,
         uint64 scheduleId,
         uint256 purchaseAmount
-    ) internal {
+    ) internal returns (uint256) {
         // Retrieve the stablecoin the purchase will spend
         uint256 retrieved = _retrieveStablecoin(buyer, purchaseAmount);
         
@@ -625,6 +676,8 @@ contract SovrynHandlerWrapper is SovrynErc20Handler {
         s_usersAccumulatedRbtc[buyer] += rbtcAmount;
         
         emit PurchaseRbtc__RbtcBought(buyer, address(i_stableToken), rbtcAmount, scheduleId, purchaseAmount);
+
+        return rbtcAmount;
     }
     
     // Events for testing

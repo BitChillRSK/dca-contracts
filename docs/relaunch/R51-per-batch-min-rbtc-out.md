@@ -91,18 +91,18 @@ R51/R52 prototype figures.
 
 ## Scope
 
-- [ ] `IDcaManager.Batch` appends `uint256 minRbtcOut`, with natspec that fixes its aggregate semantics and
+- [x] `IDcaManager.Batch` appends `uint256 minRbtcOut`, with natspec that fixes its aggregate semantics and
   WRBTC-wei units. `batchBuyRbtc(Batch)` and `batchBuyRbtcAcrossHandlers(Batch[])` keep their PR 101 shapes,
   but both selectors change because the tuple changes.
-- [ ] `DcaManager._batchBuyRbtc` forwards `batch.minRbtcOut` to the resolved handler. Preserve every PR 101
+- [x] `DcaManager._batchBuyRbtc` forwards `batch.minRbtcOut` to the resolved handler. Preserve every PR 101
   check, effect, ordering decision, and one-handler retry path.
-- [ ] `IPurchaseRbtc.batchBuyRbtc` gains `uint256 minRbtcOut`.
-- [ ] `PurchaseRbtc.batchBuyRbtc` reverts
+- [x] `IPurchaseRbtc.batchBuyRbtc` gains `uint256 minRbtcOut`.
+- [x] `PurchaseRbtc.batchBuyRbtc` reverts
   `PurchaseRbtc__BelowSwapperMinimum(uint256 rbtcReceived, uint256 minRbtcOut)` when measured aggregate
   output is below the caller minimum, after the existing zero check and before credits.
-- [ ] Extract the required `_creditBuyers` helper. Planned net amounts remain allocation weights; the
+- [x] Extract the required `_creditBuyers` helper. Planned net amounts remain allocation weights; the
   denominator, truncation, accumulated-balance writes, and per-row events are unchanged.
-- [ ] Record final method selectors and runtime sizes in the PR.
+- [x] Record final method selectors and runtime sizes in the PR.
 
 ## Governance-floor evidence and relaunch gate
 
@@ -111,9 +111,18 @@ stack, before price impact, pool/oracle drift, and stablecoin peg drift. USDT0's
 slightly looser. A caller minimum can tighten this floor but cannot make a sound trade pass when the floor
 itself is too tight. R51 therefore surfaces the evidence rather than leaving the question between specs.
 
+**Correction recorded during implementation (2026-08-31).** This spec listed *Sovryn DOC* as a shipped Dex
+path. It is not one, and must never become one: **DOC buys rBTC only through MoC redemption.** DOC may appear
+in a Uniswap path solely as an intermediate hop, never as a Dex handler's input token. The DOC Dex handler is
+development-era legacy kept for tests, in the same position as Tropykus after R37 — no DOC Dex handler is ever
+to be deployed. The shipped Dex set is therefore **LayerBank USDRIF and LayerBank USDT0**. PR 103 measured the
+DOC path anyway and records the result as evidence for deleting it, not as a route awaiting calibration.
+Separately, `DeployDexSwaps`' live branch can still construct that handler when `STABLECOIN_TYPE=DOC`; closing
+that hole is deploy-script work outside R51's Solidity scope and is tracked on its own.
+
 **What gates PR 103.** The contracts PR must record one reproducible fork-derived measurement table, at a
-named block, for every currently configured shipped handler/path (Sovryn DOC, LayerBank USDRIF, and LayerBank
-USDT0). Use the token's deployed minimum purchase and fee lower/upper bounds as the three reproducible input
+named block, for every currently configured shipped handler/path (LayerBank USDRIF and LayerBank USDT0; see
+the correction above for Sovryn DOC). Use the token's deployed minimum purchase and fee lower/upper bounds as the three reproducible input
 points unless current bot data supplies better documented aggregate sizes; this choice must not require a new
 product answer. The table records:
 
@@ -240,16 +249,16 @@ rather than blocking the contracts PR.
 
 ## Success criteria
 
-- [ ] No caller value can loosen the governance floor.
-- [ ] The bound is checked against measured aggregate rBTC on every purchase venue.
-- [ ] PR 101's checks/effects/order and both entry-point shapes are preserved.
-- [ ] Every default-profile runtime remains below EIP-170 and the PR records the final margins.
-- [ ] The PR contains the first named-block fork table for every configured production path and operational
+- [x] No caller value can loosen the governance floor.
+- [x] The bound is checked against measured aggregate rBTC on every purchase venue.
+- [x] PR 101's checks/effects/order and both entry-point shapes are preserved.
+- [x] Every default-profile runtime remains below EIP-170 and the PR records the final margins.
+- [x] The PR contains the first named-block fork table for every configured production path and operational
   size, including negative findings; it does not wait for multi-observation calibration or route enablement.
-- [ ] The off-chain issues are opened/updated with the relaunch acceptance criteria and linked in the contracts
+- [x] The off-chain issues are opened/updated with the relaunch acceptance criteria and linked in the contracts
   PR; their implementation and continuing calibration do not gate merge.
-- [ ] R9 indexing and R10 natspec rules are applied to the new error, field, and parameter.
-- [ ] No open contract product decisions.
+- [x] R9 indexing and R10 natspec rules are applied to the new error, field, and parameter.
+- [x] No open contract product decisions.
 
 ## ABI / deploy / cutover impact
 

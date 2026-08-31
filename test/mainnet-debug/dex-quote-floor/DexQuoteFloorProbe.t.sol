@@ -20,6 +20,9 @@ interface IV3SwapRouterLike {
  * @title DexQuoteFloorProbe
  * @notice R51 relaunch evidence: for every shipped Dex path, what the live pool actually pays for the
  *         batch's post-BitChill-fee input, and how that compares with the oracle-derived governance floor.
+ * @dev The shipped Dex set is LayerBank USDRIF and LayerBank USDT0. DOC is deliberately not in it — DOC buys
+ *      rBTC through MoC redemption only — and its row below is kept as evidence about a legacy path that must
+ *      never be deployed, not as a candidate awaiting calibration.
  * @dev Run with `make probe-dex-quote-floor`, which pins `FORK_BLOCK_DEX_QUOTE` so the table reproduces.
  *      This is the first single-block observation the R51 spec gates the contracts PR on. It is *not* the
  *      multi-block calibration that gates Dex relaunch: that extends this table across recent blocks and
@@ -74,10 +77,16 @@ contract DexQuoteFloorProbe is Test {
                              THE SHIPPED PATHS
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Sovryn DOC: DOC -0.05%-> rUSDT -0.05%-> WRBTC. 0.10% in fee tiers.
-    function test_quoteVsFloor_sovrynDoc() public {
+    /**
+     * @dev NOT a shipped route, and never to become one: **DOC buys rBTC only through MoC redemption.**
+     *      DOC may appear in a Uniswap path solely as an intermediate hop, never as a Dex handler's input
+     *      token. The DOC Dex handler is development-era legacy kept for tests, like Tropykus after R37.
+     *      This row is measured to document what the abandoned path is actually worth — evidence for
+     *      deleting it, not a route awaiting calibration. Path: DOC -0.05%-> rUSDT -0.05%-> WRBTC.
+     */
+    function test_quoteVsFloor_legacyDocDexPath_neverToBeDeployed() public {
         bytes memory path = abi.encodePacked(DOC, uint24(500), RUSDT, uint24(500), WRBTC);
-        _table("Sovryn DOC", DOC, 18, path, "DOC-500-rUSDT-500-WRBTC");
+        _table("LEGACY DOC dex path (never deployed; MoC is DOC's only venue)", DOC, 18, path, "DOC-500-rUSDT-500-WRBTC");
     }
 
     /// @dev LayerBank USDRIF: USDRIF -0.05%-> USDT -0.30%-> WRBTC. 0.35% in fee tiers.
