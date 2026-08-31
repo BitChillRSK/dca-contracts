@@ -1,6 +1,6 @@
 # R52 — Allowlisted Dex path failover
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
 PR 51 of the relaunch stack; planned GitHub implementation PR **#104**. Stack on R51 / GitHub #103.
 One chat/PR owns only this persistent path-governance change.
@@ -110,22 +110,22 @@ authorization call on the handler.
 
 ## Scope
 
-- [ ] Add the per-handler exact-path allowlist, owner setter, getter, combined assertion view, transition event,
+- [x] Add the per-handler exact-path allowlist, owner setter, getter, combined assertion view, transition event,
   and diagnostic errors to `IOperationsAdmin` / `OperationsAdmin`.
-- [ ] The owner setter accepts full encoded path bytes, stores their hash, and rejects no-op writes. Validate the
+- [x] The owner setter accepts full encoded path bytes, stores their hash, and rejects no-op writes. Validate the
   generic V3 path shape (`20 + n * 23`, at least one pool); the handler remains responsible for pinned endpoints.
   Validate the handler's Dex getter on every write and normalize any failed/malformed call to
   `OperationsAdmin__InvalidDexHandler(handler)`.
-- [ ] Active-path revocation queries `getSwapPath`, hashes it, and reverts. A non-active allowed path can be revoked.
-- [ ] Change `IPurchaseUniswap` natspec and `PurchaseUniswap.setPurchasePath` authorization as described above.
+- [x] Active-path revocation queries `getSwapPath`, hashes it, and reverts. A non-active allowed path can be revoked.
+- [x] Change `IPurchaseUniswap` natspec and `PurchaseUniswap.setPurchasePath` authorization as described above.
   Constructor path installation stays internal and authorization-free.
-- [ ] `DeployDexSwaps` and `DeployUsdrifHandler` seed the constructor-installed path before handler assignment.
+- [x] `DeployDexSwaps` and `DeployUsdrifHandler` seed the constructor-installed path before handler assignment.
   `DeployLayerBankHandler` is MoC-only and must **not** be changed for this Dex feature.
-- [ ] Update live/add-on Safe runbooks printed by scripts: read current path, allow it, assign the handler, and then
+- [x] Update live/add-on Safe runbooks printed by scripts: read current path, allow it, assign the handler, and then
   perform token-specific DcaManager setup such as the USDT0 minimum.
-- [ ] Assert the production ownership topology: after acceptance, OperationsAdmin and every Dex handler name the
+- [x] Assert the production ownership topology: after acceptance, OperationsAdmin and every Dex handler name the
   same Safe; document the broadcaster/pending-owner transition and the independent behavior if owners later diverge.
-- [ ] Re-measure every Dex leaf and OperationsAdmin, and record configuration gas for allow/activate/revoke.
+- [x] Re-measure every Dex leaf and OperationsAdmin, and record configuration gas for allow/activate/revoke.
 
 ## Off-chain relaunch gate
 
@@ -202,16 +202,22 @@ that an unauthorized/hash-mismatched activation fails.
 
 ## Success criteria
 
-- [ ] Every active Dex path is governance-allowlisted, including the constructor path before assignment.
-- [ ] The swapper and OperationsAdmin owner can switch only among exact approved paths.
-- [ ] Active permission cannot be revoked until another approved path is active.
-- [ ] A compromised swapper cannot widen slippage or introduce an unapproved token/pool combination.
-- [ ] All Dex handlers remain below EIP-170 in the default deploy profile.
-- [ ] Deployment scripts and off-chain issues contain complete normal/failover/recovery sequencing.
-- [ ] Steady-state ownership is the same production Safe, transitional ownership is documented/tested, and path
+- [x] Every active Dex path is governance-allowlisted, including the constructor path before assignment.
+- [x] The swapper and OperationsAdmin owner can switch only among exact approved paths.
+- [x] Active permission cannot be revoked until another approved path is active.
+- [x] A compromised swapper cannot widen slippage or introduce an unapproved token/pool combination.
+- [x] All Dex handlers remain below EIP-170 in the default deploy profile.
+- [x] Deployment scripts and off-chain issues contain complete normal/failover/recovery sequencing.
+- [x] Steady-state ownership is the same production Safe, transitional ownership is documented/tested, and path
   versus handler-configuration authority remains explicit if ownership later diverges.
-- [ ] R9 indexing and R10 natspec rules cover all new/repurposed surfaces.
-- [ ] No open product decisions.
+- [x] R9 indexing and R10 natspec rules cover all new/repurposed surfaces.
+- [x] No open product decisions.
+
+GitHub [#104](https://github.com/BitChillRSK/dca-contracts/pull/104). Default-profile runtime: `OperationsAdmin`
+9,300 (margin 15,276); `LayerBankErc20HandlerDex` 23,778 (798); `SovrynErc20HandlerDex` 23,318 (1,258);
+`TropykusErc20HandlerDex` 23,574 (1,002); `DcaManager` unchanged at 23,703 (873). Dex leaves +244 bytes vs R51
+for the DcaManager lookup plus one `requirePurchasePathSetter` call. Config gas on Anvil USDRIF dex-layerbank:
+allow ~43k, activate ~30k, revoke ~18k.
 
 ## ABI / deploy / cutover impact
 

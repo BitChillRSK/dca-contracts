@@ -99,7 +99,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R10 | 48 | none |
 | R42 integration | 49 ([#101](https://github.com/BitChillRSK/dca-contracts/pull/101)) | none (`Batch` for both entry points) |
 | R51 | 50 (planned GitHub #103) | none (first fork table in PR; durable live floor is a relaunch gate) |
-| R52 | 51 (planned GitHub #104) | none (same production Safe; explicit split authority if owners diverge) |
+| R52 | 51 ([#104](https://github.com/BitChillRSK/dca-contracts/pull/104)) | none (same production Safe; explicit split authority if owners diverge) |
 | R51 deploy follow-up | unassigned | none (enforce the DOC-Dex never-deploy rule in `DeployDexSwaps`) |
 
 ### PR 1 - R23 toolchain and dependency baseline
@@ -548,7 +548,7 @@ mirrors what R37 did for Tropykus: revert on the DOC Dex arm in the live branch 
 re-run the deploy lanes. Until then the never-deploy rule above is documentation only and is not enforced by
 the script. Sequence this before any Dex cutover broadcast; it does not block R52.
 
-### PR 51 - R52 allowlisted Dex path failover (planned GitHub #104)
+### PR 51 - R52 allowlisted Dex path failover ([#104](https://github.com/BitChillRSK/dca-contracts/pull/104))
 
 Move exact-path policy to `OperationsAdmin`: governance allowlists full encoded paths per handler, while an
 existing swapper or the OperationsAdmin owner may activate only those paths. The owner is explicit
