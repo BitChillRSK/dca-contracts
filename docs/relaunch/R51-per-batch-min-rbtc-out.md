@@ -1,8 +1,8 @@
 # R51 — Per-batch minimum rBTC output
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **implemented** · GitHub [#103](https://github.com/BitChillRSK/dca-contracts/pull/103) · Assigned: yes · Optional/further-review: no
 
-PR 50 of the relaunch stack; planned GitHub implementation PR **#103**. Stack on R42's integration
+PR 50 of the relaunch stack; GitHub implementation PR **[#103](https://github.com/BitChillRSK/dca-contracts/pull/103)**. Stack on R42's integration
 follow-up (PR 49, [#101](https://github.com/BitChillRSK/dca-contracts/pull/101)). R52 owns dex-path
 authorization and follows this PR; do not pull that surface into R51.
 
