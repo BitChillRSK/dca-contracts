@@ -32,6 +32,13 @@ interface IDcaManager {
     /// @dev Every row shares this batch's `token` and `routeIndex`, which resolve to one handler.
     ///      The four arrays are positional and must have the same nonzero length.
     ///      `batchBuyRbtc` takes one; `batchBuyRbtcAcrossHandlers` takes several.
+    /// @dev `minRbtcOut` is the caller's minimum for the batch as a whole, in rBTC/WRBTC wei (18
+    ///      decimals) whatever the stablecoin's decimals, and is compared against the rBTC the
+    ///      handler measures itself receiving. It can only tighten the handler's own governance
+    ///      floor, never loosen it, and `0` disables it. It is a liveness bound for an honestly
+    ///      operated swapper against a stale quote or adverse execution, not a second governance
+    ///      ceiling: a compromised swapper can pass `0` or `1` and remains bounded only by the
+    ///      handler's floor.
     struct Batch {
         address[] buyers;
         address token;
@@ -39,6 +46,7 @@ interface IDcaManager {
         uint64[] scheduleIds;
         uint256[] purchaseAmounts;
         uint256 routeIndex;
+        uint256 minRbtcOut;
     }
 
     /**
@@ -261,6 +269,9 @@ interface IDcaManager {
      *      swapper must filter paused schedules out before composing the call.
      *      Mixing tokens or routes in one call is rejected per row (`RouteIndexMismatch`); the
      *      token is taken from the argument, not from storage, so the swapper must not mix tokens.
+     *      If the handler measures less rBTC than `batch.minRbtcOut`, it reverts
+     *      `PurchaseRbtc__BelowSwapperMinimum` and the whole batch — schedule debits included —
+     *      rolls back.
      */
     function batchBuyRbtc(Batch calldata batch) external;
 
@@ -268,8 +279,10 @@ interface IDcaManager {
      * @notice Buy rBTC through several handlers atomically in one transaction.
      * @param batches Each element is one handler's purchase batch (`token` + `routeIndex`).
      * @dev Authenticates the caller once, then purchases each handler's batch in order through the
-     *      same one-handler helper. A failure in any batch — including a paused row — reverts every
-     *      handler. `batchBuyRbtc` remains available for one-handler retries (same `Batch` type).
+     *      same one-handler helper. A failure in any batch — including a paused row or a batch that
+     *      bought less than its own `minRbtcOut` — reverts every handler, so a later batch's minimum
+     *      undoes an earlier handler's purchase. `batchBuyRbtc` remains available for one-handler
+     *      retries (same `Batch` type).
      */
     function batchBuyRbtcAcrossHandlers(Batch[] calldata batches) external;
 

@@ -206,6 +206,79 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         assertEq(IPurchaseRbtc(secondHandler).getAccumulatedRbtcBalance(USER), secondRbtcBefore);
     }
 
+    /// @dev R51: a later batch's own minimum failing must undo the earlier handler's completed purchase,
+    ///      the same way a paused row or a venue failure does.
+    function testSecondGroupMinimumFailureRollsBackFirstGroup() external {
+        _requireTwoHandlers();
+
+        IDcaManager.DcaSchedule memory firstBefore =
+            dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX);
+        IDcaManager.DcaSchedule memory secondBefore =
+            dcaManager.getDcaSchedule(USER, address(stablecoin), SECOND_SCHEDULE_INDEX);
+        uint256 firstRbtcBefore = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
+        uint256 secondRbtcBefore = IPurchaseRbtc(secondHandler).getAccumulatedRbtcBalance(USER);
+
+        // Only the second handler's batch carries an unreachable minimum; the first is a normal purchase.
+        IDcaManager.Batch[] memory batches = _twoHandlers();
+        batches[1].minRbtcOut = type(uint256).max;
+
+        vm.prank(SWAPPER);
+        (bool ok,) = address(dcaManager).call(abi.encodeCall(IDcaManager.batchBuyRbtcAcrossHandlers, (batches)));
+        assertFalse(ok, "the bundle must fail on the second handler's minimum");
+
+        IDcaManager.DcaSchedule memory firstAfter =
+            dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX);
+        IDcaManager.DcaSchedule memory secondAfter =
+            dcaManager.getDcaSchedule(USER, address(stablecoin), SECOND_SCHEDULE_INDEX);
+        assertEq(firstAfter.tokenBalance, firstBefore.tokenBalance, "the earlier handler's debit rolls back");
+        assertEq(firstAfter.lastPurchaseTimestamp, firstBefore.lastPurchaseTimestamp);
+        assertEq(secondAfter.tokenBalance, secondBefore.tokenBalance);
+        assertEq(secondAfter.lastPurchaseTimestamp, secondBefore.lastPurchaseTimestamp);
+        assertEq(
+            IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER),
+            firstRbtcBefore,
+            "the earlier handler's rBTC credit rolls back"
+        );
+        assertEq(IPurchaseRbtc(secondHandler).getAccumulatedRbtcBalance(USER), secondRbtcBefore);
+
+        // The same bundle without that minimum still goes through, so nothing was left in a stuck state.
+        _batchBuy(_twoHandlers());
+        assertEq(
+            dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance,
+            firstBefore.tokenBalance - AMOUNT_TO_SPEND
+        );
+    }
+
+    /// @dev Each batch carries its own minimum: one handler's bound must not be applied to another's output.
+    function testEachGroupCarriesItsOwnMinimum() external {
+        _requireTwoHandlers();
+
+        // A minimum only the two handlers' outputs together could clear must still fail the batch it is on.
+        IDcaManager.Batch[] memory probe = _twoHandlers();
+        probe[0].minRbtcOut = type(uint256).max;
+        vm.prank(SWAPPER);
+        (bool ok, bytes memory returnData) =
+            address(dcaManager).call(abi.encodeCall(IDcaManager.batchBuyRbtcAcrossHandlers, (probe)));
+        assertFalse(ok);
+        assertEq(bytes4(returnData), IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector);
+
+        // Reading the first handler's own measured output back, a bundle that gives each batch a minimum it
+        // can meet on its own succeeds.
+        bytes memory args = new bytes(returnData.length - 4);
+        for (uint256 i; i < args.length; ++i) {
+            args[i] = returnData[i + 4];
+        }
+        (uint256 firstMeasured,) = abi.decode(args, (uint256, uint256));
+
+        IDcaManager.Batch[] memory batches = _twoHandlers();
+        batches[0].minRbtcOut = firstMeasured;
+        batches[1].minRbtcOut = 1;
+        _batchBuy(batches);
+
+        assertEq(IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER), firstMeasured);
+        assertGt(IPurchaseRbtc(secondHandler).getAccumulatedRbtcBalance(USER), 0);
+    }
+
     function testEmptyHandlersRevert() external {
         IDcaManager.Batch[] memory batches = new IDcaManager.Batch[](0);
         vm.expectRevert(IDcaManager.DcaManager__EmptyHandlerBatches.selector);

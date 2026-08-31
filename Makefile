@@ -12,13 +12,16 @@ FORK_TEST_CMD := forge test --no-match-test invariant --no-match-contract Compar
 # mint on a fork: block 8739512 (2026-04-16 16:20 UTC) still mints, 8740674 (2026-04-17 00:13 UTC)
 # reverts with kToken error "C2". Do not raise this past 8739512.
 FORK_BLOCK_TROPYKUS ?= 8700000
+# Rootstock mainnet 2026-08-31 10:39:35 UTC. Pins the R51 Dex quote-vs-floor table
+# (`make probe-dex-quote-floor`) so its rows reproduce. Bump only when re-observing.
+FORK_BLOCK_DEX_QUOTE ?= 9198813
 # Live SIP-0094 probe (`make probe-sovryn-exit-fee`). Override with PROBE_VERBOSITY=-vvvv
 # or PROBE_MATCH=test_controllerFlagAndVault.
 PROBE_VERBOSITY ?= -vv
 PROBE_MATCH ?=
 
 # Targets
-.PHONY: all test moc dex help check ci build patch-deps slither moc-none moc-layerbank moc-tropykus moc-sovryn dex-tropykus dex-sovryn dex-layerbank invariants invariants-sovryn fork fork-tropykus fork-sovryn probe-sovryn-exit-fee coverage
+.PHONY: all test moc dex help check ci build patch-deps slither moc-none moc-layerbank moc-tropykus moc-sovryn dex-tropykus dex-sovryn dex-layerbank invariants invariants-sovryn fork fork-tropykus fork-sovryn probe-sovryn-exit-fee probe-dex-quote-floor coverage
 
 all: help
 
@@ -131,6 +134,19 @@ probe-sovryn-exit-fee:
 		$(if $(PROBE_MATCH),--match-test $(PROBE_MATCH),) \
 		--fork-url $$RSK_MAINNET_RPC_URL $(PROBE_VERBOSITY) -j 1
 
+# R51 Dex quote-vs-floor table (excluded from check/fork/CI). Prices every shipped path against the live
+# pools at FORK_BLOCK_DEX_QUOTE and compares each row with the oracle-derived governance floor.
+probe-dex-quote-floor:
+	@echo "Probing live Dex pool quotes against the oracle floor at block $(FORK_BLOCK_DEX_QUOTE)..."
+	@set -a; [ -f .env ] && . ./.env; set +a; \
+	if [ -z "$$RSK_MAINNET_RPC_URL" ]; then \
+		echo "error: RSK_MAINNET_RPC_URL is not set. Add it to .env or export it."; \
+		exit 1; \
+	fi; \
+	SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn EXPECTED_LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=DOC \
+	forge test --match-path "test/mainnet-debug/dex-quote-floor/**" \
+		--fork-url $$RSK_MAINNET_RPC_URL --fork-block-number $(FORK_BLOCK_DEX_QUOTE) $(PROBE_VERBOSITY) -j 1
+
 # DexSwaps specific tests (DcaDappTest requires SWAP_TYPE and LENDING_PROTOCOL)
 dex:
 	@echo "Executing DexSwaps tests with $(LENDING_PROTOCOL) and $(STABLECOIN_TYPE)..."
@@ -182,6 +198,7 @@ help:
 	@echo "  make fork-tropykus             # Tropykus fork tests (pinned: kDOC mint paused 2026-04-27)"
 	@echo "  make fork-sovryn               # Sovryn fork tests (chain tip)"
 	@echo "  make probe-sovryn-exit-fee     # Live iSUSD burn: is SIP-0094's 0.1% fee charging?"
+	@echo "  make probe-dex-quote-floor     # R51: live Dex pool quotes vs the oracle floor, at a pinned block"
 	@echo ""
 	@echo "Environment variables:"
 	@echo "  SWAP_TYPE: mocSwaps (default) or dexSwaps"

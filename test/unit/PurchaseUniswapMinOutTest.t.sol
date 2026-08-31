@@ -14,6 +14,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {MockMocOracle} from "../mocks/MockMocOracle.sol";
 import {MockWrbtcToken} from "../mocks/MockWrbtcToken.sol";
 import {MockStablecoinWithDecimals} from "../mocks/MockStablecoinWithDecimals.sol";
+import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
+import {handlerBatchBuyOne, NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
 import "../Constants.sol";
 
 /**
@@ -27,6 +29,9 @@ contract PurchaseUniswapMinOutTest is Test {
     uint256 private constant SAFETY = DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK;
     uint256 private constant BTC_PRICE_18 = BTC_PRICE * 1e18; // what MockMocOracle publishes
     uint256 private constant USD_NOTIONAL = 25; // $25, the minimum purchase
+    uint256 private constant BATCH_USD_NOTIONAL = 1000; // inside the fee bands the harness is built with
+    address private constant BUYER = address(0xB0B);
+    uint64 private constant SCHEDULE_ID = 1;
 
     MockWrbtcToken private wrBtcToken;
     MockFloorSwapRouter private swapRouter;
@@ -142,8 +147,111 @@ contract PurchaseUniswapMinOutTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
+        R51: THE CALLER MINIMUM AND THE GOVERNANCE FLOOR ARE INDEPENDENT
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev The router floor bites on its own: a payout under the oracle-derived minimum is rejected by the
+    ///      swap itself, with the caller supplying no minimum at all.
+    function testOracleFloorRevertsWithNoCallerMinimum() public {
+        MinOutHarness harness = _deployHarness(18);
+        uint256 gross = _fundedGross(harness, 18);
+        uint256 net = gross - harness.calculateFee(gross);
+
+        swapRouter.setAmountOut(harness.getAmountOutMinimum(net) - 1);
+
+        vm.expectRevert(bytes("Too little received"));
+        _buyOne(harness, gross, NO_MIN_RBTC_OUT);
+    }
+
+    /// @dev The caller minimum bites on its own: a payout the router floor accepts is still rejected when the
+    ///      swapper asked for more than it delivered.
+    function testCallerMinimumRevertsAnOutputTheOracleFloorAccepts() public {
+        MinOutHarness harness = _deployHarness(18);
+        uint256 gross = _fundedGross(harness, 18);
+        uint256 net = gross - harness.calculateFee(gross);
+
+        uint256 clearsTheFloor = harness.getAmountOutMinimum(net);
+        swapRouter.setAmountOut(clearsTheFloor);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, clearsTheFloor, clearsTheFloor + 1
+            )
+        );
+        _buyOne(harness, gross, clearsTheFloor + 1);
+    }
+
+    /// @dev A caller minimum looser than the governance floor is inert: the swap that clears the floor also
+    ///      clears it, and the handler credits the measured WRBTC delta as before.
+    function testCallerMinimumBelowTheOracleFloorIsInert() public {
+        MinOutHarness harness = _deployHarness(18);
+        uint256 gross = _fundedGross(harness, 18);
+        uint256 net = gross - harness.calculateFee(gross);
+
+        uint256 floor = harness.getAmountOutMinimum(net);
+        swapRouter.setAmountOut(floor);
+
+        _buyOne(harness, gross, floor / 2);
+
+        assertEq(harness.getAccumulatedRbtcBalance(BUYER), floor, "the measured delta is still what is credited");
+    }
+
+    /// @dev No caller value can loosen the governance floor: even `minRbtcOut == 0` cannot buy below it.
+    function testCallerMinimumCannotLoosenTheOracleFloor() public {
+        MinOutHarness harness = _deployHarness(18);
+        uint256 gross = _fundedGross(harness, 18);
+        uint256 net = gross - harness.calculateFee(gross);
+
+        swapRouter.setAmountOut(harness.getAmountOutMinimum(net) - 1);
+
+        vm.expectRevert(bytes("Too little received"));
+        _buyOne(harness, gross, NO_MIN_RBTC_OUT);
+    }
+
+    /// @dev `minRbtcOut` is WRBTC wei whatever the stablecoin's decimals: the same USD notional bought at the
+    ///      same price takes the same 18-decimal minimum from a 6-decimal token as from an 18-decimal one.
+    function testCallerMinimumIsWrbtcWeiAtEveryStablecoinScale() public {
+        MinOutHarness eighteen = _deployHarness(18);
+        MinOutHarness six = _deployHarness(6);
+
+        uint256 grossEighteen = _fundedGross(eighteen, 18);
+        uint256 grossSix = _fundedGross(six, 6);
+        // Same USD notional, so the same net USD and the same oracle-derived floor in WRBTC wei.
+        uint256 floor = eighteen.getAmountOutMinimum(grossEighteen - eighteen.calculateFee(grossEighteen));
+        assertEq(six.getAmountOutMinimum(grossSix - six.calculateFee(grossSix)), floor, "same USD, same floor");
+
+        swapRouter.setAmountOut(floor);
+        _buyOne(eighteen, grossEighteen, floor);
+        _buyOne(six, grossSix, floor);
+
+        assertEq(eighteen.getAccumulatedRbtcBalance(BUYER), floor);
+        assertEq(six.getAccumulatedRbtcBalance(BUYER), floor, "a 6-decimal input still takes an 18-decimal minimum");
+
+        // A wei more than the 18-decimal payout is out of reach for both, so neither read its own token's units.
+        six.mintStablecoin(grossSix); // the first batch spent what it was funded with
+        swapRouter.setAmountOut(floor);
+        vm.expectRevert(
+            abi.encodeWithSelector(IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, floor, floor + 1)
+        );
+        _buyOne(six, grossSix, floor + 1);
+    }
+
+    /*//////////////////////////////////////////////////////////////
                                 HELPERS
     //////////////////////////////////////////////////////////////*/
+
+    /// @dev Fund the handler with a batch's gross spend: `FEE_PURCHASE_LOWER_BOUND` USD in the token's units,
+    ///      which sits inside the fee bands the harness is built with.
+    function _fundedGross(MinOutHarness harness, uint8 tokenDecimals) private returns (uint256 gross) {
+        gross = BATCH_USD_NOTIONAL * (10 ** tokenDecimals);
+        harness.mintStablecoin(gross);
+    }
+
+    /// @dev One-row batch through the real `PurchaseRbtc` pipeline, so the swap, the fee, and the caller
+    ///      minimum are all exercised the way `DcaManager` drives them.
+    function _buyOne(MinOutHarness harness, uint256 gross, uint256 minRbtcOut) private {
+        handlerBatchBuyOne(IPurchaseRbtc(address(harness)), BUYER, SCHEDULE_ID, gross, minRbtcOut);
+    }
 
     function _deployHarness(uint8 tokenDecimals) private returns (MinOutHarness) {
         return _deployHarnessFor(new MockStablecoinWithDecimals(address(this), tokenDecimals));
@@ -205,6 +313,10 @@ contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
         return _getAmountOutMinimum(stablecoinAmountToSpend);
     }
 
+    function calculateFee(uint256 grossAmount) external view returns (uint256) {
+        return _calculateFee(grossAmount);
+    }
+
     function purchaseRbtc(uint256 stablecoinAmountToSpend) external returns (uint256) {
         return _purchaseRbtc(stablecoinAmountToSpend);
     }
@@ -221,13 +333,14 @@ contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
         return 0;
     }
 
-    function _batchRetrieveStablecoin(address[] memory, uint256[] memory, uint256)
+    /// @dev The stablecoin is minted straight to the harness, so a batch "retrieves" exactly what it asked for.
+    function _batchRetrieveStablecoin(address[] memory, uint256[] memory, uint256 totalStablecoinToRetrieve)
         internal
         pure
         override
         returns (uint256)
     {
-        return 0;
+        return totalStablecoinToRetrieve;
     }
 }
 

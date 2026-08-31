@@ -29,13 +29,12 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
      *      protocol. Planned net amounts are only allocation weights: both the rBTC credited and
      *      the stablecoin reported as spent are shares of what actually moved.
      */
-    function batchBuyRbtc(address[] memory buyers, uint64[] memory scheduleIds, uint256[] memory purchaseAmounts)
-        external
-        override
-        onlyDcaManager
-    {
-        uint256 numOfPurchases = buyers.length;
-
+    function batchBuyRbtc(
+        address[] memory buyers,
+        uint64[] memory scheduleIds,
+        uint256[] memory purchaseAmounts,
+        uint256 minRbtcOut
+    ) external override onlyDcaManager {
         // Calculate net amounts
         (uint256 aggregatedFee, uint256[] memory netStablecoinAmountsToSpend, uint256 totalNetStablecoinPlanned) =
             _calculateFeeAndNetAmounts(purchaseAmounts);
@@ -54,20 +53,22 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
 
         uint256 totalPurchasedRbtc = _purchaseRbtc(totalStablecoinAmountToSpend);
         if (totalPurchasedRbtc == 0) revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(purchaseToken));
-
-        for (uint256 i; i < numOfPurchases; ++i) {
-            // @notice the planned net amounts are only allocation weights: they sum to totalNetStablecoinPlanned,
-            // so the shares below sum to exactly 1 even if the redemption paid less than expected. Both the rBTC credited
-            // and the stablecoin reported as spent are shares of what actually moved.
-            uint256 usersPurchasedRbtc =
-                totalPurchasedRbtc * netStablecoinAmountsToSpend[i] / totalNetStablecoinPlanned;
-            uint256 usersStablecoinSpent =
-                totalStablecoinAmountToSpend * netStablecoinAmountsToSpend[i] / totalNetStablecoinPlanned;
-            s_usersAccumulatedRbtc[buyers[i]] += usersPurchasedRbtc;
-            emit PurchaseRbtc__RbtcBought(
-                buyers[i], address(purchaseToken), usersPurchasedRbtc, scheduleIds[i], usersStablecoinSpent
-            );
+        // @notice the caller's bound is checked against the rBTC we measured ourselves receiving, so it holds
+        // on every purchase venue and never trusts an integrator return value. Equality passes. The venue may
+        // already have reverted on its own floor; the two bounds are independent and the stricter one wins.
+        if (totalPurchasedRbtc < minRbtcOut) {
+            revert PurchaseRbtc__BelowSwapperMinimum(totalPurchasedRbtc, minRbtcOut);
         }
+
+        _creditBuyers(
+            buyers,
+            scheduleIds,
+            netStablecoinAmountsToSpend,
+            totalNetStablecoinPlanned,
+            totalPurchasedRbtc,
+            totalStablecoinAmountToSpend,
+            purchaseToken
+        );
         emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
             address(purchaseToken), totalPurchasedRbtc, totalStablecoinAmountToSpend
         );
@@ -91,6 +92,35 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
     /*//////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @dev Credit each buyer their share of the batch and emit that row's purchase event. Split out of
+     *      `batchBuyRbtc` because the two together exceed the stack the non-IR pipeline can address.
+     */
+    function _creditBuyers(
+        address[] memory buyers,
+        uint64[] memory scheduleIds,
+        uint256[] memory netStablecoinAmountsToSpend,
+        uint256 totalNetStablecoinPlanned,
+        uint256 totalPurchasedRbtc,
+        uint256 totalStablecoinAmountToSpend,
+        IERC20 purchaseToken
+    ) private {
+        uint256 numOfPurchases = buyers.length;
+        for (uint256 i; i < numOfPurchases; ++i) {
+            // @notice the planned net amounts are only allocation weights: they sum to totalNetStablecoinPlanned,
+            // so the shares below sum to exactly 1 even if the redemption paid less than expected. Both the rBTC credited
+            // and the stablecoin reported as spent are shares of what actually moved.
+            uint256 usersPurchasedRbtc =
+                totalPurchasedRbtc * netStablecoinAmountsToSpend[i] / totalNetStablecoinPlanned;
+            uint256 usersStablecoinSpent =
+                totalStablecoinAmountToSpend * netStablecoinAmountsToSpend[i] / totalNetStablecoinPlanned;
+            s_usersAccumulatedRbtc[buyers[i]] += usersPurchasedRbtc;
+            emit PurchaseRbtc__RbtcBought(
+                buyers[i], address(purchaseToken), usersPurchasedRbtc, scheduleIds[i], usersStablecoinSpent
+            );
+        }
+    }
 
     /**
      * @dev Zero the user's accumulated balance after checking it is nonzero. Caller then pays.
