@@ -4,8 +4,9 @@ Status: **implemented** · Assigned: yes · Optional/further-review: no
 
 PR 51 of the relaunch stack; GitHub implementation PR **#104**. Stack on R51 / GitHub #103.
 This PR also turns on the default-profile optimizer (`optimizer = true`, `optimizer_runs = 200`,
-`via_ir = false`) so handler-local path policy stays under EIP-170. Remaining R53 work (Rootstock
-testnet + Blockscout re-proof of the optimizer pin) is not this PR.
+`via_ir = false`) so handler-local path policy stays under EIP-170. The Rootstock testnet +
+Blockscout re-proof of that pin is **in this PR** (`script/DeployOptimizerProof.s.sol`), not deferred
+to R53. `[profile.deploy]` pins `optimizer = false` so via-IR measurement does not inherit the pin.
 
 One chat/PR owns only this persistent path-governance change.
 
@@ -109,6 +110,8 @@ admin registry. Full `forge build --sizes` (not `--match-*`) is the record.
 - [x] Update live/add-on Safe runbooks: allowlist constructor components, assign the handler, then
   token-specific DcaManager setup such as the USDT0 minimum.
 - [x] Enable default-profile optimizer (`optimizer = true`, `optimizer_runs = 200`, `via_ir = false`).
+      Pin `[profile.deploy]` `optimizer = false`. Own the Rootstock re-proof in this PR
+      (`script/DeployOptimizerProof.s.sol`); the Blockscout tick is the success criterion below.
 - [x] Re-measure every Dex leaf and OperationsAdmin, and record configuration gas for allow/activate/revoke.
 
 ## Off-chain relaunch gate
@@ -147,13 +150,14 @@ incident runbook pass their own tests.
 - [ ] Changing `_getAmountOutMinimum`, deploy slippage defaults, or purchase-path reentrancy policy.
 - [ ] OperationsAdmin-owner break-glass activation when handler ownership has diverged.
 - [ ] A new abstract policy contract.
-- [ ] Rootstock testnet / Blockscout re-proof of the optimizer pin (R53 remainder).
+- [ ] Rootstock testnet / Blockscout re-proof of via-IR (`[profile.deploy]`).
+- [ ] Remaining R53 items other than this optimizer pin (schedule top-up, solx).
 
 ## Files likely touched
 
 - `src/interfaces/IPurchaseUniswap.sol`, `src/PurchaseUniswap.sol`
-- `foundry.toml` (default optimizer)
-- `script/DeployDexSwaps.s.sol`, `script/DeployUsdrifHandler.s.sol`
+- `foundry.toml` (default optimizer on; profile.deploy optimizer off)
+- `script/DeployDexSwaps.s.sol`, `script/DeployUsdrifHandler.s.sol`, `script/DeployOptimizerProof.s.sol`
 - `README.md` (mainnet add-on Safe runbook + compromised-swapper order)
 - `Makefile` (`fork-dex-path`)
 - `test/unit/PurchaseUniswapSettingsTest.sol`, `test/unit/DexPathFailoverTest.t.sol`
@@ -166,8 +170,9 @@ incident runbook pass their own tests.
 - Allowlisted paths can be activated by a swapper and the handler owner; arbitrary EOAs cannot.
 - The OperationsAdmin owner cannot activate or allowlist when they do not own the handler.
 - Nobody can activate a non-allowlisted path.
-- Isolation is per-handler storage (no shared admin mapping).
-- The setter rejects unchanged permission writes and wrong hop/fee lengths (via encode).
+- Isolation is per-handler storage (no shared admin mapping): `testAllowlistIsLocalToEachHandler`.
+- The setter rejects unchanged permission writes and wrong hop/fee lengths on **`setPurchasePathAllowed`**
+  (`testSetPurchasePathAllowedRevertsWithWrongArrayLengths`; encode is shared with `setPurchasePath`).
 - A non-active path can be revoked and cannot later be activated.
 - The active path cannot be revoked. After switching to another allowed path, the former path can be revoked.
 - Revoking a swapper stops future path changes but does not mutate the active path; handler-owner recovery works.
@@ -190,6 +195,17 @@ lanes default to `SWAP_TYPE=mocSwaps` and skip this suite (`vm.skip` in `setUp`)
 - [x] Deployment scripts and off-chain issues contain complete normal/failover/recovery sequencing.
 - [x] R9 indexing and R10 natspec rules cover all new/repurposed surfaces.
 - [x] No open product decisions.
+- [ ] Rootstock testnet CREATE of optimizer-on `OperationsAdmin` verified on Blockscout. Command
+      (as `TESTNET_OWNER`, chain 31; this repo does not `--broadcast` from the implementer):
+
+```bash
+REAL_DEPLOYMENT=true forge script script/DeployOptimizerProof.s.sol \
+  --rpc-url $RSK_TESTNET_RPC_URL \
+  --broadcast --legacy \
+  --verify --verifier blockscout --verifier-url $BLOCKSCOUT_API_URL
+```
+
+Record the CREATE tx and Blockscout match in this spec and the PR body, then tick this box.
 
 GitHub [#104](https://github.com/BitChillRSK/dca-contracts/pull/104). Default-profile runtime
 (`optimizer = true`, `optimizer_runs = 200`, `via_ir = false`; EIP-170 24,576): `OperationsAdmin`

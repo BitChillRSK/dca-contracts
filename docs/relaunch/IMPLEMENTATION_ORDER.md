@@ -18,7 +18,10 @@ Status: **planning guide**. Orders PRs. Not an implementation spec. Human prompt
 The proof, every documented broadcast command, and every required test lane use the default no-IR
 pipeline. `[profile.default]` enables the legacy optimizer (`optimizer = true`, `optimizer_runs = 200`,
 `via_ir = false`) starting with R52 so Dex handlers can hold their own path allowlist under EIP-170.
-`[profile.deploy]` is an experimental via-IR size profile, not an approved deployment escape hatch.
+R52 owns the Rootstock testnet + Blockscout re-proof of that optimizer-on artifact
+(`script/DeployOptimizerProof.s.sol`). `[profile.deploy]` is an experimental via-IR size profile
+that **pins `optimizer = false`** so it does not inherit the default pin (`via_ir` + optimizer
+fails solc 1284 on `ZeroTokenPurchaseUniswap`). It is not an approved deployment escape hatch.
 Until a separate toolchain decision pins via-IR through tests, broadcasts, Rootstock testnet, and
 Blockscout verification, all EIP-170 decisions use `[profile.default]` and `via_ir = false`.
 
@@ -572,7 +575,9 @@ No DcaManager ABI change. R9 indexing and R10 natspec rules apply. **No contract
 
 Handler-local policy depends on the default-profile optimizer. This PR enables `optimizer = true` /
 `optimizer_runs = 200` / `via_ir = false` on `[profile.default]` rather than keeping a centralized admin
-registry for an unoptimized EIP-170 budget. Measure with full `forge build --sizes`.
+registry for an unoptimized EIP-170 budget. Measure with full `forge build --sizes`. `[profile.deploy]`
+must set `optimizer = false` explicitly. Re-prove the optimizer-on pin on Rootstock testnet + Blockscout
+in this PR (`script/DeployOptimizerProof.s.sol`); do not defer that proof to R53.
 
 ## Closed non-implementation decisions
 

@@ -503,10 +503,10 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
         );
         vm.prank(OWNER);
         sovrynDexHandler.setPurchasePathAllowed(intermediateTokens, poolFeeRates, true);
-        
+
         vm.prank(OWNER);
         sovrynDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
-        
+
         assertEq(sovrynDexHandler.getSwapPath(), expectedPath);
         assertEq(sovrynDexHandler.getSwapPath().length, 66); // 3 addresses + 2 fees
     }

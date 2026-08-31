@@ -328,9 +328,11 @@ commands above intentionally use it, as do the required local and CI lanes. Trea
 margins as the deploy limits.
 
 `[profile.deploy]` is an experimental size-measurement profile. It enables the Yul IR pipeline and
-produces substantially smaller bytecode, but it is **not approved for broadcast**: the exact via-IR
-artifacts have not run the complete relaunch matrix or been deployed and verified on Rootstock
-testnet. Do not add `FOUNDRY_PROFILE=deploy` to a live command ad hoc.
+explicitly sets `optimizer = false` so it does not inherit the default-profile optimizer pin.
+`via_ir = true` with the optimizer on fails solc 1284 on `ZeroTokenPurchaseUniswap`. It is **not
+approved for broadcast**: the exact via-IR artifacts have not run the complete relaunch matrix or
+been deployed and verified on Rootstock testnet. Do not add `FOUNDRY_PROFILE=deploy` to a live
+command ad hoc.
 
 A future switch must be made as its own reviewed toolchain decision: pin the profile in every deploy
 command, run the full unit/invariant/fork matrix using the exact artifact, repeat the Rootstock testnet

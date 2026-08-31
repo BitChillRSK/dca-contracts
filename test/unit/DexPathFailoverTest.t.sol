@@ -3,6 +3,13 @@ pragma solidity 0.8.36;
 
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IPurchaseUniswap} from "src/interfaces/IPurchaseUniswap.sol";
+import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {IWRBTC} from "src/interfaces/IWRBTC.sol";
+import {ICoinPairPrice} from "src/interfaces/ICoinPairPrice.sol";
+import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces/ISwapRouter02.sol";
+import {DexHelperConfig} from "script/DexHelperConfig.s.sol";
+import {SovrynErc20HandlerDex} from "src/sovryn/SovrynErc20HandlerDex.sol";
+import {MockIsusdToken} from "test/mocks/MockIsusdToken.sol";
 import {BitChillOwnable} from "src/BitChillOwnable.sol";
 import {ownableUnauthorized} from "../utils/OzRevert.sol";
 
@@ -191,6 +198,41 @@ contract DexPathFailoverTest is DcaDappTest {
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(mids, fees);
     }
 
+    function testAllowlistIsLocalToEachHandler() public {
+        (address[] memory mids, uint24[] memory fees, bytes memory path) = _alternatePath();
+        bytes32 pathHash = keccak256(path);
+        _allow(mids, fees, true);
+        IPurchaseUniswap other = _secondHandler();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IPurchaseUniswap.PurchaseUniswap__PurchasePathNotAllowed.selector, pathHash)
+        );
+        vm.prank(OWNER);
+        other.setPurchasePath(mids, fees);
+
+        vm.prank(OWNER);
+        other.setPurchasePathAllowed(mids, fees, true);
+        assertTrue(other.isPurchasePathAllowed(pathHash));
+        vm.prank(OWNER);
+        other.setPurchasePathAllowed(mids, fees, false);
+        assertFalse(other.isPurchasePathAllowed(pathHash));
+        assertTrue(IPurchaseUniswap(address(stablecoinHandler)).isPurchasePathAllowed(pathHash));
+    }
+
+    function testSetPurchasePathAllowedRevertsWithWrongArrayLengths() public {
+        address[] memory mids = new address[](1);
+        mids[0] = makeAddr("r52-bad-mid");
+        uint24[] memory fees = new uint24[](1);
+        fees[0] = 3000;
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPurchaseUniswap.PurchaseUniswap__WrongNumberOfTokensOrFeeRates.selector, mids.length, fees.length
+            )
+        );
+        vm.prank(OWNER);
+        IPurchaseUniswap(address(stablecoinHandler)).setPurchasePathAllowed(mids, fees, true);
+    }
+
     function testPathPolicyConfigurationGas() public {
         (address[] memory mids, uint24[] memory fees,) = _alternatePath();
         (address[] memory ctorMids, uint24[] memory ctorFees) = _constructorComponents();
@@ -218,6 +260,32 @@ contract DexPathFailoverTest is DcaDappTest {
     function _allow(address[] memory mids, uint24[] memory fees, bool allowed) private {
         vm.prank(OWNER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePathAllowed(mids, fees, allowed);
+    }
+
+    function _secondHandler() private returns (IPurchaseUniswap other) {
+        DexHelperConfig.NetworkConfig memory config = dexHelperConfig.getActiveNetworkConfig();
+        IPurchaseUniswap primary = IPurchaseUniswap(address(stablecoinHandler));
+        other = IPurchaseUniswap(
+            address(
+                new SovrynErc20HandlerDex(
+                    address(dcaManager),
+                    address(stablecoin),
+                    address(new MockIsusdToken(address(stablecoin))),
+                    IPurchaseUniswap.UniswapSettings({
+                        wrBtcToken: IWRBTC(address(wrBtcToken)),
+                        swapRouter02: ISwapRouter02(config.swapRouter02Address),
+                        swapIntermediateTokens: config.swapIntermediateTokens,
+                        swapPoolFeeRates: config.swapPoolFeeRates,
+                        mocOracle: ICoinPairPrice(config.mocOracleAddress)
+                    }),
+                    FEE_COLLECTOR,
+                    IFeeHandler(address(stablecoinHandler)).getFeeSettings(),
+                    primary.getAmountOutMinimumPercent(),
+                    primary.getAmountOutMinimumSafetyCheck(),
+                    OWNER
+                )
+            )
+        );
     }
 
     function _constructorComponents() private view returns (address[] memory mids, uint24[] memory fees) {

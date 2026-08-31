@@ -432,10 +432,10 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         );
         vm.prank(OWNER);
         tropykusDexHandler.setPurchasePathAllowed(intermediateTokens, poolFeeRates, true);
-        
+
         vm.prank(OWNER);
         tropykusDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
-        
+
         assertEq(tropykusDexHandler.getSwapPath(), expectedPath);
         assertEq(tropykusDexHandler.getSwapPath().length, 66); // 3 addresses + 2 fees
     }
