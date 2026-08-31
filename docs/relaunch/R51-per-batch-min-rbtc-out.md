@@ -93,7 +93,10 @@ inline *and* the cached `uint256 numOfPurchases = buyers.length`. Measured again
 87 gas cheaper on `testSinglePurchase`, 416 on `testBatchPurchasesOneUser`, and 17 bytes smaller on every Dex
 handler, because it removes an internal call instead of adding one.
 
-Two separate effects, measured separately so they are not confused. **The block scope is the larger win**:
+Three separate effects, measured separately so they are not confused. **Holding the twice-read loop values
+in locals is by far the largest**: `netStablecoinAmountsToSpend[i]` and `buyers[i]` were each read twice per
+row, and a memory-array read costs a bounds check plus the load every time, so caching them saves **74 gas
+per row** and 42 bytes per handler. The other two are small. **The block scope is the larger win**:
 with the loop inline and the length uncached either way, scoping `aggregatedFee` is worth −28 gas on
 `testSinglePurchase` and −298 on `testBatchPurchasesOneUser`. **The cache is the smaller one**: measured
 through `PurchaseRbtcHarness` at 1/2/5/20/50 rows it costs ~12 gas once per call and saves 3.00 gas per row
