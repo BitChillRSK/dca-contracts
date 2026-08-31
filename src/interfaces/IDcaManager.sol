@@ -151,7 +151,8 @@ interface IDcaManager {
     error DcaManager__OperationsAdminIsNotAContract(address operationsAdmin);
     /// @notice Governance paused new deposits for this token and route.
     error DcaManager__DepositsPaused(address token, uint256 routeIndex);
-    /// @notice A named schedule is purchase-paused, so the whole `batchBuyRbtc` reverts.
+    /// @notice A named schedule is purchase-paused. That reverts `batchBuyRbtc`, and if the row is
+    ///         in `batchBuyRbtcAcrossHandlers`, every handler in the bundle.
     error DcaManager__SchedulePaused(address user, address token, uint64 scheduleId, uint256 scheduleIndex);
 
     /*//////////////////////////////////////////////////////////////
@@ -246,7 +247,8 @@ interface IDcaManager {
      * @dev A paused schedule keeps its funds on its route and stays open to deposits, amount and
      *      period edits, withdrawals, interest and rBTC claims, and deletion. Setting the state it
      *      already holds is a no-op and emits nothing, so every emitted event is a real transition.
-     *      A paused row in `batchBuyRbtc` reverts the whole batch.
+     *      A paused row in `batchBuyRbtc` reverts that handler's batch. The same row in
+     *      `batchBuyRbtcAcrossHandlers` reverts every handler in the bundle.
      */
     function setSchedulePaused(address token, uint256 scheduleIndex, uint64 scheduleId, bool paused) external;
 
@@ -255,7 +257,8 @@ interface IDcaManager {
      * @param batch One handler's purchase batch. Every row must share `token` and `routeIndex`.
      * @dev Only a swapper on the OperationsAdmin allowlist may call.
      *      Reverts `DcaManager__SchedulePaused` if any named schedule is paused, which fails the
-     *      whole batch: the swapper must filter paused schedules out before composing the call.
+     *      whole batch (and, in `batchBuyRbtcAcrossHandlers`, every handler in the bundle): the
+     *      swapper must filter paused schedules out before composing the call.
      *      Mixing tokens or routes in one call is rejected per row (`RouteIndexMismatch`); the
      *      token is taken from the argument, not from storage, so the swapper must not mix tokens.
      */
@@ -265,8 +268,8 @@ interface IDcaManager {
      * @notice Buy rBTC through several handlers atomically in one transaction.
      * @param batches Each element is one handler's purchase batch (`token` + `routeIndex`).
      * @dev Authenticates the caller once, then purchases each handler's batch in order through the
-     *      same one-handler helper. A failure in any batch reverts every handler.
-     *      The original `batchBuyRbtc` remains available for one-handler retries (same `Batch` type).
+     *      same one-handler helper. A failure in any batch — including a paused row — reverts every
+     *      handler. `batchBuyRbtc` remains available for one-handler retries (same `Batch` type).
      */
     function batchBuyRbtcAcrossHandlers(Batch[] calldata batches) external;
 

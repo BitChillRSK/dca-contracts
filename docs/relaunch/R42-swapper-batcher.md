@@ -30,10 +30,11 @@ the same two-group mocked MoC purchase at 361,133 gas through `SwapperBatcher`, 
 through a two-pass CEI-clean integrated implementation, and 344,723 gas through the one-loop
 helper this PR ships. Decided 2026-08-29: ship the cheaper one-loop. Handlers are BitChill-deployed
 and purchase paths stay `onlySwapper`, so bundle-wide CEI is not worth 2,463 gas on every tick
-(16,410 gas / 4.5% cheaper than the standalone batcher). Runtime is 23,683 bytes, leaving 893
-bytes below EIP-170 (the two-pass version was 23,833 / 743; the one-loop six-argument one-handler
-ABI was 23,716 / 860). The recurring protocol-paid saving
-outweighs preserving that unused margin.
+(16,410 gas / 4.5% cheaper than the standalone batcher). Default-profile (no-IR) runtime, the
+R9/R50 convention, is 23,683 bytes (the two-pass version was 23,833; the one-loop six-argument
+one-handler ABI was 23,716). `[profile.deploy]` (`via_ir`) is ~11,008, so EIP-170 is not a
+binding constraint on that profile. The recurring protocol-paid saving outweighs preserving
+unused no-IR margin.
 
 **Atomicity.** One revert rolls back every venue in the bundle. A paused row, malformed group, or
 handler failure therefore reverts the entire call. The bot filters rows off-chain and its EOA stays
@@ -95,7 +96,7 @@ Targeted grouped-purchase tests, then the complete repository gates from `AGENTS
 - A paused schedule in the second handler's batch rolls back the first.
 - Empty top-level batches revert with the new DcaManager error.
 - A non-swapper cannot call either purchase entry point.
-- The bot EOA can still call the original `batchBuyRbtc` entry point for one-handler retries.
+- The bot EOA can still call one-handler `batchBuyRbtc` for retries.
 - Fork: no new assertions; both required fork lanes still pass.
 
 ## Success criteria
@@ -104,7 +105,8 @@ Targeted grouped-purchase tests, then the complete repository gates from `AGENTS
 - [x] `batchBuyRbtc` takes `Batch calldata`; checks, effects, and the handler call are unchanged.
   The former six-argument selector (`0x31a1a62c`) is gone.
 - [x] Failure policy remains atomic and tested.
-- [x] The integrated manager remains below EIP-170 in the deploy profile.
+- [x] Default-profile (no-IR) runtime recorded; `[profile.deploy]` is ~11k and is not the
+  profile these numbers use.
 - [x] The standalone contract and its deployment/allowlist operations are gone.
 - [x] Consumer follow-ups describe the final manager selector and remove the batcher deployment.
 - [x] No open product decisions.
@@ -114,7 +116,8 @@ Targeted grouped-purchase tests, then the complete repository gates from `AGENTS
 - [x] The one-handler helper preserves the former `batchBuyRbtc` checks/effects/handler call.
 - [x] `onlySwapper` runs once per external entry, not once per inner handler.
 - [x] Tests cover success, rollback, pause, malformed input, handler failure, and unauthorized callers.
-- [x] Runtime and gas measurements use the pinned deploy profile.
+- [x] Runtime and gas measurements use the default (no-IR) profile that R9/R50 track, not
+  `[profile.deploy]`.
 - [x] Files beyond the list above are named and justified in the PR.
 - [x] No unrelated refactors; history is reviewable.
 
