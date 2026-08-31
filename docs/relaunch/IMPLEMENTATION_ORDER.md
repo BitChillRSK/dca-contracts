@@ -519,8 +519,16 @@ product gates; the Safe approves the measured static live backstops once during 
 Current PR 101 baseline: `DcaManager` 23,683 bytes (893 margin) and
 `LayerBankErc20HandlerDex` 23,418 (1,158 margin). DcaManager already takes `Batch`, so the obsolete
 seven-argument manager-stack finding no longer applies. The handler ABI addition has been compiled against
-PR 101 and does fail legacy no-IR codegen without extraction: `_creditBuyers` is required, not conditional.
-Preserve its arithmetic/event order and re-measure every leaf.
+PR 101 and does fail legacy no-IR codegen as written. Preserve its arithmetic/event order and re-measure
+every leaf.
+
+**No `_creditBuyers` extraction (corrected 2026-08-31, PR 103).** This entry previously called that helper
+required rather than conditional. It is neither: the function is one slot over, and dropping the redundant
+`uint256 numOfPurchases = buyers.length` local is enough to compile with the loop inline under
+`via_ir = false`. That is also ~68–112 gas cheaper and 29 bytes smaller per Dex handler than extracting.
+Checked rather than assumed: enabling the legacy optimizer (`optimizer = true`, `via_ir = false`) does **not**
+relieve stack-too-deep — solc asks for via-IR *with* the optimizer, and via-IR stays out of bounds for
+EIP-170 and deployment decisions under the Rootstock compiler/EVM proof rule above.
 
 **Sovryn DOC is not a shipped Dex route (recorded 2026-08-31, PR 103).** DOC buys rBTC only through MoC
 redemption; it may appear in a Uniswap path as an intermediate hop but never as a Dex handler's input token.

@@ -82,12 +82,26 @@ seven-argument DcaManager stack problem left for R51. Current `[profile.default]
 | `OperationsAdmin` | 6,123 | 18,453 |
 
 `PurchaseRbtc.batchBuyRbtc` is already at the legacy-codegen stack limit: adding `minRbtcOut` was compiled
-against PR 101 and produces `Stack too deep` under `via_ir = false`. Extract the per-buyer
-allocation/credit loop into a private `_creditBuyers` helper as part of R51, without changing its arithmetic,
-ordering, rounding, accumulated-balance writes, or event sequence. The same code happens to compile with
-`via_ir = true`, but that profile is not selected by any deployment command or required test lane and is not
-a reason to skip the extraction. Re-measure every handler and DcaManager; do not copy the obsolete combined
-R51/R52 prototype figures.
+against PR 101 and produces `Stack too deep` under `via_ir = false`. Re-measure every handler and DcaManager;
+do not copy the obsolete combined R51/R52 prototype figures.
+
+**Correction recorded during implementation (2026-08-31).** This section originally required extracting the
+per-buyer allocation/credit loop into a private `_creditBuyers` helper. That is **not** necessary and PR 103
+does not do it. The function is exactly *one* slot over, and the slot is the redundant
+`uint256 numOfPurchases = buyers.length` local: reading `buyers.length` in the loop condition instead compiles
+under `via_ir = false` with the loop left inline. Measured, that is also marginally *cheaper*
+(`testSinglePurchase` −68 gas, `testBatchPurchasesOneUser` −112) and 29 bytes smaller on every Dex handler
+than the helper would have been, because it removes an internal call rather than adding one. Keep the length
+uncached — re-adding that local is what fails the build, and `src/PurchaseRbtc.sol` carries a comment saying so.
+
+For the record, since it was checked rather than assumed: enabling the **legacy optimizer**
+(`optimizer = true`, `via_ir = false`) does *not* relieve this. `[profile.default]` does leave the optimizer
+off, but stack-too-deep persists with it on — solc's own message asks for `--via-ir` *while* enabling the
+optimizer, and via-IR remains out of bounds for EIP-170 and deployment decisions under the toolchain rule in
+[`IMPLEMENTATION_ORDER.md`](./IMPLEMENTATION_ORDER.md). Whether to turn the optimizer on at all is a separate
+toolchain decision with its own item; it would change every deployed size (`DcaManager` 23,703 → 13,767 in a
+measurement taken for that discussion) and the settings the Rootstock testnet proof and Blockscout
+verification were made at.
 
 ## Scope
 
@@ -100,8 +114,10 @@ R51/R52 prototype figures.
 - [x] `PurchaseRbtc.batchBuyRbtc` reverts
   `PurchaseRbtc__BelowSwapperMinimum(uint256 rbtcReceived, uint256 minRbtcOut)` when measured aggregate
   output is below the caller minimum, after the existing zero check and before credits.
-- [x] Extract the required `_creditBuyers` helper. Planned net amounts remain allocation weights; the
-  denominator, truncation, accumulated-balance writes, and per-row events are unchanged.
+- [x] Keep the per-buyer allocation/credit loop inline and free the one needed stack slot by not caching
+  `buyers.length`. (Originally specified as a `_creditBuyers` extraction; see the correction above.) Planned
+  net amounts remain allocation weights; the denominator, truncation, accumulated-balance writes, and per-row
+  events are unchanged.
 - [x] Record final method selectors and runtime sizes in the PR.
 
 ## Governance-floor evidence and relaunch gate

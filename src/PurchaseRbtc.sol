@@ -60,15 +60,23 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
             revert PurchaseRbtc__BelowSwapperMinimum(totalPurchasedRbtc, minRbtcOut);
         }
 
-        _creditBuyers(
-            buyers,
-            scheduleIds,
-            netStablecoinAmountsToSpend,
-            totalNetStablecoinPlanned,
-            totalPurchasedRbtc,
-            totalStablecoinAmountToSpend,
-            purchaseToken
-        );
+        // @notice `buyers.length` is read per iteration rather than cached in a local on purpose: this
+        // function sits one slot under the limit the non-IR pipeline can address, and the cached length was
+        // the slot that put it over. Re-adding it fails the build with "Stack too deep", it does not save
+        // gas here (measured slightly cheaper without), and the fix is not to split the loop into a helper.
+        for (uint256 i; i < buyers.length; ++i) {
+            // @notice the planned net amounts are only allocation weights: they sum to totalNetStablecoinPlanned,
+            // so the shares below sum to exactly 1 even if the redemption paid less than expected. Both the rBTC credited
+            // and the stablecoin reported as spent are shares of what actually moved.
+            uint256 usersPurchasedRbtc =
+                totalPurchasedRbtc * netStablecoinAmountsToSpend[i] / totalNetStablecoinPlanned;
+            uint256 usersStablecoinSpent =
+                totalStablecoinAmountToSpend * netStablecoinAmountsToSpend[i] / totalNetStablecoinPlanned;
+            s_usersAccumulatedRbtc[buyers[i]] += usersPurchasedRbtc;
+            emit PurchaseRbtc__RbtcBought(
+                buyers[i], address(purchaseToken), usersPurchasedRbtc, scheduleIds[i], usersStablecoinSpent
+            );
+        }
         emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
             address(purchaseToken), totalPurchasedRbtc, totalStablecoinAmountToSpend
         );
@@ -92,35 +100,6 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
     /*//////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @dev Credit each buyer their share of the batch and emit that row's purchase event. Split out of
-     *      `batchBuyRbtc` because the two together exceed the stack the non-IR pipeline can address.
-     */
-    function _creditBuyers(
-        address[] memory buyers,
-        uint64[] memory scheduleIds,
-        uint256[] memory netStablecoinAmountsToSpend,
-        uint256 totalNetStablecoinPlanned,
-        uint256 totalPurchasedRbtc,
-        uint256 totalStablecoinAmountToSpend,
-        IERC20 purchaseToken
-    ) private {
-        uint256 numOfPurchases = buyers.length;
-        for (uint256 i; i < numOfPurchases; ++i) {
-            // @notice the planned net amounts are only allocation weights: they sum to totalNetStablecoinPlanned,
-            // so the shares below sum to exactly 1 even if the redemption paid less than expected. Both the rBTC credited
-            // and the stablecoin reported as spent are shares of what actually moved.
-            uint256 usersPurchasedRbtc =
-                totalPurchasedRbtc * netStablecoinAmountsToSpend[i] / totalNetStablecoinPlanned;
-            uint256 usersStablecoinSpent =
-                totalStablecoinAmountToSpend * netStablecoinAmountsToSpend[i] / totalNetStablecoinPlanned;
-            s_usersAccumulatedRbtc[buyers[i]] += usersPurchasedRbtc;
-            emit PurchaseRbtc__RbtcBought(
-                buyers[i], address(purchaseToken), usersPurchasedRbtc, scheduleIds[i], usersStablecoinSpent
-            );
-        }
-    }
 
     /**
      * @dev Zero the user's accumulated balance after checking it is nonzero. Caller then pays.
