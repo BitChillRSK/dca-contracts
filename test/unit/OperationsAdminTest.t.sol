@@ -772,6 +772,41 @@ contract OperationsAdminTest is DcaDappTest {
         );
         vm.prank(OWNER);
         operationsAdmin.setPurchasePathAllowed(address(dummy), path, true);
+        vm.expectRevert(
+            abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__InvalidDexHandler.selector, address(dummy))
+        );
+        vm.prank(OWNER);
+        operationsAdmin.setPurchasePathAllowed(address(dummy), path, false);
+    }
+
+    function testSetPurchasePathAllowedRejectsBogusOffsetGetter() external {
+        DummyDexPathBogusOffset dummy = new DummyDexPathBogusOffset();
+        bytes memory path = _dummyV3Path(address(1), address(2));
+        vm.expectRevert(
+            abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__InvalidDexHandler.selector, address(dummy))
+        );
+        vm.prank(OWNER);
+        operationsAdmin.setPurchasePathAllowed(address(dummy), path, true);
+        vm.expectRevert(
+            abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__InvalidDexHandler.selector, address(dummy))
+        );
+        vm.prank(OWNER);
+        operationsAdmin.setPurchasePathAllowed(address(dummy), path, false);
+    }
+
+    function testSetPurchasePathAllowedRejectsOverrunLengthGetter() external {
+        DummyDexPathOverrunLength dummy = new DummyDexPathOverrunLength();
+        bytes memory path = _dummyV3Path(address(1), address(2));
+        vm.expectRevert(
+            abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__InvalidDexHandler.selector, address(dummy))
+        );
+        vm.prank(OWNER);
+        operationsAdmin.setPurchasePathAllowed(address(dummy), path, true);
+        vm.expectRevert(
+            abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__InvalidDexHandler.selector, address(dummy))
+        );
+        vm.prank(OWNER);
+        operationsAdmin.setPurchasePathAllowed(address(dummy), path, false);
     }
 
     function testSetPurchasePathAllowedRejectsNonCanonicalActivePath() external {

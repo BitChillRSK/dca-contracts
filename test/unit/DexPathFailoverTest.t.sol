@@ -8,14 +8,19 @@ import {BitChillOwnable} from "src/BitChillOwnable.sol";
 import {ownableUnauthorized} from "../utils/OzRevert.sol";
 
 /**
- * @notice R52: allowlisted Dex path activation. Skips on MoC lanes (`onlyDexSwaps`).
+ * @notice Allowlisted Dex path activation. `setUp` skips MoC lanes so they do not report empty PASSes.
  */
 contract DexPathFailoverTest is DcaDappTest {
     event PurchaseUniswap_NewPathSet(address[] intermediateTokens, uint24[] poolFeeRates, bytes newPath);
 
     address internal constant HANDLER_OWNER = address(uint160(uint256(keccak256("handler-owner"))));
 
-    function testSwapperAndAdminOwnerCanActivateAllowlistedPath() public onlyDexSwaps {
+    function setUp() public override {
+        if (!isDexSwaps) vm.skip(true);
+        super.setUp();
+    }
+
+    function testSwapperAndAdminOwnerCanActivateAllowlistedPath() public {
         (address[] memory mids, uint24[] memory fees, bytes memory path) = _alternatePath();
         vm.prank(OWNER);
         operationsAdmin.setPurchasePathAllowed(address(stablecoinHandler), path, true);
@@ -33,7 +38,7 @@ contract DexPathFailoverTest is DcaDappTest {
         assertEq(IPurchaseUniswap(address(stablecoinHandler)).getSwapPath(), constructorPath);
     }
 
-    function testCannotActivatePathThatIsNotAllowlisted() public onlyDexSwaps {
+    function testCannotActivatePathThatIsNotAllowlisted() public {
         (address[] memory mids, uint24[] memory fees, bytes memory path) = _alternatePath();
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -46,7 +51,7 @@ contract DexPathFailoverTest is DcaDappTest {
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(mids, fees);
     }
 
-    function testArbitraryEoaCannotActivateAllowlistedPath() public onlyDexSwaps {
+    function testArbitraryEoaCannotActivateAllowlistedPath() public {
         (address[] memory mids, uint24[] memory fees, bytes memory path) = _alternatePath();
         vm.prank(OWNER);
         operationsAdmin.setPurchasePathAllowed(address(stablecoinHandler), path, true);
@@ -60,8 +65,8 @@ contract DexPathFailoverTest is DcaDappTest {
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(mids, fees);
     }
 
-    function testHandlerACannotSpendHandlerBAllowlist() public onlyDexSwaps {
-        (address[] memory mids, uint24[] memory fees, bytes memory path) = _alternatePath();
+    function testHandlerACannotSpendHandlerBAllowlist() public {
+        (,, bytes memory path) = _alternatePath();
         DummyPathCaller attacker = new DummyPathCaller(address(operationsAdmin));
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -74,12 +79,9 @@ contract DexPathFailoverTest is DcaDappTest {
         operationsAdmin.setPurchasePathAllowed(address(stablecoinHandler), path, true);
         vm.prank(address(stablecoinHandler));
         operationsAdmin.requirePurchasePathSetter(SWAPPER, keccak256(path));
-        // silence unused
-        mids;
-        fees;
     }
 
-    function testRevokedPathCannotBeActivated() public onlyDexSwaps {
+    function testRevokedPathCannotBeActivated() public {
         (address[] memory mids, uint24[] memory fees, bytes memory path) = _alternatePath();
         vm.startPrank(OWNER);
         operationsAdmin.setPurchasePathAllowed(address(stablecoinHandler), path, true);
@@ -97,7 +99,7 @@ contract DexPathFailoverTest is DcaDappTest {
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(mids, fees);
     }
 
-    function testActivePathCannotBeRevokedUntilSwitched() public onlyDexSwaps {
+    function testActivePathCannotBeRevokedUntilSwitched() public {
         bytes memory active = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -121,7 +123,7 @@ contract DexPathFailoverTest is DcaDappTest {
         assertFalse(operationsAdmin.isPurchasePathAllowed(address(stablecoinHandler), keccak256(active)));
     }
 
-    function testRevokeSwapperDoesNotMutateActivePath() public onlyDexSwaps {
+    function testRevokeSwapperDoesNotMutateActivePath() public {
         (address[] memory mids, uint24[] memory fees, bytes memory path) = _alternatePath();
         vm.prank(OWNER);
         operationsAdmin.setPurchasePathAllowed(address(stablecoinHandler), path, true);
@@ -146,7 +148,7 @@ contract DexPathFailoverTest is DcaDappTest {
         assertEq(IPurchaseUniswap(address(stablecoinHandler)).getSwapPath(), _encodePath(ctorMids, ctorFees));
     }
 
-    function testDivergentOwnersSplitPathAndSlippageAuthority() public onlyDexSwaps {
+    function testDivergentOwnersSplitPathAndSlippageAuthority() public {
         vm.prank(OWNER);
         BitChillOwnable(address(stablecoinHandler)).transferOwnership(HANDLER_OWNER);
         vm.prank(HANDLER_OWNER);
@@ -177,7 +179,7 @@ contract DexPathFailoverTest is DcaDappTest {
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(mids, fees);
     }
 
-    function testSlippageAndOracleRemainHandlerOwnerOnly() public onlyDexSwaps {
+    function testSlippageAndOracleRemainHandlerOwnerOnly() public {
         vm.expectRevert(ownableUnauthorized(SWAPPER));
         vm.prank(SWAPPER);
         IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumPercent(0.996 ether);
@@ -187,7 +189,7 @@ contract DexPathFailoverTest is DcaDappTest {
         IPurchaseUniswap(address(stablecoinHandler)).updateMocOracle(address(1));
     }
 
-    function testConstructorPathIsAllowlistedBeforeAssignment() public onlyDexSwaps {
+    function testConstructorPathIsAllowlistedBeforeAssignment() public {
         bytes memory path = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
         assertTrue(operationsAdmin.isPurchasePathAllowed(address(stablecoinHandler), keccak256(path)));
         assertEq(
@@ -195,7 +197,7 @@ contract DexPathFailoverTest is DcaDappTest {
         );
     }
 
-    function testUnauthorizedOrHashMismatchedActivationFailsOnFork() public onlyDexSwaps {
+    function testUnauthorizedActivationOfNonAllowlistedPathFails() public {
         bytes memory path = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
         assertTrue(operationsAdmin.isPurchasePathAllowed(address(stablecoinHandler), keccak256(path)));
 
@@ -211,7 +213,7 @@ contract DexPathFailoverTest is DcaDappTest {
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(mids, fees);
     }
 
-    function testPathPolicyConfigurationGas() public onlyDexSwaps {
+    function testPathPolicyConfigurationGas() public {
         (address[] memory mids, uint24[] memory fees, bytes memory path) = _alternatePath();
         bytes memory former = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
         uint256 allowStart = gasleft();

@@ -305,11 +305,14 @@ Then, from the Safe UI (one call per contract), send `acceptOwnership()`. Until 
 
 Add-on scripts (`DeployIdleHandler`, `DeployLayerBankHandler`, `DeployUsdrifHandler`) revert if `pendingOwner` is set on `OperationsAdmin` or `DcaManager` — wait until the Safe has accepted, then run them.
 
-**USDT0 add-on (`STABLECOIN_TYPE=USDT0` `DeployUsdrifHandler`).** This is the live path R36 uses against an existing `DcaManager`. On mainnet the Safe already owns `OperationsAdmin`, so the Foundry EOA hits the non-owner branch: it deploys the handler, logs, and returns **without** `assignTokenHandler` and **without** `setTokenMinPurchaseAmount`. That is fail-closed for USDRIF (default min `25 ether` is correct). For USDT0 the default min is `25e18` atomic units — about 25 trillion USDT0 — so users cannot create real schedules until the Safe also sets the 6-decimal min. After the script, from the Safe, in order:
+**USDT0 / USDRIF add-on (`DeployUsdrifHandler`).** This is the live path R36 uses against an existing `DcaManager`. On mainnet the Safe already owns `OperationsAdmin`, so the Foundry EOA hits the non-owner branch: it deploys the handler, logs, and returns **without** `setPurchasePathAllowed`, **without** `assignTokenHandler`, and **without** `setTokenMinPurchaseAmount`. That is fail-closed for USDRIF until the Safe allowlists the constructor path and assigns the handler (default min `25 ether` is correct). For USDT0 the default min is `25e18` atomic units — about 25 trillion USDT0 — so users cannot create real schedules until the Safe also sets the 6-decimal min. After the script, from the Safe, **in this order**:
 
 1. `operationsAdmin.registerRoute(1, true)` **only if** `getRouteClass(1)` is still `Unregistered`. A second `registerRoute` reverts `RouteAlreadyRegistered` (LayerBank is already on the dex map after the USDRIF add-on).
-2. `operationsAdmin.assignTokenHandler(usdt0, 1, handler)`.
-3. **`dcaManager.setTokenMinPurchaseAmount(usdt0, 25000000)`** (`25e6`). Do not skip this step.
+2. `operationsAdmin.setPurchasePathAllowed(handler, getSwapPath() bytes, true)`. Read the exact constructor path from the handler; do not re-encode. Assignment without this step leaves an active path that is not allowlisted (nothing on-chain enforces the invariant at purchase time).
+3. `operationsAdmin.assignTokenHandler(token, 1, handler)`.
+4. **USDT0 only:** `dcaManager.setTokenMinPurchaseAmount(usdt0, 25000000)` (`25e6`). Do not skip this step.
+
+**Compromised swapper.** Revoke the swapper key **before** revoking any path. A still-allowlisted compromised key can front-run each `setPurchasePathAllowed(..., false)` by re-activating that path. Order is mandatory: `revokeSwapper` → owner `setPurchasePath` to the preferred approved path if needed → then revoke obsolete paths. Swapper revocation alone is not a routing kill switch.
 
 `DeployDexSwaps` live full-stack sets that min in the same broadcast because that script owns the new admin. The add-on does not.
 

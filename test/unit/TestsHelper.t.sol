@@ -58,6 +58,28 @@ contract DummyDexPathReturnsUint {
     }
 }
 
+/// @dev `bytes` ABI head with an offset past the returndata.
+contract DummyDexPathBogusOffset {
+    function getSwapPath() external pure {
+        assembly {
+            mstore(0x00, 0x80)
+            mstore(0x20, 0)
+            return(0x00, 0x40)
+        }
+    }
+}
+
+/// @dev Valid offset, length that overruns the returndata.
+contract DummyDexPathOverrunLength {
+    function getSwapPath() external pure {
+        assembly {
+            mstore(0x00, 0x20)
+            mstore(0x20, 1000)
+            return(0x00, 0x40)
+        }
+    }
+}
+
 contract FeeCalculator {
     uint256 internal s_minFeeRate = MIN_FEE_RATE;
     uint256 internal s_maxFeeRate = MAX_FEE_RATE_TEST; // Use test fee rate for testing

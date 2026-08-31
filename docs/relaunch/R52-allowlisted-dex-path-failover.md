@@ -47,9 +47,11 @@ transaction. Governance must therefore approve exact complete paths, not compone
 4. Reject revocation of the active path. Governance or the swapper must activate another allowed path first,
    then governance may revoke the old one. This preserves the invariant that every active path is allowed
    without adding an allowlist lookup to every protocol-paid purchase.
-5. A revoked swapper cannot make further changes, but its last activated path persists. Incident recovery is
-   therefore: revoke the key, restore the preferred approved path with the OperationsAdmin owner if needed,
-   then revoke obsolete paths. Do not call swapper revocation alone a routing kill switch.
+5. A revoked swapper cannot make further changes, but its last activated path persists. Incident recovery
+   order is **mandatory**, not advisory: `revokeSwapper` first, then restore the preferred approved path with
+   the OperationsAdmin owner if needed, then revoke obsolete paths. A still-authorized swapper can front-run
+   each `setPurchasePathAllowed(..., false)` by re-activating that path. Do not call swapper revocation alone
+   a routing kill switch.
 6. Deploy sequence is: construct Dex handler (constructor installs its initial path), read `getSwapPath()`,
    allowlist those exact bytes, then `assignTokenHandler`. An unassigned handler cannot receive schedule funds,
    so the initial allowlist can safely be seeded before assignment. Mainnet add-ons put allowlist + assignment
@@ -171,6 +173,8 @@ not a PR 104 merge condition.
 - `src/interfaces/IOperationsAdmin.sol`, `src/OperationsAdmin.sol`
 - `src/interfaces/IPurchaseUniswap.sol`, `src/PurchaseUniswap.sol`
 - `script/DeployDexSwaps.s.sol`, `script/DeployUsdrifHandler.s.sol`
+- `README.md` (mainnet add-on Safe runbook + compromised-swapper order)
+- `Makefile` (`fork-layerbank`, `fork-dex-path`)
 - `test/unit/OperationsAdminTest.t.sol`, `test/unit/PurchaseUniswapSettingsTest.sol`
 - `test/unit/deployment/LiveDeployPathTest.t.sol`, `NewHandlerDeploymentTest.t.sol`, and
   `Usdt0DexDeploymentTest.t.sol`
@@ -183,7 +187,8 @@ not a PR 104 merge condition.
 - Handler A cannot use handler B's path permission.
 - The setter rejects non-contract handlers, malformed encoded paths, and unchanged permission writes.
 - The setter rejects a contract with no `getSwapPath`, a getter that reverts, and malformed getter return data
-  with `OperationsAdmin__InvalidDexHandler(handler)` on both allow and revoke operations.
+  (including a bogus ABI offset or overrunning length) with `OperationsAdmin__InvalidDexHandler(handler)` on both
+  allow and revoke operations — not an empty ABI-decode revert.
 - A non-active path can be revoked and cannot later be activated.
 - The active path cannot be revoked. After switching to another allowed path, the former path can be revoked.
 - Revoking a swapper stops future path changes but does not mutate the active path; owner recovery works.
@@ -196,9 +201,13 @@ not a PR 104 merge condition.
   as a swapper.
 - Slippage/oracle setters remain owner-only and purchases still use the active path plus both R43/R51 bounds.
 
-Then run the full `AGENTS.md` done-gate and both required forks. A fork test should allow and activate a second
-real path only if its pools exist and have liquidity; otherwise prove the deployed initial path is allowlisted and
-that an unauthorized/hash-mismatched activation fails.
+Then run the full `AGENTS.md` done-gate and both required forks (`make fork-sovryn`, `make fork-tropykus`). Those
+lanes default to `SWAP_TYPE=mocSwaps` and skip this suite (`vm.skip` in `setUp`). Dex path evidence on a fork is
+`make fork-dex-path` (LayerBank / USDRIF / dexSwaps, `DexPathFailoverTest` only). A full
+`STABLECOIN_TYPE=USDRIF SWAP_TYPE=dexSwaps make fork-layerbank` still runs purchase tests against live Uniswap
+pools and can revert `Too little received`; that is not this PR's gate. `fork-sovryn` + USDRIF/USDT0 skips
+(Sovryn has no Dex listing for those tokens); `fork-tropykus` + `dexSwaps` at the pinned mint-pause block is not
+a working Dex lane.
 
 ## Success criteria
 

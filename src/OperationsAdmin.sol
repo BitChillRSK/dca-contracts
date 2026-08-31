@@ -4,10 +4,15 @@ pragma solidity 0.8.36;
 import {IOperationsAdmin} from "./interfaces/IOperationsAdmin.sol";
 import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
 import {ITokenLending} from "./interfaces/ITokenLending.sol";
-import {IPurchaseUniswap} from "./interfaces/IPurchaseUniswap.sol";
 import {IERC165} from "lib/forge-std/src/interfaces/IERC165.sol";
 import {BitChillOwnable} from "./BitChillOwnable.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+
+/// @dev Dex handlers expose this view. Kept local so the registry does not import PurchaseUniswap's
+///      Uniswap router / WRBTC / oracle types.
+interface IDexSwapPath {
+    function getSwapPath() external view returns (bytes memory);
+}
 
 /**
  * @title OperationsAdmin
@@ -242,9 +247,33 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
 
     function _readActiveSwapPath(address handler) private view returns (bytes memory path) {
         (bool success, bytes memory data) =
-            handler.staticcall(abi.encodeWithSelector(IPurchaseUniswap.getSwapPath.selector));
-        if (!success || data.length < 64) revert OperationsAdmin__InvalidDexHandler(handler);
-        path = abi.decode(data, (bytes));
+            handler.staticcall(abi.encodeWithSelector(IDexSwapPath.getSwapPath.selector));
+        if (!success) revert OperationsAdmin__InvalidDexHandler(handler);
+        path = _decodeReturnedBytes(handler, data);
         if (!_isCanonicalV3Path(path)) revert OperationsAdmin__InvalidDexHandler(handler);
+    }
+
+    /// @dev ABI-decode `bytes` returndata without `abi.decode`, which panics on a bad offset/length
+    ///      with empty data. Named `InvalidDexHandler` is the only allowed failure.
+    function _decodeReturnedBytes(address handler, bytes memory data) private pure returns (bytes memory decoded) {
+        if (data.length < 64) revert OperationsAdmin__InvalidDexHandler(handler);
+        uint256 offset;
+        assembly {
+            offset := mload(add(data, 32))
+        }
+        if (offset > data.length - 32) revert OperationsAdmin__InvalidDexHandler(handler);
+        uint256 innerLength;
+        assembly {
+            innerLength := mload(add(add(data, 32), offset))
+        }
+        if (innerLength > data.length - 32 - offset) revert OperationsAdmin__InvalidDexHandler(handler);
+        decoded = new bytes(innerLength);
+        assembly {
+            let src := add(add(data, 64), offset)
+            let dest := add(decoded, 32)
+            for { let i := 0 } lt(i, innerLength) { i := add(i, 32) } {
+                mstore(add(dest, i), mload(add(src, i)))
+            }
+        }
     }
 }
