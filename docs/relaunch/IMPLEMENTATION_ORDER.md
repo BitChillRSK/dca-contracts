@@ -589,11 +589,67 @@ verified at [`0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD`](https://rootstock-tes
 Do not treat R53 as still owning the optimizer baseline — that work is absorbed here.
 Remaining R54/R55 items live in stacked [#105](https://github.com/BitChillRSK/dca-contracts/pull/105).
 
+**Corrected 2026-08-31 (see R53).** That prototype exceeded an *unoptimized* EIP-170 budget. The solc
+optimizer has never been enabled in `[profile.default]`, so the Dex leaf's true margin is ~9.7 KB, not the
+hundreds of bytes this paragraph assumed. The placement may still be right on authority grounds — policy on
+the registry, path building on the leaf — but the bytecode argument for it is void and must not be reused.
+Re-judge in PR 51's own thread, not here.
+
+### R53 - enable the solc optimizer and re-baseline ([spec](./R53-optimizer-baseline.md), unassigned)
+
+`[profile.default]` never sets `optimizer`, and forge defaults it to `false`; `[profile.ci]` inherits that.
+Every runtime size, EIP-170 margin, and gas figure in these docs is therefore unoptimized. `DcaManager` is
+23,703 B / 873 B margin as recorded and 13,767 B / 10,809 B with the optimizer on; `testSinglePurchase` falls
+283,711 -> 243,817 gas and `testBatchPurchasesOneUser` 2,244,557 -> 1,562,720. Enable the optimizer at 200
+runs, keep `via_ir = false`, re-prove R23's Rootstock testnet and Blockscout baseline at the new settings, and
+correct the recorded numbers. Rewrite - do not delete - the "all EIP-170 decisions use `[profile.default]` and
+`via_ir = false`" rule above and its `AGENTS.md` mirror: the no-IR half stands until R55, but the basis must
+become *optimized* no-IR.
+
+This unblocks R54 and voids the bytecode premise under several shipped decisions - the R52 allowlist placement,
+the migration gate's manual exit/re-entry (justified partly by "426 bytes of runtime margin"), and R51's
+`_creditBuyers` no-IR extraction. Each is re-judged in its own PR on its remaining merits; several have
+independent arguments that survive. `via_ir` stays out: a full `forge build` under IR fails with solc error
+1284 on `ZeroTokenPurchaseUniswap`, whose unconditionally-reverting constructor is the test itself.
+
+Ask: `optimizer_runs` value (recommend keeping 200) and whether CI adopts it in the same PR (recommend yes).
+
+### R54 - top a schedule up from accrued interest ([spec](./R54-schedule-top-up-from-interest.md), unassigned, gated on R53)
+
+Revives R12. `DcaManager.topUpFromInterest(token, scheduleIndex, scheduleId)` credits the caller's accrued
+lending interest to one schedule's `tokenBalance`, so yield buys rBTC without a withdraw-then-deposit round
+trip - which also avoids Sovryn's SIP-0094 exit fee, since nothing is redeemed. `DcaManager`-only: no handler
+call, no token movement, no redeem-then-remint. The credited figure is the same expression the interest
+withdrawal uses, so the route's summed principal lands exactly on the position's floored value and never
+above it - the same end state an interest withdrawal already produces, reached from the other side.
+
+Measured at `proto/r12-compound-interest` (`7dd00fb`): +1,020 B unoptimized (margin **-147**, does not fit),
++600 B with the optimizer (margin 10,209), +508 B under IR. Gated on R53 for exactly that reason; dropping the
+dedicated event saves only 112 B and does not rescue it.
+
+Ask: whether the R48 deposit pause blocks a top-up (recommend yes - a pause means stop growing exposure on
+that route, whatever the funds' source); naming (`topUpFromInterest`, because "compound" collides with Compound
+the lending protocol that Tropykus forks - the same collision class R26 fixed for "lending token"); and
+all-or-part (recommend all, no `amount` parameter).
+
+### R55 - evaluate solx and the IR pipeline ([spec](./R55-solx-and-ir-evaluation.md), unassigned, gated on R53)
+
+Measure and recommend; change no compiler setting. Compare stock solc no-IR, stock solc `via_ir`, and solx on
+runtime size, hot-path gas, whether the full matrix passes, and whether Blockscout can verify the result on
+Rootstock. Every number must be against R53's optimized baseline - the optimizer already takes 14-30% and
+`via_ir` a further 2-4%, so solx competes against ~239k gas on `testSinglePurchase`, not ~284k, and crediting
+it with the optimizer's win would be the easiest mistake to make here.
+
+EIP-170 is explicitly not a motivation: after R53 nothing is size-constrained. The deciding factor is risk,
+not gas. These contracts are immutable and unproxied and hold user funds, R23's toolchain proof was obtained
+with stock solc, and a gas win that Blockscout cannot verify on Rootstock is not shippable. An explicit "keep
+stock solc" option is chosen unless a candidate clears both the gas bar and verification.
+
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:
 
-- **R12 compound interest into a chosen schedule — rejected.** The existing explicit withdraw-interest then deposit flow is legible and user-controlled. An atomic compound path must reconcile per-handler shares with per-route/per-schedule principal and adds a new cash-moving entry point to immutable handlers for convenience, not solvency.
+- **R12 compound interest into a chosen schedule — reopened 2026-08-31 as [R54](./R54-schedule-top-up-from-interest.md).** The original rejection is quoted here because it should not be reused: "The existing explicit withdraw-interest then deposit flow is legible and user-controlled. An atomic compound path must reconcile per-handler shares with per-route/per-schedule principal and adds a new cash-moving entry point to immutable handlers for convenience, not solvency." That describes an in-handler design which was never proposed — R12 was always `DcaManager`-only, with no handler call and no token movement. The unrecorded real blocker was EIP-170, and it was genuine: the function does not fit unoptimized. R53 removes it.
 - **Owner sweep — rejected.** A pooled balance cannot prove which tokens are harmless dust versus user liabilities. Governance must not gain a path around signer-only withdrawals.
 - **Handler per-user storage packing — rejected.** Each mapping value is already one slot and contains a financial amount. Narrowing it saves no slot across mapping entries.
 - **Address-keyed bool bitmaps — rejected.** `s_swappers` and `s_handlerAssigned` are sparse address keys; they never share a word, so a bitmap is extra math for the same SLOAD. R50 packs the `(token, routeIndex)` handler+pause pair instead.
