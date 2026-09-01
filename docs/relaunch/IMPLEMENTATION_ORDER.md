@@ -19,8 +19,11 @@ The proof, every documented broadcast command, and every required test lane use 
 pipeline. `[profile.default]` enables the legacy optimizer (`optimizer = true`, `optimizer_runs = 200`,
 `via_ir = false`) starting with R52 so Dex handlers can hold their own path allowlist under EIP-170.
 R52 owns the Rootstock testnet + Blockscout re-proof of that optimizer-on artifact
-(`script/DeployOptimizerProof.s.sol`). There is no `[profile.deploy]`; optimized via-IR and
-`ZeroTokenPurchaseUniswap` repair are R55. Until a separate toolchain decision pins via-IR through
+(`script/DeployOptimizerProof.s.sol`); **#104 is not merge-ready until that proof lands.**
+R53's optimizer-baseline work is absorbed into R52. Schedule top-up is R54; solx / via-IR
+evaluation and `ZeroTokenPurchaseUniswap` repair are R55 — defined in stacked
+[#105](https://github.com/BitChillRSK/dca-contracts/pull/105), which needs rebase after #104.
+There is no `[profile.deploy]`. Until a separate toolchain decision pins via-IR through
 tests, broadcasts, Rootstock testnet, and Blockscout verification, all EIP-170 decisions use
 `[profile.default]` and `via_ir = false`.
 
@@ -563,8 +566,9 @@ first, then revoke, so every active route remains approved without a lookup on e
 persistent availability failover for a drained/paused pool, not per-batch route selection. See
 [`R52-allowlisted-dex-path-failover.md`](./R52-allowlisted-dex-path-failover.md).
 
-Deployment order is construct handler (constructor self-allowlists the initial path) → assign handler.
-Update `DeployDexSwaps` and `DeployUsdrifHandler`; `DeployLayerBankHandler` is MoC-only and stays untouched.
+Deployment order is construct handler (constructor self-allowlists the initial path) → operator
+reads `getSwapPath()` and confirms the intended stablecoin / intermediate / WRBTC route → assign
+handler. Update `DeployDexSwaps` and `DeployUsdrifHandler`; `DeployLayerBankHandler` is MoC-only and stays untouched.
 Revoking a compromised swapper does not mutate the last active path, so the recovery runbook also restores the
 preferred path when necessary. The bot remains the sole signer and route intelligence remains read-only.
 Before claiming automatic path failover at relaunch, each enabled Dex handler needs at least one validated,
@@ -576,7 +580,9 @@ Handler-local policy depends on the default-profile optimizer. This PR enables `
 `optimizer_runs = 200` / `via_ir = false` on `[profile.default]` rather than keeping a centralized admin
 registry for an unoptimized EIP-170 budget. Measure with full `forge build --sizes`. There is no
 `[profile.deploy]`. Re-prove the optimizer-on pin on Rootstock testnet + Blockscout
-in this PR (`script/DeployOptimizerProof.s.sol`); do not defer that proof to R53.
+in this PR (`script/DeployOptimizerProof.s.sol`); **#104 is not merge-ready until that proof
+lands.** Do not treat R53 as still owning the optimizer baseline — that work is absorbed here.
+Remaining R54/R55 items live in stacked [#105](https://github.com/BitChillRSK/dca-contracts/pull/105).
 
 ## Closed non-implementation decisions
 

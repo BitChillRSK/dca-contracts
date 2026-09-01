@@ -5,8 +5,12 @@ Status: **implemented** · Assigned: yes · Optional/further-review: no
 PR 51 of the relaunch stack; GitHub implementation PR **#104**. Stack on R51 / GitHub #103.
 This PR also turns on the default-profile optimizer (`optimizer = true`, `optimizer_runs = 200`,
 `via_ir = false`) so handler-local path policy stays under EIP-170. The Rootstock testnet +
-Blockscout re-proof of that pin is **in this PR** (`script/DeployOptimizerProof.s.sol`), not deferred
-to R53. There is no `[profile.deploy]`; via-IR evaluation is R55.
+Blockscout re-proof of that pin is **in this PR** (`script/DeployOptimizerProof.s.sol`) and is an
+open merge blocker: **#104 is not merge-ready** until that CREATE verifies on Blockscout.
+R53's optimizer-baseline work is absorbed here. Schedule top-up is R54; solx / via-IR evaluation
+and `ZeroTokenPurchaseUniswap` repair are R55. Those remaining items are defined in stacked
+[#105](https://github.com/BitChillRSK/dca-contracts/pull/105), which will need rebasing after this
+PR because its original R53 optimizer plan is superseded. There is no `[profile.deploy]`.
 
 One chat/PR owns only this persistent path-governance change.
 
@@ -113,11 +117,12 @@ admin registry. Full `forge build --sizes` (not `--match-*`) is the record.
 - [x] Remove every purchase-path API from `IOperationsAdmin` / `OperationsAdmin`.
 - [x] `DeployDexSwaps` and `DeployUsdrifHandler` do **not** call `setPurchasePathAllowed` for the
   constructor path. `DeployLayerBankHandler` is MoC-only and must **not** be changed for this Dex feature.
-- [x] Update live/add-on Safe runbooks: assign the handler (constructor already approved the initial path),
-  then token-specific DcaManager setup such as the USDT0 minimum.
+- [x] Update live/add-on Safe runbooks: before `assignTokenHandler`, read `handler.getSwapPath()` and
+  confirm it matches the intended stablecoin / intermediate pools / WRBTC route; constructor already
+  approved that path. Then token-specific DcaManager setup such as the USDT0 minimum.
 - [x] Enable default-profile optimizer (`optimizer = true`, `optimizer_runs = 200`, `via_ir = false`).
       Remove vestigial `[profile.deploy]`. Own the Rootstock re-proof of optimizer-on (not via-IR) in this PR
-      (`script/DeployOptimizerProof.s.sol`); the Blockscout tick is the success criterion below.
+      (`script/DeployOptimizerProof.s.sol`); the unchecked Blockscout tick below is the merge blocker.
 - [x] Re-measure every Dex leaf and OperationsAdmin, and record configuration gas for allow/activate/revoke.
 
 ## Off-chain relaunch gate
@@ -156,8 +161,8 @@ incident runbook pass their own tests.
 - [ ] Changing `_getAmountOutMinimum`, deploy slippage defaults, or purchase-path reentrancy policy.
 - [ ] OperationsAdmin-owner break-glass activation when handler ownership has diverged.
 - [ ] A new abstract policy contract.
-- [ ] Rootstock testnet / Blockscout re-proof of via-IR (R55).
-- [ ] Remaining R53 items other than this optimizer pin (schedule top-up, solx).
+- [ ] Rootstock testnet / Blockscout re-proof of via-IR (R55 in [#105](https://github.com/BitChillRSK/dca-contracts/pull/105)).
+- [ ] Schedule top-up (R54) and solx evaluation (R55) in [#105](https://github.com/BitChillRSK/dca-contracts/pull/105).
 
 ## Files likely touched
 
@@ -186,7 +191,8 @@ incident runbook pass their own tests.
   `isPurchasePathAllowed(keccak256(getSwapPath()))` without calling the external setter
   (`testConstructorSelfAllowlistsActivePathWithoutSetter`).
 - Both live Dex deployment scripts assign without a constructor-path `setPurchasePathAllowed`;
-  mainnet non-owner add-ons print the complete Safe runbook instead of claiming they assigned the handler.
+  mainnet non-owner add-ons print the complete Safe runbook (including the `getSwapPath()` checkpoint)
+  instead of claiming they assigned the handler.
 - Slippage/oracle setters remain owner-only and purchases still use the active path plus both R43/R51 bounds.
 
 Then run the full `AGENTS.md` done-gate and both required forks (`make fork-sovryn`, `make fork-tropykus`). Those
@@ -203,7 +209,8 @@ lanes default to `SWAP_TYPE=mocSwaps` and skip this suite (`vm.skip` in `setUp`)
 - [x] Deployment scripts and off-chain issues contain complete normal/failover/recovery sequencing.
 - [x] R9 indexing and R10 natspec rules cover all new/repurposed surfaces.
 - [x] No open product decisions.
-- [ ] Rootstock testnet CREATE of optimizer-on `OperationsAdmin` verified on Blockscout. Command
+- [ ] Rootstock testnet CREATE of optimizer-on `OperationsAdmin` verified on Blockscout. **This PR
+      is not merge-ready until that CREATE succeeds and verifies.** Command
       (as `TESTNET_OWNER`, chain 31; this repo does not `--broadcast` from the implementer):
 
 ```bash
@@ -226,8 +233,9 @@ USDRIF dex-layerbank: allow ~41k, activate ~35k, revoke ~16k.
 - **ABI:** DcaManager and `IPurchaseRbtc` are unchanged. `IPurchaseUniswap` gains the path-policy setter/getter,
   event, and errors. `setPurchasePath` keeps its selector but changes authorization. OperationsAdmin **loses**
   any purchase-path APIs (none remain on R51 + this redesign).
-- **Deploy:** Dex constructor self-allowlists the initial path before assignment. Update only
-  actual Dex deploy paths (`DeployDexSwaps`, `DeployUsdrifHandler`) and their Safe runbooks/tests.
+- **Deploy:** Dex constructor self-allowlists the initial path. Before `assignTokenHandler`, the Safe
+  reads `getSwapPath()` and confirms the intended route. Update only actual Dex deploy paths
+  (`DeployDexSwaps`, `DeployUsdrifHandler`) and their Safe runbooks/tests.
 - **Consumers:** update `swapper-bot#6` with routing policy and recovery. Update `bitchill-monitoring#10` for
   the new handler event/errors and changed `NewPathSet` actor semantics. Update `front-end#22` for ABI
   regeneration if its hardcoded handler ABIs include these contracts. No data-api or metrics-dashboard issue
