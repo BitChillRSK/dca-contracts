@@ -66,7 +66,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      * @dev Builds the initial path through `_purchaseToken()`. The concrete funding base
      *      (TokenHandler via LendingErc20Handler / IdleErc20Handler) must initialize
      *      `i_stableToken` before this constructor body runs — the leaf `is` order lists
-     *      the funding base before `PurchaseUniswap`. `_setPurchasePath` reverts if that
+     *      the funding base before `PurchaseUniswap`. `_encodePurchasePath` reverts if that
      *      token is still `address(0)`, so a reversed `is` list fails at deploy rather
      *      than writing a path that cannot be bought or repaired. Constructor installation
      *      encodes once, writes `s_swapPath`, and marks that hash allowed — the initial path
@@ -89,7 +89,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         
         // Direct initial owner is not the deployer, so the constructor cannot call the onlyOwner setter.
         // This also rejects a zero purchase token before the `decimals()` call below reaches an empty address.
-        _setPurchasePath(uniswapSettings.swapIntermediateTokens, uniswapSettings.swapPoolFeeRates);
+        _installInitialPurchasePath(uniswapSettings.swapIntermediateTokens, uniswapSettings.swapPoolFeeRates);
 
         uint8 stablecoinDecimals = IERC20Metadata(address(_purchaseToken())).decimals();
         if (stablecoinDecimals > ORACLE_DECIMALS) {
@@ -131,8 +131,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         if (s_purchasePathAllowed[pathHash] == allowed) {
             revert PurchaseUniswap__PurchasePathPermissionUnchanged(pathHash, allowed);
         }
-        s_purchasePathAllowed[pathHash] = allowed;
-        emit PurchaseUniswap_PurchasePathAllowedSet(pathHash, encodedPath, intermediateTokens, poolFeeRates, allowed);
+        _setPurchasePathAllowed(pathHash, encodedPath, intermediateTokens, poolFeeRates, allowed);
     }
 
     /**
@@ -153,20 +152,46 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
                 revert PurchaseUniswap__UnauthorizedPurchasePathSetter(msg.sender);
             }
         }
+        _setPurchasePath(intermediateTokens, poolFeeRates, newPath);
+    }
+
+    /**
+     * @dev Write the active encoded path. `setPurchasePath` is the public caller; the constructor
+     *      goes through `_installInitialPurchasePath` so it can also mark the hash allowed.
+     */
+    function _setPurchasePath(
+        address[] memory intermediateTokens,
+        uint24[] memory poolFeeRates,
+        bytes memory newPath
+    ) internal {
         s_swapPath = newPath;
         emit PurchaseUniswap_NewPathSet(intermediateTokens, poolFeeRates, newPath);
     }
 
     /**
-     * @dev Constructor-only path install: encode once, write `s_swapPath`, and mark that hash allowed.
+     * @dev Store allowlist permission and emit. Checks (no-op, revoke-active) stay on the public setter.
      */
-    function _setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates) internal {
+    function _setPurchasePathAllowed(
+        bytes32 pathHash,
+        bytes memory encodedPath,
+        address[] memory intermediateTokens,
+        uint24[] memory poolFeeRates,
+        bool allowed
+    ) internal {
+        s_purchasePathAllowed[pathHash] = allowed;
+        emit PurchaseUniswap_PurchasePathAllowedSet(pathHash, encodedPath, intermediateTokens, poolFeeRates, allowed);
+    }
+
+    /**
+     * @dev Constructor-only: encode once, activate the path, and mark that hash allowed.
+     */
+    function _installInitialPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
+        internal
+    {
         bytes memory newPath = _encodePurchasePath(intermediateTokens, poolFeeRates);
         bytes32 pathHash = keccak256(newPath);
-        s_swapPath = newPath;
-        s_purchasePathAllowed[pathHash] = true;
-        emit PurchaseUniswap_NewPathSet(intermediateTokens, poolFeeRates, newPath);
-        emit PurchaseUniswap_PurchasePathAllowedSet(pathHash, newPath, intermediateTokens, poolFeeRates, true);
+        _setPurchasePath(intermediateTokens, poolFeeRates, newPath);
+        _setPurchasePathAllowed(pathHash, newPath, intermediateTokens, poolFeeRates, true);
     }
 
     function _encodePurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
@@ -182,7 +207,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         if (purchaseToken == address(0)) revert PurchaseUniswap__ZeroPurchaseToken();
 
         newPath = abi.encodePacked(purchaseToken);
-        for (uint256 i = 0; i < intermediateTokens.length; i++) {
+        for (uint256 i = 0; i < intermediateTokens.length; ++i) {
             newPath = abi.encodePacked(newPath, poolFeeRates[i], intermediateTokens[i]);
         }
 
