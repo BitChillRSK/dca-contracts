@@ -63,9 +63,6 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
         if (operationsAdmin.getRouteClass(LAYERBANK_INDEX) == IOperationsAdmin.RouteClass.Unregistered) {
             operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
         }
-        IPurchaseUniswap(usdrifHandlerAddress).setPurchasePathAllowed(
-            uniswapSettings.swapIntermediateTokens, uniswapSettings.swapPoolFeeRates, true
-        );
         operationsAdmin.assignTokenHandler(config.usdrifTokenAddress, LAYERBANK_INDEX, usdrifHandlerAddress);
         vm.stopPrank();
     }
@@ -90,7 +87,7 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
         assertTrue(operationsAdmin.isLendingRoute(LAYERBANK_INDEX));
         assertTrue(
             IPurchaseUniswap(usdrifHandlerAddress).isPurchasePathAllowed(keccak256(usdrifHandler.getSwapPath())),
-            "constructor path must be allowlisted before assignment"
+            "constructor path is allowlisted at construction"
         );
     }
 

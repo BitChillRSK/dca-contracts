@@ -69,8 +69,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      *      the funding base before `PurchaseUniswap`. `_setPurchasePath` reverts if that
      *      token is still `address(0)`, so a reversed `is` list fails at deploy rather
      *      than writing a path that cannot be bought or repaired. Constructor installation
-     *      does not write the path allowlist; the deploy script (handler owner) must approve
-     *      these components before the handler can receive schedule funds.
+     *      encodes once, writes `s_swapPath`, and marks that hash allowed — the initial path
+     *      is approved by deployment. Later paths are owner-approved through `setPurchasePathAllowed`.
      */
     constructor(
         UniswapSettings memory uniswapSettings,
@@ -157,9 +157,16 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         emit PurchaseUniswap_NewPathSet(intermediateTokens, poolFeeRates, newPath);
     }
 
+    /**
+     * @dev Constructor-only path install: encode once, write `s_swapPath`, and mark that hash allowed.
+     */
     function _setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates) internal {
-        s_swapPath = _encodePurchasePath(intermediateTokens, poolFeeRates);
-        emit PurchaseUniswap_NewPathSet(intermediateTokens, poolFeeRates, s_swapPath);
+        bytes memory newPath = _encodePurchasePath(intermediateTokens, poolFeeRates);
+        bytes32 pathHash = keccak256(newPath);
+        s_swapPath = newPath;
+        s_purchasePathAllowed[pathHash] = true;
+        emit PurchaseUniswap_NewPathSet(intermediateTokens, poolFeeRates, newPath);
+        emit PurchaseUniswap_PurchasePathAllowedSet(pathHash, newPath, intermediateTokens, poolFeeRates, true);
     }
 
     function _encodePurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)

@@ -19,11 +19,10 @@ The proof, every documented broadcast command, and every required test lane use 
 pipeline. `[profile.default]` enables the legacy optimizer (`optimizer = true`, `optimizer_runs = 200`,
 `via_ir = false`) starting with R52 so Dex handlers can hold their own path allowlist under EIP-170.
 R52 owns the Rootstock testnet + Blockscout re-proof of that optimizer-on artifact
-(`script/DeployOptimizerProof.s.sol`). `[profile.deploy]` is an experimental via-IR size profile
-that **pins `optimizer = false`** so it does not inherit the default pin (`via_ir` + optimizer
-fails solc 1284 on `ZeroTokenPurchaseUniswap`). It is not an approved deployment escape hatch.
-Until a separate toolchain decision pins via-IR through tests, broadcasts, Rootstock testnet, and
-Blockscout verification, all EIP-170 decisions use `[profile.default]` and `via_ir = false`.
+(`script/DeployOptimizerProof.s.sol`). There is no `[profile.deploy]`; optimized via-IR and
+`ZeroTokenPurchaseUniswap` repair are R55. Until a separate toolchain decision pins via-IR through
+tests, broadcasts, Rootstock testnet, and Blockscout verification, all EIP-170 decisions use
+`[profile.default]` and `via_ir = false`.
 
 ## Final scope decisions
 
@@ -564,7 +563,7 @@ first, then revoke, so every active route remains approved without a lookup on e
 persistent availability failover for a drained/paused pool, not per-batch route selection. See
 [`R52-allowlisted-dex-path-failover.md`](./R52-allowlisted-dex-path-failover.md).
 
-Deployment order is construct handler → allowlist its constructor components on the handler → assign handler.
+Deployment order is construct handler (constructor self-allowlists the initial path) → assign handler.
 Update `DeployDexSwaps` and `DeployUsdrifHandler`; `DeployLayerBankHandler` is MoC-only and stays untouched.
 Revoking a compromised swapper does not mutate the last active path, so the recovery runbook also restores the
 preferred path when necessary. The bot remains the sole signer and route intelligence remains read-only.
@@ -575,8 +574,8 @@ No DcaManager ABI change. R9 indexing and R10 natspec rules apply. **No contract
 
 Handler-local policy depends on the default-profile optimizer. This PR enables `optimizer = true` /
 `optimizer_runs = 200` / `via_ir = false` on `[profile.default]` rather than keeping a centralized admin
-registry for an unoptimized EIP-170 budget. Measure with full `forge build --sizes`. `[profile.deploy]`
-must set `optimizer = false` explicitly. Re-prove the optimizer-on pin on Rootstock testnet + Blockscout
+registry for an unoptimized EIP-170 budget. Measure with full `forge build --sizes`. There is no
+`[profile.deploy]`. Re-prove the optimizer-on pin on Rootstock testnet + Blockscout
 in this PR (`script/DeployOptimizerProof.s.sol`); do not defer that proof to R53.
 
 ## Closed non-implementation decisions

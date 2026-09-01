@@ -175,7 +175,7 @@ contract LiveDeployPathTest is Test {
                 IPurchaseUniswap(handler).isPurchasePathAllowed(
                     keccak256(IPurchaseUniswap(handler).getSwapPath())
                 ),
-                "constructor path must be allowlisted before assignment"
+                "constructor path is allowlisted at construction"
             );
         }
         assertEq(
@@ -202,7 +202,7 @@ contract LiveDeployPathTest is Test {
                 IPurchaseUniswap(handler).isPurchasePathAllowed(
                     keccak256(IPurchaseUniswap(handler).getSwapPath())
                 ),
-                "constructor path must be allowlisted before assignment"
+                "constructor path is allowlisted at construction"
             );
             vm.prank(SAFE);
             operationsAdmin.acceptOwnership();

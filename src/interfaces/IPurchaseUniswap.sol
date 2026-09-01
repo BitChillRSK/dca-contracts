@@ -27,11 +27,12 @@ interface IPurchaseUniswap {
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice An approved Uniswap V3 path was activated by a swapper or this handler's owner.
+    /// @notice An approved Uniswap V3 path was activated by construction, a swapper, or this handler's owner.
     event PurchaseUniswap_NewPathSet(
         address[] intermediateTokens, uint24[] poolFeeRates, bytes newPath
     );
     /// @notice Exact encoded path derived from `intermediateTokens` / `poolFeeRates` was allowed or revoked.
+    /// @dev Construction emits `allowed = true` for the initial path. Later writes are owner-only.
     event PurchaseUniswap_PurchasePathAllowedSet(
         bytes32 pathHash, bytes encodedPath, address[] intermediateTokens, uint24[] poolFeeRates, bool allowed
     );
@@ -82,6 +83,7 @@ interface IPurchaseUniswap {
      * @param allowed True to approve the derived path, false to revoke it.
      * @dev Owner-only. Encodes through the same pinned stablecoin and WRBTC as `setPurchasePath`.
      *      Emits the derived bytes and hash. The active path cannot be revoked. A repeated write reverts.
+     *      New paths after construction are approved here; the constructor path is approved at deploy.
      */
     function setPurchasePathAllowed(
         address[] memory intermediateTokens,
@@ -101,7 +103,8 @@ interface IPurchaseUniswap {
      * @param poolFeeRates Pool fee for each hop. Length must be `intermediateTokens.length + 1`.
      * @dev Builds the canonical path from this handler's pinned stablecoin and WRBTC. `msg.sender` must
      *      be this handler's owner or an OperationsAdmin swapper, and the derived path must already be
-     *      allowlisted. Constructor installation does not use this function.
+     *      allowlisted. Constructor installation does not use this function; it self-allowlists the
+     *      initial path.
      */
     function setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates) external;
 

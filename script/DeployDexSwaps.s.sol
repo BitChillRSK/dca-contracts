@@ -144,7 +144,6 @@ contract DeployDexSwaps is DeployBase {
                     })
                 );
                 console.log("LayerBank dex handler deployed at:", layerbankHandler);
-                _allowlistConstructorPath(uniswapSettings, layerbankHandler);
                 operationsAdmin.assignTokenHandler(stablecoinAddress, LAYERBANK_INDEX, layerbankHandler);
                 _proposeFinalOwner(layerbankHandler);
                 if (isUSDT0) {
@@ -181,7 +180,6 @@ contract DeployDexSwaps is DeployBase {
             })
         );
         console.log("Sovryn handler deployed at:", sovrynHandler);
-        _allowlistConstructorPath(uniswapSettings, sovrynHandler);
         operationsAdmin.assignTokenHandler(stablecoinAddress, SOVRYN_INDEX, sovrynHandler);
         _proposeFinalOwner(sovrynHandler);
         if (protocol == Protocol.SOVRYN) {
@@ -277,16 +275,6 @@ contract DeployDexSwaps is DeployBase {
         vm.stopBroadcast();
 
         return (operationsAdmin, docHandlerDexAddress, dcaManager, helperConfig);
-    }
-
-    function _allowlistConstructorPath(
-        IPurchaseUniswap.UniswapSettings memory settings,
-        address handler
-    ) internal {
-        IPurchaseUniswap(handler).setPurchasePathAllowed(
-            settings.swapIntermediateTokens, settings.swapPoolFeeRates, true
-        );
-        console.log("Allowlisted constructor Dex path for", handler);
     }
 
     function _stablecoinType() internal view returns (string memory stablecoinType) {

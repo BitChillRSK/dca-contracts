@@ -7,7 +7,6 @@ import {UsdrifHelperConfig} from "./UsdrifHelperConfig.s.sol";
 import {LayerBankErc20HandlerDex} from "../src/layerbank/LayerBankErc20HandlerDex.sol";
 import {OperationsAdmin} from "../src/OperationsAdmin.sol";
 import {DcaManager} from "../src/DcaManager.sol";
-import {BitChillOwnable} from "../src/BitChillOwnable.sol";
 import {IOperationsAdmin} from "../src/interfaces/IOperationsAdmin.sol";
 import {IPurchaseUniswap} from "../src/interfaces/IPurchaseUniswap.sol";
 import {IFeeHandler} from "../src/interfaces/IFeeHandler.sol";
@@ -27,8 +26,8 @@ import "./Constants.sol";
  *      permanently occupy `(token, LAYERBANK_INDEX)`). Occupied `(token, LAYERBANK_INDEX)` reverts
  *      `HandlerAlreadyAssigned` — do not skip. USDT0 live path uses 6-decimal fee bounds and
  *      `setTokenMinPurchaseAmount`. Mainnet add-on: the Foundry EOA is not the Safe, so `run()`
- *      deploys then returns without assigning. If the Foundry EOA is the new handler's owner it
- *      allowlists the constructor path; the Safe must still `assignTokenHandler` **and**, for USDT0,
+ *      deploys then returns without assigning. The constructor already allowlists the initial path.
+ *      The Safe must still `assignTokenHandler` **and**, for USDT0,
  *      `setTokenMinPurchaseAmount(usdt0, 25e6)` — the DcaManager default is 25 ether (~25 trillion
  *      USDT0). See README "Ownership after deploy".
  */
@@ -136,7 +135,7 @@ contract DeployUsdrifHandler is DeployBase {
         }
 
         console.log("LayerBank dex handler deployed at:", handler);
-        _maybeAssign(operationsAdmin, dcaManager, tokenAddress, handler, isUsdt0Live, params.uniswapSettings);
+        _maybeAssign(operationsAdmin, dcaManager, tokenAddress, handler, isUsdt0Live);
 
         vm.stopBroadcast();
 
@@ -169,15 +168,8 @@ contract DeployUsdrifHandler is DeployBase {
         DcaManager dcaManager,
         address tokenAddress,
         address handler,
-        bool isUsdt0Live,
-        IPurchaseUniswap.UniswapSettings memory settings
+        bool isUsdt0Live
     ) internal {
-        if (msg.sender == BitChillOwnable(handler).owner()) {
-            IPurchaseUniswap(handler).setPurchasePathAllowed(
-                settings.swapIntermediateTokens, settings.swapPoolFeeRates, true
-            );
-        }
-
         bool isOwner = msg.sender == operationsAdmin.owner();
 
         if (!isOwner) {
@@ -185,15 +177,12 @@ contract DeployUsdrifHandler is DeployBase {
             console.log("Safe runbook (owner of OperationsAdmin + DcaManager):");
             console.log("1. registerRoute(LAYERBANK_INDEX, true) only if getRouteClass is Unregistered");
             console.log("   (already-registered reverts RouteAlreadyRegistered; skip that call)");
-            console.log("2. If this broadcast did not own the handler, the handler owner must call");
-            console.log("   setPurchasePathAllowed(intermediateTokens, poolFeeRates, true) with the");
-            console.log("   constructor components (same encode as setPurchasePath).");
-            console.log("3. assignTokenHandler(token, LAYERBANK_INDEX, handler)");
+            console.log("2. assignTokenHandler(token, LAYERBANK_INDEX, handler)");
             console.log("tokenAddress:", tokenAddress);
             console.log("index:", LAYERBANK_INDEX);
             console.log("handlerAddress:", handler);
             if (isUsdt0Live) {
-                console.log("4. REQUIRED for USDT0: dcaManager.setTokenMinPurchaseAmount(token, 25e6)");
+                console.log("3. REQUIRED for USDT0: dcaManager.setTokenMinPurchaseAmount(token, 25e6)");
                 console.log("   Default min is 25 ether (~25 trillion USDT0). Users cannot create real schedules without this.");
                 console.log("minPurchaseAmount:", USDT0_MIN_PURCHASE_AMOUNT);
             }

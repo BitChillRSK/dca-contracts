@@ -24,10 +24,9 @@ contract DeployUsdrifHandlerHarness is DeployUsdrifHandler {
         DcaManager dcaManager,
         address tokenAddress,
         address handler,
-        bool isUsdt0Live,
-        IPurchaseUniswap.UniswapSettings memory settings
+        bool isUsdt0Live
     ) external {
-        _maybeAssign(operationsAdmin, dcaManager, tokenAddress, handler, isUsdt0Live, settings);
+        _maybeAssign(operationsAdmin, dcaManager, tokenAddress, handler, isUsdt0Live);
     }
 }
 
@@ -71,7 +70,7 @@ contract Usdt0DexDeploymentTest is Test {
         // Nested admin/manager calls come from the harness; own the stack as the harness so
         // `_maybeAssign`'s `msg.sender == owner` check matches production broadcast.
         vm.prank(address(deployer));
-        deployer.maybeAssign(operationsAdmin, dcaManager, usdt0, handler, true, _directHopSettings());
+        deployer.maybeAssign(operationsAdmin, dcaManager, usdt0, handler, true);
 
         (uint256 minPurchase, bool custom) = dcaManager.getTokenMinPurchaseAmount(usdt0);
         assertTrue(custom, "add-on _maybeAssign must set the 6-decimal min when the broadcaster is owner");
@@ -89,7 +88,7 @@ contract Usdt0DexDeploymentTest is Test {
         (OperationsAdmin operationsAdmin, DcaManager dcaManager, address handler, address usdt0) =
             _deploySixDecimalStack(address(deployer));
 
-        deployer.maybeAssign(operationsAdmin, dcaManager, usdt0, handler, true, _directHopSettings());
+        deployer.maybeAssign(operationsAdmin, dcaManager, usdt0, handler, true);
 
         (uint256 minPurchase, bool custom) = dcaManager.getTokenMinPurchaseAmount(usdt0);
         assertFalse(custom, "non-owner add-on must not set the min; Safe runbook has to");
@@ -145,18 +144,5 @@ contract Usdt0DexDeploymentTest is Test {
                 initialOwner: owner
             })
         );
-    }
-
-    function _directHopSettings() private pure returns (IPurchaseUniswap.UniswapSettings memory) {
-        address[] memory intermediates = new address[](0);
-        uint24[] memory fees = new uint24[](1);
-        fees[0] = 3000;
-        return IPurchaseUniswap.UniswapSettings({
-            wrBtcToken: IWRBTC(address(0)),
-            swapRouter02: ISwapRouter02(address(0)),
-            swapIntermediateTokens: intermediates,
-            swapPoolFeeRates: fees,
-            mocOracle: ICoinPairPrice(address(0))
-        });
     }
 }

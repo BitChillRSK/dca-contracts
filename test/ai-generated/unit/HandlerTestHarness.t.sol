@@ -132,14 +132,6 @@ abstract contract HandlerTestHarness is Test {
         
         setupRolesAndPermissions();
 
-        if (supportsDex) {
-            address[] memory mids = new address[](0);
-            uint24[] memory fees = new uint24[](1);
-            fees[0] = 3000;
-            vm.prank(OWNER);
-            IPurchaseUniswap(address(handler)).setPurchasePathAllowed(mids, fees, true);
-        }
-        
         vm.prank(OWNER);
         operationsAdmin.assignTokenHandler(
             address(stablecoin), 

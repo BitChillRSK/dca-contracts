@@ -180,6 +180,12 @@ contract DexPathFailoverTest is DcaDappTest {
         IPurchaseUniswap(address(stablecoinHandler)).updateMocOracle(address(1));
     }
 
+    function testConstructorSelfAllowlistsActivePathWithoutSetter() public {
+        IPurchaseUniswap other = _secondHandler();
+        bytes memory path = other.getSwapPath();
+        assertTrue(other.isPurchasePathAllowed(keccak256(path)));
+    }
+
     function testConstructorPathIsAllowlistedBeforeAssignment() public {
         bytes memory path = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
         assertTrue(IPurchaseUniswap(address(stablecoinHandler)).isPurchasePathAllowed(keccak256(path)));
@@ -203,6 +209,7 @@ contract DexPathFailoverTest is DcaDappTest {
         bytes32 pathHash = keccak256(path);
         _allow(mids, fees, true);
         IPurchaseUniswap other = _secondHandler();
+        assertTrue(other.isPurchasePathAllowed(keccak256(other.getSwapPath())));
 
         vm.expectRevert(
             abi.encodeWithSelector(IPurchaseUniswap.PurchaseUniswap__PurchasePathNotAllowed.selector, pathHash)

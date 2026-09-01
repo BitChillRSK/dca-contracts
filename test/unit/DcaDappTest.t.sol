@@ -397,13 +397,6 @@ contract DcaDappTest is Test {
         operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
         operationsAdmin.registerRoute(SOVRYN_INDEX, true);
         operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
-        if (isDexSwaps) {
-            IPurchaseUniswap(address(stablecoinHandler)).setPurchasePathAllowed(
-                dexHelperConfig.getActiveNetworkConfig().swapIntermediateTokens,
-                dexHelperConfig.getActiveNetworkConfig().swapPoolFeeRates,
-                true
-            );
-        }
         vm.stopPrank();
 
         // Add tokenHandler
