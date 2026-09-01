@@ -19,7 +19,7 @@ schedule and adds a new cash-moving entry point to immutable handlers" — descr
 never proposed. The specified design is `DcaManager`-only, makes no handler call, moves no cash, and
 explicitly forbids redeem-then-remint. It was rejected against a strawman.
 
-The real objection was never recorded and, until R53, was real: the function did not fit EIP-170.
+The real objection was never recorded and, until the optimizer pin, was real: the function did not fit EIP-170.
 Measured on prototype branch `proto/r12-compound-interest` (commit `7dd00fb`):
 
 | Config | baseline | with the function | Δ | margin after |
@@ -28,7 +28,7 @@ Measured on prototype branch `proto/r12-compound-interest` (commit `7dd00fb`):
 | optimizer on, no IR | 13,767 | 14,367 | +600 | 10,209 |
 | optimizer on, via IR | 11,039 | 11,547 | +508 | 13,029 |
 
-**This PR is gated on [R53](./R53-optimizer-baseline.md).** Unoptimized it does not fit at all, and
+**This PR is gated on the optimizer pin in [#104](https://github.com/BitChillRSK/dca-contracts/pull/104).** Unoptimized it does not fit at all, and
 stripping the dedicated event saves only 112 bytes — not enough to rescue it. With the optimizer on
 it costs 600 bytes against ~10.8 KB of margin.
 
@@ -86,9 +86,9 @@ strictly cheaper and strictly fewer steps, not a replacement.
 - [ ] Auto-compounding inside `batchBuyRbtc`, or splitting interest across several schedules.
 - [ ] Changing `getAccruedInterest`, `_lockedPrincipal`, `withdrawInterest`, or the R15 lending-share
       dust deferral.
-- [ ] Enabling the optimizer (R53 owns it) or `via_ir` / solx (R55).
+- [ ] Enabling the optimizer ([#104](https://github.com/BitChillRSK/dca-contracts/pull/104) owns it), re-baselining the recorded numbers (R53), or `via_ir` / solx (R55).
 - [ ] Refactoring the private helpers to share code with `depositToken` for bytecode reasons. With
-      R53's margin there is no reason to touch audited hot-path code.
+      the optimized margin there is no reason to touch audited hot-path code.
 
 ## Files likely touched
 
@@ -130,7 +130,7 @@ Behaviors to assert:
 ## Success criteria
 
 - [ ] All of the above passes on all three lending lanes.
-- [ ] `DcaManager` runtime growth is ~600 B under R53's settings, recorded in the PR with margin.
+- [ ] `DcaManager` runtime growth is ~600 B under the optimized no-IR profile, recorded in the PR with margin.
 - [ ] No handler contract changed.
 - [ ] No external state-changing call on the new path.
 - [ ] Open product decisions 1–3 are answered in the PR body, not left implicit in the code.

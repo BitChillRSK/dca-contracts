@@ -16,7 +16,7 @@ schedule, so hot-path gas is a recurring cost rather than a one-off.
 
 Two things must be settled before any solx number means anything.
 
-**The baseline must be optimized.** Until [R53](./R53-optimizer-baseline.md) lands, every gas figure
+**The baseline must be optimized.** Until [#104](https://github.com/BitChillRSK/dca-contracts/pull/104) lands, every gas figure
 in this repo is unoptimized, and measuring solx against those numbers would credit it with wins that
 belong to `optimizer = true`. Measured on the MoC/Sovryn lane:
 
@@ -37,7 +37,7 @@ that `forge test --match-*` can mask this, because forge compiles sparsely and m
 file. `[profile.deploy]` sidesteps it with `skip = ["test/**"]`, which is right for a deploy build
 but does not help the test lanes. Deciding whether and how to run tests under IR is part of this PR.
 
-EIP-170 is explicitly **not** a motivation. After R53 the margins are ~10.8 KB on `DcaManager` and
+EIP-170 is explicitly **not** a motivation. With the optimizer on the margins are ~10.8 KB on `DcaManager` and
 ~9.7 KB on the Dex handlers; nothing is size-constrained. Any past reasoning that reached for a
 smaller compiler to fit a contract is void.
 
@@ -57,8 +57,8 @@ compiler in this PR whatever the numbers say.
 ## Scope
 
 - [ ] Install a pinned solx version; record the exact version and how it was obtained. Do not float.
-- [ ] Establish the baseline at R53's settings (optimizer on, no IR). Every comparison is against
-      this, never against the pre-R53 unoptimized numbers.
+- [ ] Establish the baseline at the settings [#104](https://github.com/BitChillRSK/dca-contracts/pull/104) pins (optimizer on, 200 runs, no IR). Every comparison
+      is against this, never against the older unoptimized numbers.
 - [ ] Measure four configurations — solc no-IR, solc via-IR, solx, and solx with whatever
       optimization level is its analogue — on:
       - runtime size for `DcaManager`, `OperationsAdmin`, `LayerBankErc20HandlerDex`,
@@ -78,7 +78,7 @@ compiler in this PR whatever the numbers say.
 ## Out of scope
 
 - [ ] Changing `foundry.toml`, CI, or any deploy path. This PR measures and recommends only.
-- [ ] Enabling the optimizer (R53).
+- [ ] Enabling the optimizer ([#104](https://github.com/BitChillRSK/dca-contracts/pull/104)) or correcting the recorded historical figures (R53).
 - [ ] Any `src/` change to chase a compiler's numbers. If a candidate needs source changes to
       compile, that is a finding about the candidate.
 - [ ] Reworking `_creditBuyers` or any other no-IR workaround. Those belong to the PRs that own them
@@ -105,7 +105,7 @@ This item's "tests" are its measurements, and they must be reproducible:
 
 ## Success criteria
 
-- [ ] A table comparing all four configurations on size and gas, against an R53 baseline.
+- [ ] A table comparing all four configurations on size and gas, against the optimized no-IR baseline.
 - [ ] A clear statement of whether the full matrix passes under each.
 - [ ] A Blockscout/Rootstock testnet verification result for each contender — success with tx
       hashes, or a specific failure mode.
@@ -116,7 +116,7 @@ This item's "tests" are its measurements, and they must be reproducible:
 ## Reviewer checklist
 
 - [ ] Matches **Scope**; nothing from **Out of scope**.
-- [ ] Every number is against the post-R53 optimized baseline, never the unoptimized one.
+- [ ] Every number is against the optimized no-IR baseline, never the unoptimized one.
 - [ ] solx version is pinned and recorded.
 - [ ] `ZeroTokenPurchaseUniswap` still proves that a reversed inheritance list cannot deploy.
 - [ ] The recommendation weighs verification and miscompilation risk, not gas alone.

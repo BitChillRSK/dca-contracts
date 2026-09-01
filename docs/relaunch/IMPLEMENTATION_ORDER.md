@@ -40,7 +40,7 @@ PR 2 was the original decision-record placeholder. GitHub PR [#74](https://githu
 - Remove `setOperationsAdmin` and pin the constructor admin (R46). Enforce one assignment per handler address (R47).
 - Ship a per-token×route deposit pause (R48) and per-schedule purchase pause (R19).
 - Rename the schedule struct `DcaDetails` → `DcaSchedule` (R49), pack it to three slots (R18), then finish packing in R50 (`uint64` nonce as `scheduleId`, fees, admin handler+pause, DcaManager scalars, Dex percents, `uint32` route keys on every OperationsAdmin entry). Do not narrow handler balance/share mappings.
-- Do **not** ship R12 interest compounding: users can withdraw interest and deposit it explicitly, while an in-handler compound path couples principal/share accounting to a chosen schedule and expands the most sensitive cash surface.
+- R12 interest compounding is **reopened** as [R54](./R54-schedule-top-up-from-interest.md): the recorded rejection described an in-handler design that was never proposed, and the real blocker was an unoptimized EIP-170 budget. See the reopened entry under **Closed non-implementation decisions**.
 - Do **not** add an owner sweep: pooled stablecoin and rBTC cannot be safely distinguished from liabilities, and signer-only withdrawal remains the custody boundary.
 - Licensing is **reopened** (was: keep MIT). Two questions, both open: whether MIT is the right license for BitChill at all, and a GPL compliance gap that exists today regardless of that answer. See **Licensing — reopened** below.
 - Dex: keep the $1-listed-stable + MoC BTC/USD on-chain floor, decimal-correct it, and leave extra MEV policy to the bot (R43). LayerBank is route 1 for USDRIF/USDT0; keep Sovryn DOC at route 2; USDT0 bounds are `25e6` / `1000e6` / `100_000e6` (R36).
@@ -589,32 +589,33 @@ verified at [`0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD`](https://rootstock-tes
 Do not treat R53 as still owning the optimizer baseline — that work is absorbed here.
 Remaining R54/R55 items live in stacked [#105](https://github.com/BitChillRSK/dca-contracts/pull/105).
 
-**Corrected 2026-08-31 (see R53).** That prototype exceeded an *unoptimized* EIP-170 budget. The solc
-optimizer has never been enabled in `[profile.default]`, so the Dex leaf's true margin is ~9.7 KB, not the
-hundreds of bytes this paragraph assumed. The placement may still be right on authority grounds — policy on
-the registry, path building on the leaf — but the bytecode argument for it is void and must not be reused.
-Re-judge in PR 51's own thread, not here.
+**Superseded 2026-09-01.** The earlier plan put the allowlist on `OperationsAdmin` because a prototype with
+policy on the Dex leaf exceeded EIP-170. That budget was *unoptimized*. With `optimizer = true` the leaf has
+~9 KB of margin, and #104 accordingly moved policy back onto `PurchaseUniswap`, where per-handler storage also
+makes cross-handler misuse impossible. Do not reuse the bytecode argument for a centralized registry.
 
-### R53 - enable the solc optimizer and re-baseline ([spec](./R53-optimizer-baseline.md), unassigned)
+### R53 - re-baseline the recorded sizes and gas ([spec](./R53-optimizer-baseline.md), unassigned)
 
-`[profile.default]` never sets `optimizer`, and forge defaults it to `false`; `[profile.ci]` inherits that.
-Every runtime size, EIP-170 margin, and gas figure in these docs is therefore unoptimized. `DcaManager` is
-23,703 B / 873 B margin as recorded and 13,767 B / 10,809 B with the optimizer on; `testSinglePurchase` falls
-283,711 -> 243,817 gas and `testBatchPurchasesOneUser` 2,244,557 -> 1,562,720. Enable the optimizer at 200
-runs, keep `via_ir = false`, re-prove R23's Rootstock testnet and Blockscout baseline at the new settings, and
-correct the recorded numbers. Rewrite - do not delete - the "all EIP-170 decisions use `[profile.default]` and
-`via_ir = false`" rule above and its `AGENTS.md` mirror: the no-IR half stands until R55, but the basis must
-become *optimized* no-IR.
+The optimizer flip itself is no longer R53's. `[profile.default]` never set `optimizer` and forge defaults it
+to `false`, so the relaunch was measured unoptimized throughout; #104 pins `optimizer = true` /
+`optimizer_runs = 200` / `via_ir = false` because handler-local path policy needs it to clear EIP-170, and #104
+also owns the Rootstock testnet + Blockscout re-proof of that artifact. The measurement rule at the top of this
+file and its `AGENTS.md` mirror are already rewritten to *optimized* no-IR.
 
-This unblocks R54 and voids the bytecode premise under several shipped decisions - the R52 allowlist placement,
-the migration gate's manual exit/re-entry (justified partly by "426 bytes of runtime margin"), and R51's
-`_creditBuyers` no-IR extraction. Each is re-judged in its own PR on its remaining merits; several have
-independent arguments that survive. `via_ir` stays out: a full `forge build` under IR fails with solc error
-1284 on `ZeroTokenPurchaseUniswap`, whose unconditionally-reverting constructor is the test itself.
+What remains is the re-baseline #104 did not do: it corrected only its own figures. Every runtime size, EIP-170
+margin, and gas number recorded in the R18 / R31 / R42 / R50 / R51 entries and specs is still unoptimized. For
+scale, the flip moved `DcaManager` 23,703 B / 873 B margin -> 13,767 B / 10,809 B, `testSinglePurchase`
+283,711 -> 243,817 gas, and `testBatchPurchasesOneUser` 2,244,557 -> 1,562,720. Append the corrected figure to
+each historical entry; do not rewrite why a shipped PR chose what it chose.
 
-Ask: `optimizer_runs` value (recommend keeping 200) and whether CI adopts it in the same PR (recommend yes).
+The optimized budget also voids the bytecode premise under decisions this PR does not re-judge: the migration
+gate's manual exit/re-entry (justified partly by "426 bytes of runtime margin") and R51's `_creditBuyers`
+reasoning. Each belongs to its own PR on its remaining merits; several have independent arguments that survive.
+`via_ir` stays out (R55).
 
-### R54 - top a schedule up from accrued interest ([spec](./R54-schedule-top-up-from-interest.md), unassigned, gated on R53)
+Ask: none. `optimizer_runs = 200` and CI inheritance were settled in #104.
+
+### R54 - top a schedule up from accrued interest ([spec](./R54-schedule-top-up-from-interest.md), unassigned, gated on #104)
 
 Revives R12. `DcaManager.topUpFromInterest(token, scheduleIndex, scheduleId)` credits the caller's accrued
 lending interest to one schedule's `tokenBalance`, so yield buys rBTC without a withdraw-then-deposit round
@@ -624,7 +625,7 @@ withdrawal uses, so the route's summed principal lands exactly on the position's
 above it - the same end state an interest withdrawal already produces, reached from the other side.
 
 Measured at `proto/r12-compound-interest` (`7dd00fb`): +1,020 B unoptimized (margin **-147**, does not fit),
-+600 B with the optimizer (margin 10,209), +508 B under IR. Gated on R53 for exactly that reason; dropping the
++600 B with the optimizer (margin 10,209), +508 B under IR. Gated on the #104 optimizer pin for exactly that reason; dropping the
 dedicated event saves only 112 B and does not rescue it.
 
 Ask: whether the R48 deposit pause blocks a top-up (recommend yes - a pause means stop growing exposure on
@@ -632,15 +633,15 @@ that route, whatever the funds' source); naming (`topUpFromInterest`, because "c
 the lending protocol that Tropykus forks - the same collision class R26 fixed for "lending token"); and
 all-or-part (recommend all, no `amount` parameter).
 
-### R55 - evaluate solx and the IR pipeline ([spec](./R55-solx-and-ir-evaluation.md), unassigned, gated on R53)
+### R55 - evaluate solx and the IR pipeline ([spec](./R55-solx-and-ir-evaluation.md), unassigned, gated on #104)
 
 Measure and recommend; change no compiler setting. Compare stock solc no-IR, stock solc `via_ir`, and solx on
 runtime size, hot-path gas, whether the full matrix passes, and whether Blockscout can verify the result on
-Rootstock. Every number must be against R53's optimized baseline - the optimizer already takes 14-30% and
+Rootstock. Every number must be against the optimized baseline #104 pins - the optimizer already takes 14-30% and
 `via_ir` a further 2-4%, so solx competes against ~239k gas on `testSinglePurchase`, not ~284k, and crediting
 it with the optimizer's win would be the easiest mistake to make here.
 
-EIP-170 is explicitly not a motivation: after R53 nothing is size-constrained. The deciding factor is risk,
+EIP-170 is explicitly not a motivation: once #104 lands nothing is size-constrained. The deciding factor is risk,
 not gas. These contracts are immutable and unproxied and hold user funds, R23's toolchain proof was obtained
 with stock solc, and a gas win that Blockscout cannot verify on Rootstock is not shippable. An explicit "keep
 stock solc" option is chosen unless a candidate clears both the gas bar and verification.
