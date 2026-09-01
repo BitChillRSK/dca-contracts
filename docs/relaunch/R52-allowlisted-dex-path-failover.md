@@ -214,12 +214,15 @@ lanes default to `SWAP_TYPE=mocSwaps` and skip this suite (`vm.skip` in `setUp`)
       (as `TESTNET_OWNER`, chain 31; this repo does not `--broadcast` from the implementer):
 
 ```bash
-# On feat/r52-allowlisted-dex-path-failover, with .env sourced. Sign as TESTNET_OWNER
-# (same `--account` / keystore as other testnet broadcasts). Forge requires
-# `path:ContractName` because `.s.sol` contains extra dots.
+# On feat/r52-allowlisted-dex-path-failover, with .env sourced (`LENDING_PROTOCOL` must be set;
+# DeployBase reads it in the constructor). `--account` alone leaves `run()`'s `msg.sender` as
+# Foundry's default sender (`0x1804c8…`), which is not `TESTNET_OWNER`. Pass `--sender` and the
+# keystore whose address is `0x31e0FacEa072EE621f22971DF5bAE3a1317E41A4` (check with
+# `cast wallet address --account <name>`). Forge requires `path:ContractName` for `*.s.sol`.
 REAL_DEPLOYMENT=true forge script script/DeployOptimizerProof.s.sol:DeployOptimizerProof \
   --rpc-url $RSK_TESTNET_RPC_URL \
-  --account dev_wallet \
+  --account <keystore_that_is_TESTNET_OWNER> \
+  --sender 0x31e0FacEa072EE621f22971DF5bAE3a1317E41A4 \
   --broadcast --legacy \
   --verify --verifier blockscout --verifier-url $BLOCKSCOUT_API_URL
 ```

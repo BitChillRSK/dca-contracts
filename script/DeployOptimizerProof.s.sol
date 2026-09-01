@@ -13,13 +13,12 @@ import {console} from "forge-std/Test.sol";
  */
 contract DeployOptimizerProof is DeployBase {
     function run() external returns (OperationsAdmin admin) {
-        _assertLiveBroadcastSender(msg.sender);
         if (environment != Environment.TESTNET) {
             revert("DeployOptimizerProof is testnet-only");
         }
-
-        vm.startBroadcast();
-        admin = new OperationsAdmin(msg.sender);
+        // `--account` does not set `run()`'s `msg.sender`; pass `--sender` as TESTNET_OWNER too.
+        _beginLiveAwareBroadcast(msg.sender);
+        admin = new OperationsAdmin(deployOwner);
         vm.stopBroadcast();
 
         console.log("Optimizer-proof OperationsAdmin:", address(admin));

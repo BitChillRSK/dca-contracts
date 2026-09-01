@@ -338,9 +338,12 @@ Until then, the no-IR pipeline is authoritative.
 testnet and verifies on Blockscout. On `feat/r52-allowlisted-dex-path-failover`, as `TESTNET_OWNER`:
 
 ```bash
+# `--account` must be TESTNET_OWNER (`cast wallet address --account <name>` → 0x31e0FacEa0…).
+# `--sender` is required: `--account` does not set `run()`'s `msg.sender`.
 REAL_DEPLOYMENT=true forge script script/DeployOptimizerProof.s.sol:DeployOptimizerProof \
   --rpc-url $RSK_TESTNET_RPC_URL \
-  --account dev_wallet \
+  --account <keystore_that_is_TESTNET_OWNER> \
+  --sender 0x31e0FacEa072EE621f22971DF5bAE3a1317E41A4 \
   --broadcast --legacy \
   --verify --verifier blockscout --verifier-url $BLOCKSCOUT_API_URL
 ```
