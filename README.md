@@ -335,7 +335,15 @@ Blockscout-verification proof, and decide whether no-IR remains as a secondary c
 Until then, the no-IR pipeline is authoritative.
 
 **PR 104 is not merge-ready** until optimizer-on `OperationsAdmin` CREATE succeeds on Rootstock
-testnet and verifies on Blockscout (`script/DeployOptimizerProof.s.sol`).
+testnet and verifies on Blockscout. On `feat/r52-allowlisted-dex-path-failover`, as `TESTNET_OWNER`:
+
+```bash
+REAL_DEPLOYMENT=true forge script script/DeployOptimizerProof.s.sol:DeployOptimizerProof \
+  --rpc-url $RSK_TESTNET_RPC_URL \
+  --account dev_wallet \
+  --broadcast --legacy \
+  --verify --verifier blockscout --verifier-url $BLOCKSCOUT_API_URL
+```
 
 ## Dependency Management
 

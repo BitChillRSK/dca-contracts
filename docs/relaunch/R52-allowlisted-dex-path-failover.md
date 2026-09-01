@@ -214,8 +214,12 @@ lanes default to `SWAP_TYPE=mocSwaps` and skip this suite (`vm.skip` in `setUp`)
       (as `TESTNET_OWNER`, chain 31; this repo does not `--broadcast` from the implementer):
 
 ```bash
-REAL_DEPLOYMENT=true forge script script/DeployOptimizerProof.s.sol \
+# On feat/r52-allowlisted-dex-path-failover, with .env sourced. Sign as TESTNET_OWNER
+# (same `--account` / keystore as other testnet broadcasts). Forge requires
+# `path:ContractName` because `.s.sol` contains extra dots.
+REAL_DEPLOYMENT=true forge script script/DeployOptimizerProof.s.sol:DeployOptimizerProof \
   --rpc-url $RSK_TESTNET_RPC_URL \
+  --account dev_wallet \
   --broadcast --legacy \
   --verify --verifier blockscout --verifier-url $BLOCKSCOUT_API_URL
 ```
