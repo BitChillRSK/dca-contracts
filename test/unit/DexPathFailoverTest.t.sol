@@ -12,12 +12,16 @@ import {SovrynErc20HandlerDex} from "src/sovryn/SovrynErc20HandlerDex.sol";
 import {MockIsusdToken} from "test/mocks/MockIsusdToken.sol";
 import {BitChillOwnable} from "src/BitChillOwnable.sol";
 import {ownableUnauthorized} from "../utils/OzRevert.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 /**
  * @notice Allowlisted Dex path activation. `setUp` skips MoC lanes so they do not report empty PASSes.
  */
 contract DexPathFailoverTest is DcaDappTest {
     event PurchaseUniswap_NewPathSet(address[] intermediateTokens, uint24[] poolFeeRates, bytes newPath);
+    event PurchaseUniswap_PurchasePathAllowedSet(
+        bytes32 pathHash, bytes encodedPath, address[] intermediateTokens, uint24[] poolFeeRates, bool allowed
+    );
 
     address internal constant HANDLER_OWNER = address(uint160(uint256(keccak256("handler-owner"))));
 
@@ -181,9 +185,16 @@ contract DexPathFailoverTest is DcaDappTest {
     }
 
     function testConstructorSelfAllowlistsActivePathWithoutSetter() public {
+        (address[] memory mids, uint24[] memory fees) = _constructorComponents();
+        bytes memory path = _encodePath(mids, fees);
+        bytes32 pathHash = keccak256(path);
+
+        vm.recordLogs();
         IPurchaseUniswap other = _secondHandler();
-        bytes memory path = other.getSwapPath();
-        assertTrue(other.isPurchasePathAllowed(keccak256(path)));
+        _assertConstructorInstallLogs(address(other), vm.getRecordedLogs(), mids, fees, path);
+
+        assertEq(other.getSwapPath(), path);
+        assertTrue(other.isPurchasePathAllowed(pathHash));
     }
 
     function testConstructorPathIsAllowlistedBeforeAssignment() public {
@@ -262,6 +273,63 @@ contract DexPathFailoverTest is DcaDappTest {
         assertGt(allowGas, 0);
         assertGt(activateGas, 0);
         assertGt(revokeGas, 0);
+    }
+
+    function _assertConstructorInstallLogs(
+        address emitter,
+        Vm.Log[] memory logs,
+        address[] memory mids,
+        uint24[] memory fees,
+        bytes memory path
+    ) private {
+        bytes32 newPathSig = IPurchaseUniswap.PurchaseUniswap_NewPathSet.selector;
+        bytes32 allowedSig = IPurchaseUniswap.PurchaseUniswap_PurchasePathAllowedSet.selector;
+        int256 newPathIdx = -1;
+        int256 allowedIdx = -1;
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].emitter != emitter) continue;
+            if (logs[i].topics[0] == newPathSig) newPathIdx = int256(i);
+            if (logs[i].topics[0] == allowedSig) allowedIdx = int256(i);
+        }
+        assertFalse(newPathIdx < 0, "constructor must emit NewPathSet");
+        assertFalse(allowedIdx < 0, "constructor must emit PurchasePathAllowedSet");
+        assertLt(uint256(newPathIdx), uint256(allowedIdx), "NewPathSet then PurchasePathAllowedSet");
+
+        _assertNewPathSetLog(logs[uint256(newPathIdx)].data, mids, fees, path);
+        _assertPurchasePathAllowedSetLog(logs[uint256(allowedIdx)].data, mids, fees, path);
+    }
+
+    function _assertNewPathSetLog(
+        bytes memory data,
+        address[] memory mids,
+        uint24[] memory fees,
+        bytes memory path
+    ) private {
+        (address[] memory logMids, uint24[] memory logFees, bytes memory logPath) =
+            abi.decode(data, (address[], uint24[], bytes));
+        assertEq(logMids, mids);
+        assertEq(abi.encode(logFees), abi.encode(fees));
+        assertEq(logPath, path);
+    }
+
+    function _assertPurchasePathAllowedSetLog(
+        bytes memory data,
+        address[] memory mids,
+        uint24[] memory fees,
+        bytes memory path
+    ) private {
+        (
+            bytes32 logHash,
+            bytes memory logEncoded,
+            address[] memory logAllowedMids,
+            uint24[] memory logAllowedFees,
+            bool logAllowed
+        ) = abi.decode(data, (bytes32, bytes, address[], uint24[], bool));
+        assertEq(logHash, keccak256(path));
+        assertEq(logEncoded, path);
+        assertEq(logAllowedMids, mids);
+        assertEq(abi.encode(logAllowedFees), abi.encode(fees));
+        assertTrue(logAllowed);
     }
 
     function _allow(address[] memory mids, uint24[] memory fees, bool allowed) private {

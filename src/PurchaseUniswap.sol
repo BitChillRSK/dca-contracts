@@ -156,8 +156,9 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     /**
-     * @dev Write the active encoded path. `setPurchasePath` is the public caller; the constructor
-     *      goes through `_installInitialPurchasePath` so it can also mark the hash allowed.
+     * @dev Writes `s_swapPath` and emits `PurchaseUniswap_NewPathSet`.
+     *      `newPath` must be `_encodePurchasePath(intermediateTokens, poolFeeRates)`;
+     *      the event's components are how off-chain reconstructs the route.
      */
     function _setPurchasePath(
         address[] memory intermediateTokens,
@@ -169,7 +170,12 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     /**
-     * @dev Store allowlist permission and emit. Checks (no-op, revoke-active) stay on the public setter.
+     * @dev Raw allowlist write and `PurchaseUniswap_PurchasePathAllowedSet`.
+     *      The caller must already have rejected a no-op permission write and, when
+     *      `allowed` is false, revocation of `keccak256(s_swapPath)`, so every emit is a
+     *      real transition and the active path stays allowed. `encodedPath` must be
+     *      `_encodePurchasePath(intermediateTokens, poolFeeRates)` and `pathHash` must be
+     *      `keccak256(encodedPath)`.
      */
     function _setPurchasePathAllowed(
         bytes32 pathHash,

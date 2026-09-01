@@ -191,8 +191,10 @@ incident runbook pass their own tests.
 - The active path cannot be revoked. After switching to another allowed path, the former path can be revoked.
 - Revoking a swapper stops future path changes but does not mutate the active path; handler-owner recovery works.
 - Constructor self-allowlists the active path: a freshly constructed handler reports
-  `isPurchasePathAllowed(keccak256(getSwapPath()))` without calling the external setter
-  (`testConstructorSelfAllowlistsActivePathWithoutSetter`).
+  `isPurchasePathAllowed(keccak256(getSwapPath()))` without calling the external setter, and
+  `testConstructorSelfAllowlistsActivePathWithoutSetter` records constructor logs and asserts
+  `PurchaseUniswap_NewPathSet` then `PurchaseUniswap_PurchasePathAllowedSet` with matching
+  components and encoding.
 - Both live Dex deployment scripts assign without a constructor-path `setPurchasePathAllowed`;
   mainnet non-owner add-ons print the complete Safe runbook (including the `getSwapPath()` checkpoint)
   instead of claiming they assigned the handler.
@@ -231,8 +233,8 @@ REAL_DEPLOYMENT=true forge script script/DeployOptimizerProof.s.sol:DeployOptimi
 
 GitHub [#104](https://github.com/BitChillRSK/dca-contracts/pull/104). Default-profile runtime
 (`optimizer = true`, `optimizer_runs = 200`, `via_ir = false`; EIP-170 24,576): `OperationsAdmin`
-3,227 (margin 21,349); `LayerBankErc20HandlerDex` 15,565 (9,011); `SovrynErc20HandlerDex` 15,352
-(9,224); `TropykusErc20HandlerDex` 15,496 (9,080); `DcaManager` 13,767 (10,809). Config gas on Anvil
+3,227 (margin 21,349); `LayerBankErc20HandlerDex` 15,602 (8,974); `SovrynErc20HandlerDex` 15,389
+(9,187); `TropykusErc20HandlerDex` 15,533 (9,043); `DcaManager` 13,767 (10,809). Config gas on Anvil
 USDRIF dex-layerbank: allow ~41k, activate ~35k, revoke ~16k.
 
 ## ABI / deploy / cutover impact
