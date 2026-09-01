@@ -19,7 +19,10 @@ The proof, every documented broadcast command, and every required test lane use 
 pipeline. `[profile.default]` enables the legacy optimizer (`optimizer = true`, `optimizer_runs = 200`,
 `via_ir = false`) starting with R52 so Dex handlers can hold their own path allowlist under EIP-170.
 R52 owns the Rootstock testnet + Blockscout re-proof of that optimizer-on artifact
-(`script/DeployOptimizerProof.s.sol`); **#104 is not merge-ready until that proof lands.**
+(`script/DeployOptimizerProof.s.sol`). **Passed (2026-09-01).** CREATE
+[0x3a63dc2458142cca09144a3f290ed6d996780c616acb8adbdf15f57f736ff5bc](https://rootstock-testnet.blockscout.com/tx/0x3a63dc2458142cca09144a3f290ed6d996780c616acb8adbdf15f57f736ff5bc)
+verified [`OperationsAdmin` `0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD`](https://rootstock-testnet.blockscout.com/address/0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD)
+on chain 31 (block 8031347; optimizer 200, no IR).
 R53's optimizer-baseline work is absorbed into R52. Schedule top-up is R54; solx / via-IR
 evaluation and `ZeroTokenPurchaseUniswap` repair are R55 — defined in stacked
 [#105](https://github.com/BitChillRSK/dca-contracts/pull/105), which needs rebase after #104.
@@ -580,8 +583,10 @@ Handler-local policy depends on the default-profile optimizer. This PR enables `
 `optimizer_runs = 200` / `via_ir = false` on `[profile.default]` rather than keeping a centralized admin
 registry for an unoptimized EIP-170 budget. Measure with full `forge build --sizes`. There is no
 `[profile.deploy]`. Re-prove the optimizer-on pin on Rootstock testnet + Blockscout
-in this PR (`script/DeployOptimizerProof.s.sol`); **#104 is not merge-ready until that proof
-lands.** Do not treat R53 as still owning the optimizer baseline — that work is absorbed here.
+in this PR (`script/DeployOptimizerProof.s.sol`). **Passed (2026-09-01)** — CREATE
+[0x3a63dc…](https://rootstock-testnet.blockscout.com/tx/0x3a63dc2458142cca09144a3f290ed6d996780c616acb8adbdf15f57f736ff5bc)
+verified at [`0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD`](https://rootstock-testnet.blockscout.com/address/0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD).
+Do not treat R53 as still owning the optimizer baseline — that work is absorbed here.
 Remaining R54/R55 items live in stacked [#105](https://github.com/BitChillRSK/dca-contracts/pull/105).
 
 ## Closed non-implementation decisions

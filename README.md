@@ -334,15 +334,15 @@ unit/invariant/fork matrix using the exact artifact, repeat the Rootstock testne
 Blockscout-verification proof, and decide whether no-IR remains as a secondary compile lane.
 Until then, the no-IR pipeline is authoritative.
 
-**PR 104 is not merge-ready** until optimizer-on `OperationsAdmin` CREATE succeeds on Rootstock
-testnet and verifies on Blockscout. On `feat/r52-allowlisted-dex-path-failover`, as `TESTNET_OWNER`:
+**Optimizer-on Rootstock proof (R52, 2026-09-01).** Testnet CREATE
+[0x3a63dc2458142cca09144a3f290ed6d996780c616acb8adbdf15f57f736ff5bc](https://rootstock-testnet.blockscout.com/tx/0x3a63dc2458142cca09144a3f290ed6d996780c616acb8adbdf15f57f736ff5bc)
+verified [`OperationsAdmin` `0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD`](https://rootstock-testnet.blockscout.com/address/0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD)
+(solc 0.8.36 / cancun / optimizer 200). Replay (as `TESTNET_OWNER`):
 
 ```bash
-# `--account` must be TESTNET_OWNER (`cast wallet address --account <name>` → 0x31e0FacEa0…).
-# `--sender` is required: `--account` does not set `run()`'s `msg.sender`.
 REAL_DEPLOYMENT=true forge script script/DeployOptimizerProof.s.sol:DeployOptimizerProof \
   --rpc-url $RSK_TESTNET_RPC_URL \
-  --account <keystore_that_is_TESTNET_OWNER> \
+  --account dev_wallet \
   --sender 0x31e0FacEa072EE621f22971DF5bAE3a1317E41A4 \
   --broadcast --legacy \
   --verify --verifier blockscout --verifier-url $BLOCKSCOUT_API_URL

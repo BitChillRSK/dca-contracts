@@ -5,8 +5,11 @@ Status: **implemented** · Assigned: yes · Optional/further-review: no
 PR 51 of the relaunch stack; GitHub implementation PR **#104**. Stack on R51 / GitHub #103.
 This PR also turns on the default-profile optimizer (`optimizer = true`, `optimizer_runs = 200`,
 `via_ir = false`) so handler-local path policy stays under EIP-170. The Rootstock testnet +
-Blockscout re-proof of that pin is **in this PR** (`script/DeployOptimizerProof.s.sol`) and is an
-open merge blocker: **#104 is not merge-ready** until that CREATE verifies on Blockscout.
+Blockscout re-proof of that pin **landed** (`script/DeployOptimizerProof.s.sol`): CREATE
+[0x3a63dc2458142cca09144a3f290ed6d996780c616acb8adbdf15f57f736ff5bc](https://rootstock-testnet.blockscout.com/tx/0x3a63dc2458142cca09144a3f290ed6d996780c616acb8adbdf15f57f736ff5bc)
+at [`0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD`](https://rootstock-testnet.blockscout.com/address/0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD)
+(chain 31, block 8031347, owner `TESTNET_OWNER`, solc 0.8.36 / cancun / optimizer 200). Blockscout:
+Pass - Verified. Ready for human review.
 R53's optimizer-baseline work is absorbed here. Schedule top-up is R54; solx / via-IR evaluation
 and `ZeroTokenPurchaseUniswap` repair are R55. Those remaining items are defined in stacked
 [#105](https://github.com/BitChillRSK/dca-contracts/pull/105), which will need rebasing after this
@@ -122,7 +125,7 @@ admin registry. Full `forge build --sizes` (not `--match-*`) is the record.
   approved that path. Then token-specific DcaManager setup such as the USDT0 minimum.
 - [x] Enable default-profile optimizer (`optimizer = true`, `optimizer_runs = 200`, `via_ir = false`).
       Remove vestigial `[profile.deploy]`. Own the Rootstock re-proof of optimizer-on (not via-IR) in this PR
-      (`script/DeployOptimizerProof.s.sol`); the unchecked Blockscout tick below is the merge blocker.
+      (`script/DeployOptimizerProof.s.sol`); Blockscout tick below.
 - [x] Re-measure every Dex leaf and OperationsAdmin, and record configuration gas for allow/activate/revoke.
 
 ## Off-chain relaunch gate
@@ -209,25 +212,22 @@ lanes default to `SWAP_TYPE=mocSwaps` and skip this suite (`vm.skip` in `setUp`)
 - [x] Deployment scripts and off-chain issues contain complete normal/failover/recovery sequencing.
 - [x] R9 indexing and R10 natspec rules cover all new/repurposed surfaces.
 - [x] No open product decisions.
-- [ ] Rootstock testnet CREATE of optimizer-on `OperationsAdmin` verified on Blockscout. **This PR
-      is not merge-ready until that CREATE succeeds and verifies.** Command
-      (as `TESTNET_OWNER`, chain 31; this repo does not `--broadcast` from the implementer):
+- [x] Rootstock testnet CREATE of optimizer-on `OperationsAdmin` verified on Blockscout
+      (2026-09-01, chain 31, block 8031347).
+      CREATE [0x3a63dc…](https://rootstock-testnet.blockscout.com/tx/0x3a63dc2458142cca09144a3f290ed6d996780c616acb8adbdf15f57f736ff5bc)
+      → [`0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD`](https://rootstock-testnet.blockscout.com/address/0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD)
+      (owner `TESTNET_OWNER`, solc 0.8.36 / cancun / optimizer 200, constructor arg the owner).
+      Command that landed it (`--account` must be `dev_wallet` / `TESTNET_OWNER`; `--sender` is required
+      because `--account` does not set `run()`'s `msg.sender`; Forge requires `path:ContractName` for `*.s.sol`):
 
 ```bash
-# On feat/r52-allowlisted-dex-path-failover, with .env sourced (`LENDING_PROTOCOL` must be set;
-# DeployBase reads it in the constructor). `--account` alone leaves `run()`'s `msg.sender` as
-# Foundry's default sender (`0x1804c8…`), which is not `TESTNET_OWNER`. Pass `--sender` and the
-# keystore whose address is `0x31e0FacEa072EE621f22971DF5bAE3a1317E41A4` (check with
-# `cast wallet address --account <name>`). Forge requires `path:ContractName` for `*.s.sol`.
 REAL_DEPLOYMENT=true forge script script/DeployOptimizerProof.s.sol:DeployOptimizerProof \
   --rpc-url $RSK_TESTNET_RPC_URL \
-  --account <keystore_that_is_TESTNET_OWNER> \
+  --account dev_wallet \
   --sender 0x31e0FacEa072EE621f22971DF5bAE3a1317E41A4 \
   --broadcast --legacy \
   --verify --verifier blockscout --verifier-url $BLOCKSCOUT_API_URL
 ```
-
-Record the CREATE tx and Blockscout match in this spec and the PR body, then tick this box.
 
 GitHub [#104](https://github.com/BitChillRSK/dca-contracts/pull/104). Default-profile runtime
 (`optimizer = true`, `optimizer_runs = 200`, `via_ir = false`; EIP-170 24,576): `OperationsAdmin`
