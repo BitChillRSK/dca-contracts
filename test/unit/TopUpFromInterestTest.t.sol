@@ -38,7 +38,10 @@ contract TopUpFromInterestTest is DcaDappTest {
         return dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex);
     }
 
-    function _accruedInterest() private returns (uint256) {
+    /// @dev `view`, and that is load-bearing: the compiler rejects this the moment
+    ///      `getInterestAccrued` stops being one, which is what keeps generated clients reading it
+    ///      for free instead of routing it through a write binding.
+    function _accruedInterest() private view returns (uint256) {
         return dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
     }
 
@@ -197,6 +200,45 @@ contract TopUpFromInterestTest is DcaDappTest {
 
         assertEq(_schedule(SCHEDULE_INDEX + 1).tokenBalance, secondBalanceBefore + remainingInterest);
         assertLe(_accruedInterest(), DUST, "interest is still reported after both credits");
+    }
+
+    /**
+     * @notice The quote is a real `eth_call`: readable with no signer and no state change.
+     * @dev The helper above already fails to compile if `getInterestAccrued` loses `view`, but that
+     *      only binds Solidity callers. This binds the wire: a `staticcall` reverts on any state
+     *      write, so a getter that pokes the market would fail here.
+     */
+    function testInterestQuoteIsReadableByStaticCall() external onlyLendingLane {
+        _accrueAndOpenSlack(SCHEDULE_INDEX);
+
+        (bool success, bytes memory returnData) = address(dcaManager).staticcall(
+            abi.encodeCall(IDcaManager.getInterestAccrued, (USER, address(stablecoin), s_routeIndex))
+        );
+
+        assertTrue(success, "the accrued-interest quote is no longer readable without a transaction");
+        assertEq(abi.decode(returnData, (uint256)), _accruedInterest(), "the staticcall read a different figure");
+    }
+
+    /**
+     * @notice The quote never exceeds the ceiling the credit is bounded by, so the displayed figure
+     *         is always creditable.
+     * @dev The two are read at different rates on a market that accrues lazily — the quote at the
+     *      market's plain read, the ceiling at the rate a write path would get — and only one
+     *      ordering of the two is safe. This is the lane-agnostic half; the Tropykus handler suite
+     *      pins the case where they actually differ.
+     */
+    function testTheQuotedInterestIsAlwaysCreditable() external onlyLendingLane {
+        _accrueAndOpenSlack(SCHEDULE_INDEX);
+
+        uint256 quoted = _accruedInterest();
+        uint256 balanceBefore = _schedule(SCHEDULE_INDEX).tokenBalance;
+
+        _topUp(SCHEDULE_INDEX, quoted);
+        assertEq(
+            _schedule(SCHEDULE_INDEX).tokenBalance,
+            balanceBefore + quoted,
+            "the quoted figure was above the ceiling the credit is bounded by"
+        );
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -122,18 +122,43 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
         external
         override
         onlyDcaManager
-        returns (uint256 stablecoinInterestAmount)
+        returns (uint256)
     {
-        uint256 totalStablecoinInLending = _sharesToStablecoin(s_shares[user], _exchangeRate());
-        stablecoinInterestAmount =
-            totalStablecoinInLending > stablecoinLockedInDcaSchedules
-                ? totalStablecoinInLending - stablecoinLockedInDcaSchedules
-                : 0;
+        return _accruedInterest(user, stablecoinLockedInDcaSchedules, _exchangeRate());
+    }
+
+    /**
+     * @inheritdoc ITokenLending
+     */
+    function quoteAccruedInterest(address user, uint256 stablecoinLockedInDcaSchedules)
+        external
+        view
+        override
+        onlyDcaManager
+        returns (uint256)
+    {
+        return _accruedInterest(user, stablecoinLockedInDcaSchedules, _viewExchangeRate());
     }
 
     /*//////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @dev Share-backed stablecoin above locked principal at `exchangeRate`, or zero. The two public
+     *      readers differ only in which rate they pass: the quote uses the market's plain read, the
+     *      spendable figure the rate a write path would get.
+     */
+    function _accruedInterest(address user, uint256 stablecoinLockedInDcaSchedules, uint256 exchangeRate)
+        private
+        view
+        returns (uint256)
+    {
+        uint256 totalStablecoinInLending = _sharesToStablecoin(s_shares[user], exchangeRate);
+        return totalStablecoinInLending > stablecoinLockedInDcaSchedules
+            ? totalStablecoinInLending - stablecoinLockedInDcaSchedules
+            : 0;
+    }
 
     /**
      * @dev The stablecoin this handler lends out.

@@ -17,6 +17,7 @@ import {SovrynErc20Handler} from "../../../src/sovryn/SovrynErc20Handler.sol";
 import {TropykusErc20HandlerDex} from "../../../src/tropykus-legacy/TropykusErc20HandlerDex.sol";
 import {SovrynErc20HandlerDex} from "../../../src/sovryn/SovrynErc20HandlerDex.sol";
 import {DcaManagerAccessControl} from "../../../src/DcaManagerAccessControl.sol";
+import {IDcaManagerAccessControl} from "../../../src/interfaces/IDcaManagerAccessControl.sol";
 import "../../Constants.sol";
 
 /**
@@ -284,6 +285,21 @@ contract GettersTest is DcaDappTest {
             uint256 interest = ITokenLending(address(stablecoinHandler)).getAccruedInterest(USER, AMOUNT_TO_DEPOSIT);
             assertGe(interest, 0);
         }
+    }
+
+    /// @dev The quote is DcaManager-only like its sibling, and never reports more than the figure a
+    ///      top-up is bounded by — the ordering the pair relies on, checked on every lending lane.
+    function test_tokenLending_quoteAccruedInterest() public {
+        if (s_routeIndex == 0) return;
+
+        vm.prank(address(dcaManager));
+        uint256 quoted = ITokenLending(address(stablecoinHandler)).quoteAccruedInterest(USER, AMOUNT_TO_DEPOSIT);
+        vm.prank(address(dcaManager));
+        uint256 spendable = ITokenLending(address(stablecoinHandler)).getAccruedInterest(USER, AMOUNT_TO_DEPOSIT);
+        assertLe(quoted, spendable, "the quote ran ahead of what a top-up would accept");
+
+        vm.expectRevert(IDcaManagerAccessControl.DcaManagerAccessControl__OnlyDcaManagerCanCall.selector);
+        ITokenLending(address(stablecoinHandler)).quoteAccruedInterest(USER, AMOUNT_TO_DEPOSIT);
     }
 
     /*//////////////////////////////////////////////////////////////

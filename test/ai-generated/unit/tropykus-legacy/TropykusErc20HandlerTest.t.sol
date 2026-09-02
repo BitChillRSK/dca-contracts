@@ -109,22 +109,45 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
         assertGt(accruedInterest, 0);
     }
 
-    /// @notice Write paths and `getAccruedInterest` both call `exchangeRateCurrent`, which mutates
-    ///         the stored rate. The reported interest is a figure a caller can now spend against
-    ///         through a schedule top-up, so it must not sit a poke behind what a withdrawal pays.
-    function test_tropykus_accruedInterestAndWritesUseCurrentRate() public {
+    /**
+     * @notice The spendable figure and the write paths call `exchangeRateCurrent`, which mutates the
+     *         stored rate; the quote stays on `exchangeRateStored` and pokes nothing.
+     * @dev Tropykus is the only adapter where the two rates differ, and the gap is not dust: with no
+     *      prior poke the stored rate is a year behind, so the quote reports zero while the interest
+     *      is real. That is the whole reason the two readers exist. A top-up must bound on the
+     *      spendable figure or a user waits on someone else's transaction to reach their own yield;
+     *      the quote must stay a `view` or every client reading a balance routes it through a write
+     *      binding. The invariant that makes the pair safe is the direction of the gap: quote first,
+     *      spendable second, never the other way round.
+     */
+    function test_tropykus_quoteIsStaleAndSpendableFigureAccrues() public {
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);
 
         uint256 storedAtDeposit = kToken.exchangeRateStored();
         vm.warp(block.timestamp + 365 days);
 
-        // No prior poke: the getter accrues the year itself rather than reporting a stale zero.
+        // The quote reads the stale stored rate and leaves it stale: a year of interest reads as zero.
+        vm.prank(address(dcaManager));
+        uint256 quoted = tropykusHandler.quoteAccruedInterest(USER, DEPOSIT_AMOUNT);
+        assertEq(quoted, 0, "the quote poked the market instead of reading it");
+        assertEq(kToken.exchangeRateStored(), storedAtDeposit, "the quote moved the stored rate");
+
+        // The spendable figure accrues the year itself rather than reporting that stale zero.
         vm.expectCall(address(kToken), abi.encodeWithSelector(kToken.exchangeRateCurrent.selector));
         vm.prank(address(dcaManager));
-        uint256 accruedInterest = tropykusHandler.getAccruedInterest(USER, DEPOSIT_AMOUNT);
-        assertGt(accruedInterest, 0);
+        uint256 spendable = tropykusHandler.getAccruedInterest(USER, DEPOSIT_AMOUNT);
+        assertGt(spendable, 0, "the spendable figure reported a stale zero");
+        assertGe(spendable, quoted, "the quote ran ahead of what a top-up would accept");
         assertGt(kToken.exchangeRateStored(), storedAtDeposit);
+
+        // Once the market is poked the two agree, so the quote is only ever behind, never wrong.
+        vm.prank(address(dcaManager));
+        assertEq(
+            tropykusHandler.quoteAccruedInterest(USER, DEPOSIT_AMOUNT),
+            spendable,
+            "the two readers disagree on an already-accrued market"
+        );
 
         uint256 userBefore = stablecoin.balanceOf(USER);
         vm.expectCall(address(kToken), abi.encodeWithSelector(kToken.exchangeRateCurrent.selector));

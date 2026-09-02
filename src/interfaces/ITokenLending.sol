@@ -84,8 +84,25 @@ interface ITokenLending is ITokenHandler {
      *        handler's route.
      * @return Accrued interest in stablecoin units, or zero.
      * @dev Not a view: the figure is taken at the market's current exchange rate, which on a market
-     *      that accrues lazily is a call that updates that rate. Reading a stale stored rate instead
-     *      would understate the interest and leave part of it uncreditable.
+     *      that accrues lazily is a call that updates that rate. This is the figure a caller may
+     *      spend against, so it must not sit a poke behind what a withdrawal would pay. Reachable
+     *      only by DcaManager, so its mutability never reaches a generated client.
      */
     function getAccruedInterest(address user, uint256 stablecoinLockedInDcaSchedules) external returns (uint256);
+
+    /**
+     * @notice The same figure as `getAccruedInterest`, read without poking the market.
+     * @param user Account to query.
+     * @param stablecoinLockedInDcaSchedules Principal DcaManager still locks for this user on this
+     *        handler's route.
+     * @return Accrued interest in stablecoin units, or zero.
+     * @dev The display quote, and what keeps `IDcaManager.getInterestAccrued` a `view`. On a market
+     *      that accrues lazily this can sit below what `getAccruedInterest` reports, never above,
+     *      because a stored rate only trails a current one. So a caller may always spend the quoted
+     *      figure; the most a stale quote costs is a slice left for the next call.
+     */
+    function quoteAccruedInterest(address user, uint256 stablecoinLockedInDcaSchedules)
+        external
+        view
+        returns (uint256);
 }

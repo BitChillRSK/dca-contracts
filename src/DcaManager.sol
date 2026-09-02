@@ -373,7 +373,12 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @dev Moves no cash: the interest is already in the handler's lending position, so raising this
      *      schedule's claim over it is a storage write. The only external call reads the accrued
      *      figure, which on a lending market that accrues lazily also pokes that accrual, and never
-     *      redeems, mints, or transfers.
+     *      redeems, mints, or transfers. That poke is why the schedule is read after the call and
+     *      not before: nothing this function cached can go stale across it.
+     * @dev It bounds the credit on the spendable figure rather than the `getInterestAccrued` quote,
+     *      so a lazily-accruing market cannot make a user wait for someone else's transaction to
+     *      credit the interest they have already earned. The quote only ever trails it, so a caller
+     *      passing the displayed number is always inside the bound.
      * @dev The credited figure comes from the same expression an interest withdrawal pays out, so
      *      the route's summed principal lands on the position's value and never above it.
      * @dev Resolved through `_handler`, not the deposit-only helper: a deposit pause stops users
@@ -762,11 +767,12 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      */
     function getInterestAccrued(address user, address token, uint256 routeIndex)
         external
+        view
         override
         returns (uint256)
     {
         _checkTokenYieldsInterest(token, routeIndex);
-        return ITokenLending(address(_handler(token, routeIndex))).getAccruedInterest(
+        return ITokenLending(address(_handler(token, routeIndex))).quoteAccruedInterest(
             user, _lockedPrincipal(user, token, routeIndex)
         );
     }

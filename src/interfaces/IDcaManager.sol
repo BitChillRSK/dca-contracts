@@ -338,8 +338,11 @@ interface IDcaManager {
      *      already sit in the lending protocol, and this only raises the schedule's claim over
      *      them, which is why it pays no redemption fee. The credit must be large enough to fund
      *      at least one more purchase than the schedule could already afford, so interest cannot
-     *      be swept over in dust. A route with deposits paused still accepts a top-up: that pause
-     *      stops new funds entering the route, and this credits funds already in it. Reverts
+     *      be swept over in dust. The ceiling is the interest read at the market's current rate,
+     *      which can exceed the `getInterestAccrued` quote on a market that accrues lazily; passing
+     *      the quoted figure is therefore always accepted. A route with deposits paused still
+     *      accepts a top-up: that pause stops new funds entering the route, and this credits funds
+     *      already in it. Reverts
      *      `DcaManager__TokenDoesNotYieldInterest` on an idle route,
      *      `DcaManager__NoInterestToTopUpWith` when nothing has accrued,
      *      `DcaManager__TopUpExceedsAccruedInterest` when `amount` is more than has accrued, and
@@ -422,12 +425,13 @@ interface IDcaManager {
      * @param token Stablecoin of the route.
      * @param routeIndex Route to query. Reverts if the route is not lending.
      * @return Accrued interest in stablecoin units.
-     * @dev Not a view. The figure is read at the lending market's current exchange rate, and a
-     *      market that accrues lazily updates that rate when asked for it. Callers that only want
-     *      the number should read it with `eth_call` rather than sending a transaction.
+     * @dev A quote, read at the market's rate as a plain read. On a market that accrues lazily this
+     *      can trail what `topUpFromInterest` will accept, never exceed it, so the displayed figure
+     *      is always creditable and a stale quote costs at most a slice left for the next call.
      */
     function getInterestAccrued(address user, address token, uint256 routeIndex)
         external
+        view
         returns (uint256);
 
     /**
