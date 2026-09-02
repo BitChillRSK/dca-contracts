@@ -1,6 +1,6 @@
 # R58 — Split test-only constants out of `script/Constants.sol`
 
-Status: **assigned** · Assigned: yes · Optional/further-review: no
+Status: **assigned** · PR: [#108](https://github.com/BitChillRSK/dca-contracts/pull/108) · Assigned: yes · Optional/further-review: no
 
 PR 54 of the relaunch stack. Test/Makefile only. No `src/` or deploy-broadcast change. Branched from
 R56 / [#107](https://github.com/BitChillRSK/dca-contracts/pull/107), the latest open relaunch PR, whose
