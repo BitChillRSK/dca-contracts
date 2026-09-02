@@ -240,16 +240,10 @@ contract GettersTest is DcaDappTest {
 
     function test_purchaseUniswap_getters() public onlyDexSwaps {
         if (address(stablecoinHandler).code.length > 0) {
-            try IPurchaseUniswap(address(stablecoinHandler)).getAmountOutMinimumPercent() returns (uint256 percent) {
-                assertEq(percent, DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT);
-            } catch {
-                // Some handlers might not implement this interface
-                return;
-            }
-
             try IPurchaseUniswap(address(stablecoinHandler)).getAmountOutMinimumSafetyCheck() returns (uint256 safetyCheck) {
                 assertEq(safetyCheck, DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK);
             } catch {
+                // Some handlers might not implement this interface
                 return;
             }
 

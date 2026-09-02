@@ -45,17 +45,14 @@ contract BatchMinRbtcOutTest is DcaDappTest {
         assertEq(_accumulatedRbtc() - rbtcBefore, measured, "the batch credited exactly the minimum it cleared");
     }
 
-    /// @dev One wei above what the batch buys fails, and the error carries both diagnostic values.
+    /// @dev One wei above what the batch buys fails. On Dex the router enforces `max(oracleFloor, minRbtcOut)`
+    ///      before the measured check; on MoC only the post-check fires.
     function testMinimumOneWeiAboveMeasuredOutputReverts() external {
         uint256 measured = _measuredOutput();
 
         IDcaManager.Batch memory batch = _batch(measured + 1);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, measured, measured + 1
-            )
-        );
         vm.prank(SWAPPER);
+        _expectMinimumViolationRevert(measured, measured + 1);
         dcaManager.batchBuyRbtc(batch);
     }
 
@@ -100,12 +97,8 @@ contract BatchMinRbtcOutTest is DcaDappTest {
 
         IDcaManager.Batch[] memory batches = new IDcaManager.Batch[](1);
         batches[0] = _batch(measured + 1);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, measured, measured + 1
-            )
-        );
         vm.prank(SWAPPER);
+        _expectMinimumViolationRevert(measured, measured + 1);
         dcaManager.batchBuyRbtcAcrossHandlers(batches);
 
         // The same batch, retried one-handler with a reachable minimum, goes through.
@@ -122,13 +115,21 @@ contract BatchMinRbtcOutTest is DcaDappTest {
         assertLt(measured, grossNotional, "the fee alone puts the gross notional out of reach");
 
         IDcaManager.Batch memory batch = _batch(grossNotional);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, measured, grossNotional
-            )
-        );
         vm.prank(SWAPPER);
+        _expectMinimumViolationRevert(measured, grossNotional);
         dcaManager.batchBuyRbtc(batch);
+    }
+
+    function _expectMinimumViolationRevert(uint256 measured, uint256 minRbtcOut) private {
+        if (isDexSwaps) {
+            vm.expectRevert(bytes("Insufficient output amount"));
+        } else {
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, measured, minRbtcOut
+                )
+            );
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -136,11 +137,22 @@ contract BatchMinRbtcOutTest is DcaDappTest {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev What this batch actually buys, read from the contract rather than predicted. An unreachable
-     *      minimum reverts with the measured output as its first argument, and the revert restores every
-     *      effect the probe had, so the caller can go on to spend the same schedule at the same price.
+     * @dev What this batch actually buys. On MoC, an unreachable `minRbtcOut` reverts with the measured
+     *      output in `PurchaseRbtc__BelowSwapperMinimum` and rolls the whole batch back. On Dex, the router
+     *      would reject `type(uint256).max` before that check, so take a snapshot, buy with `0`, read the
+     *      credited delta, and revert the world.
      */
     function _measuredOutput() private returns (uint256 measured) {
+        if (isDexSwaps) {
+            uint256 snapshot = vm.snapshot();
+            uint256 rbtcBefore = _accumulatedRbtc();
+            _buy(NO_MIN_RBTC_OUT);
+            measured = _accumulatedRbtc() - rbtcBefore;
+            assertGt(measured, 0, "the batch must buy something for the minimum to be meaningful");
+            vm.revertTo(snapshot);
+            return measured;
+        }
+
         IDcaManager.Batch memory batch = _batch(type(uint256).max);
         vm.prank(SWAPPER);
         (bool ok, bytes memory returnData) = address(dcaManager).call(

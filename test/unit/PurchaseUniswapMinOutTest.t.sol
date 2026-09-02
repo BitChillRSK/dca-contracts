@@ -25,8 +25,7 @@ import "../Constants.sol";
  *      small — a swap could return a millionth of the rBTC it owed and still clear it.
  */
 contract PurchaseUniswapMinOutTest is Test {
-    uint256 private constant PERCENT = DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT; // 0.995e18
-    uint256 private constant SAFETY = DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK;
+    uint256 private constant ORACLE_FLOOR = DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK; // 0.95e18
     uint256 private constant BTC_PRICE_18 = BTC_PRICE * 1e18; // what MockMocOracle publishes
     uint256 private constant USD_NOTIONAL = 25; // $25, the minimum purchase
     uint256 private constant BATCH_USD_NOTIONAL = 1000; // inside the fee bands the harness is built with
@@ -52,7 +51,7 @@ contract PurchaseUniswapMinOutTest is Test {
         MinOutHarness eighteen = _deployHarness(18);
         MinOutHarness six = _deployHarness(6);
 
-        uint256 expected = (USD_NOTIONAL * 1e18 * PERCENT) / BTC_PRICE_18;
+        uint256 expected = (USD_NOTIONAL * 1e18 * ORACLE_FLOOR) / BTC_PRICE_18;
 
         assertEq(eighteen.getAmountOutMinimum(USD_NOTIONAL * 1e18), expected, "18-decimal min-out");
         assertEq(six.getAmountOutMinimum(USD_NOTIONAL * 1e6), expected, "6-decimal min-out");
@@ -62,7 +61,7 @@ contract PurchaseUniswapMinOutTest is Test {
         MinOutHarness six = _deployHarness(6);
         uint256 amountIn = USD_NOTIONAL * 1e6;
 
-        uint256 preR43 = (amountIn * PERCENT) / BTC_PRICE_18; // the formula this PR replaces
+        uint256 preR43 = (amountIn * ORACLE_FLOOR) / BTC_PRICE_18; // the formula this PR replaces
         uint256 minOut = six.getAmountOutMinimum(amountIn);
 
         // 1e12 tighter, up to the rounding the old formula lost by dividing a 6-decimal amount by an 18-decimal price.
@@ -79,7 +78,7 @@ contract PurchaseUniswapMinOutTest is Test {
 
         assertEq(
             harness.getAmountOutMinimum(amountIn),
-            (usdNotional * 1e18 * PERCENT) / BTC_PRICE_18,
+            (usdNotional * 1e18 * ORACLE_FLOOR) / BTC_PRICE_18,
             "min-out must track the USD notional, not the token's units"
         );
     }
@@ -112,14 +111,14 @@ contract PurchaseUniswapMinOutTest is Test {
         six.mintStablecoin(amountIn);
 
         // A router paying the pre-R43 floor is paying a millionth of a millionth of the rBTC owed.
-        swapRouter.setAmountOut((amountIn * PERCENT) / BTC_PRICE_18);
+        swapRouter.setAmountOut((amountIn * ORACLE_FLOOR) / BTC_PRICE_18);
         vm.expectRevert(bytes("Too little received"));
-        six.purchaseRbtc(amountIn);
+        six.purchaseRbtc(amountIn, 0);
 
         // The fair amount at the oracle price still clears.
         uint256 fair = (USD_NOTIONAL * 1e18 * 1e18) / BTC_PRICE_18;
         swapRouter.setAmountOut(fair);
-        assertEq(six.purchaseRbtc(amountIn), fair, "credited amount is the measured WRBTC delta");
+        assertEq(six.purchaseRbtc(amountIn, 0), fair, "credited amount is the measured WRBTC delta");
     }
 
     function testSwapCreditsTheMeasuredWrbtcDeltaNotTheFloor() public {
@@ -130,7 +129,7 @@ contract PurchaseUniswapMinOutTest is Test {
         uint256 generous = (USD_NOTIONAL * 1e18 * 1e18) / BTC_PRICE_18 * 2;
         swapRouter.setAmountOut(generous);
 
-        assertEq(eighteen.purchaseRbtc(amountIn), generous, "invariant 1: cash is the balance delta");
+        assertEq(eighteen.purchaseRbtc(amountIn, 0), generous, "invariant 1: cash is the balance delta");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -173,11 +172,7 @@ contract PurchaseUniswapMinOutTest is Test {
         uint256 clearsTheFloor = harness.getAmountOutMinimum(net);
         swapRouter.setAmountOut(clearsTheFloor);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, clearsTheFloor, clearsTheFloor + 1
-            )
-        );
+        vm.expectRevert(bytes("Too little received"));
         _buyOne(harness, gross, clearsTheFloor + 1);
     }
 
@@ -241,9 +236,7 @@ contract PurchaseUniswapMinOutTest is Test {
         // A wei more than the 18-decimal payout is out of reach for both, so neither read its own token's units.
         six.mintStablecoin(grossSix); // the first batch spent what it was funded with
         swapRouter.setAmountOut(floor);
-        vm.expectRevert(
-            abi.encodeWithSelector(IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, floor, floor + 1)
-        );
+        vm.expectRevert(bytes("Too little received"));
         _buyOne(six, grossSix, floor + 1);
     }
 
@@ -290,7 +283,7 @@ contract PurchaseUniswapMinOutTest is Test {
             feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
         });
 
-        return new MinOutHarness(stablecoin, feeSettings, uniswapSettings, PERCENT, SAFETY);
+        return new MinOutHarness(stablecoin, feeSettings, uniswapSettings, ORACLE_FLOOR);
     }
 }
 
@@ -311,13 +304,12 @@ contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
         MockStablecoinWithDecimals token,
         IFeeHandler.FeeSettings memory feeSettings,
         UniswapSettings memory uniswapSettings,
-        uint256 amountOutMinimumPercent,
         uint256 amountOutMinimumSafetyCheck
     )
         PurchaseTokenBase(token)
         FeeHandler(address(0xFEE), feeSettings, msg.sender)
         DcaManagerAccessControl(msg.sender)
-        PurchaseUniswap(uniswapSettings, amountOutMinimumPercent, amountOutMinimumSafetyCheck)
+        PurchaseUniswap(uniswapSettings, amountOutMinimumSafetyCheck)
     {}
 
     function getAmountOutMinimum(uint256 stablecoinAmountToSpend) external view returns (uint256) {
@@ -328,8 +320,8 @@ contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
         return _calculateFee(grossAmount);
     }
 
-    function purchaseRbtc(uint256 stablecoinAmountToSpend) external returns (uint256) {
-        return _purchaseRbtc(stablecoinAmountToSpend);
+    function purchaseRbtc(uint256 stablecoinAmountToSpend, uint256 minRbtcOut) external returns (uint256) {
+        return _purchaseRbtc(stablecoinAmountToSpend, minRbtcOut);
     }
 
     function mintStablecoin(uint256 amount) external {

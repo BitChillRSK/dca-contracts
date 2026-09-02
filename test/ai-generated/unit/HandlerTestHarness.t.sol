@@ -360,13 +360,11 @@ abstract contract HandlerTestHarness is Test {
         IPurchaseUniswap dexHandler = IPurchaseUniswap(address(handler));
         
         // Test DEX configuration getters
-        uint256 minPercent = dexHandler.getAmountOutMinimumPercent();
         uint256 safetyCheck = dexHandler.getAmountOutMinimumSafetyCheck();
         bytes memory swapPath = dexHandler.getSwapPath();
         
-        assertGt(minPercent, 0);
-        assertLe(minPercent, 10000); // Should be reasonable percentage
         assertGt(safetyCheck, 0);
+        assertLe(safetyCheck, 1 ether);
         assertGt(swapPath.length, 0);
         uint256 packed;
         for (uint256 i; i < 20; ++i) {
@@ -375,32 +373,25 @@ abstract contract HandlerTestHarness is Test {
         assertEq(address(uint160(packed)), address(stablecoin));
     }
     
-    function test_handler_dex_setAmountOutMinimumPercent() public {
+    function test_handler_dex_setAmountOutMinimumSafetyCheck() public {
         if (!supportsDex) return;
         
         IPurchaseUniswap dexHandler = IPurchaseUniswap(address(handler));
         
         vm.prank(OWNER);
-        dexHandler.setAmountOutMinimumPercent(9950); // 99.5% in basis points (above safety check)
+        dexHandler.setAmountOutMinimumSafetyCheck(0.96 ether);
         
-        assertEq(dexHandler.getAmountOutMinimumPercent(), 9950);
+        assertEq(dexHandler.getAmountOutMinimumSafetyCheck(), 0.96 ether);
     }
     
-    function test_handler_dex_setAmountOutMinimumPercent_reverts_invalidRange() public {
+    function test_handler_dex_setAmountOutMinimumSafetyCheck_reverts_invalidRange() public {
         if (!supportsDex) return;
         
         IPurchaseUniswap dexHandler = IPurchaseUniswap(address(handler));
         
-        // Should revert for values outside valid range (above 100% in ether scale)
         vm.expectRevert();
         vm.prank(OWNER);
-        dexHandler.setAmountOutMinimumPercent(1.01 ether); // 101% in ether scale
-        
-        // Should revert for values below safety check 
-        uint256 safetyCheck = dexHandler.getAmountOutMinimumSafetyCheck();
-        vm.expectRevert();
-        vm.prank(OWNER);
-        dexHandler.setAmountOutMinimumPercent(safetyCheck - 1);
+        dexHandler.setAmountOutMinimumSafetyCheck(1.01 ether);
     }
     
     /*//////////////////////////////////////////////////////////////

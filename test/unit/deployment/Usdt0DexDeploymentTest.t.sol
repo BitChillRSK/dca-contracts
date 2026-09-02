@@ -139,7 +139,6 @@ contract Usdt0DexDeploymentTest is Test {
                 }),
                 feeCollector: address(this),
                 feeSettings: deployer.feeSettingsForToken(true),
-                amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
                 amountOutMinimumSafetyCheck: DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
                 initialOwner: owner
             })

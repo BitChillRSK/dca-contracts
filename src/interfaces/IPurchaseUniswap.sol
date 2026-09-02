@@ -8,7 +8,7 @@ import {ICoinPairPrice} from "./ICoinPairPrice.sol";
 /**
  * @title IPurchaseUniswap
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Uniswap V3 purchase configuration: encoded path, slippage percents, and MoC BTC/USD oracle.
+ * @notice Uniswap V3 purchase configuration: encoded path, oracle backstop, and MoC BTC/USD oracle.
  */
 interface IPurchaseUniswap {
     /*//////////////////////////////////////////////////////////////
@@ -36,9 +36,7 @@ interface IPurchaseUniswap {
     event PurchaseUniswap_PurchasePathAllowedSet(
         bytes32 pathHash, bytes encodedPath, address[] intermediateTokens, uint24[] poolFeeRates, bool allowed
     );
-    /// @notice Owner changed the swap-time slippage fraction.
-    event PurchaseUniswap_AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
-    /// @notice Owner changed the config-only floor that bounds `amountOutMinimumPercent`.
+    /// @notice Owner changed the on-chain oracle backstop applied at swap time.
     event PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(uint256 oldValue, uint256 newValue);
     /// @notice Owner pointed the min-out oracle at a new MoC BTC/USD feed.
     event PurchaseUniswap_OracleUpdated(address indexed oldOracle, address indexed newOracle);
@@ -49,11 +47,7 @@ interface IPurchaseUniswap {
 
     /// @notice Path encoding requires `poolFeeRates.length == intermediateTokens.length + 1`.
     error PurchaseUniswap__WrongNumberOfTokensOrFeeRates(uint256 numberOfIntermediateTokens, uint256 numberOfFeeRates);
-    /// @notice Slippage percent cannot exceed 100%.
-    error PurchaseUniswap__AmountOutMinimumPercentTooHigh();
-    /// @notice Slippage percent cannot be set below the safety-check floor.
-    error PurchaseUniswap__AmountOutMinimumPercentTooLow();
-    /// @notice Safety-check floor cannot exceed 100%.
+    /// @notice Oracle backstop cannot exceed 100%.
     error PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh();
     /// @notice Oracle address cannot be zero.
     error PurchaseUniswap__InvalidOracleAddress();
@@ -109,28 +103,16 @@ interface IPurchaseUniswap {
     function setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates) external;
 
     /**
-     * @notice Set the swap-time minimum as a 1e18-scaled fraction of the oracle-implied rBTC.
-     * @param amountOutMinimumPercent New fraction. Cannot exceed 100% or fall below the safety-check floor.
-     */
-    function setAmountOutMinimumPercent(uint256 amountOutMinimumPercent) external;
-
-    /**
-     * @notice Current swap-time slippage fraction, 1e18-scaled.
-     * @return The fraction applied to the oracle-implied rBTC when building `amountOutMinimum`.
-     */
-    function getAmountOutMinimumPercent() external view returns (uint256);
-
-    /**
-     * @notice Set the lowest `amountOutMinimumPercent` the owner may configure.
-     * @param amountOutMinimumSafetyCheck New floor, 1e18-scaled. Config-only: it never enters swap math.
-     * @dev Raising the floor above the active percent reverts without changing state. Widening
-     *      slippage therefore takes two owner transactions — lower this floor first, then the percent.
+     * @notice Set the on-chain oracle backstop applied at swap time.
+     * @param amountOutMinimumSafetyCheck New fraction, 1e18-scaled. Cannot exceed 100%.
+     * @dev Uniswap `amountOutMinimum` is `max(oracleFloor, minRbtcOut)`; the bot's quote-derived
+     *      `minRbtcOut` is the operational bound and may tighten further.
      */
     function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external;
 
     /**
-     * @notice The config-only floor that bounds `setAmountOutMinimumPercent`. Not used at swap time.
-     * @return The lowest value `setAmountOutMinimumPercent` accepts.
+     * @notice The oracle backstop fraction applied when building `amountOutMinimum`.
+     * @return The 1e18-scaled fraction of oracle-implied rBTC enforced at swap time.
      */
     function getAmountOutMinimumSafetyCheck() external view returns (uint256);
 

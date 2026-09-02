@@ -105,8 +105,7 @@ contract EdgeCasesTest is Test {
                 feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
                 feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
             }),
-            0.997 ether, // amountOutMinimumPercent
-            0.99 ether, // amountOutMinimumSafetyCheck
+            0.95 ether,
             address(this)
         );
 
@@ -123,12 +122,6 @@ contract EdgeCasesTest is Test {
         fees[2] = 3000;
         vm.expectRevert();
         dex.setPurchasePath(tokens, fees);
-    }
-
-    function test_setAmountOutMinimumPercent_reverts_when_too_high() public {
-        (TropykusErc20HandlerDex dex,, ,, ,) = _deployDexHandler();
-        vm.expectRevert();
-        dex.setAmountOutMinimumPercent(1.1 ether);
     }
 
     function test_setAmountOutMinimumSafetyCheck_reverts_when_too_high() public {
