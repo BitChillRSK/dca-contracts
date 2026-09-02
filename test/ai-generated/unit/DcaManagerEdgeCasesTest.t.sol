@@ -98,8 +98,8 @@ contract DcaManagerEdgeCasesTest is Test {
             uniswapSettings,
             FEE_COLLECTOR,
             feeSettings,
-            9970,
-            9900,
+            DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
+            DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
             OWNER
         );
         

@@ -364,9 +364,9 @@ abstract contract HandlerTestHarness is Test {
         uint256 safetyCheck = dexHandler.getAmountOutMinimumSafetyCheck();
         bytes memory swapPath = dexHandler.getSwapPath();
         
-        assertGt(minPercent, 0);
-        assertLe(minPercent, 10000); // Should be reasonable percentage
         assertGt(safetyCheck, 0);
+        assertLe(safetyCheck, minPercent); // the wall sits at or below the live floor
+        assertLe(minPercent, 1 ether);
         assertGt(swapPath.length, 0);
         uint256 packed;
         for (uint256 i; i < 20; ++i) {
@@ -381,9 +381,9 @@ abstract contract HandlerTestHarness is Test {
         IPurchaseUniswap dexHandler = IPurchaseUniswap(address(handler));
         
         vm.prank(OWNER);
-        dexHandler.setAmountOutMinimumPercent(9950); // 99.5% in basis points (above safety check)
+        dexHandler.setAmountOutMinimumPercent(0.98 ether);
         
-        assertEq(dexHandler.getAmountOutMinimumPercent(), 9950);
+        assertEq(dexHandler.getAmountOutMinimumPercent(), 0.98 ether);
     }
     
     function test_handler_dex_setAmountOutMinimumPercent_reverts_invalidRange() public {
@@ -391,16 +391,37 @@ abstract contract HandlerTestHarness is Test {
         
         IPurchaseUniswap dexHandler = IPurchaseUniswap(address(handler));
         
-        // Should revert for values outside valid range (above 100% in ether scale)
+        // Above 100%.
         vm.expectRevert();
         vm.prank(OWNER);
-        dexHandler.setAmountOutMinimumPercent(1.01 ether); // 101% in ether scale
+        dexHandler.setAmountOutMinimumPercent(1.01 ether);
         
-        // Should revert for values below safety check 
+        // Below the safety-check wall.
         uint256 safetyCheck = dexHandler.getAmountOutMinimumSafetyCheck();
         vm.expectRevert();
         vm.prank(OWNER);
         dexHandler.setAmountOutMinimumPercent(safetyCheck - 1);
+    }
+    
+    function test_handler_dex_setAmountOutMinimumSafetyCheck() public {
+        if (!supportsDex) return;
+        
+        IPurchaseUniswap dexHandler = IPurchaseUniswap(address(handler));
+        
+        vm.prank(OWNER);
+        dexHandler.setAmountOutMinimumSafetyCheck(0.96 ether);
+        
+        assertEq(dexHandler.getAmountOutMinimumSafetyCheck(), 0.96 ether);
+    }
+    
+    function test_handler_dex_setAmountOutMinimumSafetyCheck_reverts_invalidRange() public {
+        if (!supportsDex) return;
+        
+        IPurchaseUniswap dexHandler = IPurchaseUniswap(address(handler));
+        
+        vm.expectRevert();
+        vm.prank(OWNER);
+        dexHandler.setAmountOutMinimumSafetyCheck(1.01 ether);
     }
     
     /*//////////////////////////////////////////////////////////////

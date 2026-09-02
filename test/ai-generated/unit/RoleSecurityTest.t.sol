@@ -100,8 +100,8 @@ contract RoleSecurityTest is Test {
             uniswapSettings,
             FEE_COLLECTOR,
             feeSettings,
-            9970,
-            9900,
+            DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
+            DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
             OWNER
         );
         
@@ -159,8 +159,8 @@ contract RoleSecurityTest is Test {
                 feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
                 feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
             }),
-            9970,
-            9900,
+            DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
+            DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
             OWNER
         );
         

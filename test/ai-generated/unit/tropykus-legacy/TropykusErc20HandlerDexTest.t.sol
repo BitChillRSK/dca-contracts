@@ -66,8 +66,8 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
             uniswapSettings,
             FEE_COLLECTOR,
             feeSettings,
-            9970, // 99.7% minimum output
-            9900, // 99% safety check
+            DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
+            DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
             OWNER
         );
         
@@ -111,52 +111,45 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
     //////////////////////////////////////////////////////////////*/
     
     function test_tropykusDex_deployment() public {
-        // Verify DEX-specific configuration
-        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), 9970); // 99.7%
-        assertEq(tropykusDexHandler.getAmountOutMinimumSafetyCheck(), 9900); // 99%
+        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT);
+        assertEq(tropykusDexHandler.getAmountOutMinimumSafetyCheck(), DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK);
         assertNotEq(address(tropykusDexHandler.getMocOracle()), address(0));
         assertGt(tropykusDexHandler.getSwapPath().length, 0);
     }
-    
+
     function test_tropykusDex_setAmountOutMinimumPercent_success() public {
         vm.prank(OWNER);
-        tropykusDexHandler.setAmountOutMinimumPercent(9950); // 99.5% in basis points (above safety check)
-        
-        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), 9950);
+        tropykusDexHandler.setAmountOutMinimumPercent(0.98 ether);
+
+        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), 0.98 ether);
     }
-    
-    function test_tropykusDex_setAmountOutMinimumPercent_reverts_invalidRange() public {
-        // Test upper bound (over 100% in ether scale)
-        vm.expectRevert();
-        vm.prank(OWNER);
-        tropykusDexHandler.setAmountOutMinimumPercent(1.01 ether); // 101% in ether scale
-        
-        // Test lower bound (below safety check)
-        uint256 safetyCheck = tropykusDexHandler.getAmountOutMinimumSafetyCheck();
-        vm.expectRevert();
-        vm.prank(OWNER);
-        tropykusDexHandler.setAmountOutMinimumPercent(safetyCheck - 1);
-    }
-    
+
     function test_tropykusDex_setAmountOutMinimumPercent_reverts_notOwner() public {
         vm.expectRevert(ownableUnauthorized(USER));
         vm.prank(USER);
-        tropykusDexHandler.setAmountOutMinimumPercent(9500);
-    }
-    
-    function test_tropykusDex_setAmountOutMinimumSafetyCheck_success() public {
-        vm.prank(OWNER);
-        tropykusDexHandler.setAmountOutMinimumSafetyCheck(9000); // 90% in basis points
-        
-        assertEq(tropykusDexHandler.getAmountOutMinimumSafetyCheck(), 9000);
-    }
-    
-    function test_tropykusDex_setAmountOutMinimumSafetyCheck_reverts_invalidRange() public {
-        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh.selector);
-        vm.prank(OWNER);
-        tropykusDexHandler.setAmountOutMinimumSafetyCheck(1.01 ether); // 101% in ether scale
+        tropykusDexHandler.setAmountOutMinimumPercent(0.98 ether);
     }
 
+    /// @dev The wall: one owner transaction cannot widen the live floor past the safety check.
+    function test_tropykusDex_setAmountOutMinimumPercent_reverts_belowSafetyCheck() public {
+        uint256 safetyCheck = tropykusDexHandler.getAmountOutMinimumSafetyCheck();
+        uint256 percentBefore = tropykusDexHandler.getAmountOutMinimumPercent();
+
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumPercent(safetyCheck - 1);
+
+        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), percentBefore, "the floor must be unchanged on revert");
+    }
+
+    function test_tropykusDex_setAmountOutMinimumPercent_reverts_tooHigh() public {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooHigh.selector);
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumPercent(1.01 ether);
+    }
+
+    /// @dev Raising the wall above the active floor reverts without changing state, so widening past it
+    ///      is deliberately two transactions.
     function test_tropykusDex_setAmountOutMinimumSafetyCheck_reverts_aboveCurrentPercent() public {
         uint256 percent = tropykusDexHandler.getAmountOutMinimumPercent();
         uint256 safetyBefore = tropykusDexHandler.getAmountOutMinimumSafetyCheck();
@@ -169,89 +162,40 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), percent);
     }
 
-    function test_tropykusDex_setAmountOutMinimumPercent_allowsEqualityWithSafety() public {
+    /// @dev Widening below the wall takes two owner transactions, in this order.
+    function test_tropykusDex_wideningBelowTheWallTakesTwoTransactions() public {
         vm.prank(OWNER);
-        tropykusDexHandler.setAmountOutMinimumPercent(0.99 ether);
+        tropykusDexHandler.setAmountOutMinimumSafetyCheck(0.90 ether);
         vm.prank(OWNER);
-        tropykusDexHandler.setAmountOutMinimumSafetyCheck(0.95 ether);
+        tropykusDexHandler.setAmountOutMinimumPercent(0.92 ether);
 
-        vm.expectEmit(true, true, true, true);
-        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(0.99 ether, 0.95 ether);
-        vm.prank(OWNER);
-        tropykusDexHandler.setAmountOutMinimumPercent(0.95 ether);
-
-        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), 0.95 ether);
-        assertEq(tropykusDexHandler.getAmountOutMinimumSafetyCheck(), 0.95 ether);
+        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), 0.92 ether);
+        assertEq(tropykusDexHandler.getAmountOutMinimumSafetyCheck(), 0.90 ether);
     }
 
-    function test_tropykusDex_setAmountOutMinimumSafetyCheck_allowsEqualityWithPercent() public {
-        vm.prank(OWNER);
-        tropykusDexHandler.setAmountOutMinimumPercent(0.99 ether);
-
-        uint256 safetyBefore = tropykusDexHandler.getAmountOutMinimumSafetyCheck();
-        vm.expectEmit(true, true, true, true);
-        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(safetyBefore, 0.99 ether);
-        vm.prank(OWNER);
-        tropykusDexHandler.setAmountOutMinimumSafetyCheck(0.99 ether);
-
-        assertEq(tropykusDexHandler.getAmountOutMinimumSafetyCheck(), 0.99 ether);
-        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), 0.99 ether);
-    }
-
-    function test_tropykusDex_setSlippageSettings_bothAtHundredPercent() public {
-        uint256 percentBefore = tropykusDexHandler.getAmountOutMinimumPercent();
-        uint256 safetyBefore = tropykusDexHandler.getAmountOutMinimumSafetyCheck();
-
-        vm.expectEmit(true, true, true, true);
-        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(percentBefore, 1 ether);
-        vm.prank(OWNER);
-        tropykusDexHandler.setAmountOutMinimumPercent(1 ether);
-
-        vm.expectEmit(true, true, true, true);
-        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(safetyBefore, 1 ether);
-        vm.prank(OWNER);
-        tropykusDexHandler.setAmountOutMinimumSafetyCheck(1 ether);
-
-        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), 1 ether);
-        assertEq(tropykusDexHandler.getAmountOutMinimumSafetyCheck(), 1 ether);
-    }
-
-    function test_tropykusDex_setSlippageSettings_raiseThenLower() public {
-        uint256 percentBefore = tropykusDexHandler.getAmountOutMinimumPercent();
-        uint256 safetyBefore = tropykusDexHandler.getAmountOutMinimumSafetyCheck();
-
-        vm.expectEmit(true, true, true, true);
-        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(percentBefore, 0.995 ether);
-        vm.prank(OWNER);
-        tropykusDexHandler.setAmountOutMinimumPercent(0.995 ether);
-
-        vm.expectEmit(true, true, true, true);
-        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(safetyBefore, 0.95 ether);
-        vm.prank(OWNER);
-        tropykusDexHandler.setAmountOutMinimumSafetyCheck(0.95 ether);
-
-        vm.expectEmit(true, true, true, true);
-        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(0.995 ether, 0.997 ether);
-        vm.prank(OWNER);
-        tropykusDexHandler.setAmountOutMinimumPercent(0.997 ether);
-
-        vm.expectEmit(true, true, true, true);
-        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(0.95 ether, 0.96 ether);
-        vm.prank(OWNER);
-        tropykusDexHandler.setAmountOutMinimumSafetyCheck(0.96 ether);
-
-        vm.expectEmit(true, true, true, true);
-        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(0.997 ether, 0.96 ether);
-        vm.prank(OWNER);
-        tropykusDexHandler.setAmountOutMinimumPercent(0.96 ether);
-
-        vm.expectEmit(true, true, true, true);
-        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(0.96 ether, 0.90 ether);
+    function test_tropykusDex_setAmountOutMinimumSafetyCheck_success() public {
         vm.prank(OWNER);
         tropykusDexHandler.setAmountOutMinimumSafetyCheck(0.90 ether);
 
-        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), 0.96 ether);
         assertEq(tropykusDexHandler.getAmountOutMinimumSafetyCheck(), 0.90 ether);
+    }
+
+    function test_tropykusDex_setAmountOutMinimumSafetyCheck_reverts_invalidRange() public {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh.selector);
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumSafetyCheck(1.01 ether);
+    }
+
+    function test_tropykusDex_setAmountOutMinimumSafetyCheck_reverts_notOwner() public {
+        vm.expectRevert(ownableUnauthorized(USER));
+        vm.prank(USER);
+        tropykusDexHandler.setAmountOutMinimumSafetyCheck(0.90 ether);
+    }
+
+    function test_tropykusDex_constructor_allows_hundred_percent() public {
+        TropykusErc20HandlerDex handler = _deployTropykusDexWithSlippage(1 ether, 1 ether);
+        assertEq(handler.getAmountOutMinimumPercent(), 1 ether);
+        assertEq(handler.getAmountOutMinimumSafetyCheck(), 1 ether);
     }
 
     function test_tropykusDex_constructor_allows_equal_percent_and_safety() public {
@@ -260,15 +204,14 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         assertEq(handler.getAmountOutMinimumSafetyCheck(), 0.99 ether);
     }
 
-    function test_tropykusDex_constructor_allows_both_at_hundred_percent() public {
-        TropykusErc20HandlerDex handler = _deployTropykusDexWithSlippage(1 ether, 1 ether);
-        assertEq(handler.getAmountOutMinimumPercent(), 1 ether);
-        assertEq(handler.getAmountOutMinimumSafetyCheck(), 1 ether);
-    }
-
     function test_tropykusDex_constructor_reverts_when_percent_too_high() public {
         vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooHigh.selector);
-        _deployTropykusDexWithSlippage(1.01 ether, 0.99 ether);
+        _deployTropykusDexWithSlippage(1.01 ether, 0.95 ether);
+    }
+
+    function test_tropykusDex_constructor_reverts_when_percent_below_safety() public {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
+        _deployTropykusDexWithSlippage(0.94 ether, 0.95 ether);
     }
 
     function test_tropykusDex_constructor_reverts_when_safety_too_high() public {
@@ -276,11 +219,6 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         _deployTropykusDexWithSlippage(1 ether, 1.01 ether);
     }
 
-    function test_tropykusDex_constructor_reverts_when_percent_below_safety() public {
-        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
-        _deployTropykusDexWithSlippage(0.98 ether, 0.99 ether);
-    }
-    
     function test_tropykusDex_setPurchasePath_success() public {
         address[] memory intermediateTokens = new address[](0); // Direct swap, no intermediates
         uint24[] memory poolFeeRates = new uint24[](1);
@@ -390,19 +328,18 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
     //////////////////////////////////////////////////////////////*/
     
     function test_tropykusDex_extremeSlippageSettings() public {
-        // Test with extreme but valid slippage settings
         vm.prank(OWNER);
-        tropykusDexHandler.setAmountOutMinimumSafetyCheck(5000); // Lower safety check first
-        
+        tropykusDexHandler.setAmountOutMinimumSafetyCheck(0.50 ether);
         vm.prank(OWNER);
-        tropykusDexHandler.setAmountOutMinimumPercent(5000); // 50% (very high slippage)
-        
-        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), 5000);
-        
+        tropykusDexHandler.setAmountOutMinimumPercent(0.50 ether); // 50% — very high slippage
+
+        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), 0.50 ether);
+
         vm.prank(OWNER);
-        tropykusDexHandler.setAmountOutMinimumPercent(9999); // 99.99% (very low slippage)
-        
-        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), 9999);
+        tropykusDexHandler.setAmountOutMinimumPercent(0.9999 ether); // 99.99% — very low slippage
+
+        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), 0.9999 ether);
+        assertEq(tropykusDexHandler.getAmountOutMinimumSafetyCheck(), 0.50 ether, "the wall stays where governance put it");
     }
     
     function test_tropykusDex_oracleFailure() public {

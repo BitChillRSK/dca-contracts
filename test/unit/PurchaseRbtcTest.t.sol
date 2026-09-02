@@ -428,7 +428,7 @@ contract PurchaseRbtcHarness is PurchaseRbtc {
         return i_token;
     }
 
-    function _purchaseRbtc(uint256 stablecoinAmount) internal override returns (uint256) {
+    function _purchaseRbtc(uint256 stablecoinAmount, uint256 /* minRbtcOut */) internal override returns (uint256) {
         if (revertOnPurchase) revert("route-called");
         purchaseCalls++;
         lastPurchaseAmount = stablecoinAmount;

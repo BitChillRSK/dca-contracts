@@ -32,7 +32,11 @@ abstract contract PurchaseMoc is PurchaseRbtc, IPurchaseMoc {
     /**
      * @dev Redeem DOC for rBTC and return the handler's native-balance delta.
      */
-    function _purchaseRbtc(uint256 stablecoinAmount) internal override returns (uint256 rbtcReceived) {
+    function _purchaseRbtc(uint256 stablecoinAmount, uint256 /* minRbtcOut */)
+        internal
+        override
+        returns (uint256 rbtcReceived)
+    {
         (uint256 balancePrev, uint256 balancePost) = _redeemDoc(stablecoinAmount);
         if (balancePost > balancePrev) rbtcReceived = balancePost - balancePrev;
     }

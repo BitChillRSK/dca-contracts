@@ -71,6 +71,15 @@ contract DcaDappTest is Test {
     string swapType = vm.envString("SWAP_TYPE");
     bool isMocSwaps = keccak256(abi.encodePacked(swapType)) == keccak256(abi.encodePacked("mocSwaps"));
     bool isDexSwaps = keccak256(abi.encodePacked(swapType)) == keccak256(abi.encodePacked("dexSwaps"));
+
+    /// @dev How far a purchase may land from the oracle-implied amount before an assertion fails.
+    ///      MoC redeems at the oracle price, so 0.5% is generous there. A Uniswap fill also pays the
+    ///      pool's LP fee and price impact: the live USDRIF path measured ~0.73% off oracle at block
+    ///      9198813, so a 0.5% bound would fail on a healthy fork swap. This is an assertion tolerance,
+    ///      not a bound the contracts enforce — `s_amountOutMinimumPercent` is what reverts a bad swap.
+    function _maxPurchaseSlippage() internal view returns (uint256) {
+        return isDexSwaps ? DEX_MAX_SLIPPAGE_PERCENT : MAX_SLIPPAGE_PERCENT;
+    }
     string lendingProtocol = vm.envString("LENDING_PROTOCOL");
     bool isTropykus = keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(TROPYKUS_STRING));
     bool isSovryn = keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(SOVRYN_STRING));
@@ -563,7 +572,7 @@ contract DcaDappTest is Test {
         assertApproxEqRel( // The mock contract that simulates swapping on Uniswap allows for some slippage
             rbtcBalanceAfterPurchase - rbtcBalanceBeforePurchase,
             netPurchaseAmount / s_btcPrice,
-            MAX_SLIPPAGE_PERCENT // Allow a maximum difference of 0.5% (on fork tests we saw this was necessary for both MoC and Uniswap swaps)
+            _maxPurchaseSlippage() // Allow a maximum difference of 0.5% (on fork tests we saw this was necessary for both MoC and Uniswap swaps)
         );
         // }
     }
@@ -601,7 +610,7 @@ contract DcaDappTest is Test {
                 assertApproxEqRel(
                     RbtcBalanceAfterPurchase - rbtcBalanceBeforePurchase,
                     netPurchaseAmount / s_btcPrice,
-                    MAX_SLIPPAGE_PERCENT // Allow a maximum difference of 0.75% (on fork tests we saw this was necessary for both MoC and Uniswap swaps)
+                    _maxPurchaseSlippage() // Allow a maximum difference of 0.75% (on fork tests we saw this was necessary for both MoC and Uniswap swaps)
                 );
 
                 totalStablecoinSpent += netPurchaseAmount;
@@ -615,7 +624,7 @@ contract DcaDappTest is Test {
         assertApproxEqRel(
             IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER),
             totalStablecoinSpent / s_btcPrice,
-            MAX_SLIPPAGE_PERCENT // Allow a maximum difference of 0.75% (on fork tests we saw this was necessary for both MoC and Uniswap swaps)
+            _maxPurchaseSlippage() // Allow a maximum difference of 0.75% (on fork tests we saw this was necessary for both MoC and Uniswap swaps)
         );
         
         return totalStablecoinSpent;
@@ -700,7 +709,7 @@ contract DcaDappTest is Test {
         assertApproxEqRel(
             postStablecoinHandlerBalance - prevStablecoinHandlerBalance,
             totalNetPurchaseAmount / s_btcPrice,
-            MAX_SLIPPAGE_PERCENT // Allow a maximum difference of 0.5% (on fork tests we saw this was necessary for both MoC and Uniswap purchases)
+            _maxPurchaseSlippage() // Allow a maximum difference of 0.5% (on fork tests we saw this was necessary for both MoC and Uniswap purchases)
         );
 
         vm.prank(USER);
@@ -709,7 +718,7 @@ contract DcaDappTest is Test {
         assertApproxEqRel(
             userAccumulatedRbtcPost - userAccumulatedRbtcPrev,
             totalNetPurchaseAmount / s_btcPrice,
-            MAX_SLIPPAGE_PERCENT // Allow a maximum difference of 0.5% (on fork tests we saw this was necessary for both MoC and Uniswap purchases)
+            _maxPurchaseSlippage() // Allow a maximum difference of 0.5% (on fork tests we saw this was necessary for both MoC and Uniswap purchases)
         );
 
         vm.warp(block.timestamp + 5 weeks); // warp to a time far in the future so all schedules are long due for a new purchase
@@ -730,7 +739,7 @@ contract DcaDappTest is Test {
         assertApproxEqRel(
             postStablecoinHandlerBalance2 - postStablecoinHandlerBalance,
             totalNetPurchaseAmount / s_btcPrice,
-            MAX_SLIPPAGE_PERCENT // Allow a maximum difference of 0.5% (on fork tests we saw this was necessary for both MoC and Uniswap purchases)
+            _maxPurchaseSlippage() // Allow a maximum difference of 0.5% (on fork tests we saw this was necessary for both MoC and Uniswap purchases)
         );
 
         if (isLendingLane) {

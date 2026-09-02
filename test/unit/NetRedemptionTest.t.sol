@@ -60,7 +60,7 @@ contract NetRedemptionTest is DcaDappTest {
         uint256 netRedeemed = _afterExitFee(AMOUNT_TO_SPEND);
         uint256 expected = (netRedeemed - feeCalculator.calculateFee(netRedeemed)) / s_btcPrice;
 
-        assertApproxEqRel(rbtcBought, expected, MAX_SLIPPAGE_PERCENT);
+        assertApproxEqRel(rbtcBought, expected, _maxPurchaseSlippage());
         // the exit fee is a haircut on the purchase, not a free lunch: strictly less rBTC than a fee-free redeem
         assertLt(rbtcBought, (AMOUNT_TO_SPEND - feeCalculator.calculateFee(AMOUNT_TO_SPEND)) / s_btcPrice);
     }
@@ -300,7 +300,7 @@ contract NetRedemptionTest is DcaDappTest {
         buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
 
         uint256 netPurchaseAmount = AMOUNT_TO_SPEND - feeCalculator.calculateFee(AMOUNT_TO_SPEND);
-        assertApproxEqRel(_accumulatedRbtc() - rbtcBefore, netPurchaseAmount / s_btcPrice, MAX_SLIPPAGE_PERCENT);
+        assertApproxEqRel(_accumulatedRbtc() - rbtcBefore, netPurchaseAmount / s_btcPrice, _maxPurchaseSlippage());
     }
 
     /*//////////////////////////////////////////////////////////////

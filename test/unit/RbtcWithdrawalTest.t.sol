@@ -47,7 +47,7 @@ contract RbtcWithdrawalTest is DcaDappTest {
             assertApproxEqRel( // The mock contract that simulates swapping on Uniswap allows for some slippage
                 rbtcBalanceAfterWithdrawal - rbtcBalanceBeforeWithdrawal,
                 netPurchaseAmount / s_btcPrice,
-                MAX_SLIPPAGE_PERCENT // Allow a maximum difference of 0.5%
+                _maxPurchaseSlippage() // Allow a maximum difference of 0.5%
             );
         }
     }
@@ -71,7 +71,7 @@ contract RbtcWithdrawalTest is DcaDappTest {
         assertApproxEqRel( // The mock contract that simulates swapping on Uniswap allows for some slippage
             rbtcBalanceAfterWithdrawal - rbtcBalanceBeforeWithdrawal,
             totalStablecoinSpent / s_btcPrice,
-            MAX_SLIPPAGE_PERCENT // Allow a maximum difference of 0.5% (on fork tests we saw this was necessary for both MoC and Uniswap swaps)
+            _maxPurchaseSlippage() // Allow a maximum difference of 0.5% (on fork tests we saw this was necessary for both MoC and Uniswap swaps)
         );
         // }
     }

@@ -105,8 +105,8 @@ contract EdgeCasesTest is Test {
                 feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
                 feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
             }),
-            0.997 ether, // amountOutMinimumPercent
-            0.99 ether, // amountOutMinimumSafetyCheck
+            DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
+            DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
             address(this)
         );
 

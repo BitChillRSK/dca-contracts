@@ -25,8 +25,8 @@ import "../Constants.sol";
  *      small — a swap could return a millionth of the rBTC it owed and still clear it.
  */
 contract PurchaseUniswapMinOutTest is Test {
-    uint256 private constant PERCENT = DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT; // 0.995e18
-    uint256 private constant SAFETY = DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK;
+    uint256 private constant PERCENT = DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT; // the live swap-time floor
+    uint256 private constant SAFETY = DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK; // the wall under it
     uint256 private constant BTC_PRICE_18 = BTC_PRICE * 1e18; // what MockMocOracle publishes
     uint256 private constant USD_NOTIONAL = 25; // $25, the minimum purchase
     uint256 private constant BATCH_USD_NOTIONAL = 1000; // inside the fee bands the harness is built with
@@ -114,12 +114,12 @@ contract PurchaseUniswapMinOutTest is Test {
         // A router paying the pre-R43 floor is paying a millionth of a millionth of the rBTC owed.
         swapRouter.setAmountOut((amountIn * PERCENT) / BTC_PRICE_18);
         vm.expectRevert(bytes("Too little received"));
-        six.purchaseRbtc(amountIn);
+        six.purchaseRbtc(amountIn, 0);
 
         // The fair amount at the oracle price still clears.
         uint256 fair = (USD_NOTIONAL * 1e18 * 1e18) / BTC_PRICE_18;
         swapRouter.setAmountOut(fair);
-        assertEq(six.purchaseRbtc(amountIn), fair, "credited amount is the measured WRBTC delta");
+        assertEq(six.purchaseRbtc(amountIn, 0), fair, "credited amount is the measured WRBTC delta");
     }
 
     function testSwapCreditsTheMeasuredWrbtcDeltaNotTheFloor() public {
@@ -130,7 +130,7 @@ contract PurchaseUniswapMinOutTest is Test {
         uint256 generous = (USD_NOTIONAL * 1e18 * 1e18) / BTC_PRICE_18 * 2;
         swapRouter.setAmountOut(generous);
 
-        assertEq(eighteen.purchaseRbtc(amountIn), generous, "invariant 1: cash is the balance delta");
+        assertEq(eighteen.purchaseRbtc(amountIn, 0), generous, "invariant 1: cash is the balance delta");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -173,11 +173,7 @@ contract PurchaseUniswapMinOutTest is Test {
         uint256 clearsTheFloor = harness.getAmountOutMinimum(net);
         swapRouter.setAmountOut(clearsTheFloor);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, clearsTheFloor, clearsTheFloor + 1
-            )
-        );
+        vm.expectRevert(bytes("Too little received"));
         _buyOne(harness, gross, clearsTheFloor + 1);
     }
 
@@ -241,10 +237,54 @@ contract PurchaseUniswapMinOutTest is Test {
         // A wei more than the 18-decimal payout is out of reach for both, so neither read its own token's units.
         six.mintStablecoin(grossSix); // the first batch spent what it was funded with
         swapRouter.setAmountOut(floor);
-        vm.expectRevert(
-            abi.encodeWithSelector(IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, floor, floor + 1)
-        );
+        vm.expectRevert(bytes("Too little received"));
         _buyOne(six, grossSix, floor + 1);
+    }
+
+    /// @dev The owner may retighten the live floor without touching the wall, and the swap follows it
+    ///      immediately. This is the knob that exists so the wall never has to move.
+    function testOwnerCanRetightenTheFloorAndTheSwapFollows() public {
+        MinOutHarness harness = _deployHarness(18);
+        uint256 gross = _fundedGross(harness, 18);
+        uint256 net = gross - harness.calculateFee(gross);
+
+        uint256 looseFloor = harness.getAmountOutMinimum(net);
+
+        harness.setAmountOutMinimumPercent(0.99 ether);
+        uint256 tightFloor = harness.getAmountOutMinimum(net);
+        assertGt(tightFloor, looseFloor, "raising the percent raises the swap-time floor");
+
+        // A payout the old floor accepted is now rejected, with no caller minimum involved.
+        swapRouter.setAmountOut(tightFloor - 1);
+        vm.expectRevert(bytes("Too little received"));
+        _buyOne(harness, gross, NO_MIN_RBTC_OUT);
+
+        assertEq(
+            harness.getAmountOutMinimumSafetyCheck(), SAFETY, "retightening the floor must not move the wall"
+        );
+    }
+
+    /// @dev The wall is what a compromised swapper cannot get under. Even after the owner widens the floor
+    ///      as far as one transaction allows, the swap still cannot pay less than the safety check implies.
+    function testTheWallBoundsHowFarOneOwnerTransactionCanWiden() public {
+        MinOutHarness harness = _deployHarness(18);
+        uint256 gross = _fundedGross(harness, 18);
+        uint256 net = gross - harness.calculateFee(gross);
+
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
+        harness.setAmountOutMinimumPercent(SAFETY - 1);
+
+        // The loosest reachable floor in one transaction is the wall itself.
+        harness.setAmountOutMinimumPercent(SAFETY);
+        uint256 wallFloor = harness.getAmountOutMinimum(net);
+
+        swapRouter.setAmountOut(wallFloor - 1);
+        vm.expectRevert(bytes("Too little received"));
+        _buyOne(harness, gross, 1); // a compromised swapper asking for one wei
+
+        swapRouter.setAmountOut(wallFloor);
+        _buyOne(harness, gross, 1);
+        assertEq(harness.getAccumulatedRbtcBalance(BUYER), wallFloor, "the wall is the worst reachable fill");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -321,15 +361,15 @@ contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
     {}
 
     function getAmountOutMinimum(uint256 stablecoinAmountToSpend) external view returns (uint256) {
-        return _getAmountOutMinimum(stablecoinAmountToSpend);
+        return _getAmountOutLowerBound(stablecoinAmountToSpend);
     }
 
     function calculateFee(uint256 grossAmount) external view returns (uint256) {
         return _calculateFee(grossAmount);
     }
 
-    function purchaseRbtc(uint256 stablecoinAmountToSpend) external returns (uint256) {
-        return _purchaseRbtc(stablecoinAmountToSpend);
+    function purchaseRbtc(uint256 stablecoinAmountToSpend, uint256 minRbtcOut) external returns (uint256) {
+        return _purchaseRbtc(stablecoinAmountToSpend, minRbtcOut);
     }
 
     function mintStablecoin(uint256 amount) external {

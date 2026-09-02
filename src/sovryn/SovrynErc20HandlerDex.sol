@@ -18,8 +18,8 @@ contract SovrynErc20HandlerDex is SovrynErc20Handler, PurchaseUniswap {
      * @param uniswapSettings Router, WRBTC, path, and MoC oracle.
      * @param feeCollector Address that receives purchase fees.
      * @param feeSettings Linear fee parameters.
-     * @param amountOutMinimumPercent Swap-time slippage fraction, 1e18-scaled.
-     * @param amountOutMinimumSafetyCheck Config-only floor for that percent.
+     * @param amountOutMinimumPercent Swap-time oracle floor, 1e18-scaled.
+     * @param amountOutMinimumSafetyCheck Lowest floor the owner may configure, 1e18-scaled.
      * @param initialOwner Address that owns fee/oracle configuration immediately after deploy.
      */
     constructor(

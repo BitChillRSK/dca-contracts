@@ -33,7 +33,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
     /// Slippage Settings Tests ///
     ///////////////////////////////
 
-    /// @dev The two 1e18-scaled percents are uint128s in one slot. The Dex handler's storage is
+    /// @dev The two 1e18-scaled fractions are uint128s in one slot. The Dex handler's storage is
     ///      Ownable2Step (0, 1), the fee word and bounds (2, 3), shares (4), accumulated rBTC (5),
     ///      the oracle (6), then this pair.
     function testSlippagePercentsShareOneSlot() public onlyDexSwaps {
@@ -41,111 +41,59 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         uint256 safetyCheck = IPurchaseUniswap(address(stablecoinHandler)).getAmountOutMinimumSafetyCheck();
 
         uint256 packed = uint256(vm.load(address(stablecoinHandler), bytes32(SLIPPAGE_SLOT)));
-        assertEq(uint128(packed), percent, "the swap-time percent is not the low half of the slot");
+        assertEq(uint128(packed), percent, "the swap-time floor is not the low half of the slot");
         assertEq(uint128(packed >> 128), safetyCheck, "the safety check is not the high half of the slot");
 
         // A write through the setter lands in the same word.
         vm.prank(OWNER);
-        IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumPercent(0.996 ether);
+        IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumPercent(0.98 ether);
 
         packed = uint256(vm.load(address(stablecoinHandler), bytes32(SLIPPAGE_SLOT)));
-        assertEq(uint128(packed), 0.996 ether, "the setter did not write the low half");
+        assertEq(uint128(packed), 0.98 ether, "the setter did not write the low half");
         assertEq(uint128(packed >> 128), safetyCheck, "the setter disturbed the safety check");
     }
 
     function testSlippageSettings() public onlyDexSwaps {
-        // Get the initial values
-        uint256 initialPercent = IPurchaseUniswap(address(stablecoinHandler)).getAmountOutMinimumPercent();
-        uint256 initialSafetyCheck = IPurchaseUniswap(address(stablecoinHandler)).getAmountOutMinimumSafetyCheck();
-        
-        // Verify initial values - should match what we set in the contract
-        assertEq(initialPercent, DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT, "Wrong initial slippage percent");
-        assertEq(initialSafetyCheck, DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK, "Wrong initial safety check");
-        
-        // Set new values
-        uint256 newPercent = DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT * 999 / 1000;
-        uint256 newSafetyCheck = DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK * 999 / 1000;
+        IPurchaseUniswap dex = IPurchaseUniswap(address(stablecoinHandler));
+        uint256 initialPercent = dex.getAmountOutMinimumPercent();
+        uint256 initialSafetyCheck = dex.getAmountOutMinimumSafetyCheck();
 
-        // Expect the event with the correct parameters
+        assertEq(initialPercent, DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT, "Wrong initial swap-time floor");
+        assertEq(initialSafetyCheck, DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK, "Wrong initial safety check");
+        assertGe(initialPercent, initialSafetyCheck, "the deploy defaults must satisfy the band");
+
+        uint256 newPercent = DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT * 999 / 1000;
         vm.expectEmit(true, true, true, true);
         emit PurchaseUniswap_AmountOutMinimumPercentUpdated(initialPercent, newPercent);
-
-        // Set the new value
         vm.prank(OWNER);
-        IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumPercent(newPercent);
-        
-        // Verify the new value was set
-        assertEq(
-            IPurchaseUniswap(address(stablecoinHandler)).getAmountOutMinimumPercent(), 
-            newPercent, 
-            "Slippage percent should be updated"
-        );
+        dex.setAmountOutMinimumPercent(newPercent);
+        assertEq(dex.getAmountOutMinimumPercent(), newPercent, "Swap-time floor should be updated");
 
-
-        // Expect the event with the correct parameters
+        uint256 newSafetyCheck = DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK * 999 / 1000;
         vm.expectEmit(true, true, true, true);
         emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(initialSafetyCheck, newSafetyCheck);
-        
-        // Execute the function that should emit the event
         vm.prank(OWNER);
-        IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumSafetyCheck(newSafetyCheck);
-
-        // Verify the new value was set
-        assertEq(
-            IPurchaseUniswap(address(stablecoinHandler)).getAmountOutMinimumSafetyCheck(), 
-            newSafetyCheck, 
-            "Safety check should be updated"
-        );
+        dex.setAmountOutMinimumSafetyCheck(newSafetyCheck);
+        assertEq(dex.getAmountOutMinimumSafetyCheck(), newSafetyCheck, "Safety check should be updated");
     }
-    
+
     function testSetAmountOutMinimumPercentRevertsIfTooHigh() public onlyDexSwaps {
-        // Try to set slippage too high (over 100%)
         vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooHigh.selector);
         vm.prank(OWNER);
         IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumPercent(1.01e18);
     }
-    
-    function testSetAmountOutMinimumPercentRevertsIfTooLow() public onlyDexSwaps {
-        // Get the safety check value
-        uint256 safetyCheck = IPurchaseUniswap(address(stablecoinHandler)).getAmountOutMinimumSafetyCheck();
-        
-        // Try to set slippage below safety check
+
+    /// @dev The wall. One owner transaction cannot widen the live floor past what governance pre-approved.
+    function testSetAmountOutMinimumPercentRevertsIfBelowSafetyCheck() public onlyDexSwaps {
+        IPurchaseUniswap dex = IPurchaseUniswap(address(stablecoinHandler));
+        uint256 safetyCheck = dex.getAmountOutMinimumSafetyCheck();
+        uint256 percentBefore = dex.getAmountOutMinimumPercent();
+
         vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
         vm.prank(OWNER);
-        IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumPercent(safetyCheck - 1);
-    }
-    
-    function testSetAmountOutMinimumSafetyCheck() public onlyDexSwaps {
-        // Set new safety check
-        uint256 newSafetyCheck = DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK * 90 / 100;
-        vm.prank(OWNER);
-        IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumSafetyCheck(newSafetyCheck);
-        
-        // Verify it was set
-        assertEq(
-            IPurchaseUniswap(address(stablecoinHandler)).getAmountOutMinimumSafetyCheck(), 
-            newSafetyCheck, 
-            "Safety check should be updated"
-        );
-        
-        // Now we can set a lower slippage percent
-        uint256 newPercent = DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT * 90 / 100;
-        vm.prank(OWNER);
-        IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumPercent(newPercent);
-        
-        // Verify it was set
-        assertEq(
-            IPurchaseUniswap(address(stablecoinHandler)).getAmountOutMinimumPercent(), 
-            newPercent, 
-            "Slippage percent should be updated to lower value"
-        );
-    }
-    
-    function testSetAmountOutMinimumSafetyCheckRevertsIfTooHigh() public onlyDexSwaps {
-        // Try to set safety check too high
-        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh.selector);
-        vm.prank(OWNER);
-        IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumSafetyCheck(1.01e18);
+        dex.setAmountOutMinimumPercent(safetyCheck - 1);
+
+        assertEq(dex.getAmountOutMinimumPercent(), percentBefore, "the floor must be unchanged on revert");
     }
 
     function testSetAmountOutMinimumSafetyCheckRevertsIfAboveCurrentPercent() public onlyDexSwaps {
@@ -158,37 +106,33 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         dex.setAmountOutMinimumSafetyCheck(percent + 1);
 
         assertEq(dex.getAmountOutMinimumSafetyCheck(), safetyBefore, "Safety check must be unchanged on revert");
-        assertEq(dex.getAmountOutMinimumPercent(), percent, "Percent must be unchanged on revert");
+        assertEq(dex.getAmountOutMinimumPercent(), percent, "Floor must be unchanged on revert");
     }
 
-    function testSetAmountOutMinimumPercentAllowsEqualityWithSafety() public onlyDexSwaps {
+    /// @dev Widening the live floor below the wall is deliberately two owner transactions, in this order.
+    function testWideningBelowTheWallTakesTwoTransactions() public onlyDexSwaps {
         IPurchaseUniswap dex = IPurchaseUniswap(address(stablecoinHandler));
-        uint256 safetyCheck = dex.getAmountOutMinimumSafetyCheck();
-        uint256 percentBefore = dex.getAmountOutMinimumPercent();
+        uint256 target = DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK - 0.01 ether;
 
-        vm.expectEmit(true, true, true, true);
-        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(percentBefore, safetyCheck);
-
+        // One transaction cannot get there.
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
         vm.prank(OWNER);
-        dex.setAmountOutMinimumPercent(safetyCheck);
+        dex.setAmountOutMinimumPercent(target);
 
-        assertEq(dex.getAmountOutMinimumPercent(), safetyCheck);
-        assertEq(dex.getAmountOutMinimumSafetyCheck(), safetyCheck);
+        // Lowering the wall first does.
+        vm.prank(OWNER);
+        dex.setAmountOutMinimumSafetyCheck(target);
+        vm.prank(OWNER);
+        dex.setAmountOutMinimumPercent(target);
+
+        assertEq(dex.getAmountOutMinimumPercent(), target);
+        assertEq(dex.getAmountOutMinimumSafetyCheck(), target);
     }
 
-    function testSetAmountOutMinimumSafetyCheckAllowsEqualityWithPercent() public onlyDexSwaps {
-        IPurchaseUniswap dex = IPurchaseUniswap(address(stablecoinHandler));
-        uint256 percent = dex.getAmountOutMinimumPercent();
-        uint256 safetyBefore = dex.getAmountOutMinimumSafetyCheck();
-
-        vm.expectEmit(true, true, true, true);
-        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(safetyBefore, percent);
-
+    function testSetAmountOutMinimumSafetyCheckRevertsIfTooHigh() public onlyDexSwaps {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh.selector);
         vm.prank(OWNER);
-        dex.setAmountOutMinimumSafetyCheck(percent);
-
-        assertEq(dex.getAmountOutMinimumSafetyCheck(), percent);
-        assertEq(dex.getAmountOutMinimumPercent(), percent);
+        IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumSafetyCheck(1.01e18);
     }
 
     function testSetSlippageSettingsBothAtHundredPercent() public onlyDexSwaps {
@@ -229,12 +173,6 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         dex.setAmountOutMinimumSafetyCheck(raisedSafety);
         assertEq(dex.getAmountOutMinimumSafetyCheck(), raisedSafety);
 
-        vm.expectEmit(true, true, true, true);
-        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(raisedPercent, raisedSafety);
-        vm.prank(OWNER);
-        dex.setAmountOutMinimumPercent(raisedSafety);
-        assertEq(dex.getAmountOutMinimumPercent(), raisedSafety);
-
         uint256 loweredSafety = raisedSafety / 2;
         vm.expectEmit(true, true, true, true);
         emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(raisedSafety, loweredSafety);
@@ -242,14 +180,12 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         dex.setAmountOutMinimumSafetyCheck(loweredSafety);
         assertEq(dex.getAmountOutMinimumSafetyCheck(), loweredSafety);
     }
-    
+
     function testOnlyOwnerCanSetSlippageSettings() public onlyDexSwaps {
-        // Try to set slippage as non-owner
         vm.expectRevert(ownableUnauthorized(USER));
         vm.prank(USER);
         IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumPercent(0.98e18);
-        
-        // Try to set safety check as non-owner
+
         vm.expectRevert(ownableUnauthorized(USER));
         vm.prank(USER);
         IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumSafetyCheck(0.95e18);

@@ -111,7 +111,8 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R51 | 50 (planned GitHub #103) | none (first fork table in PR; durable live floor is a relaunch gate) |
 | R52 | 51 ([#104](https://github.com/BitChillRSK/dca-contracts/pull/104)) | none (same production Safe; divergent owners keep naturally split authority) |
 | R57 | 52 ([#106](https://github.com/BitChillRSK/dca-contracts/pull/106)) | **decided 2026-09-02: keep `registerRoute(SOVRYN_INDEX, true)`** — Sovryn is a real lending route; the hole is a Dex handler for DOC |
-| R56 | unassigned (after #104; spec in [#105](https://github.com/BitChillRSK/dca-contracts/pull/105)) | none (oracle floor = safety check; bot `minRbtcOut` is operational) |
+| R56 | 53 ([#107](https://github.com/BitChillRSK/dca-contracts/pull/107)) | none (97% swap-time floor; 95% config wall; bot `minRbtcOut` is operational) |
+| R58 | unassigned | none (test-only constant split; no deploy or `src/` change) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -604,19 +605,30 @@ policy on the Dex leaf exceeded EIP-170. That budget was *unoptimized*. With `op
 ~9 KB of margin, and #104 accordingly moved policy back onto `PurchaseUniswap`, where per-handler storage also
 makes cross-handler misuse impossible. Do not reuse the bytecode argument for a centralized registry.
 
-### R56 - Dex oracle floor is the safety check ([spec](./R56-dex-oracle-floor-is-safety-check.md), unassigned, gated on #103 and #104)
+### R56 - Dex slippage band and bot minRbtcOut ([spec](./R56-dex-oracle-floor-is-safety-check.md), [#107](https://github.com/BitChillRSK/dca-contracts/pull/107), stacked on #106)
 
 R51 follow-up that PR 103 correctly left out of scope. `s_amountOutMinimumPercent` (99.5%) is still the
-Uniswap `amountOutMinimum` today, so the Safe is the only party that can add margin after a quote. Move
-the on-chain oracle floor to `s_amountOutMinimumSafetyCheck` (95%), delete the 99.5% storage percent from
-swap math and from the handler ABI, and pass `max(oracleFloor, minRbtcOut)` into `ExactInputParams`.
-`PurchaseRbtc` still checks measured output. The two-action R43 speed bump goes away: changing the
-backstop is one owner transaction. Production Dex still sends a nonzero quote-derived `minRbtcOut`.
+Uniswap floor today; R51 added `minRbtcOut` but did not wire it into `ExactInputParams`. Keep both
+slippage words and the handler ABI unchanged from mainnet-current: the swap-time floor stays
+`s_amountOutMinimumPercent`, retuned **99.5% → 97%** (probe-derived at block 9198813); the **95%**
+`s_amountOutMinimumSafetyCheck` remains the configuration wall (`safetyCheck <= percent <= 100%`).
+Pass `max(amountOutLowerBound, minRbtcOut)` into the router; `PurchaseRbtc` still checks measured output.
+Inside `[95%, 100%]` the owner retightens or widens the live floor in one transaction; widening
+*past* 95% still needs two transactions (lower the safety check first). Production Dex still sends a
+nonzero quote-derived `minRbtcOut`.
 
 Ask: none.
 
-**Supersedes** the R51 cutover that installed 99.5% then re-locked the safety check to the same value, and
-R43's "safety check is config-only / never enters swap math".
+**Supersedes** the R51 cutover that installed 99.5% then re-locked the safety check to the same value.
+Does **not** collapse R43's two-word band onto the safety check alone.
+
+### R58 - split test-only constants out of `script/Constants.sol` ([spec](./R58-split-script-test-constants.md), unassigned)
+
+Housekeeping after the deploy map work (R37/R57). `script/Constants.sol` still carries a `TESTS CONSTANTS`
+block that tests import directly; move account labels, fork holders, slippage tolerances, and dead duplicates
+into `test/Constants.sol`, keep deploy/helper values (including `BTC_PRICE` for mock routers) in script, and
+leave the R37 `TROPYKUS_STRING` / `TROPYKUS_INDEX` split untouched. Test/Makefile only; no ABI or broadcast
+change. Ask: none.
 
 ### R53 - re-baseline the recorded sizes and gas ([spec](./R53-optimizer-baseline.md), unassigned)
 
