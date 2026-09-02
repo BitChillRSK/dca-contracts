@@ -1,6 +1,6 @@
 # R59 — Enforce complete Uniswap input consumption
 
-Status: **planned** in [#111](https://github.com/BitChillRSK/dca-contracts/pull/111) · Assigned: no · Optional/further-review: no
+Status: **planned** in [#111](https://github.com/BitChillRSK/dca-contracts/pull/111) · Assigned: no · Optional/further-review: no · Order: before R55 (next unassigned)
 
 ## Objective
 
@@ -70,7 +70,8 @@ silently accepting a more expensive design.
         uint256 balanceAfter)`.
 - [ ] Add deterministic router mocks and unit coverage for first-hop and later-hop partial fills.
 - [ ] Measure incremental hot-path gas and runtime size against this PR's base commit, under the
-      compiler profile selected by R55. Record both commits, exact commands, and results in the PR.
+      `#104` pin (`optimizer = true`, `optimizer_runs = 200`, `via_ir = false`). Record both commits,
+      exact commands, and results in the PR.
 
 ### Suggested code shape
 
@@ -165,7 +166,7 @@ allowlisted.
 - [ ] Rejecting repeated/cyclic intermediate tokens or otherwise expanding path policy beyond R52's
       exact-path owner allowlist.
 - [ ] Changing purchase pauses, swapper revocation authority, or batch atomicity.
-- [ ] Compiler adoption work owned by R55.
+- [ ] Compiler adoption work owned by R55 (R55 follows this item and still changes no setting itself).
 
 ## Files likely touched
 
@@ -220,7 +221,7 @@ from this list. Extra files must be named in the PR write-up.
       handler's balance delta.
 - [ ] Added gas is at most 8,000 for a direct path and 15,000 for one intermediate token.
 - [ ] Every Dex leaf grows by at most 800 bytes and remains below EIP-170.
-- [ ] Full local, invariant, and mandatory fork gates pass under R55's selected compiler profile.
+- [ ] Full local, invariant, and mandatory fork gates pass under the `#104` pin.
 
 ## Reviewer checklist
 

@@ -117,8 +117,8 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R58 | 54 ([#108](https://github.com/BitChillRSK/dca-contracts/pull/108)) | none (test-only constant split; no deploy or `src/` change) |
 | R53 | 55 ([#109](https://github.com/BitChillRSK/dca-contracts/pull/109)) | none (documentation-only optimized baseline) |
 | R54 | 56 ([#110](https://github.com/BitChillRSK/dca-contracts/pull/110)) | answered (amount; top-up ignores deposit pause; `topUpFromInterest`) |
-| R55 | 57 (planned) | none (measure and recommend; no compiler adoption) |
-| R59 | 58 (planned) | none (fail closed on incomplete Uniswap input; gas and size ceilings are fixed) |
+| R59 | 57 (planned) | none (fail closed on incomplete Uniswap input; gas and size ceilings are fixed) |
+| R55 | 58 (planned) | none (measure and recommend; no compiler adoption) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -766,20 +766,7 @@ Cutover: [front-end#22](https://github.com/BitChillRSK/front-end/issues/22#issue
 [data-api#9](https://github.com/BitChillRSK/data-api/issues/9#issuecomment-5512738181), and
 `metrics-dashboard`; `swapper-bot` needs none.
 
-### R55 - evaluate solx and the IR pipeline ([spec](./R55-solx-and-ir-evaluation.md), unassigned, gated on #104)
-
-Measure and recommend; change no compiler setting. Compare stock solc no-IR, stock solc `via_ir`, and solx on
-runtime size, hot-path gas, whether the full matrix passes, and whether Blockscout can verify the result on
-Rootstock. Every number must be against the optimized baseline #104 pins - the optimizer already takes 14-30% and
-`via_ir` a further 2-4%, so solx competes against ~239k gas on `testSinglePurchase`, not ~284k, and crediting
-it with the optimizer's win would be the easiest mistake to make here.
-
-EIP-170 is explicitly not a motivation: once #104 lands nothing is size-constrained. The deciding factor is risk,
-not gas. These contracts are immutable and unproxied and hold user funds, R23's toolchain proof was obtained
-with stock solc, and a gas win that Blockscout cannot verify on Rootstock is not shippable. An explicit "keep
-stock solc" option is chosen unless a candidate clears both the gas bar and verification.
-
-### R59 - enforce complete Uniswap input consumption ([spec](./R59-uniswap-exact-consumption.md), unassigned, after R55)
+### R59 - enforce complete Uniswap input consumption ([spec](./R59-uniswap-exact-consumption.md), unassigned, before R55)
 
 Fail closed when SwapRouter02 does not consume the full stablecoin input or leaves a new
 intermediate-token balance in the router. Uniswap V3 `exactInput` can stop at a pool's terminal price
@@ -795,8 +782,26 @@ trust the router return, or add sweep/refund authority.
 
 This is a recurring protocol-paid hot-path check, so it ships only at no more than +8,000 gas for a
 direct path, +15,000 gas for a one-intermediate path, and +800 bytes of runtime per Dex leaf. Measure
-against the implementation PR's base under the compiler profile R55 selects. R59 follows R55 so the
-acceptance numbers are not invalidated by a concurrent code-generator decision. Ask: none.
+against the implementation PR's base under the `#104` pin (`optimizer = true`, `optimizer_runs = 200`,
+`via_ir = false`). R59 precedes R55: the safety check ships on the known production profile; R55 is
+measure-and-recommend only and does not change settings, so a later adoption PR (if any) re-measures
+these ceilings. Ask: none.
+
+### R55 - evaluate solx and the IR pipeline ([spec](./R55-solx-and-ir-evaluation.md), unassigned, after R59, gated on #104)
+
+Measure and recommend; change no compiler setting. Compare stock solc no-IR, stock solc `via_ir`, and solx on
+runtime size, hot-path gas, whether the full matrix passes, and whether Blockscout can verify the result on
+Rootstock. Every number must be against the optimized baseline #104 pins - the optimizer already takes 14-30% and
+`via_ir` a further 2-4%, so solx competes against ~239k gas on `testSinglePurchase`, not ~284k, and crediting
+it with the optimizer's win would be the easiest mistake to make here.
+
+EIP-170 is explicitly not a motivation: once #104 lands nothing is size-constrained. The deciding factor is risk,
+not gas. These contracts are immutable and unproxied and hold user funds, R23's toolchain proof was obtained
+with stock solc, and a gas win that Blockscout cannot verify on Rootstock is not shippable. An explicit "keep
+stock solc" option is chosen unless a candidate clears both the gas bar and verification.
+
+Follows R59 so the Uniswap fail-closed checks are already in the tree R55 measures; R55 still changes no
+compiler setting in its own PR.
 
 ## Closed non-implementation decisions
 
