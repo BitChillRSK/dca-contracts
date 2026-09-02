@@ -1,6 +1,6 @@
 # R59 — Enforce complete Uniswap input consumption
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **planned** in [#111](https://github.com/BitChillRSK/dca-contracts/pull/111) · Assigned: no · Optional/further-review: no
 
 ## Objective
 
