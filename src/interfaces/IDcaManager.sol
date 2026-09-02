@@ -330,8 +330,8 @@ interface IDcaManager {
      * @param token The stablecoin of the schedule.
      * @param scheduleIndex Index of the schedule in the caller's array for `token`.
      * @param scheduleId Id of that schedule, checked against storage.
-     * @param amount Interest to credit, at most everything the caller has accrued on this
-     *        schedule's route (`getInterestAccrued`).
+     * @param amount Interest to credit, at most the spendable accrued-interest ceiling computed at
+     *        the market's current rate. `getInterestAccrued` can quote less on a lazily-accruing market.
      * @dev Interest accrues per user, token, and route rather than per schedule, so the caller
      *      chooses which of their schedules on that route receives it, and may split it across
      *      several by calling this more than once. Nothing is redeemed or transferred: the funds
@@ -340,7 +340,8 @@ interface IDcaManager {
      *      at least one more purchase than the schedule could already afford, so interest cannot
      *      be swept over in dust. The ceiling is the interest read at the market's current rate,
      *      which can exceed the `getInterestAccrued` quote on a market that accrues lazily; passing
-     *      the quoted figure is therefore always accepted. A route with deposits paused still
+     *      the quoted figure therefore never exceeds the ceiling, but it can still fail the minimum
+     *      purchase-boundary check above. A route with deposits paused still
      *      accepts a top-up: that pause stops new funds entering the route, and this credits funds
      *      already in it. Reverts
      *      `DcaManager__TokenDoesNotYieldInterest` on an idle route,
@@ -426,8 +427,8 @@ interface IDcaManager {
      * @param routeIndex Route to query. Reverts if the route is not lending.
      * @return Accrued interest in stablecoin units.
      * @dev A quote, read at the market's rate as a plain read. On a market that accrues lazily this
-     *      can trail what `topUpFromInterest` will accept, never exceed it, so the displayed figure
-     *      is always creditable and a stale quote costs at most a slice left for the next call.
+     *      can trail the spendable ceiling, never exceed it. This guarantees the quote satisfies the
+     *      upper bound; `topUpFromInterest` still requires it to cross the next purchase boundary.
      */
     function getInterestAccrued(address user, address token, uint256 routeIndex)
         external

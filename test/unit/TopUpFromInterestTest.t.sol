@@ -220,14 +220,13 @@ contract TopUpFromInterestTest is DcaDappTest {
     }
 
     /**
-     * @notice The quote never exceeds the ceiling the credit is bounded by, so the displayed figure
-     *         is always creditable.
+     * @notice The quote never exceeds the ceiling the credit is bounded by.
      * @dev The two are read at different rates on a market that accrues lazily — the quote at the
      *      market's plain read, the ceiling at the rate a write path would get — and only one
      *      ordering of the two is safe. This is the lane-agnostic half; the Tropykus handler suite
      *      pins the case where they actually differ.
      */
-    function testTheQuotedInterestIsAlwaysCreditable() external onlyLendingLane {
+    function testQuotedInterestNeverExceedsTheCeiling() external onlyLendingLane {
         _accrueAndOpenSlack(SCHEDULE_INDEX);
 
         uint256 quoted = _accruedInterest();

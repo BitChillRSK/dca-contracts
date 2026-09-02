@@ -734,8 +734,9 @@ a generated client. A new `ITokenLending.quoteAccruedInterest` is the **display 
 `_viewExchangeRate()`, and keeps `DcaManager.getInterestAccrued` a `view`. Both call one private helper that
 takes the rate as an argument, so the only difference between them is which rate goes in. The pair is safe
 because the gap has a direction: a stored rate only ever trails a current one, so the quote is at most equal
-to the ceiling and never above it, and a caller passing the displayed number is always inside the bound - the
-most a stale quote costs is a slice left for the next call. `ITokenLending` gains a function, so its ERC-165
+to the ceiling and never above it. A caller passing the displayed number therefore never breaches the upper
+bound, though the independent purchase-boundary minimum can still reject it; the worst a stale quote costs
+against the ceiling is a slice left for the next call. `ITokenLending` gains a function, so its ERC-165
 id changes; handlers and `OperationsAdmin` compute it from the same source and ship together, so the lending
 gate in `assignTokenHandler` is unaffected.
 

@@ -98,8 +98,8 @@ interface ITokenLending is ITokenHandler {
      * @return Accrued interest in stablecoin units, or zero.
      * @dev The display quote, and what keeps `IDcaManager.getInterestAccrued` a `view`. On a market
      *      that accrues lazily this can sit below what `getAccruedInterest` reports, never above,
-     *      because a stored rate only trails a current one. So a caller may always spend the quoted
-     *      figure; the most a stale quote costs is a slice left for the next call.
+     *      because a stored rate only trails a current one. The quote therefore never exceeds the
+     *      top-up ceiling; DcaManager separately enforces its minimum purchase-boundary rule.
      */
     function quoteAccruedInterest(address user, uint256 stablecoinLockedInDcaSchedules)
         external

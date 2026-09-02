@@ -147,8 +147,9 @@ goes in.
 
 What makes the pair safe is the *direction* of the gap: a stored rate only ever trails a current one,
 so the quote is at most equal to the ceiling and never above it. A caller passing the displayed figure
-is therefore always inside the bound, and the worst a stale quote costs is a slice left for the next
-call. The reverse ordering would be a UI that offers a number the transaction rejects.
+therefore never breaches the upper bound; the independent rule requiring the credit to cross the
+schedule's next purchase boundary can still reject it. The worst a stale quote costs against the
+ceiling is a slice left for the next call.
 
 `ITokenLending` gains a function, so its ERC-165 id changes. Handlers and `OperationsAdmin` compute it
 from the same source and ship together, so the lending gate in `assignTokenHandler` is unaffected;
@@ -193,8 +194,8 @@ Behaviors to assert:
 - `withdrawAllAccumulatedInterest` after a full top-up is a no-op that does not revert.
 - Whichever answer decision 1 takes, a test pins it: deposits paused → top-up succeeds, while a
   deposit on the same route still reverts.
-- `DcaManager.getInterestAccrued` is still readable by `staticcall`, and the figure it quotes is
-  always accepted by `topUpFromInterest`. On Tropykus, where the two rates actually differ, the quote
+- `DcaManager.getInterestAccrued` is still readable by `staticcall`, and the figure it quotes never
+  exceeds the ceiling used by `topUpFromInterest`. On Tropykus, where the two rates actually differ, the quote
   reports a stale zero without poking the market while the ceiling accrues the year itself, and the
   two agree once the market is poked.
 - The stateful invariant actor gains the top-up, plus a coverage guard that lands one deterministic

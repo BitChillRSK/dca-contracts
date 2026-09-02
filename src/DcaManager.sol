@@ -378,7 +378,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @dev It bounds the credit on the spendable figure rather than the `getInterestAccrued` quote,
      *      so a lazily-accruing market cannot make a user wait for someone else's transaction to
      *      credit the interest they have already earned. The quote only ever trails it, so a caller
-     *      passing the displayed number is always inside the bound.
+     *      passing the displayed number never exceeds this upper bound; the separate purchase-boundary
+     *      minimum can still reject that amount.
      * @dev The credited figure comes from the same expression an interest withdrawal pays out, so
      *      the route's summed principal lands on the position's value and never above it.
      * @dev Resolved through `_handler`, not the deposit-only helper: a deposit pause stops users
