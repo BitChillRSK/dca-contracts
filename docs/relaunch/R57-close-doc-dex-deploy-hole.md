@@ -1,8 +1,8 @@
 # R57 — Close the DOC Dex deploy hole in `DeployDexSwaps`
 
-Status: **in progress** · Assigned: yes · Optional/further-review: no
+Status: **assigned** · Assigned: yes · Optional/further-review: no
 
-PR 52 of the relaunch stack; planned GitHub **#106**. Planning lives in GitHub
+PR 52 of the relaunch stack; GitHub **[#106](https://github.com/BitChillRSK/dca-contracts/pull/106)**. Planning lives in GitHub
 [#105](https://github.com/BitChillRSK/dca-contracts/pull/105); branch from that PR's head
 (`docs/r53-r55-toolchain-topup-solx`), which is the latest open relaunch PR. The spec already exists,
 so do not copy `TASK_TEMPLATE.md`. Gated on R51 /
