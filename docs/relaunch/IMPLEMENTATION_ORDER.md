@@ -115,6 +115,10 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R57 | 52 ([#106](https://github.com/BitChillRSK/dca-contracts/pull/106)) | **decided 2026-09-02: keep `registerRoute(SOVRYN_INDEX, true)`** — Sovryn is a real lending route; the hole is a Dex handler for DOC |
 | R56 | 53 ([#107](https://github.com/BitChillRSK/dca-contracts/pull/107)) | none (97% swap-time floor; 95% config wall; bot `minRbtcOut` is operational) |
 | R58 | 54 ([#108](https://github.com/BitChillRSK/dca-contracts/pull/108)) | none (test-only constant split; no deploy or `src/` change) |
+| R53 | 55 ([#109](https://github.com/BitChillRSK/dca-contracts/pull/109)) | none (documentation-only optimized baseline) |
+| R54 | 56 ([#110](https://github.com/BitChillRSK/dca-contracts/pull/110)) | answered (amount; top-up ignores deposit pause; `topUpFromInterest`) |
+| R55 | 57 (planned) | none (measure and recommend; no compiler adoption) |
+| R59 | 58 (planned) | none (fail closed on incomplete Uniswap input; gas and size ceilings are fixed) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -770,6 +774,25 @@ EIP-170 is explicitly not a motivation: once #104 lands nothing is size-constrai
 not gas. These contracts are immutable and unproxied and hold user funds, R23's toolchain proof was obtained
 with stock solc, and a gas win that Blockscout cannot verify on Rootstock is not shippable. An explicit "keep
 stock solc" option is chosen unless a candidate clears both the gas bar and verification.
+
+### R59 - enforce complete Uniswap input consumption ([spec](./R59-uniswap-exact-consumption.md), unassigned, after R55)
+
+Fail closed when SwapRouter02 does not consume the full stablecoin input or leaves a new
+intermediate-token balance in the router. Uniswap V3 `exactInput` can stop at a pool's terminal price
+limit before consuming the requested amount; an aggregate `amountOutMinimum` does not prove complete
+input consumption. A first-hop partial fill leaves stablecoin in the handler, while a later-hop
+partial fill can leave an intermediate token in the public router.
+
+Store the active intermediate-token list beside the already stored path. Around `exactInput`, compare
+the handler's purchase-token balance delta with the exact requested amount and compare each router
+intermediate-token balance after the swap with its own pre-swap value. Preserve WRBTC balance-delta
+crediting and revert the whole batch on either mismatch. Do not decode the packed path, add assembly,
+trust the router return, or add sweep/refund authority.
+
+This is a recurring protocol-paid hot-path check, so it ships only at no more than +8,000 gas for a
+direct path, +15,000 gas for a one-intermediate path, and +800 bytes of runtime per Dex leaf. Measure
+against the implementation PR's base under the compiler profile R55 selects. R59 follows R55 so the
+acceptance numbers are not invalidated by a concurrent code-generator decision. Ask: none.
 
 ## Closed non-implementation decisions
 
