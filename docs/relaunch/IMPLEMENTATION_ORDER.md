@@ -110,7 +110,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R42 integration | 49 ([#101](https://github.com/BitChillRSK/dca-contracts/pull/101)) | none (`Batch` for both entry points) |
 | R51 | 50 (planned GitHub #103) | none (first fork table in PR; durable live floor is a relaunch gate) |
 | R52 | 51 ([#104](https://github.com/BitChillRSK/dca-contracts/pull/104)) | none (same production Safe; divergent owners keep naturally split authority) |
-| R57 | unassigned (after #104; spec in [#105](https://github.com/BitChillRSK/dca-contracts/pull/105)) | none (recommend also dropping the unused `registerRoute(SOVRYN_INDEX)`) |
+| R57 | 52 (planned GitHub #106; spec in [#105](https://github.com/BitChillRSK/dca-contracts/pull/105)) | **one** — also drop the now-unused `registerRoute(SOVRYN_INDEX, true)` from the live Dex branch? (recommend yes) |
 | R56 | unassigned (after #104; spec in [#105](https://github.com/BitChillRSK/dca-contracts/pull/105)) | none (oracle floor = safety check; bot `minRbtcOut` is operational) |
 
 ### PR 1 - R23 toolchain and dependency baseline

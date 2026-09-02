@@ -2,8 +2,10 @@
 
 Status: **not started** · Assigned: no · Optional/further-review: no
 
-Planning lives in GitHub [#105](https://github.com/BitChillRSK/dca-contracts/pull/105). Implement in a
-later `Start with R57` PR, stacked on the latest open relaunch PR. Gated on R51 /
+PR 52 of the relaunch stack; planned GitHub **#106**. Planning lives in GitHub
+[#105](https://github.com/BitChillRSK/dca-contracts/pull/105); branch from that PR's head
+(`docs/r53-r55-toolchain-topup-solx`), which is the latest open relaunch PR. The spec already exists,
+so do not copy `TASK_TEMPLATE.md`. Gated on R51 /
 [#103](https://github.com/BitChillRSK/dca-contracts/pull/103), which settled the routing question.
 **Must land before any Dex cutover broadcast.**
 
@@ -66,8 +68,14 @@ live deploy arm goes, exactly as R37 kept the Tropykus leaves and their suites.
 ## Scope
 
 - [ ] `_deployLiveDexHandlers` rejects DOC on the live map: revert with a named string (mirror R37's
-      `"Tropykus is not on the production dex map"`; suggest `"DOC is not on the production dex map"`)
-      before any `CREATE`, alongside the existing `Protocol.TROPYKUS` check.
+      `"Tropykus is not on the production dex map"`; suggest `"DOC is not on the production dex map"`),
+      placed alongside the existing `Protocol.TROPYKUS` check as its first statements.
+      **Note the guarantee this gives.** `run()` already creates `OperationsAdmin` and `DcaManager`
+      before it branches, so this is not a revert "before any `CREATE`" — R37's Tropykus revert is not
+      either. What it guarantees is that no *handler* is constructed and no `assignTokenHandler` runs,
+      and that the broadcast as a whole reverts so nothing lands on chain. Keep the check where R37 put
+      its own rather than hoisting it into `run()`; hoisting would mean resolving the stablecoin type
+      earlier and is a larger change than the hazard needs.
 - [ ] Delete the now-unreachable Sovryn construction/assignment arm from `_deployLiveDexHandlers`,
       including the `sovrynShareToken` zero guard and the `selectedHandler` assignment, so the live
       branch cannot grow a DOC path back by accident.
@@ -100,8 +108,8 @@ not just an addition. `LiveDeployPathTest` does not inherit `DcaDappTest` and ke
 and deploys the DOC Dex handler.
 
 - [ ] A new `test_dexLive_revertsForDocOnTheDexMap`, modelled on `test_dexLive_revertsForTropykus`:
-      `MAINNET` environment, DOC, `vm.expectRevert` on the named string, asserting the revert lands
-      before any `CREATE`.
+      `MAINNET` environment, DOC, `vm.expectRevert` on the named string. Assert the revert, not a
+      `CREATE` count — see the note in **Scope**.
 - [ ] `_skipIfDexLiveUnsupported` skips DOC, so `test_dexLive_mainnetStyle_registersRoutesThenProposes`
       no longer runs the DOC combination.
 - [ ] If open decision 1 removes the route registration, update the two
@@ -112,8 +120,8 @@ and deploys the DOC Dex handler.
 
 ## Success criteria
 
-- [ ] A live `STABLECOIN_TYPE=DOC` (or unset) `DeployDexSwaps` run reverts with the named string before
-      any `CREATE`; no DOC Dex handler is constructed and `(DOC, SOVRYN_INDEX)` is never assigned.
+- [ ] A live `STABLECOIN_TYPE=DOC` (or unset) `DeployDexSwaps` run reverts with the named string; no DOC
+      Dex handler is constructed and `(DOC, SOVRYN_INDEX)` is never assigned.
 - [ ] `grep` of the live branch shows no Sovryn handler construction or assignment.
 - [ ] The map comment matches the shipped Dex set.
 - [ ] `make dex-sovryn`, `make dex-tropykus`, `make fork-sovryn` and `ComparePurchaseMethods` still build
@@ -124,7 +132,7 @@ and deploys the DOC Dex handler.
 ## Reviewer checklist
 
 - [ ] Matches **Scope**; nothing from **Out of scope**.
-- [ ] The revert is before any `CREATE`, not after a partial deploy.
+- [ ] The revert precedes any handler construction and any `assignTokenHandler`.
 - [ ] Local/fork DOC Dex coverage is intact; no handler or suite was deleted.
 - [ ] Protocol invariants in `AGENTS.md` still hold; none are changed by this PR.
 
