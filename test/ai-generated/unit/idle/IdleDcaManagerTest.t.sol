@@ -29,8 +29,8 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
     uint256 internal constant PURCHASE = 50 ether;
 
     function setUp() public override {
-        string memory coinType = vm.envOr("STABLECOIN_TYPE", DEFAULT_STABLECOIN);
-        if (keccak256(abi.encodePacked(coinType)) != keccak256(abi.encodePacked("DOC"))) {
+        string memory coinType = vm.envOr("STABLECOIN_TYPE", DOC_STRING);
+        if (keccak256(abi.encodePacked(coinType)) != keccak256(abi.encodePacked(DOC_STRING))) {
             vm.skip(true);
             return;
         }

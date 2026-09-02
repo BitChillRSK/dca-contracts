@@ -102,7 +102,7 @@ contract DeployMocSwaps is DeployBase {
         try vm.envString("STABLECOIN_TYPE") returns (string memory coinType) {
             stablecoinType = coinType;
         } catch {
-            stablecoinType = DEFAULT_STABLECOIN;
+            stablecoinType = DOC_STRING;
         }
 
         console.log("Using stablecoin type:", stablecoinType);

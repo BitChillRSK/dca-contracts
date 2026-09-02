@@ -184,7 +184,7 @@ contract LiveDeployPathTest is Test {
             "live dex path must not register the legacy Tropykus route"
         );
         assertEq(uint256(operationsAdmin.getRouteClass(SOVRYN_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
-        string memory coinType = vm.envOr("STABLECOIN_TYPE", DEFAULT_STABLECOIN);
+        string memory coinType = vm.envOr("STABLECOIN_TYPE", DOC_STRING);
         bytes32 coinHash = keccak256(abi.encodePacked(coinType));
         if (
             keccak256(abi.encodePacked(vm.envString("LENDING_PROTOCOL")))
@@ -227,8 +227,8 @@ contract LiveDeployPathTest is Test {
     }
 
     function _skipIfMocLiveUnsupported() internal {
-        string memory coinType = vm.envOr("STABLECOIN_TYPE", DEFAULT_STABLECOIN);
-        if (keccak256(abi.encodePacked(coinType)) != keccak256(abi.encodePacked("DOC"))) {
+        string memory coinType = vm.envOr("STABLECOIN_TYPE", DOC_STRING);
+        if (keccak256(abi.encodePacked(coinType)) != keccak256(abi.encodePacked(DOC_STRING))) {
             vm.skip(true);
             return;
         }
@@ -238,7 +238,7 @@ contract LiveDeployPathTest is Test {
         }
     }
 
-    /// @notice The live dex map is LayerBank + Sovryn. Tropykus must fail loudly, not deploy quietly.
+    /// @notice Tropykus is test-only on the Dex map and must fail loudly, not deploy quietly.
     function test_dexLive_revertsForTropykus() public {
         if (keccak256(abi.encodePacked(vm.envString("LENDING_PROTOCOL")))
             != keccak256(abi.encodePacked(TROPYKUS_STRING))) {
@@ -250,6 +250,27 @@ contract LiveDeployPathTest is Test {
         harness.run();
     }
 
+    /// @notice DOC buys rBTC through MoC. A live Dex run must not construct a DOC handler.
+    function test_dexLive_revertsForDocOnTheDexMap() public {
+        string memory coinType = vm.envOr("STABLECOIN_TYPE", DOC_STRING);
+        if (keccak256(abi.encodePacked(coinType)) != keccak256(abi.encodePacked(DOC_STRING))) {
+            vm.skip(true);
+            return;
+        }
+        bytes32 protocolHash = keccak256(abi.encodePacked(vm.envString("LENDING_PROTOCOL")));
+        // Idle has no Dex helper config; Tropykus live dex reverts first for a different reason.
+        if (
+            protocolHash == keccak256(abi.encodePacked(NONE_STRING))
+                || protocolHash == keccak256(abi.encodePacked(TROPYKUS_STRING))
+        ) {
+            vm.skip(true);
+            return;
+        }
+        DeployDexSwapsHarness harness = new DeployDexSwapsHarness(DeployBase.Environment.MAINNET, SAFE, address(this));
+        vm.expectRevert(bytes("DOC is not on the production dex map"));
+        harness.run();
+    }
+
     function _skipIfDexLiveUnsupported() internal {
         string memory lendingProtocol = vm.envString("LENDING_PROTOCOL");
         bytes32 protocolHash = keccak256(abi.encodePacked(lendingProtocol));
@@ -257,13 +278,12 @@ contract LiveDeployPathTest is Test {
             vm.skip(true);
             return;
         }
-        string memory coinType = vm.envOr("STABLECOIN_TYPE", DEFAULT_STABLECOIN);
+        string memory coinType = vm.envOr("STABLECOIN_TYPE", DOC_STRING);
         bytes32 coinHash = keccak256(abi.encodePacked(coinType));
         bool isUSDRIF = coinHash == keccak256(abi.encodePacked(USDRIF_STRING));
         bool isUSDT0 = coinHash == keccak256(abi.encodePacked(USDT0_STRING));
-        bool isDOC = coinHash == keccak256(abi.encodePacked(DEFAULT_STABLECOIN));
-        if (protocolHash == keccak256(abi.encodePacked(LAYERBANK_STRING)) && isDOC) {
-            vm.skip(true); // LayerBank DOC dex is out of scope
+        if (!isUSDRIF && !isUSDT0) {
+            vm.skip(true); // live dex path allowlists USDRIF / USDT0 only
             return;
         }
         if (

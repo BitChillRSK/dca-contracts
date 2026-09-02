@@ -85,7 +85,7 @@ contract ComparePurchaseMethods is Test {
         try vm.envString("STABLECOIN_TYPE") returns (string memory coinType) {
             stablecoinType = coinType;
         } catch {
-            stablecoinType = DEFAULT_STABLECOIN;
+            stablecoinType = DOC_STRING;
         }
         
         // Deploy both implementations

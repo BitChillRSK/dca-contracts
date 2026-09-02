@@ -12,8 +12,8 @@ contract IdleHandlerDeploymentTest is BaseDeploymentTest {
     IdleDocHandlerMoc public idleHandler;
 
     function setUp() public override {
-        string memory coinType = vm.envOr("STABLECOIN_TYPE", DEFAULT_STABLECOIN);
-        if (keccak256(abi.encodePacked(coinType)) != keccak256(abi.encodePacked("DOC"))) {
+        string memory coinType = vm.envOr("STABLECOIN_TYPE", DOC_STRING);
+        if (keccak256(abi.encodePacked(coinType)) != keccak256(abi.encodePacked(DOC_STRING))) {
             vm.skip(true);
             return;
         }

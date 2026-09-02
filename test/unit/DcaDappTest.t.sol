@@ -184,7 +184,7 @@ contract DcaDappTest is Test {
         try vm.envString("STABLECOIN_TYPE") returns (string memory coinType) {
             stablecoinType = coinType;
         } catch {
-            stablecoinType = DEFAULT_STABLECOIN;
+            stablecoinType = DOC_STRING;
         }
         
         bool isUSDRIF = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING));
@@ -273,7 +273,7 @@ contract DcaDappTest is Test {
                 );
 
                 // Fork tests - use token holders instead of minting
-                if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked("DOC"))) {
+                if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(DOC_STRING))) {
                     // Set USER to DOC holder address
                     USER = DOC_HOLDER;
                 } else if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING))) {
@@ -293,7 +293,7 @@ contract DcaDappTest is Test {
                 );
 
                 // Fork tests - use token holders instead of minting
-                if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked("DOC"))) {
+                if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(DOC_STRING))) {
                     // Set USER to DOC holder address
                     USER = DOC_HOLDER_TESTNET;
                 } else if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING))) {
@@ -340,7 +340,7 @@ contract DcaDappTest is Test {
                 // require(success, "Mint function call failed");
                 
                 // Fork tests - use token holders instead of minting
-                if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked("DOC"))) {
+                if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(DOC_STRING))) {
                     // Set USER to DOC holder address
                     USER = DOC_HOLDER;
                 } else if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING))) {

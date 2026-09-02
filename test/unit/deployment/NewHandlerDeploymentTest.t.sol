@@ -21,8 +21,8 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
     
     function setUp() public override {
         // Parent deploys MoC DOC. Skip on USDRIF/USDT0 lanes (vm.skip in the parent does not stop this setUp).
-        string memory coinType = vm.envOr("STABLECOIN_TYPE", DEFAULT_STABLECOIN);
-        if (keccak256(abi.encodePacked(coinType)) != keccak256(abi.encodePacked("DOC"))) {
+        string memory coinType = vm.envOr("STABLECOIN_TYPE", DOC_STRING);
+        if (keccak256(abi.encodePacked(coinType)) != keccak256(abi.encodePacked(DOC_STRING))) {
             vm.skip(true);
             return;
         }

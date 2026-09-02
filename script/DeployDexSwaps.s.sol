@@ -110,10 +110,15 @@ contract DeployDexSwaps is DeployBase {
         bool isUSDRIF,
         bool isUSDT0
     ) internal returns (address selectedHandler) {
-        // Live dex map is LayerBank (USDRIF / USDT0) and Sovryn (DOC). Tropykus is test-only:
-        // its route index is not even in scope here, so this is the only place that can say so.
+        // Live dex stables are LayerBank USDRIF / USDT0. DexHelperConfig's else arm is DOC
+        // config, so anything not exactly those two (unset STABLECOIN_TYPE, DOC, or a typo)
+        // must revert — DOC buys rBTC through MoC redemption. Tropykus is test-only: its
+        // route index is not even in scope here, so this is the only place that can say so.
         if (protocol == Protocol.TROPYKUS) {
             revert("Tropykus is not on the production dex map");
+        }
+        if (!isUSDRIF && !isUSDT0) {
+            revert("DOC is not on the production dex map");
         }
 
         console.log("Deploying handlers for lending protocols for live network");
@@ -154,36 +159,6 @@ contract DeployDexSwaps is DeployBase {
                     selectedHandler = layerbankHandler;
                 }
             }
-        }
-
-        if (isUSDRIF || isUSDT0) {
-            console.log("Skipping Sovryn handler deployment: Sovryn does not list this stablecoin");
-            return selectedHandler;
-        }
-
-        address sovrynShareToken = networkConfig.sovrynShareToken;
-        if (sovrynShareToken == address(0)) {
-            console.log("Warning: Sovryn shares not available for this stablecoin");
-            return selectedHandler;
-        }
-
-        address sovrynHandler = deployDocHandlerDex(
-            DeployParams({
-                protocol: Protocol.SOVRYN,
-                dcaManager: address(dcaManager),
-                tokenAddress: stablecoinAddress,
-                shareToken: sovrynShareToken,
-                uniswapSettings: uniswapSettings,
-                feeCollector: feeCollector,
-                amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
-                amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
-            })
-        );
-        console.log("Sovryn handler deployed at:", sovrynHandler);
-        operationsAdmin.assignTokenHandler(stablecoinAddress, SOVRYN_INDEX, sovrynHandler);
-        _proposeFinalOwner(sovrynHandler);
-        if (protocol == Protocol.SOVRYN) {
-            selectedHandler = sovrynHandler;
         }
     }
 
@@ -254,7 +229,7 @@ contract DeployDexSwaps is DeployBase {
             
             docHandlerDexAddress = deployDocHandlerDex(params);
         }
-        // For live networks (testnet/mainnet), deploy handlers for both lending protocols
+        // For live networks (testnet/mainnet), deploy the LayerBank Dex handler for USDRIF / USDT0.
         else if (environment == Environment.TESTNET || environment == Environment.MAINNET) {
             docHandlerDexAddress = _deployLiveDexHandlers(
                 operationsAdmin,
@@ -281,7 +256,7 @@ contract DeployDexSwaps is DeployBase {
         try vm.envString("STABLECOIN_TYPE") returns (string memory coinType) {
             stablecoinType = coinType;
         } catch {
-            stablecoinType = DEFAULT_STABLECOIN;
+            stablecoinType = DOC_STRING;
         }
     }
 }
