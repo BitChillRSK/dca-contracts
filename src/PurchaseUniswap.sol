@@ -162,6 +162,39 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     /**
+     * @inheritdoc IPurchaseUniswap
+     */
+    function setAmountOutMinimumPercent(uint256 amountOutMinimumPercent) external onlyOwner {
+        _validateSlippageSettings(amountOutMinimumPercent, s_amountOutMinimumSafetyCheck);
+        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(s_amountOutMinimumPercent, amountOutMinimumPercent);
+        s_amountOutMinimumPercent = amountOutMinimumPercent.toUint128();
+    }
+
+    /**
+     * @inheritdoc IPurchaseUniswap
+     */
+    function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external onlyOwner {
+        _validateSlippageSettings(s_amountOutMinimumPercent, amountOutMinimumSafetyCheck);
+        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(s_amountOutMinimumSafetyCheck, amountOutMinimumSafetyCheck);
+        s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint128();
+    }
+
+    /**
+     * @inheritdoc IPurchaseUniswap
+     */
+    function updateMocOracle(address newOracle) external override onlyOwner {
+        if (newOracle == address(0)) {
+            revert PurchaseUniswap__InvalidOracleAddress();
+        }
+        emit PurchaseUniswap_OracleUpdated(address(s_mocOracle), newOracle);
+        s_mocOracle = ICoinPairPrice(newOracle);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           INTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
      * @dev Writes `s_swapPath` and emits `PurchaseUniswap_NewPathSet`.
      *      `newPath` must be `_encodePurchasePath(intermediateTokens, poolFeeRates)`;
      *      the event's components are how off-chain reconstructs the route.
@@ -213,74 +246,6 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
 
         newPath = abi.encodePacked(newPath, poolFeeRates[poolFeeRates.length - 1], address(i_wrBtcToken));
     }
-
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
-    function setAmountOutMinimumPercent(uint256 amountOutMinimumPercent) external onlyOwner {
-        _validateSlippageSettings(amountOutMinimumPercent, s_amountOutMinimumSafetyCheck);
-        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(s_amountOutMinimumPercent, amountOutMinimumPercent);
-        s_amountOutMinimumPercent = amountOutMinimumPercent.toUint128();
-    }
-
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
-    function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external onlyOwner {
-        _validateSlippageSettings(s_amountOutMinimumPercent, amountOutMinimumSafetyCheck);
-        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(s_amountOutMinimumSafetyCheck, amountOutMinimumSafetyCheck);
-        s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint128();
-    }
-
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
-    function updateMocOracle(address newOracle) external override onlyOwner {
-        if (newOracle == address(0)) {
-            revert PurchaseUniswap__InvalidOracleAddress();
-        }
-        emit PurchaseUniswap_OracleUpdated(address(s_mocOracle), newOracle);
-        s_mocOracle = ICoinPairPrice(newOracle);
-    }
-
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
-    function getAmountOutMinimumPercent() external view returns (uint256) {
-        return s_amountOutMinimumPercent;
-    }
-
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
-    function getAmountOutMinimumSafetyCheck() external view returns (uint256) {
-        return s_amountOutMinimumSafetyCheck;
-    }
-
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
-    function getMocOracle() external view returns (ICoinPairPrice) {
-        return s_mocOracle;
-    }
-
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
-    function getSwapPath() external view returns (bytes memory) {
-        return s_swapPath;
-    }
-
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
-    function isPurchasePathAllowed(bytes32 pathHash) external view returns (bool) {
-        return s_purchasePathAllowed[pathHash];
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                           INTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
 
     function _validateSlippageSettings(uint256 amountOutMinimumPercent, uint256 amountOutMinimumSafetyCheck)
         private
@@ -347,6 +312,45 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         (uint256 currentPrice, bool isValid, ) = s_mocOracle.getPriceInfo();
         if (!isValid) revert PurchaseUniswap__OutdatedPrice();
         minimumRbtcAmount = (stablecoinAmountToSpend * i_stablecoinToUsdScale * s_amountOutMinimumPercent) / currentPrice;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            GETTER FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @inheritdoc IPurchaseUniswap
+     */
+    function getAmountOutMinimumPercent() external view returns (uint256) {
+        return s_amountOutMinimumPercent;
+    }
+
+    /**
+     * @inheritdoc IPurchaseUniswap
+     */
+    function getAmountOutMinimumSafetyCheck() external view returns (uint256) {
+        return s_amountOutMinimumSafetyCheck;
+    }
+
+    /**
+     * @inheritdoc IPurchaseUniswap
+     */
+    function getMocOracle() external view returns (ICoinPairPrice) {
+        return s_mocOracle;
+    }
+
+    /**
+     * @inheritdoc IPurchaseUniswap
+     */
+    function getSwapPath() external view returns (bytes memory) {
+        return s_swapPath;
+    }
+
+    /**
+     * @inheritdoc IPurchaseUniswap
+     */
+    function isPurchasePathAllowed(bytes32 pathHash) external view returns (bool) {
+        return s_purchasePathAllowed[pathHash];
     }
 
 }
