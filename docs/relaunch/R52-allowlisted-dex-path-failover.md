@@ -91,8 +91,8 @@ function setPurchasePath(address[] memory intermediateTokens, uint24[] memory po
   `PurchaseUniswap__WrongNumberOfTokensOrFeeRates` via `_encodePurchasePath`.
 - `setPurchasePath` encodes first, requires the hash to be allowlisted, then requires `msg.sender == owner()`
   or `IOperationsAdmin(dcaManager.getOperationsAdminAddress()).isSwapper(msg.sender)`.
-- Constructor `_installInitialPurchasePath` encodes once, calls `_setPurchasePath` (active path +
-  `NewPathSet`) and `_setPurchasePathAllowed` (`allowed = true`). Public `setPurchasePath` /
+- Constructor encodes once, then calls `_setPurchasePath` (active path + `NewPathSet`) and
+  `_setPurchasePathAllowed` (`allowed = true`) in a scoped block. Public `setPurchasePath` /
   `setPurchasePathAllowed` are the only other callers of those internals.
 - Purchases read `s_swapPath` only. No allowlist SLOAD on the purchase path.
 - `OperationsAdmin` has no purchase-path mapping, setter, getter, assertion, event, errors, handler-policy
@@ -115,8 +115,8 @@ admin registry. Full `forge build --sizes` (not `--match-*`) is the record.
   to `IPurchaseUniswap` / `PurchaseUniswap`.
 - [x] The owner setter accepts path components, stores the derived hash, emits path+hash, and rejects no-op
   writes and active-path revocation.
-- [x] Constructor `_installInitialPurchasePath` stays internal, self-allowlists the initial path, and emits both
-  `PurchaseUniswap_NewPathSet` and `PurchaseUniswap_PurchasePathAllowedSet`.
+- [x] Constructor self-allowlists the initial path and emits both `PurchaseUniswap_NewPathSet` and
+  `PurchaseUniswap_PurchasePathAllowedSet`. It does not call the public setters.
 - [x] Remove every purchase-path API from `IOperationsAdmin` / `OperationsAdmin`.
 - [x] `DeployDexSwaps` and `DeployUsdrifHandler` do **not** call `setPurchasePathAllowed` for the
   constructor path. `DeployLayerBankHandler` is MoC-only and must **not** be changed for this Dex feature.

@@ -87,9 +87,18 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         s_amountOutMinimumPercent = amountOutMinimumPercent.toUint128();
         s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint128();
         
-        // Direct initial owner is not the deployer, so the constructor cannot call the onlyOwner setter.
-        // This also rejects a zero purchase token before the `decimals()` call below reaches an empty address.
-        _installInitialPurchasePath(uniswapSettings.swapIntermediateTokens, uniswapSettings.swapPoolFeeRates);
+        // Direct initial owner is not the deployer, so the constructor cannot call the onlyOwner setters.
+        // Encode once, write the active path, and mark that hash allowed. The scoped locals drop
+        // before `decimals()` so the constructor stays under the stack limit. A zero purchase token
+        // reverts here, before the `decimals()` call below reaches an empty address.
+        {
+            address[] memory intermediateTokens = uniswapSettings.swapIntermediateTokens;
+            uint24[] memory poolFeeRates = uniswapSettings.swapPoolFeeRates;
+            bytes memory newPath = _encodePurchasePath(intermediateTokens, poolFeeRates);
+            bytes32 pathHash = keccak256(newPath);
+            _setPurchasePath(intermediateTokens, poolFeeRates, newPath);
+            _setPurchasePathAllowed(pathHash, newPath, intermediateTokens, poolFeeRates, true);
+        }
 
         uint8 stablecoinDecimals = IERC20Metadata(address(_purchaseToken())).decimals();
         if (stablecoinDecimals > ORACLE_DECIMALS) {
@@ -186,18 +195,6 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     ) internal {
         s_purchasePathAllowed[pathHash] = allowed;
         emit PurchaseUniswap_PurchasePathAllowedSet(pathHash, encodedPath, intermediateTokens, poolFeeRates, allowed);
-    }
-
-    /**
-     * @dev Constructor-only: encode once, activate the path, and mark that hash allowed.
-     */
-    function _installInitialPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
-        internal
-    {
-        bytes memory newPath = _encodePurchasePath(intermediateTokens, poolFeeRates);
-        bytes32 pathHash = keccak256(newPath);
-        _setPurchasePath(intermediateTokens, poolFeeRates, newPath);
-        _setPurchasePathAllowed(pathHash, newPath, intermediateTokens, poolFeeRates, true);
     }
 
     function _encodePurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
