@@ -370,6 +370,50 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
 
     /**
      * @inheritdoc IDcaManager
+     * @dev Makes no state-changing external call: the interest is already in the handler's lending
+     *      position, so raising this schedule's claim over it is a storage write and a view. The
+     *      credited figure comes from the same expression an interest withdrawal pays out, so the
+     *      route's summed principal lands on the position's value and never above it.
+     *      Deposits paused on this route reject the credit: a pause means stop growing DCA exposure
+     *      here, whatever the funds' source, and no principal is stranded because the withdraw path
+     *      stays open.
+     */
+    function topUpFromInterest(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 amount)
+        external
+        override
+        nonReentrant
+        validateScheduleIndex(msg.sender, token, scheduleIndex)
+    {
+        DcaSchedule storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
+        _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
+        uint256 routeIndex = dcaSchedule.routeIndex;
+        _checkTokenYieldsInterest(token, routeIndex);
+
+        uint256 accruedInterest = ITokenLending(address(_handlerForDeposit(token, routeIndex))).getAccruedInterest(
+            msg.sender, _lockedPrincipal(msg.sender, token, routeIndex)
+        );
+        if (accruedInterest == 0) revert DcaManager__NoInterestToTopUpWith(token, routeIndex);
+        if (amount > accruedInterest) {
+            revert DcaManager__TopUpExceedsAccruedInterest(token, routeIndex, amount, accruedInterest);
+        }
+
+        uint256 tokenBalance = dcaSchedule.tokenBalance;
+        uint256 purchaseAmount = dcaSchedule.purchaseAmount;
+        uint128 newTokenBalance = (tokenBalance + amount).toUint128();
+        // The credit must buy at least one more purchase than the balance could already fund, so
+        // interest cannot be moved over in dust. A schedule that spends nothing per purchase can
+        // never clear that bar, and has nothing to top up for.
+        if (purchaseAmount == 0 || newTokenBalance / purchaseAmount == tokenBalance / purchaseAmount) {
+            revert DcaManager__TopUpDoesNotFundAnotherPurchase(token, scheduleId, amount);
+        }
+
+        dcaSchedule.tokenBalance = newTokenBalance;
+        emit DcaManager__ScheduleToppedUpFromInterest(msg.sender, token, scheduleId, amount);
+        emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
+    }
+
+    /**
+     * @inheritdoc IDcaManager
      */
     function withdrawAllAccumulatedInterest(address[] calldata tokens, uint256[] calldata routeIndexes)
         external
