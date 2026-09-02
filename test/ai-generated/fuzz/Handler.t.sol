@@ -10,7 +10,7 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {OperationsAdmin} from "src/OperationsAdmin.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {toBatch} from "test/utils/BatchBuyOne.sol";
-import "script/Constants.sol";
+import "test/Constants.sol";
 
 /**
  * @title Handler

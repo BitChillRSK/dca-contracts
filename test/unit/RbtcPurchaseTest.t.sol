@@ -10,7 +10,7 @@ import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import {IDcaManagerAccessControl} from "../../src/interfaces/IDcaManagerAccessControl.sol";
 import {batchBuyOne, handlerBatchBuyOne, UNUSED_SCHEDULE_ID, toBatch} from "../utils/BatchBuyOne.sol";
-import "../../script/Constants.sol";
+import "../Constants.sol";
 
 contract RbtcPurchaseTest is DcaDappTest {
 

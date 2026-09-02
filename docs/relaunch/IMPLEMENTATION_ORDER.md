@@ -112,7 +112,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R52 | 51 ([#104](https://github.com/BitChillRSK/dca-contracts/pull/104)) | none (same production Safe; divergent owners keep naturally split authority) |
 | R57 | 52 ([#106](https://github.com/BitChillRSK/dca-contracts/pull/106)) | **decided 2026-09-02: keep `registerRoute(SOVRYN_INDEX, true)`** — Sovryn is a real lending route; the hole is a Dex handler for DOC |
 | R56 | 53 ([#107](https://github.com/BitChillRSK/dca-contracts/pull/107)) | none (97% swap-time floor; 95% config wall; bot `minRbtcOut` is operational) |
-| R58 | unassigned | none (test-only constant split; no deploy or `src/` change) |
+| R58 | 54 ([#108](https://github.com/BitChillRSK/dca-contracts/pull/108)) | none (test-only constant split; no deploy or `src/` change) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -622,13 +622,22 @@ Ask: none.
 **Supersedes** the R51 cutover that installed 99.5% then re-locked the safety check to the same value.
 Does **not** collapse R43's two-word band onto the safety check alone.
 
-### R58 - split test-only constants out of `script/Constants.sol` ([spec](./R58-split-script-test-constants.md), unassigned)
+### R58 - split test-only constants out of `script/Constants.sol` ([spec](./R58-split-script-test-constants.md), PR 54, [#108](https://github.com/BitChillRSK/dca-contracts/pull/108))
 
 Housekeeping after the deploy map work (R37/R57). `script/Constants.sol` still carries a `TESTS CONSTANTS`
 block that tests import directly; move account labels, fork holders, slippage tolerances, and dead duplicates
 into `test/Constants.sol`, keep deploy/helper values (including `BTC_PRICE` for mock routers) in script, and
 leave the R37 `TROPYKUS_STRING` / `TROPYKUS_INDEX` split untouched. Test/Makefile only; no ABI or broadcast
 change. Ask: none.
+
+Shipped as specified, with `RESERVED_MOC_LENDING_INDEX` dropped rather than moved - it reserves index 3 on the
+production MoC map, so `test/Constants.sol` is the wrong home, and an unused constant is what invites a script
+to register it; a comment beside `SOVRYN_INDEX` reserves the number without offering a symbol to pass. Fork
+holders consolidate on the `_TESTNET` suffix (`DOC_HOLDER_TESTNET` is what `DcaDappTest` already calls). The
+PR also hardened the R37 guard, which holds today only because `script/*.s.sol` imports mocks with the named
+`import {Mock} from ...` form: `MockMocOracle` is repointed back at `script/Constants.sol` and
+`MockSwapRouter02`'s dead import deleted, so no mock a deploy script constructs sees `TROPYKUS_INDEX` under
+any import form.
 
 ### R53 - re-baseline the recorded sizes and gas ([spec](./R53-optimizer-baseline.md), unassigned)
 

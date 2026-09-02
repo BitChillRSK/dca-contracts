@@ -4,7 +4,7 @@ pragma solidity 0.8.36;
 import {Test, console2} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ICoinPairPrice} from "src/interfaces/ICoinPairPrice.sol";
-import "../../../script/Constants.sol";
+import "../../Constants.sol";
 
 interface IV3SwapRouterLike {
     struct ExactInputParams {

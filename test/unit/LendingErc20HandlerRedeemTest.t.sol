@@ -8,7 +8,7 @@ import {ITokenLending} from "src/interfaces/ITokenLending.sol";
 import {MockStablecoin} from "../mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "../../script/Constants.sol";
+import "../Constants.sol";
 
 /**
  * @title LendingErc20HandlerRedeemTest

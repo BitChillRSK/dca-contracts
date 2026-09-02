@@ -8,7 +8,7 @@ import {DcaManager} from "../../src/DcaManager.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
 import {ownableUnauthorized} from "../utils/OzRevert.sol";
-import "../../script/Constants.sol";
+import "../Constants.sol";
 
 contract ModifiersTest is DcaDappTest {
     // Events

@@ -10,7 +10,7 @@ import {MockStablecoin} from "../../../mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ITokenLending} from "../../../../src/interfaces/ITokenLending.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import "../../../../script/Constants.sol";
+import "../../../Constants.sol";
 
 /**
  * @title SovrynErc20HandlerTest 

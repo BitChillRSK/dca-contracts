@@ -7,7 +7,7 @@ import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockLayerBankAToken, MockLayerBankPool} from "test/mocks/MockLayerBank.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
-import "script/Constants.sol";
+import "test/Constants.sol";
 import {handlerBatchBuyOne, NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 

@@ -14,7 +14,7 @@ import {SovrynDocHandlerMoc} from "src/sovryn/SovrynDocHandlerMoc.sol";
 import {TropykusErc20HandlerDex} from "src/tropykus-legacy/TropykusErc20HandlerDex.sol";
 import {IPurchaseUniswap} from "src/interfaces/IPurchaseUniswap.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
-import "script/Constants.sol";
+import "test/Constants.sol";
 import {IWRBTC} from "src/interfaces/IWRBTC.sol";
 import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces/ISwapRouter02.sol";
 import {ICoinPairPrice} from "src/interfaces/ICoinPairPrice.sol";

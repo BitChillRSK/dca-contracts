@@ -4,7 +4,7 @@ pragma solidity 0.8.36;
 
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
-import "../../script/Constants.sol";
+import "../Constants.sol";
 
 /**
  * @title FullWithdrawalTest
