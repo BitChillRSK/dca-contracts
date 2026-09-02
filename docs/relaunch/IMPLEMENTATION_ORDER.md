@@ -678,9 +678,9 @@ does not survive contact: R51's `_creditBuyers` reasoning turned on no-IR stack-
 does not relieve — R51 checked that at the time and it still holds — so only the 17-bytes-per-handler half of
 that argument was budget-driven, and via-IR (R55) is what would reopen it.
 
-### R54 - top a schedule up from accrued interest ([spec](./R54-schedule-top-up-from-interest.md), unassigned, gated on #104)
+### R54 - top a schedule up from accrued interest ([spec](./R54-schedule-top-up-from-interest.md), PR 56, [#110](https://github.com/BitChillRSK/dca-contracts/pull/110))
 
-Revives R12. `DcaManager.topUpFromInterest(token, scheduleIndex, scheduleId)` credits the caller's accrued
+Revives R12. `DcaManager.topUpFromInterest(token, scheduleIndex, scheduleId, amount)` credits the caller's accrued
 lending interest to one schedule's `tokenBalance`, so yield buys rBTC without a withdraw-then-deposit round
 trip - which also avoids Sovryn's SIP-0094 exit fee, since nothing is redeemed. `DcaManager`-only: no handler
 call, no token movement, no redeem-then-remint. The credited figure is the same expression the interest
@@ -695,6 +695,25 @@ Ask: whether the R48 deposit pause blocks a top-up (recommend yes - a pause mean
 that route, whatever the funds' source); naming (`topUpFromInterest`, because "compound" collides with Compound
 the lending protocol that Tropykus forks - the same collision class R26 fixed for "lending token"); and
 all-or-part (recommend all, no `amount` parameter).
+
+Answered 2026-09-02: the pause blocks it (the path resolves through `_handlerForDeposit`; both helpers are one
+call site returning the same handler, so the choice cost no code either way), the name is `topUpFromInterest`,
+and **all-or-part went the other way** - the function takes an `amount`, because one pot of route interest
+feeding two schedules is wanted and reaching it by crediting one schedule then withdrawing the difference pays
+the exit fee the feature exists to avoid. `amount` is bounded above by the accrued figure and below by having
+to raise the balance past its **next whole purchase**, so interest cannot be moved across in dust while a
+schedule holding 10.5 purchases needs only half a purchase amount. A flat `amount >= purchaseAmount` floor was
+rejected in the same exchange: it strands interest smaller than one purchase.
+
+Shipped with that shape. `DcaManager` 13,767 -> 14,541 B (margin 10,809 -> 10,035), +774 rather than the
+probe's +600: the `amount` parameter, its two bounded-credit errors, and the purchase-boundary comparison are
+all new since `7dd00fb`. No handler changed and no external state-changing call is made on the path - the
+suite proves that by asserting every log in the transaction is `DcaManager`'s own, which no redeem, mint, or
+transfer could be. The stateful invariant actor is deliberately not extended: crediting interest lowers
+reported accrued interest, the opposite of what `invariant_interestOnlyIncreases` encodes, so wiring it in
+means re-stating that invariant. Cutover: [front-end#22](https://github.com/BitChillRSK/front-end/issues/22#issuecomment-5512733974),
+[bitchill-monitoring#10](https://github.com/BitChillRSK/bitchill-monitoring/issues/10#issuecomment-5512737902),
+[data-api#9](https://github.com/BitChillRSK/data-api/issues/9#issuecomment-5512738181); `swapper-bot` needs none.
 
 ### R55 - evaluate solx and the IR pipeline ([spec](./R55-solx-and-ir-evaluation.md), unassigned, gated on #104)
 
