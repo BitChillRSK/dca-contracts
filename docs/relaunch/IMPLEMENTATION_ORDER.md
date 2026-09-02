@@ -645,7 +645,7 @@ PR also hardened the R37 guard, which holds today only because `script/*.s.sol` 
 `MockSwapRouter02`'s dead import deleted, so no mock a deploy script constructs sees `TROPYKUS_INDEX` under
 any import form.
 
-### R53 - re-baseline the recorded sizes and gas ([spec](./R53-optimizer-baseline.md), unassigned)
+### R53 - re-baseline the recorded sizes and gas ([spec](./R53-optimizer-baseline.md), PR 55, [#109](https://github.com/BitChillRSK/dca-contracts/pull/109))
 
 The optimizer flip itself is no longer R53's. `[profile.default]` never set `optimizer` and forge defaults it
 to `false`, so the relaunch was measured unoptimized throughout; #104 pins `optimizer = true` /
