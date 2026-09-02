@@ -370,6 +370,58 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
 
     /**
      * @inheritdoc IDcaManager
+     * @dev Moves no cash: the interest is already in the handler's lending position, so raising this
+     *      schedule's claim over it is a storage write. The only external call reads the accrued
+     *      figure, which on a lending market that accrues lazily also pokes that accrual, and never
+     *      redeems, mints, or transfers. That poke is why the schedule is read after the call and
+     *      not before: nothing this function cached can go stale across it.
+     * @dev It bounds the credit on the spendable figure rather than the `getInterestAccrued` quote,
+     *      so a lazily-accruing market cannot make a user wait for someone else's transaction to
+     *      credit the interest they have already earned. The quote only ever trails it, so a caller
+     *      passing the displayed number never exceeds this upper bound; the separate purchase-boundary
+     *      minimum can still reject that amount.
+     * @dev The credited figure comes from the same expression an interest withdrawal pays out, so
+     *      the route's summed principal lands on the position's value and never above it.
+     * @dev Resolved through `_handler`, not the deposit-only helper: a deposit pause stops users
+     *      adding new funds to a route, and interest already held there is not new funds. Crediting
+     *      it changes no balance the pause was protecting.
+     */
+    function topUpFromInterest(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 amount)
+        external
+        override
+        nonReentrant
+        validateScheduleIndex(msg.sender, token, scheduleIndex)
+    {
+        DcaSchedule storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
+        _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
+        uint256 routeIndex = dcaSchedule.routeIndex;
+        _checkTokenYieldsInterest(token, routeIndex);
+
+        uint256 accruedInterest = ITokenLending(address(_handler(token, routeIndex))).getAccruedInterest(
+            msg.sender, _lockedPrincipal(msg.sender, token, routeIndex)
+        );
+        if (accruedInterest == 0) revert DcaManager__NoInterestToTopUpWith(token, routeIndex);
+        if (amount > accruedInterest) {
+            revert DcaManager__TopUpExceedsAccruedInterest(token, routeIndex, amount, accruedInterest);
+        }
+
+        uint256 tokenBalance = dcaSchedule.tokenBalance;
+        uint256 purchaseAmount = dcaSchedule.purchaseAmount;
+        uint128 newTokenBalance = (tokenBalance + amount).toUint128();
+        // The credit must buy at least one more purchase than the balance could already fund, so
+        // interest cannot be moved over in dust. A schedule that spends nothing per purchase can
+        // never clear that bar, and has nothing to top up for.
+        if (purchaseAmount == 0 || newTokenBalance / purchaseAmount == tokenBalance / purchaseAmount) {
+            revert DcaManager__TopUpDoesNotFundAnotherPurchase(token, scheduleId, amount);
+        }
+
+        dcaSchedule.tokenBalance = newTokenBalance;
+        emit DcaManager__ScheduleToppedUpFromInterest(msg.sender, token, scheduleId, amount);
+        emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
+    }
+
+    /**
+     * @inheritdoc IDcaManager
      */
     function withdrawAllAccumulatedInterest(address[] calldata tokens, uint256[] calldata routeIndexes)
         external
@@ -721,7 +773,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         returns (uint256)
     {
         _checkTokenYieldsInterest(token, routeIndex);
-        return ITokenLending(address(_handler(token, routeIndex))).getAccruedInterest(
+        return ITokenLending(address(_handler(token, routeIndex))).quoteAccruedInterest(
             user, _lockedPrincipal(user, token, routeIndex)
         );
     }

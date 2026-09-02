@@ -678,9 +678,9 @@ does not survive contact: R51's `_creditBuyers` reasoning turned on no-IR stack-
 does not relieve — R51 checked that at the time and it still holds — so only the 17-bytes-per-handler half of
 that argument was budget-driven, and via-IR (R55) is what would reopen it.
 
-### R54 - top a schedule up from accrued interest ([spec](./R54-schedule-top-up-from-interest.md), unassigned, gated on #104)
+### R54 - top a schedule up from accrued interest ([spec](./R54-schedule-top-up-from-interest.md), PR 56, [#110](https://github.com/BitChillRSK/dca-contracts/pull/110))
 
-Revives R12. `DcaManager.topUpFromInterest(token, scheduleIndex, scheduleId)` credits the caller's accrued
+Revives R12. `DcaManager.topUpFromInterest(token, scheduleIndex, scheduleId, amount)` credits the caller's accrued
 lending interest to one schedule's `tokenBalance`, so yield buys rBTC without a withdraw-then-deposit round
 trip - which also avoids Sovryn's SIP-0094 exit fee, since nothing is redeemed. `DcaManager`-only: no handler
 call, no token movement, no redeem-then-remint. The credited figure is the same expression the interest
@@ -695,6 +695,68 @@ Ask: whether the R48 deposit pause blocks a top-up (recommend yes - a pause mean
 that route, whatever the funds' source); naming (`topUpFromInterest`, because "compound" collides with Compound
 the lending protocol that Tropykus forks - the same collision class R26 fixed for "lending token"); and
 all-or-part (recommend all, no `amount` parameter).
+
+Answered 2026-09-02, two of three against the spec's recommendation. The pause does **not** block a top-up
+(`_handler`, not `_handlerForDeposit`): R48's pause stops users putting new funds into a route, and interest
+already sitting in that route's position is not new funds, so crediting it changes no balance the pause was
+protecting. The recommendation had read the pause as "stop growing DCA exposure", which is broader than what
+R48 shipped. The name is `topUpFromInterest`. And **all-or-part went the other way** - the function takes an
+`amount`, because one pot of route interest feeding two schedules is wanted and reaching it by crediting one
+schedule then withdrawing the difference pays the exit fee the feature exists to avoid. `amount` is bounded
+above by the accrued figure and below by having to raise the balance past its **next whole purchase**, so
+interest cannot be moved across in dust while a schedule holding 10.5 purchases needs only half a purchase
+amount. A flat `amount >= purchaseAmount` floor was rejected in the same exchange: it strands interest smaller
+than one purchase.
+
+Shipped with that shape. `DcaManager` 13,767 -> 14,542 B (margin 10,809 -> 10,034), +775 rather than the
+probe's +600: the `amount` parameter, its two bounded-credit errors, and the purchase-boundary comparison are
+all new since `7dd00fb`. No handler's funds movement or share math changed, and the path moves no cash - the
+suite asserts that on the user's share balance and on the absence of any stablecoin log, which no redemption
+or transfer could avoid.
+
+One thing the spec put out of scope is taken anyway, and the shape it landed in is the second one tried. R54
+turns the accrued figure from something a user reads into something a user spends against, so the bound must
+be taken at the rate a write path would get: on a lazily accruing market - only the legacy Tropykus adapter,
+which overrides `_exchangeRate` with `exchangeRateCurrent()` - the stored rate is stale, and a year of
+interest reads as exactly zero until someone pokes the market. The first attempt pointed `getAccruedInterest`
+at `_exchangeRate()` and let the mutability propagate, which dropped `view` from `DcaManager.getInterestAccrued`
+too. That is not additive: same selector and same return, and `eth_call` still reads it free, but a regenerated
+ABI marks it non-constant, so generated clients route it through write bindings - in ethers v6 a plain call to
+a non-view function *sends a transaction*, turning a balance display into a wallet prompt. The audit's second
+pass rejected the trade on the ground that `_exchangeRate` is overridden by exactly one adapter, and that
+adapter is on neither production map: for Idle, LayerBank, and Sovryn the base `_exchangeRate()` is literally
+`return _viewExchangeRate();`, so the whole cost landed on the user-facing getter to buy behaviour no
+deployable route can observe.
+
+Split instead, since the two readers are two different jobs. `ITokenLending.getAccruedInterest` stays non-view
+and is the **spendable ceiling** the top-up bounds on; it is `onlyDcaManager`, so its mutability never reaches
+a generated client. A new `ITokenLending.quoteAccruedInterest` is the **display quote**, reads
+`_viewExchangeRate()`, and keeps `DcaManager.getInterestAccrued` a `view`. Both call one private helper that
+takes the rate as an argument, so the only difference between them is which rate goes in. The pair is safe
+because the gap has a direction: a stored rate only ever trails a current one, so the quote is at most equal
+to the ceiling and never above it. A caller passing the displayed number therefore never breaches the upper
+bound, though the independent purchase-boundary minimum can still reject it; the worst a stale quote costs
+against the ceiling is a slice left for the next call. `ITokenLending` gains a function, so its ERC-165
+id changes; handlers and `OperationsAdmin` compute it from the same source and ship together, so the lending
+gate in `assignTokenHandler` is unaffected.
+
+That split is what put `DcaManager` 23 B *below* the non-view attempt and within 1 B of the shape before it
+(14,541 -> 14,542): a `view` external call compiles to `staticcall`. The cost lands on the lending handlers
+instead, where there is room - Sovryn/LayerBank Dex +136 B each (margins 8,961 and 8,748), the MoC leaves
++147 and +162, the Tropykus Dex leaf +229 because its two rate paths genuinely differ. `IdleDocHandlerMoc` is
+byte-identical: it is not a lending handler.
+
+The stateful invariant actor **is** extended with the top-up, and a coverage guard
+(`test_invariantHandlerTopsUpFromInterest`) lands one deterministic credit, because almost every fuzzed attempt
+is discarded and `Handler` swallows the rest. It is the only action that raises principal with no matching
+deposit, so it is what stresses `invariant_totalDepositedTokensMatchesLendingProtocol` and its 100-wei
+tolerance; 64x512 passes with zero reverts. Noted, not fixed here: `invariant_interestOnlyIncreases` asserts
+`assertGe(uint256, 0)` and so encodes nothing at all.
+
+Cutover: [front-end#22](https://github.com/BitChillRSK/front-end/issues/22#issuecomment-5512733974),
+[bitchill-monitoring#10](https://github.com/BitChillRSK/bitchill-monitoring/issues/10#issuecomment-5512737902),
+[data-api#9](https://github.com/BitChillRSK/data-api/issues/9#issuecomment-5512738181), and
+`metrics-dashboard`; `swapper-bot` needs none.
 
 ### R55 - evaluate solx and the IR pipeline ([spec](./R55-solx-and-ir-evaluation.md), unassigned, gated on #104)
 

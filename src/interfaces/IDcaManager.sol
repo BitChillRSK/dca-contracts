@@ -92,6 +92,13 @@ interface IDcaManager {
     /// @dev Filterable by user and scheduleId only, matching PurchaseAmountUpdated / PurchasePeriodUpdated.
     ///      Token is recovered by joining on scheduleId; it is not a third topic.
     event DcaManager__SchedulePauseSet(address indexed user, uint64 indexed scheduleId, bool paused);
+    /// @notice Accrued lending interest was credited to one schedule's spendable balance.
+    /// @dev No tokens move: the position stays in the lending protocol and only this schedule's
+    ///      `tokenBalance` claim over it grows. `interest` is what was credited, which may be less
+    ///      than everything the caller had accrued on that route.
+    event DcaManager__ScheduleToppedUpFromInterest(
+        address indexed user, address indexed token, uint64 indexed scheduleId, uint256 interest
+    );
     /// @notice A schedule was deleted. `refundedAmount` is what left the handler, which may be less than
     ///         the schedule's `tokenBalance` if the lending protocol haircut the redemption.
     event DcaManager__DcaScheduleDeleted(
@@ -162,6 +169,12 @@ interface IDcaManager {
     /// @notice A named schedule is purchase-paused. That reverts `batchBuyRbtc`, and if the row is
     ///         in `batchBuyRbtcAcrossHandlers`, every handler in the bundle.
     error DcaManager__SchedulePaused(address user, address token, uint64 scheduleId, uint256 scheduleIndex);
+    /// @notice The caller has accrued no interest on this schedule's route, so there is nothing to credit.
+    error DcaManager__NoInterestToTopUpWith(address token, uint256 routeIndex);
+    /// @notice The requested top-up is more interest than the caller has accrued on this route.
+    error DcaManager__TopUpExceedsAccruedInterest(address token, uint256 routeIndex, uint256 amount, uint256 accruedInterest);
+    /// @notice The requested top-up would not raise the schedule's balance past another whole purchase.
+    error DcaManager__TopUpDoesNotFundAnotherPurchase(address token, uint64 scheduleId, uint256 amount);
 
     /*//////////////////////////////////////////////////////////////
                                FUNCTIONS
@@ -313,6 +326,32 @@ interface IDcaManager {
     ) external;
 
     /**
+     * @notice Credit lending interest the caller has accrued to one schedule's spendable balance.
+     * @param token The stablecoin of the schedule.
+     * @param scheduleIndex Index of the schedule in the caller's array for `token`.
+     * @param scheduleId Id of that schedule, checked against storage.
+     * @param amount Interest to credit, at most the spendable accrued-interest ceiling computed at
+     *        the market's current rate. `getInterestAccrued` can quote less on a lazily-accruing market.
+     * @dev Interest accrues per user, token, and route rather than per schedule, so the caller
+     *      chooses which of their schedules on that route receives it, and may split it across
+     *      several by calling this more than once. Nothing is redeemed or transferred: the funds
+     *      already sit in the lending protocol, and this only raises the schedule's claim over
+     *      them, which is why it pays no redemption fee. The credit must be large enough to fund
+     *      at least one more purchase than the schedule could already afford, so interest cannot
+     *      be swept over in dust. The ceiling is the interest read at the market's current rate,
+     *      which can exceed the `getInterestAccrued` quote on a market that accrues lazily; passing
+     *      the quoted figure therefore never exceeds the ceiling, but it can still fail the minimum
+     *      purchase-boundary check above. A route with deposits paused still
+     *      accepts a top-up: that pause stops new funds entering the route, and this credits funds
+     *      already in it. Reverts
+     *      `DcaManager__TokenDoesNotYieldInterest` on an idle route,
+     *      `DcaManager__NoInterestToTopUpWith` when nothing has accrued,
+     *      `DcaManager__TopUpExceedsAccruedInterest` when `amount` is more than has accrued, and
+     *      `DcaManager__TopUpDoesNotFundAnotherPurchase` when the credit is too small.
+     */
+    function topUpFromInterest(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 amount) external;
+
+    /**
      * @notice Withdraw all rBTC the caller has accumulated on one token×route handler.
      * @param token The stablecoin whose handler holds the rBTC.
      * @param routeIndex The route whose handler holds the rBTC.
@@ -387,6 +426,9 @@ interface IDcaManager {
      * @param token Stablecoin of the route.
      * @param routeIndex Route to query. Reverts if the route is not lending.
      * @return Accrued interest in stablecoin units.
+     * @dev A quote, read at the market's rate as a plain read. On a market that accrues lazily this
+     *      can trail the spendable ceiling, never exceed it. This guarantees the quote satisfies the
+     *      upper bound; `topUpFromInterest` still requires it to cross the next purchase boundary.
      */
     function getInterestAccrued(address user, address token, uint256 routeIndex)
         external

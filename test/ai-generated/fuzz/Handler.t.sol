@@ -78,6 +78,11 @@ contract Handler is Test {
     uint256 public buyRbtcSuccesses;
     uint256 public pauseCalls;
     uint256 public pauseAttemptsOnLiveSchedule;
+    /// @dev Attempts and wins for the interest top-up. Most attempts are discarded (no schedule, no
+    ///      accrued interest yet, or a credit too small to fund another purchase), so a run that
+    ///      never landed one would leave the reconciliation invariants untouched by this path.
+    uint256 public topUpFromInterestCalls;
+    uint256 public topUpFromInterestSuccesses;
     
     /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR
@@ -607,6 +612,40 @@ contract Handler is Test {
         vm.stopPrank();
     }
     
+    /**
+     * @notice Credit part of a user's accrued lending interest to one of their schedules.
+     * @dev Moves no cash, so it is the one action that raises principal without a matching deposit.
+     *      Interleaved with withdrawals and purchases it is the sequence most likely to push the
+     *      deposited-vs-lending reconciliation off, which is what `fail_on_revert = false` fuzzing
+     *      over tens of thousands of calls is for.
+     */
+    function topUpFromInterest(uint256 userSeed, uint256 scheduleIndex, uint256 amountSeed) external {
+        address user = s_users[userSeed % s_users.length];
+        topUpFromInterestCalls++;
+
+        IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
+        if (schedules.length == 0) return;
+        scheduleIndex = bound(scheduleIndex, 0, schedules.length - 1);
+
+        // Non-lending routes revert this getter rather than returning zero.
+        uint256 accruedInterest;
+        try dcaManager.getInterestAccrued(user, address(stablecoin), routeIndex) returns (uint256 accrued) {
+            accruedInterest = accrued;
+        } catch {
+            return;
+        }
+        if (accruedInterest == 0) return;
+
+        vm.prank(user);
+        try dcaManager.topUpFromInterest(
+            address(stablecoin), scheduleIndex, schedules[scheduleIndex].scheduleId, bound(amountSeed, 1, accruedInterest)
+        ) {
+            topUpFromInterestSuccesses++;
+        } catch {
+            // A credit too small to fund another purchase, or a route with no handler.
+        }
+    }
+
     /**
      * @notice Withdraw all accumulated interest for a token
      */

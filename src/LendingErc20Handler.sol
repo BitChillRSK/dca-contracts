@@ -120,21 +120,45 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
      */
     function getAccruedInterest(address user, uint256 stablecoinLockedInDcaSchedules)
         external
+        override
+        onlyDcaManager
+        returns (uint256)
+    {
+        return _accruedInterest(user, stablecoinLockedInDcaSchedules, _exchangeRate());
+    }
+
+    /**
+     * @inheritdoc ITokenLending
+     */
+    function quoteAccruedInterest(address user, uint256 stablecoinLockedInDcaSchedules)
+        external
         view
         override
         onlyDcaManager
-        returns (uint256 stablecoinInterestAmount)
+        returns (uint256)
     {
-        uint256 totalStablecoinInLending = _sharesToStablecoin(s_shares[user], _viewExchangeRate());
-        stablecoinInterestAmount =
-            totalStablecoinInLending > stablecoinLockedInDcaSchedules
-                ? totalStablecoinInLending - stablecoinLockedInDcaSchedules
-                : 0;
+        return _accruedInterest(user, stablecoinLockedInDcaSchedules, _viewExchangeRate());
     }
 
     /*//////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @dev Share-backed stablecoin above locked principal at `exchangeRate`, or zero. The two public
+     *      readers differ only in which rate they pass: the quote uses the market's plain read, the
+     *      spendable figure the rate a write path would get.
+     */
+    function _accruedInterest(address user, uint256 stablecoinLockedInDcaSchedules, uint256 exchangeRate)
+        private
+        view
+        returns (uint256)
+    {
+        uint256 totalStablecoinInLending = _sharesToStablecoin(s_shares[user], exchangeRate);
+        return totalStablecoinInLending > stablecoinLockedInDcaSchedules
+            ? totalStablecoinInLending - stablecoinLockedInDcaSchedules
+            : 0;
+    }
 
     /**
      * @dev The stablecoin this handler lends out.
@@ -224,7 +248,8 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
     }
 
     /**
-     * @dev Mutating-ok exchange rate used on write paths. Defaults to the view rate.
+     * @dev Mutating-ok exchange rate used on write paths and by `getAccruedInterest`, which reports
+     *      a figure a caller may then spend against. Defaults to the view rate.
      *      Override when the live call mutates (Compound `exchangeRateCurrent()` vs
      *      `exchangeRateStored()`). A new adapter that needs an accrual poke compiles
      *      against this default and uses a stale view rate until it overrides.
@@ -234,7 +259,8 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
     }
 
     /**
-     * @dev View exchange rate used by `getAccruedInterest`.
+     * @dev The market's exchange rate as a plain read. Adapters implement this one; callers use
+     *      `_exchangeRate`, which equals it unless the market must be poked to accrue first.
      */
     function _viewExchangeRate() internal view virtual returns (uint256);
 
