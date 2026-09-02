@@ -264,27 +264,17 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
 
     /**
      * @dev Swap net stablecoin for WRBTC and return the handler's WRBTC-balance delta.
+     *      The router's return value is treated as success/failure only; the measured WRBTC
+     *      balance delta is the amount we can credit. `amountOutMinimum` still bounds the swap.
      */
-    function _purchaseRbtc(uint256 stablecoinAmount) internal override returns (uint256) {
-        return _swapStablecoinForWrbtc(stablecoinAmount);
-    }
+    function _purchaseRbtc(uint256 stablecoinAmount) internal override returns (uint256 amountOut) {
+        TransferHelper.safeApprove(address(_purchaseToken()), address(i_swapRouter02), stablecoinAmount);
 
-    /**
-     * @param stablecoinAmountToSpend the amount of stablecoin to swap for rBTC
-     * @return amountOut the amount of WRBTC this contract actually received
-     * @dev The router's return value is treated as success/failure only; the measured WRBTC balance delta is
-     * the amount we can credit. amountOutMinimum still bounds the swap.
-     */
-    function _swapStablecoinForWrbtc(uint256 stablecoinAmountToSpend) internal returns (uint256 amountOut) {
-        // Approve the router to spend stablecoin.
-        TransferHelper.safeApprove(address(_purchaseToken()), address(i_swapRouter02), stablecoinAmountToSpend);
-
-        // Set up the swap parameters
         IV3SwapRouter.ExactInputParams memory params = IV3SwapRouter.ExactInputParams({
             path: s_swapPath,
             recipient: address(this),
-            amountIn: stablecoinAmountToSpend,
-            amountOutMinimum: _getAmountOutMinimum(stablecoinAmountToSpend)
+            amountIn: stablecoinAmount,
+            amountOutMinimum: _getAmountOutMinimum(stablecoinAmount)
         });
 
         uint256 wrBtcBalanceBefore = i_wrBtcToken.balanceOf(address(this));
@@ -306,7 +296,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      * derives from `block.timestamp` while executing is satisfied by construction. Only a deadline supplied by
      * the caller bounds anything, and that means a `batchBuyRbtc` argument, not a handler change.
      * @dev This is a revert bound, not an accounting input: what the handler credits is the measured WRBTC
-     * balance delta in `_swapStablecoinForWrbtc`.
+     *      balance delta in `_purchaseRbtc`.
      */
     function _getAmountOutMinimum(uint256 stablecoinAmountToSpend) internal view returns (uint256 minimumRbtcAmount) {
         (uint256 currentPrice, bool isValid, ) = s_mocOracle.getPriceInfo();

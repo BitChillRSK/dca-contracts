@@ -233,8 +233,8 @@ REAL_DEPLOYMENT=true forge script script/DeployOptimizerProof.s.sol:DeployOptimi
 
 GitHub [#104](https://github.com/BitChillRSK/dca-contracts/pull/104). Default-profile runtime
 (`optimizer = true`, `optimizer_runs = 200`, `via_ir = false`; EIP-170 24,576): `OperationsAdmin`
-3,227 (margin 21,349); `LayerBankErc20HandlerDex` 15,602 (8,974); `SovrynErc20HandlerDex` 15,389
-(9,187); `TropykusErc20HandlerDex` 15,533 (9,043); `DcaManager` 13,767 (10,809). Config gas on Anvil
+3,227 (margin 21,349); `LayerBankErc20HandlerDex` 15,592 (8,984); `SovrynErc20HandlerDex` 15,379
+(9,197); `TropykusErc20HandlerDex` 15,523 (9,053); `DcaManager` 13,767 (10,809). Config gas on Anvil
 USDRIF dex-layerbank: allow ~41k, activate ~35k, revoke ~16k.
 
 ## ABI / deploy / cutover impact
