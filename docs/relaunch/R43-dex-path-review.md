@@ -139,6 +139,10 @@ swap math, so widening slippage tolerance costs two owner transactions — lower
 With the owner a Safe (R45) that speed bump is worth its 32 bytes of storage; deleting it would also break the
 `getAmountOutMinimumSafetyCheck` / `setAmountOutMinimumSafetyCheck` surface for no behavioral gain.
 
+**Superseded 2026-09-02 by [R56](./R56-dex-oracle-floor-is-safety-check.md).** The 99.5% percent is the
+operational number the Safe cannot change on a quote, which is the wrong operator. R56 puts the safety
+check into swap math as the loss ceiling and deletes the percent from the hot path and ABI.
+
 **5. Path encoding.** Unchanged. `_setPurchasePath` pins hop 0 to `_purchaseToken()` and the last hop to
 `i_wrBtcToken`; only the intermediates and fee tiers are owner-set, and a wrong tier reverts rather than
 mis-settles, because cash is the measured WRBTC delta and the floor still applies. The live USDRIF path is

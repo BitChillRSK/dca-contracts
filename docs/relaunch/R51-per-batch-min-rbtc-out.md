@@ -241,6 +241,8 @@ cross-link an `rsk-uniswap-pools` issue if that repository will supply the reusa
 - [ ] Changing `_getAmountOutMinimum`, the $1 peg, oracle, safety floor, or deploy defaults in PR 103. The
   relaunch runbook may use the existing owner setter once to install the approved per-handler backstop; the bot
   never changes it and routine failures never trigger automatic lowering.
+  **Follow-up:** that floor/percent split is [R56](./R56-dex-oracle-floor-is-safety-check.md) (queued in #105),
+  not a 103 amendment.
 - [ ] An on-chain Uniswap quoter, TWAP, private-relay dependency, or caller-supplied path.
 - [ ] A mandatory nonzero minimum, deadline, or MoC quote formula.
 - [ ] Changing across-handler atomicity, fee math, redemption/clamp policy, or purchase allocation rounding.

@@ -13,9 +13,9 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  * @notice Shared rBTC purchase pipeline, accumulated-balance accounting, and signer withdrawals.
  */
 abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessControl, StablecoinSource {
-    //////////////////////
-    // State variables ///
-    //////////////////////
+    /*//////////////////////////////////////////////////////////////
+                            STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
     mapping(address user => uint256 amount) internal s_usersAccumulatedRbtc;
 
     /**

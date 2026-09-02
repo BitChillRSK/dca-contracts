@@ -111,6 +111,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R51 | 50 (planned GitHub #103) | none (first fork table in PR; durable live floor is a relaunch gate) |
 | R52 | 51 ([#104](https://github.com/BitChillRSK/dca-contracts/pull/104)) | none (same production Safe; divergent owners keep naturally split authority) |
 | R51 deploy follow-up | unassigned | none (enforce the DOC-Dex never-deploy rule in `DeployDexSwaps`) |
+| R56 | unassigned (after #104; spec in [#105](https://github.com/BitChillRSK/dca-contracts/pull/105)) | none (oracle floor = safety check; bot `minRbtcOut` is operational) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -587,7 +588,21 @@ in this PR (`script/DeployOptimizerProof.s.sol`). **Passed (2026-09-01)** — CR
 [0x3a63dc…](https://rootstock-testnet.blockscout.com/tx/0x3a63dc2458142cca09144a3f290ed6d996780c616acb8adbdf15f57f736ff5bc)
 verified at [`0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD`](https://rootstock-testnet.blockscout.com/address/0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD).
 Do not treat R53 as still owning the optimizer baseline — that work is absorbed here.
-Remaining R54/R55 items live in stacked [#105](https://github.com/BitChillRSK/dca-contracts/pull/105).
+Remaining R54/R55/R56 items live in stacked [#105](https://github.com/BitChillRSK/dca-contracts/pull/105).
+
+### R56 - Dex oracle floor is the safety check ([spec](./R56-dex-oracle-floor-is-safety-check.md), unassigned, gated on #103 and #104)
+
+R51 follow-up that PR 103 correctly left out of scope. `s_amountOutMinimumPercent` (99.5%) is still the
+Uniswap `amountOutMinimum` today, so the Safe is the only party that can add margin after a quote. Move
+the on-chain oracle floor to `s_amountOutMinimumSafetyCheck` (95%), delete the 99.5% storage percent from
+swap math and from the handler ABI, and pass `max(oracleFloor, minRbtcOut)` into `ExactInputParams`.
+`PurchaseRbtc` still checks measured output. The two-action R43 speed bump goes away: changing the
+backstop is one owner transaction. Production Dex still sends a nonzero quote-derived `minRbtcOut`.
+
+Ask: none.
+
+**Supersedes** the R51 cutover that installed 99.5% then re-locked the safety check to the same value, and
+R43's "safety check is config-only / never enters swap math".
 
 **Superseded 2026-09-01.** The earlier plan put the allowlist on `OperationsAdmin` because a prototype with
 policy on the Dex leaf exceeded EIP-170. That budget was *unoptimized*. With `optimizer = true` the leaf has

@@ -16,9 +16,9 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  *      of clamping, because PurchaseRbtc splits rBTC by the original planned weights.
  */
 abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, StablecoinSource {
-    //////////////////////
-    // State variables ///
-    //////////////////////
+    /*//////////////////////////////////////////////////////////////
+                            STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
     mapping(address user => uint256 balance) internal s_idleBalances;
 
     /**

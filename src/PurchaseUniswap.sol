@@ -27,9 +27,10 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     using SafeCast for uint256;
 
-    //////////////////////
-    // State variables ///
-    //////////////////////
+    /*//////////////////////////////////////////////////////////////
+                            STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
+
     /// @notice Wrapped rBTC token this route swaps into and unwraps on withdraw.
     /// @return The constructor-supplied WRBTC.
     IWRBTC public immutable i_wrBtcToken;
