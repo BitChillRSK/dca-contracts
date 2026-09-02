@@ -590,6 +590,11 @@ verified at [`0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD`](https://rootstock-tes
 Do not treat R53 as still owning the optimizer baseline — that work is absorbed here.
 Remaining R54/R55/R56 items live in stacked [#105](https://github.com/BitChillRSK/dca-contracts/pull/105).
 
+**Superseded 2026-09-01.** The earlier plan put the allowlist on `OperationsAdmin` because a prototype with
+policy on the Dex leaf exceeded EIP-170. That budget was *unoptimized*. With `optimizer = true` the leaf has
+~9 KB of margin, and #104 accordingly moved policy back onto `PurchaseUniswap`, where per-handler storage also
+makes cross-handler misuse impossible. Do not reuse the bytecode argument for a centralized registry.
+
 ### R56 - Dex oracle floor is the safety check ([spec](./R56-dex-oracle-floor-is-safety-check.md), unassigned, gated on #103 and #104)
 
 R51 follow-up that PR 103 correctly left out of scope. `s_amountOutMinimumPercent` (99.5%) is still the
@@ -603,11 +608,6 @@ Ask: none.
 
 **Supersedes** the R51 cutover that installed 99.5% then re-locked the safety check to the same value, and
 R43's "safety check is config-only / never enters swap math".
-
-**Superseded 2026-09-01.** The earlier plan put the allowlist on `OperationsAdmin` because a prototype with
-policy on the Dex leaf exceeded EIP-170. That budget was *unoptimized*. With `optimizer = true` the leaf has
-~9 KB of margin, and #104 accordingly moved policy back onto `PurchaseUniswap`, where per-handler storage also
-makes cross-handler misuse impossible. Do not reuse the bytecode argument for a centralized registry.
 
 ### R53 - re-baseline the recorded sizes and gas ([spec](./R53-optimizer-baseline.md), unassigned)
 
