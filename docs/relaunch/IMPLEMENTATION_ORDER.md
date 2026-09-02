@@ -117,7 +117,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R58 | 54 ([#108](https://github.com/BitChillRSK/dca-contracts/pull/108)) | none (test-only constant split; no deploy or `src/` change) |
 | R53 | 55 ([#109](https://github.com/BitChillRSK/dca-contracts/pull/109)) | none (documentation-only optimized baseline) |
 | R54 | 56 ([#110](https://github.com/BitChillRSK/dca-contracts/pull/110)) | answered (amount; top-up ignores deposit pause; `topUpFromInterest`) |
-| R59 | 57 (planned) | none (fail closed on incomplete Uniswap input; gas and size ceilings are fixed) |
+| R59 | 57 ([#112](https://github.com/BitChillRSK/dca-contracts/pull/112)) | none (fail closed on incomplete Uniswap input; gas and size ceilings are fixed) |
 | R55 | 58 (planned) | none (measure and recommend; no compiler adoption) |
 
 ### PR 1 - R23 toolchain and dependency baseline
@@ -766,7 +766,7 @@ Cutover: [front-end#22](https://github.com/BitChillRSK/front-end/issues/22#issue
 [data-api#9](https://github.com/BitChillRSK/data-api/issues/9#issuecomment-5512738181), and
 `metrics-dashboard`; `swapper-bot` needs none.
 
-### R59 - enforce complete Uniswap input consumption ([spec](./R59-uniswap-exact-consumption.md), unassigned, before R55)
+### R59 - enforce complete Uniswap input consumption ([spec](./R59-uniswap-exact-consumption.md), PR 57, [#112](https://github.com/BitChillRSK/dca-contracts/pull/112))
 
 Fail closed when SwapRouter02 does not consume the full stablecoin input or leaves a new
 intermediate-token balance in the router. Uniswap V3 `exactInput` can stop at a pool's terminal price
@@ -787,7 +787,30 @@ against the implementation PR's base under the `#104` pin (`optimizer = true`, `
 measure-and-recommend only and does not change settings, so a later adoption PR (if any) re-measures
 these ceilings. Ask: none.
 
-### R55 - evaluate solx and the IR pipeline ([spec](./R55-solx-and-ir-evaluation.md), unassigned, after R59, gated on #104)
+Shipped as specified, with one deviation from the spec's suggested code shape — and that deviation is
+what clears the spec's own ceilings. Written as sketched, the change is **+1,163 B** per Dex leaf, 363
+over the 800-byte gate. Ablation against that shape: the input-spent check is 298 B, the memory→storage
+array copy in `_setPurchasePath` 158 B, and the two purchase-time loops plus the second error 593 B.
+Most of that 593 is six inline copies of one `balanceOf` encode/staticcall/decode, so the purchase's six
+balance reads now share a private `_balanceOf(address,address)`: 508 B cheaper, one JUMP per read, and
+nothing the spec fixes — the observable checks, the per-token comparison against its own pre-swap value,
+and both errors' data — moves. Measured `7b18781` → `614cdf7` under the #104 pin: **+655 B** on each Dex
+leaf (LayerBank 16,483 / margin 8,093; Sovryn 16,270 / 8,306; Tropykus 16,414 / 8,162), with
+`DcaManager`, `OperationsAdmin` and `IdleDocHandlerMoc` byte-identical, and **+4,891 gas** direct /
+**+14,135 gas** through one intermediate on `testSinglePurchase` — the all-cold length-1 batch, so the
+worst case for a once-per-batch check — against ceilings of 8,000 and 15,000. Also measured and
+rejected: indexing `s_swapIntermediateTokens` from storage in both loops instead of caching it in memory
+saves a further 44 B and 45 gas on the multihop path but costs 226 gas on the direct path, which is a
+live route.
+
+One file beyond the spec's list, for a reason the spec could not have known: `script/DexHelperConfig.s.sol`
+gave the Anvil dex config `makeAddr("rUSDT")` as its intermediate token. The purchase now reads that
+token's `balanceOf` on the router, and a high-level call to a codeless address reverts, so every mock
+multihop lane would have failed; it deploys a real `MockStablecoin` for that slot instead. No
+live-network branch, constructor argument, or broadcast changes. The second extra file,
+`test/unit/DexPathFailoverTest.t.sol`, is where the spec itself asked the path-activation case to live.
+
+### R55 - evaluate solx and the IR pipeline ([spec](./R55-solx-and-ir-evaluation.md), unassigned, after R59 [#112](https://github.com/BitChillRSK/dca-contracts/pull/112), gated on #104)
 
 Measure and recommend; change no compiler setting. Compare stock solc no-IR, stock solc `via_ir`, and solx on
 runtime size, hot-path gas, whether the full matrix passes, and whether Blockscout can verify the result on
