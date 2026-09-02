@@ -12,7 +12,10 @@ import {SovrynErc20HandlerDex} from "src/sovryn/SovrynErc20HandlerDex.sol";
 import {MockIsusdToken} from "test/mocks/MockIsusdToken.sol";
 import {BitChillOwnable} from "src/BitChillOwnable.sol";
 import {ownableUnauthorized} from "../utils/OzRevert.sol";
+import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
+import {MockSwapRouter02} from "test/mocks/MockSwapRouter02.sol";
 import {Vm} from "forge-std/Vm.sol";
+import "../Constants.sol";
 
 /**
  * @notice Allowlisted Dex path activation. `setUp` skips MoC lanes so they do not report empty PASSes.
@@ -249,6 +252,49 @@ contract DexPathFailoverTest is DcaDappTest {
         );
         vm.prank(OWNER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePathAllowed(mids, fees, true);
+    }
+
+    /**
+     * @notice Activation swaps the path bytes and the intermediate tokens the purchase checks together.
+     * @dev Local only: it drives the mock router into a later-hop partial fill, which live pools decide
+     *      for themselves. Stale metadata would show up here as a purchase that checks the constructor's
+     *      tokens after the swapper failed over to a different route.
+     */
+    function testActivationSwitchesTheCheckedIntermediateTokens() public {
+        if (block.chainid != ANVIL_CHAIN_ID) vm.skip(true);
+
+        MockStablecoin newIntermediate = new MockStablecoin(address(this));
+        address[] memory mids = new address[](1);
+        mids[0] = address(newIntermediate);
+        uint24[] memory fees = new uint24[](2);
+        fees[0] = 500;
+        fees[1] = 3000;
+        _allow(mids, fees, true);
+        vm.prank(SWAPPER);
+        IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(mids, fees);
+
+        // The activated path's token is the one a stranded balance is now measured against.
+        uint256 stranded = 1 ether;
+        MockSwapRouter02 router = MockSwapRouter02(dexHelperConfig.getActiveNetworkConfig().swapRouter02Address);
+        router.setStrandedIntermediate(address(newIntermediate), stranded);
+        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPurchaseUniswap.PurchaseUniswap__IntermediateTokenBalanceChanged.selector,
+                address(newIntermediate),
+                0,
+                stranded
+            )
+        );
+        buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
+
+        // Back on the constructor path, that same token is no longer part of the active route, so the
+        // identical router behavior is none of this purchase's business.
+        (address[] memory ctorMids, uint24[] memory ctorFees) = _constructorComponents();
+        vm.prank(SWAPPER);
+        IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(ctorMids, ctorFees);
+        buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
+        assertEq(newIntermediate.balanceOf(address(router)), stranded);
     }
 
     function testPathPolicyConfigurationGas() public {

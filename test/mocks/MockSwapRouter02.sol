@@ -2,6 +2,7 @@
 pragma solidity 0.8.36;
 
 import {MockWrbtcToken} from "./MockWrbtcToken.sol";
+import {MockStablecoin} from "./MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // Minimal mock interface for Uniswap V3 SwapRouter
@@ -18,12 +19,27 @@ interface IV3SwapRouter {
 
 // Mock implementation of SwapRouter02 (V3 Router)
 contract MockSwapRouter02 is IV3SwapRouter {
+    /// @dev 1e18-scaled fractions, so `FULL_FILL` is "the pools took everything and paid for all of it".
+    uint256 private constant FULL_FILL = 1 ether;
+
     MockWrbtcToken s_mockWrbtcToken;
     uint256 private s_outputTokenPrice;
+    /// @dev Fraction of `amountIn` the pools actually pull. Below `FULL_FILL` this is a V3 partial fill:
+    /// a pool hit its price limit before the input ran out, so the remainder stays with the caller.
+    uint256 private s_inputConsumedPercent;
+    /// @dev Fraction of `amountIn` the output is priced on. Separate from the input fraction because a
+    /// later hop can stop short while the first hop still took the whole requested input.
+    uint256 private s_outputFillPercent;
+    /// @dev Intermediate token this router keeps after the swap, standing in for the unswapped input a
+    /// hop that stopped short leaves in the real (shared, public) SwapRouter02.
+    address private s_strandedIntermediateToken;
+    uint256 private s_strandedIntermediateAmount;
 
     constructor(MockWrbtcToken mockWrbtcToken, uint256 _outputTokenPrice) {
         s_mockWrbtcToken = mockWrbtcToken;
         s_outputTokenPrice = _outputTokenPrice;
+        s_inputConsumedPercent = FULL_FILL;
+        s_outputFillPercent = FULL_FILL;
     }
 
     // Mock function to simulate exactInput swap
@@ -31,13 +47,21 @@ contract MockSwapRouter02 is IV3SwapRouter {
         require(params.amountIn > 0, "AmountIn must be greater than zero");
         require(params.path.length >= 20, "Path too short");
 
-        amountOut = (params.amountIn * 997) / (1000 * s_outputTokenPrice);
+        uint256 amountConsumed = (params.amountIn * s_inputConsumedPercent) / FULL_FILL;
+        amountOut = (((params.amountIn * s_outputFillPercent) / FULL_FILL) * 997) / (1000 * s_outputTokenPrice);
 
         require(params.amountOutMinimum <= amountOut, "Insufficient output amount");
 
-        // Pull the input token like a real router (path starts with tokenIn)
+        // Pull the input token like a real router (path starts with tokenIn). A partial fill pulls
+        // only what the pools took, which is exactly the case the handler has to notice.
         address tokenIn = address(uint160(bytes20(params.path[:20])));
-        require(IERC20(tokenIn).transferFrom(msg.sender, address(this), params.amountIn), "transferFrom failed");
+        require(IERC20(tokenIn).transferFrom(msg.sender, address(this), amountConsumed), "transferFrom failed");
+
+        // Minted rather than swapped in: what the handler checks is that this router's balance of the
+        // intermediate token moved, not where the tokens came from.
+        if (s_strandedIntermediateAmount > 0) {
+            MockStablecoin(s_strandedIntermediateToken).mint(address(this), s_strandedIntermediateAmount);
+        }
 
         // To simulate the handler receiving WRBTC when exactInput is called, deposit rBTC in the WRBTC contract
         // msg.sender is the handler
@@ -49,5 +73,23 @@ contract MockSwapRouter02 is IV3SwapRouter {
     // Allow changing the price of the output token for testing purposes
     function setFixedAmountOut(uint256 _newPrice) external {
         s_outputTokenPrice = _newPrice;
+    }
+
+    /// @notice Take only `inputConsumedPercent` of the requested input, as a V3 pool that runs out of
+    ///         reachable liquidity does. 1e18 is a complete fill.
+    function setInputConsumedPercent(uint256 inputConsumedPercent) external {
+        s_inputConsumedPercent = inputConsumedPercent;
+    }
+
+    /// @notice Price the output on `outputFillPercent` of the requested input, so a short fill can still
+    ///         clear a loose `amountOutMinimum`. 1e18 is a complete fill.
+    function setOutputFillPercent(uint256 outputFillPercent) external {
+        s_outputFillPercent = outputFillPercent;
+    }
+
+    /// @notice Keep `amount` of `token` in this router after the swap, as a hop that stopped short would.
+    function setStrandedIntermediate(address token, uint256 amount) external {
+        s_strandedIntermediateToken = token;
+        s_strandedIntermediateAmount = amount;
     }
 }

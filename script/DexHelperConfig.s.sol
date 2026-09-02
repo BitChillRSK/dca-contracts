@@ -48,6 +48,7 @@ contract DexHelperConfig is Script {
 
     event HelperConfig__CreatedMockStablecoin(address stablecoinAddress, string symbol);
     event HelperConfig__CreatedMockShareToken(address shareTokenAddress, string protocol);
+    event HelperConfig__CreatedMockIntermediateToken(address intermediateTokenAddress);
     event HelperConfig__CreatedMockWrbtc(address wrbtcTokenAddress);
     event HelperConfig__CreatedMockSwapRouter02(address swapRouter02Address);
     event HelperConfig__CreatedMockMocOracle(address mocOracleAddress);
@@ -228,6 +229,9 @@ contract DexHelperConfig is Script {
 
         MockWrbtcToken mockWrbtcToken = new MockWrbtcToken();
         MockSwapRouter02 mockSwapRouter02 = new MockSwapRouter02(mockWrbtcToken, BTC_PRICE);
+        // The multihop lanes need a real ERC20 here, not a label: the purchase reads the router's balance of
+        // every intermediate token to prove no hop stopped short, and `balanceOf` on a codeless address reverts.
+        MockStablecoin mockIntermediateToken = new MockStablecoin(msg.sender);
         MockMocOracle mockMocOracle = new MockMocOracle();
         MockMocProxy mockMocProxy = new MockMocProxy(mockStablecoinAddress);
         
@@ -237,6 +241,7 @@ contract DexHelperConfig is Script {
         }
 
         emit HelperConfig__CreatedMockStablecoin(mockStablecoinAddress, stablecoinType);
+        emit HelperConfig__CreatedMockIntermediateToken(address(mockIntermediateToken));
         emit HelperConfig__CreatedMockWrbtc(address(mockWrbtcToken));
         emit HelperConfig__CreatedMockSwapRouter02(address(mockSwapRouter02));
         emit HelperConfig__CreatedMockMocOracle(address(mockMocOracle));
@@ -252,13 +257,13 @@ contract DexHelperConfig is Script {
             poolFeeRates[0] = 3000;
         } else if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING))) {
             intermediateTokens = new address[](1);
-            intermediateTokens[0] = makeAddr("rUSDT");
+            intermediateTokens[0] = address(mockIntermediateToken);
             poolFeeRates = new uint24[](2);
             poolFeeRates[0] = 500;
             poolFeeRates[1] = 3000;
         } else {
             intermediateTokens = new address[](1);
-            intermediateTokens[0] = makeAddr("rUSDT");
+            intermediateTokens[0] = address(mockIntermediateToken);
             poolFeeRates = new uint24[](2);
             poolFeeRates[0] = 500;
             poolFeeRates[1] = 500;
