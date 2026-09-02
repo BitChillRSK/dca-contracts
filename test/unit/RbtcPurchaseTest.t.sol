@@ -155,7 +155,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         assertApproxEqRel( // The mock contract that simulates swapping on Uniswap allows for some slippage
             IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER),
             (netPurchaseAmount / s_btcPrice) * numOfPurchases,
-            MAX_SLIPPAGE_PERCENT // Allow a maximum difference of 0.5% (on fork tests we saw this was necessary for both MoC and Uniswap purchases)
+            _maxPurchaseSlippage() // Allow a maximum difference of 0.5% (on fork tests we saw this was necessary for both MoC and Uniswap purchases)
         );
         // }
     }

@@ -196,7 +196,7 @@ contract StablecoinLendingTest is DcaDappTest {
                 shareToken.balanceOf(address(stablecoinHandler)),
                 AMOUNT_TO_DEPOSIT * 1e18 / startingExchangeRate - (AMOUNT_TO_SPEND * 1e18 / startingExchangeRate)
                     - (AMOUNT_TO_SPEND * 1e18 / exchangeRate),
-                MAX_SLIPPAGE_PERCENT // Allow a maximum difference of 0.5%
+                _maxPurchaseSlippage() // Allow a maximum difference of 0.5%
             );
         }
     }
