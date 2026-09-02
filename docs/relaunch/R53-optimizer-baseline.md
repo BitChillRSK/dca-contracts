@@ -53,9 +53,10 @@ The optimizer alone reclaims ~9.9 KB of runtime and 14–30% of purchase gas.
 This matters beyond the numbers: several shipped decisions were justified by bytecode scarcity that was an
 artifact of the measurement. The migration gate chose manual exit/re-entry partly because
 "`SovrynErc20HandlerDex` has 426 bytes of runtime margin"; R51's `_creditBuyers` discussion is a no-IR
-stack-too-deep argument. Those are re-judgements for their own PRs. This PR only fixes the record. (The
+stack-too-deep argument. R53 only fixes the record and lists them; it does not reopen them. (The
 R52 allowlist placement was the third such case and #104 already re-judged it, moving policy onto
-`PurchaseUniswap`.)
+`PurchaseUniswap`.) [#111](https://github.com/BitChillRSK/dca-contracts/pull/111) later closed the
+list: four shipped choices stand on their non-size merits, and the two rejected options stay rejected.
 
 ## Open product decisions
 
@@ -73,8 +74,9 @@ R52 allowlist placement was the third such case and #104 already re-judged it, m
       rewrite the history of why a shipped PR chose what it chose.
 - [x] Grep the docs for any remaining claim that the measurement basis is unoptimized, or that a contract
       is near EIP-170, and correct it.
-- [x] Flag, without acting on, every design decision whose stated justification was bytecode scarcity, so
-      each can be re-judged in its own PR.
+- [x] Flag, without acting on, every design decision whose stated justification was bytecode scarcity.
+      (Closed later in [#111](https://github.com/BitChillRSK/dca-contracts/pull/111): no further
+      re-judgement PRs — see [Bytecode-scarcity decisions (closed)](#bytecode-scarcity-decisions-closed).)
 
 ## Out of scope
 
@@ -103,7 +105,7 @@ No behavior changes, so no new tests. Evidence for the numbers:
 - [x] Every runtime size and EIP-170 margin quoted in `docs/relaunch/` matches a fresh
       `forge build --sizes`, or is explicitly labelled as the historical figure a past decision used.
 - [x] No document still describes the measurement basis as unoptimized.
-- [x] Decisions justified by bytecode scarcity are listed for re-judgement, and none are re-judged here.
+- [x] Decisions justified by bytecode scarcity are listed, and none are re-judged here (queue closed in #111).
 - [x] No file outside `docs/` changed.
 
 ## Reviewer checklist
@@ -156,20 +158,22 @@ For the flip alone, on one commit, #104's measurement stands: `DcaManager` 23,70
 (margin 873 → 10,809), `testSinglePurchase` 283,711 → 243,817 (−14.1%), `testBatchPurchasesOneUser`
 2,244,557 → 1,562,720 (−30.4%).
 
-## Decisions flagged for re-judgement
+## Bytecode-scarcity decisions (closed)
 
-Each was argued, in whole or in part, from bytecode scarcity that the measurement created. **R53
-re-judges none of them**; each belongs to its own PR, and several have independent arguments that
-survive the correction intact.
+<a id="decisions-flagged-for-re-judgement"></a>
 
-| Decision | The bytecode claim | Now | What survives |
-|---|---|---|---|
-| R13 migration gate — manual exit/re-entry, no cooperative migration | "`SovrynErc20HandlerDex` has 426 bytes of runtime margin", so a source-side migration "does not fit" | 15,479 B, margin 9,097 — it would fit | Reasons 1, 3, 4: migration redeems through the same path that would be broken, it is the highest-value target on immutable contracts, and generation 2 can still ship the hook |
-| R42 — integrate the grouped loop into `DcaManager` | "893 bytes below EIP-170 … is the real deployment constraint"; headroom traded for hot-path gas | 13,767 B, margin 10,809 — the trade cost a fraction of what it looked like | The gas measurement that decided it (344,723 vs 347,186 vs 361,133) is unaffected; the shipped choice is the cheap one either way |
-| R50 — merged per-user stablecoin/rBTC slot, tried and reverted | one of three objections was "~660 bytes of dex-handler EIP-170 margin (1,544 → 880)" | ~8.9 KB of Dex margin — that objection is void | `StablecoinSource` is still the wrong home for rBTC state, and the `uint128` share cap is still venue-dependent |
-| R39 — delete `buyRbtc` | partly "Dex bytecode … R31 left a few hundred bytes of margin before R9" | ~8.9 KB | One purchase pipeline instead of two, and a length-1 batch is the same operational path; the ABI is already frozen and shipped |
-| R31 — land the ABI trim before R9 | "R30 left only 329–452 bytes of EIP-170 margin", plus a conditional follow-up if `supportsInterface` did not fit | ~8.9 KB | One canonical getter per value; the trim and the ERC-165 class check both shipped |
-| R51 — no `_creditBuyers` extraction | the smallest of three effects, "17 bytes smaller on every Dex handler" | 17 B against ~8.9 KB rather than ~1.1 KB | Everything that decided it: the function was one stack slot over, the optimizer does **not** relieve stack-too-deep (R51 checked, and it still holds with the optimizer on), and only via-IR would — which is R55's call. The gas wins are unaffected |
+Each was argued, in whole or in part, from bytecode scarcity that the unoptimized measurement created.
+**R53 re-judged none of them** — it only annotated the record. [#111](https://github.com/BitChillRSK/dca-contracts/pull/111)
+closed the follow-up queue on 2026-09-02: nothing here awaits its own re-judgement PR.
+
+| Decision | Status | The bytecode claim | Now | What still holds |
+|---|---|---|---|---|
+| R13 migration gate — manual exit/re-entry, no cooperative migration | **Closed — decided against** cooperative migration | "`SovrynErc20HandlerDex` has 426 bytes of runtime margin", so a source-side migration "does not fit" | 15,479 B, margin 9,097 — it would fit | Reasons 1, 3, 4: migration redeems through the same path that would be broken, it is the highest-value target on immutable contracts, and generation 2 can still ship the hook. Do not reopen. |
+| R50 — merged per-user stablecoin/rBTC slot | **Closed — decided against** (tried and reverted in R50) | one of three objections was "~660 bytes of dex-handler EIP-170 margin (1,544 → 880)" | ~8.9 KB of Dex margin — that objection is void | `StablecoinSource` is still the wrong home for rBTC state, and the `uint128` share cap is still venue-dependent. Do not reopen. |
+| R42 — integrate the grouped loop into `DcaManager` | **Closed — shipped / stands** | "893 bytes below EIP-170 … is the real deployment constraint"; headroom traded for hot-path gas | 13,767 B, margin 10,809 — the trade cost a fraction of what it looked like | The gas measurement that decided it (344,723 vs 347,186 vs 361,133) is unaffected; the shipped choice is the cheap one either way |
+| R39 — delete `buyRbtc` | **Closed — shipped / stands** | partly "Dex bytecode … R31 left a few hundred bytes of margin before R9" | ~8.9 KB | One purchase pipeline instead of two, and a length-1 batch is the same operational path; the ABI is already frozen and shipped |
+| R31 — land the ABI trim before R9 | **Closed — shipped / stands** | "R30 left only 329–452 bytes of EIP-170 margin", plus a conditional follow-up if `supportsInterface` did not fit | ~8.9 KB | One canonical getter per value; the trim and the ERC-165 class check both shipped |
+| R51 — no `_creditBuyers` extraction | **Closed — shipped / stands** | the smallest of three effects, "17 bytes smaller on every Dex handler" | 17 B against ~8.9 KB rather than ~1.1 KB | Everything that decided it: the function was one stack slot over, the optimizer does **not** relieve stack-too-deep (R51 checked, and it still holds with the optimizer on), and only via-IR would — which is R55's call. The gas wins are unaffected |
 
 `ZeroTokenPurchaseUniswap` and anything else via-IR touches stays with [R55](./R55-solx-and-ir-evaluation.md).
 [R54](./R54-schedule-top-up-from-interest.md) was already written against the optimized budget and needs
@@ -179,4 +183,4 @@ no correction here — its `+600 B` against 10,209 B of margin is the post-flip 
 
 Beyond the spec's list: `R9`, `R13`, `R30`, `R34`, `R36`, `R38`, `R39`, `R43`, `R44`, `R45`, `R46`, `R47`
 each carry a recorded size or gas figure and now label it pre-optimizer. `R13` also gets the appended
-correction for the migration gate, which is the one live decision whose stated bytecode reason is void.
+correction for the migration gate's void bytecode reason; the gate itself stays closed (manual exit).

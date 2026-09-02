@@ -1,6 +1,6 @@
 # R55 — Evaluate solx and the IR pipeline, then decide
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **not started** · Assigned: no · Optional/further-review: no · Order: after R59
 
 ## Objective
 

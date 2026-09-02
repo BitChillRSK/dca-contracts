@@ -115,6 +115,10 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R57 | 52 ([#106](https://github.com/BitChillRSK/dca-contracts/pull/106)) | **decided 2026-09-02: keep `registerRoute(SOVRYN_INDEX, true)`** — Sovryn is a real lending route; the hole is a Dex handler for DOC |
 | R56 | 53 ([#107](https://github.com/BitChillRSK/dca-contracts/pull/107)) | none (97% swap-time floor; 95% config wall; bot `minRbtcOut` is operational) |
 | R58 | 54 ([#108](https://github.com/BitChillRSK/dca-contracts/pull/108)) | none (test-only constant split; no deploy or `src/` change) |
+| R53 | 55 ([#109](https://github.com/BitChillRSK/dca-contracts/pull/109)) | none (documentation-only optimized baseline) |
+| R54 | 56 ([#110](https://github.com/BitChillRSK/dca-contracts/pull/110)) | answered (amount; top-up ignores deposit pause; `topUpFromInterest`) |
+| R59 | 57 (planned) | none (fail closed on incomplete Uniswap input; gas and size ceilings are fixed) |
+| R55 | 58 (planned) | none (measure and recommend; no compiler adoption) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -659,9 +663,11 @@ scale, the flip moved `DcaManager` 23,703 B / 873 B margin -> 13,767 B / 10,809 
 283,711 -> 243,817 gas, and `testBatchPurchasesOneUser` 2,244,557 -> 1,562,720. Append the corrected figure to
 each historical entry; do not rewrite why a shipped PR chose what it chose.
 
-The optimized budget also voids the bytecode premise under decisions this PR does not re-judge: the migration
+The optimized budget also voids the bytecode premise under decisions R53 does not re-judge: the migration
 gate's manual exit/re-entry (justified partly by "426 bytes of runtime margin") and R51's `_creditBuyers`
-reasoning. Each belongs to its own PR on its remaining merits; several have independent arguments that survive.
+reasoning. [#111](https://github.com/BitChillRSK/dca-contracts/pull/111) closed that follow-up list without
+reopening anything: R31 / R39 / R42 / R51 stand as shipped; R13 cooperative migration and R50's merged
+per-user slot stay decided against on their non-size merits.
 `via_ir` stays out (R55).
 
 Ask: none. `optimizer_runs = 200` and CI inheritance were settled in #104.
@@ -672,11 +678,13 @@ or spec that still quotes a pre-#104 number now says so beside the number instea
 Measured at the R58 head rather than by rebuilding each historical commit, which the entries state, because a
 delta against an old entry otherwise reads as the optimizer's alone. Two figures moved since #104: the three
 Dex leaves are 100 B larger (R56), and `testSinglePurchase` / `testBatchPurchasesOneUser` are 243,790 /
-1,562,441 against #104's 243,817 / 1,562,720. Decisions argued from bytecode scarcity are listed in the spec
-([R53](./R53-optimizer-baseline.md#decisions-flagged-for-re-judgement)); none is re-judged here. One of them
-does not survive contact: R51's `_creditBuyers` reasoning turned on no-IR stack-too-deep, which the optimizer
-does not relieve — R51 checked that at the time and it still holds — so only the 17-bytes-per-handler half of
-that argument was budget-driven, and via-IR (R55) is what would reopen it.
+1,562,441 against #104's 243,817 / 1,562,720. Decisions argued from bytecode scarcity are recorded in the
+spec ([R53](./R53-optimizer-baseline.md#bytecode-scarcity-decisions-closed)); R53 re-judged none of them.
+[#111](https://github.com/BitChillRSK/dca-contracts/pull/111) closed the queue: four shipped choices stand,
+R13 / R50 stay decided against. One argument is narrowed rather than reopened: R51's `_creditBuyers`
+reasoning turned on no-IR stack-too-deep, which the optimizer does not relieve — R51 checked that at the
+time and it still holds — so only the 17-bytes-per-handler half of that argument was budget-driven, and
+via-IR (R55) is what would reopen it.
 
 ### R54 - top a schedule up from accrued interest ([spec](./R54-schedule-top-up-from-interest.md), PR 56, [#110](https://github.com/BitChillRSK/dca-contracts/pull/110))
 
@@ -758,7 +766,28 @@ Cutover: [front-end#22](https://github.com/BitChillRSK/front-end/issues/22#issue
 [data-api#9](https://github.com/BitChillRSK/data-api/issues/9#issuecomment-5512738181), and
 `metrics-dashboard`; `swapper-bot` needs none.
 
-### R55 - evaluate solx and the IR pipeline ([spec](./R55-solx-and-ir-evaluation.md), unassigned, gated on #104)
+### R59 - enforce complete Uniswap input consumption ([spec](./R59-uniswap-exact-consumption.md), unassigned, before R55)
+
+Fail closed when SwapRouter02 does not consume the full stablecoin input or leaves a new
+intermediate-token balance in the router. Uniswap V3 `exactInput` can stop at a pool's terminal price
+limit before consuming the requested amount; an aggregate `amountOutMinimum` does not prove complete
+input consumption. A first-hop partial fill leaves stablecoin in the handler, while a later-hop
+partial fill can leave an intermediate token in the public router.
+
+Store the active intermediate-token list beside the already stored path. Around `exactInput`, compare
+the handler's purchase-token balance delta with the exact requested amount and compare each router
+intermediate-token balance after the swap with its own pre-swap value. Preserve WRBTC balance-delta
+crediting and revert the whole batch on either mismatch. Do not decode the packed path, add assembly,
+trust the router return, or add sweep/refund authority.
+
+This is a recurring protocol-paid hot-path check, so it ships only at no more than +8,000 gas for a
+direct path, +15,000 gas for a one-intermediate path, and +800 bytes of runtime per Dex leaf. Measure
+against the implementation PR's base under the `#104` pin (`optimizer = true`, `optimizer_runs = 200`,
+`via_ir = false`). R59 precedes R55: the safety check ships on the known production profile; R55 is
+measure-and-recommend only and does not change settings, so a later adoption PR (if any) re-measures
+these ceilings. Ask: none.
+
+### R55 - evaluate solx and the IR pipeline ([spec](./R55-solx-and-ir-evaluation.md), unassigned, after R59, gated on #104)
 
 Measure and recommend; change no compiler setting. Compare stock solc no-IR, stock solc `via_ir`, and solx on
 runtime size, hot-path gas, whether the full matrix passes, and whether Blockscout can verify the result on
@@ -771,11 +800,16 @@ not gas. These contracts are immutable and unproxied and hold user funds, R23's 
 with stock solc, and a gas win that Blockscout cannot verify on Rootstock is not shippable. An explicit "keep
 stock solc" option is chosen unless a candidate clears both the gas bar and verification.
 
+Follows R59 so the Uniswap fail-closed checks are already in the tree R55 measures; R55 still changes no
+compiler setting in its own PR.
+
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:
 
 - **R12 compound interest into a chosen schedule — reopened 2026-08-31 as [R54](./R54-schedule-top-up-from-interest.md).** The original rejection is quoted here because it should not be reused: "The existing explicit withdraw-interest then deposit flow is legible and user-controlled. An atomic compound path must reconcile per-handler shares with per-route/per-schedule principal and adds a new cash-moving entry point to immutable handlers for convenience, not solvency." That describes an in-handler design which was never proposed — R12 was always `DcaManager`-only, with no handler call and no token movement. The unrecorded real blocker was EIP-170, and it was genuine: the function does not fit unoptimized. R53 removes it.
+- **R13 cooperative / user-initiated migration — rejected (option a stands).** Manual exit/re-entry was the recorded gate answer on 2026-08-26. R53 voided the bytecode half of reason 2; reasons 1, 3, and 4 still hold. Closed with no follow-up PR in [#111](https://github.com/BitChillRSK/dca-contracts/pull/111) — see [R53](./R53-optimizer-baseline.md#bytecode-scarcity-decisions-closed).
+- **R50 merged per-user stablecoin/rBTC slot — rejected.** Tried and reverted in R50; `StablecoinSource` is the wrong home for rBTC state and a `uint128` share cap is venue-dependent. The EIP-170 objection is void under the optimizer, but the architectural ones are not. Closed in [#111](https://github.com/BitChillRSK/dca-contracts/pull/111).
 - **Owner sweep — rejected.** A pooled balance cannot prove which tokens are harmless dust versus user liabilities. Governance must not gain a path around signer-only withdrawals.
 - **Handler per-user storage packing — rejected.** Each mapping value is already one slot and contains a financial amount. Narrowing it saves no slot across mapping entries.
 - **Address-keyed bool bitmaps — rejected.** `s_swappers` and `s_handlerAssigned` are sparse address keys; they never share a word, so a bitmap is extra math for the same SLOAD. R50 packs the `(token, routeIndex)` handler+pause pair instead.
