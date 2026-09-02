@@ -110,7 +110,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R42 integration | 49 ([#101](https://github.com/BitChillRSK/dca-contracts/pull/101)) | none (`Batch` for both entry points) |
 | R51 | 50 (planned GitHub #103) | none (first fork table in PR; durable live floor is a relaunch gate) |
 | R52 | 51 ([#104](https://github.com/BitChillRSK/dca-contracts/pull/104)) | none (same production Safe; divergent owners keep naturally split authority) |
-| R51 deploy follow-up | unassigned | none (enforce the DOC-Dex never-deploy rule in `DeployDexSwaps`) |
+| R57 | unassigned (after #104; spec in [#105](https://github.com/BitChillRSK/dca-contracts/pull/105)) | none (recommend also dropping the unused `registerRoute(SOVRYN_INDEX)`) |
 | R56 | unassigned (after #104; spec in [#105](https://github.com/BitChillRSK/dca-contracts/pull/105)) | none (oracle floor = safety check; bot `minRbtcOut` is operational) |
 
 ### PR 1 - R23 toolchain and dependency baseline
@@ -550,7 +550,7 @@ The shipped Dex set is LayerBank USDRIF and LayerBank USDT0. This supersedes the
 calibrating it. The `DcaManager`/handler ABI is unaffected; the DOC Dex handler stays as test-only legacy, in
 the same position as Tropykus after R37.
 
-### PR 50 follow-up - close the DOC Dex deploy hole (unassigned, no spec doc)
+### R57 - close the DOC Dex deploy hole ([spec](./R57-close-doc-dex-deploy-hole.md), unassigned, gated on #103)
 
 `DeployDexSwaps`' live branch still registers `SOVRYN_INDEX` and constructs `SovrynErc20HandlerDex` when
 `STABLECOIN_TYPE=DOC`, and its comment at `script/DeployDexSwaps.s.sol:113` still names Sovryn (DOC) as part
@@ -558,6 +558,14 @@ of the live dex map. Deploy-script work is outside R51's Solidity scope, so PR 1
 mirrors what R37 did for Tropykus: revert on the DOC Dex arm in the live branch and correct the comment, then
 re-run the deploy lanes. Until then the never-deploy rule above is documentation only and is not enforced by
 the script. Sequence this before any Dex cutover broadcast; it does not block R52.
+
+**Promoted to R57 on 2026-09-02.** It had no R-id and no spec, which made it the only queued item a
+handover prompt could not name, and left the reader to reassemble the hazard from three documents. The
+spec records what makes it a hazard rather than untidiness: `DEFAULT_STABLECOIN` is `DOC`, so an unset
+`STABLECOIN_TYPE` is enough to trigger it; `assignTokenHandler` is add-only, so `(DOC, SOVRYN_INDEX)` is
+burned permanently once taken — the same key `DeployMocSwaps` needs for the production
+`SovrynDocHandlerMoc`; and the live DOC arm is currently exercised and green by `LiveDeployPathTest` on
+the `moc-sovryn` lane, so closing it changes existing tests rather than only adding one.
 
 ### PR 51 - R52 allowlisted Dex path failover ([#104](https://github.com/BitChillRSK/dca-contracts/pull/104))
 

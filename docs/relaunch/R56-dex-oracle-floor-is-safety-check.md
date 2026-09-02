@@ -84,7 +84,7 @@ exactly as R43/R51.
       Deploy/cutover sets the single backstop once.
 - [ ] Optimizer / via-IR / solx (R53–R55).
 - [ ] Schedule top-up (R54).
-- [ ] Closing the DOC Dex `DeployDexSwaps` hole (PR 50 follow-up).
+- [ ] Closing the DOC Dex `DeployDexSwaps` hole ([R57](./R57-close-doc-dex-deploy-hole.md)).
 
 ## Files likely touched
 

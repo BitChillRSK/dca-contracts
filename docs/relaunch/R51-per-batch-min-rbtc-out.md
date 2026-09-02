@@ -145,7 +145,7 @@ to be deployed. The shipped Dex set is therefore **LayerBank USDRIF and LayerBan
 DOC path anyway and records the result as evidence for deleting it, not as a route awaiting calibration.
 Separately, `DeployDexSwaps`' live branch can still construct that handler when `STABLECOIN_TYPE=DOC`, and its
 comment at `script/DeployDexSwaps.s.sol:113` still names Sovryn (DOC) as part of the live dex map. Closing that
-hole is deploy-script work outside R51's Solidity scope; it is tracked as the PR 50 follow-up in
+hole is deploy-script work outside R51's Solidity scope; it is tracked as [R57](./R57-close-doc-dex-deploy-hole.md) in
 [`IMPLEMENTATION_ORDER.md`](./IMPLEMENTATION_ORDER.md). Until it lands, the never-deploy rule above is
 documentation only and is not enforced by the script.
 

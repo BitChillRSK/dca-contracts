@@ -152,7 +152,7 @@ input token's decimals and WRBTC's 18 do.
 **6. Zero price.** A `currentPrice` of 0 with `isValid` true divides by zero and reverts (panic 0x12). Loud,
 not silent, so no extra guard was added for a broken-oracle case that already cannot mis-price a swap.
 
-**Invariant 1** is untouched: `_swapStablecoinForWrbtc` still credits the measured WRBTC balance delta and
+**Invariant 1** is untouched: the Uniswap swap still credits the measured WRBTC balance delta and
 still ignores the router's return value. `amountOutMinimum` is a revert bound only.
 
 **Size and gas.** `SovrynErc20HandlerDex` 21,061 → 21,104 runtime bytes (margin 3,515 → 3,472);
