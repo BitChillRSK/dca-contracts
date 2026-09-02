@@ -7,7 +7,7 @@ import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
 import {UNUSED_SCHEDULE_ID} from "../utils/BatchBuyOne.sol";
-import "../../script/Constants.sol";
+import "../Constants.sol";
 
 contract DcaScheduleTest is DcaDappTest {
     // Events

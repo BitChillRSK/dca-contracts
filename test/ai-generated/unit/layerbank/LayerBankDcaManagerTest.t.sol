@@ -8,7 +8,7 @@ import {IDcaManager} from "src/interfaces/IDcaManager.sol";
 import {IOperationsAdmin} from "src/interfaces/IOperationsAdmin.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
-import "script/Constants.sol";
+import "test/Constants.sol";
 import {batchBuyOne} from "test/utils/BatchBuyOne.sol";
 
 /**

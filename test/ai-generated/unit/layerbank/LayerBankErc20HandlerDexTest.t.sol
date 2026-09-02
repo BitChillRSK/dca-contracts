@@ -16,7 +16,7 @@ import {MockMocOracle} from "test/mocks/MockMocOracle.sol";
 import {MockSwapRouter02} from "test/mocks/MockSwapRouter02.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {handlerBatchBuyOne} from "test/utils/BatchBuyOne.sol";
-import "script/Constants.sol";
+import "test/Constants.sol";
 
 /**
  * @title LayerBankErc20HandlerDexTest

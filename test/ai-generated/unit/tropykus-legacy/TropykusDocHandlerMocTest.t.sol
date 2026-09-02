@@ -9,7 +9,7 @@ import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
-import "script/Constants.sol";
+import "test/Constants.sol";
 import {handlerBatchBuyOne, NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
 
 /**

@@ -16,7 +16,7 @@ import {MockLayerBankAToken, MockLayerBankPool} from "test/mocks/MockLayerBank.s
 import {MockWrbtcToken} from "test/mocks/MockWrbtcToken.sol";
 import {MockSwapRouter02} from "test/mocks/MockSwapRouter02.sol";
 import {MockMocOracle} from "test/mocks/MockMocOracle.sol";
-import "script/Constants.sol";
+import "test/Constants.sol";
 
 contract DeployUsdrifHandlerHarness is DeployUsdrifHandler {
     function maybeAssign(

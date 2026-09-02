@@ -6,7 +6,7 @@ import {LayerBankDocHandlerMoc} from "src/layerbank/LayerBankDocHandlerMoc.sol";
 import {ILayerBankAToken} from "src/layerbank/ILayerBankAToken.sol";
 import {ILayerBankPool} from "src/layerbank/ILayerBankPool.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
-import "script/Constants.sol";
+import "test/Constants.sol";
 
 /**
  * @title LayerBankLivePoolProbe

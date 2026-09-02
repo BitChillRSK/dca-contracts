@@ -9,7 +9,7 @@ import {MockIsusdToken} from "test/mocks/MockIsusdToken.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import {ITokenLending} from "src/interfaces/ITokenLending.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
-import "script/Constants.sol";
+import "test/Constants.sol";
 import {NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
 
 /**

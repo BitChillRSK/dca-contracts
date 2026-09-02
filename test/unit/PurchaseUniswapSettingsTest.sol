@@ -14,7 +14,7 @@ import {IWRBTC} from "../../src/interfaces/IWRBTC.sol";
 import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces/ISwapRouter02.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {MockMocOracle} from "../mocks/MockMocOracle.sol";
-import "../../script/Constants.sol";
+import "../Constants.sol";
 import {ownableUnauthorized} from "../utils/OzRevert.sol";
 
 contract PurchaseUniswapSettingsTest is DcaDappTest {

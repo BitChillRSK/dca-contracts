@@ -10,7 +10,7 @@ import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import {ownableUnauthorized, ownableInvalidOwner} from "test/utils/OzRevert.sol";
-import "script/Constants.sol";
+import "test/Constants.sol";
 
 /**
  * @title TwoStepOwnershipTest

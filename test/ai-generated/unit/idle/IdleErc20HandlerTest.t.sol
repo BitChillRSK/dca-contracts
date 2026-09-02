@@ -7,7 +7,7 @@ import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {IdleErc20Handler} from "src/idle/IdleErc20Handler.sol";
 import {IIdleErc20Handler} from "src/idle/IIdleErc20Handler.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "script/Constants.sol";
+import "test/Constants.sol";
 
 /**
  * @title IdleErc20HandlerTest

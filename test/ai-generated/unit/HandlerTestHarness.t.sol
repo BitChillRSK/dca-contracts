@@ -15,7 +15,7 @@ import {OperationsAdmin} from "../../../src/OperationsAdmin.sol";
 import {MockStablecoin} from "../../mocks/MockStablecoin.sol";
 import {MockKdocToken} from "../../mocks/MockKdocToken.sol";
 import {MockIsusdToken} from "../../mocks/MockIsusdToken.sol";
-import "../../../script/Constants.sol";
+import "../../Constants.sol";
 import {ownableUnauthorized} from "../../utils/OzRevert.sol";
 
 /**

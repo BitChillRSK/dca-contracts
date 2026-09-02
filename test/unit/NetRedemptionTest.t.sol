@@ -7,7 +7,7 @@ import {Vm} from "forge-std/Test.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import {MockIsusdToken} from "../mocks/MockIsusdToken.sol";
 import {toBatch} from "../utils/BatchBuyOne.sol";
-import "../../script/Constants.sol";
+import "../Constants.sol";
 
 /**
  * @title NetRedemptionTest

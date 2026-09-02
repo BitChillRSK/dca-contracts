@@ -5,7 +5,7 @@ import {Vm} from "forge-std/Test.sol";
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {ITokenLending} from "src/interfaces/ITokenLending.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
-import "../../script/Constants.sol";
+import "../Constants.sol";
 
 /**
  * @title EventIndexingTest

@@ -10,7 +10,6 @@ uint16 constant MAX_FEE_RATE_TEST = 200; // 2% for testing - allows for better f
 uint16 constant MAX_FEE_RATE_PRODUCTION = 100; // 1% flat rate for production (same as MIN_FEE_RATE for flat fee)
 uint128 constant FEE_PURCHASE_LOWER_BOUND = 1000 ether; // 1000 DOC
 uint128 constant FEE_PURCHASE_UPPER_BOUND = 100_000 ether; // 100,000 DOC
-uint256 constant FEE_PERCENTAGE_DIVISOR = 10_000;
 uint256 constant MIN_PURCHASE_PERIOD = 1 days; // Default to at most one purchase each day
 uint256 constant MAX_SCHEDULES_PER_TOKEN = 10; // Default to a maximum of 10 DCA schedules per token
 
@@ -28,6 +27,12 @@ address constant MAINNET_OWNER = 0xdeAbdc410aB7B0f1Da830A6b355B5b938208315f;
 address constant TESTNET_FEE_COLLECTOR = TESTNET_OWNER;
 address constant MAINNET_FEE_COLLECTOR = 0x3caB92C050514A0368D71815CAc42ad746350F16;
 
+// Local and fork deploy accounts. `DeployBase` derives the owner and the fee collector from these
+// labels with `makeAddr` when no live network is targeted; the addresses above win on testnet and
+// mainnet. Deploy-side, not test-side: the harness reads whatever `DeployBase` produced.
+string constant OWNER_STRING = "owner";
+string constant FEE_COLLECTOR_STRING = "feeCollector";
+
 // Production route indexes (fresh relaunch map) and LENDING_PROTOCOL env strings.
 // `DeployMocSwaps` and `DeployDexSwaps` each deploy their own `OperationsAdmin`, so the MoC
 // map below and the dex map are independent; an index means nothing across the two admins.
@@ -37,7 +42,8 @@ string constant LAYERBANK_STRING = "layerbank";
 uint256 constant LAYERBANK_INDEX = 1;
 string constant SOVRYN_STRING = "sovryn";
 uint256 constant SOVRYN_INDEX = 2;
-uint256 constant RESERVED_MOC_LENDING_INDEX = 3; // reserved for future MoC lending; not assigned in this PR
+// Index 3 is reserved for a future MoC lending venue and is deliberately not declared: an unused
+// constant invites a script to register it. Do not hand it to another protocol.
 
 // Legacy Tropykus. Test-only: no deploy script builds or registers a Tropykus handler on a live
 // network, on either map, and index 4 is burned so it is never reinterpreted as another venue.
@@ -60,14 +66,10 @@ string constant USDT0_STRING = "USDT0";
 uint256 constant DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT = 0.97 ether; // 97%
 // The wall the owner cannot cross in one transaction when widening the floor above.
 uint256 constant DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK = 0.95 ether; // 95%
-// Assertion tolerance for purchase comparisons. Deliberately NOT derived from the floor above: it is how
-// close the mock router's payout must sit to the oracle price, not what the router enforces. On a live-pool
-// fork a fill between the floor and this tolerance fails the assertion rather than reverting in the router.
-uint256 constant MAX_SLIPPAGE_PERCENT = 0.005 ether; // 0.5% — MoC redeems at the oracle price
-// Uniswap also pays the pool's LP fee and price impact. Measured ~0.73% off oracle on the live USDRIF
-// path at block 9198813; 1.5% leaves room for pool movement without reaching the 3% swap-time floor.
-uint256 constant DEX_MAX_SLIPPAGE_PERCENT = 0.015 ether; // 1.5%
-uint256 constant EXCHANGE_RATE_DECIMALS = 1e18; // Valid for DOC and USDRIF in both Tropykus and Sovryn
+
+// Price the local mocks quote. `DexHelperConfig` and `UsdrifHelperConfig` pass it to `MockSwapRouter02`,
+// and `MockMocOracle` / `MockMocProxy` redeem at it, so it is a deploy-helper value rather than a test one.
+uint256 constant BTC_PRICE = 50_000; // 1 BTC = 50,000 DOC
 
 // USDT0 is 6 decimals. Do not pass MIN_PURCHASE_AMOUNT / FEE_PURCHASE_* (18-decimal DOC/USDRIF
 // units) into a USDT0 handler — that would make the min ~25 trillion USDT0 and put every real
@@ -80,27 +82,3 @@ uint128 constant USDT0_FEE_PURCHASE_UPPER_BOUND = 100_000e6;
 address constant USDT0_MAINNET = 0x779Ded0c9e1022225f8E0630b35a9b54bE713736;
 address constant LAYERBANK_USDRIF_ATOKEN = 0xc96fBD12bE56Dd565b258d243344bCf792A51128; // lRooUSDRIF
 address constant LAYERBANK_USDT0_ATOKEN = 0x6bE7d4cfCe825b106aa88F6916A412c5af230Ec0; // lRooUSDT0
-
-
-/*//////////////////////////////////////////////////////////////
-                        TESTS CONSTANTS
-//////////////////////////////////////////////////////////////*/
-
-// Test account names
-string constant OWNER_STRING = "owner";
-string constant USER_STRING = "user";
-string constant ADMIN_STRING = "ADMIN";
-string constant SWAPPER_STRING = "SWAPPER";
-string constant FEE_COLLECTOR_STRING = "feeCollector";
-
-// Test values
-uint256 constant BTC_PRICE = 50_000; // 1 BTC = 50,000 DOC
-
-// Token holders on mainnet with significant balances (for fork testing)
-address constant DOC_HOLDER = 0x65d189e839aF28B78567bD7255f3f796495141bc; // Large DOC holder on RSK mainnet
-address constant USDRIF_HOLDER = 0xD07d569322a93a47B62D71203e21f0AFf8246099; // Large USDRIF holder on RSK mainnet 
-// If these get rid of their holdings, we can look for other holders at 
-// https://rootstock.blockscout.com/token/0x3A15461d8AE0f0Fb5fA2629e9dA7D66A794a6E37?tab=holders
-// Token holders on testnet with significant balances (for fork testing)
-address constant DOC_HOLDER_TESTNET = 0x53Ec0aF115619c536480C95Dec4a065e27E6419F; // Large DOC holder on RSK testnet
-address constant USDRIF_HOLDER_TESTNET = 0xe38C86970543173D334b828485D8bc48d19Ff701; // Large USDRIF holder on RSK testnet

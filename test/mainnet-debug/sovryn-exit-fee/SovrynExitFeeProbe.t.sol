@@ -5,7 +5,7 @@ import {Test, console2} from "forge-std/Test.sol";
 import {DcaDappTest} from "../../unit/DcaDappTest.t.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IiSusdToken} from "../../../src/sovryn/IiSusdToken.sol";
-import {DOC_HOLDER} from "../../../script/Constants.sol";
+import {DOC_HOLDER} from "../../Constants.sol";
 
 interface IExitFeeControllerView {
     function exitFeeEnabled() external view returns (bool);
