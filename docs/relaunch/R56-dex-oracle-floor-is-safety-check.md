@@ -1,6 +1,6 @@
 # R56 — Dex oracle floor is the safety check; the bot sets tightness
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **not started** · Assigned: [#107](https://github.com/BitChillRSK/dca-contracts/pull/107) · Optional/further-review: no
 
 Planning lives in GitHub [#105](https://github.com/BitChillRSK/dca-contracts/pull/105). Implement in a
 later `Start with R56` PR stacked on [#104](https://github.com/BitChillRSK/dca-contracts/pull/104).
