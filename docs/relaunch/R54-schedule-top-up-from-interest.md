@@ -104,7 +104,7 @@ strictly cheaper and strictly fewer steps, not a replacement.
       existing `DcaManager__TokenBalanceUpdated`. Index user, token, and scheduleId and nothing else
       (`AGENTS.md` invariant 4).
 - [x] Make **no** external state-changing call. No redeem, no mint, no transfer. The only external
-      call is the `getAccruedInterest` view.
+      call reads the accrued figure, which on a lazily accruing market also pokes that accrual.
 - [x] Declare it on `IDcaManager` with user-facing natspec; implementation carries `@inheritdoc`.
 
 ## Out of scope
@@ -118,20 +118,42 @@ strictly cheaper and strictly fewer steps, not a replacement.
 - Refactoring the private helpers to share code with `depositToken` for bytecode reasons. With the
   optimized margin there is no reason to touch audited hot-path code.
 
-### Taken anyway: `getAccruedInterest` reads the current exchange rate
+### Taken anyway: the accrued figure is split into a quote and a ceiling
 
-The spec excluded changing `getAccruedInterest`, and this PR changes it: it now takes
-`_exchangeRate()` rather than `_viewExchangeRate()`, which drops `view` from it, from
-`ITokenLending.getAccruedInterest`, and from `DcaManager.getInterestAccrued`. Only the legacy
-Tropykus adapter overrides `_exchangeRate` with a mutating call (`exchangeRateCurrent()` against
-`exchangeRateStored()`); Sovryn and LayerBank read the same rate either way.
+The spec excluded changing `getAccruedInterest`, and this PR changes it. It belongs here because R54
+turns that figure from something a user *reads* into something a user *spends against*, and the two
+jobs want different rates. On a lazily accruing market the stored rate is stale by however long since
+the last poke — only the legacy Tropykus adapter, which overrides `_exchangeRate` with
+`exchangeRateCurrent()`; Sovryn, LayerBank, and Idle read the same rate either way — and the gap is
+not dust: with no prior poke a year of interest reads as exactly zero. A top-up bounded by that would
+refuse interest the user has already earned until someone else transacts.
 
-It belongs here because R54 turns that figure from something a user *reads* into something a user
-*spends against*. On a lazily accruing market the stored rate is stale by however long since the last
-poke, so a top-up bounded by it would silently refuse the most recent interest, and the amount a
-front-end quotes would not be the amount the credit accepts. The direction is safe — the current rate
-is the one a withdrawal would pay at — and the mutability change is the cost. Consumers must read
-both getters with `eth_call` rather than through a generated write binding.
+**The first attempt was wrong and is recorded here because the reasoning is the point.** Pointing
+`getAccruedInterest` at `_exchangeRate()` and letting the mutability propagate dropped `view` from
+`DcaManager.getInterestAccrued` as well. That is not an additive ABI change: same selector, same
+return, `eth_call` still free — but a regenerated ABI marks it non-constant, and generated clients
+route non-constant functions through write bindings. In ethers v6 a plain call to one *sends a
+transaction*, so a balance display becomes a wallet prompt. Weighed against that: `_exchangeRate` is
+overridden by exactly one adapter, and that adapter is on neither production map. For every route
+that can be deployed, `LendingErc20Handler._exchangeRate()` is literally `return _viewExchangeRate();`
+— so the entire cost landed on the user-facing getter to buy behaviour no live route can observe.
+
+**Shipped shape: two readers, one helper.** `ITokenLending.getAccruedInterest` stays non-view and is
+the **spendable ceiling** the top-up bounds on. It is `onlyDcaManager`, so its mutability never
+reaches a generated client. `ITokenLending.quoteAccruedInterest` is new, reads `_viewExchangeRate()`,
+and is the **display quote** that keeps `DcaManager.getInterestAccrued` a `view`. Both delegate to one
+private helper that takes the rate as an argument, so the only difference between them is which rate
+goes in.
+
+What makes the pair safe is the *direction* of the gap: a stored rate only ever trails a current one,
+so the quote is at most equal to the ceiling and never above it. A caller passing the displayed figure
+is therefore always inside the bound, and the worst a stale quote costs is a slice left for the next
+call. The reverse ordering would be a UI that offers a number the transaction rejects.
+
+`ITokenLending` gains a function, so its ERC-165 id changes. Handlers and `OperationsAdmin` compute it
+from the same source and ship together, so the lending gate in `assignTokenHandler` is unaffected;
+nothing is deployed yet, and nothing external pins the old id.
+
 ## Files likely touched
 
 - `src/DcaManager.sol`
@@ -157,8 +179,8 @@ Behaviors to assert:
   and the reported accrued interest afterwards is ~0.
 - **No lending `mint` / `burn` / `redeem` and no token transfer occur in the transaction.** Asserted
   on the user's share balance and on the absence of any stablecoin log, which no redemption or
-  transfer could avoid. Not on the transaction's total log count: reading the accrued figure is no
-  longer a `view` and may poke a lazy market's accrual, which can log.
+  transfer could avoid. Not on the transaction's total log count: the ceiling the credit is bounded by
+  is no longer a `view` and may poke a lazy market's accrual, which can log.
 - Other schedules on the same route keep their `tokenBalance`; only the named one moves.
 - A subsequent `batchBuyRbtc` can spend the newly credited balance, including the case where the
   schedule was depleted and resumes.
@@ -171,6 +193,10 @@ Behaviors to assert:
 - `withdrawAllAccumulatedInterest` after a full top-up is a no-op that does not revert.
 - Whichever answer decision 1 takes, a test pins it: deposits paused → top-up succeeds, while a
   deposit on the same route still reverts.
+- `DcaManager.getInterestAccrued` is still readable by `staticcall`, and the figure it quotes is
+  always accepted by `topUpFromInterest`. On Tropykus, where the two rates actually differ, the quote
+  reports a stale zero without poking the market while the ceiling accrues the year itself, and the
+  two agree once the market is poked.
 - The stateful invariant actor gains the top-up, plus a coverage guard that lands one deterministic
   credit. It is the only action that raises principal with no matching deposit, so it is what
   stresses `invariant_totalDepositedTokensMatchesLendingProtocol`, whose tolerance is 100 wei.
@@ -179,8 +205,12 @@ Behaviors to assert:
 
 - [x] All of the above passes on all three lending lanes.
 - [x] `DcaManager` runtime growth is ~600 B under the optimized no-IR profile, recorded in the PR with margin.
-- [x] No handler contract changed. (`LendingErc20Handler.getAccruedInterest` changes what rate it
-      reads — see **Taken anyway** — but no handler's funds movement or share math changes.)
+      Landed at +775 B; the quote/ceiling split cost 1 B of it, since a `view` external call compiles
+      to `staticcall`.
+- [x] No handler's funds movement or share math changed. (`LendingErc20Handler` gains
+      `quoteAccruedInterest` and routes both readers through one private helper — see **Taken
+      anyway** — which costs the lending leaves +136 to +229 B against margins of 8,748 B and up.
+      `IdleDocHandlerMoc` is byte-identical: it is not a lending handler.)
 - [x] The new path moves no cash: no redeem, mint, or transfer. Its one external call reads the
       accrued figure, which on a lazily accruing market also pokes that accrual.
 - [x] Open product decisions 1–3 are answered in the PR body, not left implicit in the code.

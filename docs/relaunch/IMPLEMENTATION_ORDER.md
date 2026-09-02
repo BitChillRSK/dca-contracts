@@ -708,18 +708,42 @@ interest cannot be moved across in dust while a schedule holding 10.5 purchases 
 amount. A flat `amount >= purchaseAmount` floor was rejected in the same exchange: it strands interest smaller
 than one purchase.
 
-Shipped with that shape. `DcaManager` 13,767 -> 14,565 B (margin 10,809 -> 10,011), +798 rather than the
+Shipped with that shape. `DcaManager` 13,767 -> 14,542 B (margin 10,809 -> 10,034), +775 rather than the
 probe's +600: the `amount` parameter, its two bounded-credit errors, and the purchase-boundary comparison are
 all new since `7dd00fb`. No handler's funds movement or share math changed, and the path moves no cash - the
 suite asserts that on the user's share balance and on the absence of any stablecoin log, which no redemption
 or transfer could avoid.
 
-One thing the spec put out of scope is taken anyway: `getAccruedInterest` now reads `_exchangeRate()` rather
-than `_viewExchangeRate()`, which drops `view` from it, from `ITokenLending.getAccruedInterest`, and from
-`DcaManager.getInterestAccrued`. R54 turns that figure from something a user reads into something a user spends
-against, and on a lazily accruing market (only the legacy Tropykus adapter, which overrides `_exchangeRate`
-with `exchangeRateCurrent()`) the stored rate is stale, so a bound taken from it would refuse the most recent
-interest and would not match what a front-end quoted. Consumers must read both getters with `eth_call`.
+One thing the spec put out of scope is taken anyway, and the shape it landed in is the second one tried. R54
+turns the accrued figure from something a user reads into something a user spends against, so the bound must
+be taken at the rate a write path would get: on a lazily accruing market - only the legacy Tropykus adapter,
+which overrides `_exchangeRate` with `exchangeRateCurrent()` - the stored rate is stale, and a year of
+interest reads as exactly zero until someone pokes the market. The first attempt pointed `getAccruedInterest`
+at `_exchangeRate()` and let the mutability propagate, which dropped `view` from `DcaManager.getInterestAccrued`
+too. That is not additive: same selector and same return, and `eth_call` still reads it free, but a regenerated
+ABI marks it non-constant, so generated clients route it through write bindings - in ethers v6 a plain call to
+a non-view function *sends a transaction*, turning a balance display into a wallet prompt. The audit's second
+pass rejected the trade on the ground that `_exchangeRate` is overridden by exactly one adapter, and that
+adapter is on neither production map: for Idle, LayerBank, and Sovryn the base `_exchangeRate()` is literally
+`return _viewExchangeRate();`, so the whole cost landed on the user-facing getter to buy behaviour no
+deployable route can observe.
+
+Split instead, since the two readers are two different jobs. `ITokenLending.getAccruedInterest` stays non-view
+and is the **spendable ceiling** the top-up bounds on; it is `onlyDcaManager`, so its mutability never reaches
+a generated client. A new `ITokenLending.quoteAccruedInterest` is the **display quote**, reads
+`_viewExchangeRate()`, and keeps `DcaManager.getInterestAccrued` a `view`. Both call one private helper that
+takes the rate as an argument, so the only difference between them is which rate goes in. The pair is safe
+because the gap has a direction: a stored rate only ever trails a current one, so the quote is at most equal
+to the ceiling and never above it, and a caller passing the displayed number is always inside the bound - the
+most a stale quote costs is a slice left for the next call. `ITokenLending` gains a function, so its ERC-165
+id changes; handlers and `OperationsAdmin` compute it from the same source and ship together, so the lending
+gate in `assignTokenHandler` is unaffected.
+
+That split is what put `DcaManager` 23 B *below* the non-view attempt and within 1 B of the shape before it
+(14,541 -> 14,542): a `view` external call compiles to `staticcall`. The cost lands on the lending handlers
+instead, where there is room - Sovryn/LayerBank Dex +136 B each (margins 8,961 and 8,748), the MoC leaves
++147 and +162, the Tropykus Dex leaf +229 because its two rate paths genuinely differ. `IdleDocHandlerMoc` is
+byte-identical: it is not a lending handler.
 
 The stateful invariant actor **is** extended with the top-up, and a coverage guard
 (`test_invariantHandlerTopsUpFromInterest`) lands one deterministic credit, because almost every fuzzed attempt
