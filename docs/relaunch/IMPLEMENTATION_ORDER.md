@@ -40,9 +40,9 @@ PR 2 was the original decision-record placeholder. GitHub PR [#74](https://githu
 - Remove `setOperationsAdmin` and pin the constructor admin (R46). Enforce one assignment per handler address (R47).
 - Ship a per-token×route deposit pause (R48) and per-schedule purchase pause (R19).
 - Rename the schedule struct `DcaDetails` → `DcaSchedule` (R49), pack it to three slots (R18), then finish packing in R50 (`uint64` nonce as `scheduleId`, fees, admin handler+pause, DcaManager scalars, Dex percents, `uint32` route keys on every OperationsAdmin entry). Do not narrow handler balance/share mappings.
-- Do **not** ship R12 interest compounding: users can withdraw interest and deposit it explicitly, while an in-handler compound path couples principal/share accounting to a chosen schedule and expands the most sensitive cash surface.
+- R12 interest compounding is **reopened** as [R54](./R54-schedule-top-up-from-interest.md): the recorded rejection described an in-handler design that was never proposed, and the real blocker was an unoptimized EIP-170 budget. See the reopened entry under **Closed non-implementation decisions**.
 - Do **not** add an owner sweep: pooled stablecoin and rBTC cannot be safely distinguished from liabilities, and signer-only withdrawal remains the custody boundary.
-- Keep SPDX **MIT** for the relaunch. A future licensing change is a legal/product project, not latent Solidity work.
+- Licensing is **reopened** (was: keep MIT). Two questions, both open: whether MIT is the right license for BitChill at all, and a GPL compliance gap that exists today regardless of that answer. See **Licensing — reopened** below.
 - Dex: keep the $1-listed-stable + MoC BTC/USD on-chain floor, decimal-correct it, and leave extra MEV policy to the bot (R43). LayerBank is route 1 for USDRIF/USDT0; keep Sovryn DOC at route 2; USDT0 bounds are `25e6` / `1000e6` / `100_000e6` (R36).
 - Keep Tropykus local/fork lanes but no live deploy path; burn index 4 (R37).
 - Replace cartesian withdraw-all semantics and keep the existing names (R38). Swapper batcher is all-or-nothing; bot EOA stays allowlisted (R42). R9 adds no extra purchase-event fields.
@@ -110,7 +110,8 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R42 integration | 49 ([#101](https://github.com/BitChillRSK/dca-contracts/pull/101)) | none (`Batch` for both entry points) |
 | R51 | 50 (planned GitHub #103) | none (first fork table in PR; durable live floor is a relaunch gate) |
 | R52 | 51 ([#104](https://github.com/BitChillRSK/dca-contracts/pull/104)) | none (same production Safe; divergent owners keep naturally split authority) |
-| R51 deploy follow-up | unassigned | none (enforce the DOC-Dex never-deploy rule in `DeployDexSwaps`) |
+| R57 | 52 (planned GitHub #106; spec in [#105](https://github.com/BitChillRSK/dca-contracts/pull/105)) | **one** — also drop the now-unused `registerRoute(SOVRYN_INDEX, true)` from the live Dex branch? (recommend yes) |
+| R56 | unassigned (after #104; spec in [#105](https://github.com/BitChillRSK/dca-contracts/pull/105)) | none (oracle floor = safety check; bot `minRbtcOut` is operational) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -549,7 +550,7 @@ The shipped Dex set is LayerBank USDRIF and LayerBank USDT0. This supersedes the
 calibrating it. The `DcaManager`/handler ABI is unaffected; the DOC Dex handler stays as test-only legacy, in
 the same position as Tropykus after R37.
 
-### PR 50 follow-up - close the DOC Dex deploy hole (unassigned, no spec doc)
+### R57 - close the DOC Dex deploy hole ([spec](./R57-close-doc-dex-deploy-hole.md), unassigned, gated on #103)
 
 `DeployDexSwaps`' live branch still registers `SOVRYN_INDEX` and constructs `SovrynErc20HandlerDex` when
 `STABLECOIN_TYPE=DOC`, and its comment at `script/DeployDexSwaps.s.sol:113` still names Sovryn (DOC) as part
@@ -557,6 +558,14 @@ of the live dex map. Deploy-script work is outside R51's Solidity scope, so PR 1
 mirrors what R37 did for Tropykus: revert on the DOC Dex arm in the live branch and correct the comment, then
 re-run the deploy lanes. Until then the never-deploy rule above is documentation only and is not enforced by
 the script. Sequence this before any Dex cutover broadcast; it does not block R52.
+
+**Promoted to R57 on 2026-09-02.** It had no R-id and no spec, which made it the only queued item a
+handover prompt could not name, and left the reader to reassemble the hazard from three documents. The
+spec records what makes it a hazard rather than untidiness: `DEFAULT_STABLECOIN` is `DOC`, so an unset
+`STABLECOIN_TYPE` is enough to trigger it; `assignTokenHandler` is add-only, so `(DOC, SOVRYN_INDEX)` is
+burned permanently once taken — the same key `DeployMocSwaps` needs for the production
+`SovrynDocHandlerMoc`; and the live DOC arm is currently exercised and green by `LiveDeployPathTest` on
+the `moc-sovryn` lane, so closing it changes existing tests rather than only adding one.
 
 ### PR 51 - R52 allowlisted Dex path failover ([#104](https://github.com/BitChillRSK/dca-contracts/pull/104))
 
@@ -587,17 +596,118 @@ in this PR (`script/DeployOptimizerProof.s.sol`). **Passed (2026-09-01)** — CR
 [0x3a63dc…](https://rootstock-testnet.blockscout.com/tx/0x3a63dc2458142cca09144a3f290ed6d996780c616acb8adbdf15f57f736ff5bc)
 verified at [`0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD`](https://rootstock-testnet.blockscout.com/address/0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD).
 Do not treat R53 as still owning the optimizer baseline — that work is absorbed here.
-Remaining R54/R55 items live in stacked [#105](https://github.com/BitChillRSK/dca-contracts/pull/105).
+Remaining R54/R55/R56 items live in stacked [#105](https://github.com/BitChillRSK/dca-contracts/pull/105).
+
+**Superseded 2026-09-01.** The earlier plan put the allowlist on `OperationsAdmin` because a prototype with
+policy on the Dex leaf exceeded EIP-170. That budget was *unoptimized*. With `optimizer = true` the leaf has
+~9 KB of margin, and #104 accordingly moved policy back onto `PurchaseUniswap`, where per-handler storage also
+makes cross-handler misuse impossible. Do not reuse the bytecode argument for a centralized registry.
+
+### R56 - Dex oracle floor is the safety check ([spec](./R56-dex-oracle-floor-is-safety-check.md), unassigned, gated on #103 and #104)
+
+R51 follow-up that PR 103 correctly left out of scope. `s_amountOutMinimumPercent` (99.5%) is still the
+Uniswap `amountOutMinimum` today, so the Safe is the only party that can add margin after a quote. Move
+the on-chain oracle floor to `s_amountOutMinimumSafetyCheck` (95%), delete the 99.5% storage percent from
+swap math and from the handler ABI, and pass `max(oracleFloor, minRbtcOut)` into `ExactInputParams`.
+`PurchaseRbtc` still checks measured output. The two-action R43 speed bump goes away: changing the
+backstop is one owner transaction. Production Dex still sends a nonzero quote-derived `minRbtcOut`.
+
+Ask: none.
+
+**Supersedes** the R51 cutover that installed 99.5% then re-locked the safety check to the same value, and
+R43's "safety check is config-only / never enters swap math".
+
+### R53 - re-baseline the recorded sizes and gas ([spec](./R53-optimizer-baseline.md), unassigned)
+
+The optimizer flip itself is no longer R53's. `[profile.default]` never set `optimizer` and forge defaults it
+to `false`, so the relaunch was measured unoptimized throughout; #104 pins `optimizer = true` /
+`optimizer_runs = 200` / `via_ir = false` because handler-local path policy needs it to clear EIP-170, and #104
+also owns the Rootstock testnet + Blockscout re-proof of that artifact. The measurement rule at the top of this
+file and its `AGENTS.md` mirror are already rewritten to *optimized* no-IR.
+
+What remains is the re-baseline #104 did not do: it corrected only its own figures. Every runtime size, EIP-170
+margin, and gas number recorded in the R18 / R31 / R42 / R50 / R51 entries and specs is still unoptimized. For
+scale, the flip moved `DcaManager` 23,703 B / 873 B margin -> 13,767 B / 10,809 B, `testSinglePurchase`
+283,711 -> 243,817 gas, and `testBatchPurchasesOneUser` 2,244,557 -> 1,562,720. Append the corrected figure to
+each historical entry; do not rewrite why a shipped PR chose what it chose.
+
+The optimized budget also voids the bytecode premise under decisions this PR does not re-judge: the migration
+gate's manual exit/re-entry (justified partly by "426 bytes of runtime margin") and R51's `_creditBuyers`
+reasoning. Each belongs to its own PR on its remaining merits; several have independent arguments that survive.
+`via_ir` stays out (R55).
+
+Ask: none. `optimizer_runs = 200` and CI inheritance were settled in #104.
+
+### R54 - top a schedule up from accrued interest ([spec](./R54-schedule-top-up-from-interest.md), unassigned, gated on #104)
+
+Revives R12. `DcaManager.topUpFromInterest(token, scheduleIndex, scheduleId)` credits the caller's accrued
+lending interest to one schedule's `tokenBalance`, so yield buys rBTC without a withdraw-then-deposit round
+trip - which also avoids Sovryn's SIP-0094 exit fee, since nothing is redeemed. `DcaManager`-only: no handler
+call, no token movement, no redeem-then-remint. The credited figure is the same expression the interest
+withdrawal uses, so the route's summed principal lands exactly on the position's floored value and never
+above it - the same end state an interest withdrawal already produces, reached from the other side.
+
+Measured at `proto/r12-compound-interest` (`7dd00fb`): +1,020 B unoptimized (margin **-147**, does not fit),
++600 B with the optimizer (margin 10,209), +508 B under IR. Gated on the #104 optimizer pin for exactly that reason; dropping the
+dedicated event saves only 112 B and does not rescue it.
+
+Ask: whether the R48 deposit pause blocks a top-up (recommend yes - a pause means stop growing exposure on
+that route, whatever the funds' source); naming (`topUpFromInterest`, because "compound" collides with Compound
+the lending protocol that Tropykus forks - the same collision class R26 fixed for "lending token"); and
+all-or-part (recommend all, no `amount` parameter).
+
+### R55 - evaluate solx and the IR pipeline ([spec](./R55-solx-and-ir-evaluation.md), unassigned, gated on #104)
+
+Measure and recommend; change no compiler setting. Compare stock solc no-IR, stock solc `via_ir`, and solx on
+runtime size, hot-path gas, whether the full matrix passes, and whether Blockscout can verify the result on
+Rootstock. Every number must be against the optimized baseline #104 pins - the optimizer already takes 14-30% and
+`via_ir` a further 2-4%, so solx competes against ~239k gas on `testSinglePurchase`, not ~284k, and crediting
+it with the optimizer's win would be the easiest mistake to make here.
+
+EIP-170 is explicitly not a motivation: once #104 lands nothing is size-constrained. The deciding factor is risk,
+not gas. These contracts are immutable and unproxied and hold user funds, R23's toolchain proof was obtained
+with stock solc, and a gas win that Blockscout cannot verify on Rootstock is not shippable. An explicit "keep
+stock solc" option is chosen unless a candidate clears both the gas bar and verification.
 
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:
 
-- **R12 compound interest into a chosen schedule — rejected.** The existing explicit withdraw-interest then deposit flow is legible and user-controlled. An atomic compound path must reconcile per-handler shares with per-route/per-schedule principal and adds a new cash-moving entry point to immutable handlers for convenience, not solvency.
+- **R12 compound interest into a chosen schedule — reopened 2026-08-31 as [R54](./R54-schedule-top-up-from-interest.md).** The original rejection is quoted here because it should not be reused: "The existing explicit withdraw-interest then deposit flow is legible and user-controlled. An atomic compound path must reconcile per-handler shares with per-route/per-schedule principal and adds a new cash-moving entry point to immutable handlers for convenience, not solvency." That describes an in-handler design which was never proposed — R12 was always `DcaManager`-only, with no handler call and no token movement. The unrecorded real blocker was EIP-170, and it was genuine: the function does not fit unoptimized. R53 removes it.
 - **Owner sweep — rejected.** A pooled balance cannot prove which tokens are harmless dust versus user liabilities. Governance must not gain a path around signer-only withdrawals.
 - **Handler per-user storage packing — rejected.** Each mapping value is already one slot and contains a financial amount. Narrowing it saves no slot across mapping entries.
 - **Address-keyed bool bitmaps — rejected.** `s_swappers` and `s_handlerAssigned` are sparse address keys; they never share a word, so a bitmap is extra math for the same SLOAD. R50 packs the `(token, routeIndex)` handler+pause pair instead.
-- **SPDX change — rejected for this relaunch.** Keep the repository's existing MIT license. Re-licensing requires an explicit legal/product process outside the contract implementation stack.
+- **SPDX change — reopened 2026-08-31.** The earlier rejection argued that re-licensing "requires an explicit legal/product process outside the contract implementation stack" and then closed the decision on that basis, which is self-defeating: that is a reason to route the question to a human, not to answer it. See **Licensing — reopened**.
+
+## Licensing — reopened
+
+Reopened 2026-08-31. Not latent Solidity work, and not an agent decision: it needs a human and
+probably counsel. Recorded here so the question is not lost, with the findings that motivate it.
+Free to change until the relaunch cutover, since verified source is immortal on explorers.
+
+**1. A compliance gap exists today, independent of any relicensing choice.** All 42 files in `src/`
+declare `MIT`. But `src/PurchaseUniswap.sol` imports `TransferHelper`, `ISwapRouter02`, and
+`IV3SwapRouter`, and `src/interfaces/IPurchaseUniswap.sol` imports `ISwapRouter02` — all four carry
+`SPDX-License-Identifier: GPL-2.0-or-later`. `TransferHelper` is a library whose code compiles into
+the deployed Dex handlers, not merely an interface, so an MIT declaration over that derivative is at
+best contested. Uniswap handle this on their own tree by shipping periphery as GPL-2.0-or-later and
+core as BUSL-1.1. `lib/v3-core` is BUSL-1.1 but nothing in `src/` imports it, so it is moot. The
+mechanism for a fix is per-file SPDX: the Uniswap-importing files take GPL-2.0-or-later, the rest
+take whatever question 2 settles.
+
+**2. Which license.** Four realistic options. MIT (today) is maximally permissive with no patent
+grant. Apache-2.0 is permissive with an explicit patent grant and a trademark clause, and is
+strictly better than MIT for a company that wants to stay permissive. BUSL-1.1 (Uniswap v3, Aave v3)
+is source-available with production use restricted for up to four years, then auto-converting to a
+nominated Change License; it needs Licensor, Change Date, Change License, and an Additional Use
+Grant. GPL-3.0/AGPL-3.0 (Uniswap v2) forces forks to stay open without preventing them.
+
+The deciding question is what is actually being protected. The moat is the Rootstock lending
+integrations, the swapper bot, and deployed liquidity rather than the Solidity, and verified source
+means anyone can copy it whatever the header says — a license buys recourse, not prevention. Against
+that, BUSL is not OSI-approved, is screened out by some integrators and grant programs, and
+complicates the GPL situation in question 1. Lean BUSL only if a specific plausible forker can be
+named; otherwise Apache-2.0.
 
 ## OpenZeppelin policy
 

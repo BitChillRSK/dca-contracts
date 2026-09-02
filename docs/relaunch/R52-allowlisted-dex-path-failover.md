@@ -11,9 +11,9 @@ at [`0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD`](https://rootstock-testnet.bloc
 (chain 31, block 8031347, owner `TESTNET_OWNER`, solc 0.8.36 / cancun / optimizer 200). Blockscout:
 Pass - Verified. Ready for human review.
 R53's optimizer-baseline work is absorbed here. Schedule top-up is R54; solx / via-IR evaluation
-and `ZeroTokenPurchaseUniswap` repair are R55. Those remaining items are defined in stacked
-[#105](https://github.com/BitChillRSK/dca-contracts/pull/105), which will need rebasing after this
-PR because its original R53 optimizer plan is superseded. There is no `[profile.deploy]`.
+and `ZeroTokenPurchaseUniswap` repair are R55; the Dex oracle-floor follow-up is R56. Those remaining
+items are defined in stacked [#105](https://github.com/BitChillRSK/dca-contracts/pull/105). There is
+no `[profile.deploy]`.
 
 One chat/PR owns only this persistent path-governance change.
 
@@ -161,11 +161,13 @@ incident runbook pass their own tests.
 - [ ] Per-batch path selection, size-dependent routing, `pathIndex`, free-form `bytes`, or switch-and-buy.
 - [ ] Swapper-writable slippage percent, safety floor, oracle, router, WRBTC, or stablecoin.
 - [ ] Automatic revocation/allowlisting from pool health, partial across-handler success, or a second signing service.
-- [ ] Changing `_getAmountOutMinimum`, deploy slippage defaults, or purchase-path reentrancy policy.
+- [ ] Changing `_getAmountOutMinimum`, deploy slippage defaults, or purchase-path reentrancy policy
+      (R56 in [#105](https://github.com/BitChillRSK/dca-contracts/pull/105)).
 - [ ] OperationsAdmin-owner break-glass activation when handler ownership has diverged.
 - [ ] A new abstract policy contract.
 - [ ] Rootstock testnet / Blockscout re-proof of via-IR (R55 in [#105](https://github.com/BitChillRSK/dca-contracts/pull/105)).
-- [ ] Schedule top-up (R54) and solx evaluation (R55) in [#105](https://github.com/BitChillRSK/dca-contracts/pull/105).
+- [ ] Schedule top-up (R54), solx evaluation (R55), and the Dex oracle-floor follow-up (R56) in
+      [#105](https://github.com/BitChillRSK/dca-contracts/pull/105).
 
 ## Files likely touched
 

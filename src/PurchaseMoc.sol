@@ -11,9 +11,9 @@ import {IPurchaseMoc} from "./interfaces/IPurchaseMoc.sol";
  * @notice MoC purchase route: redeem DOC for native rBTC and measure the handler's balance delta.
  */
 abstract contract PurchaseMoc is PurchaseRbtc, IPurchaseMoc {
-    //////////////////////
-    // State variables ///
-    //////////////////////
+    /*//////////////////////////////////////////////////////////////
+                            STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
     /// @notice Money on Chain proxy used to redeem DOC for rBTC.
     /// @return The constructor-supplied MoC proxy.
     IMocProxy public immutable i_mocProxy;

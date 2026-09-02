@@ -16,9 +16,9 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     using SafeERC20 for IERC20;
     using SafeCast for uint256;
 
-    //////////////////////
-    // State variables ///
-    //////////////////////
+    /*//////////////////////////////////////////////////////////////
+                            STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
 
     /// @dev Two slots. Rates never exceed MAX_FEE_RATE_CAP, so they fit uint16 beside the collector:
     ///      the word every purchase already loads for the fee rates is the one `_transferFee` needs.

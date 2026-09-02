@@ -139,6 +139,10 @@ swap math, so widening slippage tolerance costs two owner transactions — lower
 With the owner a Safe (R45) that speed bump is worth its 32 bytes of storage; deleting it would also break the
 `getAmountOutMinimumSafetyCheck` / `setAmountOutMinimumSafetyCheck` surface for no behavioral gain.
 
+**Superseded 2026-09-02 by [R56](./R56-dex-oracle-floor-is-safety-check.md).** The 99.5% percent is the
+operational number the Safe cannot change on a quote, which is the wrong operator. R56 puts the safety
+check into swap math as the loss ceiling and deletes the percent from the hot path and ABI.
+
 **5. Path encoding.** Unchanged. `_setPurchasePath` pins hop 0 to `_purchaseToken()` and the last hop to
 `i_wrBtcToken`; only the intermediates and fee tiers are owner-set, and a wrong tier reverts rather than
 mis-settles, because cash is the measured WRBTC delta and the floor still applies. The live USDRIF path is
@@ -148,7 +152,7 @@ input token's decimals and WRBTC's 18 do.
 **6. Zero price.** A `currentPrice` of 0 with `isValid` true divides by zero and reverts (panic 0x12). Loud,
 not silent, so no extra guard was added for a broken-oracle case that already cannot mis-price a swap.
 
-**Invariant 1** is untouched: `_swapStablecoinForWrbtc` still credits the measured WRBTC balance delta and
+**Invariant 1** is untouched: the Uniswap swap still credits the measured WRBTC balance delta and
 still ignores the router's return value. `amountOutMinimum` is a revert bound only.
 
 **Size and gas.** `SovrynErc20HandlerDex` 21,061 → 21,104 runtime bytes (margin 3,515 → 3,472);
