@@ -1,8 +1,10 @@
 # R58 — Split test-only constants out of `script/Constants.sol`
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **assigned** · Assigned: yes · Optional/further-review: no
 
-Test/Makefile only. No `src/` or deploy-broadcast change. Branch from the latest open relaunch PR head when picked up.
+PR 54 of the relaunch stack. Test/Makefile only. No `src/` or deploy-broadcast change. Branched from
+R56 / [#107](https://github.com/BitChillRSK/dca-contracts/pull/107), the latest open relaunch PR, whose
+R56 rewrite of the slippage comments this spec's line numbers predate.
 
 ## Objective
 
@@ -44,11 +46,11 @@ Audit (2026-09-02):
 
 ## Scope
 
-- [ ] Move the test-only constants listed above from `script/Constants.sol` into `test/Constants.sol` (re-export script constants via the existing import).
-- [ ] Remove the `TESTS CONSTANTS` section header from script once empty; keep `BTC_PRICE` with deploy/helper constants.
-- [ ] Update test and mock imports: prefer `test/Constants.sol` (or relative `../Constants.sol` under `test/`) over direct `script/Constants.sol` imports.
-- [ ] Consolidate duplicate fork-holder names (`DOC_HOLDER_TEST` vs `DOC_HOLDER_TESTNET`, etc.).
-- [ ] Drop dead constants unless a short comment in `test/Constants.sol` replaces `RESERVED_MOC_LENDING_INDEX`.
+- [x] Move the test-only constants listed above from `script/Constants.sol` into `test/Constants.sol` (re-export script constants via the existing import).
+- [x] Remove the `TESTS CONSTANTS` section header from script once empty; keep `BTC_PRICE` with deploy/helper constants.
+- [x] Update test and mock imports: prefer `test/Constants.sol` (or relative `../Constants.sol` under `test/`) over direct `script/Constants.sol` imports.
+- [x] Consolidate duplicate fork-holder names (`DOC_HOLDER_TEST` vs `DOC_HOLDER_TESTNET`, etc.).
+- [x] Drop dead constants unless a short comment in `test/Constants.sol` replaces `RESERVED_MOC_LENDING_INDEX`.
 
 ## Out of scope
 
@@ -72,10 +74,10 @@ Audit (2026-09-02):
 
 ## Success criteria
 
-- [ ] No test-only constant remains in `script/Constants.sol` except values deploy/helper scripts read (`BTC_PRICE` included).
-- [ ] Grep shows no test file importing `script/Constants.sol` solely for symbols now defined in `test/Constants.sol`.
-- [ ] `make check`, `make fork-sovryn`, and `make fork-tropykus` pass.
-- [ ] Open product decisions: none.
+- [x] No test-only constant remains in `script/Constants.sol` except values deploy/helper scripts read (`BTC_PRICE` included).
+- [x] Grep shows no test file importing `script/Constants.sol` solely for symbols now defined in `test/Constants.sol`.
+- [x] `make check`, `make fork-sovryn`, and `make fork-tropykus` pass.
+- [x] Open product decisions: none.
 
 ## Reviewer checklist
 
@@ -89,3 +91,31 @@ Audit (2026-09-02):
 - ABI: none.
 - Scripts: constant relocation only; deploy script behavior unchanged.
 - Cutover: none.
+
+## As implemented
+
+Every audited symbol moved as listed. Four decisions the audit left open, and one boundary the audit
+did not name:
+
+- **`RESERVED_MOC_LENDING_INDEX` dropped, not moved.** It reserves index 3 on the *production* MoC
+  map, so `test/Constants.sol` is the wrong home for it. The declaration is replaced by a two-line
+  comment beside `SOVRYN_INDEX`: an unused constant is what invites a script to register it, while a
+  comment reserves the number without offering a symbol to pass.
+- **Fork holders keep the `_TESTNET` suffix.** `DOC_HOLDER_TESTNET` is the name `DcaDappTest`
+  already calls, and it reads as the testnet counterpart of `DOC_HOLDER`. The unreferenced
+  `DOC_HOLDER_TEST` / `USDRIF_HOLDER_TEST` pair in `test/Constants.sol` is gone;
+  `USDRIF_HOLDER_TESTNET` survives the merge as the USDRIF half of that pair.
+- **`OWNER_STRING` and `FEE_COLLECTOR_STRING` stay in script, now with a reason.** `DeployBase`
+  derives the local and fork owner and fee collector from them, so they are deploy inputs the
+  harness reads back, not harness labels. `USER_STRING` / `ADMIN_STRING` / `SWAPPER_STRING` have no
+  deploy-side reader and moved.
+- **`BTC_PRICE` moved up out of the deleted test block** rather than staying under a banner that no
+  longer exists. `DexHelperConfig` and `UsdrifHelperConfig` pass it to `MockSwapRouter02`.
+
+**Script-reachable mocks stay on `script/Constants.sol`.** The R37 guard survives today only because
+`script/*.s.sol` imports mocks with the named `import {Mock} from …` form, which does not re-export a
+plain `import "…"` inside the mock; `MockMocOracle` was already reaching into `test/Constants.sol`, so
+one more plain import anywhere in that chain would have put `TROPYKUS_INDEX` in a deploy script's
+scope. `MockMocOracle` is repointed at `script/Constants.sol` and `MockMocProxy` stays there, so no
+mock a script can construct sees a test-only symbol regardless of import form. `MockSwapRouter02`'s
+`script/Constants.sol` import referenced nothing and is deleted.
