@@ -204,6 +204,7 @@ contract EventIndexingTest is DcaDappTest {
         if (sig == keccak256("FeeHandler__FeeCollectorAddressSet(address)")) return (true, 1);
         if (sig == keccak256("FeeHandler__FeeTransferred(address,address,uint256)")) return (true, 2);
         if (sig == keccak256("PurchaseUniswap_NewPathSet(address[],uint24[],bytes)")) return (true, 0);
+        if (sig == keccak256("PurchaseUniswap_AmountOutMinimumPercentUpdated(uint256,uint256)")) return (true, 0);
         if (sig == keccak256("PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(uint256,uint256)")) return (true, 0);
         if (sig == keccak256("PurchaseUniswap_OracleUpdated(address,address)")) return (true, 2);
         if (sig == keccak256("IdleErc20Handler__AmountAdjusted(address,uint256,uint256)")) return (true, 1);

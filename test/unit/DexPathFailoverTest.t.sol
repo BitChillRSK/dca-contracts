@@ -164,11 +164,11 @@ contract DexPathFailoverTest is DcaDappTest {
 
         vm.expectRevert(ownableUnauthorized(OWNER));
         vm.prank(OWNER);
-        IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumSafetyCheck(0.996 ether);
+        IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumPercent(0.996 ether);
 
         vm.prank(HANDLER_OWNER);
-        IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumSafetyCheck(0.996 ether);
-        assertEq(IPurchaseUniswap(address(stablecoinHandler)).getAmountOutMinimumSafetyCheck(), 0.996 ether);
+        IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumPercent(0.996 ether);
+        assertEq(IPurchaseUniswap(address(stablecoinHandler)).getAmountOutMinimumPercent(), 0.996 ether);
 
         vm.prank(HANDLER_OWNER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(mids, fees);
@@ -177,7 +177,7 @@ contract DexPathFailoverTest is DcaDappTest {
     function testSlippageAndOracleRemainHandlerOwnerOnly() public {
         vm.expectRevert(ownableUnauthorized(SWAPPER));
         vm.prank(SWAPPER);
-        IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumSafetyCheck(0.996 ether);
+        IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumPercent(0.996 ether);
 
         vm.expectRevert(ownableUnauthorized(SWAPPER));
         vm.prank(SWAPPER);
@@ -355,6 +355,7 @@ contract DexPathFailoverTest is DcaDappTest {
                     }),
                     FEE_COLLECTOR,
                     IFeeHandler(address(stablecoinHandler)).getFeeSettings(),
+                    primary.getAmountOutMinimumPercent(),
                     primary.getAmountOutMinimumSafetyCheck(),
                     OWNER
                 )

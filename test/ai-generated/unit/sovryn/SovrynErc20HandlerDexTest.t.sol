@@ -25,6 +25,7 @@ import {ownableUnauthorized} from "../../../utils/OzRevert.sol";
  */
 contract SovrynErc20HandlerDexTest is HandlerTestHarness {
 
+    event PurchaseUniswap_AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
     event PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(uint256 oldValue, uint256 newValue);
     
     // Sovryn DEX-specific contracts
@@ -65,6 +66,7 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
             uniswapSettings,
             FEE_COLLECTOR,
             feeSettings,
+            DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
             DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
             OWNER
         );
@@ -108,9 +110,66 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
     //////////////////////////////////////////////////////////////*/
     
     function test_sovrynDex_deployment() public {
+        assertEq(sovrynDexHandler.getAmountOutMinimumPercent(), DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT);
         assertEq(sovrynDexHandler.getAmountOutMinimumSafetyCheck(), DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK);
         assertNotEq(address(sovrynDexHandler.getMocOracle()), address(0));
         assertGt(sovrynDexHandler.getSwapPath().length, 0);
+    }
+
+    function test_sovrynDex_setAmountOutMinimumPercent_success() public {
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumPercent(0.98 ether);
+
+        assertEq(sovrynDexHandler.getAmountOutMinimumPercent(), 0.98 ether);
+    }
+
+    function test_sovrynDex_setAmountOutMinimumPercent_reverts_notOwner() public {
+        vm.expectRevert(ownableUnauthorized(USER));
+        vm.prank(USER);
+        sovrynDexHandler.setAmountOutMinimumPercent(0.98 ether);
+    }
+
+    /// @dev The wall: one owner transaction cannot widen the live floor past the safety check.
+    function test_sovrynDex_setAmountOutMinimumPercent_reverts_belowSafetyCheck() public {
+        uint256 safetyCheck = sovrynDexHandler.getAmountOutMinimumSafetyCheck();
+        uint256 percentBefore = sovrynDexHandler.getAmountOutMinimumPercent();
+
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumPercent(safetyCheck - 1);
+
+        assertEq(sovrynDexHandler.getAmountOutMinimumPercent(), percentBefore, "the floor must be unchanged on revert");
+    }
+
+    function test_sovrynDex_setAmountOutMinimumPercent_reverts_tooHigh() public {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooHigh.selector);
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumPercent(1.01 ether);
+    }
+
+    /// @dev Raising the wall above the active floor reverts without changing state, so widening past it
+    ///      is deliberately two transactions.
+    function test_sovrynDex_setAmountOutMinimumSafetyCheck_reverts_aboveCurrentPercent() public {
+        uint256 percent = sovrynDexHandler.getAmountOutMinimumPercent();
+        uint256 safetyBefore = sovrynDexHandler.getAmountOutMinimumSafetyCheck();
+
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumSafetyCheck(percent + 1);
+
+        assertEq(sovrynDexHandler.getAmountOutMinimumSafetyCheck(), safetyBefore);
+        assertEq(sovrynDexHandler.getAmountOutMinimumPercent(), percent);
+    }
+
+    /// @dev Widening below the wall takes two owner transactions, in this order.
+    function test_sovrynDex_wideningBelowTheWallTakesTwoTransactions() public {
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumSafetyCheck(0.90 ether);
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumPercent(0.92 ether);
+
+        assertEq(sovrynDexHandler.getAmountOutMinimumPercent(), 0.92 ether);
+        assertEq(sovrynDexHandler.getAmountOutMinimumSafetyCheck(), 0.90 ether);
     }
 
     function test_sovrynDex_setAmountOutMinimumSafetyCheck_success() public {
@@ -133,13 +192,30 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
     }
 
     function test_sovrynDex_constructor_allows_hundred_percent() public {
-        SovrynErc20HandlerDex handler = _deploySovrynDexWithSlippage(1 ether);
+        SovrynErc20HandlerDex handler = _deploySovrynDexWithSlippage(1 ether, 1 ether);
+        assertEq(handler.getAmountOutMinimumPercent(), 1 ether);
         assertEq(handler.getAmountOutMinimumSafetyCheck(), 1 ether);
+    }
+
+    function test_sovrynDex_constructor_allows_equal_percent_and_safety() public {
+        SovrynErc20HandlerDex handler = _deploySovrynDexWithSlippage(0.99 ether, 0.99 ether);
+        assertEq(handler.getAmountOutMinimumPercent(), 0.99 ether);
+        assertEq(handler.getAmountOutMinimumSafetyCheck(), 0.99 ether);
+    }
+
+    function test_sovrynDex_constructor_reverts_when_percent_too_high() public {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooHigh.selector);
+        _deploySovrynDexWithSlippage(1.01 ether, 0.95 ether);
+    }
+
+    function test_sovrynDex_constructor_reverts_when_percent_below_safety() public {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
+        _deploySovrynDexWithSlippage(0.94 ether, 0.95 ether);
     }
 
     function test_sovrynDex_constructor_reverts_when_safety_too_high() public {
         vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh.selector);
-        _deploySovrynDexWithSlippage(1.01 ether);
+        _deploySovrynDexWithSlippage(1 ether, 1.01 ether);
     }
 
     /**
@@ -326,13 +402,16 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
     function test_sovrynDex_extremeSlippageSettings() public {
         vm.prank(OWNER);
         sovrynDexHandler.setAmountOutMinimumSafetyCheck(0.50 ether);
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumPercent(0.50 ether); // 50% — very high slippage
 
-        assertEq(sovrynDexHandler.getAmountOutMinimumSafetyCheck(), 0.50 ether);
+        assertEq(sovrynDexHandler.getAmountOutMinimumPercent(), 0.50 ether);
 
         vm.prank(OWNER);
-        sovrynDexHandler.setAmountOutMinimumSafetyCheck(0.9999 ether);
+        sovrynDexHandler.setAmountOutMinimumPercent(0.9999 ether); // 99.99% — very low slippage
 
-        assertEq(sovrynDexHandler.getAmountOutMinimumSafetyCheck(), 0.9999 ether);
+        assertEq(sovrynDexHandler.getAmountOutMinimumPercent(), 0.9999 ether);
+        assertEq(sovrynDexHandler.getAmountOutMinimumSafetyCheck(), 0.50 ether, "the wall stays where governance put it");
     }
     
     function test_sovrynDex_oracleFailure() public {
@@ -493,7 +572,7 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
         assertGt(rbtcBalance2, 0);
     }
 
-    function _deploySovrynDexWithSlippage(uint256 amountOutMinimumSafetyCheck)
+    function _deploySovrynDexWithSlippage(uint256 amountOutMinimumPercent, uint256 amountOutMinimumSafetyCheck)
         private
         returns (SovrynErc20HandlerDex)
     {
@@ -523,6 +602,7 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
             uniswapSettings,
             FEE_COLLECTOR,
             feeSettings,
+            amountOutMinimumPercent,
             amountOutMinimumSafetyCheck,
             OWNER
         );

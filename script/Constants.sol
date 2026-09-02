@@ -52,8 +52,18 @@ string constant TROPYKUS_STRING = "tropykus";
 string constant DOC_STRING = "DOC"; // Unset STABLECOIN_TYPE falls back to this in `_stablecoinType()`.
 string constant USDRIF_STRING = "USDRIF";
 string constant USDT0_STRING = "USDT0";
-uint256 constant DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK = 0.95 ether; // 95% oracle backstop at swap time
-uint256 constant MAX_SLIPPAGE_PERCENT = 0.005 ether; // 0.5% tolerance for fork purchase comparisons
+// Swap-time oracle floor. Deliberately loose: the swapper's per-batch `minRbtcOut` is the operational
+// bound, and this is what holds when that minimum is absent, stale, or hostile. Derived from the live
+// quote table (`make probe-dex-quote-floor`, block 9198813): the worst realistic-size fill was LayerBank
+// USDRIF at 99.27% of oracle for a $1,000 batch, so 97% leaves ~227 bps for peg drift, oracle drift, and
+// pool movement between quote and inclusion, while capping a compromised-swapper loss at 3%.
+uint256 constant DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT = 0.97 ether; // 97%
+// The wall the owner cannot cross in one transaction when widening the floor above.
+uint256 constant DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK = 0.95 ether; // 95%
+// Assertion tolerance for purchase comparisons. Deliberately NOT derived from the floor above: it is how
+// close the mock router's payout must sit to the oracle price, not what the router enforces. On a live-pool
+// fork a fill between the floor and this tolerance fails the assertion rather than reverting in the router.
+uint256 constant MAX_SLIPPAGE_PERCENT = 0.005 ether; // 0.5%
 uint256 constant EXCHANGE_RATE_DECIMALS = 1e18; // Valid for DOC and USDRIF in both Tropykus and Sovryn
 
 // USDT0 is 6 decimals. Do not pass MIN_PURCHASE_AMOUNT / FEE_PURCHASE_* (18-decimal DOC/USDRIF

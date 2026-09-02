@@ -26,6 +26,7 @@ contract DeployDexSwaps is DeployBase {
         address shareToken;
         IPurchaseUniswap.UniswapSettings uniswapSettings;
         address feeCollector;
+        uint256 amountOutMinimumPercent;
         uint256 amountOutMinimumSafetyCheck;
     }
 
@@ -60,6 +61,7 @@ contract DeployDexSwaps is DeployBase {
                     params.uniswapSettings, 
                     params.feeCollector, 
                     feeSettings,
+                    params.amountOutMinimumPercent,
                     params.amountOutMinimumSafetyCheck,
                     _initialOwner()
                 )
@@ -74,6 +76,7 @@ contract DeployDexSwaps is DeployBase {
                     params.uniswapSettings, 
                     params.feeCollector, 
                     feeSettings,
+                    params.amountOutMinimumPercent,
                     params.amountOutMinimumSafetyCheck,
                     _initialOwner()
                 )
@@ -88,6 +91,7 @@ contract DeployDexSwaps is DeployBase {
                     params.uniswapSettings,
                     params.feeCollector,
                     feeSettings,
+                    params.amountOutMinimumPercent,
                     params.amountOutMinimumSafetyCheck,
                     _initialOwner()
                 )
@@ -140,6 +144,7 @@ contract DeployDexSwaps is DeployBase {
                         shareToken: layerbankAToken,
                         uniswapSettings: uniswapSettings,
                         feeCollector: feeCollector,
+                        amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
                         amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
                     })
                 );
@@ -218,6 +223,7 @@ contract DeployDexSwaps is DeployBase {
                 shareToken: shareTokenAddress,
                 uniswapSettings: uniswapSettings,
                 feeCollector: feeCollector,
+                amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
                 amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
             });
             

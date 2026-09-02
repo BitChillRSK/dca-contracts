@@ -52,6 +52,7 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
                 uniswapSettings: uniswapSettings,
                 feeCollector: makeAddr(FEE_COLLECTOR_STRING),
                 feeSettings: feeSettings,
+                amountOutMinimumPercent: config.amountOutMinimumPercent,
                 amountOutMinimumSafetyCheck: config.amountOutMinimumSafetyCheck,
                 initialOwner: operationsAdmin.owner()
             })

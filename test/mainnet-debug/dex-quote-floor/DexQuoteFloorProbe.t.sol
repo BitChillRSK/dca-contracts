@@ -4,6 +4,7 @@ pragma solidity 0.8.36;
 import {Test, console2} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ICoinPairPrice} from "src/interfaces/ICoinPairPrice.sol";
+import "../../../script/Constants.sol";
 
 interface IV3SwapRouterLike {
     struct ExactInputParams {
@@ -50,8 +51,9 @@ contract DexQuoteFloorProbe is Test {
     ///      re-approving a path is R52's surface, not R51's.
     address internal constant USDT_USDRIF_HOP = 0xAf368c91793CB22739386DFCbBb2F1A9e4bCBeBf;
 
-    /// @dev The deploy defaults R51 leaves untouched: 99.5% of the oracle-implied rBTC, $1 peg, 18-decimal oracle.
-    uint256 internal constant AMOUNT_OUT_MINIMUM_PERCENT = 0.995 ether;
+    /// @dev The shipped swap-time floor, read from the deploy constants so this table always measures the
+    ///      value the handlers actually enforce. $1 peg, 18-decimal oracle.
+    uint256 internal constant AMOUNT_OUT_MINIMUM_PERCENT = DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT;
     uint256 internal constant ORACLE_DECIMALS = 18;
     /// @dev Production fee is a flat 1% (`MIN_FEE_RATE == MAX_FEE_RATE_PRODUCTION`).
     uint256 internal constant FEE_BPS = 100;
@@ -132,7 +134,8 @@ contract DexQuoteFloorProbe is Test {
 
         console2.log("-- gross in (token units)", grossIn);
         console2.log("   post-fee in (token units)", netIn);
-        console2.log("   oracle floor @99.5% (wrbtc wei)", floor);
+        console2.log("   oracle floor (wrbtc wei)", floor);
+        console2.log("   floor percent (1e18)", AMOUNT_OUT_MINIMUM_PERCENT);
 
         // A negative finding is valid PR evidence: it moves to the relaunch calibration, and the route
         // stays disabled rather than shipping with a floor widened to make it pass.
@@ -161,7 +164,7 @@ contract DexQuoteFloorProbe is Test {
         }
     }
 
-    /// @dev The R43 formula this PR does not change: net USD notional at the $1 peg, 99.5% of oracle rBTC.
+    /// @dev The shipped formula: net USD notional at the $1 peg, `DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT` of oracle rBTC.
     function _governanceFloor(uint256 netIn, uint8 tokenDecimals) private view returns (uint256) {
         uint256 stablecoinToUsdScale = 10 ** (ORACLE_DECIMALS - tokenDecimals);
         return (netIn * stablecoinToUsdScale * AMOUNT_OUT_MINIMUM_PERCENT) / btcUsdPrice;

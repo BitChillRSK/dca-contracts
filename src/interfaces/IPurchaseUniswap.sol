@@ -8,7 +8,7 @@ import {ICoinPairPrice} from "./ICoinPairPrice.sol";
 /**
  * @title IPurchaseUniswap
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Uniswap V3 purchase configuration: encoded path, oracle backstop, and MoC BTC/USD oracle.
+ * @notice Uniswap V3 purchase configuration: encoded path, slippage band, and MoC BTC/USD oracle.
  */
 interface IPurchaseUniswap {
     /*//////////////////////////////////////////////////////////////
@@ -36,7 +36,9 @@ interface IPurchaseUniswap {
     event PurchaseUniswap_PurchasePathAllowedSet(
         bytes32 pathHash, bytes encodedPath, address[] intermediateTokens, uint24[] poolFeeRates, bool allowed
     );
-    /// @notice Owner changed the on-chain oracle backstop applied at swap time.
+    /// @notice Owner changed the swap-time oracle floor.
+    event PurchaseUniswap_AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
+    /// @notice Owner changed the lower bound on the swap-time oracle floor.
     event PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(uint256 oldValue, uint256 newValue);
     /// @notice Owner pointed the min-out oracle at a new MoC BTC/USD feed.
     event PurchaseUniswap_OracleUpdated(address indexed oldOracle, address indexed newOracle);
@@ -47,7 +49,11 @@ interface IPurchaseUniswap {
 
     /// @notice Path encoding requires `poolFeeRates.length == intermediateTokens.length + 1`.
     error PurchaseUniswap__WrongNumberOfTokensOrFeeRates(uint256 numberOfIntermediateTokens, uint256 numberOfFeeRates);
-    /// @notice Oracle backstop cannot exceed 100%.
+    /// @notice Swap-time oracle floor cannot exceed 100%.
+    error PurchaseUniswap__AmountOutMinimumPercentTooHigh();
+    /// @notice Swap-time oracle floor cannot be set below the safety-check bound.
+    error PurchaseUniswap__AmountOutMinimumPercentTooLow();
+    /// @notice Safety-check bound cannot exceed 100%.
     error PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh();
     /// @notice Oracle address cannot be zero.
     error PurchaseUniswap__InvalidOracleAddress();
@@ -103,16 +109,33 @@ interface IPurchaseUniswap {
     function setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates) external;
 
     /**
-     * @notice Set the on-chain oracle backstop applied at swap time.
-     * @param amountOutMinimumSafetyCheck New fraction, 1e18-scaled. Cannot exceed 100%.
-     * @dev Uniswap `amountOutMinimum` is `max(oracleFloor, minRbtcOut)`; the bot's quote-derived
-     *      `minRbtcOut` is the operational bound and may tighten further.
+     * @notice Set the swap-time oracle floor as a 1e18-scaled fraction of the oracle-implied rBTC.
+     * @param amountOutMinimumPercent New fraction. Cannot exceed 100% or fall below the safety check.
+     * @dev Uniswap `amountOutMinimum` is `max(thisFloor, minRbtcOut)`, so the swapper's quote-derived
+     *      `minRbtcOut` sets operational tightness and this value is the bound that holds when that
+     *      minimum is absent, stale, or hostile. Deploy it loose enough that a healthy batch never
+     *      reverts on it; the swapper, not this setter, is the weekly knob.
+     */
+    function setAmountOutMinimumPercent(uint256 amountOutMinimumPercent) external;
+
+    /**
+     * @notice Current swap-time oracle floor, 1e18-scaled.
+     * @return The fraction applied to the oracle-implied rBTC when building `amountOutMinimum`.
+     */
+    function getAmountOutMinimumPercent() external view returns (uint256);
+
+    /**
+     * @notice Set the lowest `amountOutMinimumPercent` the owner may configure.
+     * @param amountOutMinimumSafetyCheck New bound, 1e18-scaled. Never enters swap math.
+     * @dev This is the wall a single owner transaction cannot cross: widening the live floor past it
+     *      takes two transactions, lowering this bound first. Raising it above the active floor reverts
+     *      without changing state.
      */
     function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external;
 
     /**
-     * @notice The oracle backstop fraction applied when building `amountOutMinimum`.
-     * @return The 1e18-scaled fraction of oracle-implied rBTC enforced at swap time.
+     * @notice The bound that limits how far `setAmountOutMinimumPercent` may widen the live floor.
+     * @return The lowest value `setAmountOutMinimumPercent` accepts.
      */
     function getAmountOutMinimumSafetyCheck() external view returns (uint256);
 

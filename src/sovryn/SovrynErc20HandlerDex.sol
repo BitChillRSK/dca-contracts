@@ -18,7 +18,8 @@ contract SovrynErc20HandlerDex is SovrynErc20Handler, PurchaseUniswap {
      * @param uniswapSettings Router, WRBTC, path, and MoC oracle.
      * @param feeCollector Address that receives purchase fees.
      * @param feeSettings Linear fee parameters.
-     * @param amountOutMinimumSafetyCheck On-chain oracle backstop applied at swap time, 1e18-scaled.
+     * @param amountOutMinimumPercent Swap-time oracle floor, 1e18-scaled.
+     * @param amountOutMinimumSafetyCheck Lowest floor the owner may configure, 1e18-scaled.
      * @param initialOwner Address that owns fee/oracle configuration immediately after deploy.
      */
     constructor(
@@ -28,12 +29,13 @@ contract SovrynErc20HandlerDex is SovrynErc20Handler, PurchaseUniswap {
         UniswapSettings memory uniswapSettings,
         address feeCollector,
         FeeSettings memory feeSettings,
+        uint256 amountOutMinimumPercent,
         uint256 amountOutMinimumSafetyCheck,
         address initialOwner
     )
         SovrynErc20Handler(
             dcaManagerAddress, stableTokenAddress, iSusdTokenAddress, feeCollector, feeSettings, initialOwner
         )
-        PurchaseUniswap(uniswapSettings, amountOutMinimumSafetyCheck)
+        PurchaseUniswap(uniswapSettings, amountOutMinimumPercent, amountOutMinimumSafetyCheck)
     {}
 }

@@ -52,6 +52,7 @@ contract DeployMocAndUniswap is DeployBase {
         address shareToken;
         IPurchaseUniswap.UniswapSettings uniswapSettings;
         address feeCollector;
+        uint256 amountOutMinimumPercent;
         uint256 amountOutMinimumSafetyCheck;
     }
     
@@ -190,6 +191,7 @@ contract DeployMocAndUniswap is DeployBase {
             shareToken: shareToken,
             uniswapSettings: uniswapSettings,
             feeCollector: feeCollector,
+            amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
             amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
         });
 
@@ -203,6 +205,7 @@ contract DeployMocAndUniswap is DeployBase {
                 shareToken: params.shareToken,
                 uniswapSettings: params.uniswapSettings,
                 feeCollector: params.feeCollector,
+                amountOutMinimumPercent: params.amountOutMinimumPercent,
                 amountOutMinimumSafetyCheck: params.amountOutMinimumSafetyCheck
             })
         );

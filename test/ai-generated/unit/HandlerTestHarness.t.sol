@@ -360,17 +360,47 @@ abstract contract HandlerTestHarness is Test {
         IPurchaseUniswap dexHandler = IPurchaseUniswap(address(handler));
         
         // Test DEX configuration getters
+        uint256 minPercent = dexHandler.getAmountOutMinimumPercent();
         uint256 safetyCheck = dexHandler.getAmountOutMinimumSafetyCheck();
         bytes memory swapPath = dexHandler.getSwapPath();
         
         assertGt(safetyCheck, 0);
-        assertLe(safetyCheck, 1 ether);
+        assertLe(safetyCheck, minPercent); // the wall sits at or below the live floor
+        assertLe(minPercent, 1 ether);
         assertGt(swapPath.length, 0);
         uint256 packed;
         for (uint256 i; i < 20; ++i) {
             packed = (packed << 8) | uint8(swapPath[i]);
         }
         assertEq(address(uint160(packed)), address(stablecoin));
+    }
+    
+    function test_handler_dex_setAmountOutMinimumPercent() public {
+        if (!supportsDex) return;
+        
+        IPurchaseUniswap dexHandler = IPurchaseUniswap(address(handler));
+        
+        vm.prank(OWNER);
+        dexHandler.setAmountOutMinimumPercent(0.98 ether);
+        
+        assertEq(dexHandler.getAmountOutMinimumPercent(), 0.98 ether);
+    }
+    
+    function test_handler_dex_setAmountOutMinimumPercent_reverts_invalidRange() public {
+        if (!supportsDex) return;
+        
+        IPurchaseUniswap dexHandler = IPurchaseUniswap(address(handler));
+        
+        // Above 100%.
+        vm.expectRevert();
+        vm.prank(OWNER);
+        dexHandler.setAmountOutMinimumPercent(1.01 ether);
+        
+        // Below the safety-check wall.
+        uint256 safetyCheck = dexHandler.getAmountOutMinimumSafetyCheck();
+        vm.expectRevert();
+        vm.prank(OWNER);
+        dexHandler.setAmountOutMinimumPercent(safetyCheck - 1);
     }
     
     function test_handler_dex_setAmountOutMinimumSafetyCheck() public {

@@ -25,7 +25,8 @@ import "../Constants.sol";
  *      small — a swap could return a millionth of the rBTC it owed and still clear it.
  */
 contract PurchaseUniswapMinOutTest is Test {
-    uint256 private constant ORACLE_FLOOR = DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK; // 0.95e18
+    uint256 private constant PERCENT = DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT; // the live swap-time floor
+    uint256 private constant SAFETY = DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK; // the wall under it
     uint256 private constant BTC_PRICE_18 = BTC_PRICE * 1e18; // what MockMocOracle publishes
     uint256 private constant USD_NOTIONAL = 25; // $25, the minimum purchase
     uint256 private constant BATCH_USD_NOTIONAL = 1000; // inside the fee bands the harness is built with
@@ -51,7 +52,7 @@ contract PurchaseUniswapMinOutTest is Test {
         MinOutHarness eighteen = _deployHarness(18);
         MinOutHarness six = _deployHarness(6);
 
-        uint256 expected = (USD_NOTIONAL * 1e18 * ORACLE_FLOOR) / BTC_PRICE_18;
+        uint256 expected = (USD_NOTIONAL * 1e18 * PERCENT) / BTC_PRICE_18;
 
         assertEq(eighteen.getAmountOutMinimum(USD_NOTIONAL * 1e18), expected, "18-decimal min-out");
         assertEq(six.getAmountOutMinimum(USD_NOTIONAL * 1e6), expected, "6-decimal min-out");
@@ -61,7 +62,7 @@ contract PurchaseUniswapMinOutTest is Test {
         MinOutHarness six = _deployHarness(6);
         uint256 amountIn = USD_NOTIONAL * 1e6;
 
-        uint256 preR43 = (amountIn * ORACLE_FLOOR) / BTC_PRICE_18; // the formula this PR replaces
+        uint256 preR43 = (amountIn * PERCENT) / BTC_PRICE_18; // the formula this PR replaces
         uint256 minOut = six.getAmountOutMinimum(amountIn);
 
         // 1e12 tighter, up to the rounding the old formula lost by dividing a 6-decimal amount by an 18-decimal price.
@@ -78,7 +79,7 @@ contract PurchaseUniswapMinOutTest is Test {
 
         assertEq(
             harness.getAmountOutMinimum(amountIn),
-            (usdNotional * 1e18 * ORACLE_FLOOR) / BTC_PRICE_18,
+            (usdNotional * 1e18 * PERCENT) / BTC_PRICE_18,
             "min-out must track the USD notional, not the token's units"
         );
     }
@@ -111,7 +112,7 @@ contract PurchaseUniswapMinOutTest is Test {
         six.mintStablecoin(amountIn);
 
         // A router paying the pre-R43 floor is paying a millionth of a millionth of the rBTC owed.
-        swapRouter.setAmountOut((amountIn * ORACLE_FLOOR) / BTC_PRICE_18);
+        swapRouter.setAmountOut((amountIn * PERCENT) / BTC_PRICE_18);
         vm.expectRevert(bytes("Too little received"));
         six.purchaseRbtc(amountIn, 0);
 
@@ -240,6 +241,52 @@ contract PurchaseUniswapMinOutTest is Test {
         _buyOne(six, grossSix, floor + 1);
     }
 
+    /// @dev The owner may retighten the live floor without touching the wall, and the swap follows it
+    ///      immediately. This is the knob that exists so the wall never has to move.
+    function testOwnerCanRetightenTheFloorAndTheSwapFollows() public {
+        MinOutHarness harness = _deployHarness(18);
+        uint256 gross = _fundedGross(harness, 18);
+        uint256 net = gross - harness.calculateFee(gross);
+
+        uint256 looseFloor = harness.getAmountOutMinimum(net);
+
+        harness.setAmountOutMinimumPercent(0.99 ether);
+        uint256 tightFloor = harness.getAmountOutMinimum(net);
+        assertGt(tightFloor, looseFloor, "raising the percent raises the swap-time floor");
+
+        // A payout the old floor accepted is now rejected, with no caller minimum involved.
+        swapRouter.setAmountOut(tightFloor - 1);
+        vm.expectRevert(bytes("Too little received"));
+        _buyOne(harness, gross, NO_MIN_RBTC_OUT);
+
+        assertEq(
+            harness.getAmountOutMinimumSafetyCheck(), SAFETY, "retightening the floor must not move the wall"
+        );
+    }
+
+    /// @dev The wall is what a compromised swapper cannot get under. Even after the owner widens the floor
+    ///      as far as one transaction allows, the swap still cannot pay less than the safety check implies.
+    function testTheWallBoundsHowFarOneOwnerTransactionCanWiden() public {
+        MinOutHarness harness = _deployHarness(18);
+        uint256 gross = _fundedGross(harness, 18);
+        uint256 net = gross - harness.calculateFee(gross);
+
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
+        harness.setAmountOutMinimumPercent(SAFETY - 1);
+
+        // The loosest reachable floor in one transaction is the wall itself.
+        harness.setAmountOutMinimumPercent(SAFETY);
+        uint256 wallFloor = harness.getAmountOutMinimum(net);
+
+        swapRouter.setAmountOut(wallFloor - 1);
+        vm.expectRevert(bytes("Too little received"));
+        _buyOne(harness, gross, 1); // a compromised swapper asking for one wei
+
+        swapRouter.setAmountOut(wallFloor);
+        _buyOne(harness, gross, 1);
+        assertEq(harness.getAccumulatedRbtcBalance(BUYER), wallFloor, "the wall is the worst reachable fill");
+    }
+
     /*//////////////////////////////////////////////////////////////
                                 HELPERS
     //////////////////////////////////////////////////////////////*/
@@ -283,7 +330,7 @@ contract PurchaseUniswapMinOutTest is Test {
             feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
         });
 
-        return new MinOutHarness(stablecoin, feeSettings, uniswapSettings, ORACLE_FLOOR);
+        return new MinOutHarness(stablecoin, feeSettings, uniswapSettings, PERCENT, SAFETY);
     }
 }
 
@@ -304,12 +351,13 @@ contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
         MockStablecoinWithDecimals token,
         IFeeHandler.FeeSettings memory feeSettings,
         UniswapSettings memory uniswapSettings,
+        uint256 amountOutMinimumPercent,
         uint256 amountOutMinimumSafetyCheck
     )
         PurchaseTokenBase(token)
         FeeHandler(address(0xFEE), feeSettings, msg.sender)
         DcaManagerAccessControl(msg.sender)
-        PurchaseUniswap(uniswapSettings, amountOutMinimumSafetyCheck)
+        PurchaseUniswap(uniswapSettings, amountOutMinimumPercent, amountOutMinimumSafetyCheck)
     {}
 
     function getAmountOutMinimum(uint256 stablecoinAmountToSpend) external view returns (uint256) {
