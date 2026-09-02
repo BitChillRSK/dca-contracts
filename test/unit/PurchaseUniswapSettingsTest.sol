@@ -329,7 +329,6 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
     ////////////////////////////
 
     function testSetPurchasePath() public onlyDexSwaps {
-        // Create test data for new path
         address[] memory intermediateTokens = new address[](1);
         intermediateTokens[0] = makeAddr("newIntermediateToken");
         
@@ -337,20 +336,22 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         poolFeeRates[0] = 100; // 0.01%
         poolFeeRates[1] = 300; // 0.03%
         
-        // Get the current path
         bytes memory oldPath = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
-        
-        // Expect the event with the correct parameters
-        vm.expectEmit(false, false, false, false);
-        emit PurchaseUniswap_NewPathSet(intermediateTokens, poolFeeRates, oldPath);
+        bytes memory expectedPath = _encodeSwapPath(intermediateTokens, poolFeeRates);
+        vm.prank(OWNER);
+        IPurchaseUniswap(address(stablecoinHandler)).setPurchasePathAllowed(
+            intermediateTokens, poolFeeRates, true
+        );
 
-        // Set the new path
+        vm.expectEmit(false, false, false, true);
+        emit PurchaseUniswap_NewPathSet(intermediateTokens, poolFeeRates, expectedPath);
+
         vm.prank(OWNER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(intermediateTokens, poolFeeRates);
         
-        // Verify the path was updated
         bytes memory newPath = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
         assertNotEq(keccak256(newPath), keccak256(oldPath), "Path should be updated");
+        assertEq(newPath, expectedPath);
     }
     
     function testSetPurchasePathRevertsWithWrongArrayLengths() public onlyDexSwaps {
@@ -373,17 +374,24 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(intermediateTokens, poolFeeRates);
     }
     
-    function testOnlyOwnerCanSetPurchasePath() public onlyDexSwaps {
-        // Create test data
+    function testUnauthorizedCannotSetPurchasePath() public onlyDexSwaps {
         address[] memory intermediateTokens = new address[](1);
         intermediateTokens[0] = makeAddr("token");
         
         uint24[] memory poolFeeRates = new uint24[](2);
         poolFeeRates[0] = 100;
         poolFeeRates[1] = 300;
+
+        vm.prank(OWNER);
+        IPurchaseUniswap(address(stablecoinHandler)).setPurchasePathAllowed(
+            intermediateTokens, poolFeeRates, true
+        );
         
-        // Try to set path as non-owner
-        vm.expectRevert(ownableUnauthorized(USER));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPurchaseUniswap.PurchaseUniswap__UnauthorizedPurchasePathSetter.selector, USER
+            )
+        );
         vm.prank(USER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(intermediateTokens, poolFeeRates);
     }
@@ -399,6 +407,10 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         poolFeeRates[1] = 300;
 
         vm.prank(OWNER);
+        IPurchaseUniswap(address(stablecoinHandler)).setPurchasePathAllowed(
+            intermediateTokens, poolFeeRates, true
+        );
+        vm.prank(OWNER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(intermediateTokens, poolFeeRates);
 
         bytes memory updatedPath = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
@@ -412,6 +424,18 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
             packed = (packed << 8) | uint8(path[i]);
         }
         return address(uint160(packed));
+    }
+
+    function _encodeSwapPath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
+        private
+        view
+        returns (bytes memory path)
+    {
+        path = abi.encodePacked(address(stablecoin));
+        for (uint256 i; i < intermediateTokens.length; ++i) {
+            path = abi.encodePacked(path, poolFeeRates[i], intermediateTokens[i]);
+        }
+        path = abi.encodePacked(path, poolFeeRates[poolFeeRates.length - 1], address(wrBtcToken));
     }
 }
 

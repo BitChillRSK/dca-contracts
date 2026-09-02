@@ -305,11 +305,14 @@ Then, from the Safe UI (one call per contract), send `acceptOwnership()`. Until 
 
 Add-on scripts (`DeployIdleHandler`, `DeployLayerBankHandler`, `DeployUsdrifHandler`) revert if `pendingOwner` is set on `OperationsAdmin` or `DcaManager` — wait until the Safe has accepted, then run them.
 
-**USDT0 add-on (`STABLECOIN_TYPE=USDT0` `DeployUsdrifHandler`).** This is the live path R36 uses against an existing `DcaManager`. On mainnet the Safe already owns `OperationsAdmin`, so the Foundry EOA hits the non-owner branch: it deploys the handler, logs, and returns **without** `assignTokenHandler` and **without** `setTokenMinPurchaseAmount`. That is fail-closed for USDRIF (default min `25 ether` is correct). For USDT0 the default min is `25e18` atomic units — about 25 trillion USDT0 — so users cannot create real schedules until the Safe also sets the 6-decimal min. After the script, from the Safe, in order:
+**USDT0 / USDRIF add-on (`DeployUsdrifHandler`).** This is the live path R36 uses against an existing `DcaManager`. On mainnet the Safe already owns `OperationsAdmin`, so the Foundry EOA hits the non-owner branch: it deploys the handler (constructor self-allowlists the initial path), logs, and returns **without** `assignTokenHandler` and **without** `setTokenMinPurchaseAmount`. That is fail-closed for USDRIF until the Safe assigns the handler (default min `25 ether` is correct). For USDT0 the default min is `25e18` atomic units — about 25 trillion USDT0 — so users cannot create real schedules until the Safe also sets the 6-decimal min. After the script, from the Safe, **in this order**:
 
 1. `operationsAdmin.registerRoute(1, true)` **only if** `getRouteClass(1)` is still `Unregistered`. A second `registerRoute` reverts `RouteAlreadyRegistered` (LayerBank is already on the dex map after the USDRIF add-on).
-2. `operationsAdmin.assignTokenHandler(usdt0, 1, handler)`.
-3. **`dcaManager.setTokenMinPurchaseAmount(usdt0, 25000000)`** (`25e6`). Do not skip this step.
+2. Read `handler.getSwapPath()` and verify it exactly matches the intended stablecoin / intermediate pools / WRBTC route. The constructor already allowlisted that path; this is the human checkpoint before assignment.
+3. `operationsAdmin.assignTokenHandler(token, 1, handler)`.
+4. **USDT0 only:** `dcaManager.setTokenMinPurchaseAmount(usdt0, 25000000)` (`25e6`). Do not skip this step.
+
+**Compromised swapper.** Revoke the swapper key **before** revoking any path. A still-allowlisted compromised key can front-run each `setPurchasePathAllowed(..., false)` by re-activating that path. Order is mandatory: `revokeSwapper` → handler owner or remaining swapper `setPurchasePath` to the preferred approved path if needed → then handler owner revokes obsolete paths. Swapper revocation alone is not a routing kill switch.
 
 `DeployDexSwaps` live full-stack sets that min in the same broadcast because that script owns the new admin. The add-on does not.
 
@@ -319,19 +322,31 @@ Later ownership changes (new Safe, recovered wallet) are the same two steps: cur
 
 ### Compilation profile for deployment
 
-The relaunch deployment profile is currently `[profile.default]`: solc `0.8.36`, Cancun, and
-`via_ir = false`. The copy-paste broadcast commands above intentionally use it, as do the required
-local and CI lanes. Treat their EIP-170 margins as the deploy limits.
+The relaunch deployment profile is currently `[profile.default]`: solc `0.8.36`, Cancun,
+`optimizer = true`, `optimizer_runs = 200`, and `via_ir = false`. The copy-paste broadcast
+commands above intentionally use it, as do the required local and CI lanes. Treat their EIP-170
+margins as the deploy limits.
 
-`[profile.deploy]` is an experimental size-measurement profile. It enables the Yul IR pipeline and
-produces substantially smaller bytecode, but it is **not approved for broadcast**: the exact via-IR
-artifacts have not run the complete relaunch matrix or been deployed and verified on Rootstock
-testnet. Do not add `FOUNDRY_PROFILE=deploy` to a live command ad hoc.
+There is no `[profile.deploy]`. Solx / via-IR evaluation and any `ZeroTokenPurchaseUniswap` repair
+are R55 in [#105](https://github.com/BitChillRSK/dca-contracts/pull/105); this repo does not evaluate
+via-IR in R52. A future switch must pin via-IR in every deploy command, run the full
+unit/invariant/fork matrix using the exact artifact, repeat the Rootstock testnet consensus and
+Blockscout-verification proof, and decide whether no-IR remains as a secondary compile lane.
+Until then, the no-IR pipeline is authoritative.
 
-A future switch must be made as its own reviewed toolchain decision: pin the profile in every deploy
-command, run the full unit/invariant/fork matrix using the exact artifact, repeat the Rootstock testnet
-consensus and Blockscout-verification proof, and decide whether no-IR remains as a secondary compile
-lane. Until then, the no-IR pipeline is authoritative.
+**Optimizer-on Rootstock proof (R52, 2026-09-01).** Testnet CREATE
+[0x3a63dc2458142cca09144a3f290ed6d996780c616acb8adbdf15f57f736ff5bc](https://rootstock-testnet.blockscout.com/tx/0x3a63dc2458142cca09144a3f290ed6d996780c616acb8adbdf15f57f736ff5bc)
+verified [`OperationsAdmin` `0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD`](https://rootstock-testnet.blockscout.com/address/0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD)
+(solc 0.8.36 / cancun / optimizer 200). Replay (as `TESTNET_OWNER`):
+
+```bash
+REAL_DEPLOYMENT=true forge script script/DeployOptimizerProof.s.sol:DeployOptimizerProof \
+  --rpc-url $RSK_TESTNET_RPC_URL \
+  --account dev_wallet \
+  --sender 0x31e0FacEa072EE621f22971DF5bAE3a1317E41A4 \
+  --broadcast --legacy \
+  --verify --verifier blockscout --verifier-url $BLOCKSCOUT_API_URL
+```
 
 ## Dependency Management
 

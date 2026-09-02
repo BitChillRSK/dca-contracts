@@ -11,6 +11,9 @@ remappings = [
 
 solc_version = "0.8.36"
 evm_version = "cancun"
+optimizer = true
+optimizer_runs = 200
+via_ir = false
 
 [fuzz]
 runs = 1000
@@ -29,14 +32,5 @@ via_ir = false
 
 [profile.ci.fuzz]
 runs = 256
-
-[profile.deploy]
-solc_version = "0.8.36"
-evm_version = "cancun"
-via_ir = true            # Use the Yul IR pipeline for smaller bytecode
-optimizer_runs = 200
-
-# This just for quicker testing
-# optimizer = false
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

@@ -313,7 +313,9 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         uint24[] memory poolFeeRates = new uint24[](1);
         poolFeeRates[0] = 3000;
         
-        vm.expectRevert(ownableUnauthorized(USER));
+        vm.expectRevert(
+            abi.encodeWithSelector(IPurchaseUniswap.PurchaseUniswap__UnauthorizedPurchasePathSetter.selector, USER)
+        );
         vm.prank(USER);
         tropykusDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
     }
@@ -420,17 +422,20 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         uint24[] memory poolFeeRates = new uint24[](2);
         poolFeeRates[0] = 3000;
         poolFeeRates[1] = 3000;
-        
-        vm.prank(OWNER);
-        tropykusDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
-        
+
         bytes memory expectedPath = abi.encodePacked(
             address(stablecoin),
             uint24(3000),
-            address(0x123), // Intermediate token
-            uint24(3000), 
+            address(0x123),
+            uint24(3000),
             address(wrbtcToken)
         );
+        vm.prank(OWNER);
+        tropykusDexHandler.setPurchasePathAllowed(intermediateTokens, poolFeeRates, true);
+
+        vm.prank(OWNER);
+        tropykusDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
+
         assertEq(tropykusDexHandler.getSwapPath(), expectedPath);
         assertEq(tropykusDexHandler.getSwapPath().length, 66); // 3 addresses + 2 fees
     }

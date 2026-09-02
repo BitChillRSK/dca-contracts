@@ -21,7 +21,7 @@ PROBE_VERBOSITY ?= -vv
 PROBE_MATCH ?=
 
 # Targets
-.PHONY: all test moc dex help check ci build patch-deps slither moc-none moc-layerbank moc-tropykus moc-sovryn dex-tropykus dex-sovryn dex-layerbank invariants invariants-sovryn fork fork-tropykus fork-sovryn probe-sovryn-exit-fee probe-dex-quote-floor coverage
+.PHONY: all test moc dex help check ci build patch-deps slither moc-none moc-layerbank moc-tropykus moc-sovryn dex-tropykus dex-sovryn dex-layerbank invariants invariants-sovryn fork fork-tropykus fork-sovryn fork-layerbank fork-dex-path probe-sovryn-exit-fee probe-dex-quote-floor coverage
 
 all: help
 
@@ -119,6 +119,26 @@ fork-sovryn:
 	fi; \
 	SWAP_TYPE=$(SWAP_TYPE) LENDING_PROTOCOL=sovryn EXPECTED_LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=$(STABLECOIN_TYPE) \
 	$(FORK_TEST_CMD) --fork-url $$RSK_MAINNET_RPC_URL
+fork-layerbank:
+	@echo "Executing LayerBank fork tests with SWAP_TYPE=$(SWAP_TYPE) $(STABLECOIN_TYPE)..."
+	@set -a; [ -f .env ] && . ./.env; set +a; \
+	if [ -z "$$RSK_MAINNET_RPC_URL" ]; then \
+		echo "error: RSK_MAINNET_RPC_URL is not set. Add it to .env or export it."; \
+		exit 1; \
+	fi; \
+	SWAP_TYPE=$(SWAP_TYPE) LENDING_PROTOCOL=layerbank EXPECTED_LENDING_PROTOCOL=layerbank STABLECOIN_TYPE=$(STABLECOIN_TYPE) \
+	$(FORK_TEST_CMD) --fork-url $$RSK_MAINNET_RPC_URL
+# Dex path allowlist (R52). Full `fork-layerbank` + dexSwaps still runs purchase tests against live
+# Uniswap pools; those can revert `Too little received` and are not this gate.
+fork-dex-path:
+	@echo "Executing Dex path allowlist fork tests (USDRIF / LayerBank / dexSwaps)..."
+	@set -a; [ -f .env ] && . ./.env; set +a; \
+	if [ -z "$$RSK_MAINNET_RPC_URL" ]; then \
+		echo "error: RSK_MAINNET_RPC_URL is not set. Add it to .env or export it."; \
+		exit 1; \
+	fi; \
+	SWAP_TYPE=dexSwaps LENDING_PROTOCOL=layerbank EXPECTED_LENDING_PROTOCOL=layerbank STABLECOIN_TYPE=USDRIF \
+	$(FORK_TEST_CMD) --match-contract DexPathFailoverTest --fork-url $$RSK_MAINNET_RPC_URL
 
 # Live iSUSD burn probe for SIP-0094 (excluded from check/fork/CI). See
 # test/mainnet-debug/sovryn-exit-fee/README.md. PROBE_VERBOSITY=-vvvv for the burn trace.
@@ -197,6 +217,8 @@ help:
 	@echo "  make fork                      # Fork tests (reads RSK_MAINNET_RPC_URL from env/.env); tropykus pins block $(FORK_BLOCK_TROPYKUS)"
 	@echo "  make fork-tropykus             # Tropykus fork tests (pinned: kDOC mint paused 2026-04-27)"
 	@echo "  make fork-sovryn               # Sovryn fork tests (chain tip)"
+	@echo "  make fork-layerbank            # LayerBank fork tests (chain tip; default mocSwaps)"
+	@echo "  make fork-dex-path             # R52 Dex path allowlist on a LayerBank/USDRIF Uniswap fork"
 	@echo "  make probe-sovryn-exit-fee     # Live iSUSD burn: is SIP-0094's 0.1% fee charging?"
 	@echo "  make probe-dex-quote-floor     # R51: live Dex pool quotes vs the oracle floor, at a pinned block"
 	@echo ""

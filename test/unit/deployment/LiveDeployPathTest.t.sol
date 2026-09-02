@@ -14,6 +14,7 @@ import {OperationsAdmin} from "../../../src/OperationsAdmin.sol";
 import {DcaManager} from "../../../src/DcaManager.sol";
 import {IOperationsAdmin} from "../../../src/interfaces/IOperationsAdmin.sol";
 import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
+import {IPurchaseUniswap} from "../../../src/interfaces/IPurchaseUniswap.sol";
 import {BitChillOwnable} from "../../../src/BitChillOwnable.sol";
 import {BaseDeploymentTest} from "./BaseDeploymentTest.t.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
@@ -170,6 +171,12 @@ contract LiveDeployPathTest is Test {
         assertEq(dcaManager.pendingOwner(), SAFE);
         if (handler != address(0)) {
             assertEq(BitChillOwnable(handler).pendingOwner(), SAFE);
+            assertTrue(
+                IPurchaseUniswap(handler).isPurchasePathAllowed(
+                    keccak256(IPurchaseUniswap(handler).getSwapPath())
+                ),
+                "constructor path is allowlisted at construction"
+            );
         }
         assertEq(
             uint256(operationsAdmin.getRouteClass(TROPYKUS_INDEX)),
@@ -191,6 +198,22 @@ contract LiveDeployPathTest is Test {
                 uint256(operationsAdmin.getRouteClass(LAYERBANK_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending)
             );
             assertNotEq(handler, address(0), "live dex path must deploy the LayerBank handler for this stable");
+            assertTrue(
+                IPurchaseUniswap(handler).isPurchasePathAllowed(
+                    keccak256(IPurchaseUniswap(handler).getSwapPath())
+                ),
+                "constructor path is allowlisted at construction"
+            );
+            vm.prank(SAFE);
+            operationsAdmin.acceptOwnership();
+            vm.prank(SAFE);
+            dcaManager.acceptOwnership();
+            vm.prank(SAFE);
+            BitChillOwnable(handler).acceptOwnership();
+            assertEq(operationsAdmin.owner(), SAFE);
+            assertEq(dcaManager.owner(), SAFE);
+            assertEq(Ownable(handler).owner(), SAFE);
+            assertEq(operationsAdmin.owner(), Ownable(handler).owner());
             if (coinHash == keccak256(abi.encodePacked(USDT0_STRING))) {
                 IFeeHandler.FeeSettings memory stored = IFeeHandler(handler).getFeeSettings();
                 assertEq(stored.feePurchaseLowerBound, USDT0_FEE_PURCHASE_LOWER_BOUND);

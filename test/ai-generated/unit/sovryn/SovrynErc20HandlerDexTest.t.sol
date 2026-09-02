@@ -359,7 +359,9 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
         uint24[] memory poolFeeRates = new uint24[](1);
         poolFeeRates[0] = 3000;
         
-        vm.expectRevert(ownableUnauthorized(USER));
+        vm.expectRevert(
+            abi.encodeWithSelector(IPurchaseUniswap.PurchaseUniswap__UnauthorizedPurchasePathSetter.selector, USER)
+        );
         vm.prank(USER);
         sovrynDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
     }
@@ -491,17 +493,20 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
         uint24[] memory poolFeeRates = new uint24[](2);
         poolFeeRates[0] = 3000;
         poolFeeRates[1] = 3000;
-        
-        vm.prank(OWNER);
-        sovrynDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
-        
+
         bytes memory expectedPath = abi.encodePacked(
             address(stablecoin),
             uint24(3000),
-            address(0x456), // Intermediate token  
+            address(0x456),
             uint24(3000),
             address(wrbtcToken)
         );
+        vm.prank(OWNER);
+        sovrynDexHandler.setPurchasePathAllowed(intermediateTokens, poolFeeRates, true);
+
+        vm.prank(OWNER);
+        sovrynDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
+
         assertEq(sovrynDexHandler.getSwapPath(), expectedPath);
         assertEq(sovrynDexHandler.getSwapPath().length, 66); // 3 addresses + 2 fees
     }

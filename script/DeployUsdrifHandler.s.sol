@@ -26,9 +26,11 @@ import "./Constants.sol";
  *      permanently occupy `(token, LAYERBANK_INDEX)`). Occupied `(token, LAYERBANK_INDEX)` reverts
  *      `HandlerAlreadyAssigned` — do not skip. USDT0 live path uses 6-decimal fee bounds and
  *      `setTokenMinPurchaseAmount`. Mainnet add-on: the Foundry EOA is not the Safe, so `run()`
- *      deploys then returns without assigning. The Safe must `assignTokenHandler` **and**, for
- *      USDT0, `setTokenMinPurchaseAmount(usdt0, 25e6)` — the DcaManager default is 25 ether
- *      (~25 trillion USDT0). See README "Ownership after deploy".
+ *      deploys then returns without assigning. The constructor already allowlists the initial path.
+ *      The Safe must read `getSwapPath()` and confirm the intended route, then `assignTokenHandler`
+ *      **and**, for USDT0,
+ *      `setTokenMinPurchaseAmount(usdt0, 25e6)` — the DcaManager default is 25 ether (~25 trillion
+ *      USDT0). See README "Ownership after deploy".
  */
 contract DeployUsdrifHandler is DeployBase {
     struct DeployParams {
@@ -176,12 +178,14 @@ contract DeployUsdrifHandler is DeployBase {
             console.log("Safe runbook (owner of OperationsAdmin + DcaManager):");
             console.log("1. registerRoute(LAYERBANK_INDEX, true) only if getRouteClass is Unregistered");
             console.log("   (already-registered reverts RouteAlreadyRegistered; skip that call)");
-            console.log("2. assignTokenHandler(token, LAYERBANK_INDEX, handler)");
+            console.log("2. Read handler.getSwapPath() and verify it exactly matches the intended");
+            console.log("   stablecoin / intermediate pools / WRBTC route (constructor already allowlisted it)");
+            console.log("3. assignTokenHandler(token, LAYERBANK_INDEX, handler)");
             console.log("tokenAddress:", tokenAddress);
             console.log("index:", LAYERBANK_INDEX);
             console.log("handlerAddress:", handler);
             if (isUsdt0Live) {
-                console.log("3. REQUIRED for USDT0: dcaManager.setTokenMinPurchaseAmount(token, 25e6)");
+                console.log("4. REQUIRED for USDT0: dcaManager.setTokenMinPurchaseAmount(token, 25e6)");
                 console.log("   Default min is 25 ether (~25 trillion USDT0). Users cannot create real schedules without this.");
                 console.log("minPurchaseAmount:", USDT0_MIN_PURCHASE_AMOUNT);
             }

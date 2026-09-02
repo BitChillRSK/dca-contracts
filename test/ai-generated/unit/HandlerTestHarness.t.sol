@@ -131,7 +131,7 @@ abstract contract HandlerTestHarness is Test {
         handler = deployHandler();
         
         setupRolesAndPermissions();
-        
+
         vm.prank(OWNER);
         operationsAdmin.assignTokenHandler(
             address(stablecoin), 

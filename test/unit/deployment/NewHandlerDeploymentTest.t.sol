@@ -85,6 +85,10 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
         address registeredHandler = operationsAdmin.getTokenHandler(config.usdrifTokenAddress, LAYERBANK_INDEX);
         assertEq(registeredHandler, usdrifHandlerAddress, "USDRIF handler not registered in OperationsAdmin");
         assertTrue(operationsAdmin.isLendingRoute(LAYERBANK_INDEX));
+        assertTrue(
+            IPurchaseUniswap(usdrifHandlerAddress).isPurchasePathAllowed(keccak256(usdrifHandler.getSwapPath())),
+            "constructor path is allowlisted at construction"
+        );
     }
 
     function test_run_revertsOnForkWithoutRealDeployment() public {

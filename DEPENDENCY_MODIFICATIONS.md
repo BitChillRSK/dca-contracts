@@ -9,7 +9,8 @@ First-party contracts compile with:
 
 Rootstock executes `PUSH0` since Arrowhead (2024-04-03) and Cancun memory / transient opcodes (`MCOPY`, `TLOAD`/`TSTORE`) since Lovell (2025-03). `cancun` is the newest Foundry target whose *used* opcodes the chain runs. Do not set `prague` / `osaka` / `amsterdam`. Do not use `blobhash` / `block.blobbasefee` in first-party code. Deployed bytecode must not start with `0xEF` (Rootstock Vetiver rejects EOF).
 
-`[profile.deploy]` sets the same `solc_version` and `evm_version` (plus `via_ir` for size).
+`[profile.default]` sets `solc_version` and `evm_version`. There is no `[profile.deploy]` (R52
+removed it). Solx / via-IR evaluation is R55 in [#105](https://github.com/BitChillRSK/dca-contracts/pull/105).
 
 Anvil and `forge test --fork-url` execute on revm, not rskj. Prove the pin on Rootstock **testnet** before merging relaunch behavior PRs (see `docs/relaunch/IMPLEMENTATION_ORDER.md`).
 

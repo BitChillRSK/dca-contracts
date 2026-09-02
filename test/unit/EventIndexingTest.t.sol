@@ -194,6 +194,9 @@ contract EventIndexingTest is DcaDappTest {
         if (sig == keccak256("OperationsAdmin__SwapperAdded(address)")) return (true, 1);
         if (sig == keccak256("OperationsAdmin__SwapperRevoked(address)")) return (true, 1);
         if (sig == keccak256("OperationsAdmin__DepositsPauseSet(address,uint256,bool)")) return (true, 1);
+        if (sig == keccak256("PurchaseUniswap_PurchasePathAllowedSet(bytes32,bytes,address[],uint24[],bool)")) {
+            return (true, 0);
+        }
         if (sig == keccak256("FeeHandler__MinFeeRateSet(uint256)")) return (true, 0);
         if (sig == keccak256("FeeHandler__MaxFeeRateSet(uint256)")) return (true, 0);
         if (sig == keccak256("FeeHandler__PurchaseLowerBoundSet(uint256)")) return (true, 0);
