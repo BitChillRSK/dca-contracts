@@ -88,17 +88,14 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint128();
         
         // Direct initial owner is not the deployer, so the constructor cannot call the onlyOwner setters.
-        // Encode once, write the active path, and mark that hash allowed. The scoped locals drop
-        // before `decimals()` so the constructor stays under the stack limit. A zero purchase token
+        // Encode once, write the active path, and mark that hash allowed. A zero purchase token
         // reverts here, before the `decimals()` call below reaches an empty address.
-        {
-            address[] memory intermediateTokens = uniswapSettings.swapIntermediateTokens;
-            uint24[] memory poolFeeRates = uniswapSettings.swapPoolFeeRates;
-            bytes memory newPath = _encodePurchasePath(intermediateTokens, poolFeeRates);
-            bytes32 pathHash = keccak256(newPath);
-            _setPurchasePath(intermediateTokens, poolFeeRates, newPath);
-            _setPurchasePathAllowed(pathHash, newPath, intermediateTokens, poolFeeRates, true);
-        }
+        address[] memory intermediateTokens = uniswapSettings.swapIntermediateTokens;
+        uint24[] memory poolFeeRates = uniswapSettings.swapPoolFeeRates;
+        bytes memory newPath = _encodePurchasePath(intermediateTokens, poolFeeRates);
+        bytes32 pathHash = keccak256(newPath);
+        _setPurchasePath(intermediateTokens, poolFeeRates, newPath);
+        _setPurchasePathAllowed(pathHash, newPath, intermediateTokens, poolFeeRates, true);
 
         uint8 stablecoinDecimals = IERC20Metadata(address(_purchaseToken())).decimals();
         if (stablecoinDecimals > ORACLE_DECIMALS) {

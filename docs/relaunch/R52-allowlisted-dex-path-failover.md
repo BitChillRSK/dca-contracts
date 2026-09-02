@@ -92,7 +92,7 @@ function setPurchasePath(address[] memory intermediateTokens, uint24[] memory po
 - `setPurchasePath` encodes first, requires the hash to be allowlisted, then requires `msg.sender == owner()`
   or `IOperationsAdmin(dcaManager.getOperationsAdminAddress()).isSwapper(msg.sender)`.
 - Constructor encodes once, then calls `_setPurchasePath` (active path + `NewPathSet`) and
-  `_setPurchasePathAllowed` (`allowed = true`) in a scoped block. Public `setPurchasePath` /
+  `_setPurchasePathAllowed` (`allowed = true`). Public `setPurchasePath` /
   `setPurchasePathAllowed` are the only other callers of those internals.
 - Purchases read `s_swapPath` only. No allowlist SLOAD on the purchase path.
 - `OperationsAdmin` has no purchase-path mapping, setter, getter, assertion, event, errors, handler-policy
