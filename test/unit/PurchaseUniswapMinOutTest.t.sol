@@ -361,7 +361,7 @@ contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
     {}
 
     function getAmountOutMinimum(uint256 stablecoinAmountToSpend) external view returns (uint256) {
-        return _getAmountOutMinimum(stablecoinAmountToSpend);
+        return _getAmountOutLowerBound(stablecoinAmountToSpend);
     }
 
     function calculateFee(uint256 grossAmount) external view returns (uint256) {

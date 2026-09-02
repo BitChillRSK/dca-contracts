@@ -181,9 +181,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      */
     function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external onlyOwner {
         _validateSlippageSettings(s_amountOutMinimumPercent, amountOutMinimumSafetyCheck);
-        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(
-            s_amountOutMinimumSafetyCheck, amountOutMinimumSafetyCheck
-        );
+        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(s_amountOutMinimumSafetyCheck, amountOutMinimumSafetyCheck);
         s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint128();
     }
 
@@ -286,7 +284,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     /**
      * @dev Swap net stablecoin for WRBTC and return the handler's WRBTC-balance delta.
      *      The router's return value is treated as success/failure only; the measured WRBTC
-     *      balance delta is the amount we can credit. `amountOutMinimum` is `max(oracleFloor, minRbtcOut)`,
+     *      balance delta is the amount we can credit. `amountOutMinimum` is `max(amountOutLowerBound, minRbtcOut)`,
      *      so the caller can only ever tighten the swap, never loosen it below the configured floor.
      */
     function _purchaseRbtc(uint256 stablecoinAmount, uint256 minRbtcOut)
@@ -296,14 +294,14 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     {
         TransferHelper.safeApprove(address(_purchaseToken()), address(i_swapRouter02), stablecoinAmount);
 
-        uint256 oracleFloor = _getAmountOutMinimum(stablecoinAmount);
-        uint256 routerMinimum = minRbtcOut > oracleFloor ? minRbtcOut : oracleFloor;
+        uint256 amountOutLowerBound = _getAmountOutLowerBound(stablecoinAmount);
+        uint256 amountOutMinimum = minRbtcOut > amountOutLowerBound ? minRbtcOut : amountOutLowerBound;
 
         IV3SwapRouter.ExactInputParams memory params = IV3SwapRouter.ExactInputParams({
             path: s_swapPath,
             recipient: address(this),
             amountIn: stablecoinAmount,
-            amountOutMinimum: routerMinimum
+            amountOutMinimum: amountOutMinimum
         });
 
         uint256 wrBtcBalanceBefore = i_wrBtcToken.balanceOf(address(this));
@@ -327,7 +325,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      * @dev This is a revert bound, not an accounting input: what the handler credits is the measured WRBTC
      *      balance delta in `_purchaseRbtc`.
      */
-    function _getAmountOutMinimum(uint256 stablecoinAmountToSpend) internal view returns (uint256 minimumRbtcAmount) {
+    function _getAmountOutLowerBound(uint256 stablecoinAmountToSpend) internal view returns (uint256 minimumRbtcAmount) {
         (uint256 currentPrice, bool isValid,) = s_mocOracle.getPriceInfo();
         if (!isValid) revert PurchaseUniswap__OutdatedPrice();
         minimumRbtcAmount =

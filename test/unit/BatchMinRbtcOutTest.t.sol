@@ -45,7 +45,7 @@ contract BatchMinRbtcOutTest is DcaDappTest {
         assertEq(_accumulatedRbtc() - rbtcBefore, measured, "the batch credited exactly the minimum it cleared");
     }
 
-    /// @dev One wei above what the batch buys fails. On Dex the router enforces `max(oracleFloor, minRbtcOut)`
+    /// @dev One wei above what the batch buys fails. On Dex the router enforces `max(amountOutLowerBound, minRbtcOut)`
     ///      before the measured check; on MoC only the post-check fires.
     function testMinimumOneWeiAboveMeasuredOutputReverts() external {
         uint256 measured = _measuredOutput();
@@ -122,7 +122,7 @@ contract BatchMinRbtcOutTest is DcaDappTest {
 
     function _expectMinimumViolationRevert(uint256 measured, uint256 minRbtcOut) private {
         if (isDexSwaps) {
-            // The router rejects `max(oracleFloor, minRbtcOut)` before the measured check can run.
+            // The router rejects `max(amountOutLowerBound, minRbtcOut)` before the measured check can run.
             // The mock and the live SwapRouter02 word that rejection differently, so match on neither:
             // any revert is the assertion, and the venue-specific string is not the behaviour under test.
             vm.expectRevert();

@@ -1,19 +1,22 @@
-# R56 — Dex oracle floor is the safety check; the bot sets tightness
+# R56 — Dex slippage band and bot `minRbtcOut`
 
-Status: **not started** · Assigned: [#107](https://github.com/BitChillRSK/dca-contracts/pull/107) · Optional/further-review: no
+Status: **assigned** · PR: [#107](https://github.com/BitChillRSK/dca-contracts/pull/107) · Stacked on
+[#106](https://github.com/BitChillRSK/dca-contracts/pull/106) · Optional/further-review: no
 
-Planning lives in GitHub [#105](https://github.com/BitChillRSK/dca-contracts/pull/105). Implement in a
-later `Start with R56` PR stacked on [#104](https://github.com/BitChillRSK/dca-contracts/pull/104).
-Gated on R51 / [#103](https://github.com/BitChillRSK/dca-contracts/pull/103) (`minRbtcOut`) and R52 /
-[#104](https://github.com/BitChillRSK/dca-contracts/pull/104) (current `PurchaseUniswap`).
+Planning review in GitHub [#105](https://github.com/BitChillRSK/dca-contracts/pull/105). Gated on R51 /
+[#103](https://github.com/BitChillRSK/dca-contracts/pull/103) (`minRbtcOut`), R52 /
+[#104](https://github.com/BitChillRSK/dca-contracts/pull/104) (current `PurchaseUniswap`), and R57 /
+[#106](https://github.com/BitChillRSK/dca-contracts/pull/106).
 
 ## Objective
 
-Make the swapper's per-batch `minRbtcOut` the operational Dex fill bound, and use
-`s_amountOutMinimumSafetyCheck` (deploy default 95%) as the only on-chain oracle floor. Remove
-`s_amountOutMinimumPercent` from swap math and from the handler ABI. A quote-aware bot can tighten
-after seeing the pool; the Safe is no longer in that loop. A compromised or zero `minRbtcOut` still
-cannot clear less than the safety-check fraction of live MoC BTC/USD.
+Make the swapper's per-batch `minRbtcOut` the operational Dex fill bound. Keep both slippage words
+and the handler ABI: `s_amountOutMinimumPercent` (deploy default **97%**) is the swap-time oracle
+floor in `_getAmountOutLowerBound`; `s_amountOutMinimumSafetyCheck` (**95%**) is the configuration
+wall — the owner cannot set the percent below it in one transaction. Uniswap
+`ExactInputParams.amountOutMinimum` is `max(amountOutLowerBound, minRbtcOut)`. A quote-aware bot tightens
+after seeing the pool; the Safe is not on that path in normal operation. A compromised or zero
+`minRbtcOut` still cannot clear less than the percent floor of live MoC BTC/USD.
 
 ## Background
 
@@ -23,14 +26,18 @@ Widening slippage therefore took two Safe transactions. R51 added `minRbtcOut` s
 tighten, but not loosen, that floor, and explicitly left `_getAmountOutMinimum` and the 99.5% / 95%
 defaults out of PR 103.
 
-That leaves 99.5% as the number Uniswap actually enforces. It was a one-time probe, only the
+That leaves 99.5% as the number Uniswap actually enforces today. It was a one-time probe, only the
 multisig can change it, and it is too tight for live LP fees (R51's fork table: LayerBank USDRIF
-misses 99.5% by 16–23 bps). The bot cannot add margin after a quote. The 95% safety check is the
-value that was always meant as "more room" — a loss ceiling, not weekly policy.
+misses 99.5% by 16–23 bps). The bot cannot tighten after a quote until this PR wires `minRbtcOut`
+into the router.
 
 R51's threat model is unchanged: `minRbtcOut == 0` is legal (MoC; a compromised key can send `1`).
-The governance floor must still bind. This PR moves that floor from the 99.5% storage percent onto
-the 95% safety check and lets `minRbtcOut` be the operational number.
+The governance floor must still bind. This PR retunes the deploy default percent from 99.5% to **97%**
+(probe-derived; see **Revision: keep the band**), keeps the 95% safety check as the configuration
+wall, and passes `max(amountOutLowerBound, minRbtcOut)` so the bot's quote is the operational number. An
+early implementation collapsed both words onto the safety check; post-review restored the band
+because a single 95% floor caps compromised-swapper loss at 5% and removes the lower bound on owner
+widening.
 
 The $1 listed-stable peg, execution-time `isValid`, decimal scaling, and measured-WRBTC credits stay
 exactly as R43/R51.
@@ -45,7 +52,7 @@ exactly as R43/R51.
    config-only bound on it.
 2. ~~Delete `s_amountOutMinimumPercent` and its setter/getter/event.~~ **Revised.** Both words stay,
    packed in one slot. Dex constructors and deploy configs take both fractions, as before this PR.
-3. Uniswap `ExactInputParams.amountOutMinimum` is `max(oracleFloor, minRbtcOut)`. `minRbtcOut == 0`
+3. Uniswap `ExactInputParams.amountOutMinimum` is `max(amountOutLowerBound, minRbtcOut)`. `minRbtcOut == 0`
    therefore still hits the oracle floor.
 4. Keep `PurchaseRbtc`'s measured-output check. Do not trust the router return. MoC has no router
    min; it still only sees the post-check (and keeps sending `0` until a redemption preview exists).
@@ -99,10 +106,10 @@ value fixes a batch larger than the pool.
 
 ## Scope
 
-- [x] `_getAmountOutMinimum` multiplies by `s_amountOutMinimumPercent`, deployed loose (97%) instead
+- [x] `_getAmountOutLowerBound` multiplies by `s_amountOutMinimumPercent`, deployed loose (97%) instead
       of the one-time 99.5% probe value.
 - [x] `_purchaseRbtc` on Uniswap takes `minRbtcOut` (or equivalent) and passes
-      `max(oracleFloor, minRbtcOut)` into `ExactInputParams`. `PurchaseMoc._purchaseRbtc` ignores
+      `max(amountOutLowerBound, minRbtcOut)` into `ExactInputParams`. `PurchaseMoc._purchaseRbtc` ignores
       that argument. `PurchaseRbtc.batchBuyRbtc` forwards the local it already has; do not add a
       new stack slot for it.
 - [x] ~~Remove the 99.5% storage word, its setter/getter/event, and the constructor argument.~~
@@ -149,7 +156,7 @@ value fixes a batch larger than the pool.
 
 ## Required tests
 
-- Oracle floor at the percent default (97%) matches `_getAmountOutMinimum` for 18-decimal and
+- Oracle floor at the percent default (97%) matches `_getAmountOutLowerBound` for 18-decimal and
   6-decimal stables (reuse R43 scaling).
 - `minRbtcOut == 0` on Dex: router min equals the oracle floor; measured check is inert.
 - `minRbtcOut` above the floor: Uniswap reverts (or the measured check reverts) if output is between
@@ -160,7 +167,7 @@ value fixes a batch larger than the pool.
 - Owner `setAmountOutMinimumSafetyCheck` cannot be raised above the active floor.
 - Retightening the floor does not move the wall, and the swap follows the new floor immediately.
 - MoC `minRbtcOut` behavior unchanged (including `0`).
-- R51 rollback tests still hold when the Uniswap floor is the safety check.
+- R51 rollback tests still hold when the Uniswap floor is the percent default (97%).
 
 Then `make check`, `make fork-sovryn`, `make fork-tropykus`, `make fork-dex-path`, and — because
 this PR changes the number the router enforces — `SWAP_TYPE=dexSwaps STABLECOIN_TYPE=USDRIF make
@@ -193,7 +200,7 @@ percent. The mock-router lanes cannot show whether a live pool clears the floor.
   DcaManager selectors unchanged.
 - **Deploy:** two constructor fractions, as before. `DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT` moves
   99.5% -> 97%; `DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK` stays 95%. No two-step cutover.
-- **Behaviour that does change:** the router now enforces `max(floor, minRbtcOut)`, so a `minRbtcOut`
+- **Behaviour that does change:** the router now enforces `max(amountOutLowerBound, minRbtcOut)`, so a `minRbtcOut`
   the swap cannot fill reverts inside SwapRouter02 (`Too little received`) instead of surfacing
   `PurchaseRbtc__BelowSwapperMinimum(received, min)`. On the Dex path that custom error is now
   unreachable; it still fires on MoC. Consumers that parse it must handle the router string.
