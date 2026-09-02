@@ -32,7 +32,7 @@ The redundant `withdrawTokenAndInterest` route argument is assigned for removal;
 - [x] Update `IDcaManager`, tests, fuzz wrappers, scripts, and checked-in consumers to the final selectors.
 - [x] Record the before/after selector list, DcaManager runtime size, and explicit frontend/backend cutover notes.
 
-Before (R31 head): DcaManager runtime **21,061**. After: **18,433**.
+Before (R31 head): DcaManager runtime **21,061**. After: **18,433**. Both pre-optimizer ([Measurement basis](./README.md#measurement-basis)).
 
 Added:
 - `getDcaSchedule(address,address,uint256)` `a0527713`

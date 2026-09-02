@@ -23,7 +23,9 @@ R52 owns the Rootstock testnet + Blockscout re-proof of that optimizer-on artifa
 [0x3a63dc2458142cca09144a3f290ed6d996780c616acb8adbdf15f57f736ff5bc](https://rootstock-testnet.blockscout.com/tx/0x3a63dc2458142cca09144a3f290ed6d996780c616acb8adbdf15f57f736ff5bc)
 verified [`OperationsAdmin` `0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD`](https://rootstock-testnet.blockscout.com/address/0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD)
 on chain 31 (block 8031347; optimizer 200, no IR).
-R53's optimizer-baseline work is absorbed into R52. Schedule top-up is R54; solx / via-IR
+R52 owns the flip and corrected its own figures; R53 re-baselines every other recorded size, margin,
+and gas number — see [Measurement basis](./README.md#measurement-basis), which is the one place that
+states the profile every figure in `docs/relaunch/` is measured at. Schedule top-up is R54; solx / via-IR
 evaluation and `ZeroTokenPurchaseUniswap` repair are R55 — defined in stacked
 [#105](https://github.com/BitChillRSK/dca-contracts/pull/105), which needs rebase after #104.
 There is no `[profile.deploy]`. Until a separate toolchain decision pins via-IR through
@@ -286,7 +288,7 @@ Resolve the former unassigned checkpoint into implementation specs and order. No
 
 The split is intentional: authority/fund lifecycle, configuration behavior, handler ABI, DcaManager ABI, and internal cleanup each receive their own review boundary. The old checkpoint is closed; none of Candidates C–F remains in limbo.
 
-The R28 snapshot measured runtime bytecode at 21,081 bytes for `DcaManager`, 24,243 for `SovrynErc20HandlerDex`, and 24,366 for `TropykusErc20HandlerDex`. R30 changed those numbers; R31 must re-measure actual base/head sizes rather than carrying the snapshot forward as a promise.
+The R28 snapshot measured runtime bytecode at 21,081 bytes for `DcaManager`, 24,243 for `SovrynErc20HandlerDex`, and 24,366 for `TropykusErc20HandlerDex` — unoptimized, like every figure recorded before #104 ([Measurement basis](./README.md#measurement-basis)). R30 changed those numbers; R31 must re-measure actual base/head sizes rather than carrying the snapshot forward as a promise.
 
 Deliberate non-candidates remain excluded: do not merge `TokenLending` into `LendingErc20Handler`, absorb Idle into the lending base, add speculative adapter layers, or introduce proxies, delegatecall, owner rescue, or a withdrawal `to` parameter.
 
@@ -302,7 +304,7 @@ At the same time, remove the unused string protocol registry, replace it with an
 
 **No open product gates — do not ask.** Both decisions were recorded in the spec on 2026-08-26:
 
-- **Migration gate: option (a), manual exit/re-entry.** No cooperative migration ships; these handler versions will never gain the hook. Migration would not survive the bug scenarios that motivate it (it redeems through the same path), `SovrynErc20HandlerDex` has 426 bytes of runtime margin, and a position-moving function on immutable unaudited contracts is the worst place for a bug. The work is the four conditions attached to the decision, not new code. Never allow governance to move another user's funds.
+- **Migration gate: option (a), manual exit/re-entry.** No cooperative migration ships; these handler versions will never gain the hook. Migration would not survive the bug scenarios that motivate it (it redeems through the same path), `SovrynErc20HandlerDex` has 426 bytes of runtime margin, and a position-moving function on immutable unaudited contracts is the worst place for a bug. The work is the four conditions attached to the decision, not new code. Never allow governance to move another user's funds. **Re-baselined by R53:** that 426 bytes was an unoptimized measurement and the leaf now has 9,097 ([Measurement basis](./README.md#measurement-basis)), so the size half of this decision is void. The other three reasons — migration redeems through the same broken path, it is the highest-value target on immutable contracts, and generation 2 can still ship the hook — do not depend on bytecode. Re-judge in its own PR if at all; R53 does not.
 - **Idle is a route class, not index zero.** Each index registers once as idle or lending, the constructor pre-registers `0` as idle, and handler assignment requires a registered class. Without this, add-only assignment would make a buggy idle handler unrecoverable for new users on that token — because `(token, 0)` is the only idle slot and no non-zero index accepts a non-lending handler.
 
 `DcaManager.setOperationsAdmin` and ownership-transfer hardening are explicitly **out of scope** here. Their later review is now resolved: R45 adds the acceptance flow and R46 removes the setter in favor of an immutable constructor admin. Class↔handler ERC-165 (`ITokenLending` on `assignTokenHandler`) is the same error class as a mistyped index and is **required on R31**. See [`R13-operations-admin-lifecycle.md`](./R13-operations-admin-lifecycle.md).
@@ -488,7 +490,10 @@ also makes it consume the same `Batch` tuple as each across-handlers element; th
 selector does not ship. See [`R42-swapper-batcher.md`](./R42-swapper-batcher.md).
 
 **Decided:** the final manager is not planned to grow further, so the recurring hot-path saving is
-worth the remaining EIP-170 margin. Grouped calls remain atomic and the bot EOA remains allowlisted.
+worth the remaining EIP-170 margin. (**R53 re-baseline:** the margin traded away was measured
+unoptimized. `DcaManager` is 13,767 B / 10,809 B margin today, so the trade cost far less than it
+looked; the gas argument that decided it is unaffected — see
+[Measurement basis](./README.md#measurement-basis).) Grouped calls remain atomic and the bot EOA remains allowlisted.
 The cheaper one-loop implementation is preferred over a bundle-wide CEI two-pass: handlers are
 BitChill-deployed, purchase paths stay `onlySwapper`, and the extra pass costs gas on every tick.
 
@@ -529,7 +534,8 @@ as a Dex relaunch gate rather than a PR-merge gate. R9 indexing and R10 natspec 
 product gates; the Safe approves the measured static live backstops once during cutover.**
 
 Current PR 101 baseline: `DcaManager` 23,683 bytes (893 margin) and
-`LayerBankErc20HandlerDex` 23,418 (1,158 margin). DcaManager already takes `Batch`, so the obsolete
+`LayerBankErc20HandlerDex` 23,418 (1,158 margin) — unoptimized
+([Measurement basis](./README.md#measurement-basis)); today they are 13,767 / 10,809 and 15,692 / 8,884. DcaManager already takes `Batch`, so the obsolete
 seven-argument manager-stack finding no longer applies. The handler ABI addition has been compiled against
 PR 101 and does fail legacy no-IR codegen as written. Preserve its arithmetic/event order and re-measure
 every leaf.
@@ -539,8 +545,8 @@ required rather than conditional. It is neither: the function is one slot over, 
 to the block that pays the fee releases that slot, so the loop stays inline *and* keeps its cached
 `buyers.length` under `via_ir = false`. That is 87–416 gas cheaper and 17 bytes smaller per Dex handler than
 extracting.
-Checked rather than assumed: enabling the legacy optimizer (`optimizer = true`, `via_ir = false`) does **not**
-relieve stack-too-deep — solc asks for via-IR *with* the optimizer, and via-IR stays out of bounds for
+Checked rather than assumed: enabling the legacy optimizer (`optimizer = true`, `via_ir = false`) — now the
+default profile's own setting since #104 — does **not** relieve stack-too-deep — solc asks for via-IR *with* the optimizer, and via-IR stays out of bounds for
 EIP-170 and deployment decisions under the Rootstock compiler/EVM proof rule above.
 
 **Sovryn DOC is not a shipped Dex route (recorded 2026-08-31, PR 103).** DOC buys rBTC only through MoC
@@ -648,7 +654,7 @@ also owns the Rootstock testnet + Blockscout re-proof of that artifact. The meas
 file and its `AGENTS.md` mirror are already rewritten to *optimized* no-IR.
 
 What remains is the re-baseline #104 did not do: it corrected only its own figures. Every runtime size, EIP-170
-margin, and gas number recorded in the R18 / R31 / R42 / R50 / R51 entries and specs is still unoptimized. For
+margin, and gas number recorded in the R18 / R31 / R42 / R50 / R51 entries and specs was still unoptimized. For
 scale, the flip moved `DcaManager` 23,703 B / 873 B margin -> 13,767 B / 10,809 B, `testSinglePurchase`
 283,711 -> 243,817 gas, and `testBatchPurchasesOneUser` 2,244,557 -> 1,562,720. Append the corrected figure to
 each historical entry; do not rewrite why a shipped PR chose what it chose.
@@ -659,6 +665,18 @@ reasoning. Each belongs to its own PR on its remaining merits; several have inde
 `via_ir` stays out (R55).
 
 Ask: none. `optimizer_runs = 200` and CI inheritance were settled in #104.
+
+Shipped as specified, documentation only. The fresh full-build table and the two hot-path gas numbers live in
+one place — [Measurement basis](./README.md#measurement-basis) in `docs/relaunch/README.md` — and every entry
+or spec that still quotes a pre-#104 number now says so beside the number instead of repeating the table.
+Measured at the R58 head rather than by rebuilding each historical commit, which the entries state, because a
+delta against an old entry otherwise reads as the optimizer's alone. Two figures moved since #104: the three
+Dex leaves are 100 B larger (R56), and `testSinglePurchase` / `testBatchPurchasesOneUser` are 243,790 /
+1,562,441 against #104's 243,817 / 1,562,720. Decisions argued from bytecode scarcity are listed in the spec
+([R53](./R53-optimizer-baseline.md#decisions-flagged-for-re-judgement)); none is re-judged here. One of them
+does not survive contact: R51's `_creditBuyers` reasoning turned on no-IR stack-too-deep, which the optimizer
+does not relieve — R51 checked that at the time and it still holds — so only the 17-bytes-per-handler half of
+that argument was budget-driven, and via-IR (R55) is what would reopen it.
 
 ### R54 - top a schedule up from accrued interest ([spec](./R54-schedule-top-up-from-interest.md), unassigned, gated on #104)
 

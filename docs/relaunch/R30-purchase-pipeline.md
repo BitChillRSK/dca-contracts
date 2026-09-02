@@ -22,7 +22,7 @@ The two purchase bases also declare the funding hooks independently of the fundi
 
 This combines Candidates A and B from the post-R29 full-`src/` review. The later planning PR promoted Candidates C–F into R13 and R31–R34; see [`IMPLEMENTATION_ORDER.md`](./IMPLEMENTATION_ORDER.md).
 
-R28's size snapshot put the Dex handlers close to EIP-170. Abstract extraction is a source-maintenance win and may be inlined rather than reducing runtime. Do not claim bytecode savings without measuring the concrete handlers on this branch.
+R28's size snapshot put the Dex handlers close to EIP-170 (unoptimized — see [Measurement basis](./README.md#measurement-basis); the Dex leaves have ~9 KB of margin under the profile pinned in #104). Abstract extraction is a source-maintenance win and may be inlined rather than reducing runtime. Do not claim bytecode savings without measuring the concrete handlers on this branch.
 
 ## Open product decisions
 

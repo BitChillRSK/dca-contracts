@@ -69,6 +69,8 @@ make fork-tropykus
 
 Uniqueness is address-scoped, not token- or class-scoped. Reuse is blocked across two lending routes, two idle routes, a second token at the same index, and lending → idle. That last case previously fell to `OperationsAdmin__LendingHandlerOnIdleRoute`; it now reports the reuse, which is the accurate reason. No function selector changed and no getter was added.
 
+_Pre-optimizer figures (`optimizer = false`, no IR), the basis in force when this PR shipped — see [Measurement basis](./README.md#measurement-basis)._
+
 **Runtime bytecode (EIP-170 limit 24,576) vs R46:**
 
 | contract | R46 | R47 | delta | margin after |

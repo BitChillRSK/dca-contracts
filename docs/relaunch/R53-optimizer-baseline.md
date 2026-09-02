@@ -1,6 +1,6 @@
 # R53 — Re-baseline every recorded size and gas number against the optimized profile
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
@@ -63,17 +63,17 @@ R52 allowlist placement was the third such case and #104 already re-judged it, m
 
 ## Scope
 
-- [ ] Re-measure with a full `forge build --sizes` (not `--match-*`) and record `DcaManager`,
+- [x] Re-measure with a full `forge build --sizes` (not `--match-*`) and record `DcaManager`,
       `OperationsAdmin`, `IdleDocHandlerMoc`, all three `*DocHandlerMoc`, and all three
       `*Erc20HandlerDex` runtime sizes and margins.
-- [ ] Re-measure `testSinglePurchase` and `testBatchPurchasesOneUser` gas on the MoC/Sovryn lane.
-- [ ] Correct the recorded runtime/margin and gas figures in `docs/relaunch/README.md`,
+- [x] Re-measure `testSinglePurchase` and `testBatchPurchasesOneUser` gas on the MoC/Sovryn lane.
+- [x] Correct the recorded runtime/margin and gas figures in `docs/relaunch/README.md`,
       `IMPLEMENTATION_ORDER.md`, and the R18 / R31 / R42 / R50 / R51 specs. Where an entry records a
       decision made against the old number, **leave the entry and append the corrected figure** — do not
       rewrite the history of why a shipped PR chose what it chose.
-- [ ] Grep the docs for any remaining claim that the measurement basis is unoptimized, or that a contract
+- [x] Grep the docs for any remaining claim that the measurement basis is unoptimized, or that a contract
       is near EIP-170, and correct it.
-- [ ] Flag, without acting on, every design decision whose stated justification was bytecode scarcity, so
+- [x] Flag, without acting on, every design decision whose stated justification was bytecode scarcity, so
       each can be re-judged in its own PR.
 
 ## Out of scope
@@ -100,11 +100,11 @@ No behavior changes, so no new tests. Evidence for the numbers:
 
 ## Success criteria
 
-- [ ] Every runtime size and EIP-170 margin quoted in `docs/relaunch/` matches a fresh
+- [x] Every runtime size and EIP-170 margin quoted in `docs/relaunch/` matches a fresh
       `forge build --sizes`, or is explicitly labelled as the historical figure a past decision used.
-- [ ] No document still describes the measurement basis as unoptimized.
-- [ ] Decisions justified by bytecode scarcity are listed for re-judgement, and none are re-judged here.
-- [ ] No file outside `docs/` changed.
+- [x] No document still describes the measurement basis as unoptimized.
+- [x] Decisions justified by bytecode scarcity are listed for re-judgement, and none are re-judged here.
+- [x] No file outside `docs/` changed.
 
 ## Reviewer checklist
 
@@ -116,3 +116,67 @@ No behavior changes, so no new tests. Evidence for the numbers:
 ## ABI / deploy / cutover impact
 
 None. Documentation only. The bytecode change that motivates it ships in #104.
+
+## As implemented
+
+Measured 2026-09-02 on the R58 head (`docs/r53-optimizer-baseline`, stacked on
+[#108](https://github.com/BitChillRSK/dca-contracts/pull/108)) under `[profile.default]`:
+solc 0.8.36 / `cancun`, `optimizer = true`, `optimizer_runs = 200`, `via_ir = false`.
+
+Full `forge build --sizes` (no `--match-*`), EIP-170 24,576 B:
+
+| Contract | runtime (B) | margin (B) |
+|---|---:|---:|
+| `DcaManager` | 13,767 | 10,809 |
+| `OperationsAdmin` | 3,227 | 21,349 |
+| `IdleDocHandlerMoc` | 7,539 | 17,037 |
+| `SovrynDocHandlerMoc` | 10,724 | 13,852 |
+| `LayerBankDocHandlerMoc` | 10,933 | 13,643 |
+| `TropykusDocHandlerMoc` | 10,864 | 13,712 |
+| `SovrynErc20HandlerDex` | 15,479 | 9,097 |
+| `LayerBankErc20HandlerDex` | 15,692 | 8,884 |
+| `TropykusErc20HandlerDex` | 15,623 | 8,953 |
+
+Gas, MoC/Sovryn lane (`SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=DOC`):
+`testSinglePurchase` **243,790**, `testBatchPurchasesOneUser` **1,562,441**.
+
+Two deltas against the figures #104 recorded, both from source that landed between #104 and this branch,
+not from any build-setting change: the three Dex leaves are 100 B larger (R56 /
+[#107](https://github.com/BitChillRSK/dca-contracts/pull/107), which the R56 entry already records at
+these values), and the two gas numbers are 27 and 279 lower than #104's 243,817 / 1,562,720.
+`DcaManager` and `OperationsAdmin` are byte-identical to #104.
+
+The table lives in one place — [Measurement basis](./README.md#measurement-basis) in
+`docs/relaunch/README.md` — and every entry or spec that still quotes a pre-#104 number now says so
+beside the number and points there, rather than each carrying its own copy of the table to drift.
+
+**These are today's head, not a rebuild of each historical commit.** A delta between an old entry and
+this table therefore mixes the optimizer flip with every source change since, and the annotations say so.
+For the flip alone, on one commit, #104's measurement stands: `DcaManager` 23,703 → 13,767 B
+(margin 873 → 10,809), `testSinglePurchase` 283,711 → 243,817 (−14.1%), `testBatchPurchasesOneUser`
+2,244,557 → 1,562,720 (−30.4%).
+
+## Decisions flagged for re-judgement
+
+Each was argued, in whole or in part, from bytecode scarcity that the measurement created. **R53
+re-judges none of them**; each belongs to its own PR, and several have independent arguments that
+survive the correction intact.
+
+| Decision | The bytecode claim | Now | What survives |
+|---|---|---|---|
+| R13 migration gate — manual exit/re-entry, no cooperative migration | "`SovrynErc20HandlerDex` has 426 bytes of runtime margin", so a source-side migration "does not fit" | 15,479 B, margin 9,097 — it would fit | Reasons 1, 3, 4: migration redeems through the same path that would be broken, it is the highest-value target on immutable contracts, and generation 2 can still ship the hook |
+| R42 — integrate the grouped loop into `DcaManager` | "893 bytes below EIP-170 … is the real deployment constraint"; headroom traded for hot-path gas | 13,767 B, margin 10,809 — the trade cost a fraction of what it looked like | The gas measurement that decided it (344,723 vs 347,186 vs 361,133) is unaffected; the shipped choice is the cheap one either way |
+| R50 — merged per-user stablecoin/rBTC slot, tried and reverted | one of three objections was "~660 bytes of dex-handler EIP-170 margin (1,544 → 880)" | ~8.9 KB of Dex margin — that objection is void | `StablecoinSource` is still the wrong home for rBTC state, and the `uint128` share cap is still venue-dependent |
+| R39 — delete `buyRbtc` | partly "Dex bytecode … R31 left a few hundred bytes of margin before R9" | ~8.9 KB | One purchase pipeline instead of two, and a length-1 batch is the same operational path; the ABI is already frozen and shipped |
+| R31 — land the ABI trim before R9 | "R30 left only 329–452 bytes of EIP-170 margin", plus a conditional follow-up if `supportsInterface` did not fit | ~8.9 KB | One canonical getter per value; the trim and the ERC-165 class check both shipped |
+| R51 — no `_creditBuyers` extraction | the smallest of three effects, "17 bytes smaller on every Dex handler" | 17 B against ~8.9 KB rather than ~1.1 KB | Everything that decided it: the function was one stack slot over, the optimizer does **not** relieve stack-too-deep (R51 checked, and it still holds with the optimizer on), and only via-IR would — which is R55's call. The gas wins are unaffected |
+
+`ZeroTokenPurchaseUniswap` and anything else via-IR touches stays with [R55](./R55-solx-and-ir-evaluation.md).
+[R54](./R54-schedule-top-up-from-interest.md) was already written against the optimized budget and needs
+no correction here — its `+600 B` against 10,209 B of margin is the post-flip figure.
+
+## Files changed
+
+Beyond the spec's list: `R9`, `R13`, `R30`, `R34`, `R36`, `R38`, `R39`, `R43`, `R44`, `R45`, `R46`, `R47`
+each carry a recorded size or gas figure and now label it pre-optimizer. `R13` also gets the appended
+correction for the migration gate, which is the one live decision whose stated bytecode reason is void.

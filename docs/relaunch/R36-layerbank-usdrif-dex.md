@@ -89,7 +89,7 @@ not a product gate. If no liquid WRBTC route exists, stop and ask rather than gu
 - kUSDRIF (`0xDdf3CE45fcf080DF61ee61dac5Ddefef7ED4F46C`) `mintGuardianPaused == true` and `mintAllowed` reverts `Error(string) "C2"`, same as kDOC. Comptroller `0x962308fEf8edFaDD705384840e7701F8f39eD0c0`. At the Tropykus pin (`8700000`) both flags are false.
 - USDT0 Uniswap: **direct WRBTC at fee 3000**. Pool `0xaeF6fABf3b0C9e5F9d6D5170AfC703A633479Bbd`. The 500-fee USDT0/WRBTC pool exists but is empty. Do not hop through rUSDT (`0xAf368c91793CB22739386DFCbBb2F1A9e4bCBeBf`) as if it were USDT0.
 - LayerBank: Pool `0x526D06c65777eA6D56d7a1Dd47cD79230dDf72E9`; lRooUSDRIF `0xc96fBD12bE56Dd565b258d243344bCf792A51128`; lRooUSDT0 `0x6bE7d4cfCe825b106aa88F6916A412c5af230Ec0`.
-- `LayerBankErc20HandlerDex` runtime 21,578 bytes (EIP-170 margin 2,998). `SovrynErc20HandlerDex` 21,105 for comparison.
+- `LayerBankErc20HandlerDex` runtime 21,578 bytes (EIP-170 margin 2,998). `SovrynErc20HandlerDex` 21,105 for comparison. Pre-optimizer ([Measurement basis](./README.md#measurement-basis)); today those two are 15,692 / 8,884 and 15,479 / 9,097.
 
 ## Scope
 

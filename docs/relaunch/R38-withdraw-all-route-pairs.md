@@ -187,7 +187,8 @@ mints its own second stablecoin and needs the LayerBank mocks, so it is Anvil-an
 | `make fork-sovryn` | 299 / 14 / 313 | 307 / 15 / 322 |
 | `make fork-tropykus` | 292 / 18 / 310 | 300 / 19 / 319 |
 
-`DcaManager` runtime 22,470 → 22,578 bytes (EIP-170 margin 2,106 → 1,998): the empty-array
+`DcaManager` runtime 22,470 → 22,578 bytes (EIP-170 margin 2,106 → 1,998, pre-optimizer —
+see [Measurement basis](./README.md#measurement-basis); 13,767 / 10,809 today): the empty-array
 guards cost more than the removed inner loop saves; a review follow-up then shared
 `_requirePairedWithdrawalArrays` and folded both length-mismatch errors into
 `DcaManager__ArraysLengthMismatch`, which clawed 86 bytes back from the 22,664 first-push size.

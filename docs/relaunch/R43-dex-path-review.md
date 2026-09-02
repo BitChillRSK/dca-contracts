@@ -155,6 +155,8 @@ not silent, so no extra guard was added for a broken-oracle case that already ca
 **Invariant 1** is untouched: the Uniswap swap still credits the measured WRBTC balance delta and
 still ignores the router's return value. `amountOutMinimum` is a revert bound only.
 
+_Pre-optimizer figures (`optimizer = false`, no IR), the basis in force when this PR shipped — see [Measurement basis](./README.md#measurement-basis)._
+
 **Size and gas.** `SovrynErc20HandlerDex` 21,061 → 21,104 runtime bytes (margin 3,515 → 3,472);
 `TropykusErc20HandlerDex` 21,317 → 21,360 (margin 3,259 → 3,216). Both far under EIP-170; initcode margins
 stay above 21,000. A batch purchase costs ~200 more gas (one immutable read and one multiplication), on the
