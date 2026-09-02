@@ -38,10 +38,6 @@ contract DeployDexSwaps is DeployBase {
         return keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING));
     }
 
-    function _isDoc(string memory stablecoinType) internal pure returns (bool) {
-        return keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(DOC_STRING));
-    }
-
     /// @notice Live USDT0 uses 6-decimal bounds; local/fork mocks stay 18-decimal.
     function feeSettingsForToken(bool isUsdt0Live) public view returns (IFeeHandler.FeeSettings memory) {
         return IFeeHandler.FeeSettings({
@@ -114,14 +110,14 @@ contract DeployDexSwaps is DeployBase {
         bool isUSDRIF,
         bool isUSDT0
     ) internal returns (address selectedHandler) {
-        // Live dex stables are LayerBank USDRIF / USDT0. DOC buys rBTC through MoC
-        // redemption and must never get a Dex handler on a live run (DOC_STRING
-        // is DOC, so an unset STABLECOIN_TYPE is enough). Tropykus is test-only: its
+        // Live dex stables are LayerBank USDRIF / USDT0. DexHelperConfig's else arm is DOC
+        // config, so anything not exactly those two (unset STABLECOIN_TYPE, DOC, or a typo)
+        // must revert — DOC buys rBTC through MoC redemption. Tropykus is test-only: its
         // route index is not even in scope here, so this is the only place that can say so.
         if (protocol == Protocol.TROPYKUS) {
             revert("Tropykus is not on the production dex map");
         }
-        if (_isDoc(_stablecoinType())) {
+        if (!isUSDRIF && !isUSDT0) {
             revert("DOC is not on the production dex map");
         }
 

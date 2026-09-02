@@ -66,9 +66,12 @@ live deploy arm goes, exactly as R37 kept the Tropykus leaves and their suites.
 
 ## Scope
 
-- [x] `_deployLiveDexHandlers` rejects DOC on the live map: revert with a named string (mirror R37's
-      `"Tropykus is not on the production dex map"`; suggest `"DOC is not on the production dex map"`),
+- [x] `_deployLiveDexHandlers` rejects anything that is not USDRIF or USDT0 on the live map (an
+      allowlist, not an exact `"DOC"` match): revert `"DOC is not on the production dex map"`,
       placed alongside the existing `Protocol.TROPYKUS` check as its first statements.
+      DexHelperConfig's else arm is DOC config, so a typo (`Doc`, `doc`, …) would otherwise
+      silently deploy OperationsAdmin + DcaManager with no handler. Use the `isUSDRIF` /
+      `isUSDT0` booleans `run()` already passes; do not re-read `STABLECOIN_TYPE`.
       **Note the guarantee this gives.** `run()` already creates `OperationsAdmin` and `DcaManager`
       before it branches, so this is not a revert "before any `CREATE`" — R37's Tropykus revert is not
       either. What it guarantees is that no *handler* is constructed and no `assignTokenHandler` runs,
@@ -85,12 +88,15 @@ live deploy arm goes, exactly as R37 kept the Tropykus leaves and their suites.
       and say why DOC is excluded (MoC redemption is DOC's route) rather than just that it is.
 - [x] The `LOCAL` / `FORK` branch is unchanged: `deployDocHandlerDex` keeps its `Protocol.SOVRYN` arm and
       the local branch keeps building the selected protocol's handler.
-- [x] `DeployMocSwaps` is untouched. DOC's production route is MoC at `SOVRYN_INDEX` and stays that way.
+- [x] `DeployMocSwaps` behavior is untouched (DOC's production route stays MoC at `SOVRYN_INDEX`).
+      The `DOC_STRING` rename is a token-name-only edit of its `_stablecoinType()` fallback.
 
 ## Out of scope
 
 - [ ] Removing `SovrynErc20HandlerDex`, `TropykusErc20HandlerDex`, or any handler test suite.
-- [ ] `DeployUsdrifHandler`, `DeployLayerBankHandler`, `DeployIdleHandler`, or `DeployMocAndUniswap`.
+- [ ] `DeployUsdrifHandler`, `DeployLayerBankHandler`, `DeployIdleHandler`. `DeployMocAndUniswap`
+      behavior is untouched; the `DOC_STRING` rename is a token-name-only edit of its
+      `_stablecoinType()` fallback.
 - [ ] The one-shot combined live script the README anticipates; this PR only stops the hole.
 - [ ] Re-running or re-recording R51's Dex quote-vs-floor table.
 - [ ] Any `src/` change. If the fix appears to need one, that is a finding to report, not a licence.
@@ -100,6 +106,25 @@ live deploy arm goes, exactly as R37 kept the Tropykus leaves and their suites.
 - `script/DeployDexSwaps.s.sol`
 - `test/unit/deployment/LiveDeployPathTest.t.sol`
 - `docs/relaunch/README.md`, `docs/relaunch/IMPLEMENTATION_ORDER.md` (status and the queue entry)
+
+`DOC_STRING` rename (`DEFAULT_STABLECOIN` → `DOC_STRING`, no behavior change), listed so the PR
+body's **Files beyond the spec** can stay current:
+
+- `script/Constants.sol`
+- `script/DeployMocAndUniswap.s.sol`
+- `script/DeployMocSwaps.s.sol`
+- `script/DexHelperConfig.s.sol`
+- `script/MocHelperConfig.s.sol`
+- `test/ComparePurchaseMethods.t.sol`
+- `test/ai-generated/unit/idle/IdleDcaManagerTest.t.sol`
+- `test/ai-generated/unit/layerbank/LayerBankDcaManagerTest.t.sol`
+- `test/unit/DcaDappTest.t.sol`
+- `test/unit/VersionedRouteAccountingTest.t.sol`
+- `test/unit/WithdrawAllRoutePairsTest.t.sol`
+- `test/unit/deployment/BaseDeploymentTest.t.sol`
+- `test/unit/deployment/IdleHandlerDeploymentTest.t.sol`
+- `test/unit/deployment/LayerBankHandlerDeploymentTest.t.sol`
+- `test/unit/deployment/NewHandlerDeploymentTest.t.sol`
 
 ## Required tests
 
@@ -113,8 +138,8 @@ and deploys the DOC Dex handler.
       `CREATE` count — see the note in **Scope**. Skips the Tropykus lane, which reverts first for a
       different reason. Also skips `none`: DexHelperConfig has no idle arm, so that lane never reaches
       the DOC check.
-- [x] `_skipIfDexLiveUnsupported` skips DOC, so `test_dexLive_mainnetStyle_registersRoutesThenProposes`
-      no longer runs the DOC combination.
+- [x] `_skipIfDexLiveUnsupported` skips anything that is not USDRIF or USDT0, so
+      `test_dexLive_mainnetStyle_registersRoutesThenProposes` no longer runs the DOC combination (or a typo).
 - [x] Open decision 1 kept the route registration, so both `getRouteClass(SOVRYN_INDEX) == Lending`
       assertions in `LiveDeployPathTest` stay (MoC-live and dex-live).
 - [x] Full `AGENTS.md` done-gate: `make check`, plus `make fork-sovryn` and `make fork-tropykus` before
@@ -122,8 +147,9 @@ and deploys the DOC Dex handler.
 
 ## Success criteria
 
-- [x] A live `STABLECOIN_TYPE=DOC` (or unset) `DeployDexSwaps` run reverts with the named string; no DOC
-      Dex handler is constructed and `(DOC, SOVRYN_INDEX)` is never assigned.
+- [x] A live `STABLECOIN_TYPE=DOC` (or unset, or any string that is not exactly `USDRIF` / `USDT0`)
+      `DeployDexSwaps` run reverts with the named string; no DOC Dex handler is constructed and
+      `(DOC, SOVRYN_INDEX)` is never assigned.
 - [x] `grep` of the live branch shows no Sovryn handler construction or assignment.
 - [x] The map comment matches the shipped Dex set.
 - [x] `make dex-sovryn`, `make dex-tropykus`, `make fork-sovryn` and `ComparePurchaseMethods` still build

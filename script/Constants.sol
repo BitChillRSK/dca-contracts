@@ -49,7 +49,7 @@ uint256 constant RESERVED_MOC_LENDING_INDEX = 3; // reserved for future MoC lend
 string constant TROPYKUS_STRING = "tropykus";
 
 // Default configurations
-string constant DOC_STRING = "DOC"; // Default stablecoin to use if not specified
+string constant DOC_STRING = "DOC"; // Unset STABLECOIN_TYPE falls back to this in `_stablecoinType()`.
 string constant USDRIF_STRING = "USDRIF";
 string constant USDT0_STRING = "USDT0";
 uint256 constant DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT = 0.995 ether; // 99.5% -> 0.5% slippage

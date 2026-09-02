@@ -228,7 +228,7 @@ contract LiveDeployPathTest is Test {
 
     function _skipIfMocLiveUnsupported() internal {
         string memory coinType = vm.envOr("STABLECOIN_TYPE", DOC_STRING);
-        if (keccak256(abi.encodePacked(coinType)) != keccak256(abi.encodePacked("DOC"))) {
+        if (keccak256(abi.encodePacked(coinType)) != keccak256(abi.encodePacked(DOC_STRING))) {
             vm.skip(true);
             return;
         }
@@ -282,9 +282,8 @@ contract LiveDeployPathTest is Test {
         bytes32 coinHash = keccak256(abi.encodePacked(coinType));
         bool isUSDRIF = coinHash == keccak256(abi.encodePacked(USDRIF_STRING));
         bool isUSDT0 = coinHash == keccak256(abi.encodePacked(USDT0_STRING));
-        bool isDOC = coinHash == keccak256(abi.encodePacked(DOC_STRING));
-        if (isDOC) {
-            vm.skip(true); // live dex path reverts for DOC; see test_dexLive_revertsForDocOnTheDexMap
+        if (!isUSDRIF && !isUSDT0) {
+            vm.skip(true); // live dex path allowlists USDRIF / USDT0 only
             return;
         }
         if (
