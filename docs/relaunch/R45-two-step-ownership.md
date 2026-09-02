@@ -58,6 +58,8 @@ Run targeted ownership and deployment suites, every handler lane needed by const
 
 Dex constructors used to call `onlyOwner setPurchasePath` while `Ownable(msg.sender)` still made the deployer the owner. Direct initial ownership breaks that, so `PurchaseUniswap` now initializes the path through an internal helper; the public setter stays `onlyOwner`.
 
+_Pre-optimizer figures (`optimizer = false`, no IR), the basis in force when this PR shipped — see [Measurement basis](./README.md#measurement-basis)._
+
 **Runtime bytecode (EIP-170 limit 24,576) vs R44:**
 
 | contract | R44 | R45 | grown | margin after |

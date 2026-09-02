@@ -10,7 +10,7 @@ Delete the single-schedule `buyRbtc` entry points on `DcaManager` and `PurchaseR
 
 ## Background
 
-`DcaManager.buyRbtc` and `PurchaseRbtc.buyRbtc` are swapper-only. The bot always builds batches. Keeping both paths doubles the purchase pipeline, the tests, and Dex bytecode (R31 left a few hundred bytes of EIP-170 margin before R9 adds share-transition events).
+`DcaManager.buyRbtc` and `PurchaseRbtc.buyRbtc` are swapper-only. The bot always builds batches. Keeping both paths doubles the purchase pipeline, the tests, and Dex bytecode (R31 left a few hundred bytes of EIP-170 margin before R9 adds share-transition events — unoptimized; the Dex leaves carry ~8.9 KB under the profile #104 pins, see [Measurement basis](./README.md#measurement-basis), so the bytecode half of this rationale is void and the one-pipeline reason is what stands).
 
 A length-1 `batchBuyRbtc` is not a perfect clone of the old single path (array checks, aggregated fee, `PurchaseRbtc__SuccessfulRbtcBatchPurchase`), but it is the same cash motion: one retrieve, one fee transfer, one MoC/Uniswap spend, one `PurchaseRbtc__RbtcBought`. That is enough for debug and retries.
 
@@ -64,6 +64,8 @@ Targeted first, then `make check`.
 
 ## Measured results
 
+_Pre-optimizer figures (`optimizer = false`, no IR), the basis in force when this PR shipped — see [Measurement basis](./README.md#measurement-basis)._
+
 **Gas (length-1 batch vs the removed single selector, same lane and setup, snapshot-reverted between arms):**
 
 | lane | `buyRbtc` | length-1 `batchBuyRbtc` | premium |
@@ -75,6 +77,8 @@ Targeted first, then `make check`.
 | Tropykus / Dex / USDRIF | 308,585 | 323,517 | +14,932 |
 
 Accepted per the decision above: ~13–15k gas on the rare one-schedule tick, paid by the bot.
+
+_Pre-optimizer figures (`optimizer = false`, no IR), the basis in force when this PR shipped — see [Measurement basis](./README.md#measurement-basis)._
 
 **Runtime bytecode (EIP-170 limit 24,576):**
 

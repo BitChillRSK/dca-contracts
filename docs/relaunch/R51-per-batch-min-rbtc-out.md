@@ -71,7 +71,9 @@ are a measured relaunch/cutover decision, not a reason to stall PR 103.
 ## Current baseline and implementation constraint
 
 PR 101 already takes `Batch calldata` in both DcaManager entry points and `_batchBuyRbtc`; there is no
-seven-argument DcaManager stack problem left for R51. Current `[profile.default]` runtime sizes are:
+seven-argument DcaManager stack problem left for R51. `[profile.default]` runtime sizes at the time
+(unoptimized — see [Measurement basis](./README.md#measurement-basis); today `DcaManager` is 13,767 /
+10,809, the Dex leaves 15,479–15,692 / 8,884–9,097, and `OperationsAdmin` 3,227 / 21,349) were:
 
 | Contract | baseline | EIP-170 margin |
 |---|---:|---:|
@@ -105,13 +107,21 @@ through `PurchaseRbtcHarness` at 1/2/5/20/50 rows it costs ~12 gas once per call
 for it, which is not worth a second code path.
 
 For the record, since it was checked rather than assumed: enabling the **legacy optimizer**
-(`optimizer = true`, `via_ir = false`) does *not* relieve this. `[profile.default]` does leave the optimizer
-off, but stack-too-deep persists with it on — solc's own message asks for `--via-ir` *while* enabling the
+(`optimizer = true`, `via_ir = false`) does *not* relieve this. `[profile.default]` left the optimizer
+off at the time — #104 has since turned it on — but stack-too-deep persists with it on — solc's own message asks for `--via-ir` *while* enabling the
 optimizer, and via-IR remains out of bounds for EIP-170 and deployment decisions under the toolchain rule in
 [`IMPLEMENTATION_ORDER.md`](./IMPLEMENTATION_ORDER.md). Whether to turn the optimizer on at all is a separate
 toolchain decision with its own item; it would change every deployed size (`DcaManager` 23,703 → 13,767 in a
 measurement taken for that discussion) and the settings the Rootstock testnet proof and Blockscout
 verification were made at.
+
+**R53 re-baseline (2026-09-02).** That separate item was #104: the optimizer is on, and the Rootstock
+testnet + Blockscout proof was retaken at the new settings. What this changes for R51 is only the size
+half of the `_creditBuyers` discussion — the 17 bytes per Dex handler, against ~8.9 KB of margin rather
+than ~1.1 KB. It changes nothing about the constraint that actually drove the decision: the inline loop
+was one stack slot over, the optimizer does not relieve stack-too-deep (checked above, and still true
+with it on), and only via-IR would — which is R55's call, not this PR's. The gas measurements that
+selected the shipped shape are unaffected.
 
 ## Scope
 

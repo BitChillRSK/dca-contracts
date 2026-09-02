@@ -76,7 +76,7 @@ Targeted: `SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn EXPECTED_LENDING_PROTOCOL=
 
 `s_dcaSchedules` remains mapping slot 2. Handler `s_shares` / idle balances stay `uint256`.
 
-Measured on `DcaScheduleTest` / `RbtcPurchaseTest` against the R49 base (`LENDING_PROTOCOL=sovryn`). The purchase-path drop is the R19 extra slot coming back out, plus the four other schedule slots collapsing:
+Measured on `DcaScheduleTest` / `RbtcPurchaseTest` against the R49 base (`LENDING_PROTOCOL=sovryn`), pre-optimizer — see [Measurement basis](./README.md#measurement-basis). The purchase-path drop is the R19 extra slot coming back out, plus the four other schedule slots collapsing:
 
 | Test | R49 (unpacked + paused) | R18 | Delta |
 |---|---|---|---|
@@ -89,6 +89,8 @@ Measured on `DcaScheduleTest` / `RbtcPurchaseTest` against the R49 base (`LENDIN
 R19's unpacked `paused` had cost the protocol-paid purchase path +3,585 / +76,492. Packing more than returns that: `_rBtcPurchaseChecksEffects` now copies three cold slots per row instead of seven.
 
 `DcaManager` runtime 21,151 bytes (margin 3,425). SafeCast inlining grew bytecode; the gas win is storage, not code size. Dex handlers are unchanged (21,105 / 21,361).
+
+**R53 re-baseline (2026-09-02).** Every figure above is unoptimized. Under the profile #104 pins, `DcaManager` is 13,767 B / 10,809 B margin and the Dex leaves 15,479–15,692 / 8,884–9,097, and the two hot-path tests are `testSinglePurchase` 243,790 and `testBatchPurchasesOneUser` 1,562,441 at today's head. The conclusion is unchanged and does not depend on the flip: packing wins storage slots, and SLOAD/SSTORE prices are not something the optimizer discounts. The mask/shift bytecode cost that packing pays is what the optimizer partly reclaims.
 
 Timestamp arithmetic in the purchase path is done in `uint256` then `toUint48`, so a `uint48.max` last-purchase plus a period does not panic in the packed type before the named overflow revert.
 

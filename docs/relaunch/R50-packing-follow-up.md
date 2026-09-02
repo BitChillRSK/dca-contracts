@@ -61,7 +61,7 @@ Gas, `SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=DOC`, vs R36:
 | `testSinglePurchase` | 285,295 | 276,283 | −9,012 |
 | `testBatchPurchasesOneUser` | 2,229,154 | 2,151,218 | −77,936 |
 
-Runtime size, default profile, EIP-170 24,576:
+Runtime size, default profile, EIP-170 24,576 (pre-optimizer — see [Measurement basis](./README.md#measurement-basis)):
 
 | Contract | R36 | R50 | Margin after |
 |---|---|---|---|
@@ -75,6 +75,15 @@ Runtime size, default profile, EIP-170 24,576:
 
 Narrow fields mean mask/shift code on every read and write, and the default profile does not optimise
 that away — that is where the growth comes from. R38, R42, and R9 still have to fit in the margins above.
+
+**R53 re-baseline (2026-09-02).** The paragraph below described the build config as it then was. It is
+now historical on both counts: #104 removed `[profile.deploy]` and turned the optimizer on in
+`[profile.default]`, so the deploy profile *is* the optimized one and the sizes above are not what would
+go on chain. Today `DcaManager` is 13,767 (margin 10,809), `LayerBankErc20HandlerDex` 15,692 (8,884),
+`SovrynErc20HandlerDex` 15,479 (9,097), `IdleDocHandlerMoc` 7,539 (17,037), `LayerBankDocHandlerMoc`
+10,933 (13,643), `SovrynDocHandlerMoc` 10,724 (13,852), `OperationsAdmin` 3,227 (21,349). The reason
+for the growth this PR recorded is unchanged — narrow fields still cost mask/shift code — but "R38, R42,
+and R9 still have to fit in the margins above" is no longer a constraint anyone is spending against.
 
 **These are deploy sizes, not just a CI ceiling.** `[profile.deploy]` sets `via_ir = true` and compiles
 the same sources to roughly half (`DcaManager` ~11.1k, LayerBank dex ~11.5k), but **no documented or
@@ -185,6 +194,10 @@ is a separate decision, not an R50 change — until it is made, treat the margin
   responsibility belongs there, and it cost ~660 bytes of dex-handler EIP-170 margin (1,544 → 880) plus
   a `uint128` cap on lending **shares** whose token-denominated size depends on the venue's exchange
   rate. Do not re-implement as a drive-by; it needs its own PR and its own home for the storage.
+  **R53 re-baseline:** the 660 bytes were unoptimized and the Dex leaves now carry ~8.9 KB
+  ([Measurement basis](./README.md#measurement-basis)), so that third objection is void. The other two —
+  `StablecoinSource` is the wrong home for rBTC state, and the `uint128` share cap is venue-dependent —
+  are not budget arguments and still stand. Re-judging this belongs to that own PR, not to R53.
 - [ ] Bitmap-packing `s_swappers` / `s_handlerAssigned`.
 - [ ] Storing a hash (full or truncated) or a dual nonce-in-storage / hash-in-ABI id.
 - [ ] Dropping `s_scheduleNonce` or deriving ids from timestamps, array length, or last-element state.

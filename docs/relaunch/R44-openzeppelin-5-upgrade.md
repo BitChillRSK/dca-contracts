@@ -58,6 +58,8 @@ Run focused ownership/reentrancy/handler suites, `forge build --sizes`, `forge i
 
 Pinned to tag `v5.7.0` (`cab19933c33c2ad1d4c7a84864a3601dddfd16f3`), not a moving ref.
 
+_Pre-optimizer figures (`optimizer = false`, no IR), the basis in force when this PR shipped — see [Measurement basis](./README.md#measurement-basis)._
+
 **Runtime bytecode (EIP-170 limit 24,576) — every contract shrank; v5 replaced OZ's revert strings with custom errors:**
 
 | contract | v4.9.3 | v5.7.0 | freed | margin after |

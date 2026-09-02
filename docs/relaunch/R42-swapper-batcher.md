@@ -40,6 +40,14 @@ testnet verification. Switching compiler pipelines is a separate decision. R42 a
 protocol-paid saving within the measured no-IR margin because no further DcaManager growth was then
 planned; it does not treat the margin as unused.
 
+**R53 re-baseline (2026-09-02).** Every size above is unoptimized, and `[profile.deploy]` no longer
+exists — #104 removed it and pinned `optimizer = true` / `optimizer_runs = 200` / `via_ir = false` on
+`[profile.default]` ([Measurement basis](./README.md#measurement-basis)). `DcaManager` is 13,767 B
+with 10,809 B of margin today, so the "893 bytes below EIP-170 is the real deployment constraint"
+framing is void: integrating the loop cost a fraction of the headroom it appeared to cost. The gas
+measurement that actually decided this PR (344,723 vs 347,186 vs 361,133 on the same two-group
+purchase) is untouched by the flip and still selects the one-loop implementation.
+
 **Atomicity.** One revert rolls back every venue in the bundle. A paused row, malformed group, or
 handler failure therefore reverts the entire call. The bot filters rows off-chain and its EOA stays
 allowlisted so it can retry one handler through `batchBuyRbtc` after a grouped call fails.

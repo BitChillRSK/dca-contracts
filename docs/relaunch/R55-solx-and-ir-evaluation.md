@@ -16,9 +16,10 @@ schedule, so hot-path gas is a recurring cost rather than a one-off.
 
 Two things must be settled before any solx number means anything.
 
-**The baseline must be optimized.** Until [#104](https://github.com/BitChillRSK/dca-contracts/pull/104) lands, every gas figure
-in this repo is unoptimized, and measuring solx against those numbers would credit it with wins that
-belong to `optimizer = true`. Measured on the MoC/Sovryn lane:
+**The baseline must be optimized.** Every gas figure recorded before [#104](https://github.com/BitChillRSK/dca-contracts/pull/104)
+is unoptimized, and measuring solx against those numbers would credit it with wins that belong to
+`optimizer = true`. R53 re-baselined the record and marks which figures are pre-#104 — see
+[Measurement basis](./README.md#measurement-basis). Measured on the MoC/Sovryn lane:
 
 | Config | `testSinglePurchase` | `testBatchPurchasesOneUser` |
 | --- | --- | --- |
@@ -26,7 +27,8 @@ belong to `optimizer = true`. Measured on the MoC/Sovryn lane:
 | optimizer on, no IR | 243,817 (−14.1%) | 1,562,720 (−30.4%) |
 | optimizer on, via IR | 239,142 (−1.9% vs above) | 1,503,278 (−3.8% vs above) |
 
-So solx is competing against ~239k, not ~284k. The headroom it must beat is what remains *after* the
+So solx is competing against ~239k, not ~284k. (R53's fresh run of the optimizer-on row at the R58 head:
+243,790 and 1,562,441.) The headroom it must beat is what remains *after* the
 optimizer and the IR pipeline have taken theirs.
 
 **`via_ir` is not free today.** A full `forge build` under `via_ir = true` fails with solc error 1284
@@ -34,11 +36,13 @@ on `ZeroTokenPurchaseUniswap` (`test/unit/PurchaseUniswapSettingsTest.sol:440`):
 reverts unconditionally by design — that *is* the test, proving a reversed inheritance list cannot
 deploy — so the optimizer drops the immutable assignments while the runtime still reads them. Note
 that `forge test --match-*` can mask this, because forge compiles sparsely and may never reach that
-file. `[profile.deploy]` sidesteps it with `skip = ["test/**"]`, which is right for a deploy build
-but does not help the test lanes. Deciding whether and how to run tests under IR is part of this PR.
+file. The `[profile.deploy]` that sidestepped it with `skip = ["test/**"]` no longer exists — #104 removed
+it — so a deploy build under IR would need that skip re-created, and it would not help the test lanes
+either way. Deciding whether and how to run tests under IR is part of this PR.
 
 EIP-170 is explicitly **not** a motivation. With the optimizer on the margins are ~10.8 KB on `DcaManager` and
-~9.7 KB on the Dex handlers; nothing is size-constrained. Any past reasoning that reached for a
+~8.9 KB on the Dex handlers (R53's fresh full build: 8,884–9,097 B — see
+[Measurement basis](./README.md#measurement-basis)); nothing is size-constrained. Any past reasoning that reached for a
 smaller compiler to fit a contract is void.
 
 The counterweight is risk, and it is the deciding factor rather than a footnote. These contracts are

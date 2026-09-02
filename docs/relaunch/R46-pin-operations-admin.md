@@ -52,6 +52,8 @@ Target DcaManager modifiers/getters/deployment tests, inspect method identifiers
 
 `s_operationsAdmin` is now `i_operationsAdmin` (immutable). Constructor reverts `DcaManager__OperationsAdminIsNotAContract` when `code.length == 0` (zero and EOA). `getOperationsAdminAddress()` is unchanged as the read. `setOperationsAdmin(address)` (`0x32742d59`) and `DcaManager__OperationsAdminUpdated` are gone.
 
+_Pre-optimizer figures (`optimizer = false`, no IR), the basis in force when this PR shipped — see [Measurement basis](./README.md#measurement-basis)._
+
 **Runtime bytecode (EIP-170 limit 24,576) vs R45:**
 
 | contract | R45 | R46 | delta | margin after |
