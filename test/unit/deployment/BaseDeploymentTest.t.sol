@@ -32,7 +32,7 @@ contract BaseDeploymentTest is Test {
 
         // This suite always deploys DeployMocSwaps (DOC). Skip on USDRIF lanes rather than
         // setEnv STABLECOIN_TYPE — that would poison DcaDappTest the same way LENDING_PROTOCOL did.
-        string memory coinType = vm.envOr("STABLECOIN_TYPE", DEFAULT_STABLECOIN);
+        string memory coinType = vm.envOr("STABLECOIN_TYPE", DOC_STRING);
         if (keccak256(abi.encodePacked(coinType)) != keccak256(abi.encodePacked("DOC"))) {
             vm.skip(true);
             return;

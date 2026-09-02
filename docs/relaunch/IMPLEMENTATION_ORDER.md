@@ -562,7 +562,7 @@ broadcast; it does not block R52.
 
 **Promoted to R57 on 2026-09-02.** It had no R-id and no spec, which made it the only queued item a
 handover prompt could not name, and left the reader to reassemble the hazard from three documents. The
-spec records what makes it a hazard rather than untidiness: `DEFAULT_STABLECOIN` is `DOC`, so an unset
+spec records what makes it a hazard rather than untidiness: `DOC_STRING` is `DOC`, so an unset
 `STABLECOIN_TYPE` is enough to trigger it; `assignTokenHandler` is add-only, so `(DOC, SOVRYN_INDEX)` is
 burned permanently once taken — the same key `DeployMocSwaps` needs for the production
 `SovrynDocHandlerMoc`; and the live DOC arm is currently exercised and green by `LiveDeployPathTest` on

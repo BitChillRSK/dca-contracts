@@ -35,7 +35,7 @@ The script does not know that. In `_deployLiveDexHandlers` the Sovryn arm is gua
 
 Three facts make this a deploy hazard rather than untidiness:
 
-- **DOC is the default.** `DEFAULT_STABLECOIN = "DOC"` in `script/Constants.sol`, and `_stablecoinType()`
+- **DOC is the default.** `DOC_STRING = "DOC"` in `script/Constants.sol`, and `_stablecoinType()`
   falls back to it. This is what an operator gets by leaving `STABLECOIN_TYPE` unset, not an exotic
   invocation.
 - **The assignment is permanent.** `OperationsAdmin.assignTokenHandler` reverts

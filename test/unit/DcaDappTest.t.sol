@@ -184,7 +184,7 @@ contract DcaDappTest is Test {
         try vm.envString("STABLECOIN_TYPE") returns (string memory coinType) {
             stablecoinType = coinType;
         } catch {
-            stablecoinType = DEFAULT_STABLECOIN;
+            stablecoinType = DOC_STRING;
         }
         
         bool isUSDRIF = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING));

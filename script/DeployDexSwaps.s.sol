@@ -39,7 +39,7 @@ contract DeployDexSwaps is DeployBase {
     }
 
     function _isDoc(string memory stablecoinType) internal pure returns (bool) {
-        return keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(DEFAULT_STABLECOIN));
+        return keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(DOC_STRING));
     }
 
     /// @notice Live USDT0 uses 6-decimal bounds; local/fork mocks stay 18-decimal.
@@ -115,7 +115,7 @@ contract DeployDexSwaps is DeployBase {
         bool isUSDT0
     ) internal returns (address selectedHandler) {
         // Live dex stables are LayerBank USDRIF / USDT0. DOC buys rBTC through MoC
-        // redemption and must never get a Dex handler on a live run (DEFAULT_STABLECOIN
+        // redemption and must never get a Dex handler on a live run (DOC_STRING
         // is DOC, so an unset STABLECOIN_TYPE is enough). Tropykus is test-only: its
         // route index is not even in scope here, so this is the only place that can say so.
         if (protocol == Protocol.TROPYKUS) {
@@ -260,7 +260,7 @@ contract DeployDexSwaps is DeployBase {
         try vm.envString("STABLECOIN_TYPE") returns (string memory coinType) {
             stablecoinType = coinType;
         } catch {
-            stablecoinType = DEFAULT_STABLECOIN;
+            stablecoinType = DOC_STRING;
         }
     }
 }

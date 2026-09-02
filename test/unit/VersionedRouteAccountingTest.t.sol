@@ -37,7 +37,7 @@ contract VersionedRouteAccountingTest is BaseDeploymentTest {
     MockStablecoin internal docToken;
 
     function setUp() public override {
-        string memory coinType = vm.envOr("STABLECOIN_TYPE", DEFAULT_STABLECOIN);
+        string memory coinType = vm.envOr("STABLECOIN_TYPE", DOC_STRING);
         if (keccak256(abi.encodePacked(coinType)) != keccak256(abi.encodePacked("DOC"))) {
             vm.skip(true);
             return;

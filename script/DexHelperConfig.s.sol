@@ -58,7 +58,7 @@ contract DexHelperConfig is Script {
         try vm.envString("STABLECOIN_TYPE") returns (string memory coinType) {
             stablecoinType = coinType;
         } catch {
-            stablecoinType = DEFAULT_STABLECOIN;
+            stablecoinType = DOC_STRING;
         }
         
         if (block.chainid == RSK_MAINNET_CHAIN_ID) {
