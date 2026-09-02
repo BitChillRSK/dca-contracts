@@ -227,6 +227,13 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         emit PurchaseUniswap_PurchasePathAllowedSet(pathHash, encodedPath, intermediateTokens, poolFeeRates, allowed);
     }
 
+    /**
+     * @dev Uniswap V3 `exactInput` bytes: this handler's stablecoin, then each
+     *      `(fee, intermediateToken)`, then the last fee and WRBTC. Empty
+     *      `intermediateTokens` is a direct pair. `poolFeeRates.length` must be
+     *      `intermediateTokens.length + 1`. Reverts if `_purchaseToken()` is still
+     *      unset, so a reversed inheritance `is` list fails at deploy.
+     */
     function _encodePurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
         private
         view
@@ -247,6 +254,11 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         newPath = abi.encodePacked(newPath, poolFeeRates[poolFeeRates.length - 1], address(i_wrBtcToken));
     }
 
+    /**
+     * @dev Both arguments are 1e18-scaled fractions. Neither may exceed 100%, and the
+     *      swap-time percent cannot sit below the config-only safety floor. Used by the
+     *      constructor and both owner setters.
+     */
     function _validateSlippageSettings(uint256 amountOutMinimumPercent, uint256 amountOutMinimumSafetyCheck)
         private
         pure
