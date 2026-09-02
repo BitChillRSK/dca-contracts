@@ -219,6 +219,33 @@ contract InvariantTest is StdInvariant, Test {
         );
     }
 
+    /// @dev Coverage guard: the top-up action must actually land a credit. Almost every fuzzed
+    ///      attempt is discarded — no schedule yet, nothing accrued yet, or a credit too small to
+    ///      fund another purchase — and `Handler` swallows the rest in try/catch, so the action can
+    ///      contribute nothing to `invariant_totalDepositedTokensMatchesLendingProtocol` while the
+    ///      run stays green. This pins one deterministic win.
+    function test_invariantHandlerTopsUpFromInterest() public {
+        fuzzHandler.createDcaSchedule(0, MIN_PURCHASE_AMOUNT * 10, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD);
+        assertEq(fuzzHandler.createScheduleSuccesses(), 1, "Handler never created a schedule to top up");
+
+        // Leave the balance short of its next whole purchase, then let interest accrue past that gap.
+        fuzzHandler.withdrawToken(0, 0, MIN_PURCHASE_AMOUNT / 10);
+        vm.warp(block.timestamp + 365 days);
+        vm.roll(block.number + 365 days / 30);
+        uint256 accruedInterest = dcaManager.getInterestAccrued(s_users[0], address(stablecoin), s_routeIndex);
+        assertGt(accruedInterest, MIN_PURCHASE_AMOUNT / 10, "the lane accrued too little to credit");
+
+        uint256 balanceBefore = dcaManager.getDcaSchedule(s_users[0], address(stablecoin), 0).tokenBalance;
+        fuzzHandler.topUpFromInterest(0, 0, type(uint256).max);
+
+        assertEq(fuzzHandler.topUpFromInterestSuccesses(), 1, "the top-up never reached DcaManager");
+        assertGt(
+            dcaManager.getDcaSchedule(s_users[0], address(stablecoin), 0).tokenBalance,
+            balanceBefore,
+            "the top-up reverted before crediting the schedule"
+        );
+    }
+
     /*//////////////////////////////////////////////////////////////
                             INVARIANT TESTS
     //////////////////////////////////////////////////////////////*/

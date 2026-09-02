@@ -120,12 +120,11 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
      */
     function getAccruedInterest(address user, uint256 stablecoinLockedInDcaSchedules)
         external
-        view
         override
         onlyDcaManager
         returns (uint256 stablecoinInterestAmount)
     {
-        uint256 totalStablecoinInLending = _sharesToStablecoin(s_shares[user], _viewExchangeRate());
+        uint256 totalStablecoinInLending = _sharesToStablecoin(s_shares[user], _exchangeRate());
         stablecoinInterestAmount =
             totalStablecoinInLending > stablecoinLockedInDcaSchedules
                 ? totalStablecoinInLending - stablecoinLockedInDcaSchedules
@@ -224,7 +223,8 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
     }
 
     /**
-     * @dev Mutating-ok exchange rate used on write paths. Defaults to the view rate.
+     * @dev Mutating-ok exchange rate used on write paths and by `getAccruedInterest`, which reports
+     *      a figure a caller may then spend against. Defaults to the view rate.
      *      Override when the live call mutates (Compound `exchangeRateCurrent()` vs
      *      `exchangeRateStored()`). A new adapter that needs an accrual poke compiles
      *      against this default and uses a stale view rate until it overrides.
@@ -234,7 +234,8 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
     }
 
     /**
-     * @dev View exchange rate used by `getAccruedInterest`.
+     * @dev The market's exchange rate as a plain read. Adapters implement this one; callers use
+     *      `_exchangeRate`, which equals it unless the market must be poked to accrue first.
      */
     function _viewExchangeRate() internal view virtual returns (uint256);
 

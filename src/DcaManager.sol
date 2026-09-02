@@ -370,13 +370,15 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
 
     /**
      * @inheritdoc IDcaManager
-     * @dev Makes no state-changing external call: the interest is already in the handler's lending
-     *      position, so raising this schedule's claim over it is a storage write and a view. The
-     *      credited figure comes from the same expression an interest withdrawal pays out, so the
-     *      route's summed principal lands on the position's value and never above it.
-     *      Deposits paused on this route reject the credit: a pause means stop growing DCA exposure
-     *      here, whatever the funds' source, and no principal is stranded because the withdraw path
-     *      stays open.
+     * @dev Moves no cash: the interest is already in the handler's lending position, so raising this
+     *      schedule's claim over it is a storage write. The only external call reads the accrued
+     *      figure, which on a lending market that accrues lazily also pokes that accrual, and never
+     *      redeems, mints, or transfers.
+     * @dev The credited figure comes from the same expression an interest withdrawal pays out, so
+     *      the route's summed principal lands on the position's value and never above it.
+     * @dev Resolved through `_handler`, not the deposit-only helper: a deposit pause stops users
+     *      adding new funds to a route, and interest already held there is not new funds. Crediting
+     *      it changes no balance the pause was protecting.
      */
     function topUpFromInterest(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 amount)
         external
@@ -389,7 +391,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         uint256 routeIndex = dcaSchedule.routeIndex;
         _checkTokenYieldsInterest(token, routeIndex);
 
-        uint256 accruedInterest = ITokenLending(address(_handlerForDeposit(token, routeIndex))).getAccruedInterest(
+        uint256 accruedInterest = ITokenLending(address(_handler(token, routeIndex))).getAccruedInterest(
             msg.sender, _lockedPrincipal(msg.sender, token, routeIndex)
         );
         if (accruedInterest == 0) revert DcaManager__NoInterestToTopUpWith(token, routeIndex);
@@ -760,7 +762,6 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      */
     function getInterestAccrued(address user, address token, uint256 routeIndex)
         external
-        view
         override
         returns (uint256)
     {

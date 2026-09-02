@@ -63,10 +63,12 @@ strictly cheaper and strictly fewer steps, not a replacement.
 
 ### Answered 2026-09-02
 
-1. **The pause blocks a top-up.** Resolve through `_handlerForDeposit`. Both helpers return the same
-   handler at the same one call site, so the choice cost no code either way and the recommendation
-   stood: a paused route means stop growing DCA exposure there, whatever funds it. Nothing is
-   stranded — the withdraw and delete paths never consult the pause.
+1. **The pause does not block a top-up.** Resolve through `_handler`, against this spec's
+   recommendation. R48's pause exists to stop users putting *new* funds into a route; interest
+   already sitting in that route's position is not new funds, and crediting it moves nothing in and
+   changes no balance the pause was protecting. The recommendation had read the pause as "stop
+   growing DCA exposure", which is a broader rule than the one R48 actually shipped. Both helpers
+   cost the same at the single call site, so nothing but the reading decided it.
 2. **`topUpFromInterest`**, with `DcaManager__ScheduleToppedUpFromInterest` and
    `DcaManager__NoInterestToTopUpWith`, as recommended.
 3. **Part, not all: the function takes an `amount`.** Decided against the recommendation, because one
@@ -87,8 +89,8 @@ strictly cheaper and strictly fewer steps, not a replacement.
       can reach nothing but the caller's own schedules. The `amount` is decision 3's answer.
 - [x] Validate `scheduleId` against storage (`_validateScheduleId`), then read `routeIndex` from the
       schedule and require a lending route (`_checkTokenYieldsInterest`).
-- [x] Resolve the handler through `_handlerForDeposit` (decision 1), so a paused route reverts
-      `DcaManager__DepositsPaused`.
+- [x] Resolve the handler through `_handler` (decision 1), so a route with deposits paused still
+      accepts a top-up. A test pins that, and that a deposit on the same route still reverts.
 - [x] Bound the credit by `handler.getAccruedInterest(msg.sender, _lockedPrincipal(msg.sender, token, routeIndex))`.
       Reuse the exact figure the interest-withdrawal path uses; do not recompute it another way.
 - [x] Revert `DcaManager__NoInterestToTopUpWith(token, routeIndex)` when that figure is 0, and
@@ -107,16 +109,29 @@ strictly cheaper and strictly fewer steps, not a replacement.
 
 ## Out of scope
 
-- [x] Redeem-then-remint, or any per-schedule share accounting in a handler.
-- [ ] Auto-compounding inside `batchBuyRbtc`, or one call splitting interest across several
-      schedules. Decision 3 reaches several schedules by calling the function once per schedule;
-      each call still credits exactly one.
-- [x] Changing `getAccruedInterest`, `_lockedPrincipal`, `withdrawInterest`, or the R15 lending-share
-      dust deferral.
-- [x] Enabling the optimizer ([#104](https://github.com/BitChillRSK/dca-contracts/pull/104) owns it), re-baselining the recorded numbers (R53), or `via_ir` / solx (R55).
-- [x] Refactoring the private helpers to share code with `depositToken` for bytecode reasons. With
-      the optimized margin there is no reason to touch audited hot-path code.
+- Redeem-then-remint, or any per-schedule share accounting in a handler.
+- Auto-compounding inside `batchBuyRbtc`, or one call splitting interest across several schedules.
+  Decision 3 reaches several schedules by calling the function once per schedule; each call still
+  credits exactly one.
+- Changing `_lockedPrincipal`, `withdrawInterest`, or the R15 lending-share dust deferral.
+- Enabling the optimizer ([#104](https://github.com/BitChillRSK/dca-contracts/pull/104) owns it), re-baselining the recorded numbers (R53), or `via_ir` / solx (R55).
+- Refactoring the private helpers to share code with `depositToken` for bytecode reasons. With the
+  optimized margin there is no reason to touch audited hot-path code.
 
+### Taken anyway: `getAccruedInterest` reads the current exchange rate
+
+The spec excluded changing `getAccruedInterest`, and this PR changes it: it now takes
+`_exchangeRate()` rather than `_viewExchangeRate()`, which drops `view` from it, from
+`ITokenLending.getAccruedInterest`, and from `DcaManager.getInterestAccrued`. Only the legacy
+Tropykus adapter overrides `_exchangeRate` with a mutating call (`exchangeRateCurrent()` against
+`exchangeRateStored()`); Sovryn and LayerBank read the same rate either way.
+
+It belongs here because R54 turns that figure from something a user *reads* into something a user
+*spends against*. On a lazily accruing market the stored rate is stale by however long since the last
+poke, so a top-up bounded by it would silently refuse the most recent interest, and the amount a
+front-end quotes would not be the amount the credit accepts. The direction is safe — the current rate
+is the one a withdrawal would pay at — and the mutability change is the cost. Consumers must read
+both getters with `eth_call` rather than through a generated write binding.
 ## Files likely touched
 
 - `src/DcaManager.sol`
@@ -140,8 +155,10 @@ Behaviors to assert:
 
 - Top-up raises the chosen schedule's `tokenBalance` by exactly the pre-call `getInterestAccrued`,
   and the reported accrued interest afterwards is ~0.
-- **No lending `mint` / `burn` / `redeem` and no token transfer occur in the transaction.** Assert on
-  mock call counts, not just on balances.
+- **No lending `mint` / `burn` / `redeem` and no token transfer occur in the transaction.** Asserted
+  on the user's share balance and on the absence of any stablecoin log, which no redemption or
+  transfer could avoid. Not on the transaction's total log count: reading the accrued figure is no
+  longer a `view` and may poke a lazy market's accrual, which can log.
 - Other schedules on the same route keep their `tokenBalance`; only the named one moves.
 - A subsequent `batchBuyRbtc` can spend the newly credited balance, including the case where the
   schedule was depleted and resumes.
@@ -152,15 +169,21 @@ Behaviors to assert:
   that `deleteDcaSchedule` still pays out — share debits round up and clamp to shares held, so this
   is the case most likely to surface a 1-wei shortfall.
 - `withdrawAllAccumulatedInterest` after a full top-up is a no-op that does not revert.
-- Whichever answer decision 1 takes, a test pins it: deposits paused → top-up reverts, or succeeds.
+- Whichever answer decision 1 takes, a test pins it: deposits paused → top-up succeeds, while a
+  deposit on the same route still reverts.
+- The stateful invariant actor gains the top-up, plus a coverage guard that lands one deterministic
+  credit. It is the only action that raises principal with no matching deposit, so it is what
+  stresses `invariant_totalDepositedTokensMatchesLendingProtocol`, whose tolerance is 100 wei.
 
 ## Success criteria
 
-- [ ] All of the above passes on all three lending lanes.
-- [ ] `DcaManager` runtime growth is ~600 B under the optimized no-IR profile, recorded in the PR with margin.
-- [ ] No handler contract changed.
-- [ ] No external state-changing call on the new path.
-- [ ] Open product decisions 1–3 are answered in the PR body, not left implicit in the code.
+- [x] All of the above passes on all three lending lanes.
+- [x] `DcaManager` runtime growth is ~600 B under the optimized no-IR profile, recorded in the PR with margin.
+- [x] No handler contract changed. (`LendingErc20Handler.getAccruedInterest` changes what rate it
+      reads — see **Taken anyway** — but no handler's funds movement or share math changes.)
+- [x] The new path moves no cash: no redeem, mint, or transfer. Its one external call reads the
+      accrued figure, which on a lazily accruing market also pokes that accrual.
+- [x] Open product decisions 1–3 are answered in the PR body, not left implicit in the code.
 
 ## Reviewer checklist
 

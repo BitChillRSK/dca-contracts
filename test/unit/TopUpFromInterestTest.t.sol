@@ -6,6 +6,7 @@ import {Test, console2} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
+import {ITokenLending} from "../../src/interfaces/ITokenLending.sol";
 import "../Constants.sol";
 
 /**
@@ -37,7 +38,7 @@ contract TopUpFromInterestTest is DcaDappTest {
         return dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex);
     }
 
-    function _accruedInterest() private view returns (uint256) {
+    function _accruedInterest() private returns (uint256) {
         return dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
     }
 
@@ -114,24 +115,35 @@ contract TopUpFromInterestTest is DcaDappTest {
         assertLe(_accruedInterest(), DUST, "interest is still reported after crediting all of it");
     }
 
-    /// @notice Nothing is redeemed, minted, or transferred: the only log is the manager's own.
-    function testTopUpMakesNoStateChangingExternalCall() external onlyLendingLane {
+    /**
+     * @notice Nothing is redeemed, minted, or transferred: the credit only relabels what the
+     *         position already holds.
+     * @dev Asserted on the lending position and the stablecoin rather than on the transaction's log
+     *      count. Reading the accrued figure is no longer a `view` — on a market that accrues lazily
+     *      it pokes that accrual, which can log — but a redemption or a transfer cannot happen
+     *      without moving shares or stablecoin, and neither moves here.
+     */
+    function testTopUpMovesNoCashAndLeavesTheSharesAlone() external onlyLendingLane {
         _accrueAndOpenSlack(SCHEDULE_INDEX);
 
         uint256 accruedInterest = _accruedInterest();
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
         uint256 handlerStablecoinBefore = stablecoin.balanceOf(address(stablecoinHandler));
+        uint256 userSharesBefore = ITokenLending(address(stablecoinHandler)).getUserShares(USER);
 
         vm.recordLogs();
         _topUp(SCHEDULE_INDEX, accruedInterest);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // A lending mint, burn, redeem, or token transfer would log from the share token or the
-        // stablecoin. Every log here comes from DcaManager, so none of them happened.
-        assertEq(logs.length, 2, "top-up emitted something beyond its two events");
+        // A mint, burn, redeem, or transfer of the underlying would log from the stablecoin itself.
         for (uint256 i; i < logs.length; ++i) {
-            assertEq(logs[i].emitter, address(dcaManager), "a contract other than DcaManager was written to");
+            assertTrue(logs[i].emitter != address(stablecoin), "the stablecoin moved during a top-up");
         }
+        assertEq(
+            ITokenLending(address(stablecoinHandler)).getUserShares(USER),
+            userSharesBefore,
+            "the top-up minted or burnt lending shares"
+        );
         assertEq(stablecoin.balanceOf(USER), userStablecoinBefore, "stablecoin reached the user");
         assertEq(
             stablecoin.balanceOf(address(stablecoinHandler)), handlerStablecoinBefore, "stablecoin reached the handler"
@@ -425,25 +437,35 @@ contract TopUpFromInterestTest is DcaDappTest {
         assertEq(_schedule(SCHEDULE_INDEX).tokenBalance, balanceBefore, "another account moved the schedule");
     }
 
-    /// @notice A deposit pause stops DCA exposure growing on that route, whatever funds it.
-    function testTopUpRevertsWhileDepositsArePaused() external onlyLendingLane {
+    /**
+     * @notice A deposit pause is an intake valve, so it does not block a top-up.
+     * @dev The pause exists to stop users putting new funds into a route. Interest already sitting
+     *      in that route's position is not new funds, and crediting it moves nothing in, so the same
+     *      call that rejects a deposit lets the top-up through.
+     */
+    function testTopUpSucceedsWhileDepositsArePaused() external onlyLendingLane {
         _accrueAndOpenSlack(SCHEDULE_INDEX);
         uint256 accruedInterest = _accruedInterest();
+        uint256 balanceBefore = _schedule(SCHEDULE_INDEX).tokenBalance;
+        uint64 scheduleId = _schedule(SCHEDULE_INDEX).scheduleId;
 
         vm.prank(OWNER);
         operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, true);
 
-        uint64 scheduleId = _schedule(SCHEDULE_INDEX).scheduleId;
-        vm.prank(USER);
+        _topUp(SCHEDULE_INDEX, accruedInterest);
+        assertEq(
+            _schedule(SCHEDULE_INDEX).tokenBalance,
+            balanceBefore + accruedInterest,
+            "the pause blocked a credit that moves no funds in"
+        );
+
+        // The pause still does its job on the path it was written for.
+        vm.startPrank(USER);
+        stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
         vm.expectRevert(
             abi.encodeWithSelector(IDcaManager.DcaManager__DepositsPaused.selector, address(stablecoin), s_routeIndex)
         );
-        dcaManager.topUpFromInterest(address(stablecoin), SCHEDULE_INDEX, scheduleId, accruedInterest);
-
-        // The interest is not stranded: unpausing, or withdrawing it, both stay open.
-        vm.prank(OWNER);
-        operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, false);
-        _topUp(SCHEDULE_INDEX, accruedInterest);
-        assertLe(_accruedInterest(), DUST, "the credit did not go through once unpaused");
+        dcaManager.depositToken(address(stablecoin), SCHEDULE_INDEX, scheduleId, AMOUNT_TO_DEPOSIT);
+        vm.stopPrank();
     }
 }

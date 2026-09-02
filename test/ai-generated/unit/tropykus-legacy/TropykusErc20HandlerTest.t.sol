@@ -109,23 +109,28 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
         assertGt(accruedInterest, 0);
     }
 
-    /// @notice Write paths call `exchangeRateCurrent` (mutates stored); views call `exchangeRateStored`.
-    function test_tropykus_writeUsesCurrentRate_viewUsesStored() public {
+    /// @notice Write paths and `getAccruedInterest` both call `exchangeRateCurrent`, which mutates
+    ///         the stored rate. The reported interest is a figure a caller can now spend against
+    ///         through a schedule top-up, so it must not sit a poke behind what a withdrawal pays.
+    function test_tropykus_accruedInterestAndWritesUseCurrentRate() public {
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);
 
         uint256 storedAtDeposit = kToken.exchangeRateStored();
         vm.warp(block.timestamp + 365 days);
 
+        // No prior poke: the getter accrues the year itself rather than reporting a stale zero.
+        vm.expectCall(address(kToken), abi.encodeWithSelector(kToken.exchangeRateCurrent.selector));
         vm.prank(address(dcaManager));
-        assertEq(tropykusHandler.getAccruedInterest(USER, DEPOSIT_AMOUNT), 0);
+        uint256 accruedInterest = tropykusHandler.getAccruedInterest(USER, DEPOSIT_AMOUNT);
+        assertGt(accruedInterest, 0);
+        assertGt(kToken.exchangeRateStored(), storedAtDeposit);
 
         uint256 userBefore = stablecoin.balanceOf(USER);
         vm.expectCall(address(kToken), abi.encodeWithSelector(kToken.exchangeRateCurrent.selector));
         vm.prank(address(dcaManager));
         tropykusHandler.withdrawInterest(USER, DEPOSIT_AMOUNT);
         assertGt(stablecoin.balanceOf(USER), userBefore);
-        assertGt(kToken.exchangeRateStored(), storedAtDeposit);
     }
     
     function test_tropykus_redemption_adjustsForAvailableBalance() public {
