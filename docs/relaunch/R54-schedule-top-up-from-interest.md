@@ -1,6 +1,6 @@
 # R54 — Top a schedule up from its accrued lending interest
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **implemented** · Assigned: yes (PR 56) · Optional/further-review: no
 
 ## Objective
 
@@ -61,33 +61,60 @@ strictly cheaper and strictly fewer steps, not a replacement.
    parameter. Recommend keeping that — an `amount` costs bytes and calldata for a case nobody has
    asked for, and partial top-ups remain reachable by topping up and withdrawing the difference.
 
+### Answered 2026-09-02
+
+1. **The pause blocks a top-up.** Resolve through `_handlerForDeposit`. Both helpers return the same
+   handler at the same one call site, so the choice cost no code either way and the recommendation
+   stood: a paused route means stop growing DCA exposure there, whatever funds it. Nothing is
+   stranded — the withdraw and delete paths never consult the pause.
+2. **`topUpFromInterest`**, with `DcaManager__ScheduleToppedUpFromInterest` and
+   `DcaManager__NoInterestToTopUpWith`, as recommended.
+3. **Part, not all: the function takes an `amount`.** Decided against the recommendation, because one
+   pot of route interest feeding two schedules is a case the product does want, and reaching it by
+   crediting one schedule and withdrawing the difference pays the redemption fee this feature exists
+   to avoid. `amount` is bounded above by the accrued figure and below by a rule the human specified:
+   the credit must raise the schedule past its **next whole purchase**
+   (`(tokenBalance + amount) / purchaseAmount > tokenBalance / purchaseAmount`), so interest cannot be
+   moved across in dust, and a schedule holding 10.5 purchases needs only half a purchase amount
+   rather than a full one. A flat `amount >= purchaseAmount` floor was rejected in the same exchange:
+   it would strand any interest smaller than one purchase.
+
 ## Scope
 
-- [ ] `DcaManager.topUpFromInterest(address token, uint256 scheduleIndex, uint64 scheduleId)`:
+- [x] `DcaManager.topUpFromInterest(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 amount)`:
       `external`, `nonReentrant` (`AGENTS.md` invariant 6 — it writes `s_dcaSchedules`),
       `validateScheduleIndex(msg.sender, token, scheduleIndex)`, keyed off `msg.sender` only, so it
-      can reach nothing but the caller's own schedules.
-- [ ] Validate `scheduleId` against storage (`_validateScheduleId`), then read `routeIndex` from the
+      can reach nothing but the caller's own schedules. The `amount` is decision 3's answer.
+- [x] Validate `scheduleId` against storage (`_validateScheduleId`), then read `routeIndex` from the
       schedule and require a lending route (`_checkTokenYieldsInterest`).
-- [ ] Credit `handler.getAccruedInterest(msg.sender, _lockedPrincipal(msg.sender, token, routeIndex))`.
+- [x] Resolve the handler through `_handlerForDeposit` (decision 1), so a paused route reverts
+      `DcaManager__DepositsPaused`.
+- [x] Bound the credit by `handler.getAccruedInterest(msg.sender, _lockedPrincipal(msg.sender, token, routeIndex))`.
       Reuse the exact figure the interest-withdrawal path uses; do not recompute it another way.
-- [ ] Revert `DcaManager__NoInterestToTopUpWith(token, routeIndex)` when that figure is 0.
-- [ ] Widen through `SafeCast.toUint128` when writing `tokenBalance`, matching `depositToken`.
-- [ ] Emit `DcaManager__ScheduleToppedUpFromInterest(user, token, scheduleId, interest)` and the
+- [x] Revert `DcaManager__NoInterestToTopUpWith(token, routeIndex)` when that figure is 0, and
+      `DcaManager__TopUpExceedsAccruedInterest(token, routeIndex, amount, accruedInterest)` when the
+      request is larger than it.
+- [x] Revert `DcaManager__TopUpDoesNotFundAnotherPurchase(token, scheduleId, amount)` unless the
+      credit raises the balance past its next whole purchase. A zero `purchaseAmount` schedule can
+      never clear that bar, which also keeps the comparison off a division by zero.
+- [x] Widen through `SafeCast.toUint128` when writing `tokenBalance`, matching `depositToken`.
+- [x] Emit `DcaManager__ScheduleToppedUpFromInterest(user, token, scheduleId, interest)` and the
       existing `DcaManager__TokenBalanceUpdated`. Index user, token, and scheduleId and nothing else
       (`AGENTS.md` invariant 4).
-- [ ] Make **no** external state-changing call. No redeem, no mint, no transfer. The only external
+- [x] Make **no** external state-changing call. No redeem, no mint, no transfer. The only external
       call is the `getAccruedInterest` view.
-- [ ] Declare it on `IDcaManager` with user-facing natspec; implementation carries `@inheritdoc`.
+- [x] Declare it on `IDcaManager` with user-facing natspec; implementation carries `@inheritdoc`.
 
 ## Out of scope
 
-- [ ] Redeem-then-remint, or any per-schedule share accounting in a handler.
-- [ ] Auto-compounding inside `batchBuyRbtc`, or splitting interest across several schedules.
-- [ ] Changing `getAccruedInterest`, `_lockedPrincipal`, `withdrawInterest`, or the R15 lending-share
+- [x] Redeem-then-remint, or any per-schedule share accounting in a handler.
+- [ ] Auto-compounding inside `batchBuyRbtc`, or one call splitting interest across several
+      schedules. Decision 3 reaches several schedules by calling the function once per schedule;
+      each call still credits exactly one.
+- [x] Changing `getAccruedInterest`, `_lockedPrincipal`, `withdrawInterest`, or the R15 lending-share
       dust deferral.
-- [ ] Enabling the optimizer ([#104](https://github.com/BitChillRSK/dca-contracts/pull/104) owns it), re-baselining the recorded numbers (R53), or `via_ir` / solx (R55).
-- [ ] Refactoring the private helpers to share code with `depositToken` for bytecode reasons. With
+- [x] Enabling the optimizer ([#104](https://github.com/BitChillRSK/dca-contracts/pull/104) owns it), re-baselining the recorded numbers (R53), or `via_ir` / solx (R55).
+- [x] Refactoring the private helpers to share code with `depositToken` for bytecode reasons. With
       the optimized margin there is no reason to touch audited hot-path code.
 
 ## Files likely touched
