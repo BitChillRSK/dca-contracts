@@ -81,7 +81,7 @@ interface IPurchaseUniswap {
     /// @notice A later hop stopped short and left an intermediate token in the shared router.
     /// @dev The comparison is against the router's own pre-swap balance, not zero, so dust anyone can send
     ///      to a public contract does not block purchases.
-    error PurchaseUniswap__IntermediateTokenBalanceChanged(
+    error PurchaseUniswap__IntermediateBalanceChangedInRouter(
         address token, uint256 balanceBefore, uint256 balanceAfter
     );
 

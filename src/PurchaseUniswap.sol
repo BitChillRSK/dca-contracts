@@ -346,7 +346,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         for (uint256 i; i < intermediateCount; ++i) {
             uint256 routerBalanceAfter = _balanceOf(intermediateTokens[i], address(i_swapRouter02));
             if (routerBalanceAfter != routerBalancesBefore[i]) {
-                revert PurchaseUniswap__IntermediateTokenBalanceChanged(
+                revert PurchaseUniswap__IntermediateBalanceChangedInRouter(
                     intermediateTokens[i], routerBalancesBefore[i], routerBalanceAfter
                 );
             }

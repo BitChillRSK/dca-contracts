@@ -280,7 +280,7 @@ contract DexPathFailoverTest is DcaDappTest {
         uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         vm.expectRevert(
             abi.encodeWithSelector(
-                IPurchaseUniswap.PurchaseUniswap__IntermediateTokenBalanceChanged.selector,
+                IPurchaseUniswap.PurchaseUniswap__IntermediateBalanceChangedInRouter.selector,
                 address(newIntermediate),
                 0,
                 stranded

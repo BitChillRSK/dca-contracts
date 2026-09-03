@@ -114,7 +114,7 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
         uint64 scheduleId = _scheduleId();
         vm.expectRevert(
             abi.encodeWithSelector(
-                IPurchaseUniswap.PurchaseUniswap__IntermediateTokenBalanceChanged.selector,
+                IPurchaseUniswap.PurchaseUniswap__IntermediateBalanceChangedInRouter.selector,
                 address(intermediateToken),
                 0,
                 stranded
@@ -137,7 +137,7 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
         uint64 scheduleId = _scheduleId();
         vm.expectRevert(
             abi.encodeWithSelector(
-                IPurchaseUniswap.PurchaseUniswap__IntermediateTokenBalanceChanged.selector,
+                IPurchaseUniswap.PurchaseUniswap__IntermediateBalanceChangedInRouter.selector,
                 address(intermediateToken),
                 ROUTER_DUST,
                 ROUTER_DUST + stranded
