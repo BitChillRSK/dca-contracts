@@ -97,7 +97,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint128();
 
         // The initial owner is not the deployer, so the constructor cannot call the onlyOwner setters
-        // and must install the first path itself.
+        // and must install the first path itself. This must stay above the `decimals()` read below:
+        // encoding reverts on a zero purchase token, before that read reaches an empty address.
         address[] memory intermediateTokens = uniswapSettings.swapIntermediateTokens;
         uint24[] memory poolFeeRates = uniswapSettings.swapPoolFeeRates;
         bytes memory newPath = _encodePurchasePath(intermediateTokens, poolFeeRates);

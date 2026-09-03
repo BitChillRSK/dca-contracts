@@ -28,16 +28,15 @@ interface IDcaManager {
     }
 
     /// @notice One handler's purchase batch.
-    /// @dev Every row shares this batch's `token` and `routeIndex`, which resolve to one handler.
-    ///      The four arrays are positional and must have the same nonzero length.
-    ///      `batchBuyRbtc` takes one; `batchBuyRbtcAcrossHandlers` takes several.
-    /// @dev `minRbtcOut` is the caller's minimum for the batch as a whole, in rBTC/WRBTC wei (18
-    ///      decimals) whatever the stablecoin's decimals, and is compared against the rBTC the
-    ///      handler measures itself receiving. It can only tighten the handler's own governance
-    ///      floor, never loosen it, and `0` disables it. It is a liveness bound for an honestly
-    ///      operated swapper against a stale quote or adverse execution, not a second governance
-    ///      ceiling: a compromised swapper can pass `0` or `1` and remains bounded only by the
-    ///      handler's floor.
+    /// @dev Every row shares this batch's `token` and `routeIndex`, which resolve to one handler. The
+    ///      four arrays are positional and must have the same nonzero length. `batchBuyRbtc` takes one;
+    ///      `batchBuyRbtcAcrossHandlers` takes several. `minRbtcOut` is the caller's minimum for the
+    ///      batch as a whole, in rBTC/WRBTC wei (18 decimals) whatever the stablecoin's decimals, and is
+    ///      compared against the rBTC the handler measures itself receiving. It can only tighten the
+    ///      handler's own governance floor, never loosen it, and `0` disables it. It is a liveness bound
+    ///      for an honestly operated swapper against a stale quote or adverse execution, not a second
+    ///      governance ceiling: a compromised swapper can pass `0` or `1` and remains bounded only by
+    ///      the handler's floor.
     struct Batch {
         address[] buyers;
         address token;

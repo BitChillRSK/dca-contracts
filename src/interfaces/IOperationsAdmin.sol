@@ -106,7 +106,8 @@ interface IOperationsAdmin {
      *      every withdrawal (stablecoin, rBTC, interest) ignore it, so a paused route can always
      *      be exited. The pair must already have a handler, and the flag must change, so every
      *      emitted event is a real transition. There is no multi-pair form: closing a token across
-     *      several routes is one transaction per pair, and a pair already paused reverts.
+     *      several routes is one transaction per pair, and a pair already paused reverts, so a sweep
+     *      must read `areDepositsPaused` first rather than firing blind.
      */
     function setDepositsPaused(address token, uint256 routeIndex, bool paused) external;
 

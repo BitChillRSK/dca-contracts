@@ -40,8 +40,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
         uint256 totalStablecoinAmountToSpend;
         IERC20 purchaseToken;
 
-        // `aggregatedFee` is scoped to this block: it is dead once the fee is paid, and releasing its
-        // stack slot here keeps the credit loop below within stack limits.
+        // `aggregatedFee` is scoped to this block because it is dead once the fee is paid.
         {
             uint256 aggregatedFee;
             // Calculate net amounts
@@ -75,6 +74,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
             // The planned net amounts are only allocation weights: they sum to totalNetStablecoinPlanned,
             // so the shares below sum to exactly 1 even if the redemption paid less than expected. Both the
             // rBTC credited and the stablecoin reported as spent are shares of what actually moved.
+            // Both values are read twice below, so keep them in locals rather than indexing memory again.
             uint256 plannedNet = netStablecoinAmountsToSpend[i];
             address buyer = buyers[i];
             uint256 usersPurchasedRbtc = totalPurchasedRbtc * plannedNet / totalNetStablecoinPlanned;

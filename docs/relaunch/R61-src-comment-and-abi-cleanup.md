@@ -20,9 +20,13 @@ What the audit did find is a set of patterns that read as accretion rather than 
 real defects:
 
 1. **`IFeeHandler.getFeeCollectorAddress()` is missing `view`.** The implementation is `view`; Solidity
-   permits an override to narrow mutability, so it compiles, but the *published ABI* says nonpayable.
-   Generated clients (wagmi/ethers) build a transaction for a getter. Every sibling getter on that
-   interface is correctly `view`.
+   permits an override to narrow mutability, so it compiles, but the *interface's* published ABI says
+   nonpayable. Scope, measured rather than assumed: of the 33 built artifacts that declare this
+   function, exactly one — `IFeeHandler.json` — said nonpayable. `FeeHandler` and every concrete
+   handler already emitted `view`, because solc emits each contract's own declared mutability. So no
+   deployed contract's ABI ever advertised nonpayable, and the defect reaches only a client generated
+   from the standalone interface artifact, which gets a write binding for a getter. Every sibling
+   getter on that interface is correctly `view`.
 2. **The `DcaSchedule` packing NatSpec describes a build that is no longer shipped.** It reads "Without
    IR, those updates remain two `SSTORE`s"; R60 added `[profile.deploy] via_ir = true`, so the shipped
    bytecode *is* IR-compiled. The note is scoped to the profile that does not deploy.
@@ -119,7 +123,9 @@ is that the suite is unchanged *and* still green.
   comments and a `view` annotation must not move bytecode. `DcaManager` moves by exactly the
   `deleteDcaSchedule` modifier reorder, which must be isolated by rebuilding with that one change
   reverted and confirming the baseline size returns.
-- `forge inspect FeeHandler abi` must show `getFeeCollectorAddress` as `view` after the change.
+- `forge inspect IFeeHandler abi` must show `getFeeCollectorAddress` as `view` after the change. It
+  must be the **interface** artifact: `forge inspect FeeHandler abi` printed `view` before the change
+  too, since the implementation already declared it, so that command proves nothing here.
 
 ## Success criteria
 
@@ -129,10 +135,12 @@ is that the suite is unchanged *and* still green.
 - [ ] No `@notice` / `@dev` / `@param` / `@return` tag remains inside a function body in `src/`.
 - [ ] No `src/` comment contains a gas figure, an R-id, an `AGENTS.md` invariant number, or a sentence
       about what a previous PR changed.
-- [ ] No function in `src/` carries more than one `@dev` block.
+- [ ] No NatSpec block in `src/` carries more than one `@dev`, in either the `/** */` or the `///`
+      form, and on structs and contract headers as well as functions.
 - [ ] `grep -rn " $" src/` returns nothing.
 - [ ] `IStablecoin` has no reference from `src/` or `script/`.
-- [ ] `getFeeCollectorAddress` is `view` in interface and implementation.
+- [ ] `getFeeCollectorAddress` is `view` in the `IFeeHandler` artifact, checked with
+      `forge inspect IFeeHandler abi` rather than the implementation artifact.
 
 ## Reviewer checklist
 
