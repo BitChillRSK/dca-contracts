@@ -49,11 +49,13 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
     }
 
     function testDirectPathSpendsExactlyTheRequestedStablecoin() public {
+        _skipWhereThePathIsNotOurs();
         _activateDirectPath();
         _assertFullFillSpendsEverything();
     }
 
     function testOneIntermediateFillLeavesTheRouterBalanceUnchanged() public {
+        _skipWhereThePathIsNotOurs();
         _activateOneHopPath(address(intermediateToken));
         uint256 routerBefore = intermediateToken.balanceOf(_routerAddress());
         _assertFullFillSpendsEverything();
@@ -61,6 +63,7 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
     }
 
     function testPreexistingRouterDustDoesNotBlockAPurchase() public {
+        _skipWhereThePathIsNotOurs();
         _activateOneHopPath(address(intermediateToken));
         intermediateToken.mint(_routerAddress(), ROUTER_DUST);
 
@@ -148,23 +151,31 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
                                 HELPERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev A complete fill moves exactly the requested stablecoin from handler to router, strands nothing,
-    ///      and credits the buyer the WRBTC the handler measured itself receiving.
+    /// @dev A complete fill leaves the handler holding no stablecoin, debits the schedule and pays the fee,
+    ///      and credits the buyer exactly the WRBTC the handler measured itself receiving. That the swap spent
+    ///      the whole requested amount needs no assertion of its own: the purchase reverts otherwise, so
+    ///      reaching this point is the proof.
     function _assertFullFillSpendsEverything() private {
-        uint256 netAmount = _netAmountToSpend();
         PurchaseState memory before = _snapshot();
 
         _purchase(_scheduleId());
 
         PurchaseState memory afterPurchase = _snapshot();
-        assertEq(afterPurchase.routerStablecoin - before.routerStablecoin, netAmount);
         assertEq(afterPurchase.handlerStablecoin, before.handlerStablecoin);
+        assertEq(before.scheduleBalance - afterPurchase.scheduleBalance, AMOUNT_TO_SPEND);
         assertEq(afterPurchase.feeCollectorStablecoin - before.feeCollectorStablecoin, _fee());
         assertEq(
             afterPurchase.userAccumulatedRbtc - before.userAccumulatedRbtc,
             afterPurchase.handlerWrBtc - before.handlerWrBtc
         );
         assertGt(afterPurchase.userAccumulatedRbtc, before.userAccumulatedRbtc);
+
+        // Naming the amount that moved is a mock-router assertion: `MockSwapRouter02` keeps what it pulls,
+        // while Uniswap's own SwapRouter02 forwards the input straight into the pool and ends holding none
+        // of it. On a fork the handler-side delta above is the venue-independent half.
+        if (block.chainid == ANVIL_CHAIN_ID) {
+            assertEq(afterPurchase.routerStablecoin - before.routerStablecoin, _netAmountToSpend());
+        }
     }
 
     function _assertRolledBack(PurchaseState memory before) private {
@@ -273,6 +284,14 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
     /// @dev A manufactured partial fill needs the mock router. On a fork the router is Uniswap's own and
     ///      the pools decide; the deterministic cases are the point of this file.
     function _skipOnFork() private {
+        if (block.chainid != ANVIL_CHAIN_ID) vm.skip(true);
+    }
+
+    /// @dev These cases activate a route this test invented — a direct pair, or a hop through a token this
+    ///      file just deployed. Locally the mock router fills anything; on a fork there is no such pool, so
+    ///      the swap would revert on liquidity and prove nothing about the checks under test. The configured
+    ///      path is what the fork lane exercises.
+    function _skipWhereThePathIsNotOurs() private {
         if (block.chainid != ANVIL_CHAIN_ID) vm.skip(true);
     }
 }
