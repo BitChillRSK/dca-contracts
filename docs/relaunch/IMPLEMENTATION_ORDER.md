@@ -118,7 +118,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R53 | 55 ([#109](https://github.com/BitChillRSK/dca-contracts/pull/109)) | none (documentation-only optimized baseline) |
 | R54 | 56 ([#110](https://github.com/BitChillRSK/dca-contracts/pull/110)) | answered (amount; top-up ignores deposit pause; `topUpFromInterest`) |
 | R59 | 57 ([#112](https://github.com/BitChillRSK/dca-contracts/pull/112)) | none (fail closed on incomplete Uniswap input; gas and size ceilings are fixed) |
-| R55 | 58 (planned) | none (measure and recommend; no compiler adoption) |
+| R55 | 58 | none (measured; recommendation is keep stock solc, no IR) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -668,7 +668,7 @@ gate's manual exit/re-entry (justified partly by "426 bytes of runtime margin") 
 reasoning. [#111](https://github.com/BitChillRSK/dca-contracts/pull/111) closed that follow-up list without
 reopening anything: R31 / R39 / R42 / R51 stand as shipped; R13 cooperative migration and R50's merged
 per-user slot stay decided against on their non-size merits.
-`via_ir` stays out (R55).
+`via_ir` stays out (R55 measured it and recommends against adopting it).
 
 Ask: none. `optimizer_runs = 200` and CI inheritance were settled in #104.
 
@@ -684,7 +684,8 @@ spec ([R53](./R53-optimizer-baseline.md#bytecode-scarcity-decisions-closed)); R5
 R13 / R50 stay decided against. One argument is narrowed rather than reopened: R51's `_creditBuyers`
 reasoning turned on no-IR stack-too-deep, which the optimizer does not relieve — R51 checked that at the
 time and it still holds — so only the 17-bytes-per-handler half of that argument was budget-driven, and
-via-IR (R55) is what would reopen it.
+via-IR (R55) is what would reopen it. R55 measured via-IR and recommends against it, so that half stays
+closed too.
 
 ### R54 - top a schedule up from accrued interest ([spec](./R54-schedule-top-up-from-interest.md), PR 56, [#110](https://github.com/BitChillRSK/dca-contracts/pull/110))
 
@@ -830,7 +831,7 @@ and ends the call holding none of it, so "the router gained exactly the net amou
 the mock. The handler-side delta is the venue-independent half, and a successful purchase is itself the
 consumption proof, since anything less now reverts.
 
-### R55 - evaluate solx and the IR pipeline ([spec](./R55-solx-and-ir-evaluation.md), unassigned, after R59 [#112](https://github.com/BitChillRSK/dca-contracts/pull/112), gated on #104)
+### R55 - evaluate solx and the IR pipeline ([spec](./R55-solx-and-ir-evaluation.md), PR 58, after R59 [#112](https://github.com/BitChillRSK/dca-contracts/pull/112), gated on #104)
 
 Measure and recommend; change no compiler setting. Compare stock solc no-IR, stock solc `via_ir`, and solx on
 runtime size, hot-path gas, whether the full matrix passes, and whether Blockscout can verify the result on
@@ -845,6 +846,43 @@ stock solc" option is chosen unless a candidate clears both the gas bar and veri
 
 Follows R59 so the Uniswap fail-closed checks are already in the tree R55 measures; R55 still changes no
 compiler setting in its own PR.
+
+**Decided: keep stock solc, no IR.** Nothing in `foundry.toml`, CI, or any deploy path changed; the PR is the
+measurement and the recommendation. Full numbers, commands and the verification evidence are in the spec's
+[Findings](./R55-solx-and-ir-evaluation.md#findings-measured-2026-09-03).
+
+solx v0.1.8 wins the gas contest and loses on every other axis. Contract-side `DcaManager.batchBuyRbtc` is
+188,806 against the baseline's 202,530 (-6.8%), `testSinglePurchase` 222,031 (-8.9%), and the whole seven-lane
+matrix passes under it with test-for-test identical counts to a stock-solc control, invariants included. But its
+Solidity front end is `0.8.34` and every first-party file pins `pragma solidity 0.8.36;`, so solx cannot compile
+this repository at all - adoption means downgrading 143 pragmas, which the spec puts out of scope, and re-proving
+R23 at a lower solc. Its front end is also a *fork* (`0.8.34+commit.91fef221` against upstream `80d5c536`), it
+stamps `solx:0.1.8;solc:0.8.34` into the CBOR metadata, and both Rootstock Blockscout instances advertise only
+stock Solidity and Vyper compilers in `/api/v2/smart-contracts/verification/config`. A solx deployment would be
+unverifiable bytecode holding user funds, and solx's own README still says beta, testing and experimentation
+only. That fails the spec's bar before gas is even weighed.
+
+`via_ir` is stock solc, so the verification story is intact, and it buys -2.6% on `batchBuyRbtc` (-2.0% and
+-4.2% on the two hot-path tests) plus ~20-26% smaller runtime that nothing needs. It costs test work that is not
+worth doing before relaunch: `ZeroTokenPurchaseUniswap` still fails with error 1284 as predicted, and a **second,
+previously unrecorded** blocker turned up - `test/unit/RbtcWithdrawalTest.t.sol` hits Yul stack-too-deep in the
+shared harness's `makeSeveralPurchasesWithSeveralSchedules`, which `via_ir` is supposed to cure rather than cause.
+Skipping both, one test still fails on every lane, and it reduces to a `block.timestamp` cached in a local before
+`vm.warp` reading back as the post-warp value: the Yul optimizer rematerialises `TIMESTAMP`, which is valid on
+chain and wrong under a cheatcode. That is a harness hazard, not a production miscompilation, and it is also the
+clearest illustration in this evaluation that a green suite is weak evidence about a code generator. (1) can be
+handled without touching the test, through `additional_compiler_profiles` + `compilation_restrictions`, at the
+price of compiling every production contract twice and having that test exercise legacy bytecode while production
+ships IR.
+
+The Rootstock testnet deploy in the spec's scope was **not** performed: `AGENTS.md` forbids broadcasting, the only
+candidate whose verifiability was in doubt cannot compile the tree at 0.8.36 in the first place, and the
+explorer's own verifier configuration already answers the question. R53's note that via-IR is what would reopen
+R51's `_creditBuyers` reasoning therefore stays closed.
+
+Residual risk of the recommendation, stated plainly: the protocol pays 2.6-6.8% more gas per purchase than the
+cheapest measured option, permanently, in exchange for bytecode anyone can reproduce with upstream solc and a
+toolchain proof that stays valid.
 
 ## Closed non-implementation decisions
 
