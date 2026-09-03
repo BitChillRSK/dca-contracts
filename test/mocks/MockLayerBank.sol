@@ -3,7 +3,7 @@ pragma solidity 0.8.36;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IStablecoin} from "src/interfaces/IStablecoin.sol";
+import {IStablecoin} from "test/interfaces/IStablecoin.sol";
 
 /**
  * @title MockLayerBankAToken
