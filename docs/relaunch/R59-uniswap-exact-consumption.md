@@ -209,7 +209,10 @@ from this list. Extra files must be named in the PR write-up.
   purchase checks the new set, not the constructor set. Extend `DexPathFailoverTest` rather than
   duplicating R52's authorization matrix.
 - Run the full `AGENTS.md` done-gate: `make check`, `make fork-sovryn`, and
-  `make fork-tropykus`. This item adds no live-liquidity fork assertion; deterministic mocks own the
+  `make fork-tropykus`. Also run `SWAP_TYPE=dexSwaps STABLECOIN_TYPE=USDRIF make fork-layerbank`: the
+  configured-path success case is the only coverage that these checks hold against Uniswap's own
+  SwapRouter02 and real pools rather than a mock router. Cases that activate a route the test invents
+  must stay local-only, and so must any assertion about what the router itself ends up holding. This item adds no live-liquidity fork assertion; deterministic mocks own the
   partial-fill cases, which must not become dependent on a pool remaining thin.
 - Run `make fork-dex-path` because the change extends R52's active-path state, even though the fork
   test need not manufacture a partial fill.

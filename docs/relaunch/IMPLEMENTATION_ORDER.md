@@ -803,12 +803,32 @@ rejected: indexing `s_swapIntermediateTokens` from storage in both loops instead
 saves a further 44 B and 45 gas on the multihop path but costs 226 gas on the direct path, which is a
 live route.
 
-One file beyond the spec's list, for a reason the spec could not have known: `script/DexHelperConfig.s.sol`
-gave the Anvil dex config `makeAddr("rUSDT")` as its intermediate token. The purchase now reads that
-token's `balanceOf` on the router, and a high-level call to a codeless address reverts, so every mock
-multihop lane would have failed; it deploys a real `MockStablecoin` for that slot instead. No
-live-network branch, constructor argument, or broadcast changes. The second extra file,
+Files beyond the spec's list, for a reason the spec could not have known: **both** Anvil dex configs gave
+their intermediate token as `makeAddr("rUSDT")`. The purchase now reads that token's `balanceOf` on the
+router, and a high-level call to a codeless address reverts, so `script/DexHelperConfig.s.sol` and
+`script/UsdrifHelperConfig.s.sol` each deploy a real `MockStablecoin` for that slot instead. No
+live-network branch, constructor argument, or broadcast changes.
+
+The `UsdrifHelperConfig` half is worth recording as a testing lesson rather than a typo. Its deployment
+suite asserted ownership, registration, aToken wiring, and constructor path allowlisting, and every one
+of those assertions passes on a handler whose configured route cannot execute a single swap — they read
+constructor state and never call `batchBuyRbtc`. The add-on route was only ever proven deployable, not
+usable, so `test/unit/deployment/NewHandlerDeploymentTest.t.sol` now buys once through it; without the
+config fix that test fails with "call to non-contract address". The third extra file,
 `test/unit/DexPathFailoverTest.t.sol`, is where the spec itself asked the path-activation case to live.
+
+Fork behaviour is split deliberately. `SWAP_TYPE=dexSwaps STABLECOIN_TYPE=USDRIF make fork-layerbank` runs
+the configured-path success case against the live SwapRouter02 and the real USDRIF / rUSDT / WRBTC pools,
+which is the only evidence that these checks hold against Uniswap's own router rather than a mock; it
+passes, and that lane's remaining failures are `SchedulePackingTest`'s three pre-existing `SafeCast`
+overflows, which fail identically at the base commit because the impersonated whale's balance does not fit
+the packed `uint128`. The cases that activate a route the test invents — a direct pair, or a hop through a
+token the file just deployed — are local-only: on a fork there is no such pool, so they would revert on
+liquidity and prove nothing about the check under test. One assertion is local-only for the same class of
+reason: `MockSwapRouter02` keeps the input it pulls, while the real SwapRouter02 forwards it into the pool
+and ends the call holding none of it, so "the router gained exactly the net amount" is a statement about
+the mock. The handler-side delta is the venue-independent half, and a successful purchase is itself the
+consumption proof, since anything less now reverts.
 
 ### R55 - evaluate solx and the IR pipeline ([spec](./R55-solx-and-ir-evaluation.md), unassigned, after R59 [#112](https://github.com/BitChillRSK/dca-contracts/pull/112), gated on #104)
 
