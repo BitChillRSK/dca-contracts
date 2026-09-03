@@ -79,7 +79,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
             withdrawalAmount = totalStablecoinInLending;
         }
 
-        // @notice we pay out what the redemption actually produced, which may be less than requested
+        // Pay out what the redemption actually produced, which may be less than requested
         withdrawalAmount = _redeemShares(user, withdrawalAmount, exchangeRate);
         return super.withdrawToken(user, withdrawalAmount);
     }

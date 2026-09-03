@@ -30,7 +30,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     uint16 internal s_maxFeeRate; // Maximum fee rate
     uint128 internal s_feePurchaseLowerBound; // Spending below lower bound gets the maximum fee rate
     uint128 internal s_feePurchaseUpperBound; // Spending above upper bound gets the minimum fee rate
-    uint256 constant FEE_PERCENTAGE_DIVISOR = 10_000; // feeRate will belong to [100, 200], so we need to divide by 10,000 (100 * 100)
+    uint256 internal constant FEE_PERCENTAGE_DIVISOR = 10_000; // rates are basis points, so a rate times an amount divides by 10,000
     /// @notice Hard ceiling on fee rates (5%). Owner cannot set max (or a flat min==max) above this.
     uint256 internal constant MAX_FEE_RATE_CAP = 500;
 
