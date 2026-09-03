@@ -205,6 +205,9 @@ Keystores encrypt your private keys and are much more secure than plain text pri
 
 2. **Use keystore in deployment commands:**
    ```bash
+   # FOUNDRY_PROFILE=deploy is required (see "Compilation profile for deployment" below) — it is what
+   # compiles and broadcasts the via_ir bytecode. Run `make check-deploy` green on this commit first.
+   FOUNDRY_PROFILE=deploy \
    forge script script/DeployMocSwaps.s.sol \
      --rpc-url $RSK_TESTNET_RPC_URL \
      --account dev_wallet \
@@ -222,7 +225,8 @@ Keystores encrypt your private keys and are much more secure than plain text pri
 For maximum security, use a Ledger or Trezor hardware wallet:
 
 ```bash
-# With Ledger
+# With Ledger — FOUNDRY_PROFILE=deploy required, see below
+FOUNDRY_PROFILE=deploy \
 forge script script/DeployMocSwaps.s.sol \
   --rpc-url $RSK_TESTNET_RPC_URL \
   --ledger \
@@ -232,7 +236,8 @@ forge script script/DeployMocSwaps.s.sol \
   --verifier-url $BLOCKSCOUT_API_URL \
   --legacy
 
-# With Trezor
+# With Trezor — FOUNDRY_PROFILE=deploy required, see below
+FOUNDRY_PROFILE=deploy \
 forge script script/DeployMocSwaps.s.sol \
   --rpc-url $RSK_TESTNET_RPC_URL \
   --trezor \
@@ -260,8 +265,12 @@ export REAL_DEPLOYMENT=true  # Set to true for actual deployment on a live netwo
 
 2. Deploy the contracts:
 ```bash
+# FOUNDRY_PROFILE=deploy is required on every broadcast below — see "Compilation profile for
+# deployment". Precondition: `make check-deploy` passes green on the exact commit being deployed.
+
 # Deploy to Rootstock Testnet
 REAL_DEPLOYMENT=true \
+FOUNDRY_PROFILE=deploy \
 forge script script/DeployMocSwaps.s.sol \
   --rpc-url $RSK_TESTNET_RPC_URL \
   --account dev_wallet \
@@ -273,6 +282,7 @@ forge script script/DeployMocSwaps.s.sol \
 
 # Deploy to Rootstock Mainnet
 REAL_DEPLOYMENT=true \
+FOUNDRY_PROFILE=deploy \
 forge script script/DeployMocSwaps.s.sol \
   --rpc-url $RSK_MAINNET_RPC_URL \
   --account dev_wallet \
@@ -322,22 +332,43 @@ Later ownership changes (new Safe, recovered wallet) are the same two steps: cur
 
 ### Compilation profile for deployment
 
-The relaunch deployment profile is currently `[profile.default]`: solc `0.8.36`, Cancun,
-`optimizer = true`, `optimizer_runs = 200`, and `via_ir = false`. The copy-paste broadcast
-commands above intentionally use it, as do the required local and CI lanes. Treat their EIP-170
-margins as the deploy limits.
+The relaunch deployment profile is **`[profile.deploy]`** (`FOUNDRY_PROFILE=deploy`): solc `0.8.36`,
+Cancun, `optimizer = true`, `optimizer_runs = 200`, and — unlike every other profile in this repo —
+`via_ir = true`, compiled across `src/`, `test/`, and `script/` with exactly one file excluded
+(`test/unit/ZeroTokenPurchaseUniswapTest.sol`; see R60). Every broadcast command above **requires**
+`FOUNDRY_PROFILE=deploy` in its environment — `forge script` reads compiler settings from whichever
+profile is active, and without it a broadcast silently compiles and deploys the `[profile.default]`
+(no-IR) artifact instead, which is not what `make check-deploy` validated.
 
-There is no `[profile.deploy]`. Solx / via-IR evaluation and any `ZeroTokenPurchaseUniswap` repair
-are R55 in [#105](https://github.com/BitChillRSK/dca-contracts/pull/105); this repo does not evaluate
-via-IR in R52. A future switch must pin via-IR in every deploy command, run the full
-unit/invariant/fork matrix using the exact artifact, repeat the Rootstock testnet consensus and
-Blockscout-verification proof, and decide whether no-IR remains as a secondary compile lane.
-Until then, the no-IR pipeline is authoritative.
+**Precondition for any real broadcast: run `make check-deploy` green on the exact commit being
+deployed first.** That target compiles `src/`, `test/`, and `script/` under `via_ir = true` and runs the
+full seven-lane suite against that exact bytecode — a test's `new DcaManager(...)` deploys the identical
+artifact `forge script` would broadcast, so a passing `check-deploy` is the only proof this bytecode
+passes the suite. Do not broadcast on a commit `check-deploy` has not been run against.
+
+`[profile.deploy]` was added by [R60](./docs/relaunch/R60-src-only-via-ir.md)
+([#114](https://github.com/BitChillRSK/dca-contracts/pull/114)), reopening
+[R55](./docs/relaunch/R55-solx-and-ir-evaluation.md)'s ([#113](https://github.com/BitChillRSK/dca-contracts/pull/113))
+"keep stock solc, no IR" recommendation. R55 measured `via_ir` as a single project-wide setting and found
+its costs — two solc/via-IR compile failures plus a `vm.warp`/timestamp test-harness hazard — not worth
+paying before relaunch, and explicitly recommended against adopting it. R60 revisited that call once it was
+clear the win (roughly −2.6% to −4.2% gas on the purchase hot path, ~20–26% smaller runtime, for the life of
+an immutable, unproxied contract) was large enough to be worth fixing those three issues for real rather
+than accepting R55's recommendation as final — all three turned out to be test-file-only problems (one a
+known upstream solc bug on a deliberately always-reverting test constructor, the other two fixable
+test-harness refactors) with **no `src/` change required**. `make check-deploy` now passes all seven lanes
+against the `via_ir` bytecode with the same counts R55 recorded for its own project-wide via-IR
+measurement. What R60 has **not** yet done — same gap R55 left open — is an actual Rootstock testnet
+deploy and Blockscout verification of `via_ir`-compiled bytecode; that needs a human operator, since agent
+sessions do not broadcast. Until that proof lands, treat `[profile.deploy]`'s EIP-170 margins as directionally
+correct (measured, matches R55's numbers exactly) but its on-chain verifiability as inferred, not proven.
 
 **Optimizer-on Rootstock proof (R52, 2026-09-01).** Testnet CREATE
 [0x3a63dc2458142cca09144a3f290ed6d996780c616acb8adbdf15f57f736ff5bc](https://rootstock-testnet.blockscout.com/tx/0x3a63dc2458142cca09144a3f290ed6d996780c616acb8adbdf15f57f736ff5bc)
 verified [`OperationsAdmin` `0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD`](https://rootstock-testnet.blockscout.com/address/0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD)
-(solc 0.8.36 / cancun / optimizer 200). Replay (as `TESTNET_OWNER`):
+(solc 0.8.36 / cancun / optimizer 200). This predates R60 and intentionally replays the historical
+**no-IR** artifact — do not add `FOUNDRY_PROFILE=deploy` to this specific command, since doing so would
+reproduce different bytecode than the transaction being replayed. Replay (as `TESTNET_OWNER`):
 
 ```bash
 REAL_DEPLOYMENT=true forge script script/DeployOptimizerProof.s.sol:DeployOptimizerProof \

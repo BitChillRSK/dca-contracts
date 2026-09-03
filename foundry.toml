@@ -33,4 +33,36 @@ via_ir = false
 [profile.ci.fuzz]
 runs = 256
 
+# R60: what actually gets deployed. via_ir applies everywhere, including test/ and script/, so
+# `make check-deploy` runs the full suite against the exact same bytecode that ships — a test's
+# `new DcaManager(...)` deploys the identical artifact `forge script` would broadcast. Never use
+# this profile to deploy without first running `make check-deploy` green on the same commit —
+# that run is the only proof this bytecode passes the suite. Default `make check` stays
+# via_ir=false so day-to-day iteration does not pay via-IR's compile time.
+[profile.deploy]
+via_ir = true
+
+[profile.deploy.fuzz]
+runs = 1000
+
+# ZeroTokenPurchaseUniswapTest.sol's ZeroTokenPurchaseUniswap has a deliberately always-reverting
+# constructor (its _purchaseToken() override is pure, hardcoded to address(0)), which trips a known
+# solc/via_ir limitation (https://github.com/ethereum/solidity/issues/11642): the optimizer proves the
+# revert is unconditional and dead-code-eliminates the immutable assignment after it, then a later
+# checker reports error 1284 ("immutables read but never assigned"). Restructuring the real
+# PurchaseUniswap constructor cannot fix this — the bug is specific to this always-reverting derived
+# test contract. This is the only file excluded from [profile.deploy]'s via_ir; every other test file
+# and all of src/ still compile under IR, and this file's assertions still run — under legacy codegen
+# — as part of `make check-deploy`.
+[[profile.deploy.additional_compiler_profiles]]
+name = "legacy-codegen"
+via_ir = false
+optimizer = true            # required: this extra profile does not inherit [profile.deploy]'s
+optimizer_runs = 200        # optimizer settings, and without them legacy codegen builds fail
+                             # stack-too-deep (see docs/relaunch/R55-solx-and-ir-evaluation.md)
+
+[[profile.deploy.compilation_restrictions]]
+paths = "test/unit/ZeroTokenPurchaseUniswapTest.sol"
+via_ir = false
+
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

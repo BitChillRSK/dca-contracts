@@ -375,64 +375,6 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
     }
 }
 
-/**
- * @notice Proves a reversed `is PurchaseUniswap, LendingErc20Handler` (or Idle) list cannot deploy:
- *         `_purchaseToken()` is still `address(0)` when the Uniswap constructor builds the path.
- */
-contract ZeroTokenPurchaseUniswap is PurchaseUniswap {
-    constructor(
-        address dcaManagerAddress,
-        address feeCollector,
-        IFeeHandler.FeeSettings memory feeSettings,
-        UniswapSettings memory uniswapSettings,
-        uint256 amountOutMinimumPercent,
-        uint256 amountOutMinimumSafetyCheck
-    )
-        FeeHandler(feeCollector, feeSettings, msg.sender)
-        DcaManagerAccessControl(dcaManagerAddress)
-        PurchaseUniswap(uniswapSettings, amountOutMinimumPercent, amountOutMinimumSafetyCheck)
-    {}
-
-    function _purchaseToken() internal pure override returns (IERC20) {
-        return IERC20(address(0));
-    }
-
-    function _retrieveStablecoin(address, uint256) internal pure override returns (uint256) {
-        return 0;
-    }
-
-    function _batchRetrieveStablecoin(address[] memory, uint256[] memory, uint256)
-        internal
-        pure
-        override
-        returns (uint256)
-    {
-        return 0;
-    }
-}
-
-contract PurchaseUniswapZeroTokenTest is Test {
-    function testConstructorRevertsWhenPurchaseTokenIsZero() public {
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
-            minFeeRate: 100,
-            maxFeeRate: 100,
-            feePurchaseLowerBound: 1000 ether,
-            feePurchaseUpperBound: 100_000 ether
-        });
-        address[] memory intermediateTokens = new address[](0);
-        uint24[] memory poolFeeRates = new uint24[](1);
-        poolFeeRates[0] = 3000;
-        IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
-            wrBtcToken: IWRBTC(address(0x1)),
-            swapRouter02: ISwapRouter02(address(0x2)),
-            swapIntermediateTokens: intermediateTokens,
-            swapPoolFeeRates: poolFeeRates,
-            mocOracle: ICoinPairPrice(address(0x3))
-        });
-
-        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__ZeroPurchaseToken.selector);
-        new ZeroTokenPurchaseUniswap(
-            address(this), address(0xFEE), feeSettings, uniswapSettings, 0.997 ether, 0.99 ether
-        );
-    }
-}
+// ZeroTokenPurchaseUniswap and its test moved to ZeroTokenPurchaseUniswapTest.sol (R60): that
+// contract's constructor is deliberately always-reverting, which trips a known solc/via_ir limitation
+// (see that file's doc comment) and must be excluded from IR compilation on its own.

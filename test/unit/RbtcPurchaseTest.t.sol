@@ -161,21 +161,31 @@ contract RbtcPurchaseTest is DcaDappTest {
     }
 
     // This test would be relevant if a schedule runs out of stablecoin and later the user deposits more
+    // Solidity gives no ordering guarantee between "read a local assigned from block.timestamp" and
+    // "a later vm.warp changes block.timestamp" beyond what the compiler's optimizer happens to do —
+    // vm.warp is a cheatcode, not part of the language the immutable-within-a-transaction assumption
+    // is written against. The Yul optimizer under via_ir can rematerialize a TIMESTAMP read instead of
+    // keeping the assigned local, so a value snapshotted before a warp must be pinned somewhere a
+    // cheatcode-driven rematerialization cannot reach it: storage survives that, a stack local does
+    // not. See docs/relaunch/R55-solx-and-ir-evaluation.md and R60-src-only-via-ir.md.
+    uint256 private s_firstPurchaseTimestampForResumeTest;
+
     function testLastPurchaseTimestampConsistencyWhenScheduleResumed(uint256 timeUntilResume) public {
         if (timeUntilResume < MIN_PURCHASE_PERIOD) return; // Avoid known revert
         if (timeUntilResume > 100 * 52 weeks) return; // Avoid overflows
-        uint256 firstPurchaseTimestamp = block.timestamp;
+        s_firstPurchaseTimestampForResumeTest = block.timestamp;
         uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
-        
-        // Imagine after the first purchase, the schedule runs out of stablecoin and is resumed later 
-        vm.warp(vm.getBlockTimestamp() + timeUntilResume); 
-        
+
+        // Imagine after the first purchase, the schedule runs out of stablecoin and is resumed later
+        vm.warp(vm.getBlockTimestamp() + timeUntilResume);
+
         buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
 
         IDcaManager.DcaSchedule memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
         assertLe(schedule.lastPurchaseTimestamp, block.timestamp);
         assertGt(schedule.lastPurchaseTimestamp, block.timestamp - MIN_PURCHASE_PERIOD);
+        uint256 firstPurchaseTimestamp = s_firstPurchaseTimestampForResumeTest;
         uint256 periodsElapsed = (block.timestamp - firstPurchaseTimestamp) / MIN_PURCHASE_PERIOD;
         assertEq(schedule.lastPurchaseTimestamp, firstPurchaseTimestamp + periodsElapsed * MIN_PURCHASE_PERIOD);
     }

@@ -583,51 +583,69 @@ contract DcaDappTest is Test {
         uint8 numOfPurchases = 5;
 
         for (uint8 i; i < NUM_OF_SCHEDULES; ++i) {
-            uint256 scheduleIndex = i;
-            vm.startPrank(USER);
-            uint256 schedulePurchaseAmount = dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).purchaseAmount;
-            uint256 schedulePurchasePeriod = dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).purchasePeriod;
-            vm.stopPrank();
-            uint256 fee = feeCalculator.calculateFee(schedulePurchaseAmount);
-            uint256 netPurchaseAmount = schedulePurchaseAmount - fee;
-
-            for (uint8 j; j < numOfPurchases; ++j) {
-                vm.startPrank(USER);
-                uint256 stablecoinBalanceBeforePurchase = dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).tokenBalance;
-                uint256 rbtcBalanceBeforePurchase = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
-                uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).scheduleId;
-                vm.stopPrank();
-                
-                buyRbtcOne(USER, scheduleIndex, scheduleId, schedulePurchaseAmount);
-                
-                vm.startPrank(USER);
-                uint256 stablecoinBalanceAfterPurchase = dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).tokenBalance;
-                uint256 RbtcBalanceAfterPurchase = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
-                vm.stopPrank();
-                
-                // Check that stablecoin was subtracted and rBTC was added to user's balances
-                assertEq(stablecoinBalanceBeforePurchase - stablecoinBalanceAfterPurchase, schedulePurchaseAmount);
-                assertApproxEqRel(
-                    RbtcBalanceAfterPurchase - rbtcBalanceBeforePurchase,
-                    netPurchaseAmount / s_btcPrice,
-                    _maxPurchaseSlippage() // Allow a maximum difference of 0.75% (on fork tests we saw this was necessary for both MoC and Uniswap swaps)
-                );
-
-                totalStablecoinSpent += netPurchaseAmount;
-
-                // Advance time so the next purchase can be made (purchase period check)
-                updateExchangeRate(schedulePurchasePeriod);
-            }
+            totalStablecoinSpent += _runSchedulePurchases(i, numOfPurchases);
         }
-        
+
         vm.prank(USER);
         assertApproxEqRel(
             IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER),
             totalStablecoinSpent / s_btcPrice,
             _maxPurchaseSlippage() // Allow a maximum difference of 0.75% (on fork tests we saw this was necessary for both MoC and Uniswap swaps)
         );
-        
+
         return totalStablecoinSpent;
+    }
+
+    // Split out of makeSeveralPurchasesWithSeveralSchedules so the outer loop's live-variable count
+    // stays low enough to compile under via_ir (see docs/relaunch/R60-src-only-via-ir.md) — the merged
+    // body kept ~13 locals live across two nested loops, which is stack-too-deep territory under IR
+    // even though it fits under legacy codegen. No assertion or behavior changed by the split.
+    function _runSchedulePurchases(uint256 scheduleIndex, uint8 numOfPurchases)
+        private
+        returns (uint256 scheduleStablecoinSpent)
+    {
+        vm.startPrank(USER);
+        uint256 schedulePurchaseAmount =
+            dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).purchaseAmount;
+        uint256 schedulePurchasePeriod =
+            dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).purchasePeriod;
+        vm.stopPrank();
+        uint256 fee = feeCalculator.calculateFee(schedulePurchaseAmount);
+        uint256 netPurchaseAmount = schedulePurchaseAmount - fee;
+
+        for (uint8 j; j < numOfPurchases; ++j) {
+            vm.startPrank(USER);
+            uint256 stablecoinBalanceBeforePurchase =
+                dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).tokenBalance;
+            uint256 rbtcBalanceBeforePurchase =
+                IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
+            uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).scheduleId;
+            vm.stopPrank();
+
+            buyRbtcOne(USER, scheduleIndex, scheduleId, schedulePurchaseAmount);
+
+            vm.startPrank(USER);
+            uint256 stablecoinBalanceAfterPurchase =
+                dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).tokenBalance;
+            uint256 rbtcBalanceAfterPurchase =
+                IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
+            vm.stopPrank();
+
+            // Check that stablecoin was subtracted and rBTC was added to user's balances
+            assertEq(stablecoinBalanceBeforePurchase - stablecoinBalanceAfterPurchase, schedulePurchaseAmount);
+            assertApproxEqRel(
+                rbtcBalanceAfterPurchase - rbtcBalanceBeforePurchase,
+                netPurchaseAmount / s_btcPrice,
+                _maxPurchaseSlippage() // Allow a maximum difference of 0.75% (on fork tests we saw this was necessary for both MoC and Uniswap swaps)
+            );
+
+            scheduleStablecoinSpent += netPurchaseAmount;
+
+            // Advance time so the next purchase can be made (purchase period check)
+            updateExchangeRate(schedulePurchasePeriod);
+        }
+
+        return scheduleStablecoinSpent;
     }
 
     function makeBatchPurchasesOneUser() internal {
