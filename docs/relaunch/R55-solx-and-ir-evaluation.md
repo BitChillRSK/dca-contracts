@@ -1,6 +1,6 @@
 # R55 — Evaluate solx and the IR pipeline, then decide
 
-Status: **measured; recommendation is keep stock solc, no IR** · Assigned: PR 58 · Optional/further-review: no · Order: after R59
+Status: **measured; recommendation is keep stock solc, no IR** · Assigned: PR 58 ([#113](https://github.com/BitChillRSK/dca-contracts/pull/113)) · Optional/further-review: no · Order: after R59
 
 ## Objective
 

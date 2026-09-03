@@ -118,7 +118,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R53 | 55 ([#109](https://github.com/BitChillRSK/dca-contracts/pull/109)) | none (documentation-only optimized baseline) |
 | R54 | 56 ([#110](https://github.com/BitChillRSK/dca-contracts/pull/110)) | answered (amount; top-up ignores deposit pause; `topUpFromInterest`) |
 | R59 | 57 ([#112](https://github.com/BitChillRSK/dca-contracts/pull/112)) | none (fail closed on incomplete Uniswap input; gas and size ceilings are fixed) |
-| R55 | 58 | none (measured; recommendation is keep stock solc, no IR) |
+| R55 | 58 ([#113](https://github.com/BitChillRSK/dca-contracts/pull/113)) | none (measured; recommendation is keep stock solc, no IR) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -831,7 +831,7 @@ and ends the call holding none of it, so "the router gained exactly the net amou
 the mock. The handler-side delta is the venue-independent half, and a successful purchase is itself the
 consumption proof, since anything less now reverts.
 
-### R55 - evaluate solx and the IR pipeline ([spec](./R55-solx-and-ir-evaluation.md), PR 58, after R59 [#112](https://github.com/BitChillRSK/dca-contracts/pull/112), gated on #104)
+### R55 - evaluate solx and the IR pipeline ([spec](./R55-solx-and-ir-evaluation.md), PR 58, [#113](https://github.com/BitChillRSK/dca-contracts/pull/113), after R59 [#112](https://github.com/BitChillRSK/dca-contracts/pull/112), gated on #104)
 
 Measure and recommend; change no compiler setting. Compare stock solc no-IR, stock solc `via_ir`, and solx on
 runtime size, hot-path gas, whether the full matrix passes, and whether Blockscout can verify the result on
