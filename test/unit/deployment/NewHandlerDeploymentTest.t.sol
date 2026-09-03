@@ -11,10 +11,16 @@ import {IWRBTC} from "../../../src/interfaces/IWRBTC.sol";
 import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces/ISwapRouter02.sol";
 import {ICoinPairPrice} from "../../../src/interfaces/ICoinPairPrice.sol";
 import {IOperationsAdmin} from "../../../src/interfaces/IOperationsAdmin.sol";
+import {IPurchaseRbtc} from "../../../src/interfaces/IPurchaseRbtc.sol";
+import {MockStablecoin} from "../../mocks/MockStablecoin.sol";
+import {batchBuyOne} from "../../utils/BatchBuyOne.sol";
 import {console} from "forge-std/Test.sol";
 import "../../Constants.sol";
 
 contract NewHandlerDeploymentTest is BaseDeploymentTest {
+    uint256 internal constant DEPOSIT_AMOUNT = 2000 ether;
+    uint256 internal constant PURCHASE_AMOUNT = 200 ether;
+
     address public usdrifHandlerAddress;
     LayerBankErc20HandlerDex public usdrifHandler;
     UsdrifHelperConfig public usdrifHelperConfig;
@@ -88,6 +94,50 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
         assertTrue(
             IPurchaseUniswap(usdrifHandlerAddress).isPurchasePathAllowed(keccak256(usdrifHandler.getSwapPath())),
             "constructor path is allowlisted at construction"
+        );
+    }
+
+    /**
+     * @notice A schedule created on the add-on handler must actually be able to buy.
+     * @dev The deployment assertions above all hold on a handler whose configured route cannot execute:
+     *      they read constructor state and never call `batchBuyRbtc`. R59 made that gap load-bearing —
+     *      the purchase now reads each active intermediate token's `balanceOf` on the router, and a
+     *      high-level call to a codeless address reverts — so this add-on path needs one real purchase.
+     */
+    function testUsdrifHandlerPurchasesThroughTheDeployedRoute() public {
+        if (block.chainid != ANVIL_CHAIN_ID) vm.skip(true);
+
+        UsdrifHelperConfig.NetworkConfig memory config = usdrifHelperConfig.getNetworkConfig();
+        address user = makeAddr(USER_STRING);
+        address swapper = makeAddr(SWAPPER_STRING);
+        MockStablecoin usdrif = MockStablecoin(config.usdrifTokenAddress);
+
+        vm.prank(OWNER);
+        operationsAdmin.addSwapper(swapper);
+        // The mock router wraps rBTC it holds into WRBTC for the handler, the way a real swap pays out.
+        vm.deal(config.swapRouter02Address, 1000 ether);
+
+        usdrif.mint(user, DEPOSIT_AMOUNT);
+        vm.startPrank(user);
+        usdrif.approve(usdrifHandlerAddress, DEPOSIT_AMOUNT);
+        dcaManager.createDcaSchedule(
+            config.usdrifTokenAddress, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, LAYERBANK_INDEX
+        );
+        vm.stopPrank();
+
+        uint64 scheduleId = dcaManager.getDcaSchedule(user, config.usdrifTokenAddress, 0).scheduleId;
+        vm.prank(swapper);
+        batchBuyOne(dcaManager, user, config.usdrifTokenAddress, 0, scheduleId, PURCHASE_AMOUNT, LAYERBANK_INDEX);
+
+        assertGt(
+            IPurchaseRbtc(usdrifHandlerAddress).getAccumulatedRbtcBalance(user),
+            0,
+            "purchase through the deployed USDRIF route credited no rBTC"
+        );
+        assertEq(
+            usdrif.balanceOf(usdrifHandlerAddress),
+            0,
+            "a complete fill leaves no stablecoin on the handler"
         );
     }
 

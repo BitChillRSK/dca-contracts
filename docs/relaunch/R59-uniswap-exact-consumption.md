@@ -1,6 +1,6 @@
 # R59 — Enforce complete Uniswap input consumption
 
-Status: **planned** in [#111](https://github.com/BitChillRSK/dca-contracts/pull/111) · Assigned: no · Optional/further-review: no · Order: before R55 (next unassigned)
+Status: **implemented** · PR: [#112](https://github.com/BitChillRSK/dca-contracts/pull/112) (PR 57) · Assigned: yes · Optional/further-review: no · Order: before R55 (next unassigned)
 
 ## Objective
 
@@ -50,26 +50,26 @@ silently accepting a more expensive design.
 
 ## Scope
 
-- [ ] Store the active path's `intermediateTokens` beside `s_swapPath`. The constructor and every
+- [x] Store the active path's `intermediateTokens` beside `s_swapPath`. The constructor and every
       successful `_setPurchasePath` call must replace both together, so path failover cannot leave
       stale accounting metadata.
-- [ ] Immediately before `exactInput`, snapshot:
+- [x] Immediately before `exactInput`, snapshot:
       - the handler's purchase-token balance; and
       - SwapRouter02's balance of every active intermediate token.
-- [ ] Immediately after `exactInput`, require the handler's purchase-token balance to have fallen by
+- [x] Immediately after `exactInput`, require the handler's purchase-token balance to have fallen by
       exactly `stablecoinAmount`. Revert if it fell by less, did not fall, or increased.
-- [ ] Require SwapRouter02's balance of every active intermediate token to equal its pre-swap
+- [x] Require SwapRouter02's balance of every active intermediate token to equal its pre-swap
       balance. Compare before versus after, not against zero, so unrelated pre-existing router dust
       cannot grief BitChill purchases.
-- [ ] Keep measuring the handler's WRBTC balance delta as the purchased output. The router's return
+- [x] Keep measuring the handler's WRBTC balance delta as the purchased output. The router's return
       value remains ignored.
-- [ ] Add two diagnostic custom errors to `IPurchaseUniswap`:
+- [x] Add two diagnostic custom errors to `IPurchaseUniswap`:
       - `PurchaseUniswap__InputAmountNotFullySpent(uint256 expectedAmount, uint256 balanceBefore,
         uint256 balanceAfter)`; and
       - `PurchaseUniswap__IntermediateTokenBalanceChanged(address token, uint256 balanceBefore,
         uint256 balanceAfter)`.
-- [ ] Add deterministic router mocks and unit coverage for first-hop and later-hop partial fills.
-- [ ] Measure incremental hot-path gas and runtime size against this PR's base commit, under the
+- [x] Add deterministic router mocks and unit coverage for first-hop and later-hop partial fills.
+- [x] Measure incremental hot-path gas and runtime size against this PR's base commit, under the
       `#104` pin (`optimizer = true`, `optimizer_runs = 200`, `via_ir = false`). Record both commits,
       exact commands, and results in the PR.
 
@@ -137,6 +137,13 @@ in memory once; do not re-read its storage length or elements in both loops. Sma
 fine if measurements show a cheaper equally legible form, but the observable checks and error data
 above are fixed.
 
+**What shipped** ([#112](https://github.com/BitChillRSK/dca-contracts/pull/112)) follows this shape
+except that the purchase's six balance reads share one private `_balanceOf(address,address)`. That is
+not a preference: written with six inline `balanceOf` sites the change costs +1,163 bytes per Dex leaf,
+363 over the ceiling below, and sharing them is worth 508 of that for a JUMP per read. Nothing fixed
+above moves. The measurements and the full ablation are in the PR and in
+[`IMPLEMENTATION_ORDER.md`](./IMPLEMENTATION_ORDER.md).
+
 ### Cost acceptance gates
 
 Measure equivalent successful purchases before and after the change. The implementation passes only
@@ -202,7 +209,10 @@ from this list. Extra files must be named in the PR write-up.
   purchase checks the new set, not the constructor set. Extend `DexPathFailoverTest` rather than
   duplicating R52's authorization matrix.
 - Run the full `AGENTS.md` done-gate: `make check`, `make fork-sovryn`, and
-  `make fork-tropykus`. This item adds no live-liquidity fork assertion; deterministic mocks own the
+  `make fork-tropykus`. Also run `SWAP_TYPE=dexSwaps STABLECOIN_TYPE=USDRIF make fork-layerbank`: the
+  configured-path success case is the only coverage that these checks hold against Uniswap's own
+  SwapRouter02 and real pools rather than a mock router. Cases that activate a route the test invents
+  must stay local-only, and so must any assertion about what the router itself ends up holding. This item adds no live-liquidity fork assertion; deterministic mocks own the
   partial-fill cases, which must not become dependent on a pool remaining thin.
 - Run `make fork-dex-path` because the change extends R52's active-path state, even though the fork
   test need not manufacture a partial fill.
@@ -210,18 +220,18 @@ from this list. Extra files must be named in the PR write-up.
 
 ## Success criteria
 
-- [ ] A successful Dex purchase consumed exactly `stablecoinAmount` from the handler.
-- [ ] A successful multihop purchase caused no net balance change for any active intermediate token
+- [x] A successful Dex purchase consumed exactly `stablecoinAmount` from the handler.
+- [x] A successful multihop purchase caused no net balance change for any active intermediate token
       on SwapRouter02.
-- [ ] Either mismatch reverts the complete purchase, including DCA schedule and fee effects.
-- [ ] Active-path bytes and active intermediate-token metadata change atomically on construction and
+- [x] Either mismatch reverts the complete purchase, including DCA schedule and fee effects.
+- [x] Active-path bytes and active intermediate-token metadata change atomically on construction and
       every later path activation.
-- [ ] Router dust present before the call does not cause a revert when it is unchanged afterward.
-- [ ] The router return value is still not an accounting input, and WRBTC credit still uses the
+- [x] Router dust present before the call does not cause a revert when it is unchanged afterward.
+- [x] The router return value is still not an accounting input, and WRBTC credit still uses the
       handler's balance delta.
-- [ ] Added gas is at most 8,000 for a direct path and 15,000 for one intermediate token.
-- [ ] Every Dex leaf grows by at most 800 bytes and remains below EIP-170.
-- [ ] Full local, invariant, and mandatory fork gates pass under the `#104` pin.
+- [x] Added gas is at most 8,000 for a direct path and 15,000 for one intermediate token.
+- [x] Every Dex leaf grows by at most 800 bytes and remains below EIP-170.
+- [x] Full local, invariant, and mandatory fork gates pass under the `#104` pin.
 
 ## Reviewer checklist
 

@@ -139,13 +139,18 @@ contract UsdrifHelperConfig is Script {
         MockMocOracle mockMocOracle = new MockMocOracle();
         emit HelperConfig__CreatedMockToken("MocOracle", address(mockMocOracle));
 
+        // The USDRIF route hops through this token, and the purchase reads its balance on the router to
+        // prove no hop stopped short, so it has to be a real ERC20: `balanceOf` on a codeless address reverts.
+        MockStablecoin mockIntermediateToken = new MockStablecoin(msg.sender);
+        emit HelperConfig__CreatedMockToken("rUSDT", address(mockIntermediateToken));
+
         if (!isBroadcasting) {
             vm.stopBroadcast();
         }
 
         // Configure the rest
         address[] memory intermediateTokens = new address[](1);
-        intermediateTokens[0] = makeAddr("rUSDT");
+        intermediateTokens[0] = address(mockIntermediateToken);
 
         uint24[] memory poolFeeRates = new uint24[](2);
         poolFeeRates[0] = 500;

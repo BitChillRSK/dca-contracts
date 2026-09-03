@@ -11,6 +11,7 @@ import {ICoinPairPrice} from "./interfaces/ICoinPairPrice.sol";
 import {IPurchaseUniswap} from "./interfaces/IPurchaseUniswap.sol";
 import {IDcaManager} from "./interfaces/IDcaManager.sol";
 import {IOperationsAdmin} from "./interfaces/IOperationsAdmin.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
@@ -56,6 +57,12 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     /// Both are 1e18-scaled like `HUNDRED_PERCENT`; `uint128` is ample and pairs them in one slot.
     uint128 internal s_amountOutMinimumSafetyCheck;
     bytes internal s_swapPath;
+    /// @dev The intermediate tokens encoded inside `s_swapPath`, in hop order. Empty for a direct pair.
+    /// Kept as its own array because the purchase must know which tokens a partial fill could strand in the
+    /// router, and decoding them back out of the packed path bytes at swap time is the expensive way to
+    /// learn what the setter already had. Written only by `_setPurchasePath`, so it cannot describe a path
+    /// that is not the active one.
+    address[] internal s_swapIntermediateTokens;
     /// @dev Exact encoded paths this handler may activate. Purchases read `s_swapPath` only.
     mapping(bytes32 pathHash => bool allowed) private s_purchasePathAllowed;
 
@@ -201,9 +208,12 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Writes `s_swapPath` and emits `PurchaseUniswap_NewPathSet`.
-     *      `newPath` must be `_encodePurchasePath(intermediateTokens, poolFeeRates)`;
-     *      the event's components are how off-chain reconstructs the route.
+     * @dev Writes `s_swapPath` and its intermediate tokens together, then emits
+     *      `PurchaseUniswap_NewPathSet`. `newPath` must be
+     *      `_encodePurchasePath(intermediateTokens, poolFeeRates)`; the event's components are how
+     *      off-chain reconstructs the route. The two writes are one statement pair on purpose: the
+     *      purchase checks the router against the active path's intermediate tokens, and a path
+     *      activation that left the previous set behind would check the wrong tokens.
      */
     function _setPurchasePath(
         address[] memory intermediateTokens,
@@ -211,6 +221,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         bytes memory newPath
     ) internal {
         s_swapPath = newPath;
+        s_swapIntermediateTokens = intermediateTokens;
         emit PurchaseUniswap_NewPathSet(intermediateTokens, poolFeeRates, newPath);
     }
 
@@ -286,13 +297,24 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      *      The router's return value is treated as success/failure only; the measured WRBTC
      *      balance delta is the amount we can credit. `amountOutMinimum` is `max(amountOutLowerBound, minRbtcOut)`,
      *      so the caller can only ever tighten the swap, never loosen it below the configured floor.
+     * @dev `exactInput` states the input the caller asked to spend, not the input the pools took. A V3 pool
+     *      stops swapping when it reaches its own price limit, so a drained or very thin pool can fill part
+     *      of the request and still clear an aggregate `amountOutMinimum`. Output-only accounting cannot see
+     *      that: the unspent remainder is either stablecoin still sitting on this handler after the schedules
+     *      and fees were already debited, or, when a later hop is the one that stops, an intermediate token
+     *      left in the public router, outside our custody. Both are measured here as balance deltas, in the
+     *      same spirit as the WRBTC credit, and either mismatch reverts the whole purchase — pools, router,
+     *      fees and schedule effects roll back together, which is the only recovery this route needs. The
+     *      router balances are compared against their own pre-swap values rather than zero, so tokens
+     *      anyone can send to a public contract cannot block our purchases.
      */
     function _purchaseRbtc(uint256 stablecoinAmount, uint256 minRbtcOut)
         internal
         override
         returns (uint256 amountOut)
     {
-        TransferHelper.safeApprove(address(_purchaseToken()), address(i_swapRouter02), stablecoinAmount);
+        IERC20 purchaseToken = _purchaseToken();
+        TransferHelper.safeApprove(address(purchaseToken), address(i_swapRouter02), stablecoinAmount);
 
         uint256 amountOutLowerBound = _getAmountOutLowerBound(stablecoinAmount);
         uint256 amountOutMinimum = minRbtcOut > amountOutLowerBound ? minRbtcOut : amountOutLowerBound;
@@ -304,9 +326,42 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
             amountOutMinimum: amountOutMinimum
         });
 
-        uint256 wrBtcBalanceBefore = i_wrBtcToken.balanceOf(address(this));
+        uint256 inputBalanceBefore = _balanceOf(address(purchaseToken), address(this));
+
+        address[] memory intermediateTokens = s_swapIntermediateTokens;
+        uint256 intermediateCount = intermediateTokens.length;
+        uint256[] memory routerBalancesBefore = new uint256[](intermediateCount);
+        for (uint256 i; i < intermediateCount; ++i) {
+            routerBalancesBefore[i] = _balanceOf(intermediateTokens[i], address(i_swapRouter02));
+        }
+
+        uint256 wrBtcBalanceBefore = _balanceOf(address(i_wrBtcToken), address(this));
         i_swapRouter02.exactInput(params);
-        amountOut = i_wrBtcToken.balanceOf(address(this)) - wrBtcBalanceBefore;
+
+        uint256 inputBalanceAfter = _balanceOf(address(purchaseToken), address(this));
+        if (inputBalanceAfter > inputBalanceBefore || inputBalanceBefore - inputBalanceAfter != stablecoinAmount) {
+            revert PurchaseUniswap__InputAmountNotFullySpent(stablecoinAmount, inputBalanceBefore, inputBalanceAfter);
+        }
+
+        for (uint256 i; i < intermediateCount; ++i) {
+            uint256 routerBalanceAfter = _balanceOf(intermediateTokens[i], address(i_swapRouter02));
+            if (routerBalanceAfter != routerBalancesBefore[i]) {
+                revert PurchaseUniswap__IntermediateBalanceChangedInRouter(
+                    intermediateTokens[i], routerBalancesBefore[i], routerBalanceAfter
+                );
+            }
+        }
+
+        amountOut = _balanceOf(address(i_wrBtcToken), address(this)) - wrBtcBalanceBefore;
+    }
+
+    /**
+     * @dev One shared `balanceOf` call site. The purchase measures six balances, and letting the compiler
+     *      emit six copies of the same encode/staticcall/decode is the single largest piece of this route's
+     *      bytecode that buys nothing.
+     */
+    function _balanceOf(address token, address account) private view returns (uint256) {
+        return IERC20(token).balanceOf(account);
     }
 
     /**

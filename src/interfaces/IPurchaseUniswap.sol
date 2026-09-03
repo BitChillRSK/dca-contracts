@@ -71,6 +71,19 @@ interface IPurchaseUniswap {
     error PurchaseUniswap__UnauthorizedPurchasePathSetter(address caller);
     /// @notice `pathHash` is not allowlisted on this handler.
     error PurchaseUniswap__PurchasePathNotAllowed(bytes32 pathHash);
+    /// @notice The swap left stablecoin on the handler: the pools did not take the whole requested input.
+    /// @dev Emitted as a revert when the handler's stablecoin balance did not fall by exactly the requested
+    ///      amount. Fees and schedule balances are debited before the swap, so a partial fill would otherwise
+    ///      credit rBTC for stablecoin that was never spent.
+    error PurchaseUniswap__InputAmountNotFullySpent(
+        uint256 expectedAmount, uint256 balanceBefore, uint256 balanceAfter
+    );
+    /// @notice A later hop stopped short and left an intermediate token in the shared router.
+    /// @dev The comparison is against the router's own pre-swap balance, not zero, so dust anyone can send
+    ///      to a public contract does not block purchases.
+    error PurchaseUniswap__IntermediateBalanceChangedInRouter(
+        address token, uint256 balanceBefore, uint256 balanceAfter
+    );
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
