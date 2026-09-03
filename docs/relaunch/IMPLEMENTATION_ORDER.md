@@ -119,7 +119,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R54 | 56 ([#110](https://github.com/BitChillRSK/dca-contracts/pull/110)) | answered (amount; top-up ignores deposit pause; `topUpFromInterest`) |
 | R59 | 57 ([#112](https://github.com/BitChillRSK/dca-contracts/pull/112)) | none (fail closed on incomplete Uniswap input; gas and size ceilings are fixed) |
 | R55 | 58 ([#113](https://github.com/BitChillRSK/dca-contracts/pull/113)) | none (measured; recommendation is keep stock solc, no IR) |
-| R60 | 59 (planned) | none (`src/`-only `via_ir`; `test/`/`script/` stay legacy codegen) |
+| R60 | 59 (planned) | none (`via_ir` deploy profile; whole suite runs against shipped bytecode) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -888,21 +888,46 @@ toolchain proof that stays valid.
 **Reopened 2026-09-03 as [R60](./R60-src-only-via-ir.md).** R55's "keep stock solc, no IR" weighed `via_ir` as
 a single project-wide setting, and every cost it found - `ZeroTokenPurchaseUniswap`'s error 1284, the
 `RbtcWithdrawalTest.t.sol` stack-too-deep, the `block.timestamp`/`vm.warp` rematerialization - is a *test-file*
-failure, not a `src/` one. Foundry's `additional_compiler_profiles` / `compilation_restrictions` split (the same
-primitive R55 already used for the file-level `ZeroTokenPurchaseUniswap` carve-out) generalizes to a path glob:
-`via_ir = true` for `src/**`, legacy codegen for `test/**` and `script/**`. That keeps the -2.6% to -4.2% hot-path
-win and the ~20-26% runtime reduction while none of R55's three IR failures ever fire, since none of them are
-`src/` files. R60 does not reopen the solx question - that recommendation (unverifiable on Rootstock, cannot
-compile the pinned pragma) stands - and it must still supply the one thing R55 deliberately skipped: a real
-Rootstock testnet deploy and Blockscout verification of `via_ir=true` bytecode, since R55's verifier-config check
-only proved stock Solidity versions are listed, not that a `via_ir` artifact from this split configuration
-verifies end to end.
+failure, not a `src/` one.
 
-### R60 - compile `src/` under `via_ir`, keep `test/`/`script/` on legacy codegen ([spec](./R60-src-only-via-ir.md), planned PR 59)
+The first design considered was compiling only `src/**` under IR via `compilation_restrictions`, keeping
+`test/**`/`script/**` on legacy codegen. That does make all three failures disappear, but it does not satisfy
+"run the whole suite against the bytecode that actually ships": a legacy-compiled test's `new DcaManager(...)`
+resolves to a **second, legacy-codegen build** of that contract (confirmed by trace -
+`DcaManager.legacy-codegen::getOperationsAdminAddress()` - not the IR one `forge script` would deploy), because
+Foundry links a constructor call to whatever was built in the calling file's own compilation profile. That is
+parity evidence between two different builds, not identity, so the design changed: `[profile.deploy]` compiles
+`via_ir = true` everywhere - `src/`, `test/`, and `script/` - with exactly one file excluded, and the three R55
+failures had to be fixed for real rather than routed around by directory. `ZeroTokenPurchaseUniswap`'s error
+1284 turned out to be the known upstream solc/via-IR limit
+[ethereum/solidity#11642](https://github.com/ethereum/solidity/issues/11642) - the optimizer proves that
+contract's deliberately always-reverting constructor (`_purchaseToken()` is `pure`, hardcoded to `address(0)`)
+never returns, dead-code-eliminates the immutable assignment after the revert, and a later checker reports it
+unassigned; no reordering inside `PurchaseUniswap`'s real constructor changes that this one derived test contract
+always reverts by design. Fixed by moving it into its own file
+(`test/unit/ZeroTokenPurchaseUniswapTest.sol`) and excluding only that file from IR - the sole restriction in
+`[profile.deploy]`. The withdrawal-harness stack-too-deep was fixed by splitting
+`DcaDappTest.makeSeveralPurchasesWithSeveralSchedules`'s inner loop into a private helper. The `vm.warp` fuzz
+failure was fixed by moving the cached pre-warp timestamp from a stack local (which the Yul optimizer can
+rematerialize across a cheatcode-driven clock change) into a private storage variable (which it cannot). All
+three fixes are assertion-identical to what they replaced; no `src/` file changed. `make check-deploy` (all
+seven lanes, `FOUNDRY_PROFILE=deploy`) now passes with the same counts R55 recorded for its project-wide via-IR
+run, and a from-scratch `--sizes` build reproduces R55's `DcaManager` IR size (11,712 B) with no
+`.legacy-codegen` duplicate anywhere - the restriction stays scoped to the one excluded file. Default
+`make check`/`make ci` are unchanged (still `via_ir=false`).
 
-Not started. See the spec's Scope and Success criteria: the profile/restriction split above, a clean unfiltered
-`forge build` and full seven-lane `make check`, re-measured gas/size against `#104`, ABI/storage-layout
-invariance, and a Rootstock testnet deploy + Blockscout verification of the `via_ir`-compiled bytecode.
+R60 does not reopen the solx question - that recommendation (unverifiable on Rootstock, cannot compile the
+pinned pragma) stands - and still owes the one thing R55 deliberately skipped: a real Rootstock testnet deploy
+and Blockscout verification of `via_ir=true` bytecode, since R55's verifier-config check only proved stock
+Solidity versions are listed, not that a `via_ir` artifact from this exact configuration verifies end to end.
+That needs a human operator (`AGENTS.md` forbids broadcasting from an agent session) and is the one open item
+in R60's Scope.
+
+### R60 - a `via_ir` deploy profile that runs the whole suite against the shipped bytecode ([spec](./R60-src-only-via-ir.md), planned PR 59)
+
+Implemented except the Rootstock testnet deploy + Blockscout verification, which needs a human operator. See
+the spec's Scope and Success criteria for the full account of the design change from the original `src/`-only
+plan, the two solc/via-IR compile-failure root causes, and the timestamp-rematerialization fix.
 
 ## Closed non-implementation decisions
 

@@ -1,144 +1,170 @@
-# R60 — Compile `src/` under `via_ir`, keep `test/` and `script/` on legacy codegen
+# R60 — A `via_ir` deploy profile that runs the whole suite against the shipped bytecode
 
-Status: **not started** · Assigned: no · Optional/further-review: no · Order: after R55 ([#113](https://github.com/BitChillRSK/dca-contracts/pull/113))
+Status: **implemented; Rootstock testnet deploy + Blockscout verification not yet performed** · Assigned:
+yes · Optional/further-review: no · Order: after R55 ([#113](https://github.com/BitChillRSK/dca-contracts/pull/113))
 
 ## Objective
 
-Ship `via_ir = true` for the deployed contracts only, using Foundry's per-path
-`additional_compiler_profiles` / `compilation_restrictions` split, while every test and script file keeps
-compiling under the current legacy (non-IR) codegen. Capture the hot-path gas win R55 measured
-(`DcaManager.batchBuyRbtc` −2.6%, `testSinglePurchase` −2.0%, `testBatchPurchasesOneUser` −4.2%) and the
-runtime-size reduction (~20–26%) without paying the costs R55 found: `ZeroTokenPurchaseUniswap`'s error
-1284, the `RbtcWithdrawalTest.t.sol` stack-too-deep, and the `block.timestamp`/`vm.warp` rematerialization
-that broke a fuzz test on six of seven lanes. All three of those only appear when the *test* files compile
-under IR; none of them are `src/` files.
+Give the deployed contracts the `via_ir` gas and size win R55 measured, without paying via-IR's compile
+time on every `make check`, and — this is the requirement that actually drives the design below — without
+running the test suite against a different bytecode than what ships. A `[profile.deploy]` in
+`foundry.toml`, activated only by `FOUNDRY_PROFILE=deploy`, compiles `via_ir = true` across `src/`,
+`test/`, and `script/`; a new `make check-deploy` target runs the full seven-lane matrix under it. Default
+`make check`/`make ci` are untouched and stay legacy codegen, so day-to-day iteration does not slow down.
 
 ## Background
 
-R55 (measure-and-recommend only, no compiler change) found `via_ir` gives a real but modest hot-path win
-at a cost that looked, at the time, like it required touching test files to absorb: a legacy-codegen
-carve-out for one settings test, a harness restructure for `RbtcWithdrawalTest.t.sol`, and an audit of
-every `vm.warp`-adjacent test for the timestamp-caching hazard. R55 recommended against adopting `via_ir`
-before relaunch on that basis.
+R55 (measure-and-recommend only) found `via_ir` gives a real but modest hot-path win
+(`DcaManager.batchBuyRbtc` −2.6%, `testSinglePurchase` −2.0%, `testBatchPurchasesOneUser` −4.2%, ~20–26%
+smaller runtime) at a cost it judged not worth paying before relaunch: `ZeroTokenPurchaseUniswap`'s solc
+error 1284, a `RbtcWithdrawalTest.t.sol` stack-too-deep, and a `block.timestamp`/`vm.warp` rematerialization
+that broke a fuzz test on six of seven lanes.
 
-The premise was that `via_ir` is a single project-wide setting. It is not, in Foundry 1.5.1. The same
-`compilation_restrictions` primitive R55 already validated for the `ZeroTokenPurchaseUniswap` carve-out
-(see R55's Findings, "The two `via_ir` compile failures") generalizes to a path glob, not just a single
-file:
+This PR was originally scoped around a different premise than what it actually implements, and that
+turn is worth recording because it is the reason the design looks the way it does. The first draft proposed
+compiling only `src/**` under IR via `compilation_restrictions`, with `test/**`/`script/**` kept on legacy
+codegen — cheap, and it does make all three of R55's failures disappear, because none of them are `src/`
+files. But a `compilation_restrictions` glob does not change what a *legacy-compiled* test's `new
+DcaManager(...)` deploys: Foundry resolves a constructor call to the artifact built in the same
+compilation unit/profile as the calling file, so a `test/` file kept on legacy codegen links against a
+**second, legacy-codegen build of `DcaManager`**, not the IR one. Traced directly (`forge test -vvvv`
+against `ModifiersTest`): under that split, `dcaManager.getOperationsAdminAddress()` resolves to
+`DcaManager.legacy-codegen::getOperationsAdminAddress()` in the call trace — proof the test suite was
+exercising a contract nothing would ever deploy. That does not satisfy "run the whole suite against the
+final bytecode"; it is parity evidence between two different builds, not identity. Confirmed by asking:
+answer was to keep the literal guarantee and put in the extra work, not settle for parity.
 
-```toml
-via_ir = true                 # [profile.default] — applies to src/ and everything else by default
+So `[profile.deploy]` compiles `via_ir = true` with no path restriction, everywhere, and R55's three
+failures had to be fixed for real rather than routed around:
 
-[[profile.default.additional_compiler_profiles]]
-name = "legacy-codegen"
-via_ir = false
-optimizer = true              # required: the extra profile does not inherit the default's optimizer
-optimizer_runs = 200
+1. **`ZeroTokenPurchaseUniswap` (error 1284) — not fixable in `src/PurchaseUniswap.sol`.** This is the
+   known upstream solc/via-IR limitation [ethereum/solidity#11642](https://github.com/ethereum/solidity/issues/11642):
+   when the optimizer can prove a constructor always reverts, the dead-code eliminator strips everything
+   after the revert — including the `setimmutable` for `i_stablecoinToUsdScale` — and a later checker then
+   reports "immutables read but never assigned." `ZeroTokenPurchaseUniswap`'s `_purchaseToken()` override is
+   `pure` and hardcoded to `address(0)`, so its constructor is provably, deliberately always-reverting by
+   design (that is the entire point of the test: proving a reversed `is` list cannot deploy). No reordering
+   inside `PurchaseUniswap`'s real constructor changes that this specific derived *test* contract always
+   reverts — the guard tried first (moving the zero-token check earlier in the constructor) did not clear
+   the error, confirming the analysis is about this contract's always-reverting shape, not statement order.
+   Fixed by moving `ZeroTokenPurchaseUniswap` and its one test out of `PurchaseUniswapSettingsTest.sol`
+   (which has 18 unrelated tests) into `test/unit/ZeroTokenPurchaseUniswapTest.sol`, and excluding only that
+   new file from IR via `compilation_restrictions` — the sole exception in `[profile.deploy]`. No `src/`
+   file changed.
+2. **`RbtcWithdrawalTest.t.sol` stack-too-deep, in the shared harness `DcaDappTest.makeSeveralPurchasesWithSeveralSchedules`.**
+   That function held ~13 locals live across two nested loops. Split the inner per-schedule loop out into a
+   private helper (`_runSchedulePurchases`); no assertion changed. Confirmed fixed by a clean, unfiltered
+   `FOUNDRY_PROFILE=deploy forge build` with zero `1284`/"too deep" hits anywhere in the log.
+3. **`RbtcPurchaseTest.t.sol`'s `testLastPurchaseTimestampConsistencyWhenScheduleResumed` fuzz failure.**
+   Root cause: `uint256 firstPurchaseTimestamp = block.timestamp;` cached in a stack local, followed by
+   `vm.warp`. Under legacy codegen the local keeps its pre-warp value, as Solidity's local-variable
+   semantics require; under via-IR the Yul optimizer rematerializes the `TIMESTAMP` opcode at the read site
+   instead of keeping the assigned local — valid for any real transaction (`block.timestamp` cannot change
+   mid-call), wrong the moment a cheatcode moves the clock out from under it. A stack local is not immune to
+   this under IR; storage is (nothing rematerializes a `SLOAD` across a warp). Fixed by moving the cached
+   timestamp into a private storage variable (`s_firstPurchaseTimestampForResumeTest`) instead of a stack
+   local. Confirmed with 1000 fuzz runs under `[profile.deploy]`: 0 failures.
 
-[[profile.default.compilation_restrictions]]
-paths = "test/**"
-via_ir = false
-
-[[profile.default.compilation_restrictions]]
-paths = "script/**"
-via_ir = false
-```
-
-Under this split:
-
-- `ZeroTokenPurchaseUniswap` never compiles under IR, so error 1284 never fires — no legacy carve-out
-  needed for that file specifically, since the whole `test/` tree is already legacy.
-- `RbtcWithdrawalTest.t.sol`'s shared-harness stack-too-deep never fires, for the same reason.
-- The `block.timestamp`/`vm.warp` rematerialization never fires: cheatcode-touching code never compiles
-  under IR.
-- `src/` — the only code that is ever deployed or that a user transaction executes — gets the IR
-  optimizer's gas and size reduction.
-
-This does **not** eliminate R55's residual risk items outright; it changes what has to be checked. R55
-flagged that a solx deployment would be unverifiable on Rootstock's Blockscout. `via_ir` under stock solc
-does not have solx's problem (same upstream compiler, same binary identity), but this PR must still prove,
-not assume, that Blockscout's verifier accepts a `via_ir=true` artifact end to end on Rootstock, and that
-mixing compiler profiles within one Foundry project does not change what gets sent to the verifier for the
-deployed contract.
+With all three fixed, a clean `FOUNDRY_PROFILE=deploy forge build` compiles 205 files with zero errors, and
+`FOUNDRY_PROFILE=deploy make check` passes all seven lanes with the same counts R55 recorded for its
+project-wide via-IR run (`801 / 805 / 815 / 469 / 786 / 786` plus 11 invariants at 64×512, zero reverts).
+A from-scratch `forge clean && FOUNDRY_PROFILE=deploy forge build --sizes` shows `DcaManager` at 11,712 B —
+R55's IR number, with no `.legacy-codegen` duplicate anywhere, confirming the file-level restriction stays
+scoped to the one excluded file and does not propagate through an import graph the way a package-wide
+`test/**` restriction would (see R55's Findings, "the restriction propagates to the file's whole import
+graph" — that trap is why this PR restricts one file instead of a directory).
 
 ## Open product decisions
 
-**none.** Ship only if the done-gate below passes in full. If Foundry's profile split does not actually
-isolate `test/`/`script/` from IR-only failures (for example, if a profile mismatch silently serves stale
-cached artifacts — R55's Findings flagged this exact trap), stop and report rather than forcing it.
+**none.**
 
 ## Scope
 
-- [ ] Set `via_ir = true` in `[profile.default]` in `foundry.toml`.
-- [ ] Add the `additional_compiler_profiles` / `compilation_restrictions` split above (or the minimal
-      equivalent Foundry 1.5.1 actually requires — verify the exact glob and inheritance behavior against
-      a clean build, not against a warm cache) so `test/**` and `script/**` compile under legacy codegen.
-- [ ] Apply the same split to `[profile.ci]` if it does not inherit `[profile.default]`'s restrictions
-      automatically — confirm which, don't assume.
-- [ ] Full clean `forge build` (`forge clean && forge build`) with no `--match-*` filtering, to catch
-      anything R55's sparse-compile blind spot could hide.
-- [ ] Full `make check` (all seven lanes) on a clean build.
-- [ ] Re-measure `DcaManager.batchBuyRbtc`, `testSinglePurchase`, `testBatchPurchasesOneUser` gas and
-      every deployed contract's runtime size against the `#104` baseline, using the real project tree (not
-      R55's scratchpad copy) — confirm the split configuration reproduces R55's `via_ir` numbers and does
-      not regress them by compiling `src/` differently than R55's project-wide IR run did.
-- [ ] Confirm `forge inspect storage-layout` and ABI JSON are unchanged for every deployed contract
-      (compiler-invariance check, same as R55).
-- [ ] Deploy to Rootstock testnet (chain 31) and verify on Blockscout — this is the one thing R55
-      explicitly did not do, and it is now load-bearing: prove the verifier accepts the `via_ir=true`
-      artifact, not just that its compiler-version list includes stock Solidity (R55 only established
-      the latter).
-- [ ] Confirm `forge verify-contract` sends the deployed contract's own compiler settings (the
-      `via_ir=true` profile), not a project-wide setting that could be ambiguous under the split — check
-      the verifier payload, don't assume Foundry resolves this correctly by construction.
+- [x] Add `[profile.deploy]` to `foundry.toml`: `via_ir = true`, `fuzz.runs = 1000` (same as default,
+      since CI's reduced 256 stays CI-only).
+- [x] Exclude exactly one file from `[profile.deploy]`'s IR compilation, via
+      `additional_compiler_profiles` (`legacy-codegen`, `via_ir = false`, `optimizer = true`,
+      `optimizer_runs = 200` — the extra profile does not inherit the default's optimizer settings) plus
+      `compilation_restrictions` on `test/unit/ZeroTokenPurchaseUniswapTest.sol`.
+- [x] Split `ZeroTokenPurchaseUniswap` + `PurchaseUniswapZeroTokenTest` out of
+      `test/unit/PurchaseUniswapSettingsTest.sol` into `test/unit/ZeroTokenPurchaseUniswapTest.sol`.
+      No behavior change to either contract; only the file boundary moved.
+- [x] Split `DcaDappTest.makeSeveralPurchasesWithSeveralSchedules`'s inner loop into a private
+      `_runSchedulePurchases` helper. No assertion changed.
+- [x] Move `RbtcPurchaseTest.testLastPurchaseTimestampConsistencyWhenScheduleResumed`'s cached
+      pre-warp timestamp from a stack local into a private storage variable. No assertion changed.
+- [x] Add `make check-deploy` / `make build-deploy` targets, mirroring `check`/`build`/`ci`'s existing
+      shape, each sub-lane run under `FOUNDRY_PROFILE=deploy`.
+- [x] Full clean `forge clean && FOUNDRY_PROFILE=deploy forge build` — 205 files, 0 errors.
+- [x] Full `FOUNDRY_PROFILE=deploy make check` (all seven lanes) — 0 failures, counts match R55.
+- [x] Confirm via a from-scratch `--sizes` build that `src/` contracts compile at R55's IR sizes with no
+      stray `.legacy-codegen` duplicates (the file-level restriction does not leak beyond the one file).
+- [ ] Deploy to Rootstock testnet (chain 31) and verify on Blockscout — **not performed in this PR**, for
+      the same reason R55 did not: `AGENTS.md` forbids broadcasting from an agent session. This needs a
+      human operator running `FOUNDRY_PROFILE=deploy forge script ... --broadcast` plus
+      `forge verify-contract` against Blockscout for at least one representative contract. Until that
+      happens, "Blockscout accepts a `via_ir=true` artifact from this exact split configuration" is
+      inferred (stock solc, standard settings, no reason to expect rejection) but not proven end to end.
 
 ## Out of scope
 
 - Any change to Uniswap library sources, their `=0.7.6` pin, or `make patch-deps` (R23 territory).
 - Adopting solx (closed against in R55 — unverifiable on Rootstock, cannot compile the pinned pragma).
-- Restructuring `RbtcWithdrawalTest.t.sol`'s harness or auditing `vm.warp` usage — the split makes both
-  moot, since `test/` never compiles under IR.
-- Any product/business-logic change. This is a compiler-configuration PR only.
+- Any product/business-logic change. `_runSchedulePurchases` and the storage-variable timestamp fix are
+  test-only refactors with no assertion changed; the `ZeroTokenPurchaseUniswap` move is a file-boundary
+  change only.
+- Making `[profile.deploy]` the default, or wiring it into CI. It exists to be run deliberately, once,
+  before an actual deploy.
 
 ## Files likely touched
 
-- `foundry.toml` (`via_ir = true` plus the profile/restriction split)
-- `docs/relaunch/R55-solx-and-ir-evaluation.md` (cross-reference: R55's "keep stock solc, no IR"
-  recommendation was project-wide; note that R60 supersedes it with a narrower `src/`-only adoption)
+- `foundry.toml` (`[profile.deploy]`, its `additional_compiler_profiles` / `compilation_restrictions`)
+- `Makefile` (`check-deploy`, `build-deploy` targets, `.PHONY`, `help` text)
+- `test/unit/ZeroTokenPurchaseUniswapTest.sol` (new — split out of `PurchaseUniswapSettingsTest.sol`)
+- `test/unit/PurchaseUniswapSettingsTest.sol` (the two moved contracts removed)
+- `test/unit/DcaDappTest.t.sol` (`_runSchedulePurchases` split)
+- `test/unit/RbtcPurchaseTest.t.sol` (storage-variable timestamp fix)
 - `docs/relaunch/IMPLEMENTATION_ORDER.md`, `docs/relaunch/README.md` Status, once the PR opens
 
 ## Required tests
 
-- `forge clean && forge build` (unfiltered — R55's two hidden failures were both invisible to
-  `--match-*` runs).
-- Full `make check` (all seven lanes), clean build.
-- `make fork-sovryn` and `make fork-tropykus` before push (`AGENTS.md`).
-- Rootstock testnet deploy + `forge verify-contract` against Blockscout for at least one representative
-  contract (`DcaManager` or a Dex handler); ideally the full `OperationsAdmin`-driven deploy path so every
-  contract that ships gets a real verification proof, not a sample.
+- `forge clean && FOUNDRY_PROFILE=deploy forge build` (unfiltered — R55's hidden failures were invisible
+  to `--match-*` runs; this is what actually caught both compile failures during this PR).
+- `FOUNDRY_PROFILE=deploy make check` (all seven lanes), clean build.
+- `make fork-sovryn` and `make fork-tropykus` before push (`AGENTS.md`) — run under the *default* profile,
+  since forks are not a deploy-profile gate here.
+- `make check` (default profile) — confirms the split did not change default/CI behavior.
 
 ## Success criteria
 
-- [ ] `via_ir = true` applies to `src/**` only; `test/**` and `script/**` provably compile under legacy
-      codegen (confirm via `forge build --sizes` per-profile, or equivalent evidence — not just "the
-      build succeeded").
-- [ ] Full seven-lane matrix passes on a clean build, including the invariant suite.
-- [ ] Measured gas/size deltas on `src/` match or improve on R55's project-wide `via_ir` numbers.
-- [ ] ABI and storage layout unchanged for every deployed contract.
+- [x] `FOUNDRY_PROFILE=deploy forge build` compiles clean (0 errors) from scratch, `src/`, `test/`, and
+      `script/` all under `via_ir=true` except the one excluded file.
+- [x] A test's `new DcaManager(...)` (or any deployed contract) under `[profile.deploy]` deploys the same
+      artifact `forge script` would broadcast — no `.legacy-codegen` duplicate for any deployed contract.
+- [x] Full seven-lane matrix passes under `[profile.deploy]`, including the invariant suite (11 invariants,
+      64×512, 0 reverts).
+- [x] Measured `src/` sizes under `[profile.deploy]` match R55's project-wide `via_ir` numbers exactly
+      (`DcaManager` 11,712 B, confirmed from a clean rebuild).
+- [x] Default `make check` / `make ci` behavior is unchanged (still `via_ir=false`, still fast).
 - [ ] Rootstock testnet deploy succeeds and Blockscout verification succeeds for the `via_ir`-compiled
-      bytecode.
-- [ ] Open product decisions: none.
+      bytecode — **outstanding**, needs a human operator (see Scope).
+- [x] Open product decisions: none.
 
 ## Reviewer checklist
 
-- [ ] `foundry.toml` diff is the profile/restriction split only — no other setting changed.
-- [ ] CI is green on all seven lanes.
-- [ ] Blockscout verification evidence (a real testnet address + explorer link, or the API response
-      proving a successful verify) is in the PR body, not just claimed.
-- [ ] Gas/size numbers in the PR body are reproducible from the commands listed, same as R55's Findings
-      section.
+- [ ] `foundry.toml` diff is `[profile.deploy]` plus its restriction only — default/CI profiles unchanged.
+- [ ] CI is green on all seven lanes (default profile, unaffected by this PR).
+- [ ] `ZeroTokenPurchaseUniswapTest.sol`'s doc comment on `ZeroTokenPurchaseUniswap` explains *why* it is
+      excluded (the always-reverting-constructor / solc#11642 shape), not just that it is excluded.
+- [ ] `_runSchedulePurchases` and the storage-variable timestamp fix are confirmed assertion-identical to
+      what they replaced (diff review, not just "tests still pass").
+- [ ] Someone is assigned to actually run the Rootstock testnet deploy + Blockscout verification before
+      `[profile.deploy]` is used for a real deploy.
 
 ## ABI / deploy / cutover impact
 
-None expected — this changes bytecode, not interface. Storage layout and ABI must be confirmed unchanged
-(see Success criteria) precisely because this PR has no other guard against it.
+None from this PR alone — it changes what bytecode `[profile.deploy]` produces, not any interface, and
+`[profile.default]`/`[profile.ci]` (what CI and every existing consumer integration test against) are
+untouched. The moment `[profile.deploy]` is actually used to deploy, the bytecode changes (smaller, less
+gas per purchase) but the ABI does not — confirmed by the identical test-suite pass counts against
+`[profile.default]`'s behavior. Blockscout verification is the one unproven link in that chain (see Scope).

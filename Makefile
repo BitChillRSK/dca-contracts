@@ -21,7 +21,7 @@ PROBE_VERBOSITY ?= -vv
 PROBE_MATCH ?=
 
 # Targets
-.PHONY: all test moc dex help check ci build patch-deps slither moc-none moc-layerbank moc-tropykus moc-sovryn dex-tropykus dex-sovryn dex-layerbank invariants invariants-sovryn fork fork-tropykus fork-sovryn fork-layerbank fork-dex-path probe-sovryn-exit-fee probe-dex-quote-floor coverage
+.PHONY: all test moc dex help check ci check-deploy build build-deploy patch-deps slither moc-none moc-layerbank moc-tropykus moc-sovryn dex-tropykus dex-sovryn dex-layerbank invariants invariants-sovryn fork fork-tropykus fork-sovryn fork-layerbank fork-dex-path probe-sovryn-exit-fee probe-dex-quote-floor coverage
 
 all: help
 
@@ -57,6 +57,24 @@ ci:
 	FOUNDRY_PROFILE=ci STABLECOIN_TYPE=USDRIF $(MAKE) dex-layerbank
 	FOUNDRY_PROFILE=ci STABLECOIN_TYPE=USDT0 $(MAKE) dex-layerbank
 	FOUNDRY_PROFILE=ci $(MAKE) invariants-sovryn
+
+# R60: what actually gets deployed. [profile.deploy] compiles src/, test/ and script/ under via_ir
+# (foundry.toml), so every lane here runs the full suite against the same optimized IR bytecode
+# `forge script` would broadcast — a test's `new DcaManager(...)` deploys the identical artifact.
+# Not part of `check` or `ci`: via-IR compiles slowly, so this only runs before an actual deploy.
+# Never deploy without this passing green on the commit being deployed.
+check-deploy: build-deploy
+	FOUNDRY_PROFILE=deploy $(MAKE) moc-none
+	FOUNDRY_PROFILE=deploy $(MAKE) moc-layerbank
+	FOUNDRY_PROFILE=deploy $(MAKE) moc-sovryn
+	FOUNDRY_PROFILE=deploy STABLECOIN_TYPE=USDRIF $(MAKE) dex-sovryn
+	FOUNDRY_PROFILE=deploy STABLECOIN_TYPE=USDRIF $(MAKE) dex-layerbank
+	FOUNDRY_PROFILE=deploy STABLECOIN_TYPE=USDT0 $(MAKE) dex-layerbank
+	FOUNDRY_PROFILE=deploy $(MAKE) invariants-sovryn
+
+build-deploy: patch-deps
+	FOUNDRY_PROFILE=deploy forge --version
+	FOUNDRY_PROFILE=deploy forge build
 
 build: patch-deps
 	forge --version
@@ -198,6 +216,7 @@ help:
 	@echo "Available targets:"
 	@echo "  make check                     # Build + moc-none + moc-layerbank + moc-sovryn + dex-sovryn + dex-layerbank + invariants-sovryn"
 	@echo "  make ci                        # Build + required CI lanes (including dex-layerbank USDRIF and USDT0)"
+	@echo "  make check-deploy              # Same lanes as check, compiled via_ir=true (R60) — slow; run before deploying"
 	@echo "  make patch-deps                # Apply vendored Uniswap pragma compatibility patch"
 	@echo "  make slither                   # Run slither (must be installed)"
 	@echo "  make test SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=DOC"
