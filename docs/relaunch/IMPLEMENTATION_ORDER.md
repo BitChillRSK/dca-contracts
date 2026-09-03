@@ -119,6 +119,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R54 | 56 ([#110](https://github.com/BitChillRSK/dca-contracts/pull/110)) | answered (amount; top-up ignores deposit pause; `topUpFromInterest`) |
 | R59 | 57 ([#112](https://github.com/BitChillRSK/dca-contracts/pull/112)) | none (fail closed on incomplete Uniswap input; gas and size ceilings are fixed) |
 | R55 | 58 ([#113](https://github.com/BitChillRSK/dca-contracts/pull/113)) | none (measured; recommendation is keep stock solc, no IR) |
+| R60 | 59 (planned) | none (`src/`-only `via_ir`; `test/`/`script/` stay legacy codegen) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -883,6 +884,25 @@ R51's `_creditBuyers` reasoning therefore stays closed.
 Residual risk of the recommendation, stated plainly: the protocol pays 2.6-6.8% more gas per purchase than the
 cheapest measured option, permanently, in exchange for bytecode anyone can reproduce with upstream solc and a
 toolchain proof that stays valid.
+
+**Reopened 2026-09-03 as [R60](./R60-src-only-via-ir.md).** R55's "keep stock solc, no IR" weighed `via_ir` as
+a single project-wide setting, and every cost it found - `ZeroTokenPurchaseUniswap`'s error 1284, the
+`RbtcWithdrawalTest.t.sol` stack-too-deep, the `block.timestamp`/`vm.warp` rematerialization - is a *test-file*
+failure, not a `src/` one. Foundry's `additional_compiler_profiles` / `compilation_restrictions` split (the same
+primitive R55 already used for the file-level `ZeroTokenPurchaseUniswap` carve-out) generalizes to a path glob:
+`via_ir = true` for `src/**`, legacy codegen for `test/**` and `script/**`. That keeps the -2.6% to -4.2% hot-path
+win and the ~20-26% runtime reduction while none of R55's three IR failures ever fire, since none of them are
+`src/` files. R60 does not reopen the solx question - that recommendation (unverifiable on Rootstock, cannot
+compile the pinned pragma) stands - and it must still supply the one thing R55 deliberately skipped: a real
+Rootstock testnet deploy and Blockscout verification of `via_ir=true` bytecode, since R55's verifier-config check
+only proved stock Solidity versions are listed, not that a `via_ir` artifact from this split configuration
+verifies end to end.
+
+### R60 - compile `src/` under `via_ir`, keep `test/`/`script/` on legacy codegen ([spec](./R60-src-only-via-ir.md), planned PR 59)
+
+Not started. See the spec's Scope and Success criteria: the profile/restriction split above, a clean unfiltered
+`forge build` and full seven-lane `make check`, re-measured gas/size against `#104`, ABI/storage-layout
+invariance, and a Rootstock testnet deploy + Blockscout verification of the `via_ir`-compiled bytecode.
 
 ## Closed non-implementation decisions
 
