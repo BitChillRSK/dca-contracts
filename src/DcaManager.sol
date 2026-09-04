@@ -14,8 +14,12 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
  * @title DcaManager
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice User and swapper entry point: create and manage dollar-cost-averaging schedules.
- * @dev Users talk only to this contract. An allowlisted swapper triggers purchases.
- *      Handlers hold the stablecoin and accumulated rBTC.
+ * @notice The maximum DCA frequency allowed is daily.
+ * @dev Holds the schedule ledger and no funds. `s_dcaSchedules` is written only in this contract, and
+ *      every external function that writes it takes `nonReentrant` as its first modifier, so the guard
+ *      is checkable by grep rather than by reading each function. The two `onlySwapper` purchase paths
+ *      are the deliberate exception: each is CEI-clean per handler, and only an allowlisted swapper
+ *      reaches them.
  */
 contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     using SafeCast for uint256;
@@ -110,7 +114,6 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         _validateDeposit(depositAmount);
         DcaSchedule storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
-        // Widths are checked before the handler pull so an overflowing credit cannot move tokens.
         uint128 newTokenBalance = (uint256(dcaSchedule.tokenBalance) + depositAmount.toUint128()).toUint128();
         _handlerForDeposit(token, dcaSchedule.routeIndex).depositToken(msg.sender, depositAmount);
         dcaSchedule.tokenBalance = newTokenBalance;
@@ -170,9 +173,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
 
     /**
      * @inheritdoc IDcaManager
-     * @dev Widths are checked before the deposit is pulled so overflow reverts with SafeCast
-     *      data before any token moves. The nonce is bumped through SafeCast so an exhausted
-     *      counter reverts before the deposit is pulled.
+     * @dev Widths and the bumped nonce are checked before the deposit is pulled, so an overflowing
+     *      argument or an exhausted counter reverts with SafeCast data before any token moves.
      */
     function createDcaSchedule(
         address token,
@@ -181,24 +183,21 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         uint256 purchasePeriod,
         uint256 routeIndex
     ) external override nonReentrant {
-        // Checked widths first: overflow reverts with SafeCast data before any token moves.
         uint128 deposit = depositAmount.toUint128();
         uint128 purchase = purchaseAmount.toUint128();
         uint32 period = purchasePeriod.toUint32();
         uint32 route = routeIndex.toUint32();
 
-        // One load of the packed scalars, and the id this schedule will carry. The nonce is bumped
-        // through SafeCast here so an exhausted counter reverts before the deposit is pulled.
+        // One load of the packed scalars, and the id this schedule will carry.
         ProtocolSettings memory settings = s_protocolSettings;
         uint64 scheduleId = (uint256(settings.scheduleNonce) + 1).toUint64();
 
         _validatePurchasePeriod(purchasePeriod);
         _validateDeposit(depositAmount);
         _handlerForDeposit(token, route).depositToken(msg.sender, depositAmount);
-        // The remaining two checks follow the pull by construction or by history: the minimum
-        // purchase amount is validated against the credited request (the handler reverts unless
-        // the pull matches), and the max-schedules bound has sat here since the count check was
-        // fixed. Both revert the whole call, so a failure returns the deposit with it.
+        // The remaining two checks sit after the pull: the minimum purchase amount, validated against
+        // the credited request that the handler guarantees equals the amount asked for, and the
+        // max-schedules bound below. Both revert the whole call, so a failure returns the deposit.
         _validatePurchaseAmount(token, purchaseAmount, depositAmount);
 
         DcaSchedule[] storage schedules = s_dcaSchedules[msg.sender][token];
@@ -234,19 +233,21 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     /**
      * @inheritdoc IDcaManager
      */
-    function deleteDcaSchedule(address token, uint256 scheduleIndex, uint64 scheduleId) external override 
-        validateScheduleIndex(msg.sender, token, scheduleIndex)
+    function deleteDcaSchedule(address token, uint256 scheduleIndex, uint64 scheduleId)
+        external
+        override
         nonReentrant
+        validateScheduleIndex(msg.sender, token, scheduleIndex)
     {
         DcaSchedule[] storage schedules = s_dcaSchedules[msg.sender][token];
-        
+
         DcaSchedule memory dcaSchedule = schedules[scheduleIndex];
         _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
 
         uint256 tokenBalance = dcaSchedule.tokenBalance;
         uint256 routeIndex = dcaSchedule.routeIndex;
 
-        // Remove the schedule by poping the last one and overwriting the one to delete with it
+        // Remove the schedule by popping the last one and overwriting the one to delete with it
         uint256 lastIndex = schedules.length - 1;
         if (scheduleIndex != lastIndex) {
             schedules[scheduleIndex] = schedules[lastIndex];
@@ -258,7 +259,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
             amountWithdrawn = _handler(token, routeIndex).withdrawToken(msg.sender, tokenBalance);
         }
 
-        // @notice the event reports what left the handler, which may be less than the schedule's tokenBalance
+        // The event reports what left the handler, which may be less than the schedule's tokenBalance.
         emit DcaManager__DcaScheduleDeleted(msg.sender, token, scheduleId, amountWithdrawn);
     }
 
@@ -370,21 +371,9 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
 
     /**
      * @inheritdoc IDcaManager
-     * @dev Moves no cash: the interest is already in the handler's lending position, so raising this
-     *      schedule's claim over it is a storage write. The only external call reads the accrued
-     *      figure, which on a lending market that accrues lazily also pokes that accrual, and never
-     *      redeems, mints, or transfers. That poke is why the schedule is read after the call and
-     *      not before: nothing this function cached can go stale across it.
-     * @dev It bounds the credit on the spendable figure rather than the `getInterestAccrued` quote,
-     *      so a lazily-accruing market cannot make a user wait for someone else's transaction to
-     *      credit the interest they have already earned. The quote only ever trails it, so a caller
-     *      passing the displayed number never exceeds this upper bound; the separate purchase-boundary
-     *      minimum can still reject that amount.
-     * @dev The credited figure comes from the same expression an interest withdrawal pays out, so
-     *      the route's summed principal lands on the position's value and never above it.
-     * @dev Resolved through `_handler`, not the deposit-only helper: a deposit pause stops users
-     *      adding new funds to a route, and interest already held there is not new funds. Crediting
-     *      it changes no balance the pause was protecting.
+     * @dev Moves no cash. The interest already sits in the handler's lending position, so raising this
+     *      schedule's claim over it is a storage write; the accrued-interest call only reads, and never
+     *      redeems, mints, or transfers. On a market that accrues lazily that read also pokes the accrual.
      */
     function topUpFromInterest(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 amount)
         external
@@ -499,7 +488,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         if (minPurchaseAmount == 0) {
             minPurchaseAmount = s_protocolSettings.defaultMinPurchaseAmount;
         }
-        
+
         if (purchaseAmount < minPurchaseAmount) {
             revert DcaManager__PurchaseAmountMustBeGreaterThanMinimum(token, minPurchaseAmount);
         }
@@ -581,7 +570,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         uint256 lastPurchaseTimestamp = dcaSchedule.lastPurchaseTimestamp;
         uint256 purchasePeriod = dcaSchedule.purchasePeriod;
 
-        // @notice: After the first purchase, the schedule is eligible once the UTC day of last + period has started
+        // After the first purchase, the schedule is eligible once the UTC day of last + period has started
         if (lastPurchaseTimestamp != 0) {
             uint256 currentDayStart = block.timestamp - (block.timestamp % 1 days);
             uint256 nextDueTimestamp = lastPurchaseTimestamp + purchasePeriod;
@@ -598,16 +587,18 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         dcaScheduleStorage.tokenBalance = dcaSchedule.tokenBalance;
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, dcaSchedule.tokenBalance);
 
-        // @notice: this way purchases are possible with the wanted periodicity even if
-        // - a previous purchase was delayed
-        // - the schedule run out of stablecoin and was resumed later with a new deposit
-        // Floor periodsElapsed at 1 so an early UTC-day buy still consumes a slot
+        // Anchor the next due date to the schedule's own cadence, so the wanted periodicity survives
+        // a delayed purchase or a schedule that was paused or ran out of stablecoin and was resumed with
+        // a new deposit. Floor periodsElapsed at 1 so that the purchase isn't blocked when a full period
+        // has elapsed in calendar days but not in seconds. This is fine since the purchase being eligible
+        // was already checked above.
         uint256 newTimestamp;
         if (lastPurchaseTimestamp == 0) {
             newTimestamp = block.timestamp;
         } else {
             uint256 periodsElapsed = (block.timestamp - lastPurchaseTimestamp) / purchasePeriod;
             if (periodsElapsed == 0) periodsElapsed = 1;
+            // The last purchase timestamp is anchored to the time of day of the first purchase to avoid drift
             newTimestamp = lastPurchaseTimestamp + periodsElapsed * purchasePeriod;
         }
         dcaScheduleStorage.lastPurchaseTimestamp = newTimestamp.toUint48();
@@ -617,8 +608,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     }
 
     /**
-     * @dev Withdraw principal from one schedule. Debits the requested amount, not what the
-     *      lending protocol paid. `type(uint256).max` means this schedule's whole `tokenBalance`.
+     * @dev Withdraw principal from one schedule. Debits the requested amount, not what the handler
+     *      paid out. `type(uint256).max` means this schedule's whole `tokenBalance`.
      * @return routeIndex The schedule's stored route, captured before the handler call.
      */
     function _withdrawToken(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 withdrawalAmount)
@@ -634,11 +625,11 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         if (withdrawalAmount > tokenBalance) {
             revert DcaManager__WithdrawalAmountExceedsBalance(token, withdrawalAmount, tokenBalance);
         }
-        // @notice subtract the requested withdrawal amount from the token balance, not the amount the lending protocol paid
+        // Subtract the requested withdrawal amount, not the amount the handler paid out
         uint256 newTokenBalance = tokenBalance - withdrawalAmount;
         routeIndex = dcaSchedule.routeIndex;
         dcaSchedule.tokenBalance = newTokenBalance.toUint128();
-        // @notice ignore `withdrawToken()`'s return value (amount actually paid back by the lending protocol)
+        // `withdrawToken()`'s return value (what the handler actually paid out) is deliberately unused
         _handler(token, routeIndex).withdrawToken(msg.sender, withdrawalAmount);
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
     }

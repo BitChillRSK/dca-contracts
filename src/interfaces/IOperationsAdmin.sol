@@ -29,9 +29,9 @@ interface IOperationsAdmin {
         bool depositsPaused;
     }
 
-    //////////////////////
-    // Events ////////////
-    //////////////////////
+    /*//////////////////////////////////////////////////////////////
+                                 EVENTS
+    //////////////////////////////////////////////////////////////*/
     /// @notice A handler was assigned to a `(token, routeIndex)` pair. Add-only.
     event OperationsAdmin__TokenHandlerAssigned(
         address indexed token, uint256 routeIndex, address indexed handler
@@ -45,9 +45,9 @@ interface IOperationsAdmin {
     /// @notice New deposits for this pair were paused or unpaused. Every emit is a real transition.
     event OperationsAdmin__DepositsPauseSet(address indexed token, uint256 routeIndex, bool paused);
 
-    //////////////////////
-    // Errors ////////////
-    //////////////////////
+    /*//////////////////////////////////////////////////////////////
+                                 ERRORS
+    //////////////////////////////////////////////////////////////*/
     /// @notice A handler must be a contract, not an EOA.
     error OperationsAdmin__EoaCannotBeHandler(address newHandler);
     /// @notice `handler` does not ERC-165 advertise `ITokenHandler`.
@@ -69,13 +69,15 @@ interface IOperationsAdmin {
     /// @notice `setDepositsPaused` must change the flag; a repeated write reverts.
     error OperationsAdmin__DepositsPauseUnchanged(address token, uint256 routeIndex, bool paused);
 
-    ///////////////////////////////
-    // External functions /////////
-    ///////////////////////////////
+    /*//////////////////////////////////////////////////////////////
+                           EXTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Register a route index as idle or lending. One-shot: the class is never changed or deleted.
-     * @param index The route index to register. Must fit `uint32` (the packed schedule field). Index 0 is pre-registered as idle by the constructor, which also emits `RouteRegistered(0, false)`.
+     * @param index The route index to register. Must fit `uint32`, the width the packed schedule
+     *        stores. Index 0 is pre-registered as idle by the constructor, which emits
+     *        `RouteRegistered(0, false)` like any other registration.
      * @param lends True to classify the route as lending; false to classify it as idle.
      */
     function registerRoute(uint256 index, bool lends) external;
@@ -102,11 +104,10 @@ interface IOperationsAdmin {
      * @dev Incident control only: `DcaManager` consults this before `createDcaSchedule` and
      *      `depositToken` move cash, and nowhere else. Purchases, schedule edits, deletion, and
      *      every withdrawal (stablecoin, rBTC, interest) ignore it, so a paused route can always
-     *      be exited. The pair must already have a handler — pausing deposits on a route nobody can
-     *      deposit into is a no-op that would only mislead an operator — and the flag must change,
-     *      so every emitted event is a real transition. There is no multi-pair form: closing a token
-     *      across several routes is one transaction per pair, and a pair already paused reverts, so a
-     *      sweep script must read `areDepositsPaused` first rather than firing blind.
+     *      be exited. The pair must already have a handler, and the flag must change, so every
+     *      emitted event is a real transition. There is no multi-pair form: closing a token across
+     *      several routes is one transaction per pair, and a pair already paused reverts, so a sweep
+     *      must read `areDepositsPaused` first rather than firing blind.
      */
     function setDepositsPaused(address token, uint256 routeIndex, bool paused) external;
 

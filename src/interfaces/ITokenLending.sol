@@ -83,10 +83,11 @@ interface ITokenLending is ITokenHandler {
      * @param stablecoinLockedInDcaSchedules Principal DcaManager still locks for this user on this
      *        handler's route.
      * @return Accrued interest in stablecoin units, or zero.
-     * @dev Not a view: the figure is taken at the market's current exchange rate, which on a market
-     *      that accrues lazily is a call that updates that rate. This is the figure a caller may
-     *      spend against, so it must not sit a poke behind what a withdrawal would pay. Reachable
-     *      only by DcaManager, so its mutability never reaches a generated client.
+     * @dev Deliberately not a `view`, and do not make it one: the figure is taken at the market's
+     *      current exchange rate, which on a market that accrues lazily is a call that updates that
+     *      rate. This is the figure a caller may spend against, so it must not sit a poke behind what
+     *      a withdrawal would pay. The non-view mutability costs consumers nothing because only
+     *      DcaManager can reach this function; `quoteAccruedInterest` is the `view` display read.
      */
     function getAccruedInterest(address user, uint256 stablecoinLockedInDcaSchedules) external returns (uint256);
 

@@ -39,7 +39,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     /// @return The constructor-supplied router.
     ISwapRouter02 public immutable i_swapRouter02;
     ICoinPairPrice internal s_mocOracle;
-    uint256 constant HUNDRED_PERCENT = 1 ether;
+    uint256 internal constant HUNDRED_PERCENT = 1 ether;
     /// @notice decimals of the MoC BTC/USD price. Hardcoded because the oracle exposes no `decimals()`.
     uint256 internal constant ORACLE_DECIMALS = 18;
     /// @notice `10 ** (ORACLE_DECIMALS - stablecoin decimals)`, which lifts a stablecoin amount into the oracle's USD units
@@ -51,17 +51,16 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     /// from a live quote per batch and can only tighten from here.
     uint128 internal s_amountOutMinimumPercent;
     /// @notice The lowest swap-time floor the owner may configure. Bounds the setter; never used at swap time.
-    /// @dev The two fractions are separate words because they answer separate questions: how much slippage
-    /// is normal-operation tolerable, and how far the owner may ever widen that. Collapsing them into one
-    /// number forces the live floor down to whatever governance should be allowed to reach in an emergency.
-    /// Both are 1e18-scaled like `HUNDRED_PERCENT`; `uint128` is ample and pairs them in one slot.
+    /// @dev Separate from the live floor because the two answer separate questions: how much slippage is
+    /// tolerable in normal operation, and how far the owner may ever widen that. One number for both would
+    /// force the live floor down to whatever governance must be able to reach in an emergency. Both are
+    /// 1e18-scaled like `HUNDRED_PERCENT`; `uint128` is ample and pairs them in one slot.
     uint128 internal s_amountOutMinimumSafetyCheck;
     bytes internal s_swapPath;
     /// @dev The intermediate tokens encoded inside `s_swapPath`, in hop order. Empty for a direct pair.
     /// Kept as its own array because the purchase must know which tokens a partial fill could strand in the
-    /// router, and decoding them back out of the packed path bytes at swap time is the expensive way to
-    /// learn what the setter already had. Written only by `_setPurchasePath`, so it cannot describe a path
-    /// that is not the active one.
+    /// router, and the setter already has them un-packed. Written only by `_setPurchasePath`, so it cannot
+    /// describe a path that is not the active one.
     address[] internal s_swapIntermediateTokens;
     /// @dev Exact encoded paths this handler may activate. Purchases read `s_swapPath` only.
     mapping(bytes32 pathHash => bool allowed) private s_purchasePathAllowed;
@@ -76,15 +75,12 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      *      6-decimal stablecoin is not read as an 18-decimal one. Tokens with more than 18 decimals are
      *      rejected rather than rounded down to a weaker floor. The quotient is WRBTC wei because
      *      `s_amountOutMinimumPercent` is 1e18-scaled (`HUNDRED_PERCENT`) and WRBTC is 18 decimals — the
-     *      same known-token assumption as hardcoding the oracle at `ORACLE_DECIMALS`.
-     * @dev Builds the initial path through `_purchaseToken()`. The concrete funding base
-     *      (TokenHandler via LendingErc20Handler / IdleErc20Handler) must initialize
-     *      `i_stableToken` before this constructor body runs — the leaf `is` order lists
-     *      the funding base before `PurchaseUniswap`. `_encodePurchasePath` reverts if that
-     *      token is still `address(0)`, so a reversed `is` list fails at deploy rather
-     *      than writing a path that cannot be bought or repaired. Constructor installation
-     *      encodes once, writes `s_swapPath`, and marks that hash allowed — the initial path
-     *      is approved by deployment. Later paths are owner-approved through `setPurchasePathAllowed`.
+     *      same known-token assumption as hardcoding the oracle at `ORACLE_DECIMALS`. The initial path is
+     *      built through `_purchaseToken()`, so the concrete funding base must initialize `i_stableToken`
+     *      before this body runs: the leaf `is` order lists the funding base before `PurchaseUniswap`, and
+     *      `_encodePurchasePath` reverts on a zero token, so a reversed list fails at deploy rather than
+     *      writing a path that can neither be bought nor repaired. Deployment approves that first path;
+     *      later ones are owner-approved through `setPurchasePathAllowed`.
      */
     constructor(
         UniswapSettings memory uniswapSettings,
@@ -100,9 +96,9 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         s_amountOutMinimumPercent = amountOutMinimumPercent.toUint128();
         s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint128();
 
-        // Direct initial owner is not the deployer, so the constructor cannot call the onlyOwner setters.
-        // Encode once, write the active path, and mark that hash allowed. A zero purchase token
-        // reverts here, before the `decimals()` call below reaches an empty address.
+        // The initial owner is not the deployer, so the constructor cannot call the onlyOwner setters
+        // and must install the first path itself. This must stay above the `decimals()` read below:
+        // encoding reverts on a zero purchase token, before that read reaches an empty address.
         address[] memory intermediateTokens = uniswapSettings.swapIntermediateTokens;
         uint24[] memory poolFeeRates = uniswapSettings.swapPoolFeeRates;
         bytes memory newPath = _encodePurchasePath(intermediateTokens, poolFeeRates);
@@ -293,20 +289,20 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     /**
-     * @dev Swap net stablecoin for WRBTC and return the handler's WRBTC-balance delta.
-     *      The router's return value is treated as success/failure only; the measured WRBTC
-     *      balance delta is the amount we can credit. `amountOutMinimum` is `max(amountOutLowerBound, minRbtcOut)`,
-     *      so the caller can only ever tighten the swap, never loosen it below the configured floor.
-     * @dev `exactInput` states the input the caller asked to spend, not the input the pools took. A V3 pool
-     *      stops swapping when it reaches its own price limit, so a drained or very thin pool can fill part
-     *      of the request and still clear an aggregate `amountOutMinimum`. Output-only accounting cannot see
-     *      that: the unspent remainder is either stablecoin still sitting on this handler after the schedules
-     *      and fees were already debited, or, when a later hop is the one that stops, an intermediate token
-     *      left in the public router, outside our custody. Both are measured here as balance deltas, in the
-     *      same spirit as the WRBTC credit, and either mismatch reverts the whole purchase — pools, router,
-     *      fees and schedule effects roll back together, which is the only recovery this route needs. The
-     *      router balances are compared against their own pre-swap values rather than zero, so tokens
-     *      anyone can send to a public contract cannot block our purchases.
+     * @dev Swap net stablecoin for WRBTC and return the handler's WRBTC-balance delta. The router's return
+     *      value is treated as success/failure only; the measured delta is the amount we can credit.
+     *      `amountOutMinimum` is `max(amountOutLowerBound, minRbtcOut)`, so a caller can tighten the swap
+     *      but never loosen it below the configured floor.
+     *
+     *      `exactInput` states the input the caller asked to spend, not the input the pools took: a V3 pool
+     *      stops at its own price limit, so a thin or drained pool can fill part of the request and still
+     *      clear an aggregate `amountOutMinimum`. Output-only accounting cannot see that. The unspent
+     *      remainder is either stablecoin left on this handler after schedules and fees were already
+     *      debited, or, when a later hop stops, an intermediate token stranded in the public router outside
+     *      our custody. Both are measured here as balance deltas and either mismatch reverts the whole
+     *      purchase, rolling pools, router, fees and schedule effects back together. Router balances are
+     *      compared against their own pre-swap values rather than zero, so tokens anyone can send to a
+     *      public contract cannot block purchases.
      */
     function _purchaseRbtc(uint256 stablecoinAmount, uint256 minRbtcOut)
         internal
@@ -356,9 +352,9 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     /**
-     * @dev One shared `balanceOf` call site. The purchase measures six balances, and letting the compiler
-     *      emit six copies of the same encode/staticcall/decode is the single largest piece of this route's
-     *      bytecode that buys nothing.
+     * @dev One shared `balanceOf` call site, so the purchase's balance reads do not each emit their own
+     *      copy of the same encode/staticcall/decode sequence. A purchase makes four of them plus two
+     *      per intermediate token, so the saving grows with the path.
      */
     function _balanceOf(address token, address account) private view returns (uint256) {
         return IERC20(token).balanceOf(account);
@@ -368,17 +364,17 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      * @param stablecoinAmountToSpend the amount of stablecoin to swap for rBTC
      * @return minimumRbtcAmount the minimum amount of rBTC that must be received
      * @dev `stablecoinAmountToSpend * i_stablecoinToUsdScale` is the USD notional in the oracle's decimals
-     * under the $1 peg assumption. Oracle decimals cancel in the division, leaving BTC as a 0.xxx integer;
-     * multiplying by `s_amountOutMinimumPercent` (1e18-scaled) both applies slippage and converts to wei.
-     * Those wei are WRBTC's units because WRBTC is 18 decimals.
-     * @dev The oracle `isValid` bit is checked at execution, not at signing: a transaction that sits in the
-     * mempool is priced by the oracle of the block that mines it. This floor is the only bound on a stale or
-     * sandwiched swap. `ExactInputParams` carries no deadline, and the one mechanism SwapRouter02 does offer
-     * — `IMulticallExtended.multicall(uint256 deadline, bytes[])` — cannot help here: a deadline this contract
-     * derives from `block.timestamp` while executing is satisfied by construction. Only a deadline supplied by
-     * the caller bounds anything, and that means a `batchBuyRbtc` argument, not a handler change.
-     * @dev This is a revert bound, not an accounting input: what the handler credits is the measured WRBTC
-     *      balance delta in `_purchaseRbtc`.
+     *      under the $1 peg assumption. Oracle decimals cancel in the division, leaving BTC as a 0.xxx
+     *      integer; multiplying by `s_amountOutMinimumPercent` (1e18-scaled) both applies slippage and
+     *      converts to wei, which are WRBTC's units because WRBTC is 18 decimals. This is a revert bound
+     *      and not an accounting input — what the handler credits is the measured WRBTC delta in
+     *      `_purchaseRbtc`. The oracle `isValid` bit is read at execution, not at signing, so a transaction
+     *      sitting in the mempool is priced by the oracle of the block that mines it, and this floor is
+     *      the only bound on a stale or sandwiched swap. There is deliberately no swap deadline to go with
+     *      it: SwapRouter02's `ExactInputParams` has no deadline field, and its `multicall(deadline, ...)`
+     *      overload only checks the value the caller passes, so a deadline this handler computed from
+     *      `block.timestamp` mid-execution would always pass. A binding deadline has to be chosen by the
+     *      swapper before signing, so adding one means a new `batchBuyRbtc` argument, not a change here.
      */
     function _getAmountOutLowerBound(uint256 stablecoinAmountToSpend) internal view returns (uint256 minimumRbtcAmount) {
         (uint256 currentPrice, bool isValid,) = s_mocOracle.getPriceInfo();

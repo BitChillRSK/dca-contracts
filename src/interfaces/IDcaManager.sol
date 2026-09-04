@@ -5,23 +5,24 @@ pragma solidity 0.8.36;
  * @title IDcaManager
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice User and swapper entry point: create and manage dollar-cost-averaging schedules.
- * @dev Users talk only to this contract. An allowlisted swapper triggers purchases.
- *      Handlers hold the stablecoin and accumulated rBTC; this contract never custody them.
+ * @dev Users talk only to this contract. An allowlisted swapper triggers purchases. Handlers custody
+ *      both the deposited stablecoin and the rBTC bought with it; this contract holds neither and keeps
+ *      only the schedule ledger. What backs a deposit differs by route: the stablecoin itself on an idle
+ *      route, the shares minted for it on a lending one.
  */
 interface IDcaManager {
-    ////////////////////////
-    // Type declarations ///
-    ////////////////////////
+    /*//////////////////////////////////////////////////////////////
+                           TYPE DECLARATIONS
+    //////////////////////////////////////////////////////////////*/
     /// @notice One user's recurring purchase of rBTC with one stablecoin on one OperationsAdmin route.
     /// @dev Two storage slots, ordered so the two fields a purchase writes (`tokenBalance` and
-    ///      `lastPurchaseTimestamp`) share slot 0 with `paused` (23 of 32 bytes). Without IR,
-    ///      those updates remain two `SSTORE`s; the second is a cheap dirty write because both
-    ///      target the same slot. Slot 1 holds `purchaseAmount` + `purchasePeriod` + `routeIndex`
+    ///      `lastPurchaseTimestamp`) share slot 0 with `paused` (23 of 32 bytes), keeping a purchase's
+    ///      updates on one slot. Slot 1 holds `purchaseAmount` + `purchasePeriod` + `routeIndex`
     ///      + `scheduleId`, filling all 32 bytes. `scheduleId` remains the final ABI field.
     struct DcaSchedule {
         uint128 tokenBalance; // Stablecoin amount deposited by the user
         uint48 lastPurchaseTimestamp; // Timestamp of the latest purchase
-        bool paused; // Owner-set: purchases are refused while true; every other path stays open
+        bool paused; // Set by the schedule's user: purchases are refused while true, every other path stays open
         uint128 purchaseAmount; // Stablecoin amount to spend periodically on rBTC
         uint32 purchasePeriod; // Time between purchases in seconds
         uint32 routeIndex; // OperationsAdmin route that holds this schedule's funds (idle or lending)
@@ -29,16 +30,19 @@ interface IDcaManager {
     }
 
     /// @notice One handler's purchase batch.
-    /// @dev Every row shares this batch's `token` and `routeIndex`, which resolve to one handler.
-    ///      The four arrays are positional and must have the same nonzero length.
-    ///      `batchBuyRbtc` takes one; `batchBuyRbtcAcrossHandlers` takes several.
-    /// @dev `minRbtcOut` is the caller's minimum for the batch as a whole, in rBTC/WRBTC wei (18
-    ///      decimals) whatever the stablecoin's decimals, and is compared against the rBTC the
-    ///      handler measures itself receiving. It can only tighten the handler's own governance
-    ///      floor, never loosen it, and `0` disables it. It is a liveness bound for an honestly
-    ///      operated swapper against a stale quote or adverse execution, not a second governance
-    ///      ceiling: a compromised swapper can pass `0` or `1` and remains bounded only by the
-    ///      handler's floor.
+    /// @dev Every row shares this batch's `token` and `routeIndex`, which resolve to one handler. The
+    ///      four arrays are positional and must have the same nonzero length. `batchBuyRbtc` takes one;
+    ///      `batchBuyRbtcAcrossHandlers` takes several. `minRbtcOut` is the caller's minimum for the
+    ///      batch as a whole, in rBTC/WRBTC wei (18 decimals) whatever the stablecoin's decimals, and is
+    ///      compared against the rBTC the handler measures itself receiving, so it binds on every
+    ///      purchase venue. What sits underneath it does not. A Uniswap route applies an oracle floor of
+    ///      its own and swaps at `max(minRbtcOut, that floor)`, so this value can only tighten it. A MoC
+    ///      route has no floor to compose with, because DOC is redeemed at Money on Chain's own price
+    ///      rather than swapped against a pool, leaving no slippage surface for a floor to guard. Either
+    ///      way this is a liveness bound an honest swapper sets against a stale quote or adverse
+    ///      execution, and never a governance limit **on** the swapper: the swapper picks the value, so
+    ///      `0` is always available to it. What still holds when it does is the oracle floor on a Uniswap
+    ///      route, and the redemption price itself on a MoC one.
     struct Batch {
         address[] buyers;
         address token;
@@ -51,12 +55,12 @@ interface IDcaManager {
 
     /**
      * @notice The protocol scalars every create reads, plus the id counter it writes.
-     * @dev One slot (30 of 32 bytes): `createDcaSchedule` loads all four together and stores the
-     *      bumped nonce back into the same word. Owner setters take `uint256` and SafeCast at the write.
-     * @dev `scheduleNonce` is a strictly increasing counter and is the schedule id itself. Ids must not
-     *      be derived from array state: swap-pop on delete can restore a previous array shape within a
-     *      block, which would let two live schedules share an id.
-     * @dev Internal storage shape, not an ABI type: the scalars are read through their own getters.
+     * @dev One slot (30 of 32 bytes): `createDcaSchedule` loads all four together and stores the bumped
+     *      nonce back into the same word. Owner setters take `uint256` and SafeCast at the write. This is
+     *      an internal storage shape rather than an ABI type — the scalars are read through their own
+     *      getters. `scheduleNonce` is a strictly increasing counter and is the schedule id itself: ids
+     *      must not be derived from array state, because swap-pop on delete can restore a previous array
+     *      shape within a block and let two live schedules share an id.
      */
     struct ProtocolSettings {
         uint32 minPurchasePeriod; // Minimum time between purchases
@@ -65,9 +69,9 @@ interface IDcaManager {
         uint64 scheduleNonce; // Last assigned schedule id; 0 before the first schedule is created
     }
 
-    //////////////////////
-    // Events ////////////
-    //////////////////////
+    /*//////////////////////////////////////////////////////////////
+                                 EVENTS
+    //////////////////////////////////////////////////////////////*/
     /// @notice A schedule's stablecoin principal changed after a deposit, withdrawal, or purchase debit.
     event DcaManager__TokenBalanceUpdated(address indexed token, uint64 indexed scheduleId, uint256 amount);
     /// @notice The caller replaced a schedule's periodic purchase amount.
@@ -100,7 +104,7 @@ interface IDcaManager {
         address indexed user, address indexed token, uint64 indexed scheduleId, uint256 interest
     );
     /// @notice A schedule was deleted. `refundedAmount` is what left the handler, which may be less than
-    ///         the schedule's `tokenBalance` if the lending protocol haircut the redemption.
+    ///         the schedule's `tokenBalance` if the handler paid out less than it was asked for.
     event DcaManager__DcaScheduleDeleted(
         address indexed user, address indexed token, uint64 indexed scheduleId, uint256 refundedAmount
     );
@@ -117,9 +121,9 @@ interface IDcaManager {
     /// @notice Owner set a per-token minimum purchase amount. Zero clears the override.
     event DcaManager__TokenMinPurchaseAmountSet(address indexed token, uint256 minPurchaseAmount);
 
-    //////////////////////
-    // Errors ////////////
-    //////////////////////
+    /*//////////////////////////////////////////////////////////////
+                                 ERRORS
+    //////////////////////////////////////////////////////////////*/
     /// @notice No handler is assigned for this token and route.
     error DcaManager__TokenNotAccepted(address token, uint256 routeIndex);
     /// @notice Deposit amount must be greater than zero.
@@ -199,8 +203,12 @@ interface IDcaManager {
      * @param scheduleId Id of that schedule, checked against storage.
      * @param withdrawalAmount Amount to withdraw. Pass `type(uint256).max` for this schedule's
      *        whole `tokenBalance`.
-     * @dev Principal is reduced by the requested amount, not by what the lending protocol paid.
-     *      A redemption fee consumes principal rather than leaving it behind.
+     * @dev Principal is reduced by the requested amount, not by what the handler paid out. On a lending
+     *      route the shares backing the request are burned whether or not the redemption pays out in
+     *      full, so a shortfall leaves no backing behind to re-credit against: restoring it would carry
+     *      principal this route can no longer redeem, and the next withdrawal would clamp or come up
+     *      short in turn. An idle route pays short only if the handler's own ledger disagrees with this
+     *      one, which is a condition to surface rather than to paper over.
      */
     function withdrawToken(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 withdrawalAmount) external;
 
@@ -231,7 +239,7 @@ interface IDcaManager {
      * @param scheduleIndex Index of the schedule in the caller's array for `token`.
      * @param scheduleId Id of that schedule, checked against storage.
      * @dev Swap-pops the array. The deleted event reports what left the handler, which may be less
-     *      than `tokenBalance` if the lending protocol haircut the redemption. Accumulated rBTC and
+     *      than `tokenBalance` if the handler paid out less than it was asked for. Accumulated rBTC and
      *      lending interest are not claimed here — withdraw those first.
      */
     function deleteDcaSchedule(address token, uint256 scheduleIndex, uint64 scheduleId) external;
@@ -332,22 +340,17 @@ interface IDcaManager {
      * @param scheduleId Id of that schedule, checked against storage.
      * @param amount Interest to credit, at most the spendable accrued-interest ceiling computed at
      *        the market's current rate. `getInterestAccrued` can quote less on a lazily-accruing market.
-     * @dev Interest accrues per user, token, and route rather than per schedule, so the caller
-     *      chooses which of their schedules on that route receives it, and may split it across
-     *      several by calling this more than once. Nothing is redeemed or transferred: the funds
-     *      already sit in the lending protocol, and this only raises the schedule's claim over
-     *      them, which is why it pays no redemption fee. The credit must be large enough to fund
-     *      at least one more purchase than the schedule could already afford, so interest cannot
-     *      be swept over in dust. The ceiling is the interest read at the market's current rate,
-     *      which can exceed the `getInterestAccrued` quote on a market that accrues lazily; passing
-     *      the quoted figure therefore never exceeds the ceiling, but it can still fail the minimum
-     *      purchase-boundary check above. A route with deposits paused still
-     *      accepts a top-up: that pause stops new funds entering the route, and this credits funds
-     *      already in it. Reverts
+     * @dev Interest accrues per user, token, and route rather than per schedule, so the caller chooses
+     *      which of their schedules on that route receives it, and may split it across several by calling
+     *      this more than once. Nothing is redeemed or transferred — the funds already sit in the lending
+     *      protocol and this only raises the schedule's claim over them. A route with deposits paused
+     *      still accepts a top-up, since that pause stops new funds entering the route and this credits
+     *      funds already in it. Reverts
      *      `DcaManager__TokenDoesNotYieldInterest` on an idle route,
      *      `DcaManager__NoInterestToTopUpWith` when nothing has accrued,
      *      `DcaManager__TopUpExceedsAccruedInterest` when `amount` is more than has accrued, and
-     *      `DcaManager__TopUpDoesNotFundAnotherPurchase` when the credit is too small.
+     *      `DcaManager__TopUpDoesNotFundAnotherPurchase` when the credit would not fund one more purchase
+     *      than the schedule could already afford, which is what stops interest being swept over in dust.
      */
     function topUpFromInterest(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 amount) external;
 
@@ -393,9 +396,9 @@ interface IDcaManager {
      */
     function setTokenMinPurchaseAmount(address token, uint256 minPurchaseAmount) external;
 
-    //////////////////////
-    // Getter functions //
-    //////////////////////
+    /*//////////////////////////////////////////////////////////////
+                            GETTER FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @notice One DCA schedule for a user and token.

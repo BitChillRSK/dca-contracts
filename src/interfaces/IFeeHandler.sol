@@ -7,9 +7,9 @@ pragma solidity 0.8.36;
  * @notice Linear purchase-fee settings and collector. Inherited by TokenHandler and PurchaseRbtc.
  */
 interface IFeeHandler {
-    ////////////////////////
-    // Type declarations ///
-    ////////////////////////
+    /*//////////////////////////////////////////////////////////////
+                           TYPE DECLARATIONS
+    //////////////////////////////////////////////////////////////*/
     /// @notice The four parameters that interpolate a purchase fee between `maxFeeRate` and `minFeeRate`.
     /// @dev Widths match FeeHandler storage: rates are capped at 5% (`MAX_FEE_RATE_CAP`) so they fit
     ///      uint16, and the bounds are purchase amounts, so they carry the schedule's uint128.
@@ -23,9 +23,9 @@ interface IFeeHandler {
         uint128 feePurchaseUpperBound; // the purchase amount above which min fee is applied
     }
 
-    //////////////////////
-    // Events ////////////
-    //////////////////////
+    /*//////////////////////////////////////////////////////////////
+                                 EVENTS
+    //////////////////////////////////////////////////////////////*/
     /// @notice Owner set the minimum fee rate.
     event FeeHandler__MinFeeRateSet(uint256 minFeeRate);
     /// @notice Owner set the maximum fee rate.
@@ -40,9 +40,9 @@ interface IFeeHandler {
     /// @dev One log per batch for the aggregated fee. A zero fee is not logged.
     event FeeHandler__FeeTransferred(address indexed token, address indexed collector, uint256 amount);
 
-    //////////////////////
-    // Custom errors /////
-    //////////////////////
+    /*//////////////////////////////////////////////////////////////
+                                 ERRORS
+    //////////////////////////////////////////////////////////////*/
 
     /// @notice `minFeeRate` cannot exceed `maxFeeRate`.
     error FeeHandler__MinFeeRateCannotBeHigherThanMax();
@@ -53,9 +53,9 @@ interface IFeeHandler {
     /// @notice A fee rate exceeds the 5% cap.
     error FeeHandler__MaxFeeRateExceedsCap();
 
-    ///////////////////////////////
-    // External functions /////////
-    ///////////////////////////////
+    /*//////////////////////////////////////////////////////////////
+                           EXTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Set all four fee parameters atomically.
@@ -63,8 +63,8 @@ interface IFeeHandler {
      * @param maxFeeRate Highest fee rate. Must be ≥ `minFeeRate` and ≤ 5%.
      * @param feePurchaseLowerBound Purchase amount at or below which `maxFeeRate` applies.
      * @param feePurchaseUpperBound Purchase amount at or above which `minFeeRate` applies.
-     * @dev Writes each field that changed and emits only those events. Individual bound/rate
-     *      setters were removed; this is the only mutation path.
+     * @dev The only mutation path for these four values: there are no individual bound or rate
+     *      setters. Writes each field that changed and emits only those events.
      */
     function setFeeRateParams(uint256 minFeeRate, uint256 maxFeeRate, uint256 feePurchaseLowerBound, uint256 feePurchaseUpperBound)
         external;
@@ -79,7 +79,7 @@ interface IFeeHandler {
      * @notice Address that currently receives purchase fees.
      * @return The fee collector.
      */
-    function getFeeCollectorAddress() external returns (address);
+    function getFeeCollectorAddress() external view returns (address);
 
     /**
      * @notice The four fee settings used to interpolate a purchase fee.

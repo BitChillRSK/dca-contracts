@@ -25,9 +25,10 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
 
     /**
      * @inheritdoc IPurchaseRbtc
-     * @dev Spends the stablecoin actually received, never the gross amount asked of the lending
-     *      protocol. Planned net amounts are only allocation weights: both the rBTC credited and
-     *      the stablecoin reported as spent are shares of what actually moved.
+     * @dev Spends the stablecoin the retrieval actually delivered, never the gross amount it was asked
+     *      for: a lending handler can come back short when it redeems its shares, while the idle handler
+     *      reverts rather than under-deliver. Planned net amounts are only allocation weights: both the
+     *      rBTC credited and the stablecoin reported as spent are shares of what actually moved.
      */
     function batchBuyRbtc(
         address[] memory buyers,
@@ -40,18 +41,18 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
         uint256 totalStablecoinAmountToSpend;
         IERC20 purchaseToken;
 
-        // @dev `aggregatedFee` is scoped to this block deliberately: it is dead once the fee is paid, and
-        // releasing its stack slot before the credit loop is what leaves room to cache `buyers.length`.
+        // `aggregatedFee` is scoped to this block because it is dead once the fee is paid.
         {
             uint256 aggregatedFee;
             // Calculate net amounts
             (aggregatedFee, netStablecoinAmountsToSpend, totalNetStablecoinPlanned) =
                 _calculateFeeAndNetAmounts(purchaseAmounts);
 
-            // Retrieve the stablecoin to spend
-            // @notice we spend the stablecoin we actually received, never the gross amount we asked the lending protocol for
+            // Retrieve the stablecoin to spend: the net amount destined for rBTC plus the fee BitChill
+            // charges. What comes back is what the retrieval delivered, which a lending handler can leave
+            // short of the request.
             totalStablecoinAmountToSpend =
-                _batchRetrieveStablecoin(buyers, purchaseAmounts, totalNetStablecoinPlanned + aggregatedFee); // totalNetStablecoinPlanned (to spend on rBTC) + aggregatedFee (charged by BitChill)
+                _batchRetrieveStablecoin(buyers, purchaseAmounts, totalNetStablecoinPlanned + aggregatedFee);
             if (totalStablecoinAmountToSpend <= aggregatedFee) {
                 revert PurchaseRbtc__StablecoinRetrievedBelowFee(totalStablecoinAmountToSpend, aggregatedFee);
             }
@@ -63,20 +64,18 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
 
         uint256 totalPurchasedRbtc = _purchaseRbtc(totalStablecoinAmountToSpend, minRbtcOut);
         if (totalPurchasedRbtc == 0) revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(purchaseToken));
-        // @notice the caller's bound is checked against the rBTC we measured ourselves receiving, so it holds
-        // on every purchase venue and never trusts an integrator return value. Equality passes. The venue may
-        // already have reverted on its own floor; the two bounds are independent and the stricter one wins.
+        // Checked against the rBTC we measured ourselves receiving, so the bound holds on every purchase
+        // venue and never trusts an integrator return value. Equality passes. Where the venue applies a
+        // floor of its own, it is enforced there and the stricter of the two decides.
         if (totalPurchasedRbtc < minRbtcOut) {
             revert PurchaseRbtc__BelowSwapperMinimum(totalPurchasedRbtc, minRbtcOut);
         }
 
         uint256 numOfPurchases = buyers.length;
         for (uint256 i; i < numOfPurchases; ++i) {
-            // @notice the planned net amounts are only allocation weights: they sum to totalNetStablecoinPlanned,
-            // so the shares below sum to exactly 1 even if the redemption paid less than expected. Both the rBTC credited
-            // and the stablecoin reported as spent are shares of what actually moved.
-            // @notice each of these is read twice below. A memory-array read costs a bounds check plus the
-            // load every time, so holding them in locals is worth ~74 gas per row on this protocol-paid path.
+            // The planned net amounts are only allocation weights: they sum to totalNetStablecoinPlanned,
+            // so the shares below sum to exactly 1 even if the redemption paid less than expected. Both the
+            // rBTC credited and the stablecoin reported as spent are shares of what actually moved.
             uint256 plannedNet = netStablecoinAmountsToSpend[i];
             address buyer = buyers[i];
             uint256 usersPurchasedRbtc = totalPurchasedRbtc * plannedNet / totalNetStablecoinPlanned;
