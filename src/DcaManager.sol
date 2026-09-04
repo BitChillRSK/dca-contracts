@@ -14,6 +14,11 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
  * @title DcaManager
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice User and swapper entry point: create and manage dollar-cost-averaging schedules.
+ * @dev Holds the schedule ledger and no funds. `s_dcaSchedules` is written only in this contract, and
+ *      every external function that writes it takes `nonReentrant` as its first modifier, so the guard
+ *      is checkable by grep rather than by reading each function. The two `onlySwapper` purchase paths
+ *      are the deliberate exception: each is CEI-clean per handler, and only an allowlisted swapper
+ *      reaches them.
  */
 contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     using SafeCast for uint256;
