@@ -1,6 +1,6 @@
 # R62 — Add the missing `IdleErc20HandlerDex` leaf
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **assigned** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
@@ -21,10 +21,9 @@ leaves:
 | `LayerBankErc20Handler` | `LayerBankDocHandlerMoc` | `LayerBankErc20HandlerDex` |
 
 The gap is a product hole, not a technical one. MoC redemption only works for DOC, so the idle
-route is DOC-only today: USDRIF and USDT0 users are forced onto LayerBank lending, and DOC users
-who do not want lending exposure cannot use a DEX purchase path. `IdleErc20Handler` is already
-abstract and already implements `StablecoinSource` for an arbitrary ERC20 (`i_stableToken`), so the
-leaf is constructor-only, the same shape as `LayerBankErc20HandlerDex`.
+route is DOC-only today: USDRIF and USDT0 users are forced onto LayerBank lending. `IdleErc20Handler`
+is already abstract and already implements `StablecoinSource` for an arbitrary ERC20
+(`i_stableToken`), so the leaf is constructor-only, the same shape as `LayerBankErc20HandlerDex`.
 
 Inheritance order matters and is set by precedent: the funding base is listed first so
 `i_stableToken` is set before `PurchaseUniswap`'s constructor encodes the swap path from it
@@ -37,24 +36,26 @@ swapper's pre-flight already filters short buyers before this ships.
 
 ## Open product decisions
 
-- [ ] Which stablecoins get an idle+DEX route on mainnet at cutover (DOC, USDRIF, USDT0, or a
-      subset), and at which `routeIndex`. Route index 0 is pre-registered as idle and non-lending;
-      whether this leaf reuses index 0 or takes a new idle index is a registry decision, because
-      `OperationsAdmin` route assignment is add-only.
+**Answered 2026-09-04:**
+
+- All three stables are in product scope, but **DOC is never swapped on Uniswap**. DOC idle stays
+  `IdleDocHandlerMoc` at `(DOC, 0)`.
+- Idle+DEX cutover assignments: `(USDRIF, 0)` and `(USDT0, 0)` → `IdleErc20HandlerDex` (same
+  pre-registered idle index as MoC idle DOC).
 
 ## Scope
 
-- [ ] `src/idle/IdleErc20HandlerDex.sol`: `contract IdleErc20HandlerDex is IdleErc20Handler, PurchaseUniswap`,
+- [x] `src/idle/IdleErc20HandlerDex.sol`: `contract IdleErc20HandlerDex is IdleErc20Handler, PurchaseUniswap`,
       constructor only, NatSpec matching the three sibling `*Dex` leaves.
-- [ ] Deploy support in `script/DeployIdleHandler.s.sol` (or a `deployIdleHandlerDex` in
+- [x] Deploy support in `script/DeployIdleHandler.s.sol` (or a `deployIdleHandlerDex` in
       `DeployDexSwaps.s.sol`, whichever matches how the other Dex leaves are reached).
-- [ ] Unit + fork coverage for the new leaf on the same lanes the other Dex leaves use.
+- [x] Unit + fork coverage for the new leaf on the same lanes the other Dex leaves use.
 
 ## Out of scope
 
-- [ ] Any change to `IdleErc20Handler`, `PurchaseUniswap`, or the shared bases.
-- [ ] Retiring `IdleDocHandlerMoc`.
-- [ ] Mainnet route registration or broadcast.
+- [x] Any change to `IdleErc20Handler`, `PurchaseUniswap`, or the shared bases.
+- [x] Retiring `IdleDocHandlerMoc`.
+- [x] Mainnet route registration or broadcast.
 
 ## Files likely touched
 
@@ -67,15 +68,27 @@ swapper's pre-flight already filters short buyers before this ships.
 
 - `make check` (all lanes).
 - A `SWAP_TYPE=dex` lane exercising the idle route: deposit → batch purchase → withdraw rBTC.
+  Run it on **both** listed stables: `STABLECOIN_TYPE=USDRIF make dex-none` and
+  `STABLECOIN_TYPE=USDT0 make dex-none`. USDT0 is the 6-decimal case, so it is the lane that
+  exercises `i_stablecoinToUsdScale` and the USDT0 fee bounds on the new leaf, and the only one
+  that reaches the live deploy path where no LayerBank aToken exists.
 - Assert the short-buyer batch **reverts** rather than clamping, so R62 does not silently change
   the idle base's documented behavior when it reaches a Uniswap batch.
+- Live Uniswap fork coverage matching the other Dex leaves:
+  `SWAP_TYPE=dexSwaps STABLECOIN_TYPE=USDRIF make fork-none` (peer of
+  `SWAP_TYPE=dexSwaps STABLECOIN_TYPE=USDRIF make fork-layerbank`), plus
+  `make fork-dex-path` (now runs `DexPathFailoverTest` on LayerBank **and** idle).
 - `make fork-sovryn` and `make fork-tropykus` before push, per `AGENTS.md`.
 
 ## Success criteria
 
-- [ ] Every funding base has both leaves; the grid above has no empty cell.
-- [ ] The new leaf's runtime size is recorded, with its EIP-170 margin.
-- [ ] Constructor argument order and inheritance order match the sibling `*Dex` leaves.
+- [x] Every funding base has both leaves; the grid above has no empty cell.
+- [x] The new leaf's runtime size is recorded, with its EIP-170 margin.
+- [x] Constructor argument order and inheritance order match the sibling `*Dex` leaves.
+- [x] The live deploy assigns the idle leaf at `IDLE_INDEX` and selects it when
+      `LENDING_PROTOCOL=none`, on a network with **and** without a LayerBank aToken.
+
+**Size (this PR, `[profile.default]` optimizer 200 / no IR):** `IdleErc20HandlerDex` runtime **12,940 B**, EIP-170 margin **11,636 B**.
 
 ## Reviewer checklist
 
@@ -88,6 +101,7 @@ swapper's pre-flight already filters short buyers before this ships.
 ## ABI / deploy / cutover impact
 
 - ABI: a new contract artifact; no existing ABI changes.
-- Scripts: yes — a new deploy branch. Local-only until the product decision above is answered.
-- Cutover: the frontend gains a route class it has not seen (idle funding with a DEX purchase
-  venue). File a consumer issue once the route indices are decided.
+- Scripts: yes — `DeployDexSwaps` Protocol.NONE builds `IdleErc20HandlerDex`; live USDRIF/USDT0
+  deploys assign it at `IDLE_INDEX` alongside LayerBank at index 1. DOC stays MoC-only.
+- Cutover: frontend / bot / data-api gain idle funding with a DEX purchase venue for USDRIF and
+  USDT0 at route index 0 (same idle class as MoC DOC). Consumer issues filed with this PR.

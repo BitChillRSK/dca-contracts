@@ -218,15 +218,9 @@ contract DcaDappTest is Test {
             vm.skip(true);
             return;
         }
-        // Skip test if Dex Swaps + DOC combination (DcaDappTest dex lanes are USDRIF/USDT0)
+        // Skip DOC on Dex Swaps (DOC buys through MoC; idle+DEX is USDRIF/USDT0 only)
         if (isDexSwaps && !isDexStable) {
             console2.log("Skipping test: DOC is not supported by Dex Swaps");
-            vm.skip(true);
-            return;
-        }
-        // No idle dex in this relaunch
-        if (isDexSwaps && isNone) {
-            console2.log("Skipping test: dexSwaps has no idle handler");
             vm.skip(true);
             return;
         }
