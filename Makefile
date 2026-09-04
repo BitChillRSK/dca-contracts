@@ -44,6 +44,7 @@ check: build
 	$(MAKE) moc-layerbank
 	$(MAKE) moc-sovryn
 	STABLECOIN_TYPE=USDRIF $(MAKE) dex-none
+	STABLECOIN_TYPE=USDT0 $(MAKE) dex-none
 	STABLECOIN_TYPE=USDRIF $(MAKE) dex-sovryn
 	STABLECOIN_TYPE=USDRIF $(MAKE) dex-layerbank
 	STABLECOIN_TYPE=USDT0 $(MAKE) dex-layerbank
@@ -55,6 +56,7 @@ ci:
 	FOUNDRY_PROFILE=ci $(MAKE) moc-layerbank
 	FOUNDRY_PROFILE=ci $(MAKE) moc-sovryn
 	FOUNDRY_PROFILE=ci STABLECOIN_TYPE=USDRIF $(MAKE) dex-none
+	FOUNDRY_PROFILE=ci STABLECOIN_TYPE=USDT0 $(MAKE) dex-none
 	FOUNDRY_PROFILE=ci STABLECOIN_TYPE=USDRIF $(MAKE) dex-sovryn
 	FOUNDRY_PROFILE=ci STABLECOIN_TYPE=USDRIF $(MAKE) dex-layerbank
 	FOUNDRY_PROFILE=ci STABLECOIN_TYPE=USDT0 $(MAKE) dex-layerbank
@@ -70,6 +72,7 @@ check-deploy: build-deploy
 	FOUNDRY_PROFILE=deploy $(MAKE) moc-layerbank
 	FOUNDRY_PROFILE=deploy $(MAKE) moc-sovryn
 	FOUNDRY_PROFILE=deploy STABLECOIN_TYPE=USDRIF $(MAKE) dex-none
+	FOUNDRY_PROFILE=deploy STABLECOIN_TYPE=USDT0 $(MAKE) dex-none
 	FOUNDRY_PROFILE=deploy STABLECOIN_TYPE=USDRIF $(MAKE) dex-sovryn
 	FOUNDRY_PROFILE=deploy STABLECOIN_TYPE=USDRIF $(MAKE) dex-layerbank
 	FOUNDRY_PROFILE=deploy STABLECOIN_TYPE=USDT0 $(MAKE) dex-layerbank
@@ -173,7 +176,7 @@ fork-dex-path:
 		exit 1; \
 	fi; \
 	SWAP_TYPE=dexSwaps LENDING_PROTOCOL=layerbank EXPECTED_LENDING_PROTOCOL=layerbank STABLECOIN_TYPE=USDRIF \
-	$(FORK_TEST_CMD) --match-contract DexPathFailoverTest --fork-url $$RSK_MAINNET_RPC_URL; \
+	$(FORK_TEST_CMD) --match-contract DexPathFailoverTest --fork-url $$RSK_MAINNET_RPC_URL && \
 	SWAP_TYPE=dexSwaps LENDING_PROTOCOL=none EXPECTED_LENDING_PROTOCOL=none STABLECOIN_TYPE=USDRIF \
 	$(FORK_TEST_CMD) --match-contract DexPathFailoverTest --fork-url $$RSK_MAINNET_RPC_URL
 
@@ -237,7 +240,7 @@ coverage:
 help:
 	@echo "Available targets:"
 	@echo "  make check                     # Build + moc-* + dex-none/sovryn/layerbank + invariants-sovryn"
-	@echo "  make ci                        # Build + required CI lanes (including dex-none USDRIF and dex-layerbank USDRIF/USDT0)"
+	@echo "  make ci                        # Build + required CI lanes (dex-none and dex-layerbank each on USDRIF and USDT0)"
 	@echo "  make check-deploy              # Same lanes as check, compiled via_ir=true (R60) — slow; run before deploying"
 	@echo "  make patch-deps                # Apply vendored Uniswap pragma compatibility patch"
 	@echo "  make slither                   # Run slither (must be installed)"

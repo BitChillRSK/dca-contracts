@@ -189,6 +189,9 @@ contract DeployDexSwaps is DeployBase {
             }
         }
 
+        // Outside the LayerBank branch: the 6-decimal minimum is a property of the token, not of the
+        // route that happens to list it. Testnet USDT0 has no LayerBank aToken, so scoping this to
+        // that branch left the idle handler live with the 18-decimal default.
         if (isUSDT0) {
             dcaManager.setTokenMinPurchaseAmount(stablecoinAddress, USDT0_MIN_PURCHASE_AMOUNT);
             console.log("USDT0 min purchase amount set to", USDT0_MIN_PURCHASE_AMOUNT);

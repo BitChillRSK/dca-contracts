@@ -68,6 +68,10 @@ swapper's pre-flight already filters short buyers before this ships.
 
 - `make check` (all lanes).
 - A `SWAP_TYPE=dex` lane exercising the idle route: deposit → batch purchase → withdraw rBTC.
+  Run it on **both** listed stables: `STABLECOIN_TYPE=USDRIF make dex-none` and
+  `STABLECOIN_TYPE=USDT0 make dex-none`. USDT0 is the 6-decimal case, so it is the lane that
+  exercises `i_stablecoinToUsdScale` and the USDT0 fee bounds on the new leaf, and the only one
+  that reaches the live deploy path where no LayerBank aToken exists.
 - Assert the short-buyer batch **reverts** rather than clamping, so R62 does not silently change
   the idle base's documented behavior when it reaches a Uniswap batch.
 - Live Uniswap fork coverage matching the other Dex leaves:
@@ -81,6 +85,8 @@ swapper's pre-flight already filters short buyers before this ships.
 - [x] Every funding base has both leaves; the grid above has no empty cell.
 - [x] The new leaf's runtime size is recorded, with its EIP-170 margin.
 - [x] Constructor argument order and inheritance order match the sibling `*Dex` leaves.
+- [x] The live deploy assigns the idle leaf at `IDLE_INDEX` and selects it when
+      `LENDING_PROTOCOL=none`, on a network with **and** without a LayerBank aToken.
 
 **Size (this PR, `[profile.default]` optimizer 200 / no IR):** `IdleErc20HandlerDex` runtime **12,940 B**, EIP-170 margin **11,636 B**.
 

@@ -272,11 +272,9 @@ contract LiveDeployPathTest is Test {
             return;
         }
         bytes32 protocolHash = keccak256(abi.encodePacked(vm.envString("LENDING_PROTOCOL")));
-        // Idle has no Dex helper config on DOC; Tropykus live dex reverts first for a different reason.
-        if (
-            protocolHash == keccak256(abi.encodePacked(NONE_STRING))
-                || protocolHash == keccak256(abi.encodePacked(TROPYKUS_STRING))
-        ) {
+        // Tropykus live dex reverts first, for a different reason. Every other funding base —
+        // idle included, now that it has a Dex leaf — must reach the DOC guard.
+        if (protocolHash == keccak256(abi.encodePacked(TROPYKUS_STRING))) {
             vm.skip(true);
             return;
         }
