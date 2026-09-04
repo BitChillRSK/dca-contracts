@@ -352,8 +352,9 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     /**
-     * @dev One shared `balanceOf` call site, so the purchase's six balance reads do not each emit their own
-     *      copy of the same encode/staticcall/decode sequence.
+     * @dev One shared `balanceOf` call site, so the purchase's balance reads do not each emit their own
+     *      copy of the same encode/staticcall/decode sequence. A purchase makes four of them plus two
+     *      per intermediate token, so the saving grows with the path.
      */
     function _balanceOf(address token, address account) private view returns (uint256) {
         return IERC20(token).balanceOf(account);

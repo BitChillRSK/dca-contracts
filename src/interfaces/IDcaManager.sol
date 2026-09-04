@@ -205,11 +205,12 @@ interface IDcaManager {
      * @param scheduleId Id of that schedule, checked against storage.
      * @param withdrawalAmount Amount to withdraw. Pass `type(uint256).max` for this schedule's
      *        whole `tokenBalance`.
-     * @dev Principal is reduced by the requested amount, not by what the handler paid out. A lending
-     *      route can be paid short on redemption, and that difference is gone rather than left behind,
-     *      so re-crediting it would let the shortfall be withdrawn twice. An idle route pays short only
-     *      if the handler's own ledger disagrees with this one, which is a condition to surface rather
-     *      than to paper over.
+     * @dev Principal is reduced by the requested amount, not by what the handler paid out. On a lending
+     *      route the shares backing the request are burned whether or not the redemption pays out in
+     *      full, so a shortfall leaves no backing behind to re-credit against: restoring it would carry
+     *      principal this route can no longer redeem, and the next withdrawal would clamp or come up
+     *      short in turn. An idle route pays short only if the handler's own ledger disagrees with this
+     *      one, which is a condition to surface rather than to paper over.
      */
     function withdrawToken(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 withdrawalAmount) external;
 

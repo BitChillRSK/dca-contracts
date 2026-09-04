@@ -371,16 +371,15 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     /**
      * @inheritdoc IDcaManager
      * @dev Moves no cash. The interest already sits in the handler's lending position, so raising this
-     *      schedule's claim over it is a storage write; the one external call reads the accrued figure
-     *      and never redeems, mints, or transfers. On a market that accrues lazily that read also pokes
-     *      the accrual, which is why `tokenBalance` and `purchaseAmount` are read after it rather than
-     *      cached across it. The credit is bounded by the spendable figure rather than the
-     *      `getInterestAccrued` quote, so a user need not wait for someone else's transaction to credit
-     *      interest they have already earned; that bound comes from the expression an interest
-     *      withdrawal pays out, so the route's summed principal lands on the position's value and never
-     *      above it. Resolution goes through `_handler` rather than the deposit-only helper because a
-     *      deposit pause stops new funds entering a route, and interest already held there is not new
-     *      funds.
+     *      schedule's claim over it is a storage write; the accrued-interest call only reads, and never
+     *      redeems, mints, or transfers. On a market that accrues lazily that read also pokes the accrual,
+     *      which is why `tokenBalance` and `purchaseAmount` are read after it rather than cached across it.
+     *      The credit is bounded by the spendable figure rather than the `getInterestAccrued` quote, so a
+     *      user need not wait for someone else's transaction to credit interest they have already earned;
+     *      that bound comes from the expression an interest withdrawal pays out, so the route's summed
+     *      principal lands on the position's value and never above it. Resolution goes through `_handler`
+     *      rather than the deposit-only helper because a deposit pause stops new funds entering a route, and
+     *      interest already held there is not new funds.
      */
     function topUpFromInterest(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 amount)
         external
