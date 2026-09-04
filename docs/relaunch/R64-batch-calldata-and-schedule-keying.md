@@ -67,8 +67,10 @@ spec should not assume it is:
 
 ## Open product decisions
 
-- [x] Is the staleness guard worth its calldata? **Answered: keep it.** Measured at 412 gas per row
-      before the keying change and 452 after, not the ~240 estimated below.
+- [x] Is the staleness guard worth its calldata? **Answered: drop it.** Measured at 412 gas per row on
+      the old keying and ~450 on the new one, not the ~240 estimated below — and what it bought was
+      turning one user's edit into a failed tick for every other row in the batch. See
+      **Implementation**.
 - [x] Is a storage-layout change acceptable at all? **Answered: yes, implement it.** The measurement
       came first and the numbers were brought back before `src/` changed; the call was then made to
       take the flat key, on the ground that a deployment meant to run for years should carry the
@@ -270,13 +272,15 @@ for the handler call, the nested mapping's three `keccak256` per row against a f
 
 ## Decision
 
-**Gate 1 — keep the `purchaseAmounts` staleness guard.** 412 gas per row is 2.2% of a row, and what it
-buys is that a user editing a schedule between the swapper's snapshot and the tick produces a named
-revert instead of a purchase at an amount nobody quoted. The one argument against it that the numbers
-raise is not gas: with the guard, one stale row reverts the *whole* batch, so a single user's edit can
-cost the operator a tick. That is a liveness cost the bot already carries for `SchedulePaused`, and it
-is filterable the same way. Keep it, and the NatSpec now says what it is — that part ships in this PR
-regardless of anything else here.
+**Gate 1 — the recommendation was to keep the `purchaseAmounts` staleness guard; the decision was to
+drop it.** The recommendation weighed 412 gas per row against a named revert, and treated
+"one stale row reverts the whole batch" as a liveness cost the bot already carries for
+`SchedulePaused` and can filter the same way. What that under-weighted is that the array is data the
+contract does not need at all — it debits with its own stored value either way — and that the failure
+it prevents is a purchase at the amount the user themselves had just asked for. Dropping it is
+recorded as invariant 9 in `AGENTS.md` so it is not re-added by the next reader who notices the
+schedule could change mid-flight. The NatSpec correction that this PR shipped regardless is now moot
+in its original form and has been rewritten around what `Batch` actually carries.
 
 **Gate 2 — the flat key ships.** The recommendation from the measurement was to keep the nested
 design; the decision was to take the flat one, on the ground that the hot path is paid every day for
@@ -310,83 +314,98 @@ per-owner id list still swap-pops, which is exactly the hazard that invariant ex
 
 ## Implementation
 
-Shipped: the flat key, with the `purchaseAmounts` staleness guard kept. That is design C plus gate 1's
-answer, so it is not the C the measurement priced — the guard buys back 452 gas per row of C's saving,
-and the numbers below are of what actually shipped rather than of the prototype.
+The measurement PR priced two designs and recommended keeping the nested one. The decision went the
+other way, and a review of the first implementation then found a better design still, which is what
+shipped. Both steps are recorded here, because the second one is the more instructive.
 
-### Storage
+### What shipped
 
-`mapping(uint64 scheduleId => DcaSchedule)`, plus `mapping(address user => mapping(address token =>
-uint64[]))` for enumeration. `DcaSchedule` is three slots, ordered so that slot 0 still holds every
-field a purchase reads or writes and a purchase is still one `SSTORE`:
+`mapping(uint64 scheduleId => mapping(address user => StoredSchedule))`, a batch row of `(scheduleId,
+buyer)`, and no per-row amount.
+
+**The stored schedule is two slots**, because neither half of the key is repeated in it:
 
 | slot | fields | bytes used |
 |---|---|---|
 | 0 | `tokenBalance` u128 · `lastPurchaseTimestamp` u48 · `paused` · `purchasePeriod` u32 · `routeIndex` u32 | 31 of 32 |
-| 1 | `user` · `purchaseAmount` u96 | 32 of 32 |
-| 2 | `token` · `scheduleId` u64 | 28 of 32 |
+| 1 | `token` · `purchaseAmount` u96 | 32 of 32 |
 
-Two consequences are worth stating plainly. **`purchaseAmount` narrows from `uint128` to `uint96`**,
-capping one purchase at ~7.9e10 tokens at 18 decimals; `tokenBalance` keeps `uint128`. At `uint128` the
-amount no longer fits beside an address, which splits a purchase's two writes across two slots and
-gives back more than the narrower field ever saves. **`scheduleId` stays in the struct** even though it
-duplicates the key: it costs no extra slot, and without it `getDcaSchedules` would hand a caller
-schedules it could not then address.
+Slot 0 is every field a purchase reads or writes, so a purchase is still one `SSTORE`. Buying that
+costs `purchaseAmount` 32 bits of width — `uint96` caps one purchase at ~7.9e10 tokens at 18 decimals,
+while `tokenBalance` keeps `uint128` — because at `uint128` the pair no longer fits beside an address
+and the two writes split across slots, which costs more than the narrower field saves.
+
+**Storage and ABI are different types.** Getters return `DcaSchedule`, which is the stored fields plus
+the `scheduleId`. The id cannot be stored — it is half the key, and adding it back costs a third slot —
+but a caller that reads a schedule has to be able to act on it, so it is added on the way out.
+
+### Why the owner is in the key
+
+This is the part worth reading. The first implementation used a flat `mapping(uint64 => …)` with the
+owner as a stored field, which meant every path that touched a schedule had to check it, and one
+omission would have been another account's funds. That was flagged as the change's main hazard, an
+invariant was written for it, and an exhaustive test was added to hold the line.
+
+Putting the owner back in the key deletes the hazard instead of guarding it. `s_dcaSchedules[scheduleId]
+[msg.sender]` cannot reach somebody else's schedule: the lookup lands on an empty struct, which is
+refused as an id the caller does not hold. There is no owner check to write and none to forget, and
+`DcaManager__NotScheduleOwner` no longer exists because the state it described is unreachable. The same
+key also makes the struct two slots rather than three, so the safer design is also the cheaper one on
+both paths — which is not a trade-off that had to be made, and would not have been found by arguing
+about it.
+
+### Why a batch row carries no amount
+
+`purchaseAmounts` was kept in the first implementation as a staleness guard: a row whose amount no
+longer matched storage reverted rather than buying. Measured at ~450 gas per row, and what it bought
+was turning one user's edit between the swapper's snapshot and the tick into a failed tick for every
+other row in the batch — in order to refuse a purchase at the amount that user had just asked for. The
+manager debits with its own stored value either way, so the array was never anything but a comparison.
+It is gone; the manager reads what each row spends from its schedule. `minRbtcOut` still binds on the
+rBTC the handler measures itself receiving, and a Uniswap route's oracle floor still scales with the
+actual input, so nothing about slippage rested on it. The `routeIndex` comparison stays and is a
+different thing: no setter can change a schedule's route, so it is an integrity check that the row
+belongs to this batch's handler, not a guard against staleness.
 
 ### Surface
 
-Eight external signatures drop `(token, scheduleIndex)` and take the id alone: `depositToken`,
+Eight external signatures drop `(token, scheduleIndex)` for the id alone: `depositToken`,
 `withdrawToken`, `withdrawTokenAndInterest`, `deleteDcaSchedule`, `updatePurchaseAmount`,
 `updatePurchasePeriod`, `setSchedulePaused`, `topUpFromInterest`. `getDcaSchedule(user, token, index)`
-becomes `getDcaSchedule(uint64 scheduleId)`. `createDcaSchedule` and `getDcaSchedules(user, token)` are
-unchanged. `Batch` loses `buyers` and `scheduleIndexes` and is now
-`{uint64[] scheduleIds; uint256[] purchaseAmounts; address token; uint256 routeIndex; uint256 minRbtcOut}`
-— the manager builds the buyer list from what each schedule says it belongs to, so a batch can no
-longer assert a buyer at all. `IPurchaseRbtc.batchBuyRbtc` is untouched, as **Out of scope** required.
-
-### The check the mapping key used to make for free
-
-This is the change's one real hazard and it is worth naming: `s_dcaSchedules[msg.sender][token][index]`
-could not address another account's schedule, because the caller was the key. A flat key can address
-anything, so ownership became a stored field and an explicit check on every path —
-`DcaManager__InexistentSchedule` for an unknown id, `DcaManager__NotScheduleOwner` for somebody else's.
-One omission is another account's funds. `AGENTS.md` invariant 8 now states it, and
-`test/unit/ScheduleOwnershipTest.t.sol` walks the whole mutator surface rather than a sample: every
-mutator against a stranger's id, every mutator against an id belonging to nobody, id zero, and a check
-that a refused stranger left the schedule byte-for-byte as it was. The purchase path is `onlySwapper`
-and buys for the schedule's stored owner, so it instead checks existence and that the schedule's token
-matches the batch's — without that, a row could name a schedule of another stablecoin and have it
-debited by a handler that never holds its funds (`DcaManager__ScheduleTokenMismatch`).
+becomes `getDcaSchedule(user, scheduleId)`. `createDcaSchedule` and `getDcaSchedules(user, token)` keep
+their signatures. `Batch` becomes
+`{uint64[] scheduleIds; address[] buyers; address token; uint256 routeIndex; uint256 minRbtcOut}`.
+`IPurchaseRbtc.batchBuyRbtc` is untouched, as **Out of scope** required.
 
 ### What it cost and bought
 
 `batchBuyRbtc`, 200 rows, total per row including intrinsic calldata. B is the pre-R64 keying,
-reproduced as a prototype and pinned to the figures the real contract measured before the change:
+reproduced as a prototype and pinned to the figures the real contract measured before the change. C, D
+and E are the alternatives priced along the way, kept in the benchmark so the choice can be re-checked
+rather than re-argued:
 
-| | default | via-IR (ships) |
-|---|---|---|
-| B — pre-R64 nested keying | 18,918 | 17,736 |
-| **A — shipped** | **17,448** | **16,535** |
-| C — flat, guard dropped | 16,996 | 16,090 |
-
-The change takes **1,470 gas per row** off the tick under `[profile.default]` and **1,201** under
-via-IR, which is 7.8% and 6.8%. Calldata for a 200-row batch falls from 25,988 bytes to 13,060 —
-half, not more, because `purchaseAmounts` stayed. The guard costs 452 gas per row of what was
-available.
+| | default | via-IR (ships) | |
+|---|---|---|---|
+| B — pre-R64 nested keying | 18,919 | 17,736 | |
+| **A — shipped** | **15,702** | **14,845** | −17.0% / −16.3% |
+| C — flat by id, three slots | 16,996 | 16,090 | the first implementation, unguarded |
+| D — A plus the amount guard | 16,022 | 14,861 | what the dropped array would cost |
+| E — keyed on `(id, token)` | 15,275 | 14,200 | cheaper, but the owner stays a checked field |
 
 Cold paths, per schedule, paid by the user:
 
 | | create (default) | delete (default) | create (via-IR) | delete (via-IR) |
 |---|---|---|---|---|
-| B — pre-R64 | 91,358 | 10,835 | 89,524 | 10,486 |
-| **A — shipped** | **136,475** | **11,838** | **134,845** | **11,897** |
+| B — pre-R64 | 91,431 | 10,915 | 89,627 | 10,566 |
+| **A — shipped** | **114,002** | **11,556** | **113,135** | **11,900** |
 
-Create costs the user **49% more** — 45,117 gas, about $0.28 once — and delete about 1,000 gas more for
-the id-list scan. Break-even is **31 purchases** under `[profile.default]` and **39** under via-IR, so
-a daily schedule pays for its own create inside about six weeks and is ahead for the rest of its life.
+Create costs the user 22,571 gas more — about $0.14 once — and delete about 640 more for the id-list
+scan. **Break-even is 7.2 purchases under `[profile.default]` and 8.6 under via-IR**, so a daily
+schedule pays for its own create inside about a week and is ahead for the rest of its life. The
+first implementation's break-even was 31 to 39 purchases; the two-slot key is what closed that gap,
+because it gives the user's cold path back rather than trading it for the operator's hot one.
 
-`DcaManager`'s metadata-stripped runtime went **14,492 → 13,646 bytes**, 846 smaller: the flat key
-deletes `validateScheduleIndex`, the id cross-check and the nested addressing. Every deployable
+`DcaManager`'s metadata-stripped runtime went **14,492 → 13,626 bytes**, 866 smaller. Every deployable
 handler is byte-identical, since none of them reads the schedule shape.
 
 ### What did not change
@@ -394,5 +413,5 @@ handler is byte-identical, since none of them reads the schedule shape.
 Ids are still the creation nonce from a strictly increasing counter, still start at 1, and are still
 retired by deletion rather than reused (invariant 7). Every external function that writes
 `s_dcaSchedules` still carries `nonReentrant` as its first modifier, with the two `onlySwapper`
-purchase paths the same documented exception (invariant 6). Events keep their signatures and indexed
-fields; the errors that carried a `scheduleIndex` dropped that field, and two errors are new.
+purchase paths the same documented exception (invariant 6). Events keep their signatures, field
+meanings and indexed fields.
