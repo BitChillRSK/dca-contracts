@@ -8,6 +8,8 @@ import {OperationsAdmin} from "src/OperationsAdmin.sol";
 import {StubPurchaseHandler} from "./StubPurchaseHandler.sol";
 import {NestedIndexedDcaManager} from "./prototype/NestedIndexedDcaManager.sol";
 import {FlatKeyedDcaManager} from "./prototype/FlatKeyedDcaManager.sol";
+import {UserKeyedDcaManager} from "./prototype/UserKeyedDcaManager.sol";
+import {TokenKeyedDcaManager} from "./prototype/TokenKeyedDcaManager.sol";
 
 /**
  * @title R64BatchGasBenchmark
@@ -58,9 +60,13 @@ contract R64BatchGasBenchmarkTest is Test {
     /// @dev Schedule 0 is never batched; it exists so the size groups start at a non-zero offset.
     uint256 private constant FIRST_SCHEDULE = 1;
 
+    uint256 private constant DESIGNS = 5;
+
     address private constant TOKEN_A = address(uint160(uint256(keccak256("R64.token.A"))));
     address private constant TOKEN_B = address(uint160(uint256(keccak256("R64.token.B"))));
     address private constant TOKEN_C = address(uint160(uint256(keccak256("R64.token.C"))));
+    address private constant TOKEN_D = address(uint160(uint256(keccak256("R64.token.D"))));
+    address private constant TOKEN_E = address(uint160(uint256(keccak256("R64.token.E"))));
 
     address private s_swapper;
 
@@ -68,11 +74,15 @@ contract R64BatchGasBenchmarkTest is Test {
     DcaManager private s_designA;
     NestedIndexedDcaManager private s_designB;
     FlatKeyedDcaManager private s_designC;
-    StubPurchaseHandler private s_handlerA;
-    StubPurchaseHandler private s_handlerB;
-    StubPurchaseHandler private s_handlerC;
+    UserKeyedDcaManager private s_designD;
+    TokenKeyedDcaManager private s_designE;
 
-    /// @dev Buyer `i` owns schedule `i` on every design; ids run 1..261 in the same order on all three.
+    /// @dev One per design, indexed by design number, so the loops do not branch on it.
+    address[DESIGNS] private s_managers;
+    address[DESIGNS] private s_tokens;
+    StubPurchaseHandler[DESIGNS] private s_handlers;
+
+    /// @dev Buyer `i` owns schedule `i` on every design; ids run 1..261 in the same order on all five.
     address[] private s_buyers;
 
     function setUp() public {
@@ -81,13 +91,6 @@ contract R64BatchGasBenchmarkTest is Test {
 
         s_operationsAdmin = new OperationsAdmin(address(this));
         s_operationsAdmin.addSwapper(s_swapper);
-
-        s_handlerA = new StubPurchaseHandler();
-        s_handlerB = new StubPurchaseHandler();
-        s_handlerC = new StubPurchaseHandler();
-        s_operationsAdmin.assignTokenHandler(TOKEN_A, ROUTE_INDEX, address(s_handlerA));
-        s_operationsAdmin.assignTokenHandler(TOKEN_B, ROUTE_INDEX, address(s_handlerB));
-        s_operationsAdmin.assignTokenHandler(TOKEN_C, ROUTE_INDEX, address(s_handlerC));
 
         s_designA = new DcaManager(
             address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, address(this)
@@ -98,6 +101,19 @@ contract R64BatchGasBenchmarkTest is Test {
         s_designC = new FlatKeyedDcaManager(
             address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT
         );
+        s_designD = new UserKeyedDcaManager(
+            address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT
+        );
+        s_designE = new TokenKeyedDcaManager(
+            address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT
+        );
+        s_managers = [address(s_designA), address(s_designB), address(s_designC), address(s_designD), address(s_designE)];
+        s_tokens = [TOKEN_A, TOKEN_B, TOKEN_C, TOKEN_D, TOKEN_E];
+
+        for (uint256 d; d < DESIGNS; ++d) {
+            s_handlers[d] = new StubPurchaseHandler();
+            s_operationsAdmin.assignTokenHandler(s_tokens[d], ROUTE_INDEX, address(s_handlers[d]));
+        }
 
         for (uint256 i; i < TOTAL_SCHEDULES + FIRST_SCHEDULE; ++i) {
             address buyer = address(uint160(uint256(keccak256(abi.encode("R64.buyer", i)))));
@@ -106,6 +122,8 @@ contract R64BatchGasBenchmarkTest is Test {
             s_designA.createDcaSchedule(TOKEN_A, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
             s_designB.createDcaSchedule(TOKEN_B, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
             s_designC.createDcaSchedule(TOKEN_C, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+            s_designD.createDcaSchedule(TOKEN_D, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+            s_designE.createDcaSchedule(TOKEN_E, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
             vm.stopPrank();
         }
 
@@ -124,7 +142,7 @@ contract R64BatchGasBenchmarkTest is Test {
         console.log("R64 batchBuyRbtc, steady-state tick, gas");
         console.log("design  rows   bytes  calldata      exec   handler   manager     total   per-row");
 
-        for (uint256 d; d < 3; ++d) {
+        for (uint256 d; d < DESIGNS; ++d) {
             uint256 offset = FIRST_SCHEDULE;
             for (uint256 s; s < s_batchSizes.length; ++s) {
                 uint256 rows = s_batchSizes[s];
@@ -143,37 +161,18 @@ contract R64BatchGasBenchmarkTest is Test {
         _warmSharedState();
 
         address user = makeAddr("coldPathUser");
+        uint256[DESIGNS] memory createGas;
+        uint256[DESIGNS] memory deleteGas;
+
         vm.startPrank(user);
-
-        uint256 createA = gasleft();
-        s_designA.createDcaSchedule(TOKEN_A, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-        createA -= gasleft();
-        uint256 createB = gasleft();
-        s_designB.createDcaSchedule(TOKEN_B, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-        createB -= gasleft();
-        uint256 createC = gasleft();
-        s_designC.createDcaSchedule(TOKEN_C, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-        createC -= gasleft();
-
-        uint64 idA = s_designA.getDcaSchedules(user, TOKEN_A)[0].scheduleId;
-        uint64 idB = s_designB.getDcaSchedules(user, TOKEN_B)[0].scheduleId;
-        uint64 idC = uint64(s_designC.getSchedulesCreatedCount());
-
-        uint256 deleteA = gasleft();
-        s_designA.deleteDcaSchedule(idA);
-        deleteA -= gasleft();
-        uint256 deleteB = gasleft();
-        s_designB.deleteDcaSchedule(TOKEN_B, 0, idB);
-        deleteB -= gasleft();
-        uint256 deleteC = gasleft();
-        s_designC.deleteDcaSchedule(idC);
-        deleteC -= gasleft();
-
+        for (uint256 d; d < DESIGNS; ++d) {
+            (createGas[d], deleteGas[d]) = _coldPathGas(d, user);
+        }
         vm.stopPrank();
 
-        console.log(string.concat("A      ", _pad(createA, 9), _pad(deleteA, 10)));
-        console.log(string.concat("B      ", _pad(createB, 9), _pad(deleteB, 10)));
-        console.log(string.concat("C      ", _pad(createC, 9), _pad(deleteC, 10)));
+        for (uint256 d; d < DESIGNS; ++d) {
+            console.log(string.concat(_designName(d), "      ", _pad(createGas[d], 9), _pad(deleteGas[d], 10)));
+        }
         console.log("");
 
         // Design B is the keying `DcaManager` had before R64, and its cold paths are the ones that were
@@ -183,8 +182,39 @@ contract R64BatchGasBenchmarkTest is Test {
         // quietly flattering the change. The band is 10% because this assertion has to hold under both
         // profiles and via-IR takes about 6% off a cold path; a keying change moves these by ~50%, which
         // is the drift it exists to catch.
-        assertApproxEqRel(createB, 91_622, 0.10e18, "prototype B no longer reproduces the pre-R64 create");
-        assertApproxEqRel(deleteB, 11_122, 0.10e18, "prototype B no longer reproduces the pre-R64 delete");
+        assertApproxEqRel(createGas[1], 91_622, 0.10e18, "prototype B no longer reproduces the pre-R64 create");
+        assertApproxEqRel(deleteGas[1], 11_122, 0.10e18, "prototype B no longer reproduces the pre-R64 delete");
+    }
+
+    /// @dev One create and one delete on `design`, as the same fresh user, measured separately.
+    function _coldPathGas(uint256 design, address user) private returns (uint256 createGas, uint256 deleteGas) {
+        address token = s_tokens[design];
+
+        createGas = gasleft();
+        if (design == 0) s_designA.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+        else if (design == 1) s_designB.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+        else if (design == 2) s_designC.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+        else if (design == 3) s_designD.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+        else s_designE.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+        createGas -= gasleft();
+
+        uint64 scheduleId = _lastCreatedId(design, user, token);
+
+        deleteGas = gasleft();
+        if (design == 0) s_designA.deleteDcaSchedule(scheduleId);
+        else if (design == 1) s_designB.deleteDcaSchedule(token, 0, scheduleId);
+        else if (design == 2) s_designC.deleteDcaSchedule(scheduleId);
+        else if (design == 3) s_designD.deleteDcaSchedule(scheduleId);
+        else s_designE.deleteDcaSchedule(token, scheduleId);
+        deleteGas -= gasleft();
+    }
+
+    function _lastCreatedId(uint256 design, address user, address token) private view returns (uint64) {
+        if (design == 0) return s_designA.getDcaSchedules(user, token)[0].scheduleId;
+        if (design == 1) return s_designB.getDcaSchedules(user, token)[0].scheduleId;
+        if (design == 2) return uint64(s_designC.getSchedulesCreatedCount());
+        if (design == 3) return uint64(s_designD.getSchedulesCreatedCount());
+        return uint64(s_designE.getSchedulesCreatedCount());
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -196,31 +226,26 @@ contract R64BatchGasBenchmarkTest is Test {
     function test_r64_designsAgreeOnEffects() public {
         uint256 rows = 10;
         uint256 offset = FIRST_SCHEDULE;
+        uint64 scheduleId = uint64(offset + 1);
+        address buyer = s_buyers[offset];
 
-        uint256 balanceBeforeA = s_designA.getDcaSchedules(s_buyers[offset], TOKEN_A)[0].tokenBalance;
-        uint256 balanceBeforeC = s_designC.getSchedule(uint64(offset + 1)).tokenBalance;
-        assertEq(balanceBeforeA, balanceBeforeC, "designs disagree before the tick");
+        uint256 balanceBefore = s_designA.getDcaSchedules(buyer, TOKEN_A)[0].tokenBalance;
+        assertEq(s_designE.getSchedule(scheduleId, TOKEN_E).tokenBalance, balanceBefore, "designs disagree before");
 
-        _buy(0, rows, offset);
-        _buy(1, rows, offset);
-        _buy(2, rows, offset);
+        for (uint256 d; d < DESIGNS; ++d) {
+            _buy(d, rows, offset);
+        }
 
-        assertEq(
-            s_designA.getDcaSchedules(s_buyers[offset], TOKEN_A)[0].tokenBalance,
-            balanceBeforeA - PURCHASE_AMOUNT,
-            "design A debited the wrong amount"
-        );
-        assertEq(
-            s_designB.getDcaSchedules(s_buyers[offset], TOKEN_B)[0].tokenBalance,
-            balanceBeforeA - PURCHASE_AMOUNT,
-            "design B debited the wrong amount"
-        );
-        assertEq(
-            s_designC.getSchedule(uint64(offset + 1)).tokenBalance,
-            balanceBeforeA - PURCHASE_AMOUNT,
-            "design C debited the wrong amount"
-        );
-        assertEq(s_handlerA.rowsBought(), s_handlerC.rowsBought(), "designs bought a different number of rows");
+        uint256 expected = balanceBefore - PURCHASE_AMOUNT;
+        assertEq(s_designA.getDcaSchedules(buyer, TOKEN_A)[0].tokenBalance, expected, "A debited wrongly");
+        assertEq(s_designB.getDcaSchedules(buyer, TOKEN_B)[0].tokenBalance, expected, "B debited wrongly");
+        assertEq(s_designC.getSchedule(scheduleId).tokenBalance, expected, "C debited wrongly");
+        assertEq(s_designD.getSchedule(scheduleId, buyer).tokenBalance, expected, "D debited wrongly");
+        assertEq(s_designE.getSchedule(scheduleId, TOKEN_E).tokenBalance, expected, "E debited wrongly");
+
+        for (uint256 d = 1; d < DESIGNS; ++d) {
+            assertEq(s_handlers[d].rowsBought(), s_handlers[0].rowsBought(), "designs bought a different row count");
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -259,9 +284,8 @@ contract R64BatchGasBenchmarkTest is Test {
             scheduleIds[i] = uint64(i + 1);
             purchaseAmounts[i] = PURCHASE_AMOUNT;
         }
-        StubPurchaseHandler handler = design == 0 ? s_handlerA : design == 1 ? s_handlerB : s_handlerC;
         gasUsed = gasleft();
-        handler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, 0);
+        s_handlers[design].batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, 0);
         gasUsed -= gasleft();
     }
 
@@ -323,13 +347,34 @@ contract R64BatchGasBenchmarkTest is Test {
             });
             return abi.encodeCall(NestedIndexedDcaManager.batchBuyRbtc, (batch));
         }
-        FlatKeyedDcaManager.Batch memory flatBatch = FlatKeyedDcaManager.Batch({
+        if (design == 2) {
+            FlatKeyedDcaManager.Batch memory flatBatch = FlatKeyedDcaManager.Batch({
+                scheduleIds: scheduleIds,
+                token: TOKEN_C,
+                routeIndex: ROUTE_INDEX,
+                minRbtcOut: 0
+            });
+            return abi.encodeCall(FlatKeyedDcaManager.batchBuyRbtc, (flatBatch));
+        }
+        if (design == 3) {
+            UserKeyedDcaManager.Batch memory userBatch = UserKeyedDcaManager.Batch({
+                scheduleIds: scheduleIds,
+                buyers: buyers,
+                purchaseAmounts: purchaseAmounts,
+                token: TOKEN_D,
+                routeIndex: ROUTE_INDEX,
+                minRbtcOut: 0
+            });
+            return abi.encodeCall(UserKeyedDcaManager.batchBuyRbtc, (userBatch));
+        }
+        TokenKeyedDcaManager.Batch memory tokenBatch = TokenKeyedDcaManager.Batch({
             scheduleIds: scheduleIds,
-            token: TOKEN_C,
+            purchaseAmounts: purchaseAmounts,
+            token: TOKEN_E,
             routeIndex: ROUTE_INDEX,
             minRbtcOut: 0
         });
-        return abi.encodeCall(FlatKeyedDcaManager.batchBuyRbtc, (flatBatch));
+        return abi.encodeCall(TokenKeyedDcaManager.batchBuyRbtc, (tokenBatch));
     }
 
     function _buy(uint256 design, uint256 rows, uint256 offset) private {
@@ -340,7 +385,7 @@ contract R64BatchGasBenchmarkTest is Test {
     }
 
     function _buyAll(uint256 offset, uint256 rows) private {
-        for (uint256 d; d < 3; ++d) {
+        for (uint256 d; d < DESIGNS; ++d) {
             _buy(d, rows, offset);
         }
     }
@@ -349,26 +394,28 @@ contract R64BatchGasBenchmarkTest is Test {
     ///      does not pay cold-access costs the other two then find warm. Idempotent, and always called
     ///      outside a measurement window.
     function _warmSharedState() private view {
-        s_operationsAdmin.getTokenHandler(TOKEN_A, ROUTE_INDEX);
-        s_operationsAdmin.getTokenHandler(TOKEN_B, ROUTE_INDEX);
-        s_operationsAdmin.getTokenHandler(TOKEN_C, ROUTE_INDEX);
-        s_handlerA.rowsBought();
-        s_handlerB.rowsBought();
-        s_handlerC.rowsBought();
-        s_handlerA.deposits();
-        s_handlerB.deposits();
-        s_handlerC.deposits();
+        for (uint256 d; d < DESIGNS; ++d) {
+            s_operationsAdmin.getTokenHandler(s_tokens[d], ROUTE_INDEX);
+            s_handlers[d].rowsBought();
+            s_handlers[d].deposits();
+        }
         s_designA.getSchedulesCreatedCount();
         s_designB.getSchedulesCreatedCount();
         s_designC.getSchedulesCreatedCount();
+        s_designD.getSchedulesCreatedCount();
+        s_designE.getSchedulesCreatedCount();
     }
 
     function _manager(uint256 design) private view returns (address) {
-        return design == 0 ? address(s_designA) : design == 1 ? address(s_designB) : address(s_designC);
+        return s_managers[design];
     }
 
     function _designName(uint256 design) private pure returns (string memory) {
-        return design == 0 ? "A" : design == 1 ? "B" : "C";
+        if (design == 0) return "A";
+        if (design == 1) return "B";
+        if (design == 2) return "C";
+        if (design == 3) return "D";
+        return "E";
     }
 
     function _pad(uint256 value, uint256 width) private pure returns (string memory padded) {
