@@ -14,6 +14,7 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
  * @title DcaManager
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice User and swapper entry point: create and manage dollar-cost-averaging schedules.
+ * @notice The maximum DCA frequency allowed is daily.
  * @dev Holds the schedule ledger and no funds. `s_dcaSchedules` is written only in this contract, and
  *      every external function that writes it takes `nonReentrant` as its first modifier, so the guard
  *      is checkable by grep rather than by reading each function. The two `onlySwapper` purchase paths
@@ -372,14 +373,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @inheritdoc IDcaManager
      * @dev Moves no cash. The interest already sits in the handler's lending position, so raising this
      *      schedule's claim over it is a storage write; the accrued-interest call only reads, and never
-     *      redeems, mints, or transfers. On a market that accrues lazily that read also pokes the accrual,
-     *      which is why `tokenBalance` and `purchaseAmount` are read after it rather than cached across it.
-     *      The credit is bounded by the spendable figure rather than the `getInterestAccrued` quote, so a
-     *      user need not wait for someone else's transaction to credit interest they have already earned;
-     *      that bound comes from the expression an interest withdrawal pays out, so the route's summed
-     *      principal lands on the position's value and never above it. Resolution goes through `_handler`
-     *      rather than the deposit-only helper because a deposit pause stops new funds entering a route, and
-     *      interest already held there is not new funds.
+     *      redeems, mints, or transfers. On a market that accrues lazily that read also pokes the accrual.
      */
     function topUpFromInterest(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 amount)
         external
@@ -594,14 +588,17 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, dcaSchedule.tokenBalance);
 
         // Anchor the next due date to the schedule's own cadence, so the wanted periodicity survives
-        // a delayed purchase or a schedule that ran out of stablecoin and was resumed with a new
-        // deposit. Floor periodsElapsed at 1 so an early UTC-day buy still consumes a slot.
+        // a delayed purchase or a schedule that was paused or ran out of stablecoin and was resumed with
+        // a new deposit. Floor periodsElapsed at 1 so that the purchase isn't blocked when a full period
+        // has elapsed in calendar days but not in seconds. This is fine since the purchase being eligible
+        // was already checked above.
         uint256 newTimestamp;
         if (lastPurchaseTimestamp == 0) {
             newTimestamp = block.timestamp;
         } else {
             uint256 periodsElapsed = (block.timestamp - lastPurchaseTimestamp) / purchasePeriod;
             if (periodsElapsed == 0) periodsElapsed = 1;
+            // The last purchase timestamp is anchored to the time of day of the first purchase to avoid drift
             newTimestamp = lastPurchaseTimestamp + periodsElapsed * purchasePeriod;
         }
         dcaScheduleStorage.lastPurchaseTimestamp = newTimestamp.toUint48();

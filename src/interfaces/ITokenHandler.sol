@@ -46,7 +46,7 @@ interface ITokenHandler {
      * @return withdrawnAmount The amount that left this contract, measured as a `balanceOf(address(this))`
      *         delta around `safeTransfer`. This measures handler cash, not the user's balance, and it is
      *         not what a schedule's principal is debited by: principal is reduced by the amount requested,
-     *         because a handler that pays out less than it was asked for does not still hold the difference.
+     *         because a handler that pays out less than it was asked for may not still hold the difference.
      */
     function withdrawToken(address user, uint256 amount) external returns (uint256 withdrawnAmount);
 }
