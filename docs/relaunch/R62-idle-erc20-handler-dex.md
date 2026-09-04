@@ -1,6 +1,6 @@
 # R62 — Add the missing `IdleErc20HandlerDex` leaf
 
-Status: **in progress** · Assigned: yes · Optional/further-review: no
+Status: **assigned** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
