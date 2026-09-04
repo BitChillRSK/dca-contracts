@@ -6,9 +6,11 @@ pragma solidity 0.8.36;
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice User and swapper entry point: create and manage dollar-cost-averaging schedules.
  * @dev Users talk only to this contract. An allowlisted swapper triggers purchases.
- *      Handlers custody the deposited funds and the accumulated rBTC; this contract never takes
- *      custody of either. An idle handler holds the stablecoin itself, a lending handler holds the
- *      shares it was minted for that stablecoin.
+ *      Handlers custody both sides and this contract custodies neither. On the funding side an idle
+ *      handler holds the stablecoin itself and a lending handler holds the shares minted for it; on the
+ *      proceeds side a MoC handler holds native rBTC and a Uniswap handler holds WRBTC, unwrapping it
+ *      only at withdrawal. The accumulated-rBTC ledger reads the same in either case, since WRBTC is
+ *      1:1 and denominated in wei.
  */
 interface IDcaManager {
     /*//////////////////////////////////////////////////////////////
@@ -34,12 +36,15 @@ interface IDcaManager {
     ///      four arrays are positional and must have the same nonzero length. `batchBuyRbtc` takes one;
     ///      `batchBuyRbtcAcrossHandlers` takes several. `minRbtcOut` is the caller's minimum for the
     ///      batch as a whole, in rBTC/WRBTC wei (18 decimals) whatever the stablecoin's decimals, and is
-    ///      compared against the rBTC the handler measures itself receiving. The handler enforces
-    ///      `max(minRbtcOut, its own oracle floor)`, so this value can tighten the floor but never
-    ///      loosen it, and passing `0` simply leaves the floor in charge. That makes it a liveness
-    ///      bound an honest swapper sets against a stale quote or adverse execution, not a second
-    ///      governance ceiling — a swapper whose key is stolen just passes `0` and is still held to
-    ///      the handler's floor, which is why the floor and not this field is the safety limit.
+    ///      compared against the rBTC the handler measures itself receiving, so it binds on every
+    ///      purchase venue. What sits underneath it does not. A Uniswap route applies an oracle floor of
+    ///      its own and swaps at `max(minRbtcOut, that floor)`, so this value can only tighten it. A MoC
+    ///      route has no floor to compose with, because DOC is redeemed at Money on Chain's own price
+    ///      rather than swapped against a pool, leaving no slippage surface for a floor to guard. Either
+    ///      way this is a liveness bound an honest swapper sets against a stale quote or adverse
+    ///      execution, and never a governance limit **on** the swapper: the swapper picks the value, so
+    ///      `0` is always available to it. What still holds when it does is the oracle floor on a Uniswap
+    ///      route, and the redemption price itself on a MoC one.
     struct Batch {
         address[] buyers;
         address token;

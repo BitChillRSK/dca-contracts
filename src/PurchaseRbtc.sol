@@ -25,9 +25,10 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
 
     /**
      * @inheritdoc IPurchaseRbtc
-     * @dev Spends the stablecoin actually received, never the gross amount asked of the lending
-     *      protocol. Planned net amounts are only allocation weights: both the rBTC credited and
-     *      the stablecoin reported as spent are shares of what actually moved.
+     * @dev Spends the stablecoin the retrieval actually delivered, never the gross amount it was asked
+     *      for: a lending handler can come back short when it redeems its shares, while the idle handler
+     *      reverts rather than under-deliver. Planned net amounts are only allocation weights: both the
+     *      rBTC credited and the stablecoin reported as spent are shares of what actually moved.
      */
     function batchBuyRbtc(
         address[] memory buyers,
@@ -48,7 +49,8 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
                 _calculateFeeAndNetAmounts(purchaseAmounts);
 
             // Retrieve the stablecoin to spend: the net amount destined for rBTC plus the fee BitChill
-            // charges. What comes back is what the lending protocol actually paid, never the gross request.
+            // charges. What comes back is what the retrieval delivered, which a lending handler can leave
+            // short of the request.
             totalStablecoinAmountToSpend =
                 _batchRetrieveStablecoin(buyers, purchaseAmounts, totalNetStablecoinPlanned + aggregatedFee);
             if (totalStablecoinAmountToSpend <= aggregatedFee) {
@@ -63,8 +65,8 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
         uint256 totalPurchasedRbtc = _purchaseRbtc(totalStablecoinAmountToSpend, minRbtcOut);
         if (totalPurchasedRbtc == 0) revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(purchaseToken));
         // Checked against the rBTC we measured ourselves receiving, so the bound holds on every purchase
-        // venue and never trusts an integrator return value. Equality passes, and the venue's own floor is
-        // independent of this one: the stricter of the two wins.
+        // venue and never trusts an integrator return value. Equality passes. Where the venue applies a
+        // floor of its own, it is enforced there and the stricter of the two decides.
         if (totalPurchasedRbtc < minRbtcOut) {
             revert PurchaseRbtc__BelowSwapperMinimum(totalPurchasedRbtc, minRbtcOut);
         }
