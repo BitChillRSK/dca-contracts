@@ -21,7 +21,7 @@ PROBE_VERBOSITY ?= -vv
 PROBE_MATCH ?=
 
 # Targets
-.PHONY: all test moc dex help check ci check-deploy build build-deploy patch-deps slither moc-none moc-layerbank moc-tropykus moc-sovryn dex-tropykus dex-sovryn dex-layerbank invariants invariants-sovryn fork fork-tropykus fork-sovryn fork-layerbank fork-dex-path probe-sovryn-exit-fee probe-dex-quote-floor coverage
+.PHONY: all test moc dex help check ci check-deploy build build-deploy patch-deps slither moc-none moc-layerbank moc-tropykus moc-sovryn dex-none dex-tropykus dex-sovryn dex-layerbank invariants invariants-sovryn fork fork-tropykus fork-sovryn fork-layerbank fork-dex-path probe-sovryn-exit-fee probe-dex-quote-floor coverage
 
 all: help
 
@@ -43,6 +43,7 @@ check: build
 	$(MAKE) moc-none
 	$(MAKE) moc-layerbank
 	$(MAKE) moc-sovryn
+	STABLECOIN_TYPE=USDRIF $(MAKE) dex-none
 	STABLECOIN_TYPE=USDRIF $(MAKE) dex-sovryn
 	STABLECOIN_TYPE=USDRIF $(MAKE) dex-layerbank
 	STABLECOIN_TYPE=USDT0 $(MAKE) dex-layerbank
@@ -53,6 +54,7 @@ ci:
 	FOUNDRY_PROFILE=ci $(MAKE) moc-none
 	FOUNDRY_PROFILE=ci $(MAKE) moc-layerbank
 	FOUNDRY_PROFILE=ci $(MAKE) moc-sovryn
+	FOUNDRY_PROFILE=ci STABLECOIN_TYPE=USDRIF $(MAKE) dex-none
 	FOUNDRY_PROFILE=ci STABLECOIN_TYPE=USDRIF $(MAKE) dex-sovryn
 	FOUNDRY_PROFILE=ci STABLECOIN_TYPE=USDRIF $(MAKE) dex-layerbank
 	FOUNDRY_PROFILE=ci STABLECOIN_TYPE=USDT0 $(MAKE) dex-layerbank
@@ -67,6 +69,7 @@ check-deploy: build-deploy
 	FOUNDRY_PROFILE=deploy $(MAKE) moc-none
 	FOUNDRY_PROFILE=deploy $(MAKE) moc-layerbank
 	FOUNDRY_PROFILE=deploy $(MAKE) moc-sovryn
+	FOUNDRY_PROFILE=deploy STABLECOIN_TYPE=USDRIF $(MAKE) dex-none
 	FOUNDRY_PROFILE=deploy STABLECOIN_TYPE=USDRIF $(MAKE) dex-sovryn
 	FOUNDRY_PROFILE=deploy STABLECOIN_TYPE=USDRIF $(MAKE) dex-layerbank
 	FOUNDRY_PROFILE=deploy STABLECOIN_TYPE=USDT0 $(MAKE) dex-layerbank
@@ -189,6 +192,9 @@ probe-dex-quote-floor:
 dex:
 	@echo "Executing DexSwaps tests with $(LENDING_PROTOCOL) and $(STABLECOIN_TYPE)..."
 	SWAP_TYPE=dexSwaps LENDING_PROTOCOL=$(LENDING_PROTOCOL) EXPECTED_LENDING_PROTOCOL=$(LENDING_PROTOCOL) STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
+dex-none:
+	@echo "Executing DexSwaps tests with idle (none) and $(STABLECOIN_TYPE)..."
+	SWAP_TYPE=dexSwaps LENDING_PROTOCOL=none EXPECTED_LENDING_PROTOCOL=none STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
 dex-tropykus:
 	@echo "Executing DexSwaps Tropykus tests with $(STABLECOIN_TYPE)..."
 	SWAP_TYPE=dexSwaps LENDING_PROTOCOL=tropykus EXPECTED_LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=$(STABLECOIN_TYPE) $(TEST_CMD)
@@ -214,8 +220,8 @@ coverage:
 # Help target
 help:
 	@echo "Available targets:"
-	@echo "  make check                     # Build + moc-none + moc-layerbank + moc-sovryn + dex-sovryn + dex-layerbank + invariants-sovryn"
-	@echo "  make ci                        # Build + required CI lanes (including dex-layerbank USDRIF and USDT0)"
+	@echo "  make check                     # Build + moc-* + dex-none/sovryn/layerbank + invariants-sovryn"
+	@echo "  make ci                        # Build + required CI lanes (including dex-none USDRIF and dex-layerbank USDRIF/USDT0)"
 	@echo "  make check-deploy              # Same lanes as check, compiled via_ir=true (R60) — slow; run before deploying"
 	@echo "  make patch-deps                # Apply vendored Uniswap pragma compatibility patch"
 	@echo "  make slither                   # Run slither (must be installed)"
@@ -227,6 +233,7 @@ help:
 	@echo "  make moc-tropykus              # MocSwaps + Tropykus (legacy mocks; not in the production map)"
 	@echo "  make moc-sovryn                # MocSwaps + Sovryn (index 2)"
 	@echo "  make dex                       # DexSwaps local tests (LENDING_PROTOCOL from env, default tropykus)"
+	@echo "  make dex-none                  # DexSwaps + idle handler (index 0; USDRIF or USDT0)"
 	@echo "  make dex-tropykus              # DexSwaps + Tropykus"
 	@echo "  make dex-sovryn                # DexSwaps + Sovryn"
 	@echo "  make dex-layerbank             # DexSwaps + LayerBank (USDRIF or USDT0)"

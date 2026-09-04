@@ -37,7 +37,8 @@ PurchaseMoc         MoC redeem DOC → rBTC (_purchaseRbtc only)
 PurchaseUniswap     Uniswap V3 → WRBTC (_purchaseRbtc + WRBTC unwrap on withdraw)
 
 Handlers = LendingErc20Handler + a Purchase*  (lending adapters) or TokenHandler + a Purchase* (idle):
-  src/idle/              IdleErc20Handler ── IdleDocHandlerMoc (+ PurchaseMoc)  index 0
+  src/idle/              IdleErc20Handler ─┬─ IdleDocHandlerMoc (+ PurchaseMoc)  index 0 (DOC)
+                                          └─ IdleErc20HandlerDex (+ PurchaseUniswap)  index 0 (USDRIF / USDT0)
   src/layerbank/         LayerBankErc20Handler ─┬─ LayerBankDocHandlerMoc (+ PurchaseMoc) index 1
                                                └─ LayerBankErc20HandlerDex (+ PurchaseUniswap)  USDRIF / USDT0
   src/sovryn/            SovrynErc20Handler ─┬─ SovrynDocHandlerMoc   (+ PurchaseMoc)  index 2
@@ -71,10 +72,10 @@ Verified `src/` source (including NatSpec) lives on explorers for the life of th
 ## Tests and done-gate
 
 - Targeted tests for the spec first. Document exact commands in the PR.
-- **Done-gate:** `make check` (`forge build`, `make moc-none`, `make moc-layerbank`, `make moc-sovryn`, `STABLECOIN_TYPE=USDRIF make dex-sovryn`, `STABLECOIN_TYPE=USDRIF make dex-layerbank`, `STABLECOIN_TYPE=USDT0 make dex-layerbank`, and `make invariants-sovryn`).
+- **Done-gate:** `make check` (`forge build`, `make moc-none`, `make moc-layerbank`, `make moc-sovryn`, `STABLECOIN_TYPE=USDRIF make dex-none`, `STABLECOIN_TYPE=USDRIF make dex-sovryn`, `STABLECOIN_TYPE=USDRIF make dex-layerbank`, `STABLECOIN_TYPE=USDT0 make dex-layerbank`, and `make invariants-sovryn`).
 - **Before push (every relaunch PR):** `make check` is not enough. Also run `make fork-sovryn` and `make fork-tropykus` (need `RSK_MAINNET_RPC_URL` in `.env`). Fork tests are not in CI; Anvil lanes will not catch live-protocol mismatches (for example R1's batch event reports net DOC, while `makeBatchPurchasesOneUser` used to expect the requested gross). If the RPC is unset, stop and ask the human — do not push. Document the exact fork commands in the PR.
-- **CI (every PR):** `make moc-none`, `make moc-layerbank`, `make moc-sovryn`, `STABLECOIN_TYPE=USDRIF make dex-sovryn`, `STABLECOIN_TYPE=USDRIF make dex-layerbank`, `STABLECOIN_TYPE=USDT0 make dex-layerbank`, and `make invariants-sovryn`. Locally, `make ci` runs those lanes under `FOUNDRY_PROFILE=ci`. The unit lanes still `--no-match-test invariant` so the 64×512 stateful suite is not multiplied across every target. `ComparePurchaseMethods` stays excluded (Anvil early-return / mainnet-only). Local Tropykus targets (`make moc-tropykus` / `make dex-tropykus`) remain useful for mock-based coverage of the legacy handler through a second lending adapter; Tropykus is on neither production map, and index 4 stays burned. Tropykus fork tests pin a pre-pause block; see the fork-tests bullet below.
-- Defaults: `SWAP_TYPE=mocSwaps`, `LENDING_PROTOCOL=tropykus` (legacy local default), `STABLECOIN_TYPE=DOC`. Production MoC lanes are `none` / `layerbank` / `sovryn`. Dex paths often use `STABLECOIN_TYPE=USDRIF`.
+- **CI (every PR):** `make moc-none`, `make moc-layerbank`, `make moc-sovryn`, `STABLECOIN_TYPE=USDRIF make dex-none`, `STABLECOIN_TYPE=USDRIF make dex-sovryn`, `STABLECOIN_TYPE=USDRIF make dex-layerbank`, `STABLECOIN_TYPE=USDT0 make dex-layerbank`, and `make invariants-sovryn`. Locally, `make ci` runs those lanes under `FOUNDRY_PROFILE=ci`. The unit lanes still `--no-match-test invariant` so the 64×512 stateful suite is not multiplied across every target. `ComparePurchaseMethods` stays excluded (Anvil early-return / mainnet-only). Local Tropykus targets (`make moc-tropykus` / `make dex-tropykus`) remain useful for mock-based coverage of the legacy handler through a second lending adapter; Tropykus is on neither production map, and index 4 stays burned. Tropykus fork tests pin a pre-pause block; see the fork-tests bullet below.
+- Defaults: `SWAP_TYPE=mocSwaps`, `LENDING_PROTOCOL=tropykus` (legacy local default), `STABLECOIN_TYPE=DOC`. Production MoC lanes are `none` / `layerbank` / `sovryn`. Dex paths often use `STABLECOIN_TYPE=USDRIF` (idle+DEX and LayerBank).
 - `make patch-deps` applies the vendored Uniswap pragma compatibility patch used by local builds and CI. It mutates `lib/` submodules; do not commit those submodule dirties.
 - `make slither` if slither is installed; not part of `make check` (no clean baseline yet).
 - Do not `forge fmt` existing files unless the spec says to (`src/` is not fmt-clean).

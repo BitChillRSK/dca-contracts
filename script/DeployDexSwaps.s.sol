@@ -8,6 +8,7 @@ import {DcaManager} from "../src/DcaManager.sol";
 import {TropykusErc20HandlerDex} from "../src/tropykus-legacy/TropykusErc20HandlerDex.sol";
 import {SovrynErc20HandlerDex} from "../src/sovryn/SovrynErc20HandlerDex.sol";
 import {LayerBankErc20HandlerDex} from "../src/layerbank/LayerBankErc20HandlerDex.sol";
+import {IdleErc20HandlerDex} from "../src/idle/IdleErc20HandlerDex.sol";
 import {IPurchaseUniswap} from "../src/interfaces/IPurchaseUniswap.sol";
 import {OperationsAdmin} from "../src/OperationsAdmin.sol";
 import {IWRBTC} from "../src/interfaces/IWRBTC.sol";
@@ -52,6 +53,20 @@ contract DeployDexSwaps is DeployBase {
         bool isUsdt0Live = _isLiveEnvironment() && _isUsdt0(_stablecoinType());
         IFeeHandler.FeeSettings memory feeSettings = feeSettingsForToken(isUsdt0Live);
 
+        if (params.protocol == Protocol.NONE) {
+            return address(
+                new IdleErc20HandlerDex(
+                    params.dcaManager,
+                    params.tokenAddress,
+                    params.uniswapSettings,
+                    params.feeCollector,
+                    feeSettings,
+                    params.amountOutMinimumPercent,
+                    params.amountOutMinimumSafetyCheck,
+                    _initialOwner()
+                )
+            );
+        }
         if (params.protocol == Protocol.TROPYKUS) {
             return address(
                 new TropykusErc20HandlerDex(
@@ -97,7 +112,7 @@ contract DeployDexSwaps is DeployBase {
                 )
             );
         }
-        revert("Dex path is tropykus/sovryn/layerbank");
+        revert("Dex path is none/tropykus/sovryn/layerbank");
     }
 
     function _deployLiveDexHandlers(
@@ -110,10 +125,10 @@ contract DeployDexSwaps is DeployBase {
         bool isUSDRIF,
         bool isUSDT0
     ) internal returns (address selectedHandler) {
-        // Live dex stables are LayerBank USDRIF / USDT0. DexHelperConfig's else arm is DOC
-        // config, so anything not exactly those two (unset STABLECOIN_TYPE, DOC, or a typo)
-        // must revert — DOC buys rBTC through MoC redemption. Tropykus is test-only: its
-        // route index is not even in scope here, so this is the only place that can say so.
+        // Live dex stables are USDRIF / USDT0. Production map: idle=0, LayerBank=1; Sovryn is
+        // registered as a lending class but has no handler for these stables. DexHelperConfig's
+        // else arm is DOC config, so anything not exactly those two (unset STABLECOIN_TYPE, DOC,
+        // or a typo) must revert — DOC buys rBTC through MoC redemption. Tropykus is test-only.
         if (protocol == Protocol.TROPYKUS) {
             revert("Tropykus is not on the production dex map");
         }
@@ -121,44 +136,62 @@ contract DeployDexSwaps is DeployBase {
             revert("DOC is not on the production dex map");
         }
 
-        console.log("Deploying handlers for lending protocols for live network");
+        console.log("Deploying production dex handlers (idle / LayerBank)");
 
         // Owner is the Foundry broadcaster for this transaction so route registration succeeds.
-        // Mainnet proposes MAINNET_OWNER (the Safe) after setup.
+        // Mainnet proposes MAINNET_OWNER (the Safe) after setup. Index 0 is already Idle.
         operationsAdmin.registerRoute(SOVRYN_INDEX, true);
+        operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
 
-        if (isUSDRIF || isUSDT0) {
-            operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
-            address layerbankAToken = networkConfig.layerbankAToken;
-            if (layerbankAToken == address(0)) {
-                if (protocol == Protocol.LAYERBANK) {
-                    revert("LayerBank aToken not available on this network");
-                }
-                console.log("Warning: LayerBank aToken not available for this dex stable");
-            } else {
-                address layerbankHandler = deployDocHandlerDex(
-                    DeployParams({
-                        protocol: Protocol.LAYERBANK,
-                        dcaManager: address(dcaManager),
-                        tokenAddress: stablecoinAddress,
-                        shareToken: layerbankAToken,
-                        uniswapSettings: uniswapSettings,
-                        feeCollector: feeCollector,
-                        amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
-                        amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
-                    })
-                );
-                console.log("LayerBank dex handler deployed at:", layerbankHandler);
-                operationsAdmin.assignTokenHandler(stablecoinAddress, LAYERBANK_INDEX, layerbankHandler);
-                _proposeFinalOwner(layerbankHandler);
-                if (isUSDT0) {
-                    dcaManager.setTokenMinPurchaseAmount(stablecoinAddress, USDT0_MIN_PURCHASE_AMOUNT);
-                    console.log("USDT0 min purchase amount set to", USDT0_MIN_PURCHASE_AMOUNT);
-                }
-                if (protocol == Protocol.LAYERBANK) {
-                    selectedHandler = layerbankHandler;
-                }
+        address idleHandler = deployDocHandlerDex(
+            DeployParams({
+                protocol: Protocol.NONE,
+                dcaManager: address(dcaManager),
+                tokenAddress: stablecoinAddress,
+                shareToken: address(0),
+                uniswapSettings: uniswapSettings,
+                feeCollector: feeCollector,
+                amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
+                amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
+            })
+        );
+        console.log("Idle dex handler deployed at:", idleHandler);
+        operationsAdmin.assignTokenHandler(stablecoinAddress, IDLE_INDEX, idleHandler);
+        _proposeFinalOwner(idleHandler);
+        if (protocol == Protocol.NONE) {
+            selectedHandler = idleHandler;
+        }
+
+        address layerbankAToken = networkConfig.layerbankAToken;
+        if (layerbankAToken == address(0)) {
+            if (protocol == Protocol.LAYERBANK) {
+                revert("LayerBank aToken not available on this network");
             }
+            console.log("Warning: LayerBank aToken not available for this dex stable");
+        } else {
+            address layerbankHandler = deployDocHandlerDex(
+                DeployParams({
+                    protocol: Protocol.LAYERBANK,
+                    dcaManager: address(dcaManager),
+                    tokenAddress: stablecoinAddress,
+                    shareToken: layerbankAToken,
+                    uniswapSettings: uniswapSettings,
+                    feeCollector: feeCollector,
+                    amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
+                    amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
+                })
+            );
+            console.log("LayerBank dex handler deployed at:", layerbankHandler);
+            operationsAdmin.assignTokenHandler(stablecoinAddress, LAYERBANK_INDEX, layerbankHandler);
+            _proposeFinalOwner(layerbankHandler);
+            if (protocol == Protocol.LAYERBANK) {
+                selectedHandler = layerbankHandler;
+            }
+        }
+
+        if (isUSDT0) {
+            dcaManager.setTokenMinPurchaseAmount(stablecoinAddress, USDT0_MIN_PURCHASE_AMOUNT);
+            console.log("USDT0 min purchase amount set to", USDT0_MIN_PURCHASE_AMOUNT);
         }
     }
 
@@ -208,14 +241,16 @@ contract DeployDexSwaps is DeployBase {
         // For local or fork environments, deploy only the selected protocol's handler
         if (environment == Environment.LOCAL || environment == Environment.FORK) {
             console.log("Deploying single handler for local/fork environment");
-            
-            address shareTokenAddress = helperConfig.getShareTokenAddress();
-            if (shareTokenAddress == address(0)) {
-                revert("Share token not available for the selected combination");
+
+            address shareTokenAddress;
+            if (protocol != Protocol.NONE) {
+                shareTokenAddress = helperConfig.getShareTokenAddress();
+                if (shareTokenAddress == address(0)) {
+                    revert("Share token not available for the selected combination");
+                }
+                console.log("Share token address:", shareTokenAddress);
             }
-            
-            console.log("Share token address:", shareTokenAddress);
-            
+
             DeployParams memory params = DeployParams({
                 protocol: protocol,
                 dcaManager: address(dcaManager),
@@ -226,10 +261,10 @@ contract DeployDexSwaps is DeployBase {
                 amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
                 amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
             });
-            
+
             docHandlerDexAddress = deployDocHandlerDex(params);
         }
-        // For live networks (testnet/mainnet), deploy the LayerBank Dex handler for USDRIF / USDT0.
+        // Live: idle + LayerBank Dex handlers for USDRIF / USDT0 (DOC stays on MoC).
         else if (environment == Environment.TESTNET || environment == Environment.MAINNET) {
             docHandlerDexAddress = _deployLiveDexHandlers(
                 operationsAdmin,

@@ -184,26 +184,41 @@ contract LiveDeployPathTest is Test {
             "live dex path must not register the legacy Tropykus route"
         );
         assertEq(uint256(operationsAdmin.getRouteClass(SOVRYN_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
+        assertEq(uint256(operationsAdmin.getRouteClass(IDLE_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle));
+
         string memory coinType = vm.envOr("STABLECOIN_TYPE", DOC_STRING);
         bytes32 coinHash = keccak256(abi.encodePacked(coinType));
-        if (
-            keccak256(abi.encodePacked(vm.envString("LENDING_PROTOCOL")))
-                == keccak256(abi.encodePacked(LAYERBANK_STRING))
-                && (
-                    coinHash == keccak256(abi.encodePacked(USDRIF_STRING))
-                        || coinHash == keccak256(abi.encodePacked(USDT0_STRING))
-                )
-        ) {
-            assertEq(
-                uint256(operationsAdmin.getRouteClass(LAYERBANK_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending)
-            );
-            assertNotEq(handler, address(0), "live dex path must deploy the LayerBank handler for this stable");
+        bool isDexStable = coinHash == keccak256(abi.encodePacked(USDRIF_STRING))
+            || coinHash == keccak256(abi.encodePacked(USDT0_STRING));
+        bytes32 protocolHash = keccak256(abi.encodePacked(vm.envString("LENDING_PROTOCOL")));
+
+        if (isDexStable) {
+            address token = _docTokenFromHandler(handler);
+            address idleHandler = operationsAdmin.getTokenHandler(token, IDLE_INDEX);
+            assertNotEq(idleHandler, address(0), "live dex path must assign IdleErc20HandlerDex at index 0");
             assertTrue(
-                IPurchaseUniswap(handler).isPurchasePathAllowed(
-                    keccak256(IPurchaseUniswap(handler).getSwapPath())
+                IPurchaseUniswap(idleHandler).isPurchasePathAllowed(
+                    keccak256(IPurchaseUniswap(idleHandler).getSwapPath())
                 ),
-                "constructor path is allowlisted at construction"
+                "idle dex constructor path is allowlisted"
             );
+
+            if (protocolHash == keccak256(abi.encodePacked(LAYERBANK_STRING))) {
+                assertEq(
+                    uint256(operationsAdmin.getRouteClass(LAYERBANK_INDEX)),
+                    uint256(IOperationsAdmin.RouteClass.Lending)
+                );
+                assertNotEq(handler, address(0), "live dex path must deploy the LayerBank handler for this stable");
+                assertTrue(
+                    IPurchaseUniswap(handler).isPurchasePathAllowed(
+                        keccak256(IPurchaseUniswap(handler).getSwapPath())
+                    ),
+                    "constructor path is allowlisted at construction"
+                );
+            } else if (protocolHash == keccak256(abi.encodePacked(NONE_STRING))) {
+                assertEq(handler, idleHandler, "LENDING_PROTOCOL=none must select the idle dex handler");
+            }
+
             vm.prank(SAFE);
             operationsAdmin.acceptOwnership();
             vm.prank(SAFE);
@@ -218,7 +233,6 @@ contract LiveDeployPathTest is Test {
                 IFeeHandler.FeeSettings memory stored = IFeeHandler(handler).getFeeSettings();
                 assertEq(stored.feePurchaseLowerBound, USDT0_FEE_PURCHASE_LOWER_BOUND);
                 assertEq(stored.feePurchaseUpperBound, USDT0_FEE_PURCHASE_UPPER_BOUND);
-                address token = _docTokenFromHandler(handler);
                 (uint256 minPurchase, bool custom) = dcaManager.getTokenMinPurchaseAmount(token);
                 assertTrue(custom, "DeployDexSwaps live USDT0 path must set the 6-decimal min");
                 assertEq(minPurchase, USDT0_MIN_PURCHASE_AMOUNT);
@@ -258,7 +272,7 @@ contract LiveDeployPathTest is Test {
             return;
         }
         bytes32 protocolHash = keccak256(abi.encodePacked(vm.envString("LENDING_PROTOCOL")));
-        // Idle has no Dex helper config; Tropykus live dex reverts first for a different reason.
+        // Idle has no Dex helper config on DOC; Tropykus live dex reverts first for a different reason.
         if (
             protocolHash == keccak256(abi.encodePacked(NONE_STRING))
                 || protocolHash == keccak256(abi.encodePacked(TROPYKUS_STRING))
@@ -274,10 +288,6 @@ contract LiveDeployPathTest is Test {
     function _skipIfDexLiveUnsupported() internal {
         string memory lendingProtocol = vm.envString("LENDING_PROTOCOL");
         bytes32 protocolHash = keccak256(abi.encodePacked(lendingProtocol));
-        if (protocolHash == keccak256(abi.encodePacked(NONE_STRING))) {
-            vm.skip(true);
-            return;
-        }
         string memory coinType = vm.envOr("STABLECOIN_TYPE", DOC_STRING);
         bytes32 coinHash = keccak256(abi.encodePacked(coinType));
         bool isUSDRIF = coinHash == keccak256(abi.encodePacked(USDRIF_STRING));

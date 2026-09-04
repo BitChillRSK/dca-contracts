@@ -22,6 +22,8 @@ contract DexHelperConfig is Script {
     bool lendingProtocolIsSovryn = keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(SOVRYN_STRING));
     bool lendingProtocolIsLayerbank =
         keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(LAYERBANK_STRING));
+    bool lendingProtocolIsNone =
+        keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(NONE_STRING));
 
     struct NetworkConfig {
         // Stablecoin address
@@ -223,6 +225,8 @@ contract DexHelperConfig is Script {
             mockLayerbankAToken = address(aToken);
             mockShareTokenAddress = mockLayerbankAToken;
             emit HelperConfig__CreatedMockShareToken(mockLayerbankAToken, LAYERBANK_STRING);
+        } else if (lendingProtocolIsNone) {
+            // Idle dex holds the stablecoin on the handler; no share token.
         } else {
             revert("Invalid lending protocol");
         }
@@ -306,6 +310,8 @@ contract DexHelperConfig is Script {
             return activeNetworkConfig.sovrynShareToken;
         } else if (lendingProtocolIsLayerbank) {
             return activeNetworkConfig.layerbankAToken;
+        } else if (lendingProtocolIsNone) {
+            return address(0);
         }
         revert("Unsupported lending protocol");
     }

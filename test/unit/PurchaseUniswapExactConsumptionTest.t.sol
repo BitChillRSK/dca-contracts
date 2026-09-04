@@ -151,17 +151,21 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
                                 HELPERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev A complete fill leaves the handler holding no stablecoin, debits the schedule and pays the fee,
-    ///      and credits the buyer exactly the WRBTC the handler measured itself receiving. That the swap spent
-    ///      the whole requested amount needs no assertion of its own: the purchase reverts otherwise, so
-    ///      reaching this point is the proof.
+    /// @dev A complete fill debits the schedule and pays the fee, and credits the buyer exactly the WRBTC
+    ///      the handler measured itself receiving. Lending handlers hold no stablecoin between redemptions,
+    ///      so their handler balance is unchanged across a successful purchase. Idle handlers hold the pool
+    ///      on the contract, so the same purchase drops the handler balance by the full gross spend.
     function _assertFullFillSpendsEverything() private {
         PurchaseState memory before = _snapshot();
 
         _purchase(_scheduleId());
 
         PurchaseState memory afterPurchase = _snapshot();
-        assertEq(afterPurchase.handlerStablecoin, before.handlerStablecoin);
+        if (isNone) {
+            assertEq(before.handlerStablecoin - afterPurchase.handlerStablecoin, AMOUNT_TO_SPEND);
+        } else {
+            assertEq(afterPurchase.handlerStablecoin, before.handlerStablecoin);
+        }
         assertEq(before.scheduleBalance - afterPurchase.scheduleBalance, AMOUNT_TO_SPEND);
         assertEq(afterPurchase.feeCollectorStablecoin - before.feeCollectorStablecoin, _fee());
         assertEq(
@@ -210,16 +214,21 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
         return dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
     }
 
-    /// @dev The handler holds exactly the net amount when the swap starts — it retrieves gross and pays the
-    ///      fee first — so the short fill leaves the untaken remainder behind and the error reports all three.
+    /// @dev The handler pays the fee first, then snapshots its stablecoin balance for the consumption
+    ///      check. Lending retrieval leaves only the net swap amount on the handler; idle funds were
+    ///      already there, so the before-balance is the pool minus the fee just paid.
     function _expectShortFillRevert() private {
         uint256 netAmount = _netAmountToSpend();
+        uint256 inputBalanceBefore = isNone
+            ? stablecoin.balanceOf(address(stablecoinHandler)) - _fee()
+            : netAmount;
+        uint256 unspent = netAmount - (netAmount * SHORT_FILL_PERCENT) / FULL_FILL_PERCENT;
         vm.expectRevert(
             abi.encodeWithSelector(
                 IPurchaseUniswap.PurchaseUniswap__InputAmountNotFullySpent.selector,
                 netAmount,
-                netAmount,
-                netAmount - (netAmount * SHORT_FILL_PERCENT) / FULL_FILL_PERCENT
+                inputBalanceBefore,
+                inputBalanceBefore - (netAmount - unspent)
             )
         );
     }
