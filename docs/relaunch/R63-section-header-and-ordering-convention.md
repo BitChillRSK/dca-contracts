@@ -80,14 +80,17 @@ Every `src/**/*.sol` above the size floor. The two ordering fixes are `src/DcaMa
 
 ## Required tests
 
-- No new tests. This item asserts through the size proof below, not through behavior.
+- No new tests. This item asserts through the bytecode proof below, not through behavior.
 - `make check` (all lanes), `make fork-sovryn`, `make fork-tropykus`, `make check-deploy`.
 
 ## Success criteria
 
-- [ ] **Every contract byte-identical.** Reordering declarations and editing comments must not
-      move a single runtime byte. Capture `forge build --sizes` before the first edit and diff it
-      at the end; any delta is a bug in the change, not an accepted cost.
+- [ ] **Every contract's executable runtime unchanged.** Reordering declarations and editing comments
+      must not move a single runtime byte. Compare metadata-stripped `forge inspect <Contract>
+      deployedBytecode` before the first edit and at the end, the way R10 does: comments feed the CBOR
+      metadata hash, so complete deployed bytecode differs by design and equal `--sizes` output is a
+      necessary check rather than a sufficient one. Any delta in the stripped runtime is a bug in the
+      change, not an accepted cost.
 - [ ] `grep -rn "GETTER FUNCTIONS\|^ *FUNCTIONS$" src/` returns nothing (or the inverse, if the
       other spelling wins).
 - [ ] Every `private` and `internal` function in `src/` is below every `external` one in its file.
@@ -96,7 +99,8 @@ Every `src/**/*.sol` above the size floor. The two ordering fixes are `src/DcaMa
 ## Reviewer checklist
 
 - [ ] Matches **Scope**; nothing from **Out of scope**.
-- [ ] Sizes are byte-identical; the before/after table is in the PR.
+- [ ] Metadata-stripped runtime is unchanged everywhere; the before/after table is in the PR. Equal
+      `--sizes` output alone does not settle this.
 - [ ] No vendored interface was reformatted.
 - [ ] No whitespace churn on banners that were already in the chosen form — the diff should show
       renamed banners and moved declarations, nothing else.

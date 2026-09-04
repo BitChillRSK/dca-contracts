@@ -7,7 +7,8 @@ Status: **assigned** · Assigned: yes · Optional/further-review: no
 Bring the `src/` comment layer back to a single authored voice and fix the small correctness defects a
 comment audit surfaced. Verified `src/` source lives on explorers for the life of the deployment, so
 review-round accretion, dead vendor surface, and a getter whose interface disagrees with its
-implementation are all durable costs. No runtime behavior changes.
+implementation are all durable costs. Nothing here moves funds or state; the one executable change is a
+modifier reorder, whose single observable effect is which revert a rejected reentrant call returns.
 
 ## Background
 
@@ -61,8 +62,8 @@ declarations. `IWRBTC` is 9-of-11 unused but is the canonical WETH ABI, which is
 
 ## Open product decisions
 
-**none** — every item is a comment, a layering move, or a mutability annotation. Nothing changes runtime
-behavior, storage layout, or an event.
+**none** — every item is a comment, a layering move, a mutability annotation, or a modifier reorder.
+Nothing changes storage layout, an event, or what any call does with funds.
 
 ## Scope
 
@@ -91,7 +92,9 @@ behavior, storage layout, or an event.
 
 ## Out of scope
 
-- [ ] Any runtime behavior, storage layout, event, or error-signature change.
+- [ ] Any change to storage layout, an event, an error signature, or what a call does with funds. The
+      `deleteDcaSchedule` modifier reorder is in scope and is the one exception to "no executable
+      change"; see **Required tests** for what it does and does not alter.
 - [ ] Trimming `IWRBTC` (canonical WETH ABI; churn against upstream for little gain).
 - [ ] Removing `TokenLending__LendingProtocolRedeemFailed` — declared on the shared `ITokenLending` and
       raised only by legacy Tropykus. Deleting it is an ABI change on a shared interface for a dead
@@ -112,17 +115,25 @@ behavior, storage layout, or an event.
 
 ## Required tests
 
-No new tests: this PR changes no behavior, so the existing suite is the regression gate. What must pass
-is that the suite is unchanged *and* still green.
+No new tests. The only executable change is the `deleteDcaSchedule` modifier reorder, and the existing
+suite is the regression gate for it. What must pass is that the suite is unchanged *and* still green.
+
+The reorder is not behavior-neutral in the strictest sense: putting `nonReentrant` first means a
+reentrant call carrying an invalid schedule index now reverts with `ReentrancyGuardReentrantCall` where
+it previously reverted with `DcaManager__InexistentScheduleIndex`. Only the revert selector on a path
+that is already being rejected changes, and guard-first is the ordering this repo wants, so the reorder
+stands and this note records the difference rather than hiding it behind a blanket "no behavior change".
 
 - Full done-gate `make check` (`forge build`, `make moc-none`, `make moc-layerbank`, `make moc-sovryn`,
   `STABLECOIN_TYPE=USDRIF make dex-sovryn`, `STABLECOIN_TYPE=USDRIF make dex-layerbank`,
   `STABLECOIN_TYPE=USDT0 make dex-layerbank`, `make invariants-sovryn`).
 - `make fork-sovryn` and `make fork-tropykus` before push (`AGENTS.md`).
-- `forge build --sizes` before and after. Every contract except `DcaManager` must be **byte-identical**;
-  comments and a `view` annotation must not move bytecode. `DcaManager` moves by exactly the
-  `deleteDcaSchedule` modifier reorder, which must be isolated by rebuilding with that one change
-  reverted and confirming the baseline size returns.
+- Bytecode comparison before and after, using the method R10 established: comments feed Solidity's CBOR
+  metadata hash, so complete `deployedBytecode` is *expected* to differ and `forge build --sizes` proves
+  only that the size did not move. Strip the CBOR suffix (its length is the last two bytes) from
+  `forge inspect <Contract> deployedBytecode` and compare the executable runtime. Every contract except
+  `DcaManager` must match. `DcaManager` moves by exactly the `deleteDcaSchedule` modifier reorder, which
+  must be isolated by rebuilding with that one change reverted and confirming the baseline returns.
 - `forge inspect IFeeHandler abi` must show `getFeeCollectorAddress` as `view` after the change. It
   must be the **interface** artifact: `forge inspect FeeHandler abi` printed `view` before the change
   too, since the implementation already declared it, so that command proves nothing here.
@@ -130,8 +141,9 @@ is that the suite is unchanged *and* still green.
 ## Success criteria
 
 - [ ] `make check` green; `make fork-sovryn` and `make fork-tropykus` green.
-- [ ] `forge build --sizes` byte-identical for every contract except `DcaManager`, whose delta is
-      measured and shown to come only from the modifier reorder.
+- [ ] Metadata-stripped runtime bytecode unchanged for every contract except `DcaManager`, whose delta is
+      measured and shown to come only from the modifier reorder. Complete `deployedBytecode` will differ
+      wherever a comment changed; that is the metadata hash, not the executable.
 - [ ] No `@notice` / `@dev` / `@param` / `@return` tag remains inside a function body in `src/`.
 - [ ] No `src/` comment contains a gas figure, an R-id, an `AGENTS.md` invariant number, or a sentence
       about what a previous PR changed.
@@ -147,7 +159,7 @@ is that the suite is unchanged *and* still green.
 - [ ] Matches **Scope**; nothing from **Out of scope**.
 - [ ] Protocol invariants in `AGENTS.md` still hold — none is touched; invariant 6's grep is *easier* to
       run after the `deleteDcaSchedule` modifier reorder.
-- [ ] Sizes byte-identical apart from `DcaManager`'s isolated modifier-reorder delta; the diff is
+- [ ] Executable runtime unchanged apart from `DcaManager`'s isolated modifier-reorder delta; the diff is
       comments, one `view`, one file move, one modifier reorder, one interface trim.
 - [ ] Every surviving comment says something the code does not, and says it once.
 - [ ] No unrelated refactors; history is reviewable.
@@ -158,6 +170,8 @@ is that the suite is unchanged *and* still green.
   already behaved this way; this only corrects what the ABI advertises. A consumer that generated a
   write binding for it should regenerate. No selector changes, no event or error changes.
 - **Scripts:** none.
-- **Cutover:** the frontend should regenerate the `FeeHandler` ABI so `getFeeCollectorAddress` is called
-  rather than sent. Low urgency — a call against the old binding still works, it just costs a
-  transaction round-trip in tooling that honors the mutability flag.
+- **Cutover:** only consumers that generate bindings from the standalone `IFeeHandler` artifact are
+  affected; the `FeeHandler` artifact already advertised `view`, so regenerating that one changes
+  nothing. A consumer on `IFeeHandler` should regenerate so `getFeeCollectorAddress` is called rather
+  than sent. Low urgency — a call against the old binding still works, it just costs a transaction
+  round-trip in tooling that honors the mutability flag.
