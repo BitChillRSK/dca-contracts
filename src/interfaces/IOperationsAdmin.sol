@@ -112,23 +112,6 @@ interface IOperationsAdmin {
     function setDepositsPaused(address token, uint256 routeIndex, bool paused) external;
 
     /**
-     * @notice Whether new deposits to `(token, routeIndex)` are currently blocked.
-     * @param token The stablecoin.
-     * @param routeIndex The route index. Must fit `uint32`.
-     * @return paused True when `DcaManager` must reject new deposits for this pair.
-     * @dev False for unassigned pairs: only an assigned pair can be paused.
-     */
-    function areDepositsPaused(address token, uint256 routeIndex) external view returns (bool paused);
-
-    /**
-     * @notice Handler registered for a token and route index.
-     * @param token The stablecoin.
-     * @param routeIndex The route index. Must fit `uint32`.
-     * @return handler The TokenHandler, or `address(0)` if none is assigned.
-     */
-    function getTokenHandler(address token, uint256 routeIndex) external view returns (address handler);
-
-    /**
      * @notice Add `swapper` to the swapper allowlist. Idempotent; does not replace other swappers.
      * @param swapper The swapper address.
      */
@@ -139,6 +122,10 @@ interface IOperationsAdmin {
      * @param swapper The swapper address.
      */
     function revokeSwapper(address swapper) external;
+
+    /*//////////////////////////////////////////////////////////////
+                                GETTERS
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Whether `account` is an authorized swapper.
@@ -161,4 +148,21 @@ interface IOperationsAdmin {
      * @return The registered class, or `Unregistered` if it has never been classified.
      */
     function getRouteClass(uint256 index) external view returns (RouteClass);
+
+    /**
+     * @notice Handler registered for a token and route index.
+     * @param token The stablecoin.
+     * @param routeIndex The route index. Must fit `uint32`.
+     * @return handler The TokenHandler, or `address(0)` if none is assigned.
+     */
+    function getTokenHandler(address token, uint256 routeIndex) external view returns (address handler);
+
+    /**
+     * @notice Whether new deposits to `(token, routeIndex)` are currently blocked.
+     * @param token The stablecoin.
+     * @param routeIndex The route index. Must fit `uint32`.
+     * @return paused True when `DcaManager` must reject new deposits for this pair.
+     * @dev False for unassigned pairs: only an assigned pair can be paused.
+     */
+    function areDepositsPaused(address token, uint256 routeIndex) external view returns (bool paused);
 }

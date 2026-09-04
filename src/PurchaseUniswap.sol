@@ -118,7 +118,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     /*//////////////////////////////////////////////////////////////
-                               EXTERNAL FUNCTIONS
+                           EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
     /**
      * @inheritdoc IPurchaseRbtc
@@ -204,7 +204,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            GETTERS
+                                GETTERS
     //////////////////////////////////////////////////////////////*/
 
     /**
@@ -281,54 +281,6 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     ) internal {
         s_purchasePathAllowed[pathHash] = allowed;
         emit PurchaseUniswap_PurchasePathAllowedSet(pathHash, encodedPath, intermediateTokens, poolFeeRates, allowed);
-    }
-
-    /**
-     * @dev Uniswap V3 `exactInput` bytes: this handler's stablecoin, then each
-     *      `(fee, intermediateToken)`, then the last fee and WRBTC. Empty
-     *      `intermediateTokens` is a direct pair. `poolFeeRates.length` must be
-     *      `intermediateTokens.length + 1`. Reverts if `_purchaseToken()` is still
-     *      unset, so a reversed inheritance `is` list fails at deploy.
-     */
-    function _encodePurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
-        private
-        view
-        returns (bytes memory newPath)
-    {
-        if (poolFeeRates.length != intermediateTokens.length + 1) {
-            revert PurchaseUniswap__WrongNumberOfTokensOrFeeRates(intermediateTokens.length, poolFeeRates.length);
-        }
-
-        address purchaseToken = address(_purchaseToken());
-        if (purchaseToken == address(0)) revert PurchaseUniswap__ZeroPurchaseToken();
-
-        newPath = abi.encodePacked(purchaseToken);
-        for (uint256 i = 0; i < intermediateTokens.length; ++i) {
-            newPath = abi.encodePacked(newPath, poolFeeRates[i], intermediateTokens[i]);
-        }
-
-        newPath = abi.encodePacked(newPath, poolFeeRates[poolFeeRates.length - 1], address(i_wrBtcToken));
-    }
-
-    /**
-     * @dev Both arguments are 1e18-scaled fractions. Neither may exceed 100%, and the swap-time floor
-     *      cannot sit below the safety check. Keeping that wall means no single owner transaction can
-     *      widen the live floor past what governance pre-approved as the worst acceptable fill.
-     *      Used by the constructor and both owner setters.
-     */
-    function _validateSlippageSettings(uint256 amountOutMinimumPercent, uint256 amountOutMinimumSafetyCheck)
-        private
-        pure
-    {
-        if (amountOutMinimumPercent > HUNDRED_PERCENT) {
-            revert PurchaseUniswap__AmountOutMinimumPercentTooHigh();
-        }
-        if (amountOutMinimumSafetyCheck > HUNDRED_PERCENT) {
-            revert PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh();
-        }
-        if (amountOutMinimumPercent < amountOutMinimumSafetyCheck) {
-            revert PurchaseUniswap__AmountOutMinimumPercentTooLow();
-        }
     }
 
     /**
@@ -420,6 +372,54 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     /*//////////////////////////////////////////////////////////////
                             PRIVATE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @dev Uniswap V3 `exactInput` bytes: this handler's stablecoin, then each
+     *      `(fee, intermediateToken)`, then the last fee and WRBTC. Empty
+     *      `intermediateTokens` is a direct pair. `poolFeeRates.length` must be
+     *      `intermediateTokens.length + 1`. Reverts if `_purchaseToken()` is still
+     *      unset, so a reversed inheritance `is` list fails at deploy.
+     */
+    function _encodePurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
+        private
+        view
+        returns (bytes memory newPath)
+    {
+        if (poolFeeRates.length != intermediateTokens.length + 1) {
+            revert PurchaseUniswap__WrongNumberOfTokensOrFeeRates(intermediateTokens.length, poolFeeRates.length);
+        }
+
+        address purchaseToken = address(_purchaseToken());
+        if (purchaseToken == address(0)) revert PurchaseUniswap__ZeroPurchaseToken();
+
+        newPath = abi.encodePacked(purchaseToken);
+        for (uint256 i = 0; i < intermediateTokens.length; ++i) {
+            newPath = abi.encodePacked(newPath, poolFeeRates[i], intermediateTokens[i]);
+        }
+
+        newPath = abi.encodePacked(newPath, poolFeeRates[poolFeeRates.length - 1], address(i_wrBtcToken));
+    }
+
+    /**
+     * @dev Both arguments are 1e18-scaled fractions. Neither may exceed 100%, and the swap-time floor
+     *      cannot sit below the safety check. Keeping that wall means no single owner transaction can
+     *      widen the live floor past what governance pre-approved as the worst acceptable fill.
+     *      Used by the constructor and both owner setters.
+     */
+    function _validateSlippageSettings(uint256 amountOutMinimumPercent, uint256 amountOutMinimumSafetyCheck)
+        private
+        pure
+    {
+        if (amountOutMinimumPercent > HUNDRED_PERCENT) {
+            revert PurchaseUniswap__AmountOutMinimumPercentTooHigh();
+        }
+        if (amountOutMinimumSafetyCheck > HUNDRED_PERCENT) {
+            revert PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh();
+        }
+        if (amountOutMinimumPercent < amountOutMinimumSafetyCheck) {
+            revert PurchaseUniswap__AmountOutMinimumPercentTooLow();
+        }
+    }
 
     /**
      * @dev One shared `balanceOf` call site, so the purchase's balance reads do not each emit their own

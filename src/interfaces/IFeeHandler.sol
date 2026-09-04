@@ -75,6 +75,10 @@ interface IFeeHandler {
      */
     function setFeeCollectorAddress(address feeCollector) external;
 
+    /*//////////////////////////////////////////////////////////////
+                                GETTERS
+    //////////////////////////////////////////////////////////////*/
+
     /**
      * @notice Address that currently receives purchase fees.
      * @return The fee collector.

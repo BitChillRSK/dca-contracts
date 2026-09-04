@@ -25,7 +25,7 @@ interface IIdleErc20Handler {
     error IdleErc20Handler__InsufficientIdleBalance(address user, uint256 requested, uint256 available);
 
     /*//////////////////////////////////////////////////////////////
-                           EXTERNAL FUNCTIONS
+                                GETTERS
     //////////////////////////////////////////////////////////////*/
 
     /**

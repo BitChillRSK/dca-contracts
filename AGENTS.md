@@ -72,9 +72,12 @@ First-party `src/` files use Foundry-style banners with these exact titles. When
 `TYPE DECLARATIONS` → `STATE VARIABLES` → `EVENTS` → `ERRORS` → `MODIFIERS` → `CONSTRUCTOR` → `EXTERNAL FUNCTIONS` → `GETTERS` → `INTERNAL FUNCTIONS` → `PRIVATE FUNCTIONS`.
 
 - **Floor:** constructor-only contracts (the only declaration is `constructor`) carry no banners — that is the leaf-handler shape (`IdleDocHandlerMoc`, `*Erc20HandlerDex`, `*DocHandlerMoc`, …). Every other first-party file uses banners for each non-empty section.
-- **Visibility:** external → public → internal → private. Within each group, mutators before views.
-- **EXTERNAL FUNCTIONS** holds non-view `external` / `public` entry points, including `receive` / `fallback` and `public` overrides that write state.
-- **GETTERS** holds `view` / `pure` `external` / `public` accessors. `supportsInterface` (the public view ERC-165 override) lives here.
+- **Visibility:** external → public → internal → private. The externally reachable surface is therefore always the top of the file, which is what makes it readable in one pass; that property, not the banners, is the point of the ordering.
+- **EXTERNAL FUNCTIONS** holds `external` / `public` entry points that write state, including `receive` / `fallback` and `public` overrides. It is decided by mutability, not by name: `getAccruedInterest` is deliberately non-`view` and belongs here.
+- **GETTERS** holds `view` / `pure` `external` / `public` accessors — reads a caller makes for an answer. `supportsInterface` (the public view ERC-165 override) lives here. A `view` / `pure` function that only reverts is a disabled mutator, not an accessor, and stays with the mutators (`BitChillOwnable.renounceOwnership`).
+- Mutators before views applies **within EXTERNAL FUNCTIONS / GETTERS only** — that split is the whole of the rule. Internal and private helpers are ordered by call order, closest caller first, because grouping them by mutability separates a function from the helper it calls for no reader's benefit.
+- Interfaces follow the same split as their implementation, in the same declaration order, so a reader can diff the pair. `IWRBTC` and the other vendored files below are the exception.
+- Each banner title uses one indentation everywhere: `GETTERS` at column 32, `EXTERNAL FUNCTIONS` at 27. When renaming a banner, re-centre it rather than leaving the old padding.
 - Do not use `FUNCTIONS`, `GETTER FUNCTIONS`, or other spellings.
 - Leave vendored interfaces alone so they stay diffable against upstream: `IMocProxy`, `IWRBTC`, `ICoinPairPrice`, `IkToken`, `IiSusdToken`, `ILayerBankPool`, `ILayerBankAToken`.
 

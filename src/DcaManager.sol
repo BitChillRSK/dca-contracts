@@ -430,7 +430,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            GETTERS
+                                GETTERS
     //////////////////////////////////////////////////////////////*/
 
     /**

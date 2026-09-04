@@ -62,13 +62,6 @@ interface ITokenLending is ITokenHandler {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice This user's virtual lending-share balance on this handler.
-     * @param user Account to query.
-     * @return The booked share balance. Equals `newShares` on the latest `UserSharesUpdated` for `user`.
-     */
-    function getUserShares(address user) external view returns (uint256);
-
-    /**
      * @notice Pay `user` the stablecoin interest above `stablecoinLockedInDcaSchedules`.
      * @param user The address receiving the interest.
      * @param stablecoinLockedInDcaSchedules Principal DcaManager still locks for this user on this
@@ -90,6 +83,17 @@ interface ITokenLending is ITokenHandler {
      *      DcaManager can reach this function; `quoteAccruedInterest` is the `view` display read.
      */
     function getAccruedInterest(address user, uint256 stablecoinLockedInDcaSchedules) external returns (uint256);
+
+    /*//////////////////////////////////////////////////////////////
+                                GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice This user's virtual lending-share balance on this handler.
+     * @param user Account to query.
+     * @return The booked share balance. Equals `newShares` on the latest `UserSharesUpdated` for `user`.
+     */
+    function getUserShares(address user) external view returns (uint256);
 
     /**
      * @notice The same figure as `getAccruedInterest`, read without poking the market.

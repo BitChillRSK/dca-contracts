@@ -105,12 +105,6 @@ interface IPurchaseUniswap {
     ) external;
 
     /**
-     * @notice Whether `pathHash` is an approved encoded path on this handler.
-     * @param pathHash `keccak256` of the exact encoded path bytes.
-     */
-    function isPurchasePathAllowed(bytes32 pathHash) external view returns (bool);
-
-    /**
      * @notice Replace the Uniswap V3 path from this handler's stablecoin to WRBTC.
      * @param intermediateTokens Intermediate token addresses in the path (empty for a direct pair).
      * @param poolFeeRates Pool fee for each hop. Length must be `intermediateTokens.length + 1`.
@@ -132,12 +126,6 @@ interface IPurchaseUniswap {
     function setAmountOutMinimumPercent(uint256 amountOutMinimumPercent) external;
 
     /**
-     * @notice Current swap-time oracle floor, 1e18-scaled.
-     * @return The fraction applied to the oracle-implied rBTC when building `amountOutMinimum`.
-     */
-    function getAmountOutMinimumPercent() external view returns (uint256);
-
-    /**
      * @notice Set the lowest `amountOutMinimumPercent` the owner may configure.
      * @param amountOutMinimumSafetyCheck New bound, 1e18-scaled. Never enters swap math.
      * @dev This is the wall a single owner transaction cannot cross: widening the live floor past it
@@ -147,16 +135,26 @@ interface IPurchaseUniswap {
     function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external;
 
     /**
-     * @notice The bound that limits how far `setAmountOutMinimumPercent` may widen the live floor.
-     * @return The lowest value `setAmountOutMinimumPercent` accepts.
-     */
-    function getAmountOutMinimumSafetyCheck() external view returns (uint256);
-
-    /**
      * @notice Point min-out at a new MoC BTC/USD oracle.
      * @param newOracle New oracle. Cannot be zero.
      */
     function updateMocOracle(address newOracle) external;
+
+    /*//////////////////////////////////////////////////////////////
+                                GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Current swap-time oracle floor, 1e18-scaled.
+     * @return The fraction applied to the oracle-implied rBTC when building `amountOutMinimum`.
+     */
+    function getAmountOutMinimumPercent() external view returns (uint256);
+
+    /**
+     * @notice The bound that limits how far `setAmountOutMinimumPercent` may widen the live floor.
+     * @return The lowest value `setAmountOutMinimumPercent` accepts.
+     */
+    function getAmountOutMinimumSafetyCheck() external view returns (uint256);
 
     /**
      * @notice Oracle currently used to build `amountOutMinimum`.
@@ -169,4 +167,10 @@ interface IPurchaseUniswap {
      * @return The current path bytes.
      */
     function getSwapPath() external view returns (bytes memory);
+
+    /**
+     * @notice Whether `pathHash` is an approved encoded path on this handler.
+     * @param pathHash `keccak256` of the exact encoded path bytes.
+     */
+    function isPurchasePathAllowed(bytes32 pathHash) external view returns (bool);
 }
