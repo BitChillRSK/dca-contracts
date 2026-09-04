@@ -32,15 +32,23 @@ interface IDcaManager {
     /// @notice One handler's purchase batch.
     /// @dev Every row shares this batch's `token` and `routeIndex`, which resolve to one handler. The
     ///      four arrays are positional and must have the same nonzero length. `batchBuyRbtc` takes one;
-    ///      `batchBuyRbtcAcrossHandlers` takes several. `minRbtcOut` is the caller's minimum for the
-    ///      batch as a whole, in rBTC/WRBTC wei (18 decimals) whatever the stablecoin's decimals, and is
-    ///      compared against the rBTC the handler measures itself receiving, so it binds on every
-    ///      purchase venue. What sits underneath it does not. A Uniswap route applies an oracle floor of
-    ///      its own and swaps at `max(minRbtcOut, that floor)`, so this value can only tighten it. A MoC
-    ///      route has no floor to compose with, because DOC is redeemed at Money on Chain's own price
-    ///      rather than swapped against a pool, leaving no slippage surface for a floor to guard. Either
-    ///      way this is a liveness bound an honest swapper sets against a stale quote or adverse
-    ///      execution, and never a governance limit **on** the swapper: the swapper picks the value, so
+    ///      `batchBuyRbtcAcrossHandlers` takes several. `buyers` and `scheduleIndexes` address the row.
+    ///      `scheduleIds` and `purchaseAmounts` are staleness guards and not a storage-read saving:
+    ///      passing them in skips no `SLOAD`, because the row loads both of the schedule's slots either
+    ///      way — `tokenBalance` has to be read to be debited, and `purchasePeriod` to decide the row is
+    ///      due, and those two sit in different slots. What the pair buys is a clean revert when the
+    ///      user edits or deletes a schedule between the swapper composing the batch and the batch
+    ///      executing, in place of a purchase that silently proceeds against the new schedule. Measured
+    ///      at 200 rows, the amount guard costs roughly 400 gas per row of the ~19,000 a row costs in
+    ///      all. `minRbtcOut` is the caller's minimum for the batch as a whole, in rBTC/WRBTC wei
+    ///      (18 decimals) whatever the stablecoin's decimals, and is compared against the rBTC the
+    ///      handler measures itself receiving, so it binds on every purchase venue. What sits underneath
+    ///      it does not. A Uniswap route applies an oracle floor of its own and swaps at
+    ///      `max(minRbtcOut, that floor)`, so this value can only tighten it. A MoC route has no floor
+    ///      to compose with, because DOC is redeemed at Money on Chain's own price rather than swapped
+    ///      against a pool, leaving no slippage surface for a floor to guard. Either way this is a
+    ///      liveness bound an honest swapper sets against a stale quote or adverse execution, and never
+    ///      a governance limit **on** the swapper: the swapper picks the value, so
     ///      `0` is always available to it. What still holds when it does is the oracle floor on a Uniswap
     ///      route, and the redemption price itself on a MoC one.
     struct Batch {
