@@ -15,7 +15,8 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice User and swapper entry point: create and manage dollar-cost-averaging schedules.
  * @dev Users talk only to this contract. An allowlisted swapper triggers purchases.
- *      Handlers hold the stablecoin and accumulated rBTC.
+ *      Handlers custody the deposited funds and the accumulated rBTC: an idle handler holds the
+ *      stablecoin itself, a lending handler holds the shares it was minted for that stablecoin.
  */
 contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     using SafeCast for uint256;

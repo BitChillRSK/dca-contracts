@@ -6,7 +6,9 @@ pragma solidity 0.8.36;
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice User and swapper entry point: create and manage dollar-cost-averaging schedules.
  * @dev Users talk only to this contract. An allowlisted swapper triggers purchases.
- *      Handlers hold the stablecoin and accumulated rBTC; this contract never takes custody of them.
+ *      Handlers custody the deposited funds and the accumulated rBTC; this contract never takes
+ *      custody of either. An idle handler holds the stablecoin itself, a lending handler holds the
+ *      shares it was minted for that stablecoin.
  */
 interface IDcaManager {
     /*//////////////////////////////////////////////////////////////
@@ -32,11 +34,12 @@ interface IDcaManager {
     ///      four arrays are positional and must have the same nonzero length. `batchBuyRbtc` takes one;
     ///      `batchBuyRbtcAcrossHandlers` takes several. `minRbtcOut` is the caller's minimum for the
     ///      batch as a whole, in rBTC/WRBTC wei (18 decimals) whatever the stablecoin's decimals, and is
-    ///      compared against the rBTC the handler measures itself receiving. It can only tighten the
-    ///      handler's own governance floor, never loosen it, and `0` disables it. It is a liveness bound
-    ///      for an honestly operated swapper against a stale quote or adverse execution, not a second
-    ///      governance ceiling: a compromised swapper can pass `0` or `1` and remains bounded only by
-    ///      the handler's floor.
+    ///      compared against the rBTC the handler measures itself receiving. The handler enforces
+    ///      `max(minRbtcOut, its own oracle floor)`, so this value can tighten the floor but never
+    ///      loosen it, and passing `0` simply leaves the floor in charge. That makes it a liveness
+    ///      bound an honest swapper sets against a stale quote or adverse execution, not a second
+    ///      governance ceiling — a swapper whose key is stolen just passes `0` and is still held to
+    ///      the handler's floor, which is why the floor and not this field is the safety limit.
     struct Batch {
         address[] buyers;
         address token;
@@ -197,8 +200,9 @@ interface IDcaManager {
      * @param scheduleId Id of that schedule, checked against storage.
      * @param withdrawalAmount Amount to withdraw. Pass `type(uint256).max` for this schedule's
      *        whole `tokenBalance`.
-     * @dev Principal is reduced by the requested amount, not by what the lending protocol paid.
-     *      A redemption fee consumes principal rather than leaving it behind.
+     * @dev Principal is reduced by the requested amount, not by what the lending protocol paid. A
+     *      protocol that pays out less than it was asked for has consumed the difference, so leaving
+     *      it credited to the schedule would let the shortfall be withdrawn a second time.
      */
     function withdrawToken(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 withdrawalAmount) external;
 
@@ -333,9 +337,9 @@ interface IDcaManager {
      * @dev Interest accrues per user, token, and route rather than per schedule, so the caller chooses
      *      which of their schedules on that route receives it, and may split it across several by calling
      *      this more than once. Nothing is redeemed or transferred — the funds already sit in the lending
-     *      protocol and this only raises the schedule's claim over them, which is why it pays no
-     *      redemption fee. A route with deposits paused still accepts a top-up, since that pause stops new
-     *      funds entering the route and this credits funds already in it. Reverts
+     *      protocol and this only raises the schedule's claim over them. A route with deposits paused
+     *      still accepts a top-up, since that pause stops new funds entering the route and this credits
+     *      funds already in it. Reverts
      *      `DcaManager__TokenDoesNotYieldInterest` on an idle route,
      *      `DcaManager__NoInterestToTopUpWith` when nothing has accrued,
      *      `DcaManager__TopUpExceedsAccruedInterest` when `amount` is more than has accrued, and

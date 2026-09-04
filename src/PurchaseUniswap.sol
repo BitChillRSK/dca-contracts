@@ -368,12 +368,12 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      *      converts to wei, which are WRBTC's units because WRBTC is 18 decimals. This is a revert bound
      *      and not an accounting input — what the handler credits is the measured WRBTC delta in
      *      `_purchaseRbtc`. The oracle `isValid` bit is read at execution, not at signing, so a transaction
-     *      sitting in the mempool is priced by the oracle of the block that mines it, and this floor is the
-     *      only bound on a stale or sandwiched swap. `ExactInputParams` carries no deadline, and
-     *      `IMulticallExtended.multicall(uint256 deadline, bytes[])` cannot substitute for one: a deadline
-     *      this contract derives from `block.timestamp` while executing is satisfied by construction. Only
-     *      a caller-supplied deadline would bind, which means a `batchBuyRbtc` argument, not a handler
-     *      change.
+     *      sitting in the mempool is priced by the oracle of the block that mines it, and this floor is
+     *      the only bound on a stale or sandwiched swap. There is deliberately no swap deadline to go with
+     *      it: SwapRouter02's `ExactInputParams` has no deadline field, and its `multicall(deadline, ...)`
+     *      overload only checks the value the caller passes, so a deadline this handler computed from
+     *      `block.timestamp` mid-execution would always pass. A binding deadline has to be chosen by the
+     *      swapper before signing, so adding one means a new `batchBuyRbtc` argument, not a change here.
      */
     function _getAmountOutLowerBound(uint256 stablecoinAmountToSpend) internal view returns (uint256 minimumRbtcAmount) {
         (uint256 currentPrice, bool isValid,) = s_mocOracle.getPriceInfo();
