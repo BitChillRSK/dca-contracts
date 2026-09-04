@@ -70,6 +70,10 @@ swapper's pre-flight already filters short buyers before this ships.
 - A `SWAP_TYPE=dex` lane exercising the idle route: deposit → batch purchase → withdraw rBTC.
 - Assert the short-buyer batch **reverts** rather than clamping, so R62 does not silently change
   the idle base's documented behavior when it reaches a Uniswap batch.
+- Live Uniswap fork coverage matching the other Dex leaves:
+  `SWAP_TYPE=dexSwaps STABLECOIN_TYPE=USDRIF make fork-none` (peer of
+  `SWAP_TYPE=dexSwaps STABLECOIN_TYPE=USDRIF make fork-layerbank`), plus
+  `make fork-dex-path` (now runs `DexPathFailoverTest` on LayerBank **and** idle).
 - `make fork-sovryn` and `make fork-tropykus` before push, per `AGENTS.md`.
 
 ## Success criteria

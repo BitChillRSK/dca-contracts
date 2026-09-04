@@ -21,7 +21,7 @@ PROBE_VERBOSITY ?= -vv
 PROBE_MATCH ?=
 
 # Targets
-.PHONY: all test moc dex help check ci check-deploy build build-deploy patch-deps slither moc-none moc-layerbank moc-tropykus moc-sovryn dex-none dex-tropykus dex-sovryn dex-layerbank invariants invariants-sovryn fork fork-tropykus fork-sovryn fork-layerbank fork-dex-path probe-sovryn-exit-fee probe-dex-quote-floor coverage
+.PHONY: all test moc dex help check ci check-deploy build build-deploy patch-deps slither moc-none moc-layerbank moc-tropykus moc-sovryn dex-none dex-tropykus dex-sovryn dex-layerbank invariants invariants-sovryn fork fork-none fork-tropykus fork-sovryn fork-layerbank fork-dex-path probe-sovryn-exit-fee probe-dex-quote-floor coverage
 
 all: help
 
@@ -119,6 +119,10 @@ moc-sovryn:
 fork:
 	@if [ "$(LENDING_PROTOCOL)" = "sovryn" ]; then \
 		$(MAKE) fork-sovryn; \
+	elif [ "$(LENDING_PROTOCOL)" = "layerbank" ]; then \
+		$(MAKE) fork-layerbank; \
+	elif [ "$(LENDING_PROTOCOL)" = "none" ]; then \
+		$(MAKE) fork-none; \
 	else \
 		$(MAKE) fork-tropykus; \
 	fi
@@ -131,6 +135,15 @@ fork-tropykus:
 	fi; \
 	SWAP_TYPE=$(SWAP_TYPE) LENDING_PROTOCOL=tropykus EXPECTED_LENDING_PROTOCOL=tropykus STABLECOIN_TYPE=$(STABLECOIN_TYPE) \
 	$(FORK_TEST_CMD) --fork-url $$RSK_MAINNET_RPC_URL --fork-block-number $(FORK_BLOCK_TROPYKUS)
+fork-none:
+	@echo "Executing idle (none) fork tests with SWAP_TYPE=$(SWAP_TYPE) $(STABLECOIN_TYPE)..."
+	@set -a; [ -f .env ] && . ./.env; set +a; \
+	if [ -z "$$RSK_MAINNET_RPC_URL" ]; then \
+		echo "error: RSK_MAINNET_RPC_URL is not set. Add it to .env or export it."; \
+		exit 1; \
+	fi; \
+	SWAP_TYPE=$(SWAP_TYPE) LENDING_PROTOCOL=none EXPECTED_LENDING_PROTOCOL=none STABLECOIN_TYPE=$(STABLECOIN_TYPE) \
+	$(FORK_TEST_CMD) --fork-url $$RSK_MAINNET_RPC_URL
 fork-sovryn:
 	@echo "Executing Sovryn fork tests with SWAP_TYPE=$(SWAP_TYPE) $(STABLECOIN_TYPE)..."
 	@set -a; [ -f .env ] && . ./.env; set +a; \
@@ -149,16 +162,19 @@ fork-layerbank:
 	fi; \
 	SWAP_TYPE=$(SWAP_TYPE) LENDING_PROTOCOL=layerbank EXPECTED_LENDING_PROTOCOL=layerbank STABLECOIN_TYPE=$(STABLECOIN_TYPE) \
 	$(FORK_TEST_CMD) --fork-url $$RSK_MAINNET_RPC_URL
-# Dex path allowlist (R52). Full `fork-layerbank` + dexSwaps still runs purchase tests against live
-# Uniswap pools; those can revert `Too little received` and are not this gate.
+# Dex path allowlist (R52). Full `fork-layerbank` / `fork-none` + dexSwaps still run purchase
+# tests against live Uniswap pools; those can revert `Too little received` and are not this gate.
+# Idle+DEX (R62) shares PurchaseUniswap, so the allowlist suite runs on both funding bases.
 fork-dex-path:
-	@echo "Executing Dex path allowlist fork tests (USDRIF / LayerBank / dexSwaps)..."
+	@echo "Executing Dex path allowlist fork tests (USDRIF / LayerBank + idle / dexSwaps)..."
 	@set -a; [ -f .env ] && . ./.env; set +a; \
 	if [ -z "$$RSK_MAINNET_RPC_URL" ]; then \
 		echo "error: RSK_MAINNET_RPC_URL is not set. Add it to .env or export it."; \
 		exit 1; \
 	fi; \
 	SWAP_TYPE=dexSwaps LENDING_PROTOCOL=layerbank EXPECTED_LENDING_PROTOCOL=layerbank STABLECOIN_TYPE=USDRIF \
+	$(FORK_TEST_CMD) --match-contract DexPathFailoverTest --fork-url $$RSK_MAINNET_RPC_URL; \
+	SWAP_TYPE=dexSwaps LENDING_PROTOCOL=none EXPECTED_LENDING_PROTOCOL=none STABLECOIN_TYPE=USDRIF \
 	$(FORK_TEST_CMD) --match-contract DexPathFailoverTest --fork-url $$RSK_MAINNET_RPC_URL
 
 # Live iSUSD burn probe for SIP-0094 (excluded from check/fork/CI). See
@@ -241,10 +257,11 @@ help:
 	@echo "  make invariants-sovryn         # InvariantTest + Sovryn (CI lane)"
 	@echo ""
 	@echo "  make fork                      # Fork tests (reads RSK_MAINNET_RPC_URL from env/.env); tropykus pins block $(FORK_BLOCK_TROPYKUS)"
+	@echo "  make fork-none                 # Idle (none) fork tests (chain tip; use SWAP_TYPE=dexSwaps STABLECOIN_TYPE=USDRIF for idle+DEX)"
 	@echo "  make fork-tropykus             # Tropykus fork tests (pinned: kDOC mint paused 2026-04-27)"
 	@echo "  make fork-sovryn               # Sovryn fork tests (chain tip)"
 	@echo "  make fork-layerbank            # LayerBank fork tests (chain tip; default mocSwaps)"
-	@echo "  make fork-dex-path             # R52 Dex path allowlist on a LayerBank/USDRIF Uniswap fork"
+	@echo "  make fork-dex-path             # R52 Dex path allowlist on LayerBank and idle USDRIF Uniswap forks"
 	@echo "  make probe-sovryn-exit-fee     # Live iSUSD burn: is SIP-0094's 0.1% fee charging?"
 	@echo "  make probe-dex-quote-floor     # R51: live Dex pool quotes vs the oracle floor, at a pinned block"
 	@echo ""
