@@ -19,6 +19,7 @@ import {IDcaManager} from "../../../src/interfaces/IDcaManager.sol";
 import "../../Constants.sol";
 import {batchBuyOne, toBatch} from "../../utils/BatchBuyOne.sol";
 import {ownableUnauthorized} from "../../utils/OzRevert.sol";
+import {scheduleAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @title RoleSecurityTest
@@ -224,7 +225,7 @@ contract RoleSecurityTest is Test {
             TROPYKUS_INDEX
         );
         
-        uint64 scheduleId = dcaManager.getDcaSchedule(user, address(stablecoin), 0).scheduleId;
+        uint64 scheduleId = scheduleAt(dcaManager, user, address(stablecoin), 0).scheduleId;
 
         address[] memory buyers = new address[](1);
         uint256[] memory scheduleIndexes = new uint256[](1);
@@ -237,23 +238,23 @@ contract RoleSecurityTest is Test {
         // Unauthorized user should fail
         vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__UnauthorizedSwapper.selector, UNAUTHORIZED_USER));
         vm.prank(UNAUTHORIZED_USER);
-        batchBuyOne(dcaManager, user, address(stablecoin), 0, scheduleId, 100 ether, TROPYKUS_INDEX);
+        batchBuyOne(dcaManager, address(stablecoin), scheduleId, 100 ether, TROPYKUS_INDEX);
         
         // Owner cannot buy (only swapper can)
         vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__UnauthorizedSwapper.selector, OWNER));
         vm.prank(OWNER);
-        batchBuyOne(dcaManager, user, address(stablecoin), 0, scheduleId, 100 ether, TROPYKUS_INDEX);
+        batchBuyOne(dcaManager, address(stablecoin), scheduleId, 100 ether, TROPYKUS_INDEX);
         
         // Admin cannot buy (only swapper can)
         vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__UnauthorizedSwapper.selector, ADMIN));
         vm.prank(ADMIN);
-        batchBuyOne(dcaManager, user, address(stablecoin), 0, scheduleId, 100 ether, TROPYKUS_INDEX);
+        batchBuyOne(dcaManager, address(stablecoin), scheduleId, 100 ether, TROPYKUS_INDEX);
         
         // Only swapper can buy (may fail due to Uniswap mock issues, but authorization should pass)
         vm.prank(SWAPPER);
-        try dcaManager.batchBuyRbtc(toBatch(buyers, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, TROPYKUS_INDEX)) {
+        try dcaManager.batchBuyRbtc(toBatch(scheduleIds, purchaseAmounts, address(stablecoin), TROPYKUS_INDEX)) {
             // Purchase succeeded - verify balance decrease
-            assertLt(dcaManager.getDcaSchedule(user, address(stablecoin), 0).tokenBalance, 500 ether);
+            assertLt(scheduleAt(dcaManager, user, address(stablecoin), 0).tokenBalance, 500 ether);
         } catch Error(string memory reason) {
             // Expected in test environment due to Uniswap mock limitations
             // As long as we didn't get DcaManager__UnauthorizedSwapper, the authorization worked
@@ -291,26 +292,26 @@ contract RoleSecurityTest is Test {
             TROPYKUS_INDEX
         );
         
-        scheduleIds[0] = dcaManager.getDcaSchedule(users[0], address(stablecoin), 0).scheduleId;
+        scheduleIds[0] = scheduleAt(dcaManager, users[0], address(stablecoin), 0).scheduleId;
         
         // Unauthorized user should fail
         vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__UnauthorizedSwapper.selector, UNAUTHORIZED_USER));
         vm.prank(UNAUTHORIZED_USER);
-        dcaManager.batchBuyRbtc(toBatch(users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, TROPYKUS_INDEX));
+        dcaManager.batchBuyRbtc(toBatch(scheduleIds, purchaseAmounts, address(stablecoin), TROPYKUS_INDEX));
         
         // Owner cannot batch buy
         vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__UnauthorizedSwapper.selector, OWNER));
         vm.prank(OWNER);
-        dcaManager.batchBuyRbtc(toBatch(users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, TROPYKUS_INDEX));
+        dcaManager.batchBuyRbtc(toBatch(scheduleIds, purchaseAmounts, address(stablecoin), TROPYKUS_INDEX));
         
         // Admin cannot batch buy
         vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__UnauthorizedSwapper.selector, ADMIN));
         vm.prank(ADMIN);
-        dcaManager.batchBuyRbtc(toBatch(users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, TROPYKUS_INDEX));
+        dcaManager.batchBuyRbtc(toBatch(scheduleIds, purchaseAmounts, address(stablecoin), TROPYKUS_INDEX));
         
         // Only swapper can batch buy (may fail due to Uniswap mock issues, but authorization should pass)
         vm.prank(SWAPPER);
-        try dcaManager.batchBuyRbtc(toBatch(users, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, TROPYKUS_INDEX)) {
+        try dcaManager.batchBuyRbtc(toBatch(scheduleIds, purchaseAmounts, address(stablecoin), TROPYKUS_INDEX)) {
             // Batch purchase succeeded - this is the ideal case
         } catch Error(string memory reason) {
             // Expected in test environment due to Uniswap mock limitations

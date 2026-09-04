@@ -6,6 +6,7 @@ import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {ITokenLending} from "src/interfaces/ITokenLending.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import "../Constants.sol";
+import {scheduleAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @title EventIndexingTest
@@ -63,10 +64,10 @@ contract EventIndexingTest is DcaDappTest {
     }
 
     function testSchedulePauseSetIndexesUserAndScheduleIdOnly() external {
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         vm.prank(USER);
         vm.recordLogs();
-        dcaManager.setSchedulePaused(address(stablecoin), SCHEDULE_INDEX, scheduleId, true);
+        dcaManager.setSchedulePaused(scheduleId, true);
 
         bytes32 sig = keccak256("DcaManager__SchedulePauseSet(address,uint64,bool)");
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -84,28 +85,28 @@ contract EventIndexingTest is DcaDappTest {
     }
 
     function testFirstPartyLogsIndexEveryAddressAndScheduleIdOnly() external {
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         vm.recordLogs();
         depositStablecoin();
         vm.startPrank(USER);
-        dcaManager.updatePurchaseAmount(address(stablecoin), SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
-        dcaManager.updatePurchasePeriod(address(stablecoin), SCHEDULE_INDEX, scheduleId, MIN_PURCHASE_PERIOD);
-        dcaManager.setSchedulePaused(address(stablecoin), SCHEDULE_INDEX, scheduleId, true);
-        dcaManager.setSchedulePaused(address(stablecoin), SCHEDULE_INDEX, scheduleId, false);
+        dcaManager.updatePurchaseAmount(scheduleId, AMOUNT_TO_SPEND);
+        dcaManager.updatePurchasePeriod(scheduleId, MIN_PURCHASE_PERIOD);
+        dcaManager.setSchedulePaused(scheduleId, true);
+        dcaManager.setSchedulePaused(scheduleId, false);
         vm.stopPrank();
         makeSinglePurchase();
         vm.prank(USER);
         dcaManager.withdrawRbtcFromTokenHandler(address(stablecoin), s_routeIndex);
         vm.prank(USER);
-        dcaManager.deleteDcaSchedule(address(stablecoin), SCHEDULE_INDEX, scheduleId);
+        dcaManager.deleteDcaSchedule(scheduleId);
         _assertFirstPartyIndexing(vm.getRecordedLogs());
     }
 
     function testDcaScheduleDeletedIndexesUserTokenAndScheduleId() external {
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         vm.prank(USER);
         vm.recordLogs();
-        dcaManager.deleteDcaSchedule(address(stablecoin), SCHEDULE_INDEX, scheduleId);
+        dcaManager.deleteDcaSchedule(scheduleId);
 
         bytes32 sig = keccak256("DcaManager__DcaScheduleDeleted(address,address,uint64,uint256)");
         Vm.Log[] memory logs = vm.getRecordedLogs();

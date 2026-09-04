@@ -146,7 +146,7 @@ contract FeeOnTransferDepositTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(ITokenHandler.TokenHandler__DepositAmountMismatch.selector, REQUESTED, RECEIVED)
         );
-        dcaManager.depositToken(address(token), 0, scheduleId, REQUESTED);
+        dcaManager.depositToken(scheduleId, REQUESTED);
 
         // The first, fee-free deposit survives; the second one credits nothing at all.
         assertEq(dcaManager.getDcaSchedules(USER, address(token))[0].tokenBalance, REQUESTED);
@@ -229,7 +229,7 @@ contract FeeOnTransferDepositTest is Test {
         uint256 userBefore = token.balanceOf(USER);
 
         vm.prank(USER);
-        dcaManager.depositToken(address(token), 0, scheduleId, REQUESTED);
+        dcaManager.depositToken(scheduleId, REQUESTED);
 
         assertEq(dcaManager.getDcaSchedules(USER, address(token))[0].tokenBalance, REQUESTED * 2);
         assertEq(idleHandler.getUsersIdleTokenBalance(USER), REQUESTED * 2);
@@ -248,7 +248,7 @@ contract FeeOnTransferDepositTest is Test {
         token.setFeeBps(FEE_BPS);
 
         vm.prank(SWAPPER);
-        batchBuyOne(dcaManager, USER, address(token), 0, scheduleId, MIN_PURCHASE_AMOUNT, IDLE_INDEX);
+        batchBuyOne(dcaManager, address(token), scheduleId, MIN_PURCHASE_AMOUNT, IDLE_INDEX);
 
         uint256 afterBuy = REQUESTED - MIN_PURCHASE_AMOUNT;
         assertEq(dcaManager.getDcaSchedules(USER, address(token))[0].tokenBalance, afterBuy);
@@ -257,7 +257,7 @@ contract FeeOnTransferDepositTest is Test {
 
         uint256 userBalanceBefore = token.balanceOf(USER);
         vm.prank(USER);
-        dcaManager.withdrawToken(address(token), 0, scheduleId, afterBuy);
+        dcaManager.withdrawToken(scheduleId, afterBuy);
 
         // R20: principal falls by the requested amount even if outbound FOT pays the user less.
         assertEq(dcaManager.getDcaSchedules(USER, address(token))[0].tokenBalance, 0);
@@ -277,7 +277,7 @@ contract FeeOnTransferDepositTest is Test {
         vm.expectEmit(true, true, true, true, address(dcaManager));
         emit IDcaManager.DcaManager__DcaScheduleDeleted(USER, address(token), scheduleId, REQUESTED);
         vm.prank(USER);
-        dcaManager.deleteDcaSchedule(address(token), 0, scheduleId);
+        dcaManager.deleteDcaSchedule(scheduleId);
 
         assertEq(idleHandler.getUsersIdleTokenBalance(USER), 0);
         uint256 userGained = token.balanceOf(USER) - userBefore;
@@ -312,9 +312,9 @@ contract FeeOnTransferDepositTest is Test {
         uint64 scheduleId = _createTropykusSchedule(USER, MIN_PURCHASE_AMOUNT);
 
         vm.prank(USER);
-        dcaManager.depositToken(address(token), 0, scheduleId, REQUESTED);
+        dcaManager.depositToken(scheduleId, REQUESTED);
         vm.prank(USER);
-        dcaManager.depositToken(address(token), 0, scheduleId, REQUESTED);
+        dcaManager.depositToken(scheduleId, REQUESTED);
 
         assertEq(dcaManager.getDcaSchedules(USER, address(token))[0].tokenBalance, REQUESTED * 3);
         uint256 userUnderlying = _tropykusUnderlying(USER);
@@ -328,7 +328,7 @@ contract FeeOnTransferDepositTest is Test {
 
         uint256 userBefore = token.balanceOf(USER);
         vm.prank(USER);
-        dcaManager.withdrawToken(address(token), 0, scheduleId, REQUESTED);
+        dcaManager.withdrawToken(scheduleId, REQUESTED);
 
         assertEq(dcaManager.getDcaSchedules(USER, address(token))[0].tokenBalance, 0);
         assertApproxEqAbs(_tropykusUnderlying(USER), 0, LENDING_ROUNDING_SLACK);
@@ -359,13 +359,13 @@ contract FeeOnTransferDepositTest is Test {
                 ITokenLending.TokenLending__InsufficientShares.selector, USER, requestedShares, availableShares
             )
         );
-        dcaManager.batchBuyRbtc(toBatch(buyers, address(token), indexes, ids, amounts, TROPYKUS_INDEX));
+        dcaManager.batchBuyRbtc(toBatch(ids, amounts, address(token), TROPYKUS_INDEX));
 
         // Revert leaves the schedule intact; the lending clamp still lets the user withdraw.
         assertEq(dcaManager.getDcaSchedules(USER, address(token))[0].tokenBalance, REQUESTED);
         uint256 userBefore = token.balanceOf(USER);
         vm.prank(USER);
-        dcaManager.withdrawToken(address(token), 0, scheduleId, REQUESTED);
+        dcaManager.withdrawToken(scheduleId, REQUESTED);
         assertEq(dcaManager.getDcaSchedules(USER, address(token))[0].tokenBalance, 0);
         assertGt(token.balanceOf(USER), userBefore);
     }

@@ -7,6 +7,7 @@ import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
 import {UNUSED_SCHEDULE_ID} from "../utils/BatchBuyOne.sol";
+import {scheduleAt} from "test/utils/ScheduleAt.sol";
 
 contract StablecoinDepositTest is DcaDappTest {
     function setUp() public override {
@@ -25,19 +26,19 @@ contract StablecoinDepositTest is DcaDappTest {
     function testCannotDepositZeroStablecoin() external {
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         vm.expectRevert(IDcaManager.DcaManager__DepositAmountMustBeGreaterThanZero.selector);
-        dcaManager.depositToken(address(stablecoin), SCHEDULE_INDEX, scheduleId, 0);
+        dcaManager.depositToken(scheduleId, 0);
         vm.stopPrank();
     }
 
     function testDepositRevertsIfStablecoinNotApproved() external {
         vm.startPrank(USER);
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
-        uint256 balanceBefore = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint256 balanceBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
         vm.expectRevert();
-        dcaManager.depositToken(address(stablecoin), SCHEDULE_INDEX, scheduleId, AMOUNT_TO_DEPOSIT);
-        assertEq(dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance, balanceBefore);
+        dcaManager.depositToken(scheduleId, AMOUNT_TO_DEPOSIT);
+        assertEq(scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance, balanceBefore);
         vm.stopPrank();
     }
 
@@ -45,10 +46,10 @@ contract StablecoinDepositTest is DcaDappTest {
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
         uint64 wrongId = UNUSED_SCHEDULE_ID;
-        uint256 balanceBefore = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
-        vm.expectRevert(IDcaManager.DcaManager__ScheduleIdAndIndexMismatch.selector);
-        dcaManager.depositToken(address(stablecoin), SCHEDULE_INDEX, wrongId, AMOUNT_TO_DEPOSIT);
-        assertEq(dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance, balanceBefore);
+        uint256 balanceBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, wrongId));
+        dcaManager.depositToken(wrongId, AMOUNT_TO_DEPOSIT);
+        assertEq(scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance, balanceBefore);
         vm.stopPrank();
     }
 } 

@@ -8,6 +8,7 @@ import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import "../Constants.sol";
+import {scheduleAt} from "test/utils/ScheduleAt.sol";
 
 contract RbtcWithdrawalTest is DcaDappTest {
     function setUp() public override {
@@ -182,7 +183,7 @@ contract RbtcWithdrawalTest is DcaDappTest {
 
         super.makeSinglePurchase();
 
-        uint64 attackerScheduleId = dcaManager.getDcaSchedule(attacker, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 attackerScheduleId = scheduleAt(dcaManager, attacker, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         buyRbtcOne(attacker, SCHEDULE_INDEX, attackerScheduleId, AMOUNT_TO_SPEND);
 
         uint256 userAccrued = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);

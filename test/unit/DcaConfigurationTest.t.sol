@@ -8,6 +8,7 @@ import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
 import {UNUSED_SCHEDULE_ID} from "../utils/BatchBuyOne.sol";
 import "../Constants.sol";
+import {scheduleAt} from "test/utils/ScheduleAt.sol";
 
 contract DcaConfigurationTest is DcaDappTest {
     // Events
@@ -31,67 +32,71 @@ contract DcaConfigurationTest is DcaDappTest {
     function testUpdatePurchaseAmount() external {
         uint256 newPurchaseAmount = AMOUNT_TO_SPEND / 2;
         vm.startPrank(USER);
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         // The first edit after createDcaSchedule reports the amount that call wrote
         vm.expectEmit(true, true, true, true);
         emit DcaManager__PurchaseAmountUpdated(USER, scheduleId, AMOUNT_TO_SPEND, newPurchaseAmount);
-        dcaManager.updatePurchaseAmount(address(stablecoin), SCHEDULE_INDEX, scheduleId, newPurchaseAmount);
-        assertEq(newPurchaseAmount, dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).purchaseAmount);
+        dcaManager.updatePurchaseAmount(scheduleId, newPurchaseAmount);
+        assertEq(newPurchaseAmount, scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).purchaseAmount);
         // A second edit reports the amount the first one wrote
         vm.expectEmit(true, true, true, true);
         emit DcaManager__PurchaseAmountUpdated(USER, scheduleId, newPurchaseAmount, AMOUNT_TO_SPEND);
-        dcaManager.updatePurchaseAmount(address(stablecoin), SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
-        assertEq(AMOUNT_TO_SPEND, dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).purchaseAmount);
+        dcaManager.updatePurchaseAmount(scheduleId, AMOUNT_TO_SPEND);
+        assertEq(AMOUNT_TO_SPEND, scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).purchaseAmount);
         vm.stopPrank();
     }
 
-    function testUpdatePurchaseAmountRevertsIfScheduleIdAndIndexMismatch() external {
+    function testUpdatePurchaseAmountRevertsIfScheduleDoesNotExist() external {
         vm.startPrank(USER);
         uint64 wrongScheduleId = UNUSED_SCHEDULE_ID;
-        vm.expectRevert(IDcaManager.DcaManager__ScheduleIdAndIndexMismatch.selector);
-        dcaManager.updatePurchaseAmount(address(stablecoin), SCHEDULE_INDEX, wrongScheduleId, AMOUNT_TO_SPEND);
+        vm.expectRevert(
+            abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, wrongScheduleId)
+        );
+        dcaManager.updatePurchaseAmount(wrongScheduleId, AMOUNT_TO_SPEND);
         vm.stopPrank();
     }
 
-    function testUpdatePurchaseAmountRevertsIfInexistentSchedule() external {
-        vm.startPrank(USER);
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
-        vm.expectRevert(IDcaManager.DcaManager__InexistentScheduleIndex.selector);
-        dcaManager.updatePurchaseAmount(address(stablecoin), SCHEDULE_INDEX + 1, scheduleId, AMOUNT_TO_SPEND);
-        vm.stopPrank();
+    /// @dev The owner is stored on the schedule rather than carried in a mapping key, so it is checked.
+    function testUpdatePurchaseAmountRevertsIfCallerDoesNotOwnTheSchedule() external {
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        vm.prank(makeAddr("notTheOwner"));
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__NotScheduleOwner.selector, scheduleId));
+        dcaManager.updatePurchaseAmount(scheduleId, AMOUNT_TO_SPEND);
     }
 
     function testUpdatePurchasePeriod() external {
         uint256 newPurchasePeriod = MIN_PURCHASE_PERIOD * 7;
         vm.startPrank(USER);
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         // The first edit after createDcaSchedule reports the period that call wrote
         vm.expectEmit(true, true, true, true);
         emit DcaManager__PurchasePeriodUpdated(USER, scheduleId, MIN_PURCHASE_PERIOD, newPurchasePeriod);
-        dcaManager.updatePurchasePeriod(address(stablecoin), SCHEDULE_INDEX, scheduleId, newPurchasePeriod);
-        assertEq(newPurchasePeriod, dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).purchasePeriod);
+        dcaManager.updatePurchasePeriod(scheduleId, newPurchasePeriod);
+        assertEq(newPurchasePeriod, scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).purchasePeriod);
         // A second edit reports the period the first one wrote
         vm.expectEmit(true, true, true, true);
         emit DcaManager__PurchasePeriodUpdated(USER, scheduleId, newPurchasePeriod, MIN_PURCHASE_PERIOD);
-        dcaManager.updatePurchasePeriod(address(stablecoin), SCHEDULE_INDEX, scheduleId, MIN_PURCHASE_PERIOD);
-        assertEq(MIN_PURCHASE_PERIOD, dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).purchasePeriod);
+        dcaManager.updatePurchasePeriod(scheduleId, MIN_PURCHASE_PERIOD);
+        assertEq(MIN_PURCHASE_PERIOD, scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).purchasePeriod);
         vm.stopPrank();
     }
 
-    function testUpdatePurchasePeriodRevertsIfScheduleIdAndIndexMismatch() external {
+    function testUpdatePurchasePeriodRevertsIfScheduleDoesNotExist() external {
         vm.startPrank(USER);
         uint64 wrongScheduleId = UNUSED_SCHEDULE_ID;
-        vm.expectRevert(IDcaManager.DcaManager__ScheduleIdAndIndexMismatch.selector);
-        dcaManager.updatePurchasePeriod(address(stablecoin), SCHEDULE_INDEX, wrongScheduleId, MIN_PURCHASE_PERIOD);
+        vm.expectRevert(
+            abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, wrongScheduleId)
+        );
+        dcaManager.updatePurchasePeriod(wrongScheduleId, MIN_PURCHASE_PERIOD);
         vm.stopPrank();
     }
 
-    function testUpdatePurchasePeriodRevertsIfInexistentSchedule() external {
-        vm.startPrank(USER);
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
-        vm.expectRevert(IDcaManager.DcaManager__InexistentScheduleIndex.selector);
-        dcaManager.updatePurchasePeriod(address(stablecoin), SCHEDULE_INDEX + 1, scheduleId, MIN_PURCHASE_PERIOD);
-        vm.stopPrank();
+    /// @dev The owner is stored on the schedule rather than carried in a mapping key, so it is checked.
+    function testUpdatePurchasePeriodRevertsIfCallerDoesNotOwnTheSchedule() external {
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        vm.prank(makeAddr("notTheOwner"));
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__NotScheduleOwner.selector, scheduleId));
+        dcaManager.updatePurchasePeriod(scheduleId, MIN_PURCHASE_PERIOD);
     }
 
     function testModifyMaxSchedulesPerToken() external {
@@ -104,15 +109,15 @@ contract DcaConfigurationTest is DcaDappTest {
 
     function testPurchaseAmountEqualToBalanceSucceeds() external {
         vm.startPrank(USER);
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
-        dcaManager.updatePurchaseAmount(address(stablecoin), SCHEDULE_INDEX, scheduleId, AMOUNT_TO_DEPOSIT);
-        assertEq(AMOUNT_TO_DEPOSIT, dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).purchaseAmount);
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        dcaManager.updatePurchaseAmount(scheduleId, AMOUNT_TO_DEPOSIT);
+        assertEq(AMOUNT_TO_DEPOSIT, scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).purchaseAmount);
         vm.stopPrank();
     }
 
     function testPurchaseAmountCannotExceedBalance() external {
         vm.prank(USER);
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         bytes memory encodedRevert = abi.encodeWithSelector(
             IDcaManager.DcaManager__PurchaseAmountExceedsBalance.selector,
             address(stablecoin),
@@ -121,7 +126,7 @@ contract DcaConfigurationTest is DcaDappTest {
         );
         vm.expectRevert(encodedRevert);
         vm.prank(USER);
-        dcaManager.updatePurchaseAmount(address(stablecoin), SCHEDULE_INDEX, scheduleId, AMOUNT_TO_DEPOSIT + 1);
+        dcaManager.updatePurchaseAmount(scheduleId, AMOUNT_TO_DEPOSIT + 1);
     }
 
     function testCreateScheduleFundedForExactlyOnePurchase() external {
@@ -132,34 +137,34 @@ contract DcaConfigurationTest is DcaDappTest {
             address(stablecoin), onePurchaseAmount, onePurchaseAmount, MIN_PURCHASE_PERIOD, s_routeIndex
         );
         uint256 scheduleIndex = 1; // setUp already created schedule 0
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).scheduleId;
-        assertEq(onePurchaseAmount, dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).tokenBalance);
-        assertEq(onePurchaseAmount, dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).purchaseAmount);
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).scheduleId;
+        assertEq(onePurchaseAmount, scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).tokenBalance);
+        assertEq(onePurchaseAmount, scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).purchaseAmount);
         vm.stopPrank();
 
         buyRbtcOne(USER, scheduleIndex, scheduleId, AMOUNT_TO_SPEND);
 
         vm.prank(USER);
-        assertEq(0, dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).tokenBalance);
+        assertEq(0, scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).tokenBalance);
     }
 
     function testPurchaseAmountMustBeGreaterThanMin() external {
         vm.prank(USER);
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         bytes memory encodedRevert = abi.encodeWithSelector(
             IDcaManager.DcaManager__PurchaseAmountMustBeGreaterThanMinimum.selector, address(stablecoin), MIN_PURCHASE_AMOUNT
         );
         vm.expectRevert(encodedRevert);
         vm.prank(USER);
-        dcaManager.updatePurchaseAmount(address(stablecoin), SCHEDULE_INDEX, scheduleId, MIN_PURCHASE_AMOUNT - 1);
+        dcaManager.updatePurchaseAmount(scheduleId, MIN_PURCHASE_AMOUNT - 1);
     }
 
     function testPurchasePeriodMustBeGreaterThanMin() external {
         vm.prank(USER);
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         vm.expectRevert(IDcaManager.DcaManager__PurchasePeriodMustBeGreaterThanMinimum.selector);
         vm.prank(USER);
-        dcaManager.updatePurchasePeriod(address(stablecoin), SCHEDULE_INDEX, scheduleId, MIN_PURCHASE_PERIOD - 1);
+        dcaManager.updatePurchasePeriod(scheduleId, MIN_PURCHASE_PERIOD - 1);
     }
 
     function testMaxSchedulesPerTokenCannotBeExceeded() external {
@@ -267,14 +272,14 @@ contract DcaConfigurationTest is DcaDappTest {
         vm.stopPrank();
         
         vm.startPrank(USER);
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         
         // Should revert with the custom amount, not the default
         bytes memory encodedRevert = abi.encodeWithSelector(
             IDcaManager.DcaManager__PurchaseAmountMustBeGreaterThanMinimum.selector, address(stablecoin), customAmount
         );
         vm.expectRevert(encodedRevert);
-        dcaManager.updatePurchaseAmount(address(stablecoin), SCHEDULE_INDEX, scheduleId, customAmount - 1);
+        dcaManager.updatePurchaseAmount(scheduleId, customAmount - 1);
         vm.stopPrank();
     }
 }

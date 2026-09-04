@@ -6,7 +6,7 @@ import {DcaManager} from "src/DcaManager.sol";
 import {IDcaManager} from "src/interfaces/IDcaManager.sol";
 import {OperationsAdmin} from "src/OperationsAdmin.sol";
 import {StubPurchaseHandler} from "./StubPurchaseHandler.sol";
-import {NestedNoGuardDcaManager} from "./prototype/NestedNoGuardDcaManager.sol";
+import {NestedIndexedDcaManager} from "./prototype/NestedIndexedDcaManager.sol";
 import {FlatKeyedDcaManager} from "./prototype/FlatKeyedDcaManager.sol";
 
 /**
@@ -66,7 +66,7 @@ contract R64BatchGasBenchmarkTest is Test {
 
     OperationsAdmin private s_operationsAdmin;
     DcaManager private s_designA;
-    NestedNoGuardDcaManager private s_designB;
+    NestedIndexedDcaManager private s_designB;
     FlatKeyedDcaManager private s_designC;
     StubPurchaseHandler private s_handlerA;
     StubPurchaseHandler private s_handlerB;
@@ -92,7 +92,7 @@ contract R64BatchGasBenchmarkTest is Test {
         s_designA = new DcaManager(
             address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, address(this)
         );
-        s_designB = new NestedNoGuardDcaManager(
+        s_designB = new NestedIndexedDcaManager(
             address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT
         );
         s_designC = new FlatKeyedDcaManager(
@@ -160,7 +160,7 @@ contract R64BatchGasBenchmarkTest is Test {
         uint64 idC = uint64(s_designC.getSchedulesCreatedCount());
 
         uint256 deleteA = gasleft();
-        s_designA.deleteDcaSchedule(TOKEN_A, 0, idA);
+        s_designA.deleteDcaSchedule(idA);
         deleteA -= gasleft();
         uint256 deleteB = gasleft();
         s_designB.deleteDcaSchedule(TOKEN_B, 0, idB);
@@ -176,11 +176,15 @@ contract R64BatchGasBenchmarkTest is Test {
         console.log(string.concat("C      ", _pad(createC, 9), _pad(deleteC, 10)));
         console.log("");
 
-        // Design B keeps A's storage and cold paths exactly; only the batch differs. If its create or
-        // delete drifts from A's, the prototype has stopped reproducing the contract and every number
-        // above it is measuring the wrong thing.
-        assertApproxEqRel(createB, createA, 0.02e18, "prototype B no longer reproduces DcaManager's create");
-        assertApproxEqRel(deleteB, deleteA, 0.05e18, "prototype B no longer reproduces DcaManager's delete");
+        // Design B is the keying `DcaManager` had before R64, and its cold paths are the ones that were
+        // measured on the real contract then: 91,622 to create and 11,122 to delete, under
+        // [profile.default]. Holding the prototype to those figures is what keeps it a baseline rather
+        // than a sketch — if it drifts from the design it claims to reproduce, the run fails instead of
+        // quietly flattering the change. The band is 10% because this assertion has to hold under both
+        // profiles and via-IR takes about 6% off a cold path; a keying change moves these by ~50%, which
+        // is the drift it exists to catch.
+        assertApproxEqRel(createB, 91_622, 0.10e18, "prototype B no longer reproduces the pre-R64 create");
+        assertApproxEqRel(deleteB, 11_122, 0.10e18, "prototype B no longer reproduces the pre-R64 delete");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -299,26 +303,25 @@ contract R64BatchGasBenchmarkTest is Test {
 
         if (design == 0) {
             IDcaManager.Batch memory batch = IDcaManager.Batch({
-                buyers: buyers,
-                token: TOKEN_A,
-                scheduleIndexes: scheduleIndexes,
                 scheduleIds: scheduleIds,
                 purchaseAmounts: purchaseAmounts,
+                token: TOKEN_A,
                 routeIndex: ROUTE_INDEX,
                 minRbtcOut: 0
             });
             return abi.encodeCall(IDcaManager.batchBuyRbtc, (batch));
         }
         if (design == 1) {
-            NestedNoGuardDcaManager.Batch memory batch = NestedNoGuardDcaManager.Batch({
+            NestedIndexedDcaManager.Batch memory batch = NestedIndexedDcaManager.Batch({
                 buyers: buyers,
                 token: TOKEN_B,
                 scheduleIndexes: scheduleIndexes,
                 scheduleIds: scheduleIds,
+                purchaseAmounts: purchaseAmounts,
                 routeIndex: ROUTE_INDEX,
                 minRbtcOut: 0
             });
-            return abi.encodeCall(NestedNoGuardDcaManager.batchBuyRbtc, (batch));
+            return abi.encodeCall(NestedIndexedDcaManager.batchBuyRbtc, (batch));
         }
         FlatKeyedDcaManager.Batch memory flatBatch = FlatKeyedDcaManager.Batch({
             scheduleIds: scheduleIds,

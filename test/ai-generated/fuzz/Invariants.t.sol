@@ -19,6 +19,7 @@ import {MockKdocToken} from "test/mocks/MockKdocToken.sol";
 import {MockIsusdToken} from "test/mocks/MockIsusdToken.sol";
 import "test/Constants.sol";
 import {Handler} from "./Handler.t.sol";
+import {scheduleAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @title InvariantTest
@@ -188,13 +189,13 @@ contract InvariantTest is StdInvariant, Test {
 
         fuzzHandler.pauseSchedule(0, 0);
         assertTrue(
-            dcaManager.getDcaSchedule(s_users[0], address(stablecoin), 0).paused, "Handler did not pause on-chain"
+            scheduleAt(dcaManager, s_users[0], address(stablecoin), 0).paused, "Handler did not pause on-chain"
         );
         assertEq(fuzzHandler.everPausedScheduleIdsLength(), 1, "Handler did not record the pause ghost");
 
         fuzzHandler.unpauseSchedule(0, 0);
         assertFalse(
-            dcaManager.getDcaSchedule(s_users[0], address(stablecoin), 0).paused, "Handler did not resume on-chain"
+            scheduleAt(dcaManager, s_users[0], address(stablecoin), 0).paused, "Handler did not resume on-chain"
         );
     }
 
@@ -235,12 +236,12 @@ contract InvariantTest is StdInvariant, Test {
         uint256 accruedInterest = dcaManager.getInterestAccrued(s_users[0], address(stablecoin), s_routeIndex);
         assertGt(accruedInterest, MIN_PURCHASE_AMOUNT / 10, "the lane accrued too little to credit");
 
-        uint256 balanceBefore = dcaManager.getDcaSchedule(s_users[0], address(stablecoin), 0).tokenBalance;
+        uint256 balanceBefore = scheduleAt(dcaManager, s_users[0], address(stablecoin), 0).tokenBalance;
         fuzzHandler.topUpFromInterest(0, 0, type(uint256).max);
 
         assertEq(fuzzHandler.topUpFromInterestSuccesses(), 1, "the top-up never reached DcaManager");
         assertGt(
-            dcaManager.getDcaSchedule(s_users[0], address(stablecoin), 0).tokenBalance,
+            scheduleAt(dcaManager, s_users[0], address(stablecoin), 0).tokenBalance,
             balanceBefore,
             "the top-up reverted before crediting the schedule"
         );

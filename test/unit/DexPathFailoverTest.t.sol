@@ -16,6 +16,7 @@ import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockSwapRouter02} from "test/mocks/MockSwapRouter02.sol";
 import {Vm} from "forge-std/Vm.sol";
 import "../Constants.sol";
+import {scheduleAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @notice Allowlisted Dex path activation. `setUp` skips MoC lanes so they do not report empty PASSes.
@@ -277,7 +278,7 @@ contract DexPathFailoverTest is DcaDappTest {
         uint256 stranded = 1 ether;
         MockSwapRouter02 router = MockSwapRouter02(dexHelperConfig.getActiveNetworkConfig().swapRouter02Address);
         router.setStrandedIntermediate(address(newIntermediate), stranded);
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
         vm.expectRevert(
             abi.encodeWithSelector(
                 IPurchaseUniswap.PurchaseUniswap__IntermediateBalanceChangedInRouter.selector,

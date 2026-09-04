@@ -5,6 +5,7 @@ pragma solidity 0.8.36;
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import "../Constants.sol";
+import {scheduleAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @title FullWithdrawalTest
@@ -29,7 +30,7 @@ contract FullWithdrawalTest is DcaDappTest {
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
 
         vm.prank(USER);
-        dcaManager.withdrawToken(address(stablecoin), SCHEDULE_INDEX, scheduleId, type(uint256).max);
+        dcaManager.withdrawToken(scheduleId, type(uint256).max);
 
         assertEq(_scheduleBalance(SCHEDULE_INDEX), 0, "the schedule was not emptied");
         assertApproxEqAbs(
@@ -62,11 +63,11 @@ contract FullWithdrawalTest is DcaDappTest {
             )
         );
         vm.prank(USER);
-        dcaManager.withdrawToken(address(stablecoin), SCHEDULE_INDEX, scheduleId, staleBalance);
+        dcaManager.withdrawToken(scheduleId, staleBalance);
 
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
         vm.prank(USER);
-        dcaManager.withdrawToken(address(stablecoin), SCHEDULE_INDEX, scheduleId, type(uint256).max);
+        dcaManager.withdrawToken(scheduleId, type(uint256).max);
 
         assertEq(_scheduleBalance(SCHEDULE_INDEX), 0, "the schedule was not emptied");
         assertApproxEqAbs(
@@ -81,11 +82,11 @@ contract FullWithdrawalTest is DcaDappTest {
     function test_sentinelStillRevertsOnAnEmptySchedule() external {
         uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
         vm.prank(USER);
-        dcaManager.withdrawToken(address(stablecoin), SCHEDULE_INDEX, scheduleId, type(uint256).max);
+        dcaManager.withdrawToken(scheduleId, type(uint256).max);
 
         vm.expectRevert(IDcaManager.DcaManager__WithdrawalAmountMustBeGreaterThanZero.selector);
         vm.prank(USER);
-        dcaManager.withdrawToken(address(stablecoin), SCHEDULE_INDEX, scheduleId, type(uint256).max);
+        dcaManager.withdrawToken(scheduleId, type(uint256).max);
     }
 
     /// @notice only the sentinel is special: every other oversized amount is still a revert
@@ -102,7 +103,7 @@ contract FullWithdrawalTest is DcaDappTest {
             )
         );
         vm.prank(USER);
-        dcaManager.withdrawToken(address(stablecoin), SCHEDULE_INDEX, scheduleId, tokenBalance + 1);
+        dcaManager.withdrawToken(scheduleId, tokenBalance + 1);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -113,7 +114,7 @@ contract FullWithdrawalTest is DcaDappTest {
             )
         );
         vm.prank(USER);
-        dcaManager.withdrawToken(address(stablecoin), SCHEDULE_INDEX, scheduleId, type(uint256).max - 1);
+        dcaManager.withdrawToken(scheduleId, type(uint256).max - 1);
     }
 
     /**
@@ -126,7 +127,7 @@ contract FullWithdrawalTest is DcaDappTest {
         uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
 
         vm.prank(USER);
-        dcaManager.withdrawToken(address(stablecoin), SCHEDULE_INDEX, scheduleId, type(uint256).max);
+        dcaManager.withdrawToken(scheduleId, type(uint256).max);
 
         assertEq(_scheduleBalance(SCHEDULE_INDEX), 0, "the withdrawn schedule was not emptied");
         for (uint256 i = 1; i < NUM_OF_SCHEDULES; ++i) {
@@ -150,8 +151,7 @@ contract FullWithdrawalTest is DcaDappTest {
         uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
 
         vm.prank(USER);
-        dcaManager.withdrawTokenAndInterest(
-            address(stablecoin), SCHEDULE_INDEX, scheduleId, type(uint256).max
+        dcaManager.withdrawTokenAndInterest(scheduleId, type(uint256).max
         );
 
         assertEq(_scheduleBalance(SCHEDULE_INDEX), 0, "the schedule was not emptied");
@@ -168,10 +168,10 @@ contract FullWithdrawalTest is DcaDappTest {
     //////////////////////////////////////////////////////////////*/
 
     function _scheduleId(uint256 scheduleIndex) internal view returns (uint64) {
-        return dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).scheduleId;
+        return scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).scheduleId;
     }
 
     function _scheduleBalance(uint256 scheduleIndex) internal view returns (uint256) {
-        return dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex).tokenBalance;
+        return scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).tokenBalance;
     }
 }

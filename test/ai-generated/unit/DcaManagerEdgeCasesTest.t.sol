@@ -17,6 +17,7 @@ import {IDcaManager} from "../../../src/interfaces/IDcaManager.sol";
 import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
 import "../../Constants.sol";
 import {batchBuyOne, UNUSED_SCHEDULE_ID, toBatch} from "../../utils/BatchBuyOne.sol";
+import {scheduleAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @title DcaManagerEdgeCasesTest
@@ -134,12 +135,12 @@ contract DcaManagerEdgeCasesTest is Test {
         // Try to delete with wrong ID
         uint64 wrongId = UNUSED_SCHEDULE_ID;
         
-        vm.expectRevert(IDcaManager.DcaManager__ScheduleIdAndIndexMismatch.selector);
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, wrongId));
         vm.prank(USER);
-        dcaManager.deleteDcaSchedule(address(stablecoin), 0, wrongId);
+        dcaManager.deleteDcaSchedule(wrongId);
     }
     
-    function test_deleteDcaSchedule_reverts_wrongIndex() public {
+    function test_deleteDcaSchedule_reverts_deletedId() public {
         // Create a schedule first
         vm.prank(USER);
         dcaManager.createDcaSchedule(
@@ -150,10 +151,14 @@ contract DcaManagerEdgeCasesTest is Test {
             TROPYKUS_INDEX       // routeIndex
         );
         
-        // Try to delete with wrong index (index that doesn't exist)
-        vm.expectRevert(IDcaManager.DcaManager__InexistentScheduleIndex.selector); // Should revert due to array bounds check
+        // Deleting the same schedule twice: the id is retired by the first call
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), 0).scheduleId;
         vm.prank(USER);
-        dcaManager.deleteDcaSchedule(address(stablecoin), 999, UNUSED_SCHEDULE_ID);
+        dcaManager.deleteDcaSchedule(scheduleId);
+
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, scheduleId));
+        vm.prank(USER);
+        dcaManager.deleteDcaSchedule(scheduleId);
     }
     
     function test_deleteDcaSchedule_reverts_notOwner() public {
@@ -167,13 +172,13 @@ contract DcaManagerEdgeCasesTest is Test {
             TROPYKUS_INDEX       // routeIndex
         );
         
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), 0).scheduleId;
         
         // Try to delete as different user
         address otherUser = address(0x9999);
-        vm.expectRevert(IDcaManager.DcaManager__InexistentScheduleIndex.selector);
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__NotScheduleOwner.selector, scheduleId));
         vm.prank(otherUser);
-        dcaManager.deleteDcaSchedule(address(stablecoin), 0, scheduleId);
+        dcaManager.deleteDcaSchedule(scheduleId);
     }
     
     /*//////////////////////////////////////////////////////////////
@@ -213,9 +218,9 @@ contract DcaManagerEdgeCasesTest is Test {
         
         uint64 wrongId = UNUSED_SCHEDULE_ID;
         
-        vm.expectRevert(IDcaManager.DcaManager__ScheduleIdAndIndexMismatch.selector);
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, wrongId));
         vm.prank(SWAPPER);
-        batchBuyOne(dcaManager, USER, address(stablecoin), 0, wrongId, 100 ether, TROPYKUS_INDEX);
+        batchBuyOne(dcaManager, address(stablecoin), wrongId, 100 ether, TROPYKUS_INDEX);
     }
     
     function test_createSchedule_reverts_insufficientBalance() public {
@@ -254,10 +259,10 @@ contract DcaManagerEdgeCasesTest is Test {
         
         // Get the schedule ID after creation
         vm.prank(USER);
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), 0).scheduleId;
         vm.expectRevert();
         vm.prank(USER);
-        dcaManager.withdrawToken(address(stablecoin), 0, scheduleId, 600 ether); // More than deposited
+        dcaManager.withdrawToken(scheduleId, 600 ether); // More than deposited
     }
     
     function test_withdrawToken_reverts_zeroAmount() public {
@@ -273,10 +278,10 @@ contract DcaManagerEdgeCasesTest is Test {
         
         // Get the schedule ID after creation
         vm.prank(USER);
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), 0).scheduleId;
         vm.expectRevert();
         vm.prank(USER);
-        dcaManager.withdrawToken(address(stablecoin), 0, scheduleId, 0);
+        dcaManager.withdrawToken(scheduleId, 0);
     }
 
     function test_withdrawTokenAndInterest_succeedsOnLendingScheduleWithoutCallerIndex() public {
@@ -289,13 +294,13 @@ contract DcaManagerEdgeCasesTest is Test {
             TROPYKUS_INDEX
         );
 
-        IDcaManager.DcaSchedule memory schedule = dcaManager.getDcaSchedule(USER, address(stablecoin), 0);
+        IDcaManager.DcaSchedule memory schedule = scheduleAt(dcaManager, USER, address(stablecoin), 0);
         assertEq(schedule.routeIndex, TROPYKUS_INDEX);
 
         vm.prank(USER);
-        dcaManager.withdrawTokenAndInterest(address(stablecoin), 0, schedule.scheduleId, 100 ether);
+        dcaManager.withdrawTokenAndInterest(schedule.scheduleId, 100 ether);
 
-        assertEq(dcaManager.getDcaSchedule(USER, address(stablecoin), 0).tokenBalance, 400 ether);
+        assertEq(scheduleAt(dcaManager, USER, address(stablecoin), 0).tokenBalance, 400 ether);
     }
     
     /*//////////////////////////////////////////////////////////////
@@ -390,14 +395,7 @@ contract DcaManagerEdgeCasesTest is Test {
         vm.expectRevert(IDcaManager.DcaManager__EmptyBatchPurchaseArrays.selector);
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            toBatch(
-            emptyUsers,
-            address(stablecoin),
-            emptyIndexes,
-            emptyIds,
-            emptyAmounts,
-            TROPYKUS_INDEX
-            )
+            toBatch(emptyIds, emptyAmounts, address(stablecoin), TROPYKUS_INDEX)
         );
     }
     
@@ -406,23 +404,13 @@ contract DcaManagerEdgeCasesTest is Test {
         users[0] = USER;
         users[1] = address(0x9999);
         
-        uint256[] memory indexes = new uint256[](1); // Different length
-        indexes[0] = 0;
-        
         uint64[] memory ids = new uint64[](2);
-        uint256[] memory amounts = new uint256[](2);
+        uint256[] memory amounts = new uint256[](1); // Different length
         
         vm.expectRevert(IDcaManager.DcaManager__ArraysLengthMismatch.selector);
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            toBatch(
-            users,
-            address(stablecoin),
-            indexes,
-            ids,
-            amounts,
-            TROPYKUS_INDEX
-            )
+            toBatch(ids, amounts, address(stablecoin), TROPYKUS_INDEX)
         );
     }
     
@@ -443,17 +431,17 @@ contract DcaManagerEdgeCasesTest is Test {
         
         // Get the schedule ID after creation
         vm.prank(USER);
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), 0).scheduleId;
         vm.expectRevert();
         vm.prank(USER);
-        dcaManager.updatePurchaseAmount(address(stablecoin), 0, scheduleId, 0);
+        dcaManager.updatePurchaseAmount(scheduleId, 0);
     }
     
     function test_updatePurchaseAmount_reverts_invalidScheduleIndex() public {
         uint64 fakeScheduleId = UNUSED_SCHEDULE_ID;
         vm.expectRevert(); // Should revert due to array bounds
         vm.prank(USER);
-        dcaManager.updatePurchaseAmount(address(stablecoin), 999, fakeScheduleId, 100 ether);
+        dcaManager.updatePurchaseAmount(fakeScheduleId, 100 ether);
     }
     
     function test_updatePurchasePeriod_reverts_invalidPeriod() public {
@@ -469,10 +457,10 @@ contract DcaManagerEdgeCasesTest is Test {
         
         // Get the schedule ID after creation
         vm.prank(USER);
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), 0).scheduleId;
         vm.expectRevert(IDcaManager.DcaManager__PurchasePeriodMustBeGreaterThanMinimum.selector);
         vm.prank(USER);
-        dcaManager.updatePurchasePeriod(address(stablecoin), 0, scheduleId, MIN_PURCHASE_PERIOD - 1);
+        dcaManager.updatePurchasePeriod(scheduleId, MIN_PURCHASE_PERIOD - 1);
     }
     
     /*//////////////////////////////////////////////////////////////
@@ -554,17 +542,17 @@ contract DcaManagerEdgeCasesTest is Test {
         
         // Get the schedule ID after creation
         vm.prank(USER);
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), 0).scheduleId;
         vm.expectRevert();
         vm.prank(USER);
-        dcaManager.depositToken(address(stablecoin), 0, scheduleId, 0);
+        dcaManager.depositToken(scheduleId, 0);
     }
     
     function test_depositToken_reverts_invalidScheduleIndex() public {
         uint64 fakeScheduleId = UNUSED_SCHEDULE_ID;
         vm.expectRevert(); // Should revert due to array bounds
         vm.prank(USER);
-        dcaManager.depositToken(address(stablecoin), 999, fakeScheduleId, 100 ether);
+        dcaManager.depositToken(fakeScheduleId, 100 ether);
     }
     
     /*//////////////////////////////////////////////////////////////
@@ -578,15 +566,15 @@ contract DcaManagerEdgeCasesTest is Test {
         // All operations with invalid index should revert
         vm.expectRevert();
         vm.prank(USER);
-        dcaManager.depositToken(address(stablecoin), invalidIndex, fakeScheduleId, 100 ether);
+        dcaManager.depositToken(fakeScheduleId, 100 ether);
         
         vm.expectRevert();
         vm.prank(USER);
-        dcaManager.updatePurchaseAmount(address(stablecoin), invalidIndex, fakeScheduleId, 100 ether);
+        dcaManager.updatePurchaseAmount(fakeScheduleId, 100 ether);
         
         vm.expectRevert();
         vm.prank(USER);
-        dcaManager.updatePurchasePeriod(address(stablecoin), invalidIndex, fakeScheduleId, MIN_PURCHASE_PERIOD);
+        dcaManager.updatePurchasePeriod(fakeScheduleId, MIN_PURCHASE_PERIOD);
     }
     
     function testFuzz_invalidAmounts(uint256 seed) public {

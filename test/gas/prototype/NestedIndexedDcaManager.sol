@@ -9,37 +9,48 @@ import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
 import {OperationsAdmin} from "src/OperationsAdmin.sol";
 
 /**
- * @title NestedNoGuardDcaManager
- * @notice Design B of the R64 measurement: today's nested storage with the `purchaseAmounts`
- *         staleness guard removed from the batch.
- * @dev Test-only. Never deployed, never imported by `src/`. It reproduces `DcaManager`'s create,
- *      delete and purchase paths field for field — same storage layout, same checks in the same
- *      order, same two events per row, same handler call — so the only thing the benchmark reads
- *      off the difference against the real contract is the price of the guard. The paths R64 does
- *      not measure (deposits, withdrawals, interest, owner setters) are absent rather than
- *      approximated; adding them could only mislead a reader into treating this as a fork of
- *      `DcaManager`.
+ * @title NestedIndexedDcaManager
+ * @notice Design B of the R64 measurement: the schedule keying `DcaManager` had before R64 —
+ *         `s_dcaSchedules[user][token][index]`, with a batch row carrying buyer, index, id and amount.
+ * @dev Test-only. Never deployed, never imported by `src/`. This is the design the benchmark measures
+ *      against, so it is a faithful copy of the paths under test rather than a sketch: the same
+ *      two-slot struct, the same checks in the same order, the same two events per row, the same
+ *      handler call. The paths R64 does not measure (deposits, withdrawals, interest, owner setters)
+ *      are absent rather than approximated; adding them could only mislead a reader into treating
+ *      this as a fork of `DcaManager`.
  *
- *      Dropping the guard is not free of behavior: a row whose schedule changed between the
- *      swapper's snapshot and execution buys at the schedule's current amount instead of reverting
- *      with `DcaManager__PurchaseAmountMismatch`. That is the trade the numbers price.
+ *      Keeping it after the change is what lets the branch show its own before-and-after under one
+ *      harness. Its create and delete are asserted against `DcaManager`'s pre-R64 figures, so a
+ *      prototype that drifts from the design it claims to reproduce fails the run.
  */
-contract NestedNoGuardDcaManager is ReentrancyGuard {
+contract NestedIndexedDcaManager is ReentrancyGuard {
     using SafeCast for uint256;
 
-    /// @notice A batch with no per-row amount: the manager sends the handler what it read from storage.
+    /// @notice The pre-R64 schedule: two slots, with the owner and stablecoin held in the mapping key.
+    struct NestedSchedule {
+        uint128 tokenBalance;
+        uint48 lastPurchaseTimestamp;
+        bool paused;
+        uint128 purchaseAmount;
+        uint32 purchasePeriod;
+        uint32 routeIndex;
+        uint64 scheduleId;
+    }
+
+    /// @notice The pre-R64 batch: four parallel arrays, one row each.
     struct Batch {
         address[] buyers;
         address token;
         uint256[] scheduleIndexes;
         uint64[] scheduleIds;
+        uint256[] purchaseAmounts;
         uint256 routeIndex;
         uint256 minRbtcOut;
     }
 
     OperationsAdmin private immutable i_operationsAdmin;
 
-    mapping(address user => mapping(address tokenDeposited => IDcaManager.DcaSchedule[])) private s_dcaSchedules;
+    mapping(address user => mapping(address tokenDeposited => NestedSchedule[])) private s_dcaSchedules;
     IDcaManager.ProtocolSettings private s_protocolSettings;
     mapping(address token => uint256) private s_tokenMinPurchaseAmounts;
 
@@ -65,6 +76,7 @@ contract NestedNoGuardDcaManager is ReentrancyGuard {
     error Prototype__SchedulePaused();
     error Prototype__PeriodHasNotElapsed();
     error Prototype__BalanceNotEnough();
+    error Prototype__PurchaseAmountMismatch();
     error Prototype__RouteIndexMismatch();
     error Prototype__MaxSchedulesReached();
     error Prototype__EmptyBatch();
@@ -122,13 +134,13 @@ contract NestedNoGuardDcaManager is ReentrancyGuard {
         _handlerForDeposit(token, route).depositToken(msg.sender, depositAmount);
         _validatePurchaseAmount(token, purchaseAmount, depositAmount);
 
-        IDcaManager.DcaSchedule[] storage schedules = s_dcaSchedules[msg.sender][token];
+        NestedSchedule[] storage schedules = s_dcaSchedules[msg.sender][token];
         if (schedules.length >= settings.maxSchedulesPerToken) revert Prototype__MaxSchedulesReached();
 
         s_protocolSettings.scheduleNonce = scheduleId;
 
         schedules.push(
-            IDcaManager.DcaSchedule({
+            NestedSchedule({
                 tokenBalance: deposit,
                 lastPurchaseTimestamp: 0,
                 paused: false,
@@ -148,8 +160,8 @@ contract NestedNoGuardDcaManager is ReentrancyGuard {
         nonReentrant
         validateScheduleIndex(msg.sender, token, scheduleIndex)
     {
-        IDcaManager.DcaSchedule[] storage schedules = s_dcaSchedules[msg.sender][token];
-        IDcaManager.DcaSchedule memory dcaSchedule = schedules[scheduleIndex];
+        NestedSchedule[] storage schedules = s_dcaSchedules[msg.sender][token];
+        NestedSchedule memory dcaSchedule = schedules[scheduleIndex];
         if (scheduleId != dcaSchedule.scheduleId) revert Prototype__ScheduleIdAndIndexMismatch();
 
         uint256 tokenBalance = dcaSchedule.tokenBalance;
@@ -165,26 +177,22 @@ contract NestedNoGuardDcaManager is ReentrancyGuard {
         emit DcaManager__DcaScheduleDeleted(msg.sender, token, scheduleId, amountWithdrawn);
     }
 
-    /**
-     * @dev The manager forwards the amounts it read from storage rather than the ones the caller sent,
-     *      which is the whole difference from `DcaManager.batchBuyRbtc`.
-     */
     function batchBuyRbtc(Batch calldata batch) external onlySwapper {
         uint256 numOfPurchases = batch.buyers.length;
         if (numOfPurchases == 0) revert Prototype__EmptyBatch();
-        if (numOfPurchases != batch.scheduleIndexes.length || numOfPurchases != batch.scheduleIds.length) {
-            revert Prototype__ArraysLengthMismatch();
-        }
-        uint256[] memory purchaseAmounts = new uint256[](numOfPurchases);
+        if (
+            numOfPurchases != batch.scheduleIndexes.length || numOfPurchases != batch.scheduleIds.length
+                || numOfPurchases != batch.purchaseAmounts.length
+        ) revert Prototype__ArraysLengthMismatch();
         for (uint256 i; i < numOfPurchases; ++i) {
             (uint256 schedulePurchaseAmount, uint256 scheduleRouteIndex) = _rBtcPurchaseChecksEffects(
                 batch.buyers[i], batch.token, batch.scheduleIndexes[i], batch.scheduleIds[i]
             );
+            if (schedulePurchaseAmount != batch.purchaseAmounts[i]) revert Prototype__PurchaseAmountMismatch();
             if (scheduleRouteIndex != batch.routeIndex) revert Prototype__RouteIndexMismatch();
-            purchaseAmounts[i] = schedulePurchaseAmount;
         }
         IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex))).batchBuyRbtc(
-            batch.buyers, batch.scheduleIds, purchaseAmounts, batch.minRbtcOut
+            batch.buyers, batch.scheduleIds, batch.purchaseAmounts, batch.minRbtcOut
         );
     }
 
@@ -194,11 +202,7 @@ contract NestedNoGuardDcaManager is ReentrancyGuard {
         return s_protocolSettings.scheduleNonce;
     }
 
-    function getDcaSchedules(address user, address token)
-        external
-        view
-        returns (IDcaManager.DcaSchedule[] memory)
-    {
+    function getDcaSchedules(address user, address token) external view returns (NestedSchedule[] memory) {
         return s_dcaSchedules[user][token];
     }
 
@@ -221,8 +225,8 @@ contract NestedNoGuardDcaManager is ReentrancyGuard {
         validateScheduleIndex(buyer, token, scheduleIndex)
         returns (uint256, uint256)
     {
-        IDcaManager.DcaSchedule storage dcaScheduleStorage = s_dcaSchedules[buyer][token][scheduleIndex];
-        IDcaManager.DcaSchedule memory dcaSchedule = dcaScheduleStorage;
+        NestedSchedule storage dcaScheduleStorage = s_dcaSchedules[buyer][token][scheduleIndex];
+        NestedSchedule memory dcaSchedule = dcaScheduleStorage;
 
         if (scheduleId != dcaSchedule.scheduleId) revert Prototype__ScheduleIdAndIndexMismatch();
         if (dcaSchedule.paused) revert Prototype__SchedulePaused();

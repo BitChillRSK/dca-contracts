@@ -16,6 +16,7 @@ import {MockStablecoin} from "../../mocks/MockStablecoin.sol";
 import {batchBuyOne} from "../../utils/BatchBuyOne.sol";
 import {console} from "forge-std/Test.sol";
 import "../../Constants.sol";
+import {scheduleAt} from "test/utils/ScheduleAt.sol";
 
 contract NewHandlerDeploymentTest is BaseDeploymentTest {
     uint256 internal constant DEPOSIT_AMOUNT = 2000 ether;
@@ -125,9 +126,9 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
         );
         vm.stopPrank();
 
-        uint64 scheduleId = dcaManager.getDcaSchedule(user, config.usdrifTokenAddress, 0).scheduleId;
+        uint64 scheduleId = scheduleAt(dcaManager, user, config.usdrifTokenAddress, 0).scheduleId;
         vm.prank(swapper);
-        batchBuyOne(dcaManager, user, config.usdrifTokenAddress, 0, scheduleId, PURCHASE_AMOUNT, LAYERBANK_INDEX);
+        batchBuyOne(dcaManager, config.usdrifTokenAddress, scheduleId, PURCHASE_AMOUNT, LAYERBANK_INDEX);
 
         assertGt(
             IPurchaseRbtc(usdrifHandlerAddress).getAccumulatedRbtcBalance(user),

@@ -11,6 +11,7 @@ import {ITokenLending} from "src/interfaces/ITokenLending.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "test/Constants.sol";
 import {batchBuyOne} from "test/utils/BatchBuyOne.sol";
+import {scheduleAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @title IdleDcaManagerTest
@@ -75,22 +76,22 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
     function test_buyAndWithdraw_spendIdleDoc() public {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(docToken), 0).scheduleId;
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(docToken), 0).scheduleId;
 
         vm.prank(SWAPPER);
-        batchBuyOne(dcaManager, USER, address(docToken), 0, scheduleId, PURCHASE, IDLE_INDEX);
+        batchBuyOne(dcaManager, address(docToken), scheduleId, PURCHASE, IDLE_INDEX);
 
         assertGt(dcaManager.getAccumulatedRbtcBalance(USER, address(docToken), IDLE_INDEX), 0);
         assertEq(handler.getUsersIdleTokenBalance(USER), DEPOSIT - PURCHASE);
-        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 0).tokenBalance, DEPOSIT - PURCHASE);
+        assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, DEPOSIT - PURCHASE);
 
         uint256 userDocBefore = docToken.balanceOf(USER);
         vm.prank(USER);
-        dcaManager.withdrawToken(address(docToken), 0, scheduleId, DEPOSIT - PURCHASE);
+        dcaManager.withdrawToken(scheduleId, DEPOSIT - PURCHASE);
 
         assertEq(docToken.balanceOf(USER), userDocBefore + DEPOSIT - PURCHASE);
         assertEq(handler.getUsersIdleTokenBalance(USER), 0);
-        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 0).tokenBalance, 0);
+        assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, 0);
 
         uint256 userRbtcBefore = USER.balance;
         vm.prank(USER);
@@ -102,7 +103,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
     function test_interestCalls_atIndexZero_revert() public {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(docToken), 0).scheduleId;
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(docToken), 0).scheduleId;
 
         bytes memory encodedRevert =
             abi.encodeWithSelector(IDcaManager.DcaManager__TokenDoesNotYieldInterest.selector, address(docToken));
@@ -119,7 +120,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
 
         vm.prank(USER);
         vm.expectRevert(encodedRevert);
-        dcaManager.withdrawTokenAndInterest(address(docToken), 0, scheduleId, MIN_PURCHASE_AMOUNT);
+        dcaManager.withdrawTokenAndInterest(scheduleId, MIN_PURCHASE_AMOUNT);
     }
 
     function test_withdrawAllAccumulatedInterest_skipsIdleAndWithdrawsLending() public {
@@ -154,8 +155,8 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         dcaManager.withdrawAllAccumulatedInterest(tokens, indexes);
 
         assertEq(handler.getUsersIdleTokenBalance(USER), idleBalanceBefore);
-        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 0).tokenBalance, DEPOSIT);
-        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 1).tokenBalance, DEPOSIT);
+        assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, DEPOSIT);
+        assertEq(scheduleAt(dcaManager, USER, address(docToken), 1).tokenBalance, DEPOSIT);
         assertGt(docToken.balanceOf(USER), userDocBefore);
         assertLt(dcaManager.getInterestAccrued(USER, address(docToken), lendingIndex), interest);
     }
@@ -184,7 +185,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         // Counting only one lending schedule treats the other as yield (~DEPOSIT).
         // Counting idle as well locks 3*DEPOSIT against ~2*DEPOSIT lent → 0 interest.
         assertLt(interest, DEPOSIT);
-        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 0).tokenBalance, DEPOSIT);
+        assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, DEPOSIT);
         vm.expectRevert(
             abi.encodeWithSelector(IDcaManager.DcaManager__TokenDoesNotYieldInterest.selector, address(docToken))
         );
@@ -205,8 +206,8 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, lendingIndex);
 
-        IDcaManager.DcaSchedule memory idleSchedule = dcaManager.getDcaSchedule(USER, address(docToken), 0);
-        IDcaManager.DcaSchedule memory lendingSchedule = dcaManager.getDcaSchedule(USER, address(docToken), 1);
+        IDcaManager.DcaSchedule memory idleSchedule = scheduleAt(dcaManager, USER, address(docToken), 0);
+        IDcaManager.DcaSchedule memory lendingSchedule = scheduleAt(dcaManager, USER, address(docToken), 1);
         assertEq(idleSchedule.routeIndex, IDLE_INDEX);
         assertEq(lendingSchedule.routeIndex, lendingIndex);
 
@@ -214,14 +215,14 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
             abi.encodeWithSelector(IDcaManager.DcaManager__TokenDoesNotYieldInterest.selector, address(docToken));
         vm.prank(USER);
         vm.expectRevert(encodedRevert);
-        dcaManager.withdrawTokenAndInterest(address(docToken), 0, idleSchedule.scheduleId, MIN_PURCHASE_AMOUNT);
-        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 0).tokenBalance, DEPOSIT);
-        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 1).tokenBalance, DEPOSIT);
+        dcaManager.withdrawTokenAndInterest(idleSchedule.scheduleId, MIN_PURCHASE_AMOUNT);
+        assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, DEPOSIT);
+        assertEq(scheduleAt(dcaManager, USER, address(docToken), 1).tokenBalance, DEPOSIT);
 
         vm.prank(USER);
-        dcaManager.withdrawTokenAndInterest(address(docToken), 1, lendingSchedule.scheduleId, MIN_PURCHASE_AMOUNT);
-        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 0).tokenBalance, DEPOSIT);
-        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 1).tokenBalance, DEPOSIT - MIN_PURCHASE_AMOUNT);
+        dcaManager.withdrawTokenAndInterest(lendingSchedule.scheduleId, MIN_PURCHASE_AMOUNT);
+        assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, DEPOSIT);
+        assertEq(scheduleAt(dcaManager, USER, address(docToken), 1).tokenBalance, DEPOSIT - MIN_PURCHASE_AMOUNT);
     }
 
     /// @dev Tropykus views read `exchangeRateStored`; accrue so `getInterestAccrued` sees the warp.

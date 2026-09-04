@@ -19,6 +19,8 @@ import {SovrynErc20HandlerDex} from "../../../src/sovryn/SovrynErc20HandlerDex.s
 import {DcaManagerAccessControl} from "../../../src/DcaManagerAccessControl.sol";
 import {IDcaManagerAccessControl} from "../../../src/interfaces/IDcaManagerAccessControl.sol";
 import "../../Constants.sol";
+import {scheduleAt} from "test/utils/ScheduleAt.sol";
+import {UNUSED_SCHEDULE_ID} from "test/utils/BatchBuyOne.sol";
 
 /**
  * @title GettersTest
@@ -52,10 +54,10 @@ contract GettersTest is DcaDappTest {
 
     function test_dcaManager_getDcaSchedule_selfAndArbitraryUser() public {
         vm.prank(USER);
-        IDcaManager.DcaSchedule memory asUser = dcaManager.getDcaSchedule(USER, address(stablecoin), 0);
+        IDcaManager.DcaSchedule memory asUser = scheduleAt(dcaManager, USER, address(stablecoin), 0);
 
         vm.prank(OWNER);
-        IDcaManager.DcaSchedule memory asThirdParty = dcaManager.getDcaSchedule(USER, address(stablecoin), 0);
+        IDcaManager.DcaSchedule memory asThirdParty = scheduleAt(dcaManager, USER, address(stablecoin), 0);
         IDcaManager.DcaSchedule[] memory enumerated = dcaManager.getDcaSchedules(USER, address(stablecoin));
 
         assertEq(asUser.tokenBalance, AMOUNT_TO_DEPOSIT);
@@ -126,9 +128,9 @@ contract GettersTest is DcaDappTest {
         dcaManager.getInterestAccrued(USER, address(stablecoin), 0);
     }
 
-    function test_dcaManager_getDcaSchedule_reverts_invalidIndex() public {
-        vm.expectRevert(IDcaManager.DcaManager__InexistentScheduleIndex.selector);
-        dcaManager.getDcaSchedule(USER, address(stablecoin), 999);
+    function test_dcaManager_getDcaSchedule_reverts_inexistentId() public {
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, UNUSED_SCHEDULE_ID));
+        dcaManager.getDcaSchedule(UNUSED_SCHEDULE_ID);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -359,7 +361,7 @@ contract GettersTest is DcaDappTest {
     }
 
     function test_getters_singleScheduleMatchesArray() public {
-        IDcaManager.DcaSchedule memory single = dcaManager.getDcaSchedule(USER, address(stablecoin), 0);
+        IDcaManager.DcaSchedule memory single = scheduleAt(dcaManager, USER, address(stablecoin), 0);
         IDcaManager.DcaSchedule[] memory enumerated = dcaManager.getDcaSchedules(USER, address(stablecoin));
 
         assertEq(enumerated.length, 1);
@@ -425,13 +427,13 @@ contract GettersTest is DcaDappTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_getters_afterStateChanges() public {
-        uint256 initialBalance = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).tokenBalance;
+        uint256 initialBalance = scheduleAt(dcaManager, USER, address(stablecoin), 0).tokenBalance;
 
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
+        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), 0).scheduleId;
 
         buyRbtcOne(USER, 0, scheduleId, AMOUNT_TO_SPEND);
 
-        uint256 newBalance = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).tokenBalance;
+        uint256 newBalance = scheduleAt(dcaManager, USER, address(stablecoin), 0).tokenBalance;
         assertLt(newBalance, initialBalance);
 
         uint256 rbtcBalance = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);

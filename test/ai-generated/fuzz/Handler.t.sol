@@ -11,6 +11,7 @@ import {OperationsAdmin} from "src/OperationsAdmin.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {toBatch} from "test/utils/BatchBuyOne.sol";
 import "test/Constants.sol";
+import {scheduleAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @title Handler
@@ -194,8 +195,8 @@ contract Handler is Test {
         
         stablecoin.approve(address(tokenHandler), depositAmount);
         
-        uint64 scheduleId = dcaManager.getDcaSchedule(user, address(stablecoin), scheduleIndex).scheduleId;
-        try dcaManager.depositToken(address(stablecoin), scheduleIndex, scheduleId, depositAmount) {
+        uint64 scheduleId = scheduleAt(dcaManager, user, address(stablecoin), scheduleIndex).scheduleId;
+        try dcaManager.depositToken(scheduleId, depositAmount) {
             // Success
         } catch {
             // Ignore failures
@@ -228,8 +229,8 @@ contract Handler is Test {
 
         withdrawalAmount = bound(withdrawalAmount, 1, currentBalance);
         
-        uint64 scheduleId = dcaManager.getDcaSchedule(user, address(stablecoin), scheduleIndex).scheduleId;
-        try dcaManager.withdrawToken(address(stablecoin), scheduleIndex, scheduleId, withdrawalAmount) {
+        uint64 scheduleId = scheduleAt(dcaManager, user, address(stablecoin), scheduleIndex).scheduleId;
+        try dcaManager.withdrawToken(scheduleId, withdrawalAmount) {
             // Success
         } catch {
             // Ignore failures
@@ -295,7 +296,7 @@ contract Handler is Test {
                 stablecoin.mint(user, depositAmount - userBalance);
             }
             stablecoin.approve(address(tokenHandler), depositAmount);
-            try dcaManager.depositToken(address(stablecoin), scheduleIndex, scheduleId, depositAmount) {
+            try dcaManager.depositToken(scheduleId, depositAmount) {
                 // Success
             } catch {
                 // Ignore failures
@@ -303,7 +304,7 @@ contract Handler is Test {
         }
 
         if (purchaseAmount > 0) {
-            try dcaManager.updatePurchaseAmount(address(stablecoin), scheduleIndex, scheduleId, purchaseAmount) {
+            try dcaManager.updatePurchaseAmount(scheduleId, purchaseAmount) {
                 // Success
             } catch {
                 // Ignore failures
@@ -311,7 +312,7 @@ contract Handler is Test {
         }
 
         if (purchasePeriod > 0) {
-            try dcaManager.updatePurchasePeriod(address(stablecoin), scheduleIndex, scheduleId, purchasePeriod) {
+            try dcaManager.updatePurchasePeriod(scheduleId, purchasePeriod) {
                 // Success
             } catch {
                 // Ignore failures
@@ -364,7 +365,7 @@ contract Handler is Test {
             if (paused) pauseAttemptsOnLiveSchedule++;
 
             vm.prank(user);
-            try dcaManager.setSchedulePaused(address(stablecoin), index, scheduleId, paused) {
+            try dcaManager.setSchedulePaused(scheduleId, paused) {
                 if (paused) {
                     if (s_pauseGhost[scheduleId].user == address(0)) s_everPausedScheduleIds.push(scheduleId);
                     // Re-snapshot on every pause: the schedule may have bought legitimately while active.
@@ -406,7 +407,7 @@ contract Handler is Test {
 
         scheduleIndex = bound(scheduleIndex, 0, schedules.length - 1);
         
-        try dcaManager.deleteDcaSchedule(address(stablecoin), scheduleIndex, schedules[scheduleIndex].scheduleId) {
+        try dcaManager.deleteDcaSchedule(schedules[scheduleIndex].scheduleId) {
             // Success
         } catch {
             // Ignore failures
@@ -463,7 +464,7 @@ contract Handler is Test {
         purchaseAmounts[0] = schedule.purchaseAmount;
 
         try dcaManager.batchBuyRbtc(
-            toBatch(buyers, address(stablecoin), scheduleIndexes, scheduleIds, purchaseAmounts, schedule.routeIndex)
+            toBatch(scheduleIds, purchaseAmounts, address(stablecoin), schedule.routeIndex)
         ) {
             buyRbtcSuccesses++;
         } catch {
@@ -527,14 +528,7 @@ contract Handler is Test {
         // Execute batch purchase
         vm.startPrank(SWAPPER);
         try dcaManager.batchBuyRbtc(
-            toBatch(
-            buyers,
-            address(stablecoin),
-            boundedScheduleIndexes,
-            scheduleIds,
-            purchaseAmounts,
-            routeIndex
-            )
+            toBatch(scheduleIds, purchaseAmounts, address(stablecoin), routeIndex)
         ) {
             buyRbtcSuccesses++;
         } catch {
@@ -598,12 +592,8 @@ contract Handler is Test {
         
         withdrawalAmount = bound(withdrawalAmount, 1, currentBalance);
         
-        uint64 scheduleId = dcaManager.getDcaSchedule(user, address(stablecoin), scheduleIndex).scheduleId;
-        try dcaManager.withdrawTokenAndInterest(
-            address(stablecoin),
-            scheduleIndex,
-            scheduleId,
-            withdrawalAmount
+        uint64 scheduleId = scheduleAt(dcaManager, user, address(stablecoin), scheduleIndex).scheduleId;
+        try dcaManager.withdrawTokenAndInterest(scheduleId, withdrawalAmount
         ) {
             // Success
         } catch {
@@ -637,8 +627,7 @@ contract Handler is Test {
         if (accruedInterest == 0) return;
 
         vm.prank(user);
-        try dcaManager.topUpFromInterest(
-            address(stablecoin), scheduleIndex, schedules[scheduleIndex].scheduleId, bound(amountSeed, 1, accruedInterest)
+        try dcaManager.topUpFromInterest(schedules[scheduleIndex].scheduleId, bound(amountSeed, 1, accruedInterest)
         ) {
             topUpFromInterestSuccesses++;
         } catch {
