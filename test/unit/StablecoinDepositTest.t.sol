@@ -7,7 +7,7 @@ import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
 import {UNUSED_SCHEDULE_ID} from "../utils/BatchBuyOne.sol";
-import {scheduleAt} from "test/utils/ScheduleAt.sol";
+import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 contract StablecoinDepositTest is DcaDappTest {
     function setUp() public override {
@@ -26,7 +26,7 @@ contract StablecoinDepositTest is DcaDappTest {
     function testCannotDepositZeroStablecoin() external {
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
-        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.expectRevert(IDcaManager.DcaManager__DepositAmountMustBeGreaterThanZero.selector);
         dcaManager.depositToken(scheduleId, 0);
         vm.stopPrank();
@@ -34,7 +34,7 @@ contract StablecoinDepositTest is DcaDappTest {
 
     function testDepositRevertsIfStablecoinNotApproved() external {
         vm.startPrank(USER);
-        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 balanceBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
         vm.expectRevert();
         dcaManager.depositToken(scheduleId, AMOUNT_TO_DEPOSIT);
@@ -47,7 +47,7 @@ contract StablecoinDepositTest is DcaDappTest {
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
         uint64 wrongId = UNUSED_SCHEDULE_ID;
         uint256 balanceBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, wrongId));
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, USER, wrongId));
         dcaManager.depositToken(wrongId, AMOUNT_TO_DEPOSIT);
         assertEq(scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance, balanceBefore);
         vm.stopPrank();

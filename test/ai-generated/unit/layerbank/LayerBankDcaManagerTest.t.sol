@@ -10,7 +10,7 @@ import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import "test/Constants.sol";
 import {batchBuyOne} from "test/utils/BatchBuyOne.sol";
-import {scheduleAt} from "test/utils/ScheduleAt.sol";
+import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @title LayerBankDcaManagerTest
@@ -83,12 +83,12 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
     function test_buyAndWithdraw_spendLayerBankDoc() public {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, LAYERBANK_INDEX);
-        uint64 scheduleId = scheduleAt(dcaManager, USER, address(docToken), 0).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(docToken), 0);
 
         uint256 lTokensBefore = handler.getUserShares(USER);
 
         vm.prank(SWAPPER);
-        batchBuyOne(dcaManager, address(docToken), scheduleId, PURCHASE, LAYERBANK_INDEX);
+        batchBuyOne(dcaManager, USER, address(docToken), scheduleId, LAYERBANK_INDEX);
 
         assertGt(dcaManager.getAccumulatedRbtcBalance(USER, address(docToken), LAYERBANK_INDEX), 0);
         assertLt(handler.getUserShares(USER), lTokensBefore);

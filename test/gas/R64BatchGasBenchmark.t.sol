@@ -328,7 +328,7 @@ contract R64BatchGasBenchmarkTest is Test {
         if (design == 0) {
             IDcaManager.Batch memory batch = IDcaManager.Batch({
                 scheduleIds: scheduleIds,
-                purchaseAmounts: purchaseAmounts,
+                buyers: buyers,
                 token: TOKEN_A,
                 routeIndex: ROUTE_INDEX,
                 minRbtcOut: 0

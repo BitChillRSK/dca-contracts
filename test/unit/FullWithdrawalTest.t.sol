@@ -5,7 +5,7 @@ pragma solidity 0.8.36;
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import "../Constants.sol";
-import {scheduleAt} from "test/utils/ScheduleAt.sol";
+import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @title FullWithdrawalTest
@@ -168,7 +168,7 @@ contract FullWithdrawalTest is DcaDappTest {
     //////////////////////////////////////////////////////////////*/
 
     function _scheduleId(uint256 scheduleIndex) internal view returns (uint64) {
-        return scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).scheduleId;
+        return scheduleIdAt(dcaManager, USER, address(stablecoin), scheduleIndex);
     }
 
     function _scheduleBalance(uint256 scheduleIndex) internal view returns (uint256) {

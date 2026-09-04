@@ -11,7 +11,7 @@ import {ITokenLending} from "src/interfaces/ITokenLending.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "test/Constants.sol";
 import {batchBuyOne} from "test/utils/BatchBuyOne.sol";
-import {scheduleAt} from "test/utils/ScheduleAt.sol";
+import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @title IdleDcaManagerTest
@@ -76,10 +76,10 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
     function test_buyAndWithdraw_spendIdleDoc() public {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
-        uint64 scheduleId = scheduleAt(dcaManager, USER, address(docToken), 0).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(docToken), 0);
 
         vm.prank(SWAPPER);
-        batchBuyOne(dcaManager, address(docToken), scheduleId, PURCHASE, IDLE_INDEX);
+        batchBuyOne(dcaManager, USER, address(docToken), scheduleId, IDLE_INDEX);
 
         assertGt(dcaManager.getAccumulatedRbtcBalance(USER, address(docToken), IDLE_INDEX), 0);
         assertEq(handler.getUsersIdleTokenBalance(USER), DEPOSIT - PURCHASE);
@@ -103,7 +103,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
     function test_interestCalls_atIndexZero_revert() public {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
-        uint64 scheduleId = scheduleAt(dcaManager, USER, address(docToken), 0).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(docToken), 0);
 
         bytes memory encodedRevert =
             abi.encodeWithSelector(IDcaManager.DcaManager__TokenDoesNotYieldInterest.selector, address(docToken));

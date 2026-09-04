@@ -8,7 +8,7 @@ import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import {DeployIdleHandler} from "../../script/DeployIdleHandler.s.sol";
 import {DeployLayerBankHandler} from "../../script/DeployLayerBankHandler.s.sol";
 import "../Constants.sol";
-import {scheduleAt} from "test/utils/ScheduleAt.sol";
+import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @notice Exercises the integrated multi-handler purchase entry point.
@@ -78,10 +78,10 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         IDcaManager.DcaSchedule memory schedule =
             scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex);
         batch.scheduleIds = new uint64[](1);
-        batch.purchaseAmounts = new uint256[](1);
+        batch.buyers = new address[](1);
         batch.token = address(stablecoin);
         batch.scheduleIds[0] = schedule.scheduleId;
-        batch.purchaseAmounts[0] = schedule.purchaseAmount;
+        batch.buyers[0] = USER;
         batch.routeIndex = routeIndex;
     }
 
@@ -150,7 +150,7 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         IDcaManager.DcaSchedule memory firstBefore =
             scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint64 secondId =
-            scheduleAt(dcaManager, USER, address(stablecoin), SECOND_SCHEDULE_INDEX).scheduleId;
+            scheduleIdAt(dcaManager, USER, address(stablecoin), SECOND_SCHEDULE_INDEX);
         vm.prank(USER);
         dcaManager.setSchedulePaused(secondId, true);
 

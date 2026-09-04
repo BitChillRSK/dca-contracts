@@ -8,7 +8,7 @@ import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import {MockIsusdToken} from "../mocks/MockIsusdToken.sol";
 import {toBatch} from "../utils/BatchBuyOne.sol";
 import "../Constants.sol";
-import {scheduleAt} from "test/utils/ScheduleAt.sol";
+import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @title NetRedemptionTest
@@ -52,7 +52,7 @@ contract NetRedemptionTest is DcaDappTest {
     function test_sovryn_singleScheduleBatchSpendsTheNetRedeemedAmount() public onlySovrynMocMocks {
         _enableExitFee();
 
-        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 rbtcBefore = _accumulatedRbtc();
 
         buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
@@ -86,7 +86,7 @@ contract NetRedemptionTest is DcaDappTest {
 
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, purchaseAmounts, address(stablecoin), s_routeIndex)
+            toBatch(scheduleIds, users, address(stablecoin), s_routeIndex)
         );
 
         uint256 received = address(stablecoinHandler).balance - handlerRbtcBefore;
@@ -105,7 +105,7 @@ contract NetRedemptionTest is DcaDappTest {
     function test_sovryn_withdrawTokenDebitsTheRequestedAmount() public onlySovrynMocMocks {
         _enableExitFee();
 
-        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 scheduleBalanceBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
         uint256 userDocBefore = stablecoin.balanceOf(USER);
 
@@ -128,7 +128,7 @@ contract NetRedemptionTest is DcaDappTest {
     function test_sovryn_remainderIsWhatWasNotRequestedAndStaysWithdrawable() public onlySovrynMocMocks {
         _enableExitFee();
 
-        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.prank(USER);
         dcaManager.withdrawToken(scheduleId, WITHDRAWAL_AMOUNT);
 
@@ -148,7 +148,7 @@ contract NetRedemptionTest is DcaDappTest {
     function test_sovryn_deleteDcaScheduleReportsTheAmountActuallyPaid() public onlySovrynMocMocks {
         _enableExitFee();
 
-        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 userDocBefore = stablecoin.balanceOf(USER);
 
         vm.recordLogs();
@@ -207,7 +207,7 @@ contract NetRedemptionTest is DcaDappTest {
         vm.recordLogs();
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, purchaseAmounts, address(stablecoin), s_routeIndex)
+            toBatch(scheduleIds, users, address(stablecoin), s_routeIndex)
         );
 
         (uint256 perUserSpentTotal, uint256 batchSpent) = _batchSpendFromLogs();
@@ -260,7 +260,7 @@ contract NetRedemptionTest is DcaDappTest {
         );
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, purchaseAmounts, address(stablecoin), s_routeIndex)
+            toBatch(scheduleIds, users, address(stablecoin), s_routeIndex)
         );
     }
 
@@ -275,7 +275,7 @@ contract NetRedemptionTest is DcaDappTest {
     function test_sovryn_withoutExitFeeWithdrawalStaysOneToOne() public onlySovrynMocMocks {
         assertEq(MockIsusdToken(address(shareToken)).getExitFeeBps(), 0);
 
-        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 scheduleBalanceBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
         uint256 userDocBefore = stablecoin.balanceOf(USER);
 
@@ -295,7 +295,7 @@ contract NetRedemptionTest is DcaDappTest {
      * @notice Same purchase, no fee: the rBTC bought matches the fee-free expectation exactly.
      */
     function test_sovryn_withoutExitFeeBuyRbtcIsUnchanged() public onlySovrynMocMocks {
-        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 rbtcBefore = _accumulatedRbtc();
 
         buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
@@ -338,7 +338,7 @@ contract NetRedemptionTest is DcaDappTest {
         for (uint256 i; i < NUM_OF_SCHEDULES; ++i) {
             users[i] = USER;
             scheduleIndexes[i] = i;
-            scheduleIds[i] = dcaManager.getDcaSchedules(USER, address(stablecoin))[i].scheduleId;
+            scheduleIds[i] = scheduleIdAt(dcaManager, USER, address(stablecoin), i);
             purchaseAmounts[i] = dcaManager.getDcaSchedules(USER, address(stablecoin))[i].purchaseAmount;
         }
     }

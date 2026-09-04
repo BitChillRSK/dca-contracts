@@ -187,7 +187,7 @@ contract BatchMinRbtcOutTest is DcaDappTest {
         scheduleIndexes[0] = SCHEDULE_INDEX;
         scheduleIds[0] = _schedule().scheduleId;
         purchaseAmounts[0] = AMOUNT_TO_SPEND;
-        return toBatch(scheduleIds, purchaseAmounts, address(stablecoin), s_routeIndex, minRbtcOut);
+        return toBatch(scheduleIds, buyers, address(stablecoin), s_routeIndex, minRbtcOut);
     }
 
     function _buy(uint256 minRbtcOut) private {

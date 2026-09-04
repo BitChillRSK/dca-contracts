@@ -8,7 +8,7 @@ import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import {batchBuyOne, UNUSED_SCHEDULE_ID, toBatch} from "../utils/BatchBuyOne.sol";
 import "./TestsHelper.t.sol";
-import {scheduleAt} from "test/utils/ScheduleAt.sol";
+import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @notice R19: a user can stop and resume purchases on one of their own schedules.
@@ -27,7 +27,7 @@ contract SchedulePauseTest is DcaDappTest {
     }
 
     function _scheduleId(uint256 scheduleIndex) private view returns (uint64) {
-        return scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).scheduleId;
+        return scheduleIdAt(dcaManager, USER, address(stablecoin), scheduleIndex);
     }
 
     function _isPaused(uint256 scheduleIndex) private view returns (bool) {
@@ -92,8 +92,9 @@ contract SchedulePauseTest is DcaDappTest {
     function testAnotherUserCannotPauseThisSchedule() external {
         uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
 
-        vm.prank(makeAddr("r19Stranger"));
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__NotScheduleOwner.selector, scheduleId));
+        address stranger = makeAddr("r19Stranger");
+        vm.prank(stranger);
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, stranger, scheduleId));
         dcaManager.setSchedulePaused(scheduleId, true);
 
         assertFalse(_isPaused(SCHEDULE_INDEX), "a stranger paused someone else's schedule");
@@ -101,7 +102,7 @@ contract SchedulePauseTest is DcaDappTest {
 
     function testPausingAnInexistentScheduleReverts() external {
         vm.prank(USER);
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, UNUSED_SCHEDULE_ID));
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, USER, UNUSED_SCHEDULE_ID));
         dcaManager.setSchedulePaused(UNUSED_SCHEDULE_ID, true);
 
         assertFalse(_isPaused(SCHEDULE_INDEX));
@@ -178,7 +179,7 @@ contract SchedulePauseTest is DcaDappTest {
         vm.prank(SWAPPER);
         vm.expectRevert(pausedRevert);
         dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, purchaseAmounts, address(stablecoin), s_routeIndex)
+            toBatch(scheduleIds, buyers, address(stablecoin), s_routeIndex)
         );
 
         IDcaManager.DcaSchedule[] memory afterSchedules = dcaManager.getDcaSchedules(USER, address(stablecoin));

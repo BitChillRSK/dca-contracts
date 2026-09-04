@@ -6,7 +6,7 @@ import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {ITokenLending} from "src/interfaces/ITokenLending.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import "../Constants.sol";
-import {scheduleAt} from "test/utils/ScheduleAt.sol";
+import {scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @title EventIndexingTest
@@ -64,7 +64,7 @@ contract EventIndexingTest is DcaDappTest {
     }
 
     function testSchedulePauseSetIndexesUserAndScheduleIdOnly() external {
-        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.prank(USER);
         vm.recordLogs();
         dcaManager.setSchedulePaused(scheduleId, true);
@@ -85,7 +85,7 @@ contract EventIndexingTest is DcaDappTest {
     }
 
     function testFirstPartyLogsIndexEveryAddressAndScheduleIdOnly() external {
-        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.recordLogs();
         depositStablecoin();
         vm.startPrank(USER);
@@ -103,7 +103,7 @@ contract EventIndexingTest is DcaDappTest {
     }
 
     function testDcaScheduleDeletedIndexesUserTokenAndScheduleId() external {
-        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.prank(USER);
         vm.recordLogs();
         dcaManager.deleteDcaSchedule(scheduleId);

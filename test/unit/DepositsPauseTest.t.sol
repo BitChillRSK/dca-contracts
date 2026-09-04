@@ -8,7 +8,7 @@ import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {IOperationsAdmin} from "../../src/interfaces/IOperationsAdmin.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import "./TestsHelper.t.sol";
-import {scheduleAt} from "test/utils/ScheduleAt.sol";
+import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @notice R48: governance can stop new stablecoin deposits on one `(token, routeIndex)` pair.
@@ -45,7 +45,7 @@ contract DepositsPauseTest is DcaDappTest {
 
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
         uint256 handlerStablecoinBefore = stablecoin.balanceOf(address(stablecoinHandler));
-        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 scheduleBalanceBefore =
             scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
 
@@ -90,7 +90,7 @@ contract DepositsPauseTest is DcaDappTest {
     function testPauseIsCheckedBeforeTheTokenIsTouched() external {
         _pauseDeposits(true);
 
-        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
 
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), 0);
@@ -196,7 +196,7 @@ contract DepositsPauseTest is DcaDappTest {
     function testPausedRouteStillAllowsScheduleEdits() external {
         _pauseDeposits(true);
 
-        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 newPurchaseAmount = AMOUNT_TO_SPEND / 2;
         uint256 newPurchasePeriod = MIN_PURCHASE_PERIOD * 2;
 
@@ -214,7 +214,7 @@ contract DepositsPauseTest is DcaDappTest {
     function testPausedRouteStillAllowsDeletion() external {
         _pauseDeposits(true);
 
-        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
 
         vm.prank(USER);

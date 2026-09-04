@@ -8,7 +8,7 @@ import {IPurchaseUniswap} from "src/interfaces/IPurchaseUniswap.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockSwapRouter02} from "test/mocks/MockSwapRouter02.sol";
 import "../Constants.sol";
-import {scheduleAt} from "test/utils/ScheduleAt.sol";
+import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @notice Every successful Uniswap purchase must spend the whole requested stablecoin and leave the shared
@@ -212,7 +212,7 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
     }
 
     function _scheduleId() private view returns (uint64) {
-        return scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        return scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
     }
 
     /// @dev The handler pays the fee first, then snapshots its stablecoin balance for the consumption

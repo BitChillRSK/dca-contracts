@@ -13,7 +13,7 @@ import {IOperationsAdmin} from "../../src/interfaces/IOperationsAdmin.sol";
 import "./TestsHelper.t.sol";
 import {ownableUnauthorized} from "../utils/OzRevert.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
-import {scheduleAt} from "test/utils/ScheduleAt.sol";
+import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 contract OperationsAdminTest is DcaDappTest {
     event OperationsAdmin__SwapperAdded(address indexed swapper);
@@ -146,7 +146,7 @@ contract OperationsAdminTest is DcaDappTest {
     }
 
     function testRevokedSwapperCannotPurchase() external {
-        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), 0).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
         vm.prank(OWNER);
         operationsAdmin.revokeSwapper(SWAPPER);
 
@@ -285,7 +285,7 @@ contract OperationsAdminTest is DcaDappTest {
         assertEq(operationsAdmin.getTokenHandler(address(stablecoin), s_routeIndex), oldHandler);
         assertEq(operationsAdmin.getTokenHandler(address(stablecoin), SECOND_LENDING_INDEX), address(newHandler));
 
-        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), 0).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
         uint256 remaining = scheduleAt(dcaManager, USER, address(stablecoin), 0).tokenBalance;
         uint256 userBalanceBefore = stablecoin.balanceOf(USER);
 
@@ -298,7 +298,7 @@ contract OperationsAdminTest is DcaDappTest {
     }
 
     function testOwnerCannotMoveAnotherUsersTokens() external {
-        uint64 userScheduleId = scheduleAt(dcaManager, USER, address(stablecoin), 0).scheduleId;
+        uint64 userScheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
         uint256 userRemaining = scheduleAt(dcaManager, USER, address(stablecoin), 0).tokenBalance;
         uint256 userWalletBefore = stablecoin.balanceOf(USER);
 
@@ -310,12 +310,12 @@ contract OperationsAdminTest is DcaDappTest {
         );
         vm.stopPrank();
 
-        uint64 ownerScheduleId = scheduleAt(dcaManager, OWNER, address(stablecoin), 0).scheduleId;
+        uint64 ownerScheduleId = scheduleIdAt(dcaManager, OWNER, address(stablecoin), 0);
         uint256 ownerRemaining = scheduleAt(dcaManager, OWNER, address(stablecoin), 0).tokenBalance;
         uint256 ownerWalletBefore = stablecoin.balanceOf(OWNER);
 
         vm.prank(OWNER);
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__NotScheduleOwner.selector, userScheduleId));
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, OWNER, userScheduleId));
         dcaManager.withdrawToken(userScheduleId, userRemaining);
 
         vm.prank(OWNER);

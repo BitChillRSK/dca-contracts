@@ -19,7 +19,7 @@ import {SovrynErc20HandlerDex} from "../../../src/sovryn/SovrynErc20HandlerDex.s
 import {DcaManagerAccessControl} from "../../../src/DcaManagerAccessControl.sol";
 import {IDcaManagerAccessControl} from "../../../src/interfaces/IDcaManagerAccessControl.sol";
 import "../../Constants.sol";
-import {scheduleAt} from "test/utils/ScheduleAt.sol";
+import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 import {UNUSED_SCHEDULE_ID} from "test/utils/BatchBuyOne.sol";
 
 /**
@@ -129,8 +129,10 @@ contract GettersTest is DcaDappTest {
     }
 
     function test_dcaManager_getDcaSchedule_reverts_inexistentId() public {
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, UNUSED_SCHEDULE_ID));
-        dcaManager.getDcaSchedule(UNUSED_SCHEDULE_ID);
+        vm.expectRevert(
+            abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, USER, UNUSED_SCHEDULE_ID)
+        );
+        dcaManager.getDcaSchedule(USER, UNUSED_SCHEDULE_ID);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -429,7 +431,7 @@ contract GettersTest is DcaDappTest {
     function test_getters_afterStateChanges() public {
         uint256 initialBalance = scheduleAt(dcaManager, USER, address(stablecoin), 0).tokenBalance;
 
-        uint64 scheduleId = scheduleAt(dcaManager, USER, address(stablecoin), 0).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
 
         buyRbtcOne(USER, 0, scheduleId, AMOUNT_TO_SPEND);
 

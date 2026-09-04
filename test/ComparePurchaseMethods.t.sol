@@ -15,7 +15,7 @@ import {MockMocProxy} from "../test/mocks/MockMocProxy.sol";
 import {MockWrbtcToken} from "../test/mocks/MockWrbtcToken.sol";
 import {toBatch} from "./utils/BatchBuyOne.sol";
 import "./Constants.sol";
-import {scheduleAt} from "test/utils/ScheduleAt.sol";
+import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 
 contract ComparePurchaseMethods is Test {
@@ -387,7 +387,7 @@ contract ComparePurchaseMethods is Test {
             userArray[i] = users[i];
             scheduleIndexes[i] = SCHEDULE_INDEX;
             
-            scheduleIds[i] = scheduleAt(dcaManMoc, users[i], address(stablecoin), SCHEDULE_INDEX).scheduleId;
+            scheduleIds[i] = scheduleIdAt(dcaManMoc, users[i], address(stablecoin), SCHEDULE_INDEX);
             purchaseAmounts[i] = scheduleAt(dcaManMoc, users[i], address(stablecoin), SCHEDULE_INDEX).purchaseAmount;
             purchasePeriods[i] = scheduleAt(dcaManMoc, users[i], address(stablecoin), SCHEDULE_INDEX).purchasePeriod;
         }
@@ -396,7 +396,7 @@ contract ComparePurchaseMethods is Test {
         uint256 gasStart = gasleft();
         vm.prank(SWAPPER);
         dcaManMoc.batchBuyRbtc(
-            toBatch(scheduleIds, purchaseAmounts, address(stablecoin), routeIndex)
+            toBatch(scheduleIds, userArray, address(stablecoin), routeIndex)
         );
         uint256 gasUsed = gasStart - gasleft();
         uint256 gasCost = gasUsed * tx.gasprice;
@@ -439,7 +439,7 @@ contract ComparePurchaseMethods is Test {
             userArray[i] = users[i];
             scheduleIndexes[i] = SCHEDULE_INDEX;
             
-            scheduleIds[i] = scheduleAt(dcaManUni, users[i], address(stablecoin), SCHEDULE_INDEX).scheduleId;
+            scheduleIds[i] = scheduleIdAt(dcaManUni, users[i], address(stablecoin), SCHEDULE_INDEX);
             purchaseAmounts[i] = scheduleAt(dcaManUni, users[i], address(stablecoin), SCHEDULE_INDEX).purchaseAmount;
             purchasePeriods[i] = scheduleAt(dcaManUni, users[i], address(stablecoin), SCHEDULE_INDEX).purchasePeriod;
         }
@@ -448,7 +448,7 @@ contract ComparePurchaseMethods is Test {
         uint256 gasStart = gasleft();
         vm.prank(SWAPPER);
         dcaManUni.batchBuyRbtc(
-            toBatch(scheduleIds, purchaseAmounts, address(stablecoin), routeIndex)
+            toBatch(scheduleIds, userArray, address(stablecoin), routeIndex)
         );
         uint256 gasUsed = gasStart - gasleft();
         uint256 gasCost = gasUsed * tx.gasprice;

@@ -448,7 +448,7 @@ contract TopUpFromInterestTest is DcaDappTest {
         uint256 accruedInterest = _accruedInterest();
 
         vm.prank(USER);
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, wrongScheduleId));
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, USER, wrongScheduleId));
         dcaManager.topUpFromInterest(wrongScheduleId, accruedInterest);
     }
 
@@ -461,7 +461,7 @@ contract TopUpFromInterestTest is DcaDappTest {
         dcaManager.deleteDcaSchedule(scheduleId);
 
         vm.prank(USER);
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, scheduleId));
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, USER, scheduleId));
         dcaManager.topUpFromInterest(scheduleId, 1);
     }
 
@@ -475,7 +475,7 @@ contract TopUpFromInterestTest is DcaDappTest {
         uint256 accruedInterest = _accruedInterest();
 
         vm.prank(attacker);
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__NotScheduleOwner.selector, scheduleId));
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, attacker, scheduleId));
         dcaManager.topUpFromInterest(scheduleId, accruedInterest);
 
         assertEq(_schedule(SCHEDULE_INDEX).tokenBalance, balanceBefore, "another account moved the schedule");

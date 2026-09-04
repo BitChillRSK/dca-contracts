@@ -6,16 +6,17 @@ import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {UNUSED_SCHEDULE_ID} from "../utils/BatchBuyOne.sol";
 import "./TestsHelper.t.sol";
-import {scheduleAt} from "test/utils/ScheduleAt.sol";
+import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 /**
- * @notice R64: every entry point that reaches a schedule proves the caller owns it.
- * @dev A schedule used to be addressed as `s_dcaSchedules[msg.sender][token][index]`, so ownership was
- *      the mapping key and could not be got wrong. Addressed by id, it is a stored field and a check
- *      that has to be present on every path — one omission is somebody else's funds. That makes this
- *      the test that has to be exhaustive rather than representative, so it walks the whole mutator
- *      surface twice: once for an id that belongs to another account, and once for an id that belongs
- *      to nobody.
+ * @notice R64: no entry point can reach a schedule that is not the caller's.
+ * @dev A schedule is keyed by `(scheduleId, user)`, so ownership is the mapping key rather than a
+ *      checked field: `s_dcaSchedules[scheduleId][msg.sender]` lands on an empty struct when the id
+ *      belongs to somebody else, and an empty struct is refused as an id the caller does not hold.
+ *      There is no owner check to write and none to forget, which is the point — but "the key makes it
+ *      impossible" is a claim about every entry point at once, so this walks the whole mutator surface
+ *      rather than a sample of it. A stranger's id and an id nobody holds are the same case here, and
+ *      the tests assert they produce the same refusal.
  */
 contract ScheduleOwnershipTest is DcaDappTest {
     address private s_stranger;
@@ -27,15 +28,16 @@ contract ScheduleOwnershipTest is DcaDappTest {
     }
 
     function _scheduleId() private view returns (uint64) {
-        return scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        return scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
     }
 
-    function _notOwner(uint64 scheduleId) private pure returns (bytes memory) {
-        return abi.encodeWithSelector(IDcaManager.DcaManager__NotScheduleOwner.selector, scheduleId);
+    /// @dev What a stranger gets: the pair `(scheduleId, stranger)` is not a schedule.
+    function _notOwner(uint64 scheduleId) private view returns (bytes memory) {
+        return abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, s_stranger, scheduleId);
     }
 
-    function _inexistent(uint64 scheduleId) private pure returns (bytes memory) {
-        return abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, scheduleId);
+    function _inexistent(address caller, uint64 scheduleId) private pure returns (bytes memory) {
+        return abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, caller, scheduleId);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -105,7 +107,6 @@ contract ScheduleOwnershipTest is DcaDappTest {
 
         IDcaManager.DcaSchedule memory unchanged = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         assertEq(unchanged.scheduleId, before.scheduleId);
-        assertEq(unchanged.user, USER, "the owner changed");
         assertEq(unchanged.tokenBalance, before.tokenBalance, "a stranger moved the balance");
         assertEq(unchanged.purchaseAmount, before.purchaseAmount);
         assertEq(unchanged.purchasePeriod, before.purchasePeriod);
@@ -121,28 +122,28 @@ contract ScheduleOwnershipTest is DcaDappTest {
         uint64 ghost = UNUSED_SCHEDULE_ID;
 
         vm.startPrank(USER);
-        vm.expectRevert(_inexistent(ghost));
+        vm.expectRevert(_inexistent(USER, ghost));
         dcaManager.depositToken(ghost, AMOUNT_TO_DEPOSIT);
 
-        vm.expectRevert(_inexistent(ghost));
+        vm.expectRevert(_inexistent(USER, ghost));
         dcaManager.withdrawToken(ghost, AMOUNT_TO_SPEND);
 
-        vm.expectRevert(_inexistent(ghost));
+        vm.expectRevert(_inexistent(USER, ghost));
         dcaManager.withdrawTokenAndInterest(ghost, AMOUNT_TO_SPEND);
 
-        vm.expectRevert(_inexistent(ghost));
+        vm.expectRevert(_inexistent(USER, ghost));
         dcaManager.updatePurchaseAmount(ghost, AMOUNT_TO_SPEND);
 
-        vm.expectRevert(_inexistent(ghost));
+        vm.expectRevert(_inexistent(USER, ghost));
         dcaManager.updatePurchasePeriod(ghost, MIN_PURCHASE_PERIOD);
 
-        vm.expectRevert(_inexistent(ghost));
+        vm.expectRevert(_inexistent(USER, ghost));
         dcaManager.setSchedulePaused(ghost, true);
 
-        vm.expectRevert(_inexistent(ghost));
+        vm.expectRevert(_inexistent(USER, ghost));
         dcaManager.deleteDcaSchedule(ghost);
 
-        vm.expectRevert(_inexistent(ghost));
+        vm.expectRevert(_inexistent(USER, ghost));
         dcaManager.topUpFromInterest(ghost, 1);
         vm.stopPrank();
     }
@@ -150,7 +151,7 @@ contract ScheduleOwnershipTest is DcaDappTest {
     /// @dev Zero is not a schedule: ids start at 1, so an uninitialised argument must not open one.
     function testIdZeroBelongsToNoSchedule() external {
         vm.prank(USER);
-        vm.expectRevert(_inexistent(0));
+        vm.expectRevert(_inexistent(USER, 0));
         dcaManager.withdrawToken(0, AMOUNT_TO_SPEND);
     }
 
@@ -174,7 +175,9 @@ contract ScheduleOwnershipTest is DcaDappTest {
             dcaManager.getDcaSchedules(s_stranger, address(stablecoin));
         assertEq(strangerSchedules.length, 1);
         assertTrue(strangerSchedules[0].scheduleId != usersId, "two live schedules share an id");
-        assertEq(strangerSchedules[0].user, s_stranger);
-        assertEq(dcaManager.getDcaSchedule(usersId).user, USER, "the first user's schedule changed hands");
+        // The first user's schedule is still theirs, and is not reachable under the stranger's key.
+        assertEq(dcaManager.getDcaSchedule(USER, usersId).scheduleId, usersId);
+        vm.expectRevert(_inexistent(s_stranger, usersId));
+        dcaManager.getDcaSchedule(s_stranger, usersId);
     }
 }

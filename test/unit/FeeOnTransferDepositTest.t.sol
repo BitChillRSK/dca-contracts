@@ -15,6 +15,7 @@ import {MockKdocToken} from "../mocks/MockKdocToken.sol";
 import {MockMocProxy} from "../mocks/MockMocProxy.sol";
 import "../Constants.sol";
 import {batchBuyOne, toBatch} from "../utils/BatchBuyOne.sol";
+import {scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @notice R41: hop 1 must deliver exactly what was requested or the whole deposit reverts.
@@ -248,7 +249,7 @@ contract FeeOnTransferDepositTest is Test {
         token.setFeeBps(FEE_BPS);
 
         vm.prank(SWAPPER);
-        batchBuyOne(dcaManager, address(token), scheduleId, MIN_PURCHASE_AMOUNT, IDLE_INDEX);
+        batchBuyOne(dcaManager, USER, address(token), scheduleId, IDLE_INDEX);
 
         uint256 afterBuy = REQUESTED - MIN_PURCHASE_AMOUNT;
         assertEq(dcaManager.getDcaSchedules(USER, address(token))[0].tokenBalance, afterBuy);
@@ -359,7 +360,7 @@ contract FeeOnTransferDepositTest is Test {
                 ITokenLending.TokenLending__InsufficientShares.selector, USER, requestedShares, availableShares
             )
         );
-        dcaManager.batchBuyRbtc(toBatch(ids, amounts, address(token), TROPYKUS_INDEX));
+        dcaManager.batchBuyRbtc(toBatch(ids, buyers, address(token), TROPYKUS_INDEX));
 
         // Revert leaves the schedule intact; the lending clamp still lets the user withdraw.
         assertEq(dcaManager.getDcaSchedules(USER, address(token))[0].tokenBalance, REQUESTED);
@@ -380,13 +381,13 @@ contract FeeOnTransferDepositTest is Test {
     {
         vm.prank(who);
         dcaManager.createDcaSchedule(address(token), REQUESTED, purchaseAmount, MIN_PURCHASE_PERIOD, routeIndex);
-        scheduleId = dcaManager.getDcaSchedules(who, address(token))[0].scheduleId;
+        scheduleId = scheduleIdAt(dcaManager, who, address(token), 0);
     }
 
     function _createTropykusSchedule(address who, uint256 purchaseAmount) private returns (uint64 scheduleId) {
         vm.prank(who);
         dcaManager.createDcaSchedule(address(token), REQUESTED, purchaseAmount, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
-        scheduleId = dcaManager.getDcaSchedules(who, address(token))[0].scheduleId;
+        scheduleId = scheduleIdAt(dcaManager, who, address(token), 0);
     }
 
     function _createIdle(address who, uint256 purchaseAmount) private returns (uint256 credited) {

@@ -11,7 +11,7 @@ import {OperationsAdmin} from "src/OperationsAdmin.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {toBatch} from "test/utils/BatchBuyOne.sol";
 import "test/Constants.sol";
-import {scheduleAt} from "test/utils/ScheduleAt.sol";
+import {scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @title Handler
@@ -195,7 +195,7 @@ contract Handler is Test {
         
         stablecoin.approve(address(tokenHandler), depositAmount);
         
-        uint64 scheduleId = scheduleAt(dcaManager, user, address(stablecoin), scheduleIndex).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, user, address(stablecoin), scheduleIndex);
         try dcaManager.depositToken(scheduleId, depositAmount) {
             // Success
         } catch {
@@ -229,7 +229,7 @@ contract Handler is Test {
 
         withdrawalAmount = bound(withdrawalAmount, 1, currentBalance);
         
-        uint64 scheduleId = scheduleAt(dcaManager, user, address(stablecoin), scheduleIndex).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, user, address(stablecoin), scheduleIndex);
         try dcaManager.withdrawToken(scheduleId, withdrawalAmount) {
             // Success
         } catch {
@@ -256,7 +256,9 @@ contract Handler is Test {
         vm.startPrank(user);
         
         IDcaManager.DcaSchedule[] memory schedules;
-        try dcaManager.getDcaSchedules(user, address(stablecoin)) returns (IDcaManager.DcaSchedule[] memory _schedules) {
+        try dcaManager.getDcaSchedules(user, address(stablecoin)) returns (
+            IDcaManager.DcaSchedule[] memory _schedules
+        ) {
             schedules = _schedules;
         } catch {
             vm.stopPrank();
@@ -460,11 +462,11 @@ contract Handler is Test {
         uint256[] memory purchaseAmounts = new uint256[](1);
         buyers[0] = user;
         scheduleIndexes[0] = scheduleIndex;
-        scheduleIds[0] = schedule.scheduleId;
+        scheduleIds[0] = scheduleIdAt(dcaManager, user, address(stablecoin), scheduleIndex);
         purchaseAmounts[0] = schedule.purchaseAmount;
 
         try dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, purchaseAmounts, address(stablecoin), schedule.routeIndex)
+            toBatch(scheduleIds, buyers, address(stablecoin), schedule.routeIndex)
         ) {
             buyRbtcSuccesses++;
         } catch {
@@ -528,7 +530,7 @@ contract Handler is Test {
         // Execute batch purchase
         vm.startPrank(SWAPPER);
         try dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, purchaseAmounts, address(stablecoin), routeIndex)
+            toBatch(scheduleIds, buyers, address(stablecoin), routeIndex)
         ) {
             buyRbtcSuccesses++;
         } catch {
@@ -592,7 +594,7 @@ contract Handler is Test {
         
         withdrawalAmount = bound(withdrawalAmount, 1, currentBalance);
         
-        uint64 scheduleId = scheduleAt(dcaManager, user, address(stablecoin), scheduleIndex).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, user, address(stablecoin), scheduleIndex);
         try dcaManager.withdrawTokenAndInterest(scheduleId, withdrawalAmount
         ) {
             // Success
@@ -626,9 +628,12 @@ contract Handler is Test {
         }
         if (accruedInterest == 0) return;
 
+        // Read the id before the prank: `vm.prank` applies to the next call, and a read inlined into
+        // the argument list would consume it, leaving the top-up itself unpranked.
+        uint64 scheduleId = schedules[scheduleIndex].scheduleId;
+
         vm.prank(user);
-        try dcaManager.topUpFromInterest(schedules[scheduleIndex].scheduleId, bound(amountSeed, 1, accruedInterest)
-        ) {
+        try dcaManager.topUpFromInterest(scheduleId, bound(amountSeed, 1, accruedInterest)) {
             topUpFromInterestSuccesses++;
         } catch {
             // A credit too small to fund another purchase, or a route with no handler.
