@@ -41,11 +41,12 @@ interface ITokenHandler {
     /**
      * @notice Send `amount` of this handler's stablecoin to `user`.
      * @param user The user receiving the withdrawal.
-     * @param amount The amount requested. A lending handler may clamp to the user's position first.
+     * @param amount The amount requested. The handler may clamp first: a lending handler to the user's
+     *        position, the idle handler to its own per-user ledger.
      * @return withdrawnAmount The amount that left this contract, measured as a `balanceOf(address(this))`
      *         delta around `safeTransfer`. This measures handler cash, not the user's balance, and it is
      *         not what a schedule's principal is debited by: principal is reduced by the amount requested,
-     *         because a protocol that pays out less than it was asked for has consumed the difference.
+     *         because a handler that pays out less than it was asked for does not still hold the difference.
      */
     function withdrawToken(address user, uint256 amount) external returns (uint256 withdrawnAmount);
 }

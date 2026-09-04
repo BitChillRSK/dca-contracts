@@ -612,8 +612,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     }
 
     /**
-     * @dev Withdraw principal from one schedule. Debits the requested amount, not what the
-     *      lending protocol paid. `type(uint256).max` means this schedule's whole `tokenBalance`.
+     * @dev Withdraw principal from one schedule. Debits the requested amount, not what the handler
+     *      paid out. `type(uint256).max` means this schedule's whole `tokenBalance`.
      * @return routeIndex The schedule's stored route, captured before the handler call.
      */
     function _withdrawToken(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 withdrawalAmount)
@@ -629,11 +629,11 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         if (withdrawalAmount > tokenBalance) {
             revert DcaManager__WithdrawalAmountExceedsBalance(token, withdrawalAmount, tokenBalance);
         }
-        // Subtract the requested withdrawal amount, not the amount the lending protocol paid
+        // Subtract the requested withdrawal amount, not the amount the handler paid out
         uint256 newTokenBalance = tokenBalance - withdrawalAmount;
         routeIndex = dcaSchedule.routeIndex;
         dcaSchedule.tokenBalance = newTokenBalance.toUint128();
-        // `withdrawToken()`'s return value (what the lending protocol paid back) is deliberately unused
+        // `withdrawToken()`'s return value (what the handler actually paid out) is deliberately unused
         _handler(token, routeIndex).withdrawToken(msg.sender, withdrawalAmount);
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
     }

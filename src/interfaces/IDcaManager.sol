@@ -106,7 +106,7 @@ interface IDcaManager {
         address indexed user, address indexed token, uint64 indexed scheduleId, uint256 interest
     );
     /// @notice A schedule was deleted. `refundedAmount` is what left the handler, which may be less than
-    ///         the schedule's `tokenBalance` if the lending protocol haircut the redemption.
+    ///         the schedule's `tokenBalance` if the handler paid out less than it was asked for.
     event DcaManager__DcaScheduleDeleted(
         address indexed user, address indexed token, uint64 indexed scheduleId, uint256 refundedAmount
     );
@@ -205,9 +205,11 @@ interface IDcaManager {
      * @param scheduleId Id of that schedule, checked against storage.
      * @param withdrawalAmount Amount to withdraw. Pass `type(uint256).max` for this schedule's
      *        whole `tokenBalance`.
-     * @dev Principal is reduced by the requested amount, not by what the lending protocol paid. A
-     *      protocol that pays out less than it was asked for has consumed the difference, so leaving
-     *      it credited to the schedule would let the shortfall be withdrawn a second time.
+     * @dev Principal is reduced by the requested amount, not by what the handler paid out. A lending
+     *      route can be paid short on redemption, and that difference is gone rather than left behind,
+     *      so re-crediting it would let the shortfall be withdrawn twice. An idle route pays short only
+     *      if the handler's own ledger disagrees with this one, which is a condition to surface rather
+     *      than to paper over.
      */
     function withdrawToken(address token, uint256 scheduleIndex, uint64 scheduleId, uint256 withdrawalAmount) external;
 
@@ -238,7 +240,7 @@ interface IDcaManager {
      * @param scheduleIndex Index of the schedule in the caller's array for `token`.
      * @param scheduleId Id of that schedule, checked against storage.
      * @dev Swap-pops the array. The deleted event reports what left the handler, which may be less
-     *      than `tokenBalance` if the lending protocol haircut the redemption. Accumulated rBTC and
+     *      than `tokenBalance` if the handler paid out less than it was asked for. Accumulated rBTC and
      *      lending interest are not claimed here — withdraw those first.
      */
     function deleteDcaSchedule(address token, uint256 scheduleIndex, uint64 scheduleId) external;
