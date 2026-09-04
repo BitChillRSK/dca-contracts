@@ -16,7 +16,12 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
+
     mapping(address user => uint256 amount) internal s_usersAccumulatedRbtc;
+
+    /*//////////////////////////////////////////////////////////////
+                           EXTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @dev Allow the contract to receive native rBTC from MoC or from unwrapping WRBTC.
@@ -97,6 +102,10 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
         uint256 rbtcBalance = _withdrawRbtcChecksEffects(user);
         _withdrawRbtc(user, rbtcBalance);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                                GETTERS
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @inheritdoc IPurchaseRbtc

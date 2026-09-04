@@ -20,7 +20,15 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinSource {
     using SafeERC20 for IERC20;
 
+    /*//////////////////////////////////////////////////////////////
+                            STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
+
     mapping(address user => uint256 balance) internal s_shares;
+
+    /*//////////////////////////////////////////////////////////////
+                               CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @param dcaManagerAddress The DcaManager allowed to call deposit, withdraw, and interest.
@@ -41,6 +49,10 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
         TokenHandler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, initialOwner)
         TokenLending(exchangeRateDecimals)
     {}
+
+    /*//////////////////////////////////////////////////////////////
+                           EXTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @inheritdoc ITokenHandler
@@ -87,20 +99,6 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
     /**
      * @inheritdoc ITokenLending
      */
-    function getUserShares(address user) external view override returns (uint256) {
-        return s_shares[user];
-    }
-
-    /**
-     * @dev Advertise `ITokenHandler` (via TokenHandler) and `ITokenLending`.
-     */
-    function supportsInterface(bytes4 interfaceID) public view virtual override returns (bool) {
-        return interfaceID == type(ITokenLending).interfaceId || super.supportsInterface(interfaceID);
-    }
-
-    /**
-     * @inheritdoc ITokenLending
-     */
     function withdrawInterest(address user, uint256 stablecoinLockedInDcaSchedules) external override onlyDcaManager {
         uint256 exchangeRate = _exchangeRate();
         uint256 totalStablecoinInLending = _sharesToStablecoin(s_shares[user], exchangeRate);
@@ -127,6 +125,17 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
         return _accruedInterest(user, stablecoinLockedInDcaSchedules, _exchangeRate());
     }
 
+    /*//////////////////////////////////////////////////////////////
+                                GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @inheritdoc ITokenLending
+     */
+    function getUserShares(address user) external view override returns (uint256) {
+        return s_shares[user];
+    }
+
     /**
      * @inheritdoc ITokenLending
      */
@@ -140,25 +149,16 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
         return _accruedInterest(user, stablecoinLockedInDcaSchedules, _viewExchangeRate());
     }
 
+    /**
+     * @dev Advertise `ITokenHandler` (via TokenHandler) and `ITokenLending`.
+     */
+    function supportsInterface(bytes4 interfaceID) public view virtual override returns (bool) {
+        return interfaceID == type(ITokenLending).interfaceId || super.supportsInterface(interfaceID);
+    }
+
     /*//////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @dev Share-backed stablecoin above locked principal at `exchangeRate`, or zero. The two public
-     *      readers differ only in which rate they pass: the quote uses the market's plain read, the
-     *      spendable figure the rate a write path would get.
-     */
-    function _accruedInterest(address user, uint256 stablecoinLockedInDcaSchedules, uint256 exchangeRate)
-        private
-        view
-        returns (uint256)
-    {
-        uint256 totalStablecoinInLending = _sharesToStablecoin(s_shares[user], exchangeRate);
-        return totalStablecoinInLending > stablecoinLockedInDcaSchedules
-            ? totalStablecoinInLending - stablecoinLockedInDcaSchedules
-            : 0;
-    }
 
     /**
      * @dev The stablecoin this handler lends out.
@@ -236,18 +236,6 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
     }
 
     /**
-     * @dev Write the user's virtual share balance and emit the canonical transition.
-     *      No log when the balance is unchanged, so a zero-share debit is silent.
-     */
-    function _setUserShares(address user, uint256 newShares) private {
-        uint256 previousShares = s_shares[user];
-        s_shares[user] = newShares;
-        if (previousShares != newShares) {
-            emit TokenLending__UserSharesUpdated(user, previousShares, newShares);
-        }
-    }
-
-    /**
      * @dev Mutating-ok exchange rate used on write paths and by `getAccruedInterest`, which reports
      *      a figure a caller may then spend against. Defaults to the view rate.
      *      Override when the live call mutates (Compound `exchangeRateCurrent()` vs
@@ -276,6 +264,44 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
     function _protocolDeposit(uint256 stablecoinAmount) internal virtual returns (uint256 mintedShares);
 
     /**
+     * @dev Burn `sharesAmount` at the lending protocol onto this contract.
+     *      Adapters move funds only. Measurement and the zero-payout revert live in the base.
+     */
+    function _protocolRedeem(uint256 sharesAmount, uint256 exchangeRate) internal virtual;
+
+    /*//////////////////////////////////////////////////////////////
+                            PRIVATE FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @dev Share-backed stablecoin above locked principal at `exchangeRate`, or zero. The two public
+     *      readers differ only in which rate they pass: the quote uses the market's plain read, the
+     *      spendable figure the rate a write path would get.
+     */
+    function _accruedInterest(address user, uint256 stablecoinLockedInDcaSchedules, uint256 exchangeRate)
+        private
+        view
+        returns (uint256)
+    {
+        uint256 totalStablecoinInLending = _sharesToStablecoin(s_shares[user], exchangeRate);
+        return totalStablecoinInLending > stablecoinLockedInDcaSchedules
+            ? totalStablecoinInLending - stablecoinLockedInDcaSchedules
+            : 0;
+    }
+
+    /**
+     * @dev Write the user's virtual share balance and emit the canonical transition.
+     *      No log when the balance is unchanged, so a zero-share debit is silent.
+     */
+    function _setUserShares(address user, uint256 newShares) private {
+        uint256 previousShares = s_shares[user];
+        s_shares[user] = newShares;
+        if (previousShares != newShares) {
+            emit TokenLending__UserSharesUpdated(user, previousShares, newShares);
+        }
+    }
+
+    /**
      * @dev Measure the stablecoin this contract gained from a protocol redeem.
      */
     function _measuredProtocolRedeem(uint256 sharesAmount, uint256 exchangeRate)
@@ -286,10 +312,4 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
         _protocolRedeem(sharesAmount, exchangeRate);
         received = i_stableToken.balanceOf(address(this)) - stablecoinBalanceBefore;
     }
-
-    /**
-     * @dev Burn `sharesAmount` at the lending protocol onto this contract.
-     *      Adapters move funds only. Measurement and the zero-payout revert live in the base.
-     */
-    function _protocolRedeem(uint256 sharesAmount, uint256 exchangeRate) internal virtual;
 }

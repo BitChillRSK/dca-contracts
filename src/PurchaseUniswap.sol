@@ -65,6 +65,10 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     /// @dev Exact encoded paths this handler may activate. Purchases read `s_swapPath` only.
     mapping(bytes32 pathHash => bool allowed) private s_purchasePathAllowed;
 
+    /*//////////////////////////////////////////////////////////////
+                               CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
+
     /**
      * @param uniswapSettings the settings for the uniswap router
      * @param amountOutMinimumPercent The swap-time oracle floor
@@ -114,7 +118,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     /*//////////////////////////////////////////////////////////////
-                               FUNCTIONS
+                           EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
     /**
      * @inheritdoc IPurchaseRbtc
@@ -200,6 +204,45 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     /*//////////////////////////////////////////////////////////////
+                                GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @inheritdoc IPurchaseUniswap
+     */
+    function getAmountOutMinimumPercent() external view returns (uint256) {
+        return s_amountOutMinimumPercent;
+    }
+
+    /**
+     * @inheritdoc IPurchaseUniswap
+     */
+    function getAmountOutMinimumSafetyCheck() external view returns (uint256) {
+        return s_amountOutMinimumSafetyCheck;
+    }
+
+    /**
+     * @inheritdoc IPurchaseUniswap
+     */
+    function getMocOracle() external view returns (ICoinPairPrice) {
+        return s_mocOracle;
+    }
+
+    /**
+     * @inheritdoc IPurchaseUniswap
+     */
+    function getSwapPath() external view returns (bytes memory) {
+        return s_swapPath;
+    }
+
+    /**
+     * @inheritdoc IPurchaseUniswap
+     */
+    function isPurchasePathAllowed(bytes32 pathHash) external view returns (bool) {
+        return s_purchasePathAllowed[pathHash];
+    }
+
+    /*//////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
@@ -238,54 +281,6 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     ) internal {
         s_purchasePathAllowed[pathHash] = allowed;
         emit PurchaseUniswap_PurchasePathAllowedSet(pathHash, encodedPath, intermediateTokens, poolFeeRates, allowed);
-    }
-
-    /**
-     * @dev Uniswap V3 `exactInput` bytes: this handler's stablecoin, then each
-     *      `(fee, intermediateToken)`, then the last fee and WRBTC. Empty
-     *      `intermediateTokens` is a direct pair. `poolFeeRates.length` must be
-     *      `intermediateTokens.length + 1`. Reverts if `_purchaseToken()` is still
-     *      unset, so a reversed inheritance `is` list fails at deploy.
-     */
-    function _encodePurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
-        private
-        view
-        returns (bytes memory newPath)
-    {
-        if (poolFeeRates.length != intermediateTokens.length + 1) {
-            revert PurchaseUniswap__WrongNumberOfTokensOrFeeRates(intermediateTokens.length, poolFeeRates.length);
-        }
-
-        address purchaseToken = address(_purchaseToken());
-        if (purchaseToken == address(0)) revert PurchaseUniswap__ZeroPurchaseToken();
-
-        newPath = abi.encodePacked(purchaseToken);
-        for (uint256 i = 0; i < intermediateTokens.length; ++i) {
-            newPath = abi.encodePacked(newPath, poolFeeRates[i], intermediateTokens[i]);
-        }
-
-        newPath = abi.encodePacked(newPath, poolFeeRates[poolFeeRates.length - 1], address(i_wrBtcToken));
-    }
-
-    /**
-     * @dev Both arguments are 1e18-scaled fractions. Neither may exceed 100%, and the swap-time floor
-     *      cannot sit below the safety check. Keeping that wall means no single owner transaction can
-     *      widen the live floor past what governance pre-approved as the worst acceptable fill.
-     *      Used by the constructor and both owner setters.
-     */
-    function _validateSlippageSettings(uint256 amountOutMinimumPercent, uint256 amountOutMinimumSafetyCheck)
-        private
-        pure
-    {
-        if (amountOutMinimumPercent > HUNDRED_PERCENT) {
-            revert PurchaseUniswap__AmountOutMinimumPercentTooHigh();
-        }
-        if (amountOutMinimumSafetyCheck > HUNDRED_PERCENT) {
-            revert PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh();
-        }
-        if (amountOutMinimumPercent < amountOutMinimumSafetyCheck) {
-            revert PurchaseUniswap__AmountOutMinimumPercentTooLow();
-        }
     }
 
     /**
@@ -352,15 +347,6 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     /**
-     * @dev One shared `balanceOf` call site, so the purchase's balance reads do not each emit their own
-     *      copy of the same encode/staticcall/decode sequence. A purchase makes four of them plus two
-     *      per intermediate token, so the saving grows with the path.
-     */
-    function _balanceOf(address token, address account) private view returns (uint256) {
-        return IERC20(token).balanceOf(account);
-    }
-
-    /**
      * @param stablecoinAmountToSpend the amount of stablecoin to swap for rBTC
      * @return minimumRbtcAmount the minimum amount of rBTC that must be received
      * @dev `stablecoinAmountToSpend * i_stablecoinToUsdScale` is the USD notional in the oracle's decimals
@@ -384,41 +370,63 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            GETTER FUNCTIONS
+                            PRIVATE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @inheritdoc IPurchaseUniswap
+     * @dev Uniswap V3 `exactInput` bytes: this handler's stablecoin, then each
+     *      `(fee, intermediateToken)`, then the last fee and WRBTC. Empty
+     *      `intermediateTokens` is a direct pair. `poolFeeRates.length` must be
+     *      `intermediateTokens.length + 1`. Reverts if `_purchaseToken()` is still
+     *      unset, so a reversed inheritance `is` list fails at deploy.
      */
-    function getAmountOutMinimumPercent() external view returns (uint256) {
-        return s_amountOutMinimumPercent;
+    function _encodePurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
+        private
+        view
+        returns (bytes memory newPath)
+    {
+        if (poolFeeRates.length != intermediateTokens.length + 1) {
+            revert PurchaseUniswap__WrongNumberOfTokensOrFeeRates(intermediateTokens.length, poolFeeRates.length);
+        }
+
+        address purchaseToken = address(_purchaseToken());
+        if (purchaseToken == address(0)) revert PurchaseUniswap__ZeroPurchaseToken();
+
+        newPath = abi.encodePacked(purchaseToken);
+        for (uint256 i = 0; i < intermediateTokens.length; ++i) {
+            newPath = abi.encodePacked(newPath, poolFeeRates[i], intermediateTokens[i]);
+        }
+
+        newPath = abi.encodePacked(newPath, poolFeeRates[poolFeeRates.length - 1], address(i_wrBtcToken));
     }
 
     /**
-     * @inheritdoc IPurchaseUniswap
+     * @dev Both arguments are 1e18-scaled fractions. Neither may exceed 100%, and the swap-time floor
+     *      cannot sit below the safety check. Keeping that wall means no single owner transaction can
+     *      widen the live floor past what governance pre-approved as the worst acceptable fill.
+     *      Used by the constructor and both owner setters.
      */
-    function getAmountOutMinimumSafetyCheck() external view returns (uint256) {
-        return s_amountOutMinimumSafetyCheck;
+    function _validateSlippageSettings(uint256 amountOutMinimumPercent, uint256 amountOutMinimumSafetyCheck)
+        private
+        pure
+    {
+        if (amountOutMinimumPercent > HUNDRED_PERCENT) {
+            revert PurchaseUniswap__AmountOutMinimumPercentTooHigh();
+        }
+        if (amountOutMinimumSafetyCheck > HUNDRED_PERCENT) {
+            revert PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh();
+        }
+        if (amountOutMinimumPercent < amountOutMinimumSafetyCheck) {
+            revert PurchaseUniswap__AmountOutMinimumPercentTooLow();
+        }
     }
 
     /**
-     * @inheritdoc IPurchaseUniswap
+     * @dev One shared `balanceOf` call site, so the purchase's balance reads do not each emit their own
+     *      copy of the same encode/staticcall/decode sequence. A purchase makes four of them plus two
+     *      per intermediate token, so the saving grows with the path.
      */
-    function getMocOracle() external view returns (ICoinPairPrice) {
-        return s_mocOracle;
-    }
-
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
-    function getSwapPath() external view returns (bytes memory) {
-        return s_swapPath;
-    }
-
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
-    function isPurchasePathAllowed(bytes32 pathHash) external view returns (bool) {
-        return s_purchasePathAllowed[pathHash];
+    function _balanceOf(address token, address account) private view returns (uint256) {
+        return IERC20(token).balanceOf(account);
     }
 }

@@ -65,6 +65,22 @@ Unless the assigned spec explicitly changes one:
 6. **Every external function that writes `s_dcaSchedules` carries `nonReentrant`** — the only exceptions are views and the swapper-only purchase paths (`batchBuyRbtc` and `batchBuyRbtcAcrossHandlers`). The single-handler path is CEI-clean and writes nothing after its handler call. The multi-handler path loops that same helper, so a later handler's schedule writes happen after earlier handler calls; handlers are BitChill-deployed and the purchase paths stay `onlySwapper`, so bundle-wide CEI is not worth the extra pass. Checkable with grep, deliberately not a per-function judgement call. OZ's guard only blocks *other guarded* functions, so a partial set protects nothing: a mutator left unguarded is both an unblocked re-entry point and an entry point that engages no lock. Do not narrow this set for gas — the measured saving is ~2,300 gas on user-paid transactions (~1.4 cents), and the protocol-side win lives entirely on the purchase path, which this invariant does not touch. See `docs/relaunch/R6-hot-path-cleanup.md` and `docs/relaunch/R42-swapper-batcher.md`.
 7. **The public `scheduleId` is the creation nonce (`uint64`), never a hash and never array state** — `createDcaSchedule` pre-increments `s_protocolSettings.scheduleNonce` and stores that value as the schedule's id, so ids start at 1 and `getSchedulesCreatedCount()` is the last one assigned. `deleteDcaSchedule` swap-pops, which can restore a previous array shape inside one block, so any id derived from array contents (length, last element's id, a hash of the array) can be reminted while the original schedule is still live. Only a strictly increasing counter is safe. R50 removed the `keccak256(user, token, nonce)` wrapper: it added a word per schedule and hid nothing, since ids are public through `getDcaSchedules` and are stale-index checks, not capabilities.
 
+## Section headers and function order
+
+First-party `src/` files use Foundry-style banners with these exact titles. When a section is non-empty, emit its banner; skip empty ones. Order:
+
+`TYPE DECLARATIONS` → `STATE VARIABLES` → `EVENTS` → `ERRORS` → `MODIFIERS` → `CONSTRUCTOR` → `EXTERNAL FUNCTIONS` → `GETTERS` → `INTERNAL FUNCTIONS` → `PRIVATE FUNCTIONS`.
+
+- **Floor:** constructor-only contracts (the only declaration is `constructor`) carry no banners — that is the leaf-handler shape (`IdleDocHandlerMoc`, `*Erc20HandlerDex`, `*DocHandlerMoc`, …). Every other first-party file uses banners for each non-empty section.
+- **Visibility:** external → public → internal → private. The externally reachable surface is therefore always the top of the file, which is what makes it readable in one pass; that property, not the banners, is the point of the ordering.
+- **EXTERNAL FUNCTIONS** holds `external` / `public` entry points that write state, including `receive` / `fallback` and `public` overrides. It is decided by mutability, not by name: `getAccruedInterest` is deliberately non-`view` and belongs here.
+- **GETTERS** holds `view` / `pure` `external` / `public` accessors — reads a caller makes for an answer. `supportsInterface` (the public view ERC-165 override) lives here. A `view` / `pure` function that only reverts is a disabled mutator, not an accessor, and stays with the mutators (`BitChillOwnable.renounceOwnership`).
+- Mutators before views applies **within EXTERNAL FUNCTIONS / GETTERS only** — that split is the whole of the rule. Internal and private helpers are ordered by call order, closest caller first, because grouping them by mutability separates a function from the helper it calls for no reader's benefit.
+- Interfaces follow the same split as their implementation, in the same declaration order, so a reader can diff the pair. `IWRBTC` and the other vendored files below are the exception.
+- Each banner title uses one indentation everywhere: `GETTERS` at column 32, `EXTERNAL FUNCTIONS` at 27. When renaming a banner, re-centre it rather than leaving the old padding.
+- Do not use `FUNCTIONS`, `GETTER FUNCTIONS`, or other spellings.
+- Leave vendored interfaces alone so they stay diffable against upstream: `IMocProxy`, `IWRBTC`, `ICoinPairPrice`, `IkToken`, `IiSusdToken`, `ILayerBankPool`, `ILayerBankAToken`.
+
 ## Onchain comments
 
 Verified `src/` source (including NatSpec) lives on explorers for the life of the deployment. Do not mention relaunch ticket IDs (`R29`, `R42`, …) in `src/` comments. Write the durable reason instead. Specs, tests, PRs, deploy-script comments, and this file may use R-ids.

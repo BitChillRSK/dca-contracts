@@ -15,6 +15,10 @@ import {ILayerBankPool} from "./ILayerBankPool.sol";
  *      read, because mixing the two breaks the round-up solvency invariant.
  */
 abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20Handler {
+    /*//////////////////////////////////////////////////////////////
+                            STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
+
     /// @notice Aave's liquidity-index scale (RAY). Fixed for this protocol; not a constructor
     ///         arg (passing Tropykus/Sovryn's 1e18 would size withdrawals 1e9× too large).
     /// @return Always `1e27` for this protocol.
@@ -26,6 +30,10 @@ abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20H
     /// @notice LayerBank Pool this handler supplies to and withdraws from.
     /// @return The pool read from `aToken.POOL()` at construction.
     ILayerBankPool public immutable i_pool;
+
+    /*//////////////////////////////////////////////////////////////
+                               CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @param dcaManagerAddress The DcaManager allowed to call this handler.
@@ -55,6 +63,10 @@ abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20H
         if (pool == address(0)) revert LayerBankErc20Handler__PoolNotSet();
         i_pool = ILayerBankPool(pool);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                           INTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     function _viewExchangeRate() internal view override returns (uint256) {
         return _normalizedIncome();

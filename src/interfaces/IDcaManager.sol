@@ -181,7 +181,7 @@ interface IDcaManager {
     error DcaManager__TopUpDoesNotFundAnotherPurchase(address token, uint64 scheduleId, uint256 amount);
 
     /*//////////////////////////////////////////////////////////////
-                               FUNCTIONS
+                           EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /**
@@ -397,7 +397,7 @@ interface IDcaManager {
     function setTokenMinPurchaseAmount(address token, uint256 minPurchaseAmount) external;
 
     /*//////////////////////////////////////////////////////////////
-                            GETTER FUNCTIONS
+                                GETTERS
     //////////////////////////////////////////////////////////////*/
 
     /**

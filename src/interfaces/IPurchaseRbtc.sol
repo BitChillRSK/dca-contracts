@@ -72,6 +72,10 @@ interface IPurchaseRbtc {
      */
     function withdrawAccumulatedRbtc(address user) external;
 
+    /*//////////////////////////////////////////////////////////////
+                                GETTERS
+    //////////////////////////////////////////////////////////////*/
+
     /**
      * @notice rBTC this handler has accumulated for `user` and not yet withdrawn.
      * @param user Account to query.

@@ -1,6 +1,6 @@
 # R63 — One section-header and function-ordering convention across `src/`
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
@@ -52,26 +52,45 @@ once, recorded in `AGENTS.md`, and applied everywhere.
 
 ## Scope
 
-- [ ] Choose one banner set and record it in `AGENTS.md` with the exact strings. Suggested, from
+- [x] Choose one banner set and record it in `AGENTS.md` with the exact strings. Suggested, from
       the Solidity style guide order: `TYPE DECLARATIONS`, `STATE VARIABLES`, `EVENTS`, `ERRORS`,
       `MODIFIERS`, `CONSTRUCTOR`, `EXTERNAL FUNCTIONS`, `INTERNAL FUNCTIONS`, `PRIVATE FUNCTIONS`,
       `GETTERS`.
-- [ ] Record the size floor: below N declarations a file carries no banners at all.
-- [ ] Record the ordering rule: style-guide visibility order (external → public → internal →
-      private), and within each group mutators before views.
-- [ ] Move `DcaManager._batchBuyRbtc` under `PRIVATE FUNCTIONS`.
-- [ ] Regroup `LendingErc20Handler` and give it the full banner set.
-- [ ] Apply the chosen vocabulary to every `src/` file that has banners.
-- [ ] Add banners to the files above the floor that lack them.
+      **Shipped:** same vocabulary; section order places `GETTERS` after `EXTERNAL FUNCTIONS` and
+      before `INTERNAL`/`PRIVATE` (matches FeeHandler/OperationsAdmin and keeps every external above
+      every internal/private).
+- [x] Record the size floor: below N declarations a file carries no banners at all.
+      **Shipped:** constructor-only contracts (sole declaration is `constructor`) carry none.
+- [x] Record the ordering rule: style-guide visibility order (external → public → internal →
+      private), and within each group mutators before views. `supportsInterface` lives under `GETTERS`.
+      **Shipped, narrowed:** mutators-before-views binds the `EXTERNAL FUNCTIONS` / `GETTERS` split
+      only. No internal or private block in `src/` orders by mutability, and none should — helpers
+      read best in call order, closest caller first. Stating the rule universally would have cost a
+      review round on the next file, or a reshuffle that separates a function from its helper.
+      A `view` / `pure` function that only reverts (`BitChillOwnable.renounceOwnership`) is a
+      disabled mutator and stays with the mutators; membership is decided by mutability, not by
+      name, so the deliberately non-`view` `getAccruedInterest` sits under `EXTERNAL FUNCTIONS`.
+- [x] Move `DcaManager._batchBuyRbtc` under `PRIVATE FUNCTIONS`.
+- [x] Regroup `LendingErc20Handler` and give it the full banner set.
+- [x] Apply the chosen vocabulary to every `src/` file that has banners.
+- [x] Add banners to the files above the floor that lack them.
+- [x] Apply the split to first-party interfaces too, in their implementation's declaration order, so
+      a reader can diff the pair: `IFeeHandler`, `IPurchaseRbtc`, `IIdleErc20Handler`,
+      `IOperationsAdmin`, `IPurchaseUniswap`, `ITokenLending`. Leaving them on `EXTERNAL FUNCTIONS`
+      with views mixed in would have reproduced, one layer down, exactly the interfaces-differ-from-
+      contracts drift this item exists to end.
+- [x] One indentation per banner title (`GETTERS` 32, `EXTERNAL FUNCTIONS` 27). Renaming a banner
+      in place leaves the old word's padding behind, which is how the two spellings drifted apart
+      in the first place.
 
 ## Out of scope
 
-- [ ] Any change to a function body, signature, visibility, or mutability. This item moves
+- [x] Any change to a function body, signature, visibility, or mutability. This item moves
       declarations and rewrites banner text only.
-- [ ] `test/`, `script/`, and the vendored interfaces (`IMocProxy`, `IWRBTC`, `ICoinPairPrice`,
+- [x] `test/`, `script/`, and the vendored interfaces (`IMocProxy`, `IWRBTC`, `ICoinPairPrice`,
       `IkToken`, `IiSusdToken`, `ILayerBankPool`, `ILayerBankAToken`) — leave vendor files alone so
       they stay diffable against upstream.
-- [ ] `forge fmt` on files this item does not otherwise touch.
+- [x] `forge fmt` on files this item does not otherwise touch.
 
 ## Files likely touched
 
@@ -85,16 +104,19 @@ Every `src/**/*.sol` above the size floor. The two ordering fixes are `src/DcaMa
 
 ## Success criteria
 
-- [ ] **Every contract's executable runtime unchanged.** Reordering declarations and editing comments
+- [x] **Every contract's executable runtime unchanged.** Reordering declarations and editing comments
       must not move a single runtime byte. Compare metadata-stripped `forge inspect <Contract>
       deployedBytecode` before the first edit and at the end, the way R10 does: comments feed the CBOR
       metadata hash, so complete deployed bytecode differs by design and equal `--sizes` output is a
       necessary check rather than a sufficient one. Any delta in the stripped runtime is a bug in the
       change, not an accepted cost.
-- [ ] `grep -rn "GETTER FUNCTIONS\|^ *FUNCTIONS$" src/` returns nothing (or the inverse, if the
-      other spelling wins).
-- [ ] Every `private` and `internal` function in `src/` is below every `external` one in its file.
-- [ ] `AGENTS.md` states the convention, so the next file lands correct without a review round.
+- [x] `grep -rn "GETTER FUNCTIONS\|^ *FUNCTIONS$" src/` returns nothing except vendored `IWRBTC`
+      (left alone per Out of scope).
+- [x] Every `private` and `internal` function in `src/` is below every `external` one in its file.
+- [x] Every `private` function sits under `PRIVATE FUNCTIONS`, never under `INTERNAL FUNCTIONS`.
+- [x] Each banner title has exactly one indentation across `src/`.
+- [x] No first-party interface declares a `view` without a `GETTERS` banner.
+- [x] `AGENTS.md` states the convention, so the next file lands correct without a review round.
 
 ## Reviewer checklist
 

@@ -16,9 +16,17 @@ import {DcaManagerAccessControl} from "./DcaManagerAccessControl.sol";
 abstract contract TokenHandler is ITokenHandler, ERC165, FeeHandler, DcaManagerAccessControl {
     using SafeERC20 for IERC20;
 
+    /*//////////////////////////////////////////////////////////////
+                            STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
+
     /// @notice The stablecoin this handler deposits and withdraws.
     /// @return The constructor-supplied ERC20.
     IERC20 public immutable i_stableToken;
+
+    /*//////////////////////////////////////////////////////////////
+                               CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @param dcaManagerAddress The DcaManager allowed to call deposit and withdraw.
@@ -63,6 +71,10 @@ abstract contract TokenHandler is ITokenHandler, ERC165, FeeHandler, DcaManagerA
         withdrawnAmount = balanceBefore - i_stableToken.balanceOf(address(this));
         emit TokenHandler__TokenWithdrawn(address(i_stableToken), user, withdrawnAmount);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                                GETTERS
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @dev ERC-165: `ITokenHandler` plus whatever the parent advertises.

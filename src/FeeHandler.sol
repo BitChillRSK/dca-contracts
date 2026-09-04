@@ -34,6 +34,10 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     /// @notice Hard ceiling on fee rates (5%). Owner cannot set max (or a flat min==max) above this.
     uint256 internal constant MAX_FEE_RATE_CAP = 500;
 
+    /*//////////////////////////////////////////////////////////////
+                               CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
+
     constructor(address feeCollector, FeeSettings memory feeSettings, address initialOwner)
         BitChillOwnable(initialOwner)
     {
@@ -114,17 +118,6 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     /*//////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-
-    function _validateFeeSettings(
-        uint256 minFeeRate,
-        uint256 maxFeeRate,
-        uint256 feePurchaseLowerBound,
-        uint256 feePurchaseUpperBound
-    ) private pure {
-        if (maxFeeRate > MAX_FEE_RATE_CAP) revert FeeHandler__MaxFeeRateExceedsCap();
-        if (minFeeRate > maxFeeRate) revert FeeHandler__MinFeeRateCannotBeHigherThanMax();
-        if (feePurchaseLowerBound >= feePurchaseUpperBound) revert FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound();
-    }
 
     /**
      * @dev Calculates the fee based on the purchase amount.
@@ -214,5 +207,20 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         address collector = s_feeCollector;
         token.safeTransfer(collector, fee);
         emit FeeHandler__FeeTransferred(address(token), collector, fee);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            PRIVATE FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    function _validateFeeSettings(
+        uint256 minFeeRate,
+        uint256 maxFeeRate,
+        uint256 feePurchaseLowerBound,
+        uint256 feePurchaseUpperBound
+    ) private pure {
+        if (maxFeeRate > MAX_FEE_RATE_CAP) revert FeeHandler__MaxFeeRateExceedsCap();
+        if (minFeeRate > maxFeeRate) revert FeeHandler__MinFeeRateCannotBeHigherThanMax();
+        if (feePurchaseLowerBound >= feePurchaseUpperBound) revert FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound();
     }
 }
