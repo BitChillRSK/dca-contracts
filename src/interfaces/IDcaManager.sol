@@ -15,40 +15,52 @@ interface IDcaManager {
                            TYPE DECLARATIONS
     //////////////////////////////////////////////////////////////*/
     /// @notice One user's recurring purchase of rBTC with one stablecoin on one OperationsAdmin route.
-    /// @dev Three storage slots. A schedule is addressed by its id alone, so the owner and the stablecoin
-    ///      live in the struct rather than in a mapping key, and that is what the third slot pays for.
-    ///      Slot 0 is every field a purchase touches or tests — `tokenBalance` and `lastPurchaseTimestamp`
-    ///      share it with `paused`, `purchasePeriod` and `routeIndex` (31 of 32 bytes) — so a purchase
-    ///      still writes one slot. Slot 1 pairs `user` with `purchaseAmount`, which is `uint96` for that
-    ///      reason: at `uint128` the pair no longer fits beside an address, and splitting them costs a
-    ///      second `SSTORE` on every purchase, which is more than the narrower field ever saves. `uint96`
-    ///      caps one purchase at ~7.9e10 tokens at 18 decimals. Slot 2 carries `token` and `scheduleId`.
-    ///      `scheduleId` duplicates the mapping key and is kept anyway: it costs no extra slot, and
-    ///      without it `getDcaSchedules` would hand a caller schedules it cannot then address.
+    /// @dev What every getter returns. `scheduleId` leads it because that, with the owner, is how a
+    ///      schedule is addressed — see `StoredSchedule` for why the id cannot also be a stored field.
+    ///      A row is therefore self-describing: whatever a caller reads, it can act on.
     struct DcaSchedule {
+        uint64 scheduleId; // Unique identifier of each DCA schedule: the value of the creation nonce
         uint128 tokenBalance; // Stablecoin amount deposited by the user
         uint48 lastPurchaseTimestamp; // Timestamp of the latest purchase
         bool paused; // Set by the schedule's user: purchases are refused while true, every other path stays open
         uint32 purchasePeriod; // Time between purchases in seconds
         uint32 routeIndex; // OperationsAdmin route that holds this schedule's funds (idle or lending)
-        address user; // The schedule's owner: the only account that may deposit, edit, withdraw or delete
-        uint96 purchaseAmount; // Stablecoin amount to spend periodically on rBTC
         address token; // The stablecoin this schedule spends
-        uint64 scheduleId; // Unique identifier of each DCA schedule: the value of the creation nonce
+        uint96 purchaseAmount; // Stablecoin amount to spend periodically on rBTC
+    }
+
+    /// @notice How a schedule is held in storage.
+    /// @dev An internal storage shape rather than an ABI type: getters return `DcaSchedule`. Two slots,
+    ///      because a schedule is keyed by `(scheduleId, user)` and neither half of that key is
+    ///      repeated here. The owner being the key is what makes ownership unforgeable — no path can
+    ///      reach a schedule that is not the caller's, because the lookup lands on an empty struct
+    ///      rather than on somebody else's — and it is also what buys the second slot back. Slot 0 is
+    ///      every field a purchase reads or writes (31 of 32 bytes), so a purchase writes one slot.
+    ///      Slot 1 pairs `token` with `purchaseAmount`, which is `uint96` for that reason: at `uint128`
+    ///      the pair no longer fits beside an address, and splitting them costs a second `SSTORE` on
+    ///      every purchase, which is more than the narrower field ever saves. `uint96` caps one purchase
+    ///      at ~7.9e10 tokens at 18 decimals; `tokenBalance` keeps `uint128`. The id is absent for the
+    ///      same reason the owner is: adding either back costs a third slot and buys nothing storage
+    ///      needs. A live schedule always has a non-zero `token`, which is what "this exists" means.
+    struct StoredSchedule {
+        uint128 tokenBalance;
+        uint48 lastPurchaseTimestamp;
+        bool paused;
+        uint32 purchasePeriod;
+        uint32 routeIndex;
+        address token;
+        uint96 purchaseAmount;
     }
 
     /// @notice One handler's purchase batch.
-    /// @dev Every row shares this batch's `token` and `routeIndex`, which resolve to one handler. The
-    ///      two arrays are positional and must have the same nonzero length. `batchBuyRbtc` takes one;
-    ///      `batchBuyRbtcAcrossHandlers` takes several. `scheduleIds` is the whole address of a row: the
-    ///      owner and the stablecoin are read from the schedule, so a batch cannot name a buyer the
-    ///      schedule does not belong to. `purchaseAmounts` is a staleness guard and not a storage-read
-    ///      saving: passing it in skips no `SLOAD`, because the row loads the schedule either way —
-    ///      `tokenBalance` has to be read to be debited, and `purchasePeriod` to decide the row is due.
-    ///      What it buys is a clean revert when the user edits a schedule between the swapper composing
-    ///      the batch and the batch executing, in place of a purchase that silently proceeds at the new
-    ///      amount. Measured at 200 rows, it costs roughly 400 gas per row of the ~17,000 a row costs in
-    ///      all. `minRbtcOut` is the caller's minimum for the batch as a whole, in rBTC/WRBTC wei
+    /// @dev Every row shares this batch's `token` and `routeIndex`, which resolve to one handler. A row
+    ///      is `scheduleIds[i]` and `buyers[i]`, which together are the schedule's storage key: the two
+    ///      arrays are positional and must have the same nonzero length. Nothing else about a row is
+    ///      passed in. The amount each row spends is read from the schedule and never taken from the
+    ///      caller, so a batch cannot spend an amount the schedule does not hold, and a naming error
+    ///      cannot become a wrong debit — a pair that is not a live schedule reads as an empty struct
+    ///      and reverts. `batchBuyRbtc` takes one batch; `batchBuyRbtcAcrossHandlers` takes several.
+    ///      `minRbtcOut` is the caller's minimum for the batch as a whole, in rBTC/WRBTC wei
     ///      (18 decimals) whatever the stablecoin's decimals, and is compared against the rBTC the
     ///      handler measures itself receiving, so it binds on every purchase venue. What sits underneath
     ///      it does not. A Uniswap route applies an oracle floor of its own and swaps at
@@ -56,12 +68,12 @@ interface IDcaManager {
     ///      to compose with, because DOC is redeemed at Money on Chain's own price rather than swapped
     ///      against a pool, leaving no slippage surface for a floor to guard. Either way this is a
     ///      liveness bound an honest swapper sets against a stale quote or adverse execution, and never
-    ///      a governance limit **on** the swapper: the swapper picks the value, so
-    ///      `0` is always available to it. What still holds when it does is the oracle floor on a Uniswap
-    ///      route, and the redemption price itself on a MoC one.
+    ///      a governance limit **on** the swapper: the swapper picks the value, so `0` is always
+    ///      available to it. What still holds when it does is the oracle floor on a Uniswap route, and
+    ///      the redemption price itself on a MoC one.
     struct Batch {
         uint64[] scheduleIds;
-        uint256[] purchaseAmounts;
+        address[] buyers;
         address token;
         uint256 routeIndex;
         uint256 minRbtcOut;
@@ -156,17 +168,16 @@ interface IDcaManager {
     error DcaManager__PurchaseAmountExceedsBalance(address token, uint256 purchaseAmount, uint256 tokenBalance);
     /// @notice The UTC day of `lastPurchaseTimestamp + purchasePeriod` has not started.
     error DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed(uint256 timeRemaining);
-    /// @notice No schedule carries this id: it was never created, or it was deleted.
-    error DcaManager__InexistentSchedule(uint64 scheduleId);
-    /// @notice The schedule exists but belongs to another account. Only its owner may act on it.
-    error DcaManager__NotScheduleOwner(uint64 scheduleId);
+    /// @notice `user` holds no live schedule under this id. Ownership is the storage key, so a
+    ///         schedule belonging to somebody else is indistinguishable from one that never existed.
+    error DcaManager__InexistentSchedule(address user, uint64 scheduleId);
     /// @notice A batch row's schedule holds a different stablecoin than the batch it was named in.
-    error DcaManager__ScheduleTokenMismatch(uint64 scheduleId, address batchToken, address scheduleToken);
+    error DcaManager__ScheduleTokenMismatch(address user, uint64 scheduleId, address batchToken, address scheduleToken);
     /// @notice The schedule's remaining principal cannot cover one purchase.
-    error DcaManager__ScheduleBalanceNotEnoughForPurchase(uint64 scheduleId, address token, uint256 remainingBalance);
+    error DcaManager__ScheduleBalanceNotEnoughForPurchase(address user, uint64 scheduleId, address token, uint256 remainingBalance);
     /// @notice Parallel arrays (batch purchase or withdraw-all pairs) have different lengths.
     error DcaManager__ArraysLengthMismatch();
-    /// @notice `batchBuyRbtc` was called with empty id/amount arrays.
+    /// @notice `batchBuyRbtc` was called with empty id/buyer arrays.
     error DcaManager__EmptyBatchPurchaseArrays();
     /// @notice `batchBuyRbtcAcrossHandlers` was called without any handler batches.
     error DcaManager__EmptyHandlerBatches();
@@ -178,8 +189,6 @@ interface IDcaManager {
     error DcaManager__TokenDoesNotYieldInterest(address token);
     /// @notice Caller is not on the OperationsAdmin swapper allowlist.
     error DcaManager__UnauthorizedSwapper(address sender);
-    /// @notice A batch row's `purchaseAmounts[i]` does not match the schedule's stored amount.
-    error DcaManager__PurchaseAmountMismatch(address user, address token, uint64 scheduleId, uint256 actualPurchaseAmount, uint256 expectedPurchaseAmount);
     /// @notice A batch row's schedule is on a different route than this batch's `routeIndex`.
     error DcaManager__RouteIndexMismatch(address user, address token, uint64 scheduleId, uint256 actualRouteIndex, uint256 expectedRouteIndex);
     /// @notice Constructor `operationsAdmin` has no code.
@@ -208,8 +217,8 @@ interface IDcaManager {
      * @dev The stablecoin and the route are read from the schedule, not passed in.
      *      Reverts `DcaManager__DepositsPaused` before any transfer if governance paused deposits
      *      on this schedule's route. Purchases, edits, withdrawals, and deletion ignore that pause.
-     *      Reverts `DcaManager__InexistentSchedule` for an id no schedule carries, and
-     *      `DcaManager__NotScheduleOwner` for one that belongs to somebody else.
+     *      The caller and the id together are the schedule's storage key, so a caller can only ever
+     *      reach their own; anything else reverts `DcaManager__InexistentSchedule`.
      */
     function depositToken(uint64 scheduleId, uint256 depositAmount) external;
 
@@ -256,8 +265,8 @@ interface IDcaManager {
      *      event reports what left the handler, which may be less than `tokenBalance` if the handler
      *      paid out less than it was asked for. Accumulated rBTC and lending interest are not claimed
      *      here — withdraw those first.
-     *      Reverts `DcaManager__InexistentSchedule` for an id no schedule carries, and
-     *      `DcaManager__NotScheduleOwner` for one that belongs to somebody else.
+     *      The caller and the id together are the schedule's storage key, so a caller can only ever
+     *      reach their own; anything else reverts `DcaManager__InexistentSchedule`.
      */
     function deleteDcaSchedule(uint64 scheduleId) external;
 
@@ -267,8 +276,8 @@ interface IDcaManager {
      * @param newPurchaseAmount New amount to spend periodically on rBTC. Cannot exceed the schedule's
      *        current `tokenBalance` or fall below the token minimum, and is stored as `uint96`.
      * @dev Emits `DcaManager__PurchaseAmountUpdated` with the replaced amount and the new one.
-     *      Reverts `DcaManager__InexistentSchedule` for an id no schedule carries, and
-     *      `DcaManager__NotScheduleOwner` for one that belongs to somebody else.
+     *      The caller and the id together are the schedule's storage key, so a caller can only ever
+     *      reach their own; anything else reverts `DcaManager__InexistentSchedule`.
      */
     function updatePurchaseAmount(uint64 scheduleId, uint256 newPurchaseAmount) external;
 
@@ -277,8 +286,8 @@ interface IDcaManager {
      * @param scheduleId The schedule to edit. Must belong to the caller.
      * @param newPurchasePeriod New seconds between purchases. Cannot be shorter than the protocol minimum.
      * @dev Emits `DcaManager__PurchasePeriodUpdated` with the replaced period and the new one.
-     *      Reverts `DcaManager__InexistentSchedule` for an id no schedule carries, and
-     *      `DcaManager__NotScheduleOwner` for one that belongs to somebody else.
+     *      The caller and the id together are the schedule's storage key, so a caller can only ever
+     *      reach their own; anything else reverts `DcaManager__InexistentSchedule`.
      */
     function updatePurchasePeriod(uint64 scheduleId, uint256 newPurchasePeriod) external;
 
@@ -336,8 +345,8 @@ interface IDcaManager {
      *        `tokenBalance`.
      * @dev Interest is withdrawn from the schedule's stored lending route. An idle schedule reverts
      *      because that route does not yield.
-     *      Reverts `DcaManager__InexistentSchedule` for an id no schedule carries, and
-     *      `DcaManager__NotScheduleOwner` for one that belongs to somebody else.
+     *      The caller and the id together are the schedule's storage key, so a caller can only ever
+     *      reach their own; anything else reverts `DcaManager__InexistentSchedule`.
      */
     function withdrawTokenAndInterest(uint64 scheduleId, uint256 withdrawalAmount) external;
 
@@ -357,8 +366,8 @@ interface IDcaManager {
      *      `DcaManager__TopUpExceedsAccruedInterest` when `amount` is more than has accrued, and
      *      `DcaManager__TopUpDoesNotFundAnotherPurchase` when the credit would not fund one more purchase
      *      than the schedule could already afford, which is what stops interest being swept over in dust.
-     *      Reverts `DcaManager__InexistentSchedule` for an id no schedule carries, and
-     *      `DcaManager__NotScheduleOwner` for one that belongs to somebody else.
+     *      The caller and the id together are the schedule's storage key, so a caller can only ever
+     *      reach their own; anything else reverts `DcaManager__InexistentSchedule`.
      */
     function topUpFromInterest(uint64 scheduleId, uint256 amount) external;
 
@@ -409,21 +418,22 @@ interface IDcaManager {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice One DCA schedule, by id.
+     * @notice One DCA schedule, by its owner and id.
+     * @param user The schedule's owner.
      * @param scheduleId The schedule to read. Any account may read any schedule.
-     * @return The schedule carrying that id.
-     * @dev Reverts `DcaManager__InexistentSchedule` for an id no schedule carries.
+     * @return The schedule that pair addresses.
+     * @dev Reverts `DcaManager__InexistentSchedule` unless `user` holds a live schedule under that id.
      */
-    function getDcaSchedule(uint64 scheduleId) external view returns (DcaSchedule memory);
+    function getDcaSchedule(address user, uint64 scheduleId) external view returns (DcaSchedule memory);
 
     /**
-     * @notice Every DCA schedule a user holds for a token.
+     * @notice Every DCA schedule a user holds for a token, with the ids that address them.
      * @param user Schedule owner.
      * @param token Stablecoin of the schedules.
-     * @return The user's schedules for `token`, each carrying its own id.
+     * @return The user's schedules for `token`, each carrying the id that addresses it.
      * @dev The order is the owner's list order, which delete does not preserve: removing a schedule
-     *      moves the last one into the freed position. Address a schedule by its `scheduleId`, never
-     *      by where it appeared in a previous read of this list.
+     *      moves the last one into the freed position. Address a schedule by its `scheduleId`, never by
+     *      where it appeared in a previous read of this list.
      */
     function getDcaSchedules(address user, address token) external view returns (DcaSchedule[] memory);
 
