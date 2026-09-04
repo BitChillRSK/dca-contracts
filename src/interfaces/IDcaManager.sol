@@ -5,12 +5,10 @@ pragma solidity 0.8.36;
  * @title IDcaManager
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice User and swapper entry point: create and manage dollar-cost-averaging schedules.
- * @dev Users talk only to this contract. An allowlisted swapper triggers purchases.
- *      Handlers custody both sides and this contract custodies neither. On the funding side an idle
- *      handler holds the stablecoin itself and a lending handler holds the shares minted for it; on the
- *      proceeds side a MoC handler holds native rBTC and a Uniswap handler holds WRBTC, unwrapping it
- *      only at withdrawal. The accumulated-rBTC ledger reads the same in either case, since WRBTC is
- *      1:1 and denominated in wei.
+ * @dev Users talk only to this contract. An allowlisted swapper triggers purchases. Handlers custody
+ *      both the deposited stablecoin and the rBTC bought with it; this contract holds neither and keeps
+ *      only the schedule ledger. What backs a deposit differs by route: the stablecoin itself on an idle
+ *      route, the shares minted for it on a lending one.
  */
 interface IDcaManager {
     /*//////////////////////////////////////////////////////////////
