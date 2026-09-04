@@ -19,7 +19,12 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
+
     mapping(address user => uint256 balance) internal s_idleBalances;
+
+    /*//////////////////////////////////////////////////////////////
+                               CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @param dcaManagerAddress The DcaManager allowed to call deposit and withdraw.
@@ -35,6 +40,10 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
         FeeSettings memory feeSettings,
         address initialOwner
     ) TokenHandler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, initialOwner) {}
+
+    /*//////////////////////////////////////////////////////////////
+                           EXTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @inheritdoc ITokenHandler
@@ -65,6 +74,10 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
         if (requested > 0 && withdrawalAmount == 0) revert IdleErc20Handler__ZeroStablecoinPaid(requested);
         return super.withdrawToken(user, withdrawalAmount);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                                GETTERS
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @inheritdoc IIdleErc20Handler

@@ -13,9 +13,21 @@ import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
  *      Renouncing would freeze owner-only configuration with no recovery.
  */
 abstract contract BitChillOwnable is Ownable2Step {
+    /*//////////////////////////////////////////////////////////////
+                                 ERRORS
+    //////////////////////////////////////////////////////////////*/
+
     error BitChillOwnable__OwnershipCannotBeRenounced();
 
+    /*//////////////////////////////////////////////////////////////
+                               CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
+
     constructor(address initialOwner) Ownable(initialOwner) {}
+
+    /*//////////////////////////////////////////////////////////////
+                           EXTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @dev Ownership cannot be renounced. The owner-only configuration (routes, fees, oracle)

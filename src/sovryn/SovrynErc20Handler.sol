@@ -10,6 +10,10 @@ import {IiSusdToken} from "./IiSusdToken.sol";
  * @notice Sovryn adapter: iSUSD mint/burn. Share accounting lives on LendingErc20Handler.
  */
 abstract contract SovrynErc20Handler is LendingErc20Handler {
+    /*//////////////////////////////////////////////////////////////
+                            STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
+
     /// @notice Sovryn iToken exchange-rate scale (1e18).
     /// @return Always `1e18` for this protocol.
     uint256 public constant EXCHANGE_RATE_DECIMALS = 1e18;
@@ -17,6 +21,10 @@ abstract contract SovrynErc20Handler is LendingErc20Handler {
     /// @notice Sovryn iSUSD (or equivalent iToken) this handler mints and burns.
     /// @return The constructor-supplied iToken.
     IiSusdToken public immutable i_iSusdToken;
+
+    /*//////////////////////////////////////////////////////////////
+                               CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @param dcaManagerAddress The DcaManager allowed to call this handler.
@@ -40,6 +48,10 @@ abstract contract SovrynErc20Handler is LendingErc20Handler {
     {
         i_iSusdToken = IiSusdToken(iSusdTokenAddress);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                           INTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     function _viewExchangeRate() internal view override returns (uint256) {
         return i_iSusdToken.tokenPrice();

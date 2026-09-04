@@ -72,7 +72,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     }
 
     /*//////////////////////////////////////////////////////////////
-                               FUNCTIONS
+                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
     /**
@@ -100,6 +100,10 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
             scheduleNonce: 0
         });
     }
+
+    /*//////////////////////////////////////////////////////////////
+                           EXTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @inheritdoc IDcaManager
@@ -294,46 +298,6 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     }
 
     /**
-     * @dev Validate one handler's batch, debit every named schedule, then call that handler.
-     */
-    function _batchBuyRbtc(Batch calldata batch) private {
-        uint256 numOfPurchases = batch.buyers.length;
-        if (numOfPurchases == 0) revert DcaManager__EmptyBatchPurchaseArrays();
-        if (
-            numOfPurchases != batch.scheduleIndexes.length || numOfPurchases != batch.scheduleIds.length
-                || numOfPurchases != batch.purchaseAmounts.length
-        ) revert DcaManager__ArraysLengthMismatch();
-        for (uint256 i; i < numOfPurchases; ++i) {
-            (uint256 schedulePurchaseAmount, uint256 scheduleRouteIndex) = _rBtcPurchaseChecksEffects(
-                batch.buyers[i], batch.token, batch.scheduleIndexes[i], batch.scheduleIds[i]
-            );
-            if (schedulePurchaseAmount != batch.purchaseAmounts[i]) {
-                revert DcaManager__PurchaseAmountMismatch(
-                    batch.buyers[i],
-                    batch.token,
-                    batch.scheduleIds[i],
-                    batch.scheduleIndexes[i],
-                    schedulePurchaseAmount,
-                    batch.purchaseAmounts[i]
-                );
-            }
-            if (scheduleRouteIndex != batch.routeIndex) {
-                revert DcaManager__RouteIndexMismatch(
-                    batch.buyers[i],
-                    batch.token,
-                    batch.scheduleIds[i],
-                    batch.scheduleIndexes[i],
-                    scheduleRouteIndex,
-                    batch.routeIndex
-                );
-            }
-        }
-        IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex))).batchBuyRbtc(
-            batch.buyers, batch.scheduleIds, batch.purchaseAmounts, batch.minRbtcOut
-        );
-    }
-
-    /**
      * @inheritdoc IDcaManager
      */
     function withdrawRbtcFromTokenHandler(address token, uint256 routeIndex) external override nonReentrant {
@@ -466,8 +430,143 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     }
 
     /*//////////////////////////////////////////////////////////////
+                            GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @inheritdoc IDcaManager
+     */
+    function getDcaSchedule(address user, address token, uint256 scheduleIndex)
+        external
+        view
+        override
+        validateScheduleIndex(user, token, scheduleIndex)
+        returns (DcaSchedule memory)
+    {
+        return s_dcaSchedules[user][token][scheduleIndex];
+    }
+
+    /**
+     * @inheritdoc IDcaManager
+     */
+    function getDcaSchedules(address user, address token) external view override returns (DcaSchedule[] memory) {
+        return s_dcaSchedules[user][token];
+    }
+
+    /**
+     * @inheritdoc IDcaManager
+     */
+    function getOperationsAdminAddress() external view override returns (address) {
+        return address(i_operationsAdmin);
+    }
+
+    /**
+     * @inheritdoc IDcaManager
+     */
+    function getMinPurchasePeriod() external view override returns (uint256) {
+        return s_protocolSettings.minPurchasePeriod;
+    }
+
+    /**
+     * @inheritdoc IDcaManager
+     */
+    function getMaxSchedulesPerToken() external view override returns (uint256) {
+        return s_protocolSettings.maxSchedulesPerToken;
+    }
+
+    /**
+     * @inheritdoc IDcaManager
+     */
+    function getSchedulesCreatedCount() external view override returns (uint256) {
+        return s_protocolSettings.scheduleNonce;
+    }
+
+    /**
+     * @inheritdoc IDcaManager
+     */
+    function getDefaultMinPurchaseAmount() external view override returns (uint256) {
+        return s_protocolSettings.defaultMinPurchaseAmount;
+    }
+
+    /**
+     * @inheritdoc IDcaManager
+     */
+    function getTokenMinPurchaseAmount(address token) external view override returns (uint256 minPurchaseAmount, bool customMinAmountSet) {
+        uint256 customAmount = s_tokenMinPurchaseAmounts[token];
+        customMinAmountSet = customAmount != 0;
+        minPurchaseAmount = customMinAmountSet ? customAmount : s_protocolSettings.defaultMinPurchaseAmount;
+    }
+
+    /**
+     * @inheritdoc IDcaManager
+     */
+    function getAccumulatedRbtcBalance(address user, address token, uint256 routeIndex)
+        external
+        view
+        override
+        returns (uint256)
+    {
+        return IPurchaseRbtc(address(_handler(token, routeIndex))).getAccumulatedRbtcBalance(user);
+    }
+
+    /**
+     * @inheritdoc IDcaManager
+     */
+    function getInterestAccrued(address user, address token, uint256 routeIndex)
+        external
+        view
+        override
+        returns (uint256)
+    {
+        _checkTokenYieldsInterest(token, routeIndex);
+        return ITokenLending(address(_handler(token, routeIndex))).quoteAccruedInterest(
+            user, _lockedPrincipal(user, token, routeIndex)
+        );
+    }
+
+    /*//////////////////////////////////////////////////////////////
                             PRIVATE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @dev Validate one handler's batch, debit every named schedule, then call that handler.
+     */
+    function _batchBuyRbtc(Batch calldata batch) private {
+        uint256 numOfPurchases = batch.buyers.length;
+        if (numOfPurchases == 0) revert DcaManager__EmptyBatchPurchaseArrays();
+        if (
+            numOfPurchases != batch.scheduleIndexes.length || numOfPurchases != batch.scheduleIds.length
+                || numOfPurchases != batch.purchaseAmounts.length
+        ) revert DcaManager__ArraysLengthMismatch();
+        for (uint256 i; i < numOfPurchases; ++i) {
+            (uint256 schedulePurchaseAmount, uint256 scheduleRouteIndex) = _rBtcPurchaseChecksEffects(
+                batch.buyers[i], batch.token, batch.scheduleIndexes[i], batch.scheduleIds[i]
+            );
+            if (schedulePurchaseAmount != batch.purchaseAmounts[i]) {
+                revert DcaManager__PurchaseAmountMismatch(
+                    batch.buyers[i],
+                    batch.token,
+                    batch.scheduleIds[i],
+                    batch.scheduleIndexes[i],
+                    schedulePurchaseAmount,
+                    batch.purchaseAmounts[i]
+                );
+            }
+            if (scheduleRouteIndex != batch.routeIndex) {
+                revert DcaManager__RouteIndexMismatch(
+                    batch.buyers[i],
+                    batch.token,
+                    batch.scheduleIds[i],
+                    batch.scheduleIndexes[i],
+                    scheduleRouteIndex,
+                    batch.routeIndex
+                );
+            }
+        }
+        IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex))).batchBuyRbtc(
+            batch.buyers, batch.scheduleIds, batch.purchaseAmounts, batch.minRbtcOut
+        );
+    }
 
     /**
      * @dev Revert unless `scheduleId` matches the schedule at the given index.
@@ -672,100 +771,5 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      */
     function _checkTokenYieldsInterest(address token, uint256 routeIndex) private view {
         if (!_tokenYieldsInterest(routeIndex)) revert DcaManager__TokenDoesNotYieldInterest(token);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            GETTER FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @inheritdoc IDcaManager
-     */
-    function getDcaSchedule(address user, address token, uint256 scheduleIndex)
-        external
-        view
-        override
-        validateScheduleIndex(user, token, scheduleIndex)
-        returns (DcaSchedule memory)
-    {
-        return s_dcaSchedules[user][token][scheduleIndex];
-    }
-
-    /**
-     * @inheritdoc IDcaManager
-     */
-    function getDcaSchedules(address user, address token) external view override returns (DcaSchedule[] memory) {
-        return s_dcaSchedules[user][token];
-    }
-
-    /**
-     * @inheritdoc IDcaManager
-     */
-    function getOperationsAdminAddress() external view override returns (address) {
-        return address(i_operationsAdmin);
-    }
-
-    /**
-     * @inheritdoc IDcaManager
-     */
-    function getMinPurchasePeriod() external view override returns (uint256) {
-        return s_protocolSettings.minPurchasePeriod;
-    }
-
-    /**
-     * @inheritdoc IDcaManager
-     */
-    function getMaxSchedulesPerToken() external view override returns (uint256) {
-        return s_protocolSettings.maxSchedulesPerToken;
-    }
-
-    /**
-     * @inheritdoc IDcaManager
-     */
-    function getSchedulesCreatedCount() external view override returns (uint256) {
-        return s_protocolSettings.scheduleNonce;
-    }
-
-    /**
-     * @inheritdoc IDcaManager
-     */
-    function getDefaultMinPurchaseAmount() external view override returns (uint256) {
-        return s_protocolSettings.defaultMinPurchaseAmount;
-    }
-
-    /**
-     * @inheritdoc IDcaManager
-     */
-    function getTokenMinPurchaseAmount(address token) external view override returns (uint256 minPurchaseAmount, bool customMinAmountSet) {
-        uint256 customAmount = s_tokenMinPurchaseAmounts[token];
-        customMinAmountSet = customAmount != 0;
-        minPurchaseAmount = customMinAmountSet ? customAmount : s_protocolSettings.defaultMinPurchaseAmount;
-    }
-
-    /**
-     * @inheritdoc IDcaManager
-     */
-    function getAccumulatedRbtcBalance(address user, address token, uint256 routeIndex)
-        external
-        view
-        override
-        returns (uint256)
-    {
-        return IPurchaseRbtc(address(_handler(token, routeIndex))).getAccumulatedRbtcBalance(user);
-    }
-
-    /**
-     * @inheritdoc IDcaManager
-     */
-    function getInterestAccrued(address user, address token, uint256 routeIndex)
-        external
-        view
-        override
-        returns (uint256)
-    {
-        _checkTokenYieldsInterest(token, routeIndex);
-        return ITokenLending(address(_handler(token, routeIndex))).quoteAccruedInterest(
-            user, _lockedPrincipal(user, token, routeIndex)
-        );
     }
 }

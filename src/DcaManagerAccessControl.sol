@@ -9,14 +9,26 @@ import {IDcaManagerAccessControl} from "src/interfaces/IDcaManagerAccessControl.
  * @notice Restricts handler entry points to the DcaManager passed at construction.
  */
 abstract contract DcaManagerAccessControl is IDcaManagerAccessControl {
+    /*//////////////////////////////////////////////////////////////
+                            STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
+
     /// @notice The DcaManager allowed to call this handler's entry points.
     /// @return The constructor-supplied DcaManager address.
     address public immutable i_dcaManager;
+
+    /*//////////////////////////////////////////////////////////////
+                               MODIFIERS
+    //////////////////////////////////////////////////////////////*/
 
     modifier onlyDcaManager() {
         if (msg.sender != i_dcaManager) revert DcaManagerAccessControl__OnlyDcaManagerCanCall();
         _;
     }
+
+    /*//////////////////////////////////////////////////////////////
+                               CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @param dcaManagerAddress The DcaManager allowed to call handler entry points.

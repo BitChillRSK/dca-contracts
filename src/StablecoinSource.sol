@@ -12,6 +12,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  *      token the purchase reports as spent tied to the token the handler actually holds.
  */
 abstract contract StablecoinSource {
+    /*//////////////////////////////////////////////////////////////
+                           INTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
     /**
      * @dev The stablecoin this handler holds or lends out, spent by the purchase and reported in
      *      fees, errors, and events. Implemented against the handler's own stablecoin so the

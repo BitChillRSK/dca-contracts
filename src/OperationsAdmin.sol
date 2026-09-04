@@ -38,7 +38,7 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
     mapping(address handler => bool assigned) private s_handlerAssigned;
 
     /*//////////////////////////////////////////////////////////////
-                           EXTERNAL FUNCTIONS
+                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
     /**
@@ -51,6 +51,10 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
         s_routeClass[0] = RouteClass.Idle;
         emit OperationsAdmin__RouteRegistered(0, false);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                           EXTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @inheritdoc IOperationsAdmin

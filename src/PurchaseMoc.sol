@@ -18,6 +18,10 @@ abstract contract PurchaseMoc is PurchaseRbtc, IPurchaseMoc {
     /// @return The constructor-supplied MoC proxy.
     IMocProxy public immutable i_mocProxy;
 
+    /*//////////////////////////////////////////////////////////////
+                               CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
+
     /**
      * @param mocProxyAddress Money on Chain proxy that exposes `redeemDocRequest` / `redeemFreeDoc`.
      */

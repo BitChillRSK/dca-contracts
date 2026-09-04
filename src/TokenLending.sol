@@ -10,11 +10,23 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
  * @notice Share ↔ stablecoin conversion math. No TokenHandler inherit; adapters pass the scale.
  */
 abstract contract TokenLending is ITokenLending {
+    /*//////////////////////////////////////////////////////////////
+                            STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
+
     uint256 immutable i_exchangeRateDecimals;
+
+    /*//////////////////////////////////////////////////////////////
+                               CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
 
     constructor(uint256 exchangeRateDecimals) {
         i_exchangeRateDecimals = exchangeRateDecimals;
     }
+
+    /*//////////////////////////////////////////////////////////////
+                           INTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @dev Convert stablecoin to shares. Rounds up so the virtual share debit is never below
