@@ -12,14 +12,14 @@ import "./TestsHelper.t.sol";
 import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 /**
- * @notice R18 + R50 + R64: each `DcaSchedule` occupies three slots with checked widths, and the
+ * @notice R18 + R50 + R64: each stored schedule occupies two slots with checked widths, and the
  *         protocol scalars plus the id nonce share one slot of their own.
  * @dev External arguments stay `uint256`, except `scheduleId`, which is the `uint64` creation nonce.
  *      Overflow reverts with OZ `SafeCast` data before cash or schedule state changes. A schedule is
- *      keyed by its id, so slot 0 must still hold every field a purchase touches — that is what keeps
- *      a purchase to one `SSTORE` — while the owner and the stablecoin the mapping key used to carry
- *      sit in slots 1 and 2. Deleting a schedule swap-pops its owner's id list and never moves a
- *      schedule, so no other schedule's fields may change.
+ *      keyed by `(scheduleId, user)`, so neither key is duplicated in the value. Slot 0 holds every
+ *      field a purchase touches, keeping a purchase to one `SSTORE`; slot 1 holds the stablecoin and
+ *      purchase amount. Deleting a schedule swap-pops its owner's id list and never moves another
+ *      schedule's value.
  */
 contract SchedulePackingTest is DcaDappTest {
     uint256 private constant SCHEDULES_MAPPING_SLOT = 2;
@@ -99,7 +99,7 @@ contract SchedulePackingTest is DcaDappTest {
         vm.stopPrank();
 
         vm.warp(type(uint48).max);
-        super.buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
+        super.buyRbtcOne(USER, scheduleId);
 
         vm.prank(USER);
         dcaManager.setSchedulePaused(scheduleId, true);
@@ -345,7 +345,7 @@ contract SchedulePackingTest is DcaDappTest {
     function testFirstPurchaseAcceptsUint48MaxTimestamp() external {
         vm.warp(type(uint48).max);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        super.buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
+        super.buyRbtcOne(USER, scheduleId);
 
         assertEq(
             scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).lastPurchaseTimestamp,
@@ -361,7 +361,7 @@ contract SchedulePackingTest is DcaDappTest {
         uint256 balanceBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
 
         vm.expectRevert(_safeCastOverflow(48, uint256(type(uint48).max) + 1));
-        super.buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
+        super.buyRbtcOne(USER, scheduleId);
 
         IDcaManager.DcaSchedule memory schedule =
             scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
@@ -372,14 +372,14 @@ contract SchedulePackingTest is DcaDappTest {
     function testSubsequentPurchaseRevertsWhenTimestampWouldOverflowUint48() external {
         vm.warp(type(uint48).max);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        super.buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
+        super.buyRbtcOne(USER, scheduleId);
 
         vm.warp(uint256(type(uint48).max) + MIN_PURCHASE_PERIOD);
         uint256 overflowingTimestamp = uint256(type(uint48).max) + MIN_PURCHASE_PERIOD;
         uint256 balanceBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
 
         vm.expectRevert(_safeCastOverflow(48, overflowingTimestamp));
-        super.buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
+        super.buyRbtcOne(USER, scheduleId);
 
         IDcaManager.DcaSchedule memory schedule =
             scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
@@ -474,7 +474,7 @@ contract SchedulePackingTest is DcaDappTest {
         vm.prank(USER);
         dcaManager.updatePurchaseAmount(last.scheduleId, distinctAmount);
 
-        super.buyRbtcOne(USER, lastIndex, last.scheduleId, distinctAmount);
+        super.buyRbtcOne(USER, last.scheduleId);
 
         vm.prank(USER);
         dcaManager.setSchedulePaused(last.scheduleId, true);

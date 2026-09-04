@@ -13,18 +13,19 @@ import {TokenKeyedDcaManager} from "./prototype/TokenKeyedDcaManager.sol";
 
 /**
  * @title R64BatchGasBenchmark
- * @notice Prices the two coupled choices R64 exists to decide: whether the `Batch` staleness guard
- *         earns its calldata, and whether a flat `mapping(uint64 => DcaSchedule)` beats today's
- *         nested one on the path the swapper pays every day.
+ * @notice Prices the schedule-key and batch-calldata designs considered for R64 on the path the
+ *         swapper pays every day.
  * @dev Reproduce the table with:
  *
  *          forge test --match-path 'test/gas/*' -vv
  *          FOUNDRY_PROFILE=deploy forge test --match-path 'test/gas/*' -vv
  *
- *      Three designs, one stub handler, identical schedules:
- *        A — `src/DcaManager` as it stands: nested storage, four parallel arrays per batch.
- *        B — nested storage, no `purchaseAmounts` array. The A→B delta is the guard's price.
- *        C — flat `mapping(uint64 => …)`, one `uint64` per row. The A→C delta is the keying's price.
+ *      Five designs, one stub handler, identical schedules:
+ *        A — `src/DcaManager`: keyed by `(scheduleId, user)`, with ids and buyers in the batch.
+ *        B — pre-R64: keyed by `(user, token, index)`, with ids, buyers, indexes, and amounts.
+ *        C — keyed by `scheduleId`, with owner and token stored in a three-slot value.
+ *        D — A with the per-row purchase-amount staleness guard restored.
+ *        E — keyed by `(scheduleId, token)`, with owner stored and checked on each user path.
  *
  *      What each column means:
  *        `calldata`  Intrinsic transaction cost of the encoded call, 4 gas per zero byte and 16 per
@@ -394,6 +395,7 @@ contract R64BatchGasBenchmarkTest is Test {
     ///      does not pay cold-access costs the other two then find warm. Idempotent, and always called
     ///      outside a measurement window.
     function _warmSharedState() private view {
+        s_operationsAdmin.isSwapper(s_swapper);
         for (uint256 d; d < DESIGNS; ++d) {
             s_operationsAdmin.getTokenHandler(s_tokens[d], ROUTE_INDEX);
             s_handlers[d].rowsBought();

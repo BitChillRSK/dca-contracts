@@ -151,7 +151,7 @@ contract OperationsAdminTest is DcaDappTest {
         operationsAdmin.revokeSwapper(SWAPPER);
 
         vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__UnauthorizedSwapper.selector, SWAPPER));
-        buyRbtcOne(USER, 0, scheduleId, AMOUNT_TO_SPEND);
+        buyRbtcOne(USER, scheduleId);
     }
 
     function testReregisteringAnyIndexReverts() external {

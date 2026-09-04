@@ -511,11 +511,11 @@ contract DcaDappTest is Test {
     }
 
     /**
-     * @notice the one-schedule purchase path after R39 removed `buyRbtc`: a length-1 `batchBuyRbtc`.
-     * @dev takes the purchase amount explicitly and makes no call before the prank, so a caller's
-     *      `vm.expectEmit` / `vm.expectRevert` still lands on the batch call itself.
+     * @notice The one-schedule purchase path after R39 removed `buyRbtc`: a length-1 `batchBuyRbtc`.
+     * @dev Makes no call before the prank, so a caller's `vm.expectEmit` / `vm.expectRevert` still
+     *      lands on the batch call itself. The manager reads the amount from the schedule by id.
      */
-    function buyRbtcOne(address buyer, uint256 scheduleIndex, uint64 scheduleId, uint256 purchaseAmount) internal {
+    function buyRbtcOne(address buyer, uint64 scheduleId) internal {
         vm.prank(SWAPPER);
         batchBuyOne(dcaManager, buyer, address(stablecoin), scheduleId, s_routeIndex);
     }
@@ -551,7 +551,7 @@ contract DcaDappTest is Test {
             dcaDetails[SCHEDULE_INDEX].scheduleId,
             netPurchaseAmount
         );
-        buyRbtcOne(USER, SCHEDULE_INDEX, dcaDetails[SCHEDULE_INDEX].scheduleId, AMOUNT_TO_SPEND);
+        buyRbtcOne(USER, dcaDetails[SCHEDULE_INDEX].scheduleId);
 
         vm.startPrank(USER);
         uint256 stablecoinBalanceAfterPurchase = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
@@ -617,7 +617,7 @@ contract DcaDappTest is Test {
             uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), scheduleIndex);
             vm.stopPrank();
 
-            buyRbtcOne(USER, scheduleIndex, scheduleId, schedulePurchaseAmount);
+            buyRbtcOne(USER, scheduleId);
 
             vm.startPrank(USER);
             uint256 stablecoinBalanceAfterPurchase =

@@ -388,9 +388,7 @@ contract DcaManagerEdgeCasesTest is Test {
     
     function test_batchBuyRbtc_reverts_emptyArrays() public {
         address[] memory emptyUsers = new address[](0);
-        uint256[] memory emptyIndexes = new uint256[](0);
         uint64[] memory emptyIds = new uint64[](0);
-        uint256[] memory emptyAmounts = new uint256[](0);
         
         vm.expectRevert(IDcaManager.DcaManager__EmptyBatchPurchaseArrays.selector);
         vm.prank(SWAPPER);
@@ -437,9 +435,9 @@ contract DcaManagerEdgeCasesTest is Test {
         dcaManager.updatePurchaseAmount(scheduleId, 0);
     }
     
-    function test_updatePurchaseAmount_reverts_invalidScheduleIndex() public {
+    function test_updatePurchaseAmount_reverts_inexistentScheduleId() public {
         uint64 fakeScheduleId = UNUSED_SCHEDULE_ID;
-        vm.expectRevert(); // Should revert due to array bounds
+        vm.expectRevert();
         vm.prank(USER);
         dcaManager.updatePurchaseAmount(fakeScheduleId, 100 ether);
     }
@@ -548,9 +546,9 @@ contract DcaManagerEdgeCasesTest is Test {
         dcaManager.depositToken(scheduleId, 0);
     }
     
-    function test_depositToken_reverts_invalidScheduleIndex() public {
+    function test_depositToken_reverts_inexistentScheduleId() public {
         uint64 fakeScheduleId = UNUSED_SCHEDULE_ID;
-        vm.expectRevert(); // Should revert due to array bounds
+        vm.expectRevert();
         vm.prank(USER);
         dcaManager.depositToken(fakeScheduleId, 100 ether);
     }
@@ -559,11 +557,9 @@ contract DcaManagerEdgeCasesTest is Test {
                            FUZZ TESTS
     //////////////////////////////////////////////////////////////*/
     
-    function testFuzz_invalidScheduleOperations(uint256 invalidIndex) public {
-        vm.assume(invalidIndex > 0 && invalidIndex < type(uint256).max);
-        
+    function test_inexistentScheduleOperationsRevert() public {
         uint64 fakeScheduleId = UNUSED_SCHEDULE_ID;
-        // All operations with invalid index should revert
+        // Every id-addressed operation rejects a schedule the caller does not hold.
         vm.expectRevert();
         vm.prank(USER);
         dcaManager.depositToken(fakeScheduleId, 100 ether);
@@ -620,4 +616,4 @@ contract DcaManagerEdgeCasesTest is Test {
             TROPYKUS_INDEX
         );
     }
-} 
+}

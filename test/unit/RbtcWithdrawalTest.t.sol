@@ -26,7 +26,7 @@ contract RbtcWithdrawalTest is DcaDappTest {
         vm.prank(USER);
         IDcaManager.DcaSchedule[] memory dcaDetails = dcaManager.getDcaSchedules(USER, address(stablecoin));
 
-        buyRbtcOne(USER, SCHEDULE_INDEX, dcaDetails[SCHEDULE_INDEX].scheduleId, AMOUNT_TO_SPEND);
+        buyRbtcOne(USER, dcaDetails[SCHEDULE_INDEX].scheduleId);
 
         uint256 rbtcBalanceBeforeWithdrawal = USER.balance;
         vm.prank(USER);
@@ -121,7 +121,7 @@ contract RbtcWithdrawalTest is DcaDappTest {
     function testWithdrawAllRbtcSkipsUnregisteredPairAndKeepsGoing() external {
         vm.prank(USER);
         IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(USER, address(stablecoin));
-        buyRbtcOne(USER, SCHEDULE_INDEX, schedules[SCHEDULE_INDEX].scheduleId, AMOUNT_TO_SPEND);
+        buyRbtcOne(USER, schedules[SCHEDULE_INDEX].scheduleId);
 
         uint256 accumulatedRbtc = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
         assertGt(accumulatedRbtc, 0);
@@ -145,7 +145,7 @@ contract RbtcWithdrawalTest is DcaDappTest {
     function testWithdrawAllRbtcWithDuplicatePairPaysOnce() external {
         vm.prank(USER);
         IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(USER, address(stablecoin));
-        buyRbtcOne(USER, SCHEDULE_INDEX, schedules[SCHEDULE_INDEX].scheduleId, AMOUNT_TO_SPEND);
+        buyRbtcOne(USER, schedules[SCHEDULE_INDEX].scheduleId);
 
         uint256 accumulatedRbtc = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
         uint256 rbtcBalanceBeforeWithdrawal = USER.balance;
@@ -184,7 +184,7 @@ contract RbtcWithdrawalTest is DcaDappTest {
         super.makeSinglePurchase();
 
         uint64 attackerScheduleId = scheduleIdAt(dcaManager, attacker, address(stablecoin), SCHEDULE_INDEX);
-        buyRbtcOne(attacker, SCHEDULE_INDEX, attackerScheduleId, AMOUNT_TO_SPEND);
+        buyRbtcOne(attacker, attackerScheduleId);
 
         uint256 userAccrued = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
         uint256 attackerAccrued = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(attacker);

@@ -144,7 +144,7 @@ contract DcaConfigurationTest is DcaDappTest {
         assertEq(onePurchaseAmount, scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).purchaseAmount);
         vm.stopPrank();
 
-        buyRbtcOne(USER, scheduleIndex, scheduleId, AMOUNT_TO_SPEND);
+        buyRbtcOne(USER, scheduleId);
 
         vm.prank(USER);
         assertEq(0, scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).tokenBalance);

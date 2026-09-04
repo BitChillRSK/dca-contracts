@@ -228,12 +228,9 @@ contract RoleSecurityTest is Test {
         uint64 scheduleId = scheduleIdAt(dcaManager, user, address(stablecoin), 0);
 
         address[] memory buyers = new address[](1);
-        uint256[] memory scheduleIndexes = new uint256[](1);
         uint64[] memory scheduleIds = new uint64[](1);
-        uint256[] memory purchaseAmounts = new uint256[](1);
         buyers[0] = user;
         scheduleIds[0] = scheduleId;
-        purchaseAmounts[0] = 100 ether;
 
         // Unauthorized user should fail
         vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__UnauthorizedSwapper.selector, UNAUTHORIZED_USER));
@@ -272,11 +269,7 @@ contract RoleSecurityTest is Test {
         // Setup batch purchase arrays
         address[] memory users = new address[](1);
         users[0] = address(0x6666);
-        uint256[] memory scheduleIndexes = new uint256[](1);
-        scheduleIndexes[0] = 0;
         uint64[] memory scheduleIds = new uint64[](1);
-        uint256[] memory purchaseAmounts = new uint256[](1);
-        purchaseAmounts[0] = 100 ether;
         
         // Setup user with DCA schedule
         stablecoin.mint(users[0], 1000 ether);
@@ -423,4 +416,4 @@ contract RoleSecurityTest is Test {
         operationsAdmin.addSwapper(newAdmin);
         assertTrue(operationsAdmin.isSwapper(newAdmin));
     }
-} 
+}

@@ -16,8 +16,8 @@ interface IDcaManager {
     //////////////////////////////////////////////////////////////*/
     /// @notice One user's recurring purchase of rBTC with one stablecoin on one OperationsAdmin route.
     /// @dev What every getter returns. `scheduleId` leads it because that, with the owner, is how a
-    ///      schedule is addressed — see `StoredSchedule` for why the id cannot also be a stored field.
-    ///      A row is therefore self-describing: whatever a caller reads, it can act on.
+    ///      schedule is addressed. The implementation reattaches the id from the mapping key rather
+    ///      than duplicating it in storage, so whatever a caller reads is self-describing and actionable.
     struct DcaSchedule {
         uint64 scheduleId; // Unique identifier of each DCA schedule: the value of the creation nonce
         uint128 tokenBalance; // Stablecoin amount deposited by the user
@@ -27,29 +27,6 @@ interface IDcaManager {
         uint32 routeIndex; // OperationsAdmin route that holds this schedule's funds (idle or lending)
         address token; // The stablecoin this schedule spends
         uint96 purchaseAmount; // Stablecoin amount to spend periodically on rBTC
-    }
-
-    /// @notice How a schedule is held in storage.
-    /// @dev An internal storage shape rather than an ABI type: getters return `DcaSchedule`. Two slots,
-    ///      because a schedule is keyed by `(scheduleId, user)` and neither half of that key is
-    ///      repeated here. The owner being the key is what makes ownership unforgeable — no path can
-    ///      reach a schedule that is not the caller's, because the lookup lands on an empty struct
-    ///      rather than on somebody else's — and it is also what buys the second slot back. Slot 0 is
-    ///      every field a purchase reads or writes (31 of 32 bytes), so a purchase writes one slot.
-    ///      Slot 1 pairs `token` with `purchaseAmount`, which is `uint96` for that reason: at `uint128`
-    ///      the pair no longer fits beside an address, and splitting them costs a second `SSTORE` on
-    ///      every purchase, which is more than the narrower field ever saves. `uint96` caps one purchase
-    ///      at ~7.9e10 tokens at 18 decimals; `tokenBalance` keeps `uint128`. The id is absent for the
-    ///      same reason the owner is: adding either back costs a third slot and buys nothing storage
-    ///      needs. A live schedule always has a non-zero `token`, which is what "this exists" means.
-    struct StoredSchedule {
-        uint128 tokenBalance;
-        uint48 lastPurchaseTimestamp;
-        bool paused;
-        uint32 purchasePeriod;
-        uint32 routeIndex;
-        address token;
-        uint96 purchaseAmount;
     }
 
     /// @notice One handler's purchase batch.

@@ -396,16 +396,17 @@ Cold paths, per schedule, paid by the user:
 
 | | create (default) | delete (default) | create (via-IR) | delete (via-IR) |
 |---|---|---|---|---|
-| B — pre-R64 | 91,431 | 10,915 | 89,627 | 10,566 |
-| **A — shipped** | **114,002** | **11,556** | **113,135** | **11,900** |
+| B — pre-R64 | 91,430 | 10,915 | 89,627 | 10,565 |
+| **A — shipped** | **114,037** | **11,557** | **113,246** | **11,900** |
 
-Create costs the user 22,571 gas more — about $0.14 once — and delete about 640 more for the id-list
-scan. **Break-even is 7.2 purchases under `[profile.default]` and 8.6 under via-IR**, so a daily
+Create costs the user 22,607 gas more under `[profile.default]` — about $0.14 once — and delete 642
+more for the id-list scan. Including both cold paths, **break-even is 7.2 purchases under
+`[profile.default]` and 8.6 under via-IR**, so a daily
 schedule pays for its own create inside about a week and is ahead for the rest of its life. The
 first implementation's break-even was 31 to 39 purchases; the two-slot key is what closed that gap,
 because it gives the user's cold path back rather than trading it for the operator's hot one.
 
-`DcaManager`'s metadata-stripped runtime went **14,492 → 13,626 bytes**, 866 smaller. Every deployable
+`DcaManager`'s metadata-stripped runtime went **14,492 → 13,669 bytes**, 823 smaller. Every deployable
 handler is byte-identical, since none of them reads the schedule shape.
 
 ### What did not change
@@ -414,4 +415,5 @@ Ids are still the creation nonce from a strictly increasing counter, still start
 retired by deletion rather than reused (invariant 7). Every external function that writes
 `s_dcaSchedules` still carries `nonReentrant` as its first modifier, with the two `onlySwapper`
 purchase paths the same documented exception (invariant 6). Events keep their signatures, field
-meanings and indexed fields.
+meanings and indexed fields. A zero token is rejected even if governance assigned that pair a handler,
+because `token != address(0)` is the stored schedule's existence sentinel.

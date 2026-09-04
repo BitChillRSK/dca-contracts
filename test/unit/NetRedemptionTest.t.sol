@@ -55,7 +55,7 @@ contract NetRedemptionTest is DcaDappTest {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 rbtcBefore = _accumulatedRbtc();
 
-        buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
+        buyRbtcOne(USER, scheduleId);
 
         uint256 rbtcBought = _accumulatedRbtc() - rbtcBefore;
         uint256 netRedeemed = _afterExitFee(AMOUNT_TO_SPEND);
@@ -74,12 +74,7 @@ contract NetRedemptionTest is DcaDappTest {
         createSeveralDcaSchedules();
         _enableExitFee();
 
-        (
-            address[] memory users,
-            uint256[] memory scheduleIndexes,
-            uint64[] memory scheduleIds,
-            uint256[] memory purchaseAmounts
-        ) = _batchArrays();
+        (address[] memory users,, uint64[] memory scheduleIds,) = _batchArrays();
 
         uint256 handlerRbtcBefore = address(stablecoinHandler).balance;
         uint256 creditedBefore = _accumulatedRbtc();
@@ -192,12 +187,7 @@ contract NetRedemptionTest is DcaDappTest {
         createSeveralDcaSchedules();
         _enableExitFee();
 
-        (
-            address[] memory users,
-            uint256[] memory scheduleIndexes,
-            uint64[] memory scheduleIds,
-            uint256[] memory purchaseAmounts
-        ) = _batchArrays();
+        (address[] memory users,, uint64[] memory scheduleIds, uint256[] memory purchaseAmounts) = _batchArrays();
 
         uint256 plannedNetTotal;
         for (uint256 i; i < purchaseAmounts.length; ++i) {
@@ -235,12 +225,7 @@ contract NetRedemptionTest is DcaDappTest {
         // earlier with TokenLending__ZeroStablecoinReceived, which is a different failure.
         MockIsusdToken(address(shareToken)).setExitFeeBps(RUG_EXIT_FEE_BPS);
 
-        (
-            address[] memory users,
-            uint256[] memory scheduleIndexes,
-            uint64[] memory scheduleIds,
-            uint256[] memory purchaseAmounts
-        ) = _batchArrays();
+        (address[] memory users,, uint64[] memory scheduleIds, uint256[] memory purchaseAmounts) = _batchArrays();
 
         uint256 aggregatedFee;
         uint256 totalPurchase;
@@ -298,7 +283,7 @@ contract NetRedemptionTest is DcaDappTest {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 rbtcBefore = _accumulatedRbtc();
 
-        buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
+        buyRbtcOne(USER, scheduleId);
 
         uint256 netPurchaseAmount = AMOUNT_TO_SPEND - feeCalculator.calculateFee(AMOUNT_TO_SPEND);
         assertApproxEqRel(_accumulatedRbtc() - rbtcBefore, netPurchaseAmount / s_btcPrice, _maxPurchaseSlippage());

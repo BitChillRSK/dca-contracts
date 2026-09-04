@@ -282,7 +282,7 @@ contract TopUpFromInterestTest is DcaDappTest {
         assertEq(_schedule(SCHEDULE_INDEX).tokenBalance, credit, "the depleted schedule was not credited");
 
         uint256 rbtcBefore = dcaManager.getAccumulatedRbtcBalance(USER, address(stablecoin), s_routeIndex);
-        super.buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, purchaseAmount);
+        super.buyRbtcOne(USER, scheduleId);
 
         assertEq(
             _schedule(SCHEDULE_INDEX).tokenBalance,

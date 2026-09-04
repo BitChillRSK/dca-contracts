@@ -137,7 +137,7 @@ contract SchedulePauseTest is DcaDappTest {
         uint256 rbtcBefore = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
 
         vm.expectRevert(_schedulePausedRevert(SCHEDULE_INDEX));
-        super.buyRbtcOne(USER, SCHEDULE_INDEX, before.scheduleId, AMOUNT_TO_SPEND);
+        super.buyRbtcOne(USER, before.scheduleId);
 
         IDcaManager.DcaSchedule memory unchangedSchedule =
             scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
@@ -336,7 +336,7 @@ contract SchedulePauseTest is DcaDappTest {
         uint256 activeIndex = SCHEDULE_INDEX;
         IDcaManager.DcaSchedule memory active = scheduleAt(dcaManager, USER, address(stablecoin), activeIndex);
 
-        super.buyRbtcOne(USER, activeIndex, active.scheduleId, active.purchaseAmount);
+        super.buyRbtcOne(USER, active.scheduleId);
 
         assertEq(
             scheduleAt(dcaManager, USER, address(stablecoin), activeIndex).tokenBalance,

@@ -49,7 +49,7 @@ contract FullWithdrawalTest is DcaDappTest {
         uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
         uint256 staleBalance = _scheduleBalance(SCHEDULE_INDEX);
 
-        buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
+        buyRbtcOne(USER, scheduleId);
 
         uint256 liveBalance = _scheduleBalance(SCHEDULE_INDEX);
         assertLt(liveBalance, staleBalance, "the purchase did not move the balance");

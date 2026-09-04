@@ -433,7 +433,7 @@ contract GettersTest is DcaDappTest {
 
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
 
-        buyRbtcOne(USER, 0, scheduleId, AMOUNT_TO_SPEND);
+        buyRbtcOne(USER, scheduleId);
 
         uint256 newBalance = scheduleAt(dcaManager, USER, address(stablecoin), 0).tokenBalance;
         assertLt(newBalance, initialBalance);
@@ -459,4 +459,4 @@ contract GettersTest is DcaDappTest {
         gasAfter = gasleft();
         assertLt(gasBefore - gasAfter, 10000);
     }
-} 
+}

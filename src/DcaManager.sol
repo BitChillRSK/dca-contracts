@@ -25,6 +25,27 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     using SafeCast for uint256;
 
     /*//////////////////////////////////////////////////////////////
+                           TYPE DECLARATIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @dev Storage-only schedule shape. The public getters return `DcaSchedule`, adding the id back
+     *      from the mapping key. Neither the id nor the owner is repeated here, keeping this value at
+     *      two slots. Slot 0 contains every field a purchase reads or writes, so a purchase writes one
+     *      slot. Slot 1 pairs `token` with a `uint96 purchaseAmount`; widening it would add a third slot.
+     *      A live schedule always has a non-zero token, which is the existence sentinel.
+     */
+    struct StoredSchedule {
+        uint128 tokenBalance;
+        uint48 lastPurchaseTimestamp;
+        bool paused;
+        uint32 purchasePeriod;
+        uint32 routeIndex;
+        address token;
+        uint96 purchaseAmount;
+    }
+
+    /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
@@ -167,6 +188,9 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         uint256 purchasePeriod,
         uint256 routeIndex
     ) external override nonReentrant {
+        // A zero token is the empty-value sentinel for the id/user mapping and can never be live,
+        // even if governance mistakenly assigned a handler to that pair.
+        if (token == address(0)) revert DcaManager__TokenNotAccepted(token, routeIndex);
         uint128 deposit = depositAmount.toUint128();
         uint96 purchase = purchaseAmount.toUint96();
         uint32 period = purchasePeriod.toUint32();

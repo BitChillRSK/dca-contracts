@@ -5,9 +5,9 @@ pragma solidity 0.8.36;
 import {Test, console, Vm} from "forge-std/Test.sol";
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
-import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
 import {UNUSED_SCHEDULE_ID} from "../utils/BatchBuyOne.sol";
 import "../Constants.sol";
+import {DummyTokenHandler} from "./TestsHelper.t.sol";
 import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 contract DcaScheduleTest is DcaDappTest {
@@ -34,7 +34,7 @@ contract DcaScheduleTest is DcaDappTest {
      * @notice Deletes a schedule and checks its event. The identity fields must match exactly; the refunded
      * amount is what the handler paid, compared with a rounding tolerance.
      */
-    function _deleteAndAssertEvent(uint256 scheduleIndex, uint64 scheduleId, uint256 expectedRefund) private {
+    function _deleteAndAssertEvent(uint64 scheduleId, uint256 expectedRefund) private {
         vm.recordLogs();
         dcaManager.deleteDcaSchedule(scheduleId);
 
@@ -78,6 +78,26 @@ contract DcaScheduleTest is DcaDappTest {
         assertEq(AMOUNT_TO_SPEND, scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).purchaseAmount);
         assertEq(MIN_PURCHASE_PERIOD, scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).purchasePeriod);
         vm.stopPrank();
+    }
+
+    function testCannotCreateAZeroTokenScheduleEvenIfAHandlerWasAssigned() external {
+        uint256 zeroTokenRoute = 10;
+        DummyTokenHandler zeroTokenHandler = new DummyTokenHandler();
+
+        vm.startPrank(OWNER);
+        operationsAdmin.registerRoute(zeroTokenRoute, false);
+        operationsAdmin.assignTokenHandler(address(0), zeroTokenRoute, address(zeroTokenHandler));
+        vm.stopPrank();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IDcaManager.DcaManager__TokenNotAccepted.selector, address(0), zeroTokenRoute)
+        );
+        vm.prank(USER);
+        dcaManager.createDcaSchedule(
+            address(0), AMOUNT_TO_DEPOSIT, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, zeroTokenRoute
+        );
+
+        assertEq(dcaManager.getDcaSchedules(USER, address(0)).length, 0);
     }
 
     function testDcaScheduleIdsDontCollide() external {
@@ -174,7 +194,7 @@ contract DcaScheduleTest is DcaDappTest {
         console.log("scheduleId is", vm.toString(scheduleId));
         console.log("scheduleId2 is", vm.toString(scheduleId2));
         // Delete one
-        _deleteAndAssertEvent(1, scheduleId, AMOUNT_TO_DEPOSIT * 2);
+        _deleteAndAssertEvent(scheduleId, AMOUNT_TO_DEPOSIT * 2);
         // Check that there are two (the one created in setUp() and the second one created in this test)
         assertEq(dcaManager.getDcaSchedules(USER, address(stablecoin)).length, 2);
         // Check that the deleted one was the first one created in this test and its place was taken by the second one
@@ -200,9 +220,9 @@ contract DcaScheduleTest is DcaDappTest {
         console.log("scheduleId 2 is", vm.toString(scheduleId2));
         console.log(vm.toString(scheduleIdAt(dcaManager, USER, address(stablecoin), 2)));
         // Delete one
-        _deleteAndAssertEvent(1, scheduleId, AMOUNT_TO_DEPOSIT * 2);
+        _deleteAndAssertEvent(scheduleId, AMOUNT_TO_DEPOSIT * 2);
         // Delete the second one passing the same index, since the first one was already deleted
-        _deleteAndAssertEvent(1, scheduleId2, AMOUNT_TO_DEPOSIT * 3);
+        _deleteAndAssertEvent(scheduleId2, AMOUNT_TO_DEPOSIT * 3);
         // Check only the schedule created in setUp() remains
         assertEq(dcaManager.getDcaSchedules(USER, address(stablecoin)).length, 1);
         vm.stopPrank();
@@ -221,11 +241,8 @@ contract DcaScheduleTest is DcaDappTest {
         vm.stopPrank();
     }
 
-    /**
-     * @notice this test shows that a transaction that aims to delete the last schedule in the array after another schedule has been deleted in a previous transaction
-     * reverts if both transactions have been included in the same block // this has to be prevented in the front end
-     */
-    function testCannotDeleteLastDcaScheduleInTheSameBlock() external {
+    /// @dev Id-based deletion is independent of a schedule's current position in the enumeration list.
+    function testCanDeleteTwoSchedulesByIdInTheSameBlock() external {
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT * 5);
         // Create two schedules in different blocks
@@ -243,9 +260,10 @@ contract DcaScheduleTest is DcaDappTest {
         console.log("scheduleId 2 is", vm.toString(scheduleId2));
         console.log(vm.toString(scheduleIdAt(dcaManager, USER, address(stablecoin), 2)));
         // Delete one
-        _deleteAndAssertEvent(1, scheduleId, AMOUNT_TO_DEPOSIT * 2);
-        // Deleting the second one fails, because when the first one was deleted, the second one was moved to its index
-        _deleteAndAssertEvent(1, scheduleId2, AMOUNT_TO_DEPOSIT * 3);
+        _deleteAndAssertEvent(scheduleId, AMOUNT_TO_DEPOSIT * 2);
+        // The first delete moves this id in the enumeration list, but its identity does not change.
+        _deleteAndAssertEvent(scheduleId2, AMOUNT_TO_DEPOSIT * 3);
+        assertEq(dcaManager.getDcaSchedules(USER, address(stablecoin)).length, 1);
         vm.stopPrank();
     }
 

@@ -208,7 +208,7 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
     /// @dev Takes the id rather than reading it, so a caller's `vm.expectRevert` lands on the batch call
     ///      itself and not on the getter that would otherwise run first.
     function _purchase(uint64 scheduleId) private {
-        buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
+        buyRbtcOne(USER, scheduleId);
     }
 
     function _scheduleId() private view returns (uint64) {
