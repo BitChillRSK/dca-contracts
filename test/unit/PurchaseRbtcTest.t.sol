@@ -486,12 +486,16 @@ contract PurchaseRbtcHarness is PurchaseRbtc {
         return useRetrieveOverride ? retrieveOverride : amount;
     }
 
-    function _batchRetrieveStablecoin(address[] memory, uint256[] memory, uint256 totalStablecoinToRetrieve)
+    /// @dev Funds every row, so `unfundedRows` stays empty.
+    function _batchRetrieveStablecoin(address[] memory, uint256[] memory purchaseAmounts)
         internal
         view
         override
-        returns (uint256)
+        returns (uint256 totalStablecoinToRetrieve, uint256[] memory)
     {
-        return useRetrieveOverride ? retrieveOverride : totalStablecoinToRetrieve;
+        for (uint256 i; i < purchaseAmounts.length; ++i) {
+            totalStablecoinToRetrieve += purchaseAmounts[i];
+        }
+        if (useRetrieveOverride) totalStablecoinToRetrieve = retrieveOverride;
     }
 }

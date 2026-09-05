@@ -338,7 +338,10 @@ contract FeeOnTransferDepositTest is Test {
         assertLt(userGained, REQUESTED);
     }
 
-    function test_tropykus_batchBuy_ofOverstatedBalance_reverts() public {
+    /// @dev R66: the schedule's principal is ahead of the shares behind it, so the row cannot fund
+    ///      itself. It is skipped rather than reverting the batch, which is what stops one buyer's
+    ///      overstated balance from costing every other row in the same tick its purchase.
+    function test_tropykus_batchBuy_ofOverstatedBalance_skipsTheRow() public {
         kToken.setMintShortfallBps(FEE_BPS);
         uint64 scheduleId = _createTropykusSchedule(USER, REQUESTED);
 
@@ -346,17 +349,16 @@ contract FeeOnTransferDepositTest is Test {
         rows[0] = packBatchRow(scheduleId, uint96(REQUESTED));
 
         uint256 availableShares = tropykusHandler.getUserShares(USER);
-        uint256 rate = kToken.exchangeRateStored();
-        uint256 requestedShares = (REQUESTED * EXCHANGE_RATE_DECIMALS + rate - 1) / rate;
-        vm.prank(SWAPPER);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ITokenLending.TokenLending__InsufficientShares.selector, USER, requestedShares, availableShares
-            )
+        vm.expectEmit(true, true, false, true, address(dcaManager));
+        emit IDcaManager.DcaManager__PurchaseRowSkipped(
+            address(token), scheduleId, IDcaManager.PurchaseRowSkipReason.FundingInsufficient
         );
+        vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(toBatch(rows, address(token), TROPYKUS_INDEX));
 
-        // Revert leaves the schedule intact; the lending clamp still lets the user withdraw.
+        // The skip leaves the schedule and the share book intact; the lending clamp still lets the
+        // user withdraw.
+        assertEq(tropykusHandler.getUserShares(USER), availableShares);
         assertEq(scheduleAt(dcaManager, USER, address(token), 0).tokenBalance, REQUESTED);
         uint256 userBefore = token.balanceOf(USER);
         vm.prank(USER);

@@ -553,11 +553,8 @@ contract DcaDappTest is Test {
         uint256 fee = feeCalculator.calculateFee(AMOUNT_TO_SPEND);
         uint256 netPurchaseAmount = AMOUNT_TO_SPEND - fee;
 
-        vm.expectEmit(true, true, true, true);
-        uint256 lastTs = dcaDetails[SCHEDULE_INDEX].lastPurchaseTimestamp;
-        uint256 period = dcaDetails[SCHEDULE_INDEX].purchasePeriod;
-        uint256 lastPurchaseTimestamp = lastTs == 0 ? block.timestamp : lastTs + period;
-        emit DcaManager__LastPurchaseTimestampUpdated(address(stablecoin), dcaDetailsIds[SCHEDULE_INDEX], lastPurchaseTimestamp);
+        // R66 order: the handler's funding, fee and purchase logs come first, because the manager has to
+        // hear which rows funded before it debits any schedule. Its own logs close the transaction.
         if (isLendingLane) {
             vm.expectEmit(true, false, false, false);
             emit TokenLending__SharesRedeemed(USER, 0, 0);
@@ -574,6 +571,11 @@ contract DcaDappTest is Test {
             dcaDetailsIds[SCHEDULE_INDEX],
             netPurchaseAmount
         );
+        vm.expectEmit(true, true, true, true);
+        uint256 lastTs = dcaDetails[SCHEDULE_INDEX].lastPurchaseTimestamp;
+        uint256 period = dcaDetails[SCHEDULE_INDEX].purchasePeriod;
+        uint256 lastPurchaseTimestamp = lastTs == 0 ? block.timestamp : lastTs + period;
+        emit DcaManager__LastPurchaseTimestampUpdated(address(stablecoin), dcaDetailsIds[SCHEDULE_INDEX], lastPurchaseTimestamp);
         buyRbtcOne(dcaDetailsIds[SCHEDULE_INDEX]);
 
         vm.startPrank(USER);

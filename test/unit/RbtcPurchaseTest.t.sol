@@ -367,15 +367,18 @@ contract RbtcPurchaseTest is DcaDappTest {
     function testBatchPurchaseSkipsIfAnIdBelongsToNoSchedule() external {
         super.createSeveralDcaSchedules();
 
-        uint64 scheduleId = UNUSED_SCHEDULE_ID;
+        // Ids come from a monotonic nonce that has only ever reached single digits here, so the top of
+        // the range belongs to no schedule. They still have to be strictly increasing: the sort rule is
+        // about batch composition and does not care whether a row is going to be skipped.
+        uint64 scheduleId = UNUSED_SCHEDULE_ID - uint64(NUM_OF_SCHEDULES) + 1;
 
         uint256 prevStablecoinHandlerBalance = address(stablecoinHandler).balance;
         vm.prank(USER);
         uint256 userAccumulatedRbtcPrev = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
-        // Every row names the same id, and it belongs to no schedule
+        // Every row names an id that belongs to no schedule
         bytes32[] memory rows = new bytes32[](NUM_OF_SCHEDULES);
         for (uint8 i; i < NUM_OF_SCHEDULES; ++i) {
-            rows[i] = packBatchRow(scheduleId, 0);
+            rows[i] = packBatchRow(scheduleId + i, 0);
         }
         vm.expectEmit(true, true, false, true, address(dcaManager));
         emit IDcaManager.DcaManager__PurchaseRowSkipped(

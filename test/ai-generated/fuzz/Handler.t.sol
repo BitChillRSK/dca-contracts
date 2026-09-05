@@ -519,6 +519,12 @@ contract Handler is Test {
             vm.deal(address(handler), currentHandlerBalance + totalRbtcNeeded);
         }
 
+        // R66: rows must be in strictly increasing schedule-id order, which is what the swapper sends.
+        // Fuzzed seeds pick indexes freely, so sort and drop repeats here — otherwise almost every
+        // multi-row draw would be rejected as a composition error and this action would stop
+        // exercising the purchase path at all.
+        rows = _sortedUniqueRows(rows);
+
         // Execute batch purchase
         vm.startPrank(SWAPPER);
         try dcaManager.batchBuyRbtc(
@@ -531,6 +537,35 @@ contract Handler is Test {
         vm.stopPrank();
     }
     
+    /**
+     * @dev Insertion-sort packed rows by decoded schedule id and drop repeats. The id sits in the high
+     *      bits, so sorting the packed words numerically already orders them by id.
+     */
+    function _sortedUniqueRows(bytes32[] memory rows) private pure returns (bytes32[] memory unique) {
+        for (uint256 i = 1; i < rows.length; ++i) {
+            bytes32 row = rows[i];
+            uint256 j = i;
+            while (j > 0 && rows[j - 1] > row) {
+                rows[j] = rows[j - 1];
+                --j;
+            }
+            rows[j] = row;
+        }
+
+        uint256 kept;
+        bytes32[] memory buffer = new bytes32[](rows.length);
+        for (uint256 i = 0; i < rows.length; ++i) {
+            uint64 scheduleId = uint64(uint256(rows[i]) >> 96);
+            if (kept != 0 && scheduleId == uint64(uint256(buffer[kept - 1]) >> 96)) continue;
+            buffer[kept++] = rows[i];
+        }
+
+        unique = new bytes32[](kept);
+        for (uint256 i = 0; i < kept; ++i) {
+            unique[i] = buffer[i];
+        }
+    }
+
     /**
      * @notice Withdraw accumulated rBTC for a random user
      */

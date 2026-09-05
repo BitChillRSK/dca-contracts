@@ -106,9 +106,10 @@ contract IdleErc20HandlerDexTest is HandlerTestHarness {
         assertGt(USER.balance, 0);
     }
 
-    /// @notice Idle batch retrieval reverts on shortfall (does not clamp). Same rule as the MoC idle
-    ///         leaf; a Uniswap batch must not silently change that and dilute other buyers.
-    function test_idleDex_batchBuy_revertsIfBuyerShort() public {
+    /// @notice R66: idle batch retrieval drops a short row rather than clamping it or reverting. Same
+    ///         rule as the MoC idle leaf — clamping would dilute every other buyer, and reverting would
+    ///         cost them their purchase outright.
+    function test_idleDex_batchBuy_skipsTheShortBuyerAndBuysForTheRest() public {
         address user1 = makeAddr("user1");
         address user2 = makeAddr("user2");
         stablecoin.mint(user1, DEPOSIT_AMOUNT);
@@ -133,20 +134,15 @@ contract IdleErc20HandlerDexTest is HandlerTestHarness {
         purchaseAmounts[0] = DEPOSIT_AMOUNT * 2;
         purchaseAmounts[1] = DEPOSIT_AMOUNT / 2;
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdleErc20Handler.IdleErc20Handler__InsufficientIdleBalance.selector,
-                user1,
-                DEPOSIT_AMOUNT * 2,
-                DEPOSIT_AMOUNT
-            )
-        );
         vm.prank(address(dcaManager));
-        idleDexHandler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT_RATE);
+        uint256[] memory unfundedRows =
+            idleDexHandler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT_RATE);
 
-        assertEq(idleDexHandler.getUsersIdleTokenBalance(user1), DEPOSIT_AMOUNT);
-        assertEq(idleDexHandler.getUsersIdleTokenBalance(user2), DEPOSIT_AMOUNT);
-        assertEq(idleDexHandler.getAccumulatedRbtcBalance(user1), 0);
-        assertEq(idleDexHandler.getAccumulatedRbtcBalance(user2), 0);
+        assertEq(unfundedRows.length, 1, "exactly one row should have been reported unfunded");
+        assertEq(unfundedRows[0], 0, "the short row is row 0");
+        assertEq(idleDexHandler.getUsersIdleTokenBalance(user1), DEPOSIT_AMOUNT, "the short row was debited");
+        assertEq(idleDexHandler.getUsersIdleTokenBalance(user2), DEPOSIT_AMOUNT / 2);
+        assertEq(idleDexHandler.getAccumulatedRbtcBalance(user1), 0, "the short row was credited rBTC");
+        assertGt(idleDexHandler.getAccumulatedRbtcBalance(user2), 0, "the funded row did not buy");
     }
 }
