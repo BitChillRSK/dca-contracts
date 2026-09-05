@@ -1,6 +1,6 @@
 # R66 — A batch row can be reverted or definanced from under it before the tick lands
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **in progress** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
@@ -55,10 +55,83 @@ purchase amount before the tick let the purchase complete at a materially worse 
 quote while still clearing a `minRbtcOut` sized for the smaller, pre-edit amount; halving it reverted
 the whole batch under the same pending minimum.
 
-## Open product decisions
+## Decided (2026-09-05)
 
-**Yes — the human should confirm the direction before implementation, not just the existence of the
-bug.** Three candidate mechanisms, not mutually exclusive:
+All three candidate mechanisms ship together, plus a scope correction on MoC. Recorded here before any
+Solidity changed, per the repo's spec-before-code rule.
+
+1. **Skip a bad row instead of reverting the batch.** `_rBtcPurchaseChecksEffects` splits into a
+   check-only pass and an effects pass. `_batchBuyRbtc` runs checks for every row before writing
+   anything: an ineligible row (deleted, paused, balance short, period not elapsed) or an
+   expected-amount mismatch (mechanism 3) is skipped and reported via
+   `DcaManager__PurchaseRowSkipped(token, scheduleId, reason)`; only rows that pass every check get
+   their storage effects applied and are forwarded to the handler. Storage remains the sole authority
+   for the buyer and the amount actually spent — skipping never substitutes a caller-supplied value for
+   either. A row naming a schedule of a different route (`RouteIndexMismatch`) is not owner-triggered —
+   no setter can move a schedule's route — so it stays a hard revert of the whole batch: that is a
+   swapper-side composition error, not a front-run to tolerate.
+
+   If every row in a submitted batch is skipped, `_batchBuyRbtc` emits the skip events and returns
+   without calling the handler, in both `batchBuyRbtc` and each element of
+   `batchBuyRbtcAcrossHandlers` — a genuinely empty *input* array (`batch.scheduleIds`/`rows` of length
+   zero) still reverts `DcaManager__EmptyBatchPurchaseArrays`, since that is malformed swapper input,
+   not a filtered-down live batch. This also answers the "Required tests" question below:
+   `batchBuyRbtcAcrossHandlers` does not revert the whole call when one handler's batch empties out; it
+   simply continues to the next handler, because the emptied batch no longer reverts on its own.
+
+2. **Bind the slippage floor to the amount actually spent, not an absolute quoted figure.** The `Batch`
+   field (and the matching `IPurchaseRbtc.batchBuyRbtc` / `PurchaseRbtc` internals) is renamed
+   `minRbtcOut` → `minRbtcOutRate`: rBTC wei per **raw** stablecoin unit (the token's own decimals, not
+   USD-normalized), scaled by `1e18`. The shared check in `PurchaseRbtc.batchBuyRbtc` becomes
+   `requiredMin = Math.mulDiv(minRbtcOutRate, totalStablecoinAmountToSpend, 1e18, Math.Rounding.Ceil)`
+   against the measured `totalPurchasedRbtc`, using the actual post-fee net spend rather than a
+   pre-computed absolute figure — this is what closes the staleness gap, since the amount the rate is
+   applied to is measured after the current tick's retrieval, not planned before it. Rounding the
+   required minimum **up** means the floor is never accidentally weaker than configured. `0` still
+   disables the check.
+
+   `minRbtcOutRate` is threaded down into `_purchaseRbtc` (replacing the old absolute `minRbtcOut`
+   parameter) so `PurchaseUniswap` derives its own absolute `amountOutMinimum` from the same rate
+   against the same actual `stablecoinAmount` it is about to swap, composing with the existing oracle
+   floor exactly as today: `max(amountOutLowerBound, Math.mulDiv(minRbtcOutRate, stablecoinAmount, 1e18,
+   Ceil))`. A Uniswap purchase that fails this bound now reverts inside the router call with the
+   pre-existing Uniswap revert path; the shared post-hoc check in `PurchaseRbtc` is then a redundant
+   but harmless second gate for that route, and the *only* gate for MoC (see the scope correction
+   below). Both 6-decimal and 18-decimal stablecoins are covered by the same formula — the rate's
+   numeric value differs by token, decided off-chain by whoever composes the batch, but the on-chain
+   scaling is decimal-agnostic (always `/1e18` against the token's raw units), so `PurchaseRbtc` needs
+   no per-token decimals lookup.
+
+3. **Pack the swapper's expected amount into the batch row.** `Batch.scheduleIds` (`uint64[]`) becomes
+   `Batch.rows` (`bytes32[]`), each row packing `(uint64 scheduleId, uint96 expectedPurchaseAmount)`
+   (scheduleId in the high 64 bits, expectedPurchaseAmount in the low 96, top 96 bits zero). A row whose
+   `expectedPurchaseAmount` no longer matches the schedule's stored `purchaseAmount` is skipped under
+   mechanism (1) rather than purchased at a size the swapper never saw. This is the piece that stops an
+   inflated row from pushing the batch's aggregate input through a pool's depth: mechanism (2) alone
+   only bounds price, not size.
+
+**Scope correction — MoC is in scope for the caller-rate check.** The original open-decisions text
+excluded "any change to the MoC route" because MoC has no pool and so no rate-shaped *oracle* floor to
+compose with. That reasoning does not extend to the caller-supplied `minRbtcOutRate` check itself:
+`PurchaseMoc._purchaseRbtc` already ignores `minRbtcOut` entirely today, and the shared check this item
+adds lives in `PurchaseRbtc.batchBuyRbtc`, above both routes — applying it uniformly is not a change to
+MoC's redemption mechanism, only to whether the caller's floor is enforced on it at all. It should be:
+a swapper-composed MoC batch is exactly as exposed to a mid-flight amount increase as a Uniswap one, and
+the pre-R66 code already lets a caller pass a nonzero `minRbtcOut` that MoC silently drops. AGENTS.md's
+`Batch.minRbtcOut` natspec ("A MoC route has no floor to compose with... leaving no slippage surface for
+a floor to guard") is corrected by this PR: MoC has no *oracle* floor, but it is not exempt from the
+caller's own floor.
+
+**Deferred — cross-handler isolation.** Whether `batchBuyRbtcAcrossHandlers` should isolate one
+handler's revert from the others remains its own open question, raised but not decided here (see **Out
+of scope**). This item's skip-based row filtering already removes most of the *pressure* for that
+question — a single owner's stale edit no longer forces a revert at all — but a genuine venue failure
+(oracle down, router revert) is untouched and still takes down every earlier handler in the same call.
+
+<details>
+<summary>Original candidate framing (superseded by the Decided section above)</summary>
+
+Three candidate mechanisms, not mutually exclusive:
 
 1. **Skip a bad row instead of reverting the batch.** Restructure `_rBtcPurchaseChecksEffects` (checks
    already precede effects, so this is a return-a-reason-code refactor, not a reordering) so
@@ -97,67 +170,85 @@ behavior is documented as deliberate at
 [`IDcaManager.sol:327`](../../src/interfaces/IDcaManager.sol#L327) — raise it to the human rather than
 deciding it silently inside this item.
 
+</details>
+
 ## Scope
 
-- [ ] Whatever subset of (1)/(2)/(3) above the human approves.
-- [ ] Update `Batch` NatSpec and any invariant list in `AGENTS.md` that describes today's
-      all-or-nothing row behavior.
-- [ ] Consumer follow-up: swapper-bot (batch composition and any new skipped-row event), monitoring
-      (alert shape if `DcaManager__PurchaseRowSkipped` is added), and any repo that encodes `Batch` if
-      its shape changes under (3).
+- [x] All of (1), (2), and (3) above.
+- [x] Apply the caller-rate check (2) to the MoC route as well as Uniswap — see the scope correction
+      above.
+- [x] Update `Batch` NatSpec and invariant 9 in `AGENTS.md`, which stated "a batch row is one
+      `uint64` and nothing else" and "do not add a per-row amount back as a staleness guard" — both are
+      superseded by mechanism (3)'s packed row. Invariant 8's "its rows are ids" corrected in passing.
+- [ ] Consumer follow-up: swapper-bot (`Batch.rows` packing, `minRbtcOutRate` semantics, and the new
+      skipped-row event), monitoring (alert shape for `DcaManager__PurchaseRowSkipped`), and any repo
+      that encodes `Batch` off-chain.
 
 ## Out of scope
 
-- [ ] Cross-handler isolation in `batchBuyRbtcAcrossHandlers` — raise as a separate open question to
-      the human; do not fold a try/catch redesign into this item without an explicit decision.
-- [ ] Any change to the MoC route (no pool, no rate-based floor to apply — see
-      [`IDcaManager.sol:53`](../../src/interfaces/IDcaManager.sol#L53)) beyond what (1) already gives
-      it for free.
+- [ ] Cross-handler isolation in `batchBuyRbtcAcrossHandlers` — deferred, see above. Keep the loop
+      atomic across handlers: a genuine handler-call failure (not a skipped-to-empty batch, which no
+      longer reverts) still unwinds every earlier handler in the same `batchBuyRbtcAcrossHandlers` call.
 - [ ] Re-opening R64's keying/calldata decision. This item assumes R64's shipped shape
       (`mapping(address token => mapping(uint64 scheduleId => DcaSchedule))`) as its baseline.
 
 ## Files likely touched
 
-- `src/DcaManager.sol`, `src/interfaces/IDcaManager.sol`
-- `src/PurchaseRbtc.sol`, `src/interfaces/IPurchaseRbtc.sol`
-- `src/PurchaseUniswap.sol` (if the rate-based floor composition changes), `src/PurchaseMoc.sol`
-- Every test/fuzz caller that constructs `IDcaManager.Batch` or calls the handler ABI directly
+- `src/DcaManager.sol`, `src/interfaces/IDcaManager.sol` — row decode/skip loop, `Batch.rows`,
+  `DcaManager__PurchaseRowSkipped`.
+- `src/PurchaseRbtc.sol`, `src/interfaces/IPurchaseRbtc.sol` — `minRbtcOut` → `minRbtcOutRate`,
+  rate-against-actual-spend check shared by every route.
+- `src/PurchaseUniswap.sol`, `src/interfaces/IPurchaseUniswap.sol` — swap-time `amountOutMinimum`
+  derived from the same rate against the same actual `stablecoinAmount`.
+- `src/PurchaseMoc.sol` — no redemption-mechanism change; confirms it now receives the same shared
+  rate check as every other route through `PurchaseRbtc`.
+- `AGENTS.md` invariant 9.
+- Every test/fuzz caller that constructs `IDcaManager.Batch` or calls the handler ABI directly (see the
+  file list gathered during implementation for the full set).
 
 ## Required tests
 
-- A schedule paused, withdrawn-from, deleted, or amount-decreased in the block before the tick no
-  longer reverts any other row in the same batch (once (1) ships).
-- A schedule's purchase amount increased in the block before the tick either drops that row (once (3)
-  ships) or is bound by a floor that reflects the amount actually spent, not the stale quoted one
-  (once (2) ships) — reproduce the doubling scenario from this item's Background and assert the
-  post-fix behavior.
-- The oracle floor and the caller-supplied floor continue to compose as `max(...)` and remain
-  independently testable, per R51's existing test shape.
-- `batchBuyRbtcAcrossHandlers` behavior for a skipped-to-empty single-handler batch (does it skip that
-  handler or revert the whole call — decide and test).
+- A schedule paused, withdrawn-from, deleted, or amount-decreased in the block before the tick is
+  skipped with `DcaManager__PurchaseRowSkipped` and no longer reverts any other row in the same batch.
+- A schedule's purchase amount increased in the block before the tick is skipped once its packed
+  `expectedPurchaseAmount` no longer matches storage (mechanism 3), reproducing the doubling scenario
+  from this item's Background and asserting it is skipped rather than purchased at the stale quote.
+- `minRbtcOutRate` bound to actual net spend, tested on both a 6-decimal and an 18-decimal stablecoin.
+- The oracle floor and the caller-supplied rate floor continue to compose as `max(...)` on the Uniswap
+  route and remain independently testable, per R51's existing test shape.
+- The MoC route now enforces a nonzero `minRbtcOutRate` (it previously ignored `minRbtcOut` entirely).
+- A batch that skips every row emits every row's skip event, calls no handler, and does not revert;
+  `batchBuyRbtcAcrossHandlers` continues to the next handler rather than reverting the whole call in
+  that case. A batch submitted with a genuinely empty row array still reverts
+  `DcaManager__EmptyBatchPurchaseArrays`.
+- A genuine handler-level failure (not a skipped-to-empty batch) still unwinds every earlier handler in
+  `batchBuyRbtcAcrossHandlers`, confirming cross-handler atomicity is unchanged.
 
 ## Success criteria
 
-- [ ] No schedule owner's own state change — benign or adversarial — can prevent any other schedule's
+- [x] No schedule owner's own state change — benign or adversarial — can prevent any other schedule's
       purchase in the same tick.
-- [ ] The slippage bound applied to a purchase reflects the amount actually spent on that purchase,
+- [x] The slippage bound applied to a purchase reflects the amount actually spent on that purchase,
       not a snapshot taken before an intervening edit.
-- [ ] No open product decisions remain unresolved in this file once implementation starts.
+- [x] No open product decisions remain unresolved in this file once implementation starts.
 
 ## Reviewer checklist
 
 - [ ] Matches **Scope**; nothing from **Out of scope**.
-- [ ] `AGENTS.md` invariants updated if this changes documented all-or-nothing batch behavior.
+- [ ] `AGENTS.md` invariant 9 updated for the packed row and the MoC scope correction.
 - [ ] Consumer issues opened/updated for every affected repo in the same turn as the PR.
 - [ ] No unrelated refactors; history is reviewable.
 
 ## ABI / deploy / cutover impact
 
-- ABI: depends on which of (1)/(2)/(3) is approved. (1) adds an event. (2) changes `minRbtcOut`
-  semantics without changing its type (still `uint256`, still the final `Batch` field) but is a
-  behavior change every consumer computing it must know about. (3) changes `Batch.scheduleIds` from
-  `uint64[]` to a packed `bytes32[]`, which changes both DcaManager purchase selectors.
+- ABI: `Batch.scheduleIds` (`uint64[]`) → `Batch.rows` (`bytes32[]`, packed `(uint64 scheduleId, uint96
+  expectedPurchaseAmount)`); `Batch.minRbtcOut` → `Batch.minRbtcOutRate` (still `uint256`, new units and
+  semantics); `IPurchaseRbtc.batchBuyRbtc`'s `minRbtcOut` parameter renamed and reinterpreted the same
+  way; new event `DcaManager__PurchaseRowSkipped(address indexed token, uint64 indexed scheduleId,
+  uint8 reason)`. Both `batchBuyRbtc` and `batchBuyRbtcAcrossHandlers` selectors change.
 - Scripts: none expected.
-- Cutover: the swapper bot must change how it composes a batch under (2) and, if approved, (3). Open
+- Cutover: the swapper bot must change how it composes a batch (pack `expectedPurchaseAmount` per row,
+  compute `minRbtcOutRate` instead of an absolute quote-derived figure) and must handle
+  `DcaManager__PurchaseRowSkipped` as an expected, non-error outcome rather than a call failure. Open
   or update `swapper-bot#7` (already carries R64-era context) and any monitoring issue that decodes
-  `minRbtcOut` or the batch row shape.
+  `minRbtcOut`/`minRbtcOutRate` or the batch row shape.
