@@ -40,29 +40,36 @@ interface IDcaManager {
 
     /// @notice One handler's purchase batch.
     /// @dev Every row shares this batch's `token` and `routeIndex`, which resolve to one handler. A row
-    ///      is one `uint64` id and nothing else: `scheduleIds` is the only array, and the stablecoin it
-    ///      is paired with completes the storage key for every row at once, so it is sent once for the
-    ///      batch rather than once per row. Neither the buyer nor the amount is passed in — both are
-    ///      read from the schedule about to be debited, so a batch cannot spend an amount the schedule
-    ///      does not hold and cannot credit rBTC to an account the schedule does not name. An id that
-    ///      addresses no live schedule of this stablecoin reads as an empty struct and reverts.
-    ///      `batchBuyRbtc` takes one batch; `batchBuyRbtcAcrossHandlers` takes several.
-    ///      `minRbtcOut` is the caller's minimum for the batch as a whole, in rBTC/WRBTC wei
-    ///      (18 decimals) whatever the stablecoin's decimals, and is compared against the rBTC the
-    ///      handler measures itself receiving, so it binds on every purchase venue. What sits underneath
-    ///      it does not. A Uniswap route applies an oracle floor of its own and swaps at
-    ///      `max(minRbtcOut, that floor)`, so this value can only tighten it. A MoC route has no floor
-    ///      to compose with, because DOC is redeemed at Money on Chain's own price rather than swapped
-    ///      against a pool, leaving no slippage surface for a floor to guard. Either way this is a
+    ///      is one packed `bytes32`: the high 64 bits are the schedule id, the low 96 bits are the
+    ///      `expectedPurchaseAmount` the swapper composed the batch against, and the remaining 96 bits
+    ///      are zero. `rows` is the only array, and the stablecoin it is paired with completes the
+    ///      storage key for every row at once, so it is sent once for the batch rather than once per
+    ///      row. Neither the buyer nor the amount actually spent is passed in — both are read from the
+    ///      schedule about to be debited, so a batch cannot spend an amount the schedule does not hold
+    ///      and cannot credit rBTC to an account the schedule does not name. `expectedPurchaseAmount` is
+    ///      a match check, not a substitute value: a row whose schedule no longer has that exact
+    ///      `purchaseAmount` is skipped (see `DcaManager__PurchaseRowSkipped`) rather than purchased at
+    ///      a size the swapper never saw. An id that addresses no live schedule of this stablecoin is
+    ///      likewise skipped rather than reverting the batch. `batchBuyRbtc` takes one batch;
+    ///      `batchBuyRbtcAcrossHandlers` takes several.
+    ///      `minRbtcOutRate` is the caller's minimum for the batch as a whole, expressed as rBTC/WRBTC
+    ///      wei (18 decimals) per raw unit of this batch's stablecoin, scaled by `1e18` — not an
+    ///      absolute rBTC figure. It is applied to the stablecoin the handler actually measures itself
+    ///      spending on this tick, never to a pre-computed or planned amount, which is what keeps the
+    ///      bound meaningful when a schedule's `purchaseAmount` changed since the swapper quoted it. The
+    ///      required minimum, `minRbtcOutRate * actualStablecoinSpent / 1e18` rounded up, is compared
+    ///      against the rBTC the handler measures itself receiving, so it binds on every purchase venue,
+    ///      MoC included. What sits underneath it does not. A Uniswap route additionally applies an
+    ///      oracle floor of its own, derived the same way from the same actual spend, and swaps at
+    ///      `max(thatRateApplied, that floor)`, so this value can only tighten it. Either way this is a
     ///      liveness bound an honest swapper sets against a stale quote or adverse execution, and never
     ///      a governance limit **on** the swapper: the swapper picks the value, so `0` is always
-    ///      available to it. What still holds when it does is the oracle floor on a Uniswap route, and
-    ///      the redemption price itself on a MoC one.
+    ///      available to it. What still holds when it does is the oracle floor on a Uniswap route.
     struct Batch {
-        uint64[] scheduleIds;
+        bytes32[] rows;
         address token;
         uint256 routeIndex;
-        uint256 minRbtcOut;
+        uint256 minRbtcOutRate;
     }
 
     /**
@@ -81,9 +88,30 @@ interface IDcaManager {
         uint64 scheduleNonce; // Last assigned schedule id; 0 before the first schedule is created
     }
 
+    /// @notice Why one batch row was skipped instead of purchased.
+    /// @dev Every reason here is a state a schedule's own owner can reach between the swapper's query
+    ///      and its transaction landing — by accident or adversarially — which is exactly the class of
+    ///      front-run this type exists to make non-fatal to every other row in the batch.
+    enum PurchaseRowSkipReason {
+        InexistentSchedule,
+        SchedulePaused,
+        PeriodNotElapsed,
+        BalanceInsufficient,
+        PurchaseAmountMismatch
+    }
+
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
+    /// @notice A batch row was skipped instead of purchased; every other row in the batch is unaffected.
+    /// @dev Fires for a row whose schedule state changed out from under the swapper's snapshot: deleted
+    ///      (`InexistentSchedule`), paused, not yet due, short of balance, or carrying a stale
+    ///      `expectedPurchaseAmount` (`PurchaseAmountMismatch`, see `Batch.rows`). Does not fire for a
+    ///      route-index mismatch, which reverts the whole batch instead — see
+    ///      `DcaManager__RouteIndexMismatch`.
+    event DcaManager__PurchaseRowSkipped(
+        address indexed token, uint64 indexed scheduleId, PurchaseRowSkipReason reason
+    );
     /// @notice A schedule's stablecoin principal changed after a deposit, withdrawal, or purchase debit.
     event DcaManager__TokenBalanceUpdated(address indexed token, uint64 indexed scheduleId, uint256 amount);
     /// @notice The caller replaced a schedule's periodic purchase amount.
@@ -152,18 +180,19 @@ interface IDcaManager {
     error DcaManager__MinPurchasePeriodMustBeAtLeastOneDay();
     /// @notice Purchase amount exceeds the schedule's current `tokenBalance`.
     error DcaManager__PurchaseAmountExceedsBalance(address token, uint256 purchaseAmount, uint256 tokenBalance);
-    /// @notice The UTC day of `lastPurchaseTimestamp + purchasePeriod` has not started.
-    error DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed(uint256 timeRemaining);
     /// @notice No live schedule of this stablecoin holds this id. The pair is the storage key, so a
     ///         right id named with the wrong stablecoin reads the same as one that never existed.
+    /// @dev Reverts every direct schedule lookup (`_callersSchedule`, `getDcaSchedule`). The purchase
+    ///      path treats a batch row naming no live schedule as
+    ///      `PurchaseRowSkipReason.InexistentSchedule` and skips it instead of reverting.
     error DcaManager__InexistentSchedule(address token, uint64 scheduleId);
     /// @notice The schedule exists but belongs to somebody else. `owner` is who it belongs to.
     error DcaManager__NotScheduleOwner(address token, uint64 scheduleId, address owner);
-    /// @notice The schedule's remaining principal cannot cover one purchase.
-    error DcaManager__ScheduleBalanceNotEnoughForPurchase(address token, uint64 scheduleId, uint256 remainingBalance);
     /// @notice Parallel arrays (batch purchase or withdraw-all pairs) have different lengths.
     error DcaManager__ArraysLengthMismatch();
-    /// @notice `batchBuyRbtc` was called with empty id/buyer arrays.
+    /// @notice `batchBuyRbtc` was called with an empty `Batch.rows`.
+    /// @dev Only a literally empty input array reverts. A non-empty array that skips down to zero
+    ///      purchasable rows does not revert; see `DcaManager__PurchaseRowSkipped`.
     error DcaManager__EmptyBatchPurchaseArrays();
     /// @notice `batchBuyRbtcAcrossHandlers` was called without any handler batches.
     error DcaManager__EmptyHandlerBatches();
@@ -181,9 +210,6 @@ interface IDcaManager {
     error DcaManager__OperationsAdminIsNotAContract(address operationsAdmin);
     /// @notice Governance paused new deposits for this token and route.
     error DcaManager__DepositsPaused(address token, uint256 routeIndex);
-    /// @notice A named schedule is purchase-paused. That reverts `batchBuyRbtc`, and if the row is
-    ///         in `batchBuyRbtcAcrossHandlers`, every handler in the bundle.
-    error DcaManager__SchedulePaused(address token, uint64 scheduleId);
     /// @notice The caller has accrued no interest on this schedule's route, so there is nothing to credit.
     error DcaManager__NoInterestToTopUpWith(address token, uint256 routeIndex);
     /// @notice The requested top-up is more interest than the caller has accrued on this route.
@@ -298,8 +324,9 @@ interface IDcaManager {
      * @dev A paused schedule keeps its funds on its route and stays open to deposits, amount and
      *      period edits, withdrawals, interest and rBTC claims, and deletion. Setting the state it
      *      already holds is a no-op and emits nothing, so every emitted event is a real transition.
-     *      A paused row in `batchBuyRbtc` reverts that handler's batch. The same row in
-     *      `batchBuyRbtcAcrossHandlers` reverts every handler in the bundle.
+     *      A paused row named in `batchBuyRbtc` or `batchBuyRbtcAcrossHandlers` is skipped
+     *      (`DcaManager__PurchaseRowSkipped`, `PurchaseRowSkipReason.SchedulePaused`) rather than
+     *      failing the batch it is in.
      */
     function setSchedulePaused(address token, uint64 scheduleId, bool paused) external;
 
@@ -307,14 +334,17 @@ interface IDcaManager {
      * @notice Buy rBTC for every named due schedule on one handler.
      * @param batch One handler's purchase batch. Every row must share `token` and `routeIndex`.
      * @dev Only a swapper on the OperationsAdmin allowlist may call.
-     *      Reverts `DcaManager__SchedulePaused` if any named schedule is paused, which fails the
-     *      whole batch (and, in `batchBuyRbtcAcrossHandlers`, every handler in the bundle): the
-     *      swapper must filter paused schedules out before composing the call.
-     *      A row of another stablecoin cannot be debited here at all: the batch's `token` is half
-     *      the storage key, so such a row addresses no schedule and reverts
-     *      `DcaManager__InexistentSchedule`. A row on another route of the same stablecoin is caught
-     *      by comparison (`DcaManager__RouteIndexMismatch`).
-     *      If the handler measures less rBTC than `batch.minRbtcOut`, it reverts
+     *      A row that is paused, deleted, short of balance, not yet due, or whose packed
+     *      `expectedPurchaseAmount` no longer matches the schedule's stored `purchaseAmount` is
+     *      skipped — `DcaManager__PurchaseRowSkipped` with the matching `PurchaseRowSkipReason` — and
+     *      every other row in the batch still purchases. If every row is skipped, no handler is called
+     *      and the call does not revert. A row of another stablecoin cannot be debited here at all: the
+     *      batch's `token` is half the storage key, so such a row addresses no schedule and is skipped
+     *      as `InexistentSchedule` the same as a deleted one. A row on another route of the same
+     *      stablecoin is not owner-triggered and is not a skip case: it reverts the whole batch
+     *      (`DcaManager__RouteIndexMismatch`), since no setter can move a schedule's route and a
+     *      mismatch here is a swapper-side composition error. If the handler measures less rBTC than
+     *      `batch.minRbtcOutRate` applied to what it actually spent, it reverts
      *      `PurchaseRbtc__BelowSwapperMinimum` and the whole batch — schedule debits included —
      *      rolls back.
      */
@@ -324,10 +354,12 @@ interface IDcaManager {
      * @notice Buy rBTC through several handlers atomically in one transaction.
      * @param batches Each element is one handler's purchase batch (`token` + `routeIndex`).
      * @dev Authenticates the caller once, then purchases each handler's batch in order through the
-     *      same one-handler helper. A failure in any batch — including a paused row or a batch that
-     *      bought less than its own `minRbtcOut` — reverts every handler, so a later batch's minimum
-     *      undoes an earlier handler's purchase. `batchBuyRbtc` remains available for one-handler
-     *      retries (same `Batch` type).
+     *      same one-handler helper. A batch that skips down to zero purchasable rows does not revert,
+     *      so the loop simply moves on to the next handler. A genuine failure in any batch — a route
+     *      mismatch, a handler-level revert, or a batch that bought less than its own
+     *      `minRbtcOutRate` applied to actual spend — reverts every handler, so a later batch's
+     *      failure undoes an earlier handler's purchase. `batchBuyRbtc` remains available for
+     *      one-handler retries (same `Batch` type).
      */
     function batchBuyRbtcAcrossHandlers(Batch[] calldata batches) external;
 

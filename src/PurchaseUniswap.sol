@@ -14,6 +14,7 @@ import {IOperationsAdmin} from "./interfaces/IOperationsAdmin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @title PurchaseUniswap
@@ -42,7 +43,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     ///      and an 18-decimal one both reach the oracle's units. Above 18 the constructor reverts.
     uint256 internal immutable i_stablecoinToUsdScale;
     /// @notice The swap-time oracle floor: the fraction of oracle-implied rBTC the router must pay.
-    /// @dev Deliberately loose. It is the bound that holds when the caller's `minRbtcOut` is absent,
+    /// @dev Deliberately loose. It is the bound that holds when the caller's `minRbtcOutRate` is absent,
     /// stale, or hostile, not the operational tightness of a healthy batch — the swapper derives that
     /// from a live quote per batch and can only tighten from here.
     uint128 internal s_amountOutMinimumPercent;
@@ -282,8 +283,10 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     /**
      * @dev Swap net stablecoin for WRBTC and return the handler's WRBTC-balance delta. The router's return
      *      value is treated as success/failure only; the measured delta is the amount we can credit.
-     *      `amountOutMinimum` is `max(amountOutLowerBound, minRbtcOut)`, so a caller can tighten the swap
-     *      but never loosen it below the configured floor.
+     *      `amountOutMinimum` is `max(amountOutLowerBound, callerMinimum)`, where `callerMinimum` is
+     *      `minRbtcOutRate * stablecoinAmount / 1e18` rounded up — the caller's rate applied to the same
+     *      actual input this call is about to swap, not a pre-computed absolute figure — so a caller can
+     *      tighten the swap but never loosen it below the configured floor.
      *
      *      `exactInput` states the input the caller asked to spend, not the input the pools took: a V3 pool
      *      stops at its own price limit, so a thin or drained pool can fill part of the request and still
@@ -295,7 +298,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      *      compared against their own pre-swap values rather than zero, so tokens anyone can send to a
      *      public contract cannot block purchases.
      */
-    function _purchaseRbtc(uint256 stablecoinAmount, uint256 minRbtcOut)
+    function _purchaseRbtc(uint256 stablecoinAmount, uint256 minRbtcOutRate)
         internal
         override
         returns (uint256 amountOut)
@@ -304,7 +307,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         TransferHelper.safeApprove(address(purchaseToken), address(i_swapRouter02), stablecoinAmount);
 
         uint256 amountOutLowerBound = _getAmountOutLowerBound(stablecoinAmount);
-        uint256 amountOutMinimum = minRbtcOut > amountOutLowerBound ? minRbtcOut : amountOutLowerBound;
+        uint256 callerMinimum = Math.mulDiv(minRbtcOutRate, stablecoinAmount, 1 ether, Math.Rounding.Ceil);
+        uint256 amountOutMinimum = callerMinimum > amountOutLowerBound ? callerMinimum : amountOutLowerBound;
 
         IV3SwapRouter.ExactInputParams memory params = IV3SwapRouter.ExactInputParams({
             path: s_swapPath,

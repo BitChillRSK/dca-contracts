@@ -38,7 +38,9 @@ interface IPurchaseRbtc {
     /// @notice The batch retrieved no more stablecoin than the fee it owes, so there is nothing left to spend.
     error PurchaseRbtc__StablecoinRetrievedBelowFee(uint256 stablecoinRetrieved, uint256 aggregatedFee);
     /// @notice The measured rBTC this batch bought is below the minimum the caller attached to it.
-    error PurchaseRbtc__BelowSwapperMinimum(uint256 rbtcReceived, uint256 minRbtcOut);
+    /// @dev `requiredMinimum` is `minRbtcOutRate * actualStablecoinSpent / 1e18`, rounded up — the rate
+    ///      applied to what this batch actually spent, not a pre-computed absolute figure.
+    error PurchaseRbtc__BelowSwapperMinimum(uint256 rbtcReceived, uint256 requiredMinimum);
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
@@ -49,20 +51,24 @@ interface IPurchaseRbtc {
      * @param buyers Users to buy for. An address may appear more than once.
      * @param scheduleIds Schedule id for each row, used only in `RbtcBought`.
      * @param purchaseAmounts Gross stablecoin each row spends before the protocol fee.
-     * @param minRbtcOut Minimum rBTC this batch as a whole must buy, in rBTC/WRBTC wei (18 decimals)
-     *        whatever the stablecoin's decimals. `0` disables this check.
+     * @param minRbtcOutRate Minimum rBTC this batch as a whole must buy per raw unit of stablecoin
+     *        actually spent, in rBTC/WRBTC wei (18 decimals) per stablecoin wei, scaled by `1e18`.
+     *        `0` disables this check.
      * @dev Called only by DcaManager after it has debited each schedule. Fees are aggregated and
-     *      transferred once; each buyer is credited a pro-rata share of the measured rBTC. `minRbtcOut`
-     *      is compared against the rBTC this handler measures itself receiving, so it applies to every
-     *      purchase venue and never trusts an integrator return value. Where the venue applies a floor of
-     *      its own — `PurchaseUniswap` does, `PurchaseMoc` does not — that floor is enforced
-     *      independently and the stricter of the two decides the outcome.
+     *      transferred once; each buyer is credited a pro-rata share of the measured rBTC.
+     *      `minRbtcOutRate` is applied to the stablecoin this handler actually measures itself
+     *      spending — never to a planned or pre-fee figure — and the resulting minimum is compared
+     *      against the rBTC this handler measures itself receiving, so it applies to every purchase
+     *      venue and never trusts an integrator return value. Where the venue applies a floor of its
+     *      own — `PurchaseUniswap` does, derived from the same rate against the same actual spend;
+     *      `PurchaseMoc` has no venue floor of its own but still enforces this same shared check — the
+     *      stricter of the two decides the outcome.
      */
     function batchBuyRbtc(
         address[] memory buyers,
         uint64[] memory scheduleIds,
         uint256[] memory purchaseAmounts,
-        uint256 minRbtcOut
+        uint256 minRbtcOutRate
     ) external;
 
     /**

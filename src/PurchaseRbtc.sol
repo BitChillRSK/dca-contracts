@@ -6,6 +6,7 @@ import {DcaManagerAccessControl} from "./DcaManagerAccessControl.sol";
 import {FeeHandler} from "./FeeHandler.sol";
 import {StablecoinSource} from "./StablecoinSource.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @title PurchaseRbtc
@@ -39,7 +40,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
         address[] memory buyers,
         uint64[] memory scheduleIds,
         uint256[] memory purchaseAmounts,
-        uint256 minRbtcOut
+        uint256 minRbtcOutRate
     ) external override onlyDcaManager {
         uint256[] memory netStablecoinAmountsToSpend;
         uint256 totalNetStablecoinPlanned;
@@ -67,13 +68,19 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
             _transferFee(purchaseToken, aggregatedFee);
         }
 
-        uint256 totalPurchasedRbtc = _purchaseRbtc(totalStablecoinAmountToSpend, minRbtcOut);
+        uint256 totalPurchasedRbtc = _purchaseRbtc(totalStablecoinAmountToSpend, minRbtcOutRate);
         if (totalPurchasedRbtc == 0) revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(purchaseToken));
-        // Checked against the rBTC we measured ourselves receiving, so the bound holds on every purchase
-        // venue and never trusts an integrator return value. Equality passes. Where the venue applies a
-        // floor of its own, it is enforced there and the stricter of the two decides.
-        if (totalPurchasedRbtc < minRbtcOut) {
-            revert PurchaseRbtc__BelowSwapperMinimum(totalPurchasedRbtc, minRbtcOut);
+        // The rate is applied to the stablecoin actually spent on this tick, measured just above, never
+        // to a pre-computed or planned amount: that is what keeps the bound meaningful when a schedule's
+        // purchaseAmount changed since the swapper quoted minRbtcOutRate. Checked against the rBTC we
+        // measured ourselves receiving, so the bound holds on every purchase venue — MoC included — and
+        // never trusts an integrator return value. Rounding the requirement up means the floor is never
+        // accidentally weaker than configured. Equality passes. Where the venue applies a floor of its
+        // own, it is enforced there and the stricter of the two decides.
+        uint256 requiredMinimum =
+            Math.mulDiv(minRbtcOutRate, totalStablecoinAmountToSpend, 1 ether, Math.Rounding.Ceil);
+        if (totalPurchasedRbtc < requiredMinimum) {
+            revert PurchaseRbtc__BelowSwapperMinimum(totalPurchasedRbtc, requiredMinimum);
         }
 
         uint256 numOfPurchases = buyers.length;
@@ -140,6 +147,14 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
 
     /**
      * @dev Spend `stablecoinAmount` of net stablecoin and return only measured rBTC or WRBTC received.
+     * @param minRbtcOutRate rBTC/WRBTC wei per raw stablecoin wei, 1e18-scaled. A route with a swap-time
+     *        floor of its own (Uniswap) derives an absolute minimum from this rate against
+     *        `stablecoinAmount` and enforces it during the swap; a route with no such floor (MoC) simply
+     *        ignores it here, since the shared post-purchase check in `batchBuyRbtc` above still applies
+     *        the same rate against the same measured spend.
      */
-    function _purchaseRbtc(uint256 stablecoinAmount, uint256 minRbtcOut) internal virtual returns (uint256 rbtcReceived);
+    function _purchaseRbtc(uint256 stablecoinAmount, uint256 minRbtcOutRate)
+        internal
+        virtual
+        returns (uint256 rbtcReceived);
 }
