@@ -8,6 +8,10 @@ import {PurchaseMoc} from "src/PurchaseMoc.sol";
  * @title TropykusDocHandlerMoc
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Tropykus-lent DOC + MoC. Legacy only: no live deploy path.
+ * @dev Constructor-only leaf: the funding base supplies the deposit and share accounting, and
+ *      `PurchaseMoc` the purchase route. DOC is redeemed at Money on Chain's own price rather
+ *      than swapped against a pool, so no oracle floor or slippage bound applies here — the
+ *      redemption price itself is the whole of the execution guarantee.
  */
 contract TropykusDocHandlerMoc is TropykusErc20Handler, PurchaseMoc {
     /**

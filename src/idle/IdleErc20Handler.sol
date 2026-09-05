@@ -10,10 +10,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 /**
  * @title IdleErc20Handler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Holds deposited stablecoin on the handler instead of minting shares.
- * @dev Per-user idle balances clamp withdrawals and single purchases so a DcaManager
- *      accounting bug cannot spend another user's pooled DOC. Batch purchases revert instead
- *      of clamping, because PurchaseRbtc splits rBTC by the original planned weights.
+ * @notice Base for the handlers that hold their stablecoin instead of lending it; each leaf adds a
+ *         purchase route.
  */
 abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, StablecoinSource {
     /*//////////////////////////////////////////////////////////////
@@ -98,9 +96,9 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
     }
 
     /**
-     * @dev Retrieve `amount` of the user's idle stablecoin for the purchase path.
-     *      Lending handlers redeem their shares to pull DOC onto the handler; idle DOC is
-     *      already here, so this only debits the mapping.
+     * @dev Retrieve `amount` of the user's idle stablecoin for the purchase path. A lending handler
+     *      redeems shares to pull the stablecoin onto itself first; an idle one already holds it, so
+     *      this only debits the mapping.
      */
     function _retrieveStablecoin(address user, uint256 amount) internal virtual override returns (uint256) {
         return _debitIdleBalance(user, amount);

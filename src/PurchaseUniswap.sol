@@ -19,11 +19,6 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
  * @title PurchaseUniswap
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Uniswap V3 purchase route: swap stablecoin for WRBTC, unwrap on withdraw.
- * @dev Min-out is built from the MoC BTC/USD oracle under a $1 peg assumption: one unit of the handler's
- *      stablecoin is taken to be one USD. BitChill only lists 1:1 stables (DOC, USDRIF, USDT0) and does not
- *      run a per-stablecoin USD feed. If a listed stablecoin depegs downwards, the pool prices it below the
- *      oracle-implied floor and the swap reverts; nothing here redeems a depegged stablecoin at $1, and a
- *      persistent depeg is handled by delisting the token, not by the purchase path.
  */
 abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     using SafeCast for uint256;
@@ -43,7 +38,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     /// @notice decimals of the MoC BTC/USD price. Hardcoded because the oracle exposes no `decimals()`.
     uint256 internal constant ORACLE_DECIMALS = 18;
     /// @notice `10 ** (ORACLE_DECIMALS - stablecoin decimals)`, which lifts a stablecoin amount into the oracle's USD units
-    /// @dev Fixed at deploy because the handler's stablecoin is immutable. USDT0 is 6 decimals, DOC and USDRIF 18.
+    /// @dev Fixed at deploy because the handler's stablecoin is immutable, so a 6-decimal stablecoin
+    ///      and an 18-decimal one both reach the oracle's units. Above 18 the constructor reverts.
     uint256 internal immutable i_stablecoinToUsdScale;
     /// @notice The swap-time oracle floor: the fraction of oracle-implied rBTC the router must pay.
     /// @dev Deliberately loose. It is the bound that holds when the caller's `minRbtcOut` is absent,

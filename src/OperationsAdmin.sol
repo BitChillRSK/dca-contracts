@@ -11,15 +11,15 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 /**
  * @title OperationsAdmin
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Governance registry for route classes, token handlers, and swappers.
- * @dev One owner. Route indexes are add-only: a class is recorded once and is never
- *      mutated or deregistered. Old routes stay resolvable so users can exit the handler
- *      that holds their funds. `(token, routeIndex)` handler assignment is likewise
- *      add-only, and a handler address may be assigned at most once: none of a handler's
- *      per-user accounting is route-keyed, so sharing one instance across two pairs would let
- *      one route's principal be read as another's yield. There is no cooperative migration on
- *      these handler versions. The one mutable flag here is a per-pair deposit pause, a circuit
- *      breaker that blocks new inflows without touching purchases or any exit path.
+ * @notice Registry through which every route class, handler assignment, and swapper check is
+ *         resolved.
+ * @dev Governance surface, stated here so the deployed contract is readable on its own;
+ *      `IOperationsAdmin` carries the same rules with the reasoning behind them. Every write but one
+ *      is irreversible: a route index is classified once, a `(token, routeIndex)` pair is assigned a
+ *      handler once, and a handler address is accepted for at most one pair. Nothing is deregistered
+ *      or remapped, so a retired route stays resolvable and its users keep an exit. The single
+ *      mutable flag is the per-pair deposit pause, which blocks new inflows and leaves purchases and
+ *      every exit path open.
  */
 contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
     using SafeCast for uint256;
