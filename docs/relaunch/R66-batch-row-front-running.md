@@ -128,6 +128,91 @@ of scope**). This item's skip-based row filtering already removes most of the *p
 question — a single owner's stale edit no longer forces a revert at all — but a genuine venue failure
 (oracle down, router revert) is untouched and still takes down every earlier handler in the same call.
 
+## Decided (2026-09-05, second pass): the funding shortfall closes the same gap
+
+Review of the first pass found that mechanisms (1)–(3) do not actually deliver the guarantee they
+claim. Every check they added reads the **schedule**, and a schedule's principal is not the same book
+as the funds behind it. A lending handler credits shares rounded down on deposit and debits them
+rounded up on spend, so a schedule at its tail — balance exactly one purchase — can want one share more
+than its owner holds; and because shares are pooled per buyer rather than per schedule, one schedule's
+withdrawal moves what another one's purchase can spend. R43 knew about this and decided to keep it as a
+batch revert, on the grounds that the swapper filters the tail before batching. R66's threat model is
+exactly what breaks that argument: **the owner reaches this state after the bot's snapshot**, and the
+schedule balance, the purchase amount and the due date the manager checks are all still precisely what
+was quoted. So one buyer's sub-wei rounding dust reverted every other buyer's purchase in the tick.
+
+**How reachable it is, measured rather than asserted.** Accrued interest covers the rounding by orders
+of magnitude — one second of it is worth ~4×10¹³ shares against a gap of one or two — so no user meets
+this by accident while their position is earning. It is the *owner* who decides when that cushion goes
+away: `withdrawAllAccumulatedInterest` sweeps it to a rounding remainder, and each
+withdraw-and-redeposit round trip after that burns one more share (the withdrawal's debit rounds up,
+the deposit's mint rounds down) while putting the principal straight back, so the ledger the manager
+sees never moves. On the mock lanes that is one call plus zero round trips on LayerBank and four on
+Sovryn and Tropykus — all of which a contract owning the schedules does in one transaction ahead of the
+tick, for gas and no profit. `test/unit/BatchRowFundingSkipTest.t.sol` runs exactly that sequence.
+
+The schedule-creation variant is **not** reachable: BitChill's off-chain indexer only reads finalized
+blocks (12 on Rootstock), so a schedule created in the tick's own block is never in the batch it would
+front-run.
+
+**The decision.** A row the handler cannot fund is a **skip**, on the same footing as the five schedule
+states already skipped, with a sixth reason `FundingInsufficient`. This supersedes R43's batch-revert
+decision for batches. It does **not** clamp, forgive or subsidise the shortfall: the row keeps its
+principal, buys nothing, pays no fee and is credited no rBTC, and the owner's exits are unchanged
+(withdraw the rest, deposit more, or lower the purchase amount). Clamping stays rejected for the reason
+R43 gave and one more: a short row would still carry its original weight through the allocation, so it
+would be paid for out of the other buyers' stablecoin.
+
+Three consequences follow, and they are the whole cost of the decision:
+
+1. **The manager cannot know which rows funded until the handler tells it**, because the funds are the
+   handler's book, pooled per buyer. So `IPurchaseRbtc.batchBuyRbtc` returns `uint256[] unfundedRows` —
+   the ascending indexes of the rows it could not fund, and an empty array in the usual case where it
+   funded all of them — and `_batchBuyRbtc` becomes *check every row, call the handler once, then debit
+   the rows that funded*. Nothing is written before the call: an optimistic debit would have to be taken
+   back, and a dropped row would have consumed a period it never bought in. Handlers filter in place,
+   before any fee is charged or anything bought, and pass zero rows over untouched, so no array is ever
+   compacted and the indexes line up on both sides.
+2. **Both purchase entry points take `nonReentrant`.** Schedule writes now follow a handler call, so the
+   exception invariant 6 carved out for the purchase paths is gone. The guard is what keeps an owner
+   mutation, or a second purchase, out of the window between the checks and the commit.
+3. **A batch's rows must be in strictly increasing schedule-id order** (`DcaManager__BatchRowsNotSorted`,
+   naming the row that broke it). With the checks no longer interleaved with the effects, the same
+   schedule listed twice would pass twice and buy twice; sorting makes that unrepresentable for one
+   comparison per row and gives a batch a canonical order. Skipped rows hold their place in it. This is a
+   swapper composition rule, not an owner-triggerable state, so it reverts like the route mismatch does.
+   Across `batchBuyRbtcAcrossHandlers` no rule is needed: each inner batch commits before the next one's
+   checks run, so a repeat in a later batch reads the updated timestamp and skips as `PeriodNotElapsed`.
+
+Two smaller things fall out of the same pass. Lending now sums each row's own rounded-up share debit
+instead of slicing one aggregate figure pro rata, which makes the shares redeemed exactly the shares
+taken off the buyers — the old two-stage rounding asked them for slightly more than it burned. And
+`TokenLending__InsufficientShares` and `IdleErc20Handler__InsufficientIdleBalance` are removed: the
+batch path was the only thrower of either.
+
+**Gas.** `test/gas/R64BatchGasBenchmark.t.sol` design A is `src/DcaManager` on the stub handler; running
+it on this branch and on the parent commit gives the operator's bill for one steady-state tick,
+execution plus Rootstock calldata, with nothing skipped:
+
+| rows | before | after | Δ | Δ % |
+|---:|---:|---:|---:|---:|
+| 1 | 30,381 | 36,377 | +5,996 | +19.7% |
+| 5 | 88,625 | 93,538 | +4,913 | +5.5% |
+| 10 | 167,069 | 173,126 | +6,057 | +3.6% |
+| 50 | 794,802 | 810,020 | +15,218 | +1.9% |
+| 200 | 3,152,505 | 3,202,077 | +49,572 | +1.6% |
+
+Calldata is unchanged — the `Batch` shape is the same. **5,207 gas of the fixed cost is `nonReentrant`
+alone**, measured by removing only that modifier; the rest is ~790 fixed and ~220 a row (the sort
+comparison, the commit pass, and the handler's filter pass). Returning the unfunded-row indexes rather
+than echoing a per-row answer is what keeps the marginal cost at ~220 instead of ~410 a row. The guard's
+5,207 is a cold storage slot written and cleared; OpenZeppelin's `ReentrancyGuardTransient` would make
+it ~200 on this Cancun target and would pay off on every user call too, but swapping the protocol's
+reentrancy primitive is its own change and is deliberately **not** in this PR.
+
+Reproduce with `forge test --match-path 'test/gas/R64BatchGasBenchmark.t.sol' -vv`, here and on the
+parent commit, and read row A.
+
 <details>
 <summary>Original candidate framing (superseded by the Decided section above)</summary>
 
@@ -175,6 +260,12 @@ deciding it silently inside this item.
 ## Scope
 
 - [x] All of (1), (2), and (3) above.
+- [x] A row the handler cannot fund from the buyer's own book is skipped rather than reverting the
+      batch, with a sixth skip reason `FundingInsufficient`. Supersedes R43's batch-revert decision;
+      `docs/relaunch/R43-dex-path-review.md` updated to point here.
+- [x] `nonReentrant` on both purchase entry points, and strictly increasing row ids
+      (`DcaManager__BatchRowsNotSorted`) — both consequences of committing schedule debits after the
+      handler result. Invariant 6 in `AGENTS.md` updated.
 - [x] Apply the caller-rate check (2) to the MoC route as well as Uniswap — see the scope correction
       above.
 - [x] Update `Batch` NatSpec and invariant 9 in `AGENTS.md`, which stated "a batch row is one
@@ -202,7 +293,10 @@ deciding it silently inside this item.
   derived from the same rate against the same actual `stablecoinAmount`.
 - `src/PurchaseMoc.sol` — no redemption-mechanism change; confirms it now receives the same shared
   rate check as every other route through `PurchaseRbtc`.
-- `AGENTS.md` invariant 9.
+- `src/StablecoinSource.sol`, `src/LendingErc20Handler.sol`, `src/idle/IdleErc20Handler.sol`,
+  `src/interfaces/ITokenLending.sol`, `src/idle/IIdleErc20Handler.sol` — the funding hook filters rows
+  and reports the ones it dropped; the two shortfall errors it used to throw are removed.
+- `AGENTS.md` invariants 6 and 9; `docs/relaunch/R43-dex-path-review.md`.
 - Every test/fuzz caller that constructs `IDcaManager.Batch` or calls the handler ABI directly (see the
   file list gathered during implementation for the full set).
 
@@ -223,6 +317,15 @@ deciding it silently inside this item.
   `DcaManager__EmptyBatchPurchaseArrays`.
 - A genuine handler-level failure (not a skipped-to-empty batch) still unwinds every earlier handler in
   `batchBuyRbtcAcrossHandlers`, confirming cross-handler atomicity is unchanged.
+- A buyer who starves their own funding between the swapper's snapshot and the tick loses that row and
+  nobody else's: the bystander buys, the skipped row keeps its balance, timestamp, shares and rBTC, and
+  pays no fee. The pre-mutation batch is asserted to work first, so the test cannot pass vacuously.
+- `BatchTailScheduleTest`'s R43 pins are flipped, not deleted, as their own header asked: the tail row
+  is skipped and a healthy buyer in the same batch still buys. Handler-level shortfall tests on all
+  three lending leaves and both idle leaves assert the row is dropped, nothing is redeemed against it,
+  and its book is untouched.
+- Duplicate and descending rows revert `DcaManager__BatchRowsNotSorted`, including when the offending
+  row would have been skipped anyway.
 
 ## Success criteria
 
@@ -230,12 +333,17 @@ deciding it silently inside this item.
       purchase in the same tick.
 - [x] The slippage bound applied to a purchase reflects the amount actually spent on that purchase,
       not a snapshot taken before an intervening edit.
+- [x] No schedule owner's own state change can prevent another schedule's purchase **through the
+      funding book either**, not only through the schedule ledger.
+- [x] The batch gas cost of that guarantee is measured against the parent commit and recorded above.
 - [x] No open product decisions remain unresolved in this file once implementation starts.
 
 ## Reviewer checklist
 
 - [ ] Matches **Scope**; nothing from **Out of scope**.
-- [ ] `AGENTS.md` invariant 9 updated for the packed row and the MoC scope correction.
+- [ ] `AGENTS.md` invariant 9 updated for the packed row and the MoC scope correction, and invariant 6
+      for the purchase-path guard.
+- [ ] The gas table above reproduces on the reviewer's machine from both revisions.
 - [ ] Consumer issues opened/updated for every affected repo in the same turn as the PR.
 - [ ] No unrelated refactors; history is reviewable.
 
@@ -245,10 +353,20 @@ deciding it silently inside this item.
   expectedPurchaseAmount)`); `Batch.minRbtcOut` → `Batch.minRbtcOutRate` (still `uint256`, new units and
   semantics); `IPurchaseRbtc.batchBuyRbtc`'s `minRbtcOut` parameter renamed and reinterpreted the same
   way; new event `DcaManager__PurchaseRowSkipped(address indexed token, uint64 indexed scheduleId,
-  uint8 reason)`. Both `batchBuyRbtc` and `batchBuyRbtcAcrossHandlers` selectors change.
+  uint8 reason)` with a sixth reason `FundingInsufficient`; new error
+  `DcaManager__BatchRowsNotSorted(uint64 scheduleId)`. `IPurchaseRbtc.batchBuyRbtc` now returns
+  `uint256[] unfundedRows`. `TokenLending__InsufficientShares` and
+  `IdleErc20Handler__InsufficientIdleBalance` are removed. Both `batchBuyRbtc` and
+  `batchBuyRbtcAcrossHandlers` selectors change.
+- Log order: a handler's funding, fee and purchase logs now precede the manager's schedule-debit and
+  timestamp logs for the same row, because the manager commits after the handler returns. Anything that
+  reads a transaction's logs in order must be checked against that.
 - Scripts: none expected.
 - Cutover: the swapper bot must change how it composes a batch (pack `expectedPurchaseAmount` per row,
   compute `minRbtcOutRate` instead of an absolute quote-derived figure) and must handle
-  `DcaManager__PurchaseRowSkipped` as an expected, non-error outcome rather than a call failure. Open
-  or update `swapper-bot#7` (already carries R64-era context) and any monitoring issue that decodes
-  `minRbtcOut`/`minRbtcOutRate` or the batch row shape.
+  `DcaManager__PurchaseRowSkipped` as an expected, non-error outcome rather than a call failure. It must
+  additionally **sort each batch's rows by ascending schedule id and send no id twice**, or the batch
+  reverts `DcaManager__BatchRowsNotSorted`; a skipped row still has to hold its place in that order.
+  Monitoring gains the `FundingInsufficient` reason, loses the two removed errors, and must not depend
+  on the previous cross-contract log order. Open or update `swapper-bot#7` (already carries R64-era
+  context) and any monitoring issue that decodes `minRbtcOut`/`minRbtcOutRate` or the batch row shape.

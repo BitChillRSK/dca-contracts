@@ -172,13 +172,23 @@ before this spec. They now name `DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT` and
 R39 handed this review two questions about the surviving batch path. Both are answered **keep today's
 behavior**, and neither is implemented here — they are lending-side behavior, not the Dex path this PR reviews.
 
-1. **Share shortfall: revert, do not clamp.** `_batchRetrieveStablecoin` still reverts
+1. **Share shortfall: revert, do not clamp.** *(Superseded by [R66](./R66-batch-row-front-running.md);
+recorded here as decided at the time.)* `_batchRetrieveStablecoin` reverted
 `TokenLending__InsufficientShares` when a schedule spends its exact remaining balance and the rounded-up debit
 is one share short. Clamping would make the handler debit fewer shares than the schedule's `purchaseAmounts[i]`
 says was spent, diverging the DcaManager balance from the share book for the sake of dust, and it would touch
 every lending route rather than the Dex path. The tail is a state the swapper bot must filter before batching,
-like a paused schedule; the user's own exit is the withdraw-all sentinel. `BatchTailScheduleTest` keeps its
-tests unflipped and its header records that R43 decided this.
+like a paused schedule; the user's own exit is the withdraw-all sentinel. `BatchTailScheduleTest` kept its
+tests unflipped and its header recorded that R43 decided this.
+
+**What R66 changed, and why the reasoning above stopped holding.** The bot cannot filter this: the owner
+reaches the shortfall *after* the bot's snapshot, by sweeping their own interest, with the schedule
+balance, purchase amount and due date all still exactly as quoted. So it was one buyer's sub-wei rounding
+dust against every other buyer's purchase in the same tick — the very hazard R66 was opened for. The row is
+now **skipped** (`PurchaseRowSkipReason.FundingInsufficient`) and the rest of the batch buys. Clamping is
+still rejected, for R43's reason and one more R66 adds: a clamped row would keep its full weight in the
+allocation and so be paid for out of the other buyers' stablecoin. `BatchTailScheduleTest` is flipped, as
+its header said it should be if this was ever revisited, and `TokenLending__InsufficientShares` is gone.
 2. **Fee on the planned gross, not the retrieval.** `batchBuyRbtc` still computes the aggregated fee from
 `purchaseAmounts` before retrieval. The fee band is a function of the purchase the user asked for, the
 aggregate is transferred once before the swap, and re-deriving it from the retrieved amount would add a second
