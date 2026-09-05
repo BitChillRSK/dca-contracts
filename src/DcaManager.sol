@@ -228,8 +228,9 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @inheritdoc IDcaManager
      */
     function deleteDcaSchedule(address token, uint64 scheduleId) external override nonReentrant {
-        DcaSchedule memory dcaSchedule = _callersSchedule(token, scheduleId);
+        DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
 
+        // Both fields are read before the schedule is deleted, and both live in its first slot.
         uint256 tokenBalance = dcaSchedule.tokenBalance;
         uint256 routeIndex = dcaSchedule.routeIndex;
 
@@ -661,8 +662,10 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         private
         returns (address, uint256, uint256)
     {
-        DcaSchedule storage dcaScheduleStorage = s_dcaSchedules[token][scheduleId];
-        DcaSchedule memory dcaSchedule = dcaScheduleStorage;
+        // The schedule's fields are read through the storage pointer as they are needed, rather than
+        // copied into a memory struct up front: the copy materialises all seven fields on every row,
+        // while the two slots they live in are read once and reused.
+        DcaSchedule storage dcaSchedule = s_dcaSchedules[token][scheduleId];
 
         address buyer = dcaSchedule.user;
         if (buyer == address(0)) revert DcaManager__InexistentSchedule(token, scheduleId);
@@ -682,12 +685,14 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
             }
         }
 
-        if (dcaSchedule.purchaseAmount > dcaSchedule.tokenBalance) {
-            revert DcaManager__ScheduleBalanceNotEnoughForPurchase(token, scheduleId, dcaSchedule.tokenBalance);
+        uint96 purchaseAmount = dcaSchedule.purchaseAmount;
+        uint128 tokenBalance = dcaSchedule.tokenBalance;
+        if (purchaseAmount > tokenBalance) {
+            revert DcaManager__ScheduleBalanceNotEnoughForPurchase(token, scheduleId, tokenBalance);
         }
-        dcaSchedule.tokenBalance -= dcaSchedule.purchaseAmount;
-        dcaScheduleStorage.tokenBalance = dcaSchedule.tokenBalance;
-        emit DcaManager__TokenBalanceUpdated(token, scheduleId, dcaSchedule.tokenBalance);
+        tokenBalance -= purchaseAmount;
+        dcaSchedule.tokenBalance = tokenBalance;
+        emit DcaManager__TokenBalanceUpdated(token, scheduleId, tokenBalance);
 
         // Anchor the next due date to the schedule's own cadence, so the wanted periodicity survives
         // a delayed purchase or a schedule that was paused or ran out of stablecoin and was resumed with
@@ -703,10 +708,10 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
             // The last purchase timestamp is anchored to the time of day of the first purchase to avoid drift
             newTimestamp = lastPurchaseTimestamp + periodsElapsed * purchasePeriod;
         }
-        dcaScheduleStorage.lastPurchaseTimestamp = newTimestamp.toUint48();
+        dcaSchedule.lastPurchaseTimestamp = newTimestamp.toUint48();
         emit DcaManager__LastPurchaseTimestampUpdated(token, scheduleId, newTimestamp);
 
-        return (buyer, dcaSchedule.purchaseAmount, dcaSchedule.routeIndex);
+        return (buyer, purchaseAmount, dcaSchedule.routeIndex);
     }
 
     /**
