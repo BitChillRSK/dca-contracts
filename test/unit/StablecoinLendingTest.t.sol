@@ -12,6 +12,7 @@ import {IShareToken} from "../interfaces/IShareToken.sol";
 import {IkToken} from "../../src/tropykus-legacy/IkToken.sol";
 import {MocHelperConfig} from "../../script/MocHelperConfig.s.sol";
 import "../Constants.sol";
+import {scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 contract StablecoinLendingTest is DcaDappTest {
     uint256 constant SHARE_TOKEN_STARTING_EXCHANGE_RATE = 2e16;
@@ -322,9 +323,9 @@ contract StablecoinLendingTest is DcaDappTest {
         uint256 userStablecoinBalanceBeforeInterestWithdrawal = stablecoin.balanceOf(USER);
         assertGt(withdrawableInterest, 0);
 
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), 0).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
         vm.prank(USER);
-        dcaManager.withdrawTokenAndInterest(address(stablecoin), 0, scheduleId, AMOUNT_TO_SPEND);
+        dcaManager.withdrawTokenAndInterest(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
 
         uint256 userStablecoinBalanceAfterInterestWithdrawal = stablecoin.balanceOf(USER);
         assertApproxEqRel(
@@ -369,7 +370,7 @@ contract StablecoinLendingTest is DcaDappTest {
     //     emit TokenLending__WithdrawalAmountAdjusted(USER, attemptedWithdrawalAmount, stablecoinInLendingProtocol);
 
     //     vm.prank(USER);
-    //     dcaManager.withdrawToken(address(stablecoin), 0, attemptedWithdrawalAmount);
+    //     dcaManager.withdrawToken(address(stablecoin), address(stablecoin), 0, attemptedWithdrawalAmount);
 
     //     // Verify user received their full balance
     //     assertEq(stablecoin.balanceOf(USER), stablecoinInLendingProtocol);

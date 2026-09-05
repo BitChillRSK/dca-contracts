@@ -16,6 +16,7 @@ import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockSwapRouter02} from "test/mocks/MockSwapRouter02.sol";
 import {Vm} from "forge-std/Vm.sol";
 import "../Constants.sol";
+import {scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @notice Allowlisted Dex path activation. `setUp` skips MoC lanes so they do not report empty PASSes.
@@ -277,7 +278,7 @@ contract DexPathFailoverTest is DcaDappTest {
         uint256 stranded = 1 ether;
         MockSwapRouter02 router = MockSwapRouter02(dexHelperConfig.getActiveNetworkConfig().swapRouter02Address);
         router.setStrandedIntermediate(address(newIntermediate), stranded);
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.expectRevert(
             abi.encodeWithSelector(
                 IPurchaseUniswap.PurchaseUniswap__IntermediateBalanceChangedInRouter.selector,
@@ -286,14 +287,14 @@ contract DexPathFailoverTest is DcaDappTest {
                 stranded
             )
         );
-        buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
+        buyRbtcOne(scheduleId);
 
         // Back on the constructor path, that same token is no longer part of the active route, so the
         // identical router behavior is none of this purchase's business.
         (address[] memory ctorMids, uint24[] memory ctorFees) = _constructorComponents();
         vm.prank(SWAPPER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(ctorMids, ctorFees);
-        buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
+        buyRbtcOne(scheduleId);
         assertEq(newIntermediate.balanceOf(address(router)), stranded);
     }
 

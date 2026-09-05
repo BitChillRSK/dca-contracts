@@ -15,6 +15,7 @@ import {MockMocProxy} from "../test/mocks/MockMocProxy.sol";
 import {MockWrbtcToken} from "../test/mocks/MockWrbtcToken.sol";
 import {toBatch} from "./utils/BatchBuyOne.sol";
 import "./Constants.sol";
+import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 
 contract ComparePurchaseMethods is Test {
@@ -376,33 +377,17 @@ contract ComparePurchaseMethods is Test {
         }
         
         // Prepare batch data
-        address[] memory userArray = new address[](NUM_OF_USERS);
-        uint256[] memory scheduleIndexes = new uint256[](NUM_OF_USERS);
         uint64[] memory scheduleIds = new uint64[](NUM_OF_USERS);
-        uint256[] memory purchaseAmounts = new uint256[](NUM_OF_USERS);
-        uint256[] memory purchasePeriods = new uint256[](NUM_OF_USERS);
-        
+
         for (uint256 i = 0; i < NUM_OF_USERS; i++) {
-            userArray[i] = users[i];
-            scheduleIndexes[i] = SCHEDULE_INDEX;
-            
-            scheduleIds[i] = dcaManMoc.getDcaSchedule(users[i], address(stablecoin), SCHEDULE_INDEX).scheduleId;
-            purchaseAmounts[i] = dcaManMoc.getDcaSchedule(users[i], address(stablecoin), SCHEDULE_INDEX).purchaseAmount;
-            purchasePeriods[i] = dcaManMoc.getDcaSchedule(users[i], address(stablecoin), SCHEDULE_INDEX).purchasePeriod;
+            scheduleIds[i] = scheduleIdAt(dcaManMoc, users[i], address(stablecoin), SCHEDULE_INDEX);
         }
         
         // Execute batch purchase
         uint256 gasStart = gasleft();
         vm.prank(SWAPPER);
         dcaManMoc.batchBuyRbtc(
-            toBatch(
-            userArray,
-            address(stablecoin),
-            scheduleIndexes,
-            scheduleIds,
-            purchaseAmounts,
-            routeIndex
-            )
+            toBatch(scheduleIds, address(stablecoin), routeIndex)
         );
         uint256 gasUsed = gasStart - gasleft();
         uint256 gasCost = gasUsed * tx.gasprice;
@@ -435,33 +420,17 @@ contract ComparePurchaseMethods is Test {
         }
         
         // Prepare batch data
-        address[] memory userArray = new address[](NUM_OF_USERS);
-        uint256[] memory scheduleIndexes = new uint256[](NUM_OF_USERS);
         uint64[] memory scheduleIds = new uint64[](NUM_OF_USERS);
-        uint256[] memory purchaseAmounts = new uint256[](NUM_OF_USERS);
-        uint256[] memory purchasePeriods = new uint256[](NUM_OF_USERS);
-        
+
         for (uint256 i = 0; i < NUM_OF_USERS; i++) {
-            userArray[i] = users[i];
-            scheduleIndexes[i] = SCHEDULE_INDEX;
-            
-            scheduleIds[i] = dcaManUni.getDcaSchedule(users[i], address(stablecoin), SCHEDULE_INDEX).scheduleId;
-            purchaseAmounts[i] = dcaManUni.getDcaSchedule(users[i], address(stablecoin), SCHEDULE_INDEX).purchaseAmount;
-            purchasePeriods[i] = dcaManUni.getDcaSchedule(users[i], address(stablecoin), SCHEDULE_INDEX).purchasePeriod;
+            scheduleIds[i] = scheduleIdAt(dcaManUni, users[i], address(stablecoin), SCHEDULE_INDEX);
         }
         
         // Execute batch purchase
         uint256 gasStart = gasleft();
         vm.prank(SWAPPER);
         dcaManUni.batchBuyRbtc(
-            toBatch(
-            userArray,
-            address(stablecoin),
-            scheduleIndexes,
-            scheduleIds,
-            purchaseAmounts,
-            routeIndex
-            )
+            toBatch(scheduleIds, address(stablecoin), routeIndex)
         );
         uint256 gasUsed = gasStart - gasleft();
         uint256 gasCost = gasUsed * tx.gasprice;

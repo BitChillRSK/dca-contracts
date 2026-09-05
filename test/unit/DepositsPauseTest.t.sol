@@ -8,6 +8,7 @@ import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {IOperationsAdmin} from "../../src/interfaces/IOperationsAdmin.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import "./TestsHelper.t.sol";
+import {scheduleAt, scheduleIdAt, scheduleCount} from "test/utils/ScheduleAt.sol";
 
 /**
  * @notice R48: governance can stop new stablecoin deposits on one `(token, routeIndex)` pair.
@@ -44,14 +45,14 @@ contract DepositsPauseTest is DcaDappTest {
 
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
         uint256 handlerStablecoinBefore = stablecoin.balanceOf(address(stablecoinHandler));
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 scheduleBalanceBefore =
-            dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
+            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
 
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
         vm.expectRevert(_depositsPausedRevert());
-        dcaManager.depositToken(address(stablecoin), SCHEDULE_INDEX, scheduleId, AMOUNT_TO_DEPOSIT);
+        dcaManager.depositToken(address(stablecoin), scheduleId, AMOUNT_TO_DEPOSIT);
         vm.stopPrank();
 
         assertEq(stablecoin.balanceOf(USER), userStablecoinBefore, "the user paid on a paused route");
@@ -61,7 +62,7 @@ contract DepositsPauseTest is DcaDappTest {
             "the handler took cash on a paused route"
         );
         assertEq(
-            dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance,
+            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance,
             scheduleBalanceBefore
         );
     }
@@ -70,7 +71,7 @@ contract DepositsPauseTest is DcaDappTest {
         _pauseDeposits(true);
 
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
-        uint256 numOfSchedulesBefore = dcaManager.getDcaSchedules(USER, address(stablecoin)).length;
+        uint256 numOfSchedulesBefore = scheduleCount(dcaManager, USER, address(stablecoin));
 
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
@@ -81,7 +82,7 @@ contract DepositsPauseTest is DcaDappTest {
         vm.stopPrank();
 
         assertEq(stablecoin.balanceOf(USER), userStablecoinBefore, "the user paid on a paused route");
-        assertEq(dcaManager.getDcaSchedules(USER, address(stablecoin)).length, numOfSchedulesBefore);
+        assertEq(scheduleCount(dcaManager, USER, address(stablecoin)), numOfSchedulesBefore);
     }
 
     /// @dev With no allowance a deposit would revert inside the handler. The pause error is what
@@ -89,12 +90,12 @@ contract DepositsPauseTest is DcaDappTest {
     function testPauseIsCheckedBeforeTheTokenIsTouched() external {
         _pauseDeposits(true);
 
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
 
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), 0);
         vm.expectRevert(_depositsPausedRevert());
-        dcaManager.depositToken(address(stablecoin), SCHEDULE_INDEX, scheduleId, AMOUNT_TO_DEPOSIT);
+        dcaManager.depositToken(address(stablecoin), scheduleId, AMOUNT_TO_DEPOSIT);
         vm.stopPrank();
     }
 
@@ -111,7 +112,7 @@ contract DepositsPauseTest is DcaDappTest {
             address(stablecoin), AMOUNT_TO_DEPOSIT, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_routeIndex
         );
         vm.stopPrank();
-        assertEq(dcaManager.getDcaSchedules(USER, address(stablecoin)).length, 2);
+        assertEq(scheduleCount(dcaManager, USER, address(stablecoin)), 2);
     }
 
     /// @dev An incident on one pair must not stop deposits anywhere else.
@@ -195,17 +196,17 @@ contract DepositsPauseTest is DcaDappTest {
     function testPausedRouteStillAllowsScheduleEdits() external {
         _pauseDeposits(true);
 
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 newPurchaseAmount = AMOUNT_TO_SPEND / 2;
         uint256 newPurchasePeriod = MIN_PURCHASE_PERIOD * 2;
 
         vm.startPrank(USER);
-        dcaManager.updatePurchaseAmount(address(stablecoin), SCHEDULE_INDEX, scheduleId, newPurchaseAmount);
-        dcaManager.updatePurchasePeriod(address(stablecoin), SCHEDULE_INDEX, scheduleId, newPurchasePeriod);
+        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, newPurchaseAmount);
+        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, newPurchasePeriod);
         vm.stopPrank();
 
         IDcaManager.DcaSchedule memory schedule =
-            dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX);
+            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         assertEq(schedule.purchaseAmount, newPurchaseAmount);
         assertEq(schedule.purchasePeriod, newPurchasePeriod);
     }
@@ -213,13 +214,13 @@ contract DepositsPauseTest is DcaDappTest {
     function testPausedRouteStillAllowsDeletion() external {
         _pauseDeposits(true);
 
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
 
         vm.prank(USER);
-        dcaManager.deleteDcaSchedule(address(stablecoin), SCHEDULE_INDEX, scheduleId);
+        dcaManager.deleteDcaSchedule(address(stablecoin), scheduleId);
 
-        assertEq(dcaManager.getDcaSchedules(USER, address(stablecoin)).length, 0);
+        assertEq(scheduleCount(dcaManager, USER, address(stablecoin)), 0);
         assertGt(stablecoin.balanceOf(USER), userStablecoinBefore, "the refund never reached the user");
     }
 }

@@ -10,6 +10,7 @@ import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import "test/Constants.sol";
 import {batchBuyOne} from "test/utils/BatchBuyOne.sol";
+import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @title LayerBankDcaManagerTest
@@ -71,7 +72,7 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, LAYERBANK_INDEX);
 
-        IDcaManager.DcaSchedule memory schedule = dcaManager.getDcaSchedules(USER, address(docToken))[0];
+        IDcaManager.DcaSchedule memory schedule = scheduleAt(dcaManager, USER, address(docToken), 0);
         assertEq(schedule.routeIndex, LAYERBANK_INDEX);
         assertEq(schedule.tokenBalance, DEPOSIT);
         assertGt(handler.getUserShares(USER), 0);
@@ -82,23 +83,23 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
     function test_buyAndWithdraw_spendLayerBankDoc() public {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, LAYERBANK_INDEX);
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(docToken), 0).scheduleId;
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(docToken), 0);
 
         uint256 lTokensBefore = handler.getUserShares(USER);
 
         vm.prank(SWAPPER);
-        batchBuyOne(dcaManager, USER, address(docToken), 0, scheduleId, PURCHASE, LAYERBANK_INDEX);
+        batchBuyOne(dcaManager, address(docToken), scheduleId, LAYERBANK_INDEX);
 
         assertGt(dcaManager.getAccumulatedRbtcBalance(USER, address(docToken), LAYERBANK_INDEX), 0);
         assertLt(handler.getUserShares(USER), lTokensBefore);
-        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 0).tokenBalance, DEPOSIT - PURCHASE);
+        assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, DEPOSIT - PURCHASE);
 
         uint256 userDocBefore = docToken.balanceOf(USER);
         vm.prank(USER);
-        dcaManager.withdrawToken(address(docToken), 0, scheduleId, DEPOSIT - PURCHASE);
+        dcaManager.withdrawToken(address(docToken), scheduleId, DEPOSIT - PURCHASE);
 
         assertEq(docToken.balanceOf(USER), userDocBefore + DEPOSIT - PURCHASE);
-        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 0).tokenBalance, 0);
+        assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, 0);
 
         uint256 userRbtcBefore = USER.balance;
         vm.prank(USER);

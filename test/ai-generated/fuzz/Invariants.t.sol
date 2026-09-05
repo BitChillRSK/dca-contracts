@@ -19,6 +19,7 @@ import {MockKdocToken} from "test/mocks/MockKdocToken.sol";
 import {MockIsusdToken} from "test/mocks/MockIsusdToken.sol";
 import "test/Constants.sol";
 import {Handler} from "./Handler.t.sol";
+import {scheduleAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @title InvariantTest
@@ -174,8 +175,7 @@ contract InvariantTest is StdInvariant, Test {
             1,
             "Handler never created a schedule at the selected route"
         );
-        IDcaManager.DcaSchedule[] memory schedules =
-            dcaManager.getDcaSchedules(s_users[0], address(stablecoin));
+        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) = dcaManager.getDcaSchedules(s_users[0], address(stablecoin));
         assertEq(schedules.length, 1);
         assertEq(schedules[0].routeIndex, s_routeIndex);
     }
@@ -188,13 +188,13 @@ contract InvariantTest is StdInvariant, Test {
 
         fuzzHandler.pauseSchedule(0, 0);
         assertTrue(
-            dcaManager.getDcaSchedule(s_users[0], address(stablecoin), 0).paused, "Handler did not pause on-chain"
+            scheduleAt(dcaManager, s_users[0], address(stablecoin), 0).paused, "Handler did not pause on-chain"
         );
         assertEq(fuzzHandler.everPausedScheduleIdsLength(), 1, "Handler did not record the pause ghost");
 
         fuzzHandler.unpauseSchedule(0, 0);
         assertFalse(
-            dcaManager.getDcaSchedule(s_users[0], address(stablecoin), 0).paused, "Handler did not resume on-chain"
+            scheduleAt(dcaManager, s_users[0], address(stablecoin), 0).paused, "Handler did not resume on-chain"
         );
     }
 
@@ -235,12 +235,12 @@ contract InvariantTest is StdInvariant, Test {
         uint256 accruedInterest = dcaManager.getInterestAccrued(s_users[0], address(stablecoin), s_routeIndex);
         assertGt(accruedInterest, MIN_PURCHASE_AMOUNT / 10, "the lane accrued too little to credit");
 
-        uint256 balanceBefore = dcaManager.getDcaSchedule(s_users[0], address(stablecoin), 0).tokenBalance;
+        uint256 balanceBefore = scheduleAt(dcaManager, s_users[0], address(stablecoin), 0).tokenBalance;
         fuzzHandler.topUpFromInterest(0, 0, type(uint256).max);
 
         assertEq(fuzzHandler.topUpFromInterestSuccesses(), 1, "the top-up never reached DcaManager");
         assertGt(
-            dcaManager.getDcaSchedule(s_users[0], address(stablecoin), 0).tokenBalance,
+            scheduleAt(dcaManager, s_users[0], address(stablecoin), 0).tokenBalance,
             balanceBefore,
             "the top-up reverted before crediting the schedule"
         );
@@ -266,7 +266,9 @@ contract InvariantTest is StdInvariant, Test {
             totalLendingBalances += userLendingBalance;
             
             // Get all schedules for this user with the stablecoin
-            try dcaManager.getDcaSchedules(user, address(stablecoin)) returns (IDcaManager.DcaSchedule[] memory schedules) {
+            try dcaManager.getDcaSchedules(user, address(stablecoin)) returns (
+                uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules
+            ) {
                 for (uint256 j = 0; j < schedules.length; j++) {
                     totalUserDeposits += schedules[j].tokenBalance;
                 }
@@ -341,13 +343,15 @@ contract InvariantTest is StdInvariant, Test {
             handler.getAccumulatedRbtcBalance(user);
             // No upper bound checks – only logical consistency properties below
 
-            try dcaManager.getDcaSchedules(user, address(stablecoin)) returns (IDcaManager.DcaSchedule[] memory schedules) {
+            try dcaManager.getDcaSchedules(user, address(stablecoin)) returns (
+                uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules
+            ) {
                 for (uint256 j = 0; j < schedules.length; j++) {
                     if (schedules[j].purchaseAmount > 0) {
                         assertGt(schedules[j].purchaseAmount, MIN_PURCHASE_AMOUNT);
                         assertGe(schedules[j].purchasePeriod, MIN_PURCHASE_PERIOD);
                     }
-                    assertNotEq(schedules[j].scheduleId, uint64(0));
+                    assertNotEq(schedulesIds[j], uint64(0));
                 }
             } catch {
                 // User has no schedules, which is fine
@@ -422,17 +426,19 @@ contract InvariantTest is StdInvariant, Test {
             (address user, uint256 timestampAtPause, bool pausedNow) = fuzzHandler.s_pauseGhost(scheduleId);
             if (!pausedNow) continue;
 
+            uint64[] memory schedulesIds;
             IDcaManager.DcaSchedule[] memory schedules;
             try dcaManager.getDcaSchedules(user, address(stablecoin)) returns (
-                IDcaManager.DcaSchedule[] memory _schedules
+                uint64[] memory _schedulesIds, IDcaManager.DcaSchedule[] memory _schedules
             ) {
+                schedulesIds = _schedulesIds;
                 schedules = _schedules;
             } catch {
                 continue;
             }
 
             for (uint256 j = 0; j < schedules.length; j++) {
-                if (schedules[j].scheduleId != scheduleId) continue;
+                if (schedulesIds[j] != scheduleId) continue;
 
                 assertTrue(schedules[j].paused, "a schedule the ghost holds paused is active on-chain");
                 assertEq(
@@ -452,7 +458,9 @@ contract InvariantTest is StdInvariant, Test {
         for (uint256 i = 0; i < s_users.length; i++) {
             address user = s_users[i];
             
-            try dcaManager.getDcaSchedules(user, address(stablecoin)) returns (IDcaManager.DcaSchedule[] memory schedules) {
+            try dcaManager.getDcaSchedules(user, address(stablecoin)) returns (
+                uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules
+            ) {
                 if (schedules.length > 0) {
                     uint256 totalDeposited = 0;
                     for (uint256 j = 0; j < schedules.length; j++) {

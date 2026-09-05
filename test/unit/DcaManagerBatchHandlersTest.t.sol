@@ -8,6 +8,7 @@ import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import {DeployIdleHandler} from "../../script/DeployIdleHandler.s.sol";
 import {DeployLayerBankHandler} from "../../script/DeployLayerBankHandler.s.sol";
 import "../Constants.sol";
+import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @notice Exercises the integrated multi-handler purchase entry point.
@@ -75,16 +76,10 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         returns (IDcaManager.Batch memory batch)
     {
         IDcaManager.DcaSchedule memory schedule =
-            dcaManager.getDcaSchedule(USER, address(stablecoin), scheduleIndex);
-        batch.buyers = new address[](1);
-        batch.scheduleIndexes = new uint256[](1);
+            scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex);
         batch.scheduleIds = new uint64[](1);
-        batch.purchaseAmounts = new uint256[](1);
-        batch.buyers[0] = USER;
         batch.token = address(stablecoin);
-        batch.scheduleIndexes[0] = scheduleIndex;
-        batch.scheduleIds[0] = schedule.scheduleId;
-        batch.purchaseAmounts[0] = schedule.purchaseAmount;
+        batch.scheduleIds[0] = scheduleIdAt(dcaManager, USER, address(stablecoin), scheduleIndex);
         batch.routeIndex = routeIndex;
     }
 
@@ -107,18 +102,18 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         uint256 firstRbtcBefore = firstHandler.getAccumulatedRbtcBalance(USER);
         uint256 secondRbtcBefore = otherHandler.getAccumulatedRbtcBalance(USER);
         uint256 firstBalanceBefore =
-            dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
+            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
         uint256 secondBalanceBefore =
-            dcaManager.getDcaSchedule(USER, address(stablecoin), SECOND_SCHEDULE_INDEX).tokenBalance;
+            scheduleAt(dcaManager, USER, address(stablecoin), SECOND_SCHEDULE_INDEX).tokenBalance;
 
         _batchBuy(_twoHandlers());
 
         assertEq(
-            dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance,
+            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance,
             firstBalanceBefore - AMOUNT_TO_SPEND
         );
         assertEq(
-            dcaManager.getDcaSchedule(USER, address(stablecoin), SECOND_SCHEDULE_INDEX).tokenBalance,
+            scheduleAt(dcaManager, USER, address(stablecoin), SECOND_SCHEDULE_INDEX).tokenBalance,
             secondBalanceBefore - AMOUNT_TO_SPEND
         );
         assertGt(firstHandler.getAccumulatedRbtcBalance(USER), firstRbtcBefore);
@@ -129,7 +124,7 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         _requireTwoHandlers();
 
         IDcaManager.DcaSchedule memory firstBefore =
-            dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX);
+            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 firstRbtcBefore = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
 
         IDcaManager.Batch[] memory batches = new IDcaManager.Batch[](2);
@@ -141,7 +136,7 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         _batchBuy(batches);
 
         IDcaManager.DcaSchedule memory firstAfter =
-            dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX);
+            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         assertEq(firstAfter.tokenBalance, firstBefore.tokenBalance);
         assertEq(firstAfter.lastPurchaseTimestamp, firstBefore.lastPurchaseTimestamp);
         assertEq(IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER), firstRbtcBefore);
@@ -151,26 +146,20 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         _requireTwoHandlers();
 
         IDcaManager.DcaSchedule memory firstBefore =
-            dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX);
+            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint64 secondId =
-            dcaManager.getDcaSchedule(USER, address(stablecoin), SECOND_SCHEDULE_INDEX).scheduleId;
+            scheduleIdAt(dcaManager, USER, address(stablecoin), SECOND_SCHEDULE_INDEX);
         vm.prank(USER);
-        dcaManager.setSchedulePaused(address(stablecoin), SECOND_SCHEDULE_INDEX, secondId, true);
+        dcaManager.setSchedulePaused(address(stablecoin), secondId, true);
 
         IDcaManager.Batch[] memory batches = _twoHandlers();
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IDcaManager.DcaManager__SchedulePaused.selector,
-                USER,
-                address(stablecoin),
-                secondId,
-                SECOND_SCHEDULE_INDEX
-            )
+            abi.encodeWithSelector(IDcaManager.DcaManager__SchedulePaused.selector, address(stablecoin), secondId)
         );
         _batchBuy(batches);
 
         IDcaManager.DcaSchedule memory firstAfter =
-            dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX);
+            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         assertEq(firstAfter.tokenBalance, firstBefore.tokenBalance);
         assertEq(firstAfter.lastPurchaseTimestamp, firstBefore.lastPurchaseTimestamp);
         assertEq(IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER), 0);
@@ -180,9 +169,9 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         _requireTwoHandlers();
 
         IDcaManager.DcaSchedule memory firstBefore =
-            dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX);
+            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         IDcaManager.DcaSchedule memory secondBefore =
-            dcaManager.getDcaSchedule(USER, address(stablecoin), SECOND_SCHEDULE_INDEX);
+            scheduleAt(dcaManager, USER, address(stablecoin), SECOND_SCHEDULE_INDEX);
         uint256 firstRbtcBefore = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
         uint256 secondRbtcBefore = IPurchaseRbtc(secondHandler).getAccumulatedRbtcBalance(USER);
 
@@ -195,9 +184,9 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         _batchBuy(batches);
 
         IDcaManager.DcaSchedule memory firstAfter =
-            dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX);
+            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         IDcaManager.DcaSchedule memory secondAfter =
-            dcaManager.getDcaSchedule(USER, address(stablecoin), SECOND_SCHEDULE_INDEX);
+            scheduleAt(dcaManager, USER, address(stablecoin), SECOND_SCHEDULE_INDEX);
         assertEq(firstAfter.tokenBalance, firstBefore.tokenBalance);
         assertEq(firstAfter.lastPurchaseTimestamp, firstBefore.lastPurchaseTimestamp);
         assertEq(secondAfter.tokenBalance, secondBefore.tokenBalance);
@@ -212,9 +201,9 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         _requireTwoHandlers();
 
         IDcaManager.DcaSchedule memory firstBefore =
-            dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX);
+            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         IDcaManager.DcaSchedule memory secondBefore =
-            dcaManager.getDcaSchedule(USER, address(stablecoin), SECOND_SCHEDULE_INDEX);
+            scheduleAt(dcaManager, USER, address(stablecoin), SECOND_SCHEDULE_INDEX);
         uint256 firstRbtcBefore = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
         uint256 secondRbtcBefore = IPurchaseRbtc(secondHandler).getAccumulatedRbtcBalance(USER);
 
@@ -227,9 +216,9 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         assertFalse(ok, "the bundle must fail on the second handler's minimum");
 
         IDcaManager.DcaSchedule memory firstAfter =
-            dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX);
+            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         IDcaManager.DcaSchedule memory secondAfter =
-            dcaManager.getDcaSchedule(USER, address(stablecoin), SECOND_SCHEDULE_INDEX);
+            scheduleAt(dcaManager, USER, address(stablecoin), SECOND_SCHEDULE_INDEX);
         assertEq(firstAfter.tokenBalance, firstBefore.tokenBalance, "the earlier handler's debit rolls back");
         assertEq(firstAfter.lastPurchaseTimestamp, firstBefore.lastPurchaseTimestamp);
         assertEq(secondAfter.tokenBalance, secondBefore.tokenBalance);
@@ -244,7 +233,7 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         // The same bundle without that minimum still goes through, so nothing was left in a stuck state.
         _batchBuy(_twoHandlers());
         assertEq(
-            dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance,
+            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance,
             firstBefore.tokenBalance - AMOUNT_TO_SPEND
         );
     }
@@ -294,20 +283,20 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__UnauthorizedSwapper.selector, attacker));
         dcaManager.batchBuyRbtcAcrossHandlers(batches);
 
-        assertEq(dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).lastPurchaseTimestamp, 0);
+        assertEq(scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).lastPurchaseTimestamp, 0);
     }
 
     function testAllowlistedSwapperCanBuyOneHandler() external {
         IDcaManager.Batch[] memory batches = new IDcaManager.Batch[](1);
         batches[0] = _oneRow(SCHEDULE_INDEX, s_routeIndex);
         _batchBuy(batches);
-        assertGt(dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).lastPurchaseTimestamp, 0);
+        assertGt(scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).lastPurchaseTimestamp, 0);
     }
 
     function testBotEoaCanStillCallOriginalBatchBuyRbtc() external {
         IDcaManager.Batch memory batch = _oneRow(SCHEDULE_INDEX, s_routeIndex);
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(batch);
-        assertGt(dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).lastPurchaseTimestamp, 0);
+        assertGt(scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).lastPurchaseTimestamp, 0);
     }
 }

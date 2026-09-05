@@ -10,6 +10,7 @@ import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import {ITokenLending} from "../../src/interfaces/ITokenLending.sol";
 import {MockStablecoin} from "../mocks/MockStablecoin.sol";
 import "../Constants.sol";
+import {scheduleAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @title WithdrawAllRoutePairsTest
@@ -136,8 +137,8 @@ contract WithdrawAllRoutePairsTest is BaseDeploymentTest {
         assertApproxEqRel(tokenOne.balanceOf(USER) - balanceOneBefore, interestOne, 1);
         assertApproxEqRel(tokenTwo.balanceOf(USER) - balanceTwoBefore, interestTwo, 1);
         assertEq(handlerOneTwo.getUserShares(USER), 0, "cross-pair handler holds no position");
-        assertEq(dcaManager.getDcaSchedule(USER, address(tokenOne), 0).tokenBalance, DEPOSIT);
-        assertEq(dcaManager.getDcaSchedule(USER, address(tokenTwo), 0).tokenBalance, DEPOSIT);
+        assertEq(scheduleAt(dcaManager, USER, address(tokenOne), 0).tokenBalance, DEPOSIT);
+        assertEq(scheduleAt(dcaManager, USER, address(tokenTwo), 0).tokenBalance, DEPOSIT);
     }
 
     /// @notice The rBTC path zips the same way.

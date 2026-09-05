@@ -6,6 +6,7 @@ import {DeployLayerBankHandler} from "../../script/DeployLayerBankHandler.s.sol"
 import {LayerBankDocHandlerMoc} from "../../src/layerbank/LayerBankDocHandlerMoc.sol";
 import {MockStablecoin} from "../mocks/MockStablecoin.sol";
 import "../Constants.sol";
+import {scheduleAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @title VersionedRouteAccountingTest
@@ -134,7 +135,7 @@ contract VersionedRouteAccountingTest is BaseDeploymentTest {
         assertLt(docToken.balanceOf(USER) - userDocBefore, DEPOSIT_V1);
         // Route v2 is untouched: its handler never saw the call.
         assertEq(handlerV2.getUserShares(USER), sharesV2Before);
-        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 0).tokenBalance, DEPOSIT_V1);
-        assertEq(dcaManager.getDcaSchedule(USER, address(docToken), 1).tokenBalance, DEPOSIT_V2);
+        assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, DEPOSIT_V1);
+        assertEq(scheduleAt(dcaManager, USER, address(docToken), 1).tokenBalance, DEPOSIT_V2);
     }
 }

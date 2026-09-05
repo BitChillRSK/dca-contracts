@@ -12,11 +12,11 @@ import {MockKdocToken} from "../mocks/MockKdocToken.sol";
 import {MockMocProxy} from "../mocks/MockMocProxy.sol";
 import "../Constants.sol";
 import {reentrantCall} from "../utils/OzRevert.sol";
+import {scheduleCount} from "test/utils/ScheduleAt.sol";
 
 contract ReentrantDepositor is ITransferFromHook {
     DcaManager public dca;
     address public token;
-    uint256 public deleteIndex;
     uint64 public deleteId;
     bool public attack;
 
@@ -25,16 +25,15 @@ contract ReentrantDepositor is ITransferFromHook {
         token = token_;
     }
 
-    function armDelete(uint256 index, uint64 id) external {
+    function armDelete(uint64 id) external {
         attack = true;
-        deleteIndex = index;
         deleteId = id;
     }
 
     function onTransferFrom(address, address, uint256) external {
         if (!attack) return;
         attack = false;
-        dca.deleteDcaSchedule(token, deleteIndex, deleteId);
+        dca.deleteDcaSchedule(token, deleteId);
     }
 
     function createSchedule(uint256 depositAmount, uint256 purchaseAmount, uint256 period, uint256 lendingIndex)
@@ -43,12 +42,12 @@ contract ReentrantDepositor is ITransferFromHook {
         dca.createDcaSchedule(token, depositAmount, purchaseAmount, period, lendingIndex);
     }
 
-    function remove(uint256 scheduleIndex, uint64 scheduleId) external {
-        dca.deleteDcaSchedule(token, scheduleIndex, scheduleId);
+    function remove(uint64 scheduleId) external {
+        dca.deleteDcaSchedule(token, scheduleId);
     }
 
-    function deposit(uint256 scheduleIndex, uint64 scheduleId, uint256 amount) external {
-        dca.depositToken(token, scheduleIndex, scheduleId, amount);
+    function deposit(uint64 scheduleId, uint256 amount) external {
+        dca.depositToken(token, scheduleId, amount);
     }
 }
 
@@ -111,37 +110,37 @@ contract DepositSwapPopReentrancyTest is Test {
 
     function test_depositToken_reverts_whenHookDeletesSameIndex() public {
         _createTwoSchedules();
-        IDcaManager.DcaSchedule[] memory beforeSchedules = dcaManager.getDcaSchedules(address(user), address(token));
-        uint64 idA = beforeSchedules[0].scheduleId;
+        (uint64[] memory beforeSchedulesIds, IDcaManager.DcaSchedule[] memory beforeSchedules) = dcaManager.getDcaSchedules(address(user), address(token));
+        uint64 idA = beforeSchedulesIds[0];
 
-        user.armDelete(0, idA);
+        user.armDelete(idA);
         token.setHook(address(user), true);
 
         vm.expectRevert(reentrantCall());
-        user.deposit(0, idA, EXTRA);
+        user.deposit(idA, EXTRA);
 
-        IDcaManager.DcaSchedule[] memory afterSchedules = dcaManager.getDcaSchedules(address(user), address(token));
+        (uint64[] memory afterSchedulesIds, IDcaManager.DcaSchedule[] memory afterSchedules) = dcaManager.getDcaSchedules(address(user), address(token));
         assertEq(afterSchedules.length, 2);
-        assertEq(afterSchedules[0].scheduleId, beforeSchedules[0].scheduleId);
-        assertEq(afterSchedules[1].scheduleId, beforeSchedules[1].scheduleId);
+        assertEq(afterSchedulesIds[0], beforeSchedulesIds[0]);
+        assertEq(afterSchedulesIds[1], beforeSchedulesIds[1]);
         assertEq(afterSchedules[0].tokenBalance, beforeSchedules[0].tokenBalance);
         assertEq(afterSchedules[1].tokenBalance, beforeSchedules[1].tokenBalance);
     }
 
     function test_depositToken_reverts_whenHookDeletesLastRemainingSchedule() public {
         user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
-        IDcaManager.DcaSchedule[] memory beforeSchedules = dcaManager.getDcaSchedules(address(user), address(token));
-        uint64 idA = beforeSchedules[0].scheduleId;
+        (uint64[] memory beforeSchedulesIds, IDcaManager.DcaSchedule[] memory beforeSchedules) = dcaManager.getDcaSchedules(address(user), address(token));
+        uint64 idA = beforeSchedulesIds[0];
 
-        user.armDelete(0, idA);
+        user.armDelete(idA);
         token.setHook(address(user), true);
 
         vm.expectRevert(reentrantCall());
-        user.deposit(0, idA, EXTRA);
+        user.deposit(idA, EXTRA);
 
-        IDcaManager.DcaSchedule[] memory afterSchedules = dcaManager.getDcaSchedules(address(user), address(token));
+        (uint64[] memory afterSchedulesIds, IDcaManager.DcaSchedule[] memory afterSchedules) = dcaManager.getDcaSchedules(address(user), address(token));
         assertEq(afterSchedules.length, 1);
-        assertEq(afterSchedules[0].scheduleId, idA);
+        assertEq(afterSchedulesIds[0], idA);
         assertEq(afterSchedules[0].tokenBalance, beforeSchedules[0].tokenBalance);
     }
 
@@ -149,9 +148,9 @@ contract DepositSwapPopReentrancyTest is Test {
     function test_createDeleteCreate_mintsUniqueScheduleIds() public {
         (uint64 idB, uint64 idC) = _createDeleteCreateSequence();
         assertTrue(idB != idC);
-        IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(address(user), address(token));
+        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) = dcaManager.getDcaSchedules(address(user), address(token));
         assertEq(schedules.length, 2);
-        assertTrue(schedules[0].scheduleId != schedules[1].scheduleId);
+        assertTrue(schedulesIds[0] != schedulesIds[1]);
     }
 
     /// @dev Regression: deriving ids from array state let swap-pop rewind the chain.
@@ -161,39 +160,39 @@ contract DepositSwapPopReentrancyTest is Test {
         user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX); // A
         user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX); // B
         user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX); // C
-        IDcaManager.DcaSchedule[] memory created = dcaManager.getDcaSchedules(address(user), address(token));
-        uint64 idA = created[0].scheduleId;
-        uint64 idC = created[2].scheduleId;
+        (uint64[] memory createdIds, IDcaManager.DcaSchedule[] memory created) = dcaManager.getDcaSchedules(address(user), address(token));
+        uint64 idA = createdIds[0];
+        uint64 idC = createdIds[2];
 
-        user.remove(0, idA); // C swap-pops into slot 0; B becomes the last element again
+        user.remove(idA); // C swap-pops into slot 0; B becomes the last element again
         user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX); // D
 
-        IDcaManager.DcaSchedule[] memory live = dcaManager.getDcaSchedules(address(user), address(token));
+        (uint64[] memory liveIds, IDcaManager.DcaSchedule[] memory live) = dcaManager.getDcaSchedules(address(user), address(token));
         assertEq(live.length, 3);
-        assertEq(live[0].scheduleId, idC); // C is still live in slot 0
-        assertTrue(live[2].scheduleId != idC); // D must not reuse it
+        assertEq(liveIds[0], idC); // C is still live in slot 0
+        assertTrue(liveIds[2] != idC); // D must not reuse it
         for (uint256 i; i < live.length; ++i) {
             for (uint256 j = i + 1; j < live.length; ++j) {
-                assertTrue(live[i].scheduleId != live[j].scheduleId);
+                assertTrue(liveIds[i] != liveIds[j]);
             }
         }
     }
 
     function test_depositToken_reverts_whenHookDeletesReusedSlot() public {
         (uint64 idB,) = _createDeleteCreateSequence();
-        IDcaManager.DcaSchedule[] memory beforeSchedules = dcaManager.getDcaSchedules(address(user), address(token));
+        (uint64[] memory beforeSchedulesIds, IDcaManager.DcaSchedule[] memory beforeSchedules) = dcaManager.getDcaSchedules(address(user), address(token));
 
-        user.armDelete(0, idB);
+        user.armDelete(idB);
         token.setHook(address(user), true);
 
         // The deposit/delete mutex stops the nested delete before any swap-pop can happen.
         vm.expectRevert(reentrantCall());
-        user.deposit(0, idB, EXTRA);
+        user.deposit(idB, EXTRA);
 
-        IDcaManager.DcaSchedule[] memory afterSchedules = dcaManager.getDcaSchedules(address(user), address(token));
+        (uint64[] memory afterSchedulesIds, IDcaManager.DcaSchedule[] memory afterSchedules) = dcaManager.getDcaSchedules(address(user), address(token));
         assertEq(afterSchedules.length, 2);
-        assertEq(afterSchedules[0].scheduleId, beforeSchedules[0].scheduleId);
-        assertEq(afterSchedules[1].scheduleId, beforeSchedules[1].scheduleId);
+        assertEq(afterSchedulesIds[0], beforeSchedulesIds[0]);
+        assertEq(afterSchedulesIds[1], beforeSchedulesIds[1]);
         assertEq(afterSchedules[0].tokenBalance, beforeSchedules[0].tokenBalance);
         assertEq(afterSchedules[1].tokenBalance, beforeSchedules[1].tokenBalance);
     }
@@ -202,23 +201,23 @@ contract DepositSwapPopReentrancyTest is Test {
         user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
         vm.warp(block.timestamp + 1);
         user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
-        assertEq(dcaManager.getDcaSchedules(address(user), address(token)).length, 2);
+        assertEq(scheduleCount(dcaManager, address(user), address(token)), 2);
     }
 
     /// @dev Create A,B then delete A and create C in the same timestamp.
     function _createDeleteCreateSequence() private returns (uint64 idB, uint64 idC) {
         user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
         user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
-        IDcaManager.DcaSchedule[] memory created = dcaManager.getDcaSchedules(address(user), address(token));
-        uint64 idA = created[0].scheduleId;
-        idB = created[1].scheduleId;
+        (uint64[] memory createdIds, IDcaManager.DcaSchedule[] memory created) = dcaManager.getDcaSchedules(address(user), address(token));
+        uint64 idA = createdIds[0];
+        idB = createdIds[1];
         assertTrue(idA != idB);
 
-        user.remove(0, idA);
+        user.remove(idA);
         user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
-        IDcaManager.DcaSchedule[] memory afterCreate = dcaManager.getDcaSchedules(address(user), address(token));
+        (uint64[] memory afterCreateIds, IDcaManager.DcaSchedule[] memory afterCreate) = dcaManager.getDcaSchedules(address(user), address(token));
         assertEq(afterCreate.length, 2);
-        assertEq(afterCreate[0].scheduleId, idB);
-        idC = afterCreate[1].scheduleId;
+        assertEq(afterCreateIds[0], idB);
+        idC = afterCreateIds[1];
     }
 }

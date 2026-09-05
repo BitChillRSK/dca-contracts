@@ -16,6 +16,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {MockMocOracle} from "../mocks/MockMocOracle.sol";
 import "../Constants.sol";
 import {ownableUnauthorized} from "../utils/OzRevert.sol";
+import {scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 contract PurchaseUniswapSettingsTest is DcaDappTest {
     uint256 private constant SLIPPAGE_SLOT = 7;
@@ -242,8 +243,8 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         // Setup: First perform the necessary setup for the test
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
-        uint64 scheduleId = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
-        dcaManager.updatePurchaseAmount(address(stablecoin), SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
+        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
         vm.stopPrank();
         
         // Create a mock oracle that returns invalid prices
@@ -257,7 +258,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         
         // Try to make a purchase, which should revert due to invalid price
         vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__OutdatedPrice.selector);
-        buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
+        buyRbtcOne(scheduleId);
     }
 
     ////////////////////////////

@@ -16,17 +16,12 @@ uint256 constant NO_MIN_RBTC_OUT = 0;
  *         `DcaManager.buyRbtc` (R39).
  * @dev Free function, so no external call happens between the caller's `vm.prank` and
  *      `batchBuyRbtc`: a prank placed immediately before this helper still applies to the batch.
+ *      R64 made a row a bare `scheduleId`, keyed by the batch's own token, and dropped both the
+ *      per-row buyer and the per-row amount: the manager reads from the schedule who is buying and
+ *      what it spends, so there is nothing else to pass.
  */
-function batchBuyOne(
-    IDcaManager dcaManager,
-    address buyer,
-    address token,
-    uint256 scheduleIndex,
-    uint64 scheduleId,
-    uint256 purchaseAmount,
-    uint256 routeIndex
-) {
-    batchBuyOne(dcaManager, buyer, token, scheduleIndex, scheduleId, purchaseAmount, routeIndex, NO_MIN_RBTC_OUT);
+function batchBuyOne(IDcaManager dcaManager, address token, uint64 scheduleId, uint256 routeIndex) {
+    batchBuyOne(dcaManager, token, scheduleId, routeIndex, NO_MIN_RBTC_OUT);
 }
 
 /**
@@ -34,60 +29,37 @@ function batchBuyOne(
  */
 function batchBuyOne(
     IDcaManager dcaManager,
-    address buyer,
     address token,
-    uint256 scheduleIndex,
     uint64 scheduleId,
-    uint256 purchaseAmount,
     uint256 routeIndex,
     uint256 minRbtcOut
 ) {
-    address[] memory buyers = new address[](1);
-    uint256[] memory scheduleIndexes = new uint256[](1);
     uint64[] memory scheduleIds = new uint64[](1);
-    uint256[] memory purchaseAmounts = new uint256[](1);
-    buyers[0] = buyer;
-    scheduleIndexes[0] = scheduleIndex;
     scheduleIds[0] = scheduleId;
-    purchaseAmounts[0] = purchaseAmount;
-    dcaManager.batchBuyRbtc(
-        toBatch(buyers, token, scheduleIndexes, scheduleIds, purchaseAmounts, routeIndex, minRbtcOut)
-    );
+    dcaManager.batchBuyRbtc(toBatch(scheduleIds, token, routeIndex, minRbtcOut));
 }
 
 /**
  * @notice Pack the parallel arrays `DcaManager.batchBuyRbtc` used to take into one `Batch`.
  * @dev Leaves `minRbtcOut` at `NO_MIN_RBTC_OUT`, which is the pre-R51 behavior every caller of this
- *      arity was written against. Use the eight-argument form to exercise the caller minimum.
+ *      arity was written against. Use the five-argument form to exercise the caller minimum.
  */
-function toBatch(
-    address[] memory buyers,
-    address token,
-    uint256[] memory scheduleIndexes,
-    uint64[] memory scheduleIds,
-    uint256[] memory purchaseAmounts,
-    uint256 routeIndex
-) pure returns (IDcaManager.Batch memory batch) {
-    return toBatch(buyers, token, scheduleIndexes, scheduleIds, purchaseAmounts, routeIndex, NO_MIN_RBTC_OUT);
+function toBatch(uint64[] memory scheduleIds, address token, uint256 routeIndex)
+    pure
+    returns (IDcaManager.Batch memory batch)
+{
+    return toBatch(scheduleIds, token, routeIndex, NO_MIN_RBTC_OUT);
 }
 
 /**
  * @notice `toBatch` with an explicit per-batch minimum rBTC output (R51).
  */
-function toBatch(
-    address[] memory buyers,
-    address token,
-    uint256[] memory scheduleIndexes,
-    uint64[] memory scheduleIds,
-    uint256[] memory purchaseAmounts,
-    uint256 routeIndex,
-    uint256 minRbtcOut
-) pure returns (IDcaManager.Batch memory batch) {
-    batch.buyers = buyers;
-    batch.token = token;
-    batch.scheduleIndexes = scheduleIndexes;
+function toBatch(uint64[] memory scheduleIds, address token, uint256 routeIndex, uint256 minRbtcOut)
+    pure
+    returns (IDcaManager.Batch memory batch)
+{
     batch.scheduleIds = scheduleIds;
-    batch.purchaseAmounts = purchaseAmounts;
+    batch.token = token;
     batch.routeIndex = routeIndex;
     batch.minRbtcOut = minRbtcOut;
 }

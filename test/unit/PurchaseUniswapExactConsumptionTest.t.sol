@@ -8,6 +8,7 @@ import {IPurchaseUniswap} from "src/interfaces/IPurchaseUniswap.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockSwapRouter02} from "test/mocks/MockSwapRouter02.sol";
 import "../Constants.sol";
+import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @notice Every successful Uniswap purchase must spend the whole requested stablecoin and leave the shared
@@ -194,7 +195,7 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
     }
 
     function _snapshot() private view returns (PurchaseState memory state) {
-        IDcaManager.DcaSchedule memory schedule = dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX);
+        IDcaManager.DcaSchedule memory schedule = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         state.scheduleBalance = schedule.tokenBalance;
         state.lastPurchaseTimestamp = schedule.lastPurchaseTimestamp;
         state.handlerStablecoin = stablecoin.balanceOf(address(stablecoinHandler));
@@ -207,11 +208,11 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
     /// @dev Takes the id rather than reading it, so a caller's `vm.expectRevert` lands on the batch call
     ///      itself and not on the getter that would otherwise run first.
     function _purchase(uint64 scheduleId) private {
-        buyRbtcOne(USER, SCHEDULE_INDEX, scheduleId, AMOUNT_TO_SPEND);
+        buyRbtcOne(scheduleId);
     }
 
     function _scheduleId() private view returns (uint64) {
-        return dcaManager.getDcaSchedule(USER, address(stablecoin), SCHEDULE_INDEX).scheduleId;
+        return scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
     }
 
     /// @dev The handler pays the fee first, then snapshots its stablecoin balance for the consumption
