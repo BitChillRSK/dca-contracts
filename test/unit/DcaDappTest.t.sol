@@ -664,20 +664,17 @@ contract DcaDappTest is Test {
         uint256 totalFee;
         // Create the arrays for the batch purchase (in production, this is done in the back end)
         for (uint8 i; i < NUM_OF_SCHEDULES; ++i) {
-            uint256 scheduleIndex = i;
-            vm.startPrank(USER);
-            uint256 schedulePurchaseAmount = scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).purchaseAmount;
-            vm.stopPrank();
-            uint256 fee = feeCalculator.calculateFee(schedulePurchaseAmount);
-            totalNetPurchaseAmount += schedulePurchaseAmount - fee;
+            // One read per schedule, kept in its own scope: the struct copy is what pushes this
+            // function over via-IR's stack limit if it is spread across separate reads.
+            IDcaManager.DcaSchedule memory schedule = scheduleAt(dcaManager, USER, address(stablecoin), i);
+            uint256 fee = feeCalculator.calculateFee(schedule.purchaseAmount);
+            totalNetPurchaseAmount += schedule.purchaseAmount - fee;
             totalFee += fee;
             users[i] = USER; // Same user for has 5 schedules due for a purchase in this scenario
             scheduleIndexes[i] = i;
-            vm.startPrank(OWNER);
-            purchaseAmounts[i] = scheduleAt(dcaManager, users[0], address(stablecoin), i).purchaseAmount;
-            purchasePeriods[i] = scheduleAt(dcaManager, users[0], address(stablecoin), i).purchasePeriod;
-            scheduleIds[i] = scheduleIdAt(dcaManager, users[0], address(stablecoin), i);
-            vm.stopPrank();
+            purchaseAmounts[i] = schedule.purchaseAmount;
+            purchasePeriods[i] = schedule.purchasePeriod;
+            scheduleIds[i] = scheduleIdAt(dcaManager, USER, address(stablecoin), i);
         }
         // After R1 the batch event's measured DOC is in data, not a topic. expectEmit
         // cannot check that: data is exact, and on a live iSUSD fork tokenPrice
