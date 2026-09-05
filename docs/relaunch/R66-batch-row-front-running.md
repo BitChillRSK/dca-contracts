@@ -1,6 +1,6 @@
 # R66 — A batch row can be reverted or definanced from under it before the tick lands
 
-Status: **in progress** · Assigned: yes · Optional/further-review: no
+Status: **assigned** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
@@ -180,7 +180,7 @@ deciding it silently inside this item.
 - [x] Update `Batch` NatSpec and invariant 9 in `AGENTS.md`, which stated "a batch row is one
       `uint64` and nothing else" and "do not add a per-row amount back as a staleness guard" — both are
       superseded by mechanism (3)'s packed row. Invariant 8's "its rows are ids" corrected in passing.
-- [ ] Consumer follow-up: swapper-bot (`Batch.rows` packing, `minRbtcOutRate` semantics, and the new
+- [x] Consumer follow-up: swapper-bot (`Batch.rows` packing, `minRbtcOutRate` semantics, and the new
       skipped-row event), monitoring (alert shape for `DcaManager__PurchaseRowSkipped`), and any repo
       that encodes `Batch` off-chain.
 
