@@ -173,7 +173,7 @@ identical schedules, at 1, 10, 50 and 200 rows:
 | **E** | A's design keyed the other way round, `[scheduleId][token]` | id |
 | **F** | flat by id, a `uint32 routeId` in place of the token address | id |
 | **G** | `[scheduleId][user][token]`: both halves structural | buyer, id |
-| **H** | G's key with the row packed into one word, `(id << 160) | buyer` | packed word |
+| **H** | G's key with the row packed into one word, `(id << 160) \| buyer` | packed word |
 | **I** | `[user][token][scheduleId]`: the pre-R64 key with the index replaced by the id | buyer, id |
 
 A is `src/DcaManager` itself, not a copy of it. The rest are test-only prototypes under
@@ -428,7 +428,7 @@ re-argued. B is the pre-R64 keying, reproduced as a prototype:
 | C — flat by id, owner *and* token stored, three slots | 17,008 | 16,100 | +2,342 |
 | I — `[user][token][id]`, both structural, buyers in the batch | 15,730 | 14,606 | +848 |
 | G — `[id][user][token]`, both structural, buyers in the batch | 15,687 | 14,603 | +845 |
-| H — G's key, row packed as one word `(id << 160) | buyer` | 15,069 | 14,219 | +461 |
+| H — G's key, row packed as one word `(id << 160) \| buyer` | 15,069 | 14,219 | +461 |
 | F — flat by id, `uint32 routeId` in place of the token | 14,901 | 13,955 | +197 |
 | E — the same design keyed `[id][token]` | 14,910 | 13,951 | +193 |
 | **A — shipped: `[token][id]`, owner stored and checked** | **14,918** | **13,758** | — |
