@@ -85,6 +85,41 @@ First-party `src/` files use Foundry-style banners with these exact titles. When
 - Do not use `FUNCTIONS`, `GETTER FUNCTIONS`, or other spellings.
 - Leave vendored interfaces alone so they stay diffable against upstream: `IMocProxy`, `IWRBTC`, `ICoinPairPrice`, `IkToken`, `IiSusdToken`, `ILayerBankPool`, `ILayerBankAToken`.
 
+## Contract header NatSpec
+
+Solidity inherits NatSpec for functions, events, errors, and public state variables, so the function
+layer is written once, on the interface, and reaches the implementation through `@inheritdoc`. It does
+**not** inherit the `@title`/`@notice`/`@dev` block above a contract, and `@inheritdoc` is not an escape
+hatch: on a contract it fails the compile outright (`Error (6546): Documentation tag @inheritdoc not
+valid for contracts`). Header NatSpec is own-file — it does not cross `is` to an implementation, and it
+does not travel down an inheritance chain either, so `SovrynDocHandlerMoc` inherits nothing from
+`SovrynErc20Handler`'s header. The header layer is therefore written by hand, and this is where.
+
+- Every first-party `src/` file carries `@title`, `@author`, and exactly one `@notice` line.
+- The two `@notice` lines of an interface/implementation pair are **labels**, and must not be the same
+  sentence. The interface's names the surface; the implementation's names what that contract is in the
+  system. A one-line label on each side is not duplication.
+- The `@dev` paragraph — what a caller may rely on, and why — belongs to the **interface that declares
+  the functions it describes**. An implementation adds a `@dev` only for a fact about its own code that
+  a reader of the surface could not infer, and never restates a claim the interface already makes.
+  `DcaManager` is the shape to copy: `IDcaManager` says who custodies what, `DcaManager` says that
+  `s_dcaSchedules` is written only there and how the `nonReentrant` set is kept greppable.
+- Two exceptions, both because no interface owns the claim. An interface that declares **no functions**
+  (`IDcaManagerAccessControl`, `IPurchaseMoc`, `ILayerBankErc20Handler`) is a home for errors and
+  events, not a surface: its `@notice` says what it carries, and the paragraph stays on the
+  implementation. And a fact true of one implementation cannot live on an interface several share —
+  `ITokenLending` is Sovryn's, LayerBank's, and Tropykus's at once — so it stays on that implementation.
+- Constructor-only leaves carry the header even though they carry no banners, and sibling leaves state
+  the same fact the same way: the four `*Erc20HandlerDex` contracts each say `Constructor-only leaf` and
+  the funding-base-first constructor ordering in `@dev`, not one of them in `@notice`.
+- **What a missing implementation `@dev` costs.** Whatever an implementation does not say itself is
+  absent from the contract-level `details` of the artifact that ships; per-method `details` is
+  unaffected, because functions do inherit. Measured across the ten deployable contracts when this rule
+  landed: `OperationsAdmin` lost its entry to `IOperationsAdmin`'s artifact, `SovrynErc20HandlerDex` and
+  `TropykusErc20HandlerDex` gained one, and every method count was unchanged. Losing the entry is the
+  price of the rule — do not restore a paragraph to an implementation to fill that field, and do not
+  write one that restates the interface in order to have something there.
+
 ## Onchain comments
 
 Verified `src/` source (including NatSpec) lives on explorers for the life of the deployment. Do not mention relaunch ticket IDs (`R29`, `R42`, …) in `src/` comments. Write the durable reason instead. Specs, tests, PRs, deploy-script comments, and this file may use R-ids.
