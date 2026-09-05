@@ -24,9 +24,6 @@ interface IIdleErc20Handler {
 
     /// @notice A requested payout debited nothing from the idle mapping.
     error IdleErc20Handler__ZeroStablecoinPaid(uint256 requested);
-    /// @notice A batch purchase asked for more idle balance than this user holds.
-    /// @dev Batch purchases revert instead of clamping so PurchaseRbtc's planned weights stay valid.
-    error IdleErc20Handler__InsufficientIdleBalance(address user, uint256 requested, uint256 available);
 
     /*//////////////////////////////////////////////////////////////
                                 GETTERS

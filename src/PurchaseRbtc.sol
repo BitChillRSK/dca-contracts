@@ -31,34 +31,41 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
 
     /**
      * @inheritdoc IPurchaseRbtc
-     * @dev Spends the stablecoin the retrieval actually delivered, never the gross amount it was asked
-     *      for: a lending handler can come back short when it redeems its shares, while the idle handler
-     *      reverts rather than under-deliver. Planned net amounts are only allocation weights: both the
-     *      rBTC credited and the stablecoin reported as spent are shares of what actually moved.
+     * @dev Retrieval comes first and decides which rows this batch is actually buying for. A buyer's
+     *      funds here are their own — pooled across their schedules on this route, and independent of
+     *      the principal the manager's ledger says each schedule holds — so a row can pass every check
+     *      the manager makes and still have nothing behind it. `_batchRetrieveStablecoin` zeroes those
+     *      rows in `purchaseAmounts` instead of reverting, and every step after it reads the filtered
+     *      array: no fee is charged for a dropped row, and it gets no weight in the allocation. Their
+     *      indexes are what this returns, so the manager knows not to debit their schedules.
+     *
+     *      What is spent is then the stablecoin the retrieval actually delivered, never the gross that
+     *      was asked for. Planned net amounts are only allocation weights: both the rBTC credited and
+     *      the stablecoin reported as spent are shares of what actually moved.
      */
     function batchBuyRbtc(
         address[] memory buyers,
         uint64[] memory scheduleIds,
         uint256[] memory purchaseAmounts,
         uint256 minRbtcOutRate
-    ) external override onlyDcaManager {
+    ) external override onlyDcaManager returns (uint256[] memory unfundedRows) {
         uint256[] memory netStablecoinAmountsToSpend;
         uint256 totalNetStablecoinPlanned;
+        // Retrieve first, so the fee and the weights below are calculated on the rows that funded.
         uint256 totalStablecoinAmountToSpend;
+        (totalStablecoinAmountToSpend, unfundedRows) = _batchRetrieveStablecoin(buyers, purchaseAmounts);
         IERC20 purchaseToken;
 
         // `aggregatedFee` is scoped to this block because it is dead once the fee is paid.
         {
             uint256 aggregatedFee;
-            // Calculate net amounts
+            // Calculate net amounts. A dropped row is zero here, so it pays no fee and carries no
+            // weight; the fee each surviving row pays is still the fee on the gross it asked for.
             (aggregatedFee, netStablecoinAmountsToSpend, totalNetStablecoinPlanned) =
                 _calculateFeeAndNetAmounts(purchaseAmounts);
+            // Nothing funded: no fee to transfer and nothing to swap. The manager debits no schedule.
+            if (totalNetStablecoinPlanned == 0) return unfundedRows;
 
-            // Retrieve the stablecoin to spend: the net amount destined for rBTC plus the fee BitChill
-            // charges. What comes back is what the retrieval delivered, which a lending handler can leave
-            // short of the request.
-            totalStablecoinAmountToSpend =
-                _batchRetrieveStablecoin(buyers, purchaseAmounts, totalNetStablecoinPlanned + aggregatedFee);
             if (totalStablecoinAmountToSpend <= aggregatedFee) {
                 revert PurchaseRbtc__StablecoinRetrievedBelowFee(totalStablecoinAmountToSpend, aggregatedFee);
             }
@@ -89,6 +96,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
             // so the shares below sum to exactly 1 even if the redemption paid less than expected. Both the
             // rBTC credited and the stablecoin reported as spent are shares of what actually moved.
             uint256 plannedNet = netStablecoinAmountsToSpend[i];
+            if (plannedNet == 0) continue; // a row this handler could not fund: no credit, no event
             address buyer = buyers[i];
             uint256 usersPurchasedRbtc = totalPurchasedRbtc * plannedNet / totalNetStablecoinPlanned;
             uint256 usersStablecoinSpent = totalStablecoinAmountToSpend * plannedNet / totalNetStablecoinPlanned;

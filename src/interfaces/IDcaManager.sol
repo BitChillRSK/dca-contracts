@@ -91,13 +91,17 @@ interface IDcaManager {
     /// @notice Why one batch row was skipped instead of purchased.
     /// @dev Every reason here is a state a schedule's own owner can reach between the swapper's query
     ///      and its transaction landing — by accident or adversarially — which is exactly the class of
-    ///      front-run this type exists to make non-fatal to every other row in the batch.
+    ///      front-run this type exists to make non-fatal to every other row in the batch. The first five
+    ///      are read off the schedule; `FundingInsufficient` is the handler's answer, since the account
+    ///      backing a schedule's principal is the buyer's, pooled across their schedules on that route,
+    ///      and only the handler holds it.
     enum PurchaseRowSkipReason {
         InexistentSchedule,
         SchedulePaused,
         PeriodNotElapsed,
         BalanceInsufficient,
-        PurchaseAmountMismatch
+        PurchaseAmountMismatch,
+        FundingInsufficient
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -106,9 +110,10 @@ interface IDcaManager {
     /// @notice A batch row was skipped instead of purchased; every other row in the batch is unaffected.
     /// @dev Fires for a row whose schedule state changed out from under the swapper's snapshot: deleted
     ///      (`InexistentSchedule`), paused, not yet due, short of balance, or carrying a stale
-    ///      `expectedPurchaseAmount` (`PurchaseAmountMismatch`, see `Batch.rows`). Does not fire for a
-    ///      route-index mismatch, which reverts the whole batch instead — see
-    ///      `DcaManager__RouteIndexMismatch`.
+    ///      `expectedPurchaseAmount` (`PurchaseAmountMismatch`, see `Batch.rows`), and for a row whose
+    ///      buyer no longer has the funds behind that principal on the handler
+    ///      (`FundingInsufficient`). Does not fire for a route-index mismatch, which reverts the whole
+    ///      batch instead — see `DcaManager__RouteIndexMismatch`.
     event DcaManager__PurchaseRowSkipped(
         address indexed token, uint64 indexed scheduleId, PurchaseRowSkipReason reason
     );
@@ -194,6 +199,12 @@ interface IDcaManager {
     /// @dev Only a literally empty input array reverts. A non-empty array that skips down to zero
     ///      purchasable rows does not revert; see `DcaManager__PurchaseRowSkipped`.
     error DcaManager__EmptyBatchPurchaseArrays();
+    /// @notice A batch's rows are not in strictly increasing schedule-id order. `scheduleId` is the
+    ///         first row that broke the order, which is also how a repeated row reports itself.
+    /// @dev A swapper composition error, not an owner front-run: rows are all checked before any of
+    ///      them is committed, so the same schedule twice would buy twice. Sorting the rows makes that
+    ///      unrepresentable for one comparison per row, and gives a batch a canonical order.
+    error DcaManager__BatchRowsNotSorted(uint64 scheduleId);
     /// @notice `batchBuyRbtcAcrossHandlers` was called without any handler batches.
     error DcaManager__EmptyHandlerBatches();
     /// @notice A withdraw-all call was given empty token/route arrays.

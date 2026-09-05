@@ -8,14 +8,12 @@ import {TokenLending} from "src/TokenLending.sol";
 import {StablecoinSource} from "src/StablecoinSource.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @title LendingErc20Handler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Shared per-user share accounting, withdraw clamp, interest, and batch pro-rata
- *         redeem for lending handlers. Protocol adapters implement the exchange-rate and
- *         mint/redeem hooks.
+ * @notice Shared per-user share accounting, withdraw clamp, interest, and batch redeem for lending
+ *         handlers. Protocol adapters implement the exchange-rate and mint/redeem hooks.
  */
 abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinSource {
     using SafeERC20 for IERC20;
@@ -208,31 +206,56 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
 
     /**
      * @dev Retrieve several users' stablecoin in one protocol redemption.
+     *
+     *      Each row reserves its own rounded-up share debit against its buyer's book, and the rows are
+     *      walked in order, so a buyer with several rows here spends what they have on the earlier ones.
+     *      A row whose buyer no longer holds those shares is zeroed for the caller and costs nothing —
+     *      the alternative, reverting, hands one buyer's rounding dust the power to fail every other
+     *      buyer in the same tick, and the shortfall is reachable from a plain interest withdrawal
+     *      (see `docs/relaunch/R66-batch-row-front-running.md`).
+     *
+     *      Summing the per-row debits, rather than slicing one aggregate figure pro rata, is also what
+     *      makes the shares redeemed here exactly the shares taken off the users: rounding an aggregate
+     *      and then rounding each share of it again asked the users for slightly more than it burned.
      */
-    function _batchRetrieveStablecoin(
-        address[] memory users,
-        uint256[] memory purchaseAmounts,
-        uint256 totalStablecoinAmount
-    ) internal virtual override returns (uint256) {
+    function _batchRetrieveStablecoin(address[] memory users, uint256[] memory purchaseAmounts)
+        internal
+        virtual
+        override
+        returns (uint256, uint256[] memory unfundedRows)
+    {
         uint256 exchangeRate = _exchangeRate();
-        uint256 totalSharesToRedeem = _stablecoinToShares(totalStablecoinAmount, exchangeRate);
+        uint256 totalSharesToRedeem;
+        uint256 totalStablecoinAmount;
+        uint256 numOfUnfundedRows;
 
-        uint256 numOfPurchases = users.length;
-        for (uint256 i; i < numOfPurchases; ++i) {
-            // round up so we never underestimate the debit against this user
-            uint256 usersSharesToRedeem =
-                Math.mulDiv(totalSharesToRedeem, purchaseAmounts[i], totalStablecoinAmount, Math.Rounding.Ceil);
+        uint256 numOfRows = users.length;
+        for (uint256 i; i < numOfRows; ++i) {
+            uint256 purchaseAmount = purchaseAmounts[i];
+            if (purchaseAmount == 0) continue;
+            // Round up so we never underestimate the debit against this user
+            uint256 usersSharesToRedeem = _stablecoinToShares(purchaseAmount, exchangeRate);
             uint256 usersShares = s_shares[users[i]];
             if (usersSharesToRedeem > usersShares) {
-                revert TokenLending__InsufficientShares(users[i], usersSharesToRedeem, usersShares);
+                purchaseAmounts[i] = 0;
+                // Allocated on the first drop only, so a batch that funds everything — the usual one —
+                // never pays for the list at all.
+                if (numOfUnfundedRows == 0) unfundedRows = new uint256[](numOfRows);
+                unfundedRows[numOfUnfundedRows++] = i;
+                continue;
             }
             _setUserShares(users[i], usersShares - usersSharesToRedeem);
-            emit TokenLending__SharesRedeemed(users[i], purchaseAmounts[i], usersSharesToRedeem);
+            totalSharesToRedeem += usersSharesToRedeem;
+            totalStablecoinAmount += purchaseAmount;
+            emit TokenLending__SharesRedeemed(users[i], purchaseAmount, usersSharesToRedeem);
         }
+
+        if (numOfUnfundedRows != 0) unfundedRows = _trimRowIndexes(unfundedRows, numOfUnfundedRows);
+        if (totalSharesToRedeem == 0) return (0, unfundedRows);
         uint256 stablecoinReceived = _measuredProtocolRedeem(totalSharesToRedeem, exchangeRate);
-        if (stablecoinReceived > 0) emit TokenLending__SharesRedeemedBatch(stablecoinReceived, totalSharesToRedeem);
-        else revert TokenLending__ZeroStablecoinReceived(totalStablecoinAmount);
-        return stablecoinReceived;
+        if (stablecoinReceived == 0) revert TokenLending__ZeroStablecoinReceived(totalStablecoinAmount);
+        emit TokenLending__SharesRedeemedBatch(stablecoinReceived, totalSharesToRedeem);
+        return (stablecoinReceived, unfundedRows);
     }
 
     /**

@@ -33,15 +33,35 @@ abstract contract StablecoinSource {
     function _retrieveStablecoin(address buyer, uint256 amount) internal virtual returns (uint256);
 
     /**
-     * @dev Retrieve several buyers' stablecoin for a batch purchase.
+     * @dev Retrieve several buyers' stablecoin for a batch purchase, and say which rows it could fund.
+     *      A buyer's position here is pooled across their schedules on this route, so whether a row can
+     *      be funded is decided in row order against what that buyer has left, and a row that cannot be
+     *      funded in full is dropped rather than clamped: a short row would still carry its original
+     *      weight through the allocation and so would be paid for out of the other buyers' stablecoin.
      * @param buyers Buyers whose positions are debited.
-     * @param purchaseAmounts Amount charged to each buyer.
-     * @param totalStablecoinToRetrieve Total stablecoin wanted.
-     * @return The total amount actually available to spend.
+     * @param purchaseAmounts Amount charged to each buyer, edited in place: a row this handler could
+     *        not fund is set to zero, and a row that is already zero is passed over untouched.
+     * @return totalRetrieved The total amount actually available to spend.
+     * @return unfundedRows Indexes of the rows this handler could not fund, ascending. Empty — and
+     *         never allocated — when it funded every row it was given, which is the usual case.
      */
-    function _batchRetrieveStablecoin(
-        address[] memory buyers,
-        uint256[] memory purchaseAmounts,
-        uint256 totalStablecoinToRetrieve
-    ) internal virtual returns (uint256);
+    function _batchRetrieveStablecoin(address[] memory buyers, uint256[] memory purchaseAmounts)
+        internal
+        virtual
+        returns (uint256 totalRetrieved, uint256[] memory unfundedRows);
+
+    /**
+     * @dev Copy the first `length` entries of a row-index list into a right-sized array. Reached only
+     *      by a batch that actually had a row it could not fund.
+     */
+    function _trimRowIndexes(uint256[] memory rowIndexes, uint256 length)
+        internal
+        pure
+        returns (uint256[] memory trimmed)
+    {
+        trimmed = new uint256[](length);
+        for (uint256 i; i < length; ++i) {
+            trimmed[i] = rowIndexes[i];
+        }
+    }
 }

@@ -105,27 +105,40 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
     }
 
     /**
-     * @dev Debit each buyer's idle balance for a batch purchase. Reverts if any buyer cannot
-     *      cover their purchase amount. Clamping here would return a short total that
-     *      PurchaseRbtc still splits by the original planned weights, so one underfunded
-     *      buyer would dilute every other buyer in the batch.
+     * @dev Debit each buyer's idle balance for a batch purchase, in row order. A buyer who cannot cover
+     *      a row in full has that row zeroed for the caller rather than clamped or reverted: clamping
+     *      would return a short total that `PurchaseRbtc` still splits by the original weights, so one
+     *      underfunded buyer would be paid for out of every other buyer's stablecoin, and reverting
+     *      would let one buyer's shortfall cost every other row in the tick its purchase.
+     *
+     *      Idle balances are one-to-one with no exchange rate, so nothing here rounds and the manager's
+     *      own balance check already covers a single-schedule buyer. It stays as a filter anyway,
+     *      because the idle book is pooled per buyer just like the lending one, and because the two
+     *      handler families have to answer the manager the same way.
      */
-    function _batchRetrieveStablecoin(address[] memory users, uint256[] memory purchaseAmounts, uint256)
+    function _batchRetrieveStablecoin(address[] memory users, uint256[] memory purchaseAmounts)
         internal
         virtual
         override
-        returns (uint256 totalWithdrawn)
+        returns (uint256 totalWithdrawn, uint256[] memory unfundedRows)
     {
-        uint256 numOfPurchases = users.length;
-        for (uint256 i; i < numOfPurchases; ++i) {
+        uint256 numOfRows = users.length;
+        uint256 numOfUnfundedRows;
+        for (uint256 i; i < numOfRows; ++i) {
             uint256 amount = purchaseAmounts[i];
+            if (amount == 0) continue;
             uint256 idleBalance = s_idleBalances[users[i]];
             if (amount > idleBalance) {
-                revert IdleErc20Handler__InsufficientIdleBalance(users[i], amount, idleBalance);
+                purchaseAmounts[i] = 0;
+                // Allocated on the first drop only; a batch that funds everything never pays for it.
+                if (numOfUnfundedRows == 0) unfundedRows = new uint256[](numOfRows);
+                unfundedRows[numOfUnfundedRows++] = i;
+                continue;
             }
             s_idleBalances[users[i]] = idleBalance - amount;
             totalWithdrawn += amount;
         }
+        if (numOfUnfundedRows != 0) unfundedRows = _trimRowIndexes(unfundedRows, numOfUnfundedRows);
     }
 
     /**

@@ -54,8 +54,17 @@ interface IPurchaseRbtc {
      * @param minRbtcOutRate Minimum rBTC this batch as a whole must buy per raw unit of stablecoin
      *        actually spent, in rBTC/WRBTC wei (18 decimals) per stablecoin wei, scaled by `1e18`.
      *        `0` disables this check.
-     * @dev Called only by DcaManager after it has debited each schedule. Fees are aggregated and
-     *      transferred once; each buyer is credited a pro-rata share of the measured rBTC.
+     * @return unfundedRows Indexes of the rows this handler could not fund, in ascending order. Empty
+     *         when it funded every row it was given, which is the usual case and the reason this is the
+     *         return rather than a per-row answer. DcaManager debits only the rows not named here, so a
+     *         buyer who no longer has the funds behind a schedule's principal loses that row rather than
+     *         the whole batch. Rows submitted as zero are passed over and never appear.
+     * @dev Called only by DcaManager, which holds its reentrancy guard for the whole call and debits
+     *      the schedules of the funded rows once this returns. Rows this handler cannot fund are
+     *      dropped before any fee is charged or anything is bought, so they pay nothing and are
+     *      credited nothing. If no row funds, no fee is transferred and no purchase is made.
+     *      Fees are aggregated and transferred once; each funded buyer is credited a pro-rata share of
+     *      the measured rBTC.
      *      `minRbtcOutRate` is applied to the stablecoin this handler actually measures itself
      *      spending — never to a planned or pre-fee figure — and the resulting minimum is compared
      *      against the rBTC this handler measures itself receiving, so it applies to every purchase
@@ -69,7 +78,7 @@ interface IPurchaseRbtc {
         uint64[] memory scheduleIds,
         uint256[] memory purchaseAmounts,
         uint256 minRbtcOutRate
-    ) external;
+    ) external returns (uint256[] memory unfundedRows);
 
     /**
      * @notice Pay `user` the rBTC this handler has accumulated for them.

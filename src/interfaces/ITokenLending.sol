@@ -53,9 +53,6 @@ interface ITokenLending is ITokenHandler {
     error TokenLending__LendingProtocolRedeemFailed(uint256 errorCode);
     /// @notice A positive share redemption produced no stablecoin; the call is rolled back.
     error TokenLending__ZeroStablecoinReceived(uint256 stablecoinAttempted);
-    /// @notice Batch redeem asked for more of this user's shares than the handler tracks.
-    /// @dev Same outcome as a 0.8 underflow on `s_shares[user] -=`; the named error is for the swapper.
-    error TokenLending__InsufficientShares(address user, uint256 requested, uint256 available);
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS

@@ -16,9 +16,10 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
  * @notice Stores every DCA schedule and routes user and swapper calls to the handler that holds the
  *         funds they name.
  * @dev `s_dcaSchedules` is written only in this contract, and every external function that writes it
- *      takes `nonReentrant` as its first modifier, so the guard is checkable by grep rather than by
- *      reading each function. The two `onlySwapper` purchase paths are the deliberate exception: each
- *      is CEI-clean per handler, and only an allowlisted swapper reaches them.
+ *      carries `nonReentrant`, so the guard is checkable by grep rather than by reading each function.
+ *      That now includes the two `onlySwapper` purchase paths: a batch has to hear back from its
+ *      handler before it knows which rows funded, so its schedule writes follow a handler call and the
+ *      guard is what keeps any owner mutation, or a second purchase, out of that window.
  */
 contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     using SafeCast for uint256;
@@ -261,14 +262,14 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     /**
      * @inheritdoc IDcaManager
      */
-    function batchBuyRbtc(Batch calldata batch) external override onlySwapper {
+    function batchBuyRbtc(Batch calldata batch) external override onlySwapper nonReentrant {
         _batchBuyRbtc(batch);
     }
 
     /**
      * @inheritdoc IDcaManager
      */
-    function batchBuyRbtcAcrossHandlers(Batch[] calldata batches) external override onlySwapper {
+    function batchBuyRbtcAcrossHandlers(Batch[] calldata batches) external override onlySwapper nonReentrant {
         uint256 numBatches = batches.length;
         if (numBatches == 0) revert DcaManager__EmptyHandlerBatches();
 
@@ -508,13 +509,22 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Validate one handler's batch, debit every purchasable row, then call that handler once with
-     *      the survivors. A row that fails a check an owner controls (paused, deleted, short of
-     *      balance, not yet due, or a stale `expectedPurchaseAmount`) is skipped and reported via
-     *      `DcaManager__PurchaseRowSkipped` instead of reverting the batch; a row on the wrong route
-     *      still reverts the whole call, because no setter can move a schedule's route and a mismatch
-     *      there is a swapper-side composition error, not an owner front-run. If every row is skipped,
-     *      no handler is called and this returns without reverting.
+     * @dev Check one handler's batch, hand it to that handler once, then debit the rows it funded.
+     *
+     *      A row that fails a check an owner controls (paused, deleted, short of balance, not yet due,
+     *      or a stale `expectedPurchaseAmount`) is skipped and reported via
+     *      `DcaManager__PurchaseRowSkipped` instead of reverting the batch. Passing those checks is not
+     *      the same as being fundable: a schedule's principal and the buyer's funds on the handler are
+     *      two different books, and the second is pooled across that buyer's schedules on this route,
+     *      so only the handler can decide it. It answers by zeroing the rows it could not fund, before
+     *      it charges any fee or buys anything, and the loop below debits exactly the rows that
+     *      survived. That is why nothing is written before the call: a debit would otherwise have to be
+     *      taken back, and a row the handler dropped would have consumed a period it never bought in.
+     *
+     *      A row on the wrong route still reverts the whole call, because no setter can move a
+     *      schedule's route and a mismatch there is a swapper-side composition error, not an owner
+     *      front-run. So are rows out of order — see `DcaManager__BatchRowsNotSorted`. If every row is
+     *      skipped, no handler is called and this returns without reverting.
      */
     function _batchBuyRbtc(Batch calldata batch) private {
         uint256 numOfRows = batch.rows.length;
@@ -526,32 +536,43 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         address[] memory buyers = new address[](numOfRows);
         uint64[] memory scheduleIds = new uint64[](numOfRows);
         uint256[] memory purchaseAmounts = new uint256[](numOfRows);
-        uint256 numOfPurchases;
+        bool anyPurchasable;
+        // Ids start at 1, so a zero seed also rejects a row naming schedule 0.
+        uint64 previousScheduleId;
         for (uint256 i; i < numOfRows; ++i) {
             (uint64 scheduleId, uint96 expectedPurchaseAmount) = _decodeBatchRow(batch.rows[i]);
-            (address buyer, uint256 schedulePurchaseAmount, uint256 scheduleRouteIndex, bool skipped) =
-                _rBtcPurchaseChecks(batch.token, scheduleId, expectedPurchaseAmount);
-            if (skipped) continue;
-            if (scheduleRouteIndex != batch.routeIndex) {
-                revert DcaManager__RouteIndexMismatch(batch.token, scheduleId, scheduleRouteIndex, batch.routeIndex);
+            if (scheduleId <= previousScheduleId) revert DcaManager__BatchRowsNotSorted(scheduleId);
+            previousScheduleId = scheduleId;
+            scheduleIds[i] = scheduleId;
+            (buyers[i], purchaseAmounts[i]) =
+                _rBtcPurchaseChecks(batch.token, scheduleId, expectedPurchaseAmount, batch.routeIndex);
+            if (purchaseAmounts[i] != 0) anyPurchasable = true;
+        }
+        if (!anyPurchasable) return;
+
+        // Skipped rows keep their place, carrying a zero amount the handler passes over, so the row
+        // indexes it reports back are indexes into these same arrays and nothing has to be compacted.
+        uint256[] memory unfundedRows = IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex)))
+            .batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, batch.minRbtcOutRate);
+
+        // The handler reports only what this contract cannot work out for itself: the rows it could not
+        // fund, ascending, and almost always none at all. Walking that list with a cursor rather than
+        // reading a per-row answer keeps the usual batch — every row funded — at one comparison a row.
+        uint256 numOfUnfundedRows = unfundedRows.length;
+        uint256 nextUnfundedRow;
+        for (uint256 i; i < numOfRows; ++i) {
+            if (purchaseAmounts[i] == 0) continue;
+            if (nextUnfundedRow < numOfUnfundedRows && unfundedRows[nextUnfundedRow] == i) {
+                ++nextUnfundedRow;
+                emit DcaManager__PurchaseRowSkipped(
+                    batch.token, scheduleIds[i], PurchaseRowSkipReason.FundingInsufficient
+                );
+                continue;
             }
-            _rBtcPurchaseEffects(batch.token, scheduleId, schedulePurchaseAmount);
-            buyers[numOfPurchases] = buyer;
-            scheduleIds[numOfPurchases] = scheduleId;
-            purchaseAmounts[numOfPurchases] = schedulePurchaseAmount;
-            ++numOfPurchases;
+            // Debited with this contract's own figure: the handler says which rows funded, never for
+            // how much.
+            _rBtcPurchaseEffects(batch.token, scheduleIds[i], purchaseAmounts[i]);
         }
-        if (numOfPurchases == 0) return;
-        if (numOfPurchases < numOfRows) {
-            // Copy the survivors into right-sized arrays rather than forwarding the padded ones: the
-            // handler must see exactly the rows it is being asked to purchase, and a trailing zero
-            // buyer would be credited as an account. Only a batch that actually skipped a row pays for
-            // this, and the purchase path stays assembly-free (invariant 5).
-            (buyers, scheduleIds, purchaseAmounts) = _compact(buyers, scheduleIds, purchaseAmounts, numOfPurchases);
-        }
-        IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex))).batchBuyRbtc(
-            buyers, scheduleIds, purchaseAmounts, batch.minRbtcOutRate
-        );
     }
 
     /**
@@ -562,27 +583,6 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     function _decodeBatchRow(bytes32 row) private pure returns (uint64 scheduleId, uint96 expectedPurchaseAmount) {
         scheduleId = uint64(uint256(row) >> 96);
         expectedPurchaseAmount = uint96(uint256(row));
-    }
-
-    /**
-     * @dev Copy the first `length` entries of the three parallel purchase arrays into right-sized ones.
-     *      Reached only when at least one row was skipped.
-     */
-    function _compact(
-        address[] memory buyers,
-        uint64[] memory scheduleIds,
-        uint256[] memory purchaseAmounts,
-        uint256 length
-    ) private pure returns (address[] memory, uint64[] memory, uint256[] memory) {
-        address[] memory compactedBuyers = new address[](length);
-        uint64[] memory compactedScheduleIds = new uint64[](length);
-        uint256[] memory compactedPurchaseAmounts = new uint256[](length);
-        for (uint256 i; i < length; ++i) {
-            compactedBuyers[i] = buyers[i];
-            compactedScheduleIds[i] = scheduleIds[i];
-            compactedPurchaseAmounts[i] = purchaseAmounts[i];
-        }
-        return (compactedBuyers, compactedScheduleIds, compactedPurchaseAmounts);
     }
 
     /**
@@ -704,30 +704,32 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      *      nothing and reads as `InexistentSchedule` rather than being debited by a handler that never
      *      held its funds. No owner is supplied by the caller either: the account credited with the
      *      purchase is read from the schedule. Every condition here is one a schedule's own owner can
-     *      flip between the swapper's snapshot and this call landing, so each one is a skip
-     *      (`skipped = true`, with the matching `PurchaseRowSkipReason` emitted by the caller) rather
-     *      than a revert — except the route index, which the caller still compares and reverts on,
-     *      since that mismatch cannot come from anything an owner controls.
+     *      flip between the swapper's snapshot and this call landing, so each one is a skip — a zero
+     *      `purchaseAmount`, reported with the matching `PurchaseRowSkipReason` — rather than a revert.
+     *      The route index is the exception and reverts, since that mismatch cannot come from anything
+     *      an owner controls. It is compared last, so a row that was going to be skipped anyway never
+     *      fails the batch on a route it was never going to use.
      * @return buyer The schedule's owner (zero when skipped).
-     * @return purchaseAmount The schedule's current purchase amount (zero when skipped).
-     * @return routeIndex The schedule's route index (zero when skipped).
-     * @return skipped True when the caller must skip this row instead of purchasing it.
+     * @return purchaseAmount The schedule's current purchase amount, or zero when the row is skipped.
+     *         A live schedule's amount is always above the token minimum, so zero is unambiguous.
      */
-    function _rBtcPurchaseChecks(address token, uint64 scheduleId, uint96 expectedPurchaseAmount)
-        private
-        returns (address buyer, uint256 purchaseAmount, uint256 routeIndex, bool skipped)
-    {
+    function _rBtcPurchaseChecks(
+        address token,
+        uint64 scheduleId,
+        uint96 expectedPurchaseAmount,
+        uint256 routeIndex
+    ) private returns (address buyer, uint256 purchaseAmount) {
         DcaSchedule storage dcaSchedule = s_dcaSchedules[token][scheduleId];
 
         buyer = dcaSchedule.user;
         if (buyer == address(0)) {
             emit DcaManager__PurchaseRowSkipped(token, scheduleId, PurchaseRowSkipReason.InexistentSchedule);
-            return (address(0), 0, 0, true);
+            return (address(0), 0);
         }
 
         if (dcaSchedule.paused) {
             emit DcaManager__PurchaseRowSkipped(token, scheduleId, PurchaseRowSkipReason.SchedulePaused);
-            return (address(0), 0, 0, true);
+            return (address(0), 0);
         }
 
         uint256 lastPurchaseTimestamp = dcaSchedule.lastPurchaseTimestamp;
@@ -740,27 +742,31 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
             uint256 nextPurchaseDayStart = nextDueTimestamp - (nextDueTimestamp % 1 days);
             if (currentDayStart < nextPurchaseDayStart) {
                 emit DcaManager__PurchaseRowSkipped(token, scheduleId, PurchaseRowSkipReason.PeriodNotElapsed);
-                return (address(0), 0, 0, true);
+                return (address(0), 0);
             }
         }
 
         purchaseAmount = dcaSchedule.purchaseAmount;
         if (purchaseAmount != expectedPurchaseAmount) {
             emit DcaManager__PurchaseRowSkipped(token, scheduleId, PurchaseRowSkipReason.PurchaseAmountMismatch);
-            return (address(0), 0, 0, true);
+            return (address(0), 0);
         }
 
         if (purchaseAmount > dcaSchedule.tokenBalance) {
             emit DcaManager__PurchaseRowSkipped(token, scheduleId, PurchaseRowSkipReason.BalanceInsufficient);
-            return (address(0), 0, 0, true);
+            return (address(0), 0);
         }
 
-        routeIndex = dcaSchedule.routeIndex;
+        if (dcaSchedule.routeIndex != routeIndex) {
+            revert DcaManager__RouteIndexMismatch(token, scheduleId, dcaSchedule.routeIndex, routeIndex);
+        }
     }
 
     /**
-     * @dev Effects of one purchase row, applied only after `_rBtcPurchaseChecks` and the route
-     *      comparison both pass. Debits `purchaseAmount` (already validated against `tokenBalance`) and
+     * @dev Effects of one purchase row, applied only once `_rBtcPurchaseChecks` has passed and the
+     *      handler has reported the row funded. Debits `purchaseAmount` (already validated against
+     *      `tokenBalance`, which nothing can have moved since: the shared reentrancy guard is held for
+     *      the whole call, so no owner mutation can land between the check and this write) and
      *      anchors the next due date to the schedule's own cadence, so the wanted periodicity survives
      *      a delayed purchase or a schedule that was paused or ran out of stablecoin and was resumed
      *      with a new deposit. Floors `periodsElapsed` at 1 so the purchase isn't blocked when a full
