@@ -26,7 +26,9 @@ import {UserTokenIdDcaManager} from "./prototype/UserTokenIdDcaManager.sol";
  *          forge test --match-path 'test/gas/*' -vv
  *          FOUNDRY_PROFILE=deploy forge test --match-path 'test/gas/*' -vv
  *
- *      Nine designs, identical schedules, one stub handler per design and size:
+ *      Nine designs, identical schedules, one stub handler per design and size. The sizes are 1, 5,
+ *      10, 50 and 200 rows; 5 is there because the last tick the live protocol ran before this branch
+ *      was a five-schedule batch, so the table can be read against a transaction that happened.
  *        A — `src/DcaManager`: keyed by `(token, scheduleId)`, with the owner stored and checked, and
  *            a batch row that is one id.
  *        B — pre-R64: keyed by `(user, token, index)`, with ids, buyers, indexes, and amounts.
@@ -81,13 +83,13 @@ contract R64BatchGasBenchmarkTest is Test {
     uint256 private constant START_TIMESTAMP = 1_770_000_000; // 2026-02-02, a plausible relaunch clock
 
     uint256 private constant DESIGNS = 9;
-    uint256 private constant SIZES = 4;
+    uint256 private constant SIZES = 5;
 
     /// @dev Batch sizes the spec asks for.
-    uint256[SIZES] private s_batchSizes = [uint256(1), 10, 50, 200];
+    uint256[SIZES] private s_batchSizes = [uint256(1), 5, 10, 50, 200];
     /// @dev Schedule 0 is never batched; it exists so the size groups start at a non-zero offset.
     uint256 private constant FIRST_SCHEDULE = 1;
-    uint256 private constant TOTAL_SCHEDULES = 261; // 1 + 10 + 50 + 200
+    uint256 private constant TOTAL_SCHEDULES = 266; // 1 + 5 + 10 + 50 + 200
 
     address private s_swapper;
 
@@ -112,7 +114,7 @@ contract R64BatchGasBenchmarkTest is Test {
     StubPurchaseHandler[SIZES][DESIGNS] private s_handlers;
     uint32[SIZES] private s_routeIdsF;
 
-    /// @dev Buyer `i` owns schedule `i` on every design; ids run 1..262 in the same order on all six.
+    /// @dev Buyer `i` owns schedule `i` on every design; ids run 1..267 in the same order on all nine.
     address[] private s_buyers;
 
     function setUp() public {

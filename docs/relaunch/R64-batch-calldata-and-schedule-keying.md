@@ -162,7 +162,8 @@ FOUNDRY_PROFILE=deploy forge test --match-path 'test/gas/*' -vv
 ```
 
 `test/gas/R64BatchGasBenchmark.t.sol` prices every design considered, against one stub handler and
-identical schedules, at 1, 10, 50 and 200 rows:
+identical schedules, at 1, 5, 10, 50 and 200 rows — 5 because that is the size of the last tick the
+live protocol ran before this branch (**Against the last live tick**):
 
 | | storage | a batch row is |
 |---|---|---|
@@ -222,8 +223,8 @@ section carried while the measurement PR was open: those were taken with a pre-w
 with only A, B and C built.
 
 The headline, at 200 rows under via-IR, the profile that ships: **17,746 gas per row before R64,
-13,758 after** — 22.5% off every row of every tick, of which 736 is calldata the swapper no longer
-sends and 3,251 is execution. **Implementation → Where the gas went** breaks that down term by term.
+13,759 after** — 22.5% off every row of every tick, of which 736 is calldata the swapper no longer
+sends and 3,252 is execution. **Implementation → Where the gas went** breaks that down term by term.
 
 ## What the numbers say
 
@@ -234,16 +235,18 @@ calldata those fields cost was never buying a storage read; it was buying a comp
 the contract had already loaded.
 
 **Calldata was not where most of the win was either.** At 200 rows under via-IR the shipped design
-saves 3,988 gas per row against pre-R64, of which 147,156/200 ≈ 736 is intrinsic calldata. The other
-3,251 is execution: a cold slot per row that the array's length used to cost, decoding one calldata
+saves 3,987 gas per row against pre-R64, of which 147,156/200 ≈ 736 is intrinsic calldata. The other
+3,252 is execution: a cold slot per row that the array's length used to cost, decoding one calldata
 array instead of four, copying one fewer into memory for the handler call, one `keccak256` per row
 fewer than a three-level key, the `validateScheduleIndex` and id cross-check that an id-addressed
 schedule deletes outright, and the memory copy the purchase path no longer makes.
 
-**The staleness guard costs about 450 gas per row.** Design D is the shipped design with the
-`purchaseAmounts` array restored: 14,871 against the 14,188 the shipped design measured before its
-read pattern changed (**Where the gas went**), at 200 rows under via-IR, or 683 —
-of which 201 is calldata. It is priced separately because it is a separate decision, taken in Gate 1.
+**The staleness guard costs about 265 gas per row.** Design D is the owner-in-key design carrying a
+`purchaseAmounts` array as well as its buyers: 14,871 per row at 200 rows under via-IR, against 14,603
+and 14,606 for the two designs of the same family that carry only buyers and ids (G and I). About 214
+of that is the extra calldata word; the comparison is not exact, because no two prototypes differ by
+the array alone, but both pairs land in the same place. It is priced separately because it is a
+separate decision, taken in Gate 1.
 
 **Two payers, not one.** The tick is paid by the protocol, every day, for the life of every schedule.
 Create and delete are paid once, by the user who opens a schedule. This item makes the first cheaper
@@ -252,9 +255,12 @@ break-even here: they come out of different pockets, and a break-even in purchas
 protocol's saving repays the user's cost, which it does not.
 
 **Scale, for the payer that matters daily.** Rootstock's block gas limit is 10,000,000 (measured at
-block 9,210,661), so one tick fits about **560 rows under the pre-R64 design and about 725 under the
-shipped one** — the operational headroom is the part of this that compounds, not the fraction of a
-cent per row.
+block 9,210,661). Against the benchmark's stub handler that is about **560 rows under the pre-R64
+design and about 725 under the shipped one** — but read those as the *manager-side* ceiling, not an
+operational one. A real tick spends most of its gas in the handler: in the last live batch the venue
+leg was 83% of the transaction (**Against the last live tick**), and how that leg scales per row is
+not measured on this branch. What R64 moves is the manager's slope, and the headroom it buys is the
+part that compounds, not the fraction of a cent per row.
 
 ## Decision
 
@@ -291,7 +297,7 @@ that hazard structurally and got back to two slots — but it forced the swapper
 address for every row, which is 20 bytes per row on the path the protocol pays for daily. The third,
 which ships, puts the **stablecoin** in the key instead: a row goes back to a bare `uint64`, the
 token check becomes structural in the same motion, and the owner becomes a field checked in exactly
-one place. Measured at 200 rows under via-IR, that is 13,758 gas per row against 14,606 for
+one place. Measured at 200 rows under via-IR, that is 13,759 gas per row against 14,606 for
 owner-in-key and 17,746 for pre-R64.
 
 The ownership check is the price, and it is worth stating plainly rather than explaining away: a
@@ -369,11 +375,11 @@ situ, so the mapping was flipped in `src/DcaManager` itself and the benchmark re
 
 | | default | via-IR (ships) |
 |---|---|---|
-| `[token][scheduleId]` — ships | 14,918 | 13,758 |
-| `[scheduleId][token]` | 14,927 | 13,743 |
+| `[token][scheduleId]` — ships | 14,937 | 13,759 |
+| `[scheduleId][token]` | 14,928 | 13,744 |
 
-Token-first costs **15 gas a row under via-IR, 0.11%**, and saves 9 under the default profile. It
-ships because `s_dcaSchedules[token][scheduleId]` says what the mapping is — for each stablecoin, the
+Token-first costs **15 gas a row under via-IR, 0.11%**, and 9 under the default profile, which is
+inside the noise the id and address distributions put on this table. It ships because `s_dcaSchedules[token][scheduleId]` says what the mapping is — for each stablecoin, the
 schedules that spend it — while `s_dcaSchedules[scheduleId][token]` reads as an id with a second key
 bolted on, and a tenth of a percent is not worth a storage declaration that misleads every future
 reader.
@@ -418,28 +424,28 @@ schedule as `(token, scheduleId)` rather than by owner. `IPurchaseRbtc.batchBuyR
 
 ### What it cost and bought
 
-`batchBuyRbtc`, 200 rows, total per row including intrinsic calldata. Every alternative priced along
-the way is kept in `test/gas/R64BatchGasBenchmark.t.sol` so the choice can be re-checked rather than
+`batchBuyRbtc` at 200 rows, total per row including intrinsic calldata; the benchmark prints 1, 5, 10
+and 50 as well. Every alternative priced along the way is kept in `test/gas/R64BatchGasBenchmark.t.sol` so the choice can be re-checked rather than
 re-argued. B is the pre-R64 keying, reproduced as a prototype:
 
 | | default | via-IR (ships) | vs shipped, via-IR |
 |---|---|---|---|
-| B — pre-R64 `[user][token][index]`, four arrays | 18,931 | 17,746 | +3,988 |
-| C — flat by id, owner *and* token stored, three slots | 17,008 | 16,100 | +2,342 |
-| I — `[user][token][id]`, both structural, buyers in the batch | 15,730 | 14,606 | +848 |
-| G — `[id][user][token]`, both structural, buyers in the batch | 15,687 | 14,603 | +845 |
-| H — G's key, row packed as one word `(id << 160) \| buyer` | 15,069 | 14,219 | +461 |
-| F — flat by id, `uint32 routeId` in place of the token | 14,901 | 13,955 | +197 |
-| E — the same design keyed `[id][token]` | 14,910 | 13,951 | +193 |
-| **A — shipped: `[token][id]`, owner stored and checked** | **14,918** | **13,758** | — |
+| B — pre-R64 `[user][token][index]`, four arrays | 18,941 | 17,746 | +3,987 |
+| C — flat by id, owner *and* token stored, three slots | 17,012 | 16,100 | +2,341 |
+| I — `[user][token][id]`, both structural, buyers in the batch | 15,753 | 14,606 | +847 |
+| G — `[id][user][token]`, both structural, buyers in the batch | 15,705 | 14,603 | +844 |
+| H — G's key, row packed as one word `(id << 160) \| buyer` | 15,080 | 14,219 | +460 |
+| F — flat by id, `uint32 routeId` in place of the token | 14,909 | 13,955 | +196 |
+| E — the same design keyed `[id][token]` | 14,916 | 13,952 | +193 |
+| **A — shipped: `[token][id]`, owner stored and checked** | **14,937** | **13,759** | — |
 
 Read the last three rows with two caveats. **A is the only row that reads its schedule through a
 storage pointer**: every prototype still opens its purchase path with the memory copy `DcaManager`
 itself used until late in this branch, worth 430 gas a row under via-IR (see below). **And A is the
 only row that is not a prototype**, which the compiler optimises harder than the full contract — the
-in-situ key flip above measures E's design 15 gas a row from A's, where the prototype table shows 237.
+in-situ key flip above measures E's design 15 gas a row from A's, where the prototype table shows 193.
 Both caveats cut the same way, and neither touches the comparison with B: B is a faithful copy of the
-pre-R64 contract, memory copy included, so the 3,988 is a real before-and-after of what the protocol
+pre-R64 contract, memory copy included, so the 3,987 is a real before-and-after of what the protocol
 pays. E and F were rejected on what they cost outside the gas table anyway — E's mapping reads as an id
 with a useless second key, and F needs a second route identifier minted inside `OperationsAdmin`.
 
@@ -447,11 +453,11 @@ Cold paths, per schedule, paid by the user:
 
 | | create (default) | delete (default) | create (via-IR) | delete (via-IR) |
 |---|---|---|---|---|
-| B — pre-R64 | 99,928 | 10,924 | 98,125 | 10,567 |
+| B — pre-R64 | 99,928 | 10,916 | 98,125 | 10,567 |
 | **A — shipped** | **122,629** | **11,402** | **121,636** | **11,402** |
 
 Create costs the user about 23,500 gas more than the pre-R64 design and delete about 800 more; both
-are paid once per schedule, by the user, while the 3,988 gas per row the tick saves is paid every day,
+are paid once per schedule, by the user, while the 3,987 gas per row the tick saves is paid every day,
 by the protocol. The two are different bills and are not netted here.
 
 ### Where the gas went
@@ -460,10 +466,10 @@ Per row at 200 rows, under the via-IR profile that ships:
 
 | | pre-R64 (B) | shipped (A) | delta |
 |---|---|---|---|
-| intrinsic calldata | 894 | 158 | −736 |
-| manager execution | 16,254 | 13,002 | −3,251 |
+| intrinsic calldata | 894 | 159 | −736 |
+| manager execution | 16,254 | 13,002 | −3,252 |
 | stub handler leg, identical by construction | 598 | 598 | 0 |
-| **total** | **17,746** | **13,758** | **−3,988** |
+| **total** | **17,746** | **13,759** | **−3,987** |
 
 **Calldata: four words a row became one.** A pre-R64 row carried a buyer, an index, an id and an
 amount — 128 bytes, because an element of a dynamic array occupies a whole word whatever its declared
@@ -486,7 +492,7 @@ stablecoin addresses empty storage, and is refused by the `user == address(0)` t
 anyway. What is left is an owner comparison — which the purchase path does not make, because it takes
 the buyer from the schedule instead of checking one the caller supplied.
 
-**The per-row amount is gone**: one calldata word and about 450 gas a row (design D restores it and
+**The per-row amount is gone**: one calldata word and about 265 gas a row (design D carries it and
 prices it), for a staleness guard the manager never debited with.
 
 **Packing is not where the win came from — it is where the cost went.** Both designs store two slots.
@@ -513,23 +519,19 @@ that ships it costs 430 gas a row:**
 
 | `_rBtcPurchaseChecksEffects` reads its schedule by | default | via-IR (ships) |
 |---|---|---|
-| copying the struct into memory | 14,231 | 14,188 |
-| a storage pointer, fields into locals | 14,918 | **13,758** |
+| copying the struct into memory | 14,921 | 14,189 |
+| a storage pointer, fields into locals | 14,937 | **13,759** |
 
-The two pipelines optimise different things. The legacy pipeline does not eliminate a repeated `SLOAD`
-of a slot it has already read, so reading seven fields off a pointer pays 100 gas for each one after
-the first, and copying the struct once — two `SLOAD`s and some memory traffic — is the cheaper shape,
-by 687 gas a row. Under via-IR those redundant loads are eliminated: the pointer version also reads
-each of the two slots exactly once, and the copy is left doing work that buys nothing — materialising
-all seven fields eagerly, a memory word each, masking and shifting every one of them, including the
-ones a row that reverts never reaches.
-
-`[profile.deploy]`, via-IR, is what ships (R60), so the pointer read is what ships. The default
-profile's 687 is a test-profile number and nobody pays it.
+Under via-IR the copy is pure overhead: the optimiser already eliminates a repeated `SLOAD` of a slot
+it has read, so the pointer version reads each of the two slots exactly once, while the copy
+materialises all seven fields eagerly — a memory word each, masked and shifted — including the ones a
+row that reverts never reaches. Under the legacy pipeline that eager copy nearly pays for itself, and
+the two shapes finish 16 gas a row apart, which is inside this table's noise. So the change is 430 gas
+a row where it counts and free where it does not; `[profile.deploy]`, via-IR, is what ships (R60).
 
 `deleteDcaSchedule` carried the same copy — made to read two fields out of one slot before the
-schedule is deleted — and dropping it takes that path from 11,860 to 11,402, 458 gas off a cost the
-user pays.
+schedule is deleted — and dropping it takes that path from 11,860 to 11,402 under via-IR, and from
+11,789 to 11,402 under the default profile: 458 gas off a cost the user pays.
 
 **The rule this gives is not "never copy a struct into memory."** It is that under via-IR a copy has
 to earn its keep: many reads of the same field, or a snapshot that has to survive a call which could
@@ -563,6 +565,61 @@ sits in the schedule's second slot, which is exactly where the pre-R64 design ke
 `scheduleId` it compared. So each should shed roughly the 2,100 of that cold length slot. It is not
 quantified, because the pre-R64 prototype implements the purchase path and nothing else, so this
 branch has no like-for-like harness for the rest; the lookup itself is the one the tick measures.
+
+### Against the last live tick
+
+The protocol's most recent batch purchase before this branch was
+[`0xa6ac747a…eb983320`](https://explorer.rootstock.io/tx/0xa6ac747ab6a972f8cda94de9d1c5ecc1c68f00b4b65f74a808876598eb983320),
+block 9,198,662, 2026-08-31: **five schedules, one DOC batch through the Sovryn handler and MoC**. The
+benchmark carries a 5-row size so the table can be read against a transaction that actually happened.
+
+**What Rootstock charged.** 815,384 gas against a 999,220 limit (81.6%), at 0.03 gwei — 0.00002446152
+RBTC, about $1.92, or $0.38 a purchase. Its calldata was 964 bytes: 636 zero, 328 non-zero, 31 words,
+which on Rootstock's schedule is 8,164 gas over the 21,060 base. Most of those non-zero bytes are the
+five `bytes32` schedule ids the deployed version passes — 160 bytes of near-full entropy at 16 gas
+each, where a `uint64` id is 24 zero bytes at 4.
+
+**Where it went.** Replaying the transaction with `cast run` against a fork of that block, with the
+block's earlier transactions executed first:
+
+| | gas | share |
+|---|---:|---:|
+| handler leg — Sovryn `assetBalanceOf`/`profitOf`/`tokenPrice`, the iSUSD redeem, the MoC redeem, the fee transfer, five rBTC credits | 770,086 | 83% |
+| `DcaManager` bookkeeping — decode, five schedules read and written, ten events | 147,335 | 16% |
+| `OperationsAdmin` — role check and handler lookup | 6,071 | 1% |
+
+**R64 changes the 16% and the calldata. It does not touch the 83%.** What the same five rows cost
+under each design, from the benchmark at 5 rows under via-IR — read the manager and calldata columns,
+since the stub handler is not Sovryn:
+
+| 5-row tick, via-IR | pre-R64 (B) | shipped (A) |
+|---|---:|---:|
+| calldata | 1,028 bytes / 6,560 gas | 356 bytes / 1,952 gas |
+| manager execution | 84,254 | 68,328 |
+| total, per row | 19,795 | 15,688 |
+
+About **20,500 gas off a five-row tick, 20.7%, some 4,100 a row** — at that day's gas price, roughly
+five cents. At 200 rows the same change is worth about $1.88 a tick. Neither number is the point: the
+point is the slope, and the block headroom it buys.
+
+Three things this comparison is not:
+
+1. **The deployed contract is not design B.** It is the pre-relaunch codebase — `bytes32` ids, the
+   pre-R18/R50 struct, the pre-R30 purchase pipeline — and it spends 147,335 on bookkeeping where B's
+   prototype spends 84,254 on the same five rows. That gap is the rest of the relaunch stack, which
+   ships in the same deploy. R64's own share is the B → A column above.
+2. **Foundry prices execution like Ethereum.** The replay of this transaction reports 923,984 gas where
+   Rootstock charged 815,384 — **13.3% high**, on identical state. Only the benchmark's calldata column
+   is on Rootstock's own schedule; its execution columns are not, so read them as a design-to-design
+   ratio rather than as a Rootstock bill. Where the 13.3% comes from is not established here: the
+   shape of it — one transaction touching a great many slots for the first time — points at
+   storage-access pricing rather than at anything this item touches, but that is a guess, and nothing
+   on this branch tests it.
+3. **It says nothing about how many rows fit in a block.** At five rows the venue leg is 83% of the
+   transaction, and one live sample cannot separate its fixed part — one redeem, one swap, one fee
+   transfer — from its per-row part. The row ceilings quoted in **What the numbers say** are
+   manager-side, against a stub handler. Sizing the swapper's batches needs the handler leg measured
+   the same way, which this branch does not do.
 
 ### What did not change
 
