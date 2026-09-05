@@ -244,7 +244,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        dcaManager.updatePurchaseAmount(scheduleId, AMOUNT_TO_SPEND);
+        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
         vm.stopPrank();
         
         // Create a mock oracle that returns invalid prices
@@ -258,7 +258,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         
         // Try to make a purchase, which should revert due to invalid price
         vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__OutdatedPrice.selector);
-        buyRbtcOne(USER, scheduleId);
+        buyRbtcOne(scheduleId);
     }
 
     ////////////////////////////

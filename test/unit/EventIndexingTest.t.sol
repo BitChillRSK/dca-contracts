@@ -67,7 +67,7 @@ contract EventIndexingTest is DcaDappTest {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.prank(USER);
         vm.recordLogs();
-        dcaManager.setSchedulePaused(scheduleId, true);
+        dcaManager.setSchedulePaused(address(stablecoin), scheduleId, true);
 
         bytes32 sig = keccak256("DcaManager__SchedulePauseSet(address,uint64,bool)");
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -89,16 +89,16 @@ contract EventIndexingTest is DcaDappTest {
         vm.recordLogs();
         depositStablecoin();
         vm.startPrank(USER);
-        dcaManager.updatePurchaseAmount(scheduleId, AMOUNT_TO_SPEND);
-        dcaManager.updatePurchasePeriod(scheduleId, MIN_PURCHASE_PERIOD);
-        dcaManager.setSchedulePaused(scheduleId, true);
-        dcaManager.setSchedulePaused(scheduleId, false);
+        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
+        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, MIN_PURCHASE_PERIOD);
+        dcaManager.setSchedulePaused(address(stablecoin), scheduleId, true);
+        dcaManager.setSchedulePaused(address(stablecoin), scheduleId, false);
         vm.stopPrank();
         makeSinglePurchase();
         vm.prank(USER);
         dcaManager.withdrawRbtcFromTokenHandler(address(stablecoin), s_routeIndex);
         vm.prank(USER);
-        dcaManager.deleteDcaSchedule(scheduleId);
+        dcaManager.deleteDcaSchedule(address(stablecoin), scheduleId);
         _assertFirstPartyIndexing(vm.getRecordedLogs());
     }
 
@@ -106,7 +106,7 @@ contract EventIndexingTest is DcaDappTest {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.prank(USER);
         vm.recordLogs();
-        dcaManager.deleteDcaSchedule(scheduleId);
+        dcaManager.deleteDcaSchedule(address(stablecoin), scheduleId);
 
         bytes32 sig = keccak256("DcaManager__DcaScheduleDeleted(address,address,uint64,uint256)");
         Vm.Log[] memory logs = vm.getRecordedLogs();

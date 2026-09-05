@@ -78,10 +78,8 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         IDcaManager.DcaSchedule memory schedule =
             scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex);
         batch.scheduleIds = new uint64[](1);
-        batch.buyers = new address[](1);
         batch.token = address(stablecoin);
-        batch.scheduleIds[0] = schedule.scheduleId;
-        batch.buyers[0] = USER;
+        batch.scheduleIds[0] = scheduleIdAt(dcaManager, USER, address(stablecoin), scheduleIndex);
         batch.routeIndex = routeIndex;
     }
 
@@ -152,17 +150,11 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         uint64 secondId =
             scheduleIdAt(dcaManager, USER, address(stablecoin), SECOND_SCHEDULE_INDEX);
         vm.prank(USER);
-        dcaManager.setSchedulePaused(secondId, true);
+        dcaManager.setSchedulePaused(address(stablecoin), secondId, true);
 
         IDcaManager.Batch[] memory batches = _twoHandlers();
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IDcaManager.DcaManager__SchedulePaused.selector,
-                USER,
-                address(stablecoin),
-                secondId,
-                SECOND_SCHEDULE_INDEX
-            )
+            abi.encodeWithSelector(IDcaManager.DcaManager__SchedulePaused.selector, address(stablecoin), secondId)
         );
         _batchBuy(batches);
 

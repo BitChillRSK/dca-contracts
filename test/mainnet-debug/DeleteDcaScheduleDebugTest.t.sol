@@ -47,11 +47,13 @@ contract DeleteDcaScheduleDebugTest is Test {
         DcaManager dcaManager = DcaManager(DCA_MANAGER_ADDRESS);
         
         // Check user's schedules first
-        try dcaManager.getDcaSchedules(USER_ADDRESS, TOKEN_ADDRESS) returns (DcaManager.DcaSchedule[] memory schedules) {
+        try dcaManager.getDcaSchedules(USER_ADDRESS, TOKEN_ADDRESS) returns (
+            uint64[] memory scheduleIds, DcaManager.DcaSchedule[] memory schedules
+        ) {
             console2.log("Number of schedules:", schedules.length);
             if (schedules.length > 0) {
                 console2.log("Schedule 0 token balance:", schedules[0].tokenBalance);
-                console2.log("Schedule 0 schedule ID:", vm.toString(schedules[0].scheduleId));
+                console2.log("Schedule 0 schedule ID:", vm.toString(scheduleIds[0]));
             }
         } catch {
             console2.log("Failed to get schedules");

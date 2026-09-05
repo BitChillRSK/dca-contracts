@@ -8,7 +8,7 @@ import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ITokenLending} from "../../src/interfaces/ITokenLending.sol";
 import "../Constants.sol";
-import {scheduleAt} from "test/utils/ScheduleAt.sol";
+import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @notice R54: `topUpFromInterest` credits accrued lending interest to one schedule's spendable
@@ -39,6 +39,10 @@ contract TopUpFromInterestTest is DcaDappTest {
         return scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex);
     }
 
+    function _scheduleId(uint256 scheduleIndex) private view returns (uint64) {
+        return scheduleIdAt(dcaManager, USER, address(stablecoin), scheduleIndex);
+    }
+
     /// @dev `view`, and that is load-bearing: the compiler rejects this the moment
     ///      `getInterestAccrued` stops being one, which is what keeps generated clients reading it
     ///      for free instead of routing it through a write binding.
@@ -49,9 +53,9 @@ contract TopUpFromInterestTest is DcaDappTest {
     /// @dev Every schedule read is hoisted out of the arguments: a view call made after `vm.prank`
     ///      or `vm.expectRevert` consumes the cheatcode instead of the call under test.
     function _topUp(uint256 scheduleIndex, uint256 amount) private {
-        uint64 scheduleId = _schedule(scheduleIndex).scheduleId;
+        uint64 scheduleId = _scheduleId(scheduleIndex);
         vm.prank(USER);
-        dcaManager.topUpFromInterest(scheduleId, amount);
+        dcaManager.topUpFromInterest(address(stablecoin), scheduleId, amount);
     }
 
     /**
@@ -74,16 +78,18 @@ contract TopUpFromInterestTest is DcaDappTest {
         if (slack > schedule.purchaseAmount / 10) slack = schedule.purchaseAmount / 10;
         assertGt(slack, 0, "the accrued interest is too small to open any slack");
 
+        uint64 scheduleId = _scheduleId(scheduleIndex);
         vm.prank(USER);
-        dcaManager.withdrawToken(schedule.scheduleId, slack);
+        dcaManager.withdrawToken(address(stablecoin), scheduleId, slack);
     }
 
     /// @dev Open the same slack on a second schedule, after interest has already accrued.
     function _openSlackOn(uint256 scheduleIndex, uint256 slack) private {
         IDcaManager.DcaSchedule memory schedule = _schedule(scheduleIndex);
         assertEq(schedule.tokenBalance % schedule.purchaseAmount, 0, "the balance is no longer a whole multiple");
+        uint64 scheduleId = _scheduleId(scheduleIndex);
         vm.prank(USER);
-        dcaManager.withdrawToken(schedule.scheduleId, slack);
+        dcaManager.withdrawToken(address(stablecoin), scheduleId, slack);
     }
 
     /// @dev The credit that takes a schedule past its next whole purchase.
@@ -103,7 +109,7 @@ contract TopUpFromInterestTest is DcaDappTest {
         uint256 accruedInterest = _accruedInterest();
         assertGt(accruedInterest, slack, "the lane accrued too little to cross a purchase boundary");
         uint256 balanceBefore = _schedule(SCHEDULE_INDEX).tokenBalance;
-        uint64 scheduleId = _schedule(SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
 
         vm.expectEmit(true, true, true, true);
         emit DcaManager__ScheduleToppedUpFromInterest(USER, address(stablecoin), scheduleId, accruedInterest);
@@ -266,10 +272,10 @@ contract TopUpFromInterestTest is DcaDappTest {
         vm.prank(OWNER);
         dcaManager.setTokenMinPurchaseAmount(address(stablecoin), purchaseAmount);
 
-        uint64 scheduleId = _schedule(SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
         vm.startPrank(USER);
-        dcaManager.updatePurchaseAmount(scheduleId, purchaseAmount);
-        dcaManager.withdrawToken(scheduleId, type(uint256).max);
+        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, purchaseAmount);
+        dcaManager.withdrawToken(address(stablecoin), scheduleId, type(uint256).max);
         vm.stopPrank();
         assertEq(_schedule(SCHEDULE_INDEX).tokenBalance, 0, "the schedule was not depleted");
 
@@ -282,7 +288,7 @@ contract TopUpFromInterestTest is DcaDappTest {
         assertEq(_schedule(SCHEDULE_INDEX).tokenBalance, credit, "the depleted schedule was not credited");
 
         uint256 rbtcBefore = dcaManager.getAccumulatedRbtcBalance(USER, address(stablecoin), s_routeIndex);
-        super.buyRbtcOne(USER, scheduleId);
+        super.buyRbtcOne(scheduleId);
 
         assertEq(
             _schedule(SCHEDULE_INDEX).tokenBalance,
@@ -309,9 +315,9 @@ contract TopUpFromInterestTest is DcaDappTest {
         uint256 credited = _schedule(SCHEDULE_INDEX).tokenBalance;
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
 
-        uint64 scheduleId = _schedule(SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
         vm.prank(USER);
-        dcaManager.withdrawToken(scheduleId, type(uint256).max);
+        dcaManager.withdrawToken(address(stablecoin), scheduleId, type(uint256).max);
 
         assertEq(_schedule(SCHEDULE_INDEX).tokenBalance, 0, "the sentinel left principal behind");
         assertApproxEqAbs(
@@ -327,9 +333,9 @@ contract TopUpFromInterestTest is DcaDappTest {
         uint256 credited = _schedule(SCHEDULE_INDEX).tokenBalance;
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
 
-        uint64 scheduleId = _schedule(SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
         vm.prank(USER);
-        dcaManager.deleteDcaSchedule(scheduleId);
+        dcaManager.deleteDcaSchedule(address(stablecoin), scheduleId);
 
         assertApproxEqAbs(
             stablecoin.balanceOf(USER) - userStablecoinBefore, credited, DUST, "deletion paid less than the ledger"
@@ -362,7 +368,7 @@ contract TopUpFromInterestTest is DcaDappTest {
     /// @notice Nothing has accrued yet, so there is nothing to credit.
     function testTopUpRevertsWithoutAccruedInterest() external onlyLendingLane {
         assertEq(_accruedInterest(), 0, "the lane accrued interest before any time passed");
-        uint64 scheduleId = _schedule(SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
 
         vm.prank(USER);
         vm.expectRevert(
@@ -370,14 +376,14 @@ contract TopUpFromInterestTest is DcaDappTest {
                 IDcaManager.DcaManager__NoInterestToTopUpWith.selector, address(stablecoin), s_routeIndex
             )
         );
-        dcaManager.topUpFromInterest(scheduleId, AMOUNT_TO_SPEND);
+        dcaManager.topUpFromInterest(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
     }
 
     /// @notice A caller cannot credit more than they have earned on the route.
     function testTopUpRevertsWhenTheAmountExceedsTheAccruedInterest() external onlyLendingLane {
         _accrueAndOpenSlack(SCHEDULE_INDEX);
         uint256 accruedInterest = _accruedInterest();
-        uint64 scheduleId = _schedule(SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
 
         vm.prank(USER);
         vm.expectRevert(
@@ -389,7 +395,7 @@ contract TopUpFromInterestTest is DcaDappTest {
                 accruedInterest
             )
         );
-        dcaManager.topUpFromInterest(scheduleId, accruedInterest + 1);
+        dcaManager.topUpFromInterest(address(stablecoin), scheduleId, accruedInterest + 1);
     }
 
     /// @notice A credit that buys no further purchase is refused, so interest cannot be moved as dust.
@@ -398,7 +404,7 @@ contract TopUpFromInterestTest is DcaDappTest {
 
         uint256 needed = _neededToFundAnotherPurchase(SCHEDULE_INDEX);
         assertLt(needed, _accruedInterest(), "the accrued interest cannot reach the boundary at all");
-        uint64 scheduleId = _schedule(SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
 
         vm.startPrank(USER);
         vm.expectRevert(
@@ -409,14 +415,14 @@ contract TopUpFromInterestTest is DcaDappTest {
                 needed - 1
             )
         );
-        dcaManager.topUpFromInterest(scheduleId, needed - 1);
+        dcaManager.topUpFromInterest(address(stablecoin), scheduleId, needed - 1);
 
         vm.expectRevert(
             abi.encodeWithSelector(
                 IDcaManager.DcaManager__TopUpDoesNotFundAnotherPurchase.selector, address(stablecoin), scheduleId, 0
             )
         );
-        dcaManager.topUpFromInterest(scheduleId, 0);
+        dcaManager.topUpFromInterest(address(stablecoin), scheduleId, 0);
         vm.stopPrank();
 
         // The boundary itself is reachable: one wei more is accepted.
@@ -431,38 +437,38 @@ contract TopUpFromInterestTest is DcaDappTest {
             return;
         }
 
-        uint64 scheduleId = _schedule(SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
 
         vm.prank(USER);
         vm.expectRevert(
             abi.encodeWithSelector(IDcaManager.DcaManager__TokenDoesNotYieldInterest.selector, address(stablecoin))
         );
-        dcaManager.topUpFromInterest(scheduleId, AMOUNT_TO_SPEND);
+        dcaManager.topUpFromInterest(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
     }
 
     /// @notice The id is checked against storage, as on every other schedule mutator.
     function testTopUpRevertsOnAnIdThatBelongsToNoSchedule() external onlyLendingLane {
         _accrueAndOpenSlack(SCHEDULE_INDEX);
 
-        uint64 wrongScheduleId = _schedule(SCHEDULE_INDEX).scheduleId + 1;
+        uint64 wrongScheduleId = _scheduleId(SCHEDULE_INDEX) + 1;
         uint256 accruedInterest = _accruedInterest();
 
         vm.prank(USER);
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, USER, wrongScheduleId));
-        dcaManager.topUpFromInterest(wrongScheduleId, accruedInterest);
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), wrongScheduleId));
+        dcaManager.topUpFromInterest(address(stablecoin), wrongScheduleId, accruedInterest);
     }
 
     /// @notice A deleted id is retired: it never comes back and never opens the schedule that replaced it.
     function testTopUpRevertsOnADeletedSchedule() external onlyLendingLane {
         updateExchangeRate(ACCRUAL_TIME);
-        uint64 scheduleId = _schedule(SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
 
         vm.prank(USER);
-        dcaManager.deleteDcaSchedule(scheduleId);
+        dcaManager.deleteDcaSchedule(address(stablecoin), scheduleId);
 
         vm.prank(USER);
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, USER, scheduleId));
-        dcaManager.topUpFromInterest(scheduleId, 1);
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), scheduleId));
+        dcaManager.topUpFromInterest(address(stablecoin), scheduleId, 1);
     }
 
     /// @notice The schedule stores its owner, so the entry point only reaches the caller's own.
@@ -470,13 +476,13 @@ contract TopUpFromInterestTest is DcaDappTest {
         _accrueAndOpenSlack(SCHEDULE_INDEX);
 
         uint256 balanceBefore = _schedule(SCHEDULE_INDEX).tokenBalance;
-        uint64 scheduleId = _schedule(SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
         address attacker = makeAddr("attacker");
         uint256 accruedInterest = _accruedInterest();
 
         vm.prank(attacker);
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, attacker, scheduleId));
-        dcaManager.topUpFromInterest(scheduleId, accruedInterest);
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__NotScheduleOwner.selector, address(stablecoin), scheduleId, USER));
+        dcaManager.topUpFromInterest(address(stablecoin), scheduleId, accruedInterest);
 
         assertEq(_schedule(SCHEDULE_INDEX).tokenBalance, balanceBefore, "another account moved the schedule");
     }
@@ -491,7 +497,7 @@ contract TopUpFromInterestTest is DcaDappTest {
         _accrueAndOpenSlack(SCHEDULE_INDEX);
         uint256 accruedInterest = _accruedInterest();
         uint256 balanceBefore = _schedule(SCHEDULE_INDEX).tokenBalance;
-        uint64 scheduleId = _schedule(SCHEDULE_INDEX).scheduleId;
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
 
         vm.prank(OWNER);
         operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, true);
@@ -509,7 +515,7 @@ contract TopUpFromInterestTest is DcaDappTest {
         vm.expectRevert(
             abi.encodeWithSelector(IDcaManager.DcaManager__DepositsPaused.selector, address(stablecoin), s_routeIndex)
         );
-        dcaManager.depositToken(scheduleId, AMOUNT_TO_DEPOSIT);
+        dcaManager.depositToken(address(stablecoin), scheduleId, AMOUNT_TO_DEPOSIT);
         vm.stopPrank();
     }
 }

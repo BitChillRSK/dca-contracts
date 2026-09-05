@@ -9,15 +9,15 @@ import {IdleDocHandlerMoc} from "../../src/idle/IdleDocHandlerMoc.sol";
 import {MockMocProxy} from "../mocks/MockMocProxy.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "./TestsHelper.t.sol";
-import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
+import {scheduleAt, scheduleIdAt, scheduleCount} from "test/utils/ScheduleAt.sol";
 
 /**
  * @notice R18 + R50 + R64: each stored schedule occupies two slots with checked widths, and the
  *         protocol scalars plus the id nonce share one slot of their own.
  * @dev External arguments stay `uint256`, except `scheduleId`, which is the `uint64` creation nonce.
  *      Overflow reverts with OZ `SafeCast` data before cash or schedule state changes. A schedule is
- *      keyed by `(scheduleId, user)`, so neither key is duplicated in the value. Slot 0 holds every
- *      field a purchase touches, keeping a purchase to one `SSTORE`; slot 1 holds the stablecoin and
+ *      keyed by `(token, scheduleId)`, so neither key is duplicated in the value. Slot 0 holds every
+ *      field a purchase touches, keeping a purchase to one `SSTORE`; slot 1 holds the owner and the
  *      purchase amount. Deleting a schedule swap-pops its owner's id list and never moves another
  *      schedule's value.
  */
@@ -33,9 +33,10 @@ contract SchedulePackingTest is DcaDappTest {
         return abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, bits, value);
     }
 
-    function _scheduleBase(uint64 scheduleId, address user) private pure returns (uint256) {
-        bytes32 inner = keccak256(abi.encode(scheduleId, SCHEDULES_MAPPING_SLOT));
-        return uint256(keccak256(abi.encode(user, inner)));
+    /// @dev `s_dcaSchedules[token][scheduleId]`: the stablecoin picks the inner mapping, the id the value.
+    function _scheduleBase(address token, uint64 scheduleId) private pure returns (uint256) {
+        bytes32 inner = keccak256(abi.encode(token, SCHEDULES_MAPPING_SLOT));
+        return uint256(keccak256(abi.encode(scheduleId, inner)));
     }
 
     function _load(uint256 slot) private view returns (uint256) {
@@ -45,17 +46,18 @@ contract SchedulePackingTest is DcaDappTest {
     function _assertPackedAgainstGetter(uint256 scheduleIndex) private {
         IDcaManager.DcaSchedule memory schedule =
             scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex);
-        uint256 base = _scheduleBase(schedule.scheduleId, USER);
+        uint256 base =
+            _scheduleBase(address(stablecoin), scheduleIdAt(dcaManager, USER, address(stablecoin), scheduleIndex));
 
         // Slot 0 is every field a purchase reads or writes, so the whole update is one SSTORE.
         uint256 slot0 = uint256(uint128(schedule.tokenBalance))
             | (uint256(uint48(schedule.lastPurchaseTimestamp)) << 128) | (uint256(schedule.paused ? 1 : 0) << 176)
             | (uint256(uint32(schedule.purchasePeriod)) << 184) | (uint256(uint32(schedule.routeIndex)) << 216);
-        // Slot 1 pairs the stablecoin with the purchase amount, which is `uint96` so that the pair fits.
-        uint256 slot1 = uint256(uint160(schedule.token)) | (uint256(uint96(schedule.purchaseAmount)) << 160);
+        // Slot 1 pairs the owner with the purchase amount, which is `uint96` so that the pair fits.
+        uint256 slot1 = uint256(uint160(schedule.user)) | (uint256(uint96(schedule.purchaseAmount)) << 160);
 
         assertEq(_load(base), slot0, "slot 0 is not tokenBalance|timestamp|paused|period|route");
-        assertEq(_load(base + 1), slot1, "slot 1 is not token|purchaseAmount");
+        assertEq(_load(base + 1), slot1, "slot 1 is not user|purchaseAmount");
         // Neither half of the key is repeated in storage, so nothing follows.
         assertEq(_load(base + 2), 0, "a third slot was written");
     }
@@ -65,20 +67,23 @@ contract SchedulePackingTest is DcaDappTest {
     //////////////////////////////////////////////////////////////*/
 
     function testOneScheduleOccupiesExactlyTwoSlots() external {
-        assertEq(dcaManager.getDcaSchedules(USER, address(stablecoin)).length, 1);
+        assertEq(scheduleCount(dcaManager, USER, address(stablecoin)), 1);
         _assertPackedAgainstGetter(SCHEDULE_INDEX);
 
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        assertEq(_load(_scheduleBase(scheduleId, USER) + 2), 0, "a third slot was written for one schedule");
+        assertEq(
+            _load(_scheduleBase(address(stablecoin), scheduleId) + 2), 0, "a third slot was written for one schedule"
+        );
     }
 
-    /// @dev The owner is half the key, so the same id under another account is untouched storage.
-    function testAnIdUnderAnotherAccountIsEmptyStorage() external {
+    /// @dev The stablecoin is half the key, so the same id under another one is untouched storage.
+    ///      This is what makes a batch row of the wrong stablecoin address nothing at all.
+    function testAnIdUnderAnotherStablecoinIsEmptyStorage() external {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        uint256 strangerBase = _scheduleBase(scheduleId, makeAddr("packingStranger"));
+        uint256 otherTokenBase = _scheduleBase(makeAddr("packingStablecoin"), scheduleId);
 
-        assertEq(_load(strangerBase), 0, "another account's key is not empty");
-        assertEq(_load(strangerBase + 1), 0, "another account's key is not empty");
+        assertEq(_load(otherTokenBase), 0, "another stablecoin's key is not empty");
+        assertEq(_load(otherTokenBase + 1), 0, "another stablecoin's key is not empty");
     }
 
     function testProtocolScalarsAndNonceShareOneSlot() external {
@@ -95,14 +100,14 @@ contract SchedulePackingTest is DcaDappTest {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
 
         vm.startPrank(USER);
-        dcaManager.updatePurchasePeriod(scheduleId, type(uint32).max);
+        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, type(uint32).max);
         vm.stopPrank();
 
         vm.warp(type(uint48).max);
-        super.buyRbtcOne(USER, scheduleId);
+        super.buyRbtcOne(scheduleId);
 
         vm.prank(USER);
-        dcaManager.setSchedulePaused(scheduleId, true);
+        dcaManager.setSchedulePaused(address(stablecoin), scheduleId, true);
 
         IDcaManager.DcaSchedule memory schedule =
             scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
@@ -142,7 +147,7 @@ contract SchedulePackingTest is DcaDappTest {
         uint256 overflowing = uint256(type(uint128).max) + 1;
         uint256 userBefore = stablecoin.balanceOf(USER);
         uint256 handlerBefore = stablecoin.balanceOf(address(stablecoinHandler));
-        uint256 schedulesBefore = dcaManager.getDcaSchedules(USER, address(stablecoin)).length;
+        uint256 schedulesBefore = scheduleCount(dcaManager, USER, address(stablecoin));
 
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), overflowing);
@@ -154,7 +159,7 @@ contract SchedulePackingTest is DcaDappTest {
 
         assertEq(stablecoin.balanceOf(USER), userBefore, "an overflowing create pulled tokens");
         assertEq(stablecoin.balanceOf(address(stablecoinHandler)), handlerBefore);
-        assertEq(dcaManager.getDcaSchedules(USER, address(stablecoin)).length, schedulesBefore);
+        assertEq(scheduleCount(dcaManager, USER, address(stablecoin)), schedulesBefore);
     }
 
     function testCreateRevertsUint96MaxPlusOnePurchaseAmountBeforeTokensMove() external {
@@ -256,7 +261,7 @@ contract SchedulePackingTest is DcaDappTest {
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), overflowingAdd);
         vm.expectRevert(_safeCastOverflow(128, uint256(type(uint128).max) + 1));
-        dcaManager.depositToken(scheduleId, overflowingAdd);
+        dcaManager.depositToken(address(stablecoin), scheduleId, overflowingAdd);
         vm.stopPrank();
 
         assertEq(
@@ -277,7 +282,7 @@ contract SchedulePackingTest is DcaDappTest {
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), overflowing);
         vm.expectRevert(_safeCastOverflow(128, overflowing));
-        dcaManager.depositToken(scheduleId, overflowing);
+        dcaManager.depositToken(address(stablecoin), scheduleId, overflowing);
         vm.stopPrank();
 
         assertEq(scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance, scheduleBefore);
@@ -294,8 +299,8 @@ contract SchedulePackingTest is DcaDappTest {
 
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), extra);
-        dcaManager.depositToken(scheduleId, extra);
-        dcaManager.updatePurchaseAmount(scheduleId, maxAmount);
+        dcaManager.depositToken(address(stablecoin), scheduleId, extra);
+        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, maxAmount);
         vm.stopPrank();
 
         assertEq(
@@ -310,7 +315,7 @@ contract SchedulePackingTest is DcaDappTest {
 
         vm.prank(USER);
         vm.expectRevert(_safeCastOverflow(96, overflowing));
-        dcaManager.updatePurchaseAmount(scheduleId, overflowing);
+        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, overflowing);
 
         assertEq(
             scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).purchaseAmount, amountBefore
@@ -321,7 +326,7 @@ contract SchedulePackingTest is DcaDappTest {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
 
         vm.prank(USER);
-        dcaManager.updatePurchasePeriod(scheduleId, type(uint32).max);
+        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, type(uint32).max);
 
         assertEq(
             scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).purchasePeriod, type(uint32).max
@@ -335,7 +340,7 @@ contract SchedulePackingTest is DcaDappTest {
 
         vm.prank(USER);
         vm.expectRevert(_safeCastOverflow(32, overflowing));
-        dcaManager.updatePurchasePeriod(scheduleId, overflowing);
+        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, overflowing);
 
         assertEq(
             scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).purchasePeriod, periodBefore
@@ -345,7 +350,7 @@ contract SchedulePackingTest is DcaDappTest {
     function testFirstPurchaseAcceptsUint48MaxTimestamp() external {
         vm.warp(type(uint48).max);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        super.buyRbtcOne(USER, scheduleId);
+        super.buyRbtcOne(scheduleId);
 
         assertEq(
             scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).lastPurchaseTimestamp,
@@ -361,7 +366,7 @@ contract SchedulePackingTest is DcaDappTest {
         uint256 balanceBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
 
         vm.expectRevert(_safeCastOverflow(48, uint256(type(uint48).max) + 1));
-        super.buyRbtcOne(USER, scheduleId);
+        super.buyRbtcOne(scheduleId);
 
         IDcaManager.DcaSchedule memory schedule =
             scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
@@ -372,14 +377,14 @@ contract SchedulePackingTest is DcaDappTest {
     function testSubsequentPurchaseRevertsWhenTimestampWouldOverflowUint48() external {
         vm.warp(type(uint48).max);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        super.buyRbtcOne(USER, scheduleId);
+        super.buyRbtcOne(scheduleId);
 
         vm.warp(uint256(type(uint48).max) + MIN_PURCHASE_PERIOD);
         uint256 overflowingTimestamp = uint256(type(uint48).max) + MIN_PURCHASE_PERIOD;
         uint256 balanceBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
 
         vm.expectRevert(_safeCastOverflow(48, overflowingTimestamp));
-        super.buyRbtcOne(USER, scheduleId);
+        super.buyRbtcOne(scheduleId);
 
         IDcaManager.DcaSchedule memory schedule =
             scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
@@ -415,16 +420,16 @@ contract SchedulePackingTest is DcaDappTest {
         uint64 survivorId = scheduleIdAt(dcaManager, USER, address(stablecoin), lastIndex);
 
         vm.prank(USER);
-        dcaManager.deleteDcaSchedule(deletedId);
+        dcaManager.deleteDcaSchedule(address(stablecoin), deletedId);
 
         // The survivor now sits at index 0 carrying its own nonce; the deleted id must not open it.
         assertEq(scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX), survivorId);
         vm.prank(USER);
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, USER, deletedId));
-        dcaManager.updatePurchaseAmount(deletedId, MIN_PURCHASE_AMOUNT);
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), deletedId));
+        dcaManager.updatePurchaseAmount(address(stablecoin), deletedId, MIN_PURCHASE_AMOUNT);
 
         vm.prank(USER);
-        dcaManager.updatePurchaseAmount(survivorId, MIN_PURCHASE_AMOUNT);
+        dcaManager.updatePurchaseAmount(address(stablecoin), survivorId, MIN_PURCHASE_AMOUNT);
         assertEq(scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).purchaseAmount, MIN_PURCHASE_AMOUNT);
     }
 
@@ -441,7 +446,7 @@ contract SchedulePackingTest is DcaDappTest {
 
         uint256 userBefore = stablecoin.balanceOf(USER);
         uint256 handlerBefore = stablecoin.balanceOf(address(stablecoinHandler));
-        uint256 schedulesBefore = dcaManager.getDcaSchedules(USER, address(stablecoin)).length;
+        uint256 schedulesBefore = scheduleCount(dcaManager, USER, address(stablecoin));
 
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
@@ -453,7 +458,7 @@ contract SchedulePackingTest is DcaDappTest {
 
         assertEq(stablecoin.balanceOf(USER), userBefore, "an exhausted nonce still pulled tokens");
         assertEq(stablecoin.balanceOf(address(stablecoinHandler)), handlerBefore);
-        assertEq(dcaManager.getDcaSchedules(USER, address(stablecoin)).length, schedulesBefore);
+        assertEq(scheduleCount(dcaManager, USER, address(stablecoin)), schedulesBefore);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -468,37 +473,42 @@ contract SchedulePackingTest is DcaDappTest {
 
         uint256 lastIndex = NUM_OF_SCHEDULES - 1;
         IDcaManager.DcaSchedule memory last = scheduleAt(dcaManager, USER, address(stablecoin), lastIndex);
+        uint64 lastId = scheduleIdAt(dcaManager, USER, address(stablecoin), lastIndex);
         uint256 distinctAmount = last.purchaseAmount / 2;
         if (distinctAmount < MIN_PURCHASE_AMOUNT) distinctAmount = MIN_PURCHASE_AMOUNT;
 
         vm.prank(USER);
-        dcaManager.updatePurchaseAmount(last.scheduleId, distinctAmount);
+        dcaManager.updatePurchaseAmount(address(stablecoin), lastId, distinctAmount);
 
-        super.buyRbtcOne(USER, last.scheduleId);
+        super.buyRbtcOne(lastId);
 
         vm.prank(USER);
-        dcaManager.setSchedulePaused(last.scheduleId, true);
+        dcaManager.setSchedulePaused(address(stablecoin), lastId, true);
 
         IDcaManager.DcaSchedule memory expected = scheduleAt(dcaManager, USER, address(stablecoin), lastIndex);
         uint64 deletedId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
 
         vm.prank(USER);
-        dcaManager.deleteDcaSchedule(deletedId);
+        dcaManager.deleteDcaSchedule(address(stablecoin), deletedId);
 
         // The survivor moved into the freed position in the list, and is otherwise untouched.
         IDcaManager.DcaSchedule memory moved = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        assertEq(moved.scheduleId, expected.scheduleId, "swap-pop changed the survivor's id");
+        assertEq(
+            scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX),
+            lastId,
+            "swap-pop changed the survivor's id"
+        );
         assertEq(moved.tokenBalance, expected.tokenBalance, "swap-pop dropped tokenBalance");
         assertEq(moved.purchaseAmount, expected.purchaseAmount, "swap-pop dropped purchaseAmount");
         assertEq(moved.purchasePeriod, expected.purchasePeriod, "swap-pop dropped purchasePeriod");
         assertEq(moved.lastPurchaseTimestamp, expected.lastPurchaseTimestamp, "swap-pop dropped timestamp");
         assertEq(moved.routeIndex, expected.routeIndex, "swap-pop dropped routeIndex");
-        assertEq(moved.token, expected.token, "swap-pop dropped the stablecoin");
+        assertEq(moved.user, expected.user, "swap-pop dropped the owner");
         assertTrue(moved.paused, "swap-pop dropped paused");
         _assertPackedAgainstGetter(SCHEDULE_INDEX);
 
         // Reading it by id gives the same schedule: the list position was never part of its address.
-        IDcaManager.DcaSchedule memory byId = dcaManager.getDcaSchedule(USER, expected.scheduleId);
+        IDcaManager.DcaSchedule memory byId = dcaManager.getDcaSchedule(address(stablecoin), lastId);
         assertEq(byId.tokenBalance, expected.tokenBalance);
         assertEq(byId.purchaseAmount, expected.purchaseAmount);
     }
@@ -508,11 +518,11 @@ contract SchedulePackingTest is DcaDappTest {
         super.createSeveralDcaSchedules();
 
         uint64 deletedId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        uint256 base = _scheduleBase(deletedId, USER);
+        uint256 base = _scheduleBase(address(stablecoin), deletedId);
         assertTrue(_load(base) != 0, "the schedule was empty before the delete");
 
         vm.prank(USER);
-        dcaManager.deleteDcaSchedule(deletedId);
+        dcaManager.deleteDcaSchedule(address(stablecoin), deletedId);
 
         assertEq(_load(base), 0, "slot 0 survived the delete");
         assertEq(_load(base + 1), 0, "slot 1 survived the delete");

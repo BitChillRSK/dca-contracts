@@ -287,14 +287,14 @@ contract DexPathFailoverTest is DcaDappTest {
                 stranded
             )
         );
-        buyRbtcOne(USER, scheduleId);
+        buyRbtcOne(scheduleId);
 
         // Back on the constructor path, that same token is no longer part of the active route, so the
         // identical router behavior is none of this purchase's business.
         (address[] memory ctorMids, uint24[] memory ctorFees) = _constructorComponents();
         vm.prank(SWAPPER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(ctorMids, ctorFees);
-        buyRbtcOne(USER, scheduleId);
+        buyRbtcOne(scheduleId);
         assertEq(newIntermediate.balanceOf(address(router)), stranded);
     }
 

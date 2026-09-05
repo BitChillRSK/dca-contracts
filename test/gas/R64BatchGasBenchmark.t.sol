@@ -4,12 +4,18 @@ pragma solidity 0.8.36;
 import {Test, console} from "forge-std/Test.sol";
 import {DcaManager} from "src/DcaManager.sol";
 import {IDcaManager} from "src/interfaces/IDcaManager.sol";
+import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 import {OperationsAdmin} from "src/OperationsAdmin.sol";
 import {StubPurchaseHandler} from "./StubPurchaseHandler.sol";
 import {NestedIndexedDcaManager} from "./prototype/NestedIndexedDcaManager.sol";
 import {FlatKeyedDcaManager} from "./prototype/FlatKeyedDcaManager.sol";
 import {UserKeyedDcaManager} from "./prototype/UserKeyedDcaManager.sol";
 import {TokenKeyedDcaManager} from "./prototype/TokenKeyedDcaManager.sol";
+import {RouteIdDcaManager} from "./prototype/RouteIdDcaManager.sol";
+import {RouteIdRegistry} from "./prototype/RouteIdRegistry.sol";
+import {TripleKeyedDcaManager} from "./prototype/TripleKeyedDcaManager.sol";
+import {PackedRowDcaManager} from "./prototype/PackedRowDcaManager.sol";
+import {UserTokenIdDcaManager} from "./prototype/UserTokenIdDcaManager.sol";
 
 /**
  * @title R64BatchGasBenchmark
@@ -20,18 +26,26 @@ import {TokenKeyedDcaManager} from "./prototype/TokenKeyedDcaManager.sol";
  *          forge test --match-path 'test/gas/*' -vv
  *          FOUNDRY_PROFILE=deploy forge test --match-path 'test/gas/*' -vv
  *
- *      Five designs, one stub handler, identical schedules:
- *        A — `src/DcaManager`: keyed by `(scheduleId, user)`, with ids and buyers in the batch.
+ *      Six designs, identical schedules, one stub handler per design and size:
+ *        A — `src/DcaManager`: keyed by `(token, scheduleId)`, with the owner stored and checked, and
+ *            a batch row that is one id.
  *        B — pre-R64: keyed by `(user, token, index)`, with ids, buyers, indexes, and amounts.
  *        C — keyed by `scheduleId`, with owner and token stored in a three-slot value.
  *        D — A with the per-row purchase-amount staleness guard restored.
- *        E — keyed by `(scheduleId, token)`, with owner stored and checked on each user path.
+ *        E — A's design with the mapping's keys the other way round, `(scheduleId, token)`. Same work,
+ *            same storage, one difference: with the token innermost its hash is recomputed per row,
+ *            while A's outermost token hashes once for the whole batch.
+ *        F — keyed by `scheduleId` alone, the schedule carrying a `uint32 routeId` in place of the
+ *            token address, so a flat key still fits two slots.
+ *        G — keyed by `(scheduleId, user, token)`: both halves of a schedule's identity in the key, so
+ *            no identity is stored and none is checked. `purchaseAmount` keeps its full `uint128`.
+ *        H — G's key with the batch row packed as `(scheduleId << 160) | buyer`, one word per row.
  *
  *      What each column means:
- *        `calldata`  Intrinsic transaction cost of the encoded call, 4 gas per zero byte and 16 per
- *                    non-zero (EIP-2028). Computed from the bytes actually sent, not estimated. A test
- *                    calling a contract never pays this — a swapper sending a transaction always does,
- *                    so it has to be added back by hand or the whole comparison misses the point.
+ *        `calldata`  Intrinsic transaction cost of the encoded call. Computed from the bytes actually
+ *                    sent, on Rootstock's schedule (see `_intrinsicCalldataGas`). A test calling a
+ *                    contract never pays this — a swapper sending a transaction always does, so it has
+ *                    to be added back by hand or the whole comparison misses the point.
  *        `exec`      Gas the call itself burned, measured around a raw `call` with those same bytes.
  *        `handler`   The stub handler leg inside `exec`, measured separately at the same length. It is
  *                    identical across designs by construction; a real venue's cost is far larger and
@@ -39,11 +53,15 @@ import {TokenKeyedDcaManager} from "./prototype/TokenKeyedDcaManager.sol";
  *        `manager`   `exec - handler`: the schedule bookkeeping, which is what the design changes.
  *        `total`     `calldata + exec`, the operator's bill for the batch.
  *
- *      Every measurement runs after a warm-up batch, so the `OperationsAdmin` lookup and the handler
- *      account are warm in all three designs and the sizes stay comparable to each other. A real tick's
- *      first row additionally pays those cold accesses once (~4.7k), which no design avoids. Each size
- *      uses its own schedules, created in `setUp` and purchased once there, so the measured tick is a
- *      steady-state one reading cold schedule slots — what the swapper actually meets.
+ *      Registry access is measured, not held out. Every (design, size) pair gets its own token, its own
+ *      handler and its own route record, so each measured batch reads a registry slot that is cold, as
+ *      the first batch of a real transaction does. That matters because the designs do not read the
+ *      same number of slots: A through E resolve a handler in one, while F reads a second for the
+ *      stablecoin its events name. An earlier version of this file warmed the registry for every design
+ *      before measuring, which silently handed F that second slot for free — and because the whole
+ *      benchmark is one transaction, F's first batch then left it warm for every size that followed.
+ *      Only the swapper allowlist and the handler accounts are pre-warmed, and those are identical work
+ *      for every design.
  */
 contract R64BatchGasBenchmarkTest is Test {
     uint256 private constant MAX_SCHEDULES_PER_TOKEN = 5;
@@ -55,35 +73,39 @@ contract R64BatchGasBenchmarkTest is Test {
     uint256 private constant ROUTE_INDEX = 0;
     uint256 private constant START_TIMESTAMP = 1_770_000_000; // 2026-02-02, a plausible relaunch clock
 
+    uint256 private constant DESIGNS = 9;
+    uint256 private constant SIZES = 4;
+
     /// @dev Batch sizes the spec asks for.
-    uint256[4] private s_batchSizes = [uint256(1), 10, 50, 200];
-    uint256 private constant TOTAL_SCHEDULES = 261; // 1 + 10 + 50 + 200
+    uint256[SIZES] private s_batchSizes = [uint256(1), 10, 50, 200];
     /// @dev Schedule 0 is never batched; it exists so the size groups start at a non-zero offset.
     uint256 private constant FIRST_SCHEDULE = 1;
-
-    uint256 private constant DESIGNS = 5;
-
-    address private constant TOKEN_A = address(uint160(uint256(keccak256("R64.token.A"))));
-    address private constant TOKEN_B = address(uint160(uint256(keccak256("R64.token.B"))));
-    address private constant TOKEN_C = address(uint160(uint256(keccak256("R64.token.C"))));
-    address private constant TOKEN_D = address(uint160(uint256(keccak256("R64.token.D"))));
-    address private constant TOKEN_E = address(uint160(uint256(keccak256("R64.token.E"))));
+    uint256 private constant TOTAL_SCHEDULES = 261; // 1 + 10 + 50 + 200
 
     address private s_swapper;
 
     OperationsAdmin private s_operationsAdmin;
+    RouteIdRegistry private s_routeIdRegistry;
+
     DcaManager private s_designA;
     NestedIndexedDcaManager private s_designB;
     FlatKeyedDcaManager private s_designC;
     UserKeyedDcaManager private s_designD;
     TokenKeyedDcaManager private s_designE;
+    RouteIdDcaManager private s_designF;
+    TripleKeyedDcaManager private s_designG;
+    PackedRowDcaManager private s_designH;
+    UserTokenIdDcaManager private s_designI;
 
     /// @dev One per design, indexed by design number, so the loops do not branch on it.
     address[DESIGNS] private s_managers;
-    address[DESIGNS] private s_tokens;
-    StubPurchaseHandler[DESIGNS] private s_handlers;
+    /// @dev One token, handler and route record per (design, size), so every measured batch reads a
+    ///      cold registry slot rather than one a previous size already paid for.
+    address[SIZES][DESIGNS] private s_tokens;
+    StubPurchaseHandler[SIZES][DESIGNS] private s_handlers;
+    uint32[SIZES] private s_routeIdsF;
 
-    /// @dev Buyer `i` owns schedule `i` on every design; ids run 1..261 in the same order on all five.
+    /// @dev Buyer `i` owns schedule `i` on every design; ids run 1..262 in the same order on all six.
     address[] private s_buyers;
 
     function setUp() public {
@@ -92,6 +114,8 @@ contract R64BatchGasBenchmarkTest is Test {
 
         s_operationsAdmin = new OperationsAdmin(address(this));
         s_operationsAdmin.addSwapper(s_swapper);
+        s_routeIdRegistry = new RouteIdRegistry();
+        s_routeIdRegistry.addSwapper(s_swapper);
 
         s_designA = new DcaManager(
             address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT, address(this)
@@ -108,29 +132,63 @@ contract R64BatchGasBenchmarkTest is Test {
         s_designE = new TokenKeyedDcaManager(
             address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT
         );
-        s_managers = [address(s_designA), address(s_designB), address(s_designC), address(s_designD), address(s_designE)];
-        s_tokens = [TOKEN_A, TOKEN_B, TOKEN_C, TOKEN_D, TOKEN_E];
+        s_designF = new RouteIdDcaManager(
+            address(s_routeIdRegistry), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT
+        );
+        s_designG = new TripleKeyedDcaManager(
+            address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT
+        );
+        s_designH = new PackedRowDcaManager(
+            address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT
+        );
+        s_designI = new UserTokenIdDcaManager(
+            address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT
+        );
+        s_managers = [
+            address(s_designA),
+            address(s_designB),
+            address(s_designC),
+            address(s_designD),
+            address(s_designE),
+            address(s_designF),
+            address(s_designG),
+            address(s_designH),
+            address(s_designI)
+        ];
 
         for (uint256 d; d < DESIGNS; ++d) {
-            s_handlers[d] = new StubPurchaseHandler();
-            s_operationsAdmin.assignTokenHandler(s_tokens[d], ROUTE_INDEX, address(s_handlers[d]));
+            for (uint256 s; s < SIZES; ++s) {
+                address token = address(uint160(uint256(keccak256(abi.encode("R64.token", d, s)))));
+                s_tokens[d][s] = token;
+                s_handlers[d][s] = new StubPurchaseHandler();
+                if (d == 5) s_routeIdsF[s] = s_routeIdRegistry.assignTokenHandler(token, uint32(ROUTE_INDEX), address(s_handlers[d][s]));
+                else s_operationsAdmin.assignTokenHandler(token, ROUTE_INDEX, address(s_handlers[d][s]));
+            }
         }
 
         for (uint256 i; i < TOTAL_SCHEDULES + FIRST_SCHEDULE; ++i) {
-            address buyer = address(uint160(uint256(keccak256(abi.encode("R64.buyer", i)))));
-            s_buyers.push(buyer);
-            vm.startPrank(buyer);
-            s_designA.createDcaSchedule(TOKEN_A, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-            s_designB.createDcaSchedule(TOKEN_B, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-            s_designC.createDcaSchedule(TOKEN_C, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-            s_designD.createDcaSchedule(TOKEN_D, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-            s_designE.createDcaSchedule(TOKEN_E, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+            s_buyers.push(address(uint160(uint256(keccak256(abi.encode("R64.buyer", i))))));
+            uint256 group = _groupOf(i);
+            vm.startPrank(s_buyers[i]);
+            s_designA.createDcaSchedule(s_tokens[0][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+            s_designB.createDcaSchedule(s_tokens[1][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+            s_designC.createDcaSchedule(s_tokens[2][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+            s_designD.createDcaSchedule(s_tokens[3][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+            s_designE.createDcaSchedule(s_tokens[4][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+            s_designF.createDcaSchedule(s_tokens[5][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+            s_designG.createDcaSchedule(s_tokens[6][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+            s_designH.createDcaSchedule(s_tokens[7][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+            s_designI.createDcaSchedule(s_tokens[8][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
             vm.stopPrank();
         }
 
         // One purchase over every schedule, so the measured tick is a steady-state one rather than a
         // first purchase, which takes a different branch and writes a zero timestamp.
-        _buyAll(0, TOTAL_SCHEDULES + FIRST_SCHEDULE);
+        for (uint256 d; d < DESIGNS; ++d) {
+            for (uint256 s; s < SIZES; ++s) {
+                _buy(d, s);
+            }
+        }
         vm.warp(START_TIMESTAMP + 2 days);
     }
 
@@ -144,11 +202,8 @@ contract R64BatchGasBenchmarkTest is Test {
         console.log("design  rows   bytes  calldata      exec   handler   manager     total   per-row");
 
         for (uint256 d; d < DESIGNS; ++d) {
-            uint256 offset = FIRST_SCHEDULE;
-            for (uint256 s; s < s_batchSizes.length; ++s) {
-                uint256 rows = s_batchSizes[s];
-                _report(d, rows, offset);
-                offset += rows;
+            for (uint256 s; s < SIZES; ++s) {
+                _report(d, s);
             }
             console.log("");
         }
@@ -176,76 +231,105 @@ contract R64BatchGasBenchmarkTest is Test {
         }
         console.log("");
 
-        // Design B is the keying `DcaManager` had before R64, and its cold paths are the ones that were
-        // measured on the real contract then: 91,622 to create and 11,122 to delete, under
-        // [profile.default]. Holding the prototype to those figures is what keeps it a baseline rather
-        // than a sketch — if it drifts from the design it claims to reproduce, the run fails instead of
-        // quietly flattering the change. The band is 10% because this assertion has to hold under both
-        // profiles and via-IR takes about 6% off a cold path; a keying change moves these by ~50%, which
-        // is the drift it exists to catch.
-        assertApproxEqRel(createGas[1], 91_622, 0.10e18, "prototype B no longer reproduces the pre-R64 create");
+        // Design B is the keying `DcaManager` had before R64, and holding the prototype to the figures
+        // the real contract produced is what keeps it a baseline rather than a sketch: if it drifts from
+        // the design it claims to reproduce, the run fails instead of quietly flattering the change.
+        //
+        // The create figure is 99,000 rather than the 91,622 first recorded for the real contract because
+        // this file no longer pre-warms route records: a create now pays the cold registry read a first
+        // transaction really pays, which is worth about 8,300. The delete path reads no route record and
+        // is unchanged. The band is 10% because this assertion has to hold under both profiles and via-IR
+        // takes about 6% off a cold path; a keying change moves these by ~50%, which is the drift it
+        // exists to catch.
+        assertApproxEqRel(createGas[1], 99_000, 0.10e18, "prototype B no longer reproduces the pre-R64 create");
         assertApproxEqRel(deleteGas[1], 11_122, 0.10e18, "prototype B no longer reproduces the pre-R64 delete");
     }
 
     /// @dev One create and one delete on `design`, as the same fresh user, measured separately.
     function _coldPathGas(uint256 design, address user) private returns (uint256 createGas, uint256 deleteGas) {
-        address token = s_tokens[design];
+        address token = s_tokens[design][0];
 
         createGas = gasleft();
         if (design == 0) s_designA.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
         else if (design == 1) s_designB.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
         else if (design == 2) s_designC.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
         else if (design == 3) s_designD.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-        else s_designE.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+        else if (design == 4) s_designE.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+        else if (design == 5) s_designF.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+        else if (design == 6) s_designG.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+        else if (design == 7) s_designH.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+        else s_designI.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
         createGas -= gasleft();
 
         uint64 scheduleId = _lastCreatedId(design, user, token);
 
         deleteGas = gasleft();
-        if (design == 0) s_designA.deleteDcaSchedule(scheduleId);
+        if (design == 0) s_designA.deleteDcaSchedule(token, scheduleId);
         else if (design == 1) s_designB.deleteDcaSchedule(token, 0, scheduleId);
         else if (design == 2) s_designC.deleteDcaSchedule(scheduleId);
         else if (design == 3) s_designD.deleteDcaSchedule(scheduleId);
-        else s_designE.deleteDcaSchedule(token, scheduleId);
+        else if (design == 4) s_designE.deleteDcaSchedule(token, scheduleId);
+        else if (design == 5) s_designF.deleteDcaSchedule(scheduleId);
+        else if (design == 6) s_designG.deleteDcaSchedule(token, scheduleId);
+        else if (design == 7) s_designH.deleteDcaSchedule(token, scheduleId);
+        else s_designI.deleteDcaSchedule(token, scheduleId);
         deleteGas -= gasleft();
     }
 
     function _lastCreatedId(uint256 design, address user, address token) private view returns (uint64) {
-        if (design == 0) return s_designA.getDcaSchedules(user, token)[0].scheduleId;
+        if (design == 0) return scheduleIdAt(s_designA, user, token, 0);
         if (design == 1) return s_designB.getDcaSchedules(user, token)[0].scheduleId;
         if (design == 2) return uint64(s_designC.getSchedulesCreatedCount());
         if (design == 3) return uint64(s_designD.getSchedulesCreatedCount());
-        return uint64(s_designE.getSchedulesCreatedCount());
+        if (design == 4) return uint64(s_designE.getSchedulesCreatedCount());
+        if (design == 5) return uint64(s_designF.getSchedulesCreatedCount());
+        if (design == 6) return uint64(s_designG.getSchedulesCreatedCount());
+        if (design == 7) return uint64(s_designH.getSchedulesCreatedCount());
+        return uint64(s_designI.getSchedulesCreatedCount());
     }
 
     /*//////////////////////////////////////////////////////////////
                              SANITY CHECKS
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev The three designs must debit the same schedules by the same amount, or the gas table is
+    /// @dev Every design must debit the same schedules by the same amount, or the gas table is
     ///      comparing different work. Asserted rather than assumed.
     function test_r64_designsAgreeOnEffects() public {
-        uint256 rows = 10;
-        uint256 offset = FIRST_SCHEDULE;
+        uint256 group = 1; // the ten-row group
+        uint256 offset = _offsetOf(group);
         uint64 scheduleId = uint64(offset + 1);
         address buyer = s_buyers[offset];
 
-        uint256 balanceBefore = s_designA.getDcaSchedules(buyer, TOKEN_A)[0].tokenBalance;
-        assertEq(s_designE.getSchedule(scheduleId, TOKEN_E).tokenBalance, balanceBefore, "designs disagree before");
+        uint256 balanceBefore = scheduleAt(s_designA, buyer, s_tokens[0][group], 0).tokenBalance;
+        assertEq(s_designF.getSchedule(scheduleId).tokenBalance, balanceBefore, "designs disagree before");
 
         for (uint256 d; d < DESIGNS; ++d) {
-            _buy(d, rows, offset);
+            _buy(d, group);
         }
 
         uint256 expected = balanceBefore - PURCHASE_AMOUNT;
-        assertEq(s_designA.getDcaSchedules(buyer, TOKEN_A)[0].tokenBalance, expected, "A debited wrongly");
-        assertEq(s_designB.getDcaSchedules(buyer, TOKEN_B)[0].tokenBalance, expected, "B debited wrongly");
+        assertEq(scheduleAt(s_designA, buyer, s_tokens[0][group], 0).tokenBalance, expected, "A debited wrongly");
+        assertEq(
+            s_designB.getDcaSchedules(buyer, s_tokens[1][group])[0].tokenBalance, expected, "B debited wrongly"
+        );
         assertEq(s_designC.getSchedule(scheduleId).tokenBalance, expected, "C debited wrongly");
         assertEq(s_designD.getSchedule(scheduleId, buyer).tokenBalance, expected, "D debited wrongly");
-        assertEq(s_designE.getSchedule(scheduleId, TOKEN_E).tokenBalance, expected, "E debited wrongly");
+        assertEq(s_designE.getSchedule(scheduleId, s_tokens[4][group]).tokenBalance, expected, "E debited wrongly");
+        assertEq(s_designF.getSchedule(scheduleId).tokenBalance, expected, "F debited wrongly");
+        assertEq(
+            s_designG.getSchedule(scheduleId, buyer, s_tokens[6][group]).tokenBalance, expected, "G debited wrongly"
+        );
+        assertEq(
+            s_designH.getSchedule(scheduleId, buyer, s_tokens[7][group]).tokenBalance, expected, "H debited wrongly"
+        );
+        assertEq(
+            s_designI.getSchedule(buyer, s_tokens[8][group], scheduleId).tokenBalance, expected, "I debited wrongly"
+        );
 
         for (uint256 d = 1; d < DESIGNS; ++d) {
-            assertEq(s_handlers[d].rowsBought(), s_handlers[0].rowsBought(), "designs bought a different row count");
+            assertEq(
+                s_handlers[d][group].rowsBought(), s_handlers[0][group].rowsBought(), "designs bought a different row count"
+            );
         }
     }
 
@@ -253,16 +337,17 @@ contract R64BatchGasBenchmarkTest is Test {
                                INTERNALS
     //////////////////////////////////////////////////////////////*/
 
-    function _report(uint256 design, uint256 rows, uint256 offset) private {
-        bytes memory data = _encodeBatch(design, rows, offset);
+    function _report(uint256 design, uint256 size) private {
+        uint256 rows = s_batchSizes[size];
+        bytes memory data = _encodeBatch(design, size);
         uint256 calldataGas = _intrinsicCalldataGas(data);
 
         _warmSharedState();
-        uint256 handlerGas = this.measureHandlerLeg(design, rows);
+        uint256 handlerGas = this.measureHandlerLeg(design, size);
 
         vm.prank(s_swapper);
         uint256 execGas = gasleft();
-        (bool ok,) = _manager(design).call(data);
+        (bool ok,) = s_managers[design].call(data);
         execGas -= gasleft();
         assertTrue(ok, "batch reverted");
 
@@ -276,7 +361,8 @@ contract R64BatchGasBenchmarkTest is Test {
     ///      Runs in a fresh frame through `this.`: encoding the handler's three memory arrays pays
     ///      memory expansion, which is quadratic and cumulative within a frame, so measuring it inline
     ///      would charge each successive design for the memory the previous ones had already grown.
-    function measureHandlerLeg(uint256 design, uint256 rows) external returns (uint256 gasUsed) {
+    function measureHandlerLeg(uint256 design, uint256 size) external returns (uint256 gasUsed) {
+        uint256 rows = s_batchSizes[size];
         address[] memory buyers = new address[](rows);
         uint64[] memory scheduleIds = new uint64[](rows);
         uint256[] memory purchaseAmounts = new uint256[](rows);
@@ -286,7 +372,7 @@ contract R64BatchGasBenchmarkTest is Test {
             purchaseAmounts[i] = PURCHASE_AMOUNT;
         }
         gasUsed = gasleft();
-        s_handlers[design].batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, 0);
+        s_handlers[design][size].batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, 0);
         gasUsed -= gasleft();
     }
 
@@ -314,7 +400,11 @@ contract R64BatchGasBenchmarkTest is Test {
         gasCost += 12 * ((data.length + 31) / 32);
     }
 
-    function _encodeBatch(uint256 design, uint256 rows, uint256 offset) private view returns (bytes memory) {
+    function _encodeBatch(uint256 design, uint256 size) private view returns (bytes memory) {
+        uint256 rows = s_batchSizes[size];
+        uint256 offset = _offsetOf(size);
+        address token = s_tokens[design][size];
+
         uint64[] memory scheduleIds = new uint64[](rows);
         address[] memory buyers = new address[](rows);
         uint256[] memory scheduleIndexes = new uint256[](rows);
@@ -327,89 +417,168 @@ contract R64BatchGasBenchmarkTest is Test {
         }
 
         if (design == 0) {
-            IDcaManager.Batch memory batch = IDcaManager.Batch({
-                scheduleIds: scheduleIds,
-                buyers: buyers,
-                token: TOKEN_A,
-                routeIndex: ROUTE_INDEX,
-                minRbtcOut: 0
-            });
-            return abi.encodeCall(IDcaManager.batchBuyRbtc, (batch));
+            return abi.encodeCall(
+                IDcaManager.batchBuyRbtc,
+                (
+                    IDcaManager.Batch({
+                        scheduleIds: scheduleIds,
+                        token: token,
+                        routeIndex: ROUTE_INDEX,
+                        minRbtcOut: 0
+                    })
+                )
+            );
         }
         if (design == 1) {
-            NestedIndexedDcaManager.Batch memory batch = NestedIndexedDcaManager.Batch({
-                buyers: buyers,
-                token: TOKEN_B,
-                scheduleIndexes: scheduleIndexes,
-                scheduleIds: scheduleIds,
-                purchaseAmounts: purchaseAmounts,
-                routeIndex: ROUTE_INDEX,
-                minRbtcOut: 0
-            });
-            return abi.encodeCall(NestedIndexedDcaManager.batchBuyRbtc, (batch));
+            return abi.encodeCall(
+                NestedIndexedDcaManager.batchBuyRbtc,
+                (
+                    NestedIndexedDcaManager.Batch({
+                        buyers: buyers,
+                        token: token,
+                        scheduleIndexes: scheduleIndexes,
+                        scheduleIds: scheduleIds,
+                        purchaseAmounts: purchaseAmounts,
+                        routeIndex: ROUTE_INDEX,
+                        minRbtcOut: 0
+                    })
+                )
+            );
         }
         if (design == 2) {
-            FlatKeyedDcaManager.Batch memory flatBatch = FlatKeyedDcaManager.Batch({
-                scheduleIds: scheduleIds,
-                token: TOKEN_C,
-                routeIndex: ROUTE_INDEX,
-                minRbtcOut: 0
-            });
-            return abi.encodeCall(FlatKeyedDcaManager.batchBuyRbtc, (flatBatch));
+            return abi.encodeCall(
+                FlatKeyedDcaManager.batchBuyRbtc,
+                (
+                    FlatKeyedDcaManager.Batch({
+                        scheduleIds: scheduleIds,
+                        token: token,
+                        routeIndex: ROUTE_INDEX,
+                        minRbtcOut: 0
+                    })
+                )
+            );
         }
         if (design == 3) {
-            UserKeyedDcaManager.Batch memory userBatch = UserKeyedDcaManager.Batch({
-                scheduleIds: scheduleIds,
-                buyers: buyers,
-                purchaseAmounts: purchaseAmounts,
-                token: TOKEN_D,
-                routeIndex: ROUTE_INDEX,
-                minRbtcOut: 0
-            });
-            return abi.encodeCall(UserKeyedDcaManager.batchBuyRbtc, (userBatch));
+            return abi.encodeCall(
+                UserKeyedDcaManager.batchBuyRbtc,
+                (
+                    UserKeyedDcaManager.Batch({
+                        scheduleIds: scheduleIds,
+                        buyers: buyers,
+                        purchaseAmounts: purchaseAmounts,
+                        token: token,
+                        routeIndex: ROUTE_INDEX,
+                        minRbtcOut: 0
+                    })
+                )
+            );
         }
-        TokenKeyedDcaManager.Batch memory tokenBatch = TokenKeyedDcaManager.Batch({
-            scheduleIds: scheduleIds,
-            purchaseAmounts: purchaseAmounts,
-            token: TOKEN_E,
-            routeIndex: ROUTE_INDEX,
-            minRbtcOut: 0
-        });
-        return abi.encodeCall(TokenKeyedDcaManager.batchBuyRbtc, (tokenBatch));
+        if (design == 4) {
+            return abi.encodeCall(
+                TokenKeyedDcaManager.batchBuyRbtc,
+                (
+                    TokenKeyedDcaManager.Batch({
+                        scheduleIds: scheduleIds,
+                        token: token,
+                        routeIndex: ROUTE_INDEX,
+                        minRbtcOut: 0
+                    })
+                )
+            );
+        }
+        if (design == 5) {
+            return abi.encodeCall(
+                RouteIdDcaManager.batchBuyRbtc,
+                (RouteIdDcaManager.Batch({scheduleIds: scheduleIds, routeId: s_routeIdsF[size], minRbtcOut: 0}))
+            );
+        }
+        if (design == 6) {
+            return abi.encodeCall(
+                TripleKeyedDcaManager.batchBuyRbtc,
+                (
+                    TripleKeyedDcaManager.Batch({
+                        scheduleIds: scheduleIds,
+                        buyers: buyers,
+                        token: token,
+                        routeIndex: ROUTE_INDEX,
+                        minRbtcOut: 0
+                    })
+                )
+            );
+        }
+        if (design == 7) {
+            bytes32[] memory packedRows = new bytes32[](rows);
+            for (uint256 i; i < rows; ++i) {
+                packedRows[i] = bytes32((uint256(scheduleIds[i]) << 160) | uint256(uint160(buyers[i])));
+            }
+            return abi.encodeCall(
+                PackedRowDcaManager.batchBuyRbtc,
+                (
+                    PackedRowDcaManager.Batch({
+                        rows: packedRows,
+                        token: token,
+                        routeIndex: ROUTE_INDEX,
+                        minRbtcOut: 0
+                    })
+                )
+            );
+        }
+        return abi.encodeCall(
+            UserTokenIdDcaManager.batchBuyRbtc,
+            (
+                UserTokenIdDcaManager.Batch({
+                    scheduleIds: scheduleIds,
+                    buyers: buyers,
+                    token: token,
+                    routeIndex: ROUTE_INDEX,
+                    minRbtcOut: 0
+                })
+            )
+        );
     }
 
-    function _buy(uint256 design, uint256 rows, uint256 offset) private {
-        bytes memory data = _encodeBatch(design, rows, offset);
+    function _buy(uint256 design, uint256 size) private {
+        bytes memory data = _encodeBatch(design, size);
         vm.prank(s_swapper);
-        (bool ok,) = _manager(design).call(data);
+        (bool ok,) = s_managers[design].call(data);
         assertTrue(ok, "warm-up batch reverted");
     }
 
-    function _buyAll(uint256 offset, uint256 rows) private {
-        for (uint256 d; d < DESIGNS; ++d) {
-            _buy(d, rows, offset);
-        }
-    }
-
-    /// @dev Touch every account and registry slot the three designs share, so the first design measured
-    ///      does not pay cold-access costs the other two then find warm. Idempotent, and always called
-    ///      outside a measurement window.
+    /**
+     * @dev Touch what every design pays for identically, and nothing else. The swapper allowlist and the
+     *      handler accounts qualify: the same one lookup and the same one external account, whatever the
+     *      key looks like. The route records deliberately do not — the designs read a different number
+     *      of slots there, which is part of what is being measured. Idempotent, and always called
+     *      outside a measurement window.
+     */
     function _warmSharedState() private view {
         s_operationsAdmin.isSwapper(s_swapper);
+        s_routeIdRegistry.isSwapper(s_swapper);
         for (uint256 d; d < DESIGNS; ++d) {
-            s_operationsAdmin.getTokenHandler(s_tokens[d], ROUTE_INDEX);
-            s_handlers[d].rowsBought();
-            s_handlers[d].deposits();
+            for (uint256 s; s < SIZES; ++s) {
+                s_handlers[d][s].rowsBought();
+                s_handlers[d][s].deposits();
+            }
         }
-        s_designA.getSchedulesCreatedCount();
-        s_designB.getSchedulesCreatedCount();
-        s_designC.getSchedulesCreatedCount();
-        s_designD.getSchedulesCreatedCount();
-        s_designE.getSchedulesCreatedCount();
     }
 
-    function _manager(uint256 design) private view returns (address) {
-        return s_managers[design];
+    /// @dev Where each size group starts in `s_buyers`; group `s` owns `s_batchSizes[s]` consecutive ids.
+    function _offsetOf(uint256 size) private view returns (uint256 offset) {
+        offset = FIRST_SCHEDULE;
+        for (uint256 s; s < size; ++s) {
+            offset += s_batchSizes[s];
+        }
+    }
+
+    /// @dev Which size group buyer `i` belongs to. Buyer 0 rides with the first group; its schedule is
+    ///      never batched, and exists only so ids start above zero.
+    function _groupOf(uint256 index) private view returns (uint256) {
+        uint256 offset = FIRST_SCHEDULE;
+        for (uint256 s; s < SIZES; ++s) {
+            offset += s_batchSizes[s];
+            if (index < offset) return s;
+        }
+        return SIZES - 1;
     }
 
     function _designName(uint256 design) private pure returns (string memory) {
@@ -417,7 +586,11 @@ contract R64BatchGasBenchmarkTest is Test {
         if (design == 1) return "B";
         if (design == 2) return "C";
         if (design == 3) return "D";
-        return "E";
+        if (design == 4) return "E";
+        if (design == 5) return "F";
+        if (design == 6) return "G";
+        if (design == 7) return "H";
+        return "I";
     }
 
     function _pad(uint256 value, uint256 width) private pure returns (string memory padded) {

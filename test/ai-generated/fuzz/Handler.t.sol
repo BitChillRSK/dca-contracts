@@ -182,7 +182,7 @@ contract Handler is Test {
         vm.startPrank(user);
         
         // Fetch schedules – must exist so we assume
-        IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
+        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) = dcaManager.getDcaSchedules(user, address(stablecoin));
         vm.assume(schedules.length > 0);
 
         scheduleIndex = bound(scheduleIndex, 0, schedules.length - 1);
@@ -196,7 +196,7 @@ contract Handler is Test {
         stablecoin.approve(address(tokenHandler), depositAmount);
         
         uint64 scheduleId = scheduleIdAt(dcaManager, user, address(stablecoin), scheduleIndex);
-        try dcaManager.depositToken(scheduleId, depositAmount) {
+        try dcaManager.depositToken(address(stablecoin), scheduleId, depositAmount) {
             // Success
         } catch {
             // Ignore failures
@@ -219,7 +219,7 @@ contract Handler is Test {
         
         vm.startPrank(user);
         
-        IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
+        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) = dcaManager.getDcaSchedules(user, address(stablecoin));
         vm.assume(schedules.length > 0);
 
         scheduleIndex = bound(scheduleIndex, 0, schedules.length - 1);
@@ -230,7 +230,7 @@ contract Handler is Test {
         withdrawalAmount = bound(withdrawalAmount, 1, currentBalance);
         
         uint64 scheduleId = scheduleIdAt(dcaManager, user, address(stablecoin), scheduleIndex);
-        try dcaManager.withdrawToken(scheduleId, withdrawalAmount) {
+        try dcaManager.withdrawToken(address(stablecoin), scheduleId, withdrawalAmount) {
             // Success
         } catch {
             // Ignore failures
@@ -255,10 +255,12 @@ contract Handler is Test {
         
         vm.startPrank(user);
         
+        uint64[] memory schedulesIds;
         IDcaManager.DcaSchedule[] memory schedules;
         try dcaManager.getDcaSchedules(user, address(stablecoin)) returns (
-            IDcaManager.DcaSchedule[] memory _schedules
+            uint64[] memory _scheduleIds, IDcaManager.DcaSchedule[] memory _schedules
         ) {
+            schedulesIds = _scheduleIds;
             schedules = _schedules;
         } catch {
             vm.stopPrank();
@@ -271,7 +273,7 @@ contract Handler is Test {
         }
         
         scheduleIndex = bound(scheduleIndex, 0, schedules.length - 1);
-        uint64 scheduleId = schedules[scheduleIndex].scheduleId;
+        uint64 scheduleId = schedulesIds[scheduleIndex];
         uint256 currentBalance = schedules[scheduleIndex].tokenBalance;
 
         if (depositAmount > 0) {
@@ -298,7 +300,7 @@ contract Handler is Test {
                 stablecoin.mint(user, depositAmount - userBalance);
             }
             stablecoin.approve(address(tokenHandler), depositAmount);
-            try dcaManager.depositToken(scheduleId, depositAmount) {
+            try dcaManager.depositToken(address(stablecoin), scheduleId, depositAmount) {
                 // Success
             } catch {
                 // Ignore failures
@@ -306,7 +308,7 @@ contract Handler is Test {
         }
 
         if (purchaseAmount > 0) {
-            try dcaManager.updatePurchaseAmount(scheduleId, purchaseAmount) {
+            try dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, purchaseAmount) {
                 // Success
             } catch {
                 // Ignore failures
@@ -314,7 +316,7 @@ contract Handler is Test {
         }
 
         if (purchasePeriod > 0) {
-            try dcaManager.updatePurchasePeriod(scheduleId, purchasePeriod) {
+            try dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, purchasePeriod) {
                 // Success
             } catch {
                 // Ignore failures
@@ -358,16 +360,16 @@ contract Handler is Test {
             // type(uint256).max, and `userSeed + k` on one of those panics with an overflow.
             address user = s_users[(userSeed % numOfUsers + k) % numOfUsers];
 
-            IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
+            (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) = dcaManager.getDcaSchedules(user, address(stablecoin));
             if (schedules.length == 0) continue;
 
             uint256 index = bound(scheduleIndex, 0, schedules.length - 1);
-            uint64 scheduleId = schedules[index].scheduleId;
+            uint64 scheduleId = schedulesIds[index];
 
             if (paused) pauseAttemptsOnLiveSchedule++;
 
             vm.prank(user);
-            try dcaManager.setSchedulePaused(scheduleId, paused) {
+            try dcaManager.setSchedulePaused(address(stablecoin), scheduleId, paused) {
                 if (paused) {
                     if (s_pauseGhost[scheduleId].user == address(0)) s_everPausedScheduleIds.push(scheduleId);
                     // Re-snapshot on every pause: the schedule may have bought legitimately while active.
@@ -404,12 +406,12 @@ contract Handler is Test {
         
         vm.startPrank(user);
         
-        IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
+        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) = dcaManager.getDcaSchedules(user, address(stablecoin));
         vm.assume(schedules.length > 0);
 
         scheduleIndex = bound(scheduleIndex, 0, schedules.length - 1);
         
-        try dcaManager.deleteDcaSchedule(schedules[scheduleIndex].scheduleId) {
+        try dcaManager.deleteDcaSchedule(address(stablecoin), schedulesIds[scheduleIndex]) {
             // Success
         } catch {
             // Ignore failures
@@ -430,7 +432,7 @@ contract Handler is Test {
         
         address user = s_users[userSeed % s_users.length];
         
-        IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
+        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) = dcaManager.getDcaSchedules(user, address(stablecoin));
         vm.assume(schedules.length > 0);
 
         scheduleIndex = bound(scheduleIndex, 0, schedules.length - 1);
@@ -466,7 +468,7 @@ contract Handler is Test {
         purchaseAmounts[0] = schedule.purchaseAmount;
 
         try dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, buyers, address(stablecoin), schedule.routeIndex)
+            toBatch(scheduleIds, address(stablecoin), schedule.routeIndex)
         ) {
             buyRbtcSuccesses++;
         } catch {
@@ -498,7 +500,7 @@ contract Handler is Test {
             address user = s_users[userSeeds[i] % s_users.length];
             buyers[i] = user;
             
-            IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
+            (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) = dcaManager.getDcaSchedules(user, address(stablecoin));
             vm.assume(schedules.length > 0);
             
             boundedScheduleIndexes[i] = bound(scheduleIndexes[i], 0, schedules.length - 1);
@@ -507,7 +509,7 @@ contract Handler is Test {
             vm.assume(schedule.tokenBalance >= schedule.purchaseAmount);
             vm.assume(schedule.routeIndex == routeIndex);
             
-            scheduleIds[i] = schedule.scheduleId;
+            scheduleIds[i] = schedulesIds[boundedScheduleIndexes[i]];
             purchaseAmounts[i] = schedule.purchaseAmount;
             
             // Calculate rBTC needed for this purchase
@@ -530,7 +532,7 @@ contract Handler is Test {
         // Execute batch purchase
         vm.startPrank(SWAPPER);
         try dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, buyers, address(stablecoin), routeIndex)
+            toBatch(scheduleIds, address(stablecoin), routeIndex)
         ) {
             buyRbtcSuccesses++;
         } catch {
@@ -585,7 +587,7 @@ contract Handler is Test {
         
         vm.startPrank(user);
         
-        IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
+        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) = dcaManager.getDcaSchedules(user, address(stablecoin));
         vm.assume(schedules.length > 0);
         
         scheduleIndex = bound(scheduleIndex, 0, schedules.length - 1);
@@ -595,7 +597,7 @@ contract Handler is Test {
         withdrawalAmount = bound(withdrawalAmount, 1, currentBalance);
         
         uint64 scheduleId = scheduleIdAt(dcaManager, user, address(stablecoin), scheduleIndex);
-        try dcaManager.withdrawTokenAndInterest(scheduleId, withdrawalAmount
+        try dcaManager.withdrawTokenAndInterest(address(stablecoin), scheduleId, withdrawalAmount
         ) {
             // Success
         } catch {
@@ -615,7 +617,7 @@ contract Handler is Test {
         address user = s_users[userSeed % s_users.length];
         topUpFromInterestCalls++;
 
-        IDcaManager.DcaSchedule[] memory schedules = dcaManager.getDcaSchedules(user, address(stablecoin));
+        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) = dcaManager.getDcaSchedules(user, address(stablecoin));
         if (schedules.length == 0) return;
         scheduleIndex = bound(scheduleIndex, 0, schedules.length - 1);
 
@@ -630,10 +632,10 @@ contract Handler is Test {
 
         // Read the id before the prank: `vm.prank` applies to the next call, and a read inlined into
         // the argument list would consume it, leaving the top-up itself unpranked.
-        uint64 scheduleId = schedules[scheduleIndex].scheduleId;
+        uint64 scheduleId = schedulesIds[scheduleIndex];
 
         vm.prank(user);
-        try dcaManager.topUpFromInterest(scheduleId, bound(amountSeed, 1, accruedInterest)) {
+        try dcaManager.topUpFromInterest(address(stablecoin), scheduleId, bound(amountSeed, 1, accruedInterest)) {
             topUpFromInterestSuccesses++;
         } catch {
             // A credit too small to fund another purchase, or a route with no handler.

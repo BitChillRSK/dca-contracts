@@ -6,50 +6,53 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {IDcaManager} from "src/interfaces/IDcaManager.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
-import {OperationsAdmin} from "src/OperationsAdmin.sol";
+import {RouteIdRegistry} from "./RouteIdRegistry.sol";
 
 /**
- * @title TokenKeyedDcaManager
- * @notice Design E: the shipped design with the mapping's two keys the other way round,
- *         `mapping(uint64 scheduleId => mapping(address token => Schedule))`.
- * @dev Test-only. Never deployed, never imported by `src/`. Same checks, effects, events, packing and
- *      batch shape as the shipped manager — the key order is the only difference, which is the point:
- *      this row and `src/DcaManager`'s price that one decision against each other.
+ * @title RouteIdDcaManager
+ * @notice Design F: `mapping(uint64 scheduleId => Schedule)`, where the schedule carries a four-byte
+ *         `routeId` instead of a twenty-byte token address, so a flat key still fits two slots.
+ * @dev Test-only. Never deployed, never imported by `src/`. Same checks, effects and events as the
+ *      shipped manager; only the key, the packing and the route reference differ.
  *
- *      With the stablecoin outermost, as shipped, its hash is loop-invariant across a batch's rows and
- *      the compiler may hoist it; with the id outermost, both hashes are recomputed per row. Which way
- *      that lands is a codegen question rather than a design one, so it is measured rather than
- *      argued — and the answer differs between an isolated prototype and the full contract, which is
- *      why the number the spec quotes is the one taken on `src/DcaManager` itself.
+ *      The token address is what made design C cost a third slot, not the flat key. `(token, routeIndex)`
+ *      is already an add-only, assign-once pair in `OperationsAdmin`, so naming it with a `uint32` loses
+ *      no information and weakens no guarantee. Replace the address with that name and the schedule is
+ *      two slots again, an id addresses a schedule on its own, and a batch row is one `uint64`.
  *
- *      What does not differ: a row is one `uint64`, the owner is read from storage, and the token
- *      check is structural either way.
+ *      The user-facing API is unchanged: `createDcaSchedule` still takes `(token, routeIndex)` and
+ *      resolves the id once, on the cold path. Compact in storage, legible at the surface.
  */
-contract TokenKeyedDcaManager is ReentrancyGuard {
+contract RouteIdDcaManager is ReentrancyGuard {
     using SafeCast for uint256;
 
-    /// @notice Two slots: the stablecoin is the key, so only the owner has to be carried.
+    /**
+     * @notice Two slots, grouped by how a purchase touches them.
+     * @dev Slot 0 is read on every purchase and written by none of them. Slot 1 holds every field a
+     *      purchase reads or writes, so a purchase is two cold `SLOAD`s and one `SSTORE`. Neither the
+     *      id nor the token is repeated: the id is the key, and the token is reachable through
+     *      `routeId`. A live schedule always has a non-zero `user`, which is the existence sentinel.
+     */
     struct Schedule {
-        uint128 tokenBalance;
-        uint48 lastPurchaseTimestamp;
-        bool paused;
-        uint32 purchasePeriod;
-        uint32 routeIndex;
         address user;
         uint96 purchaseAmount;
+        uint128 tokenBalance;
+        uint48 lastPurchaseTimestamp;
+        uint32 purchasePeriod;
+        uint32 routeId;
+        bool paused;
     }
 
-    /// @notice A row is one id; the batch's `token` completes the key for every row at once.
+    /// @notice A row is one `uint64`. Everything else a batch needs it carries once.
     struct Batch {
         uint64[] scheduleIds;
-        address token;
-        uint256 routeIndex;
+        uint32 routeId;
         uint256 minRbtcOut;
     }
 
-    OperationsAdmin private immutable i_operationsAdmin;
+    RouteIdRegistry private immutable i_registry;
 
-    mapping(uint64 scheduleId => mapping(address token => Schedule)) private s_dcaSchedules;
+    mapping(uint64 scheduleId => Schedule) private s_dcaSchedules;
     mapping(address user => mapping(address token => uint64[] scheduleIds)) private s_scheduleIds;
     IDcaManager.ProtocolSettings private s_protocolSettings;
     mapping(address token => uint256) private s_tokenMinPurchaseAmounts;
@@ -76,7 +79,7 @@ contract TokenKeyedDcaManager is ReentrancyGuard {
     error Prototype__SchedulePaused();
     error Prototype__PeriodHasNotElapsed();
     error Prototype__BalanceNotEnough();
-    error Prototype__RouteIndexMismatch();
+    error Prototype__RouteIdMismatch();
     error Prototype__MaxSchedulesReached();
     error Prototype__EmptyBatch();
     error Prototype__PurchasePeriodBelowMinimum();
@@ -88,17 +91,17 @@ contract TokenKeyedDcaManager is ReentrancyGuard {
     error Prototype__UnauthorizedSwapper();
 
     modifier onlySwapper() {
-        if (!i_operationsAdmin.isSwapper(msg.sender)) revert Prototype__UnauthorizedSwapper();
+        if (!i_registry.isSwapper(msg.sender)) revert Prototype__UnauthorizedSwapper();
         _;
     }
 
     constructor(
-        address operationsAdminAddress,
+        address registryAddress,
         uint256 minPurchasePeriod,
         uint256 maxSchedulesPerToken,
         uint256 defaultMinPurchaseAmount
     ) {
-        i_operationsAdmin = OperationsAdmin(operationsAdminAddress);
+        i_registry = RouteIdRegistry(registryAddress);
         s_protocolSettings = IDcaManager.ProtocolSettings({
             minPurchasePeriod: minPurchasePeriod.toUint32(),
             maxSchedulesPerToken: maxSchedulesPerToken.toUint16(),
@@ -107,6 +110,7 @@ contract TokenKeyedDcaManager is ReentrancyGuard {
         });
     }
 
+    /// @dev The pair is resolved to its compact id once, here, on the path the user already pays for.
     function createDcaSchedule(
         address token,
         uint256 depositAmount,
@@ -117,14 +121,16 @@ contract TokenKeyedDcaManager is ReentrancyGuard {
         uint128 deposit = depositAmount.toUint128();
         uint96 purchase = purchaseAmount.toUint96();
         uint32 period = purchasePeriod.toUint32();
-        uint32 route = routeIndex.toUint32();
+
+        uint32 routeId = i_registry.getRouteId(token, routeIndex);
+        if (routeId == 0) revert Prototype__TokenNotAccepted();
 
         IDcaManager.ProtocolSettings memory settings = s_protocolSettings;
         uint64 scheduleId = (uint256(settings.scheduleNonce) + 1).toUint64();
 
         _validatePurchasePeriod(purchasePeriod);
         _validateDeposit(depositAmount);
-        _handlerForDeposit(token, route).depositToken(msg.sender, depositAmount);
+        _handlerForDeposit(routeId).depositToken(msg.sender, depositAmount);
         _validatePurchaseAmount(token, purchaseAmount, depositAmount);
 
         uint64[] storage scheduleIds = s_scheduleIds[msg.sender][token];
@@ -132,14 +138,14 @@ contract TokenKeyedDcaManager is ReentrancyGuard {
 
         s_protocolSettings.scheduleNonce = scheduleId;
 
-        s_dcaSchedules[scheduleId][token] = Schedule({
+        s_dcaSchedules[scheduleId] = Schedule({
+            user: msg.sender,
+            purchaseAmount: purchase,
             tokenBalance: deposit,
             lastPurchaseTimestamp: 0,
-            paused: false,
             purchasePeriod: period,
-            routeIndex: route,
-            user: msg.sender,
-            purchaseAmount: purchase
+            routeId: routeId,
+            paused: false
         });
         scheduleIds.push(scheduleId);
 
@@ -148,19 +154,19 @@ contract TokenKeyedDcaManager is ReentrancyGuard {
         );
     }
 
-    /// @dev The token completes the key, so the caller supplies it; ownership is still a check.
-    function deleteDcaSchedule(address token, uint64 scheduleId) external nonReentrant {
-        Schedule memory dcaSchedule = s_dcaSchedules[scheduleId][token];
+    /// @dev The id addresses the schedule on its own; the token is reached through the route it names.
+    function deleteDcaSchedule(uint64 scheduleId) external nonReentrant {
+        Schedule memory dcaSchedule = s_dcaSchedules[scheduleId];
         if (dcaSchedule.user == address(0)) revert Prototype__InexistentSchedule();
         if (dcaSchedule.user != msg.sender) revert Prototype__NotScheduleOwner();
 
+        (address token,) = i_registry.getRoute(dcaSchedule.routeId);
         _removeScheduleId(msg.sender, token, scheduleId);
-        delete s_dcaSchedules[scheduleId][token];
+        delete s_dcaSchedules[scheduleId];
 
         uint256 amountWithdrawn;
         if (dcaSchedule.tokenBalance > 0) {
-            amountWithdrawn =
-                _handler(token, dcaSchedule.routeIndex).withdrawToken(msg.sender, dcaSchedule.tokenBalance);
+            amountWithdrawn = _handler(dcaSchedule.routeId).withdrawToken(msg.sender, dcaSchedule.tokenBalance);
         }
 
         emit DcaManager__DcaScheduleDeleted(msg.sender, token, scheduleId, amountWithdrawn);
@@ -169,22 +175,21 @@ contract TokenKeyedDcaManager is ReentrancyGuard {
     function batchBuyRbtc(Batch calldata batch) external onlySwapper {
         uint256 numOfPurchases = batch.scheduleIds.length;
         if (numOfPurchases == 0) revert Prototype__EmptyBatch();
+        (address handler, address token) = i_registry.getHandlerAndToken(batch.routeId);
+        if (handler == address(0)) revert Prototype__TokenNotAccepted();
         address[] memory buyers = new address[](numOfPurchases);
         uint256[] memory purchaseAmounts = new uint256[](numOfPurchases);
         for (uint256 i; i < numOfPurchases; ++i) {
-            (address buyer, uint256 schedulePurchaseAmount, uint256 scheduleRouteIndex) =
-                _rBtcPurchaseChecksEffects(batch.scheduleIds[i], batch.token);
-            if (scheduleRouteIndex != batch.routeIndex) revert Prototype__RouteIndexMismatch();
+            (address buyer, uint256 schedulePurchaseAmount) =
+                _rBtcPurchaseChecksEffects(batch.scheduleIds[i], batch.routeId, token);
             buyers[i] = buyer;
             purchaseAmounts[i] = schedulePurchaseAmount;
         }
-        IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex))).batchBuyRbtc(
-            buyers, batch.scheduleIds, purchaseAmounts, batch.minRbtcOut
-        );
+        IPurchaseRbtc(handler).batchBuyRbtc(buyers, batch.scheduleIds, purchaseAmounts, batch.minRbtcOut);
     }
 
-    function getSchedule(uint64 scheduleId, address token) external view returns (Schedule memory) {
-        return s_dcaSchedules[scheduleId][token];
+    function getSchedule(uint64 scheduleId) external view returns (Schedule memory) {
+        return s_dcaSchedules[scheduleId];
     }
 
     function getScheduleIds(address user, address token) external view returns (uint64[] memory) {
@@ -196,18 +201,20 @@ contract TokenKeyedDcaManager is ReentrancyGuard {
     }
 
     /**
-     * @dev Existence and the token check are one comparison: a row naming a schedule of another
-     *      stablecoin lands on an empty struct, whose `user` is `address(0)`.
+     * @dev The route comparison replaces both the token check and the route check the shipped manager
+     *      makes: one `uint32` equality proves the row belongs to the handler this batch is paying,
+     *      because a `routeId` names the pair rather than either half of it.
      */
-    function _rBtcPurchaseChecksEffects(uint64 scheduleId, address token)
+    function _rBtcPurchaseChecksEffects(uint64 scheduleId, uint32 batchRouteId, address token)
         private
-        returns (address, uint256, uint256)
+        returns (address, uint256)
     {
-        Schedule storage dcaScheduleStorage = s_dcaSchedules[scheduleId][token];
+        Schedule storage dcaScheduleStorage = s_dcaSchedules[scheduleId];
         Schedule memory dcaSchedule = dcaScheduleStorage;
 
         address buyer = dcaSchedule.user;
         if (buyer == address(0)) revert Prototype__InexistentSchedule();
+        if (dcaSchedule.routeId != batchRouteId) revert Prototype__RouteIdMismatch();
         if (dcaSchedule.paused) revert Prototype__SchedulePaused();
 
         uint256 lastPurchaseTimestamp = dcaSchedule.lastPurchaseTimestamp;
@@ -236,7 +243,7 @@ contract TokenKeyedDcaManager is ReentrancyGuard {
         dcaScheduleStorage.lastPurchaseTimestamp = newTimestamp.toUint48();
         emit DcaManager__LastPurchaseTimestampUpdated(token, scheduleId, newTimestamp);
 
-        return (buyer, dcaSchedule.purchaseAmount, dcaSchedule.routeIndex);
+        return (buyer, dcaSchedule.purchaseAmount);
     }
 
     function _removeScheduleId(address user, address token, uint64 scheduleId) private {
@@ -253,14 +260,14 @@ contract TokenKeyedDcaManager is ReentrancyGuard {
         revert Prototype__InexistentSchedule();
     }
 
-    function _handlerForDeposit(address token, uint256 routeIndex) private view returns (ITokenHandler) {
-        ITokenHandler tokenHandler = _handler(token, routeIndex);
-        if (i_operationsAdmin.areDepositsPaused(token, routeIndex)) revert Prototype__DepositsPaused();
+    function _handlerForDeposit(uint32 routeId) private view returns (ITokenHandler) {
+        ITokenHandler tokenHandler = _handler(routeId);
+        if (i_registry.areDepositsPaused(routeId)) revert Prototype__DepositsPaused();
         return tokenHandler;
     }
 
-    function _handler(address token, uint256 routeIndex) private view returns (ITokenHandler) {
-        address tokenHandlerAddress = i_operationsAdmin.getTokenHandler(token, routeIndex);
+    function _handler(uint32 routeId) private view returns (ITokenHandler) {
+        address tokenHandlerAddress = i_registry.getHandler(routeId);
         if (tokenHandlerAddress == address(0)) revert Prototype__TokenNotAccepted();
         return ITokenHandler(tokenHandlerAddress);
     }

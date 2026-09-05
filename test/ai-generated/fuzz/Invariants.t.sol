@@ -175,8 +175,7 @@ contract InvariantTest is StdInvariant, Test {
             1,
             "Handler never created a schedule at the selected route"
         );
-        IDcaManager.DcaSchedule[] memory schedules =
-            dcaManager.getDcaSchedules(s_users[0], address(stablecoin));
+        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) = dcaManager.getDcaSchedules(s_users[0], address(stablecoin));
         assertEq(schedules.length, 1);
         assertEq(schedules[0].routeIndex, s_routeIndex);
     }
@@ -268,7 +267,7 @@ contract InvariantTest is StdInvariant, Test {
             
             // Get all schedules for this user with the stablecoin
             try dcaManager.getDcaSchedules(user, address(stablecoin)) returns (
-                IDcaManager.DcaSchedule[] memory schedules
+                uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules
             ) {
                 for (uint256 j = 0; j < schedules.length; j++) {
                     totalUserDeposits += schedules[j].tokenBalance;
@@ -345,14 +344,14 @@ contract InvariantTest is StdInvariant, Test {
             // No upper bound checks – only logical consistency properties below
 
             try dcaManager.getDcaSchedules(user, address(stablecoin)) returns (
-                IDcaManager.DcaSchedule[] memory schedules
+                uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules
             ) {
                 for (uint256 j = 0; j < schedules.length; j++) {
                     if (schedules[j].purchaseAmount > 0) {
                         assertGt(schedules[j].purchaseAmount, MIN_PURCHASE_AMOUNT);
                         assertGe(schedules[j].purchasePeriod, MIN_PURCHASE_PERIOD);
                     }
-                    assertNotEq(schedules[j].scheduleId, uint64(0));
+                    assertNotEq(schedulesIds[j], uint64(0));
                 }
             } catch {
                 // User has no schedules, which is fine
@@ -427,17 +426,19 @@ contract InvariantTest is StdInvariant, Test {
             (address user, uint256 timestampAtPause, bool pausedNow) = fuzzHandler.s_pauseGhost(scheduleId);
             if (!pausedNow) continue;
 
+            uint64[] memory schedulesIds;
             IDcaManager.DcaSchedule[] memory schedules;
             try dcaManager.getDcaSchedules(user, address(stablecoin)) returns (
-                IDcaManager.DcaSchedule[] memory _schedules
+                uint64[] memory _schedulesIds, IDcaManager.DcaSchedule[] memory _schedules
             ) {
+                schedulesIds = _schedulesIds;
                 schedules = _schedules;
             } catch {
                 continue;
             }
 
             for (uint256 j = 0; j < schedules.length; j++) {
-                if (schedules[j].scheduleId != scheduleId) continue;
+                if (schedulesIds[j] != scheduleId) continue;
 
                 assertTrue(schedules[j].paused, "a schedule the ghost holds paused is active on-chain");
                 assertEq(
@@ -458,7 +459,7 @@ contract InvariantTest is StdInvariant, Test {
             address user = s_users[i];
             
             try dcaManager.getDcaSchedules(user, address(stablecoin)) returns (
-                IDcaManager.DcaSchedule[] memory schedules
+                uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules
             ) {
                 if (schedules.length > 0) {
                     uint256 totalDeposited = 0;

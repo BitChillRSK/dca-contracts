@@ -34,7 +34,7 @@ import {IkToken} from "../../src/tropykus-legacy/IkToken.sol";
 import {IiSusdToken} from "../../src/sovryn/IiSusdToken.sol";
 import {IPurchaseUniswap} from "../../src/interfaces/IPurchaseUniswap.sol";
 import {batchBuyOne, toBatch} from "../utils/BatchBuyOne.sol";
-import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
+import {scheduleAt, scheduleIdAt, scheduleCount} from "test/utils/ScheduleAt.sol";
 
 contract DcaDappTest is Test {
     DcaManager dcaManager;
@@ -444,7 +444,7 @@ contract DcaDappTest is Test {
     /// @dev Schedule ids derive from a monotonic nonce, so tests must read them back
     /// instead of recomputing the derivation. Returns the id of the most recently created schedule.
     function _lastScheduleId() internal view returns (uint64) {
-        uint256 len = dcaManager.getDcaSchedules(USER, address(stablecoin)).length;
+        uint256 len = scheduleCount(dcaManager, USER, address(stablecoin));
         return scheduleIdAt(dcaManager, USER, address(stablecoin), len - 1);
     }
 
@@ -457,7 +457,7 @@ contract DcaDappTest is Test {
         emit TokenHandler__TokenDeposited(address(stablecoin), USER, AMOUNT_TO_DEPOSIT);
         vm.expectEmit(true, true, true, false);
         emit DcaManager__TokenBalanceUpdated(address(stablecoin), scheduleId, 2 * AMOUNT_TO_DEPOSIT); // 2 *, since a previous deposit is made in the setup
-        dcaManager.depositToken(scheduleId, AMOUNT_TO_DEPOSIT);
+        dcaManager.depositToken(address(stablecoin), scheduleId, AMOUNT_TO_DEPOSIT);
         uint256 userBalanceAfterDeposit = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
         vm.stopPrank();
         return (userBalanceAfterDeposit, userBalanceBeforeDeposit);
@@ -468,7 +468,7 @@ contract DcaDappTest is Test {
         vm.expectEmit(true, true, false, false); // Amounts may not match to the last wei, so third parameter is false
         emit TokenHandler__TokenWithdrawn(address(stablecoin), USER, AMOUNT_TO_DEPOSIT);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        dcaManager.withdrawToken(scheduleId, AMOUNT_TO_DEPOSIT);
+        dcaManager.withdrawToken(address(stablecoin), scheduleId, AMOUNT_TO_DEPOSIT);
         uint256 remainingAmount = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
         assertEq(remainingAmount, 0);
         vm.stopPrank();
@@ -481,12 +481,12 @@ contract DcaDappTest is Test {
         uint256 purchaseAmount = AMOUNT_TO_SPEND / NUM_OF_SCHEDULES;
         // Delete the schedule created in setUp to have all five schedules with the same amounts
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
-        dcaManager.deleteDcaSchedule(scheduleId);
+        dcaManager.deleteDcaSchedule(address(stablecoin), scheduleId);
         for (uint256 i = 0; i < NUM_OF_SCHEDULES; ++i) {
             uint256 scheduleIndex = SCHEDULE_INDEX + i;
             uint256 purchasePeriod = MIN_PURCHASE_PERIOD + i * 5 days;
             uint256 userBalanceBeforeDeposit;
-            if (dcaManager.getDcaSchedules(USER, address(stablecoin)).length > scheduleIndex) {
+            if (scheduleCount(dcaManager, USER, address(stablecoin)) > scheduleIndex) {
                 userBalanceBeforeDeposit = scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).tokenBalance;
             } else {
                 userBalanceBeforeDeposit = 0;
@@ -515,16 +515,16 @@ contract DcaDappTest is Test {
      * @dev Makes no call before the prank, so a caller's `vm.expectEmit` / `vm.expectRevert` still
      *      lands on the batch call itself. The manager reads the amount from the schedule by id.
      */
-    function buyRbtcOne(address buyer, uint64 scheduleId) internal {
+    function buyRbtcOne(uint64 scheduleId) internal {
         vm.prank(SWAPPER);
-        batchBuyOne(dcaManager, buyer, address(stablecoin), scheduleId, s_routeIndex);
+        batchBuyOne(dcaManager, address(stablecoin), scheduleId, s_routeIndex);
     }
 
     function makeSinglePurchase() internal {
         vm.startPrank(USER);
         uint256 stablecoinBalanceBeforePurchase = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
         uint256 rbtcBalanceBeforePurchase = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
-        IDcaManager.DcaSchedule[] memory dcaDetails = dcaManager.getDcaSchedules(USER, address(stablecoin));
+        (uint64[] memory dcaDetailsIds, IDcaManager.DcaSchedule[] memory dcaDetails) = dcaManager.getDcaSchedules(USER, address(stablecoin));
         vm.stopPrank();
 
         uint256 fee = feeCalculator.calculateFee(AMOUNT_TO_SPEND);
@@ -534,7 +534,7 @@ contract DcaDappTest is Test {
         uint256 lastTs = dcaDetails[SCHEDULE_INDEX].lastPurchaseTimestamp;
         uint256 period = dcaDetails[SCHEDULE_INDEX].purchasePeriod;
         uint256 lastPurchaseTimestamp = lastTs == 0 ? block.timestamp : lastTs + period;
-        emit DcaManager__LastPurchaseTimestampUpdated(address(stablecoin), dcaDetails[SCHEDULE_INDEX].scheduleId, lastPurchaseTimestamp);
+        emit DcaManager__LastPurchaseTimestampUpdated(address(stablecoin), dcaDetailsIds[SCHEDULE_INDEX], lastPurchaseTimestamp);
         if (isLendingLane) {
             vm.expectEmit(true, false, false, false);
             emit TokenLending__SharesRedeemed(USER, 0, 0);
@@ -548,10 +548,10 @@ contract DcaDappTest is Test {
             USER,
             address(stablecoin),
             netPurchaseAmount / s_btcPrice,
-            dcaDetails[SCHEDULE_INDEX].scheduleId,
+            dcaDetailsIds[SCHEDULE_INDEX],
             netPurchaseAmount
         );
-        buyRbtcOne(USER, dcaDetails[SCHEDULE_INDEX].scheduleId);
+        buyRbtcOne(dcaDetailsIds[SCHEDULE_INDEX]);
 
         vm.startPrank(USER);
         uint256 stablecoinBalanceAfterPurchase = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
@@ -617,7 +617,7 @@ contract DcaDappTest is Test {
             uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), scheduleIndex);
             vm.stopPrank();
 
-            buyRbtcOne(USER, scheduleId);
+            buyRbtcOne(scheduleId);
 
             vm.startPrank(USER);
             uint256 stablecoinBalanceAfterPurchase =
@@ -674,8 +674,8 @@ contract DcaDappTest is Test {
             users[i] = USER; // Same user for has 5 schedules due for a purchase in this scenario
             scheduleIndexes[i] = i;
             vm.startPrank(OWNER);
-            purchaseAmounts[i] = dcaManager.getDcaSchedules(users[0], address(stablecoin))[i].purchaseAmount;
-            purchasePeriods[i] = dcaManager.getDcaSchedules(users[0], address(stablecoin))[i].purchasePeriod;
+            purchaseAmounts[i] = scheduleAt(dcaManager, users[0], address(stablecoin), i).purchaseAmount;
+            purchasePeriods[i] = scheduleAt(dcaManager, users[0], address(stablecoin), i).purchasePeriod;
             scheduleIds[i] = scheduleIdAt(dcaManager, users[0], address(stablecoin), i);
             vm.stopPrank();
         }
@@ -704,7 +704,7 @@ contract DcaDappTest is Test {
 
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, users, address(stablecoin), s_routeIndex)
+            toBatch(scheduleIds, address(stablecoin), s_routeIndex)
         );
 
         if (isLendingLane) {
@@ -738,7 +738,7 @@ contract DcaDappTest is Test {
         vm.recordLogs();
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, users, address(stablecoin), s_routeIndex)
+            toBatch(scheduleIds, address(stablecoin), s_routeIndex)
         );
         
         uint256 postStablecoinHandlerBalance2;

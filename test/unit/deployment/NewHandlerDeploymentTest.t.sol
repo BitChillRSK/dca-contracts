@@ -128,7 +128,7 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
 
         uint64 scheduleId = scheduleIdAt(dcaManager, user, config.usdrifTokenAddress, 0);
         vm.prank(swapper);
-        batchBuyOne(dcaManager, user, config.usdrifTokenAddress, scheduleId, LAYERBANK_INDEX);
+        batchBuyOne(dcaManager, config.usdrifTokenAddress, scheduleId, LAYERBANK_INDEX);
 
         assertGt(
             IPurchaseRbtc(usdrifHandlerAddress).getAccumulatedRbtcBalance(user),

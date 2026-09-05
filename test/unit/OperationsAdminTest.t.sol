@@ -151,7 +151,7 @@ contract OperationsAdminTest is DcaDappTest {
         operationsAdmin.revokeSwapper(SWAPPER);
 
         vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__UnauthorizedSwapper.selector, SWAPPER));
-        buyRbtcOne(USER, scheduleId);
+        buyRbtcOne(scheduleId);
     }
 
     function testReregisteringAnyIndexReverts() external {
@@ -290,7 +290,7 @@ contract OperationsAdminTest is DcaDappTest {
         uint256 userBalanceBefore = stablecoin.balanceOf(USER);
 
         vm.prank(USER);
-        dcaManager.withdrawToken(scheduleId, remaining);
+        dcaManager.withdrawToken(address(stablecoin), scheduleId, remaining);
 
         assertGt(stablecoin.balanceOf(USER), userBalanceBefore);
         assertEq(scheduleAt(dcaManager, USER, address(stablecoin), 0).tokenBalance, 0);
@@ -315,15 +315,15 @@ contract OperationsAdminTest is DcaDappTest {
         uint256 ownerWalletBefore = stablecoin.balanceOf(OWNER);
 
         vm.prank(OWNER);
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, OWNER, userScheduleId));
-        dcaManager.withdrawToken(userScheduleId, userRemaining);
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__NotScheduleOwner.selector, address(stablecoin), userScheduleId, USER));
+        dcaManager.withdrawToken(address(stablecoin), userScheduleId, userRemaining);
 
         vm.prank(OWNER);
         vm.expectRevert(IDcaManagerAccessControl.DcaManagerAccessControl__OnlyDcaManagerCanCall.selector);
         ITokenHandler(address(stablecoinHandler)).withdrawToken(USER, userRemaining);
 
         vm.prank(OWNER);
-        dcaManager.withdrawToken(ownerScheduleId, ownerRemaining);
+        dcaManager.withdrawToken(address(stablecoin), ownerScheduleId, ownerRemaining);
 
         assertGt(stablecoin.balanceOf(OWNER), ownerWalletBefore);
         assertEq(scheduleAt(dcaManager, OWNER, address(stablecoin), 0).tokenBalance, 0);

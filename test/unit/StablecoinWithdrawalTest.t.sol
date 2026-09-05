@@ -25,7 +25,7 @@ contract StablecoinWithdrawalTest is DcaDappTest {
         vm.startPrank(USER);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.expectRevert(IDcaManager.DcaManager__WithdrawalAmountMustBeGreaterThanZero.selector);
-        dcaManager.withdrawToken(scheduleId, 0);
+        dcaManager.withdrawToken(address(stablecoin), scheduleId, 0);
         vm.stopPrank();
     }
 
@@ -39,15 +39,15 @@ contract StablecoinWithdrawalTest is DcaDappTest {
             AMOUNT_TO_DEPOSIT
         );
         vm.expectRevert(encodedRevert);
-        dcaManager.withdrawToken(scheduleId, USER_TOTAL_AMOUNT);
+        dcaManager.withdrawToken(address(stablecoin), scheduleId, USER_TOTAL_AMOUNT);
         vm.stopPrank();
     }
 
     function testCannotWithdrawFromInexistentSchedule() external {
         vm.startPrank(USER);
         uint64 wrongScheduleId = UNUSED_SCHEDULE_ID;
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, USER, wrongScheduleId));
-        dcaManager.withdrawToken(wrongScheduleId, AMOUNT_TO_DEPOSIT);
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), wrongScheduleId));
+        dcaManager.withdrawToken(address(stablecoin), wrongScheduleId, AMOUNT_TO_DEPOSIT);
         vm.stopPrank();
     }
 
@@ -56,8 +56,8 @@ contract StablecoinWithdrawalTest is DcaDappTest {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         address stranger = makeAddr("notTheOwner");
         vm.prank(stranger);
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, stranger, scheduleId));
-        dcaManager.withdrawToken(scheduleId, AMOUNT_TO_DEPOSIT);
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__NotScheduleOwner.selector, address(stablecoin), scheduleId, USER));
+        dcaManager.withdrawToken(address(stablecoin), scheduleId, AMOUNT_TO_DEPOSIT);
     }
 
 

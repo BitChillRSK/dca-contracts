@@ -325,7 +325,7 @@ contract StablecoinLendingTest is DcaDappTest {
 
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
         vm.prank(USER);
-        dcaManager.withdrawTokenAndInterest(scheduleId, AMOUNT_TO_SPEND);
+        dcaManager.withdrawTokenAndInterest(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
 
         uint256 userStablecoinBalanceAfterInterestWithdrawal = stablecoin.balanceOf(USER);
         assertApproxEqRel(
@@ -370,7 +370,7 @@ contract StablecoinLendingTest is DcaDappTest {
     //     emit TokenLending__WithdrawalAmountAdjusted(USER, attemptedWithdrawalAmount, stablecoinInLendingProtocol);
 
     //     vm.prank(USER);
-    //     dcaManager.withdrawToken(address(stablecoin), 0, attemptedWithdrawalAmount);
+    //     dcaManager.withdrawToken(address(stablecoin), address(stablecoin), 0, attemptedWithdrawalAmount);
 
     //     // Verify user received their full balance
     //     assertEq(stablecoin.balanceOf(USER), stablecoinInLendingProtocol);

@@ -55,7 +55,7 @@ contract NetRedemptionTest is DcaDappTest {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 rbtcBefore = _accumulatedRbtc();
 
-        buyRbtcOne(USER, scheduleId);
+        buyRbtcOne(scheduleId);
 
         uint256 rbtcBought = _accumulatedRbtc() - rbtcBefore;
         uint256 netRedeemed = _afterExitFee(AMOUNT_TO_SPEND);
@@ -81,7 +81,7 @@ contract NetRedemptionTest is DcaDappTest {
 
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, users, address(stablecoin), s_routeIndex)
+            toBatch(scheduleIds, address(stablecoin), s_routeIndex)
         );
 
         uint256 received = address(stablecoinHandler).balance - handlerRbtcBefore;
@@ -105,7 +105,7 @@ contract NetRedemptionTest is DcaDappTest {
         uint256 userDocBefore = stablecoin.balanceOf(USER);
 
         vm.prank(USER);
-        dcaManager.withdrawToken(scheduleId, WITHDRAWAL_AMOUNT);
+        dcaManager.withdrawToken(address(stablecoin), scheduleId, WITHDRAWAL_AMOUNT);
 
         uint256 paid = stablecoin.balanceOf(USER) - userDocBefore;
         uint256 deducted =
@@ -125,14 +125,14 @@ contract NetRedemptionTest is DcaDappTest {
 
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.prank(USER);
-        dcaManager.withdrawToken(scheduleId, WITHDRAWAL_AMOUNT);
+        dcaManager.withdrawToken(address(stablecoin), scheduleId, WITHDRAWAL_AMOUNT);
 
         uint256 remaining = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
         assertEq(remaining, AMOUNT_TO_DEPOSIT - WITHDRAWAL_AMOUNT, "the fee must not be credited back");
 
         uint256 userDocBefore = stablecoin.balanceOf(USER);
         vm.prank(USER);
-        dcaManager.withdrawToken(scheduleId, remaining);
+        dcaManager.withdrawToken(address(stablecoin), scheduleId, remaining);
         assertGt(stablecoin.balanceOf(USER) - userDocBefore, 0, "remainder was not claimable");
         assertEq(scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance, 0);
     }
@@ -148,7 +148,7 @@ contract NetRedemptionTest is DcaDappTest {
 
         vm.recordLogs();
         vm.prank(USER);
-        dcaManager.deleteDcaSchedule(scheduleId);
+        dcaManager.deleteDcaSchedule(address(stablecoin), scheduleId);
 
         uint256 paid = stablecoin.balanceOf(USER) - userDocBefore;
         assertLt(paid, AMOUNT_TO_DEPOSIT, "the exit fee should have produced a shortfall");
@@ -197,7 +197,7 @@ contract NetRedemptionTest is DcaDappTest {
         vm.recordLogs();
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, users, address(stablecoin), s_routeIndex)
+            toBatch(scheduleIds, address(stablecoin), s_routeIndex)
         );
 
         (uint256 perUserSpentTotal, uint256 batchSpent) = _batchSpendFromLogs();
@@ -245,7 +245,7 @@ contract NetRedemptionTest is DcaDappTest {
         );
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, users, address(stablecoin), s_routeIndex)
+            toBatch(scheduleIds, address(stablecoin), s_routeIndex)
         );
     }
 
@@ -265,7 +265,7 @@ contract NetRedemptionTest is DcaDappTest {
         uint256 userDocBefore = stablecoin.balanceOf(USER);
 
         vm.prank(USER);
-        dcaManager.withdrawToken(scheduleId, WITHDRAWAL_AMOUNT);
+        dcaManager.withdrawToken(address(stablecoin), scheduleId, WITHDRAWAL_AMOUNT);
 
         uint256 paid = stablecoin.balanceOf(USER) - userDocBefore;
         uint256 deducted =
@@ -283,7 +283,7 @@ contract NetRedemptionTest is DcaDappTest {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 rbtcBefore = _accumulatedRbtc();
 
-        buyRbtcOne(USER, scheduleId);
+        buyRbtcOne(scheduleId);
 
         uint256 netPurchaseAmount = AMOUNT_TO_SPEND - feeCalculator.calculateFee(AMOUNT_TO_SPEND);
         assertApproxEqRel(_accumulatedRbtc() - rbtcBefore, netPurchaseAmount / s_btcPrice, _maxPurchaseSlippage());
@@ -324,7 +324,7 @@ contract NetRedemptionTest is DcaDappTest {
             users[i] = USER;
             scheduleIndexes[i] = i;
             scheduleIds[i] = scheduleIdAt(dcaManager, USER, address(stablecoin), i);
-            purchaseAmounts[i] = dcaManager.getDcaSchedules(USER, address(stablecoin))[i].purchaseAmount;
+            purchaseAmounts[i] = scheduleAt(dcaManager, USER, address(stablecoin), i).purchaseAmount;
         }
     }
 

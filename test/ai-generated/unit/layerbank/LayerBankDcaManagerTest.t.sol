@@ -72,7 +72,7 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, LAYERBANK_INDEX);
 
-        IDcaManager.DcaSchedule memory schedule = dcaManager.getDcaSchedules(USER, address(docToken))[0];
+        IDcaManager.DcaSchedule memory schedule = scheduleAt(dcaManager, USER, address(docToken), 0);
         assertEq(schedule.routeIndex, LAYERBANK_INDEX);
         assertEq(schedule.tokenBalance, DEPOSIT);
         assertGt(handler.getUserShares(USER), 0);
@@ -88,7 +88,7 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
         uint256 lTokensBefore = handler.getUserShares(USER);
 
         vm.prank(SWAPPER);
-        batchBuyOne(dcaManager, USER, address(docToken), scheduleId, LAYERBANK_INDEX);
+        batchBuyOne(dcaManager, address(docToken), scheduleId, LAYERBANK_INDEX);
 
         assertGt(dcaManager.getAccumulatedRbtcBalance(USER, address(docToken), LAYERBANK_INDEX), 0);
         assertLt(handler.getUserShares(USER), lTokensBefore);
@@ -96,7 +96,7 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
 
         uint256 userDocBefore = docToken.balanceOf(USER);
         vm.prank(USER);
-        dcaManager.withdrawToken(scheduleId, DEPOSIT - PURCHASE);
+        dcaManager.withdrawToken(address(docToken), scheduleId, DEPOSIT - PURCHASE);
 
         assertEq(docToken.balanceOf(USER), userDocBefore + DEPOSIT - PURCHASE);
         assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, 0);

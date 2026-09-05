@@ -65,7 +65,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
 
-        IDcaManager.DcaSchedule memory schedule = dcaManager.getDcaSchedules(USER, address(docToken))[0];
+        IDcaManager.DcaSchedule memory schedule = scheduleAt(dcaManager, USER, address(docToken), 0);
         assertEq(schedule.routeIndex, IDLE_INDEX);
         assertEq(schedule.tokenBalance, DEPOSIT);
         assertEq(handler.getUsersIdleTokenBalance(USER), DEPOSIT);
@@ -79,7 +79,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(docToken), 0);
 
         vm.prank(SWAPPER);
-        batchBuyOne(dcaManager, USER, address(docToken), scheduleId, IDLE_INDEX);
+        batchBuyOne(dcaManager, address(docToken), scheduleId, IDLE_INDEX);
 
         assertGt(dcaManager.getAccumulatedRbtcBalance(USER, address(docToken), IDLE_INDEX), 0);
         assertEq(handler.getUsersIdleTokenBalance(USER), DEPOSIT - PURCHASE);
@@ -87,7 +87,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
 
         uint256 userDocBefore = docToken.balanceOf(USER);
         vm.prank(USER);
-        dcaManager.withdrawToken(scheduleId, DEPOSIT - PURCHASE);
+        dcaManager.withdrawToken(address(docToken), scheduleId, DEPOSIT - PURCHASE);
 
         assertEq(docToken.balanceOf(USER), userDocBefore + DEPOSIT - PURCHASE);
         assertEq(handler.getUsersIdleTokenBalance(USER), 0);
@@ -120,7 +120,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
 
         vm.prank(USER);
         vm.expectRevert(encodedRevert);
-        dcaManager.withdrawTokenAndInterest(scheduleId, MIN_PURCHASE_AMOUNT);
+        dcaManager.withdrawTokenAndInterest(address(docToken), scheduleId, MIN_PURCHASE_AMOUNT);
     }
 
     function test_withdrawAllAccumulatedInterest_skipsIdleAndWithdrawsLending() public {
@@ -211,16 +211,19 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         assertEq(idleSchedule.routeIndex, IDLE_INDEX);
         assertEq(lendingSchedule.routeIndex, lendingIndex);
 
+        uint64 idleScheduleId = scheduleIdAt(dcaManager, USER, address(docToken), 0);
+        uint64 lendingScheduleId = scheduleIdAt(dcaManager, USER, address(docToken), 1);
+
         bytes memory encodedRevert =
             abi.encodeWithSelector(IDcaManager.DcaManager__TokenDoesNotYieldInterest.selector, address(docToken));
         vm.prank(USER);
         vm.expectRevert(encodedRevert);
-        dcaManager.withdrawTokenAndInterest(idleSchedule.scheduleId, MIN_PURCHASE_AMOUNT);
+        dcaManager.withdrawTokenAndInterest(address(docToken), idleScheduleId, MIN_PURCHASE_AMOUNT);
         assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, DEPOSIT);
         assertEq(scheduleAt(dcaManager, USER, address(docToken), 1).tokenBalance, DEPOSIT);
 
         vm.prank(USER);
-        dcaManager.withdrawTokenAndInterest(lendingSchedule.scheduleId, MIN_PURCHASE_AMOUNT);
+        dcaManager.withdrawTokenAndInterest(address(docToken), lendingScheduleId, MIN_PURCHASE_AMOUNT);
         assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, DEPOSIT);
         assertEq(scheduleAt(dcaManager, USER, address(docToken), 1).tokenBalance, DEPOSIT - MIN_PURCHASE_AMOUNT);
     }

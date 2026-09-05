@@ -6,7 +6,7 @@ import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import {toBatch, NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
 import "../Constants.sol";
-import {scheduleAt} from "test/utils/ScheduleAt.sol";
+import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @notice R51: the swapper's per-batch minimum rBTC output, on whichever venue the lane is running.
@@ -185,9 +185,9 @@ contract BatchMinRbtcOutTest is DcaDappTest {
         uint256[] memory purchaseAmounts = new uint256[](1);
         buyers[0] = USER;
         scheduleIndexes[0] = SCHEDULE_INDEX;
-        scheduleIds[0] = _schedule().scheduleId;
+        scheduleIds[0] = _scheduleId();
         purchaseAmounts[0] = AMOUNT_TO_SPEND;
-        return toBatch(scheduleIds, buyers, address(stablecoin), s_routeIndex, minRbtcOut);
+        return toBatch(scheduleIds, address(stablecoin), s_routeIndex, minRbtcOut);
     }
 
     function _buy(uint256 minRbtcOut) private {
@@ -198,6 +198,10 @@ contract BatchMinRbtcOutTest is DcaDappTest {
 
     function _schedule() private view returns (IDcaManager.DcaSchedule memory) {
         return scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
+    }
+
+    function _scheduleId() private view returns (uint64) {
+        return scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
     }
 
     function _accumulatedRbtc() private view returns (uint256) {

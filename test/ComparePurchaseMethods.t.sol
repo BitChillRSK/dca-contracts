@@ -396,7 +396,7 @@ contract ComparePurchaseMethods is Test {
         uint256 gasStart = gasleft();
         vm.prank(SWAPPER);
         dcaManMoc.batchBuyRbtc(
-            toBatch(scheduleIds, userArray, address(stablecoin), routeIndex)
+            toBatch(scheduleIds, address(stablecoin), routeIndex)
         );
         uint256 gasUsed = gasStart - gasleft();
         uint256 gasCost = gasUsed * tx.gasprice;
@@ -448,7 +448,7 @@ contract ComparePurchaseMethods is Test {
         uint256 gasStart = gasleft();
         vm.prank(SWAPPER);
         dcaManUni.batchBuyRbtc(
-            toBatch(scheduleIds, userArray, address(stablecoin), routeIndex)
+            toBatch(scheduleIds, address(stablecoin), routeIndex)
         );
         uint256 gasUsed = gasStart - gasleft();
         uint256 gasCost = gasUsed * tx.gasprice;
