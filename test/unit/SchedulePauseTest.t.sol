@@ -6,7 +6,7 @@ import {Test, console} from "forge-std/Test.sol";
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
-import {batchBuyOne, UNUSED_SCHEDULE_ID, toBatch} from "../utils/BatchBuyOne.sol";
+import {UNUSED_SCHEDULE_ID, toBatch, packBatchRow} from "../utils/BatchBuyOne.sol";
 import "./TestsHelper.t.sol";
 import {scheduleAt, scheduleIdAt, scheduleCount} from "test/utils/ScheduleAt.sol";
 
@@ -40,11 +40,6 @@ contract SchedulePauseTest is DcaDappTest {
         dcaManager.setSchedulePaused(address(stablecoin), scheduleId, paused);
     }
 
-    function _schedulePausedRevert(uint256 scheduleIndex) private view returns (bytes memory) {
-        return abi.encodeWithSelector(
-            IDcaManager.DcaManager__SchedulePaused.selector, address(stablecoin), _scheduleId(scheduleIndex)
-        );
-    }
 
     /*//////////////////////////////////////////////////////////////
                               PAUSE STATE
@@ -126,14 +121,18 @@ contract SchedulePauseTest is DcaDappTest {
                             PURCHASES BLOCKED
     //////////////////////////////////////////////////////////////*/
 
-    function testPausedScheduleRejectsPurchase() external {
+    /// @dev R66: a paused row is skipped rather than reverting the batch it is the only row in.
+    function testPausedScheduleSkipsPurchase() external {
         _setPaused(SCHEDULE_INDEX, true);
 
         IDcaManager.DcaSchedule memory before = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 rbtcBefore = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
 
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        vm.expectRevert(_schedulePausedRevert(SCHEDULE_INDEX));
+        vm.expectEmit(true, true, false, true, address(dcaManager));
+        emit IDcaManager.DcaManager__PurchaseRowSkipped(
+            address(stablecoin), scheduleId, IDcaManager.PurchaseRowSkipReason.SchedulePaused
+        );
         super.buyRbtcOne(scheduleId);
 
         IDcaManager.DcaSchedule memory unchangedSchedule =
@@ -151,41 +150,54 @@ contract SchedulePauseTest is DcaDappTest {
         );
     }
 
-    /// @dev One paused row fails the whole batch: no other row may keep its debit or timestamp.
-    function testOnePausedRowRevertsTheWholeBatch() external {
+    /// @dev R66: one paused row is skipped, and every other row in the same batch still buys — the
+    ///      opposite of the pre-R66 all-or-nothing behavior this test used to pin.
+    function testOnePausedRowIsSkippedWithoutBlockingTheRestOfTheBatch() external {
         super.createSeveralDcaSchedules();
 
         uint256 pausedIndex = NUM_OF_SCHEDULES - 1;
+        uint64 pausedScheduleId = _scheduleId(pausedIndex);
         _setPaused(pausedIndex, true);
 
         (uint64[] memory beforeIds, IDcaManager.DcaSchedule[] memory before) = dcaManager.getDcaSchedules(USER, address(stablecoin));
         uint256 rbtcBefore = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
 
-        uint64[] memory scheduleIds = new uint64[](NUM_OF_SCHEDULES);
+        bytes32[] memory rows = new bytes32[](NUM_OF_SCHEDULES);
         for (uint256 i; i < NUM_OF_SCHEDULES; ++i) {
-            scheduleIds[i] = beforeIds[i];
+            rows[i] = packBatchRow(beforeIds[i], before[i].purchaseAmount);
         }
 
-        bytes memory pausedRevert = _schedulePausedRevert(pausedIndex);
+        vm.expectEmit(true, true, false, true, address(dcaManager));
+        emit IDcaManager.DcaManager__PurchaseRowSkipped(
+            address(stablecoin), pausedScheduleId, IDcaManager.PurchaseRowSkipReason.SchedulePaused
+        );
         vm.prank(SWAPPER);
-        vm.expectRevert(pausedRevert);
         dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, address(stablecoin), s_routeIndex)
+            toBatch(rows, address(stablecoin), s_routeIndex)
         );
 
-        (uint64[] memory afterSchedulesIds, IDcaManager.DcaSchedule[] memory afterSchedules) = dcaManager.getDcaSchedules(USER, address(stablecoin));
+        (, IDcaManager.DcaSchedule[] memory afterSchedules) = dcaManager.getDcaSchedules(USER, address(stablecoin));
         for (uint256 i; i < NUM_OF_SCHEDULES; ++i) {
-            assertEq(afterSchedules[i].tokenBalance, before[i].tokenBalance, "a batch row kept its debit");
-            assertEq(
-                afterSchedules[i].lastPurchaseTimestamp,
-                before[i].lastPurchaseTimestamp,
-                "a batch row kept its timestamp"
-            );
+            if (i == pausedIndex) {
+                assertEq(afterSchedules[i].tokenBalance, before[i].tokenBalance, "the paused row was debited");
+                assertEq(
+                    afterSchedules[i].lastPurchaseTimestamp,
+                    before[i].lastPurchaseTimestamp,
+                    "the paused row consumed a period"
+                );
+            } else {
+                assertEq(
+                    afterSchedules[i].tokenBalance,
+                    before[i].tokenBalance - before[i].purchaseAmount,
+                    "a non-paused row did not buy"
+                );
+                assertGt(afterSchedules[i].lastPurchaseTimestamp, before[i].lastPurchaseTimestamp);
+            }
         }
-        assertEq(
+        assertGt(
             IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER),
             rbtcBefore,
-            "a reverted batch still bought rBTC"
+            "the rest of the batch did not buy despite one paused row"
         );
     }
 

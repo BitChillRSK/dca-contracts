@@ -38,7 +38,9 @@ interface IPurchaseRbtc {
     /// @notice The batch retrieved no more stablecoin than the fee it owes, so there is nothing left to spend.
     error PurchaseRbtc__StablecoinRetrievedBelowFee(uint256 stablecoinRetrieved, uint256 aggregatedFee);
     /// @notice The measured rBTC this batch bought is below the minimum the caller attached to it.
-    error PurchaseRbtc__BelowSwapperMinimum(uint256 rbtcReceived, uint256 minRbtcOut);
+    /// @dev `requiredMinimum` is `minRbtcOutRate * actualStablecoinSpent / 1e18`, rounded up — the rate
+    ///      applied to what this batch actually spent, not a pre-computed absolute figure.
+    error PurchaseRbtc__BelowSwapperMinimum(uint256 rbtcReceived, uint256 requiredMinimum);
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
@@ -49,21 +51,34 @@ interface IPurchaseRbtc {
      * @param buyers Users to buy for. An address may appear more than once.
      * @param scheduleIds Schedule id for each row, used only in `RbtcBought`.
      * @param purchaseAmounts Gross stablecoin each row spends before the protocol fee.
-     * @param minRbtcOut Minimum rBTC this batch as a whole must buy, in rBTC/WRBTC wei (18 decimals)
-     *        whatever the stablecoin's decimals. `0` disables this check.
-     * @dev Called only by DcaManager after it has debited each schedule. Fees are aggregated and
-     *      transferred once; each buyer is credited a pro-rata share of the measured rBTC. `minRbtcOut`
-     *      is compared against the rBTC this handler measures itself receiving, so it applies to every
-     *      purchase venue and never trusts an integrator return value. Where the venue applies a floor of
-     *      its own — `PurchaseUniswap` does, `PurchaseMoc` does not — that floor is enforced
-     *      independently and the stricter of the two decides the outcome.
+     * @param minRbtcOutRate Minimum rBTC this batch as a whole must buy per raw unit of stablecoin
+     *        actually spent, in rBTC/WRBTC wei (18 decimals) per stablecoin wei, scaled by `1e18`.
+     *        `0` disables this check.
+     * @return unfundedRows Indexes of the rows this handler could not fund, in ascending order. Empty
+     *         when it funded every row it was given, which is the usual case and the reason this is the
+     *         return rather than a per-row answer. DcaManager debits only the rows not named here, so a
+     *         buyer who no longer has the funds behind a schedule's principal loses that row rather than
+     *         the whole batch. Rows submitted as zero are passed over and never appear.
+     * @dev Called only by DcaManager, which holds its reentrancy guard for the whole call and debits
+     *      the schedules of the funded rows once this returns. Rows this handler cannot fund are
+     *      dropped before any fee is charged or anything is bought, so they pay nothing and are
+     *      credited nothing. If no row funds, no fee is transferred and no purchase is made.
+     *      Fees are aggregated and transferred once; each funded buyer is credited a pro-rata share of
+     *      the measured rBTC.
+     *      `minRbtcOutRate` is applied to the stablecoin this handler actually measures itself
+     *      spending — never to a planned or pre-fee figure — and the resulting minimum is compared
+     *      against the rBTC this handler measures itself receiving, so it applies to every purchase
+     *      venue and never trusts an integrator return value. Where the venue applies a floor of its
+     *      own — `PurchaseUniswap` does, derived from the same rate against the same actual spend;
+     *      `PurchaseMoc` has no venue floor of its own but still enforces this same shared check — the
+     *      stricter of the two decides the outcome.
      */
     function batchBuyRbtc(
         address[] memory buyers,
         uint64[] memory scheduleIds,
         uint256[] memory purchaseAmounts,
-        uint256 minRbtcOut
-    ) external;
+        uint256 minRbtcOutRate
+    ) external returns (uint256[] memory unfundedRows);
 
     /**
      * @notice Pay `user` the rBTC this handler has accumulated for them.

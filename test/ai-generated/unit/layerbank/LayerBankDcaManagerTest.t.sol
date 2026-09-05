@@ -9,7 +9,7 @@ import {IOperationsAdmin} from "src/interfaces/IOperationsAdmin.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import "test/Constants.sol";
-import {batchBuyOne} from "test/utils/BatchBuyOne.sol";
+import {batchOf} from "test/utils/BatchBuyOne.sol";
 import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 /**
@@ -88,7 +88,7 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
         uint256 lTokensBefore = handler.getUserShares(USER);
 
         vm.prank(SWAPPER);
-        batchBuyOne(dcaManager, address(docToken), scheduleId, LAYERBANK_INDEX);
+        dcaManager.batchBuyRbtc(batchOf(address(docToken), scheduleId, uint96(PURCHASE), LAYERBANK_INDEX));
 
         assertGt(dcaManager.getAccumulatedRbtcBalance(USER, address(docToken), LAYERBANK_INDEX), 0);
         assertLt(handler.getUserShares(USER), lTokensBefore);

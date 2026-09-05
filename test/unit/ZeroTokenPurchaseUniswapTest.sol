@@ -50,13 +50,13 @@ contract ZeroTokenPurchaseUniswap is PurchaseUniswap {
         return 0;
     }
 
-    function _batchRetrieveStablecoin(address[] memory, uint256[] memory, uint256)
+    function _batchRetrieveStablecoin(address[] memory, uint256[] memory)
         internal
         pure
         override
-        returns (uint256)
+        returns (uint256, uint256[] memory)
     {
-        return 0;
+        return (0, new uint256[](0));
     }
 }
 

@@ -116,7 +116,9 @@ contract IdleErc20HandlerTest is HandlerTestHarness {
         handler.withdrawToken(USER, DEPOSIT_AMOUNT);
     }
 
-    function test_idle_batchRetrieveStablecoin_revertsIfInsufficient() public {
+    /// @notice R66: a buyer short of idle balance loses their own row, not everybody else's. The row is
+    ///         zeroed in place, so the caller can tell which rows funded without a second pass.
+    function test_idle_batchRetrieveStablecoin_zeroesTheShortRow() public {
         address user1 = makeAddr("user1");
         address user2 = makeAddr("user2");
         stablecoin.mint(user1, DEPOSIT_AMOUNT);
@@ -138,18 +140,13 @@ contract IdleErc20HandlerTest is HandlerTestHarness {
         amounts[0] = DEPOSIT_AMOUNT * 2;
         amounts[1] = DEPOSIT_AMOUNT / 2;
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdleErc20Handler.IdleErc20Handler__InsufficientIdleBalance.selector,
-                user1,
-                DEPOSIT_AMOUNT * 2,
-                DEPOSIT_AMOUNT
-            )
-        );
-        idleHandler.testBatchRetrieveStablecoin(users, amounts, amounts[0] + amounts[1]);
+        (uint256 retrieved, uint256[] memory fundedAmounts,) = idleHandler.testBatchRetrieveStablecoin(users, amounts);
 
-        assertEq(idleHandler.getUsersIdleTokenBalance(user1), DEPOSIT_AMOUNT);
-        assertEq(idleHandler.getUsersIdleTokenBalance(user2), DEPOSIT_AMOUNT);
+        assertEq(retrieved, DEPOSIT_AMOUNT / 2, "only the funded row should have been retrieved");
+        assertEq(fundedAmounts[0], 0, "the short row should have been zeroed");
+        assertEq(fundedAmounts[1], DEPOSIT_AMOUNT / 2, "the funded row should have been left alone");
+        assertEq(idleHandler.getUsersIdleTokenBalance(user1), DEPOSIT_AMOUNT, "the short row was debited");
+        assertEq(idleHandler.getUsersIdleTokenBalance(user2), DEPOSIT_AMOUNT / 2);
     }
 }
 
@@ -170,11 +167,13 @@ contract IdleTestHandler is IdleErc20Handler {
         return _retrieveStablecoin(user, amount);
     }
 
-    function testBatchRetrieveStablecoin(
-        address[] memory users,
-        uint256[] memory purchaseAmounts,
-        uint256 totalStablecoinAmount
-    ) external returns (uint256) {
-        return _batchRetrieveStablecoin(users, purchaseAmounts, totalStablecoinAmount);
+    /// @dev `purchaseAmounts` is filtered in place, so it has to come back out: an external call copies
+    ///      the caller's memory, and the zeroing would otherwise be invisible to the test.
+    function testBatchRetrieveStablecoin(address[] memory users, uint256[] memory purchaseAmounts)
+        external
+        returns (uint256 retrieved, uint256[] memory fundedAmounts, uint256[] memory unfundedRows)
+    {
+        (retrieved, unfundedRows) = _batchRetrieveStablecoin(users, purchaseAmounts);
+        fundedAmounts = purchaseAmounts;
     }
 }

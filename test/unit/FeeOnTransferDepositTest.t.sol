@@ -14,7 +14,7 @@ import {MockFeeOnTransferStablecoin} from "../mocks/MockFeeOnTransferStablecoin.
 import {MockKdocToken} from "../mocks/MockKdocToken.sol";
 import {MockMocProxy} from "../mocks/MockMocProxy.sol";
 import "../Constants.sol";
-import {batchBuyOne, toBatch} from "../utils/BatchBuyOne.sol";
+import {batchOf, toBatch, packBatchRow} from "../utils/BatchBuyOne.sol";
 import {scheduleIdAt, scheduleCount, scheduleAt} from "test/utils/ScheduleAt.sol";
 
 /**
@@ -249,7 +249,7 @@ contract FeeOnTransferDepositTest is Test {
         token.setFeeBps(FEE_BPS);
 
         vm.prank(SWAPPER);
-        batchBuyOne(dcaManager, address(token), scheduleId, IDLE_INDEX);
+        dcaManager.batchBuyRbtc(batchOf(address(token), scheduleId, uint96(MIN_PURCHASE_AMOUNT), IDLE_INDEX));
 
         uint256 afterBuy = REQUESTED - MIN_PURCHASE_AMOUNT;
         assertEq(scheduleAt(dcaManager, USER, address(token), 0).tokenBalance, afterBuy);
@@ -338,31 +338,27 @@ contract FeeOnTransferDepositTest is Test {
         assertLt(userGained, REQUESTED);
     }
 
-    function test_tropykus_batchBuy_ofOverstatedBalance_reverts() public {
+    /// @dev R66: the schedule's principal is ahead of the shares behind it, so the row cannot fund
+    ///      itself. It is skipped rather than reverting the batch, which is what stops one buyer's
+    ///      overstated balance from costing every other row in the same tick its purchase.
+    function test_tropykus_batchBuy_ofOverstatedBalance_skipsTheRow() public {
         kToken.setMintShortfallBps(FEE_BPS);
         uint64 scheduleId = _createTropykusSchedule(USER, REQUESTED);
 
-        address[] memory buyers = new address[](1);
-        buyers[0] = USER;
-        uint256[] memory indexes = new uint256[](1);
-        indexes[0] = 0;
-        uint64[] memory ids = new uint64[](1);
-        ids[0] = scheduleId;
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = REQUESTED;
+        bytes32[] memory rows = new bytes32[](1);
+        rows[0] = packBatchRow(scheduleId, uint96(REQUESTED));
 
         uint256 availableShares = tropykusHandler.getUserShares(USER);
-        uint256 rate = kToken.exchangeRateStored();
-        uint256 requestedShares = (REQUESTED * EXCHANGE_RATE_DECIMALS + rate - 1) / rate;
-        vm.prank(SWAPPER);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ITokenLending.TokenLending__InsufficientShares.selector, USER, requestedShares, availableShares
-            )
+        vm.expectEmit(true, true, false, true, address(dcaManager));
+        emit IDcaManager.DcaManager__PurchaseRowSkipped(
+            address(token), scheduleId, IDcaManager.PurchaseRowSkipReason.FundingInsufficient
         );
-        dcaManager.batchBuyRbtc(toBatch(ids, address(token), TROPYKUS_INDEX));
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(toBatch(rows, address(token), TROPYKUS_INDEX));
 
-        // Revert leaves the schedule intact; the lending clamp still lets the user withdraw.
+        // The skip leaves the schedule and the share book intact; the lending clamp still lets the
+        // user withdraw.
+        assertEq(tropykusHandler.getUserShares(USER), availableShares);
         assertEq(scheduleAt(dcaManager, USER, address(token), 0).tokenBalance, REQUESTED);
         uint256 userBefore = token.balanceOf(USER);
         vm.prank(USER);

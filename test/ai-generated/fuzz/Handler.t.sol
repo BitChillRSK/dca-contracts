@@ -9,7 +9,7 @@ import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {OperationsAdmin} from "src/OperationsAdmin.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
-import {toBatch} from "test/utils/BatchBuyOne.sol";
+import {toBatch, packBatchRow} from "test/utils/BatchBuyOne.sol";
 import "test/Constants.sol";
 import {scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
@@ -458,17 +458,12 @@ contract Handler is Test {
         // Simulate the swapper role making the purchase using a length-1 batchBuyRbtc
         vm.startPrank(SWAPPER);
         
-        address[] memory buyers = new address[](1);
-        uint256[] memory scheduleIndexes = new uint256[](1);
-        uint64[] memory scheduleIds = new uint64[](1);
-        uint256[] memory purchaseAmounts = new uint256[](1);
-        buyers[0] = user;
-        scheduleIndexes[0] = scheduleIndex;
-        scheduleIds[0] = scheduleIdAt(dcaManager, user, address(stablecoin), scheduleIndex);
-        purchaseAmounts[0] = schedule.purchaseAmount;
+        uint64 scheduleId = scheduleIdAt(dcaManager, user, address(stablecoin), scheduleIndex);
+        bytes32[] memory rows = new bytes32[](1);
+        rows[0] = packBatchRow(scheduleId, schedule.purchaseAmount);
 
         try dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, address(stablecoin), schedule.routeIndex)
+            toBatch(rows, address(stablecoin), schedule.routeIndex)
         ) {
             buyRbtcSuccesses++;
         } catch {
@@ -489,50 +484,51 @@ contract Handler is Test {
         vm.assume(userSeeds.length == scheduleIndexes.length);
         vm.assume(userSeeds.length <= s_users.length); // Prevent array bounds issues
         
-        address[] memory buyers = new address[](userSeeds.length);
-        uint256[] memory boundedScheduleIndexes = new uint256[](userSeeds.length);
-        uint64[] memory scheduleIds = new uint64[](userSeeds.length);
-        uint256[] memory purchaseAmounts = new uint256[](userSeeds.length);
+        bytes32[] memory rows = new bytes32[](userSeeds.length);
         uint256 totalRbtcNeeded = 0;
-        
+
         // Prepare batch data and calculate total rBTC needed
         for (uint256 i = 0; i < userSeeds.length; i++) {
             address user = s_users[userSeeds[i] % s_users.length];
-            buyers[i] = user;
-            
+
             (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) = dcaManager.getDcaSchedules(user, address(stablecoin));
             vm.assume(schedules.length > 0);
-            
-            boundedScheduleIndexes[i] = bound(scheduleIndexes[i], 0, schedules.length - 1);
-            IDcaManager.DcaSchedule memory schedule = schedules[boundedScheduleIndexes[i]];
-            
+
+            uint256 boundedScheduleIndex = bound(scheduleIndexes[i], 0, schedules.length - 1);
+            IDcaManager.DcaSchedule memory schedule = schedules[boundedScheduleIndex];
+
             vm.assume(schedule.tokenBalance >= schedule.purchaseAmount);
             vm.assume(schedule.routeIndex == routeIndex);
-            
-            scheduleIds[i] = schedulesIds[boundedScheduleIndexes[i]];
-            purchaseAmounts[i] = schedule.purchaseAmount;
-            
+
+            rows[i] = packBatchRow(schedulesIds[boundedScheduleIndex], schedule.purchaseAmount);
+
             // Calculate rBTC needed for this purchase
             uint256 rbtcForThisPurchase = (uint256(schedule.purchaseAmount) * 3e16) / 1e18;
             totalRbtcNeeded += rbtcForThisPurchase;
-            
+
             // Advance time if needed
             uint256 nextValidTime = uint256(schedule.lastPurchaseTimestamp) + uint256(schedule.purchasePeriod);
             if (block.timestamp < nextValidTime) {
                 vm.warp(nextValidTime);
             }
         }
-        
+
         // Ensure handler has enough rBTC for the entire batch
         uint256 currentHandlerBalance = address(handler).balance;
         if (currentHandlerBalance < totalRbtcNeeded) {
             vm.deal(address(handler), currentHandlerBalance + totalRbtcNeeded);
         }
-        
+
+        // R66: rows must be in strictly increasing schedule-id order, which is what the swapper sends.
+        // Fuzzed seeds pick indexes freely, so sort and drop repeats here — otherwise almost every
+        // multi-row draw would be rejected as a composition error and this action would stop
+        // exercising the purchase path at all.
+        rows = _sortedUniqueRows(rows);
+
         // Execute batch purchase
         vm.startPrank(SWAPPER);
         try dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, address(stablecoin), routeIndex)
+            toBatch(rows, address(stablecoin), routeIndex)
         ) {
             buyRbtcSuccesses++;
         } catch {
@@ -541,6 +537,35 @@ contract Handler is Test {
         vm.stopPrank();
     }
     
+    /**
+     * @dev Insertion-sort packed rows by decoded schedule id and drop repeats. The id sits in the high
+     *      bits, so sorting the packed words numerically already orders them by id.
+     */
+    function _sortedUniqueRows(bytes32[] memory rows) private pure returns (bytes32[] memory unique) {
+        for (uint256 i = 1; i < rows.length; ++i) {
+            bytes32 row = rows[i];
+            uint256 j = i;
+            while (j > 0 && rows[j - 1] > row) {
+                rows[j] = rows[j - 1];
+                --j;
+            }
+            rows[j] = row;
+        }
+
+        uint256 kept;
+        bytes32[] memory buffer = new bytes32[](rows.length);
+        for (uint256 i = 0; i < rows.length; ++i) {
+            uint64 scheduleId = uint64(uint256(rows[i]) >> 96);
+            if (kept != 0 && scheduleId == uint64(uint256(buffer[kept - 1]) >> 96)) continue;
+            buffer[kept++] = rows[i];
+        }
+
+        unique = new bytes32[](kept);
+        for (uint256 i = 0; i < kept; ++i) {
+            unique[i] = buffer[i];
+        }
+    }
+
     /**
      * @notice Withdraw accumulated rBTC for a random user
      */

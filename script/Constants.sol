@@ -58,8 +58,8 @@ string constant TROPYKUS_STRING = "tropykus";
 string constant DOC_STRING = "DOC"; // Unset STABLECOIN_TYPE falls back to this in `_stablecoinType()`.
 string constant USDRIF_STRING = "USDRIF";
 string constant USDT0_STRING = "USDT0";
-// Swap-time oracle floor. Deliberately loose: the swapper's per-batch `minRbtcOut` is the operational
-// bound, and this is what holds when that minimum is absent, stale, or hostile. Derived from the live
+// Swap-time oracle floor. Deliberately loose: the swapper's per-batch `minRbtcOutRate` is the operational
+// bound, and this is what holds when that rate is absent, stale, or hostile. Derived from the live
 // quote table (`make probe-dex-quote-floor`, block 9198813): the worst realistic-size fill was LayerBank
 // USDRIF at 99.27% of oracle for a $1,000 batch, so 97% leaves ~227 bps for peg drift, oracle drift, and
 // pool movement between quote and inclusion, while capping a compromised-swapper loss at 3%.

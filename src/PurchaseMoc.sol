@@ -34,9 +34,12 @@ abstract contract PurchaseMoc is PurchaseRbtc, IPurchaseMoc {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Redeem DOC for rBTC and return the handler's native-balance delta.
+     * @dev Redeem DOC for rBTC and return the handler's native-balance delta. DOC is redeemed at Money
+     *      on Chain's own price rather than swapped against a pool, so there is no venue-level floor for
+     *      this route to derive from `minRbtcOutRate` the way `PurchaseUniswap` does. The caller's rate
+     *      is still enforced, by the shared measured-output check in `PurchaseRbtc.batchBuyRbtc`.
      */
-    function _purchaseRbtc(uint256 stablecoinAmount, uint256 /* minRbtcOut */)
+    function _purchaseRbtc(uint256 stablecoinAmount, uint256 /* minRbtcOutRate, enforced by the caller */ )
         internal
         override
         returns (uint256 rbtcReceived)

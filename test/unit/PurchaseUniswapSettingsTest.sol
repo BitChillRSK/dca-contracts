@@ -7,6 +7,7 @@ import {PurchaseUniswap} from "../../src/PurchaseUniswap.sol";
 import {FeeHandler} from "../../src/FeeHandler.sol";
 import {DcaManagerAccessControl} from "../../src/DcaManagerAccessControl.sol";
 import {IPurchaseUniswap} from "../../src/interfaces/IPurchaseUniswap.sol";
+import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
 import {ICoinPairPrice} from "../../src/interfaces/ICoinPairPrice.sol";
@@ -256,9 +257,13 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         IPurchaseUniswap(address(stablecoinHandler)).updateMocOracle(address(invalidOracle));
         
         
-        // Try to make a purchase, which should revert due to invalid price
+        // Try to make a purchase, which should revert due to invalid price. Built before arming the
+        // cheatcode: buyRbtcOne's own getDcaSchedule read would otherwise consume this expectRevert
+        // before the purchase call it is meant for.
+        IDcaManager.Batch memory batch = currentBatch(scheduleId);
         vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__OutdatedPrice.selector);
-        buyRbtcOne(scheduleId);
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(batch);
     }
 
     ////////////////////////////

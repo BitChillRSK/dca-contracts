@@ -13,7 +13,7 @@ import {ICoinPairPrice} from "../../../src/interfaces/ICoinPairPrice.sol";
 import {IOperationsAdmin} from "../../../src/interfaces/IOperationsAdmin.sol";
 import {IPurchaseRbtc} from "../../../src/interfaces/IPurchaseRbtc.sol";
 import {MockStablecoin} from "../../mocks/MockStablecoin.sol";
-import {batchBuyOne} from "../../utils/BatchBuyOne.sol";
+import {batchOf} from "../../utils/BatchBuyOne.sol";
 import {console} from "forge-std/Test.sol";
 import "../../Constants.sol";
 import {scheduleIdAt} from "test/utils/ScheduleAt.sol";
@@ -128,7 +128,9 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
 
         uint64 scheduleId = scheduleIdAt(dcaManager, user, config.usdrifTokenAddress, 0);
         vm.prank(swapper);
-        batchBuyOne(dcaManager, config.usdrifTokenAddress, scheduleId, LAYERBANK_INDEX);
+        dcaManager.batchBuyRbtc(
+            batchOf(config.usdrifTokenAddress, scheduleId, uint96(PURCHASE_AMOUNT), LAYERBANK_INDEX)
+        );
 
         assertGt(
             IPurchaseRbtc(usdrifHandlerAddress).getAccumulatedRbtcBalance(user),

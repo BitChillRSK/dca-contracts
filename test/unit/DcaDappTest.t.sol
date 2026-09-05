@@ -33,7 +33,7 @@ import "./TestsHelper.t.sol";
 import {IkToken} from "../../src/tropykus-legacy/IkToken.sol";
 import {IiSusdToken} from "../../src/sovryn/IiSusdToken.sol";
 import {IPurchaseUniswap} from "../../src/interfaces/IPurchaseUniswap.sol";
-import {batchBuyOne, toBatch} from "../utils/BatchBuyOne.sol";
+import {batchOf, toBatch, packBatchRow} from "../utils/BatchBuyOne.sol";
 import {scheduleAt, scheduleIdAt, scheduleCount} from "test/utils/ScheduleAt.sol";
 
 contract DcaDappTest is Test {
@@ -511,13 +511,36 @@ contract DcaDappTest is Test {
     }
 
     /**
-     * @notice The one-schedule purchase path after R39 removed `buyRbtc`: a length-1 `batchBuyRbtc`.
-     * @dev Makes no call before the prank, so a caller's `vm.expectEmit` / `vm.expectRevert` still
-     *      lands on the batch call itself. The manager reads the amount from the schedule by id.
+     * @notice The one-schedule purchase path after R39 removed `buyRbtc`: a length-1 `batchBuyRbtc`,
+     *         packing the row against the schedule's *current* stored `purchaseAmount` (R66).
+     * @dev Reads the schedule and sends the purchase itself, in that order. Do **not** call this after
+     *      arming `vm.expectRevert` / `vm.expectEmit`: the read is an external `view` call that would
+     *      consume the cheatcode before the purchase call it is meant for. A caller that needs to
+     *      expect something on the purchase must build with `currentBatch` first, arm the cheatcode,
+     *      then call `dcaManager.batchBuyRbtc(batch)` directly.
      */
     function buyRbtcOne(uint64 scheduleId) internal {
+        IDcaManager.Batch memory batch = currentBatch(scheduleId);
         vm.prank(SWAPPER);
-        batchBuyOne(dcaManager, address(stablecoin), scheduleId, s_routeIndex);
+        dcaManager.batchBuyRbtc(batch);
+    }
+
+    /**
+     * @notice Build the length-1 `Batch` `buyRbtcOne` would send, reading the schedule's current
+     *         `purchaseAmount` now. A caller that needs to arm `vm.expectRevert` / `vm.expectEmit` on
+     *         the purchase call must do so *after* calling this and *before* calling
+     *         `dcaManager.batchBuyRbtc` directly — this function's own read must not sit between the
+     *         cheatcode and the purchase.
+     * @dev `getDcaSchedule` reverts on an id that addresses no live schedule; a caller building a row
+     *      for exactly that id (an unused or deleted id) wants the row packed anyway, so the manager
+     *      can skip it as `InexistentSchedule` rather than this helper reverting first.
+     */
+    function currentBatch(uint64 scheduleId) internal view returns (IDcaManager.Batch memory) {
+        uint96 expectedAmount;
+        try dcaManager.getDcaSchedule(address(stablecoin), scheduleId) returns (IDcaManager.DcaSchedule memory schedule) {
+            expectedAmount = schedule.purchaseAmount;
+        } catch {}
+        return batchOf(address(stablecoin), scheduleId, expectedAmount, s_routeIndex);
     }
 
     function makeSinglePurchase() internal {
@@ -530,11 +553,8 @@ contract DcaDappTest is Test {
         uint256 fee = feeCalculator.calculateFee(AMOUNT_TO_SPEND);
         uint256 netPurchaseAmount = AMOUNT_TO_SPEND - fee;
 
-        vm.expectEmit(true, true, true, true);
-        uint256 lastTs = dcaDetails[SCHEDULE_INDEX].lastPurchaseTimestamp;
-        uint256 period = dcaDetails[SCHEDULE_INDEX].purchasePeriod;
-        uint256 lastPurchaseTimestamp = lastTs == 0 ? block.timestamp : lastTs + period;
-        emit DcaManager__LastPurchaseTimestampUpdated(address(stablecoin), dcaDetailsIds[SCHEDULE_INDEX], lastPurchaseTimestamp);
+        // R66 order: the handler's funding, fee and purchase logs come first, because the manager has to
+        // hear which rows funded before it debits any schedule. Its own logs close the transaction.
         if (isLendingLane) {
             vm.expectEmit(true, false, false, false);
             emit TokenLending__SharesRedeemed(USER, 0, 0);
@@ -551,6 +571,11 @@ contract DcaDappTest is Test {
             dcaDetailsIds[SCHEDULE_INDEX],
             netPurchaseAmount
         );
+        vm.expectEmit(true, true, true, true);
+        uint256 lastTs = dcaDetails[SCHEDULE_INDEX].lastPurchaseTimestamp;
+        uint256 period = dcaDetails[SCHEDULE_INDEX].purchasePeriod;
+        uint256 lastPurchaseTimestamp = lastTs == 0 ? block.timestamp : lastTs + period;
+        emit DcaManager__LastPurchaseTimestampUpdated(address(stablecoin), dcaDetailsIds[SCHEDULE_INDEX], lastPurchaseTimestamp);
         buyRbtcOne(dcaDetailsIds[SCHEDULE_INDEX]);
 
         vm.startPrank(USER);
@@ -655,6 +680,7 @@ contract DcaDappTest is Test {
         vm.prank(USER);
         uint256 userAccumulatedRbtcPrev = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
         uint64[] memory scheduleIds = new uint64[](NUM_OF_SCHEDULES);
+        bytes32[] memory rows = new bytes32[](NUM_OF_SCHEDULES);
 
         uint256 totalNetPurchaseAmount;
         uint256 totalFee;
@@ -667,6 +693,7 @@ contract DcaDappTest is Test {
             totalNetPurchaseAmount += schedule.purchaseAmount - fee;
             totalFee += fee;
             scheduleIds[i] = scheduleIdAt(dcaManager, USER, address(stablecoin), i);
+            rows[i] = packBatchRow(scheduleIds[i], schedule.purchaseAmount);
         }
         // After R1 the batch event's measured DOC is in data, not a topic. expectEmit
         // cannot check that: data is exact, and on a live iSUSD fork tokenPrice
@@ -693,11 +720,11 @@ contract DcaDappTest is Test {
 
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, address(stablecoin), s_routeIndex)
+            toBatch(rows, address(stablecoin), s_routeIndex)
         );
 
         if (isLendingLane) {
-            _assertBatchRedemptionReported(totalNetPurchaseAmount + totalFee);
+            _assertBatchRedemptionReported(totalNetPurchaseAmount + totalFee, NUM_OF_SCHEDULES);
         }
 
         uint256 postStablecoinHandlerBalance;
@@ -727,7 +754,7 @@ contract DcaDappTest is Test {
         vm.recordLogs();
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, address(stablecoin), s_routeIndex)
+            toBatch(rows, address(stablecoin), s_routeIndex)
         );
         
         uint256 postStablecoinHandlerBalance2;
@@ -745,24 +772,28 @@ contract DcaDappTest is Test {
         );
 
         if (isLendingLane) {
-            _assertBatchRedemptionReported(totalNetPurchaseAmount + totalFee);
+            _assertBatchRedemptionReported(totalNetPurchaseAmount + totalFee, NUM_OF_SCHEDULES);
         }
     }
 
     /**
      * @notice assert that the batch redemption event reports the stablecoin the handler measured
      * @param requestedGross the total stablecoin the purchase path asked the lending protocol for
-     * @dev data[0] is the measured redemption. Live iSUSD / kDOC conversion can be 1 wei off the
-     * request; SIP-0094 is not enabled, so a 0.1% band would hide a wrong emit. If the Perimeter
-     * Fee starts charging, this 1-wei check will fail on `make fork-sovryn` — that is the signal.
+     * @param numOfRows how many rows the batch funded
+     * @dev data[0] is the measured redemption. Live iSUSD / kDOC conversion is off the request by
+     * under one share per row: R66 gives every row its own rounded-up share debit and redeems exactly
+     * their sum, where the batch used to round one aggregate figure and slice it. That is why the band
+     * scales with the row count instead of being a flat wei — it is still far too tight to hide a wrong
+     * emit, and SIP-0094 is not charging. If the Perimeter Fee starts charging, this check will fail on
+     * `make fork-sovryn` — that is the signal.
      */
-    function _assertBatchRedemptionReported(uint256 requestedGross) internal {
+    function _assertBatchRedemptionReported(uint256 requestedGross, uint256 numOfRows) internal {
         Vm.Log[] memory entries = vm.getRecordedLogs();
         bool found;
         for (uint256 i; i < entries.length; ++i) {
             if (entries[i].topics[0] == TokenLending__SharesRedeemedBatch.selector) {
                 (uint256 underlyingAmount,) = abi.decode(entries[i].data, (uint256, uint256));
-                assertApproxEqAbs(underlyingAmount, requestedGross, 1);
+                assertApproxEqAbs(underlyingAmount, requestedGross, numOfRows + 1);
                 found = true;
                 break;
             }

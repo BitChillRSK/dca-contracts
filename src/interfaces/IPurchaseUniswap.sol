@@ -126,10 +126,10 @@ interface IPurchaseUniswap {
     /**
      * @notice Set the swap-time oracle floor as a 1e18-scaled fraction of the oracle-implied rBTC.
      * @param amountOutMinimumPercent New fraction. Cannot exceed 100% or fall below the safety check.
-     * @dev Uniswap `amountOutMinimum` is `max(thisFloor, minRbtcOut)`, so the swapper's quote-derived
-     *      `minRbtcOut` sets operational tightness and this value is the bound that holds when that
-     *      minimum is absent, stale, or hostile. Deploy it loose enough that a healthy batch never
-     *      reverts on it; the swapper, not this setter, is the weekly knob.
+     * @dev Uniswap `amountOutMinimum` is `max(thisFloor, minRbtcOutRate * actualSpend / 1e18)`, so the
+     *      swapper's quote-derived `minRbtcOutRate` sets operational tightness and this value is the
+     *      bound that holds when that minimum is absent, stale, or hostile. Deploy it loose enough that
+     *      a healthy batch never reverts on it; the swapper, not this setter, is the weekly knob.
      */
     function setAmountOutMinimumPercent(uint256 amountOutMinimumPercent) external;
 

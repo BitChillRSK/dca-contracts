@@ -516,17 +516,18 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
      * @dev Must track `IPurchaseRbtc.batchBuyRbtc` exactly. DcaManager reaches these wrappers through an
      *      interface cast, so a stale signature is not a compile error — it is a selector miss at runtime
      *      that reverts every purchase while the invariants above still pass, vacuously. R51 added
-     *      `minRbtcOut`; `test_invariantHandlerBuysRbtcThroughDcaManager` is the guard that keeps this
-     *      honest if the signature drifts again.
+     *      `minRbtcOut` and R66 the `unfundedRows` return; `test_invariantHandlerBuysRbtcThroughDcaManager`
+     *      is the guard that keeps this honest if the signature drifts again.
      */
     function batchBuyRbtc(
         address[] memory buyers,
         uint64[] memory scheduleIds,
         uint256[] memory purchaseAmounts,
         uint256 minRbtcOut
-    ) external onlyDcaManager {
+    ) external onlyDcaManager returns (uint256[] memory unfundedRows) {
         uint256 totalPurchasedRbtc;
         for (uint256 i = 0; i < buyers.length; i++) {
+            if (purchaseAmounts[i] == 0) continue;
             totalPurchasedRbtc += _buyRbtcInternal(buyers[i], scheduleIds[i], purchaseAmounts[i]);
         }
         // The real pipeline checks before crediting; a revert here undoes the credits above, so the
@@ -534,6 +535,7 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
         if (totalPurchasedRbtc < minRbtcOut) {
             revert IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum(totalPurchasedRbtc, minRbtcOut);
         }
+        // This wrapper funds every row it is given, so it names none back.
     }
     
     /**
@@ -639,17 +641,18 @@ contract SovrynHandlerWrapper is SovrynErc20Handler {
      * @dev Must track `IPurchaseRbtc.batchBuyRbtc` exactly. DcaManager reaches these wrappers through an
      *      interface cast, so a stale signature is not a compile error — it is a selector miss at runtime
      *      that reverts every purchase while the invariants above still pass, vacuously. R51 added
-     *      `minRbtcOut`; `test_invariantHandlerBuysRbtcThroughDcaManager` is the guard that keeps this
-     *      honest if the signature drifts again.
+     *      `minRbtcOut` and R66 the `unfundedRows` return; `test_invariantHandlerBuysRbtcThroughDcaManager`
+     *      is the guard that keeps this honest if the signature drifts again.
      */
     function batchBuyRbtc(
         address[] memory buyers,
         uint64[] memory scheduleIds,
         uint256[] memory purchaseAmounts,
         uint256 minRbtcOut
-    ) external onlyDcaManager {
+    ) external onlyDcaManager returns (uint256[] memory unfundedRows) {
         uint256 totalPurchasedRbtc;
         for (uint256 i = 0; i < buyers.length; i++) {
+            if (purchaseAmounts[i] == 0) continue;
             totalPurchasedRbtc += _buyRbtcInternal(buyers[i], scheduleIds[i], purchaseAmounts[i]);
         }
         // The real pipeline checks before crediting; a revert here undoes the credits above, so the
@@ -657,6 +660,7 @@ contract SovrynHandlerWrapper is SovrynErc20Handler {
         if (totalPurchasedRbtc < minRbtcOut) {
             revert IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum(totalPurchasedRbtc, minRbtcOut);
         }
+        // This wrapper funds every row it is given, so it names none back.
     }
     
     /**

@@ -426,14 +426,20 @@ contract R64BatchGasBenchmarkTest is Test {
         }
 
         if (design == 0) {
+            // R66 packed each row as (scheduleId << 96 | expectedPurchaseAmount); every schedule here
+            // shares PURCHASE_AMOUNT, so the row matches storage and no benchmark run skips a row.
+            bytes32[] memory currentDesignRows = new bytes32[](rows);
+            for (uint256 i; i < rows; ++i) {
+                currentDesignRows[i] = bytes32((uint256(scheduleIds[i]) << 96) | uint256(uint96(PURCHASE_AMOUNT)));
+            }
             return abi.encodeCall(
                 IDcaManager.batchBuyRbtc,
                 (
                     IDcaManager.Batch({
-                        scheduleIds: scheduleIds,
+                        rows: currentDesignRows,
                         token: token,
                         routeIndex: ROUTE_INDEX,
-                        minRbtcOut: 0
+                        minRbtcOutRate: 0
                     })
                 )
             );

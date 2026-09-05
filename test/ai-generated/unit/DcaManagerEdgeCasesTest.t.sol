@@ -16,7 +16,7 @@ import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces
 import {IDcaManager} from "../../../src/interfaces/IDcaManager.sol";
 import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
 import "../../Constants.sol";
-import {batchBuyOne, UNUSED_SCHEDULE_ID, toBatch} from "../../utils/BatchBuyOne.sol";
+import {UNUSED_SCHEDULE_ID, toBatch, batchOf} from "../../utils/BatchBuyOne.sol";
 import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 /**
@@ -205,7 +205,7 @@ contract DcaManagerEdgeCasesTest is Test {
         // in the DcaDappTest integration tests where the full environment is set up properly
     }
     
-    function test_singleScheduleBatch_reverts_invalidScheduleId() public {
+    function test_singleScheduleBatch_skipsInvalidScheduleId() public {
         // Create schedule
         vm.prank(USER);
         dcaManager.createDcaSchedule(
@@ -217,10 +217,14 @@ contract DcaManagerEdgeCasesTest is Test {
         );
         
         uint64 wrongId = UNUSED_SCHEDULE_ID;
-        
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), wrongId));
+
+        // R66: an id addressing no live schedule is skipped, not reverted.
+        vm.expectEmit(true, true, false, true, address(dcaManager));
+        emit IDcaManager.DcaManager__PurchaseRowSkipped(
+            address(stablecoin), wrongId, IDcaManager.PurchaseRowSkipReason.InexistentSchedule
+        );
         vm.prank(SWAPPER);
-        batchBuyOne(dcaManager, address(stablecoin), wrongId, TROPYKUS_INDEX);
+        dcaManager.batchBuyRbtc(batchOf(address(stablecoin), wrongId, 0, TROPYKUS_INDEX));
     }
     
     function test_createSchedule_reverts_insufficientBalance() public {
@@ -388,24 +392,23 @@ contract DcaManagerEdgeCasesTest is Test {
     //////////////////////////////////////////////////////////////*/
     
     function test_batchBuyRbtc_reverts_emptyArrays() public {
-        address[] memory emptyUsers = new address[](0);
-        uint64[] memory emptyIds = new uint64[](0);
-        
-        vm.expectRevert(IDcaManager.DcaManager__EmptyBatchPurchaseArrays.selector);
-        vm.prank(SWAPPER);
-        dcaManager.batchBuyRbtc(
-            toBatch(emptyIds, address(stablecoin), TROPYKUS_INDEX)
-        );
-    }
-    
-    /// @dev A batch carries one array, so its rows can no longer disagree in length with anything.
-    ///      What is left to reject is a batch with no rows at all.
-    function test_batchBuyRbtc_reverts_emptyBatch() public {
-        uint64[] memory ids = new uint64[](0);
+        bytes32[] memory emptyRows = new bytes32[](0);
 
         vm.expectRevert(IDcaManager.DcaManager__EmptyBatchPurchaseArrays.selector);
         vm.prank(SWAPPER);
-        dcaManager.batchBuyRbtc(toBatch(ids, address(stablecoin), TROPYKUS_INDEX));
+        dcaManager.batchBuyRbtc(
+            toBatch(emptyRows, address(stablecoin), TROPYKUS_INDEX)
+        );
+    }
+
+    /// @dev A batch carries one array, so its rows can no longer disagree in length with anything.
+    ///      What is left to reject is a batch with no rows at all.
+    function test_batchBuyRbtc_reverts_emptyBatch() public {
+        bytes32[] memory emptyRows = new bytes32[](0);
+
+        vm.expectRevert(IDcaManager.DcaManager__EmptyBatchPurchaseArrays.selector);
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(toBatch(emptyRows, address(stablecoin), TROPYKUS_INDEX));
     }
     
     /*//////////////////////////////////////////////////////////////

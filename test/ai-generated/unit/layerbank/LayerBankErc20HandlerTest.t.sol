@@ -303,7 +303,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         assertEq(layerbankHandler.getUserShares(USER), aTokenBalanceBefore);
     }
 
-    function test_layerbank_batchRetrieveStablecoin_exceedsBalance_reverts() public {
+    function test_layerbank_batchRetrieveStablecoin_exceedsBalance_dropsTheRow() public {
         address user1 = makeAddr("user1");
         address[] memory users = new address[](1);
         users[0] = user1;
@@ -318,19 +318,15 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         vm.prank(address(dcaManager));
         handler.depositToken(user1, DEPOSIT_AMOUNT / 10);
 
-        uint256 excessiveAmount = DEPOSIT_AMOUNT * 2;
-        uint256 available = layerbankHandler.getUserShares(user1);
-        uint256 exchangeRate = aToken.getNormalizedIncome();
-        uint256 totalAtokenToRedeem =
-            Math.mulDiv(excessiveAmount, aToken.RAY(), exchangeRate, Math.Rounding.Ceil);
-        uint256 requested = Math.mulDiv(totalAtokenToRedeem, amounts[0], excessiveAmount, Math.Rounding.Ceil);
+        uint256 sharesBefore = layerbankHandler.getUserShares(user1);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ITokenLending.TokenLending__InsufficientShares.selector, user1, requested, available
-            )
-        );
-        layerbankHandler.testBatchRetrieveStablecoin(users, amounts, excessiveAmount);
+        (uint256 retrieved, uint256[] memory fundedAmounts,) = layerbankHandler.testBatchRetrieveStablecoin(users, amounts);
+
+        // R66: the row this buyer cannot back is dropped, not clamped and not reverted. Nothing was
+        // redeemed, nothing was debited, and the caller is told by the zeroed amount.
+        assertEq(retrieved, 0, "an unbacked row should have redeemed nothing");
+        assertEq(fundedAmounts[0], 0, "the unbacked row should have been zeroed");
+        assertEq(layerbankHandler.getUserShares(user1), sharesBefore, "the unbacked row was charged shares");
     }
 
     function test_layerbank_batchRetrieveStablecoin_zeroPayout_reverts() public {
@@ -355,7 +351,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         vm.expectRevert(
             abi.encodeWithSelector(ITokenLending.TokenLending__ZeroStablecoinReceived.selector, amounts[0])
         );
-        layerbankHandler.testBatchRetrieveStablecoin(users, amounts, amounts[0]);
+        layerbankHandler.testBatchRetrieveStablecoin(users, amounts);
 
         assertEq(layerbankHandler.getUserShares(user1), aTokenBalanceBefore);
     }
@@ -433,11 +429,13 @@ contract LayerBankTestHandler is LayerBankErc20Handler {
         )
     {}
 
-    function testBatchRetrieveStablecoin(
-        address[] memory users,
-        uint256[] memory purchaseAmounts,
-        uint256 totalStablecoinAmount
-    ) external returns (uint256) {
-        return _batchRetrieveStablecoin(users, purchaseAmounts, totalStablecoinAmount);
+    /// @dev `purchaseAmounts` is filtered in place, so it has to come back out: an external call copies
+    ///      the caller's memory, and the zeroing would otherwise be invisible to the test.
+    function testBatchRetrieveStablecoin(address[] memory users, uint256[] memory purchaseAmounts)
+        external
+        returns (uint256 retrieved, uint256[] memory fundedAmounts, uint256[] memory unfundedRows)
+    {
+        (retrieved, unfundedRows) = _batchRetrieveStablecoin(users, purchaseAmounts);
+        fundedAmounts = purchaseAmounts;
     }
 }

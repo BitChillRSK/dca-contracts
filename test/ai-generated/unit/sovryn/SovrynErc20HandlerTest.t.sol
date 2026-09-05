@@ -300,7 +300,7 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
         // Call _batchRetrieveStablecoin through the test handler
         uint256 totalToRetrieve = amounts[0] + amounts[1];
         
-        uint256 retrieved = sovrynHandler.testBatchRetrieveStablecoin(users, amounts, totalToRetrieve);
+        (uint256 retrieved,,) = sovrynHandler.testBatchRetrieveStablecoin(users, amounts);
         
         // Verify the batch redemption worked
         assertGt(retrieved, 0);
@@ -322,7 +322,7 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
      * rather than from a view — here the per-user share exceeds the balance we track for that user.
      * Named `TokenLending__InsufficientShares` instead of a 0.8 underflow panic.
      */
-    function test_sovryn_batchRetrieveStablecoin_exceedsBalance_reverts() public {
+    function test_sovryn_batchRetrieveStablecoin_exceedsBalance_dropsTheRow() public {
         address user1 = makeAddr("user1");
         address[] memory users = new address[](1);
         users[0] = user1;
@@ -339,18 +339,15 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
         vm.prank(address(dcaManager));
         handler.depositToken(user1, DEPOSIT_AMOUNT / 10); // Deposit only 1/10th
 
-        uint256 excessiveAmount = DEPOSIT_AMOUNT * 2;
-        uint256 available = sovrynHandler.getUserShares(user1);
-        uint256 price = iSusdToken.tokenPrice();
-        uint256 totalIsusdToRedeem = Math.mulDiv(excessiveAmount, EXCHANGE_RATE_DECIMALS, price, Math.Rounding.Ceil);
-        uint256 requested = Math.mulDiv(totalIsusdToRedeem, amounts[0], excessiveAmount, Math.Rounding.Ceil);
+        uint256 sharesBefore = sovrynHandler.getUserShares(user1);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ITokenLending.TokenLending__InsufficientShares.selector, user1, requested, available
-            )
-        );
-        sovrynHandler.testBatchRetrieveStablecoin(users, amounts, excessiveAmount);
+        (uint256 retrieved, uint256[] memory fundedAmounts,) = sovrynHandler.testBatchRetrieveStablecoin(users, amounts);
+
+        // R66: the row this buyer cannot back is dropped, not clamped and not reverted. Nothing was
+        // redeemed, nothing was debited, and the caller is told by the zeroed amount.
+        assertEq(retrieved, 0, "an unbacked row should have redeemed nothing");
+        assertEq(fundedAmounts[0], 0, "the unbacked row should have been zeroed");
+        assertEq(sovrynHandler.getUserShares(user1), sharesBefore, "the unbacked row was charged shares");
     }
 
     /**
@@ -402,11 +399,13 @@ contract SovrynTestHandler is SovrynErc20Handler {
      * @notice Expose _batchRetrieveStablecoin for testing
      * @dev This allows us to test the internal batch redemption logic
      */
-    function testBatchRetrieveStablecoin(
-        address[] memory users,
-        uint256[] memory purchaseAmounts,
-        uint256 totalStablecoinAmount
-    ) external returns (uint256) {
-        return _batchRetrieveStablecoin(users, purchaseAmounts, totalStablecoinAmount);
+    /// @dev `purchaseAmounts` is filtered in place, so it has to come back out: an external call copies
+    ///      the caller's memory, and the zeroing would otherwise be invisible to the test.
+    function testBatchRetrieveStablecoin(address[] memory users, uint256[] memory purchaseAmounts)
+        external
+        returns (uint256 retrieved, uint256[] memory fundedAmounts, uint256[] memory unfundedRows)
+    {
+        (retrieved, unfundedRows) = _batchRetrieveStablecoin(users, purchaseAmounts);
+        fundedAmounts = purchaseAmounts;
     }
 } 

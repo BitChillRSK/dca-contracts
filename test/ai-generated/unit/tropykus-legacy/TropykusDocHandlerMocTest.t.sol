@@ -10,7 +10,7 @@ import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import "test/Constants.sol";
-import {handlerBatchBuyOne, NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
+import {handlerBatchBuyOne, NO_MIN_RBTC_OUT_RATE} from "test/utils/BatchBuyOne.sol";
 
 /**
  * @title TropykusDocHandlerMocTest
@@ -123,7 +123,7 @@ contract TropykusDocHandlerMocTest is Test {
         }
 
         // Execute batch buy (onlyDcaManager)
-        handler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT);
+        handler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT_RATE);
 
         // Validate each user received rBTC proportionally
         uint256 totalAccrued;

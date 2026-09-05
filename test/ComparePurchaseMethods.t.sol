@@ -13,7 +13,7 @@ import {DexHelperConfig} from "../script/DexHelperConfig.s.sol";
 import {MockStablecoin} from "../test/mocks/MockStablecoin.sol";
 import {MockMocProxy} from "../test/mocks/MockMocProxy.sol";
 import {MockWrbtcToken} from "../test/mocks/MockWrbtcToken.sol";
-import {toBatch} from "./utils/BatchBuyOne.sol";
+import {toBatch, packBatchRow} from "./utils/BatchBuyOne.sol";
 import "./Constants.sol";
 import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
@@ -376,18 +376,20 @@ contract ComparePurchaseMethods is Test {
             vm.stopPrank();
         }
         
-        // Prepare batch data
-        uint64[] memory scheduleIds = new uint64[](NUM_OF_USERS);
+        // Prepare batch data: each row is packed against the schedule's own purchaseAmount, which is
+        // docToSpendArray[i] since createInitialSchedules() created it with that amount.
+        bytes32[] memory rows = new bytes32[](NUM_OF_USERS);
 
         for (uint256 i = 0; i < NUM_OF_USERS; i++) {
-            scheduleIds[i] = scheduleIdAt(dcaManMoc, users[i], address(stablecoin), SCHEDULE_INDEX);
+            uint64 scheduleId = scheduleIdAt(dcaManMoc, users[i], address(stablecoin), SCHEDULE_INDEX);
+            rows[i] = packBatchRow(scheduleId, uint96(docToSpendArray[i]));
         }
-        
+
         // Execute batch purchase
         uint256 gasStart = gasleft();
         vm.prank(SWAPPER);
         dcaManMoc.batchBuyRbtc(
-            toBatch(scheduleIds, address(stablecoin), routeIndex)
+            toBatch(rows, address(stablecoin), routeIndex)
         );
         uint256 gasUsed = gasStart - gasleft();
         uint256 gasCost = gasUsed * tx.gasprice;
@@ -419,18 +421,20 @@ contract ComparePurchaseMethods is Test {
             vm.stopPrank();
         }
         
-        // Prepare batch data
-        uint64[] memory scheduleIds = new uint64[](NUM_OF_USERS);
+        // Prepare batch data: each row is packed against the schedule's own purchaseAmount, which is
+        // docToSpendArray[i] since createInitialSchedules() created it with that amount.
+        bytes32[] memory rows = new bytes32[](NUM_OF_USERS);
 
         for (uint256 i = 0; i < NUM_OF_USERS; i++) {
-            scheduleIds[i] = scheduleIdAt(dcaManUni, users[i], address(stablecoin), SCHEDULE_INDEX);
+            uint64 scheduleId = scheduleIdAt(dcaManUni, users[i], address(stablecoin), SCHEDULE_INDEX);
+            rows[i] = packBatchRow(scheduleId, uint96(docToSpendArray[i]));
         }
-        
+
         // Execute batch purchase
         uint256 gasStart = gasleft();
         vm.prank(SWAPPER);
         dcaManUni.batchBuyRbtc(
-            toBatch(scheduleIds, address(stablecoin), routeIndex)
+            toBatch(rows, address(stablecoin), routeIndex)
         );
         uint256 gasUsed = gasStart - gasleft();
         uint256 gasCost = gasUsed * tx.gasprice;

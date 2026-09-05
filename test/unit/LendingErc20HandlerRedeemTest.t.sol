@@ -135,7 +135,7 @@ contract LendingErc20HandlerRedeemTest is Test {
         amounts[1] = secondDebit;
 
         vm.recordLogs();
-        harness.batchRetrieveStablecoin(users, amounts, firstDebit + secondDebit);
+        harness.batchRetrieveStablecoin(users, amounts);
 
         _assertSequentialShareDebits(start, firstDebit, secondDebit);
         assertEq(harness.getUserShares(userA), start - firstDebit - secondDebit);
@@ -153,7 +153,7 @@ contract LendingErc20HandlerRedeemTest is Test {
         uint256[] memory amounts = new uint256[](2);
         amounts[0] = 10 ether;
         amounts[1] = 15 ether;
-        harness.batchRetrieveStablecoin(users, amounts, 25 ether);
+        harness.batchRetrieveStablecoin(users, amounts);
 
         (uint256 replayedA, uint256 replayedB) = _replayUserShares(userA, userB);
         assertEq(replayedA, harness.getUserShares(userA));
@@ -292,12 +292,11 @@ contract LendingErc20HandlerHarness is LendingErc20Handler {
         return _redeemShares(user, stablecoinAmount, _exchangeRate());
     }
 
-    function batchRetrieveStablecoin(
-        address[] memory users,
-        uint256[] memory purchaseAmounts,
-        uint256 totalStablecoinAmount
-    ) external returns (uint256) {
-        return _batchRetrieveStablecoin(users, purchaseAmounts, totalStablecoinAmount);
+    function batchRetrieveStablecoin(address[] memory users, uint256[] memory purchaseAmounts)
+        external
+        returns (uint256, uint256[] memory)
+    {
+        return _batchRetrieveStablecoin(users, purchaseAmounts);
     }
 
     function _viewExchangeRate() internal view override returns (uint256) {
