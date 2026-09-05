@@ -46,7 +46,48 @@ onto one side is another. What is not defensible is deciding it per file.
 (`FeeHandler`/`IFeeHandler` at 0.94, `OperationsAdmin`/`IOperationsAdmin` at 0.80) should be settled by
 the same rule rather than reworded individually.
 
-## Decision
+## Decision (revised under review)
+
+The first implementation of this item chose "the interface owns the paragraph" and accepted, as the
+measured price of the rule, that `OperationsAdmin` would ship an empty contract-level `details`. Review
+rejected that trade and it was right to. The priority was backwards: it let *no duplicated `@dev`*
+outrank *a deployed contract is readable on its own*. Anyone auditing this protocol lands on the
+verified concrete contract, and concise overlap between an implementation and its interface is
+deliberate redundancy on the artifact that ships, not duplication to be factored out.
+
+One part of the original reasoning survives and one does not. The devdoc measurement stands: header
+NatSpec does not travel down an inheritance chain, so an **abstract** contract's paragraph reaches no
+shipped artifact whichever side it sits on, and single-sourcing those on the interface costs nothing.
+What does not survive is extending that to deployed contracts, where the field is exactly what is lost.
+The rule now splits on that line rather than applying uniformly.
+
+**The revised rule**, in `AGENTS.md`:
+
+- **Every deployed contract carries a short `@dev` on its own security and lifecycle model** — what is
+  irreversible, what is guarded, what can be paused, who may call — written even when the interface says
+  the same thing. Applying this surfaced three contracts the original pass never considered: the
+  `*DocHandlerMoc` leaves shipped no `details` at all, before or after R65.
+- Abstracts stay single-sourced on the interface, for the reason above.
+- The interface still owns the full paragraph: the caller-facing rules **and** the reasoning behind them.
+- The two no-interface-owns-it cases stand unchanged (zero-function interfaces; a fact true of one
+  implementation among several sharing `ITokenLending`).
+
+Two further defects came out of the same review, neither of them about placement:
+
+**Comments naming tokens in token-agnostic contracts.** `PurchaseUniswap` is constructed with whatever
+stablecoin it is given and rejects only >18 decimals; naming DOC on it is not merely stale but *wrong*,
+since DOC is redeemed at Money on Chain and never swapped on Uniswap — R62's own `IdleErc20HandlerDex`
+header says exactly that. The USDRIF/USDT0 roster beside it is a listing snapshot that rots. Three sites
+fixed (`IPurchaseUniswap` header, `PurchaseUniswap`'s scale comment, `IdleErc20Handler._retrieveStablecoin`)
+and the prohibition generalized in `AGENTS.md` so the next one does not land. `IDcaManager`'s mention of
+DOC is **kept**: it describes the MoC venue specifically, where the claim is true.
+
+**Documented policy the contract does not enforce.** The peg paragraph asserted a listing rule and a
+delisting process, neither of which exists in code, which reads as a safety mechanism. It now separates
+what the constructor checks (the decimal bound, the scaling) from what is assumed of governance (the
+peg), and says recovery from a persistent depeg is a governance action.
+
+## Superseded first decision
 
 **The interface owns the paragraph.** Recorded in `AGENTS.md` under **Contract header NatSpec**:
 
@@ -154,8 +195,15 @@ other eleven pairs the chosen rule moves. `AGENTS.md`.
 
 ## Success criteria
 
-- [x] `AGENTS.md` states the rule and the devdoc consequence.
-- [x] No interface/implementation pair in `src/` has an identical `@dev` or `@notice` body. Maximum `@notice` similarity 0.63, maximum `@dev` similarity 0.02.
+- [x] `AGENTS.md` states the rule and the devdoc consequence. The consequence is now stated as the
+      reason abstracts are single-sourced and deployed contracts are not, rather than as a price paid.
+      All ten deployable contracts ship a non-empty contract-level `details`; three of them did not
+      before this item.
+- [x] No interface/implementation pair in `src/` has an identical `@dev` or `@notice` body. Maximum
+      `@notice` similarity 0.63. Note this criterion is now read as the spec wrote it — *identical* —
+      rather than as "minimise overlap": under the revised rule a deployed contract's `@dev`
+      deliberately restates its interface's claims in short form, which the original pass treated as
+      a defect to be eliminated.
 - [x] Metadata-stripped runtime unchanged on every contract; comments must not move an executable
       byte. Complete `deployedBytecode` will differ, since the CBOR metadata hash covers comments.
       **Result:** metadata-stripped runtime byte-identical on all ten deployable contracts (SHA-256 of
