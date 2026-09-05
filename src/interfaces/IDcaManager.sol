@@ -23,7 +23,8 @@ interface IDcaManager {
     ///        slot 0  tokenBalance, lastPurchaseTimestamp, paused, purchasePeriod, routeIndex
     ///        slot 1  user, purchaseAmount
     ///
-    ///      Slot 0 is every field a purchase reads or writes, so a purchase writes one slot. Pairing the
+    ///      Slot 0 holds every field a purchase writes, so a purchase writes one slot; the owner and the
+    ///      amount it also reads sit in slot 1, so a purchase reads two slots and writes one. Pairing the
     ///      owner with a `uint96 purchaseAmount` is what seats slot 1 in one word; a wider amount would
     ///      cost a third slot on every schedule. A live schedule always has a non-zero `user`, which is
     ///      the existence sentinel.
@@ -200,7 +201,7 @@ interface IDcaManager {
      * @param scheduleId The schedule to fund. Must belong to the caller.
      * @param depositAmount Amount requested from the caller. The handler reverts unless it receives
      *        exactly this amount, so the schedule is credited with the full request.
-     * @dev The stablecoin and the route are read from the schedule, not passed in.
+     * @dev The route is read from the schedule, not passed in. The stablecoin is: it is half the key.
      *      Reverts `DcaManager__DepositsPaused` before any transfer if governance paused deposits
      *      on this schedule's route. Purchases, edits, withdrawals, and deletion ignore that pause.
      *      The stablecoin and the id are the schedule's storage key, and the owner it stores is

@@ -377,19 +377,10 @@ contract ComparePurchaseMethods is Test {
         }
         
         // Prepare batch data
-        address[] memory userArray = new address[](NUM_OF_USERS);
-        uint256[] memory scheduleIndexes = new uint256[](NUM_OF_USERS);
         uint64[] memory scheduleIds = new uint64[](NUM_OF_USERS);
-        uint256[] memory purchaseAmounts = new uint256[](NUM_OF_USERS);
-        uint256[] memory purchasePeriods = new uint256[](NUM_OF_USERS);
-        
+
         for (uint256 i = 0; i < NUM_OF_USERS; i++) {
-            userArray[i] = users[i];
-            scheduleIndexes[i] = SCHEDULE_INDEX;
-            
             scheduleIds[i] = scheduleIdAt(dcaManMoc, users[i], address(stablecoin), SCHEDULE_INDEX);
-            purchaseAmounts[i] = scheduleAt(dcaManMoc, users[i], address(stablecoin), SCHEDULE_INDEX).purchaseAmount;
-            purchasePeriods[i] = scheduleAt(dcaManMoc, users[i], address(stablecoin), SCHEDULE_INDEX).purchasePeriod;
         }
         
         // Execute batch purchase
@@ -429,19 +420,10 @@ contract ComparePurchaseMethods is Test {
         }
         
         // Prepare batch data
-        address[] memory userArray = new address[](NUM_OF_USERS);
-        uint256[] memory scheduleIndexes = new uint256[](NUM_OF_USERS);
         uint64[] memory scheduleIds = new uint64[](NUM_OF_USERS);
-        uint256[] memory purchaseAmounts = new uint256[](NUM_OF_USERS);
-        uint256[] memory purchasePeriods = new uint256[](NUM_OF_USERS);
-        
+
         for (uint256 i = 0; i < NUM_OF_USERS; i++) {
-            userArray[i] = users[i];
-            scheduleIndexes[i] = SCHEDULE_INDEX;
-            
             scheduleIds[i] = scheduleIdAt(dcaManUni, users[i], address(stablecoin), SCHEDULE_INDEX);
-            purchaseAmounts[i] = scheduleAt(dcaManUni, users[i], address(stablecoin), SCHEDULE_INDEX).purchaseAmount;
-            purchasePeriods[i] = scheduleAt(dcaManUni, users[i], address(stablecoin), SCHEDULE_INDEX).purchasePeriod;
         }
         
         // Execute batch purchase

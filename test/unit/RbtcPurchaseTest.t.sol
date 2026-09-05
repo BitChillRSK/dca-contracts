@@ -15,13 +15,6 @@ import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 contract RbtcPurchaseTest is DcaDappTest {
 
-    struct BatchPurchase {
-        address[] buyers;
-        uint256[] scheduleIndexes;
-        uint64[] scheduleIds;
-        uint256[] purchaseAmounts;
-    }
-
     function setUp() public override {
         super.setUp();
     }
@@ -303,14 +296,8 @@ contract RbtcPurchaseTest is DcaDappTest {
     }
 
     function testBatchPurchaseFailsIfRouteIndexMismatch() external {
-        address[] memory users = new address[](1);
-        users[0] = USER;
-        uint256[] memory scheduleIndexes = new uint256[](1);
-        scheduleIndexes[0] = SCHEDULE_INDEX;
         uint64[] memory scheduleIds = new uint64[](1);
         scheduleIds[0] = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        uint256[] memory purchaseAmounts = new uint256[](1);
-        purchaseAmounts[0] = AMOUNT_TO_SPEND;
         vm.expectRevert(
             abi.encodeWithSelector(
                 IDcaManager.DcaManager__RouteIndexMismatch.selector,
@@ -362,30 +349,10 @@ contract RbtcPurchaseTest is DcaDappTest {
         uint256 prevStablecoinHandlerBalance = address(stablecoinHandler).balance;
         vm.prank(USER);
         uint256 userAccumulatedRbtcPrev = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
-        address[] memory users = new address[](NUM_OF_SCHEDULES);
-        uint256[] memory scheduleIndexes = new uint256[](NUM_OF_SCHEDULES);
-        uint256[] memory purchaseAmounts = new uint256[](NUM_OF_SCHEDULES);
-        uint256[] memory purchasePeriods = new uint256[](NUM_OF_SCHEDULES);
+        // Every row names the same id, and it belongs to no schedule
         uint64[] memory scheduleIds = new uint64[](NUM_OF_SCHEDULES);
-
-        uint256 totalNetPurchaseAmount;
-
-        // Create the arrays for the batch purchase (in production, this is done in the back end)
         for (uint8 i; i < NUM_OF_SCHEDULES; ++i) {
-            uint256 scheduleIndex = i;
-            vm.startPrank(USER);
-            uint256 schedulePurchaseAmount = scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).purchaseAmount;
-            vm.stopPrank();
-            uint256 fee = feeCalculator.calculateFee(schedulePurchaseAmount);
-            totalNetPurchaseAmount += schedulePurchaseAmount - fee;
-
-            users[i] = USER; // Same user for has 5 schedules due for a purchase in this scenario
-            scheduleIndexes[i] = i;
-            vm.startPrank(OWNER);
-            purchaseAmounts[i] = scheduleAt(dcaManager, users[0], address(stablecoin), i).purchaseAmount;
-            purchasePeriods[i] = scheduleAt(dcaManager, users[0], address(stablecoin), i).purchasePeriod;
             scheduleIds[i] = scheduleId;
-            vm.stopPrank();
         }
         vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), scheduleId));
         vm.prank(SWAPPER);
@@ -457,36 +424,23 @@ contract RbtcPurchaseTest is DcaDappTest {
 
         // Perform the required number of purchase rounds
         for (uint256 round; round < purchasesPerSchedule; ++round) {
-            // Build batch arrays in auxiliary struct
-            BatchPurchase memory batchPurchase = BatchPurchase({
-                buyers: new address[](totalSchedules),
-                scheduleIndexes: new uint256[](totalSchedules),
-                scheduleIds: new uint64[](totalSchedules),
-                purchaseAmounts: new uint256[](totalSchedules)
-            });
+            // Build the batch's only array: one id per row
+            uint64[] memory scheduleIds = new uint64[](totalSchedules);
 
             uint256 idx;
-            // Fill arrays for USER
             for (uint256 i; i < SCHEDULES_PER_USER; ++i) {
-                batchPurchase.buyers[idx] = USER;
-                batchPurchase.scheduleIndexes[idx] = i;
-                batchPurchase.purchaseAmounts[idx] = AMOUNT_TO_SPEND;
-                batchPurchase.scheduleIds[idx] = scheduleIdAt(dcaManager, USER, address(stablecoin), i);
+                scheduleIds[idx] = scheduleIdAt(dcaManager, USER, address(stablecoin), i);
                 ++idx;
             }
-            // Fill arrays for SECOND_USER
             for (uint256 i; i < SCHEDULES_PER_USER; ++i) {
-                batchPurchase.buyers[idx] = SECOND_USER;
-                batchPurchase.scheduleIndexes[idx] = i;
-                batchPurchase.purchaseAmounts[idx] = AMOUNT_TO_SPEND;
-                batchPurchase.scheduleIds[idx] = scheduleIdAt(dcaManager, SECOND_USER, address(stablecoin), i);
+                scheduleIds[idx] = scheduleIdAt(dcaManager, SECOND_USER, address(stablecoin), i);
                 ++idx;
             }
 
             // Execute batch purchase as SWAPPER
             vm.prank(SWAPPER);
             dcaManager.batchBuyRbtc(
-                toBatch(batchPurchase.scheduleIds, address(stablecoin), s_routeIndex)
+                toBatch(scheduleIds, address(stablecoin), s_routeIndex)
             );
 
             // Advance time and update exchange rate so future purchases are allowed and interest accrues
@@ -671,36 +625,23 @@ contract RbtcPurchaseTest is DcaDappTest {
 
         // Perform the required number of purchase rounds
         for (uint256 round; round < purchasesPerSchedule; ++round) {
-            // Build batch arrays in auxiliary struct
-            BatchPurchase memory batchPurchase = BatchPurchase({
-                buyers: new address[](totalSchedules),
-                scheduleIndexes: new uint256[](totalSchedules),
-                scheduleIds: new uint64[](totalSchedules),
-                purchaseAmounts: new uint256[](totalSchedules)
-            });
+            // Build the batch's only array: one id per row
+            uint64[] memory scheduleIds = new uint64[](totalSchedules);
 
             uint256 idx;
-            // Fill arrays for USER
             for (uint256 i; i < SCHEDULES_PER_USER; ++i) {
-                batchPurchase.buyers[idx] = USER;
-                batchPurchase.scheduleIndexes[idx] = i;
-                batchPurchase.purchaseAmounts[idx] = AMOUNT_TO_SPEND;
-                batchPurchase.scheduleIds[idx] = scheduleIdAt(dcaManager, USER, address(stablecoin), i);
+                scheduleIds[idx] = scheduleIdAt(dcaManager, USER, address(stablecoin), i);
                 ++idx;
             }
-            // Fill arrays for SECOND_USER
             for (uint256 i; i < SCHEDULES_PER_USER; ++i) {
-                batchPurchase.buyers[idx] = SECOND_USER;
-                batchPurchase.scheduleIndexes[idx] = i;
-                batchPurchase.purchaseAmounts[idx] = AMOUNT_TO_SPEND;
-                batchPurchase.scheduleIds[idx] = scheduleIdAt(dcaManager, SECOND_USER, address(stablecoin), i);
+                scheduleIds[idx] = scheduleIdAt(dcaManager, SECOND_USER, address(stablecoin), i);
                 ++idx;
             }
 
             // Execute batch purchase as SWAPPER
             vm.prank(SWAPPER);
             dcaManager.batchBuyRbtc(
-                toBatch(batchPurchase.scheduleIds, address(stablecoin), s_routeIndex)
+                toBatch(scheduleIds, address(stablecoin), s_routeIndex)
             );
 
             // Withdrawing interest should not revert

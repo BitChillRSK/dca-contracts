@@ -108,13 +108,14 @@ contract ScheduleOwnershipTest is DcaDappTest {
     /// @dev The schedule has to come through all of that untouched, not merely have refused each call.
     function testARefusedStrangerLeavesTheScheduleExactlyAsItWas() external {
         IDcaManager.DcaSchedule memory before = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
+        uint64 idBefore = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
 
         this.testAStrangerCannotDepositIntoAnotherUsersSchedule();
         this.testAStrangerCannotEditAnotherUsersSchedule();
         this.testAStrangerCannotDeleteAnotherUsersSchedule();
 
         IDcaManager.DcaSchedule memory unchanged = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        assertEq(scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX), scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX));
+        assertEq(scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX), idBefore, "a stranger moved the id");
         assertEq(unchanged.tokenBalance, before.tokenBalance, "a stranger moved the balance");
         assertEq(unchanged.purchaseAmount, before.purchaseAmount);
         assertEq(unchanged.purchasePeriod, before.purchasePeriod);

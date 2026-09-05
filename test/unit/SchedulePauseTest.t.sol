@@ -161,15 +161,9 @@ contract SchedulePauseTest is DcaDappTest {
         (uint64[] memory beforeIds, IDcaManager.DcaSchedule[] memory before) = dcaManager.getDcaSchedules(USER, address(stablecoin));
         uint256 rbtcBefore = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
 
-        address[] memory buyers = new address[](NUM_OF_SCHEDULES);
-        uint256[] memory scheduleIndexes = new uint256[](NUM_OF_SCHEDULES);
         uint64[] memory scheduleIds = new uint64[](NUM_OF_SCHEDULES);
-        uint256[] memory purchaseAmounts = new uint256[](NUM_OF_SCHEDULES);
         for (uint256 i; i < NUM_OF_SCHEDULES; ++i) {
-            buyers[i] = USER;
-            scheduleIndexes[i] = i;
             scheduleIds[i] = beforeIds[i];
-            purchaseAmounts[i] = before[i].purchaseAmount;
         }
 
         bytes memory pausedRevert = _schedulePausedRevert(pausedIndex);

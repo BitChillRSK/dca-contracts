@@ -179,14 +179,8 @@ contract BatchMinRbtcOutTest is DcaDappTest {
     }
 
     function _batch(uint256 minRbtcOut) private view returns (IDcaManager.Batch memory) {
-        address[] memory buyers = new address[](1);
-        uint256[] memory scheduleIndexes = new uint256[](1);
         uint64[] memory scheduleIds = new uint64[](1);
-        uint256[] memory purchaseAmounts = new uint256[](1);
-        buyers[0] = USER;
-        scheduleIndexes[0] = SCHEDULE_INDEX;
         scheduleIds[0] = _scheduleId();
-        purchaseAmounts[0] = AMOUNT_TO_SPEND;
         return toBatch(scheduleIds, address(stablecoin), s_routeIndex, minRbtcOut);
     }
 

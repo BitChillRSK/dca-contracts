@@ -654,10 +654,6 @@ contract DcaDappTest is Test {
 
         vm.prank(USER);
         uint256 userAccumulatedRbtcPrev = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
-        address[] memory users = new address[](NUM_OF_SCHEDULES);
-        uint256[] memory scheduleIndexes = new uint256[](NUM_OF_SCHEDULES);
-        uint256[] memory purchaseAmounts = new uint256[](NUM_OF_SCHEDULES);
-        uint256[] memory purchasePeriods = new uint256[](NUM_OF_SCHEDULES);
         uint64[] memory scheduleIds = new uint64[](NUM_OF_SCHEDULES);
 
         uint256 totalNetPurchaseAmount;
@@ -670,10 +666,6 @@ contract DcaDappTest is Test {
             uint256 fee = feeCalculator.calculateFee(schedule.purchaseAmount);
             totalNetPurchaseAmount += schedule.purchaseAmount - fee;
             totalFee += fee;
-            users[i] = USER; // Same user for has 5 schedules due for a purchase in this scenario
-            scheduleIndexes[i] = i;
-            purchaseAmounts[i] = schedule.purchaseAmount;
-            purchasePeriods[i] = schedule.purchasePeriod;
             scheduleIds[i] = scheduleIdAt(dcaManager, USER, address(stablecoin), i);
         }
         // After R1 the batch event's measured DOC is in data, not a topic. expectEmit

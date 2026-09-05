@@ -55,9 +55,13 @@ contract GettersTest is DcaDappTest {
     function test_dcaManager_getDcaSchedule_selfAndArbitraryUser() public {
         vm.prank(USER);
         IDcaManager.DcaSchedule memory asUser = scheduleAt(dcaManager, USER, address(stablecoin), 0);
+        vm.prank(USER);
+        uint64 asUserId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
 
         vm.prank(OWNER);
         IDcaManager.DcaSchedule memory asThirdParty = scheduleAt(dcaManager, USER, address(stablecoin), 0);
+        vm.prank(OWNER);
+        uint64 asThirdPartyId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
         (uint64[] memory enumeratedIds, IDcaManager.DcaSchedule[] memory enumerated) = dcaManager.getDcaSchedules(USER, address(stablecoin));
 
         assertEq(asUser.tokenBalance, AMOUNT_TO_DEPOSIT);
@@ -69,7 +73,7 @@ contract GettersTest is DcaDappTest {
         assertEq(asThirdParty.tokenBalance, asUser.tokenBalance);
         assertEq(asThirdParty.purchaseAmount, asUser.purchaseAmount);
         assertEq(asThirdParty.purchasePeriod, asUser.purchasePeriod);
-        assertEq(scheduleIdAt(dcaManager, USER, address(stablecoin), 0), scheduleIdAt(dcaManager, USER, address(stablecoin), 0));
+        assertEq(asThirdPartyId, asUserId);
         assertEq(asThirdParty.routeIndex, asUser.routeIndex);
         assertEq(asThirdParty.lastPurchaseTimestamp, asUser.lastPurchaseTimestamp);
 
