@@ -52,7 +52,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      *      max-schedules-per-token bound both need this list, so create and delete each write two
      *      structures. Both are cold paths, paid once by the user; the purchase path never reads it.
      */
-    mapping(address user => mapping(address tokenDeposited => uint64[] scheduleIds)) private s_scheduleIds;
+    mapping(address user => mapping(address token => uint64[] scheduleIds)) private s_scheduleIds;
 
     ProtocolSettings private s_protocolSettings;
     mapping(address token => uint256) private s_tokenMinPurchaseAmounts; // Custom minimum purchase amounts per token
@@ -748,7 +748,6 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         uint64[] storage scheduleIds = s_scheduleIds[user][token];
         uint256 numOfSchedules = scheduleIds.length;
         for (uint256 i; i < numOfSchedules; ++i) {
-            // `routeIndex` and `tokenBalance` share slot 0, so each schedule costs one read here.
             DcaSchedule storage dcaSchedule = s_dcaSchedules[token][scheduleIds[i]];
             if (dcaSchedule.routeIndex == routeIndex) {
                 lockedTokenAmount += dcaSchedule.tokenBalance;
