@@ -178,9 +178,6 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         uint256 purchasePeriod,
         uint256 routeIndex
     ) external override nonReentrant {
-        // The zero address is a valid mapping key but never a stablecoin. Refusing it here keeps
-        // "a schedule's token is a token" true for every consumer, and cannot be undone later:
-        // a schedule's stablecoin is fixed at creation and route assignment is add-only.
         if (token == address(0)) revert DcaManager__TokenNotAccepted(token, routeIndex);
         uint128 deposit = depositAmount.toUint128();
         uint96 purchase = purchaseAmount.toUint96();
