@@ -38,7 +38,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     /// @notice decimals of the MoC BTC/USD price. Hardcoded because the oracle exposes no `decimals()`.
     uint256 internal constant ORACLE_DECIMALS = 18;
     /// @notice `10 ** (ORACLE_DECIMALS - stablecoin decimals)`, which lifts a stablecoin amount into the oracle's USD units
-    /// @dev Fixed at deploy because the handler's stablecoin is immutable. USDT0 is 6 decimals, DOC and USDRIF 18.
+    /// @dev Fixed at deploy because the handler's stablecoin is immutable, so a 6-decimal stablecoin
+    ///      and an 18-decimal one both reach the oracle's units. Above 18 the constructor reverts.
     uint256 internal immutable i_stablecoinToUsdScale;
     /// @notice The swap-time oracle floor: the fraction of oracle-implied rBTC the router must pay.
     /// @dev Deliberately loose. It is the bound that holds when the caller's `minRbtcOut` is absent,

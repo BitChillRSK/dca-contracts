@@ -96,9 +96,9 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
     }
 
     /**
-     * @dev Retrieve `amount` of the user's idle stablecoin for the purchase path.
-     *      Lending handlers redeem their shares to pull DOC onto the handler; idle DOC is
-     *      already here, so this only debits the mapping.
+     * @dev Retrieve `amount` of the user's idle stablecoin for the purchase path. A lending handler
+     *      redeems shares to pull the stablecoin onto itself first; an idle one already holds it, so
+     *      this only debits the mapping.
      */
     function _retrieveStablecoin(address user, uint256 amount) internal virtual override returns (uint256) {
         return _debitIdleBalance(user, amount);

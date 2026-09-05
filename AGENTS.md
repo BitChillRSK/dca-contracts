@@ -95,30 +95,43 @@ valid for contracts`). Header NatSpec is own-file — it does not cross `is` to 
 does not travel down an inheritance chain either, so `SovrynDocHandlerMoc` inherits nothing from
 `SovrynErc20Handler`'s header. The header layer is therefore written by hand, and this is where.
 
+**A deployed contract must be readable on its own.** Anyone auditing this protocol lands on the verified
+concrete contract. Every contract that is actually deployed — `DcaManager`, `OperationsAdmin`, and the
+handler leaves — carries a short `@dev` covering its own security and lifecycle model: what is
+irreversible, what is guarded, what can be paused, who may call. Write it even when the interface says
+the same thing. That overlap is deliberate redundancy on the artifact that ships, not duplication to be
+factored out, and it is the one place where restating the interface is correct.
+
+Everything else is single-sourced on the interface:
+
 - Every first-party `src/` file carries `@title`, `@author`, and exactly one `@notice` line.
-- The two `@notice` lines of an interface/implementation pair are **labels**, and must not be the same
+- The two `@notice` lines of an interface/implementation pair are labels, and must not be the same
   sentence. The interface's names the surface; the implementation's names what that contract is in the
   system. A one-line label on each side is not duplication.
-- The `@dev` paragraph — what a caller may rely on, and why — belongs to the **interface that declares
-  the functions it describes**. An implementation adds a `@dev` only for a fact about its own code that
-  a reader of the surface could not infer, and never restates a claim the interface already makes.
-  `DcaManager` is the shape to copy: `IDcaManager` says who custodies what, `DcaManager` says that
-  `s_dcaSchedules` is written only there and how the `nonReentrant` set is kept greppable.
-- Two exceptions, both because no interface owns the claim. An interface that declares **no functions**
-  (`IDcaManagerAccessControl`, `IPurchaseMoc`, `ILayerBankErc20Handler`) is a home for errors and
-  events, not a surface: its `@notice` says what it carries, and the paragraph stays on the
-  implementation. And a fact true of one implementation cannot live on an interface several share —
-  `ITokenLending` is Sovryn's, LayerBank's, and Tropykus's at once — so it stays on that implementation.
+- The full paragraph — the caller-facing rules and the reasoning behind them — belongs to the interface
+  that declares the functions it describes. An **abstract** contract adds a `@dev` only for a fact about
+  its own code that a reader of the surface could not infer; an abstract's header reaches no shipped
+  artifact whichever side it sits on, so there is nothing to be gained by restating the interface there.
+- Two cases where no interface owns the claim, so it stays on the implementation. An interface that
+  declares no functions (`IDcaManagerAccessControl`, `IPurchaseMoc`, `ILayerBankErc20Handler`) is a home
+  for errors and events, not a surface: its `@notice` says what it carries. And a fact true of one
+  implementation cannot live on an interface several share — `ITokenLending` is Sovryn's, LayerBank's,
+  and Tropykus's at once.
 - Constructor-only leaves carry the header even though they carry no banners, and sibling leaves state
   the same fact the same way: the four `*Erc20HandlerDex` contracts each say `Constructor-only leaf` and
   the funding-base-first constructor ordering in `@dev`, not one of them in `@notice`.
-- **What a missing implementation `@dev` costs.** Whatever an implementation does not say itself is
-  absent from the contract-level `details` of the artifact that ships; per-method `details` is
-  unaffected, because functions do inherit. Measured across the ten deployable contracts when this rule
-  landed: `OperationsAdmin` lost its entry to `IOperationsAdmin`'s artifact, `SovrynErc20HandlerDex` and
-  `TropykusErc20HandlerDex` gained one, and every method count was unchanged. Losing the entry is the
-  price of the rule — do not restore a paragraph to an implementation to fill that field, and do not
-  write one that restates the interface in order to have something there.
+
+**Do not name a token in a contract that does not name it itself.** `PurchaseUniswap`, `IdleErc20Handler`,
+`LendingErc20Handler`, `TokenHandler` and their interfaces are constructed with whatever stablecoin they
+are given; a comment listing DOC, USDRIF, or USDT0 there is a snapshot of a listing decision that will
+rot, and on the Uniswap path naming DOC is simply wrong — DOC is redeemed at MoC and never swapped.
+State the property the code relies on (a decimal bound, a peg assumption) instead of the roster that
+happens to satisfy it today. Token names are correct only where the contract is token-specific: the
+`*DocHandlerMoc` leaves, `PurchaseMoc`, and the per-protocol `README.md`s.
+
+**Say what is enforced, and what is only assumed.** A header that states an operational policy the
+contract does not check — a listing rule, a delisting process — reads as a safety mechanism and is not
+one. Name it as a precondition and say who owns it.
 
 ## Onchain comments
 
