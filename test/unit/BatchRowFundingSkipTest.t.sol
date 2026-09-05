@@ -46,7 +46,7 @@ contract BatchRowFundingSkipTest is DcaDappTest {
 
     function setUp() public override {
         super.setUp();
-        if (address(dcaManager) == address(0) || !isLendingLane) return;
+        if (!_lanesApply()) return;
 
         // A live protocol's exchange rate is never a round number, and a schedule that has been around
         // for a while is the only one that can be batched at all: the swapper indexes from finalized
@@ -230,8 +230,16 @@ contract BatchRowFundingSkipTest is DcaDappTest {
                                 HELPERS
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev A lending route is what has a share book to run short of; the idle handler holds its
+    ///      stablecoin one-to-one, with no rate and no rounding. Anvil because this funds a second buyer
+    ///      by minting, which a fork of the real stablecoin cannot do — the shortfall itself is not
+    ///      mock-specific, and `make fork-sovryn` still runs the flipped `BatchTailScheduleTest` pins.
+    function _lanesApply() private view returns (bool) {
+        return address(dcaManager) != address(0) && isLendingLane && block.chainid == ANVIL_CHAIN_ID;
+    }
+
     function _skipUnlessLending() private {
-        if (!isLendingLane) vm.skip(true);
+        if (!_lanesApply()) vm.skip(true);
     }
 
     /**

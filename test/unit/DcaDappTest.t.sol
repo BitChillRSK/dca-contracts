@@ -724,7 +724,7 @@ contract DcaDappTest is Test {
         );
 
         if (isLendingLane) {
-            _assertBatchRedemptionReported(totalNetPurchaseAmount + totalFee);
+            _assertBatchRedemptionReported(totalNetPurchaseAmount + totalFee, NUM_OF_SCHEDULES);
         }
 
         uint256 postStablecoinHandlerBalance;
@@ -772,24 +772,28 @@ contract DcaDappTest is Test {
         );
 
         if (isLendingLane) {
-            _assertBatchRedemptionReported(totalNetPurchaseAmount + totalFee);
+            _assertBatchRedemptionReported(totalNetPurchaseAmount + totalFee, NUM_OF_SCHEDULES);
         }
     }
 
     /**
      * @notice assert that the batch redemption event reports the stablecoin the handler measured
      * @param requestedGross the total stablecoin the purchase path asked the lending protocol for
-     * @dev data[0] is the measured redemption. Live iSUSD / kDOC conversion can be 1 wei off the
-     * request; SIP-0094 is not enabled, so a 0.1% band would hide a wrong emit. If the Perimeter
-     * Fee starts charging, this 1-wei check will fail on `make fork-sovryn` — that is the signal.
+     * @param numOfRows how many rows the batch funded
+     * @dev data[0] is the measured redemption. Live iSUSD / kDOC conversion is off the request by
+     * under one share per row: R66 gives every row its own rounded-up share debit and redeems exactly
+     * their sum, where the batch used to round one aggregate figure and slice it. That is why the band
+     * scales with the row count instead of being a flat wei — it is still far too tight to hide a wrong
+     * emit, and SIP-0094 is not charging. If the Perimeter Fee starts charging, this check will fail on
+     * `make fork-sovryn` — that is the signal.
      */
-    function _assertBatchRedemptionReported(uint256 requestedGross) internal {
+    function _assertBatchRedemptionReported(uint256 requestedGross, uint256 numOfRows) internal {
         Vm.Log[] memory entries = vm.getRecordedLogs();
         bool found;
         for (uint256 i; i < entries.length; ++i) {
             if (entries[i].topics[0] == TokenLending__SharesRedeemedBatch.selector) {
                 (uint256 underlyingAmount,) = abi.decode(entries[i].data, (uint256, uint256));
-                assertApproxEqAbs(underlyingAmount, requestedGross, 1);
+                assertApproxEqAbs(underlyingAmount, requestedGross, numOfRows + 1);
                 found = true;
                 break;
             }
