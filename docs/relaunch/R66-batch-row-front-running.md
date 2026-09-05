@@ -46,7 +46,7 @@ The first five rows are not novel to this batch design: they exist in the pre-re
 today, and none of them requires an adversary — any user pausing, withdrawing, or editing a schedule
 in the same block as a scheduled tick reverts every other user's purchase in that batch by accident.
 That is a liveness bug on its own. The sixth is a genuine slippage-protection gap: R64 replaced a
-staleness guard that reverted a stale row (`ScheduleTokenMismatch`, pre-R64) with nothing that
+staleness guard that reverted a stale row (`PurchaseAmountMismatch`, pre-R64) with nothing that
 constrains a purchase-amount increase, and the PR's claim that "nothing about slippage depended on
 the removed guard" is too strong given this case.
 
