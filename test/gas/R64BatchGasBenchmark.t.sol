@@ -26,7 +26,7 @@ import {UserTokenIdDcaManager} from "./prototype/UserTokenIdDcaManager.sol";
  *          forge test --match-path 'test/gas/*' -vv
  *          FOUNDRY_PROFILE=deploy forge test --match-path 'test/gas/*' -vv
  *
- *      Six designs, identical schedules, one stub handler per design and size:
+ *      Nine designs, identical schedules, one stub handler per design and size:
  *        A — `src/DcaManager`: keyed by `(token, scheduleId)`, with the owner stored and checked, and
  *            a batch row that is one id.
  *        B — pre-R64: keyed by `(user, token, index)`, with ids, buyers, indexes, and amounts.
@@ -40,6 +40,13 @@ import {UserTokenIdDcaManager} from "./prototype/UserTokenIdDcaManager.sol";
  *        G — keyed by `(scheduleId, user, token)`: both halves of a schedule's identity in the key, so
  *            no identity is stored and none is checked. `purchaseAmount` keeps its full `uint128`.
  *        H — G's key with the batch row packed as `(scheduleId << 160) | buyer`, one word per row.
+ *        I — keyed by `(user, token, scheduleId)`: the pre-R64 key with the index replaced by the id.
+ *
+ *      One difference the table does not isolate: every prototype reads its schedule by copying the
+ *      struct into memory, the way `src/DcaManager` did until late in this branch, while A now reads
+ *      through a storage pointer — worth about 430 gas a row under via-IR. That is faithful for B,
+ *      which reproduces the pre-R64 contract as it was, and it is a handicap on every other row when
+ *      one design is compared with A. The spec's `Reading a schedule` section has the measurement.
  *
  *      What each column means:
  *        `calldata`  Intrinsic transaction cost of the encoded call. Computed from the bytes actually

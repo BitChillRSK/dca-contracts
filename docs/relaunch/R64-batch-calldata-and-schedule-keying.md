@@ -222,8 +222,8 @@ section carried while the measurement PR was open: those were taken with a pre-w
 with only A, B and C built.
 
 The headline, at 200 rows under via-IR, the profile that ships: **17,746 gas per row before R64,
-14,188 after** — 20.0% off every row of every tick, of which 4,143 is calldata the swapper no longer
-sends and the rest is execution.
+13,758 after** — 22.5% off every row of every tick, of which 736 is calldata the swapper no longer
+sends and 3,251 is execution. **Implementation → Where the gas went** breaks that down term by term.
 
 ## What the numbers say
 
@@ -234,23 +234,25 @@ calldata those fields cost was never buying a storage read; it was buying a comp
 the contract had already loaded.
 
 **Calldata was not where most of the win was either.** At 200 rows under via-IR the shipped design
-saves 3,558 gas per row against pre-R64, of which 4,143/200 ≈ 736 is intrinsic calldata. The rest is
-execution: decoding one calldata array instead of four, copying one fewer into memory for the handler
-call, one `keccak256` per row fewer than a three-level key, and the `validateScheduleIndex` and id
-cross-check that an id-addressed schedule deletes outright.
+saves 3,988 gas per row against pre-R64, of which 147,156/200 ≈ 736 is intrinsic calldata. The other
+3,251 is execution: a cold slot per row that the array's length used to cost, decoding one calldata
+array instead of four, copying one fewer into memory for the handler call, one `keccak256` per row
+fewer than a three-level key, the `validateScheduleIndex` and id cross-check that an id-addressed
+schedule deletes outright, and the memory copy the purchase path no longer makes.
 
 **The staleness guard costs about 450 gas per row.** Design D is the shipped design with the
-`purchaseAmounts` array restored: 14,871 against 14,188 per row at 200 rows under via-IR, or 683 —
+`purchaseAmounts` array restored: 14,871 against the 14,188 the shipped design measured before its
+read pattern changed (**Where the gas went**), at 200 rows under via-IR, or 683 —
 of which 201 is calldata. It is priced separately because it is a separate decision, taken in Gate 1.
 
 **Two payers, not one.** The tick is paid by the protocol, every day, for the life of every schedule.
 Create and delete are paid once, by the user who opens a schedule. This item makes the first cheaper
-by 20% and the second dearer by about 23,500 gas, and those two figures are **not** netted into a
+by 22.5% and the second dearer by about 23,500 gas, and those two figures are **not** netted into a
 break-even here: they come out of different pockets, and a break-even in purchases would imply the
 protocol's saving repays the user's cost, which it does not.
 
 **Scale, for the payer that matters daily.** Rootstock's block gas limit is 10,000,000 (measured at
-block 9,210,661), so one tick fits about **560 rows under the pre-R64 design and about 700 under the
+block 9,210,661), so one tick fits about **560 rows under the pre-R64 design and about 725 under the
 shipped one** — the operational headroom is the part of this that compounds, not the fraction of a
 cent per row.
 
@@ -289,7 +291,7 @@ that hazard structurally and got back to two slots — but it forced the swapper
 address for every row, which is 20 bytes per row on the path the protocol pays for daily. The third,
 which ships, puts the **stablecoin** in the key instead: a row goes back to a bare `uint64`, the
 token check becomes structural in the same motion, and the owner becomes a field checked in exactly
-one place. Measured at 200 rows under via-IR, that is 14,188 gas per row against 14,606 for
+one place. Measured at 200 rows under via-IR, that is 13,758 gas per row against 14,606 for
 owner-in-key and 17,746 for pre-R64.
 
 The ownership check is the price, and it is worth stating plainly rather than explaining away: a
@@ -360,16 +362,31 @@ check at all, because it reads the buyer from the schedule rather than taking on
 That is what invariant 8 in `AGENTS.md` now says, and the reviewer's obligation it names is a single
 grep: no mutator may read `s_dcaSchedules` directly.
 
-**Key order was measured, not assumed.** `[token][scheduleId]` and `[scheduleId][token]` are the same
-storage and the same work; the token being outermost makes its hash loop-invariant, and whether the
-compiler hoists it decides the sign. On the shipped contract under via-IR, at 200 rows,
-`[scheduleId][token]` measures 14,167 gas per row against 14,188 for `[token][scheduleId]` — the
-token-first order costs **21 gas per row, 0.15%**. It ships anyway, because
-`s_dcaSchedules[token][scheduleId]` says what the mapping is (for each stablecoin, the schedules that
-spend it) while `s_dcaSchedules[scheduleId][token]` reads as an id with a second key bolted on, and
-0.15% is not worth a storage declaration that misleads every future reader. An isolated two-contract
-probe had the saving the other way round at ~17 gas per row; it did not survive contact with the full
-contract, which is why the number quoted here is the in-situ one.
+**Key order was measured, not assumed, and it is a dead heat.** `[token][scheduleId]` and
+`[scheduleId][token]` are the same storage and the same work; the token being outermost makes its hash
+loop-invariant, and whether the compiler hoists it decides the sign. The only way to answer that is in
+situ, so the mapping was flipped in `src/DcaManager` itself and the benchmark re-run. At 200 rows:
+
+| | default | via-IR (ships) |
+|---|---|---|
+| `[token][scheduleId]` — ships | 14,918 | 13,758 |
+| `[scheduleId][token]` | 14,927 | 13,743 |
+
+Token-first costs **15 gas a row under via-IR, 0.11%**, and saves 9 under the default profile. It
+ships because `s_dcaSchedules[token][scheduleId]` says what the mapping is — for each stablecoin, the
+schedules that spend it — while `s_dcaSchedules[scheduleId][token]` reads as an id with a second key
+bolted on, and a tenth of a percent is not worth a storage declaration that misleads every future
+reader.
+
+Two earlier figures for this are wrong and are recorded here because the way they were wrong is the
+point. An isolated two-contract probe put the saving the other way round, ~17 gas a row in favour of
+token-first; it was measuring an optimiser decision that does not reproduce at full contract size. A
+first in-situ measurement then said 21 gas a row against token-first, which was right for the contract
+as it stood but was taken before the purchase path stopped copying the schedule into memory. Design E
+in the table below — the same design as a prototype, keyed the other way — measures 237 gas a row
+below what ships, and that number does not survive in situ either: **a prototype is not the contract**,
+and the compiler optimises the small one harder. Every key-order claim in this document is the in-situ
+one.
 
 ### Why a batch row carries no amount
 
@@ -407,31 +424,145 @@ re-argued. B is the pre-R64 keying, reproduced as a prototype:
 
 | | default | via-IR (ships) | vs shipped, via-IR |
 |---|---|---|---|
-| B — pre-R64 `[user][token][index]`, four arrays | 18,931 | 17,746 | +3,558 |
-| C — flat by id, owner *and* token stored, three slots | 17,008 | 16,100 | +1,912 |
-| I — `[user][token][id]`, both structural, buyers in the batch | 15,730 | 14,606 | +418 |
-| G — `[id][user][token]`, both structural, buyers in the batch | 15,687 | 14,603 | +415 |
-| H — G's key, row packed as one word `(id << 160) | buyer` | 15,069 | 14,219 | +31 |
-| **A — shipped: `[token][id]`, owner stored and checked** | **14,231** | **14,188** | — |
-| E — the same design keyed `[id][token]` | 14,910 | 13,951 | −237 |
-| F — flat by id, `uint32 routeId` in place of the token | 14,901 | 13,955 | −233 |
+| B — pre-R64 `[user][token][index]`, four arrays | 18,931 | 17,746 | +3,988 |
+| C — flat by id, owner *and* token stored, three slots | 17,008 | 16,100 | +2,342 |
+| I — `[user][token][id]`, both structural, buyers in the batch | 15,730 | 14,606 | +848 |
+| G — `[id][user][token]`, both structural, buyers in the batch | 15,687 | 14,603 | +845 |
+| H — G's key, row packed as one word `(id << 160) | buyer` | 15,069 | 14,219 | +461 |
+| F — flat by id, `uint32 routeId` in place of the token | 14,901 | 13,955 | +197 |
+| E — the same design keyed `[id][token]` | 14,910 | 13,951 | +193 |
+| **A — shipped: `[token][id]`, owner stored and checked** | **14,918** | **13,758** | — |
 
-E and F sit a fifth of a percent below the shipped design and were rejected on what they cost outside
-the gas table: E's mapping reads as an id with a useless second key, and F needs a second route
-identifier minted inside `OperationsAdmin`. The E row measured here is a prototype, which the compiler
-optimises more aggressively than the full contract; the like-for-like key-order comparison on the
-shipped contract is the 21 gas per row above, not this 237.
+Read the last three rows with two caveats. **A is the only row that reads its schedule through a
+storage pointer**: every prototype still opens its purchase path with the memory copy `DcaManager`
+itself used until late in this branch, worth 430 gas a row under via-IR (see below). **And A is the
+only row that is not a prototype**, which the compiler optimises harder than the full contract — the
+in-situ key flip above measures E's design 15 gas a row from A's, where the prototype table shows 237.
+Both caveats cut the same way, and neither touches the comparison with B: B is a faithful copy of the
+pre-R64 contract, memory copy included, so the 3,988 is a real before-and-after of what the protocol
+pays. E and F were rejected on what they cost outside the gas table anyway — E's mapping reads as an id
+with a useless second key, and F needs a second route identifier minted inside `OperationsAdmin`.
 
 Cold paths, per schedule, paid by the user:
 
 | | create (default) | delete (default) | create (via-IR) | delete (via-IR) |
 |---|---|---|---|---|
 | B — pre-R64 | 99,928 | 10,924 | 98,125 | 10,567 |
-| **A — shipped** | **122,629** | **11,789** | **121,636** | **11,860** |
+| **A — shipped** | **122,629** | **11,402** | **121,636** | **11,402** |
 
-Create costs the user about 23,500 gas more than the pre-R64 design and delete about 1,200 more for
-the id-list scan; both are paid once per schedule, by the user, while the 3,558 gas per row the tick
-saves is paid every day, by the protocol. The two are different bills and are not netted here.
+Create costs the user about 23,500 gas more than the pre-R64 design and delete about 800 more; both
+are paid once per schedule, by the user, while the 3,988 gas per row the tick saves is paid every day,
+by the protocol. The two are different bills and are not netted here.
+
+### Where the gas went
+
+Per row at 200 rows, under the via-IR profile that ships:
+
+| | pre-R64 (B) | shipped (A) | delta |
+|---|---|---|---|
+| intrinsic calldata | 894 | 158 | −736 |
+| manager execution | 16,254 | 13,002 | −3,251 |
+| stub handler leg, identical by construction | 598 | 598 | 0 |
+| **total** | **17,746** | **13,758** | **−3,988** |
+
+**Calldata: four words a row became one.** A pre-R64 row carried a buyer, an index, an id and an
+amount — 128 bytes, because an element of a dynamic array occupies a whole word whatever its declared
+width. A row is now one `uint64` in one array: 32 bytes, 30 or 31 of them zeros. Across the batch that
+is 25,988 bytes against 6,596. On Rootstock's schedule — 4 gas a zero byte, 16 a non-zero one, plus 12
+per 32-byte word, the term with no Ethereum equivalent — it prices at 894 gas a row against 158.
+
+**The lookup lost a cold slot.** `s_dcaSchedules[user][token][index]` is two mapping hashes and then a
+dynamic array, and an array keeps its length in a slot of its own, which every access reads in order
+to bounds-check the index. The rows of a tick belong to different users, so that slot is cold on every
+row: 2,100 gas, and the single largest term in the execution column. `s_dcaSchedules[token][scheduleId]`
+has no length slot — two hashes address the value directly, and the outer one is the same for the whole
+batch, because a batch is one stablecoin's. Both designs then read the same two struct slots, both cold.
+Three cold slots a row became two.
+
+**Two identity checks became the address itself.** Pre-R64 a row's id had to be proved against the
+schedule it landed on, so the struct stored its own `scheduleId` and the manager compared them; the
+stablecoin was the caller's word in the same way. Under `(token, scheduleId)` a wrong id or a wrong
+stablecoin addresses empty storage, and is refused by the `user == address(0)` test the row runs
+anyway. What is left is an owner comparison — which the purchase path does not make, because it takes
+the buyer from the schedule instead of checking one the caller supplied.
+
+**The per-row amount is gone**: one calldata word and about 450 gas a row (design D restores it and
+prices it), for a staleness guard the manager never debited with.
+
+**Packing is not where the win came from — it is where the cost went.** Both designs store two slots.
+Fitting `user` beside `purchaseAmount` in slot 1 cost the amount 32 bits of width, `uint128` → `uint96`
+(~7.9e10 tokens at 18 decimals): at `uint128` the pair no longer fits next to an address, slot 1
+spills, and a purchase's two writes split across slots for more than the narrower field saves.
+`tokenBalance` keeps `uint128`, and slot 0 still holds every field a purchase reads or writes, so a
+purchase is still one `SSTORE`.
+
+**And the schedule is read through a storage pointer**, which is the last 430.
+
+### Reading a schedule: a storage pointer, not a memory copy
+
+`_rBtcPurchaseChecksEffects` used to open with a copy of the schedule into memory, alongside the
+storage pointer it wrote its effects through:
+
+```solidity
+DcaSchedule storage dcaScheduleStorage = s_dcaSchedules[token][scheduleId];
+DcaSchedule memory dcaSchedule = dcaScheduleStorage;
+```
+
+That pattern is common enough to be worth recording why it is not here any more. **Under the profile
+that ships it costs 430 gas a row:**
+
+| `_rBtcPurchaseChecksEffects` reads its schedule by | default | via-IR (ships) |
+|---|---|---|
+| copying the struct into memory | 14,231 | 14,188 |
+| a storage pointer, fields into locals | 14,918 | **13,758** |
+
+The two pipelines optimise different things. The legacy pipeline does not eliminate a repeated `SLOAD`
+of a slot it has already read, so reading seven fields off a pointer pays 100 gas for each one after
+the first, and copying the struct once — two `SLOAD`s and some memory traffic — is the cheaper shape,
+by 687 gas a row. Under via-IR those redundant loads are eliminated: the pointer version also reads
+each of the two slots exactly once, and the copy is left doing work that buys nothing — materialising
+all seven fields eagerly, a memory word each, masking and shifting every one of them, including the
+ones a row that reverts never reaches.
+
+`[profile.deploy]`, via-IR, is what ships (R60), so the pointer read is what ships. The default
+profile's 687 is a test-profile number and nobody pays it.
+
+`deleteDcaSchedule` carried the same copy — made to read two fields out of one slot before the
+schedule is deleted — and dropping it takes that path from 11,860 to 11,402, 458 gas off a cost the
+user pays.
+
+**The rule this gives is not "never copy a struct into memory."** It is that under via-IR a copy has
+to earn its keep: many reads of the same field, or a snapshot that has to survive a call which could
+write the storage underneath it. A schedule read once per row does neither. Where a memory copy stays
+in this contract it is because the value is returned — `getDcaSchedule` and `getDcaSchedules` build
+memory structs because that is what an ABI read hands back.
+
+### What changed for the functions the user pays for
+
+| | before | after | via-IR |
+|---|---|---|---|
+| `createDcaSchedule` | one push onto `s_dcaSchedules[user][token]` | the keyed value, plus the id pushed onto `s_scheduleIds[user][token]` | 98,125 → 121,636 |
+| `deleteDcaSchedule` | swap-pop the struct out of the array | clear the keyed value, swap-pop the id out of the list | 10,567 → 11,402 |
+| the seven schedule mutators | `[user][token][index]`, bounds check, stored-id comparison | `[token][scheduleId]`, owner comparison | about 2,100 cheaper, not measured |
+
+**Create pays for an enumeration that used to be free.** Pre-R64 the array *was* the storage: a
+schedule lived in `s_dcaSchedules[user][token]`, so "this user's schedules for this token" needed
+nothing extra to answer. A keyed mapping cannot be enumerated, so `s_scheduleIds[user][token]` now
+holds the ids, and creating a schedule writes a slot that did not exist before — a zero → non-zero
+`SSTORE`, 20,000 — plus that list's length and the id counter. Nearly all of the ~23,500 is there.
+
+**Delete pays for the same second structure**, ~835: the schedule's two slots are cleared, with the
+refunds that brings, and the id is swap-popped out of its list, where before there was a single array
+to swap-pop.
+
+**The seven mutators get cheaper, by the tick's own mechanism.** `depositToken`, `withdrawToken`,
+`withdrawTokenAndInterest`, `updatePurchaseAmount`, `updatePurchasePeriod`, `setSchedulePaused` and
+`topUpFromInterest` all reach their schedule through `_callersSchedule`, which drops the array's cold
+length slot and its bounds check. The owner comparison they gain is not an extra slot read: `user`
+sits in the schedule's second slot, which is exactly where the pre-R64 design kept the stored
+`scheduleId` it compared. So each should shed roughly the 2,100 of that cold length slot. It is not
+quantified, because the pre-R64 prototype implements the purchase path and nothing else, so this
+branch has no like-for-like harness for the rest; the lookup itself is the one the tick measures.
 
 ### What did not change
 
