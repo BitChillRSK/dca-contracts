@@ -8,8 +8,8 @@ import {LayerBankErc20Handler} from "./LayerBankErc20Handler.sol";
  * @title LayerBankErc20HandlerDex
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice LayerBank lending + Uniswap V3 purchases. One bytecode, two deployments (USDRIF and USDT0).
- * @dev Constructor-only leaf, same shape as `SovrynErc20HandlerDex`. The funding base is listed
- *      first so `i_stableToken` is set before `PurchaseUniswap` builds the swap path.
+ * @dev Constructor-only leaf. The funding base is listed first so `i_stableToken` is set before
+ *      `PurchaseUniswap` builds the swap path.
  */
 contract LayerBankErc20HandlerDex is LayerBankErc20Handler, PurchaseUniswap {
     /**

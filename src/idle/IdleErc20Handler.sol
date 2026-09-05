@@ -10,10 +10,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 /**
  * @title IdleErc20Handler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Holds deposited stablecoin on the handler instead of minting shares.
- * @dev Per-user idle balances clamp withdrawals and single purchases so a DcaManager
- *      accounting bug cannot spend another user's pooled DOC. Batch purchases revert instead
- *      of clamping, because PurchaseRbtc splits rBTC by the original planned weights.
+ * @notice Base for the handlers that hold their stablecoin instead of lending it; each leaf adds a
+ *         purchase route.
  */
 abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, StablecoinSource {
     /*//////////////////////////////////////////////////////////////

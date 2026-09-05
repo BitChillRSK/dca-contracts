@@ -4,7 +4,8 @@ pragma solidity 0.8.36;
 /**
  * @title IDcaManagerAccessControl
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Restricts handler entry points to the pinned DcaManager.
+ * @notice The revert a handler raises when a caller other than its pinned DcaManager reaches an
+ *         `onlyDcaManager` entry point.
  */
 interface IDcaManagerAccessControl {
     /*//////////////////////////////////////////////////////////////

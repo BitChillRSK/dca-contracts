@@ -9,6 +9,12 @@ import {ICoinPairPrice} from "./ICoinPairPrice.sol";
  * @title IPurchaseUniswap
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Uniswap V3 purchase configuration: encoded path, slippage band, and MoC BTC/USD oracle.
+ * @dev Min-out is built from the MoC BTC/USD oracle under a $1 peg assumption: one unit of the
+ *      handler's stablecoin is taken to be one USD. BitChill only lists 1:1 stables (DOC, USDRIF,
+ *      USDT0) and does not run a per-stablecoin USD feed. If a listed stablecoin depegs downwards, the
+ *      pool prices it below the oracle-implied floor and the swap reverts; nothing here redeems a
+ *      depegged stablecoin at $1, and a persistent depeg is handled by delisting the token, not by the
+ *      purchase path.
  */
 interface IPurchaseUniswap {
     /*//////////////////////////////////////////////////////////////

@@ -8,6 +8,8 @@ import {TropykusErc20Handler} from "./TropykusErc20Handler.sol";
  * @title TropykusErc20HandlerDex
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Tropykus lending + Uniswap V3 purchases. Legacy only: no live deploy path.
+ * @dev Constructor-only leaf. The funding base is listed first so `i_stableToken` is set before
+ *      `PurchaseUniswap` builds the swap path.
  */
 contract TropykusErc20HandlerDex is TropykusErc20Handler, PurchaseUniswap {
     /**

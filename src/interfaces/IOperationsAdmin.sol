@@ -5,8 +5,14 @@ pragma solidity 0.8.36;
  * @title IOperationsAdmin
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Governance registry for route classes, token handlers, swappers, and per-pair deposit pause.
- * @dev One owner. Route indexes and handler assignments are add-only. A handler address may be
- *      assigned at most once. There is no cooperative migration on these handler versions.
+ * @dev One owner. Route indexes are add-only: a class is recorded once and is never mutated or
+ *      deregistered, so an old route stays resolvable and a user can always exit the handler that
+ *      holds their funds. `(token, routeIndex)` handler assignment is add-only for the same reason,
+ *      and a handler address may be assigned at most once: none of a handler's per-user accounting is
+ *      route-keyed, so sharing one instance across two pairs would let one route's principal be read
+ *      as another's yield. There is no cooperative migration on these handler versions. The per-pair
+ *      deposit pause is the one mutable flag here, a circuit breaker that blocks new inflows without
+ *      touching purchases or any exit path.
  */
 interface IOperationsAdmin {
     /**

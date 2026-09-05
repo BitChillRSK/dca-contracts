@@ -10,7 +10,8 @@ import {BitChillOwnable} from "./BitChillOwnable.sol";
 /**
  * @title FeeHandler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Linear purchase-fee math and collector. Inherited by TokenHandler and PurchaseRbtc.
+ * @notice Interpolates a purchase fee between the configured rate bounds and pays it to the
+ *         collector. Inherited by TokenHandler and PurchaseRbtc.
  */
 abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     using SafeERC20 for IERC20;

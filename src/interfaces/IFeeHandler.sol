@@ -4,7 +4,8 @@ pragma solidity 0.8.36;
 /**
  * @title IFeeHandler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Linear purchase-fee settings and collector. Inherited by TokenHandler and PurchaseRbtc.
+ * @notice Purchase-fee configuration: the rate bounds, the purchase amounts they interpolate
+ *         between, and the address fees are paid to.
  */
 interface IFeeHandler {
     /*//////////////////////////////////////////////////////////////

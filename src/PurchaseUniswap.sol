@@ -19,11 +19,6 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
  * @title PurchaseUniswap
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Uniswap V3 purchase route: swap stablecoin for WRBTC, unwrap on withdraw.
- * @dev Min-out is built from the MoC BTC/USD oracle under a $1 peg assumption: one unit of the handler's
- *      stablecoin is taken to be one USD. BitChill only lists 1:1 stables (DOC, USDRIF, USDT0) and does not
- *      run a per-stablecoin USD feed. If a listed stablecoin depegs downwards, the pool prices it below the
- *      oracle-implied floor and the swap reverts; nothing here redeems a depegged stablecoin at $1, and a
- *      persistent depeg is handled by delisting the token, not by the purchase path.
  */
 abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     using SafeCast for uint256;
