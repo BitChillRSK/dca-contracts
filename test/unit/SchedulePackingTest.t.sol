@@ -365,8 +365,12 @@ contract SchedulePackingTest is DcaDappTest {
             scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).lastPurchaseTimestamp;
         uint256 balanceBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
 
+        // Built before arming the cheatcode: buyRbtcOne's own getDcaSchedule read would otherwise
+        // consume this expectRevert before the purchase call it is meant for.
+        IDcaManager.Batch memory batch = currentBatch(scheduleId);
         vm.expectRevert(_safeCastOverflow(48, uint256(type(uint48).max) + 1));
-        super.buyRbtcOne(scheduleId);
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(batch);
 
         IDcaManager.DcaSchedule memory schedule =
             scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
@@ -383,8 +387,10 @@ contract SchedulePackingTest is DcaDappTest {
         uint256 overflowingTimestamp = uint256(type(uint48).max) + MIN_PURCHASE_PERIOD;
         uint256 balanceBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
 
+        IDcaManager.Batch memory batch = currentBatch(scheduleId);
         vm.expectRevert(_safeCastOverflow(48, overflowingTimestamp));
-        super.buyRbtcOne(scheduleId);
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(batch);
 
         IDcaManager.DcaSchedule memory schedule =
             scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);

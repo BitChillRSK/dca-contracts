@@ -9,6 +9,8 @@ import {DeployIdleHandler} from "../../script/DeployIdleHandler.s.sol";
 import {DeployLayerBankHandler} from "../../script/DeployLayerBankHandler.s.sol";
 import "../Constants.sol";
 import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
+import {packBatchRow} from "test/utils/BatchBuyOne.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @notice Exercises the integrated multi-handler purchase entry point.
@@ -17,6 +19,11 @@ import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
  */
 contract DcaManagerBatchHandlersTest is DcaDappTest {
     uint256 internal constant SECOND_SCHEDULE_INDEX = 1;
+
+    /// @dev A rate no real purchase can clear, but small enough that `rate * netSpend / 1e18` does not
+    ///      itself overflow — unlike `type(uint256).max`, which panics as a rate once multiplied by any
+    ///      nonzero spend and so would report an arithmetic panic instead of the minimum violation.
+    uint256 internal constant UNREACHABLE_RATE = type(uint128).max;
 
     address internal secondHandler;
     uint256 internal secondRouteIndex;
@@ -77,9 +84,10 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
     {
         IDcaManager.DcaSchedule memory schedule =
             scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex);
-        batch.scheduleIds = new uint64[](1);
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), scheduleIndex);
+        batch.rows = new bytes32[](1);
         batch.token = address(stablecoin);
-        batch.scheduleIds[0] = scheduleIdAt(dcaManager, USER, address(stablecoin), scheduleIndex);
+        batch.rows[0] = packBatchRow(scheduleId, schedule.purchaseAmount);
         batch.routeIndex = routeIndex;
     }
 
@@ -142,7 +150,9 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         assertEq(IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER), firstRbtcBefore);
     }
 
-    function testPausedSecondGroupRollsBackFirstGroup() external {
+    /// @dev R66: a paused row is skipped rather than reverting its handler's batch, so the first
+    ///      handler's purchase now goes through even though the second group's only row is paused.
+    function testPausedSecondGroupSkipsWithoutBlockingFirstGroup() external {
         _requireTwoHandlers();
 
         IDcaManager.DcaSchedule memory firstBefore =
@@ -153,16 +163,25 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         dcaManager.setSchedulePaused(address(stablecoin), secondId, true);
 
         IDcaManager.Batch[] memory batches = _twoHandlers();
-        vm.expectRevert(
-            abi.encodeWithSelector(IDcaManager.DcaManager__SchedulePaused.selector, address(stablecoin), secondId)
+        vm.expectEmit(true, true, false, true, address(dcaManager));
+        emit IDcaManager.DcaManager__PurchaseRowSkipped(
+            address(stablecoin), secondId, IDcaManager.PurchaseRowSkipReason.SchedulePaused
         );
         _batchBuy(batches);
 
         IDcaManager.DcaSchedule memory firstAfter =
             scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        assertEq(firstAfter.tokenBalance, firstBefore.tokenBalance);
-        assertEq(firstAfter.lastPurchaseTimestamp, firstBefore.lastPurchaseTimestamp);
-        assertEq(IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER), 0);
+        assertEq(firstAfter.tokenBalance, firstBefore.tokenBalance - AMOUNT_TO_SPEND, "the first group still buys");
+        assertGt(firstAfter.lastPurchaseTimestamp, firstBefore.lastPurchaseTimestamp);
+        assertGt(
+            IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER),
+            0,
+            "the first group's buyer is credited even though the second group's only row was skipped"
+        );
+
+        IDcaManager.DcaSchedule memory secondAfter =
+            scheduleAt(dcaManager, USER, address(stablecoin), SECOND_SCHEDULE_INDEX);
+        assertEq(secondAfter.lastPurchaseTimestamp, 0, "the paused schedule was skipped, not purchased");
     }
 
     function testSecondHandlerFailureRollsBackFirstHandlerInteraction() external {
@@ -209,7 +228,7 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
 
         // Only the second handler's batch carries an unreachable minimum; the first is a normal purchase.
         IDcaManager.Batch[] memory batches = _twoHandlers();
-        batches[1].minRbtcOut = type(uint256).max;
+        batches[1].minRbtcOutRate = UNREACHABLE_RATE;
 
         vm.prank(SWAPPER);
         (bool ok,) = address(dcaManager).call(abi.encodeCall(IDcaManager.batchBuyRbtcAcrossHandlers, (batches)));
@@ -238,20 +257,22 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         );
     }
 
-    /// @dev Each batch carries its own minimum: one handler's bound must not be applied to another's output.
+    /// @dev Each batch carries its own minimum rate: one handler's bound must not be applied to another's
+    ///      output. R66 made the field a rate applied to each handler's own measured net spend, so the
+    ///      rate that reproduces the first handler's output is derived from that spend, not copied across.
     function testEachGroupCarriesItsOwnMinimum() external {
         _requireTwoHandlers();
 
         // A minimum only the two handlers' outputs together could clear must still fail the batch it is on.
         IDcaManager.Batch[] memory probe = _twoHandlers();
-        probe[0].minRbtcOut = type(uint256).max;
+        probe[0].minRbtcOutRate = UNREACHABLE_RATE;
         vm.prank(SWAPPER);
         (bool ok, bytes memory returnData) =
             address(dcaManager).call(abi.encodeCall(IDcaManager.batchBuyRbtcAcrossHandlers, (probe)));
         assertFalse(ok);
         assertEq(bytes4(returnData), IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector);
 
-        // Reading the first handler's own measured output back, a bundle that gives each batch a minimum it
+        // Reading the first handler's own measured output back, a bundle that gives each batch a rate it
         // can meet on its own succeeds.
         bytes memory args = new bytes(returnData.length - 4);
         for (uint256 i; i < args.length; ++i) {
@@ -259,12 +280,15 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         }
         (uint256 firstMeasured,) = abi.decode(args, (uint256, uint256));
 
+        uint256 netSpend = AMOUNT_TO_SPEND - feeCalculator.calculateFee(AMOUNT_TO_SPEND);
         IDcaManager.Batch[] memory batches = _twoHandlers();
-        batches[0].minRbtcOut = firstMeasured;
-        batches[1].minRbtcOut = 1;
+        // Rounded down, so the contract's own round-up of `rate * netSpend / 1e18` cannot overshoot what
+        // this handler measured itself buying.
+        batches[0].minRbtcOutRate = Math.mulDiv(firstMeasured, 1 ether, netSpend, Math.Rounding.Floor);
+        batches[1].minRbtcOutRate = 1;
         _batchBuy(batches);
 
-        assertEq(IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER), firstMeasured);
+        assertGe(IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER), firstMeasured);
         assertGt(IPurchaseRbtc(secondHandler).getAccumulatedRbtcBalance(USER), 0);
     }
 

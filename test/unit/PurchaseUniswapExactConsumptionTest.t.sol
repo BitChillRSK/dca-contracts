@@ -84,8 +84,10 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
 
         PurchaseState memory before = _snapshot();
         uint64 scheduleId = _scheduleId();
+        IDcaManager.Batch memory batch = _batchFor(scheduleId);
         _expectShortFillRevert();
-        _purchase(scheduleId);
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(batch);
         _assertRolledBack(before);
     }
 
@@ -96,8 +98,10 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
 
         PurchaseState memory before = _snapshot();
         uint64 scheduleId = _scheduleId();
+        IDcaManager.Batch memory batch = _batchFor(scheduleId);
         _expectShortFillRevert();
-        _purchase(scheduleId);
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(batch);
         _assertRolledBack(before);
         assertEq(intermediateToken.balanceOf(_routerAddress()), 0);
     }
@@ -113,6 +117,7 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
 
         PurchaseState memory before = _snapshot();
         uint64 scheduleId = _scheduleId();
+        IDcaManager.Batch memory batch = _batchFor(scheduleId);
         vm.expectRevert(
             abi.encodeWithSelector(
                 IPurchaseUniswap.PurchaseUniswap__IntermediateBalanceChangedInRouter.selector,
@@ -121,7 +126,8 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
                 stranded
             )
         );
-        _purchase(scheduleId);
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(batch);
         _assertRolledBack(before);
         assertEq(intermediateToken.balanceOf(_routerAddress()), 0);
     }
@@ -136,6 +142,7 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
 
         PurchaseState memory before = _snapshot();
         uint64 scheduleId = _scheduleId();
+        IDcaManager.Batch memory batch = _batchFor(scheduleId);
         vm.expectRevert(
             abi.encodeWithSelector(
                 IPurchaseUniswap.PurchaseUniswap__IntermediateBalanceChangedInRouter.selector,
@@ -144,7 +151,8 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
                 ROUTER_DUST + stranded
             )
         );
-        _purchase(scheduleId);
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(batch);
         _assertRolledBack(before);
     }
 
@@ -205,10 +213,19 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
         state.userAccumulatedRbtc = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
     }
 
-    /// @dev Takes the id rather than reading it, so a caller's `vm.expectRevert` lands on the batch call
-    ///      itself and not on the getter that would otherwise run first.
+    /// @dev Builds the batch (a `getDcaSchedule` read) before pranking, so a caller's `vm.expectRevert`
+    ///      must be armed *after* calling this, not before it — arming it first would be consumed by
+    ///      this function's own read rather than by the purchase call it is meant for.
     function _purchase(uint64 scheduleId) private {
-        buyRbtcOne(scheduleId);
+        IDcaManager.Batch memory batch = currentBatch(scheduleId);
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(batch);
+    }
+
+    /// @dev For callers that must arm `vm.expectRevert` before the purchase: build the batch first,
+    ///      return it, then the caller arms the cheatcode and sends it directly.
+    function _batchFor(uint64 scheduleId) private view returns (IDcaManager.Batch memory) {
+        return currentBatch(scheduleId);
     }
 
     function _scheduleId() private view returns (uint64) {

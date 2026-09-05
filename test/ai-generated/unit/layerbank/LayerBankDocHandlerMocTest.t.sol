@@ -8,7 +8,7 @@ import {MockLayerBankAToken, MockLayerBankPool} from "test/mocks/MockLayerBank.s
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import "test/Constants.sol";
-import {handlerBatchBuyOne, NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
+import {handlerBatchBuyOne, NO_MIN_RBTC_OUT_RATE} from "test/utils/BatchBuyOne.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 
 /**
@@ -107,7 +107,7 @@ contract LayerBankDocHandlerMocTest is Test {
             purchaseAmounts[i] = purchaseBase * (i + 1);
         }
 
-        handler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT);
+        handler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT_RATE);
 
         uint256 totalAccrued;
         for (uint256 i = 0; i < buyers.length; i++) {

@@ -15,7 +15,7 @@ import {MockWrbtcToken} from "test/mocks/MockWrbtcToken.sol";
 import {MockMocOracle} from "test/mocks/MockMocOracle.sol";
 import {MockSwapRouter02} from "test/mocks/MockSwapRouter02.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {handlerBatchBuyOne, NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
+import {handlerBatchBuyOne, NO_MIN_RBTC_OUT_RATE} from "test/utils/BatchBuyOne.sol";
 import "test/Constants.sol";
 
 /**
@@ -142,7 +142,7 @@ contract IdleErc20HandlerDexTest is HandlerTestHarness {
             )
         );
         vm.prank(address(dcaManager));
-        idleDexHandler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT);
+        idleDexHandler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT_RATE);
 
         assertEq(idleDexHandler.getUsersIdleTokenBalance(user1), DEPOSIT_AMOUNT);
         assertEq(idleDexHandler.getUsersIdleTokenBalance(user2), DEPOSIT_AMOUNT);

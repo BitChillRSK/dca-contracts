@@ -6,7 +6,7 @@ import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {Vm} from "forge-std/Test.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import {MockIsusdToken} from "../mocks/MockIsusdToken.sol";
-import {toBatch} from "../utils/BatchBuyOne.sol";
+import {toBatch, packBatchRow} from "../utils/BatchBuyOne.sol";
 import "../Constants.sol";
 import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
@@ -74,14 +74,14 @@ contract NetRedemptionTest is DcaDappTest {
         createSeveralDcaSchedules();
         _enableExitFee();
 
-        (address[] memory users,, uint64[] memory scheduleIds,) = _batchArrays();
+        (,, uint64[] memory scheduleIds, uint256[] memory purchaseAmounts) = _batchArrays();
 
         uint256 handlerRbtcBefore = address(stablecoinHandler).balance;
         uint256 creditedBefore = _accumulatedRbtc();
 
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, address(stablecoin), s_routeIndex)
+            toBatch(_packRows(scheduleIds, purchaseAmounts), address(stablecoin), s_routeIndex)
         );
 
         uint256 received = address(stablecoinHandler).balance - handlerRbtcBefore;
@@ -187,7 +187,7 @@ contract NetRedemptionTest is DcaDappTest {
         createSeveralDcaSchedules();
         _enableExitFee();
 
-        (address[] memory users,, uint64[] memory scheduleIds, uint256[] memory purchaseAmounts) = _batchArrays();
+        (,, uint64[] memory scheduleIds, uint256[] memory purchaseAmounts) = _batchArrays();
 
         uint256 plannedNetTotal;
         for (uint256 i; i < purchaseAmounts.length; ++i) {
@@ -197,7 +197,7 @@ contract NetRedemptionTest is DcaDappTest {
         vm.recordLogs();
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, address(stablecoin), s_routeIndex)
+            toBatch(_packRows(scheduleIds, purchaseAmounts), address(stablecoin), s_routeIndex)
         );
 
         (uint256 perUserSpentTotal, uint256 batchSpent) = _batchSpendFromLogs();
@@ -225,7 +225,7 @@ contract NetRedemptionTest is DcaDappTest {
         // earlier with TokenLending__ZeroStablecoinReceived, which is a different failure.
         MockIsusdToken(address(shareToken)).setExitFeeBps(RUG_EXIT_FEE_BPS);
 
-        (address[] memory users,, uint64[] memory scheduleIds, uint256[] memory purchaseAmounts) = _batchArrays();
+        (,, uint64[] memory scheduleIds, uint256[] memory purchaseAmounts) = _batchArrays();
 
         uint256 aggregatedFee;
         uint256 totalPurchase;
@@ -245,7 +245,7 @@ contract NetRedemptionTest is DcaDappTest {
         );
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, address(stablecoin), s_routeIndex)
+            toBatch(_packRows(scheduleIds, purchaseAmounts), address(stablecoin), s_routeIndex)
         );
     }
 
@@ -325,6 +325,18 @@ contract NetRedemptionTest is DcaDappTest {
             scheduleIndexes[i] = i;
             scheduleIds[i] = scheduleIdAt(dcaManager, USER, address(stablecoin), i);
             purchaseAmounts[i] = scheduleAt(dcaManager, USER, address(stablecoin), i).purchaseAmount;
+        }
+    }
+
+    /// @dev Pack each schedule id against its own current purchaseAmount (R66).
+    function _packRows(uint64[] memory scheduleIds, uint256[] memory purchaseAmounts)
+        private
+        pure
+        returns (bytes32[] memory rows)
+    {
+        rows = new bytes32[](scheduleIds.length);
+        for (uint256 i; i < scheduleIds.length; ++i) {
+            rows[i] = packBatchRow(scheduleIds[i], uint96(purchaseAmounts[i]));
         }
     }
 

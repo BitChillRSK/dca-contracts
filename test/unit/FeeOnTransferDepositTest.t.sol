@@ -14,7 +14,7 @@ import {MockFeeOnTransferStablecoin} from "../mocks/MockFeeOnTransferStablecoin.
 import {MockKdocToken} from "../mocks/MockKdocToken.sol";
 import {MockMocProxy} from "../mocks/MockMocProxy.sol";
 import "../Constants.sol";
-import {batchBuyOne, toBatch} from "../utils/BatchBuyOne.sol";
+import {batchOf, toBatch, packBatchRow} from "../utils/BatchBuyOne.sol";
 import {scheduleIdAt, scheduleCount, scheduleAt} from "test/utils/ScheduleAt.sol";
 
 /**
@@ -249,7 +249,7 @@ contract FeeOnTransferDepositTest is Test {
         token.setFeeBps(FEE_BPS);
 
         vm.prank(SWAPPER);
-        batchBuyOne(dcaManager, address(token), scheduleId, IDLE_INDEX);
+        dcaManager.batchBuyRbtc(batchOf(address(token), scheduleId, uint96(MIN_PURCHASE_AMOUNT), IDLE_INDEX));
 
         uint256 afterBuy = REQUESTED - MIN_PURCHASE_AMOUNT;
         assertEq(scheduleAt(dcaManager, USER, address(token), 0).tokenBalance, afterBuy);
@@ -342,14 +342,8 @@ contract FeeOnTransferDepositTest is Test {
         kToken.setMintShortfallBps(FEE_BPS);
         uint64 scheduleId = _createTropykusSchedule(USER, REQUESTED);
 
-        address[] memory buyers = new address[](1);
-        buyers[0] = USER;
-        uint256[] memory indexes = new uint256[](1);
-        indexes[0] = 0;
-        uint64[] memory ids = new uint64[](1);
-        ids[0] = scheduleId;
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = REQUESTED;
+        bytes32[] memory rows = new bytes32[](1);
+        rows[0] = packBatchRow(scheduleId, uint96(REQUESTED));
 
         uint256 availableShares = tropykusHandler.getUserShares(USER);
         uint256 rate = kToken.exchangeRateStored();
@@ -360,7 +354,7 @@ contract FeeOnTransferDepositTest is Test {
                 ITokenLending.TokenLending__InsufficientShares.selector, USER, requestedShares, availableShares
             )
         );
-        dcaManager.batchBuyRbtc(toBatch(ids, address(token), TROPYKUS_INDEX));
+        dcaManager.batchBuyRbtc(toBatch(rows, address(token), TROPYKUS_INDEX));
 
         // Revert leaves the schedule intact; the lending clamp still lets the user withdraw.
         assertEq(scheduleAt(dcaManager, USER, address(token), 0).tokenBalance, REQUESTED);

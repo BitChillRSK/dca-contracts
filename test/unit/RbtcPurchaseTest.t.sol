@@ -9,7 +9,7 @@ import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import {IDcaManagerAccessControl} from "../../src/interfaces/IDcaManagerAccessControl.sol";
-import {batchBuyOne, handlerBatchBuyOne, UNUSED_SCHEDULE_ID, toBatch} from "../utils/BatchBuyOne.sol";
+import {batchOf, handlerBatchBuyOne, UNUSED_SCHEDULE_ID, toBatch, packBatchRow} from "../utils/BatchBuyOne.sol";
 import "../Constants.sol";
 import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
@@ -26,25 +26,32 @@ contract RbtcPurchaseTest is DcaDappTest {
         super.makeSinglePurchase();
     }
 
+    /// @dev R66: a batch row naming no live schedule is skipped, not reverted. A length-1 batch that
+    ///      skips its only row buys nothing and calls no handler, but does not revert.
     function testCannotBuyIfInexistentSchedule() external {
         uint64 wrongScheduleId = UNUSED_SCHEDULE_ID;
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), wrongScheduleId));
+        vm.expectEmit(true, true, false, true, address(dcaManager));
+        emit IDcaManager.DcaManager__PurchaseRowSkipped(
+            address(stablecoin), wrongScheduleId, IDcaManager.PurchaseRowSkipReason.InexistentSchedule
+        );
         buyRbtcOne(wrongScheduleId);
     }
 
     /// @dev A row is one id, and the batch's token is the other half of the key that addresses it.
     ///      A schedule holding another stablecoin is therefore not reachable from this batch at all:
-    ///      the pair addresses empty storage rather than a schedule to debit.
+    ///      the pair addresses empty storage and is skipped the same as a deleted schedule (R66).
     function testCannotBuyIfScheduleHoldsAnotherToken() external {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         address otherToken = makeAddr("someOtherStablecoin");
-        vm.expectRevert(
-            abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, otherToken, scheduleId)
+        vm.expectEmit(true, true, false, true, address(dcaManager));
+        emit IDcaManager.DcaManager__PurchaseRowSkipped(
+            otherToken, scheduleId, IDcaManager.PurchaseRowSkipReason.InexistentSchedule
         );
         vm.prank(SWAPPER);
-        batchBuyOne(dcaManager, otherToken, scheduleId, s_routeIndex);
+        dcaManager.batchBuyRbtc(batchOf(otherToken, scheduleId, 0, s_routeIndex));
     }
 
+    /// @dev R66: a row not yet due is skipped, not reverted.
     function testCannotBuyIfPeriodNotElapsed() external {
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
@@ -54,12 +61,13 @@ contract RbtcPurchaseTest is DcaDappTest {
         vm.stopPrank();
         buyRbtcOne(scheduleId); // first purchase
         IDcaManager.DcaSchedule memory schedule = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        bytes memory encodedRevert = abi.encodeWithSelector(
-            IDcaManager.DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed.selector,
-            _secondsUntilDueUtcDayStart(schedule.lastPurchaseTimestamp, schedule.purchasePeriod)
+        vm.expectEmit(true, true, false, true, address(dcaManager));
+        emit IDcaManager.DcaManager__PurchaseRowSkipped(
+            address(stablecoin), scheduleId, IDcaManager.PurchaseRowSkipReason.PeriodNotElapsed
         );
-        vm.expectRevert(encodedRevert);
-        buyRbtcOne(scheduleId); // second purchase
+        buyRbtcOne(scheduleId); // second purchase, skipped
+        IDcaManager.DcaSchedule memory unchanged = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
+        assertEq(unchanged.lastPurchaseTimestamp, schedule.lastPurchaseTimestamp, "the skipped row is not purchased");
     }
 
     function testBuyAllowedAtUtcDayStartOfDueDay() external {
@@ -81,15 +89,21 @@ contract RbtcPurchaseTest is DcaDappTest {
         vm.warp(firstBuy);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         buyRbtcOne(scheduleId);
+        uint256 lastPurchaseTimestamp =
+            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).lastPurchaseTimestamp;
 
         uint256 dueDayStart = _utcDayStart(firstBuy) + 1 days;
         vm.warp(dueDayStart - 1);
-        bytes memory encodedRevert = abi.encodeWithSelector(
-            IDcaManager.DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed.selector,
-            uint256(1)
+        vm.expectEmit(true, true, false, true, address(dcaManager));
+        emit IDcaManager.DcaManager__PurchaseRowSkipped(
+            address(stablecoin), scheduleId, IDcaManager.PurchaseRowSkipReason.PeriodNotElapsed
         );
-        vm.expectRevert(encodedRevert);
         buyRbtcOne(scheduleId);
+        assertEq(
+            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).lastPurchaseTimestamp,
+            lastPurchaseTimestamp,
+            "the skipped row is not purchased"
+        );
     }
 
     function testUtcDayEarlyBuyConsumesOnePeriodAndBlocksSameDaySecondBuy() external {
@@ -106,12 +120,16 @@ contract RbtcPurchaseTest is DcaDappTest {
         assertEq(schedule.lastPurchaseTimestamp, firstBuy + MIN_PURCHASE_PERIOD);
 
         vm.warp(dueDayStart + 9 hours); // still the due UTC day
-        bytes memory encodedRevert = abi.encodeWithSelector(
-            IDcaManager.DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed.selector,
-            _secondsUntilDueUtcDayStart(schedule.lastPurchaseTimestamp, schedule.purchasePeriod)
+        vm.expectEmit(true, true, false, true, address(dcaManager));
+        emit IDcaManager.DcaManager__PurchaseRowSkipped(
+            address(stablecoin), scheduleId, IDcaManager.PurchaseRowSkipReason.PeriodNotElapsed
         );
-        vm.expectRevert(encodedRevert);
         buyRbtcOne(scheduleId);
+        assertEq(
+            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).lastPurchaseTimestamp,
+            schedule.lastPurchaseTimestamp,
+            "the skipped row is not purchased"
+        );
     }
 
     function testWeeklyBuyAllowedOnDueUtcDay() external {
@@ -192,7 +210,7 @@ contract RbtcPurchaseTest is DcaDappTest {
     }
 
     /**
-     * @notice the DcaManager balance guard fires once a schedule has nothing left to spend.
+     * @notice A schedule with nothing left to spend is skipped rather than failing the batch (R66).
      * @dev The batch path debits each buyer's shares rounded **up** (`_batchRetrieveStablecoin`) and
      *      reverts on a shortfall, where the removed single path clamped to the shares held. On a
      *      live lending fork with a static exchange rate that round-up costs ~1 wei of shares per
@@ -200,7 +218,7 @@ contract RbtcPurchaseTest is DcaDappTest {
      *      before the schedule balance reaches zero. Withdraw the tail instead of spending it, so
      *      this test asserts the DcaManager guard it is named for on every lane.
      */
-    function testRevertPurchasetIfStablecoinRunsOut() external {
+    function testSkipsPurchaseIfStablecoinRunsOut() external {
         uint256 numOfPurchases = AMOUNT_TO_DEPOSIT / AMOUNT_TO_SPEND;
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         for (uint256 i; i < numOfPurchases - 1; ++i) {
@@ -214,12 +232,13 @@ contract RbtcPurchaseTest is DcaDappTest {
         dcaManager.withdrawToken(address(stablecoin), scheduleId, remaining);
         assertEq(scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance, 0);
 
-        // Attempt to purchase once more
-        bytes memory encodedRevert = abi.encodeWithSelector(
-            IDcaManager.DcaManager__ScheduleBalanceNotEnoughForPurchase.selector, address(stablecoin), scheduleId, 0
+        // Attempt to purchase once more: skipped, not reverted
+        vm.expectEmit(true, true, false, true, address(dcaManager));
+        emit IDcaManager.DcaManager__PurchaseRowSkipped(
+            address(stablecoin), scheduleId, IDcaManager.PurchaseRowSkipReason.BalanceInsufficient
         );
-        vm.expectRevert(encodedRevert);
         buyRbtcOne(scheduleId);
+        assertEq(scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance, 0);
     }
 
     function testSeveralPurchasesWithSeveralSchedules() external {
@@ -234,7 +253,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         bytes memory encodedRevert = abi.encodeWithSelector(IDcaManager.DcaManager__UnauthorizedSwapper.selector, USER);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.expectRevert(encodedRevert);
-        batchBuyOne(dcaManager, address(stablecoin), scheduleId, s_routeIndex);
+        dcaManager.batchBuyRbtc(batchOf(address(stablecoin), scheduleId, uint96(AMOUNT_TO_SPEND), s_routeIndex));
         uint256 stablecoinBalanceAfterPurchase = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
         uint256 RbtcBalanceAfterPurchase = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
         vm.stopPrank();
@@ -264,12 +283,11 @@ contract RbtcPurchaseTest is DcaDappTest {
     }
 
     function testBatchPurchaseFailsIfArraysEmpty() external {
-        address[] memory emptyBuyerArray;
-        uint64[] memory emptyScheduleIdArray;
+        bytes32[] memory emptyRows;
         vm.expectRevert(IDcaManager.DcaManager__EmptyBatchPurchaseArrays.selector);
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            toBatch(emptyScheduleIdArray, address(stablecoin), s_routeIndex)
+            toBatch(emptyRows, address(stablecoin), s_routeIndex)
         );
     }
 
@@ -286,7 +304,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         uint256 balanceBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
 
         vm.prank(SWAPPER);
-        batchBuyOne(dcaManager, address(stablecoin), scheduleId, s_routeIndex);
+        dcaManager.batchBuyRbtc(batchOf(address(stablecoin), scheduleId, uint96(editedAmount), s_routeIndex));
 
         assertEq(
             scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance,
@@ -296,31 +314,31 @@ contract RbtcPurchaseTest is DcaDappTest {
     }
 
     function testBatchPurchaseFailsIfRouteIndexMismatch() external {
-        uint64[] memory scheduleIds = new uint64[](1);
-        scheduleIds[0] = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.expectRevert(
             abi.encodeWithSelector(
                 IDcaManager.DcaManager__RouteIndexMismatch.selector,
                 address(stablecoin),
-                scheduleIds[0],
+                scheduleId,
                 s_routeIndex,
                 s_routeIndex + 1
             )
         );
         vm.prank(SWAPPER);
-        dcaManager.batchBuyRbtc(toBatch(scheduleIds, address(stablecoin), s_routeIndex + 1));
+        dcaManager.batchBuyRbtc(batchOf(address(stablecoin), scheduleId, uint96(AMOUNT_TO_SPEND), s_routeIndex + 1));
     }
 
     /// @dev A batch carries a single array, so there are no two lengths left to disagree. What the
     ///      manager still refuses is a batch that names no rows at all.
     function testBatchPurchaseFailsIfTheBatchIsEmpty() external {
-        uint64[] memory noScheduleIds = new uint64[](0);
+        bytes32[] memory emptyRows;
         vm.expectRevert(IDcaManager.DcaManager__EmptyBatchPurchaseArrays.selector);
         vm.prank(SWAPPER);
-        dcaManager.batchBuyRbtc(toBatch(noScheduleIds, address(stablecoin), s_routeIndex));
+        dcaManager.batchBuyRbtc(toBatch(emptyRows, address(stablecoin), s_routeIndex));
     }
 
-    function testPurchaseFailsIfTheIdBelongsToNoSchedule() external {
+    /// @dev R66: an id that belongs to no schedule is skipped, not reverted.
+    function testPurchaseSkipsIfTheIdBelongsToNoSchedule() external {
         uint64 scheduleId = UNUSED_SCHEDULE_ID;
 
         vm.startPrank(USER);
@@ -328,7 +346,10 @@ contract RbtcPurchaseTest is DcaDappTest {
         uint256 rbtcBalanceBeforePurchase = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
         vm.stopPrank();
 
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), scheduleId));
+        vm.expectEmit(true, true, false, true, address(dcaManager));
+        emit IDcaManager.DcaManager__PurchaseRowSkipped(
+            address(stablecoin), scheduleId, IDcaManager.PurchaseRowSkipReason.InexistentSchedule
+        );
         buyRbtcOne(scheduleId);
 
         vm.startPrank(USER);
@@ -341,7 +362,9 @@ contract RbtcPurchaseTest is DcaDappTest {
         assertEq(rbtcBalanceAfterPurchase - rbtcBalanceBeforePurchase, 0);
     }
 
-    function testBatchPurchaseFailsIfAnIdBelongsToNoSchedule() external {
+    /// @dev R66: every row in this batch names the same nonexistent id, so every row is skipped and
+    ///      the call itself does not revert.
+    function testBatchPurchaseSkipsIfAnIdBelongsToNoSchedule() external {
         super.createSeveralDcaSchedules();
 
         uint64 scheduleId = UNUSED_SCHEDULE_ID;
@@ -350,14 +373,17 @@ contract RbtcPurchaseTest is DcaDappTest {
         vm.prank(USER);
         uint256 userAccumulatedRbtcPrev = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
         // Every row names the same id, and it belongs to no schedule
-        uint64[] memory scheduleIds = new uint64[](NUM_OF_SCHEDULES);
+        bytes32[] memory rows = new bytes32[](NUM_OF_SCHEDULES);
         for (uint8 i; i < NUM_OF_SCHEDULES; ++i) {
-            scheduleIds[i] = scheduleId;
+            rows[i] = packBatchRow(scheduleId, 0);
         }
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), scheduleId));
+        vm.expectEmit(true, true, false, true, address(dcaManager));
+        emit IDcaManager.DcaManager__PurchaseRowSkipped(
+            address(stablecoin), scheduleId, IDcaManager.PurchaseRowSkipReason.InexistentSchedule
+        );
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, address(stablecoin), s_routeIndex)
+            toBatch(rows, address(stablecoin), s_routeIndex)
         );
 
         uint256 postStablecoinHandlerBalance = address(stablecoinHandler).balance;
@@ -424,23 +450,24 @@ contract RbtcPurchaseTest is DcaDappTest {
 
         // Perform the required number of purchase rounds
         for (uint256 round; round < purchasesPerSchedule; ++round) {
-            // Build the batch's only array: one id per row
-            uint64[] memory scheduleIds = new uint64[](totalSchedules);
+            // Build the batch's only array: one packed row per schedule, all sharing AMOUNT_TO_SPEND
+            bytes32[] memory rows = new bytes32[](totalSchedules);
 
             uint256 idx;
             for (uint256 i; i < SCHEDULES_PER_USER; ++i) {
-                scheduleIds[idx] = scheduleIdAt(dcaManager, USER, address(stablecoin), i);
+                rows[idx] = packBatchRow(scheduleIdAt(dcaManager, USER, address(stablecoin), i), uint96(AMOUNT_TO_SPEND));
                 ++idx;
             }
             for (uint256 i; i < SCHEDULES_PER_USER; ++i) {
-                scheduleIds[idx] = scheduleIdAt(dcaManager, SECOND_USER, address(stablecoin), i);
+                rows[idx] =
+                    packBatchRow(scheduleIdAt(dcaManager, SECOND_USER, address(stablecoin), i), uint96(AMOUNT_TO_SPEND));
                 ++idx;
             }
 
             // Execute batch purchase as SWAPPER
             vm.prank(SWAPPER);
             dcaManager.batchBuyRbtc(
-                toBatch(scheduleIds, address(stablecoin), s_routeIndex)
+                toBatch(rows, address(stablecoin), s_routeIndex)
             );
 
             // Advance time and update exchange rate so future purchases are allowed and interest accrues
@@ -450,11 +477,11 @@ contract RbtcPurchaseTest is DcaDappTest {
         // After time has passed and multiple purchase rounds, check that interest has accrued
         uint256 finalInterestUser = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
         uint256 finalInterestSecondUser = dcaManager.getInterestAccrued(SECOND_USER, address(stablecoin), s_routeIndex);
-        
+
         // Both users should have accrued some interest during the test
         assertGt(finalInterestUser, initialInterestUser, "USER should have accrued interest during the test");
         assertGt(finalInterestSecondUser, initialInterestSecondUser, "SECOND_USER should have accrued interest during the test");
-        
+
         // The interest should be positive (greater than 0) since time has passed
         assertGt(finalInterestUser, 0, "USER should have positive interest after time passage");
         assertGt(finalInterestSecondUser, 0, "SECOND_USER should have positive interest after time passage");
@@ -625,23 +652,24 @@ contract RbtcPurchaseTest is DcaDappTest {
 
         // Perform the required number of purchase rounds
         for (uint256 round; round < purchasesPerSchedule; ++round) {
-            // Build the batch's only array: one id per row
-            uint64[] memory scheduleIds = new uint64[](totalSchedules);
+            // Build the batch's only array: one packed row per schedule, all sharing AMOUNT_TO_SPEND
+            bytes32[] memory rows = new bytes32[](totalSchedules);
 
             uint256 idx;
             for (uint256 i; i < SCHEDULES_PER_USER; ++i) {
-                scheduleIds[idx] = scheduleIdAt(dcaManager, USER, address(stablecoin), i);
+                rows[idx] = packBatchRow(scheduleIdAt(dcaManager, USER, address(stablecoin), i), uint96(AMOUNT_TO_SPEND));
                 ++idx;
             }
             for (uint256 i; i < SCHEDULES_PER_USER; ++i) {
-                scheduleIds[idx] = scheduleIdAt(dcaManager, SECOND_USER, address(stablecoin), i);
+                rows[idx] =
+                    packBatchRow(scheduleIdAt(dcaManager, SECOND_USER, address(stablecoin), i), uint96(AMOUNT_TO_SPEND));
                 ++idx;
             }
 
             // Execute batch purchase as SWAPPER
             vm.prank(SWAPPER);
             dcaManager.batchBuyRbtc(
-                toBatch(scheduleIds, address(stablecoin), s_routeIndex)
+                toBatch(rows, address(stablecoin), s_routeIndex)
             );
 
             // Withdrawing interest should not revert
@@ -702,13 +730,4 @@ contract RbtcPurchaseTest is DcaDappTest {
         return candidate;
     }
 
-    function _secondsUntilDueUtcDayStart(uint256 lastPurchaseTimestamp, uint256 purchasePeriod)
-        private
-        view
-        returns (uint256)
-    {
-        uint256 nextDueTimestamp = lastPurchaseTimestamp + purchasePeriod;
-        uint256 nextPurchaseDayStart = _utcDayStart(nextDueTimestamp);
-        return nextPurchaseDayStart - block.timestamp;
-    }
 }

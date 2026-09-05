@@ -150,8 +150,12 @@ contract OperationsAdminTest is DcaDappTest {
         vm.prank(OWNER);
         operationsAdmin.revokeSwapper(SWAPPER);
 
+        // Built before arming the cheatcode: buyRbtcOne's own getDcaSchedule read would otherwise
+        // consume this expectRevert before the purchase call it is meant for.
+        IDcaManager.Batch memory batch = currentBatch(scheduleId);
         vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__UnauthorizedSwapper.selector, SWAPPER));
-        buyRbtcOne(scheduleId);
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(batch);
     }
 
     function testReregisteringAnyIndexReverts() external {

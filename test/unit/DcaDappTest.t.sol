@@ -33,7 +33,7 @@ import "./TestsHelper.t.sol";
 import {IkToken} from "../../src/tropykus-legacy/IkToken.sol";
 import {IiSusdToken} from "../../src/sovryn/IiSusdToken.sol";
 import {IPurchaseUniswap} from "../../src/interfaces/IPurchaseUniswap.sol";
-import {batchBuyOne, toBatch} from "../utils/BatchBuyOne.sol";
+import {batchOf, toBatch, packBatchRow} from "../utils/BatchBuyOne.sol";
 import {scheduleAt, scheduleIdAt, scheduleCount} from "test/utils/ScheduleAt.sol";
 
 contract DcaDappTest is Test {
@@ -511,13 +511,36 @@ contract DcaDappTest is Test {
     }
 
     /**
-     * @notice The one-schedule purchase path after R39 removed `buyRbtc`: a length-1 `batchBuyRbtc`.
-     * @dev Makes no call before the prank, so a caller's `vm.expectEmit` / `vm.expectRevert` still
-     *      lands on the batch call itself. The manager reads the amount from the schedule by id.
+     * @notice The one-schedule purchase path after R39 removed `buyRbtc`: a length-1 `batchBuyRbtc`,
+     *         packing the row against the schedule's *current* stored `purchaseAmount` (R66).
+     * @dev Reads the schedule and sends the purchase itself, in that order. Do **not** call this after
+     *      arming `vm.expectRevert` / `vm.expectEmit`: the read is an external `view` call that would
+     *      consume the cheatcode before the purchase call it is meant for. A caller that needs to
+     *      expect something on the purchase must build with `currentBatch` first, arm the cheatcode,
+     *      then call `dcaManager.batchBuyRbtc(batch)` directly.
      */
     function buyRbtcOne(uint64 scheduleId) internal {
+        IDcaManager.Batch memory batch = currentBatch(scheduleId);
         vm.prank(SWAPPER);
-        batchBuyOne(dcaManager, address(stablecoin), scheduleId, s_routeIndex);
+        dcaManager.batchBuyRbtc(batch);
+    }
+
+    /**
+     * @notice Build the length-1 `Batch` `buyRbtcOne` would send, reading the schedule's current
+     *         `purchaseAmount` now. A caller that needs to arm `vm.expectRevert` / `vm.expectEmit` on
+     *         the purchase call must do so *after* calling this and *before* calling
+     *         `dcaManager.batchBuyRbtc` directly — this function's own read must not sit between the
+     *         cheatcode and the purchase.
+     * @dev `getDcaSchedule` reverts on an id that addresses no live schedule; a caller building a row
+     *      for exactly that id (an unused or deleted id) wants the row packed anyway, so the manager
+     *      can skip it as `InexistentSchedule` rather than this helper reverting first.
+     */
+    function currentBatch(uint64 scheduleId) internal view returns (IDcaManager.Batch memory) {
+        uint96 expectedAmount;
+        try dcaManager.getDcaSchedule(address(stablecoin), scheduleId) returns (IDcaManager.DcaSchedule memory schedule) {
+            expectedAmount = schedule.purchaseAmount;
+        } catch {}
+        return batchOf(address(stablecoin), scheduleId, expectedAmount, s_routeIndex);
     }
 
     function makeSinglePurchase() internal {
@@ -655,6 +678,7 @@ contract DcaDappTest is Test {
         vm.prank(USER);
         uint256 userAccumulatedRbtcPrev = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
         uint64[] memory scheduleIds = new uint64[](NUM_OF_SCHEDULES);
+        bytes32[] memory rows = new bytes32[](NUM_OF_SCHEDULES);
 
         uint256 totalNetPurchaseAmount;
         uint256 totalFee;
@@ -667,6 +691,7 @@ contract DcaDappTest is Test {
             totalNetPurchaseAmount += schedule.purchaseAmount - fee;
             totalFee += fee;
             scheduleIds[i] = scheduleIdAt(dcaManager, USER, address(stablecoin), i);
+            rows[i] = packBatchRow(scheduleIds[i], schedule.purchaseAmount);
         }
         // After R1 the batch event's measured DOC is in data, not a topic. expectEmit
         // cannot check that: data is exact, and on a live iSUSD fork tokenPrice
@@ -693,7 +718,7 @@ contract DcaDappTest is Test {
 
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, address(stablecoin), s_routeIndex)
+            toBatch(rows, address(stablecoin), s_routeIndex)
         );
 
         if (isLendingLane) {
@@ -727,7 +752,7 @@ contract DcaDappTest is Test {
         vm.recordLogs();
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, address(stablecoin), s_routeIndex)
+            toBatch(rows, address(stablecoin), s_routeIndex)
         );
         
         uint256 postStablecoinHandlerBalance2;

@@ -15,7 +15,7 @@ import {MockMocOracle} from "../../../mocks/MockMocOracle.sol";
 import {MockSwapRouter02} from "../../../mocks/MockSwapRouter02.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../../../Constants.sol";
-import {handlerBatchBuyOne, NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
+import {handlerBatchBuyOne, NO_MIN_RBTC_OUT_RATE} from "test/utils/BatchBuyOne.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {ownableUnauthorized} from "../../../utils/OzRevert.sol";
 
@@ -469,7 +469,7 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         
         // Call batchBuyRbtc, which redeems shares through _batchRetrieveStablecoin
         vm.prank(address(dcaManager));
-        tropykusDexHandler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT);
+        tropykusDexHandler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT_RATE);
         
         // Verify the shares were redeemed - lending balances should be reduced
         uint256 finalBalance1 = tropykusDexHandler.getUserShares(user1);
