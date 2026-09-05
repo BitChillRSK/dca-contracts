@@ -25,27 +25,6 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     using SafeCast for uint256;
 
     /*//////////////////////////////////////////////////////////////
-                           TYPE DECLARATIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @dev Storage-only schedule shape. The public getters return `DcaSchedule`, adding the id back
-     *      from the mapping key. Neither the id nor the owner is repeated here, keeping this value at
-     *      two slots. Slot 0 contains every field a purchase reads or writes, so a purchase writes one
-     *      slot. Slot 1 pairs `token` with a `uint96 purchaseAmount`; widening it would add a third slot.
-     *      A live schedule always has a non-zero token, which is the existence sentinel.
-     */
-    struct StoredSchedule {
-        uint128 tokenBalance;
-        uint48 lastPurchaseTimestamp;
-        bool paused;
-        uint32 purchasePeriod;
-        uint32 routeIndex;
-        address token;
-        uint96 purchaseAmount;
-    }
-
-    /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
@@ -54,13 +33,18 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     OperationsAdmin private immutable i_operationsAdmin;
 
     /**
-     * @notice Every schedule, addressed by the id it was created with and the account that owns it.
-     * @dev The owner is half the key rather than a field, which is what makes ownership unforgeable:
-     *      a caller reaching `s_dcaSchedules[scheduleId][msg.sender]` cannot land on somebody else's
-     *      schedule, so there is no owner check to write and none to forget. It also keeps the struct
-     *      at two slots, since only the stablecoin has to be carried.
+     * @notice The schedules that spend each stablecoin, addressed by the id each was created with.
+     * @dev Keyed by the stablecoin first because that is how the work arrives: a purchase batch is one
+     *      handler's, so one stablecoin's, and the rows in it are ids. Ids are a protocol-wide creation
+     *      nonce rather than a per-token counter, so the outer key partitions the id space rather than
+     *      namespacing it — no two live schedules share an id, whatever stablecoin they spend.
+     *
+     *      Holding the stablecoin in the key is what keeps the value at two slots, and it makes a batch
+     *      row's stablecoin structural: a row naming a schedule of a different one addresses nothing
+     *      and is refused, rather than being caught by a comparison after the fact. The owner is the
+     *      field that pays for it, and `_callersSchedule` is the single place it is checked.
      */
-    mapping(uint64 scheduleId => mapping(address user => StoredSchedule dcaSchedule)) private s_dcaSchedules;
+    mapping(address token => mapping(uint64 scheduleId => DcaSchedule dcaSchedule)) private s_dcaSchedules;
 
     /**
      * @notice The ids each user holds for each stablecoin.
@@ -132,10 +116,9 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @inheritdoc IDcaManager
      * @dev Widths are checked before the handler pull so an overflowing credit cannot move tokens.
      */
-    function depositToken(uint64 scheduleId, uint256 depositAmount) external override nonReentrant {
+    function depositToken(address token, uint64 scheduleId, uint256 depositAmount) external override nonReentrant {
         _validateDeposit(depositAmount);
-        StoredSchedule storage dcaSchedule = _callersSchedule(scheduleId);
-        address token = dcaSchedule.token;
+        DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
         uint128 newTokenBalance = (uint256(dcaSchedule.tokenBalance) + depositAmount.toUint128()).toUint128();
         _handlerForDeposit(token, dcaSchedule.routeIndex).depositToken(msg.sender, depositAmount);
         dcaSchedule.tokenBalance = newTokenBalance;
@@ -145,9 +128,12 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     /**
      * @inheritdoc IDcaManager
      */
-    function updatePurchaseAmount(uint64 scheduleId, uint256 newPurchaseAmount) external override nonReentrant {
-        StoredSchedule storage dcaSchedule = _callersSchedule(scheduleId);
-        address token = dcaSchedule.token;
+    function updatePurchaseAmount(address token, uint64 scheduleId, uint256 newPurchaseAmount)
+        external
+        override
+        nonReentrant
+    {
+        DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
         uint96 newAmount = newPurchaseAmount.toUint96();
         _validatePurchaseAmount(token, newAmount, dcaSchedule.tokenBalance);
         uint256 previousPurchaseAmount = dcaSchedule.purchaseAmount;
@@ -158,8 +144,12 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     /**
      * @inheritdoc IDcaManager
      */
-    function updatePurchasePeriod(uint64 scheduleId, uint256 newPurchasePeriod) external override nonReentrant {
-        StoredSchedule storage dcaSchedule = _callersSchedule(scheduleId);
+    function updatePurchasePeriod(address token, uint64 scheduleId, uint256 newPurchasePeriod)
+        external
+        override
+        nonReentrant
+    {
+        DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
         _validatePurchasePeriod(newPurchasePeriod);
         uint256 previousPurchasePeriod = dcaSchedule.purchasePeriod;
         dcaSchedule.purchasePeriod = newPurchasePeriod.toUint32();
@@ -169,8 +159,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     /**
      * @inheritdoc IDcaManager
      */
-    function setSchedulePaused(uint64 scheduleId, bool paused) external override nonReentrant {
-        StoredSchedule storage dcaSchedule = _callersSchedule(scheduleId);
+    function setSchedulePaused(address token, uint64 scheduleId, bool paused) external override nonReentrant {
+        DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
         if (dcaSchedule.paused == paused) return;
         dcaSchedule.paused = paused;
         emit DcaManager__SchedulePauseSet(msg.sender, scheduleId, paused);
@@ -188,8 +178,9 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         uint256 purchasePeriod,
         uint256 routeIndex
     ) external override nonReentrant {
-        // A zero token is the empty-value sentinel for the id/user mapping and can never be live,
-        // even if governance mistakenly assigned a handler to that pair.
+        // The zero address is a valid mapping key but never a stablecoin. Refusing it here keeps
+        // "a schedule's token is a token" true for every consumer, and cannot be undone later:
+        // a schedule's stablecoin is fixed at creation and route assignment is add-only.
         if (token == address(0)) revert DcaManager__TokenNotAccepted(token, routeIndex);
         uint128 deposit = depositAmount.toUint128();
         uint96 purchase = purchaseAmount.toUint96();
@@ -215,13 +206,13 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
 
         s_protocolSettings.scheduleNonce = scheduleId;
 
-        s_dcaSchedules[scheduleId][msg.sender] = StoredSchedule({
+        s_dcaSchedules[token][scheduleId] = DcaSchedule({
             tokenBalance: deposit,
             lastPurchaseTimestamp: 0,
             paused: false,
             purchasePeriod: period,
             routeIndex: route,
-            token: token,
+            user: msg.sender,
             purchaseAmount: purchase
         });
         scheduleIds.push(scheduleId);
@@ -239,17 +230,16 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     /**
      * @inheritdoc IDcaManager
      */
-    function deleteDcaSchedule(uint64 scheduleId) external override nonReentrant {
-        StoredSchedule memory dcaSchedule = _callersSchedule(scheduleId);
+    function deleteDcaSchedule(address token, uint64 scheduleId) external override nonReentrant {
+        DcaSchedule memory dcaSchedule = _callersSchedule(token, scheduleId);
 
-        address token = dcaSchedule.token;
         uint256 tokenBalance = dcaSchedule.tokenBalance;
         uint256 routeIndex = dcaSchedule.routeIndex;
 
         // Both structures drop the schedule before the handler call: the schedule itself, and the id's
         // place in its owner's list for this token.
         _removeScheduleId(msg.sender, token, scheduleId);
-        delete s_dcaSchedules[scheduleId][msg.sender];
+        delete s_dcaSchedules[token][scheduleId];
 
         uint256 amountWithdrawn;
         if (tokenBalance > 0) {
@@ -263,8 +253,12 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     /**
      * @inheritdoc IDcaManager
      */
-    function withdrawToken(uint64 scheduleId, uint256 withdrawalAmount) external override nonReentrant {
-        _withdrawToken(scheduleId, withdrawalAmount);
+    function withdrawToken(address token, uint64 scheduleId, uint256 withdrawalAmount)
+        external
+        override
+        nonReentrant
+    {
+        _withdrawToken(token, scheduleId, withdrawalAmount);
     }
 
     /**
@@ -311,12 +305,12 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      * @inheritdoc IDcaManager
      * @dev The route index is captured from the schedule before the handler call.
      */
-    function withdrawTokenAndInterest(uint64 scheduleId, uint256 withdrawalAmount)
+    function withdrawTokenAndInterest(address token, uint64 scheduleId, uint256 withdrawalAmount)
         external
         override
         nonReentrant
     {
-        (address token, uint256 routeIndex) = _withdrawToken(scheduleId, withdrawalAmount);
+        uint256 routeIndex = _withdrawToken(token, scheduleId, withdrawalAmount);
         _checkTokenYieldsInterest(token, routeIndex);
         _withdrawInterest(ITokenLending(address(_handler(token, routeIndex))), token, routeIndex);
     }
@@ -327,9 +321,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      *      schedule's claim over it is a storage write; the accrued-interest call only reads, and never
      *      redeems, mints, or transfers. On a market that accrues lazily that read also pokes the accrual.
      */
-    function topUpFromInterest(uint64 scheduleId, uint256 amount) external override nonReentrant {
-        StoredSchedule storage dcaSchedule = _callersSchedule(scheduleId);
-        address token = dcaSchedule.token;
+    function topUpFromInterest(address token, uint64 scheduleId, uint256 amount) external override nonReentrant {
+        DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
         uint256 routeIndex = dcaSchedule.routeIndex;
         _checkTokenYieldsInterest(token, routeIndex);
 
@@ -419,10 +412,10 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     /**
      * @inheritdoc IDcaManager
      */
-    function getDcaSchedule(address user, uint64 scheduleId) external view override returns (DcaSchedule memory) {
-        StoredSchedule memory dcaSchedule = s_dcaSchedules[scheduleId][user];
-        if (dcaSchedule.token == address(0)) revert DcaManager__InexistentSchedule(user, scheduleId);
-        return _toDcaSchedule(scheduleId, dcaSchedule);
+    function getDcaSchedule(address token, uint64 scheduleId) external view override returns (DcaSchedule memory) {
+        DcaSchedule memory dcaSchedule = s_dcaSchedules[token][scheduleId];
+        if (dcaSchedule.user == address(0)) revert DcaManager__InexistentSchedule(token, scheduleId);
+        return dcaSchedule;
     }
 
     /**
@@ -432,14 +425,13 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         external
         view
         override
-        returns (DcaSchedule[] memory schedules)
+        returns (uint64[] memory scheduleIds, DcaSchedule[] memory schedules)
     {
-        uint64[] storage scheduleIds = s_scheduleIds[user][token];
+        scheduleIds = s_scheduleIds[user][token];
         uint256 numOfSchedules = scheduleIds.length;
         schedules = new DcaSchedule[](numOfSchedules);
         for (uint256 i; i < numOfSchedules; ++i) {
-            uint64 scheduleId = scheduleIds[i];
-            schedules[i] = _toDcaSchedule(scheduleId, s_dcaSchedules[scheduleId][user]);
+            schedules[i] = s_dcaSchedules[token][scheduleIds[i]];
         }
     }
 
@@ -524,55 +516,44 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
     function _batchBuyRbtc(Batch calldata batch) private {
         uint256 numOfPurchases = batch.scheduleIds.length;
         if (numOfPurchases == 0) revert DcaManager__EmptyBatchPurchaseArrays();
-        if (numOfPurchases != batch.buyers.length) revert DcaManager__ArraysLengthMismatch();
-        // What each row spends is read from its schedule, never taken from the caller, so the handler
-        // is paid the amounts the ledger holds and a batch cannot spend one the schedule does not.
+        // What each row spends, and who it is bought for, are read from the schedule rather than taken
+        // from the caller: the handler is paid the amounts the ledger holds and credits the accounts
+        // the ledger names, so a batch can neither spend an amount a schedule does not hold nor send
+        // one account's rBTC to another.
+        address[] memory buyers = new address[](numOfPurchases);
         uint256[] memory purchaseAmounts = new uint256[](numOfPurchases);
         for (uint256 i; i < numOfPurchases; ++i) {
-            (uint256 schedulePurchaseAmount, uint256 scheduleRouteIndex) =
-                _rBtcPurchaseChecksEffects(batch.scheduleIds[i], batch.buyers[i], batch.token);
+            (address buyer, uint256 schedulePurchaseAmount, uint256 scheduleRouteIndex) =
+                _rBtcPurchaseChecksEffects(batch.token, batch.scheduleIds[i]);
             if (scheduleRouteIndex != batch.routeIndex) {
                 revert DcaManager__RouteIndexMismatch(
-                    batch.buyers[i], batch.token, batch.scheduleIds[i], scheduleRouteIndex, batch.routeIndex
+                    batch.token, batch.scheduleIds[i], scheduleRouteIndex, batch.routeIndex
                 );
             }
+            buyers[i] = buyer;
             purchaseAmounts[i] = schedulePurchaseAmount;
         }
         IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex))).batchBuyRbtc(
-            batch.buyers, batch.scheduleIds, purchaseAmounts, batch.minRbtcOut
+            buyers, batch.scheduleIds, purchaseAmounts, batch.minRbtcOut
         );
     }
 
     /**
-     * @dev Resolve one of the caller's schedules by id. There is no ownership check here and none is
-     *      possible to omit elsewhere: `msg.sender` is half the key, so a caller naming another
-     *      account's schedule reads an empty struct and is refused as an id they do not hold. A live
-     *      schedule always has a non-zero `token`.
+     * @dev Resolve one of the caller's schedules. This is the ownership check, and it is the only one
+     *      in this contract: every user-facing mutator reaches a schedule through here, so the check
+     *      cannot be present in one path and forgotten in another. Nothing else may read
+     *      `s_dcaSchedules` on a caller's behalf. A live schedule always has a non-zero `user`, so a
+     *      pair that addresses nothing is refused before the owner is compared.
      */
-    function _callersSchedule(uint64 scheduleId) private view returns (StoredSchedule storage dcaSchedule) {
-        dcaSchedule = s_dcaSchedules[scheduleId][msg.sender];
-        if (dcaSchedule.token == address(0)) revert DcaManager__InexistentSchedule(msg.sender, scheduleId);
-    }
-
-    /**
-     * @dev Put a stored schedule into the shape the getters return, which is the stored fields plus the
-     *      half of its key that storage does not repeat.
-     */
-    function _toDcaSchedule(uint64 scheduleId, StoredSchedule memory dcaSchedule)
+    function _callersSchedule(address token, uint64 scheduleId)
         private
-        pure
-        returns (DcaSchedule memory)
+        view
+        returns (DcaSchedule storage dcaSchedule)
     {
-        return DcaSchedule({
-            scheduleId: scheduleId,
-            tokenBalance: dcaSchedule.tokenBalance,
-            lastPurchaseTimestamp: dcaSchedule.lastPurchaseTimestamp,
-            paused: dcaSchedule.paused,
-            purchasePeriod: dcaSchedule.purchasePeriod,
-            routeIndex: dcaSchedule.routeIndex,
-            token: dcaSchedule.token,
-            purchaseAmount: dcaSchedule.purchaseAmount
-        });
+        dcaSchedule = s_dcaSchedules[token][scheduleId];
+        address owner = dcaSchedule.user;
+        if (owner == address(0)) revert DcaManager__InexistentSchedule(token, scheduleId);
+        if (owner != msg.sender) revert DcaManager__NotScheduleOwner(token, scheduleId, owner);
     }
 
     /**
@@ -592,7 +573,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
                 return;
             }
         }
-        revert DcaManager__InexistentSchedule(user, scheduleId);
+        revert DcaManager__InexistentSchedule(token, scheduleId);
     }
 
     /**
@@ -672,26 +653,24 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
 
     /**
      * @dev Checks and effects of one purchase row, before the handler interaction.
-     *      The `(scheduleId, buyer)` pair is the storage key, so a row naming a schedule the buyer does
-     *      not hold reads as an empty struct and is refused here rather than debiting anything. The
-     *      stablecoin is checked for the same reason the key used to guarantee it: a schedule of
-     *      another token must not be debited while the handler for this batch's token does the buying.
-     *      The route comparison stays with the caller, which is where its error is raised.
-     * @return The schedule's purchase amount and route index.
+     *      The `(token, scheduleId)` pair is the storage key, so a row of another stablecoin addresses
+     *      nothing and is refused here rather than being debited by a handler that never held its
+     *      funds — the stablecoin check is the lookup itself rather than a comparison after it. No
+     *      owner is supplied by the caller either: the account credited with the purchase is read from
+     *      the schedule. The route comparison stays with the caller, which is where its error is raised.
+     * @return The schedule's owner, purchase amount and route index.
      */
-    function _rBtcPurchaseChecksEffects(uint64 scheduleId, address buyer, address token)
+    function _rBtcPurchaseChecksEffects(address token, uint64 scheduleId)
         private
-        returns (uint256, uint256)
+        returns (address, uint256, uint256)
     {
-        StoredSchedule storage dcaScheduleStorage = s_dcaSchedules[scheduleId][buyer];
-        StoredSchedule memory dcaSchedule = dcaScheduleStorage;
+        DcaSchedule storage dcaScheduleStorage = s_dcaSchedules[token][scheduleId];
+        DcaSchedule memory dcaSchedule = dcaScheduleStorage;
 
-        if (dcaSchedule.token == address(0)) revert DcaManager__InexistentSchedule(buyer, scheduleId);
-        if (dcaSchedule.token != token) {
-            revert DcaManager__ScheduleTokenMismatch(buyer, scheduleId, token, dcaSchedule.token);
-        }
+        address buyer = dcaSchedule.user;
+        if (buyer == address(0)) revert DcaManager__InexistentSchedule(token, scheduleId);
 
-        if (dcaSchedule.paused) revert DcaManager__SchedulePaused(buyer, token, scheduleId);
+        if (dcaSchedule.paused) revert DcaManager__SchedulePaused(token, scheduleId);
 
         uint256 lastPurchaseTimestamp = dcaSchedule.lastPurchaseTimestamp;
         uint256 purchasePeriod = dcaSchedule.purchasePeriod;
@@ -707,9 +686,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         }
 
         if (dcaSchedule.purchaseAmount > dcaSchedule.tokenBalance) {
-            revert DcaManager__ScheduleBalanceNotEnoughForPurchase(
-                buyer, scheduleId, token, dcaSchedule.tokenBalance
-            );
+            revert DcaManager__ScheduleBalanceNotEnoughForPurchase(token, scheduleId, dcaSchedule.tokenBalance);
         }
         dcaSchedule.tokenBalance -= dcaSchedule.purchaseAmount;
         dcaScheduleStorage.tokenBalance = dcaSchedule.tokenBalance;
@@ -732,21 +709,19 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         dcaScheduleStorage.lastPurchaseTimestamp = newTimestamp.toUint48();
         emit DcaManager__LastPurchaseTimestampUpdated(token, scheduleId, newTimestamp);
 
-        return (dcaSchedule.purchaseAmount, dcaSchedule.routeIndex);
+        return (buyer, dcaSchedule.purchaseAmount, dcaSchedule.routeIndex);
     }
 
     /**
      * @dev Withdraw principal from one schedule. Debits the requested amount, not what the handler
      *      paid out. `type(uint256).max` means this schedule's whole `tokenBalance`.
-     * @return token The schedule's stablecoin, and `routeIndex` its stored route, both captured
-     *         before the handler call.
+     * @return routeIndex The schedule's stored route, captured before the handler call.
      */
-    function _withdrawToken(uint64 scheduleId, uint256 withdrawalAmount)
+    function _withdrawToken(address token, uint64 scheduleId, uint256 withdrawalAmount)
         private
-        returns (address token, uint256 routeIndex)
+        returns (uint256 routeIndex)
     {
-        StoredSchedule storage dcaSchedule = _callersSchedule(scheduleId);
-        token = dcaSchedule.token;
+        DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
         uint256 tokenBalance = dcaSchedule.tokenBalance;
         if (withdrawalAmount == type(uint256).max) withdrawalAmount = tokenBalance;
         if (withdrawalAmount == 0) revert DcaManager__WithdrawalAmountMustBeGreaterThanZero();
@@ -774,7 +749,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         uint256 numOfSchedules = scheduleIds.length;
         for (uint256 i; i < numOfSchedules; ++i) {
             // `routeIndex` and `tokenBalance` share slot 0, so each schedule costs one read here.
-            StoredSchedule storage dcaSchedule = s_dcaSchedules[scheduleIds[i]][user];
+            DcaSchedule storage dcaSchedule = s_dcaSchedules[token][scheduleIds[i]];
             if (dcaSchedule.routeIndex == routeIndex) {
                 lockedTokenAmount += dcaSchedule.tokenBalance;
             }
