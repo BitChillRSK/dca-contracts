@@ -13,8 +13,8 @@ import {NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
 
 /**
  * @title PurchaseRbtcTest
- * @notice Base-level coverage for the shared batch purchase algorithm, independent of
- *         MoC/Uniswap cash measurement.
+ * @notice Base-level coverage for the shared batch purchase algorithm, including exact venue-input
+ *         consumption independently of MoC and Uniswap.
  */
 contract PurchaseRbtcTest is Test {
     event PurchaseRbtc__RbtcBought(
@@ -130,6 +130,32 @@ contract PurchaseRbtcTest is Test {
         );
         harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(100 ether), NO_MIN_RBTC_OUT);
 
+        assertEq(harness.getAccumulatedRbtcBalance(buyerA), 0);
+    }
+
+    function test_lengthOneBatch_partialInputConsumptionRevertsAndRollsBack() public {
+        uint256 requested = 100 ether;
+        uint256 fee = _fee(requested);
+        uint256 net = requested - fee;
+        uint256 partialAmount = net - 1 ether;
+        harness.setPurchaseInputOverride(partialAmount);
+
+        uint256 handlerBalanceBefore = token.balanceOf(address(harness));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPurchaseRbtc.PurchaseRbtc__InputAmountNotFullySpent.selector,
+                net,
+                handlerBalanceBefore - fee,
+                handlerBalanceBefore - fee - partialAmount
+            )
+        );
+        harness.batchBuyRbtc(
+            _oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested), NO_MIN_RBTC_OUT
+        );
+
+        assertEq(token.balanceOf(address(harness)), handlerBalanceBefore);
+        assertEq(token.balanceOf(feeCollector), 0);
+        assertEq(token.balanceOf(address(0xBEEF)), 0);
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), 0);
     }
 
@@ -467,7 +493,9 @@ contract PurchaseRbtcHarness is PurchaseRbtc {
     uint256 public purchaseCalls;
     uint256 public rbtcOut;
     uint256 internal retrieveOverride;
+    uint256 internal purchaseInputOverride;
     bool internal useRetrieveOverride;
+    bool internal usePurchaseInputOverride;
     bool internal revertOnPurchase;
 
     constructor(
@@ -489,6 +517,11 @@ contract PurchaseRbtcHarness is PurchaseRbtc {
         useRetrieveOverride = true;
     }
 
+    function setPurchaseInputOverride(uint256 amount) external {
+        purchaseInputOverride = amount;
+        usePurchaseInputOverride = true;
+    }
+
     function setRevertOnPurchase(bool shouldRevert) external {
         revertOnPurchase = shouldRevert;
     }
@@ -502,6 +535,8 @@ contract PurchaseRbtcHarness is PurchaseRbtc {
         purchaseCalls++;
         lastPurchaseAmount = stablecoinAmount;
         feeCollectorBalanceOnPurchase = i_token.balanceOf(s_feeCollector);
+        uint256 inputToConsume = usePurchaseInputOverride ? purchaseInputOverride : stablecoinAmount;
+        require(i_token.transfer(address(0xBEEF), inputToConsume));
         return rbtcOut;
     }
 
