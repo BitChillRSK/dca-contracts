@@ -26,7 +26,6 @@ contract NetRedemptionTest is DcaDappTest {
     uint256 constant EXIT_FEE_BPS = 10; // the 0.10% Sovryn approved
     /// @dev not SIP-0094: a lending protocol withholding almost the whole redemption (rug / insolvency)
     uint256 constant RUG_EXIT_FEE_BPS = 9950;
-    uint256 constant BPS_DIVISOR = 10_000;
     uint256 constant WITHDRAWAL_AMOUNT = AMOUNT_TO_DEPOSIT / 2;
     uint256 constant ROUNDING_TOLERANCE = 1e6; // the share conversion rounds up, so payouts can exceed the request by dust
 
@@ -236,7 +235,7 @@ contract NetRedemptionTest is DcaDappTest {
             aggregatedFee += feeCalculator.calculateFee(purchaseAmounts[i]);
             totalPurchase += purchaseAmounts[i];
         }
-        uint256 expectedRedeemed = totalPurchase * (BPS_DIVISOR - RUG_EXIT_FEE_BPS) / BPS_DIVISOR;
+        uint256 expectedRedeemed = totalPurchase * (BPS_DENOMINATOR - RUG_EXIT_FEE_BPS) / BPS_DENOMINATOR;
         // the two conditions the guard exists for, spelled out
         assertGt(expectedRedeemed, 0, "a zero payout is a different error");
         assertLe(expectedRedeemed, aggregatedFee, "the redeem must fall short of the fee for this to fire");
@@ -301,7 +300,7 @@ contract NetRedemptionTest is DcaDappTest {
     }
 
     function _afterExitFee(uint256 grossAmount) internal pure returns (uint256) {
-        return grossAmount - (grossAmount * EXIT_FEE_BPS / BPS_DIVISOR);
+        return grossAmount - (grossAmount * EXIT_FEE_BPS / BPS_DENOMINATOR);
     }
 
     function _accumulatedRbtc() internal view returns (uint256) {

@@ -88,7 +88,7 @@ Nothing changes storage layout, an event, or what any call does with funds.
       attribution header.
 - [ ] Nits: `custody` grammar in `IDcaManager`; `poping` typo in `DcaManager`; clarify that
       `DcaSchedule.paused` is set by the schedule's user, not the protocol owner; give `HUNDRED_PERCENT`
-      and `FEE_PERCENTAGE_DIVISOR` explicit visibility; unify the three section-banner styles.
+      and `BPS_DENOMINATOR` explicit visibility; unify the three section-banner styles.
 
 ## Out of scope
 

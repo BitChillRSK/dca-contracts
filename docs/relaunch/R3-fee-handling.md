@@ -18,7 +18,7 @@ Linear means: `maxFeeRate` at or below `feePurchaseLowerBound`, `minFeeRate` at 
 
 **R5:** `_calculateFeeAndNetAmounts` calls `_calculateFee` per item. `_calculateFee` is `view` and SLOAD’s the four fee fields on every iteration. Those values do not change during the tx.
 
-**Constructor / collector / cap / getter (user-requested on this PR):** There is no later relaunch PR that owns fee-collector safety, an on-chain `maxFeeRate` ceiling, or `getFeeSettings`. Apply the same pair checks at construction; reject `feeCollector == address(0)` in the constructor and `setFeeCollectorAddress`; cap `maxFeeRate` at 5% (`500` with `FEE_PERCENTAGE_DIVISOR = 10_000`); expose `getFeeSettings()` wrapping `_feeSettings()`.
+**Constructor / collector / cap / getter (user-requested on this PR):** There is no later relaunch PR that owns fee-collector safety, an on-chain `maxFeeRate` ceiling, or `getFeeSettings`. Apply the same pair checks at construction; reject `feeCollector == address(0)` in the constructor and `setFeeCollectorAddress`; cap `maxFeeRate` at 5% (`500` with `BPS_DENOMINATOR = 10_000`); expose `getFeeSettings()` wrapping `_feeSettings()`.
 
 `PurchaseMoc` / `PurchaseUniswap` keep calling `_calculateFee` / `_calculateFeeAndNetAmounts`. Do not change fee rates, interpolation, or which path (`buyRbtc` vs batch) is used beyond the SLOAD load-once change.
 
@@ -89,7 +89,7 @@ make check
 Behaviors to assert:
 
 - Existing fee unit tests (below lower bound, above upper bound, interpolated, at bounds) still pass for `_calculateFee`.
-- `minFeeRate == maxFeeRate` (flat) still charges `amount * minFeeRate / 10_000` regardless of purchase amount vs bounds.
+- `minFeeRate == maxFeeRate` (flat) still charges `amount * minFeeRate / BPS_DENOMINATOR` regardless of purchase amount vs bounds.
 - `setFeeRateParams` that raises min above the old max but below the new max (e.g. 100/200 → 250/400) succeeds and stores the new pair.
 - `setFeeRateParams` that moves both bounds so the new lower is `>=` the old upper (e.g. 100/1000 ether → 2000/5000 ether) succeeds.
 - Invalid combined pairs still revert (`min > max`, `lower >= upper`).

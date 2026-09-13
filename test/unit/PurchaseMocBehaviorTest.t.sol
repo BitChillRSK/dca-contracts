@@ -89,7 +89,7 @@ contract PurchaseMocBehaviorTest is Test {
 
     function test_partialFreeDocRedemptionRevertsAndRollsBack() public {
         uint256 purchaseAmount = 25 ether;
-        uint256 fee = purchaseAmount * MAX_FEE_RATE_TEST / FEE_PERCENTAGE_DIVISOR;
+        uint256 fee = purchaseAmount * MAX_FEE_RATE_TEST / BPS_DENOMINATOR;
         uint256 netAmount = purchaseAmount - fee;
         uint256 partialAmount = netAmount - 1 ether;
         moc.setFreeDoc(partialAmount);

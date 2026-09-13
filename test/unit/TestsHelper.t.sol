@@ -37,7 +37,7 @@ contract FeeCalculator {
     function calculateFee(uint256 purchaseAmount) external view returns (uint256) {
 
         if (s_minFeeRate == s_maxFeeRate) {
-            return purchaseAmount * s_minFeeRate / FEE_PERCENTAGE_DIVISOR;
+            return purchaseAmount * s_minFeeRate / BPS_DENOMINATOR;
         }
 
         uint256 feeRate;
@@ -52,6 +52,6 @@ contract FeeCalculator {
                 - ((purchaseAmount - s_feePurchaseLowerBound) * (s_maxFeeRate - s_minFeeRate))
                     / (s_feePurchaseUpperBound - s_feePurchaseLowerBound);
         }
-        return purchaseAmount * feeRate / FEE_PERCENTAGE_DIVISOR;
+        return purchaseAmount * feeRate / BPS_DENOMINATOR;
     }
 }

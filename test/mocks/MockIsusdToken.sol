@@ -17,7 +17,7 @@ contract MockIsusdToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
     uint256 immutable i_deploymentTimestamp;
     uint256 constant ANNUAL_INCREASE = 5; // The DOC tokens redeemed by each iSUSD token increase by 5% annually (mocking behaviour)
     uint256 constant YEAR_IN_SECONDS = 31536000;
-    uint256 constant BPS_DIVISOR = 10_000;
+    uint256 constant BPS_DENOMINATOR = 10_000;
     /**
      * @notice SIP-0094 Perimeter Fee, in basis points, charged on burn().
      * @dev Zero models both the pre-activation state and Sovryn's fail-open path, where net == gross.
@@ -33,9 +33,9 @@ contract MockIsusdToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
     bool private s_silentZeroPayout;
     /**
      * @notice When set, burn only this many BPS of the requested iSUSD and pay cash for that fraction.
-     * @dev Models a partial-liquidity fill that leaves the unpaid claim withdrawable. 10_000 = full.
+     * @dev Models a partial-liquidity fill that leaves the unpaid claim withdrawable. BPS_DENOMINATOR = full.
      */
-    uint256 private s_partialBurnBps = 10_000;
+    uint256 private s_partialBurnBps = BPS_DENOMINATOR;
     /**
      * @notice When set, burn fails before any transfer or share movement (atomic liquidity shortage).
      */
@@ -79,8 +79,8 @@ contract MockIsusdToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
         } else if (s_overBurn) {
             sharesToBurn = burnAmount + 1;
             require(balanceOf(msg.sender) >= sharesToBurn, "Insufficient balance for over-burn");
-        } else if (s_partialBurnBps < BPS_DIVISOR) {
-            sharesToBurn = burnAmount * s_partialBurnBps / BPS_DIVISOR;
+        } else if (s_partialBurnBps < BPS_DENOMINATOR) {
+            sharesToBurn = burnAmount * s_partialBurnBps / BPS_DENOMINATOR;
         }
 
         // Cash follows the burned slice on partial fill; otherwise the full requested gross (SIP-0094).
@@ -88,7 +88,7 @@ contract MockIsusdToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
             ? Math.ceilDiv(sharesToBurn * tokenPrice(), DECIMALS)
             : Math.ceilDiv(burnAmount * tokenPrice(), DECIMALS);
         loanAmountPaid = Math.ceilDiv(burnAmount * tokenPrice(), DECIMALS); // return stays GROSS of the request
-        uint256 exitFee = cashGross * s_exitFeeBps / BPS_DIVISOR;
+        uint256 exitFee = cashGross * s_exitFeeBps / BPS_DENOMINATOR;
         uint256 netPayout = cashGross - exitFee;
 
         if (s_silentZeroPayout) {
@@ -114,7 +114,7 @@ contract MockIsusdToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
      * @param exitFeeBps the fee in basis points (10 = the 0.10% Sovryn approved). Zero disables it.
      */
     function setExitFeeBps(uint256 exitFeeBps) external {
-        require(exitFeeBps <= BPS_DIVISOR, "Fee above 100%");
+        require(exitFeeBps <= BPS_DENOMINATOR, "Fee above 100%");
         s_exitFeeBps = exitFeeBps;
     }
 
@@ -122,9 +122,9 @@ contract MockIsusdToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
         s_silentZeroPayout = silentZeroPayout;
     }
 
-    /// @notice Burn only `partialBurnBps / 10_000` of the requested iSUSD and pay cash for that slice.
+    /// @notice Burn only `partialBurnBps / BPS_DENOMINATOR` of the requested iSUSD and pay cash for that slice.
     function setPartialBurnBps(uint256 partialBurnBps) external {
-        require(partialBurnBps <= BPS_DIVISOR, "Bps above 100%");
+        require(partialBurnBps <= BPS_DENOMINATOR, "Bps above 100%");
         s_partialBurnBps = partialBurnBps;
     }
 

@@ -580,8 +580,8 @@ contract LendingErc20HandlerHarness is LendingErc20Handler {
     bool public payOut = true;
     uint256 public protocolRedeemCalls;
     uint256 public protocolShares;
-    /// @notice BPS of `sharesAmount` actually burned. 10_000 = full. Positive cash still paid for the fraction.
-    uint256 public burnBps = 10_000;
+    /// @notice BPS of `sharesAmount` actually burned. BPS_DENOMINATOR = full. Positive cash still paid for the fraction.
+    uint256 public burnBps = BPS_DENOMINATOR;
     bool public overBurn;
     bool public increaseBalanceOnRedeem;
     bool public revertOnRedeem;
@@ -662,8 +662,8 @@ contract LendingErc20HandlerHarness is LendingErc20Handler {
             toBurn = 0;
         } else if (overBurn) {
             toBurn = sharesAmount + 1;
-        } else if (burnBps < 10_000) {
-            toBurn = sharesAmount * burnBps / 10_000;
+        } else if (burnBps < BPS_DENOMINATOR) {
+            toBurn = sharesAmount * burnBps / BPS_DENOMINATOR;
         }
         if (toBurn > 0) {
             protocolShares -= toBurn;
