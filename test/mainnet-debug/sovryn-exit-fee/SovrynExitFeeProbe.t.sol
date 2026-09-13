@@ -5,7 +5,7 @@ import {Test, console2} from "forge-std/Test.sol";
 import {DcaDappTest} from "../../unit/DcaDappTest.t.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IiSusdToken} from "../../../src/sovryn/IiSusdToken.sol";
-import {DOC_HOLDER} from "../../Constants.sol";
+import {BPS_DENOMINATOR, DOC_HOLDER} from "../../Constants.sol";
 
 interface IExitFeeControllerView {
     function exitFeeEnabled() external view returns (bool);
@@ -74,7 +74,7 @@ contract SovrynExitFeeDirectBurnProbe is Test {
         vm.stopPrank();
 
         uint256 haircut = returned > received ? returned - received : 0;
-        uint256 haircutBps = returned > 0 ? (haircut * 10_000) / returned : 0;
+        uint256 haircutBps = returned > 0 ? (haircut * BPS_DENOMINATOR) / returned : 0;
 
         console2.log("burn returned (gross)", returned);
         console2.log("DOC received (net)", received);
@@ -130,7 +130,10 @@ contract SovrynExitFeeWithdrawalProbe is DcaDappTest {
         console2.log("10 bps of requested would be", AMOUNT_TO_DEPOSIT / 1000);
         if (AMOUNT_TO_DEPOSIT > paid) {
             console2.log("haircut DOC", AMOUNT_TO_DEPOSIT - paid);
-            console2.log("haircut bps (approx)", ((AMOUNT_TO_DEPOSIT - paid) * 10_000) / AMOUNT_TO_DEPOSIT);
+            console2.log(
+                "haircut bps (approx)",
+                ((AMOUNT_TO_DEPOSIT - paid) * BPS_DENOMINATOR) / AMOUNT_TO_DEPOSIT
+            );
         }
     }
 }

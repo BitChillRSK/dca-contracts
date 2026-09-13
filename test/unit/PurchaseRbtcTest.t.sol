@@ -30,7 +30,7 @@ contract PurchaseRbtcTest is Test {
     event FeeHandler__FeeTransferred(address indexed token, address indexed collector, uint256 amount);
 
     uint16 internal constant FLAT_FEE_RATE = 100; // 1%
-    uint256 internal constant FEE_DIVISOR = 10_000;
+    uint256 internal constant BPS_DENOMINATOR = 10_000;
     uint256 internal constant RBTC_OUT = 1 ether;
 
     address internal buyerA = address(0xA11CE);
@@ -451,7 +451,7 @@ contract PurchaseRbtcTest is Test {
     }
 
     function _fee(uint256 amount) private pure returns (uint256) {
-        return amount * FLAT_FEE_RATE / FEE_DIVISOR;
+        return amount * FLAT_FEE_RATE / BPS_DENOMINATOR;
     }
 
     function _oneBuyerBatchBuyers() private view returns (address[] memory buyers) {

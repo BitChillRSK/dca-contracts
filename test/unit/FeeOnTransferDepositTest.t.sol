@@ -35,7 +35,6 @@ contract FeeOnTransferDepositTest is Test {
     address internal constant OTHER = address(0xB0B);
 
     uint256 internal constant FEE_BPS = 100; // 1%
-    uint256 internal constant BPS_DIVISOR = 10_000;
     uint256 internal constant REQUESTED = 100 ether;
     uint256 internal constant RECEIVED = 99 ether; // what hop 1 would deliver under FEE_BPS
     uint256 internal constant LENDING_ROUNDING_SLACK = 100;
@@ -161,7 +160,7 @@ contract FeeOnTransferDepositTest is Test {
     }
 
     function test_zeroReceivedDeposit_revertsWithTheSameError() public {
-        token.setFeeBps(BPS_DIVISOR);
+        token.setFeeBps(BPS_DENOMINATOR);
         uint256 userBefore = token.balanceOf(USER);
 
         vm.prank(USER);
@@ -409,7 +408,7 @@ contract FeeOnTransferDepositTest is Test {
     }
 
     function _afterShortfall(uint256 amount) private pure returns (uint256) {
-        return amount * (BPS_DIVISOR - FEE_BPS) / BPS_DIVISOR;
+        return amount * (BPS_DENOMINATOR - FEE_BPS) / BPS_DENOMINATOR;
     }
 
     function _tropykusUnderlying(address who) private view returns (uint256) {

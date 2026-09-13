@@ -53,7 +53,7 @@ and constructor oracle validation on 2026-09-13.
 
 ## Out of scope
 
-- [ ] Fee arithmetic or naming changes, including `FEE_PERCENTAGE_DIVISOR`.
+- [ ] Fee arithmetic or naming changes, including `BPS_DENOMINATOR`.
 - [ ] `minRbtcOut` semantics, MoC `freeDoc()` preflights, partial-redeem retries, batch splitting, or a new
       purchase pause.
 - [ ] Uniswap path, oracle-floor, intermediate-token, or output-delta behavior beyond relocating the common

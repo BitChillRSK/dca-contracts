@@ -47,7 +47,6 @@ contract DexQuoteFloorProbe is Test {
     uint256 internal constant ORACLE_DECIMALS = 18;
     /// @dev Production fee is a flat 1% (`MIN_FEE_RATE == MAX_FEE_RATE_PRODUCTION`).
     uint256 internal constant FEE_BPS = 100;
-    uint256 internal constant BPS_DIVISOR = 10_000;
 
     SwapProbe internal probe;
     uint256 internal btcUsdPrice;
@@ -119,7 +118,7 @@ contract DexQuoteFloorProbe is Test {
     }
 
     function _row(address tokenIn, uint8 tokenDecimals, bytes memory path, uint256 grossIn) private {
-        uint256 netIn = grossIn - (grossIn * FEE_BPS / BPS_DIVISOR); // what the swap actually spends
+        uint256 netIn = grossIn - (grossIn * FEE_BPS / BPS_DENOMINATOR); // what the swap actually spends
         uint256 floor = _governanceFloor(netIn, tokenDecimals);
 
         console2.log("-- gross in (token units)", grossIn);
@@ -141,14 +140,14 @@ contract DexQuoteFloorProbe is Test {
 
         console2.log("   pool quote (wrbtc wei)", amountOut);
         if (amountOut >= floor) {
-            console2.log("   clears the floor by (bps)", (amountOut - floor) * BPS_DIVISOR / floor);
+            console2.log("   clears the floor by (bps)", (amountOut - floor) * BPS_DENOMINATOR / floor);
         } else {
-            console2.log("   BELOW the floor by (bps)", (floor - amountOut) * BPS_DIVISOR / floor);
+            console2.log("   BELOW the floor by (bps)", (floor - amountOut) * BPS_DENOMINATOR / floor);
         }
         // The tolerance the bot must leave under this quote to turn it into `minRbtcOut` and still clear the
         // floor: any tighter bound is inert, because the floor reverts first.
         if (amountOut > floor) {
-            console2.log("   bot tolerance before the floor binds (bps)", (amountOut - floor) * BPS_DIVISOR / amountOut);
+            console2.log("   bot tolerance before the floor binds (bps)", (amountOut - floor) * BPS_DENOMINATOR / amountOut);
         } else {
             console2.log("   bot tolerance before the floor binds (bps)", uint256(0));
         }

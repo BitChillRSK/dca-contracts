@@ -43,9 +43,9 @@ contract MockKdocToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
      * share clamp exists for. Hop 1 is fee-free, so `TokenHandler` never sees a mismatch.
      */
     uint256 private s_mintShortfallBps;
-    uint256 private constant BPS_DIVISOR = 10_000;
-    /// @notice Burn only this many BPS of the requested kDOC and pay cash for that slice. 10_000 = full.
-    uint256 private s_partialBurnBps = 10_000;
+    uint256 private constant BPS_DENOMINATOR = 10_000;
+    /// @notice Burn only this many BPS of the requested kDOC and pay cash for that slice. BPS_DENOMINATOR = full.
+    uint256 private s_partialBurnBps = BPS_DENOMINATOR;
     bool private s_revertOnRedeem;
     bool private s_overBurn;
     bool private s_increaseBalanceOnRedeem;
@@ -59,12 +59,12 @@ contract MockKdocToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
     }
 
     function setMintShortfallBps(uint256 mintShortfallBps) external {
-        require(mintShortfallBps <= 10_000, "Shortfall above 100%");
+        require(mintShortfallBps <= BPS_DENOMINATOR, "Shortfall above 100%");
         s_mintShortfallBps = mintShortfallBps;
     }
 
     function setPartialBurnBps(uint256 partialBurnBps) external {
-        require(partialBurnBps <= BPS_DIVISOR, "Bps above 100%");
+        require(partialBurnBps <= BPS_DENOMINATOR, "Bps above 100%");
         s_partialBurnBps = partialBurnBps;
     }
 
@@ -88,7 +88,7 @@ contract MockKdocToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
         i_docToken.transferFrom(msg.sender, address(this), amount);
         if (s_forceZeroMint) return 0;
         uint256 received = i_docToken.balanceOf(address(this)) - balanceBefore;
-        uint256 credited = received * (10_000 - s_mintShortfallBps) / 10_000;
+        uint256 credited = received * (BPS_DENOMINATOR - s_mintShortfallBps) / BPS_DENOMINATOR;
         _mint(msg.sender, credited * DECIMALS / exchangeRateCurrent());
         return 0;
     }
@@ -122,8 +122,8 @@ contract MockKdocToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
         } else if (s_overBurn) {
             sharesToBurn = kDocToBurn + 1;
             require(balanceOf(msg.sender) >= sharesToBurn, "Insufficient balance for over-burn");
-        } else if (s_partialBurnBps < BPS_DIVISOR) {
-            sharesToBurn = kDocToBurn * s_partialBurnBps / BPS_DIVISOR;
+        } else if (s_partialBurnBps < BPS_DENOMINATOR) {
+            sharesToBurn = kDocToBurn * s_partialBurnBps / BPS_DENOMINATOR;
         }
 
         uint256 docToRedeem = sharesToBurn > 0

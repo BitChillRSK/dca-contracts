@@ -16,6 +16,7 @@ contract FeeHandlerTest is Test {
     uint16 constant MIN_FEE_RATE = 100; // 1%
     uint16 constant MAX_FEE_RATE = 200; // 2%
     uint16 constant FEE_RATE_CAP = 500;
+    uint256 constant BPS_DENOMINATOR = 10_000;
     uint128 constant LOWER_BOUND = 100 ether; // below this gets max fee
     uint128 constant UPPER_BOUND = 1000 ether; // above this gets min fee
 
@@ -87,14 +88,14 @@ contract FeeHandlerTest is Test {
 
     function test_calculateFee_belowLowerBound() public {
         uint256 purchaseAmount = 50 ether; // below lower bound
-        uint256 expectedFee = purchaseAmount * MAX_FEE_RATE / 10_000;
+        uint256 expectedFee = purchaseAmount * MAX_FEE_RATE / BPS_DENOMINATOR;
         uint256 actualFee = feeHandler.exposedCalculateFee(purchaseAmount);
         assertEq(actualFee, expectedFee);
     }
 
     function test_calculateFee_aboveUpperBound() public {
         uint256 purchaseAmount = 2000 ether; // above upper bound
-        uint256 expectedFee = purchaseAmount * MIN_FEE_RATE / 10_000;
+        uint256 expectedFee = purchaseAmount * MIN_FEE_RATE / BPS_DENOMINATOR;
         uint256 actualFee = feeHandler.exposedCalculateFee(purchaseAmount);
         assertEq(actualFee, expectedFee);
     }
@@ -103,21 +104,21 @@ contract FeeHandlerTest is Test {
         uint256 purchaseAmount = 550 ether; // middle of bounds
         // Expected interpolated rate: 200 - ((550-100)/(1000-100)) * (200-100) = 200 - 50 = 150
         uint256 expectedRate = 150;
-        uint256 expectedFee = purchaseAmount * expectedRate / 10_000;
+        uint256 expectedFee = purchaseAmount * expectedRate / BPS_DENOMINATOR;
         uint256 actualFee = feeHandler.exposedCalculateFee(purchaseAmount);
         assertEq(actualFee, expectedFee);
     }
 
     function test_calculateFee_atLowerBound() public {
         uint256 purchaseAmount = LOWER_BOUND;
-        uint256 expectedFee = purchaseAmount * MAX_FEE_RATE / 10_000;
+        uint256 expectedFee = purchaseAmount * MAX_FEE_RATE / BPS_DENOMINATOR;
         uint256 actualFee = feeHandler.exposedCalculateFee(purchaseAmount);
         assertEq(actualFee, expectedFee);
     }
 
     function test_calculateFee_atUpperBound() public {
         uint256 purchaseAmount = UPPER_BOUND;
-        uint256 expectedFee = purchaseAmount * MIN_FEE_RATE / 10_000;
+        uint256 expectedFee = purchaseAmount * MIN_FEE_RATE / BPS_DENOMINATOR;
         uint256 actualFee = feeHandler.exposedCalculateFee(purchaseAmount);
         assertEq(actualFee, expectedFee);
     }
@@ -196,9 +197,9 @@ contract FeeHandlerTest is Test {
         uint256 below = 50 ether;
         uint256 mid = 550 ether;
         uint256 above = 2000 ether;
-        assertEq(feeHandler.exposedCalculateFee(below), below * flatRate / 10_000);
-        assertEq(feeHandler.exposedCalculateFee(mid), mid * flatRate / 10_000);
-        assertEq(feeHandler.exposedCalculateFee(above), above * flatRate / 10_000);
+        assertEq(feeHandler.exposedCalculateFee(below), below * flatRate / BPS_DENOMINATOR);
+        assertEq(feeHandler.exposedCalculateFee(mid), mid * flatRate / BPS_DENOMINATOR);
+        assertEq(feeHandler.exposedCalculateFee(above), above * flatRate / BPS_DENOMINATOR);
     }
 
     function test_calculateFeeAndNetAmounts_matchesSequentialCalculateFee() public {
@@ -292,8 +293,8 @@ contract FeeHandlerTest is Test {
             uint256 fee1 = feeHandler.exposedCalculateFee(amounts[i]);
             uint256 fee2 = feeHandler.exposedCalculateFee(amounts[i + 1]);
             
-            uint256 rate1 = fee1 * 10_000 / amounts[i];
-            uint256 rate2 = fee2 * 10_000 / amounts[i + 1];
+            uint256 rate1 = fee1 * BPS_DENOMINATOR / amounts[i];
+            uint256 rate2 = fee2 * BPS_DENOMINATOR / amounts[i + 1];
             
             assertGe(rate1, rate2, "Fee rate should decrease or stay equal with higher amounts");
         }

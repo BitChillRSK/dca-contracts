@@ -32,7 +32,7 @@ Audit (2026-09-02):
 - `MAX_SLIPPAGE_PERCENT`, `DEX_MAX_SLIPPAGE_PERCENT` (`DcaDappTest` purchase tolerance).
 - Fork holders: `DOC_HOLDER`, `USDRIF_HOLDER`, `DOC_HOLDER_TESTNET`.
 - `EXCHANGE_RATE_DECIMALS` — test assertions only; handlers define their own scales.
-- `FEE_PERCENTAGE_DIVISOR` — `TestsHelper.t.sol` only (`FeeHandler.sol` already declares its own).
+- `BPS_DENOMINATOR` — `TestsHelper.t.sol` only (`FeeHandler.sol` already declares its own).
 
 **Remove or consolidate**
 
@@ -57,7 +57,7 @@ Audit (2026-09-02):
 - Changing production deploy values, route maps, or `src/` behavior.
 - Moving `TROPYKUS_STRING` out of script (R37 invariant).
 - Moving `TROPYKUS_INDEX` out of test (R37 invariant).
-- Deduplicating `FEE_PERCENTAGE_DIVISOR` between `TestsHelper` and `FeeHandler` (separate hygiene).
+- Deduplicating `BPS_DENOMINATOR` between `TestsHelper` and `FeeHandler` (separate hygiene).
 
 ## Files likely touched
 

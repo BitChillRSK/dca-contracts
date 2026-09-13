@@ -60,7 +60,7 @@ interface IFeeHandler {
 
     /**
      * @notice Set all four fee parameters atomically.
-     * @param minFeeRate Lowest fee rate (basis points / 10_000).
+     * @param minFeeRate Lowest fee rate, in basis points.
      * @param maxFeeRate Highest fee rate. Must be ≥ `minFeeRate` and ≤ 5%.
      * @param feePurchaseLowerBound Purchase amount at or below which `maxFeeRate` applies.
      * @param feePurchaseUpperBound Purchase amount at or above which `minFeeRate` applies.

@@ -26,12 +26,12 @@ contract MockLayerBankAToken is ERC20 {
     uint256 private s_payoutCap;
     bool private s_useIncomeOverride;
     uint256 private s_incomeOverride;
-    /// @notice Burn only this many BPS of the scaled amount Aave would burn. 10_000 = full.
-    uint256 private s_partialBurnBps = 10_000;
+    /// @notice Burn only this many BPS of the scaled amount Aave would burn. BPS_DENOMINATOR = full.
+    uint256 private s_partialBurnBps = BPS_DENOMINATOR;
     bool private s_revertOnBurn;
     bool private s_overBurn;
     bool private s_increaseBalanceOnBurn;
-    uint256 private constant BPS_DIVISOR = 10_000;
+    uint256 private constant BPS_DENOMINATOR = 10_000;
 
     error MockLayerBankAToken__OnlyPool();
     error MockLayerBankAToken__PoolAlreadySet();
@@ -87,7 +87,7 @@ contract MockLayerBankAToken is ERC20 {
 
     /// @notice After computing Aave's scaled burn, consume only this fraction and still pay cash.
     function setPartialBurnBps(uint256 partialBurnBps) external {
-        require(partialBurnBps <= BPS_DIVISOR, "Bps above 100%");
+        require(partialBurnBps <= BPS_DENOMINATOR, "Bps above 100%");
         s_partialBurnBps = partialBurnBps;
     }
 
@@ -149,8 +149,8 @@ contract MockLayerBankAToken is ERC20 {
             scaled = 0;
         } else if (s_overBurn) {
             scaled = scaled + 1;
-        } else if (s_partialBurnBps < BPS_DIVISOR) {
-            scaled = scaled * s_partialBurnBps / BPS_DIVISOR;
+        } else if (s_partialBurnBps < BPS_DENOMINATOR) {
+            scaled = scaled * s_partialBurnBps / BPS_DENOMINATOR;
         }
 
         if (scaled > 0) {
@@ -158,9 +158,9 @@ contract MockLayerBankAToken is ERC20 {
         }
         if (s_silentZeroPayout) return 0;
         // Cash: on partial share burn, pay for the burned slice; otherwise the requested underlying
-        // (payout-cap may still haircut — that is fee/loss with a full burn when bps == 10_000).
+        // (payout-cap may still haircut — that is fee/loss with a full burn at BPS_DENOMINATOR).
         uint256 cashOut = underlyingAmount;
-        if (s_partialBurnBps < BPS_DIVISOR && !s_overBurn && !s_increaseBalanceOnBurn) {
+        if (s_partialBurnBps < BPS_DENOMINATOR && !s_overBurn && !s_increaseBalanceOnBurn) {
             cashOut = scaled * rate / RAY;
         }
         return _payout(to, cashOut);

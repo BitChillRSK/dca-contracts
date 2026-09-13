@@ -101,7 +101,7 @@ contract PurchaseRbtcConservationHandler is Test {
  */
 contract PurchaseRbtcConservationInvariantTest is StdInvariant, Test {
     uint16 internal constant FLAT_FEE_RATE = 100; // 1%
-    uint256 internal constant FEE_DIVISOR = 10_000;
+    uint256 internal constant BPS_DENOMINATOR = 10_000;
 
     MockStablecoin internal token;
     PurchaseRbtcHarness internal harness;

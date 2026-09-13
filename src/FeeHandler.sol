@@ -31,7 +31,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     uint16 internal s_maxFeeRate; // Maximum fee rate
     uint128 internal s_feePurchaseLowerBound; // Spending below lower bound gets the maximum fee rate
     uint128 internal s_feePurchaseUpperBound; // Spending above upper bound gets the minimum fee rate
-    uint256 internal constant FEE_PERCENTAGE_DIVISOR = 10_000; // rates are basis points, so a rate times an amount divides by 10,000
+    uint256 internal constant BPS_DENOMINATOR = 10_000; // rates are basis points, so a rate times an amount divides by this denominator
     /// @notice Hard ceiling on fee rates (5%). Owner cannot set max (or a flat min==max) above this.
     uint256 internal constant MAX_FEE_RATE_CAP = 500;
 
@@ -179,11 +179,11 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         uint256 feePurchaseUpperBound = feeSettings.feePurchaseUpperBound;
 
         if (minFeeRate == maxFeeRate || purchaseAmount >= feePurchaseUpperBound) {
-            return purchaseAmount * minFeeRate / FEE_PERCENTAGE_DIVISOR;
+            return purchaseAmount * minFeeRate / BPS_DENOMINATOR;
         }
 
         if (purchaseAmount <= feePurchaseLowerBound) {
-            return purchaseAmount * maxFeeRate / FEE_PERCENTAGE_DIVISOR;
+            return purchaseAmount * maxFeeRate / BPS_DENOMINATOR;
         }
 
         uint256 feeRate;
@@ -193,7 +193,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
                     * (maxFeeRate - minFeeRate))
                     / (feePurchaseUpperBound - feePurchaseLowerBound);
         }
-        return purchaseAmount * feeRate / FEE_PERCENTAGE_DIVISOR;
+        return purchaseAmount * feeRate / BPS_DENOMINATOR;
     }
 
     /**

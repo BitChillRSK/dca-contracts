@@ -40,7 +40,7 @@ uint256 constant EXCHANGE_RATE_DECIMALS = 1e18; // Valid for DOC and USDRIF in b
 // Fee-rate denominator mirrored by `TestsHelper`'s independent fee calculation. `FeeHandler`
 // declares its own copy on purpose: the test must not compute the expected fee from the same
 // symbol the implementation uses.
-uint256 constant FEE_PERCENTAGE_DIVISOR = 10_000;
+uint256 constant BPS_DENOMINATOR = 10_000;
 
 // Token holders on mainnet with significant balances (for fork testing)
 address constant DOC_HOLDER = 0x65d189e839aF28B78567bD7255f3f796495141bc; // Large DOC holder on RSK mainnet
