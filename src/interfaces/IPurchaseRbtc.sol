@@ -39,6 +39,12 @@ interface IPurchaseRbtc {
     error PurchaseRbtc__StablecoinRetrievedBelowFee(uint256 stablecoinRetrieved, uint256 aggregatedFee);
     /// @notice The measured rBTC this batch bought is below the minimum the caller attached to it.
     error PurchaseRbtc__BelowSwapperMinimum(uint256 rbtcReceived, uint256 minRbtcOut);
+    /// @notice The purchase venue did not consume exactly the net stablecoin amount supplied to it.
+    /// @dev A successful venue call must reduce the handler's purchase-token balance by `expectedAmount`.
+    ///      Any smaller, larger, or negative delta reverts the entire batch and all earlier accounting.
+    error PurchaseRbtc__InputAmountNotFullySpent(
+        uint256 expectedAmount, uint256 balanceBefore, uint256 balanceAfter
+    );
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
@@ -54,7 +60,8 @@ interface IPurchaseRbtc {
      * @dev DcaManager has already debited the schedules. Fees are aggregated once; measured rBTC and
      *      measured net spend are allocated by planned-net weight. Per-row floor division can leave
      *      less than one wei per row uncredited, so liabilities never exceed assets. `minRbtcOut` binds
-     *      the measured receipt independently of any venue-specific floor.
+     *      the measured receipt independently of any venue-specific floor. A successful venue call must
+     *      consume exactly the net stablecoin passed to it; otherwise the entire batch reverts.
      */
     function batchBuyRbtc(
         address[] memory buyers,

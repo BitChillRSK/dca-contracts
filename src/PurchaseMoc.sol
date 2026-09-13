@@ -34,7 +34,8 @@ abstract contract PurchaseMoc is PurchaseRbtc {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Redeem free DOC at MoC and return the handler's native-balance delta. MoC reverts bubble.
+     * @dev Redeem free DOC at MoC and return the handler's native-balance delta. MoC reverts bubble;
+     *      PurchaseRbtc separately proves that MoC consumed the complete DOC amount supplied here.
      */
     function _purchaseRbtc(uint256 stablecoinAmount, uint256 /* minRbtcOut */)
         internal

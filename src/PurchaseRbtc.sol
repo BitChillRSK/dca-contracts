@@ -69,7 +69,17 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
             _transferFee(purchaseToken, aggregatedFee);
         }
 
+        uint256 inputBalanceBefore = purchaseToken.balanceOf(address(this));
         uint256 totalPurchasedRbtc = _purchaseRbtc(totalStablecoinAmountToSpend, minRbtcOut);
+        uint256 inputBalanceAfter = purchaseToken.balanceOf(address(this));
+        if (
+            inputBalanceAfter > inputBalanceBefore
+                || inputBalanceBefore - inputBalanceAfter != totalStablecoinAmountToSpend
+        ) {
+            revert PurchaseRbtc__InputAmountNotFullySpent(
+                totalStablecoinAmountToSpend, inputBalanceBefore, inputBalanceAfter
+            );
+        }
         if (totalPurchasedRbtc == 0) revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(purchaseToken));
         // Checked against the rBTC we measured ourselves receiving, so the bound holds on every purchase
         // venue and never trusts an integrator return value. Equality passes. Where the venue applies a
@@ -142,6 +152,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
 
     /**
      * @dev Spend `stablecoinAmount` of net stablecoin and return only measured rBTC or WRBTC received.
+     *      The caller proves exact purchase-token consumption around this call.
      */
     function _purchaseRbtc(uint256 stablecoinAmount, uint256 minRbtcOut) internal virtual returns (uint256 rbtcReceived);
 }

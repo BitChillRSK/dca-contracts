@@ -13,6 +13,7 @@ contract MockMocProxy {
     uint256 public docRequestCalls;
     uint256 public freeDocCalls;
     string private s_revertFreeDoc;
+    uint256 private s_freeDoc = type(uint256).max;
 
     constructor(address docTokenAddress) {
         mockDocToken = MockStablecoin(docTokenAddress);
@@ -20,6 +21,10 @@ contract MockMocProxy {
 
     function setRevertFreeDoc(string calldata reason) external {
         s_revertFreeDoc = reason;
+    }
+
+    function setFreeDoc(uint256 freeDoc) external {
+        s_freeDoc = freeDoc;
     }
 
     function redeemDocRequest(uint256) external {
@@ -31,17 +36,18 @@ contract MockMocProxy {
         if (bytes(s_revertFreeDoc).length != 0) {
             revert(s_revertFreeDoc);
         }
-        // Priced off the requested amount on purpose: production DOC is not fee-on-transfer, so
-        // received == docAmount. The burn below uses the measured delta only so this mock stays
-        // solvent when a FOT stablecoin mock is swapped in; it is not modelling a MoC payout rule.
-        uint256 redeemedRbtc = docAmount / BTC_PRICE;
+        // Live MoC caps the redeemed DOC at the available free-DOC amount and can therefore return a
+        // positive rBTC payout after consuming less than requested. The configurable cap reproduces
+        // that behavior; its default preserves a complete redemption.
+        uint256 finalDocAmount = docAmount < s_freeDoc ? docAmount : s_freeDoc;
+        uint256 redeemedRbtc = finalDocAmount / BTC_PRICE;
         uint256 balanceBefore = mockDocToken.balanceOf(address(this));
-        mockDocToken.transferFrom(msg.sender, address(this), docAmount);
+        mockDocToken.transferFrom(msg.sender, address(this), finalDocAmount);
         uint256 received = mockDocToken.balanceOf(address(this)) - balanceBefore;
         mockDocToken.burn(received);
         (bool success,) = msg.sender.call{value: redeemedRbtc}("");
         if (success) {
-            emit MockMocProxy__DocRedeemed(msg.sender, docAmount, redeemedRbtc);
+            emit MockMocProxy__DocRedeemed(msg.sender, finalDocAmount, redeemedRbtc);
         }
     }
 

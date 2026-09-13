@@ -13,6 +13,16 @@ import "../Constants.sol";
  * @notice PurchaseMoc: free-DOC redeem only; MoC revert data bubbles; zero output fails closed.
  */
 contract PurchaseMocBehaviorTest is Test {
+    struct PurchaseState {
+        uint256 userIdleBalance;
+        uint256 handlerDoc;
+        uint256 mocDoc;
+        uint256 feeCollectorDoc;
+        uint256 handlerRbtc;
+        uint256 mocRbtc;
+        uint256 userAccumulatedRbtc;
+    }
+
     MockStablecoin internal doc;
     MockMocProxy internal moc;
     IdleDocHandlerMoc internal handler;
@@ -77,6 +87,43 @@ contract PurchaseMocBehaviorTest is Test {
         handler.batchBuyRbtc(buyers, scheduleIds, amounts, 0);
     }
 
+    function test_partialFreeDocRedemptionRevertsAndRollsBack() public {
+        uint256 purchaseAmount = 25 ether;
+        uint256 fee = purchaseAmount * MAX_FEE_RATE_TEST / FEE_PERCENTAGE_DIVISOR;
+        uint256 netAmount = purchaseAmount - fee;
+        uint256 partialAmount = netAmount - 1 ether;
+        moc.setFreeDoc(partialAmount);
+
+        address[] memory buyers = new address[](1);
+        buyers[0] = buyer;
+        uint64[] memory scheduleIds = new uint64[](1);
+        scheduleIds[0] = 1;
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = purchaseAmount;
+
+        PurchaseState memory before = _snapshot();
+        uint256 inputBalanceBefore = before.handlerDoc - fee;
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPurchaseRbtc.PurchaseRbtc__InputAmountNotFullySpent.selector,
+                netAmount,
+                inputBalanceBefore,
+                inputBalanceBefore - partialAmount
+            )
+        );
+        handler.batchBuyRbtc(buyers, scheduleIds, amounts, 0);
+
+        PurchaseState memory afterRevert = _snapshot();
+        assertEq(afterRevert.userIdleBalance, before.userIdleBalance);
+        assertEq(afterRevert.handlerDoc, before.handlerDoc);
+        assertEq(afterRevert.mocDoc, before.mocDoc);
+        assertEq(afterRevert.feeCollectorDoc, before.feeCollectorDoc);
+        assertEq(afterRevert.handlerRbtc, before.handlerRbtc);
+        assertEq(afterRevert.mocRbtc, before.mocRbtc);
+        assertEq(afterRevert.userAccumulatedRbtc, before.userAccumulatedRbtc);
+        assertEq(moc.freeDocCalls(), 0, "MoC side effects must roll back");
+    }
+
     function test_zeroRbtcOutputFailsClosed() public {
         // MoC "succeeds" but sends no value → measured delta is 0 → batch purchase reverts.
         // Counter asserts after expectRevert are useless: the whole call rolls back.
@@ -93,5 +140,15 @@ contract PurchaseMocBehaviorTest is Test {
             abi.encodeWithSelector(IPurchaseRbtc.PurchaseRbtc__RbtcBatchPurchaseFailed.selector, address(doc))
         );
         handler.batchBuyRbtc(buyers, scheduleIds, amounts, 0);
+    }
+
+    function _snapshot() private view returns (PurchaseState memory state) {
+        state.userIdleBalance = handler.getUsersIdleTokenBalance(buyer);
+        state.handlerDoc = doc.balanceOf(address(handler));
+        state.mocDoc = doc.balanceOf(address(moc));
+        state.feeCollectorDoc = doc.balanceOf(address(0xFEE));
+        state.handlerRbtc = address(handler).balance;
+        state.mocRbtc = address(moc).balance;
+        state.userAccumulatedRbtc = handler.getAccumulatedRbtcBalance(buyer);
     }
 }
