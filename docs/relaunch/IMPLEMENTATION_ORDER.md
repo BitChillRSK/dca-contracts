@@ -124,6 +124,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R69 | 69 ([#126](https://github.com/BitChillRSK/dca-contracts/pull/126)) | none (OZ IERC165; SafeERC20 approve on Dex; external+internal deposit/withdraw; floor dust documented, not credited) |
 | R70 | 70 ([#127](https://github.com/BitChillRSK/dca-contracts/pull/127)) | none (public `i_operationsAdmin`; fail-closed per-token mins; `_requireUserMutationsAllowed` comment) |
 | R71 | 71 ([#128](https://github.com/BitChillRSK/dca-contracts/pull/128) source phase) | **license/SPDX deferred; Dex admin keep; batch lending-event semantics; evidence-gated MoC sequence/reverts** (src first in #128; deploy/release work follows) |
+| R76 | post-R75 pre-deployment fix | none (shared exact purchase-input consumption; zero-oracle constructor guard) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1026,6 +1027,14 @@ one-purchase-per-UTC-day rule becomes true by construction instead of by proof. 
 future and never the execution time. Reaffirms skip-don't-recover — the policy has been intended
 since `6335994` — and records the reasoning, which had never been written down. **ABI-affecting, so
 it cannot land after the relaunch deploy.** Ask: none.
+
+### R76 - exact stablecoin consumption on every purchase venue ([spec](./R76-exact-purchase-input-consumption.md))
+
+Pre-deployment accounting fix stacked on R75. Move the existing Uniswap input balance-delta check to
+the shared `PurchaseRbtc` pipeline so a positive partial Money on Chain redemption cannot commit full
+schedule and handler-book debits while leaving unowned DOC behind. Keep Uniswap's intermediate-token
+router check in the venue implementation. Also reject a zero MoC oracle in the Dex constructor, matching
+the existing setter and canonical deployment guard. Ask: none.
 
 ## Closed non-implementation decisions
 
