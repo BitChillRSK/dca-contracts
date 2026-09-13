@@ -6,11 +6,13 @@ import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {PurchaseUniswap} from "../../src/PurchaseUniswap.sol";
 import {FeeHandler} from "../../src/FeeHandler.sol";
 import {DcaManagerAccessControl} from "../../src/DcaManagerAccessControl.sol";
+import {IdleErc20HandlerDex} from "../../src/idle/IdleErc20HandlerDex.sol";
 import {IPurchaseUniswap} from "../../src/interfaces/IPurchaseUniswap.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
 import {ICoinPairPrice} from "../../src/interfaces/ICoinPairPrice.sol";
 import {IWRBTC} from "../../src/interfaces/IWRBTC.sol";
+import {IUniswapV3SwapRouter} from "../../src/interfaces/IUniswapV3SwapRouter.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {MockMocOracle} from "../mocks/MockMocOracle.sol";
 import "../Constants.sol";
@@ -222,6 +224,39 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__InvalidOracleAddress.selector);
         vm.prank(OWNER);
         IPurchaseUniswap(address(stablecoinHandler)).updateMocOracle(address(0));
+    }
+
+    function testConstructorRevertsIfOracleIsZeroAddress() public onlyDexSwaps {
+        address[] memory intermediateTokens = new address[](0);
+        uint24[] memory poolFeeRates = new uint24[](1);
+        poolFeeRates[0] = 3000;
+        IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
+            wrBtcToken: IWRBTC(address(wrBtcToken)),
+            swapRouter02: IUniswapV3SwapRouter(
+                address(PurchaseUniswap(payable(address(stablecoinHandler))).i_swapRouter02())
+            ),
+            swapIntermediateTokens: intermediateTokens,
+            swapPoolFeeRates: poolFeeRates,
+            mocOracle: ICoinPairPrice(address(0))
+        });
+        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+            minFeeRate: MIN_FEE_RATE,
+            maxFeeRate: MAX_FEE_RATE_TEST,
+            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
+            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+        });
+
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__InvalidOracleAddress.selector);
+        new IdleErc20HandlerDex(
+            address(this),
+            address(stablecoin),
+            uniswapSettings,
+            FEE_COLLECTOR,
+            feeSettings,
+            DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
+            DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
+            OWNER
+        );
     }
     
     function testOnlyOwnerCanUpdateOracle() public onlyDexSwaps {

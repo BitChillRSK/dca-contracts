@@ -75,6 +75,9 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         uint256 amountOutMinimumPercent,
         uint256 amountOutMinimumSafetyCheck
     ) {
+        if (address(uniswapSettings.mocOracle) == address(0)) {
+            revert PurchaseUniswap__InvalidOracleAddress();
+        }
         i_swapRouter02 = uniswapSettings.swapRouter02;
         i_wrBtcToken = uniswapSettings.wrBtcToken;
         s_mocOracle = uniswapSettings.mocOracle;
@@ -268,9 +271,9 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
 
     /**
      * @dev Uses the stricter of the oracle and caller floors, and credits only the measured WRBTC delta.
-     *      Uniswap may partially fill exact input at a pool price limit, so success also requires the exact
-     *      stablecoin input to leave this handler and every intermediate-token router balance to return to
-     *      its pre-swap value. Comparing deltas, not zero balances, prevents donated tokens from blocking it.
+     *      PurchaseRbtc proves the exact stablecoin input left this handler. This venue-specific layer also
+     *      requires every intermediate-token router balance to return to its pre-swap value. Comparing
+     *      deltas, not zero balances, prevents donated tokens from blocking it.
      */
     function _purchaseRbtc(uint256 stablecoinAmount, uint256 minRbtcOut)
         internal
@@ -290,8 +293,6 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
             amountOutMinimum: amountOutMinimum
         });
 
-        uint256 inputBalanceBefore = _balanceOf(address(purchaseToken), address(this));
-
         address[] memory intermediateTokens = s_swapIntermediateTokens;
         uint256 intermediateCount = intermediateTokens.length;
         uint256[] memory routerBalancesBefore = new uint256[](intermediateCount);
@@ -301,11 +302,6 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
 
         uint256 wrBtcBalanceBefore = _balanceOf(address(i_wrBtcToken), address(this));
         i_swapRouter02.exactInput(params);
-
-        uint256 inputBalanceAfter = _balanceOf(address(purchaseToken), address(this));
-        if (inputBalanceAfter > inputBalanceBefore || inputBalanceBefore - inputBalanceAfter != stablecoinAmount) {
-            revert PurchaseUniswap__InputAmountNotFullySpent(stablecoinAmount, inputBalanceBefore, inputBalanceAfter);
-        }
 
         for (uint256 i; i < intermediateCount; ++i) {
             uint256 routerBalanceAfter = _balanceOf(intermediateTokens[i], address(i_swapRouter02));
@@ -389,7 +385,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
 
     /**
      * @dev One shared `balanceOf` call site, so the purchase's balance reads do not each emit their own
-     *      copy of the same encode/staticcall/decode sequence. A purchase makes four of them plus two
+     *      copy of the same encode/staticcall/decode sequence. A purchase makes two of them plus two
      *      per intermediate token, so the saving grows with the path.
      */
     function _balanceOf(address token, address account) private view returns (uint256) {

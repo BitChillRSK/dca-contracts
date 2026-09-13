@@ -226,7 +226,7 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
         uint256 unspent = netAmount - (netAmount * SHORT_FILL_PERCENT) / FULL_FILL_PERCENT;
         vm.expectRevert(
             abi.encodeWithSelector(
-                IPurchaseUniswap.PurchaseUniswap__InputAmountNotFullySpent.selector,
+                IPurchaseRbtc.PurchaseRbtc__InputAmountNotFullySpent.selector,
                 netAmount,
                 inputBalanceBefore,
                 inputBalanceBefore - (netAmount - unspent)

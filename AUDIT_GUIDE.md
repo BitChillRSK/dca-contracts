@@ -45,7 +45,9 @@ batch is also atomic across all handlers.
 
 DOC is redeemed through Money on Chain. USDRIF and USDT0 are swapped to WRBTC through an allowlisted
 Uniswap V3 path and then unwrapped only when the user withdraws. The Uniswap path checks both an
-oracle-derived floor and the swapper's batch `minRbtcOut`; the stricter bound wins.
+oracle-derived floor and the swapper's batch `minRbtcOut`; the stricter bound wins. Across both venues,
+a successful purchase must consume exactly the net stablecoin supplied to it. Uniswap additionally
+requires every intermediate-token balance on the shared router to return to its pre-swap value.
 
 ## Authority and trust boundaries
 
@@ -79,6 +81,9 @@ apply the same decision everywhere it is meant to apply.
   a venue fee or realized loss.
 - Integrator return values and balance views are not treated as received cash. Stablecoin and native
   receipts are measured by balance deltas.
+- Every successful purchase must reduce the handler's stablecoin balance by exactly the net amount
+  passed to the venue. A positive rBTC/WRBTC receipt with a partial or excessive input delta reverts
+  the entire batch.
 - Purchase fees are computed per row, transferred before the venue call, and configured independently
   on every handler. Batch rBTC and measured stablecoin are allocated using planned net amounts as
   weights. Integer division can leave less than one wei per row uncredited in the handler.
