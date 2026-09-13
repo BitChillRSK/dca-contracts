@@ -1,6 +1,6 @@
 # R76 — Exact stablecoin consumption on every purchase venue
 
-Status: **assigned** · Assigned: yes · Optional/further-review: no · Order: stack on R75 before any deployment
+Status: **implemented** · GitHub [#135](https://github.com/BitChillRSK/dca-contracts/pull/135) · Assigned: yes · Optional/further-review: no · Order: stack on R75 before any deployment
 
 ## Objective
 
