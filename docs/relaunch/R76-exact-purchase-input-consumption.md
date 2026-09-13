@@ -34,22 +34,22 @@ and constructor oracle validation on 2026-09-13.
 
 ## Scope
 
-- [ ] In `PurchaseRbtc.batchBuyRbtc`, snapshot `_purchaseToken()` immediately before `_purchaseRbtc` and
+- [x] In `PurchaseRbtc.batchBuyRbtc`, snapshot `_purchaseToken()` immediately before `_purchaseRbtc` and
       require the handler's balance to decrease by exactly the net stablecoin amount passed to the venue.
-- [ ] Declare the generic exact-consumption error on `IPurchaseRbtc`, with expected amount and before/after
+- [x] Declare the generic exact-consumption error on `IPurchaseRbtc`, with expected amount and before/after
       balances for diagnosis.
-- [ ] Remove the now-duplicated handler-input snapshot/check and its Uniswap-specific error from
+- [x] Remove the now-duplicated handler-input snapshot/check and its Uniswap-specific error from
       `PurchaseUniswap` / `IPurchaseUniswap`; retain measured WRBTC output and the router intermediate-token
       balance checks.
-- [ ] Reject `address(0)` for `uniswapSettings.mocOracle` in the `PurchaseUniswap` constructor using the
+- [x] Reject `address(0)` for `uniswapSettings.mocOracle` in the `PurchaseUniswap` constructor using the
       existing invalid-oracle error.
-- [ ] Extend the MoC mock and focused tests to prove a positive partial redemption reverts and rolls back
+- [x] Extend the MoC mock and focused tests to prove a positive partial redemption reverts and rolls back
       the buyer's idle balance, fee payment, token movement, and accumulated rBTC.
-- [ ] Update the Uniswap exact-consumption tests to assert the shared error, and add constructor-zero-oracle
+- [x] Update the Uniswap exact-consumption tests to assert the shared error, and add constructor-zero-oracle
       coverage.
-- [ ] Record the shared invariant and update current audit/release guidance where it describes exact input
+- [x] Record the shared invariant and update current audit/release guidance where it describes exact input
       consumption as Uniswap-only.
-- [ ] Update the existing matching consumer issues for the handler custom-error change and MoC failure mode.
+- [x] Update the existing matching consumer issues for the handler custom-error change and MoC failure mode.
 
 ## Out of scope
 
@@ -102,11 +102,11 @@ before push.
 
 ## Success criteria
 
-- [ ] No successful `PurchaseRbtc` venue can consume less or more stablecoin than the net amount passed to it.
-- [ ] A partial MoC free-DOC redemption cannot strand stablecoin after BitChill accounting was debited.
-- [ ] Uniswap retains its exact-input and intermediate-token guarantees without duplicating the common check.
-- [ ] A Dex handler cannot be constructed with a zero MoC oracle.
-- [ ] No open product decisions remain and every required gate passes.
+- [x] No successful `PurchaseRbtc` venue can consume less or more stablecoin than the net amount passed to it.
+- [x] A partial MoC free-DOC redemption cannot strand stablecoin after BitChill accounting was debited.
+- [x] Uniswap retains its exact-input and intermediate-token guarantees without duplicating the common check.
+- [x] A Dex handler cannot be constructed with a zero MoC oracle.
+- [x] No open product decisions remain and every required gate passes.
 
 ## Reviewer checklist
 
