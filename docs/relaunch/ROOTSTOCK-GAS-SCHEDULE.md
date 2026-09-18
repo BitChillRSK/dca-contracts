@@ -13,7 +13,8 @@ surcharge. Every `SLOAD` costs 200 gas.
 ## SSTORE: no EIP-1283 / EIP-2200 net metering
 
 [`VM.java` `doSSTORE`](https://github.com/rsksmart/rskj/blob/master/rskj-core/src/main/java/org/ethereum/vm/VM.java)
-branches only on whether the **current** stored value is zero. There is no original-value / dirty map:
+branches on whether the **current** stored value is present (`oldValue == null`), not on an
+original-value / dirty map:
 
 ```java
 // From null to non-zero
@@ -33,6 +34,26 @@ else if (oldValue != null && newValue.isZero()) {
 
 Consequence: every write to a non-zero slot costs `RESET_SSTORE` (5,000), including repeat writes to
 the same slot inside one transaction. Foundry's warm repeat-write (~100) does not apply.
+
+### Cleared slots are deleted (why `null` means SET)
+
+`doSSTORE`'s SET branch is `oldValue == null`, not `oldValue == 0`. That is load-bearing: if a
+cleared slot stayed as an explicit zero in the trie, the next write would take the `else` path
+(`RESET`, 5,000) instead of `SET` (20,000), and every clear-then-set analysis in this file — including
+[R77](./R77-accumulated-rbtc-storage-sentinel.md)'s 15,000 swapper→user transfer — would invert.
+
+It does not stay. [`MutableRepository.addStorageBytes`](https://github.com/rsksmart/rskj/blob/master/rskj-core/src/main/java/org/ethereum/db/MutableRepository.java)
+passes `null` into the trie for an empty value, which removes the node (verified against current
+`master`, 2026-09-19):
+
+```java
+// Special case: if the value is an empty vector, we pass "null" which commands the trie to remove the item.
+if (value == null || value.length == 0) {
+    internalPut(triekey, null);
+}
+```
+
+A cleared slot is deleted, so the next write to it is a `SET` (20,000), not a `RESET` (5,000).
 
 ## Pre-EIP-3529 refunds
 
