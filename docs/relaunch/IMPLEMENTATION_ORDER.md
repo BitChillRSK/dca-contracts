@@ -126,6 +126,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R71 | 71 ([#128](https://github.com/BitChillRSK/dca-contracts/pull/128) source phase) | **license/SPDX deferred; Dex admin keep; batch lending-event semantics; evidence-gated MoC sequence/reverts** (src first in #128; deploy/release work follows) |
 | R76 | post-R75 pre-deployment fix | none (shared exact purchase-input consumption; zero-oracle constructor guard) |
 | R77 | post-R74 gas encoding | none (accumulated-rBTC `claimable + 1` storage sentinel) |
+| R78 | post-R77 gas fast path | none (flat-fee batches skip the unused fee-bound storage word) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1046,6 +1047,13 @@ swapper (SET→RESET) onto the user (forgone CLEAR−REFUND); system net is 0 be
 `SET − REFUND = RESET` ([ROOTSTOCK-GAS-SCHEDULE.md](./ROOTSTOCK-GAS-SCHEDULE.md)). Accepts permanent
 one-slot state per ever-credited user×handler and Foundry-measured always-on encode overhead. Ask:
 none (human accepted the tradeoff 2026-09-18).
+
+### R78 - flat-fee purchase fast path ([spec](./R78-flat-fee-fast-path.md))
+
+Post-R77 behavior-preserving purchase optimization. When a handler's min/max fee rates are equal,
+choose the flat calculation once per batch and leave the linear curve's packed amount-bound word cold.
+Keep the existing variable-fee path, storage, setter, ABI, per-row rounding, and events unchanged. Also
+correct R77's amortization language to the actual per-buyer trigger and measured always-on cost. Ask: none.
 
 ## Closed non-implementation decisions
 
