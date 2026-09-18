@@ -1053,7 +1053,9 @@ none (human accepted the tradeoff 2026-09-18).
 Post-R77 behavior-preserving purchase optimization. When a handler's min/max fee rates are equal,
 choose the flat calculation once per batch and leave the linear curve's packed amount-bound word cold.
 Keep the existing variable-fee path, storage, setter, ABI, per-row rounding, and events unchanged. Also
-correct R77's amortization language to the actual per-buyer trigger and measured always-on cost. Ask: none.
+correct R77's amortization language to the actual per-buyer trigger and measured always-on cost. The
+same-build harness measures **2,450 / 3,247 gas saved** for one / five rows under the default profile
+and **2,547 / 3,236** under the shipped deploy profile. Ask: none.
 
 ## Closed non-implementation decisions
 

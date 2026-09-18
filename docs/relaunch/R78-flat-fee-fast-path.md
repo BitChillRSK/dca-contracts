@@ -30,18 +30,18 @@ and governance retains the same atomic setter and variable-fee range.
 
 ## Scope
 
-- [ ] In `_calculateFeeAndNetAmounts`, load the packed min/max rates first and choose the flat path
+- [x] In `_calculateFeeAndNetAmounts`, load the packed min/max rates first and choose the flat path
       once per batch when they are equal.
-- [ ] On the flat path, do not load `s_feePurchaseLowerBound` or `s_feePurchaseUpperBound`; calculate
+- [x] On the flat path, do not load `s_feePurchaseLowerBound` or `s_feePurchaseUpperBound`; calculate
       every row as `amount * flatRate / BPS_DENOMINATOR` with the existing per-row rounding.
-- [ ] Preserve the variable path's `_calculateFeeWithParams` behavior, aggregation, checked
+- [x] Preserve the variable path's `_calculateFeeWithParams` behavior, aggregation, checked
       overflows, and net-amount array exactly.
-- [ ] Add focused correctness coverage for flat and variable batches, including row-by-row rounding.
-- [ ] Add a gas harness and record default-profile and shipped `FOUNDRY_PROFILE=deploy` deltas against
+- [x] Add focused correctness coverage for flat and variable batches, including row-by-row rounding.
+- [x] Add a gas harness and record default-profile and shipped `FOUNDRY_PROFILE=deploy` deltas against
       R77 for representative one-row and multi-row batches.
-- [ ] Correct R77's economics from unconditional “per row” language to conditional per-buyer
+- [x] Correct R77's economics from unconditional “per row” language to conditional per-buyer
       re-credit language, including the measured always-on cost.
-- [ ] Update `docs/relaunch/README.md` and `IMPLEMENTATION_ORDER.md` with R78.
+- [x] Update `docs/relaunch/README.md` and `IMPLEMENTATION_ORDER.md` with R78.
 
 ## Out of scope
 
@@ -61,6 +61,7 @@ and governance retains the same atomic setter and variable-fee range.
 
 - `src/FeeHandler.sol`
 - `test/ai-generated/unit/FeeHandlerTest.t.sol`
+- `test/gas/R77AccumulatedRbtcSentinelGas.t.sol`
 - `test/gas/R78FlatFeeFastPathGas.t.sol`
 - `docs/relaunch/R77-accumulated-rbtc-storage-sentinel.md`
 - `docs/relaunch/R78-flat-fee-fast-path.md`
@@ -84,15 +85,22 @@ every row, including amounts that round down to zero fee. The gas harness compar
 batch before and after this PR; the implementation must materially save a cold storage read per
 handler batch under the shipped profile. This item adds no fork-only assertion.
 
+Measured in the same-build R77-reference/R78-fast-path harness:
+
+| Profile | One row | Five rows |
+|---|---:|---:|
+| default | 2,450 gas saved | 3,247 gas saved |
+| deploy (`via_ir`) | 2,547 gas saved | 3,236 gas saved |
+
 ## Success criteria
 
-- [ ] Flat-fee batches do not read the purchase-bound storage word.
-- [ ] Flat and variable fee outputs, aggregation, and rounding are unchanged.
-- [ ] The measured saving is recorded under both compiler profiles and is meaningful on a one-row
+- [x] Flat-fee batches do not read the purchase-bound storage word.
+- [x] Flat and variable fee outputs, aggregation, and rounding are unchanged.
+- [x] The measured saving is recorded under both compiler profiles and is meaningful on a one-row
       batch, rather than existing only at unrealistic batch sizes.
-- [ ] No ABI, event, error, storage-layout, deploy-script, or consumer change.
-- [ ] R77's gas statement names its real trigger and includes the always-on cost.
-- [ ] Required tests pass and no open product decisions remain.
+- [x] No ABI, event, error, storage-layout, deploy-script, or consumer change.
+- [x] R77's gas statement names its real trigger and includes the always-on cost.
+- [x] Required tests pass and no open product decisions remain.
 
 ## Reviewer checklist
 
