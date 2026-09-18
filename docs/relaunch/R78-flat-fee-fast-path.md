@@ -95,10 +95,11 @@ not deployment-deadline-bound.
 
 ### R80 survivor: remove `DcaManager__CadenceAnchorUpdated`
 
-**Candidate.** Remove the event declaration and the one emit in `_rBtcPurchaseChecksEffects`. Do not
-consolidate it with `DcaManager__TokenBalanceUpdated`: that event is emitted from four sites and is
-the canonical balance-change record, so changing only its purchase-path shape would break that
-property for consumers.
+**Candidate.** Remove the event declaration and its only emit, currently in
+`DcaManager._rBtcPurchaseChecksEffects` at `DcaManager.sol:635`. Do not consolidate it with
+`DcaManager__TokenBalanceUpdated`: that event is emitted from four sites and is the canonical
+balance-change record, so changing only its purchase-path shape would break that property for
+consumers.
 
 **Rootstock upside.** Removing the cadence event saves **1,946 gas per purchased row**. LOG pricing is
 the same on Foundry and Rootstock, so this measurement transfers unchanged. The pure LOG3 component
@@ -117,8 +118,8 @@ The median `batchBuyRbtc` result moves **179,090 → 177,144**. The largest case
 
 **Information preservation.** `getDcaSchedule()` returns the current `cadenceAnchor`. An indexer that
 holds the prior anchor and purchase period can reproduce the new anchor exactly with the formula in
-`DcaManager._rBtcPurchaseChecksEffects`: use the current UTC-day start; on a subsequent purchase,
-advance the prior anchor by the whole number of elapsed periods.
+`DcaManager._rBtcPurchaseChecksEffects` (currently `DcaManager.sol:608-620`): use the current UTC-day
+start; on a subsequent purchase, advance the prior anchor by the whole number of elapsed periods.
 
 **Required proof and cutover.** Write a dedicated R80 spec when assigned. It needs a product decision,
 the measured gas test, the event expectation update, an ABI diff, migration/backfill guidance, and a
@@ -129,20 +130,20 @@ R80 must be scheduled first.
 
 ### Closed: nonzero-slot retention has zero Rootstock system value
 
-The following five candidates are closed as chain-invalid gas optimizations:
+These five candidates are closed as chain-invalid gas optimizations:
 
-1. Retain a finite residual/sentinel Uniswap router allowance.
-2. Seed handler stablecoin balances or WRBTC balances.
-3. Keep one atomic unit in the fee collector.
-4. Add sentinels to lending-share mappings.
-5. Add sentinels to idle-balance mappings.
+| Candidate | Rootstock closure |
+|---|---|
+| Retain a finite residual/sentinel Uniswap router allowance | Its claimed storage win replaces `CLEAR` + `SET` with `RESET`; `SET − REFUND = RESET`, so system storage gas is zero. See [`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SCHEDULE.md). |
+| Seed handler stablecoin or WRBTC balances | The seed keeps a token balance nonzero, making the same `CLEAR` + `SET` → `RESET` substitution; `SET − REFUND = RESET`. See [`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SCHEDULE.md). |
+| Keep one atomic unit in the fee collector | The retained unit changes the next balance creation to a reset but forgoes the prior clear refund; `SET − REFUND = RESET`. See [`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SCHEDULE.md). |
+| Add sentinels to lending-share mappings | The encoded slot moves cost between the clearing purchase and later deposit but creates no system saving because `SET − REFUND = RESET`. See [`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SCHEDULE.md). |
+| Add sentinels to idle-balance mappings | The encoded slot has the same zero-sum storage substitution: `SET − REFUND = RESET`. See [`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SCHEDULE.md). |
 
-Each proposal's claimed storage win merely substitutes a later `RESET` for a `CLEAR` followed by `SET`. On Rootstock,
-`SET − REFUND = RESET`, so each has **exactly zero net system gas value**; see
-[`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SCHEDULE.md). Some could move cost between the user,
-swapper, venue, or treasury as R77 intentionally does, but none creates a saving. The allowance and
-seed variants also add approval exposure or permanently unowned dust. Do not reopen them as gas
-optimizations unless Rootstock activates a proposal such as RSKIP-243 and changes its storage schedule.
+Some could move cost between the user, swapper, venue, or treasury as R77 intentionally does, but
+none creates a saving. The allowance and seed variants also add approval exposure or permanently
+unowned dust. Do not reopen them as gas optimizations unless Rootstock activates a proposal such as
+RSKIP-243 and changes its storage schedule.
 
 An unlimited router allowance could additionally skip later approval calls and their log/compute
 cost, so it is not the same arithmetic claim. It remains rejected on security grounds: idle handlers
