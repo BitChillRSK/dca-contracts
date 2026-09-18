@@ -11,8 +11,9 @@ instead of clearing storage. The next credit for that user is then a cheaper non
 ## Background
 
 `PurchaseRbtc` stores claimable rBTC in `s_usersAccumulatedRbtc[user]` and writes `0` on full
-withdrawal. The next purchase for that user pays a zero-to-nonzero `SSTORE` again. Storage warmth
-does not survive across transactions; what matters is keeping the slot nonzero.
+withdrawal. The next purchase for that user then pays a zero-to-nonzero `SSTORE` (`SET`) again. On
+Rootstock that is a flat 20,000 vs 5,000 `RESET` — there is no EIP-2929 cold/warm schedule; what
+matters is keeping the slot nonzero so the next credit is a RESET.
 
 Leaving one claimable wei behind would save the same gas but would permanently show dust in
 `getAccumulatedRbtcBalance` and complicate `withdrawAllAccumulatedRbtc`'s zero-balance skip. The
@@ -26,16 +27,43 @@ cleaner encoding is:
 - Subsequent purchases add into the nonzero slot.
 
 Tradeoffs accepted by this PR: permanent one-slot state per user×handler that has ever been
-credited, and loss of the user's storage-clear refund on full withdrawal.
+credited, and moving storage-clear economics onto the user at full withdrawal.
 
-**Amortized framing (what decides whether the permanent state is worth it):** the ≈17,100 gas
-operator saving fires only on a purchase whose buyer fully withdrew since their last credit. For a
-weekly-DCA user who withdraws monthly that is roughly one row in four, so **≈4,300 gas/row** expected
-operator saving — not 17,100 on every tick. Of the peak 17,100, **4,800 is a transfer from the user**
-(EIP-3529 clear refund forgone on every full `withdrawAccumulatedRbtc`; ×N in
-`withdrawAllAccumulatedRbtc`), not new value: the protocol-level net per withdraw-and-rebuy cycle is
-therefore **≈12,300**. Peak cold re-credit delta (SSTORE_SET − SSTORE_RESET) is still what the harness
-measures (**17,105**, pinned as `EXPECTED_COLD_SAVING`).
+### Rootstock economics (production schedule)
+
+On Rootstock, SSTORE is Petersburg-style: `SET = 20,000`, `RESET = CLEAR = 5,000`, `REFUND = 15,000`,
+with refunds capped at `gasUsed / 2`. See [`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SCHEDULE.md).
+Because `SET − REFUND = RESET`, keeping the slot non-zero is **gas-neutral for the system**; it only
+moves cost between parties.
+
+| Per withdraw-and-rebuy cycle, on Rootstock | without sentinel | with sentinel | delta |
+|---|---:|---:|---:|
+| Swapper's first credit after a withdrawal | 20,000 SET | 5,000 RESET | **−15,000** |
+| User's full withdrawal | 5,000 CLEAR − 15,000 refund = −10,000 | 5,000 RESET | **+15,000** |
+| System net | | | **0** |
+
+Three consequences, in order:
+
+1. **This is the intended effect.** R77 exists to move 15,000 gas per cycle off the swapper — a
+   recurring protocol operating cost paid on every post-withdraw re-credit forever — and onto users'
+   individual, occasional withdrawals. That transfer is the approved rationale and it lands at full
+   size on Rootstock, larger on the user side than the Ethereum arithmetic suggested (15,000, not
+   4,800). The 15,000 clear refund is fully realized whenever withdraw `gasUsed ≥ 30,000` (cap is
+   `gasUsed / 2`), which every real withdrawal exceeds.
+2. **It creates no net system value**, and the earlier “≈12,300 net” figure was wrong. That number was
+   an artifact of EIP-3529, which deliberately made Ethereum's clear refund smaller than its
+   set/reset gap. Rootstock never adopted it, so the two sides cancel exactly.
+3. **The encoding is not free.** The always-on Foundry-measured overhead is **+298** one-row /
+   **+938** five-row same-buyer on ordinary credits — real deadweight paid on every non-sentinel
+   credit, and the honest cost of the transfer. Those figures are Foundry / Cancun measurements, not
+   Rootstock bills.
+
+### Foundry / Cancun regression pin (not a Rootstock saving)
+
+`test/gas/R77AccumulatedRbtcSentinelGas.t.sol` pins `EXPECTED_COLD_SAVING = 17_105` under Foundry's
+Cancun schedule (cold SET − cold RESET after `vm.cool`). That number is a **same-build regression
+pin**. It is **not** the Rootstock operator saving (which is 15,000 on the SET→RESET substitution
+above). Do not quote 17,105 / ≈17,100 / ≈4,300 / −4,800 / ≈12,300 as production Rootstock economics.
 
 `DcaManager` needs no logic change: it already reads and skips through
 `IPurchaseRbtc.getAccumulatedRbtcBalance`, which must keep returning the decoded claimable amount.
@@ -75,10 +103,11 @@ stacked implementation PR rather than folding it into R74.
 
 - `src/PurchaseRbtc.sol`
 - `src/interfaces/IPurchaseRbtc.sol`
-- `AGENTS.md` (invariant 13)
+- `AGENTS.md` (invariant 13; Foundry-vs-Rootstock gas methodology under Tests and done-gate)
 - `test/unit/PurchaseRbtcTest.t.sol`
 - `test/gas/R77AccumulatedRbtcSentinelGas.t.sol`
 - `docs/relaunch/R77-accumulated-rbtc-storage-sentinel.md`
+- `docs/relaunch/ROOTSTOCK-GAS-SCHEDULE.md`
 - `docs/relaunch/IMPLEMENTATION_ORDER.md`
 - `docs/relaunch/README.md`
 
@@ -106,9 +135,9 @@ re-credit must be materially cheaper (on the order of the zero-to-nonzero vs non
 - [x] After a full withdraw the storage slot stays nonzero (`1`); the next credit avoids a
       zero-to-nonzero `SSTORE`.
 - [x] `withdrawAllAccumulatedRbtc` still skips zero-claimable handlers via the decoded getter.
-- [x] Measured re-credit gas saving is recorded with amortized framing (**≈4,300 gas/row** expected for
-      weekly-DCA / monthly-withdraw; peak cold **≈17,100** / harness pin **17,105**; **≈12,300** net per
-      withdraw-and-rebuy after the −4,800 user clear-refund transfer); no open product decisions remain.
+- [x] Rootstock economics recorded: −15,000 swapper / +15,000 user / 0 system net per withdraw-and-rebuy;
+      Foundry pin `EXPECTED_COLD_SAVING = 17_105` labelled as Cancun regression only; always-on encoding
+      overhead +298 / +938 kept as Foundry deadweight. No open product decisions remain.
 - [x] `make check`, `make fork-sovryn`, and `make fork-tropykus` pass.
 
 ## Reviewer checklist

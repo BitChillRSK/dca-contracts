@@ -21,17 +21,17 @@ import {NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
  *      The paired comparison snapshots the post-setUp state and reverts between the two credits so
  *      shared cold costs cancel.
  *
- *      Expected gap ≈ 17,100 (SSTORE_SET − SSTORE_RESET). This harness pins `EXPECTED_COLD_SAVING`
- *      at 17,105 (what the paired cool+snapshot run prints); ±500 absorbs forge noise.
- *      That peak is conditional (buyer fully withdrew since last credit). Amortized under weekly DCA /
- *      monthly withdraw ≈ 4,300 gas/row; of the peak, 4,800 is a user→operator transfer (forgone
- *      clear refund), so net created value per withdraw-and-rebuy cycle ≈ 12,300.
+ *      Expected Foundry/Cancun gap ≈ 17,100 (cold SET − cold RESET). This harness pins
+ *      `EXPECTED_COLD_SAVING` at 17,105 as a **Foundry-schedule regression pin**; ±500 absorbs forge
+ *      noise. It is not a Rootstock operator saving. On Rootstock the production transfer is
+ *      SET 20,000 → RESET 5,000 (−15,000 swapper) against CLEAR−REFUND → RESET (+15,000 user), system
+ *      net 0 — see docs/relaunch/ROOTSTOCK-GAS-SCHEDULE.md and R77's Rootstock economics section.
  */
 contract R77AccumulatedRbtcSentinelGasTest is Test {
     uint16 internal constant FLAT_FEE_RATE = 100;
     uint256 internal constant RBTC_OUT = 1 ether;
     uint256 internal constant GROSS = 100 ether;
-    /// @dev What this cool+snapshot harness prints for cold first − cold re-credit (≈17,100 SSTORE gap).
+    /// @dev Foundry/Cancun regression pin (cold first − cold re-credit). Not a Rootstock saving.
     uint256 internal constant EXPECTED_COLD_SAVING = 17_105;
 
     address internal buyerFirst = address(0xA11CE);

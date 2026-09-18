@@ -1041,9 +1041,11 @@ the existing setter and canonical deployment guard. Ask: none.
 
 Post-R74 operator-gas encoding. Store each handler's per-user accumulated rBTC as `claimable + 1` so
 a full withdrawal leaves sentinel `1` instead of clearing the slot; getters and withdrawals decode and
-still pay the complete claim. Avoids a zero-to-nonzero `SSTORE` on the next credit after a full
-withdraw. Accepts permanent one-slot state per ever-credited user×handler and loss of the storage-clear
-refund. Ask: none (human accepted the tradeoff 2026-09-18).
+still pay the complete claim. On Rootstock this moves 15,000 gas per withdraw-and-rebuy cycle from the
+swapper (SET→RESET) onto the user (forgone CLEAR−REFUND); system net is 0 because
+`SET − REFUND = RESET` ([ROOTSTOCK-GAS-SCHEDULE.md](./ROOTSTOCK-GAS-SCHEDULE.md)). Accepts permanent
+one-slot state per ever-credited user×handler and Foundry-measured always-on encode overhead. Ask:
+none (human accepted the tradeoff 2026-09-18).
 
 ## Closed non-implementation decisions
 
