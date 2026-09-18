@@ -10,7 +10,7 @@ uint16 constant MAX_FEE_RATE_TEST = 200; // 2% for testing - allows for better f
 uint16 constant MAX_FEE_RATE_PRODUCTION = 100; // 1% flat rate for production (same as MIN_FEE_RATE for flat fee)
 uint128 constant FEE_PURCHASE_LOWER_BOUND = 1000 ether; // 1000 DOC
 uint128 constant FEE_PURCHASE_UPPER_BOUND = 100_000 ether; // 100,000 DOC
-uint256 constant MIN_PURCHASE_PERIOD = 1 days; // Default to at most one purchase each day
+uint256 constant MIN_PURCHASE_PERIOD = 7 days; // Launch default: at most one purchase each week
 uint256 constant MAX_SCHEDULES_PER_TOKEN = 10; // Default to a maximum of 10 DCA schedules per token
 
 // Chain IDs

@@ -400,8 +400,14 @@ contract SchedulePackingTest is DcaDappTest {
     function testSubsequentPurchaseRevertsWhenAnchorWouldOverflowUint48() external {
         if (block.chainid != ANVIL_CHAIN_ID) return;
 
-        vm.warp(type(uint48).max);
+        // Keep this one-day boundary probe independent of the weekly launch default.
+        vm.prank(OWNER);
+        dcaManager.modifyMinPurchasePeriod(1 days);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
+        vm.prank(USER);
+        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, 1 days);
+
+        vm.warp(type(uint48).max);
         super.buyRbtcOne(scheduleId);
 
         vm.warp(_firstUnrepresentableDayStart());
