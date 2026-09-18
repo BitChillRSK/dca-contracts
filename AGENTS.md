@@ -75,6 +75,8 @@ Unless the assigned spec explicitly changes one:
 
 12. **Exact stablecoin consumption on every successful purchase** — `PurchaseRbtc` measures the handler's purchase-token balance immediately around `_purchaseRbtc` and requires it to decrease by exactly the net amount supplied to the venue. A positive rBTC/WRBTC receipt is not proof that Money on Chain or a router consumed the complete input. Keep this check in the shared purchase pipeline so every venue inherits it; venue-specific code may add stricter custody checks, such as Uniswap intermediate-token balance equality. Any partial, excessive, or negative delta reverts the whole batch, including fees, funding debits, schedule effects, and venue state.
 
+13. **Accumulated rBTC encoding lives in three helpers only** — `s_usersAccumulatedRbtc` stores `claimable + 1` when live (`0` = never credited; `1` = post-withdraw sentinel). Read or write it only through `_creditRbtc`, `_claimableRbtc`, and `_withdrawRbtcChecksEffects`. A raw `+=` on the mapping underpays the user by one wei of encoding on every later decode. Checkable with one grep: no other `src/` site may name `s_usersAccumulatedRbtc`. See `docs/relaunch/R77-accumulated-rbtc-storage-sentinel.md`.
+
 ## Section headers and function order
 
 First-party `src/` files use Foundry-style banners with these exact titles. When a section is non-empty, emit its banner; skip empty ones. Order:

@@ -454,7 +454,7 @@ contract PurchaseRbtcTest is Test {
                      ACCUMULATED-RBTC STORAGE SENTINEL
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Full withdraw pays the complete claim, getter stays 0, and raw storage keeps sentinel 1.
+    /// @dev Full withdraw pays the complete claim, getter stays 0, and raw storage keeps sentinel 1.
     function test_fullWithdraw_leavesSentinelAndPaysCompleteClaim() public {
         vm.deal(address(harness), RBTC_OUT);
         harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(100 ether), NO_MIN_RBTC_OUT);
@@ -470,7 +470,7 @@ contract PurchaseRbtcTest is Test {
         assertEq(harness.rawAccumulatedRbtc(buyerA), 1, "full withdraw cleared storage");
     }
 
-    /// @notice After a full withdraw, the next credit lands on the sentinel and stays fully withdrawable.
+    /// @dev After a full withdraw, the next credit lands on the sentinel and stays fully withdrawable.
     function test_recreditAfterFullWithdraw_creditsAndPaysAgain() public {
         vm.deal(address(harness), 2 * RBTC_OUT);
         harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(100 ether), NO_MIN_RBTC_OUT);
@@ -487,7 +487,7 @@ contract PurchaseRbtcTest is Test {
         assertEq(harness.rawAccumulatedRbtc(buyerA), 1);
     }
 
-    /// @notice A never-credited user and a post-withdraw sentinel both refuse a direct withdraw.
+    /// @dev A never-credited user and a post-withdraw sentinel both refuse a direct withdraw.
     function test_withdraw_revertsWhenNeverCreditedOrOnlySentinel() public {
         vm.expectRevert(IPurchaseRbtc.PurchaseRbtc__NoAccumulatedRbtcToWithdraw.selector);
         harness.withdrawAccumulatedRbtc(buyerA);
@@ -500,7 +500,7 @@ contract PurchaseRbtcTest is Test {
         harness.withdrawAccumulatedRbtc(buyerA);
     }
 
-    /// @notice A zero floor allocation must not plant a sentinel on a never-credited buyer.
+    /// @dev A zero floor allocation must not plant a sentinel on a never-credited buyer.
     function test_zeroCredit_doesNotPlantSentinelOnNeverCreditedBuyer() public {
         harness.setRbtcOut(2);
         address[] memory buyers = new address[](2);

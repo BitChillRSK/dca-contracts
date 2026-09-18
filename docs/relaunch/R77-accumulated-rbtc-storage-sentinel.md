@@ -26,9 +26,11 @@ cleaner encoding is:
 - Subsequent purchases add into the nonzero slot.
 
 Tradeoffs accepted by this PR: permanent one-slot state per user×handler that has ever been
-credited, and loss of the user's storage-clear refund on full withdrawal. The operator saving is the
-cheaper re-credit `SSTORE` on every purchase after a full withdraw (~17k–20k gas per such row after
-shared-path warm-up; measured **19,865** gas in `R77AccumulatedRbtcSentinelGas`).
+credited, and loss of the user's storage-clear refund on full withdrawal. Quantified: **−4,800 gas
+user-paid** per full `withdrawAccumulatedRbtc` (EIP-3529 clear refund forgone; ×N in
+`withdrawAllAccumulatedRbtc`), versus **+17,090 gas operator-paid** per subsequent re-credit when both
+credits are measured cold across transaction boundaries (SSTORE_SET − SSTORE_RESET). Still net
+positive whenever a withdrawn user is credited again; not free on the withdraw side.
 
 `DcaManager` needs no logic change: it already reads and skips through
 `IPurchaseRbtc.getAccumulatedRbtcBalance`, which must keep returning the decoded claimable amount.
@@ -41,17 +43,18 @@ stacked implementation PR rather than folding it into R74.
 ## Scope
 
 - [x] Encode `s_usersAccumulatedRbtc` as `claimable + 1` when the slot is live; leave `0` only for
-      never-credited users.
+      never-credited users. Credit through a single `_creditRbtc` helper; decode through
+      `_claimableRbtc` / `_withdrawRbtcChecksEffects` only (`AGENTS.md` invariant 13).
 - [x] Decode in `getAccumulatedRbtcBalance` and in `_withdrawRbtcChecksEffects`.
 - [x] On full withdrawal, write sentinel `1` and transfer the full decoded claim (never leave
       claimable dust).
 - [x] On credit, skip the storage write when the row's allocated rBTC is `0` so a never-credited user
       is not marked live by a zero floor allocation.
-- [x] Document the encoding in `IPurchaseRbtc` / `PurchaseRbtc` NatSpec (durable reason, no R-id in
-      `src/`).
+- [x] Document the encoding in `PurchaseRbtc` NatSpec (durable reason, no R-id in `src/`); keep the
+      interface getter return tag free of storage-gas detail.
 - [x] Unit-test: full withdraw pays everything, getter stays `0`, raw slot is `1`, a later purchase
       credits and withdraws cleanly again; never-credited withdraw still reverts / withdraw-all skips.
-- [x] Gas benchmark: first credit (zero→nonzero) vs re-credit after full withdraw (nonzero→nonzero),
+- [x] Gas benchmark: cold first credit vs cold re-credit after full withdraw (setUp + `vm.cool`),
       and record the delta in the PR / spec success notes.
 - [x] Update `docs/relaunch/README.md` Status and `IMPLEMENTATION_ORDER.md` with R77.
 
@@ -67,6 +70,7 @@ stacked implementation PR rather than folding it into R74.
 
 - `src/PurchaseRbtc.sol`
 - `src/interfaces/IPurchaseRbtc.sol`
+- `AGENTS.md` (invariant 13)
 - `test/unit/PurchaseRbtcTest.t.sol`
 - `test/gas/R77AccumulatedRbtcSentinelGas.t.sol`
 - `docs/relaunch/R77-accumulated-rbtc-storage-sentinel.md`
@@ -97,8 +101,8 @@ re-credit must be materially cheaper (on the order of the zero-to-nonzero vs non
 - [x] After a full withdraw the storage slot stays nonzero (`1`); the next credit avoids a
       zero-to-nonzero `SSTORE`.
 - [x] `withdrawAllAccumulatedRbtc` still skips zero-claimable handlers via the decoded getter.
-- [x] Measured re-credit gas saving is recorded (**19,865** gas after shared-path warm-up); no open
-      product decisions remain.
+- [x] Measured re-credit gas saving is recorded (**17,090** gas cold; −4,800 user clear-refund forgone
+      per full withdraw); no open product decisions remain.
 - [x] `make check`, `make fork-sovryn`, and `make fork-tropykus` pass.
 
 ## Reviewer checklist
