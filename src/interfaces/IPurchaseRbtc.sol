@@ -84,7 +84,9 @@ interface IPurchaseRbtc {
     /**
      * @notice rBTC this handler has accumulated for `user` and not yet withdrawn.
      * @param user Account to query.
-     * @return Accumulated rBTC in wei.
+     * @return Accumulated rBTC in wei — the full amount a withdrawal would pay. Internal storage may
+     *         keep a nonzero sentinel after a full withdrawal so the next credit avoids a
+     *         zero-to-nonzero SSTORE; that encoding is never returned here.
      */
     function getAccumulatedRbtcBalance(address user) external view returns (uint256);
 }

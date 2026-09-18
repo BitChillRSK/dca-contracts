@@ -17,7 +17,10 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    mapping(address user => uint256 amount) internal s_usersAccumulatedRbtc;
+    /// @dev Encoded claimable rBTC. `0` means never credited; a live value is `claimable + 1`
+    ///      (including post-withdraw sentinel `1`). Keeps the slot nonzero so the next credit after a
+    ///      full withdrawal is a cheaper nonzero-to-nonzero SSTORE. Getters and withdrawals decode.
+    mapping(address user => uint256 encodedAmount) internal s_usersAccumulatedRbtc;
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
@@ -97,7 +100,12 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
             address buyer = buyers[i];
             uint256 usersPurchasedRbtc = totalPurchasedRbtc * plannedNet / totalNetStablecoinPlanned;
             uint256 usersStablecoinSpent = totalStablecoinAmountToSpend * plannedNet / totalNetStablecoinPlanned;
-            s_usersAccumulatedRbtc[buyer] += usersPurchasedRbtc;
+            if (usersPurchasedRbtc != 0) {
+                // Live slots store claimable + 1. A never-credited slot stays 0 until the first positive
+                // credit so a zero floor allocation does not plant a sentinel.
+                uint256 stored = s_usersAccumulatedRbtc[buyer];
+                s_usersAccumulatedRbtc[buyer] = (stored == 0 ? 1 : stored) + usersPurchasedRbtc;
+            }
             emit PurchaseRbtc__RbtcBought(
                 buyer, address(purchaseToken), usersPurchasedRbtc, scheduleIds[i], usersStablecoinSpent
             );
@@ -123,7 +131,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
      * @inheritdoc IPurchaseRbtc
      */
     function getAccumulatedRbtcBalance(address user) external view override returns (uint256) {
-        return s_usersAccumulatedRbtc[user];
+        return _claimableRbtc(user);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -131,14 +139,30 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Zero the user's accumulated balance after checking it is nonzero. Caller then pays.
+     * @dev Decode claimable rBTC, revert if none, and leave the post-withdraw sentinel (`1`).
+     *      Caller then pays the decoded amount in full.
      */
     function _withdrawRbtcChecksEffects(address user) internal returns (uint256) {
-        uint256 rbtcBalance = s_usersAccumulatedRbtc[user];
-        if (rbtcBalance == 0) revert PurchaseRbtc__NoAccumulatedRbtcToWithdraw();
+        uint256 stored = s_usersAccumulatedRbtc[user];
+        // `0` = never credited; `1` = fully withdrawn sentinel. Both mean nothing to pay.
+        if (stored <= 1) revert PurchaseRbtc__NoAccumulatedRbtcToWithdraw();
 
-        s_usersAccumulatedRbtc[user] = 0;
-        return rbtcBalance;
+        unchecked {
+            uint256 rbtcBalance = stored - 1;
+            s_usersAccumulatedRbtc[user] = 1;
+            return rbtcBalance;
+        }
+    }
+
+    /**
+     * @dev Claimable rBTC for `user`. Decodes the `claimable + 1` encoding; `0` / sentinel `1` both
+     *      return 0 so callers never see dust.
+     */
+    function _claimableRbtc(address user) internal view returns (uint256) {
+        uint256 stored = s_usersAccumulatedRbtc[user];
+        unchecked {
+            return stored == 0 ? 0 : stored - 1;
+        }
     }
 
     /**
