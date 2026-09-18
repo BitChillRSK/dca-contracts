@@ -66,8 +66,11 @@ contract R78FeeHandlerGasHarness is FeeHandler {
  *          forge test --match-path test/gas/R78FlatFeeFastPathGas.t.sol -vv
  *          FOUNDRY_PROFILE=deploy forge test --match-path test/gas/R78FlatFeeFastPathGas.t.sol -vv
  *
- *      Each measurement runs inside a fresh harness call. Cooling the harness before each call makes
- *      the rate and bounds slots cold, matching the first access in a handler purchase transaction.
+ *      These are Foundry / Cancun regression measurements, not Rootstock bills. Each measurement
+ *      runs inside a fresh harness call. Cooling the harness before each call makes the rate and
+ *      bounds slots cold under Foundry and proves the optimized branch avoids exactly one bounds-word
+ *      read. Derive production gas by replacing Foundry's 2,100-gas cold SLOAD with Rootstock's flat
+ *      200-gas SLOAD; see docs/relaunch/ROOTSTOCK-GAS-SCHEDULE.md.
  */
 contract R78FlatFeeFastPathGasTest is Test {
     uint16 internal constant FLAT_FEE_RATE = 100;
@@ -118,7 +121,7 @@ contract R78FlatFeeFastPathGasTest is Test {
         console2.log("R77 generic fee loop:", baselineGas);
         console2.log("R78 flat-fee fast path:", optimizedGas);
         console2.log("saving:", saving);
-        assertGt(saving, 1_500, "flat path did not materially save a cold storage read");
+        assertGt(saving, 1_500, "Foundry delta did not include the avoided cold read");
         assertLt(saving, 10_000, "saving exceeded the intended fee-loop scope");
     }
 

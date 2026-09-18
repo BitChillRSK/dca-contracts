@@ -19,9 +19,10 @@ The rates and collector share one storage word. The two purchase bounds share a 
 fast path can load only the rate word, choose one loop for the complete batch, and leave the bounds
 word cold. The variable path must continue to load the bounds and use the same interpolation math.
 
-R77's storage-sentinel gas statement is also corrected in this stacked PR: the zero-to-nonzero
-saving occurs once per buyer whose slot was cleared, not once per row when the same buyer appears
-several times. The always-on encoding overhead must be recorded beside that conditional saving.
+Foundry executes these tests on an Ethereum Cancun gas schedule, while production runs on Rootstock.
+The fast path avoids exactly one storage read, so its production value must adjust Foundry's cold
+`SLOAD` price to Rootstock's flat price; see
+[`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SCHEDULE.md).
 
 ## Open product decisions
 
@@ -38,9 +39,9 @@ and governance retains the same atomic setter and variable-fee range.
       overflows, and net-amount array exactly.
 - [x] Add focused correctness coverage for flat and variable batches, including row-by-row rounding.
 - [x] Add a gas harness and record default-profile and shipped `FOUNDRY_PROFILE=deploy` deltas against
-      R77 for representative one-row and multi-row batches.
-- [x] Correct R77's economics from unconditional “per row” language to conditional per-buyer
-      re-credit language, including the measured always-on cost.
+      R77 for representative one-row and multi-row batches, labelled as Foundry / Cancun.
+- [x] Derive the Rootstock production delta from the one avoided storage read and the unchanged
+      memory/compute work, using the repository's Rootstock gas-schedule reference.
 - [x] Update `docs/relaunch/README.md` and `IMPLEMENTATION_ORDER.md` with R78.
 
 ## Out of scope
@@ -51,161 +52,125 @@ and governance retains the same atomic setter and variable-fee range.
 
 ## Deferred optimization record
 
-The estimates in this section are preliminary unless explicitly described as measured. They are
-useful for ordering future work, but they are not promises of net transaction savings: compiler
-output, Rootstock's gas schedule, token implementations, storage warmth, refunds, and real batch
-composition can all change the result. A future item should add a same-build gas harness and test the
-shipped `deploy` profile before accepting any candidate.
+This record uses Rootstock production economics, not Foundry's Ethereum Cancun prices. In particular,
+Rootstock has no EIP-2200 net metering: every write to an already-nonzero slot costs 5,000 gas, even
+when the same slot was written earlier in the transaction. Conversely, the identity
+`SET − REFUND = RESET` makes every clear-and-later-set versus keep-nonzero proposal system-neutral.
+See [`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SCHEDULE.md) for the constants and sources.
 
-### Consolidate the two DcaManager per-row state events
+### R79 survivor: coalesce repeated-buyer writes
 
-**Candidate.** `_rBtcPurchaseChecksEffects` emits `DcaManager__TokenBalanceUpdated` and
-`DcaManager__CadenceAnchorUpdated` after updating one schedule. Replace them with one purchase-state
-event carrying both new values, or make one existing purchase event the canonical state-change
-record.
+**Candidate.** Have the swapper sort each handler batch by buyer. In the contract, accumulate one
+contiguous buyer run and flush it once to `_creditRbtc`; do the same for `_setUserShares` on lending
+handlers. Because `_setUserShares` currently couples the write with the canonical transition event,
+R79 must separate those responsibilities: emit the same previous→new transition for every row while
+persisting only the final balance at the run flush. Per-row fee/rBTC calculations and every existing
+event remain in their current order and retain their current values. The idle-balance path can be
+evaluated separately, but it must not use a sentinel (see the closed items below).
 
-**Potential upside.** Preliminary EVM log-cost arithmetic suggests roughly 1,500 gas per row from
-removing one log and its duplicated topics/data; the exact amount depends on the final signature and
-compiler-generated memory work. Unlike a storage sentinel, this would benefit every successful row.
+**Rootstock upside.** A five-row single-buyer batch currently writes the same accumulated-rBTC slot
+five times and the same lending-share slot five times. Rootstock charges 5,000 for every nonzero-slot
+write, including repeat writes within one transaction. Coalescing saves four writes per mapping:
 
-**Why deferred.** This is a public event-schema change, not merely a local implementation cleanup.
-Monitoring and indexers may replay the two existing events independently, and consolidating them can
-alter ordering and backfill assumptions. It therefore requires a product choice about the canonical
-event, an ABI diff, migration/backfill notes, and a `bitchill-monitoring` consumer issue.
+```
+4 avoided writes × 5,000 × 2 mappings = approximately 40,000 gas
+```
 
-**Evidence required.** Inventory all consumers of both events; design the replacement payload and
-indexing; benchmark one- and multi-row purchases; test event ordering and values; and prove that a
-consumer can reconstruct the same state from genesis or from the cutover block. **Recommendation:**
-worth a dedicated PR if event consumers accept the migration, because the benefit scales per row.
+That is about 5% of the 815,384-gas live tick recorded by R64. Foundry shows only approximately 800
+gas for the same structural change because its warm dirty-slot writes cost approximately 100; using
+that number ranked this candidate about 50 times too low.
 
-### Retain or sentinel the Uniswap router allowance
+**Why ordering is not a blocker.** Contiguous rows are a batch-construction choice, not a protocol
+constraint: the swapper already constructs the array and can sort it by buyer for free off-chain. The
+contract then needs only compare-with-previous-row and a run flush, not a general in-memory map. R79
+must coordinate that ordering with the swapper team, but the contract ABI, events, and consumer
+surface remain unchanged.
 
-**Candidate.** `PurchaseUniswap._purchaseRbtc` currently calls `forceApprove(router, exactAmount)` for
-every batch. A residual nonzero allowance, a sentinel allowance, or a bounded reusable allowance
-could avoid an allowance zero-to-nonzero write on later purchases.
+**Required proof.** Write a dedicated R79 spec when assigned. Differential fuzzing must prove
+per-row outputs, reverts, rounding, totals, and event equivalence. Benchmark unique buyers,
+clustered duplicates, and adversarial unsorted duplicates under both Foundry profiles, then derive
+the Rootstock write delta explicitly. Include both rBTC credits and lending-share debits and ensure a
+unique-buyer batch does not regress materially. **Priority:** largest surviving gas opportunity, but
+not deployment-deadline-bound.
 
-**Potential upside.** For a standard ERC-20 allowance implementation, preliminary storage-cost
-arithmetic puts the upper bound around 12,300 system gas per batch relative to repeatedly clearing
-and recreating the allowance. This is not a measured USDRIF/USDT0 result. A token that requires the
-USDT-style zero-first sequence can consume most or all of that gain through `forceApprove`'s fallback.
+### R80 survivor: remove `DcaManager__CadenceAnchorUpdated`
 
-**Why deferred.** Unlimited approval is not acceptable as the default design: idle handlers also
-custody pooled user deposits, so a compromised or upgraded router could reach more than the current
-purchase. Even a bounded residual allowance changes the trust and revocation model. Token-specific
-approval behavior also cannot safely be inferred from generic ERC-20 behavior.
+**Candidate.** Remove the event declaration and the one emit in `_rBtcPurchaseChecksEffects`. Do not
+consolidate it with `DcaManager__TokenBalanceUpdated`: that event is emitted from four sites and is
+the canonical balance-change record, so changing only its purchase-path shape would break that
+property for consumers.
 
-**Evidence required.** Fork-test the deployed USDRIF and USDT0 contracts for exact-amount,
-zero-first, allowance-decrement, and return-value behavior; benchmark the complete router call under
-both routes; bound the maximum residual exposure; define owner revocation and router-change behavior;
-and test that failed swaps cannot strand an unsafe approval. **Recommendation:** investigate because
-the per-batch ceiling is meaningful, but ship only a bounded design with live-token evidence—never a
-blanket unlimited allowance for a deposit-holding handler.
+**Rootstock upside.** Removing the cadence event saves **1,946 gas per purchased row**. LOG pricing is
+the same on Foundry and Rootstock, so this measurement transfers unchanged. The pure LOG3 component
+is `375 + 3 × 375 + 8 × 32 = 1,756`; the remaining 190 gas is compiler-generated work.
 
-### Seed handler stablecoin or WRBTC balances
+Reproduction method:
 
-**Candidate.** Fund each handler with one atomic unit so recurring venue transfers do not repeatedly
-create a zero balance slot. The same idea could apply to the input stablecoin, intermediate tokens,
-or WRBTC depending on which route clears a handler balance.
+```bash
+# Temporarily remove the event emit, then run:
+SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn EXPECTED_LENDING_PROTOCOL=sovryn \
+  STABLECOIN_TYPE=DOC forge test --match-path test/unit/RbtcPurchaseTest.t.sol --gas-report
+```
 
-**Potential upside.** A qualifying zero-to-nonzero recipient write can avoid the expensive storage
-creation on later calls; the order of magnitude may resemble the R77 sentinel saving. It is not yet
-benchmarked, and some routes may never clear the relevant balance or may perform an extra cleanup
-write that erases the benefit.
+The median `batchBuyRbtc` result moves **179,090 → 177,144**. The largest case moves
+**365,143 → 353,467**, exactly `6 × 1,946`. Only the test that expects this event fails.
 
-**Why deferred.** The seed is permanently unowned dust unless a recovery lifecycle is designed. It
-changes deployment funding and balance invariants, can interact with the exact input-consumption and
-WRBTC-unwrapping checks, and must be reasoned about separately for every token/venue/handler pair.
+**Information preservation.** `getDcaSchedule()` returns the current `cadenceAnchor`. An indexer that
+holds the prior anchor and purchase period can reproduce the new anchor exactly with the formula in
+`DcaManager._rBtcPurchaseChecksEffects`: use the current UTC-day start; on a subsequent purchase,
+advance the prior anchor by the whole number of elapsed periods.
 
-**Evidence required.** Trace pre/post balances on all MoC and DEX routes; identify which slots truly
-cycle through zero; benchmark with the deployed token implementations; specify who funds and owns the
-seed; update deploy scripts and tests; and prove the seed cannot be withdrawn, allocated to a buyer,
-or mistaken for venue proceeds. **Recommendation:** low priority unless route-level measurements show
-a recurring material win that justifies permanent dust and deployment complexity.
+**Required proof and cutover.** Write a dedicated R80 spec when assigned. It needs a product decision,
+the measured gas test, the event expectation update, an ABI diff, migration/backfill guidance, and a
+consumer wave across `front-end`, `swapper-bot`, `data-api`, `bitchill-monitoring`, and
+`metrics-dashboard`, which are already mid-cutover for R75. **Priority:** smaller than R79, but it is
+ABI-affecting and immutable/unproxied contracts cannot drop the event after relaunch deployment, so
+R80 must be scheduled first.
 
-### Coalesce repeated-buyer writes within one batch
+### Closed: nonzero-slot retention has zero Rootstock system value
 
-**Candidate.** When the same buyer owns several rows in a batch, aggregate their rBTC allocations
-before `_creditRbtc`, and/or aggregate their lending-share or idle-balance debits before storage is
-updated. Continue calculating and emitting each schedule row independently.
+The following five candidates are closed as chain-invalid gas optimizations:
 
-**Potential upside.** Each avoided update to an already-warm mapping slot is likely only a few
-hundred gas after accounting for the additional comparison/aggregation logic. The gain exists only
-for duplicate buyers and depends heavily on row ordering; an auxiliary in-memory map can cost more
-than it saves on ordinary batches.
+1. Retain a finite residual/sentinel Uniswap router allowance.
+2. Seed handler stablecoin balances or WRBTC balances.
+3. Keep one atomic unit in the fee collector.
+4. Add sentinels to lending-share mappings.
+5. Add sentinels to idle-balance mappings.
 
-**Why deferred.** The current loops apply rows sequentially. Coalescing must preserve per-row fee and
-rBTC rounding, insufficient-balance failure behavior, checked totals, and the exact order and meaning
-of schedule-level events. The optimal algorithm depends on whether the swapper already groups a
-buyer's rows contiguously and on the real duplicate-buyer distribution.
+Each proposal's claimed storage win merely substitutes a later `RESET` for a `CLEAR` followed by `SET`. On Rootstock,
+`SET − REFUND = RESET`, so each has **exactly zero net system gas value**; see
+[`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SCHEDULE.md). Some could move cost between the user,
+swapper, venue, or treasury as R77 intentionally does, but none creates a saving. The allowance and
+seed variants also add approval exposure or permanently unowned dust. Do not reopen them as gas
+optimizations unless Rootstock activates a proposal such as RSKIP-243 and changes its storage schedule.
 
-**Evidence required.** Obtain representative production batch histograms (row count, duplicate rate,
-and ordering); compare contiguous-run aggregation with a general in-memory scheme; benchmark unique,
-clustered-duplicate, and adversarial ordering; and prove output, revert, and event equivalence with
-differential fuzz tests. **Recommendation:** consider only if telemetry shows common contiguous
-duplicates; otherwise the complexity and regressions on unique-buyer batches are unlikely to pay.
+An unlimited router allowance could additionally skip later approval calls and their log/compute
+cost, so it is not the same arithmetic claim. It remains rejected on security grounds: idle handlers
+hold pooled deposits, and a compromised or changed router must not gain access beyond the exact
+purchase. A bounded reusable allowance has the same residual-exposure problem and needs a separate
+security design; it is not a resurrection of the invalid approximately-12,300-gas storage claim.
 
-### Add sentinels to lending-share or idle-balance mappings
+### Closed: remove the linear fee model
 
-**Candidate.** Encode per-user shares or idle stablecoin balances as `claimable + 1`, mirroring R77's
-accumulated-rBTC sentinel, so a purchase that spends a user's full balance leaves a nonzero slot.
+R78 already leaves the purchase-bound word unread and skips interpolation whenever the configured fee
+is flat. Deleting the variable model therefore saves approximately **0 additional production gas** on
+the shipped flat configuration while permanently removing governance's option to choose a variable
+fee from immutable contracts. No proxy exists anywhere in `src/`. Keep the model.
 
-**Potential upside.** It can avoid a later zero-to-nonzero refill, but adds decode/encode work to
-every balance access and intentionally gives up the clear-to-zero refund on the purchase that empties
-the balance.
+### Closed: merge stablecoin and rBTC accounting
 
-**Why not recommended.** The operator pays for the hot purchase while the user pays for the later
-deposit. Here the sentinel removes an operator-side clear/refund and moves the possible later saving
-to a user-funded transaction—the opposite of the useful R77 cost shift, where users occasionally
-withdraw and the swapper commonly re-credits. It also expands a delicate accounting encoding across
-deposit, withdrawal, interest, and lending-share conversion paths.
-
-**Evidence required before reconsideration.** A full lifecycle benchmark separated by fee payer,
-plus evidence that user refills dominate full-balance purchases enough to overcome the always-on
-encoding cost and lost operator refund. **Recommendation:** reject under the current payer model.
-
-### Keep one atomic unit in the fee collector
-
-**Candidate.** Operationally avoid withdrawing a fee token's collector balance completely, leaving
-one atomic unit so the next fee transfer credits a nonzero recipient balance. No contract change is
-required if treasury operations already permit a retained minimum.
-
-**Potential upside.** For a conventional ERC-20 balance mapping this avoids the next recipient
-zero-to-nonzero storage creation; gross storage arithmetic can be material (roughly 15,000 gas before
-transaction-level refund effects), but the actual result is token-implementation and withdrawal-flow
-dependent. The benefit occurs once after each collector drain, not on every batch while its balance
-is already nonzero.
-
-**Why deferred.** This is treasury policy rather than protocol code. The contracts cannot guarantee
-that the collector retains dust, and documenting the tactic as a contract invariant would be false.
-
-**Evidence required.** Confirm how each fee token implements balances, benchmark the first transfer
-after an empty versus one-unit collector, and decide whether treasury accounting and sweeping tools
-can intentionally retain dust. **Recommendation:** adopt as an optional runbook practice if measured;
-do not add contract machinery to enforce it.
-
-### Merge per-user stablecoin and rBTC accounting into one slot
-
-**Candidate.** Pack or otherwise combine the handler's stablecoin-side user accounting with the
-accumulated-rBTC balance so a purchase touches fewer storage words.
-
-**Why not recommended.** These balances have different owners, widths, lifecycle rules, and—in the
-lending handlers—different units because stablecoin claims are represented by protocol shares. The
-fields also live across separate inheritance responsibilities. R50 previously rejected this shape:
-the packing would couple otherwise independent deposit/withdraw and purchase/claim paths, complicate
-upgrades and auditing, and still would not provide one uniform slot across idle and lending handlers.
-Any apparent SLOAD/SSTORE saving must also pay for masking and repacking.
-
-**Evidence required before reconsideration.** A new storage architecture proposal covering every
-handler family, migration/layout safety, bit-width bounds, and lifecycle benchmarks. **Recommendation:**
-retain the current separation; do not pursue as a local gas optimization.
+R50 already rejected combining these mappings. Idle balances and lending shares use different units
+and lifecycle rules from accumulated rBTC, and the fields sit in separate inheritance responsibilities.
+Packing would couple independent deposit/withdraw and purchase/claim paths, need different layouts
+for idle and lending handlers, and pay masking/repacking costs. This is an architectural redesign, not
+a local gas optimization; retain the current separation.
 
 ## Files likely touched
 
+- `AGENTS.md`
 - `src/FeeHandler.sol`
 - `test/ai-generated/unit/FeeHandlerTest.t.sol`
-- `test/gas/R77AccumulatedRbtcSentinelGas.t.sol`
 - `test/gas/R78FlatFeeFastPathGas.t.sol`
-- `docs/relaunch/R77-accumulated-rbtc-storage-sentinel.md`
 - `docs/relaunch/R78-flat-fee-fast-path.md`
 - `docs/relaunch/IMPLEMENTATION_ORDER.md`
 - `docs/relaunch/README.md`
@@ -224,24 +189,43 @@ make fork-tropykus
 
 Assert that flat and variable batch results equal sequential `_calculateFeeWithParams` calls for
 every row, including amounts that round down to zero fee. The gas harness compares the same flat-fee
-batch before and after this PR; the implementation must materially save a cold storage read per
-handler batch under the shipped profile. This item adds no fork-only assertion.
+batch before and after this PR under Foundry / Cancun; the storage-access test separately proves that
+the optimized branch avoids exactly one word. This item adds no fork-only assertion.
 
-Measured in the same-build R77-reference/R78-fast-path harness:
+Foundry / Cancun measurements in the same-build R77-reference/R78-fast-path harness:
 
-| Profile | One row | Five rows |
+| Foundry profile | One row | Five rows |
 |---|---:|---:|
 | default | 2,450 gas saved | 3,247 gas saved |
 | deploy (`via_ir`) | 2,547 gas saved | 3,236 gas saved |
+
+Rootstock production values are **derived**, not measured by Foundry. The access test proves one
+avoided storage-word read. [`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SCHEDULE.md) records a
+2,100-gas first `SLOAD` in Foundry and a flat 200-gas `SLOAD` on Rootstock, so the adjustment is:
+
+```
+1 avoided read × (2,100 − 200) = −1,900 gas from the Foundry delta
+```
+
+The remaining struct construction / memory work (approximately 350 gas) and avoided per-row branch
+(approximately 200 gas per row) are pure compute and transfer unchanged:
+
+| R78 saving | Foundry / Cancun measured (default) | Rootstock derived |
+|---|---:|---:|
+| one row | 2,450 | approximately 550 |
+| five rows | 3,247 | approximately 1,350 |
+
+R78 remains worth keeping at the smaller Rootstock figure: it adds no state, ABI change, protocol
+invariant, external call, or failure mode, and focused plus fuzz testing proves output equivalence on
+both the flat and variable branches. The code is also simpler on the launch configuration's hot path.
 
 ## Success criteria
 
 - [x] Flat-fee batches do not read the purchase-bound storage word.
 - [x] Flat and variable fee outputs, aggregation, and rounding are unchanged.
-- [x] The measured saving is recorded under both compiler profiles and is meaningful on a one-row
-      batch, rather than existing only at unrealistic batch sizes.
+- [x] Foundry measurements are labelled as Cancun regression pins; the production Rootstock saving
+      is derived explicitly from the one avoided read and the Rootstock gas schedule.
 - [x] No ABI, event, error, storage-layout, deploy-script, or consumer change.
-- [x] R77's gas statement names its real trigger and includes the always-on cost.
 - [x] Required tests pass and no open product decisions remain.
 
 ## Reviewer checklist

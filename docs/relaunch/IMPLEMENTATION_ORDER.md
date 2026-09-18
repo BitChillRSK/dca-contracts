@@ -127,6 +127,8 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R76 | post-R75 pre-deployment fix | none (shared exact purchase-input consumption; zero-oracle constructor guard) |
 | R77 | post-R74 gas encoding | none (accumulated-rBTC `claimable + 1` storage sentinel) |
 | R78 | post-R77 gas fast path | none (flat-fee batches skip the unused fee-bound storage word) |
+| R80 | post-R78, before relaunch deploy | decide whether to remove `DcaManager__CadenceAnchorUpdated`; five-repo event cutover |
+| R79 | post-R80, not deploy-bound | coordinate buyer-sorted batches with the swapper team; internal write coalescing |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1046,16 +1048,29 @@ still pay the complete claim. On Rootstock this moves 15,000 gas per withdraw-an
 swapper (SET→RESET) onto the user (forgone CLEAR−REFUND); system net is 0 because
 `SET − REFUND = RESET` ([ROOTSTOCK-GAS-SCHEDULE.md](./ROOTSTOCK-GAS-SCHEDULE.md)). Accepts permanent
 one-slot state per ever-credited user×handler and Foundry-measured always-on encode overhead. Ask:
-none (human accepted the tradeoff 2026-09-18).
+none (human accepted the tradeoff 2026-09-18). The decision is keep; the revert-or-keep window closes
+at relaunch deployment because this mapping encoding is not layout-compatible with deployed handlers.
 
 ### R78 - flat-fee purchase fast path ([spec](./R78-flat-fee-fast-path.md))
 
 Post-R77 behavior-preserving purchase optimization. When a handler's min/max fee rates are equal,
 choose the flat calculation once per batch and leave the linear curve's packed amount-bound word cold.
-Keep the existing variable-fee path, storage, setter, ABI, per-row rounding, and events unchanged. Also
-correct R77's amortization language to the actual per-buyer trigger and measured always-on cost. The
-same-build harness measures **2,450 / 3,247 gas saved** for one / five rows under the default profile
-and **2,547 / 3,236** under the shipped deploy profile. Ask: none.
+Keep the existing variable-fee path, storage, setter, ABI, per-row rounding, and events unchanged.
+Foundry / Cancun measures **2,450 / 3,247 gas saved** for one / five rows under the default profile and
+**2,547 / 3,236** under deploy (`via_ir`). Correcting the one avoided cold `SLOAD` to Rootstock's flat
+200-gas read derives approximately **550 / 1,350 gas** for one / five rows; see
+[`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SCHEDULE.md). Ask: none.
+
+### R80 - remove the cadence-anchor purchase event ([analysis](./R78-flat-fee-fast-path.md#r80-survivor-remove-dcamanager__cadenceanchorupdated))
+
+Next unassigned and pre-deployment: decide whether to remove the one-site event for 1,946 gas per row,
+then perform the ABI and five-consumer cutover. Write the full R80 spec only when assigned.
+
+### R79 - coalesce repeated-buyer writes ([analysis](./R78-flat-fee-fast-path.md#r79-survivor-coalesce-repeated-buyer-writes))
+
+After R80 and not deployment-bound: coordinate buyer sorting with the swapper and coalesce contiguous
+rBTC/share writes (approximately 40,000 Rootstock gas on five same-buyer lending rows). Write the full
+R79 spec only when assigned.
 
 ## Closed non-implementation decisions
 
