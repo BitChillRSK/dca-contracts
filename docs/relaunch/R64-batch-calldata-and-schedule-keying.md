@@ -611,10 +611,10 @@ Three things this comparison is not:
 2. **Foundry prices execution like Ethereum.** The replay of this transaction reports 923,984 gas where
    Rootstock charged 815,384 — **13.3% high**, on identical state. Only the benchmark's calldata column
    is on Rootstock's own schedule; its execution columns are not, so read them as a design-to-design
-   ratio rather than as a Rootstock bill. Where the 13.3% comes from is not established here: the
-   shape of it — one transaction touching a great many slots for the first time — points at
-   storage-access pricing rather than at anything this item touches, but that is a guess, and nothing
-   on this branch tests it.
+   ratio rather than as a Rootstock bill. Where the 13.3% comes from is established in
+   [`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SCHEDULE.md): Foundry applies EIP-2929 cold-access
+   surcharges that rskj does not charge. The shape of this sample — one transaction touching a great
+   many slots for the first time — matches that cause; this branch still does not re-measure it.
 3. **It says nothing about how many rows fit in a block.** At five rows the venue leg is 83% of the
    transaction, and one live sample cannot separate its fixed part — one redeem, one swap, one fee
    transfer — from its per-row part. The row ceilings quoted in **What the numbers say** are
