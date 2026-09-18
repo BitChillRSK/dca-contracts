@@ -137,17 +137,15 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
     /**
      * @dev Decode claimable rBTC, revert if none, and leave the post-withdraw sentinel. Caller then pays.
      */
-    function _withdrawRbtcChecksEffects(address user) internal returns (uint256) {
+    function _withdrawRbtcChecksEffects(address user) internal returns (uint256 rbtcBalance) {
         uint256 stored = s_usersAccumulatedRbtc[user];
         // `0` = never credited; `1` = fully withdrawn sentinel. Both mean nothing to pay.
         if (stored <= 1) revert PurchaseRbtc__NoAccumulatedRbtcToWithdraw();
 
-        uint256 rbtcBalance;
         unchecked {
             rbtcBalance = stored - 1;
         }
         s_usersAccumulatedRbtc[user] = 1;
-        return rbtcBalance;
     }
 
     /**
