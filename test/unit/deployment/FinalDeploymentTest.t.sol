@@ -137,6 +137,8 @@ contract FinalDeploymentTest is Test {
         assertEq(stack.dcaManager.getTokenMinPurchaseAmount(address(doc)), MIN_PURCHASE_AMOUNT);
         assertEq(stack.dcaManager.getTokenMinPurchaseAmount(address(usdrif)), MIN_PURCHASE_AMOUNT);
         assertEq(stack.dcaManager.getTokenMinPurchaseAmount(address(usdt0)), USDT0_MIN_PURCHASE_AMOUNT);
+        assertEq(stack.dcaManager.getMinPurchasePeriod(), 7 days);
+        assertEq(stack.dcaManager.getMaxSchedulesPerToken(), 10);
 
         _assertHandlerOwnerPending(stack.docIdle, SAFE);
         _assertHandlerOwnerPending(stack.docLayerBank, SAFE);

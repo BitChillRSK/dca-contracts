@@ -14,9 +14,14 @@ import "../Constants.sol";
 import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 contract RbtcPurchaseTest is DcaDappTest {
+    uint256 private constant TEST_PURCHASE_PERIOD = 1 days;
 
     function setUp() public override {
         super.setUp();
+        // Exercise the contract-level daily cadence independently of the weekly launch default.
+        vm.prank(OWNER);
+        dcaManager.modifyMinPurchasePeriod(TEST_PURCHASE_PERIOD);
+        _setPurchasePeriod(TEST_PURCHASE_PERIOD);
     }
 
     //////////////////////
@@ -50,7 +55,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
-        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, MIN_PURCHASE_PERIOD);
+        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, TEST_PURCHASE_PERIOD);
         vm.stopPrank();
         buyRbtcOne(scheduleId); // first purchase
         IDcaManager.DcaSchedule memory schedule = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
@@ -75,7 +80,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         buyRbtcOne(scheduleId);
 
         IDcaManager.DcaSchedule memory schedule = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        assertEq(schedule.cadenceAnchor, _utcDayStart(firstBuy) + MIN_PURCHASE_PERIOD);
+        assertEq(schedule.cadenceAnchor, _utcDayStart(firstBuy) + TEST_PURCHASE_PERIOD);
     }
 
     function testCannotBuyOneSecondBeforeDueUtcDay() external {
@@ -107,7 +112,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         buyRbtcOne(scheduleId);
 
         IDcaManager.DcaSchedule memory schedule = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        assertEq(schedule.cadenceAnchor, _utcDayStart(firstBuy) + MIN_PURCHASE_PERIOD);
+        assertEq(schedule.cadenceAnchor, _utcDayStart(firstBuy) + TEST_PURCHASE_PERIOD);
 
         vm.warp(dueDayStart + 9 hours); // still the due UTC day
         bytes memory encodedRevert = abi.encodeWithSelector(
@@ -242,10 +247,10 @@ contract RbtcPurchaseTest is DcaDappTest {
 
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.prank(USER);
-        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, MIN_PURCHASE_PERIOD);
+        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, TEST_PURCHASE_PERIOD);
         for (uint256 i; i < numOfPurchases; ++i) {
             buyRbtcOne(scheduleId);
-            vm.warp(vm.getBlockTimestamp() + MIN_PURCHASE_PERIOD);
+            vm.warp(vm.getBlockTimestamp() + TEST_PURCHASE_PERIOD);
         }
         vm.prank(USER);
         // assertEq(stablecoinHandler.getAccumulatedRbtcBalance(), (netPurchaseAmount / s_btcPrice) * numOfPurchases);
@@ -275,7 +280,7 @@ contract RbtcPurchaseTest is DcaDappTest {
     uint256 private s_firstPurchaseTimestampForResumeTest;
 
     function testCadenceAnchorConsistencyWhenScheduleResumed(uint256 timeUntilResume) public {
-        if (timeUntilResume < MIN_PURCHASE_PERIOD) return; // Avoid known revert
+        if (timeUntilResume < TEST_PURCHASE_PERIOD) return; // Avoid known revert
         if (timeUntilResume > 100 * 52 weeks) return; // Avoid overflows
         s_firstPurchaseTimestampForResumeTest = block.timestamp;
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
@@ -290,12 +295,12 @@ contract RbtcPurchaseTest is DcaDappTest {
         uint256 firstPurchaseTimestamp = s_firstPurchaseTimestampForResumeTest;
         uint256 firstAnchor = _utcDayStart(firstPurchaseTimestamp);
         uint256 currentDayStart = _utcDayStart(block.timestamp);
-        uint256 periodsElapsed = (currentDayStart - firstAnchor) / MIN_PURCHASE_PERIOD;
-        assertEq(schedule.cadenceAnchor, firstAnchor + periodsElapsed * MIN_PURCHASE_PERIOD);
+        uint256 periodsElapsed = (currentDayStart - firstAnchor) / TEST_PURCHASE_PERIOD;
+        assertEq(schedule.cadenceAnchor, firstAnchor + periodsElapsed * TEST_PURCHASE_PERIOD);
         // The anchor is a grid point at or before today, and the next one is on a strictly later day.
         assertEq(schedule.cadenceAnchor % 1 days, 0);
         assertLe(schedule.cadenceAnchor, currentDayStart);
-        assertGt(schedule.cadenceAnchor + MIN_PURCHASE_PERIOD, currentDayStart);
+        assertGt(schedule.cadenceAnchor + TEST_PURCHASE_PERIOD, currentDayStart);
     }
 
     /**
@@ -312,7 +317,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         for (uint256 i; i < numOfPurchases - 1; ++i) {
             buyRbtcOne(scheduleId);
-            vm.warp(vm.getBlockTimestamp() + MIN_PURCHASE_PERIOD);
+            vm.warp(vm.getBlockTimestamp() + TEST_PURCHASE_PERIOD);
         }
 
         // Empty the schedule without spending the tail, so its balance is exactly zero
@@ -551,7 +556,7 @@ contract RbtcPurchaseTest is DcaDappTest {
             );
 
             // Advance time and update exchange rate so future purchases are allowed and interest accrues
-            updateExchangeRate(MIN_PURCHASE_PERIOD);
+            updateExchangeRate(TEST_PURCHASE_PERIOD);
         }
 
         // After time has passed and multiple purchase rounds, check that interest has accrued
@@ -643,7 +648,7 @@ contract RbtcPurchaseTest is DcaDappTest {
             }
 
             // Advance time and update exchange rate so future purchases are allowed and interest accrues
-            updateExchangeRate(MIN_PURCHASE_PERIOD);
+            updateExchangeRate(TEST_PURCHASE_PERIOD);
         }
 
         // After time has passed and multiple purchase rounds, check that interest has accrued
@@ -759,7 +764,7 @@ contract RbtcPurchaseTest is DcaDappTest {
             dcaManager.withdrawAllAccumulatedInterest(tokens, routeIndexes);
 
             // Advance time and update exchange rate so future purchases are allowed and interest accrues
-            updateExchangeRate(MIN_PURCHASE_PERIOD);
+            updateExchangeRate(TEST_PURCHASE_PERIOD);
         }
 
         // After time has passed and multiple purchase rounds, check that interest has accrued
@@ -790,7 +795,7 @@ contract RbtcPurchaseTest is DcaDappTest {
                 address(stablecoin),
                 AMOUNT_TO_DEPOSIT,
                 AMOUNT_TO_SPEND,
-                MIN_PURCHASE_PERIOD,
+                TEST_PURCHASE_PERIOD,
                 s_routeIndex
             );
         }
@@ -803,6 +808,12 @@ contract RbtcPurchaseTest is DcaDappTest {
             candidate += 1 days;
         }
         return candidate;
+    }
+
+    function _setPurchasePeriod(uint256 purchasePeriod) private {
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
+        vm.prank(USER);
+        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, purchasePeriod);
     }
 
     function _secondsUntilDueUtcDayStart(uint256 cadenceAnchor, uint256 purchasePeriod)
