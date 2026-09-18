@@ -460,14 +460,14 @@ contract PurchaseRbtcTest is Test {
         harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(100 ether), NO_MIN_RBTC_OUT);
 
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), RBTC_OUT);
-        assertEq(harness.rawAccumulatedRbtc(buyerA), RBTC_OUT + 1);
+        assertEq(_rawAccumulatedRbtc(buyerA), RBTC_OUT + 1);
 
         uint256 balanceBefore = buyerA.balance;
         harness.withdrawAccumulatedRbtc(buyerA);
 
         assertEq(buyerA.balance - balanceBefore, RBTC_OUT, "withdrawal left claimable dust");
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), 0, "getter exposed the sentinel");
-        assertEq(harness.rawAccumulatedRbtc(buyerA), 1, "full withdraw cleared storage");
+        assertEq(_rawAccumulatedRbtc(buyerA), 1, "full withdraw cleared storage");
     }
 
     /// @dev After a full withdraw, the next credit lands on the sentinel and stays fully withdrawable.
@@ -478,13 +478,13 @@ contract PurchaseRbtcTest is Test {
 
         harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(100 ether), NO_MIN_RBTC_OUT);
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), RBTC_OUT);
-        assertEq(harness.rawAccumulatedRbtc(buyerA), RBTC_OUT + 1);
+        assertEq(_rawAccumulatedRbtc(buyerA), RBTC_OUT + 1);
 
         uint256 balanceBefore = buyerA.balance;
         harness.withdrawAccumulatedRbtc(buyerA);
         assertEq(buyerA.balance - balanceBefore, RBTC_OUT);
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), 0);
-        assertEq(harness.rawAccumulatedRbtc(buyerA), 1);
+        assertEq(_rawAccumulatedRbtc(buyerA), 1);
     }
 
     /// @dev A never-credited user and a post-withdraw sentinel both refuse a direct withdraw.
@@ -516,10 +516,16 @@ contract PurchaseRbtcTest is Test {
         harness.batchBuyRbtc(buyers, scheduleIds, amounts, NO_MIN_RBTC_OUT);
 
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), 0);
-        assertEq(harness.rawAccumulatedRbtc(buyerA), 0, "zero credit marked a never-credited user live");
+        assertEq(_rawAccumulatedRbtc(buyerA), 0, "zero credit marked a never-credited user live");
         // Heavy row takes floor(2 * heavyNet / totalNet) == 1; one wei of measured rBTC stays uncredited.
         assertEq(harness.getAccumulatedRbtcBalance(buyerB), 1);
-        assertEq(harness.rawAccumulatedRbtc(buyerB), 2);
+        assertEq(_rawAccumulatedRbtc(buyerB), 2);
+    }
+
+    /// @dev Test probe into private `s_usersAccumulatedRbtc` (slot 4 on this harness layout).
+    ///      Re-check with `forge inspect PurchaseRbtcHarness storage-layout` if FeeHandler packing moves.
+    function _rawAccumulatedRbtc(address user) private view returns (uint256) {
+        return uint256(vm.load(address(harness), keccak256(abi.encode(user, uint256(4)))));
     }
 
     function _fee(uint256 amount) private pure returns (uint256) {
@@ -596,17 +602,6 @@ contract PurchaseRbtcHarness is PurchaseRbtc {
 
     function setRevertOnPurchase(bool shouldRevert) external {
         revertOnPurchase = shouldRevert;
-    }
-
-    /// @dev Exposes the encoded storage word for sentinel tests (not part of the production ABI).
-    ///      The mapping is private on `PurchaseRbtc`; this harness layout places it at slot 4
-    ///      (after Ownable2Step + FeeHandler). Re-check with `forge inspect PurchaseRbtcHarness storage-layout`
-    ///      if FeeHandler packing moves.
-    function rawAccumulatedRbtc(address user) external view returns (uint256 encoded) {
-        bytes32 slot = keccak256(abi.encode(user, uint256(4)));
-        assembly {
-            encoded := sload(slot)
-        }
     }
 
     function _purchaseToken() internal view override returns (IERC20) {

@@ -58,8 +58,8 @@ contract R77AccumulatedRbtcSentinelGasTest is Test {
         _withdraw(buyerWarmup);
         _buy(buyerSentinel);
         _withdraw(buyerSentinel);
-        assertEq(harness.rawAccumulatedRbtc(buyerSentinel), 1, "sentinel missing before re-credit");
-        assertEq(harness.rawAccumulatedRbtc(buyerFirst), 0, "first-credit buyer was pre-touched");
+        assertEq(_rawAccumulatedRbtc(buyerSentinel), 1, "sentinel missing before re-credit");
+        assertEq(_rawAccumulatedRbtc(buyerFirst), 0, "first-credit buyer was pre-touched");
     }
 
     function test_gas_coldFirstCreditOntoZero() public {
@@ -123,6 +123,12 @@ contract R77AccumulatedRbtcSentinelGasTest is Test {
 
     function _withdraw(address buyer) private {
         harness.withdrawAccumulatedRbtc(buyer);
+    }
+
+    /// @dev Test probe into private `s_usersAccumulatedRbtc` (slot 4 on this harness layout).
+    ///      Re-check with `forge inspect PurchaseRbtcHarness storage-layout` if FeeHandler packing moves.
+    function _rawAccumulatedRbtc(address user) private view returns (uint256) {
+        return uint256(vm.load(address(harness), keccak256(abi.encode(user, uint256(4)))));
     }
 
     /// @dev forge-std's `Vm` interface on this pin omits `cool`; the cheatcode exists on the binary.
