@@ -167,8 +167,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     }
 
     /**
-     * @dev Pack the four fee storage fields for two loads per batch: the rate word (already warm for
-     *      `_transferFee`, which reads the collector beside them) and the bounds word.
+     * @dev Return all four fee parameters as one settings value for the external getter.
      */
     function _feeSettings() internal view returns (FeeSettings memory) {
         return FeeSettings({
@@ -180,7 +179,8 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     }
 
     /**
-     * @dev Same interpolation as `_calculateFee`, using already-loaded fee settings.
+     * @dev Apply the variable-fee interpolation using already-loaded fee settings. The flat-rate
+     *      branch also keeps this helper correct for standalone callers.
      */
     function _calculateFeeWithParams(uint256 purchaseAmount, FeeSettings memory feeSettings)
         internal
@@ -224,6 +224,8 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
                             PRIVATE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev Flat batches need no curve: fill `netAmountsToSpend` in place and leave the
+    ///      purchase-bound storage word unread.
     function _calculateFlatFeeAndNetAmounts(
         uint256[] memory purchaseAmounts,
         uint256[] memory netAmountsToSpend,
