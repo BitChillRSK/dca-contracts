@@ -28,9 +28,10 @@ cleaner encoding is:
 Tradeoffs accepted by this PR: permanent one-slot state per user×handler that has ever been
 credited, and loss of the user's storage-clear refund on full withdrawal. Quantified: **−4,800 gas
 user-paid** per full `withdrawAccumulatedRbtc` (EIP-3529 clear refund forgone; ×N in
-`withdrawAllAccumulatedRbtc`), versus **+17,090 gas operator-paid** per subsequent re-credit when both
-credits are measured cold across transaction boundaries (SSTORE_SET − SSTORE_RESET). Still net
-positive whenever a withdrawn user is credited again; not free on the withdraw side.
+`withdrawAllAccumulatedRbtc`), versus **≈17,100 gas operator-paid** per subsequent re-credit when both
+credits are measured cold (SSTORE_SET − SSTORE_RESET; this repo's cool+snapshot harness prints
+**17,105**, pinned as `EXPECTED_COLD_SAVING`). Still net positive whenever a withdrawn user is credited
+again; not free on the withdraw side.
 
 `DcaManager` needs no logic change: it already reads and skips through
 `IPurchaseRbtc.getAccumulatedRbtcBalance`, which must keep returning the decoded claimable amount.
@@ -101,8 +102,8 @@ re-credit must be materially cheaper (on the order of the zero-to-nonzero vs non
 - [x] After a full withdraw the storage slot stays nonzero (`1`); the next credit avoids a
       zero-to-nonzero `SSTORE`.
 - [x] `withdrawAllAccumulatedRbtc` still skips zero-claimable handlers via the decoded getter.
-- [x] Measured re-credit gas saving is recorded (**17,090** gas cold; −4,800 user clear-refund forgone
-      per full withdraw); no open product decisions remain.
+- [x] Measured re-credit gas saving is recorded (**≈17,100** / harness pin **17,105**; −4,800 user
+      clear-refund forgone per full withdraw); no open product decisions remain.
 - [x] `make check`, `make fork-sovryn`, and `make fork-tropykus` pass.
 
 ## Reviewer checklist

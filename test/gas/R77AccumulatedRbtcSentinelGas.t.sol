@@ -21,7 +21,8 @@ import {NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
  *      The paired comparison snapshots the post-setUp state and reverts between the two credits so
  *      shared cold costs cancel.
  *
- *      Expected gap: SSTORE_SET (~20,000) − SSTORE_RESET (~2,900) ≈ 17,100. Recorded saving: 17,090.
+ *      Expected gap ≈ 17,100 (SSTORE_SET − SSTORE_RESET). This harness pins `EXPECTED_COLD_SAVING`
+ *      at 17,105 (what the paired cool+snapshot run prints); ±500 absorbs forge noise.
  *      The other side of the ledger: EIP-3529 drops the storage-clear refund (4,800 gas) on every
  *      full `withdrawAccumulatedRbtc`, paid by the user.
  */
@@ -29,8 +30,8 @@ contract R77AccumulatedRbtcSentinelGasTest is Test {
     uint16 internal constant FLAT_FEE_RATE = 100;
     uint256 internal constant RBTC_OUT = 1 ether;
     uint256 internal constant GROSS = 100 ether;
-    /// @dev Cross-transaction saving measured with cold slots after `vm.cool` (SSTORE_SET − SSTORE_RESET).
-    uint256 internal constant EXPECTED_COLD_SAVING = 17_090;
+    /// @dev What this cool+snapshot harness prints for cold first − cold re-credit (≈17,100 SSTORE gap).
+    uint256 internal constant EXPECTED_COLD_SAVING = 17_105;
 
     address internal buyerFirst = address(0xA11CE);
     address internal buyerSentinel = address(0xB0B);
