@@ -224,6 +224,57 @@ contract FeeHandlerTest is Test {
         assertEq(totalNet, expectedTotalNet);
     }
 
+    function test_calculateFeeAndNetAmounts_flatMatchesSequentialIncludingRounding() public {
+        uint16 flatRate = 137;
+        feeHandler.testSetFeeRateParams(flatRate, flatRate, LOWER_BOUND, UPPER_BOUND);
+
+        uint256[] memory amounts = new uint256[](5);
+        amounts[0] = 1;
+        amounts[1] = 72;
+        amounts[2] = 9_999;
+        amounts[3] = 10_000;
+        amounts[4] = 550 ether;
+
+        (uint256 aggregatedFee, uint256[] memory netAmounts, uint256 totalNet) =
+            feeHandler.exposedCalculateFeeAndNetAmounts(amounts);
+
+        uint256 expectedAggregatedFee;
+        uint256 expectedTotalNet;
+        for (uint256 i; i < amounts.length; ++i) {
+            uint256 expectedFee = amounts[i] * flatRate / BPS_DENOMINATOR;
+            expectedAggregatedFee += expectedFee;
+            expectedTotalNet += amounts[i] - expectedFee;
+            assertEq(netAmounts[i], amounts[i] - expectedFee);
+        }
+        assertEq(aggregatedFee, expectedAggregatedFee);
+        assertEq(totalNet, expectedTotalNet);
+    }
+
+    function test_calculateFeeAndNetAmounts_flatDoesNotReadBoundsSlot() public {
+        feeHandler.testSetFeeRateParams(MIN_FEE_RATE, MIN_FEE_RATE, LOWER_BOUND, UPPER_BOUND);
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 550 ether;
+
+        vm.record();
+        feeHandler.exposedCalculateFeeAndNetAmounts(amounts);
+        (bytes32[] memory reads,) = vm.accesses(address(feeHandler));
+
+        assertTrue(_contains(reads, bytes32(uint256(2))), "flat path did not read rate slot");
+        assertFalse(_contains(reads, bytes32(uint256(3))), "flat path read unused bounds slot");
+    }
+
+    function test_calculateFeeAndNetAmounts_variableReadsBoundsSlot() public {
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 550 ether;
+
+        vm.record();
+        feeHandler.exposedCalculateFeeAndNetAmounts(amounts);
+        (bytes32[] memory reads,) = vm.accesses(address(feeHandler));
+
+        assertTrue(_contains(reads, bytes32(uint256(2))), "variable path did not read rate slot");
+        assertTrue(_contains(reads, bytes32(uint256(3))), "variable path did not read bounds slot");
+    }
+
     function test_setFeeRateParams_reverts_aboveCap() public {
         vm.expectRevert(IFeeHandler.FeeHandler__MaxFeeRateExceedsCap.selector);
         feeHandler.setFeeRateParams(MIN_FEE_RATE, FEE_RATE_CAP + 1, LOWER_BOUND, UPPER_BOUND);
@@ -348,5 +399,12 @@ contract FeeHandlerTest is Test {
             abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 128, overflowing)
         );
         feeHandler.setFeeRateParams(MIN_FEE_RATE, MAX_FEE_RATE, LOWER_BOUND, overflowing);
+    }
+
+    function _contains(bytes32[] memory values, bytes32 needle) private pure returns (bool) {
+        for (uint256 i; i < values.length; ++i) {
+            if (values[i] == needle) return true;
+        }
+        return false;
     }
 }

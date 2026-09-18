@@ -134,7 +134,21 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     {
         uint256 len = purchaseAmounts.length;
         netAmountsToSpend = new uint256[](len);
-        FeeSettings memory feeSettings = _feeSettings();
+        uint16 minFeeRate = s_minFeeRate;
+        uint16 maxFeeRate = s_maxFeeRate;
+
+        if (minFeeRate == maxFeeRate) {
+            (aggregatedFee, totalAmountToSpend) =
+                _calculateFlatFeeAndNetAmounts(purchaseAmounts, netAmountsToSpend, minFeeRate);
+            return (aggregatedFee, netAmountsToSpend, totalAmountToSpend);
+        }
+
+        FeeSettings memory feeSettings = FeeSettings({
+            minFeeRate: minFeeRate,
+            maxFeeRate: maxFeeRate,
+            feePurchaseLowerBound: s_feePurchaseLowerBound,
+            feePurchaseUpperBound: s_feePurchaseUpperBound
+        });
 
         for (uint256 i; i < len; ++i) {
             uint256 amount = purchaseAmounts[i];
@@ -209,6 +223,27 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     /*//////////////////////////////////////////////////////////////
                             PRIVATE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    function _calculateFlatFeeAndNetAmounts(
+        uint256[] memory purchaseAmounts,
+        uint256[] memory netAmountsToSpend,
+        uint256 feeRate
+    ) private pure returns (uint256 aggregatedFee, uint256 totalAmountToSpend) {
+        uint256 len = purchaseAmounts.length;
+        for (uint256 i; i < len; ++i) {
+            uint256 amount = purchaseAmounts[i];
+            uint256 fee = amount * feeRate / BPS_DENOMINATOR;
+            aggregatedFee += fee;
+
+            uint256 net;
+            unchecked {
+                // Fee rates are capped at 5%, so the fee cannot exceed its input amount.
+                net = amount - fee;
+            }
+            netAmountsToSpend[i] = net;
+            totalAmountToSpend += net;
+        }
+    }
 
     function _validateFeeSettings(
         uint256 minFeeRate,
