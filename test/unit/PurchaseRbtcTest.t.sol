@@ -450,6 +450,84 @@ contract PurchaseRbtcTest is Test {
         harness.batchBuyRbtc(buyers, scheduleIds, amounts, minRbtcOut);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                     ACCUMULATED-RBTC STORAGE SENTINEL
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Full withdraw pays the complete claim, getter stays 0, and raw storage keeps sentinel 1.
+    function test_fullWithdraw_leavesSentinelAndPaysCompleteClaim() public {
+        vm.deal(address(harness), RBTC_OUT);
+        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(100 ether), NO_MIN_RBTC_OUT);
+
+        assertEq(harness.getAccumulatedRbtcBalance(buyerA), RBTC_OUT);
+        assertEq(_rawAccumulatedRbtc(buyerA), RBTC_OUT + 1);
+
+        uint256 balanceBefore = buyerA.balance;
+        harness.withdrawAccumulatedRbtc(buyerA);
+
+        assertEq(buyerA.balance - balanceBefore, RBTC_OUT, "withdrawal left claimable dust");
+        assertEq(harness.getAccumulatedRbtcBalance(buyerA), 0, "getter exposed the sentinel");
+        assertEq(_rawAccumulatedRbtc(buyerA), 1, "full withdraw cleared storage");
+    }
+
+    /// @dev After a full withdraw, the next credit lands on the sentinel and stays fully withdrawable.
+    function test_recreditAfterFullWithdraw_creditsAndPaysAgain() public {
+        vm.deal(address(harness), 2 * RBTC_OUT);
+        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(100 ether), NO_MIN_RBTC_OUT);
+        harness.withdrawAccumulatedRbtc(buyerA);
+
+        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(100 ether), NO_MIN_RBTC_OUT);
+        assertEq(harness.getAccumulatedRbtcBalance(buyerA), RBTC_OUT);
+        assertEq(_rawAccumulatedRbtc(buyerA), RBTC_OUT + 1);
+
+        uint256 balanceBefore = buyerA.balance;
+        harness.withdrawAccumulatedRbtc(buyerA);
+        assertEq(buyerA.balance - balanceBefore, RBTC_OUT);
+        assertEq(harness.getAccumulatedRbtcBalance(buyerA), 0);
+        assertEq(_rawAccumulatedRbtc(buyerA), 1);
+    }
+
+    /// @dev A never-credited user and a post-withdraw sentinel both refuse a direct withdraw.
+    function test_withdraw_revertsWhenNeverCreditedOrOnlySentinel() public {
+        vm.expectRevert(IPurchaseRbtc.PurchaseRbtc__NoAccumulatedRbtcToWithdraw.selector);
+        harness.withdrawAccumulatedRbtc(buyerA);
+
+        vm.deal(address(harness), RBTC_OUT);
+        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(100 ether), NO_MIN_RBTC_OUT);
+        harness.withdrawAccumulatedRbtc(buyerA);
+
+        vm.expectRevert(IPurchaseRbtc.PurchaseRbtc__NoAccumulatedRbtcToWithdraw.selector);
+        harness.withdrawAccumulatedRbtc(buyerA);
+    }
+
+    /// @dev A zero floor allocation must not plant a sentinel on a never-credited buyer.
+    function test_zeroCredit_doesNotPlantSentinelOnNeverCreditedBuyer() public {
+        harness.setRbtcOut(2);
+        address[] memory buyers = new address[](2);
+        buyers[0] = buyerA;
+        buyers[1] = buyerB;
+        uint64[] memory scheduleIds = new uint64[](2);
+        scheduleIds[0] = scheduleA;
+        scheduleIds[1] = scheduleB;
+        uint256[] memory amounts = new uint256[](2);
+        // Light row floors to 0; heavy row takes the full 2 wei of measured rBTC.
+        amounts[0] = 1 ether;
+        amounts[1] = 100_000 ether;
+        harness.batchBuyRbtc(buyers, scheduleIds, amounts, NO_MIN_RBTC_OUT);
+
+        assertEq(harness.getAccumulatedRbtcBalance(buyerA), 0);
+        assertEq(_rawAccumulatedRbtc(buyerA), 0, "zero credit marked a never-credited user live");
+        // Heavy row takes floor(2 * heavyNet / totalNet) == 1; one wei of measured rBTC stays uncredited.
+        assertEq(harness.getAccumulatedRbtcBalance(buyerB), 1);
+        assertEq(_rawAccumulatedRbtc(buyerB), 2);
+    }
+
+    /// @dev Test probe into private `s_usersAccumulatedRbtc` (slot 4 on this harness layout).
+    ///      Re-check with `forge inspect PurchaseRbtcHarness storage-layout` if FeeHandler packing moves.
+    function _rawAccumulatedRbtc(address user) private view returns (uint256) {
+        return uint256(vm.load(address(harness), keccak256(abi.encode(user, uint256(4)))));
+    }
+
     function _fee(uint256 amount) private pure returns (uint256) {
         return amount * FLAT_FEE_RATE / BPS_DENOMINATOR;
     }

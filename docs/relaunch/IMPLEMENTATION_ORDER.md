@@ -125,6 +125,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R70 | 70 ([#127](https://github.com/BitChillRSK/dca-contracts/pull/127)) | none (public `i_operationsAdmin`; fail-closed per-token mins; `_requireUserMutationsAllowed` comment) |
 | R71 | 71 ([#128](https://github.com/BitChillRSK/dca-contracts/pull/128) source phase) | **license/SPDX deferred; Dex admin keep; batch lending-event semantics; evidence-gated MoC sequence/reverts** (src first in #128; deploy/release work follows) |
 | R76 | post-R75 pre-deployment fix | none (shared exact purchase-input consumption; zero-oracle constructor guard) |
+| R77 | post-R74 gas encoding | none (accumulated-rBTC `claimable + 1` storage sentinel) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1035,6 +1036,16 @@ the shared `PurchaseRbtc` pipeline so a positive partial Money on Chain redempti
 schedule and handler-book debits while leaving unowned DOC behind. Keep Uniswap's intermediate-token
 router check in the venue implementation. Also reject a zero MoC oracle in the Dex constructor, matching
 the existing setter and canonical deployment guard. Ask: none.
+
+### R77 - accumulated rBTC storage sentinel ([spec](./R77-accumulated-rbtc-storage-sentinel.md))
+
+Post-R74 operator-gas encoding. Store each handler's per-user accumulated rBTC as `claimable + 1` so
+a full withdrawal leaves sentinel `1` instead of clearing the slot; getters and withdrawals decode and
+still pay the complete claim. On Rootstock this moves 15,000 gas per withdraw-and-rebuy cycle from the
+swapper (SET→RESET) onto the user (forgone CLEAR−REFUND); system net is 0 because
+`SET − REFUND = RESET` ([ROOTSTOCK-GAS-SCHEDULE.md](./ROOTSTOCK-GAS-SCHEDULE.md)). Accepts permanent
+one-slot state per ever-credited user×handler and Foundry-measured always-on encode overhead. Ask:
+none (human accepted the tradeoff 2026-09-18).
 
 ## Closed non-implementation decisions
 
