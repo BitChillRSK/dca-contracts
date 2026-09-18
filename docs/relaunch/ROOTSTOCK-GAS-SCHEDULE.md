@@ -94,12 +94,18 @@ So the cap is **`gasUsed / 2`** (Ethereum's pre-3529 rule), not `/ 5`. A full `R
 is fully realized whenever the transaction's `gasUsed` before refund is at least 30,000 — true of any
 real BitChill rBTC withdrawal.
 
-## RSKIP-243 (watch item)
+## RSKIP watch list (draft, not active)
 
-[RSKIP-243](https://github.com/rsksmart/RSKIPs/blob/master/IPs/RSKIP243.md) (Draft, 2021) would introduce
-per-transaction slot tracking and change SSTORE / refund accounting. It is **not** active. If it
-activates, the net-metering conclusions in this file change and every production gas claim that rests
-on Petersburg-style SSTORE must be re-checked.
+Neither proposal is active. If either activates, re-check every production gas claim that rests on
+Petersburg-style SSTORE.
+
+- [RSKIP-243](https://github.com/rsksmart/RSKIPs/blob/master/IPs/RSKIP243.md) (Draft, 2021) —
+  per-transaction slot tracking and refund/net-metering changes. Breaks the
+  `SET − REFUND = RESET` identity and every clear-vs-keep analysis that uses it (including R77).
+- [RSKIP-244](https://github.com/rsksmart/RSKIPs/blob/master/IPs/RSKIP244.md) (Draft, 2021,
+  Variable Storage Costs) — size-dependent SSTORE pricing that can put a non-zero→non-zero write
+  well below today's flat `RESET` 5,000. Breaks the repeat-write conversion row and any estimate that
+  assumes every in-tx rewrite still costs 5,000 (including R79-style packing claims).
 
 ## Corroboration from this repo
 
