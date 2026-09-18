@@ -1,6 +1,6 @@
 # R77 — Accumulated rBTC storage sentinel
 
-Status: **implemented** · GitHub TBD · Assigned: yes · Optional/further-review: no · Order: stack on R74 ([#137](https://github.com/BitChillRSK/dca-contracts/pull/137))
+Status: **implemented** · GitHub [#138](https://github.com/BitChillRSK/dca-contracts/pull/138) · Assigned: yes · Optional/further-review: no · Order: stack on R74 ([#137](https://github.com/BitChillRSK/dca-contracts/pull/137))
 
 ## Objective
 
