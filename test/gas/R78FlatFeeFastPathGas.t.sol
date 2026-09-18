@@ -76,6 +76,7 @@ contract R78FlatFeeFastPathGasTest is Test {
     uint16 internal constant FLAT_FEE_RATE = 100;
 
     R78FeeHandlerGasHarness internal harness;
+    R78FeeHandlerGasHarness internal variableFeeHarness;
 
     function setUp() public {
         IFeeHandler.FeeSettings memory settings = IFeeHandler.FeeSettings({
@@ -85,6 +86,12 @@ contract R78FlatFeeFastPathGasTest is Test {
             feePurchaseUpperBound: 100_000 ether
         });
         harness = new R78FeeHandlerGasHarness(settings);
+
+        settings.minFeeRate = 100;
+        settings.maxFeeRate = 200;
+        settings.feePurchaseLowerBound = 100 ether;
+        settings.feePurchaseUpperBound = 1000 ether;
+        variableFeeHarness = new R78FeeHandlerGasHarness(settings);
     }
 
     function test_gas_flatOneRowFastPath() public {
@@ -101,6 +108,16 @@ contract R78FlatFeeFastPathGasTest is Test {
         amounts[3] = 550 ether;
         amounts[4] = 2000 ether;
         _assertSaving(amounts, "five-row");
+    }
+
+    function testFuzz_optimizedMatchesBaseline(uint96[5] memory fuzzedAmounts) public {
+        uint256[] memory amounts = new uint256[](fuzzedAmounts.length);
+        for (uint256 i; i < fuzzedAmounts.length; ++i) {
+            amounts[i] = fuzzedAmounts[i];
+        }
+
+        _assertEquivalent(harness, amounts);
+        _assertEquivalent(variableFeeHarness, amounts);
     }
 
     function _assertSaving(uint256[] memory amounts, string memory label) private {
@@ -123,6 +140,15 @@ contract R78FlatFeeFastPathGasTest is Test {
         console2.log("saving:", saving);
         assertGt(saving, 1_500, "Foundry delta did not include the avoided cold read");
         assertLt(saving, 10_000, "saving exceeded the intended fee-loop scope");
+    }
+
+    function _assertEquivalent(R78FeeHandlerGasHarness target, uint256[] memory amounts) private {
+        (, uint256 baselineFee, uint256 baselineNet, bytes32 baselineHash) = target.measureBaseline(amounts);
+        (, uint256 optimizedFee, uint256 optimizedNet, bytes32 optimizedHash) = target.measureOptimized(amounts);
+
+        assertEq(optimizedFee, baselineFee, "aggregated fee changed");
+        assertEq(optimizedNet, baselineNet, "aggregated net changed");
+        assertEq(optimizedHash, baselineHash, "per-row net amounts changed");
     }
 
     /// @dev forge-std's `Vm` interface on this pin omits `cool`; the cheatcode exists on the binary.
