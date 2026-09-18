@@ -23,8 +23,9 @@ import {NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
  *
  *      Expected gap ≈ 17,100 (SSTORE_SET − SSTORE_RESET). This harness pins `EXPECTED_COLD_SAVING`
  *      at 17,105 (what the paired cool+snapshot run prints); ±500 absorbs forge noise.
- *      The other side of the ledger: EIP-3529 drops the storage-clear refund (4,800 gas) on every
- *      full `withdrawAccumulatedRbtc`, paid by the user.
+ *      That peak is conditional (buyer fully withdrew since last credit). Amortized under weekly DCA /
+ *      monthly withdraw ≈ 4,300 gas/row; of the peak, 4,800 is a user→operator transfer (forgone
+ *      clear refund), so net created value per withdraw-and-rebuy cycle ≈ 12,300.
  */
 contract R77AccumulatedRbtcSentinelGasTest is Test {
     uint16 internal constant FLAT_FEE_RATE = 100;

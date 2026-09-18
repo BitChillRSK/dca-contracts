@@ -26,12 +26,16 @@ cleaner encoding is:
 - Subsequent purchases add into the nonzero slot.
 
 Tradeoffs accepted by this PR: permanent one-slot state per user×handler that has ever been
-credited, and loss of the user's storage-clear refund on full withdrawal. Quantified: **−4,800 gas
-user-paid** per full `withdrawAccumulatedRbtc` (EIP-3529 clear refund forgone; ×N in
-`withdrawAllAccumulatedRbtc`), versus **≈17,100 gas operator-paid** per subsequent re-credit when both
-credits are measured cold (SSTORE_SET − SSTORE_RESET; this repo's cool+snapshot harness prints
-**17,105**, pinned as `EXPECTED_COLD_SAVING`). Still net positive whenever a withdrawn user is credited
-again; not free on the withdraw side.
+credited, and loss of the user's storage-clear refund on full withdrawal.
+
+**Amortized framing (what decides whether the permanent state is worth it):** the ≈17,100 gas
+operator saving fires only on a purchase whose buyer fully withdrew since their last credit. For a
+weekly-DCA user who withdraws monthly that is roughly one row in four, so **≈4,300 gas/row** expected
+operator saving — not 17,100 on every tick. Of the peak 17,100, **4,800 is a transfer from the user**
+(EIP-3529 clear refund forgone on every full `withdrawAccumulatedRbtc`; ×N in
+`withdrawAllAccumulatedRbtc`), not new value: the protocol-level net per withdraw-and-rebuy cycle is
+therefore **≈12,300**. Peak cold re-credit delta (SSTORE_SET − SSTORE_RESET) is still what the harness
+measures (**17,105**, pinned as `EXPECTED_COLD_SAVING`).
 
 `DcaManager` needs no logic change: it already reads and skips through
 `IPurchaseRbtc.getAccumulatedRbtcBalance`, which must keep returning the decoded claimable amount.
@@ -44,8 +48,8 @@ stacked implementation PR rather than folding it into R74.
 ## Scope
 
 - [x] Encode `s_usersAccumulatedRbtc` as `claimable + 1` when the slot is live; leave `0` only for
-      never-credited users. Credit through a single `_creditRbtc` helper; decode through
-      `_claimableRbtc` / `_withdrawRbtcChecksEffects` only (`AGENTS.md` invariant 13).
+      never-credited users. Mapping is `private`; credit through `_creditRbtc`, decode through
+      `_claimableRbtc` / `_withdrawRbtcChecksEffects` only (`AGENTS.md` invariant 13 — compile-enforced).
 - [x] Decode in `getAccumulatedRbtcBalance` and in `_withdrawRbtcChecksEffects`.
 - [x] On full withdrawal, write sentinel `1` and transfer the full decoded claim (never leave
       claimable dust).
@@ -102,8 +106,9 @@ re-credit must be materially cheaper (on the order of the zero-to-nonzero vs non
 - [x] After a full withdraw the storage slot stays nonzero (`1`); the next credit avoids a
       zero-to-nonzero `SSTORE`.
 - [x] `withdrawAllAccumulatedRbtc` still skips zero-claimable handlers via the decoded getter.
-- [x] Measured re-credit gas saving is recorded (**≈17,100** / harness pin **17,105**; −4,800 user
-      clear-refund forgone per full withdraw); no open product decisions remain.
+- [x] Measured re-credit gas saving is recorded with amortized framing (**≈4,300 gas/row** expected for
+      weekly-DCA / monthly-withdraw; peak cold **≈17,100** / harness pin **17,105**; **≈12,300** net per
+      withdraw-and-rebuy after the −4,800 user clear-refund transfer); no open product decisions remain.
 - [x] `make check`, `make fork-sovryn`, and `make fork-tropykus` pass.
 
 ## Reviewer checklist

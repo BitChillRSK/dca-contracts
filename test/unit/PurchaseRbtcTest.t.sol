@@ -599,8 +599,14 @@ contract PurchaseRbtcHarness is PurchaseRbtc {
     }
 
     /// @dev Exposes the encoded storage word for sentinel tests (not part of the production ABI).
-    function rawAccumulatedRbtc(address user) external view returns (uint256) {
-        return s_usersAccumulatedRbtc[user];
+    ///      The mapping is private on `PurchaseRbtc`; this harness layout places it at slot 4
+    ///      (after Ownable2Step + FeeHandler). Re-check with `forge inspect PurchaseRbtcHarness storage-layout`
+    ///      if FeeHandler packing moves.
+    function rawAccumulatedRbtc(address user) external view returns (uint256 encoded) {
+        bytes32 slot = keccak256(abi.encode(user, uint256(4)));
+        assembly {
+            encoded := sload(slot)
+        }
     }
 
     function _purchaseToken() internal view override returns (IERC20) {
