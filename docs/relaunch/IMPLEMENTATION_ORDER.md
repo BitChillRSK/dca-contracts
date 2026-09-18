@@ -1063,8 +1063,9 @@ Foundry / Cancun measures **2,450 / 3,247 gas saved** for one / five rows under 
 
 ### R80 - remove the cadence-anchor purchase event ([analysis](./R78-flat-fee-fast-path.md#r80-survivor-remove-dcamanager__cadenceanchorupdated))
 
-Next unassigned and pre-deployment: decide whether to remove the one-site event for 1,946 gas per row,
-then perform the ABI and five-consumer cutover. Write the full R80 spec only when assigned.
+Next unassigned and pre-deployment: decide whether to remove the one-site event for 1,813 gas per row
+under the production deploy (`via_ir`) profile (1,946 under default), then perform the ABI and
+five-consumer cutover. Write the full R80 spec only when assigned.
 
 ### R79 - coalesce repeated-buyer writes ([analysis](./R78-flat-fee-fast-path.md#r79-survivor-coalesce-repeated-buyer-writes))
 

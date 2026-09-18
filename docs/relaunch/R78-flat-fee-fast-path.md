@@ -101,20 +101,29 @@ not deployment-deadline-bound.
 balance-change record, so changing only its purchase-path shape would break that property for
 consumers.
 
-**Rootstock upside.** Removing the cadence event saves **1,946 gas per purchased row**. LOG pricing is
-the same on Foundry and Rootstock, so this measurement transfers unchanged. The pure LOG3 component
-is `375 + 3 × 375 + 8 × 32 = 1,756`; the remaining 190 gas is compiler-generated work.
+**Rootstock upside.** Removing the cadence event saves **1,813 gas per purchased row under the deploy
+(`via_ir`) profile** and **1,946 gas per row under the default legacy-codegen profile**. The pure LOG3
+component is profile-invariant: `375 + 3 × 375 + 8 × 32 = 1,756`. Compiler-generated compute around
+the emit accounts for the remaining 57 gas under deploy and 190 gas under default. Both components
+transfer to current Rootstock because its LOG and ordinary compute prices match the measured EVM
+schedule; this path changes no storage access whose price would need a Rootstock-specific conversion.
 
 Reproduction method:
 
 ```bash
-# Temporarily remove the event emit, then run:
+# Temporarily remove the event emit, then run each profile:
 SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn EXPECTED_LENDING_PROTOCOL=sovryn \
   STABLECOIN_TYPE=DOC forge test --match-path test/unit/RbtcPurchaseTest.t.sol --gas-report
+
+FOUNDRY_PROFILE=deploy SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn \
+  EXPECTED_LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=DOC \
+  forge test --match-path test/unit/RbtcPurchaseTest.t.sol --gas-report
 ```
 
-The median `batchBuyRbtc` result moves **179,090 → 177,144**. The largest case moves
-**365,143 → 353,467**, exactly `6 × 1,946`. Only the test that expects this event fails.
+Under default, the median `batchBuyRbtc` result moves **179,090 → 177,144** and the largest case moves
+**365,143 → 353,467**, exactly `6 × 1,946`. Under deploy, the median moves
+**173,704 → 171,891** and the largest case moves **352,573 → 341,695**, exactly `6 × 1,813`.
+Only the test that expects this event fails in either profile.
 
 **Information preservation.** `getDcaSchedule()` returns the current `cadenceAnchor`. An indexer that
 holds the prior anchor and purchase period can reproduce the new anchor exactly with the formula in
