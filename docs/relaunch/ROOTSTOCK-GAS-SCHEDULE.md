@@ -97,11 +97,16 @@ and magnitude match a storage-heavy tick priced on Cancun access lists.
 | LOG (375 base / 375 per topic / 8 per byte) | same | same | yes |
 | First `SLOAD` of a slot | 2,100 | 200 | no — Foundry 10.5× high |
 | Repeat `SLOAD` | 100 | 200 | no — Foundry understated |
-| First write zero → non-zero (`SET`) | ~22,100 cold | 20,000 | approximate only |
-| First write non-zero → non-zero | ~2,900 cold | 5,000 | no |
+| First write zero → non-zero (`SET`) | warm 20,000 / cold 22,100 | 20,000 | only when Foundry's slot was cold |
+| First write non-zero → non-zero | warm 2,900 / cold 5,000 | 5,000 | only when Foundry's slot was cold |
 | Repeat write to same slot in one tx | ~100 | 5,000 | no — Foundry 50× low |
 | Clear-to-zero refund | 4,800 (EIP-3529) | 15,000 | no |
 | Refund cap | `gasUsed / 5` | `gasUsed / 2` | no |
+
+EIP-2929 footnote: Cancun charges `COLD_SLOAD_COST` (2,100) on the first access to a slot in
+the transaction, then the warm SSTORE base (`SET` 20,000 or `SSTORE_RESET_GAS` 2,900). A cold
+non-zero → non-zero write is therefore 2,100 + 2,900 = 5,000 — identical to Rootstock's flat
+`RESET`. Do not convert a Foundry cold-RESET figure as if it were 2,900.
 
 ## How to use this file
 
