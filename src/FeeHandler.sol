@@ -132,29 +132,26 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         view
         returns (uint256 aggregatedFee, uint256[] memory netAmountsToSpend, uint256 totalAmountToSpend)
     {
-        uint256 len = purchaseAmounts.length;
-        netAmountsToSpend = new uint256[](len);
-        FeeSettings memory feeSettings = _feeSettings();
+        uint16 minFeeRate = s_minFeeRate;
+        uint16 maxFeeRate = s_maxFeeRate;
 
-        for (uint256 i; i < len; ++i) {
-            uint256 amount = purchaseAmounts[i];
-            uint256 fee = _calculateFeeWithParams(amount, feeSettings);
-            aggregatedFee += fee;
-
-            // maxFeeRate is capped at MAX_FEE_RATE_CAP (5%) by `_validateFeeSettings`, the only write path
-            // for the fee rates, so `_calculateFeeWithParams` can never return a fee above its input amount.
-            uint256 net;
-            unchecked {
-                net = amount - fee;
-            }
-            netAmountsToSpend[i] = net;
-            totalAmountToSpend += net;
+        if (minFeeRate == maxFeeRate) {
+            return _calculateFlatFeeAndNetAmounts(purchaseAmounts, minFeeRate);
         }
+
+        return _calculateVariableFeeAndNetAmounts(
+            purchaseAmounts,
+            FeeSettings({
+                minFeeRate: minFeeRate,
+                maxFeeRate: maxFeeRate,
+                feePurchaseLowerBound: s_feePurchaseLowerBound,
+                feePurchaseUpperBound: s_feePurchaseUpperBound
+            })
+        );
     }
 
     /**
-     * @dev Pack the four fee storage fields for two loads per batch: the rate word (already warm for
-     *      `_transferFee`, which reads the collector beside them) and the bounds word.
+     * @dev Return all four fee parameters as one settings value for the external getter.
      */
     function _feeSettings() internal view returns (FeeSettings memory) {
         return FeeSettings({
@@ -166,7 +163,8 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     }
 
     /**
-     * @dev Same interpolation as `_calculateFee`, using already-loaded fee settings.
+     * @dev Apply the variable-fee interpolation using already-loaded fee settings. The flat-rate
+     *      branch also keeps this helper correct for standalone callers.
      */
     function _calculateFeeWithParams(uint256 purchaseAmount, FeeSettings memory feeSettings)
         internal
@@ -209,6 +207,59 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     /*//////////////////////////////////////////////////////////////
                             PRIVATE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    /// @dev Flat batches need no curve and leave the purchase-bound storage word unread.
+    function _calculateFlatFeeAndNetAmounts(
+        uint256[] memory purchaseAmounts,
+        uint256 feeRate
+    )
+        private
+        pure
+        returns (uint256 aggregatedFee, uint256[] memory netAmountsToSpend, uint256 totalAmountToSpend)
+    {
+        uint256 len = purchaseAmounts.length;
+        netAmountsToSpend = new uint256[](len);
+        for (uint256 i; i < len; ++i) {
+            uint256 amount = purchaseAmounts[i];
+            uint256 fee = amount * feeRate / BPS_DENOMINATOR;
+            aggregatedFee += fee;
+
+            uint256 net;
+            unchecked {
+                // Fee rates are capped at 5%, so the fee cannot exceed its input amount.
+                net = amount - fee;
+            }
+            netAmountsToSpend[i] = net;
+            totalAmountToSpend += net;
+        }
+    }
+
+    /// @dev Variable batches load the bounds once and reuse the complete settings for every row.
+    function _calculateVariableFeeAndNetAmounts(
+        uint256[] memory purchaseAmounts,
+        FeeSettings memory feeSettings
+    )
+        private
+        pure
+        returns (uint256 aggregatedFee, uint256[] memory netAmountsToSpend, uint256 totalAmountToSpend)
+    {
+        uint256 len = purchaseAmounts.length;
+        netAmountsToSpend = new uint256[](len);
+        for (uint256 i; i < len; ++i) {
+            uint256 amount = purchaseAmounts[i];
+            uint256 fee = _calculateFeeWithParams(amount, feeSettings);
+            aggregatedFee += fee;
+
+            // maxFeeRate is capped at MAX_FEE_RATE_CAP (5%) by `_validateFeeSettings`, the only write path
+            // for the fee rates, so `_calculateFeeWithParams` can never return a fee above its input amount.
+            uint256 net;
+            unchecked {
+                net = amount - fee;
+            }
+            netAmountsToSpend[i] = net;
+            totalAmountToSpend += net;
+        }
+    }
 
     function _validateFeeSettings(
         uint256 minFeeRate,
