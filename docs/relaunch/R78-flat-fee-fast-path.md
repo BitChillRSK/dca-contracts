@@ -160,6 +160,26 @@ hold pooled deposits, and a compromised or changed router must not gain access b
 purchase. A bounded reusable allowance has the same residual-exposure problem and needs a separate
 security design; it is not a resurrection of the invalid approximately-12,300-gas storage claim.
 
+### Closed: repack all fee settings into one word
+
+The four settings do not currently fit one word: two `uint16` rates plus two `uint128` bounds total
+288 bits. Narrowing both bounds to `uint112` would fit exactly; `uint96` would match the maximum
+purchase amount stored in a schedule. A dedicated storage struct would also be required so Solidity
+starts the settings on a fresh word instead of using the 12 bytes left beside Ownable2Step's
+`_pendingOwner`. The public `FeeSettings` struct could retain its `uint128` fields, but the setter
+would then reject values above the narrower internal width, so this is still a configuration and
+storage-layout change rather than a free reorder.
+
+It does not improve the shipped flat-fee purchase path on Rootstock. Today fee calculation reads the
+rate/collector word and `_transferFee` later reads that same word again. With one settings word, fee
+calculation would read it and `_transferFee` would instead read a separate collector word. Rootstock
+charges 200 gas for every `SLOAD`, including repeated reads, so both layouts cost two reads = 400 gas.
+Materializing the complete settings struct would also restore fixed memory/unpacking work that the
+flat path deliberately avoids. The repack would save one 200-gas read only on variable-fee batches,
+and one read on the external view getter; neither is the launch hot path. A one-word struct could
+also coalesce rare owner writes, but governance configuration is not frequent enough to justify the
+layout and accepted-range change. Keep the present collector-plus-rates / bounds layout.
+
 ### Closed: remove the linear fee model
 
 R78 already leaves the purchase-bound word unread and skips interpolation whenever the configured fee
@@ -206,8 +226,8 @@ Foundry / Cancun measurements in the same-build R77-reference/R78-fast-path harn
 
 | Foundry profile | One row | Five rows |
 |---|---:|---:|
-| default | 2,450 gas saved | 3,247 gas saved |
-| deploy (`via_ir`) | 2,547 gas saved | 3,236 gas saved |
+| default | 2,462 gas saved | 3,259 gas saved |
+| deploy (`via_ir`) | 2,571 gas saved | 3,260 gas saved |
 
 Rootstock production values are **derived**, not measured by Foundry. The access test proves one
 avoided storage-word read. [`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SCHEDULE.md) records a
@@ -217,13 +237,18 @@ avoided storage-word read. [`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SCHEDUL
 1 avoided read × (2,100 − 200) = −1,900 gas from the Foundry delta
 ```
 
-The remaining struct construction / memory work (approximately 350 gas) and avoided per-row branch
-(approximately 200 gas per row) are pure compute and transfer unchanged:
+The remaining avoided struct construction / memory work and per-row branch are pure compute and
+transfer unchanged. Applying the same conversion to both compiler profiles makes the production
+profile explicit:
 
-| R78 saving | Foundry / Cancun measured (default) | Rootstock derived |
+| Profile | One row, Foundry → Rootstock | Five rows, Foundry → Rootstock |
 |---|---:|---:|
-| one row | 2,450 | approximately 550 |
-| five rows | 3,247 | approximately 1,350 |
+| default | 2,462 → approximately 562 | 3,259 → approximately 1,359 |
+| deploy (`via_ir`) | 2,571 → approximately 671 | 3,260 → approximately 1,360 |
+
+Production ships the deploy (`via_ir`) profile, so approximately **671 / 1,360 gas** for one / five
+rows is the relevant Rootstock estimate. Against R64's 815,384-gas five-row live tick, the larger
+case is about 0.17%.
 
 R78 remains worth keeping at the smaller Rootstock figure: it adds no state, ABI change, protocol
 invariant, external call, or failure mode, and focused plus fuzz testing proves output equivalence on
