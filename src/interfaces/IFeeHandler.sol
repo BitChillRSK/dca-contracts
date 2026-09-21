@@ -12,11 +12,11 @@ interface IFeeHandler {
                            TYPE DECLARATIONS
     //////////////////////////////////////////////////////////////*/
     /// @notice The four parameters that interpolate a purchase fee between `maxFeeRate` and `minFeeRate`.
-    /// @dev Widths match FeeHandler storage: rates are capped at 5% (`MAX_FEE_RATE_CAP`) so they fit
-    ///      uint16, and the bounds are purchase amounts, so they carry the schedule's uint128.
-    ///      The constructor takes this struct and assigns each field straight through, so these
-    ///      types are the check; `setFeeRateParams` takes uint256 and SafeCasts at the write.
-    ///      Either way `_validateFeeSettings` runs on the values first.
+    /// @dev Rates are capped at 5% (`MAX_FEE_RATE_CAP`) so they fit uint16. The ABI keeps uint128
+    ///      bounds while FeeHandler checked-casts them to uint112 storage: two bounds plus both rates
+    ///      then occupy one word, and uint112 remains wider than a schedule's uint96 purchase amount.
+    ///      `setFeeRateParams` likewise takes uint256 and checked-casts at the write. Either way
+    ///      `_validateFeeSettings` runs on the values first.
     struct FeeSettings {
         uint16 minFeeRate; // the lowest possible fee
         uint16 maxFeeRate; // the highest possible fee

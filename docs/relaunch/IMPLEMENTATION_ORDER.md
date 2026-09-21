@@ -1053,13 +1053,12 @@ at relaunch deployment because this mapping encoding is not layout-compatible wi
 
 ### R78 - flat-fee purchase fast path ([spec](./R78-flat-fee-fast-path.md))
 
-Post-R77 behavior-preserving purchase optimization. When a handler's min/max fee rates are equal,
-choose the flat calculation once per batch and leave the linear curve's packed amount-bound word cold.
-Keep the existing variable-fee path, storage, setter, ABI, per-row rounding, and events unchanged.
-Foundry / Cancun measures **2,462 / 3,259 gas saved** for one / five rows under the default profile and
-**2,571 / 3,260** under deploy (`via_ir`). Correcting the one avoided cold `SLOAD` to Rootstock's flat
-200-gas read derives approximately **671 / 1,360 gas** for the shipped deploy profile; see
-[`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SCHEDULE.md). Ask: none.
+Post-R77 behavior-preserving purchase optimization. When min/max rates are equal, choose the flat
+calculation once per batch; both fee branches call one shared fee-at-rate helper. Pack both internal
+`uint112` bounds plus both rates into one word while retaining the public `uint128` ABI. Under deploy
+(`via_ir`), the compute-only fast path saves **466 / 1,143 / 17,204 gas** for one / five / 100 rows on
+both Foundry and Rootstock. Packing separately avoids one 200-gas Rootstock `SLOAD` per batch, making
+the complete R77 delta approximately **666 / 1,343 / 17,404 gas**. Ask: none.
 
 ### R80 - remove the cadence-anchor purchase event ([analysis](./R78-flat-fee-fast-path.md#r80-survivor-remove-dcamanager__cadenceanchorupdated))
 

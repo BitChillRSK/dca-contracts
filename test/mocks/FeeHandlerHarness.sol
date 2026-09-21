@@ -4,8 +4,11 @@ pragma solidity 0.8.36;
 import {FeeHandler} from "../../src/FeeHandler.sol";
 import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 contract FeeHandlerHarness is FeeHandler {
+    using SafeCast for uint256;
+
     constructor(address feeCollector, IFeeHandler.FeeSettings memory settings, address initialOwner)
         FeeHandler(feeCollector, settings, initialOwner)
     {}
@@ -27,8 +30,8 @@ contract FeeHandlerHarness is FeeHandler {
     function testSetFeeRateParams(uint16 minFee, uint16 maxFee, uint128 lower, uint128 upper) external {
         s_minFeeRate = minFee;
         s_maxFeeRate = maxFee;
-        s_feePurchaseLowerBound = lower;
-        s_feePurchaseUpperBound = upper;
+        s_feePurchaseLowerBound = uint256(lower).toUint112();
+        s_feePurchaseUpperBound = uint256(upper).toUint112();
     }
 
     function testSetMinFeeRate(uint16 minFee) external {
@@ -40,11 +43,11 @@ contract FeeHandlerHarness is FeeHandler {
     }
 
     function testSetFeePurchaseLowerBound(uint128 lower) external {
-        s_feePurchaseLowerBound = lower;
+        s_feePurchaseLowerBound = uint256(lower).toUint112();
     }
 
     function testSetFeePurchaseUpperBound(uint128 upper) external {
-        s_feePurchaseUpperBound = upper;
+        s_feePurchaseUpperBound = uint256(upper).toUint112();
     }
 
     function exposedTransferFee(IERC20 token, uint256 fee) external {

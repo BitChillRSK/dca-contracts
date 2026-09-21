@@ -34,7 +34,8 @@ contract R78FeeHandlerGasHarness is FeeHandler {
         netAmountsHash = keccak256(abi.encode(netAmounts));
     }
 
-    /// @dev The R77 implementation retained here only as a same-build gas baseline.
+    /// @dev The pre-fast-path generic loop compiled against the same packed settings layout, so the
+    ///      comparison isolates compute and memory rather than a chain-specific storage-read price.
     function _baselineCalculateFeeAndNetAmounts(uint256[] memory purchaseAmounts)
         private
         view
@@ -60,17 +61,14 @@ contract R78FeeHandlerGasHarness is FeeHandler {
 
 /**
  * @title R78FlatFeeFastPathGas
- * @notice Compares R77's generic fee loop with the flat-fee batch fast path in the same build.
+ * @notice Compares the generic fee loop with the flat-fee batch fast path in the same build.
  * @dev Reproduce with both:
  *
  *          forge test --match-path test/gas/R78FlatFeeFastPathGas.t.sol -vv
  *          FOUNDRY_PROFILE=deploy forge test --match-path test/gas/R78FlatFeeFastPathGas.t.sol -vv
  *
- *      These are Foundry / Cancun regression measurements, not Rootstock bills. Each measurement
- *      runs inside a fresh harness call. Cooling the harness before each call makes the rate and
- *      bounds slots cold under Foundry and proves the optimized branch avoids exactly one bounds-word
- *      read. Derive production gas by replacing Foundry's 2,100-gas cold SLOAD with Rootstock's flat
- *      200-gas SLOAD; see docs/relaunch/ROOTSTOCK-GAS-SCHEDULE.md.
+ *      Both variants load the same one-word settings layout. Their delta contains only compute and
+ *      memory work, whose pricing is the same on Foundry / Cancun and Rootstock.
  */
 contract R78FlatFeeFastPathGasTest is Test {
     uint16 internal constant FLAT_FEE_RATE = 100;
@@ -110,6 +108,14 @@ contract R78FlatFeeFastPathGasTest is Test {
         _assertSaving(amounts, "five-row");
     }
 
+    function test_gas_flatHundredRowFastPath() public {
+        uint256[] memory amounts = new uint256[](100);
+        for (uint256 i; i < amounts.length; ++i) {
+            amounts[i] = (i + 1) * 1 ether;
+        }
+        _assertSaving(amounts, "hundred-row");
+    }
+
     function testFuzz_optimizedMatchesBaseline(uint96[5] memory fuzzedAmounts) public {
         uint256[] memory amounts = new uint256[](fuzzedAmounts.length);
         for (uint256 i; i < fuzzedAmounts.length; ++i) {
@@ -135,11 +141,11 @@ contract R78FlatFeeFastPathGasTest is Test {
 
         uint256 saving = baselineGas - optimizedGas;
         console2.log(label);
-        console2.log("R77 generic fee loop:", baselineGas);
+        console2.log("generic fee loop:", baselineGas);
         console2.log("R78 flat-fee fast path:", optimizedGas);
         console2.log("saving:", saving);
-        assertGt(saving, 1_500, "Foundry delta did not include the avoided cold read");
-        assertLt(saving, 10_000, "saving exceeded the intended fee-loop scope");
+        assertGt(saving, 100, "fast path did not save compute");
+        assertLt(saving, 50_000, "saving exceeded the intended fee-loop scope");
     }
 
     function _assertEquivalent(R78FeeHandlerGasHarness target, uint256[] memory amounts) private {

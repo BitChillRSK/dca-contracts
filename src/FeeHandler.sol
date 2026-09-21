@@ -21,16 +21,15 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Two slots. Rates never exceed MAX_FEE_RATE_CAP, so they fit uint16 beside the collector:
-    ///      the word every purchase already loads for the fee rates is the one `_transferFee` needs.
-    ///      The collector is declared first so it starts the word rather than being pushed out of the
-    ///      12 bytes Ownable2Step leaves free next to `_pendingOwner`. Bounds are purchase amounts, so
-    ///      they share the schedule's uint128.
+    /// @dev Two slots. The collector starts its own word because it cannot fit in the 12 bytes left by
+    ///      Ownable2Step's `_pendingOwner`. A uint112 bound then starts the next word; both bounds and
+    ///      both uint16 rates fill that word exactly. The bound width remains wider than the uint96
+    ///      purchase amount of any schedule.
     address internal s_feeCollector; // Address to which the fees charged to the user will be sent
+    uint112 internal s_feePurchaseLowerBound; // Spending below lower bound gets the maximum fee rate
+    uint112 internal s_feePurchaseUpperBound; // Spending above upper bound gets the minimum fee rate
     uint16 internal s_minFeeRate; // Minimum fee rate
     uint16 internal s_maxFeeRate; // Maximum fee rate
-    uint128 internal s_feePurchaseLowerBound; // Spending below lower bound gets the maximum fee rate
-    uint128 internal s_feePurchaseUpperBound; // Spending above upper bound gets the minimum fee rate
     uint256 internal constant BPS_DENOMINATOR = 10_000; // rates are basis points, so a rate times an amount divides by this denominator
     /// @notice Hard ceiling on fee rates (5%). Owner cannot set max (or a flat min==max) above this.
     uint256 internal constant MAX_FEE_RATE_CAP = 500;
@@ -51,10 +50,10 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         );
 
         s_feeCollector = feeCollector;
+        s_feePurchaseLowerBound = uint256(feeSettings.feePurchaseLowerBound).toUint112();
+        s_feePurchaseUpperBound = uint256(feeSettings.feePurchaseUpperBound).toUint112();
         s_minFeeRate = feeSettings.minFeeRate;
         s_maxFeeRate = feeSettings.maxFeeRate;
-        s_feePurchaseLowerBound = feeSettings.feePurchaseLowerBound;
-        s_feePurchaseUpperBound = feeSettings.feePurchaseUpperBound;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -80,11 +79,11 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
             emit FeeHandler__MaxFeeRateSet(maxFeeRate);
         }
         if (s_feePurchaseLowerBound != feePurchaseLowerBound) {
-            s_feePurchaseLowerBound = feePurchaseLowerBound.toUint128();
+            s_feePurchaseLowerBound = feePurchaseLowerBound.toUint112();
             emit FeeHandler__PurchaseLowerBoundSet(feePurchaseLowerBound);
         }
         if (s_feePurchaseUpperBound != feePurchaseUpperBound) {
-            s_feePurchaseUpperBound = feePurchaseUpperBound.toUint128();
+            s_feePurchaseUpperBound = feePurchaseUpperBound.toUint112();
             emit FeeHandler__PurchaseUpperBoundSet(feePurchaseUpperBound);
         }
     }
@@ -177,11 +176,11 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         uint256 feePurchaseUpperBound = feeSettings.feePurchaseUpperBound;
 
         if (minFeeRate == maxFeeRate || purchaseAmount >= feePurchaseUpperBound) {
-            return purchaseAmount * minFeeRate / BPS_DENOMINATOR;
+            return _calculateFeeAtRate(purchaseAmount, minFeeRate);
         }
 
         if (purchaseAmount <= feePurchaseLowerBound) {
-            return purchaseAmount * maxFeeRate / BPS_DENOMINATOR;
+            return _calculateFeeAtRate(purchaseAmount, maxFeeRate);
         }
 
         uint256 feeRate;
@@ -191,7 +190,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
                     * (maxFeeRate - minFeeRate))
                     / (feePurchaseUpperBound - feePurchaseLowerBound);
         }
-        return purchaseAmount * feeRate / BPS_DENOMINATOR;
+        return _calculateFeeAtRate(purchaseAmount, feeRate);
     }
 
     /**
@@ -208,7 +207,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
                             PRIVATE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Flat batches need no curve and leave the purchase-bound storage word unread.
+    /// @dev Flat batches choose one loop and skip the per-row curve branch.
     function _calculateFlatFeeAndNetAmounts(
         uint256[] memory purchaseAmounts,
         uint256 feeRate
@@ -221,7 +220,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         netAmountsToSpend = new uint256[](len);
         for (uint256 i; i < len; ++i) {
             uint256 amount = purchaseAmounts[i];
-            uint256 fee = amount * feeRate / BPS_DENOMINATOR;
+            uint256 fee = _calculateFeeAtRate(amount, feeRate);
             aggregatedFee += fee;
 
             uint256 net;
@@ -232,6 +231,11 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
             netAmountsToSpend[i] = net;
             totalAmountToSpend += net;
         }
+    }
+
+    /// @dev Apply one basis-point rate. Shared by the flat batch and variable curve paths.
+    function _calculateFeeAtRate(uint256 amount, uint256 feeRate) private pure returns (uint256) {
+        return amount * feeRate / BPS_DENOMINATOR;
     }
 
     /// @dev Variable batches load the bounds once and reuse the complete settings for every row.

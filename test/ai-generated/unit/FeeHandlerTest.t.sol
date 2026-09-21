@@ -86,6 +86,21 @@ contract FeeHandlerTest is Test {
         new FeeHandlerHarness(FEE_COLLECTOR, settings, address(this));
     }
 
+    function test_constructor_reverts_uncastableBound() public {
+        uint128 overflowing = uint128(type(uint112).max) + 1;
+        IFeeHandler.FeeSettings memory settings = IFeeHandler.FeeSettings({
+            minFeeRate: MIN_FEE_RATE,
+            maxFeeRate: MAX_FEE_RATE,
+            feePurchaseLowerBound: LOWER_BOUND,
+            feePurchaseUpperBound: overflowing
+        });
+
+        vm.expectRevert(
+            abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 112, overflowing)
+        );
+        new FeeHandlerHarness(FEE_COLLECTOR, settings, address(this));
+    }
+
     function test_calculateFee_belowLowerBound() public {
         uint256 purchaseAmount = 50 ether; // below lower bound
         uint256 expectedFee = purchaseAmount * MAX_FEE_RATE / BPS_DENOMINATOR;
@@ -250,31 +265,6 @@ contract FeeHandlerTest is Test {
         assertEq(totalNet, expectedTotalNet);
     }
 
-    function test_calculateFeeAndNetAmounts_flatDoesNotReadBoundsSlot() public {
-        feeHandler.testSetFeeRateParams(MIN_FEE_RATE, MIN_FEE_RATE, LOWER_BOUND, UPPER_BOUND);
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = 550 ether;
-
-        vm.record();
-        feeHandler.exposedCalculateFeeAndNetAmounts(amounts);
-        (bytes32[] memory reads,) = vm.accesses(address(feeHandler));
-
-        assertTrue(_contains(reads, bytes32(uint256(2))), "flat path did not read rate slot");
-        assertFalse(_contains(reads, bytes32(uint256(3))), "flat path read unused bounds slot");
-    }
-
-    function test_calculateFeeAndNetAmounts_variableReadsBoundsSlot() public {
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = 550 ether;
-
-        vm.record();
-        feeHandler.exposedCalculateFeeAndNetAmounts(amounts);
-        (bytes32[] memory reads,) = vm.accesses(address(feeHandler));
-
-        assertTrue(_contains(reads, bytes32(uint256(2))), "variable path did not read rate slot");
-        assertTrue(_contains(reads, bytes32(uint256(3))), "variable path did not read bounds slot");
-    }
-
     function test_setFeeRateParams_reverts_aboveCap() public {
         vm.expectRevert(IFeeHandler.FeeHandler__MaxFeeRateExceedsCap.selector);
         feeHandler.setFeeRateParams(MIN_FEE_RATE, FEE_RATE_CAP + 1, LOWER_BOUND, UPPER_BOUND);
@@ -355,18 +345,18 @@ contract FeeHandlerTest is Test {
                             STORAGE PACKING
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev R50: the five logical fee fields live in two slots. Ownable2Step owns slots 0 and 1,
-    ///      so the collector starts slot 2 with both rates beside it, and the bounds share slot 3.
+    /// @dev The five logical fee fields live in two slots. Ownable2Step owns slots 0 and 1, the
+    ///      collector occupies slot 2, and all four settings fill slot 3 exactly.
     function test_feeSettingsOccupyTwoSlots() public {
-        uint256 rateSlot = uint256(vm.load(address(feeHandler), bytes32(uint256(2))));
-        assertEq(address(uint160(rateSlot)), FEE_COLLECTOR, "the collector is not the low 20 bytes of slot 2");
-        assertEq(uint16(rateSlot >> 160), MIN_FEE_RATE, "minFeeRate does not follow the collector");
-        assertEq(uint16(rateSlot >> 176), MAX_FEE_RATE, "maxFeeRate does not follow minFeeRate");
-        assertEq(rateSlot >> 192, 0, "something else was written into the rate slot");
+        uint256 collectorSlot = uint256(vm.load(address(feeHandler), bytes32(uint256(2))));
+        assertEq(address(uint160(collectorSlot)), FEE_COLLECTOR, "slot 2 does not hold the collector");
+        assertEq(collectorSlot >> 160, 0, "settings spilled into the collector slot");
 
-        uint256 boundSlot = uint256(vm.load(address(feeHandler), bytes32(uint256(3))));
-        assertEq(uint128(boundSlot), LOWER_BOUND, "the lower bound is not the low half of slot 3");
-        assertEq(uint128(boundSlot >> 128), UPPER_BOUND, "the upper bound is not the high half of slot 3");
+        uint256 settingsSlot = uint256(vm.load(address(feeHandler), bytes32(uint256(3))));
+        assertEq(uint112(settingsSlot), LOWER_BOUND, "lower bound is not first in slot 3");
+        assertEq(uint112(settingsSlot >> 112), UPPER_BOUND, "upper bound does not follow lower bound");
+        assertEq(uint16(settingsSlot >> 224), MIN_FEE_RATE, "minFeeRate does not follow the bounds");
+        assertEq(uint16(settingsSlot >> 240), MAX_FEE_RATE, "maxFeeRate does not finish slot 3");
 
         assertEq(uint256(vm.load(address(feeHandler), bytes32(uint256(4)))), 0, "fee state spilled into a third slot");
     }
@@ -382,8 +372,8 @@ contract FeeHandlerTest is Test {
         assertEq(settings.feePurchaseLowerBound, newLower);
         assertEq(settings.feePurchaseUpperBound, newUpper);
 
-        uint256 rateSlot = uint256(vm.load(address(feeHandler), bytes32(uint256(2))));
-        assertEq(address(uint160(rateSlot)), FEE_COLLECTOR, "writing rates disturbed the collector");
+        uint256 collectorSlot = uint256(vm.load(address(feeHandler), bytes32(uint256(2))));
+        assertEq(address(uint160(collectorSlot)), FEE_COLLECTOR, "writing settings disturbed the collector");
     }
 
     function test_setFeeRateParams_revertsOnUncastableRate() public {
@@ -394,17 +384,10 @@ contract FeeHandlerTest is Test {
     }
 
     function test_setFeeRateParams_revertsOnUncastableBound() public {
-        uint256 overflowing = uint256(type(uint128).max) + 1;
+        uint256 overflowing = uint256(type(uint112).max) + 1;
         vm.expectRevert(
-            abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 128, overflowing)
+            abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 112, overflowing)
         );
         feeHandler.setFeeRateParams(MIN_FEE_RATE, MAX_FEE_RATE, LOWER_BOUND, overflowing);
-    }
-
-    function _contains(bytes32[] memory values, bytes32 needle) private pure returns (bool) {
-        for (uint256 i; i < values.length; ++i) {
-            if (values[i] == needle) return true;
-        }
-        return false;
     }
 }

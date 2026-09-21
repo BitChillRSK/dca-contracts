@@ -4,44 +4,47 @@ Status: **implemented** · GitHub [#139](https://github.com/BitChillRSK/dca-cont
 
 ## Objective
 
-Avoid loading and evaluating the linear fee curve when a handler is configured with the launch's
-flat fee (`minFeeRate == maxFeeRate`). Preserve the existing variable-fee configuration and results.
+Avoid evaluating the linear fee curve for every row when a handler is configured with the launch's
+flat fee (`minFeeRate == maxFeeRate`). Single-source the fee-at-rate formula, and pack all four fee
+settings into one storage word without changing the public `FeeSettings` ABI.
 
 ## Background
 
 R74 selects a flat 100-bps launch fee but deliberately keeps the existing owner-controlled linear
-fee model available. `FeeHandler._calculateFeeAndNetAmounts` currently loads both packed fee-storage
-words into a `FeeSettings` struct before it knows the rate is flat. The purchase then tests
-`minFeeRate == maxFeeRate` again for every row in `_calculateFeeWithParams`; the amount bounds are
-irrelevant in that configuration.
+fee model available. R77's `FeeHandler._calculateFeeAndNetAmounts` materializes all settings and then
+tests `minFeeRate == maxFeeRate` again for every row in `_calculateFeeWithParams`; the curve is
+irrelevant in that configuration. R78 hoists that decision once per batch. Its flat loop and the
+variable curve both call `_calculateFeeAtRate`, so `amount * rate / BPS_DENOMINATOR` exists once.
 
-The rates and collector share one storage word. The two purchase bounds share a second word. A flat
-fast path can load only the rate word, choose one loop for the complete batch, and leave the bounds
-word cold. The variable path must continue to load the bounds and use the same interpolation math.
-
-Foundry executes these tests on an Ethereum Cancun gas schedule, while production runs on Rootstock.
-The fast path avoids exactly one storage read, so its production value must adjust Foundry's cold
-`SLOAD` price to Rootstock's flat price; see
-[`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SCHEDULE.md).
+R77 stores the collector plus rates in one word and both `uint128` bounds in another. R78 keeps the
+public struct at those ABI widths but checked-casts the internal bounds to `uint112`: collector alone
+in slot 2, then both bounds and both `uint16` rates exactly fill slot 3. A schedule purchase is only
+`uint96`, so each bound remains 65,536 times wider than any reachable purchase amount. Both the
+generic gas baseline and fast path therefore read the same single settings word. Their measured delta
+is compute and memory only and transfers directly from Foundry to Rootstock; the packing itself saves
+one additional Rootstock `SLOAD` (200 gas) per batch relative to R77.
 
 ## Open product decisions
 
-**none** — this is behavior-preserving execution work. The approved fee remains 100 bps at launch,
-and governance retains the same atomic setter and variable-fee range.
+**none** — the approved fee remains 100 bps at launch and governance retains the same atomic setter,
+variable curve, and public ABI. The accepted internal bound range narrows from `uint128` to `uint112`,
+still wider than the `uint96` amount that can reach the curve.
 
 ## Scope
 
 - [x] In `_calculateFeeAndNetAmounts`, load the packed min/max rates first and choose the flat path
       once per batch when they are equal.
-- [x] On the flat path, do not load `s_feePurchaseLowerBound` or `s_feePurchaseUpperBound`; calculate
-      every row as `amount * flatRate / BPS_DENOMINATOR` with the existing per-row rounding.
+- [x] Single-source `amount * rate / BPS_DENOMINATOR` in `_calculateFeeAtRate`; both the flat loop and
+      variable curve call it with the existing per-row rounding.
 - [x] Preserve the variable path's `_calculateFeeWithParams` behavior, aggregation, checked
       overflows, and net-amount array exactly.
+- [x] Pack both internal bounds and both rates into one word with `uint112` checked casts; retain the
+      external `FeeSettings` component types and the two-slot total including the collector.
 - [x] Add focused correctness coverage for flat and variable batches, including row-by-row rounding.
 - [x] Add a gas harness and record default-profile and shipped `FOUNDRY_PROFILE=deploy` deltas against
-      R77 for representative one-row and multi-row batches, labelled as Foundry / Cancun.
-- [x] Derive the Rootstock production delta from the one avoided storage read and the unchanged
-      memory/compute work, using the repository's Rootstock gas-schedule reference.
+      the generic loop for one, five, and 100 rows.
+- [x] Price the compute-only fast-path delta directly on Rootstock and add the packing's exact
+      one-read / 200-gas saving separately.
 - [x] Update `docs/relaunch/README.md` and `IMPLEMENTATION_ORDER.md` with R78.
 
 ## Out of scope
@@ -160,25 +163,23 @@ hold pooled deposits, and a compromised or changed router must not gain access b
 purchase. A bounded reusable allowance has the same residual-exposure problem and needs a separate
 security design; it is not a resurrection of the invalid approximately-12,300-gas storage claim.
 
-### Closed: repack all fee settings into one word
+### Implemented: pack all fee settings into one word
 
-The four settings do not currently fit one word: two `uint16` rates plus two `uint128` bounds total
-288 bits. Narrowing both bounds to `uint112` would fit exactly; `uint96` would match the maximum
-purchase amount stored in a schedule. A dedicated storage struct would also be required so Solidity
-starts the settings on a fresh word instead of using the 12 bytes left beside Ownable2Step's
-`_pendingOwner`. The public `FeeSettings` struct could retain its `uint128` fields, but the setter
-would then reject values above the narrower internal width, so this is still a configuration and
-storage-layout change rather than a free reorder.
+Two `uint16` rates plus two `uint128` bounds total 288 bits. R78 retains those public ABI types but
+checked-casts the internal bounds to `uint112`, making the stored settings exactly 256 bits. No
+storage struct is needed: the collector starts slot 2; the first 14-byte bound cannot fit in its
+12-byte remainder and therefore starts slot 3, followed by the other bound and both rates. Derived
+state still starts at slot 4.
 
-It does not improve the shipped flat-fee purchase path on Rootstock. Today fee calculation reads the
-rate/collector word and `_transferFee` later reads that same word again. With one settings word, fee
-calculation would read it and `_transferFee` would instead read a separate collector word. Rootstock
-charges 200 gas for every `SLOAD`, including repeated reads, so both layouts cost two reads = 400 gas.
-Materializing the complete settings struct would also restore fixed memory/unpacking work that the
-flat path deliberately avoids. The repack would save one 200-gas read only on variable-fee batches,
-and one read on the external view getter; neither is the launch hot path. A one-word struct could
-also coalesce rare owner writes, but governance configuration is not frequent enough to justify the
-layout and accepted-range change. Keep the present collector-plus-rates / bounds layout.
+This changes the internal storage encoding before deployment and narrows the theoretical setting
+range. It does not narrow any reachable purchase: `uint112` is 65,536 times wider than the schedule's
+`uint96` purchase amount. The public struct, getter, setter arguments, selectors, and event fields stay
+unchanged; constructor and setter reject an uncastable bound with the existing SafeCast error.
+
+Compared with R77, `_feeSettings` reads one word instead of two. Rootstock charges 200 gas per
+`SLOAD`, so packing saves exactly **200 gas per batch** on either fee branch and 200 gas on the
+external settings getter. The fast-path harness compiles its generic and optimized variants against
+this same packed layout, deliberately excluding that storage saving from the compute comparison.
 
 ### Closed: remove the linear fee model
 
@@ -199,6 +200,8 @@ a local gas optimization; retain the current separation.
 
 - `AGENTS.md`
 - `src/FeeHandler.sol`
+- `src/interfaces/IFeeHandler.sol`
+- `test/mocks/FeeHandlerHarness.sol`
 - `test/ai-generated/unit/FeeHandlerTest.t.sol`
 - `test/gas/R78FlatFeeFastPathGas.t.sol`
 - `docs/relaunch/R78-flat-fee-fast-path.md`
@@ -218,49 +221,35 @@ make fork-tropykus
 ```
 
 Assert that flat and variable batch results equal sequential `_calculateFeeWithParams` calls for
-every row, including amounts that round down to zero fee. The gas harness compares the same flat-fee
-batch before and after this PR under Foundry / Cancun; the storage-access test separately proves that
-the optimized branch avoids exactly one word. This item adds no fork-only assertion.
+every row, including amounts that round down to zero fee. The gas harness compares the generic and
+flat loops against the same packed storage layout, so only compute and memory differ. This item adds
+no fork-only assertion.
 
-Foundry / Cancun measurements in the same-build R77-reference/R78-fast-path harness:
+Same-build fast-path measurements after single-sourcing the formula:
 
-| Foundry profile | One row | Five rows |
-|---|---:|---:|
-| default | 2,462 gas saved | 3,259 gas saved |
-| deploy (`via_ir`) | 2,571 gas saved | 3,260 gas saved |
+| Foundry profile | One row | Five rows | 100 rows |
+|---|---:|---:|---:|
+| default | 362 gas saved | 1,183 gas saved | 20,664 gas saved |
+| deploy (`via_ir`) | 466 gas saved | 1,143 gas saved | 17,204 gas saved |
 
-Rootstock production values are **derived**, not measured by Foundry. The access test proves one
-avoided storage-word read. [`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SCHEDULE.md) records a
-2,100-gas first `SLOAD` in Foundry and a flat 200-gas `SLOAD` on Rootstock, so the adjustment is:
+These deltas contain no changed storage access: both variants load the same packed settings word.
+Compute and memory pricing is the same on current Rootstock, so the production fast-path figures are
+the shipped deploy-profile measurements directly: **466 / 1,143 / 17,204 gas** for one / five / 100
+rows. Packing adds one avoided Rootstock `SLOAD`, exactly **200 gas per batch**, making the complete
+PR approximately **666 / 1,343 / 17,404 gas** cheaper than R77 at those sizes. Against R64's
+815,384-gas five-row live tick, the complete five-row saving is about 0.16%.
 
-```
-1 avoided read × (2,100 − 200) = −1,900 gas from the Foundry delta
-```
-
-The remaining avoided struct construction / memory work and per-row branch are pure compute and
-transfer unchanged. Applying the same conversion to both compiler profiles makes the production
-profile explicit:
-
-| Profile | One row, Foundry → Rootstock | Five rows, Foundry → Rootstock |
-|---|---:|---:|
-| default | 2,462 → approximately 562 | 3,259 → approximately 1,359 |
-| deploy (`via_ir`) | 2,571 → approximately 671 | 3,260 → approximately 1,360 |
-
-Production ships the deploy (`via_ir`) profile, so approximately **671 / 1,360 gas** for one / five
-rows is the relevant Rootstock estimate. Against R64's 815,384-gas five-row live tick, the larger
-case is about 0.17%.
-
-R78 remains worth keeping at the smaller Rootstock figure: it adds no state, ABI change, protocol
-invariant, external call, or failure mode, and focused plus fuzz testing proves output equivalence on
-both the flat and variable branches. The code is also simpler on the launch configuration's hot path.
+The shared helper costs 205 gas at one row and 217 gas at five rows relative to the earlier
+duplicated-formula deploy measurement, while retaining about 84% of that version's five-row saving.
+Focused plus fuzz testing proves output equivalence on both the flat and variable branches.
 
 ## Success criteria
 
-- [x] Flat-fee batches do not read the purchase-bound storage word.
+- [x] Flat-fee batches choose their loop once; the fee-at-rate formula exists once.
 - [x] Flat and variable fee outputs, aggregation, and rounding are unchanged.
-- [x] Foundry measurements are labelled as Cancun regression pins; the production Rootstock saving
-      is derived explicitly from the one avoided read and the Rootstock gas schedule.
-- [x] No ABI, event, error, storage-layout, deploy-script, or consumer change.
+- [x] All settings occupy one word; the public ABI is unchanged and uncastable bounds revert.
+- [x] Compute-only measurements transfer directly; the separate Rootstock storage saving is explicit.
+- [x] No ABI, event, error, deploy-script, or consumer change.
 - [x] Required tests pass and no open product decisions remain.
 
 ## Reviewer checklist
@@ -275,5 +264,7 @@ both the flat and variable branches. The code is also simpler on the launch conf
 
 - ABI: none.
 - Scripts: none.
-- Cutover: none. Fee settings, rounding, transfers, and events remain unchanged, so no consumer issue
-  is required.
+- Storage: predeployment-only encoding change; total fee-state slot count remains two and derived
+  storage does not move.
+- Cutover: none. Public fee settings, rounding, transfers, and events remain unchanged, so no consumer
+  issue is required.
