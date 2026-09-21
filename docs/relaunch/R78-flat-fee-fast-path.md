@@ -183,10 +183,11 @@ this same packed layout, deliberately excluding that storage saving from the com
 
 ### Closed: remove the linear fee model
 
-R78 already leaves the purchase-bound word unread and skips interpolation whenever the configured fee
-is flat. Deleting the variable model therefore saves approximately **0 additional production gas** on
-the shipped flat configuration while permanently removing governance's option to choose a variable
-fee from immutable contracts. No proxy exists anywhere in `src/`. Keep the model.
+R78 already skips interpolation whenever the configured fee is flat; packing puts the bounds and rates
+in the same word, so there is no separate bounds read left to remove. Deleting the variable model
+therefore saves approximately **0 additional production gas** on the shipped flat configuration while
+permanently removing governance's option to choose a variable fee from immutable contracts. No proxy
+exists anywhere in `src/`. Keep the model.
 
 ### Closed: merge stablecoin and rBTC accounting
 
