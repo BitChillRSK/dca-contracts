@@ -34,8 +34,8 @@ contract R78FeeHandlerGasHarness is FeeHandler {
         netAmountsHash = keccak256(abi.encode(netAmounts));
     }
 
-    /// @dev The pre-fast-path generic loop compiled against the same packed settings layout, so the
-    ///      comparison isolates compute and memory rather than a chain-specific storage-read price.
+    /// @dev The generic loop uses the current fee helper and packed settings layout, so the comparison
+    ///      isolates loop specialization rather than helper changes or chain-specific storage pricing.
     function _baselineCalculateFeeAndNetAmounts(uint256[] memory purchaseAmounts)
         private
         view
@@ -122,15 +122,16 @@ contract R78FlatFeeFastPathGasTest is Test {
         _assertSaving(amounts, "hundred-row");
     }
 
-    function test_gas_variableHundredRowsStackParams() public {
-        uint256[] memory amounts = new uint256[](100);
-        for (uint256 i; i < amounts.length; ++i) {
-            amounts[i] = (i + 1) * 1 ether;
-        }
+    function test_gas_variableOneRowFullCurve() public {
+        _logVariableGas(1, "variable one-row full curve");
+    }
 
-        _cool(address(variableFeeHarness));
-        (uint256 gasUsed,,,) = variableFeeHarness.measureOptimized(amounts);
-        console2.log("variable hundred-row stack-scalar loop:", gasUsed);
+    function test_gas_variableFiveRowsFullCurve() public {
+        _logVariableGas(5, "variable five-row full curve");
+    }
+
+    function test_gas_variableHundredRowsFullCurve() public {
+        _logVariableGas(100, "variable hundred-row full curve");
     }
 
     function testFuzz_optimizedMatchesBaseline(uint96[5] memory fuzzedAmounts) public {
@@ -172,6 +173,18 @@ contract R78FlatFeeFastPathGasTest is Test {
         assertEq(optimizedFee, baselineFee, "aggregated fee changed");
         assertEq(optimizedNet, baselineNet, "aggregated net changed");
         assertEq(optimizedHash, baselineHash, "per-row net amounts changed");
+    }
+
+    function _logVariableGas(uint256 rows, string memory label) private {
+        uint256[] memory amounts = new uint256[](rows);
+        for (uint256 i; i < rows; ++i) {
+            amounts[i] = 550 ether;
+        }
+
+        _cool(address(variableFeeHarness));
+        (uint256 gasUsed,,,) = variableFeeHarness.measureOptimized(amounts);
+        console2.log(label);
+        console2.log("stack-scalar loop:", gasUsed);
     }
 
     /// @dev forge-std's `Vm` interface on this pin omits `cool`; the cheatcode exists on the binary.

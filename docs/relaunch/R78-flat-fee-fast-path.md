@@ -17,7 +17,10 @@ irrelevant in that configuration. R78 hoists that decision once per batch. Its f
 variable curve both call `_calculateFeeAtRate`, so `amount * rate / BPS_DENOMINATOR` exists once.
 The variable loop keeps the four already-loaded parameters as stack scalars instead of materializing
 a `FeeSettings memory` value and loading its four words again for every row. `_feeSettings()` remains
-the struct-producing boundary for the external getter only.
+the struct-producing boundary for the external getter only. Because the dispatcher has already
+proved unequal rates before entering the variable loop, the curve helper does not repeat that test
+per row. Standalone equal-rate calls remain correct: `maxFeeRate - minFeeRate` is zero, so the
+interpolation returns the common rate.
 
 R77 stores the collector plus rates in one word and both `uint128` bounds in another. R78 narrows the
 public struct and internal bounds to `uint112`: collector alone in slot 2, then both bounds and both
@@ -44,6 +47,8 @@ the curve.
       overflows, and net-amount array exactly.
 - [x] Pass the variable curve's four parameters as stack scalars; do not build or read a
       `FeeSettings memory` value on the batch hot path.
+- [x] Do not repeat the already-proved unequal-rate test inside the variable loop; retain equal-rate
+      correctness for standalone helper callers through the curve arithmetic itself.
 - [x] Pack both bounds and both rates into one word; declare the `FeeSettings` bounds as `uint112` so
       the constructor type matches storage, while the `uint256` owner setter retains checked casts.
 - [x] Add focused correctness coverage for flat and variable batches, including row-by-row rounding.
@@ -239,19 +244,19 @@ helper to stack scalars:
 
 | Foundry profile | One row | Five rows | 100 rows |
 |---|---:|---:|---:|
-| default | 356 gas saved | 1,153 gas saved | 20,064 gas saved |
-| deploy (`via_ir`) | 524 gas saved | 1,261 gas saved | 18,747 gas saved |
+| default | 359 gas saved | 1,227 gas saved | 20,364 gas saved |
+| deploy (`via_ir`) | 529 gas saved | 1,341 gas saved | 19,247 gas saved |
 
 These deltas contain no changed storage access: both variants load the same packed settings word.
 Compute and memory pricing is the same on current Rootstock, so the production fast-path figures are
-the shipped deploy-profile measurements directly: **524 / 1,261 / 18,747 gas** for one / five / 100
+the shipped deploy-profile measurements directly: **529 / 1,341 / 19,247 gas** for one / five / 100
 rows. Packing adds one avoided Rootstock `SLOAD`, exactly **200 gas per batch**, making the complete
-PR approximately **724 / 1,461 / 18,947 gas** cheaper than R77 at those sizes. Against R64's
-815,384-gas five-row live tick, the complete five-row saving is about 0.16%.
+PR approximately **729 / 1,541 / 19,447 gas** cheaper than R77 at those sizes. Against R64's
+815,384-gas five-row live tick, the complete five-row saving is about 0.19%.
 
-The earlier duplicated-formula deploy measurement saved 671 / 1,360 gas for one / five rows. The
-shared helper therefore costs 147 gas at one row and 99 gas at five rows in the final scalar-helper
-build, while retaining about 93% of that version's five-row saving. These Rootstock figures use the
+The earlier duplicated-formula deploy measurement saved 671 / 1,359 gas for one / five rows. The
+shared helper therefore costs 142 gas at one row and 18 gas at five rows in the final scalar-helper
+build, while retaining about 99% of that version's five-row saving. These Rootstock figures use the
 production deploy profile; the default-profile values are not substituted for shipped code.
 
 The variable-path scalar change was also measured directly at 100 rows with a cold packed settings
@@ -269,11 +274,31 @@ gas-neutral on the shipped flat configuration because that branch never construc
 it pays only if governance selects variable rates. Focused plus fuzz testing proves output equivalence
 on both the flat and variable branches.
 
+The remaining equal-rate test inside `_calculateFeeWithParams` was then measured separately with
+every row at 550 ether, between the harness's 100- and 1,000-ether bounds so every row executes the
+full interpolation. The dispatcher proves unequal rates before the variable loop, making the test
+redundant on that hot path:
+
+| Foundry profile | Rows | With repeated test | Without repeated test | Saving |
+|---|---:|---:|---:|---:|
+| default | 1 | 3,493 gas | 3,459 gas | 34 gas |
+| default | 5 | 6,633 gas | 6,463 gas | 170 gas |
+| default | 100 | 81,269 gas | 77,869 gas | 3,400 gas |
+| deploy (`via_ir`) | 1 | 3,335 gas | 3,292 gas | 43 gas |
+| deploy (`via_ir`) | 5 | 6,179 gas | 5,964 gas | 215 gas |
+| deploy (`via_ir`) | 100 | 73,785 gas | 69,485 gas | 4,300 gas |
+
+The shipped build therefore avoids **43 gas per variable-fee row**. Removing the test does not add a
+flat-fee special case elsewhere: for equal rates the interpolation term multiplies by zero and returns
+that rate. The committed flat/variable differential fuzz test and focused helper tests keep that
+equivalence reproducible.
+
 ## Success criteria
 
 - [x] Flat-fee batches choose their loop once; the fee-at-rate formula exists once.
 - [x] Flat and variable fee outputs, aggregation, and rounding are unchanged.
 - [x] The batch hot path does not materialize a `FeeSettings memory` value.
+- [x] The variable loop does not repeat the dispatcher's unequal-rate test per row.
 - [x] All settings occupy one word; the public struct declares the stored widths and setter overflow reverts.
 - [x] Compute-only measurements transfer directly; the separate Rootstock storage saving is explicit.
 - [x] Constructor/getter ABI metadata and deploy constants use `uint112`; runtime values, selectors,

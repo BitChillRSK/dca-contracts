@@ -1057,10 +1057,12 @@ Post-R77 behavior-preserving purchase optimization. When min/max rates are equal
 calculation once per batch; both fee branches call one shared fee-at-rate helper. Pack both internal
 `uint112` bounds plus both rates into one word and narrow the public struct bounds to their stored
 width before deployment. The variable
-loop keeps the four fee parameters on the stack instead of loading them from a memory struct per row.
-Under deploy (`via_ir`), the compute-only fast path saves **524 / 1,261 / 18,747 gas** for one / five / 100 rows on
+loop keeps the four fee parameters on the stack instead of loading them from a memory struct per row,
+and does not repeat the dispatcher's unequal-rate test inside that loop. Under deploy (`via_ir`), the
+compute-only fast path saves **529 / 1,341 / 19,247 gas** for one / five / 100 rows on
 both Foundry and Rootstock. Packing separately avoids one 200-gas Rootstock `SLOAD` per batch, making
-the complete R77 delta approximately **724 / 1,461 / 18,947 gas**. Ask: none.
+the complete R77 delta approximately **729 / 1,541 / 19,447 gas**. The redundant-test removal also
+saves 43 gas per row if governance selects variable rates. Ask: none.
 
 ### R80 - remove the cadence-anchor purchase event ([analysis](./R78-flat-fee-fast-path.md#r80-survivor-remove-dcamanager__cadenceanchorupdated))
 

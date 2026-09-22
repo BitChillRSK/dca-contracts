@@ -160,8 +160,8 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     }
 
     /**
-     * @dev Apply the variable-fee interpolation using already-loaded fee settings. The flat-rate
-     *      branch also keeps this helper correct for standalone callers.
+     * @dev Apply the variable-fee interpolation using already-loaded fee settings. Equal rates are
+     *      also safe for standalone callers: their zero difference makes interpolation return that rate.
      */
     function _calculateFeeWithParams(
         uint256 purchaseAmount,
@@ -174,7 +174,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         pure
         returns (uint256)
     {
-        if (minFeeRate == maxFeeRate || purchaseAmount >= feePurchaseUpperBound) {
+        if (purchaseAmount >= feePurchaseUpperBound) {
             return _calculateFeeAtRate(purchaseAmount, minFeeRate);
         }
 
@@ -232,11 +232,6 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         }
     }
 
-    /// @dev Apply one basis-point rate. Shared by the flat batch and variable curve paths.
-    function _calculateFeeAtRate(uint256 amount, uint256 feeRate) private pure returns (uint256) {
-        return amount * feeRate / BPS_DENOMINATOR;
-    }
-
     /// @dev Variable batches load the settings once and keep the four scalars on the stack across rows.
     function _calculateVariableFeeAndNetAmounts(
         uint256[] memory purchaseAmounts,
@@ -271,6 +266,11 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
             netAmountsToSpend[i] = net;
             totalAmountToSpend += net;
         }
+    }
+
+    /// @dev Apply one basis-point rate. Shared by the flat batch and variable curve paths.
+    function _calculateFeeAtRate(uint256 amount, uint256 feeRate) private pure returns (uint256) {
+        return amount * feeRate / BPS_DENOMINATOR;
     }
 
     function _validateFeeSettings(
