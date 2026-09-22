@@ -1055,10 +1055,11 @@ at relaunch deployment because this mapping encoding is not layout-compatible wi
 
 Post-R77 behavior-preserving purchase optimization. When min/max rates are equal, choose the flat
 calculation once per batch; both fee branches call one shared fee-at-rate helper. Pack both internal
-`uint112` bounds plus both rates into one word while retaining the public `uint128` ABI. Under deploy
-(`via_ir`), the compute-only fast path saves **466 / 1,143 / 17,204 gas** for one / five / 100 rows on
+`uint112` bounds plus both rates into one word while retaining the public `uint128` ABI. The variable
+loop keeps the four fee parameters on the stack instead of loading them from a memory struct per row.
+Under deploy (`via_ir`), the compute-only fast path saves **524 / 1,261 / 18,747 gas** for one / five / 100 rows on
 both Foundry and Rootstock. Packing separately avoids one 200-gas Rootstock `SLOAD` per batch, making
-the complete R77 delta approximately **666 / 1,343 / 17,404 gas**. Ask: none.
+the complete R77 delta approximately **724 / 1,461 / 18,947 gas**. Ask: none.
 
 ### R80 - remove the cadence-anchor purchase event ([analysis](./R78-flat-fee-fast-path.md#r80-survivor-remove-dcamanager__cadenceanchorupdated))
 

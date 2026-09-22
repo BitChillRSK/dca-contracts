@@ -15,6 +15,9 @@ fee model available. R77's `FeeHandler._calculateFeeAndNetAmounts` materializes 
 tests `minFeeRate == maxFeeRate` again for every row in `_calculateFeeWithParams`; the curve is
 irrelevant in that configuration. R78 hoists that decision once per batch. Its flat loop and the
 variable curve both call `_calculateFeeAtRate`, so `amount * rate / BPS_DENOMINATOR` exists once.
+The variable loop keeps the four already-loaded parameters as stack scalars instead of materializing
+a `FeeSettings memory` value and loading its four words again for every row. `_feeSettings()` remains
+the struct-producing boundary for the external getter only.
 
 R77 stores the collector plus rates in one word and both `uint128` bounds in another. R78 keeps the
 public struct at those ABI widths but checked-casts the internal bounds to `uint112`: collector alone
@@ -38,6 +41,8 @@ still wider than the `uint96` amount that can reach the curve.
       variable curve call it with the existing per-row rounding.
 - [x] Preserve the variable path's `_calculateFeeWithParams` behavior, aggregation, checked
       overflows, and net-amount array exactly.
+- [x] Pass the variable curve's four parameters as stack scalars; do not build or read a
+      `FeeSettings memory` value on the batch hot path.
 - [x] Pack both internal bounds and both rates into one word with `uint112` checked casts; retain the
       external `FeeSettings` component types and the two-slot total including the collector.
 - [x] Add focused correctness coverage for flat and variable batches, including row-by-row rounding.
@@ -226,28 +231,46 @@ every row, including amounts that round down to zero fee. The gas harness compar
 flat loops against the same packed storage layout, so only compute and memory differ. This item adds
 no fork-only assertion.
 
-Same-build fast-path measurements after single-sourcing the formula:
+Same-build flat fast-path measurements after single-sourcing the formula and changing the variable
+helper to stack scalars:
 
 | Foundry profile | One row | Five rows | 100 rows |
 |---|---:|---:|---:|
-| default | 362 gas saved | 1,183 gas saved | 20,664 gas saved |
-| deploy (`via_ir`) | 466 gas saved | 1,143 gas saved | 17,204 gas saved |
+| default | 356 gas saved | 1,153 gas saved | 20,064 gas saved |
+| deploy (`via_ir`) | 524 gas saved | 1,261 gas saved | 18,747 gas saved |
 
 These deltas contain no changed storage access: both variants load the same packed settings word.
 Compute and memory pricing is the same on current Rootstock, so the production fast-path figures are
-the shipped deploy-profile measurements directly: **466 / 1,143 / 17,204 gas** for one / five / 100
+the shipped deploy-profile measurements directly: **524 / 1,261 / 18,747 gas** for one / five / 100
 rows. Packing adds one avoided Rootstock `SLOAD`, exactly **200 gas per batch**, making the complete
-PR approximately **666 / 1,343 / 17,404 gas** cheaper than R77 at those sizes. Against R64's
+PR approximately **724 / 1,461 / 18,947 gas** cheaper than R77 at those sizes. Against R64's
 815,384-gas five-row live tick, the complete five-row saving is about 0.16%.
 
-The shared helper costs 205 gas at one row and 217 gas at five rows relative to the earlier
-duplicated-formula deploy measurement, while retaining about 84% of that version's five-row saving.
-Focused plus fuzz testing proves output equivalence on both the flat and variable branches.
+The earlier duplicated-formula deploy measurement saved 671 / 1,360 gas for one / five rows. The
+shared helper therefore costs 147 gas at one row and 99 gas at five rows in the final scalar-helper
+build, while retaining about 93% of that version's five-row saving. These Rootstock figures use the
+production deploy profile; the default-profile values are not substituted for shipped code.
+
+The variable-path scalar change was also measured directly at 100 rows with a cold packed settings
+slot. The before measurement is commit `6abc630`; the after measurement uses the same amounts and
+harness entry point:
+
+| Foundry profile | `FeeSettings memory` before | Stack scalars after | Saving |
+|---|---:|---:|---:|
+| default | 83,945 gas | 75,369 gas | 8,576 gas |
+| deploy (`via_ir`) | 71,711 gas | 68,285 gas | 3,426 gas |
+
+The absolute costs include Foundry's cold-read schedule, but the before/after storage access is
+identical. The delta is memory and compute only and therefore transfers directly to Rootstock. It is
+gas-neutral on the shipped flat configuration because that branch never constructs the memory struct;
+it pays only if governance selects variable rates. Focused plus fuzz testing proves output equivalence
+on both the flat and variable branches.
 
 ## Success criteria
 
 - [x] Flat-fee batches choose their loop once; the fee-at-rate formula exists once.
 - [x] Flat and variable fee outputs, aggregation, and rounding are unchanged.
+- [x] The batch hot path does not materialize a `FeeSettings memory` value.
 - [x] All settings occupy one word; the public ABI is unchanged and uncastable bounds revert.
 - [x] Compute-only measurements transfer directly; the separate Rootstock storage saving is explicit.
 - [x] No ABI, event, error, deploy-script, or consumer change.

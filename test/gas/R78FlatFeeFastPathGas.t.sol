@@ -47,7 +47,13 @@ contract R78FeeHandlerGasHarness is FeeHandler {
 
         for (uint256 i; i < len; ++i) {
             uint256 amount = purchaseAmounts[i];
-            uint256 fee = _calculateFeeWithParams(amount, feeSettings);
+            uint256 fee = _calculateFeeWithParams(
+                amount,
+                feeSettings.minFeeRate,
+                feeSettings.maxFeeRate,
+                feeSettings.feePurchaseLowerBound,
+                feeSettings.feePurchaseUpperBound
+            );
             aggregatedFee += fee;
             uint256 net;
             unchecked {
@@ -114,6 +120,17 @@ contract R78FlatFeeFastPathGasTest is Test {
             amounts[i] = (i + 1) * 1 ether;
         }
         _assertSaving(amounts, "hundred-row");
+    }
+
+    function test_gas_variableHundredRowsStackParams() public {
+        uint256[] memory amounts = new uint256[](100);
+        for (uint256 i; i < amounts.length; ++i) {
+            amounts[i] = (i + 1) * 1 ether;
+        }
+
+        _cool(address(variableFeeHarness));
+        (uint256 gasUsed,,,) = variableFeeHarness.measureOptimized(amounts);
+        console2.log("variable hundred-row stack-scalar loop:", gasUsed);
     }
 
     function testFuzz_optimizedMatchesBaseline(uint96[5] memory fuzzedAmounts) public {

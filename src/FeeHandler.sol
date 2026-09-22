@@ -140,12 +140,10 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
 
         return _calculateVariableFeeAndNetAmounts(
             purchaseAmounts,
-            FeeSettings({
-                minFeeRate: minFeeRate,
-                maxFeeRate: maxFeeRate,
-                feePurchaseLowerBound: s_feePurchaseLowerBound,
-                feePurchaseUpperBound: s_feePurchaseUpperBound
-            })
+            minFeeRate,
+            maxFeeRate,
+            s_feePurchaseLowerBound,
+            s_feePurchaseUpperBound
         );
     }
 
@@ -165,16 +163,17 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
      * @dev Apply the variable-fee interpolation using already-loaded fee settings. The flat-rate
      *      branch also keeps this helper correct for standalone callers.
      */
-    function _calculateFeeWithParams(uint256 purchaseAmount, FeeSettings memory feeSettings)
+    function _calculateFeeWithParams(
+        uint256 purchaseAmount,
+        uint256 minFeeRate,
+        uint256 maxFeeRate,
+        uint256 feePurchaseLowerBound,
+        uint256 feePurchaseUpperBound
+    )
         internal
         pure
         returns (uint256)
     {
-        uint256 minFeeRate = feeSettings.minFeeRate;
-        uint256 maxFeeRate = feeSettings.maxFeeRate;
-        uint256 feePurchaseLowerBound = feeSettings.feePurchaseLowerBound;
-        uint256 feePurchaseUpperBound = feeSettings.feePurchaseUpperBound;
-
         if (minFeeRate == maxFeeRate || purchaseAmount >= feePurchaseUpperBound) {
             return _calculateFeeAtRate(purchaseAmount, minFeeRate);
         }
@@ -238,10 +237,13 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         return amount * feeRate / BPS_DENOMINATOR;
     }
 
-    /// @dev Variable batches load the bounds once and reuse the complete settings for every row.
+    /// @dev Variable batches load the settings once and keep the four scalars on the stack across rows.
     function _calculateVariableFeeAndNetAmounts(
         uint256[] memory purchaseAmounts,
-        FeeSettings memory feeSettings
+        uint256 minFeeRate,
+        uint256 maxFeeRate,
+        uint256 feePurchaseLowerBound,
+        uint256 feePurchaseUpperBound
     )
         private
         pure
@@ -251,7 +253,13 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         netAmountsToSpend = new uint256[](len);
         for (uint256 i; i < len; ++i) {
             uint256 amount = purchaseAmounts[i];
-            uint256 fee = _calculateFeeWithParams(amount, feeSettings);
+            uint256 fee = _calculateFeeWithParams(
+                amount,
+                minFeeRate,
+                maxFeeRate,
+                feePurchaseLowerBound,
+                feePurchaseUpperBound
+            );
             aggregatedFee += fee;
 
             // maxFeeRate is capped at MAX_FEE_RATE_CAP (5%) by `_validateFeeSettings`, the only write path
