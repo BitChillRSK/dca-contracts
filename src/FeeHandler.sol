@@ -50,8 +50,8 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         );
 
         s_feeCollector = feeCollector;
-        s_feePurchaseLowerBound = uint256(feeSettings.feePurchaseLowerBound).toUint112();
-        s_feePurchaseUpperBound = uint256(feeSettings.feePurchaseUpperBound).toUint112();
+        s_feePurchaseLowerBound = feeSettings.feePurchaseLowerBound;
+        s_feePurchaseUpperBound = feeSettings.feePurchaseUpperBound;
         s_minFeeRate = feeSettings.minFeeRate;
         s_maxFeeRate = feeSettings.maxFeeRate;
     }

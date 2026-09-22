@@ -17,8 +17,8 @@ contract FeeHandlerTest is Test {
     uint16 constant MAX_FEE_RATE = 200; // 2%
     uint16 constant FEE_RATE_CAP = 500;
     uint256 constant BPS_DENOMINATOR = 10_000;
-    uint128 constant LOWER_BOUND = 100 ether; // below this gets max fee
-    uint128 constant UPPER_BOUND = 1000 ether; // above this gets min fee
+    uint112 constant LOWER_BOUND = 100 ether; // below this gets max fee
+    uint112 constant UPPER_BOUND = 1000 ether; // above this gets min fee
 
     // Events
     event FeeHandler__MinFeeRateSet(uint256 minFeeRate);
@@ -83,21 +83,6 @@ contract FeeHandlerTest is Test {
         });
 
         vm.expectRevert(IFeeHandler.FeeHandler__MaxFeeRateExceedsCap.selector);
-        new FeeHandlerHarness(FEE_COLLECTOR, settings, address(this));
-    }
-
-    function test_constructor_reverts_uncastableBound() public {
-        uint128 overflowing = uint128(type(uint112).max) + 1;
-        IFeeHandler.FeeSettings memory settings = IFeeHandler.FeeSettings({
-            minFeeRate: MIN_FEE_RATE,
-            maxFeeRate: MAX_FEE_RATE,
-            feePurchaseLowerBound: LOWER_BOUND,
-            feePurchaseUpperBound: overflowing
-        });
-
-        vm.expectRevert(
-            abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 112, overflowing)
-        );
         new FeeHandlerHarness(FEE_COLLECTOR, settings, address(this));
     }
 

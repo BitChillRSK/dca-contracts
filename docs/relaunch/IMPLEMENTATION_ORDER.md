@@ -1055,7 +1055,8 @@ at relaunch deployment because this mapping encoding is not layout-compatible wi
 
 Post-R77 behavior-preserving purchase optimization. When min/max rates are equal, choose the flat
 calculation once per batch; both fee branches call one shared fee-at-rate helper. Pack both internal
-`uint112` bounds plus both rates into one word while retaining the public `uint128` ABI. The variable
+`uint112` bounds plus both rates into one word and narrow the public struct bounds to their stored
+width before deployment. The variable
 loop keeps the four fee parameters on the stack instead of loading them from a memory struct per row.
 Under deploy (`via_ir`), the compute-only fast path saves **524 / 1,261 / 18,747 gas** for one / five / 100 rows on
 both Foundry and Rootstock. Packing separately avoids one 200-gas Rootstock `SLOAD` per batch, making

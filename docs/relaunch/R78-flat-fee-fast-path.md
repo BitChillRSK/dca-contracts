@@ -6,7 +6,7 @@ Status: **implemented** · GitHub [#139](https://github.com/BitChillRSK/dca-cont
 
 Avoid evaluating the linear fee curve for every row when a handler is configured with the launch's
 flat fee (`minFeeRate == maxFeeRate`). Single-source the fee-at-rate formula, and pack all four fee
-settings into one storage word without changing the public `FeeSettings` ABI.
+settings into one storage word with the public `FeeSettings` bounds matching their stored width.
 
 ## Background
 
@@ -19,19 +19,20 @@ The variable loop keeps the four already-loaded parameters as stack scalars inst
 a `FeeSettings memory` value and loading its four words again for every row. `_feeSettings()` remains
 the struct-producing boundary for the external getter only.
 
-R77 stores the collector plus rates in one word and both `uint128` bounds in another. R78 keeps the
-public struct at those ABI widths but checked-casts the internal bounds to `uint112`: collector alone
-in slot 2, then both bounds and both `uint16` rates exactly fill slot 3. A schedule purchase is only
-`uint96`, so each bound remains 65,536 times wider than any reachable purchase amount. Both the
+R77 stores the collector plus rates in one word and both `uint128` bounds in another. R78 narrows the
+public struct and internal bounds to `uint112`: collector alone in slot 2, then both bounds and both
+`uint16` rates exactly fill slot 3. A schedule purchase is only `uint96`, so each bound remains 65,536
+times wider than any reachable purchase amount. Both the
 generic gas baseline and fast path therefore read the same single settings word. Their measured delta
 is compute and memory only and transfers directly from Foundry to Rootstock; the packing itself saves
 one additional Rootstock `SLOAD` (200 gas) per batch relative to R77.
 
 ## Open product decisions
 
-**none** — the approved fee remains 100 bps at launch and governance retains the same atomic setter,
-variable curve, and public ABI. The accepted internal bound range narrows from `uint128` to `uint112`,
-still wider than the `uint96` amount that can reach the curve.
+**none** — the approved fee remains 100 bps at launch and governance retains the same atomic setter
+and variable curve. Before deployment, the public constructor/getter struct is narrowed from
+`uint128` to its real `uint112` storage constraint, still wider than the `uint96` amount that can reach
+the curve.
 
 ## Scope
 
@@ -43,8 +44,8 @@ still wider than the `uint96` amount that can reach the curve.
       overflows, and net-amount array exactly.
 - [x] Pass the variable curve's four parameters as stack scalars; do not build or read a
       `FeeSettings memory` value on the batch hot path.
-- [x] Pack both internal bounds and both rates into one word with `uint112` checked casts; retain the
-      external `FeeSettings` component types and the two-slot total including the collector.
+- [x] Pack both bounds and both rates into one word; declare the `FeeSettings` bounds as `uint112` so
+      the constructor type matches storage, while the `uint256` owner setter retains checked casts.
 - [x] Add focused correctness coverage for flat and variable batches, including row-by-row rounding.
 - [x] Add a gas harness and record default-profile and shipped `FOUNDRY_PROFILE=deploy` deltas against
       the generic loop for one, five, and 100 rows.
@@ -170,16 +171,17 @@ security design; it is not a resurrection of the invalid approximately-12,300-ga
 
 ### Implemented: pack all fee settings into one word
 
-Two `uint16` rates plus two `uint128` bounds total 288 bits. R78 retains those public ABI types but
-checked-casts the internal bounds to `uint112`, making the stored settings exactly 256 bits. No
-storage struct is needed: the collector starts slot 2; the first 14-byte bound cannot fit in its
-12-byte remainder and therefore starts slot 3, followed by the other bound and both rates. Derived
-state still starts at slot 4.
+Two `uint16` rates plus two `uint112` bounds total exactly 256 bits. No storage struct is needed: the
+collector starts slot 2; the first 14-byte bound cannot fit in its 12-byte remainder and therefore
+starts slot 3, followed by the other bound and both rates. Derived state still starts at slot 4.
 
-This changes the internal storage encoding before deployment and narrows the theoretical setting
-range. It does not narrow any reachable purchase: `uint112` is 65,536 times wider than the schedule's
-`uint96` purchase amount. The public struct, getter, setter arguments, selectors, and event fields stay
-unchanged; constructor and setter reject an uncastable bound with the existing SafeCast error.
+This changes the storage and public constructor/getter struct before deployment and narrows the
+theoretical setting range. It does not narrow any reachable purchase: `uint112` is 65,536 times wider
+than the schedule's `uint96` purchase amount. The constructor now expresses that limit in its type
+instead of accepting `uint128` and failing later with a raw SafeCast error. The owner setter remains
+`uint256`, validates first, and rejects an uncastable bound with the existing SafeCast error. Its
+selector and all event fields stay unchanged. `getFeeSettings()` also keeps its selector and word-for-
+word return encoding, although its ABI component metadata narrows to `uint112`.
 
 Compared with R77, `_feeSettings` reads one word instead of two. Rootstock charges 200 gas per
 `SLOAD`, so packing saves exactly **200 gas per batch** on either fee branch and 200 gas on the
@@ -207,6 +209,7 @@ a local gas optimization; retain the current separation.
 - `AGENTS.md`
 - `src/FeeHandler.sol`
 - `src/interfaces/IFeeHandler.sol`
+- `script/Constants.sol`
 - `test/mocks/FeeHandlerHarness.sol`
 - `test/ai-generated/unit/FeeHandlerTest.t.sol`
 - `test/gas/R78FlatFeeFastPathGas.t.sol`
@@ -271,9 +274,10 @@ on both the flat and variable branches.
 - [x] Flat-fee batches choose their loop once; the fee-at-rate formula exists once.
 - [x] Flat and variable fee outputs, aggregation, and rounding are unchanged.
 - [x] The batch hot path does not materialize a `FeeSettings memory` value.
-- [x] All settings occupy one word; the public ABI is unchanged and uncastable bounds revert.
+- [x] All settings occupy one word; the public struct declares the stored widths and setter overflow reverts.
 - [x] Compute-only measurements transfer directly; the separate Rootstock storage saving is explicit.
-- [x] No ABI, event, error, deploy-script, or consumer change.
+- [x] Constructor/getter ABI metadata and deploy constants use `uint112`; runtime values, selectors,
+      return encoding, events, errors, and fee behavior are unchanged.
 - [x] Required tests pass and no open product decisions remain.
 
 ## Reviewer checklist
@@ -286,9 +290,11 @@ on both the flat and variable branches.
 
 ## ABI / deploy / cutover impact
 
-- ABI: none.
-- Scripts: none.
+- ABI: `FeeSettings.feePurchaseLowerBound` and `feePurchaseUpperBound` narrow from `uint128` to
+  `uint112`. This changes constructor and getter ABI metadata, but no function selector or runtime
+  word encoding.
+- Scripts: the four fee-bound constants match the struct at `uint112`; their values are unchanged.
 - Storage: predeployment-only encoding change; total fee-state slot count remains two and derived
   storage does not move.
-- Cutover: none. Public fee settings, rounding, transfers, and events remain unchanged, so no consumer
-  issue is required.
+- Cutover: clients that carry handler ABI metadata should regenerate it for the two narrower getter
+  components. Existing decoders remain wire-compatible because each value is still one ABI word.
