@@ -1104,8 +1104,10 @@ regression deltas on the same harness, not the production bill.
   inside `_rBtcPurchaseChecksEffects` the legacy compiler splits them. Steady-state (later) row,
   Foundry **−184** (default) / **−315** (deploy). Rootstock **−5,200** per row on the default profile
   (one `RESET`, one `SLOAD`) and **−5,400** under deploy (one `RESET`, two `SLOAD`s). Protocol-paid.
-- `createDcaSchedule` stores slots 0+1 as **3+2** (default) and **2+1** (deploy), down from 5+2 and
-  5+1. Foundry **−926** / **−1,052**. Rootstock **−10,400** / **−15,600**.
+- `createDcaSchedule` stores slots 0+1 once each on both profiles (1 write and 1 read of slot 0,
+  1 write and 0 reads of slot 1), down from 5+2 and 5+1. `routeIndex` is assigned before
+  `purchasePeriod`; declaration order still stores slot 0 twice under deploy. Foundry **−2,178** /
+  **−1,273**. Rootstock **−26,200** / **−20,800**.
 - `setFeeRateParams` changing all four fields stores the fee word once, down from four. Foundry
   **−782** / **−496**. Rootstock **−16,200** (default: three `RESET`s and six `SLOAD`s) / **−15,600**
   (deploy: three `RESET`s and three `SLOAD`s).

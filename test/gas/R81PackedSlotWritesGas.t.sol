@@ -26,9 +26,10 @@ contract R81FeeHandlerHarness is FeeHandler {
  *      prices at 5,000 a repeat. Foundry's own gas is logged as a Cancun regression figure; it is
  *      not the production saving.
  *
- *      Measured on this file: each purchase row stores schedule slot 0 once, on both profiles, for a
- *      first anchor and a later one. `createDcaSchedule` stores slots 0+1 as 3+2 (default) and 2+1
- *      (deploy). `setFeeRateParams` changing all four fields stores the fee word once on both.
+ *      Measured on this file, both profiles: each purchase row stores schedule slot 0 once, for a
+ *      first anchor and a later one. `createDcaSchedule` stores slots 0 and 1 once each.
+ *      `setFeeRateParams` stores the fee word once when any field changes, and not at all when
+ *      nothing changes. Events fire only for the fields that changed.
  */
 contract R81PackedSlotWritesGasTest is Test {
     uint256 private constant MIN_PURCHASE_PERIOD = 1 days;
@@ -114,14 +115,12 @@ contract R81PackedSlotWritesGasTest is Test {
         console2.log("R81 create slot1 writes", slot1Writes);
         console2.log("R81 create gas", gasUsed);
 
-        // The struct literal stored slot 0 five times on both profiles (and slot 1 twice under the
-        // default profile, once under deploy). These bounds are the measured storage-pointer targets
-        // and are strictly under that literal on both profiles.
-        assertLe(slot0Writes, 3, "slot 0 writes above the measured target");
-        assertLe(slot1Writes, 2, "slot 1 writes above the measured target");
-        assertLt(slot0Writes + slot1Writes, 6, "create did not store the schedule fewer times");
-        assertGt(slot0Writes, 0, "slot 0 was not stored");
-        assertGt(slot1Writes, 0, "slot 1 was not stored");
+        // Exact on both profiles. The struct literal was 5+2 (default) and 5+1 (deploy). An upper
+        // bound would let a deploy regression from 1+1 back to 2+1 pass.
+        assertEq(slot0Writes, 1, "slot 0 was not stored once");
+        assertEq(slot1Writes, 1, "slot 1 was not stored once");
+        assertEq(_readCount(accesses, address(s_manager), slot0), 1, "slot 0 was read more than once");
+        assertEq(_readCount(accesses, address(s_manager), slot1), 0, "slot 1 was read");
 
         IDcaManager.DcaSchedule memory schedule = s_manager.getDcaSchedule(s_token, scheduleId);
         assertEq(schedule.tokenBalance, DEPOSIT_AMOUNT);
@@ -168,6 +167,41 @@ contract R81PackedSlotWritesGasTest is Test {
         assertEq(settings.maxFeeRate, newMax);
         assertEq(settings.feePurchaseLowerBound, newLower);
         assertEq(settings.feePurchaseUpperBound, newUpper);
+    }
+
+    function test_setFeeRateParams_partialChange_emitsOnlyChangedFieldsAndWritesOnce() public {
+        uint256 newMin = 50;
+        uint256 newUpper = 5000 ether;
+
+        vm.recordLogs();
+        vm.startStateDiffRecording();
+        s_feeHandler.setFeeRateParams(newMin, 100, 1000 ether, newUpper);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        Vm.AccountAccess[] memory accesses = vm.stopAndReturnStateDiff();
+
+        assertEq(_writeCount(accesses, address(s_feeHandler), bytes32(FEE_WORD_SLOT)), 1);
+        assertEq(logs.length, 2, "unchanged fee fields emitted");
+        assertEq(logs[0].topics[0], keccak256("FeeHandler__MinFeeRateSet(uint256)"));
+        assertEq(logs[1].topics[0], keccak256("FeeHandler__PurchaseUpperBoundSet(uint256)"));
+        assertEq(abi.decode(logs[0].data, (uint256)), newMin);
+        assertEq(abi.decode(logs[1].data, (uint256)), newUpper);
+
+        IFeeHandler.FeeSettings memory settings = s_feeHandler.getFeeSettings();
+        assertEq(settings.minFeeRate, newMin);
+        assertEq(settings.maxFeeRate, 100);
+        assertEq(settings.feePurchaseLowerBound, 1000 ether);
+        assertEq(settings.feePurchaseUpperBound, newUpper);
+    }
+
+    function test_setFeeRateParams_unchanged_emitsNothingAndDoesNotWrite() public {
+        vm.recordLogs();
+        vm.startStateDiffRecording();
+        s_feeHandler.setFeeRateParams(100, 100, 1000 ether, 100_000 ether);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        Vm.AccountAccess[] memory accesses = vm.stopAndReturnStateDiff();
+
+        assertEq(_writeCount(accesses, address(s_feeHandler), bytes32(FEE_WORD_SLOT)), 0);
+        assertEq(logs.length, 0, "an unchanged fee update emitted");
     }
 
     function _assertPurchaseSlot0Writes(uint256 rows, bool laterPurchase) private {
@@ -237,13 +271,29 @@ contract R81PackedSlotWritesGasTest is Test {
         pure
         returns (uint256 count)
     {
+        return _accessCount(accesses, account, slot, true);
+    }
+
+    function _readCount(Vm.AccountAccess[] memory accesses, address account, bytes32 slot)
+        private
+        pure
+        returns (uint256 count)
+    {
+        return _accessCount(accesses, account, slot, false);
+    }
+
+    function _accessCount(Vm.AccountAccess[] memory accesses, address account, bytes32 slot, bool writes)
+        private
+        pure
+        returns (uint256 count)
+    {
         uint256 n = accesses.length;
         for (uint256 i; i < n; ++i) {
             Vm.StorageAccess[] memory storageAccesses = accesses[i].storageAccesses;
             uint256 m = storageAccesses.length;
             for (uint256 j; j < m; ++j) {
                 Vm.StorageAccess memory access = storageAccesses[j];
-                if (access.account == account && access.slot == slot && access.isWrite && !access.reverted) {
+                if (access.account == account && access.slot == slot && access.isWrite == writes && !access.reverted) {
                     ++count;
                 }
             }

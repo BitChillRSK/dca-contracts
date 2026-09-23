@@ -149,6 +149,33 @@ contract FeeHandlerTest is Test {
         assertEq(settings.feePurchaseUpperBound, newUpper, "Upper bound not set");
     }
 
+    function test_setFeeRateParams_partialChange_emitsOnlyTheChangedFields() public {
+        uint256 newMin = 80;
+        uint256 newUpper = 1500 ether;
+
+        vm.recordLogs();
+        feeHandler.setFeeRateParams(newMin, MAX_FEE_RATE, LOWER_BOUND, newUpper);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        assertEq(logs.length, 2);
+        assertEq(logs[0].topics[0], keccak256("FeeHandler__MinFeeRateSet(uint256)"));
+        assertEq(logs[1].topics[0], keccak256("FeeHandler__PurchaseUpperBoundSet(uint256)"));
+        assertEq(abi.decode(logs[0].data, (uint256)), newMin);
+        assertEq(abi.decode(logs[1].data, (uint256)), newUpper);
+
+        IFeeHandler.FeeSettings memory settings = feeHandler.getFeeSettings();
+        assertEq(settings.minFeeRate, newMin);
+        assertEq(settings.maxFeeRate, MAX_FEE_RATE);
+        assertEq(settings.feePurchaseLowerBound, LOWER_BOUND);
+        assertEq(settings.feePurchaseUpperBound, newUpper);
+    }
+
+    function test_setFeeRateParams_unchanged_emitsNothing() public {
+        vm.recordLogs();
+        feeHandler.setFeeRateParams(MIN_FEE_RATE, MAX_FEE_RATE, LOWER_BOUND, UPPER_BOUND);
+        assertEq(vm.getRecordedLogs().length, 0);
+    }
+
     function test_setFeeRateParams_raisesMinAboveOldMax() public {
         uint256 newMin = 250;
         uint256 newMax = 400;

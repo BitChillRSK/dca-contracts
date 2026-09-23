@@ -149,12 +149,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         s_protocolSettings.scheduleNonce = scheduleId;
 
         // A new id addresses empty storage, so the zero cadence anchor and paused flag are left unset.
-        DcaSchedule storage created = s_dcaSchedules[token][scheduleId];
-        created.tokenBalance = deposit;
-        created.purchasePeriod = period;
-        created.routeIndex = route;
-        created.user = msg.sender;
-        created.purchaseAmount = purchase;
+        _storeNewSchedule(s_dcaSchedules[token][scheduleId], deposit, period, route, msg.sender, purchase);
         scheduleIds.push(scheduleId);
         emit DcaManager__DcaScheduleCreated(
             msg.sender,
@@ -710,6 +705,23 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
      */
     function _validateDeposit(uint256 depositAmount) private pure {
         if (depositAmount == 0) revert DcaManager__DepositAmountMustBeGreaterThanZero();
+    }
+
+    /// @dev Slot 0 and slot 1 of a new schedule. `routeIndex` is assigned before `purchasePeriod`:
+    ///      that order stores slot 0 once. Declaration order stores it twice.
+    function _storeNewSchedule(
+        DcaSchedule storage created,
+        uint128 deposit,
+        uint32 period,
+        uint32 route,
+        address user,
+        uint96 purchase
+    ) private {
+        created.tokenBalance = deposit;
+        created.routeIndex = route;
+        created.purchasePeriod = period;
+        created.user = user;
+        created.purchaseAmount = purchase;
     }
 
     /**

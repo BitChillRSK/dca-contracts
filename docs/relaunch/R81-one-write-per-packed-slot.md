@@ -44,6 +44,10 @@ The saving is paid by the protocol on every row of every tick: about 520,000 gas
 Just making the writes adjacent while leaving the cast between them does **not** merge them; that
 variant was measured and still writes the slot twice.
 
+This table is the audit at `8d07bf9`, before the cadence event was removed. The shipped purchase path
+saves **−5,200** Rootstock gas per row on the default profile and **−5,400** under deploy: the same
+removed `RESET`, plus one removed slot-0 `SLOAD` on default and two under deploy.
+
 **`createDcaSchedule`.** The struct literal at `DcaManager.sol:151` writes slot 0 once per field,
 five times in all, including the zero `cadenceAnchor` and `paused`. That is a `SET` (20,000) followed by
 four `RESET`s (5,000 each). Measured variants:
@@ -55,9 +59,14 @@ four `RESET`s (5,000 each). Measured variants:
 | storage pointer, non-zero fields in declaration order | **3+2** | **2+1** | **118,200** (−10,400) | **107,800** (−15,600) |
 | storage pointer, non-zero fields in reverse order | 3+2 | 2+2 | 118,200 | 113,200 |
 
-Cancun reports only −926 (default) and −1,052 (deploy) for the winning variant. Skipping the two zero
-fields is sound because a new `(token, scheduleId)` key always addresses two empty slots: ids come
-from a strictly increasing nonce and are never reissued (invariant 7).
+Cancun reports only −926 (default) and −1,052 (deploy) for the winning variant in that table.
+Skipping the two zero fields is sound because a new `(token, scheduleId)` key always addresses two
+empty slots: ids come from a strictly increasing nonce and are never reissued (invariant 7).
+
+The table stops at declaration order inside the create function. Assigning from a small helper, with
+`routeIndex` before `purchasePeriod`, stores each slot once on both profiles. Against the struct
+literal that is Foundry **−2,178 / −1,273** and Rootstock **−26,200 / −20,800**. Declaration order
+inside the helper still stores slot 0 twice under deploy.
 
 **`FeeHandler.setFeeRateParams`.** Since R78 all four fee fields share one word. The setter compares,
 casts, writes, and emits per field, so changing all four writes the word four times: 21,000 RSK
@@ -76,10 +85,11 @@ the same fix.
       already removed `CadenceAnchorUpdated`. The two assignments live in `_storePurchaseProgress`:
       the same statements inside `_rBtcPurchaseChecksEffects` compile to two `SSTORE`s (the frame is
       too deep for the legacy combiner). The helper is one store per row on both profiles.
-- [x] `createDcaSchedule`: storage pointer assigns only `tokenBalance`, `purchasePeriod`,
-      `routeIndex`, `user`, and `purchaseAmount`, in that order. Zero `cadenceAnchor` and `paused`
-      stay unset because a new id addresses empty storage. Writes are 3+2 (default) and 2+1 (deploy),
-      the measured targets.
+- [x] `createDcaSchedule`: a storage pointer assigns only `tokenBalance`, `routeIndex`,
+      `purchasePeriod`, `user`, and `purchaseAmount`, in that order, from `_storeNewSchedule`.
+      `routeIndex` precedes `purchasePeriod` because declaration order still stores slot 0 twice
+      under deploy. Zero `cadenceAnchor` and `paused` stay unset because a new id addresses empty
+      storage. Both profiles store slots 0 and 1 once each.
 - [x] `setFeeRateParams`: validate and cast all four arguments before the first write, assign the
       packed word once when anything changed (unchanged fields are written with their current value
       so the assignments stay together), then emit the per-field events in today's order for the
@@ -124,9 +134,9 @@ the same fix.
 ## Success criteria
 
 - [x] One `SSTORE` to slot 0 per purchase row on both profiles.
-- [x] `createDcaSchedule` and `setFeeRateParams` write counts are at or below the measured targets,
-      and the PR records them per profile. Create is 3+2 default and 2+1 deploy. The fee word is one
-      write on both when all four fields change.
+- [x] `createDcaSchedule` and `setFeeRateParams` write counts are pinned exactly, on both profiles.
+      Create stores slots 0 and 1 once each. The fee word is one write when any field changes, and
+      zero writes when nothing changes. Events fire only for the fields that changed.
 - [x] Each saving is stated on both schedules: Foundry/Cancun measured, Rootstock derived as
       5,000 per removed `RESET` plus 200 per removed `SLOAD`. See the R81 entry in
       `IMPLEMENTATION_ORDER.md`.

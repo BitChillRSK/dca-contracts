@@ -84,9 +84,10 @@ adjacent with nothing that can revert, log, or call between them. Cancun prices 
   slot share a word (four ids per word). That is +5,000 user gas on a rare call. Assigning then
   popping, in either order, is two read-modify-writes of the same word, and merging them needs
   assembly. Accepted.
-- **Four `SLOAD`s of schedule slot 0 per purchase row** (about 600 gas of re-reads at 200 each). R81's
-  merged write removes one; the rest are field reads the optimizer does not CSE across the checks.
-  Not worth a memory copy of the whole struct.
+- **Four `SLOAD`s of schedule slot 0 per purchase row** (about 600 gas of re-reads at 200 each), counted
+  before R81. The merged write removes one of those reads on the default profile and two under deploy;
+  the rest are field reads the optimizer does not CSE across the checks. Not worth a memory copy of the
+  whole struct.
 - **`batchBuyRbtc` calls `OperationsAdmin` twice per batch**: `isSwapper` in `onlySwapper`, then
   `getTokenHandler`. By analogy with finding 7, that is roughly 950 protocol gas per batch; this was
   not measured. It is per batch, not per row (`batchBuyRbtcAcrossHandlers` checks the swapper once for
