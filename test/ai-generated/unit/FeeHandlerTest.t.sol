@@ -17,8 +17,8 @@ contract FeeHandlerTest is Test {
     uint16 constant MAX_FEE_RATE = 200; // 2%
     uint16 constant FEE_RATE_CAP = 500;
     uint256 constant BPS_DENOMINATOR = 10_000;
-    uint128 constant LOWER_BOUND = 100 ether; // below this gets max fee
-    uint128 constant UPPER_BOUND = 1000 ether; // above this gets min fee
+    uint112 constant LOWER_BOUND = 100 ether; // below this gets max fee
+    uint112 constant UPPER_BOUND = 1000 ether; // above this gets min fee
 
     // Events
     event FeeHandler__MinFeeRateSet(uint256 minFeeRate);
@@ -224,6 +224,32 @@ contract FeeHandlerTest is Test {
         assertEq(totalNet, expectedTotalNet);
     }
 
+    function test_calculateFeeAndNetAmounts_flatMatchesSequentialIncludingRounding() public {
+        uint16 flatRate = 137;
+        feeHandler.testSetFeeRateParams(flatRate, flatRate, LOWER_BOUND, UPPER_BOUND);
+
+        uint256[] memory amounts = new uint256[](5);
+        amounts[0] = 1;
+        amounts[1] = 72;
+        amounts[2] = 9_999;
+        amounts[3] = 10_000;
+        amounts[4] = 550 ether;
+
+        (uint256 aggregatedFee, uint256[] memory netAmounts, uint256 totalNet) =
+            feeHandler.exposedCalculateFeeAndNetAmounts(amounts);
+
+        uint256 expectedAggregatedFee;
+        uint256 expectedTotalNet;
+        for (uint256 i; i < amounts.length; ++i) {
+            uint256 expectedFee = amounts[i] * flatRate / BPS_DENOMINATOR;
+            expectedAggregatedFee += expectedFee;
+            expectedTotalNet += amounts[i] - expectedFee;
+            assertEq(netAmounts[i], amounts[i] - expectedFee);
+        }
+        assertEq(aggregatedFee, expectedAggregatedFee);
+        assertEq(totalNet, expectedTotalNet);
+    }
+
     function test_setFeeRateParams_reverts_aboveCap() public {
         vm.expectRevert(IFeeHandler.FeeHandler__MaxFeeRateExceedsCap.selector);
         feeHandler.setFeeRateParams(MIN_FEE_RATE, FEE_RATE_CAP + 1, LOWER_BOUND, UPPER_BOUND);
@@ -304,18 +330,18 @@ contract FeeHandlerTest is Test {
                             STORAGE PACKING
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev R50: the five logical fee fields live in two slots. Ownable2Step owns slots 0 and 1,
-    ///      so the collector starts slot 2 with both rates beside it, and the bounds share slot 3.
+    /// @dev The five logical fee fields live in two slots. Ownable2Step owns slots 0 and 1, the
+    ///      collector occupies slot 2, and all four settings fill slot 3 exactly.
     function test_feeSettingsOccupyTwoSlots() public {
-        uint256 rateSlot = uint256(vm.load(address(feeHandler), bytes32(uint256(2))));
-        assertEq(address(uint160(rateSlot)), FEE_COLLECTOR, "the collector is not the low 20 bytes of slot 2");
-        assertEq(uint16(rateSlot >> 160), MIN_FEE_RATE, "minFeeRate does not follow the collector");
-        assertEq(uint16(rateSlot >> 176), MAX_FEE_RATE, "maxFeeRate does not follow minFeeRate");
-        assertEq(rateSlot >> 192, 0, "something else was written into the rate slot");
+        uint256 collectorSlot = uint256(vm.load(address(feeHandler), bytes32(uint256(2))));
+        assertEq(address(uint160(collectorSlot)), FEE_COLLECTOR, "slot 2 does not hold the collector");
+        assertEq(collectorSlot >> 160, 0, "settings spilled into the collector slot");
 
-        uint256 boundSlot = uint256(vm.load(address(feeHandler), bytes32(uint256(3))));
-        assertEq(uint128(boundSlot), LOWER_BOUND, "the lower bound is not the low half of slot 3");
-        assertEq(uint128(boundSlot >> 128), UPPER_BOUND, "the upper bound is not the high half of slot 3");
+        uint256 settingsSlot = uint256(vm.load(address(feeHandler), bytes32(uint256(3))));
+        assertEq(uint112(settingsSlot), LOWER_BOUND, "lower bound is not first in slot 3");
+        assertEq(uint112(settingsSlot >> 112), UPPER_BOUND, "upper bound does not follow lower bound");
+        assertEq(uint16(settingsSlot >> 224), MIN_FEE_RATE, "minFeeRate does not follow the bounds");
+        assertEq(uint16(settingsSlot >> 240), MAX_FEE_RATE, "maxFeeRate does not finish slot 3");
 
         assertEq(uint256(vm.load(address(feeHandler), bytes32(uint256(4)))), 0, "fee state spilled into a third slot");
     }
@@ -331,8 +357,8 @@ contract FeeHandlerTest is Test {
         assertEq(settings.feePurchaseLowerBound, newLower);
         assertEq(settings.feePurchaseUpperBound, newUpper);
 
-        uint256 rateSlot = uint256(vm.load(address(feeHandler), bytes32(uint256(2))));
-        assertEq(address(uint160(rateSlot)), FEE_COLLECTOR, "writing rates disturbed the collector");
+        uint256 collectorSlot = uint256(vm.load(address(feeHandler), bytes32(uint256(2))));
+        assertEq(address(uint160(collectorSlot)), FEE_COLLECTOR, "writing settings disturbed the collector");
     }
 
     function test_setFeeRateParams_revertsOnUncastableRate() public {
@@ -343,9 +369,9 @@ contract FeeHandlerTest is Test {
     }
 
     function test_setFeeRateParams_revertsOnUncastableBound() public {
-        uint256 overflowing = uint256(type(uint128).max) + 1;
+        uint256 overflowing = uint256(type(uint112).max) + 1;
         vm.expectRevert(
-            abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 128, overflowing)
+            abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 112, overflowing)
         );
         feeHandler.setFeeRateParams(MIN_FEE_RATE, MAX_FEE_RATE, LOWER_BOUND, overflowing);
     }

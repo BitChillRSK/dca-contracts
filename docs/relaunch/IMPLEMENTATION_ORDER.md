@@ -126,6 +126,9 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R71 | 71 ([#128](https://github.com/BitChillRSK/dca-contracts/pull/128) source phase) | **license/SPDX deferred; Dex admin keep; batch lending-event semantics; evidence-gated MoC sequence/reverts** (src first in #128; deploy/release work follows) |
 | R76 | post-R75 pre-deployment fix | none (shared exact purchase-input consumption; zero-oracle constructor guard) |
 | R77 | post-R74 gas encoding | none (accumulated-rBTC `claimable + 1` storage sentinel) |
+| R78 | post-R77 gas fast path | none (flat-fee batches skip the unused fee-bound storage word) |
+| R80 | post-R78, before relaunch deploy | decide whether to remove `DcaManager__CadenceAnchorUpdated`; five-repo event cutover |
+| R79 | post-R80, not deploy-bound | coordinate buyer-sorted batches with the swapper team; internal write coalescing |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1045,7 +1048,37 @@ still pay the complete claim. On Rootstock this moves 15,000 gas per withdraw-an
 swapper (SET→RESET) onto the user (forgone CLEAR−REFUND); system net is 0 because
 `SET − REFUND = RESET` ([ROOTSTOCK-GAS-SCHEDULE.md](./ROOTSTOCK-GAS-SCHEDULE.md)). Accepts permanent
 one-slot state per ever-credited user×handler and Foundry-measured always-on encode overhead. Ask:
-none (human accepted the tradeoff 2026-09-18).
+none (human accepted the tradeoff 2026-09-18). The decision is keep; the revert-or-keep window closes
+at relaunch deployment because this mapping encoding is not layout-compatible with deployed handlers.
+
+### R78 - flat-fee purchase fast path ([spec](./R78-flat-fee-fast-path.md))
+
+Post-R77 behavior-preserving purchase optimization. When min/max rates are equal, choose the flat
+calculation once per batch; both fee branches call one shared fee-at-rate helper. Pack both internal
+`uint112` bounds plus both rates into one word and narrow the public struct bounds to their stored
+width before deployment. The variable
+loop keeps the four fee parameters on the stack instead of loading them from a memory struct per row,
+and does not repeat the dispatcher's unequal-rate test inside that loop. Only the batch calculator and
+fee transfer remain inheritance hooks; the calculation details are private and ordered by call flow.
+Under deploy (`via_ir`), the compute-only fast path saves **280 / 1,091 / 18,995 gas** for one / five / 100 rows on
+both Foundry and Rootstock. Packing separately avoids one 200-gas Rootstock `SLOAD` per batch, making
+the complete R77 delta approximately **480 / 1,291 / 19,195 gas**. If governance later sets unequal
+rates, the recurring fee-loop premium on Rootstock (deploy/`via_ir`, one `SLOAD` on each path) is
+**250 / 1,034 / 19,654 gas** for one / five / 100 full-interpolation rows (~197 gas/row at scale); see
+[Ongoing purchase cost after activating the variable fee](./R78-flat-fee-fast-path.md#ongoing-purchase-cost-after-activating-the-variable-fee).
+The redundant-test removal also saves 43 gas per row while variable rates are active. Ask: none.
+
+### R80 - remove the cadence-anchor purchase event ([analysis](./R78-flat-fee-fast-path.md#r80-survivor-remove-dcamanager__cadenceanchorupdated))
+
+Next unassigned and pre-deployment: decide whether to remove the one-site event for 1,813 gas per row
+under the production deploy (`via_ir`) profile (1,946 under default), then perform the ABI and
+five-consumer cutover. Write the full R80 spec only when assigned.
+
+### R79 - coalesce repeated-buyer writes ([analysis](./R78-flat-fee-fast-path.md#r79-survivor-coalesce-repeated-buyer-writes))
+
+After R80 and not deployment-bound: coordinate buyer sorting with the swapper and coalesce contiguous
+rBTC/share writes (approximately 40,000 Rootstock gas on five same-buyer lending rows). Write the full
+R79 spec only when assigned.
 
 ## Closed non-implementation decisions
 

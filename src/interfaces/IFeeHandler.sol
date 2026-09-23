@@ -12,16 +12,14 @@ interface IFeeHandler {
                            TYPE DECLARATIONS
     //////////////////////////////////////////////////////////////*/
     /// @notice The four parameters that interpolate a purchase fee between `maxFeeRate` and `minFeeRate`.
-    /// @dev Widths match FeeHandler storage: rates are capped at 5% (`MAX_FEE_RATE_CAP`) so they fit
-    ///      uint16, and the bounds are purchase amounts, so they carry the schedule's uint128.
-    ///      The constructor takes this struct and assigns each field straight through, so these
-    ///      types are the check; `setFeeRateParams` takes uint256 and SafeCasts at the write.
-    ///      Either way `_validateFeeSettings` runs on the values first.
+    /// @dev Two uint112 bounds plus two uint16 rates occupy one storage word. The bounds remain wider
+    ///      than a schedule's uint96 purchase amount. `setFeeRateParams` accepts uint256 values for
+    ///      owner ergonomics and checked-casts them at the write; `_validateFeeSettings` runs first.
     struct FeeSettings {
         uint16 minFeeRate; // the lowest possible fee
         uint16 maxFeeRate; // the highest possible fee
-        uint128 feePurchaseLowerBound; // the purchase amount below which max fee is applied
-        uint128 feePurchaseUpperBound; // the purchase amount above which min fee is applied
+        uint112 feePurchaseLowerBound; // the purchase amount below which max fee is applied
+        uint112 feePurchaseUpperBound; // the purchase amount above which min fee is applied
     }
 
     /*//////////////////////////////////////////////////////////////
