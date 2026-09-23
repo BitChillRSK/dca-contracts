@@ -1062,8 +1062,11 @@ and does not repeat the dispatcher's unequal-rate test inside that loop. Only th
 fee transfer remain inheritance hooks; the calculation details are private and ordered by call flow.
 Under deploy (`via_ir`), the compute-only fast path saves **280 / 1,091 / 18,995 gas** for one / five / 100 rows on
 both Foundry and Rootstock. Packing separately avoids one 200-gas Rootstock `SLOAD` per batch, making
-the complete R77 delta approximately **480 / 1,291 / 19,195 gas**. The redundant-test removal also
-saves 43 gas per row if governance selects variable rates. Ask: none.
+the complete R77 delta approximately **480 / 1,291 / 19,195 gas**. If governance later sets unequal
+rates, the recurring fee-loop premium on Rootstock (deploy/`via_ir`, one `SLOAD` on each path) is
+**250 / 1,034 / 19,654 gas** for one / five / 100 full-interpolation rows (~197 gas/row at scale); see
+[Ongoing purchase cost after activating the variable fee](./R78-flat-fee-fast-path.md#ongoing-purchase-cost-after-activating-the-variable-fee).
+The redundant-test removal also saves 43 gas per row while variable rates are active. Ask: none.
 
 ### R80 - remove the cadence-anchor purchase event ([analysis](./R78-flat-fee-fast-path.md#r80-survivor-remove-dcamanager__cadenceanchorupdated))
 

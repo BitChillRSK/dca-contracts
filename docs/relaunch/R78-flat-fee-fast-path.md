@@ -206,7 +206,8 @@ R78 already skips interpolation whenever the configured fee is flat; packing put
 in the same word, so there is no separate bounds read left to remove. Deleting the variable model
 therefore saves approximately **0 additional production gas** on the shipped flat configuration while
 permanently removing governance's option to choose a variable fee from immutable contracts. No proxy
-exists anywhere in `src/`. Keep the model.
+exists anywhere in `src/`. Keep the model. The fee-loop cost paid **only while** rates are unequal is
+recorded under [Ongoing purchase cost after activating the variable fee](#ongoing-purchase-cost-after-activating-the-variable-fee).
 
 ### Closed: merge stablecoin and rBTC accounting
 
@@ -246,8 +247,10 @@ including amounts that round down to zero fee. The differential fuzz bounds ever
 1 wei–2,000 ether so its variable configuration exercises the below-bound, interpolation, and
 above-bound branches; focused unit tests cover both exact knees. Separate baseline and optimized
 harness contracts use the same packed storage layout, so test-only reference code cannot perturb
-optimized code generation and the measured delta contains only compute and memory. This item adds no
-fork-only assertion.
+optimized code generation and the measured delta contains only compute and memory. The activation-
+premium cases compare flat vs variable on identical mid-curve amounts and record the recurring
+fee-loop premium while unequal rates are live; under deploy/`via_ir` both paths execute one `SLOAD`,
+so that premium transfers to Rootstock. This item adds no fork-only assertion.
 
 Same-build flat fast-path measurements after single-sourcing the formula and changing the variable
 helper to stack scalars:
@@ -304,6 +307,57 @@ The shipped build therefore avoids **43 gas per variable-fee row**. Removing the
 flat-fee special case elsewhere: the batch dispatcher owns that decision and the curve helper is now
 private, so no derived caller can bypass the precondition. The committed flat/variable differential
 fuzz test keeps output equivalence reproducible.
+
+### Ongoing purchase cost after activating the variable fee
+
+Governance ships flat (`minFeeRate == maxFeeRate`). If the owner later sets unequal rates, every
+purchase batch pays the variable loop instead of the flat fast path. This section records that
+**recurring fee-loop premium** on Rootstock. It does **not** include the one-time
+`setFeeRateParams` owner transaction: that cost depends on which packed fields change and will also
+move under the planned packed-write optimization (R81), so it is out of scope here.
+
+Reproduce under the production profile:
+
+```bash
+FOUNDRY_PROFILE=deploy forge test --match-path test/gas/R78FlatFeeFastPathGas.t.sol \
+  --match-test ActivationPremium -vv
+```
+
+The harness feeds **identical mid-curve amounts** (550 ether, between the 100- and 1,000-ether bounds)
+to both the flat and variable optimized handlers with cold settings slots, so the logged delta is the
+configuration difference, not an input or cache artifact. Scope is `_calculateFeeAndNetAmounts`
+only — the rest of `batchBuyRbtc` is unchanged.
+
+**Rootstock derivation (deploy / `via_ir` only).** Opcode tracing under the production deploy profile
+confirms both the flat and variable paths execute **exactly one `SLOAD`** (the packed settings word).
+The measured premiums therefore contain no storage-access delta: they are compute and memory only.
+Those opcode classes price the same on Foundry/Cancun and current Rootstock, so the premiums transfer
+unchanged:
+
+| Rows | Flat loop | Variable full-curve loop | Recurring premium |
+|---:|---:|---:|---:|
+| 1 | 3,042 | 3,292 | **250 gas** |
+| 5 | 4,930 | 5,964 | **1,034 gas** |
+| 100 | 49,831 | 69,485 | **19,654 gas** |
+
+At scale that is about **197 gas per purchased row**. Against R64's 815,384-gas five-row live tick,
+five rows add about **0.13%**.
+
+Do **not** treat the raw Foundry delta under the default legacy-codegen profile as a Rootstock
+figure. That profile executes **one `SLOAD` on the flat path and two on the variable path**, so its
+measured premium includes an extra Cancun cold/warm read that Rootstock would price differently
+(flat 200 per `SLOAD`). Production ships deploy/`via_ir`; only that profile's premiums above are
+authoritative. Absolute loop costs under either profile still include Foundry's cold-read schedule
+and must not be quoted as Rootstock absolutes — only the deploy-profile premium cancels cleanly.
+
+Caveats while unequal rates are live:
+
+- These figures are **worst-case per row**: every amount hits the interpolation branch. Purchases at
+  or below the lower bound, or at or above the upper bound, skip interpolation and cost less than the
+  table (still more than flat, because the dispatcher still takes the variable loop).
+- Deleting the variable model instead of keeping it dormant still saves approximately **0** gas on the
+  shipped flat configuration (see Closed item above); this premium is paid only while rates are
+  unequal.
 
 ## Success criteria
 

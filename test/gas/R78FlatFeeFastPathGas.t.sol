@@ -114,6 +114,10 @@ contract R78BaselineFeeHandlerGasHarness is FeeHandler {
  *
  *      Both variants load the same one-word settings layout. Their delta contains only compute and
  *      memory work, whose pricing is the same on Foundry / Cancun and Rootstock.
+ *
+ *      The activation-premium cases compare flat vs variable on identical mid-curve amounts so the
+ *      logged delta is the recurring fee-loop premium while unequal rates are live. Under
+ *      FOUNDRY_PROFILE=deploy both paths execute one SLOAD, so that premium transfers to Rootstock.
  */
 contract R78FlatFeeFastPathGasTest is Test {
     uint16 internal constant FLAT_FEE_RATE = 100;
@@ -165,16 +169,16 @@ contract R78FlatFeeFastPathGasTest is Test {
         _assertSaving(amounts, "hundred-row");
     }
 
-    function test_gas_variableOneRowFullCurve() public {
-        _logVariableGas(1, "variable one-row full curve");
+    function test_gas_variableActivationPremiumOneRow() public {
+        _logActivationPremium(1, "activation premium one-row");
     }
 
-    function test_gas_variableFiveRowsFullCurve() public {
-        _logVariableGas(5, "variable five-row full curve");
+    function test_gas_variableActivationPremiumFiveRows() public {
+        _logActivationPremium(5, "activation premium five-row");
     }
 
-    function test_gas_variableHundredRowsFullCurve() public {
-        _logVariableGas(100, "variable hundred-row full curve");
+    function test_gas_variableActivationPremiumHundredRows() public {
+        _logActivationPremium(100, "activation premium hundred-row");
     }
 
     function testFuzz_optimizedMatchesBaseline(uint96[5] memory fuzzedAmounts) public {
@@ -222,16 +226,28 @@ contract R78FlatFeeFastPathGasTest is Test {
         assertEq(optimizedHash, baselineHash, "per-row net amounts changed");
     }
 
-    function _logVariableGas(uint256 rows, string memory label) private {
+    /// @dev Same mid-curve amounts on both configs so the flat→variable premium is the
+    ///      operational cost of activating unequal rates, not an artifact of different inputs.
+    function _logActivationPremium(uint256 rows, string memory label) private {
         uint256[] memory amounts = new uint256[](rows);
         for (uint256 i; i < rows; ++i) {
+            // Between the variable harness's 100- and 1,000-ether bounds: full interpolation.
             amounts[i] = 550 ether;
         }
 
+        _cool(address(optimizedHarness));
+        (uint256 flatGas,,,) = optimizedHarness.measure(amounts);
+
         _cool(address(variableOptimizedHarness));
-        (uint256 gasUsed,,,) = variableOptimizedHarness.measure(amounts);
+        (uint256 variableGas,,,) = variableOptimizedHarness.measure(amounts);
+
+        uint256 premium = variableGas - flatGas;
         console2.log(label);
-        console2.log("stack-scalar loop:", gasUsed);
+        console2.log("flat fee loop:", flatGas);
+        console2.log("variable full-curve loop:", variableGas);
+        console2.log("activation premium:", premium);
+        assertGt(premium, 0, "variable path was not more expensive than flat");
+        assertLt(premium, 50_000, "premium exceeded the intended fee-loop scope");
     }
 
     /// @dev forge-std's `Vm` interface on this pin omits `cool`; the cheatcode exists on the binary.
