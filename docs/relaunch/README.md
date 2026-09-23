@@ -196,7 +196,8 @@ decided against). No further re-judgement PRs.
   **[R81](./R81-one-write-per-packed-slot.md)** one `SSTORE` per packed slot (−5,200 Rootstock gas per
   purchase row, protocol-paid; −15,600 per create); **[R82](./R82-transient-reentrancy-guard.md)**
   transient reentrancy guard (−9,900 per guarded user call); **[R83](./R83-standing-spender-approvals.md)**
-  standing vs per-use spender approvals (product gate; ~10,400 per use); and
-  **[R84](./R84-single-registry-read-for-deposits.md)** one registry read for deposit routing (≈−1,100
-  per deposit; may be closed instead).
+  standing vs per-use spender approvals (product gate; ~10,400 per use after a one-time ~20,000); and
+  **[R84](./R84-no-repeated-registry-reads.md)** no repeated registry reads (≈−1,900 on
+  `withdrawTokenAndInterest` with no ABI change; ≈−950 each on deposit, top-up, and each interest pair
+  through one additive view).
 - Planned after R84: **R79 — repeated-buyer write coalescing**. Approximately 40,000 Rootstock gas on a five-row single-buyer lending batch; internal-only and not deployment-bound. Full analysis: [R78 deferred record](./R78-flat-fee-fast-path.md#r79-survivor-coalesce-repeated-buyer-writes).

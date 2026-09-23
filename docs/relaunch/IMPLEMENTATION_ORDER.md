@@ -15,7 +15,7 @@ Status: **planning guide**. Orders PRs. Not an implementation spec. Human prompt
 
 **Passed (2026-08-15).** Rootstock testnet (chain 31) accepted first-party bytecode compiled with solc **0.8.36** / `cancun`. Blockscout verified `OperationsAdmin`, `DcaManager`, and `TropykusDocHandlerMoc` at those settings. Anvil/`forge test --fork-url` is still not rskj; this testnet tx is the consensus proof. PR 3+ may merge on this pin. Do not set `prague` / `osaka` / `amsterdam`. Do not use blob opcodes.
 
-The proof, every documented broadcast command, and every required test lane use the default no-IR
+Both proofs in this section, the 2026-08-15 proof above and R52's re-proof below, used the default no-IR
 pipeline. `[profile.default]` enables the legacy optimizer (`optimizer = true`, `optimizer_runs = 200`,
 `via_ir = false`) starting with R52 so Dex handlers can hold their own path allowlist under EIP-170.
 R52 owns the Rootstock testnet + Blockscout re-proof of that optimizer-on artifact
@@ -28,9 +28,22 @@ and gas number — see [Measurement basis](./README.md#measurement-basis), which
 states the profile every figure in `docs/relaunch/` is measured at. Schedule top-up is R54; solx / via-IR
 evaluation and `ZeroTokenPurchaseUniswap` repair are R55 — defined in stacked
 [#105](https://github.com/BitChillRSK/dca-contracts/pull/105), which needs rebase after #104.
-There is no `[profile.deploy]`. Until a separate toolchain decision pins via-IR through
-tests, broadcasts, Rootstock testnet, and Blockscout verification, all EIP-170 decisions use
-`[profile.default]` and `via_ir = false`.
+
+**Superseded by [R60](./R60-src-only-via-ir.md).** This section once said there was no
+`[profile.deploy]`; there is one now. `[profile.deploy]` (`via_ir = true`, selected with
+`FOUNDRY_PROFILE=deploy`) is the profile that ships:
+
+- `make check-deploy` runs the full suite against that exact bytecode.
+- [`CUTOVER_RUNBOOK.md`](./CUTOVER_RUNBOOK.md) deploys with it.
+- Gas figures that argue production cost, such as R78's and the
+  [Rootstock gas audit](./ROOTSTOCK-GAS-AUDIT.md), are stated under it.
+
+`[profile.default]` (`via_ir = false`) remains the day-to-day `make check` profile and the recorded
+[Measurement basis](./README.md#measurement-basis) for sizes and historical figures.
+
+What is still missing is the Rootstock proof for the via-IR artifact. R60 left its Rootstock testnet
+deploy and Blockscout verification to a human operator, and neither is recorded as done. Until it is,
+the consensus proofs above cover only no-IR bytecode.
 
 ## Final scope decisions
 
@@ -131,7 +144,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R81 | post-R80, before relaunch deploy | none (one `SSTORE` per packed slot: purchase row, create, fee setter) |
 | R82 | post-R81, before relaunch deploy | none (`ReentrancyGuardTransient`; same guarded set) |
 | R83 | post-R82, before relaunch deploy | **standing vs per-use approvals** for the Uniswap router and the lending spender |
-| R84 | post-R83, before relaunch deploy | none (one registry read for deposit routing; may be closed instead) |
+| R84 | post-R83, before relaunch deploy | none (no repeated registry reads; the `getRouteInfo` view may be dropped, keeping the internal `withdrawTokenAndInterest` fix) |
 | R79 | post-R84, not deploy-bound | coordinate buyer-sorted batches with the swapper team; internal write coalescing |
 
 ### PR 1 - R23 toolchain and dependency baseline
@@ -1102,17 +1115,29 @@ Ask: none.
 ### R83 - standing vs per-use spender approvals ([spec](./R83-standing-spender-approvals.md))
 
 The Dex purchase and lending deposit paths approve an exact amount before every spend. That 0 → X → 0
-allowance round trip costs ~10,000 net on Rootstock and ~2,300 on Ethereum. **Ask:** whether Dex
-handlers (all, lending-only, or none) and lending handlers should hold a standing approval to their
-spender instead. The main exposure is idle deposits held by `IdleErc20HandlerDex`. A "keep exact"
-answer on both closes the item with no code change.
+allowance round trip costs ~10,000 net on Rootstock and ~2,300 on Ethereum. A standing approval costs
+a one-time ~20,000 at deploy and breaks even after about 2–4 uses.
 
-### R84 - one registry read for deposit routing ([spec](./R84-single-registry-read-for-deposits.md))
+**Ask:** whether Dex handlers (all, lending-only, or none) and lending handlers should hold a standing
+approval to their spender instead. Ask only after the PR records each spender's code identity,
+upgradeability, and admins, SwapRouter02 included. The main exposure is idle deposits held by
+`IdleErc20HandlerDex`.
 
-`_handlerForDeposit` calls `OperationsAdmin` twice to read one packed `TokenRoute` word. On Rootstock
-a repeat call costs a flat 700, so one combined getter saves ≈1,100 user gas per deposit or create
-under deploy. It adds one `OperationsAdmin` view (additive ABI). Smallest audit item; the human may
-close it instead. Ask: none.
+Lending approvals must be set at the end of each adapter's constructor. The base constructor would
+read the spender immutable as `address(0)`. A "keep exact" answer on both closes the item with no
+code change.
+
+### R84 - no repeated registry reads ([spec](./R84-no-repeated-registry-reads.md))
+
+Several `DcaManager` paths call `OperationsAdmin` more than once to resolve one route. On Rootstock
+each repeat costs a flat 700 plus a 200 read. Fixes, under deploy:
+
+- `withdrawTokenAndInterest` reuses the handler `_withdrawToken` already resolved: ≈ −1,900. No ABI
+  change.
+- One additive `getRouteInfo` view (handler, deposit pause, route class) serves deposit routing,
+  `topUpFromInterest`, and each `withdrawAllAccumulatedInterest` pair: ≈ −950 each.
+
+The human may drop the view and keep only the internal fix. Ask: none.
 
 ### R79 - coalesce repeated-buyer writes ([analysis](./R78-flat-fee-fast-path.md#r79-survivor-coalesce-repeated-buyer-writes))
 
