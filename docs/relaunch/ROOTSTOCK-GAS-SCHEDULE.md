@@ -94,6 +94,50 @@ So the cap is **`gasUsed / 2`** (Ethereum's pre-3529 rule), not `/ 5`. A full `R
 is fully realized whenever the transaction's `gasUsed` before refund is at least 30,000 — true of any
 real BitChill rBTC withdrawal.
 
+## Packed-field writes
+
+A write to one field of a packed word compiles to a read, a mask, and an `SSTORE` of the whole word.
+Solidity (legacy and via-IR alike) merges two such writes only when they are adjacent and nothing
+that can revert, log, or call sits between them. A `SafeCast`, an `emit`, or a struct literal assigning
+fields one by one is enough to keep them apart. The [audit](./ROOTSTOCK-GAS-AUDIT.md) measured a struct
+literal writing one word five times.
+
+On Cancun every write after the first to a dirty slot is ~100, so a Foundry diff shows the merge as
+noise. On Rootstock each extra write is a full `RESET` (5,000). **Count `SSTORE`s per slot, not total
+gas**: use `vm.startStateDiffRecording()` / `vm.stopAndReturnStateDiff()` and count the `isWrite`
+storage accesses on each slot. To merge writes, do every cast and check first, write the fields back
+to back, then emit.
+
+## Account access: no EIP-2929 either
+
+`GasCost.java` prices account access flat, with no cold/warm distinction:
+
+| Opcode | Rootstock | Cancun cold / warm |
+|---|---:|---:|
+| `CALL` / `STATICCALL` / `DELEGATECALL` base | 700 | 2,600 / 100 |
+| `BALANCE` | 400 | 2,600 / 100 |
+| `EXTCODESIZE` / `EXTCODECOPY` | 700 | 2,600 / 100 |
+| `EXTCODEHASH` | 400 | 2,600 / 100 |
+
+The first call into a contract is cheaper on Rootstock than Foundry reports; every later call into
+the same contract is about 7× dearer. Batching two reads of one contract into one call is worth more
+than a Foundry diff suggests. Value transfer (`VT_CALL` 9,000) and new-account (`NEW_ACCT_CALL`
+25,000) surcharges match Ethereum.
+
+## Transient storage (Lovell 7.0.0)
+
+`TLOAD` and `TSTORE` exist and cost 100 each (`GasCost.TLOAD` / `GasCost.TSTORE`). They were
+activated by RSKIP-446 in Lovell 7.0.0 (mainnet block 7,338,024, 2025-03), together with `MCOPY`
+(RSKIP-445). A per-transaction flag kept in transient storage therefore costs ~300 per round trip,
+against ~10,200 for a non-zero storage flag written and restored (`SLOAD` + two `RESET`s). That makes
+OZ `ReentrancyGuardTransient` the Rootstock-cheap guard; see [R82](./R82-transient-reentrancy-guard.md).
+
+## Calldata: EIP-2028 adopted
+
+`Transaction.java` charges 16 per non-zero and 4 per zero calldata byte once RSKIP-400 is active
+(Arrowhead 6.0.0, mainnet block 6,223,700). This is the same as Ethereum, so calldata savings transfer
+unchanged. Before Arrowhead, a non-zero byte cost 68.
+
 ## RSKIP watch list (draft, not active)
 
 Neither proposal is active. If either activates, re-check every production gas claim that rests on
@@ -129,6 +173,11 @@ and magnitude match a storage-heavy tick priced on Cancun access lists.
 | Repeat write to same slot in one tx | ~100 | 5,000 | no — Foundry 50× low |
 | Clear-to-zero refund | 4,800 (EIP-3529) | 15,000 | no |
 | Refund cap | `gasUsed / 5` | `gasUsed / 2` | no |
+| Restore slot to its original value in the same tx | refunds most of the write (EIP-2200) | no refund; each write is 5,000 | no |
+| First call into a contract in the tx | 2,600 | 700 | no — Foundry 3.7× high |
+| Later call into the same contract | 100 | 700 | no — Foundry 7× low |
+| `TLOAD` / `TSTORE` | 100 / 100 | 100 / 100 | yes |
+| Calldata byte (non-zero / zero) | 16 / 4 | 16 / 4 | yes |
 
 EIP-2929 footnote: Cancun charges `COLD_SLOAD_COST` (2,100) on the first access to a slot in
 the transaction, then the warm SSTORE base (`SET` 20,000 or `SSTORE_RESET_GAS` 2,900). A cold
