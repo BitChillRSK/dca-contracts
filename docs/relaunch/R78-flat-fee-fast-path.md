@@ -242,9 +242,12 @@ make fork-tropykus
 ```
 
 Assert that flat and variable batch results equal an independent reference curve for every row,
-including amounts that round down to zero fee. Separate baseline and optimized harness contracts use
-the same packed storage layout, so test-only reference code cannot perturb optimized code generation
-and the measured delta contains only compute and memory. This item adds no fork-only assertion.
+including amounts that round down to zero fee. The differential fuzz bounds every generated amount to
+1 wei–2,000 ether so its variable configuration exercises the below-bound, interpolation, and
+above-bound branches; focused unit tests cover both exact knees. Separate baseline and optimized
+harness contracts use the same packed storage layout, so test-only reference code cannot perturb
+optimized code generation and the measured delta contains only compute and memory. This item adds no
+fork-only assertion.
 
 Same-build flat fast-path measurements after single-sourcing the formula and changing the variable
 helper to stack scalars:

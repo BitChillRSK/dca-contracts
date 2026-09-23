@@ -182,7 +182,8 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         }
     }
 
-    /// @dev When the linear variable fee rate is in use, batches load the settings once and keep the four scalars on the stack across rows.
+    /// @dev When the linear variable fee rate is in use, batches load the settings once and keep the
+    ///      four scalars on the stack across rows.
     function _calculateVariableFeeAndNetAmounts(
         uint256[] memory purchaseAmounts,
         uint256 minFeeRate,

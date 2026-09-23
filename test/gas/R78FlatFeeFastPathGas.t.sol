@@ -180,7 +180,7 @@ contract R78FlatFeeFastPathGasTest is Test {
     function testFuzz_optimizedMatchesBaseline(uint96[5] memory fuzzedAmounts) public {
         uint256[] memory amounts = new uint256[](fuzzedAmounts.length);
         for (uint256 i; i < fuzzedAmounts.length; ++i) {
-            amounts[i] = fuzzedAmounts[i];
+            amounts[i] = bound(uint256(fuzzedAmounts[i]), 1, 2000 ether);
         }
 
         _assertEquivalent(baselineHarness, optimizedHarness, amounts);
