@@ -1,6 +1,6 @@
 # R81 — one storage write per packed slot
 
-Status: **in progress** · Assigned: yes · Optional/further-review: no
+Status: **implemented** · GitHub [#142](https://github.com/BitChillRSK/dca-contracts/pull/142) · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
@@ -87,7 +87,7 @@ the same fix.
 - [x] Add `test/gas/R81PackedSlotWritesGas.t.sol`, which counts writes per slot with
       `vm.startStateDiffRecording()` / `vm.stopAndReturnStateDiff()` (the `isWrite` storage accesses).
 - [x] Existing Foundry gas pins (`test/gas/R64*`, `R77*`, `R78*`) did not move. R77 and R78 were re-run.
-- [ ] Update `docs/relaunch/README.md` Status and `IMPLEMENTATION_ORDER.md`.
+- [x] Update `docs/relaunch/README.md` Status and `IMPLEMENTATION_ORDER.md`.
 
 ## Out of scope
 
