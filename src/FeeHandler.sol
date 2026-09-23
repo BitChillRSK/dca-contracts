@@ -60,9 +60,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
                            EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @inheritdoc IFeeHandler
-     */
+    /// @inheritdoc IFeeHandler
     function setFeeRateParams(uint256 minFeeRate, uint256 maxFeeRate, uint256 feePurchaseLowerBound, uint256 feePurchaseUpperBound)
         external
         override
@@ -88,9 +86,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         }
     }
 
-    /**
-     * @inheritdoc IFeeHandler
-     */
+    /// @inheritdoc IFeeHandler
     function setFeeCollectorAddress(address feeCollector) external override onlyOwner {
         if (feeCollector == address(0)) revert FeeHandler__InvalidFeeCollector();
         s_feeCollector = feeCollector;
@@ -101,16 +97,12 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
                                 GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @inheritdoc IFeeHandler
-     */
+    /// @inheritdoc IFeeHandler
     function getFeeCollectorAddress() external view override returns (address) {
         return s_feeCollector;
     }
 
-    /**
-     * @inheritdoc IFeeHandler
-     */
+    /// @inheritdoc IFeeHandler
     function getFeeSettings() external view override returns (FeeSettings memory) {
         return FeeSettings({
             minFeeRate: s_minFeeRate,
@@ -152,9 +144,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         );
     }
 
-    /**
-     * @dev Transfer `fee` of `token` to the collector and emit `FeeTransferred`. No-op when `fee` is 0.
-     */
+    /// @dev Transfer `fee` of `token` to the collector and emit `FeeTransferred`. No-op when `fee` is 0.
     function _transferFee(IERC20 token, uint256 fee) internal {
         if (fee == 0) return;
         address collector = s_feeCollector;
@@ -166,7 +156,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
                             PRIVATE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Flat batches choose one loop and skip the per-row curve branch.
+    /// @dev When the linear variable fee rate is not in use, apply the flat fee rate to all amounts.
     function _calculateFlatFeeAndNetAmounts(
         uint256[] memory purchaseAmounts,
         uint256 feeRate
@@ -183,8 +173,8 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
             aggregatedFee += fee;
 
             uint256 net;
+            // Fee rates are capped at 5%, so the fee cannot exceed its input amount.
             unchecked {
-                // Fee rates are capped at 5%, so the fee cannot exceed its input amount.
                 net = amount - fee;
             }
             netAmountsToSpend[i] = net;
@@ -192,7 +182,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         }
     }
 
-    /// @dev Variable batches load the settings once and keep the four scalars on the stack across rows.
+    /// @dev When the linear variable fee rate is in use, batches load the settings once and keep the four scalars on the stack across rows.
     function _calculateVariableFeeAndNetAmounts(
         uint256[] memory purchaseAmounts,
         uint256 minFeeRate,
@@ -217,9 +207,8 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
             );
             aggregatedFee += fee;
 
-            // maxFeeRate is capped at MAX_FEE_RATE_CAP (5%) by `_validateFeeSettings`, the only write path
-            // for the fee rates, so `_calculateVariableFee` can never return a fee above its input amount.
             uint256 net;
+            // Fee rates are capped at 5%, so the fee cannot exceed its input amount.
             unchecked {
                 net = amount - fee;
             }
@@ -228,7 +217,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         }
     }
 
-    /// @dev Apply the linear fee curve to one amount using settings loaded by the batch dispatcher.
+    /// @dev Apply the linear fee rate to one amount using settings loaded by the batch dispatcher.
     function _calculateVariableFee(
         uint256 purchaseAmount,
         uint256 minFeeRate,
@@ -254,11 +243,12 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         return _calculateFeeAtRate(purchaseAmount, feeRate);
     }
 
-    /// @dev Apply one basis-point rate. Shared by the flat batch and variable curve paths.
+    /// @dev Apply one basis-point rate. Shared by the flat and variable fee rate paths.
     function _calculateFeeAtRate(uint256 amount, uint256 feeRate) private pure returns (uint256) {
         return amount * feeRate / BPS_DENOMINATOR;
     }
 
+    /// @dev Validate the fee settings.
     function _validateFeeSettings(
         uint256 minFeeRate,
         uint256 maxFeeRate,
