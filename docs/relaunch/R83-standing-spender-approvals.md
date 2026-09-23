@@ -124,8 +124,10 @@ recorded in `IMPLEMENTATION_ORDER.md`.
 
 ## Required tests
 
-- Unit, for **each** adapter and leaf that gains an approval, built through its deploy script per
-  `AGENTS.md`:
+- Unit, for **each** adapter and leaf that gains an approval. Production handlers are built through
+  their deploy scripts per `AGENTS.md`. Tropykus handlers have no live deploy path, since `script/`
+  deliberately cannot name a Tropykus route, so build them directly in handler-level tests with
+  `new`, as the existing `test/ai-generated/unit/tropykus-legacy/` suites do. In each case:
   - after construction, the stablecoin allowance to the adapter's **real** spender
     (`i_iSusdToken`, `i_pool`, `i_kToken`, `i_swapRouter02`) is `max`;
   - the allowance to `address(0)` is zero, which proves the approval did not run before the immutable

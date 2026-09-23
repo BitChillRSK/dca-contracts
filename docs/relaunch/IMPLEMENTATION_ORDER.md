@@ -1129,8 +1129,9 @@ code change.
 
 ### R84 - no repeated registry reads ([spec](./R84-no-repeated-registry-reads.md))
 
-Several `DcaManager` paths call `OperationsAdmin` more than once to resolve one route. On Rootstock
-each repeat costs a flat 700 plus a 200 read. Fixes, under deploy:
+Several `DcaManager` paths read the same registry fact for the same route twice, or read two facts
+through two calls where one would do. On Rootstock each extra `OperationsAdmin` call costs a flat 700
+plus a 200 read. Fixes, under deploy:
 
 - `withdrawTokenAndInterest` reuses the handler `_withdrawToken` already resolved: ≈ −1,900. No ABI
   change.

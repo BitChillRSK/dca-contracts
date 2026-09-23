@@ -4,9 +4,12 @@ Status: **not started** · Assigned: no · Optional/further-review: no
 
 ## Objective
 
-Stop `DcaManager` from calling `OperationsAdmin` more than once to resolve a single route. Rootstock
-charges every one of those calls a flat 700 gas, plus 200 for the read behind it, where Foundry charges
-100 + 100 for a repeat. Four user paths are affected:
+Stop `DcaManager` from reading the same registry fact for the same route twice in one call. The facts
+are a route's handler, its deposit pause, and its route class. Rootstock charges every
+`OperationsAdmin` call a flat 700 gas, plus 200 for the read behind it, where Foundry charges 100 + 100
+for a repeat. A path may still make one call per *distinct* fact it needs.
+`withdrawTokenAndInterest` keeps one handler lookup and one route-class lookup. Four user paths are
+affected:
 
 | Path | Today | Change | Rootstock saving (deploy) |
 |---|---|---|---:|
@@ -98,7 +101,10 @@ per call not worth an additive `OperationsAdmin` view, ship that change alone an
 
 ## Success criteria
 
-- [ ] None of the four paths calls `OperationsAdmin` more than once per route it resolves.
+- [ ] None of the four paths reads the same registry fact (handler, deposit pause, route class) for
+      the same route more than once.
+- [ ] The three `getRouteInfo` paths make one `OperationsAdmin` call per route.
+      `withdrawTokenAndInterest` makes two: one handler lookup and one route-class lookup.
 - [ ] Errors, skips, and their order are unchanged.
 - [ ] The saving is stated on both schedules.
 

@@ -46,8 +46,9 @@ The stub handler moves no tokens, so handler-side storage (`s_idleBalances`, `s_
 | 7 | Deposit routing, `topUpFromInterest`, and `withdrawAllAccumulatedInterest` each make two registry calls for one route | user, per call / per pair | −341 to −351 | ≈ −940 to −950 (deploy) | [R84](./R84-no-repeated-registry-reads.md) |
 
 Row 6 and the interest paths in row 7 were raised in review of #140, after the first pass had
-checked only deposit routing for repeated registry calls. R84 now covers every `DcaManager` path
-that resolves one route through more than one `OperationsAdmin` call.
+checked only deposit routing for repeated registry calls. With R84, no user path reads the same
+registry fact for the same route twice. The remaining multi-call paths are listed under **Closed
+without a spec**.
 
 What links 1, 3, and 5: the compiler writes a packed field as its own `SSTORE` unless the writes are
 adjacent with nothing that can revert, log, or call between them. Cancun prices the extra writes at
@@ -90,6 +91,9 @@ adjacent with nothing that can revert, log, or call between them. Cancun prices 
   `getTokenHandler`. By analogy with finding 7, that is roughly 950 protocol gas per batch; this was
   not measured. It is per batch, not per row (`batchBuyRbtcAcrossHandlers` checks the swapper once for
   all batches). Merging it would need a view that couples authorization with route resolution. Closed.
+- **After R84, `withdrawTokenAndInterest` still makes two registry calls**, one for the handler and
+  one for the route class. Those are two distinct facts. Folding the class into `_withdrawToken`
+  would add a read to plain `withdrawToken`, and it is unmeasured. Closed (R84 out of scope).
 - **`getInterestAccrued` makes two registry calls.** It is a view, reached through `eth_call`, so it
   costs no transaction gas. Closed.
 - **`withdrawAllAccumulatedRbtc` pre-checks each pair's balance before withdrawing.** That is an extra

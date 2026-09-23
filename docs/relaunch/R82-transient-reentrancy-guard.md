@@ -36,7 +36,11 @@ with rskj constants):
 | `setSchedulePaused` | 9,839 → 7,032 | 16,000 → **6,100** |
 | `depositToken` | 15,673 → 12,866 | 21,400 → **11,500** |
 
-Foundry will report about −2,800 per call; the Rootstock saving is about **−9,900**. The twelve guarded
+Foundry will report about −2,800 per call; the Rootstock saving is about **−9,900**. The swap also
+removes a one-time cost. OZ's storage guard constructor writes `NOT_ENTERED` into an empty slot, a
+`SET` of 20,000 gas at deploy, and the transient guard has no constructor write. That does not affect
+the decision. OZ's own `_nonReentrantAfter` comment says restoring the value "triggers a refund
+(EIP-2200)". That refund is exactly the one Rootstock does not pay. The twelve guarded
 entry points are `createDcaSchedule`, `depositToken`, `updatePurchaseAmount`, `updatePurchasePeriod`,
 `setSchedulePaused`, `deleteDcaSchedule`, `withdrawToken`, `withdrawTokenAndInterest`,
 `topUpFromInterest`, `withdrawAllAccumulatedInterest`, `withdrawRbtcFromTokenHandler`, and
