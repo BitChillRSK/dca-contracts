@@ -128,7 +128,11 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R77 | post-R74 gas encoding | none (accumulated-rBTC `claimable + 1` storage sentinel) |
 | R78 | post-R77 gas fast path | none (flat-fee batches skip the unused fee-bound storage word) |
 | R80 | post-R78, before relaunch deploy | decide whether to remove `DcaManager__CadenceAnchorUpdated`; five-repo event cutover |
-| R79 | post-R80, not deploy-bound | coordinate buyer-sorted batches with the swapper team; internal write coalescing |
+| R81 | post-R80, before relaunch deploy | none (one `SSTORE` per packed slot: purchase row, create, fee setter) |
+| R82 | post-R81, before relaunch deploy | none (`ReentrancyGuardTransient`; same guarded set) |
+| R83 | post-R82, before relaunch deploy | **standing vs per-use approvals** for the Uniswap router and the lending spender |
+| R84 | post-R83, before relaunch deploy | none (one registry read for deposit routing; may be closed instead) |
+| R79 | post-R84, not deploy-bound | coordinate buyer-sorted batches with the swapper team; internal write coalescing |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1074,9 +1078,45 @@ Next unassigned and pre-deployment: decide whether to remove the one-site event 
 under the production deploy (`via_ir`) profile (1,946 under default), then perform the ABI and
 five-consumer cutover. Write the full R80 spec only when assigned.
 
+### R81 - one storage write per packed slot ([spec](./R81-one-write-per-packed-slot.md))
+
+From the [Rootstock gas audit](./ROOTSTOCK-GAS-AUDIT.md). The compiler writes each packed field as
+its own `SSTORE` unless the writes are adjacent with nothing that can revert, log, or call between
+them. Foundry prices the extra writes at ~100; Rootstock prices them at 5,000. Fix, without assembly:
+
+- Each purchase row writes `DcaSchedule` slot 0 once instead of twice: **−5,200 Rootstock gas per row**,
+  protocol-paid.
+- `createDcaSchedule` stops writing slot 0 five times: **−15,600** under deploy.
+- `setFeeRateParams` stops writing the fee word up to four times.
+
+No ABI, event, or layout change. Ask: none.
+
+### R82 - transient reentrancy guard ([spec](./R82-transient-reentrancy-guard.md))
+
+Swap `ReentrancyGuard` for `ReentrancyGuardTransient` in `DcaManager`, keeping the same guarded set
+(invariant 6). The storage guard costs ~10,200 per guarded call on Rootstock (two `RESET`s, no restore
+refund), not the ~2,300 Foundry reports. The transient guard costs ~300; Rootstock has had
+`TLOAD`/`TSTORE` since Lovell 7.0.0. Saves ~9,900 on each of twelve user entry points. No ABI change.
+Ask: none.
+
+### R83 - standing vs per-use spender approvals ([spec](./R83-standing-spender-approvals.md))
+
+The Dex purchase and lending deposit paths approve an exact amount before every spend. That 0 → X → 0
+allowance round trip costs ~10,000 net on Rootstock and ~2,300 on Ethereum. **Ask:** whether Dex
+handlers (all, lending-only, or none) and lending handlers should hold a standing approval to their
+spender instead. The main exposure is idle deposits held by `IdleErc20HandlerDex`. A "keep exact"
+answer on both closes the item with no code change.
+
+### R84 - one registry read for deposit routing ([spec](./R84-single-registry-read-for-deposits.md))
+
+`_handlerForDeposit` calls `OperationsAdmin` twice to read one packed `TokenRoute` word. On Rootstock
+a repeat call costs a flat 700, so one combined getter saves ≈1,100 user gas per deposit or create
+under deploy. It adds one `OperationsAdmin` view (additive ABI). Smallest audit item; the human may
+close it instead. Ask: none.
+
 ### R79 - coalesce repeated-buyer writes ([analysis](./R78-flat-fee-fast-path.md#r79-survivor-coalesce-repeated-buyer-writes))
 
-After R80 and not deployment-bound: coordinate buyer sorting with the swapper and coalesce contiguous
+After R84 and not deployment-bound: coordinate buyer sorting with the swapper and coalesce contiguous
 rBTC/share writes (approximately 40,000 Rootstock gas on five same-buyer lending rows). Write the full
 R79 spec only when assigned.
 

@@ -1,0 +1,147 @@
+# R81 — one storage write per packed slot
+
+Status: **not started** · Assigned: no · Optional/further-review: no
+
+## Objective
+
+Stop the compiler from writing the same packed storage word several times in one call on three paths:
+each purchase row's `DcaSchedule` slot 0 in `_rBtcPurchaseChecksEffects`, the new schedule in
+`createDcaSchedule`, and the fee word in `FeeHandler.setFeeRateParams`. Rootstock charges every extra
+write a full `RESET` (5,000). Foundry charges a warm rewrite about 100, so the waste never showed up in
+review. No behavior, ABI, event, event-order, or storage-layout change, and no assembly.
+
+## Background
+
+Found by the [Rootstock gas audit of `src/`](./ROOTSTOCK-GAS-AUDIT.md). Pricing is from
+[`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SCHEDULE.md#packed-field-writes).
+
+Solidity writes a packed struct field as a read, a mask, and an `SSTORE` of the whole word. Both
+codegens (legacy and via-IR) merge two such writes to one word only when they are adjacent and nothing
+that can revert, log, or call sits between them. A `SafeCast` call, an `emit`, or a struct literal that
+assigns every field one at a time is enough to keep them apart.
+
+On Ethereum/Cancun the second write to a dirty slot costs ~100 gas, so a Foundry diff reports the merge
+as ~200 gas. On Rootstock every write to a non-empty slot is `RESET_SSTORE` = 5,000.
+
+### Measured (audit harness, commit `8d07bf9`, stub handler — see the audit record for method)
+
+"Cancun" is execution gas on the same schedule Foundry uses. "RSK storage" is every traced `SLOAD` /
+`SSTORE` in the call, priced with rskj constants. Only the storage part differs between the two
+schedules; compute, memory, and logs price the same.
+
+**Purchase row** (`batchBuyRbtc`, later purchase, anchor non-zero → non-zero). Today slot 0 is written
+twice per row: `tokenBalance` at `DcaManager.sol:631`, then `cadenceAnchor` at `:634`. The two writes are
+separated by an `emit` and by `newAnchor.toUint48()`. Hoisting the cast above both writes and making
+the writes adjacent, with both emits after them in the same order, merges them into one write on both
+profiles:
+
+| Profile | Cancun 1 row | RSK storage 1 row | RSK storage 4 rows |
+|---|---:|---:|---:|
+| default | 19,223 → 19,008 (−215) | 17,200 → 12,000 (**−5,200**) | 52,000 → 31,200 (−20,800) |
+| deploy (`via_ir`) | 18,322 → 18,107 (−215) | 16,600 → 11,400 (**−5,200**) | 49,600 → 28,800 (−20,800) |
+
+The saving is paid by the protocol on every row of every tick: about 520,000 gas on a 100-row batch.
+Just making the writes adjacent while leaving the cast between them does **not** merge them; that
+variant was measured and still writes the slot twice.
+
+**`createDcaSchedule`.** The struct literal at `DcaManager.sol:151` writes slot 0 once per field,
+five times in all, including the zero `cadenceAnchor` and `paused`. That is a `SET` (20,000) followed by
+four `RESET`s (5,000 each). Measured variants:
+
+| Variant | default slot writes (0+1) | deploy slot writes (0+1) | RSK storage default | RSK storage deploy |
+|---|---:|---:|---:|---:|
+| struct literal (today) | 5+2 | 5+1 | 128,600 | 123,400 |
+| memory struct, then one assignment | 5+2 | 5+1 | 128,600 | 123,400 |
+| storage pointer, non-zero fields in declaration order | **3+2** | **2+1** | **118,200** (−10,400) | **107,800** (−15,600) |
+| storage pointer, non-zero fields in reverse order | 3+2 | 2+2 | 118,200 | 113,200 |
+
+Cancun reports only −926 (default) and −1,052 (deploy) for the winning variant. Skipping the two zero
+fields is sound because a new `(token, scheduleId)` key always addresses two empty slots: ids come
+from a strictly increasing nonce and are never reissued (invariant 7).
+
+**`FeeHandler.setFeeRateParams`.** Since R78 all four fee fields share one word. The setter compares,
+casts, writes, and emits per field, so changing all four writes the word four times: 21,000 RSK
+storage under deploy vs 9,104 Cancun. With every cast done first and the writes kept adjacent, a
+single `RESET` (5,000) should remain. This path is owner-only and rare, but it is the same defect and
+the same fix.
+
+## Open product decisions
+
+**none**
+
+## Scope
+
+- [ ] `_rBtcPurchaseChecksEffects`: compute `newAnchor.toUint48()` before either field write, then
+      write `tokenBalance` and `cadenceAnchor` back to back, then emit `TokenBalanceUpdated` and then
+      `CadenceAnchorUpdated`. Event order and event arguments do not change. If R80 has already
+      removed `CadenceAnchorUpdated`, the requirement is the same: one `SSTORE` to slot 0 per row.
+- [ ] `createDcaSchedule`: replace the struct literal with a storage pointer that assigns only
+      `tokenBalance`, `purchasePeriod`, `routeIndex`, `user`, and `purchaseAmount`, in that order. Keep
+      a short `src/` comment saying why the zero fields are omitted (a new id addresses empty storage).
+      You may try other orderings; ship whichever gives the fewest writes under the deploy profile, and
+      no more than the counts measured above.
+- [ ] `setFeeRateParams`: validate and cast all four arguments before the first write, write the
+      changed fields back to back, then emit the per-field events in today's order for the fields that
+      changed. Writing an unchanged field with its own value is fine if that is what lets the writes
+      merge, but events still fire only for real changes.
+- [ ] Add `test/gas/R81PackedSlotWritesGas.t.sol`, which counts writes per slot with
+      `vm.startStateDiffRecording()` / `vm.stopAndReturnStateDiff()` (the `isWrite` storage accesses).
+- [ ] Update any existing Foundry gas pins that move (`test/gas/R64*`, `R77*`, `R78*`), labelled as
+      Foundry/Cancun regression pins.
+- [ ] Update `docs/relaunch/README.md` Status and `IMPLEMENTATION_ORDER.md`.
+
+## Out of scope
+
+- [ ] Assembly on any path (invariant 5). If a word cannot be merged in Solidity, record the count;
+      do not reach for `sstore`.
+- [ ] R80 (removing the cadence event) and R79 (coalescing writes for a repeated buyer across rows).
+- [ ] The swap-and-pop double write in `deleteDcaSchedule` (closed in the audit record).
+- [ ] Any change to `DcaSchedule` field order or width, `ProtocolSettings`, or the fee layout.
+- [ ] The reentrancy guard (R82).
+
+## Files likely touched
+
+- `src/DcaManager.sol`
+- `src/FeeHandler.sol`
+- `test/gas/R81PackedSlotWritesGas.t.sol` (new)
+- `test/gas/R64BatchGasBenchmark.t.sol`, `test/gas/R77AccumulatedRbtcSentinelGas.t.sol`,
+  `test/gas/R78FlatFeeFastPathGas.t.sol` (only pins that move)
+
+## Required tests
+
+- `forge test --match-path test/gas/R81PackedSlotWritesGas.t.sol -vv` and the same command with
+  `FOUNDRY_PROFILE=deploy`.
+- Assert **exactly one** write to the schedule's slot 0 per row for a 1-row and a 5-row
+  `batchBuyRbtc`, on both profiles, for both a first purchase (anchor 0) and a later one.
+- Assert that `createDcaSchedule` writes fewer times to slots 0 and 1 than today on both profiles.
+  Record the exact per-profile counts in the PR.
+- Assert that `setFeeRateParams` changing all four fields writes the fee word fewer than four times
+  (target one). Record the count in the PR.
+- Behavior must not change: `getDcaSchedule` after create returns `cadenceAnchor == 0` and
+  `paused == false`; events and their order are unchanged on purchase, create, and set-fee. The
+  existing suites cover this and must stay green.
+- `make check`, `make check-deploy`; fork lanes per `AGENTS.md`. No fork-specific assertions.
+
+## Success criteria
+
+- [ ] One `SSTORE` to slot 0 per purchase row on both profiles.
+- [ ] `createDcaSchedule` and `setFeeRateParams` write counts are at or below the measured targets,
+      and the PR records them per profile.
+- [ ] The PR states each saving on both schedules: Foundry/Cancun measured, Rootstock derived as
+      5,000 per removed `RESET` plus 200 per removed `SLOAD`.
+- [ ] No ABI, event, or storage-layout change.
+
+## Reviewer checklist
+
+- [ ] Matches **Scope**; nothing from **Out of scope**.
+- [ ] Protocol invariants in `AGENTS.md` still hold (5: no assembly; 7: ids never reissued, which is
+      what makes skipping the zero fields safe).
+- [ ] Tests in the PR match **Required tests**.
+- [ ] Files beyond this list are limited to direct dependencies and are named in the PR.
+- [ ] No unrelated refactors; history is reviewable.
+
+## ABI / deploy / cutover impact
+
+- ABI: none.
+- Scripts: none.
+- Cutover: none. Events, their arguments, and their order are unchanged.
