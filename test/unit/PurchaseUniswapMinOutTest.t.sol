@@ -365,14 +365,10 @@ contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
     }
 
     function calculateFee(uint256 grossAmount) external view returns (uint256) {
-        IFeeHandler.FeeSettings memory settings = _feeSettings();
-        return _calculateFeeWithParams(
-            grossAmount,
-            settings.minFeeRate,
-            settings.maxFeeRate,
-            settings.feePurchaseLowerBound,
-            settings.feePurchaseUpperBound
-        );
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = grossAmount;
+        (uint256 fee,,) = _calculateFeeAndNetAmounts(amounts);
+        return fee;
     }
 
     function purchaseRbtc(uint256 stablecoinAmountToSpend, uint256 minRbtcOut) external returns (uint256) {

@@ -1058,10 +1058,11 @@ calculation once per batch; both fee branches call one shared fee-at-rate helper
 `uint112` bounds plus both rates into one word and narrow the public struct bounds to their stored
 width before deployment. The variable
 loop keeps the four fee parameters on the stack instead of loading them from a memory struct per row,
-and does not repeat the dispatcher's unequal-rate test inside that loop. Under deploy (`via_ir`), the
-compute-only fast path saves **529 / 1,341 / 19,247 gas** for one / five / 100 rows on
+and does not repeat the dispatcher's unequal-rate test inside that loop. Only the batch calculator and
+fee transfer remain inheritance hooks; the calculation details are private and ordered by call flow.
+Under deploy (`via_ir`), the compute-only fast path saves **280 / 1,091 / 18,995 gas** for one / five / 100 rows on
 both Foundry and Rootstock. Packing separately avoids one 200-gas Rootstock `SLOAD` per batch, making
-the complete R77 delta approximately **729 / 1,541 / 19,447 gas**. The redundant-test removal also
+the complete R77 delta approximately **480 / 1,291 / 19,195 gas**. The redundant-test removal also
 saves 43 gas per row if governance selects variable rates. Ask: none.
 
 ### R80 - remove the cadence-anchor purchase event ([analysis](./R78-flat-fee-fast-path.md#r80-survivor-remove-dcamanager__cadenceanchorupdated))

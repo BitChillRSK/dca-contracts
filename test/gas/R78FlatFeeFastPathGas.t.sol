@@ -5,10 +5,10 @@ import {Test, console2} from "forge-std/Test.sol";
 import {FeeHandler} from "src/FeeHandler.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 
-contract R78FeeHandlerGasHarness is FeeHandler {
+contract R78OptimizedFeeHandlerGasHarness is FeeHandler {
     constructor(IFeeHandler.FeeSettings memory feeSettings) FeeHandler(address(0xFEE), feeSettings, msg.sender) {}
 
-    function measureOptimized(uint256[] calldata purchaseAmounts)
+    function measure(uint256[] calldata purchaseAmounts)
         external
         view
         returns (uint256 gasUsed, uint256 aggregatedFee, uint256 totalAmountToSpend, bytes32 netAmountsHash)
@@ -20,8 +20,12 @@ contract R78FeeHandlerGasHarness is FeeHandler {
         gasUsed = gasBefore - gasleft();
         netAmountsHash = keccak256(abi.encode(netAmounts));
     }
+}
 
-    function measureBaseline(uint256[] calldata purchaseAmounts)
+contract R78BaselineFeeHandlerGasHarness is FeeHandler {
+    constructor(IFeeHandler.FeeSettings memory feeSettings) FeeHandler(address(0xFEE), feeSettings, msg.sender) {}
+
+    function measure(uint256[] calldata purchaseAmounts)
         external
         view
         returns (uint256 gasUsed, uint256 aggregatedFee, uint256 totalAmountToSpend, bytes32 netAmountsHash)
@@ -34,8 +38,8 @@ contract R78FeeHandlerGasHarness is FeeHandler {
         netAmountsHash = keccak256(abi.encode(netAmounts));
     }
 
-    /// @dev The generic loop uses the current fee helper and packed settings layout, so the comparison
-    ///      isolates loop specialization rather than helper changes or chain-specific storage pricing.
+    /// @dev The generic loop mirrors the private production curve against the same packed settings
+    ///      layout. Its separate harness keeps reference code from changing optimized code generation.
     function _baselineCalculateFeeAndNetAmounts(uint256[] memory purchaseAmounts)
         private
         view
@@ -43,11 +47,16 @@ contract R78FeeHandlerGasHarness is FeeHandler {
     {
         uint256 len = purchaseAmounts.length;
         netAmountsToSpend = new uint256[](len);
-        FeeSettings memory feeSettings = _feeSettings();
+        FeeSettings memory feeSettings = FeeSettings({
+            minFeeRate: s_minFeeRate,
+            maxFeeRate: s_maxFeeRate,
+            feePurchaseLowerBound: s_feePurchaseLowerBound,
+            feePurchaseUpperBound: s_feePurchaseUpperBound
+        });
 
         for (uint256 i; i < len; ++i) {
             uint256 amount = purchaseAmounts[i];
-            uint256 fee = _calculateFeeWithParams(
+            uint256 fee = _baselineCalculateVariableFee(
                 amount,
                 feeSettings.minFeeRate,
                 feeSettings.maxFeeRate,
@@ -62,6 +71,36 @@ contract R78FeeHandlerGasHarness is FeeHandler {
             netAmountsToSpend[i] = net;
             totalAmountToSpend += net;
         }
+    }
+
+    /// @dev Test-only reference copy because the production curve is deliberately private.
+    function _baselineCalculateVariableFee(
+        uint256 purchaseAmount,
+        uint256 minFeeRate,
+        uint256 maxFeeRate,
+        uint256 feePurchaseLowerBound,
+        uint256 feePurchaseUpperBound
+    ) private pure returns (uint256) {
+        if (purchaseAmount >= feePurchaseUpperBound) {
+            return _baselineCalculateFeeAtRate(purchaseAmount, minFeeRate);
+        }
+
+        if (purchaseAmount <= feePurchaseLowerBound) {
+            return _baselineCalculateFeeAtRate(purchaseAmount, maxFeeRate);
+        }
+
+        uint256 feeRate;
+        unchecked {
+            feeRate = maxFeeRate
+                - ((purchaseAmount - feePurchaseLowerBound)
+                    * (maxFeeRate - minFeeRate))
+                    / (feePurchaseUpperBound - feePurchaseLowerBound);
+        }
+        return _baselineCalculateFeeAtRate(purchaseAmount, feeRate);
+    }
+
+    function _baselineCalculateFeeAtRate(uint256 amount, uint256 feeRate) private pure returns (uint256) {
+        return amount * feeRate / BPS_DENOMINATOR;
     }
 }
 
@@ -79,8 +118,10 @@ contract R78FeeHandlerGasHarness is FeeHandler {
 contract R78FlatFeeFastPathGasTest is Test {
     uint16 internal constant FLAT_FEE_RATE = 100;
 
-    R78FeeHandlerGasHarness internal harness;
-    R78FeeHandlerGasHarness internal variableFeeHarness;
+    R78OptimizedFeeHandlerGasHarness internal optimizedHarness;
+    R78OptimizedFeeHandlerGasHarness internal variableOptimizedHarness;
+    R78BaselineFeeHandlerGasHarness internal baselineHarness;
+    R78BaselineFeeHandlerGasHarness internal variableBaselineHarness;
 
     function setUp() public {
         IFeeHandler.FeeSettings memory settings = IFeeHandler.FeeSettings({
@@ -89,13 +130,15 @@ contract R78FlatFeeFastPathGasTest is Test {
             feePurchaseLowerBound: 1000 ether,
             feePurchaseUpperBound: 100_000 ether
         });
-        harness = new R78FeeHandlerGasHarness(settings);
+        optimizedHarness = new R78OptimizedFeeHandlerGasHarness(settings);
+        baselineHarness = new R78BaselineFeeHandlerGasHarness(settings);
 
         settings.minFeeRate = 100;
         settings.maxFeeRate = 200;
         settings.feePurchaseLowerBound = 100 ether;
         settings.feePurchaseUpperBound = 1000 ether;
-        variableFeeHarness = new R78FeeHandlerGasHarness(settings);
+        variableOptimizedHarness = new R78OptimizedFeeHandlerGasHarness(settings);
+        variableBaselineHarness = new R78BaselineFeeHandlerGasHarness(settings);
     }
 
     function test_gas_flatOneRowFastPath() public {
@@ -140,18 +183,18 @@ contract R78FlatFeeFastPathGasTest is Test {
             amounts[i] = fuzzedAmounts[i];
         }
 
-        _assertEquivalent(harness, amounts);
-        _assertEquivalent(variableFeeHarness, amounts);
+        _assertEquivalent(baselineHarness, optimizedHarness, amounts);
+        _assertEquivalent(variableBaselineHarness, variableOptimizedHarness, amounts);
     }
 
     function _assertSaving(uint256[] memory amounts, string memory label) private {
-        _cool(address(harness));
+        _cool(address(baselineHarness));
         (uint256 baselineGas, uint256 baselineFee, uint256 baselineNet, bytes32 baselineHash) =
-            harness.measureBaseline(amounts);
+            baselineHarness.measure(amounts);
 
-        _cool(address(harness));
+        _cool(address(optimizedHarness));
         (uint256 optimizedGas, uint256 optimizedFee, uint256 optimizedNet, bytes32 optimizedHash) =
-            harness.measureOptimized(amounts);
+            optimizedHarness.measure(amounts);
 
         assertEq(optimizedFee, baselineFee, "aggregated fee changed");
         assertEq(optimizedNet, baselineNet, "aggregated net changed");
@@ -166,9 +209,13 @@ contract R78FlatFeeFastPathGasTest is Test {
         assertLt(saving, 50_000, "saving exceeded the intended fee-loop scope");
     }
 
-    function _assertEquivalent(R78FeeHandlerGasHarness target, uint256[] memory amounts) private {
-        (, uint256 baselineFee, uint256 baselineNet, bytes32 baselineHash) = target.measureBaseline(amounts);
-        (, uint256 optimizedFee, uint256 optimizedNet, bytes32 optimizedHash) = target.measureOptimized(amounts);
+    function _assertEquivalent(
+        R78BaselineFeeHandlerGasHarness baseline,
+        R78OptimizedFeeHandlerGasHarness optimized,
+        uint256[] memory amounts
+    ) private {
+        (, uint256 baselineFee, uint256 baselineNet, bytes32 baselineHash) = baseline.measure(amounts);
+        (, uint256 optimizedFee, uint256 optimizedNet, bytes32 optimizedHash) = optimized.measure(amounts);
 
         assertEq(optimizedFee, baselineFee, "aggregated fee changed");
         assertEq(optimizedNet, baselineNet, "aggregated net changed");
@@ -181,8 +228,8 @@ contract R78FlatFeeFastPathGasTest is Test {
             amounts[i] = 550 ether;
         }
 
-        _cool(address(variableFeeHarness));
-        (uint256 gasUsed,,,) = variableFeeHarness.measureOptimized(amounts);
+        _cool(address(variableOptimizedHarness));
+        (uint256 gasUsed,,,) = variableOptimizedHarness.measure(amounts);
         console2.log(label);
         console2.log("stack-scalar loop:", gasUsed);
     }

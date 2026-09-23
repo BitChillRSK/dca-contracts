@@ -112,7 +112,12 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
      * @inheritdoc IFeeHandler
      */
     function getFeeSettings() external view override returns (FeeSettings memory) {
-        return _feeSettings();
+        return FeeSettings({
+            minFeeRate: s_minFeeRate,
+            maxFeeRate: s_maxFeeRate,
+            feePurchaseLowerBound: s_feePurchaseLowerBound,
+            feePurchaseUpperBound: s_feePurchaseUpperBound
+        });
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -120,7 +125,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Calculate the fee and net amounts for a batch of purchase amounts.
+     * @dev Calculate the fee and net amounts for a batch of purchase amounts.
      * @param purchaseAmounts The array with the raw purchase amounts specified by users.
      * @return aggregatedFee      The total fee to be collected for all purchases.
      * @return netAmountsToSpend  An array with the net amounts (purchase amount minus fee) for each user.
@@ -145,51 +150,6 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
             s_feePurchaseLowerBound,
             s_feePurchaseUpperBound
         );
-    }
-
-    /**
-     * @dev Return all four fee parameters as one settings value for the external getter.
-     */
-    function _feeSettings() internal view returns (FeeSettings memory) {
-        return FeeSettings({
-            minFeeRate: s_minFeeRate,
-            maxFeeRate: s_maxFeeRate,
-            feePurchaseLowerBound: s_feePurchaseLowerBound,
-            feePurchaseUpperBound: s_feePurchaseUpperBound
-        });
-    }
-
-    /**
-     * @dev Apply the variable-fee interpolation using already-loaded fee settings. Equal rates are
-     *      also safe for standalone callers: their zero difference makes interpolation return that rate.
-     */
-    function _calculateFeeWithParams(
-        uint256 purchaseAmount,
-        uint256 minFeeRate,
-        uint256 maxFeeRate,
-        uint256 feePurchaseLowerBound,
-        uint256 feePurchaseUpperBound
-    )
-        internal
-        pure
-        returns (uint256)
-    {
-        if (purchaseAmount >= feePurchaseUpperBound) {
-            return _calculateFeeAtRate(purchaseAmount, minFeeRate);
-        }
-
-        if (purchaseAmount <= feePurchaseLowerBound) {
-            return _calculateFeeAtRate(purchaseAmount, maxFeeRate);
-        }
-
-        uint256 feeRate;
-        unchecked {
-            feeRate = maxFeeRate
-                - ((purchaseAmount - feePurchaseLowerBound)
-                    * (maxFeeRate - minFeeRate))
-                    / (feePurchaseUpperBound - feePurchaseLowerBound);
-        }
-        return _calculateFeeAtRate(purchaseAmount, feeRate);
     }
 
     /**
@@ -248,7 +208,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         netAmountsToSpend = new uint256[](len);
         for (uint256 i; i < len; ++i) {
             uint256 amount = purchaseAmounts[i];
-            uint256 fee = _calculateFeeWithParams(
+            uint256 fee = _calculateVariableFee(
                 amount,
                 minFeeRate,
                 maxFeeRate,
@@ -258,7 +218,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
             aggregatedFee += fee;
 
             // maxFeeRate is capped at MAX_FEE_RATE_CAP (5%) by `_validateFeeSettings`, the only write path
-            // for the fee rates, so `_calculateFeeWithParams` can never return a fee above its input amount.
+            // for the fee rates, so `_calculateVariableFee` can never return a fee above its input amount.
             uint256 net;
             unchecked {
                 net = amount - fee;
@@ -266,6 +226,32 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
             netAmountsToSpend[i] = net;
             totalAmountToSpend += net;
         }
+    }
+
+    /// @dev Apply the linear fee curve to one amount using settings loaded by the batch dispatcher.
+    function _calculateVariableFee(
+        uint256 purchaseAmount,
+        uint256 minFeeRate,
+        uint256 maxFeeRate,
+        uint256 feePurchaseLowerBound,
+        uint256 feePurchaseUpperBound
+    ) private pure returns (uint256) {
+        if (purchaseAmount >= feePurchaseUpperBound) {
+            return _calculateFeeAtRate(purchaseAmount, minFeeRate);
+        }
+
+        if (purchaseAmount <= feePurchaseLowerBound) {
+            return _calculateFeeAtRate(purchaseAmount, maxFeeRate);
+        }
+
+        uint256 feeRate;
+        unchecked {
+            feeRate = maxFeeRate
+                - ((purchaseAmount - feePurchaseLowerBound)
+                    * (maxFeeRate - minFeeRate))
+                    / (feePurchaseUpperBound - feePurchaseLowerBound);
+        }
+        return _calculateFeeAtRate(purchaseAmount, feeRate);
     }
 
     /// @dev Apply one basis-point rate. Shared by the flat batch and variable curve paths.
