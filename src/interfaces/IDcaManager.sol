@@ -112,9 +112,6 @@ interface IDcaManager {
     event DcaManager__MaxSchedulesPerTokenModified(uint256 newMaxSchedulesPerToken);
     /// @notice Owner changed the protocol minimum purchase period (whole UTC days, never below one).
     event DcaManager__MinPurchasePeriodModified(uint256 newMinPurchasePeriod);
-    /// @notice A purchase moved the schedule's anchor to its newest consumed cadence slot.
-    /// @dev This is a past-or-current UTC midnight, not the execution time; use the log's block timestamp for that.
-    event DcaManager__CadenceAnchorUpdated(address indexed token, uint64 indexed scheduleId, uint256 cadenceAnchor);
     /// @notice Owner set a per-token minimum purchase amount. Zero is not allowed.
     event DcaManager__TokenMinPurchaseAmountSet(address indexed token, uint256 minPurchaseAmount);
 

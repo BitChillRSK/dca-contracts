@@ -631,8 +631,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         dcaSchedule.tokenBalance = tokenBalance;
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, tokenBalance);
 
+        // No anchor log: purchases emit RbtcBought, and the new anchor follows from the prior one and the period.
         dcaSchedule.cadenceAnchor = newAnchor.toUint48();
-        emit DcaManager__CadenceAnchorUpdated(token, scheduleId, newAnchor);
 
         return (buyer, purchaseAmount, dcaSchedule.routeIndex);
     }
