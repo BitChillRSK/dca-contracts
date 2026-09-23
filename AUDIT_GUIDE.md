@@ -128,7 +128,8 @@ Other deliberate availability trade-offs:
   lending redemptions are unsupported.
 - The bot must quote, simulate, group rows by handler, respect the protected-window workflow, and retry
   within the due UTC day when appropriate. Monitoring must track custom errors and the current event
-  ABI, including `DcaManager__CadenceAnchorUpdated`.
+  ABI. There is no `CadenceAnchorUpdated` log: after a purchase, recompute the anchor from prior
+  schedule state or read `getDcaSchedule`; use `PurchaseRbtc__RbtcBought` as the purchase signal.
 
 ## Reproducing the release gates
 

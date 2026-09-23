@@ -114,7 +114,10 @@ the Rootstock write delta explicitly. Include both rBTC credits and lending-shar
 unique-buyer batch does not regress materially. **Priority:** largest surviving gas opportunity, but
 not deployment-deadline-bound.
 
-### R80 survivor: remove `DcaManager__CadenceAnchorUpdated`
+### R80 survivor: remove `DcaManager__CadenceAnchorUpdated` — **implemented**
+
+See [`R80-remove-cadence-anchor-event.md`](./R80-remove-cadence-anchor-event.md). Product decision:
+remove (2026-09-23). Analysis below is retained as the measurement record.
 
 **Candidate.** Remove the event declaration and its only emit, currently in
 `DcaManager._rBtcPurchaseChecksEffects` at `DcaManager.sol:635`. Do not consolidate it with

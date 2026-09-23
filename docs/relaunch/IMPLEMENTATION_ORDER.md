@@ -140,7 +140,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R76 | post-R75 pre-deployment fix | none (shared exact purchase-input consumption; zero-oracle constructor guard) |
 | R77 | post-R74 gas encoding | none (accumulated-rBTC `claimable + 1` storage sentinel) |
 | R78 | post-R77 gas fast path | none (flat-fee batches skip the unused fee-bound storage word) |
-| R80 | post-R78, before relaunch deploy | decide whether to remove `DcaManager__CadenceAnchorUpdated`; five-repo event cutover |
+| R80 | post-R78, before relaunch deploy | remove `DcaManager__CadenceAnchorUpdated` (decided 2026-09-23); five-repo event cutover |
 | R81 | post-R80, before relaunch deploy | none (one `SSTORE` per packed slot: purchase row, create, fee setter) |
 | R82 | post-R81, before relaunch deploy | none (`ReentrancyGuardTransient`; same guarded set) |
 | R83 | post-R82, before relaunch deploy | **standing vs per-use approvals** for the Uniswap router and the lending spender |
@@ -1085,11 +1085,11 @@ rates, the recurring fee-loop premium on Rootstock (deploy/`via_ir`, one `SLOAD`
 [Ongoing purchase cost after activating the variable fee](./R78-flat-fee-fast-path.md#ongoing-purchase-cost-after-activating-the-variable-fee).
 The redundant-test removal also saves 43 gas per row while variable rates are active. Ask: none.
 
-### R80 - remove the cadence-anchor purchase event ([analysis](./R78-flat-fee-fast-path.md#r80-survivor-remove-dcamanager__cadenceanchorupdated))
+### R80 - remove the cadence-anchor purchase event ([spec](./R80-remove-cadence-anchor-event.md), [analysis](./R78-flat-fee-fast-path.md#r80-survivor-remove-dcamanager__cadenceanchorupdated))
 
-Next unassigned and pre-deployment: decide whether to remove the one-site event for 1,813 gas per row
-under the production deploy (`via_ir`) profile (1,946 under default), then perform the ABI and
-five-consumer cutover. Write the full R80 spec only when assigned.
+**Decided remove (2026-09-23).** Drop `DcaManager__CadenceAnchorUpdated` for ~1,813 gas/row under
+deploy/`via_ir` (1,946 under default). The write stays; indexers recompute from prior state or read
+`getDcaSchedule`. Five-consumer event cutover. Stack on the post-R78 tip before relaunch deploy.
 
 ### R81 - one storage write per packed slot ([spec](./R81-one-write-per-packed-slot.md))
 

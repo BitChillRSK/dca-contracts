@@ -175,7 +175,6 @@ contract EventIndexingTest is DcaDappTest {
         if (sig == keccak256("DcaManager__DcaScheduleDeleted(address,address,uint64,uint256)")) return (true, 3);
         if (sig == keccak256("DcaManager__MaxSchedulesPerTokenModified(uint256)")) return (true, 0);
         if (sig == keccak256("DcaManager__MinPurchasePeriodModified(uint256)")) return (true, 0);
-        if (sig == keccak256("DcaManager__CadenceAnchorUpdated(address,uint64,uint256)")) return (true, 2);
         if (sig == keccak256("DcaManager__TokenMinPurchaseAmountSet(address,uint256)")) return (true, 1);
         if (sig == keccak256("TokenLending__UserSharesUpdated(address,uint256,uint256)")) return (true, 1);
         if (sig == keccak256("TokenLending__SharesRedeemed(address,uint256,uint256)")) return (true, 1);

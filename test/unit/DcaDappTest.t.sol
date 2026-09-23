@@ -130,7 +130,6 @@ contract DcaDappTest is Test {
         uint256 purchasePeriod,
         uint256 routeIndex
     );
-    event DcaManager__CadenceAnchorUpdated(address indexed token, uint64 indexed scheduleId, uint256 cadenceAnchor);
 
     // TokenHandler
     event TokenHandler__TokenDeposited(address indexed token, address indexed user, uint256 amount);
@@ -558,11 +557,6 @@ contract DcaDappTest is Test {
         uint256 fee = feeCalculator.calculateFee(AMOUNT_TO_SPEND);
         uint256 netPurchaseAmount = AMOUNT_TO_SPEND - fee;
 
-        vm.expectEmit(true, true, true, true);
-        uint256 anchor = dcaDetails[SCHEDULE_INDEX].cadenceAnchor;
-        uint256 period = dcaDetails[SCHEDULE_INDEX].purchasePeriod;
-        uint256 cadenceAnchor = _expectedCadenceAnchor(anchor, period);
-        emit DcaManager__CadenceAnchorUpdated(address(stablecoin), dcaDetailsIds[SCHEDULE_INDEX], cadenceAnchor);
         // Lending purchases go through `_batchRetrieveStablecoin`, which does not emit
         // `TokenLending__SharesRedeemed` (that event is single-redeem / measured cash only).
         if (block.chainid == ANVIL_CHAIN_ID && isMocSwaps) {
@@ -582,6 +576,14 @@ contract DcaDappTest is Test {
         vm.startPrank(USER);
         uint256 stablecoinBalanceAfterPurchase = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
         uint256 rbtcBalanceAfterPurchase = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
+        uint256 expectedAnchor = _expectedCadenceAnchor(
+            dcaDetails[SCHEDULE_INDEX].cadenceAnchor, dcaDetails[SCHEDULE_INDEX].purchasePeriod
+        );
+        assertEq(
+            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).cadenceAnchor,
+            expectedAnchor,
+            "cadenceAnchor after purchase"
+        );
         vm.stopPrank();
 
         // Check that stablecoin was subtracted and rBTC was added to user's balances
