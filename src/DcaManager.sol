@@ -631,10 +631,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         dcaSchedule.tokenBalance = tokenBalance;
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, tokenBalance);
 
-        // No CadenceAnchorUpdated log: the write is purchase-only, already announced by
-        // TokenBalanceUpdated and PurchaseRbtc__RbtcBought, and the new midnight is a pure
-        // function of the prior anchor, period, and today's UTC day start (recompute off-chain
-        // or read getDcaSchedule). Emitting it cost ~1.8k gas per row on the swapper-paid path.
+        // No anchor log: purchases emit RbtcBought, and the new anchor follows from the prior one and the period.
         dcaSchedule.cadenceAnchor = newAnchor.toUint48();
 
         return (buyer, purchaseAmount, dcaSchedule.routeIndex);
