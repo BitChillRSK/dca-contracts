@@ -1,7 +1,8 @@
 # R80 — Remove `DcaManager__CadenceAnchorUpdated`
 
-Status: **in progress** · Assigned: yes · Optional/further-review: no · Order: stack on the current relaunch tip after R78 (and any docs stacked on it), before R81 and
-relaunch deployment
+Status: **implemented** · GitHub [#141](https://github.com/BitChillRSK/dca-contracts/pull/141) ·
+Assigned: yes · Optional/further-review: no · Order: stack on the current relaunch tip after R78
+(and any docs stacked on it), before R81 and relaunch deployment
 
 ## Objective
 
@@ -46,16 +47,16 @@ deliberate exception:
 
 ## Scope
 
-- [ ] Delete `DcaManager__CadenceAnchorUpdated` from `IDcaManager` and its emit in
+- [x] Delete `DcaManager__CadenceAnchorUpdated` from `IDcaManager` and its emit in
       `DcaManager._rBtcPurchaseChecksEffects`. Leave the `cadenceAnchor` storage write and formula
       unchanged.
-- [ ] Update unit harness expectations: stop declaring/expecting the event in `DcaDappTest`; drop it
+- [x] Update unit harness expectations: stop declaring/expecting the event in `DcaDappTest`; drop it
       from `EventIndexingTest`’s freeze table.
-- [ ] Assert post-purchase `cadenceAnchor` via schedule getters where a test previously relied only on
+- [x] Assert post-purchase `cadenceAnchor` via schedule getters where a test previously relied only on
       the event (keep `_expectedCadenceAnchor` / storage assertions).
-- [ ] Document the decision in this spec, `IMPLEMENTATION_ORDER.md`, and `docs/relaunch/README.md`
+- [x] Document the decision in this spec, `IMPLEMENTATION_ORDER.md`, and `docs/relaunch/README.md`
       Status. Point `AUDIT_GUIDE.md` at purchase events + getter/recompute instead of this event.
-- [ ] Open or comment on consumer issues for every repo that must stop indexing or filtering the
+- [x] Open or comment on consumer issues for every repo that must stop indexing or filtering the
       event (`AGENTS.md` Consumer follow-up). Paste URLs in the PR cutover note.
 
 ## Out of scope
@@ -109,11 +110,11 @@ Behaviors:
 
 ## Success criteria
 
-- [ ] Event declaration and emit gone; `cadenceAnchor` write unchanged.
-- [ ] Tests green under the commands above; `make check` + both forks green before push.
-- [ ] README Status points at this PR; next unassigned prompt is `Start with R79`.
-- [ ] Consumer issues opened or updated; URLs in the PR cutover note.
-- [ ] No open product decisions.
+- [x] Event declaration and emit gone; `cadenceAnchor` write unchanged.
+- [x] Tests green under the commands above; `make check` + both forks green before push.
+- [x] README Status points at this PR; next unassigned prompt is `Start with R81`.
+- [x] Consumer issues opened or updated; URLs in the PR cutover note.
+- [x] No open product decisions.
 
 ## Reviewer checklist
 
