@@ -1,6 +1,6 @@
 # R81 — one storage write per packed slot
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **in progress** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
@@ -71,23 +71,22 @@ the same fix.
 
 ## Scope
 
-- [ ] `_rBtcPurchaseChecksEffects`: compute `newAnchor.toUint48()` before either field write, then
-      write `tokenBalance` and `cadenceAnchor` back to back, then emit `TokenBalanceUpdated` and then
-      `CadenceAnchorUpdated`. Event order and event arguments do not change. If R80 has already
-      removed `CadenceAnchorUpdated`, the requirement is the same: one `SSTORE` to slot 0 per row.
-- [ ] `createDcaSchedule`: replace the struct literal with a storage pointer that assigns only
-      `tokenBalance`, `purchasePeriod`, `routeIndex`, `user`, and `purchaseAmount`, in that order. Keep
-      a short `src/` comment saying why the zero fields are omitted (a new id addresses empty storage).
-      You may try other orderings; ship whichever gives the fewest writes under the deploy profile, and
-      no more than the counts measured above.
-- [ ] `setFeeRateParams`: validate and cast all four arguments before the first write, write the
-      changed fields back to back, then emit the per-field events in today's order for the fields that
-      changed. Writing an unchanged field with its own value is fine if that is what lets the writes
-      merge, but events still fire only for real changes.
-- [ ] Add `test/gas/R81PackedSlotWritesGas.t.sol`, which counts writes per slot with
+- [x] `_rBtcPurchaseChecksEffects`: compute `newAnchor.toUint48()` before either field write, then
+      write `tokenBalance` and `cadenceAnchor` back to back, then emit `TokenBalanceUpdated`. R80
+      already removed `CadenceAnchorUpdated`. The two assignments live in `_storePurchaseProgress`:
+      the same statements inside `_rBtcPurchaseChecksEffects` compile to two `SSTORE`s (the frame is
+      too deep for the legacy combiner). The helper is one store per row on both profiles.
+- [x] `createDcaSchedule`: storage pointer assigns only `tokenBalance`, `purchasePeriod`,
+      `routeIndex`, `user`, and `purchaseAmount`, in that order. Zero `cadenceAnchor` and `paused`
+      stay unset because a new id addresses empty storage. Writes are 3+2 (default) and 2+1 (deploy),
+      the measured targets.
+- [x] `setFeeRateParams`: validate and cast all four arguments before the first write, assign the
+      packed word once when anything changed (unchanged fields are written with their current value
+      so the assignments stay together), then emit the per-field events in today's order for the
+      fields that changed. All four changing is one write on both profiles.
+- [x] Add `test/gas/R81PackedSlotWritesGas.t.sol`, which counts writes per slot with
       `vm.startStateDiffRecording()` / `vm.stopAndReturnStateDiff()` (the `isWrite` storage accesses).
-- [ ] Update any existing Foundry gas pins that move (`test/gas/R64*`, `R77*`, `R78*`), labelled as
-      Foundry/Cancun regression pins.
+- [x] Existing Foundry gas pins (`test/gas/R64*`, `R77*`, `R78*`) did not move. R77 and R78 were re-run.
 - [ ] Update `docs/relaunch/README.md` Status and `IMPLEMENTATION_ORDER.md`.
 
 ## Out of scope
@@ -124,12 +123,14 @@ the same fix.
 
 ## Success criteria
 
-- [ ] One `SSTORE` to slot 0 per purchase row on both profiles.
-- [ ] `createDcaSchedule` and `setFeeRateParams` write counts are at or below the measured targets,
-      and the PR records them per profile.
-- [ ] The PR states each saving on both schedules: Foundry/Cancun measured, Rootstock derived as
-      5,000 per removed `RESET` plus 200 per removed `SLOAD`.
-- [ ] No ABI, event, or storage-layout change.
+- [x] One `SSTORE` to slot 0 per purchase row on both profiles.
+- [x] `createDcaSchedule` and `setFeeRateParams` write counts are at or below the measured targets,
+      and the PR records them per profile. Create is 3+2 default and 2+1 deploy. The fee word is one
+      write on both when all four fields change.
+- [x] Each saving is stated on both schedules: Foundry/Cancun measured, Rootstock derived as
+      5,000 per removed `RESET` plus 200 per removed `SLOAD`. See the R81 entry in
+      `IMPLEMENTATION_ORDER.md`.
+- [x] No ABI, event, or storage-layout change.
 
 ## Reviewer checklist
 

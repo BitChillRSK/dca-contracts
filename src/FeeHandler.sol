@@ -68,22 +68,30 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     {
         _validateFeeSettings(minFeeRate, maxFeeRate, feePurchaseLowerBound, feePurchaseUpperBound);
 
-        if (s_minFeeRate != minFeeRate) {
-            s_minFeeRate = minFeeRate.toUint16();
-            emit FeeHandler__MinFeeRateSet(minFeeRate);
+        // The four fee fields share one word. Cast and compare first, then assign them with nothing
+        // between the writes; an emit between them stores the word again. Unchanged fields are written
+        // with their current value so the assignments stay together. Events still fire only for real changes.
+        uint16 newMinFeeRate = minFeeRate.toUint16();
+        uint16 newMaxFeeRate = maxFeeRate.toUint16();
+        uint112 newLowerBound = feePurchaseLowerBound.toUint112();
+        uint112 newUpperBound = feePurchaseUpperBound.toUint112();
+
+        bool minChanged = s_minFeeRate != newMinFeeRate;
+        bool maxChanged = s_maxFeeRate != newMaxFeeRate;
+        bool lowerChanged = s_feePurchaseLowerBound != newLowerBound;
+        bool upperChanged = s_feePurchaseUpperBound != newUpperBound;
+
+        if (minChanged || maxChanged || lowerChanged || upperChanged) {
+            s_feePurchaseLowerBound = newLowerBound;
+            s_feePurchaseUpperBound = newUpperBound;
+            s_minFeeRate = newMinFeeRate;
+            s_maxFeeRate = newMaxFeeRate;
         }
-        if (s_maxFeeRate != maxFeeRate) {
-            s_maxFeeRate = maxFeeRate.toUint16();
-            emit FeeHandler__MaxFeeRateSet(maxFeeRate);
-        }
-        if (s_feePurchaseLowerBound != feePurchaseLowerBound) {
-            s_feePurchaseLowerBound = feePurchaseLowerBound.toUint112();
-            emit FeeHandler__PurchaseLowerBoundSet(feePurchaseLowerBound);
-        }
-        if (s_feePurchaseUpperBound != feePurchaseUpperBound) {
-            s_feePurchaseUpperBound = feePurchaseUpperBound.toUint112();
-            emit FeeHandler__PurchaseUpperBoundSet(feePurchaseUpperBound);
-        }
+
+        if (minChanged) emit FeeHandler__MinFeeRateSet(minFeeRate);
+        if (maxChanged) emit FeeHandler__MaxFeeRateSet(maxFeeRate);
+        if (lowerChanged) emit FeeHandler__PurchaseLowerBoundSet(feePurchaseLowerBound);
+        if (upperChanged) emit FeeHandler__PurchaseUpperBoundSet(feePurchaseUpperBound);
     }
 
     /// @inheritdoc IFeeHandler

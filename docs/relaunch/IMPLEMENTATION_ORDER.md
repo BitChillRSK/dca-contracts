@@ -1095,12 +1095,20 @@ deploy/`via_ir` (1,946 under default). The write stays; indexers recompute from 
 
 From the [Rootstock gas audit](./ROOTSTOCK-GAS-AUDIT.md). The compiler writes each packed field as
 its own `SSTORE` unless the writes are adjacent with nothing that can revert, log, or call between
-them. Foundry prices the extra writes at ~100; Rootstock prices them at 5,000. Fix, without assembly:
+them. Foundry prices the extra writes at ~100; Rootstock prices them at 5,000. Shipped without assembly.
+Write counts are `SSTORE`s per slot (`vm.stopAndReturnStateDiff`). Rootstock figures are
+5,000 per removed `RESET` plus 200 per removed `SLOAD` of that slot. Foundry figures are Cancun
+regression deltas on the same harness, not the production bill.
 
-- Each purchase row writes `DcaSchedule` slot 0 once instead of twice: **−5,200 Rootstock gas per row**,
-  protocol-paid.
-- `createDcaSchedule` stops writing slot 0 five times: **−15,600** under deploy.
-- `setFeeRateParams` stops writing the fee word up to four times.
+- Each purchase row stores `DcaSchedule` slot 0 once. The two field assignments sit in a small helper;
+  inside `_rBtcPurchaseChecksEffects` the legacy compiler splits them. Steady-state (later) row,
+  Foundry **−184** (default) / **−315** (deploy). Rootstock **−5,200** per row on the default profile
+  (one `RESET`, one `SLOAD`) and **−5,400** under deploy (one `RESET`, two `SLOAD`s). Protocol-paid.
+- `createDcaSchedule` stores slots 0+1 as **3+2** (default) and **2+1** (deploy), down from 5+2 and
+  5+1. Foundry **−926** / **−1,052**. Rootstock **−10,400** / **−15,600**.
+- `setFeeRateParams` changing all four fields stores the fee word once, down from four. Foundry
+  **−782** / **−496**. Rootstock **−16,200** (default: three `RESET`s and six `SLOAD`s) / **−15,600**
+  (deploy: three `RESET`s and three `SLOAD`s).
 
 No ABI, event, or layout change. Ask: none.
 

@@ -148,15 +148,13 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
 
         s_protocolSettings.scheduleNonce = scheduleId;
 
-        s_dcaSchedules[token][scheduleId] = DcaSchedule({
-            tokenBalance: deposit,
-            cadenceAnchor: 0,
-            paused: false,
-            purchasePeriod: period,
-            routeIndex: route,
-            user: msg.sender,
-            purchaseAmount: purchase
-        });
+        // A new id addresses empty storage, so the zero cadence anchor and paused flag are left unset.
+        DcaSchedule storage created = s_dcaSchedules[token][scheduleId];
+        created.tokenBalance = deposit;
+        created.purchasePeriod = period;
+        created.routeIndex = route;
+        created.user = msg.sender;
+        created.purchaseAmount = purchase;
         scheduleIds.push(scheduleId);
         emit DcaManager__DcaScheduleCreated(
             msg.sender,
@@ -622,19 +620,28 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
 
         uint96 purchaseAmount = dcaSchedule.purchaseAmount;
         uint128 tokenBalance = dcaSchedule.tokenBalance;
+        uint256 routeIndex = dcaSchedule.routeIndex;
         if (purchaseAmount > tokenBalance) {
             revert DcaManager__ScheduleBalanceNotEnoughForPurchase(token, scheduleId, tokenBalance);
         }
         unchecked {
             tokenBalance -= purchaseAmount;
         }
-        dcaSchedule.tokenBalance = tokenBalance;
+        // Both fields share slot 0. Assigned in their own frame so the two updates compile to one
+        // store; written in this function, the same assignments are split. No anchor log: purchases
+        // emit RbtcBought, and the new anchor follows from the prior one and the period.
+        _storePurchaseProgress(dcaSchedule, tokenBalance, newAnchor.toUint48());
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, tokenBalance);
 
-        // No anchor log: purchases emit RbtcBought, and the new anchor follows from the prior one and the period.
-        dcaSchedule.cadenceAnchor = newAnchor.toUint48();
+        return (buyer, purchaseAmount, routeIndex);
+    }
 
-        return (buyer, purchaseAmount, dcaSchedule.routeIndex);
+    /// @dev Slot 0 of a schedule. The two fields are assigned with nothing between them.
+    function _storePurchaseProgress(DcaSchedule storage dcaSchedule, uint128 tokenBalance, uint48 cadenceAnchor)
+        private
+    {
+        dcaSchedule.tokenBalance = tokenBalance;
+        dcaSchedule.cadenceAnchor = cadenceAnchor;
     }
 
     /// @dev The single owner check for user mutators. A zero owner means the key addresses no schedule.
