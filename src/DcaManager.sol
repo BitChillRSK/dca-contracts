@@ -741,9 +741,9 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     /**
      * @dev Resolve the handler for a deposit, rejecting the call if governance paused deposits.
      *      Only `depositToken` and `createDcaSchedule` route through here, and both do so before
-     *      any token moves, so a paused pair never takes cash it would have to refund. Every other
-     *      caller keeps using `_handler`: purchases, edits, deletion, and withdrawals must stay
-     *      available on a paused route.
+     *      any token moves, so a paused pair never takes cash it would have to refund. No other path
+     *      checks the pause: purchases, edits, deletion, withdrawals, and interest top-ups and
+     *      withdrawals must stay available on a paused route.
      */
     function _handlerForDeposit(address token, uint256 routeIndex) private view returns (ITokenHandler) {
         (IOperationsAdmin.TokenRoute memory tokenRoute,) = i_operationsAdmin.getRouteInfo(token, routeIndex);
