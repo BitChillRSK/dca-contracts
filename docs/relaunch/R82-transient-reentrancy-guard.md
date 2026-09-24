@@ -1,6 +1,6 @@
 # R82 — transient reentrancy guard
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
@@ -53,16 +53,16 @@ applies.
 
 ## Scope
 
-- [ ] `DcaManager` inherits `ReentrancyGuardTransient` instead of `ReentrancyGuard`. No modifier moves,
+- [x] `DcaManager` inherits `ReentrancyGuardTransient` instead of `ReentrancyGuard`. No modifier moves,
       and none is added or removed.
-- [ ] `AGENTS.md` invariant 6: the "refuses before the guard's `SSTORE`" wording becomes the guard's
+- [x] `AGENTS.md` invariant 6: the "refuses before the guard's `SSTORE`" wording becomes the guard's
       transient write, and the gas sentence states the Rootstock cost with and without the transient
       guard.
-- [ ] `test/utils/OzRevert.sol`: import the error from `ReentrancyGuardTransient` so the helper names the
+- [x] `test/utils/OzRevert.sol`: import the error from `ReentrancyGuardTransient` so the helper names the
       guard that ships. The selector is identical.
-- [ ] Add a regression test showing a guarded call makes no `SSTORE` to the ERC-7201 guard slot (state
+- [x] Add a regression test showing a guarded call makes no `SSTORE` to the ERC-7201 guard slot (state
       diff) and still reverts on re-entry with `ReentrancyGuardReentrantCall`.
-- [ ] Update `docs/relaunch/README.md` Status and `IMPLEMENTATION_ORDER.md`.
+- [x] Update `docs/relaunch/README.md` Status and `IMPLEMENTATION_ORDER.md`.
 
 ## Out of scope
 
@@ -90,10 +90,10 @@ applies.
 
 ## Success criteria
 
-- [ ] Guard semantics unchanged; the same twelve functions are guarded.
-- [ ] The PR states the saving on both schedules: Foundry measured, Rootstock ≈ 10,200 → ≈ 300 per
+- [x] Guard semantics unchanged; the same twelve functions are guarded.
+- [x] The PR states the saving on both schedules: Foundry measured, Rootstock ≈ 10,200 → ≈ 300 per
       guarded call.
-- [ ] `AGENTS.md` invariant 6 no longer quotes a Cancun figure as the production cost.
+- [x] `AGENTS.md` invariant 6 no longer quotes a Cancun figure as the production cost.
 
 ## Reviewer checklist
 
