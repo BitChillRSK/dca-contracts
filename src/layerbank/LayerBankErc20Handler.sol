@@ -61,6 +61,7 @@ abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20H
         address pool = i_aToken.POOL();
         if (pool == address(0)) revert LayerBankErc20Handler__PoolNotSet();
         i_pool = ILayerBankPool(pool);
+        _approveLendingSpender(); // last: the helper reads the immutable assigned on the line above
     }
 
     /*//////////////////////////////////////////////////////////////

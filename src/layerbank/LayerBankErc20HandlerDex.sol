@@ -11,6 +11,8 @@ import {LayerBankErc20Handler} from "./LayerBankErc20Handler.sol";
  * @dev Constructor-only leaf. Only its immutable DcaManager moves principal, buys, or withdraws rBTC;
  *      the owner controls fees, oracle, path allowlist, and floor. The funding base is listed first so
  *      `i_stableToken` is set before `PurchaseUniswap` builds the path.
+ *      Holds standing, unbounded stablecoin approvals to the Uniswap router and to the lending spender,
+ *      both granted at construction; each is spendable only inside this handler's own call.
  */
 contract LayerBankErc20HandlerDex is LayerBankErc20Handler, PurchaseUniswap {
     /**

@@ -117,7 +117,23 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
     //////////////////////////////////////////////////////////////*/
 
     /**
+     * @dev Grants the lending spender an unbounded stablecoin allowance, so no deposit pays for an
+     *      allowance write. The spender pulls only from the account that calls it, which is why a
+     *      standing allowance is spendable by nobody but this handler's own deposit.
+     *
+     *      Call this as the **last statement of the protocol adapter's constructor**, never from this
+     *      base's constructor: `_lendingSpender()` reads an immutable that only the adapter assigns,
+     *      and a base constructor runs first, where that immutable is still `address(0)`. The virtual
+     *      call compiles and silently approves the zero address rather than failing loudly.
+     */
+    function _approveLendingSpender() internal {
+        i_stableToken.forceApprove(_lendingSpender(), type(uint256).max);
+    }
+
+    /**
      * @dev TokenHandler reverts unless the pull matches `depositAmount`, so the mint always uses the full request.
+     *      The standing allowance normally covers the pull, and the top-up below is the fallback for a
+     *      stablecoin that decrements even an unbounded allowance far enough to fall short.
      */
     function _depositToken(address user, uint256 depositAmount) internal virtual override {
         super._depositToken(user, depositAmount);

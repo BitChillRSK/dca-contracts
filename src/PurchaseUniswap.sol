@@ -69,6 +69,9 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      *      weakening the floor through rounding. The funding base must precede this base in the leaf's
      *      inheritance list because path construction reads its immutable stablecoin; a zero value reverts.
      *      The initial path is allowlisted here, while later paths require owner approval.
+     *      The router is granted a standing stablecoin allowance here, so no batch pays for an allowance
+     *      write. It is the last statement because it reads the purchase token, which the decimals check
+     *      above has just proved is a live ERC20.
      */
     constructor(
         UniswapSettings memory uniswapSettings,
@@ -102,6 +105,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
             revert PurchaseUniswap__UnsupportedStablecoinDecimals(stablecoinDecimals);
         }
         i_stablecoinToUsdScale = 10 ** (ORACLE_DECIMALS - stablecoinDecimals);
+
+        _purchaseToken().forceApprove(address(i_swapRouter02), type(uint256).max);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -274,15 +279,17 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      *      PurchaseRbtc proves the exact stablecoin input left this handler. This venue-specific layer also
      *      requires every intermediate-token router balance to return to its pre-swap value. Comparing
      *      deltas, not zero balances, prevents donated tokens from blocking it.
+     *
+     *      The router spends the standing allowance granted at construction, so no approval is written
+     *      here. The swap is still bounded by `stablecoinAmount`: an exact-input swap pulls exactly that
+     *      much from the payer on the first hop and funds every later hop from the router's own balance,
+     *      and the router pulls only from the caller of the swap it is executing.
      */
     function _purchaseRbtc(uint256 stablecoinAmount, uint256 minRbtcOut)
         internal
         override
         returns (uint256 amountOut)
     {
-        IERC20 purchaseToken = _purchaseToken();
-        purchaseToken.forceApprove(address(i_swapRouter02), stablecoinAmount);
-
         uint256 amountOutLowerBound = _getAmountOutLowerBound(stablecoinAmount);
         uint256 amountOutMinimum = minRbtcOut > amountOutLowerBound ? minRbtcOut : amountOutLowerBound;
 

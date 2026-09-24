@@ -48,6 +48,7 @@ abstract contract TropykusErc20Handler is LendingErc20Handler {
         )
     {
         i_kToken = IkToken(kTokenAddress);
+        _approveLendingSpender(); // last: the helper reads the immutable assigned on the line above
     }
 
     /*//////////////////////////////////////////////////////////////
