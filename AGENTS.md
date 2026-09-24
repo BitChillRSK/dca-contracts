@@ -145,6 +145,15 @@ one. Name it as a precondition and say who owns it.
 
 Verified `src/` source (including NatSpec) lives on explorers for the life of the deployment. Do not mention relaunch ticket IDs (`R29`, `R42`, …) in `src/` comments. Write the durable reason instead. Specs, tests, PRs, deploy-script comments, and this file may use R-ids.
 
+**NatSpec delimiter.** A NatSpec comment of one line uses `///`: `/// @inheritdoc IDcaManager`, not a
+three-line `/** */` wrapper around that same line. A paragraph of two or more lines uses a `/** */` block,
+and an existing block stays a block. The short `///` runs already in `src/` (a `@notice` / `@dev` pair on
+a state variable, a sentence wrapped at the line limit) were deliberately left alone rather than churned;
+write new multi-line NatSpec as a block. This rule is the delimiter only — what a comment says and which
+side of a pair owns it are **Contract header NatSpec** above and [R10](./docs/relaunch/R10-natspec.md).
+Comments do not move an executable byte, so a delimiter change is proven by comparing
+metadata-stripped runtime, not `forge build --sizes` (see [R85](./docs/relaunch/R85-one-line-natspec-slash-style.md)).
+
 ## Tests and done-gate
 
 - Targeted tests for the spec first. Document exact commands in the PR.

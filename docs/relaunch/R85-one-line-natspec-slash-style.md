@@ -1,6 +1,6 @@
 # R85 — one-line NatSpec uses `///`
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **in progress** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
