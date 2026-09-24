@@ -1122,6 +1122,16 @@ refund), not the ~2,300 Foundry reports. The transient guard costs ~300; Rootsto
 `TLOAD`/`TSTORE` since Lovell 7.0.0. Saves ~9,900 on each of twelve user entry points. No ABI change.
 Ask: none.
 
+Shipped: `DcaManager` inherits `ReentrancyGuardTransient`; no modifier moved, and the storage layout
+is unchanged. Rootstock: guard **≈10,200 → ≈300** per guarded user call (`SLOAD` + two `RESET`s →
+one `TLOAD` + two `TSTORE`s), plus no 20,000 `SET` at deploy. Foundry (Cancun execution before
+refunds, stub handler, cold guard slot): **−4,792** on each of `updatePurchaseAmount`,
+`setSchedulePaused`, and `depositToken` (default), **−4,807** each under deploy; the audit's −2,800
+is the same swap with the guard slot already warm. Cancun later refunds
+2,800 of the storage guard's restore, so its net saving is about 2,000; that refund is the one
+Rootstock does not pay. `test/gas/R82TransientGuardGas.t.sol` pins no persistent access to the
+ERC-7201 guard slot and re-entry refused with `ReentrancyGuardReentrantCall`.
+
 ### R83 - standing vs per-use spender approvals ([spec](./R83-standing-spender-approvals.md))
 
 The Dex purchase and lending deposit paths approve an exact amount before every spend. That 0 → X → 0

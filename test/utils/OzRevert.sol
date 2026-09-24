@@ -2,7 +2,7 @@
 pragma solidity 0.8.36;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
 /**
  * @notice Exact OpenZeppelin v5 revert data for the guards this repo relies on (R44).
@@ -21,5 +21,5 @@ function ownableInvalidOwner(address owner) pure returns (bytes memory) {
 }
 
 function reentrantCall() pure returns (bytes memory) {
-    return abi.encodeWithSelector(ReentrancyGuard.ReentrancyGuardReentrantCall.selector);
+    return abi.encodeWithSelector(ReentrancyGuardTransient.ReentrancyGuardReentrantCall.selector);
 }
