@@ -1147,15 +1147,19 @@ Lending approvals must be set at the end of each adapter's constructor. The base
 read the spender immutable as `address(0)`.
 
 **Answered 2026-09-24: standing approvals on both sites** — every Dex handler, idle and lending alike,
-and every lending adapter. The exposure question resolved on evidence rather than on judgement. Each of
-the three live spenders pulls only from its own caller: SwapRouter02's verified source has just two
+and every lending adapter. The exposure question resolved on evidence rather than on judgement. Every
+deposit, redeem and swap entry point on the three live spenders pulls only from its own caller:
+SwapRouter02's verified source has just two
 `transferFrom` sites (`pay`, whose payer is the swap's `msg.sender`, and `pull`, whose `from` is
 `msg.sender`), and its callback — the one place a payer is caller-supplied — is reachable only by a
 factory-derived pool, which calls back whoever invoked `swap`. A fork probe
 ([`StandingApprovalProbe`](../../test/mainnet-debug/standing-approvals/StandingApprovalProbe.t.sol),
 `make probe-standing-approvals`) fails every attacker route against a victim holding a standing `max`
 allowance — `pull`, `exactInput`, a forged callback, and a pool-relayed callback — and the same holds for
-iSUSD `mint` and LayerBank `supply`. So a standing allowance adds no third-party reachability; it adds
+iSUSD `mint` and LayerBank `supply`. The exception is Aave's flash loan, which repays from a
+caller-named receiver: LayerBank has it disabled on all three reserves (their switch), and a lending
+handler answers no `executeOperation` and has no `fallback`, so the callback reverts (ours, and carried
+as a precondition in the headers). With that held, a standing allowance adds no third-party reachability; it adds
 exposure only to the spender's own future code. That is nil for the router (not upgradeable, no admin),
 a 24–48 h Bitocracy timelock at Sovryn, and an instant EOA upgrade at LayerBank — whose Pool already
 custodies the whole position, leaving only transient deposit-time stablecoin and dust as new surface.
@@ -1164,8 +1168,8 @@ Shipped: `LendingErc20Handler._approveLendingSpender()` called as the last state
 LayerBank, and Tropykus constructors; `PurchaseUniswap`'s constructor approves the router and its
 `_purchaseRbtc` no longer writes an allowance. The deposit's `allowance < depositAmount` top-up stays as
 the fallback for a decrementing token. Live decrement facts: USDRIF preserves a `max` allowance (saving
-~10,400 per use), DOC and USDT0 decrement it (~5,400). Foundry, execution before refunds: **−28,737**
-(default) / **−28,158** (deploy) per lending deposit, allowance-slot writes **2 → 0**, and zero writes on
+~10,400 per use), DOC and USDT0 decrement it (~5,400). Foundry, execution before refunds: **−23,445**
+(default) / **−22,866** (deploy) per lending deposit, allowance-slot writes **2 → 0**, and zero writes on
 the Dex batch. One 20,000 `SET` per standing approval at deploy; break-even ≈ 2–4 uses. No ABI change.
 
 ### R84 - no repeated registry reads ([spec](./R84-no-repeated-registry-reads.md))

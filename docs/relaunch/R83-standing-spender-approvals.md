@@ -117,11 +117,35 @@ That reasoning is tested rather than asserted, in
 is untouched. iSUSD `mint(receiver, amount)` and LayerBank `supply(asset, amount, onBehalfOf, 0)` credit
 an arbitrary account but likewise pull only from `msg.sender`; both attacker attempts revert.
 
-So the standing allowance adds no third-party reachability at any of the three spenders. What it adds is
-exposure to the spender's own future code: nil for the router, which cannot change; a 24–48 h governance
-window at Sovryn; and, at LayerBank, an instant EOA-controlled upgrade — against a spender that already
-custodies the whole lending position, so the extra surface there is the stablecoin transiently held
-during a deposit or redeem, plus dust.
+### The one entry point that does name a third party
+
+"Pulls only from `msg.sender`" holds for every deposit and redeem entry point, but it is **not** true of
+the Aave Pool ABI as a whole, and the first draft of this decision said it was. Aave's `flashLoan` /
+`flashLoanSimple` hand the amount to a caller-named `receiverAddress`, require its `executeOperation` to
+return true, and then `safeTransferFrom(receiverAddress, aToken, amount + premium)`. An address holding a
+standing allowance that answers that callback therefore pays a stranger's premium — 5 bps per call on
+this pool, repeatable up to its balance.
+
+Two independent things keep that off a lending handler, and only the second is BitChill's:
+
+1. LayerBank has the reserve-level flash-loan flag **off** for DOC, USDRIF and USDT0 (bit 80 of each
+   `ReserveConfigurationMap`; a call reverts with Aave error `91`, `FLASHLOAN_DISABLED`). That is their
+   configuration, flippable by the same EOA that can upgrade the Pool, so the probe asserts it rather
+   than relying on it.
+2. A lending handler declares no `executeOperation` and no `fallback` — only `PurchaseRbtc`'s
+   `receive()` — so the Pool's callback into it reverts and unwinds the flash loan.
+
+(2) is the one we own, so it is stated as a precondition in `LendingErc20Handler._approveLendingSpender`
+and in every lending leaf header, and asserted against a real handler by
+`test/unit/StandingApprovalFallbackTest.t.sol`. Sovryn's iSUSD has the same shape through bZx's
+`flashBorrowToken`, which routes a call to an arbitrary target; it reverts today with
+`LoanTokenLogicProxy:target not active`, a Sovryn governance setting, so the probe asserts that too.
+
+So, with that precondition held, the standing allowance adds no third-party reachability at any of the
+three spenders. What it adds is exposure to the spender's own future code: nil for the router, which
+cannot change; a 24–48 h governance window at Sovryn; and, at LayerBank, an instant EOA-controlled
+upgrade — against a spender that already custodies the whole lending position, so the extra surface there
+is the stablecoin transiently held during a deposit or redeem, plus dust.
 
 ### Allowance-decrement facts
 
@@ -136,7 +160,10 @@ Live, same probe, same block:
 ### Measured cost
 
 Per lending deposit, Foundry execution before refunds (`test/gas/R83StandingApprovalGas.t.sol`):
-**−28,737** default, **−28,158** under deploy, with allowance-slot writes going **2 → 0**. Cancun refunds
+**−23,445** default, **−22,866** under deploy, with allowance-slot writes going **2 → 0**. Each arm is
+measured in its own transaction: sharing one made the delta swing by ~10,600 gas on call order alone,
+because whichever arm ran first paid the cold access to the stablecoin and the depositor's balance for
+both. Cancun refunds
 roughly 19,900 of the removed round trip, which is why it never showed up as an Ethereum problem.
 Rootstock does not: `SET` 20,000 + `CLEAR` 5,000 − `REFUND` 15,000 = **10,000** net, plus a flat 700 for
 the `approve` call. The same test pins the Dex batch at **zero** allowance-slot writes. Against that, each
