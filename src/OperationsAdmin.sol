@@ -24,10 +24,12 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Handler and deposit pause share one mapping value, so assigning a handler and pausing
-    ///      its pair dirty the same slot. Every route-index argument below is bounded to `uint32`,
-    ///      the width a packed `DcaSchedule` can store, so no caller can read or write a route no
-    ///      schedule could ever name.
+    /**
+     * @dev Handler and deposit pause share one mapping value, so assigning a handler and pausing
+     *      its pair dirty the same slot. Every route-index argument below is bounded to `uint32`,
+     *      the width a packed `DcaSchedule` can store, so no caller can read or write a route no
+     *      schedule could ever name.
+     */
     mapping(address token => mapping(uint256 routeIndex => TokenRoute)) private s_tokenRoute;
     mapping(uint256 routeIndex => RouteClass) private s_routeClass;
     mapping(address swapper => bool) private s_swappers;

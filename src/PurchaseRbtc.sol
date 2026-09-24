@@ -17,10 +17,12 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Encoded claimable rBTC. `0` means never credited; a live value is `claimable + 1`
-    ///      (including post-withdraw sentinel `1`). Keeps the slot nonzero so the next credit after a
-    ///      full withdrawal is a cheaper nonzero-to-nonzero SSTORE. Getters and withdrawals decode.
-    ///      Private so leaves cannot bypass `_creditRbtc` / `_claimableRbtc` / `_withdrawRbtcChecksEffects`.
+    /**
+     * @dev Encoded claimable rBTC. `0` means never credited; a live value is `claimable + 1`
+     *      (including post-withdraw sentinel `1`). Keeps the slot nonzero so the next credit after a
+     *      full withdrawal is a cheaper nonzero-to-nonzero SSTORE. Getters and withdrawals decode.
+     *      Private so leaves cannot bypass `_creditRbtc` / `_claimableRbtc` / `_withdrawRbtcChecksEffects`.
+     */
     mapping(address user => uint256 encodedAmount) private s_usersAccumulatedRbtc;
 
     /*//////////////////////////////////////////////////////////////

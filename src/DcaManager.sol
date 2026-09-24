@@ -27,27 +27,37 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Five block heights including the activation block; fixed because this is an execution
-    ///      buffer, not a confirmation or finality period.
+    /**
+     * @dev Five block heights including the activation block; fixed because this is an execution
+     *      buffer, not a confirmation or finality period.
+     */
     uint256 public constant PROTECTED_PURCHASE_WINDOW_BLOCKS = 5;
 
-    /// @dev Constructor-pinned registry. There is no setter: swapping this address
-    ///      would redirect every live schedule and bypass add-only route assignment.
+    /**
+     * @dev Constructor-pinned registry. There is no setter: swapping this address
+     *      would redirect every live schedule and bypass add-only route assignment.
+     */
     IOperationsAdmin public immutable override i_operationsAdmin;
 
-    /// @notice Schedules keyed by their stablecoin and protocol-wide creation id.
-    /// @dev Keeping both outside the value makes it two slots. A batch row named under the wrong token
-    ///      addresses nothing; `_callersSchedule` is the single user-ownership check.
+    /**
+     * @notice Schedules keyed by their stablecoin and protocol-wide creation id.
+     * @dev Keeping both outside the value makes it two slots. A batch row named under the wrong token
+     *      addresses nothing; `_callersSchedule` is the single user-ownership check.
+     */
     mapping(address token => mapping(uint64 scheduleId => DcaSchedule dcaSchedule)) private s_dcaSchedules;
 
-    /// @notice The ids each user holds for each stablecoin.
-    /// @dev Enumeration only: purchases never read it.
+    /**
+     * @notice The ids each user holds for each stablecoin.
+     * @dev Enumeration only: purchases never read it.
+     */
     mapping(address user => mapping(address token => uint64[] scheduleIds)) private s_scheduleIds;
 
     ProtocolSettings private s_protocolSettings;
     mapping(address token => uint256) private s_tokenMinPurchaseAmounts; // Per-token minimum purchase amounts
-    /// @dev Zero means never activated: every real block number is at least zero, so mutations start
-    ///      unlocked. While live this holds the first block at which the seven guarded calls resume.
+    /**
+     * @dev Zero means never activated: every real block number is at least zero, so mutations start
+     *      unlocked. While live this holds the first block at which the seven guarded calls resume.
+     */
     uint256 private s_userMutationsAllowedFromBlock;
 
     /*//////////////////////////////////////////////////////////////
@@ -576,8 +586,10 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         return (buyer, purchaseAmount, routeIndex);
     }
 
-    /// @dev Both fields live in slot 0. They merge into one store only in their own frame; inlined into
-    ///      the caller the compiler splits them, which costs a full storage write on Rootstock.
+    /**
+     * @dev Both fields live in slot 0. They merge into one store only in their own frame; inlined into
+     *      the caller the compiler splits them, which costs a full storage write on Rootstock.
+     */
     function _storePurchaseProgress(DcaSchedule storage dcaSchedule, uint128 tokenBalance, uint48 cadenceAnchor)
         private
     {
@@ -649,8 +661,10 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         if (depositAmount == 0) revert DcaManager__DepositAmountMustBeGreaterThanZero();
     }
 
-    /// @dev Slot 0 and slot 1 of a new schedule. `routeIndex` is assigned before `purchasePeriod`:
-    ///      that order stores slot 0 once. Declaration order stores it twice.
+    /**
+     * @dev Slot 0 and slot 1 of a new schedule. `routeIndex` is assigned before `purchasePeriod`:
+     *      that order stores slot 0 once. Declaration order stores it twice.
+     */
     function _storeNewSchedule(
         DcaSchedule storage created,
         uint128 deposit,

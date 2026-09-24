@@ -17,14 +17,16 @@ interface IDcaManager {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
     //////////////////////////////////////////////////////////////*/
-    /// @notice One user's recurring purchase of rBTC with one stablecoin on one OperationsAdmin route.
-    /// @dev The stablecoin and id are the storage key, so neither is repeated in the two-slot value:
-    ///
-    ///        slot 0  tokenBalance, cadenceAnchor, paused, purchasePeriod, routeIndex
-    ///        slot 1  user, purchaseAmount
-    ///
-    ///      The purchase path writes only slot 0. A live schedule has a non-zero `user`, its existence
-    ///      sentinel. `getDcaSchedules` returns ids alongside these values.
+    /**
+     * @notice One user's recurring purchase of rBTC with one stablecoin on one OperationsAdmin route.
+     * @dev The stablecoin and id are the storage key, so neither is repeated in the two-slot value:
+     *
+     *        slot 0  tokenBalance, cadenceAnchor, paused, purchasePeriod, routeIndex
+     *        slot 1  user, purchaseAmount
+     *
+     *      The purchase path writes only slot 0. A live schedule has a non-zero `user`, its existence
+     *      sentinel. `getDcaSchedules` returns ids alongside these values.
+     */
     struct DcaSchedule {
         uint128 tokenBalance; // Stablecoin amount deposited by the user
         uint48 cadenceAnchor; // UTC midnight of the newest consumed cadence slot; zero before the first purchase
@@ -35,11 +37,13 @@ interface IDcaManager {
         uint96 purchaseAmount; // Stablecoin amount to spend periodically on rBTC
     }
 
-    /// @notice One handler's purchase batch.
-    /// @dev Every id shares `token` and `routeIndex`, which resolve to one handler. Buyer and amount come
-    ///      from storage, so caller data cannot redirect or resize a purchase. `minRbtcOut` is a batch-wide
-    ///      minimum in rBTC wei, checked against the handler's measured receipt. Uniswap also enforces its
-    ///      oracle floor; MoC redeems at its protocol price and has no pool-slippage floor.
+    /**
+     * @notice One handler's purchase batch.
+     * @dev Every id shares `token` and `routeIndex`, which resolve to one handler. Buyer and amount come
+     *      from storage, so caller data cannot redirect or resize a purchase. `minRbtcOut` is a batch-wide
+     *      minimum in rBTC wei, checked against the handler's measured receipt. Uniswap also enforces its
+     *      oracle floor; MoC redeems at its protocol price and has no pool-slippage floor.
+     */
     struct Batch {
         uint64[] scheduleIds;
         address token;
@@ -86,25 +90,33 @@ interface IDcaManager {
         uint256 purchasePeriod,
         uint256 routeIndex
     );
-    /// @notice The caller paused or resumed purchases on one of their schedules.
-    /// @dev Filterable by user and scheduleId only, matching PurchaseAmountUpdated / PurchasePeriodUpdated.
-    ///      Token is recovered by joining on scheduleId; it is not a third topic.
+    /**
+     * @notice The caller paused or resumed purchases on one of their schedules.
+     * @dev Filterable by user and scheduleId only, matching PurchaseAmountUpdated / PurchasePeriodUpdated.
+     *      Token is recovered by joining on scheduleId; it is not a third topic.
+     */
     event DcaManager__SchedulePauseSet(address indexed user, uint64 indexed scheduleId, bool paused);
-    /// @notice An authorized swapper opened a five-block protected purchase window.
-    /// @dev `userMutationsAllowedFromBlock` is not indexed: it is a scalar rather than an address or
-    ///      schedule id. Guarded user mutations are refused before this block and available from it.
+    /**
+     * @notice An authorized swapper opened a five-block protected purchase window.
+     * @dev `userMutationsAllowedFromBlock` is not indexed: it is a scalar rather than an address or
+     *      schedule id. Guarded user mutations are refused before this block and available from it.
+     */
     event DcaManager__ProtectedPurchaseWindowActivated(
         address indexed swapper, uint256 userMutationsAllowedFromBlock
     );
-    /// @notice Accrued lending interest was credited to one schedule's spendable balance.
-    /// @dev No tokens move: the position stays in the lending protocol and only this schedule's
-    ///      `tokenBalance` claim over it grows. `interest` is what was credited, which may be less
-    ///      than everything the caller had accrued on that route.
+    /**
+     * @notice Accrued lending interest was credited to one schedule's spendable balance.
+     * @dev No tokens move: the position stays in the lending protocol and only this schedule's
+     *      `tokenBalance` claim over it grows. `interest` is what was credited, which may be less
+     *      than everything the caller had accrued on that route.
+     */
     event DcaManager__ScheduleToppedUpFromInterest(
         address indexed user, address indexed token, uint64 indexed scheduleId, uint256 interest
     );
-    /// @notice A schedule was deleted. `refundedAmount` is what left the handler, which may be less than
-    ///         the schedule's `tokenBalance` if the handler paid out less than it was asked for.
+    /**
+     * @notice A schedule was deleted. `refundedAmount` is what left the handler, which may be less than
+     *         the schedule's `tokenBalance` if the handler paid out less than it was asked for.
+     */
     event DcaManager__DcaScheduleDeleted(
         address indexed user, address indexed token, uint64 indexed scheduleId, uint256 refundedAmount
     );
@@ -140,18 +152,24 @@ interface IDcaManager {
     error DcaManager__PurchasePeriodMustBeWholeDays();
     /// @notice Purchase amount exceeds the schedule's current `tokenBalance`.
     error DcaManager__PurchaseAmountExceedsBalance(address token, uint256 purchaseAmount, uint256 tokenBalance);
-    /// @notice The next cadence boundary has not been reached.
-    /// @dev Names the row like every other purchase-path revert, so a batch that a mid-flight
-    ///      `updatePurchasePeriod` unwound tells the caller which schedule to drop before retrying.
+    /**
+     * @notice The next cadence boundary has not been reached.
+     * @dev Names the row like every other purchase-path revert, so a batch that a mid-flight
+     *      `updatePurchasePeriod` unwound tells the caller which schedule to drop before retrying.
+     */
     error DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed(address token, uint64 scheduleId, uint256 timeRemaining);
-    /// @notice No live schedule of this stablecoin holds this id. The pair is the storage key, so a
-    ///         right id named with the wrong stablecoin reads the same as one that never existed.
+    /**
+     * @notice No live schedule of this stablecoin holds this id. The pair is the storage key, so a
+     *         right id named with the wrong stablecoin reads the same as one that never existed.
+     */
     error DcaManager__InexistentSchedule(address token, uint64 scheduleId);
     /// @notice The schedule exists but belongs to somebody else. `owner` is who it belongs to.
     error DcaManager__NotScheduleOwner(address token, uint64 scheduleId, address owner);
-    /// @notice `deleteDcaSchedule`'s index doesn't name this id in the caller's enumeration list.
-    /// @dev The index is wrong or stale, not a sign of a missing schedule — `deleteDcaSchedule` already
-    ///      confirmed the id exists and belongs to the caller. Re-read `getDcaSchedules` and retry.
+    /**
+     * @notice `deleteDcaSchedule`'s index doesn't name this id in the caller's enumeration list.
+     * @dev The index is wrong or stale, not a sign of a missing schedule — `deleteDcaSchedule` already
+     *      confirmed the id exists and belongs to the caller. Re-read `getDcaSchedules` and retry.
+     */
     error DcaManager__ScheduleIdIndexMismatch(address token, uint64 scheduleId, uint256 scheduleIdIndex);
     /// @notice The schedule's remaining principal cannot cover one purchase.
     error DcaManager__ScheduleBalanceNotEnoughForPurchase(address token, uint64 scheduleId, uint256 remainingBalance);
@@ -179,8 +197,10 @@ interface IDcaManager {
     error DcaManager__OperationsAdminIsNotAContract(address operationsAdmin);
     /// @notice Governance paused new deposits for this token and route.
     error DcaManager__DepositsPaused(address token, uint256 routeIndex);
-    /// @notice A named schedule is purchase-paused. That reverts `batchBuyRbtc`, and if the row is
-    ///         in `batchBuyRbtcAcrossHandlers`, every handler in the bundle.
+    /**
+     * @notice A named schedule is purchase-paused. That reverts `batchBuyRbtc`, and if the row is
+     *         in `batchBuyRbtcAcrossHandlers`, every handler in the bundle.
+     */
     error DcaManager__SchedulePaused(address token, uint64 scheduleId);
     /// @notice The caller has accrued no interest on this schedule's route, so there is nothing to credit.
     error DcaManager__NoInterestToTopUpWith(address token, uint256 routeIndex);

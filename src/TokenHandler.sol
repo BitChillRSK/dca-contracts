@@ -20,8 +20,10 @@ abstract contract TokenHandler is ITokenHandler, ERC165, FeeHandler, DcaManagerA
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice The stablecoin this handler deposits and withdraws.
-    /// @return The constructor-supplied ERC20.
+    /**
+     * @notice The stablecoin this handler deposits and withdraws.
+     * @return The constructor-supplied ERC20.
+     */
     IERC20 public immutable i_stableToken;
 
     /*//////////////////////////////////////////////////////////////

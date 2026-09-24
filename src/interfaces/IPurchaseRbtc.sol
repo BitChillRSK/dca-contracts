@@ -39,9 +39,11 @@ interface IPurchaseRbtc {
     error PurchaseRbtc__StablecoinRetrievedBelowFee(uint256 stablecoinRetrieved, uint256 aggregatedFee);
     /// @notice The measured rBTC this batch bought is below the minimum the caller attached to it.
     error PurchaseRbtc__BelowSwapperMinimum(uint256 rbtcReceived, uint256 minRbtcOut);
-    /// @notice The purchase venue did not consume exactly the net stablecoin amount supplied to it.
-    /// @dev A successful venue call must reduce the handler's purchase-token balance by `expectedAmount`.
-    ///      Any smaller, larger, or negative delta reverts the entire batch and all earlier accounting.
+    /**
+     * @notice The purchase venue did not consume exactly the net stablecoin amount supplied to it.
+     * @dev A successful venue call must reduce the handler's purchase-token balance by `expectedAmount`.
+     *      Any smaller, larger, or negative delta reverts the entire batch and all earlier accounting.
+     */
     error PurchaseRbtc__InputAmountNotFullySpent(
         uint256 expectedAmount, uint256 balanceBefore, uint256 balanceAfter
     );
