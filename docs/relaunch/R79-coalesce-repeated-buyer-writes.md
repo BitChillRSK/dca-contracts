@@ -1,6 +1,6 @@
 # R79 — coalesce repeated-buyer writes
 
-Status: **implemented** · PR pending · Assigned: yes · Optional/further-review: no
+Status: **implemented** · [#148](https://github.com/BitChillRSK/dca-contracts/pull/148) · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
@@ -66,8 +66,9 @@ Blockscout API on 2026-09-25 (blocks 7,783,853 to 9,265,925), grouped by transac
 | of those, already next to that buyer's previous row | **118 (all)** |
 | batches with at least one repeated buyer | 47 |
 
-The bot already groups each buyer's rows. R79 needs no change to batch construction to save gas. It
-only needs the bot to keep doing that. The last live tick R64 replayed (`0xa6ac747a…`) happens to have
+Every live batch so far kept each buyer's rows together, but the bot does not guarantee it: when it
+splits a batch by gas, it sorts candidates by `nextPurchaseTime`, which can interleave buyers. The
+swapper-bot follow-up asks for an explicit group-by-buyer on each final batch. The last live tick R64 replayed (`0xa6ac747a…`) happens to have
 five different buyers, so it is not typical.
 
 ### Measured
@@ -146,8 +147,9 @@ of testing `i == 0` saved about 57 per row.
 - [x] Add a differential fuzz test. It compares the new batch retrieval against a copy of today's
       per-row loop kept in the test, and the new rBTC credits against a per-row replay of today's
       credit rule, on the same fuzzed state and rows.
-- [ ] Open a `swapper-bot` issue: within each `Batch`, place one buyer's rows next to each other.
-- [ ] Update `docs/relaunch/README.md` Status and `IMPLEMENTATION_ORDER.md`.
+- [x] Open a `swapper-bot` issue: within each `Batch`, place one buyer's rows next to each other
+      ([swapper-bot#5](https://github.com/BitChillRSK/swapper-bot/issues/5#issuecomment-5823311821)).
+- [x] Update `docs/relaunch/README.md` Status and `IMPLEMENTATION_ORDER.md`.
 
 ## Out of scope
 
@@ -220,6 +222,8 @@ of testing `i == 0` saved about 57 per row.
 
 - ABI: none. Selectors, events, errors, and storage layout are unchanged.
 - Scripts: none.
-- Cutover: `swapper-bot` must keep each buyer's rows adjacent within a `Batch`. Every historical batch
-  already does. A batch that splits a buyer's rows stays correct but saves nothing on the split rows.
+- Cutover: `swapper-bot` must keep each buyer's rows adjacent within a `Batch`
+  ([swapper-bot#5](https://github.com/BitChillRSK/swapper-bot/issues/5#issuecomment-5823311821)). Every
+  historical batch already does, but the gas split's sort can interleave buyers, so the bot should group
+  explicitly. A batch that splits a buyer's rows stays correct but saves nothing on the split rows.
   No other consumer is affected: events and their order are unchanged.
