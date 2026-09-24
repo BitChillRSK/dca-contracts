@@ -11,7 +11,8 @@ import "test/Constants.sol";
 
 /**
  * @title StandingApprovalFallbackTest
- * @notice The deposit path's allowance top-up, on a stablecoin that decrements an unbounded allowance.
+ * @notice The deposit path's allowance top-up on a decrementing stablecoin, and the callback shape that
+ *         keeps a standing lending allowance out of reach.
  * @dev The standing approval granted at construction is what every deposit normally spends, so the
  *      top-up in `LendingErc20Handler._depositToken` only fires for a token that decrements far enough
  *      to fall short. Runs on every lane: it builds its own handler and never reads the lane env.
@@ -79,5 +80,39 @@ contract StandingApprovalFallbackTest is Test {
             0,
             "the top-up approves exactly the deposit, which the mint then spends in full"
         );
+    }
+
+    /**
+     * @notice A lending handler answers no flash-loan callback, which is what bounds its standing
+     *         allowance to its own deposits.
+     * @dev Aave-style pools repay a flash loan from the `receiverAddress` the caller names rather than
+     *      from the caller, so an address that holds a standing allowance **and** answers
+     *      `executeOperation` can be made to pay a stranger's premium. LayerBank has flash loans
+     *      disabled on all three shipped reserves today, but that is their switch, not ours. Ours is
+     *      this: the handler declares no `executeOperation` and no `fallback`, so the callback reverts
+     *      and unwinds the loan. Adding either to a lending handler would hand that vector a live
+     *      target, which is why the leaf headers carry it as a precondition.
+     */
+    function test_handlerAnswersNoFlashLoanCallback() public {
+        (bool answered,) = address(handler).call(
+            abi.encodeWithSignature(
+                "executeOperation(address,uint256,uint256,address,bytes)",
+                address(docToken),
+                DEPOSIT_AMOUNT,
+                0,
+                address(this),
+                ""
+            )
+        );
+        assertFalse(answered, "the handler answered a flash-loan callback");
+
+        // Nor does it accept unknown calldata through a fallback, which would decode as a false return.
+        (bool fellThrough,) = address(handler).call(abi.encodeWithSignature("someUnknownHook()"));
+        assertFalse(fellThrough, "the handler has a fallback");
+
+        // Native rBTC still arrives, so the refusal above is the missing hook and not a dead contract.
+        vm.deal(address(this), 1 ether);
+        (bool received,) = address(handler).call{value: 1 ether}("");
+        assertTrue(received, "the handler should still accept native rBTC");
     }
 }

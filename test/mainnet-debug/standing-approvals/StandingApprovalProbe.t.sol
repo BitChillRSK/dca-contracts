@@ -37,6 +37,25 @@ interface ILoanTokenLike {
 
 interface IAavePoolLike {
     function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external;
+    function flashLoanSimple(
+        address receiverAddress,
+        address asset,
+        uint256 amount,
+        bytes calldata params,
+        uint16 referralCode
+    ) external;
+    function FLASHLOAN_PREMIUM_TOTAL() external view returns (uint128);
+    function getConfiguration(address asset) external view returns (uint256);
+}
+
+interface ISovrynFlashBorrowLike {
+    function flashBorrowToken(
+        uint256 borrowAmount,
+        address borrower,
+        address target,
+        string calldata signature,
+        bytes calldata data
+    ) external payable;
 }
 
 /**
@@ -75,6 +94,9 @@ contract StandingApprovalProbe is Test {
     ///      underlying is DOC) and `LayerBankErc20Handler._lendingSpender()` (the Aave-v3 Pool).
     address internal constant ISUSD = 0xd8D25f03EBbA94E15Df2eD4d6D38276B595593c1;
     address internal constant LAYERBANK_POOL = 0x526D06c65777eA6D56d7a1Dd47cD79230dDf72E9;
+    address internal constant LAYERBANK_POOL_CONFIGURATOR = 0x72F712EFD09cc5683a07BE5dB7f3fd00Cc593922;
+    /// @dev Aave's `ReserveConfigurationMap` bit for "flash loans enabled on this reserve".
+    uint256 internal constant FLASH_LOAN_ENABLED_BIT = 80;
 
     address internal victim;
     address internal attacker;
@@ -91,15 +113,23 @@ contract StandingApprovalProbe is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_maxAllowanceDecrementPerStablecoin() public {
-        _reportDecrement("DOC", DOC, DOC_HOLDER, 100e18);
-        _reportDecrement("USDRIF", USDRIF, USDRIF_HOLDER, 100e18);
-        _reportDecrement("USDT0", USDT0, USDT0_HOLDER, 100e6);
+        // Asserted, not just logged: these three answers are what the per-use saving is derived from,
+        // so a token that changes behaviour must fail here rather than quietly restate the arithmetic.
+        _assertDecrement("DOC", DOC, DOC_HOLDER, 100e18, true);
+        _assertDecrement("USDRIF", USDRIF, USDRIF_HOLDER, 100e18, false);
+        _assertDecrement("USDT0", USDT0, USDT0_HOLDER, 100e6, true);
     }
 
-    /// @dev Approves `max` from a fresh holder to a fresh spender, spends once, and reports the
+    /// @dev Approves `max` from a fresh holder to a fresh spender, spends once, and checks the
     ///      allowance that survives. `spender` is an arbitrary address on purpose: the decrement is a
     ///      property of the token, not of who is approved.
-    function _reportDecrement(string memory name, address token, address whale, uint256 amount) internal {
+    function _assertDecrement(
+        string memory name,
+        address token,
+        address whale,
+        uint256 amount,
+        bool expectedToDecrement
+    ) internal {
         address holder = makeAddr(string.concat(name, "Holder"));
         address spender = makeAddr(string.concat(name, "Spender"));
 
@@ -118,6 +148,8 @@ contract StandingApprovalProbe is Test {
         console2.log(name, "allowance after ", remaining);
         console2.log(name, "decrements max? ", remaining != before);
         assertEq(before, type(uint256).max, "approval did not take");
+        assertEq(remaining != before, expectedToDecrement, "this token changed how it treats a max allowance");
+        if (expectedToDecrement) assertEq(remaining, before - amount, "decrement was not the spent amount");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -215,6 +247,67 @@ contract StandingApprovalProbe is Test {
             LAYERBANK_POOL.call(abi.encodeCall(IAavePoolLike.supply, (USDRIF, funded, attacker, 0)));
         assertFalse(supplied, "LayerBank supplied against someone else's allowance");
         assertEq(IERC20(USDRIF).balanceOf(victim), funded, "a standing pool allowance was spendable");
+    }
+
+    /*//////////////////////////////////////////////////////////////
+          4. THE ONE SPENDER PATH THAT DOES NAME A THIRD PARTY
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice LayerBank's Pool repays a flash loan from the `receiverAddress` the **caller** names, not
+     *         from the caller — the one spender entry point in this file that does not pull from
+     *         `msg.sender` — and the reserve-level flag that would enable it is off for all three
+     *         stablecoins.
+     * @dev Aave's `flashLoan` / `flashLoanSimple` hand `amount` to `receiverAddress`, require its
+     *      `executeOperation` to return true, and then `safeTransferFrom(receiverAddress, aToken,
+     *      amount + premium)`. An address holding a standing allowance that answers that callback
+     *      therefore loses the premium on every call, repeatable up to its balance, without ever having
+     *      asked for a loan.
+     *
+     *      Two independent things keep that off a lending handler, and only the second is BitChill's:
+     *
+     *      1. LayerBank has the reserve flash-loan flag off for DOC, USDRIF and USDT0. That is their
+     *         configuration, flippable by the same EOA that can upgrade the Pool, so it is asserted here
+     *         to fail loudly rather than relied on.
+     *      2. A lending handler declares no `executeOperation` and no `fallback`, so the callback into it
+     *         reverts and takes the flash loan with it. That is the precondition the handler headers
+     *         state, and `StandingApprovalFallbackTest` asserts it against a real handler.
+     */
+    function test_layerBankFlashLoanFlag_isOffForEveryShippedStablecoin() public {
+        assertFalse(_flashLoanEnabled(DOC), "LayerBank enabled DOC flash loans; re-check the precondition");
+        assertFalse(_flashLoanEnabled(USDRIF), "LayerBank enabled USDRIF flash loans; re-check the precondition");
+        assertFalse(_flashLoanEnabled(USDT0), "LayerBank enabled USDT0 flash loans; re-check the precondition");
+        console2.log("LayerBank flash-loan premium if ever enabled (bps)", IAavePoolLike(LAYERBANK_POOL).FLASHLOAN_PREMIUM_TOTAL());
+    }
+
+    /**
+     * @notice Sovryn's iSUSD can make itself call an arbitrary contract through `flashBorrowToken`, and
+     *         that entry point is disabled today.
+     * @dev bZx's loan tokens route a flash borrow through an arbitrary `target` call, which is the same
+     *      shape as the LayerBank case: reachable only if the approver answers. It is inert right now —
+     *      the logic proxy has no active target for the selector — but that is a Sovryn governance
+     *      setting, not a property of the code, so this assertion is here to fail loudly if it changes.
+     */
+    function test_sovrynFlashBorrow_isDisabled() public {
+        vm.prank(attacker);
+        (bool ok, bytes memory reason) = ISUSD.call(
+            abi.encodeCall(ISovrynFlashBorrowLike.flashBorrowToken, (1e18, attacker, attacker, "", ""))
+        );
+        assertFalse(ok, "Sovryn flash borrow is live again; re-examine the standing iSUSD approval");
+        console2.log("Sovryn flashBorrowToken refusal", string(_revertReason(reason)));
+    }
+
+    function _flashLoanEnabled(address asset) private view returns (bool) {
+        return (IAavePoolLike(LAYERBANK_POOL).getConfiguration(asset) >> FLASH_LOAN_ENABLED_BIT) & 1 == 1;
+    }
+
+    function _revertReason(bytes memory reason) private pure returns (bytes memory) {
+        if (reason.length < 68) return bytes("(no reason string)");
+        bytes memory trimmed = new bytes(reason.length - 68);
+        for (uint256 i; i < trimmed.length; ++i) {
+            trimmed[i] = reason[i + 68];
+        }
+        return trimmed;
     }
 }
 

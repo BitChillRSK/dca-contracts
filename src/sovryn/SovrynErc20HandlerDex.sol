@@ -12,7 +12,10 @@ import {SovrynErc20Handler} from "./SovrynErc20Handler.sol";
  *      the owner controls fees, oracle, path allowlist, and floor. The funding base is listed first so
  *      `i_stableToken` is set before `PurchaseUniswap` builds the path.
  *      Holds standing, unbounded stablecoin approvals to the Uniswap router and to the lending spender,
- *      both granted at construction; each is spendable only inside this handler's own call.
+ *      both granted at construction. SwapRouter02 pulls only from the caller of the swap it is executing
+ *      and is not upgradeable. The lending allowance rests on a precondition instead: this handler
+ *      answers no protocol callback, so a pool entry point that repays from a caller-named address
+ *      cannot reach it. Adding a `fallback` or an `executeOperation` here would break that.
  */
 contract SovrynErc20HandlerDex is SovrynErc20Handler, PurchaseUniswap {
     /**

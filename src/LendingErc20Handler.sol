@@ -118,13 +118,20 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
 
     /**
      * @dev Grants the lending spender an unbounded stablecoin allowance, so no deposit pays for an
-     *      allowance write. The spender pulls only from the account that calls it, which is why a
-     *      standing allowance is spendable by nobody but this handler's own deposit.
+     *      allowance write.
+     *
+     *      What bounds that allowance is a precondition, not a guarantee this contract enforces. The
+     *      deposit and redeem entry points of both shipped lending protocols pull from their caller, so
+     *      only this handler's own deposit spends it. Aave-style pools also expose a flash loan, which
+     *      repays from the receiver address the *caller* names: that reaches an approver only if the
+     *      approver answers `executeOperation`. This contract declares no such hook and no `fallback`,
+     *      so such a call reverts. **Do not add a `fallback`, an `executeOperation`, or any other
+     *      callback a lending protocol may invoke on an arbitrary address.** Whether a given protocol
+     *      offers such an entry point at all is the protocol owner's setting, not BitChill's.
      *
      *      Call this as the **last statement of the protocol adapter's constructor**, never from this
      *      base's constructor: `_lendingSpender()` reads an immutable that only the adapter assigns,
-     *      and a base constructor runs first, where that immutable is still `address(0)`. The virtual
-     *      call compiles and silently approves the zero address rather than failing loudly.
+     *      and a base constructor runs first, where that immutable is still `address(0)`.
      */
     function _approveLendingSpender() internal {
         i_stableToken.forceApprove(_lendingSpender(), type(uint256).max);

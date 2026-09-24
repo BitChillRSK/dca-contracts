@@ -11,8 +11,11 @@ import {PurchaseMoc} from "src/PurchaseMoc.sol";
  * @dev Constructor-only leaf. Only its immutable DcaManager moves principal, buys, or withdraws rBTC;
  *      the owner controls fee settings and collection. MoC redeems at its protocol price, so this
  *      route has no pool-slippage floor.
- *      Holds a standing, unbounded stablecoin approval to the lending spender, granted at
- *      construction; it is spendable only inside this handler's own deposit.
+ *      Holds a standing, unbounded stablecoin approval to the lending spender, granted at construction.
+ *      That rests on a precondition, not on an enforced property: this handler answers no protocol
+ *      callback, so a pool entry point that repays from a caller-named address cannot reach it. Adding a
+ *      `fallback` or an `executeOperation` here would break that. The spender's own code is governed by
+ *      its protocol's admin, not by BitChill.
  */
 contract LayerBankDocHandlerMoc is LayerBankErc20Handler, PurchaseMoc {
     /**
