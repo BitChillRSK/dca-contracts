@@ -29,13 +29,17 @@ import "test/Constants.sol";
  *          FOUNDRY_PROFILE=deploy forge test --match-path test/gas/R83StandingApprovalGas.t.sol -vv
  *
  *      The write counts are the durable evidence; the gas figures are same-build Cancun regression pins.
- *      A `gasleft()` delta is execution before refunds, so the logged −28,737 (default) / −28,158
- *      (deploy) per deposit is what Cancun charges up front and roughly 19,900 of it comes back as a
- *      refund there, which is why the removed round trip never registered on Ethereum. Rootstock refunds
- *      less and charges more for the same two writes: `SET` 20,000 + `CLEAR` 5,000 − `REFUND` 15,000 =
- *      10,000 net, plus a flat 700 for the `approve` call, against a standing approval's zero writes on a
- *      token that preserves `max` (USDRIF) or one `RESET` of 5,000 on a token that decrements it (DOC and
- *      USDT0). Which token does which is a live fact, measured by
+ *      Each deposit arm is measured in its own transaction, so neither pays the other's cold access —
+ *      see the note on the standing-approval test. Default profile: 140,559 exact against 117,114
+ *      standing, **−23,445**. Deploy profile: 137,731 against 114,865, **−22,866**.
+ *
+ *      A `gasleft()` delta is execution before refunds, so that is what Cancun charges up front, and
+ *      roughly 19,900 of it comes back as a refund there — which is why the removed round trip never
+ *      registered as an Ethereum problem. Rootstock refunds less and charges more for the same two
+ *      writes: `SET` 20,000 + `CLEAR` 5,000 − `REFUND` 15,000 = 10,000 net, plus a flat 700 for the
+ *      `approve` call, against a standing approval's zero writes on a token that preserves `max`
+ *      (USDRIF) or one `RESET` of 5,000 on a token that decrements it (DOC and USDT0). Which token does
+ *      which is a live fact, measured by
  *      `test/mainnet-debug/standing-approvals/StandingApprovalProbe.t.sol`, not an assumption.
  */
 contract R83StandingApprovalGasTest is Test {
@@ -127,28 +131,35 @@ contract R83StandingApprovalGasTest is Test {
     }
 
     /**
-     * @notice The lending deposit against the standing approval, measured against the exact-approval
-     *         shape it replaced.
-     * @dev The comparison arm is the real fallback path, not a reconstruction: with the allowance at
-     *      zero, `_depositToken`'s top-up fires, which is exactly the pre-R83 `0 -> amount -> 0` round
-     *      trip. Each arm uses its own handler and iToken so that each allowance slot enters this
-     *      transaction holding the value its arm models.
+     * @notice The lending deposit against the standing approval: no allowance slot is written.
+     * @dev Measured in its own transaction, as is its counterpart below, and the two are compared across
+     *      them rather than inside one. Both arms share the stablecoin contract and the depositor's
+     *      balance slot, so whichever ran first in a combined test paid the cold access and the first
+     *      dirty write for both: that made the delta swing by ~10,600 gas on call order alone, and by
+     *      ~5,600 even after the shared reads were warmed. One arm per transaction removes the question.
      */
-    function test_lendingDeposit_standingApprovalWritesNoAllowanceSlot() public {
-        bytes32 standingSlot = _allowanceSlot(address(s_lendingHandler), address(s_iSusd));
-        bytes32 exactSlot = _allowanceSlot(address(s_exactApprovalHandler), address(s_exactApprovalISusd));
+    function test_lendingDeposit_standingApproval_writesNoAllowanceSlot() public {
+        bytes32 allowanceSlot = _allowanceSlot(address(s_lendingHandler), address(s_iSusd));
+        (uint256 gasUsed, uint256 writes) = _measureDeposit(s_lendingHandler, allowanceSlot);
 
-        (uint256 perUseGas, uint256 perUseWrites) = _measureDeposit(s_exactApprovalHandler, exactSlot);
-        (uint256 standingGas, uint256 standingWrites) = _measureDeposit(s_lendingHandler, standingSlot);
+        console2.log("R83 lending deposit, standing approval (Foundry gas)", gasUsed);
+        assertEq(writes, 0, "the deposit still writes the allowance slot");
+        assertGt(s_lendingHandler.getUserShares(USER), 0);
+    }
 
-        console2.log("R83 lending deposit, exact approval    (Foundry gas)", perUseGas);
-        console2.log("R83 lending deposit, standing approval (Foundry gas)", standingGas);
-        console2.log("R83 lending deposit delta (Foundry gas)", perUseGas - standingGas);
-        console2.log("R83 allowance-slot writes, exact / standing", perUseWrites, standingWrites);
+    /**
+     * @notice The exact-approval shape this PR replaced, for comparison: two allowance-slot writes.
+     * @dev Not a reconstruction. `setUp` revokes this handler's standing approval, so the deposit takes
+     *      the real top-up branch in `LendingErc20Handler._depositToken`, which is the pre-R83
+     *      `0 -> amount -> 0` round trip exactly as it used to run.
+     */
+    function test_lendingDeposit_exactApproval_writesTheAllowanceSlotTwice() public {
+        bytes32 allowanceSlot = _allowanceSlot(address(s_exactApprovalHandler), address(s_exactApprovalISusd));
+        (uint256 gasUsed, uint256 writes) = _measureDeposit(s_exactApprovalHandler, allowanceSlot);
 
-        assertEq(standingWrites, 0, "the deposit still writes the allowance slot");
-        assertEq(perUseWrites, 2, "the exact-approval arm should set the allowance and spend it to zero");
-        assertLt(standingGas, perUseGas);
+        console2.log("R83 lending deposit, exact approval    (Foundry gas)", gasUsed);
+        assertEq(writes, 2, "the exact-approval arm should set the allowance and spend it to zero");
+        assertGt(s_exactApprovalHandler.getUserShares(USER), 0);
     }
 
     /// @notice The Dex batch purchase writes no allowance slot at all.

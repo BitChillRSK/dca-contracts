@@ -70,8 +70,9 @@ contract TropykusDocHandlerMocTest is Test {
 
     /**
      * @notice The kToken is approved once, at construction, and nobody else is.
-     * @dev `address(0)` is the canary: the approval reads `i_kToken`, assigned in the adapter
-     *      constructor, so an earlier call would have approved the zero address instead. MoC needs no
+     * @dev `== max` carries the ordering rule: the approval reads `i_kToken`, assigned in the adapter
+     *      constructor, and an earlier call would approve the zero address, which this token refuses
+     *      outright. MoC needs no
      *      allowance at all — `redeemFreeDoc` burns the caller's own DOC — so the proxy's allowance here
      *      is the one `setUp` grants, not one the handler sets for itself.
      */

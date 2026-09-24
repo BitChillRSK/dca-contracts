@@ -215,10 +215,11 @@ contract FinalDeploymentTest is Test {
 
     /**
      * @notice Every production handler holds a standing allowance to its own spender, and to nobody else.
-     * @dev The `address(0)` assertion is the real canary. A lending handler grants its approval in the
-     *      protocol adapter's constructor because that is where the spender immutable is assigned; calling
-     *      the same helper from `LendingErc20Handler`'s constructor compiles, reads `address(0)`, and would
-     *      leave the spender unapproved with the allowance parked on the zero address instead.
+     * @dev The assertion that carries the ordering rule is `== max` to the real spender. A lending handler
+     *      grants its approval in the protocol adapter's constructor because that is where the spender
+     *      immutable is assigned; the same helper called from `LendingErc20Handler`'s constructor compiles
+     *      and reads `address(0)`. With an OpenZeppelin token that reverts the deploy outright, so the
+     *      companion `address(0)` assertion below is belt-and-braces for a token that would allow it.
      */
     function test_finalStack_standingSpenderApprovals() public {
         DeployFinalHarness harness =

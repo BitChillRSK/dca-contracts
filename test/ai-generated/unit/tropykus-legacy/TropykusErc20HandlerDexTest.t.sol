@@ -119,9 +119,9 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
 
     /**
      * @notice Both of this leaf's spenders are approved once, at construction.
-     * @dev The zero-address assertion is the canary for the ordering rule: the lending approval reads
-     *      `i_kToken`, which only `TropykusErc20Handler`'s constructor assigns, so running it any earlier
-     *      would have approved `address(0)` instead.
+     * @dev `== max` is what carries the ordering rule: the lending approval reads `i_kToken`, which only
+     *      `TropykusErc20Handler`'s constructor assigns, so running it earlier would approve `address(0)`
+     *      — which an OpenZeppelin token refuses outright, failing the deploy rather than this assertion.
      */
     function test_tropykusDex_standingSpenderApprovals() public {
         address handlerAddress = address(tropykusDexHandler);
