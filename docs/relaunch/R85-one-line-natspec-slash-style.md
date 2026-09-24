@@ -1,6 +1,6 @@
 # R85 — one-line NatSpec uses `///`
 
-Status: **in progress** · Assigned: yes · Optional/further-review: no
+Status: **implemented** · GitHub [#147](https://github.com/BitChillRSK/dca-contracts/pull/147) · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
