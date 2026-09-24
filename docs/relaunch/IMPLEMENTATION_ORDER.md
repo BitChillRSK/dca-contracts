@@ -146,7 +146,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R83 | post-R82, before relaunch deploy | **answered 2026-09-24: standing approvals on every Dex handler and every lending adapter** |
 | R84 | post-R83, before relaunch deploy | none (no repeated registry reads; the `getRouteInfo` view may be dropped, keeping the internal `withdrawTokenAndInterest` fix) |
 | R85 | after R84; not deployment-bound | none (one-line NatSpec uses `///`, multi-line uses `/** */`; comment-only) |
-| R79 | after R84; not deployment-bound | coalesce repeated-buyer writes (swapper sort + contiguous rBTC/share stores) |
+| R79 | after R85; not deployment-bound | none (one write per contiguous buyer run on rBTC, share, and idle slots; swapper sorts by buyer) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1210,11 +1210,12 @@ wrapper, and NatSpec of two or more lines uses a `/** */` block, not a `///` run
 was added to scope by the human on 2026-09-24). Write the rule into `AGENTS.md` and apply it across
 first-party `src/`. Comment-only; metadata-stripped runtime must stay byte-identical. Ask: none.
 
-### R79 - coalesce repeated-buyer writes ([analysis](./R78-flat-fee-fast-path.md#r79-survivor-coalesce-repeated-buyer-writes))
+### R79 - coalesce repeated-buyer writes ([spec](./R79-coalesce-repeated-buyer-writes.md))
 
-After R84 and not deployment-bound: coordinate buyer sorting with the swapper and coalesce contiguous
-rBTC/share writes (approximately 40,000 Rootstock gas on five same-buyer lending rows). Write the full
-R79 spec only when assigned.
+After R85 and not deployment-bound: write each buyer's accumulated-rBTC, lending-share, and idle-balance
+slot once per contiguous run instead of once per row (approximately 40,000 Rootstock gas on five
+same-buyer lending rows). Per-row events, reverts, and values are unchanged. The swapper sorts each
+batch by buyer. Ask: none.
 
 ## Closed non-implementation decisions
 
