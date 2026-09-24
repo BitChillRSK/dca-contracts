@@ -22,9 +22,7 @@ abstract contract PurchaseMoc is PurchaseRbtc {
                                CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @param mocProxyAddress Money on Chain proxy that exposes `redeemFreeDoc`.
-     */
+    /// @param mocProxyAddress Money on Chain proxy that exposes `redeemFreeDoc`.
     constructor(address mocProxyAddress) {
         i_mocProxy = IMocProxy(mocProxyAddress);
     }

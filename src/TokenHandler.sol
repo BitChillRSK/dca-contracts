@@ -58,9 +58,7 @@ abstract contract TokenHandler is ITokenHandler, ERC165, FeeHandler, DcaManagerA
         _depositToken(user, depositAmount);
     }
 
-    /**
-     * @inheritdoc ITokenHandler
-     */
+    /// @inheritdoc ITokenHandler
     function withdrawToken(address user, uint256 withdrawalAmount)
         external
         override
@@ -74,9 +72,7 @@ abstract contract TokenHandler is ITokenHandler, ERC165, FeeHandler, DcaManagerA
                                 GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @dev ERC-165: `ITokenHandler` plus whatever the parent advertises.
-     */
+    /// @dev ERC-165: `ITokenHandler` plus whatever the parent advertises.
     function supportsInterface(bytes4 interfaceID) public view virtual override returns (bool) {
         return interfaceID == type(ITokenHandler).interfaceId || super.supportsInterface(interfaceID);
     }
@@ -85,9 +81,7 @@ abstract contract TokenHandler is ITokenHandler, ERC165, FeeHandler, DcaManagerA
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @dev Pull `depositAmount` from `user` and revert unless the measured balance delta matches.
-     */
+    /// @dev Pull `depositAmount` from `user` and revert unless the measured balance delta matches.
     function _depositToken(address user, uint256 depositAmount) internal virtual {
         uint256 balanceBefore = i_stableToken.balanceOf(address(this));
         i_stableToken.safeTransferFrom(user, address(this), depositAmount);
@@ -96,9 +90,7 @@ abstract contract TokenHandler is ITokenHandler, ERC165, FeeHandler, DcaManagerA
         emit TokenHandler__TokenDeposited(address(i_stableToken), user, depositAmount);
     }
 
-    /**
-     * @dev Pay `withdrawalAmount` of the stablecoin to `user` and return the measured balance delta.
-     */
+    /// @dev Pay `withdrawalAmount` of the stablecoin to `user` and return the measured balance delta.
     function _withdrawToken(address user, uint256 withdrawalAmount) internal virtual returns (uint256 withdrawnAmount) {
         uint256 balanceBefore = i_stableToken.balanceOf(address(this));
         i_stableToken.safeTransfer(user, withdrawalAmount);

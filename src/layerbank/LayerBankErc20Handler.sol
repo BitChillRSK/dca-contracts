@@ -76,16 +76,12 @@ abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20H
         return address(i_pool);
     }
 
-    /**
-     * @dev Aave liquidity index including pending interest, RAY (1e27) scale.
-     */
+    /// @dev Aave liquidity index including pending interest, RAY (1e27) scale.
     function _normalizedIncome() internal view returns (uint256) {
         return i_pool.getReserveNormalizedIncome(address(i_stableToken));
     }
 
-    /**
-     * @dev The shares credited are the aTokens actually gained, never a Pool return.
-     */
+    /// @dev The shares credited are the aTokens actually gained, never a Pool return.
     function _protocolDeposit(uint256 stablecoinAmount) internal override returns (uint256 mintedShares) {
         uint256 prevShares = i_aToken.scaledBalanceOf(address(this));
         i_pool.supply(address(i_stableToken), stablecoinAmount, address(this), 0);

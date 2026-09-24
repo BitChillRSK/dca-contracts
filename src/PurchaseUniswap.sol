@@ -123,9 +123,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         _withdrawRbtc(user, rbtcBalance);
     }
 
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
+    /// @inheritdoc IPurchaseUniswap
     function setPurchasePathAllowed(
         address[] memory intermediateTokens,
         uint24[] memory poolFeeRates,
@@ -142,9 +140,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         _setPurchasePathAllowed(pathHash, encodedPath, intermediateTokens, poolFeeRates, allowed);
     }
 
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
+    /// @inheritdoc IPurchaseUniswap
     function setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
         external
         override
@@ -162,27 +158,21 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         _setPurchasePath(intermediateTokens, poolFeeRates, newPath);
     }
 
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
+    /// @inheritdoc IPurchaseUniswap
     function setAmountOutMinimumPercent(uint256 amountOutMinimumPercent) external onlyOwner {
         _validateSlippageSettings(amountOutMinimumPercent, s_amountOutMinimumSafetyCheck);
         emit PurchaseUniswap__AmountOutMinimumPercentUpdated(s_amountOutMinimumPercent, amountOutMinimumPercent);
         s_amountOutMinimumPercent = amountOutMinimumPercent.toUint128();
     }
 
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
+    /// @inheritdoc IPurchaseUniswap
     function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external onlyOwner {
         _validateSlippageSettings(s_amountOutMinimumPercent, amountOutMinimumSafetyCheck);
         emit PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(s_amountOutMinimumSafetyCheck, amountOutMinimumSafetyCheck);
         s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint128();
     }
 
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
+    /// @inheritdoc IPurchaseUniswap
     function updateMocOracle(address newOracle) external override onlyOwner {
         if (newOracle == address(0)) {
             revert PurchaseUniswap__InvalidOracleAddress();
@@ -200,37 +190,27 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
                                 GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
+    /// @inheritdoc IPurchaseUniswap
     function getAmountOutMinimumPercent() external view returns (uint256) {
         return s_amountOutMinimumPercent;
     }
 
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
+    /// @inheritdoc IPurchaseUniswap
     function getAmountOutMinimumSafetyCheck() external view returns (uint256) {
         return s_amountOutMinimumSafetyCheck;
     }
 
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
+    /// @inheritdoc IPurchaseUniswap
     function getMocOracle() external view returns (ICoinPairPrice) {
         return s_mocOracle;
     }
 
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
+    /// @inheritdoc IPurchaseUniswap
     function getSwapPath() external view returns (bytes memory) {
         return s_swapPath;
     }
 
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
+    /// @inheritdoc IPurchaseUniswap
     function isPurchasePathAllowed(bytes32 pathHash) external view returns (bool) {
         return s_purchasePathAllowed[pathHash];
     }

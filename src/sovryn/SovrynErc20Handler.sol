@@ -62,9 +62,7 @@ abstract contract SovrynErc20Handler is LendingErc20Handler {
         return address(i_iSusdToken);
     }
 
-    /**
-     * @dev The iSUSD credited is the balance actually gained, never `mint()`'s return value.
-     */
+    /// @dev The iSUSD credited is the balance actually gained, never `mint()`'s return value.
     function _protocolDeposit(uint256 stablecoinAmount) internal override returns (uint256 mintedShares) {
         uint256 prevIsusdBalance = i_iSusdToken.balanceOf(address(this));
         i_iSusdToken.mint(address(this), stablecoinAmount);

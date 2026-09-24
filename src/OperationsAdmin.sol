@@ -121,17 +121,13 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
         emit OperationsAdmin__DepositsPauseSet(token, route, paused);
     }
 
-    /**
-     * @inheritdoc IOperationsAdmin
-     */
+    /// @inheritdoc IOperationsAdmin
     function addSwapper(address swapper) external onlyOwner {
         s_swappers[swapper] = true;
         emit OperationsAdmin__SwapperAdded(swapper);
     }
 
-    /**
-     * @inheritdoc IOperationsAdmin
-     */
+    /// @inheritdoc IOperationsAdmin
     function revokeSwapper(address swapper) external onlyOwner {
         s_swappers[swapper] = false;
         emit OperationsAdmin__SwapperRevoked(swapper);
@@ -141,37 +137,27 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
                                 GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @inheritdoc IOperationsAdmin
-     */
+    /// @inheritdoc IOperationsAdmin
     function isSwapper(address account) external view returns (bool) {
         return s_swappers[account];
     }
 
-    /**
-     * @inheritdoc IOperationsAdmin
-     */
+    /// @inheritdoc IOperationsAdmin
     function isLendingRoute(uint256 index) external view returns (bool) {
         return s_routeClass[index.toUint32()] == RouteClass.Lending;
     }
 
-    /**
-     * @inheritdoc IOperationsAdmin
-     */
+    /// @inheritdoc IOperationsAdmin
     function getRouteClass(uint256 index) external view returns (RouteClass) {
         return s_routeClass[index.toUint32()];
     }
 
-    /**
-     * @inheritdoc IOperationsAdmin
-     */
+    /// @inheritdoc IOperationsAdmin
     function getTokenHandler(address token, uint256 routeIndex) external view returns (address) {
         return s_tokenRoute[token][routeIndex.toUint32()].handler;
     }
 
-    /**
-     * @inheritdoc IOperationsAdmin
-     */
+    /// @inheritdoc IOperationsAdmin
     function areDepositsPaused(address token, uint256 routeIndex) external view returns (bool) {
         return s_tokenRoute[token][routeIndex.toUint32()].depositsPaused;
     }
