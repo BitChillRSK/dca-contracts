@@ -1,6 +1,6 @@
 # R82 — transient reentrancy guard
 
-Status: **implemented** · GitHub [#143](https://github.com/BitChillRSK/dca-contracts/pull/143) · Assigned: yes · Optional/further-review: no
+Status: **implemented** · GitHub [#144](https://github.com/BitChillRSK/dca-contracts/pull/144) · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
