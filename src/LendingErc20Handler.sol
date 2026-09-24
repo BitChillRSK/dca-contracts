@@ -126,8 +126,14 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
      *      repays from the receiver address the *caller* names: that reaches an approver only if the
      *      approver answers `executeOperation`. This contract declares no such hook and no `fallback`,
      *      so such a call reverts. **Do not add a `fallback`, an `executeOperation`, or any other
-     *      callback a lending protocol may invoke on an arbitrary address.** Whether a given protocol
-     *      offers such an entry point at all is the protocol owner's setting, not BitChill's.
+     *      callback a lending protocol may invoke on an arbitrary address.**
+     *
+     *      That rule is necessary but not sufficient, and a new adapter must check its own protocol
+     *      rather than assume it. A lender of the other shape — one that calls a target the caller names
+     *      with calldata the caller supplies, as bZx's `flashBorrowToken` does — spends an approver's
+     *      allowance without the approver answering anything, if the lender makes that call under its own
+     *      address. Nothing this contract declares or omits defends against that; only the protocol not
+     *      offering such an entry point does, which is the protocol owner's setting, not BitChill's.
      *
      *      Call this as the **last statement of the protocol adapter's constructor**, never from this
      *      base's constructor: `_lendingSpender()` reads an immutable that only the adapter assigns,

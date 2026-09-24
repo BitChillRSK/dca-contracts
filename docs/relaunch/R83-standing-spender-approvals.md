@@ -128,18 +128,33 @@ this pool, repeatable up to its balance.
 
 Two independent things keep that off a lending handler, and only the second is BitChill's:
 
-1. LayerBank has the reserve-level flash-loan flag **off** for DOC, USDRIF and USDT0 (bit 80 of each
-   `ReserveConfigurationMap`; a call reverts with Aave error `91`, `FLASHLOAN_DISABLED`). That is their
+1. LayerBank has the reserve-level flash-loan flag **off** for DOC, USDRIF and USDT0. That is their
    configuration, flippable by the same EOA that can upgrade the Pool, so the probe asserts it rather
-   than relying on it.
+   than relying on it — twice over, because the first draft of that assertion was wrong. It decoded the
+   `ReserveConfigurationMap` with a hand-written bit index and read bit 80, the low bit of the borrow
+   cap, instead of bit 63; it passed only because all three live borrow caps (700,000, 700,000 and 0)
+   happen to be even, and it would have missed the flag being switched on. The probe now carries no bit
+   index at all: it reads Aave's own `getFlashLoanEnabled`, and separately calls `flashLoanSimple` and
+   requires the refusal to be exactly `91`, `FLASHLOAN_DISABLED`.
 2. A lending handler declares no `executeOperation` and no `fallback` — only `PurchaseRbtc`'s
    `receive()` — so the Pool's callback into it reverts and unwinds the flash loan.
 
 (2) is the one we own, so it is stated as a precondition in `LendingErc20Handler._approveLendingSpender`
 and in every lending leaf header, and asserted against a real handler by
-`test/unit/StandingApprovalFallbackTest.t.sol`. Sovryn's iSUSD has the same shape through bZx's
-`flashBorrowToken`, which routes a call to an arbitrary target; it reverts today with
-`LoanTokenLogicProxy:target not active`, a Sovryn governance setting, so the probe asserts that too.
+`test/unit/StandingApprovalFallbackTest.t.sol`.
+
+**Sovryn is not the same shape, and an earlier draft of this section said it was.** bZx's
+`flashBorrowToken` lets its caller name both a `target` and the calldata sent to it; the approver answers
+nothing, so declaring no callback defends nothing there. Whether a standing iSUSD allowance would be
+exposed turns on who `msg.sender` is at that `target` — the loan token itself, or a separate relay — and
+that is not established here, because Sovryn's shipped loan-token logic does not implement the function:
+the call reverts with `LoanTokenLogicProxy:target not active`, and `flashBorrowToken` appears nowhere in
+the Sovryn source tree outside a diagram. The probe asserts that exact refusal string rather than merely
+asserting a revert, since a reinstated `flashBorrowToken` would also revert on the probe's input (it
+lends, calls an empty target, and is never repaid) and a bare revert check would sail through the one
+change it exists to catch. **The defence at Sovryn is Sovryn governance, not BitChill's callback shape.**
+The residual exposure if that changed is bounded by what the handler holds: the stablecoin in flight
+during a deposit or redeem, plus dust, since the position itself sits in iSUSD.
 
 So, with that precondition held, the standing allowance adds no third-party reachability at any of the
 three spenders. What it adds is exposure to the spender's own future code: nil for the router, which
