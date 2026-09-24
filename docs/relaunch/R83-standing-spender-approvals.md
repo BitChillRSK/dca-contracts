@@ -1,6 +1,6 @@
 # R83 — standing vs per-use spender approvals
 
-Status: **implemented** · Assigned: yes · Optional/further-review: no
+Status: **implemented** · GitHub [#145](https://github.com/BitChillRSK/dca-contracts/pull/145) · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
