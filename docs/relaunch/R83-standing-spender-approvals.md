@@ -1,6 +1,6 @@
 # R83 — standing vs per-use spender approvals
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
@@ -84,11 +84,69 @@ The questions:
 If both answers are "keep exact approvals", this item closes with no code change and the reason is
 recorded in `IMPLEMENTATION_ORDER.md`.
 
+## Decision (2026-09-24)
+
+Both questions were answered **standing approval**, on the evidence below.
+
+1. **Uniswap router — standing approval on every Dex handler**, idle and lending alike.
+2. **Lending spender — standing approval at deploy**, on every protocol adapter.
+
+### Spender control facts
+
+Read at Rootstock mainnet block 9,268,224.
+
+| Spender | Identity | Upgradeable | Controlled by |
+|---|---|---|---|
+| SwapRouter02 `0x0B14ff67f0014046b4b99057Aec4509640b3947A` | verified `SwapRouter02`, solc 0.7.6, 24,497 bytes, code hash `0x2bc529fc…d870fc` | **no** — no EIP-1967 slots, no `owner()` / `admin()` / `implementation()` | nobody |
+| Sovryn iSUSD `0xd8D25f03EBbA94E15Df2eD4d6D38276B595593c1` | verified `LoanToken` proxy → `LoanTokenLogicProxy` `0x8Cf4737D…F26e` | yes | `owner()` = timelock `0x967c84b7…F69f` (48 h delay), `admin()` = timelock `0x6c94c8aa…FB13` (24 h), each behind a Bitocracy governor contract; separate pauser `0xDd8e07A5…88b7` |
+| LayerBank Pool `0x526D06c65777eA6D56d7a1Dd47cD79230dDf72E9` | Aave-v3 `InitializableImmutableAdminUpgradeabilityProxy` → `PoolInstance` revision 7 `0x88919001…0f34` | yes | `PoolAddressesProvider` `0x0c32000a…7052`, whose `owner()` **and** ACL admin is the EOA `0x57b5D81C…9D3a` (codesize 0). No timelock: one transaction replaces the Pool implementation |
+
+### How each spender can move approved tokens
+
+SwapRouter02's verified source has exactly two `transferFrom` sites: `PeripheryPayments.pay`, whose
+payer is the `msg.sender` of the swap in progress (or the router itself on later hops of a multi-hop
+exact input), and `PeripheryPaymentsExtended.pull`, whose `from` is hardcoded to `msg.sender`. The
+callback does read a caller-supplied `payer`, but only a factory-derived pool may call it, and a pool
+calls back **whoever invoked `swap`** — so a third party cannot reach that state on somebody else's
+behalf. `sweepToken` and `callPositionManager` move the router's own balance, not an approver's.
+
+That reasoning is tested rather than asserted, in
+[`test/mainnet-debug/standing-approvals/StandingApprovalProbe.t.sol`](../../test/mainnet-debug/standing-approvals/StandingApprovalProbe.t.sol)
+(`make probe-standing-approvals`). Against a victim holding a standing `max` allowance, an attacker's
+`pull`, `exactInput`, forged `uniswapV3SwapCallback`, and pool-relayed callback all fail and the balance
+is untouched. iSUSD `mint(receiver, amount)` and LayerBank `supply(asset, amount, onBehalfOf, 0)` credit
+an arbitrary account but likewise pull only from `msg.sender`; both attacker attempts revert.
+
+So the standing allowance adds no third-party reachability at any of the three spenders. What it adds is
+exposure to the spender's own future code: nil for the router, which cannot change; a 24–48 h governance
+window at Sovryn; and, at LayerBank, an instant EOA-controlled upgrade — against a spender that already
+custodies the whole lending position, so the extra surface there is the stablecoin transiently held
+during a deposit or redeem, plus dust.
+
+### Allowance-decrement facts
+
+Live, same probe, same block:
+
+| Token | Decrements a `max` allowance | Per-use saving vs `0 → X → 0` | Break-even |
+|---|---|---:|---:|
+| USDRIF | no | ~10,400 | ≈ 2 uses |
+| DOC | yes (`RESET`) | ~5,400 | ≈ 4 uses |
+| USDT0 | yes (`RESET`) | ~5,400 | ≈ 4 uses |
+
+### Measured cost
+
+Per lending deposit, Foundry execution before refunds (`test/gas/R83StandingApprovalGas.t.sol`):
+**−28,737** default, **−28,158** under deploy, with allowance-slot writes going **2 → 0**. Cancun refunds
+roughly 19,900 of the removed round trip, which is why it never showed up as an Ethereum problem.
+Rootstock does not: `SET` 20,000 + `CLEAR` 5,000 − `REFUND` 15,000 = **10,000** net, plus a flat 700 for
+the `approve` call. The same test pins the Dex batch at **zero** allowance-slot writes. Against that, each
+handler pays one 20,000 `SET` per standing approval at deploy, once, by the deployer.
+
 ## Scope
 
-- [ ] Fork-measure whether DOC, USDRIF, and USDT0 decrement a `type(uint256).max` allowance on
+- [x] Fork-measure whether DOC, USDRIF, and USDT0 decrement a `type(uint256).max` allowance on
       `transferFrom` (read the allowance before and after a spend) and record the result in the PR.
-- [ ] Implement the answered option(s) only:
+- [x] Implement the answered option(s) only:
   - **Lending:** add one internal helper to `LendingErc20Handler` that approves `type(uint256).max` to
     `_lendingSpender()`. Call it as the **last statement of each protocol adapter's constructor**
     (`SovrynErc20Handler`, `LayerBankErc20Handler`, `TropykusErc20Handler`). Do **not** call it from
@@ -103,9 +161,9 @@ recorded in `IMPLEMENTATION_ORDER.md`.
     Reading `_purchaseToken()` there is safe: the constructor already depends on the funding base being
     earlier in the leaf's inheritance list, and the router is this contract's own immutable, assigned
     earlier in the same constructor. Leave invariant 12's exact-consumption check exactly as it is.
-- [ ] State in each affected contract's header `@dev` that the handler holds a standing approval to
+- [x] State in each affected contract's header `@dev` that the handler holds a standing approval to
       that spender (`AGENTS.md` **Say what is enforced, and what is only assumed**).
-- [ ] Update `docs/relaunch/README.md` Status and `IMPLEMENTATION_ORDER.md`.
+- [x] Update `docs/relaunch/README.md` Status and `IMPLEMENTATION_ORDER.md`.
 
 ## Out of scope
 
@@ -142,11 +200,11 @@ recorded in `IMPLEMENTATION_ORDER.md`.
 
 ## Success criteria
 
-- [ ] Both product questions are answered and recorded, together with the spender control facts
+- [x] Both product questions are answered and recorded, together with the spender control facts
       above.
-- [ ] Only the answered sites change. The steady-state saving, the one-time deploy cost, and the
+- [x] Only the answered sites change. The steady-state saving, the one-time deploy cost, and the
       break-even are stated on both schedules.
-- [ ] Headers state the standing approval where one now exists.
+- [x] Headers state the standing approval where one now exists.
 
 ## Reviewer checklist
 
