@@ -12,7 +12,11 @@ Human operator only. Agents must not `--broadcast`.
    handler, per-token minimum purchase amounts, and the minimum purchase period. See
    [`R74-economics-parameters-revisit.md`](./R74-economics-parameters-revisit.md).
 4. Deploy and Blockscout-verify a representative `FOUNDRY_PROFILE=deploy` (`via_ir = true`) artifact
-   on Rootstock testnet. This is the outstanding R60 compiler/verifier proof.
+   on Rootstock testnet. This is the outstanding R60 compiler/verifier proof. On that deployment,
+   execute at least two guarded `DcaManager` user calls in separate transactions (for example
+   `createDcaSchedule`, then `updatePurchaseAmount` on the new schedule). The reentrancy guard is the
+   first `TSTORE` in shipped bytecode ([R82](./R82-transient-reentrancy-guard.md)); the second call
+   succeeding proves rskj executes it and clears the lock between transactions.
 5. Green on the frozen revision:
    - `make check`
    - `make check-deploy`

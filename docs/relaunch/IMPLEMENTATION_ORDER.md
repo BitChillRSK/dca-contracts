@@ -1126,7 +1126,8 @@ Shipped: `DcaManager` inherits `ReentrancyGuardTransient`; no modifier moved, an
 is unchanged. Rootstock: guard **≈10,200 → ≈300** per guarded user call (`SLOAD` + two `RESET`s →
 one `TLOAD` + two `TSTORE`s), plus no 20,000 `SET` at deploy. Foundry (Cancun execution before
 refunds, stub handler, cold guard slot): **−4,792** on each of `updatePurchaseAmount`,
-`setSchedulePaused`, and `depositToken` (default), **−4,807** each under deploy. Cancun later refunds
+`setSchedulePaused`, and `depositToken` (default), **−4,807** each under deploy; the audit's −2,800
+is the same swap with the guard slot already warm. Cancun later refunds
 2,800 of the storage guard's restore, so its net saving is about 2,000; that refund is the one
 Rootstock does not pay. `test/gas/R82TransientGuardGas.t.sol` pins no persistent access to the
 ERC-7201 guard slot and re-entry refused with `ReentrancyGuardReentrantCall`.
