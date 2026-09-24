@@ -3,20 +3,13 @@ pragma solidity 0.8.36;
 
 import {Test, console2, Vm} from "forge-std/Test.sol";
 import {DcaManager} from "src/DcaManager.sol";
-import {FeeHandler} from "src/FeeHandler.sol";
 import {IDcaManager} from "src/interfaces/IDcaManager.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {OperationsAdmin} from "src/OperationsAdmin.sol";
 import {StubPurchaseHandler} from "./StubPurchaseHandler.sol";
 
-contract R81FeeHandlerHarness is FeeHandler {
-    constructor(IFeeHandler.FeeSettings memory feeSettings) FeeHandler(address(0xFEE), feeSettings, msg.sender) {}
-}
-
 /**
  * @title R81PackedSlotWritesGas
- * @notice Counts storage writes per packed slot on the three paths that used to store one word
- *         several times.
+ * @notice Counts storage writes per packed schedule slot on the purchase and create paths.
  * @dev Reproduce on both profiles:
  *
  *          forge test --match-path test/gas/R81PackedSlotWritesGas.t.sol -vv
@@ -28,8 +21,8 @@ contract R81FeeHandlerHarness is FeeHandler {
  *
  *      Measured on this file, both profiles: each purchase row stores schedule slot 0 once, for a
  *      first anchor and a later one. `createDcaSchedule` stores slots 0 and 1 once each.
- *      `setFeeRateParams` stores the fee word once when any field changes, and not at all when
- *      nothing changes. Events fire only for the fields that changed.
+ *      `setFeeRateParams` is not pinned here: the owner path stays the readable per-field
+ *      if/write/emit shape (see R81).
  */
 contract R81PackedSlotWritesGasTest is Test {
     uint256 private constant MIN_PURCHASE_PERIOD = 1 days;
@@ -41,15 +34,11 @@ contract R81PackedSlotWritesGasTest is Test {
     uint256 private constant ROUTE_INDEX = 0;
     /// @dev `s_dcaSchedules` base slot. Re-check with `forge inspect DcaManager storage-layout`.
     uint256 private constant SCHEDULES_SLOT = 2;
-    /// @dev Packed fee word on `R81FeeHandlerHarness` (owner, pending owner, collector, then the word).
-    ///      Re-check with `forge inspect R81FeeHandlerHarness storage-layout`.
-    uint256 private constant FEE_WORD_SLOT = 3;
 
     address private s_swapper;
     address private s_token;
     OperationsAdmin private s_operationsAdmin;
     DcaManager private s_manager;
-    R81FeeHandlerHarness private s_feeHandler;
 
     function setUp() public {
         vm.warp(1_700_000_000);
@@ -65,15 +54,6 @@ contract R81PackedSlotWritesGasTest is Test {
         for (uint256 i; i < 5; ++i) {
             _create(makeAddr(string(abi.encodePacked("buyer", vm.toString(i)))));
         }
-
-        s_feeHandler = new R81FeeHandlerHarness(
-            IFeeHandler.FeeSettings({
-                minFeeRate: 100,
-                maxFeeRate: 100,
-                feePurchaseLowerBound: 1000 ether,
-                feePurchaseUpperBound: 100_000 ether
-            })
-        );
     }
 
     function test_purchase_oneRow_firstAnchor_writesSlot0Once() public {
@@ -115,8 +95,6 @@ contract R81PackedSlotWritesGasTest is Test {
         console2.log("R81 create slot1 writes", slot1Writes);
         console2.log("R81 create gas", gasUsed);
 
-        // Exact on both profiles. The struct literal was 5+2 (default) and 5+1 (deploy). An upper
-        // bound would let a deploy regression from 1+1 back to 2+1 pass.
         assertEq(slot0Writes, 1, "slot 0 was not stored once");
         assertEq(slot1Writes, 1, "slot 1 was not stored once");
         assertEq(_readCount(accesses, address(s_manager), slot0), 1, "slot 0 was read more than once");
@@ -130,78 +108,6 @@ contract R81PackedSlotWritesGasTest is Test {
         assertEq(schedule.routeIndex, ROUTE_INDEX);
         assertEq(schedule.user, buyer);
         assertEq(schedule.purchaseAmount, PURCHASE_AMOUNT);
-    }
-
-    function test_setFeeRateParams_allFourFields_writesTheFeeWordOnce() public {
-        uint256 newMin = 50;
-        uint256 newMax = 200;
-        uint256 newLower = 100 ether;
-        uint256 newUpper = 5000 ether;
-
-        vm.expectEmit(address(s_feeHandler));
-        emit IFeeHandler.FeeHandler__MinFeeRateSet(newMin);
-        vm.expectEmit(address(s_feeHandler));
-        emit IFeeHandler.FeeHandler__MaxFeeRateSet(newMax);
-        vm.expectEmit(address(s_feeHandler));
-        emit IFeeHandler.FeeHandler__PurchaseLowerBoundSet(newLower);
-        vm.expectEmit(address(s_feeHandler));
-        emit IFeeHandler.FeeHandler__PurchaseUpperBoundSet(newUpper);
-
-        uint256 snap = vm.snapshot();
-        uint256 gasBefore = gasleft();
-        s_feeHandler.setFeeRateParams(newMin, newMax, newLower, newUpper);
-        uint256 gasUsed = gasBefore - gasleft();
-        vm.revertTo(snap);
-
-        vm.startStateDiffRecording();
-        s_feeHandler.setFeeRateParams(newMin, newMax, newLower, newUpper);
-        Vm.AccountAccess[] memory accesses = vm.stopAndReturnStateDiff();
-
-        uint256 writes = _writeCount(accesses, address(s_feeHandler), bytes32(FEE_WORD_SLOT));
-        console2.log("R81 fee word writes", writes);
-        console2.log("R81 fee gas", gasUsed);
-        assertEq(writes, 1, "changing all four fee fields stored the word more than once");
-
-        IFeeHandler.FeeSettings memory settings = s_feeHandler.getFeeSettings();
-        assertEq(settings.minFeeRate, newMin);
-        assertEq(settings.maxFeeRate, newMax);
-        assertEq(settings.feePurchaseLowerBound, newLower);
-        assertEq(settings.feePurchaseUpperBound, newUpper);
-    }
-
-    function test_setFeeRateParams_partialChange_emitsOnlyChangedFieldsAndWritesOnce() public {
-        uint256 newMin = 50;
-        uint256 newUpper = 5000 ether;
-
-        vm.recordLogs();
-        vm.startStateDiffRecording();
-        s_feeHandler.setFeeRateParams(newMin, 100, 1000 ether, newUpper);
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        Vm.AccountAccess[] memory accesses = vm.stopAndReturnStateDiff();
-
-        assertEq(_writeCount(accesses, address(s_feeHandler), bytes32(FEE_WORD_SLOT)), 1);
-        assertEq(logs.length, 2, "unchanged fee fields emitted");
-        assertEq(logs[0].topics[0], keccak256("FeeHandler__MinFeeRateSet(uint256)"));
-        assertEq(logs[1].topics[0], keccak256("FeeHandler__PurchaseUpperBoundSet(uint256)"));
-        assertEq(abi.decode(logs[0].data, (uint256)), newMin);
-        assertEq(abi.decode(logs[1].data, (uint256)), newUpper);
-
-        IFeeHandler.FeeSettings memory settings = s_feeHandler.getFeeSettings();
-        assertEq(settings.minFeeRate, newMin);
-        assertEq(settings.maxFeeRate, 100);
-        assertEq(settings.feePurchaseLowerBound, 1000 ether);
-        assertEq(settings.feePurchaseUpperBound, newUpper);
-    }
-
-    function test_setFeeRateParams_unchanged_emitsNothingAndDoesNotWrite() public {
-        vm.recordLogs();
-        vm.startStateDiffRecording();
-        s_feeHandler.setFeeRateParams(100, 100, 1000 ether, 100_000 ether);
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        Vm.AccountAccess[] memory accesses = vm.stopAndReturnStateDiff();
-
-        assertEq(_writeCount(accesses, address(s_feeHandler), bytes32(FEE_WORD_SLOT)), 0);
-        assertEq(logs.length, 0, "an unchanged fee update emitted");
     }
 
     function _assertPurchaseSlot0Writes(uint256 rows, bool laterPurchase) private {
@@ -244,20 +150,22 @@ contract R81PackedSlotWritesGasTest is Test {
         s_manager.createDcaSchedule(s_token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
     }
 
-    function _scheduleIds(uint256 rows) private pure returns (uint64[] memory scheduleIds) {
-        scheduleIds = new uint64[](rows);
+    function _buy(uint64[] memory scheduleIds) private {
+        IDcaManager.Batch memory batch =
+            IDcaManager.Batch({token: s_token, scheduleIds: scheduleIds, routeIndex: ROUTE_INDEX, minRbtcOut: 0});
+        vm.prank(s_swapper);
+        s_manager.batchBuyRbtc(batch);
+    }
+
+    function _scheduleIds(uint256 rows) private view returns (uint64[] memory ids) {
+        ids = new uint64[](rows);
         for (uint256 i; i < rows; ++i) {
-            scheduleIds[i] = uint64(i + 1);
+            ids[i] = uint64(i + 1);
         }
     }
 
-    function _buy(uint64[] memory scheduleIds) private {
-        vm.prank(s_swapper);
-        s_manager.batchBuyRbtc(
-            IDcaManager.Batch({
-                scheduleIds: scheduleIds, token: s_token, routeIndex: ROUTE_INDEX, minRbtcOut: 0
-            })
-        );
+    function _dayStart(uint256 timestamp) private pure returns (uint256) {
+        return timestamp - (timestamp % 1 days);
     }
 
     function _scheduleSlots(address token, uint64 scheduleId) private pure returns (bytes32 slot0, bytes32 slot1) {
@@ -269,7 +177,7 @@ contract R81PackedSlotWritesGasTest is Test {
     function _writeCount(Vm.AccountAccess[] memory accesses, address account, bytes32 slot)
         private
         pure
-        returns (uint256 count)
+        returns (uint256)
     {
         return _accessCount(accesses, account, slot, true);
     }
@@ -277,7 +185,7 @@ contract R81PackedSlotWritesGasTest is Test {
     function _readCount(Vm.AccountAccess[] memory accesses, address account, bytes32 slot)
         private
         pure
-        returns (uint256 count)
+        returns (uint256)
     {
         return _accessCount(accesses, account, slot, false);
     }
@@ -287,20 +195,16 @@ contract R81PackedSlotWritesGasTest is Test {
         pure
         returns (uint256 count)
     {
-        uint256 n = accesses.length;
-        for (uint256 i; i < n; ++i) {
+        for (uint256 i; i < accesses.length; ++i) {
+            if (accesses[i].account != account) continue;
             Vm.StorageAccess[] memory storageAccesses = accesses[i].storageAccesses;
-            uint256 m = storageAccesses.length;
-            for (uint256 j; j < m; ++j) {
-                Vm.StorageAccess memory access = storageAccesses[j];
-                if (access.account == account && access.slot == slot && access.isWrite == writes && !access.reverted) {
-                    ++count;
+            for (uint256 j; j < storageAccesses.length; ++j) {
+                if (storageAccesses[j].slot == slot && storageAccesses[j].isWrite == writes) {
+                    unchecked {
+                        ++count;
+                    }
                 }
             }
         }
-    }
-
-    function _dayStart(uint256 timestamp) private pure returns (uint256) {
-        return timestamp - (timestamp % 1 days);
     }
 }

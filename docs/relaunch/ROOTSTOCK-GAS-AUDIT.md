@@ -41,7 +41,7 @@ The stub handler moves no tokens, so handler-side storage (`s_idleBalances`, `s_
 | 2 | Storage `ReentrancyGuard` does two `RESET`s per guarded call | user, 12 entry points | −2,800 / call | **−9,900 / call** | [R82](./R82-transient-reentrancy-guard.md) |
 | 3 | `createDcaSchedule` struct literal writes slot 0 five times | user, per create | −1,052 | **−15,600** (deploy) | [R81](./R81-one-write-per-packed-slot.md) |
 | 4 | Exact-amount approvals go 0 → X → 0 every use (router per Dex batch; lending spender per deposit) | protocol / user | ~−2,300 net | **~−10,400 / use** steady-state, after a one-time ~20,000 at deploy (break-even ≈ 2–4 uses) | [R83](./R83-standing-spender-approvals.md) (product gate) |
-| 5 | `setFeeRateParams` writes the packed fee word up to four times | owner | small | up to −15,000 | [R81](./R81-one-write-per-packed-slot.md) |
+| 5 | `setFeeRateParams` writes the packed fee word up to four times | owner | small | up to −15,000 | [R81](./R81-one-write-per-packed-slot.md) measured, declined |
 | 6 | `withdrawTokenAndInterest` resolves the same handler twice | user, per call | −1,194 | ≈ **−1,900** (deploy) | [R84](./R84-no-repeated-registry-reads.md) |
 | 7 | Deposit routing, `topUpFromInterest`, and `withdrawAllAccumulatedInterest` each make two registry calls for one route | user, per call / per pair | −341 to −351 | ≈ −940 to −950 (deploy) | [R84](./R84-no-repeated-registry-reads.md) |
 
@@ -84,6 +84,9 @@ adjacent with nothing that can revert, log, or call between them. Cancun prices 
   slot share a word (four ids per word). That is +5,000 user gas on a rare call. Assigning then
   popping, in either order, is two read-modify-writes of the same word, and merging them needs
   assembly. Accepted.
+- **`setFeeRateParams` writes the fee word up to four times.** Measured in R81 (−16,200 / −15,600
+  Rootstock when all four change). Declined: owner-only and at most yearly; keep the per-field
+  if/write/emit shape. R81 ships purchase and create only.
 - **Four `SLOAD`s of schedule slot 0 per purchase row** (about 600 gas of re-reads at 200 each), counted
   before R81. The merged write removes one of those reads on the default profile and two under deploy;
   the rest are field reads the optimizer does not CSE across the checks. Not worth a memory copy of the

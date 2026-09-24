@@ -4,11 +4,12 @@ Status: **implemented** · GitHub [#142](https://github.com/BitChillRSK/dca-cont
 
 ## Objective
 
-Stop the compiler from writing the same packed storage word several times in one call on three paths:
-each purchase row's `DcaSchedule` slot 0 in `_rBtcPurchaseChecksEffects`, the new schedule in
-`createDcaSchedule`, and the fee word in `FeeHandler.setFeeRateParams`. Rootstock charges every extra
-write a full `RESET` (5,000). Foundry charges a warm rewrite about 100, so the waste never showed up in
-review. No behavior, ABI, event, event-order, or storage-layout change, and no assembly.
+Stop the compiler from writing the same packed storage word several times in one call on the purchase
+row's `DcaSchedule` slot 0 in `_rBtcPurchaseChecksEffects` and the new schedule in `createDcaSchedule`.
+Rootstock charges every extra write a full `RESET` (5,000). Foundry charges a warm rewrite about 100,
+so the waste never showed up in review. No behavior, ABI, event, event-order, or storage-layout change,
+and no assembly. The fee-word path in `setFeeRateParams` was measured and declined: owner-only and
+rare (at most yearly); the per-field if/write/emit shape is clearer.
 
 ## Background
 
@@ -70,9 +71,9 @@ inside the helper still stores slot 0 twice under deploy.
 
 **`FeeHandler.setFeeRateParams`.** Since R78 all four fee fields share one word. The setter compares,
 casts, writes, and emits per field, so changing all four writes the word four times: 21,000 RSK
-storage under deploy vs 9,104 Cancun. With every cast done first and the writes kept adjacent, a
-single `RESET` (5,000) should remain. This path is owner-only and rare, but it is the same defect and
-the same fix.
+storage under deploy vs 9,104 Cancun. Merging the writes was measured (Foundry **−782 / −496**,
+Rootstock **−16,200 / −15,600**) and **declined**: the path is owner-only and at most yearly, and the
+per-field if/write/emit shape is easier to read. R81 does not change `FeeHandler.sol`.
 
 ## Open product decisions
 
@@ -90,10 +91,8 @@ the same fix.
       `routeIndex` precedes `purchasePeriod` because declaration order still stores slot 0 twice
       under deploy. Zero `cadenceAnchor` and `paused` stay unset because a new id addresses empty
       storage. Both profiles store slots 0 and 1 once each.
-- [x] `setFeeRateParams`: validate and cast all four arguments before the first write, assign the
-      packed word once when anything changed (unchanged fields are written with their current value
-      so the assignments stay together), then emit the per-field events in today's order for the
-      fields that changed. All four changing is one write on both profiles.
+- [x] `setFeeRateParams`: **declined.** Measured, then left as the per-field if/write/emit shape.
+      See Background.
 - [x] Add `test/gas/R81PackedSlotWritesGas.t.sol`, which counts writes per slot with
       `vm.startStateDiffRecording()` / `vm.stopAndReturnStateDiff()` (the `isWrite` storage accesses).
 - [x] Existing Foundry gas pins (`test/gas/R64*`, `R77*`, `R78*`) did not move. R77 and R78 were re-run.
@@ -106,12 +105,12 @@ the same fix.
 - [ ] R80 (removing the cadence event) and R79 (coalescing writes for a repeated buyer across rows).
 - [ ] The swap-and-pop double write in `deleteDcaSchedule` (closed in the audit record).
 - [ ] Any change to `DcaSchedule` field order or width, `ProtocolSettings`, or the fee layout.
+- [ ] Merging `setFeeRateParams` into one fee-word write (measured and declined; owner-rare).
 - [ ] The reentrancy guard (R82).
 
 ## Files likely touched
 
 - `src/DcaManager.sol`
-- `src/FeeHandler.sol`
 - `test/gas/R81PackedSlotWritesGas.t.sol` (new)
 - `test/gas/R64BatchGasBenchmark.t.sol`, `test/gas/R77AccumulatedRbtcSentinelGas.t.sol`,
   `test/gas/R78FlatFeeFastPathGas.t.sol` (only pins that move)
@@ -124,19 +123,16 @@ the same fix.
   `batchBuyRbtc`, on both profiles, for both a first purchase (anchor 0) and a later one.
 - Assert that `createDcaSchedule` writes fewer times to slots 0 and 1 than today on both profiles.
   Record the exact per-profile counts in the PR.
-- Assert that `setFeeRateParams` changing all four fields writes the fee word fewer than four times
-  (target one). Record the count in the PR.
 - Behavior must not change: `getDcaSchedule` after create returns `cadenceAnchor == 0` and
-  `paused == false`; events and their order are unchanged on purchase, create, and set-fee. The
-  existing suites cover this and must stay green.
+  `paused == false`; events and their order are unchanged on purchase and create. The existing
+  suites cover this and must stay green.
 - `make check`, `make check-deploy`; fork lanes per `AGENTS.md`. No fork-specific assertions.
 
 ## Success criteria
 
 - [x] One `SSTORE` to slot 0 per purchase row on both profiles.
-- [x] `createDcaSchedule` and `setFeeRateParams` write counts are pinned exactly, on both profiles.
-      Create stores slots 0 and 1 once each. The fee word is one write when any field changes, and
-      zero writes when nothing changes. Events fire only for the fields that changed.
+- [x] `createDcaSchedule` write counts are pinned exactly on both profiles (slots 0 and 1 once each).
+- [x] `setFeeRateParams` left readable; merge measured and declined (see Background).
 - [x] Each saving is stated on both schedules: Foundry/Cancun measured, Rootstock derived as
       5,000 per removed `RESET` plus 200 per removed `SLOAD`. See the R81 entry in
       `IMPLEMENTATION_ORDER.md`.

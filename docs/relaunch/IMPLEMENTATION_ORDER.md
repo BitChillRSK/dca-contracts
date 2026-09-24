@@ -141,7 +141,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R77 | post-R74 gas encoding | none (accumulated-rBTC `claimable + 1` storage sentinel) |
 | R78 | post-R77 gas fast path | none (flat-fee batches skip the unused fee-bound storage word) |
 | R80 | post-R78, before relaunch deploy | remove `DcaManager__CadenceAnchorUpdated` (decided 2026-09-23); five-repo event cutover |
-| R81 | post-R80, before relaunch deploy | none (one `SSTORE` per packed slot: purchase row, create, fee setter) |
+| R81 | post-R80, before relaunch deploy | none (one `SSTORE` per packed slot: purchase row, create; fee setter measured and declined) |
 | R82 | post-R81, before relaunch deploy | none (`ReentrancyGuardTransient`; same guarded set) |
 | R83 | post-R82, before relaunch deploy | **standing vs per-use approvals** for the Uniswap router and the lending spender |
 | R84 | post-R83, before relaunch deploy | none (no repeated registry reads; the `getRouteInfo` view may be dropped, keeping the internal `withdrawTokenAndInterest` fix) |
@@ -1108,9 +1108,8 @@ regression deltas on the same harness, not the production bill.
   1 write and 0 reads of slot 1), down from 5+2 and 5+1. `routeIndex` is assigned before
   `purchasePeriod`; declaration order still stores slot 0 twice under deploy. Foundry **−2,178** /
   **−1,273**. Rootstock **−26,200** / **−20,800**.
-- `setFeeRateParams` changing all four fields stores the fee word once, down from four. Foundry
-  **−782** / **−496**. Rootstock **−16,200** (default: three `RESET`s and six `SLOAD`s) / **−15,600**
-  (deploy: three `RESET`s and three `SLOAD`s).
+- `setFeeRateParams` merge measured (Foundry **−782** / **−496**, Rootstock **−16,200** /
+  **−15,600**) and declined: owner-only, at most yearly; keep the per-field if/write/emit shape.
 
 No ABI, event, or layout change. Ask: none.
 
