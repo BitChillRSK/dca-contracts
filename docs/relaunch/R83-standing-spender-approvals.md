@@ -169,6 +169,21 @@ Rootstock does not: `SET` 20,000 + `CLEAR` 5,000 − `REFUND` 15,000 = **10,000*
 the `approve` call. The same test pins the Dex batch at **zero** allowance-slot writes. Against that, each
 handler pays one 20,000 `SET` per standing approval at deploy, once, by the deployer.
 
+## Reviewed and kept as-is
+
+Two review points were considered and deliberately not changed.
+
+**The deposit top-up re-approves the exact amount, not `max`.** If it ever fired, the handler would go
+back to paying the allowance round trip on every deposit rather than restoring the standing approval.
+That branch needs roughly 2²⁵⁶ wei of cumulative spend to become reachable, so it is unreachable in
+practice; and keeping the runtime fallback exact means no runtime path can ever widen an allowance —
+the unbounded one is granted once, in construction, which is the state that gets audited. The spec
+assigned "keep the existing top-up", and this is why keeping it unchanged is the right reading.
+
+**The `allowance()` read stays on the deposit path**, about 900 Rootstock gas (a 700 call plus a 200
+read). Dropping it would save that on every deposit but would delete the fallback above. It is present
+in both the before and after shapes, so it does not affect any figure quoted here.
+
 ## Scope
 
 - [x] Fork-measure whether DOC, USDRIF, and USDT0 decrement a `type(uint256).max` allowance on
