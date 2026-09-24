@@ -151,6 +151,20 @@ interface IOperationsAdmin {
     function getTokenHandler(address token, uint256 routeIndex) external view returns (address handler);
 
     /**
+     * @notice Everything the registry records about one pair, in one call.
+     * @param token The stablecoin.
+     * @param routeIndex The route index. Must fit `uint32`.
+     * @return tokenRoute The pair's handler and deposit pause; `(address(0), false)` if unassigned.
+     * @return routeClass The class of `routeIndex`, which does not depend on `token`.
+     * @dev For a caller that needs more than one of these facts: the same answers as
+     *      `getTokenHandler`, `areDepositsPaused`, and `getRouteClass`, for one call instead of several.
+     */
+    function getRouteInfo(address token, uint256 routeIndex)
+        external
+        view
+        returns (TokenRoute memory tokenRoute, RouteClass routeClass);
+
+    /**
      * @notice Whether new deposits to `(token, routeIndex)` are currently blocked.
      * @param token The stablecoin.
      * @param routeIndex The route index. Must fit `uint32`.

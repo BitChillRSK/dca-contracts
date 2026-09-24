@@ -672,6 +672,9 @@ contract OperationsAdminTest is DcaDappTest {
 
         vm.expectRevert(_routeIndexOverflow(overflowing));
         operationsAdmin.getRouteClass(overflowing);
+
+        vm.expectRevert(_routeIndexOverflow(overflowing));
+        operationsAdmin.getRouteInfo(address(stablecoin), overflowing);
     }
 
     function testInRangeRouteIndexGettersAreUnchanged() external {
@@ -679,6 +682,40 @@ contract OperationsAdminTest is DcaDappTest {
         assertFalse(operationsAdmin.areDepositsPaused(address(stablecoin), s_routeIndex));
         assertEq(operationsAdmin.getTokenHandler(address(stablecoin), SECOND_IDLE_INDEX), address(0));
         assertFalse(operationsAdmin.areDepositsPaused(address(stablecoin), SECOND_IDLE_INDEX));
+    }
+
+    function testGetRouteInfoReturnsHandlerPauseAndClass() external {
+        (IOperationsAdmin.TokenRoute memory tokenRoute, IOperationsAdmin.RouteClass routeClass) =
+            operationsAdmin.getRouteInfo(address(stablecoin), s_routeIndex);
+        assertEq(tokenRoute.handler, address(stablecoinHandler));
+        assertFalse(tokenRoute.depositsPaused);
+        IOperationsAdmin.RouteClass expectedClass = operationsAdmin.isLendingRoute(s_routeIndex)
+            ? IOperationsAdmin.RouteClass.Lending
+            : IOperationsAdmin.RouteClass.Idle;
+        assertEq(uint256(routeClass), uint256(expectedClass));
+
+        vm.prank(OWNER);
+        operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, true);
+        (tokenRoute, routeClass) = operationsAdmin.getRouteInfo(address(stablecoin), s_routeIndex);
+        assertEq(tokenRoute.handler, address(stablecoinHandler), "pausing moved the handler");
+        assertTrue(tokenRoute.depositsPaused);
+        assertEq(uint256(routeClass), uint256(expectedClass), "pausing changed the route class");
+    }
+
+    function testGetRouteInfoOnUnassignedPairReadsZeroHandlerAndTheIndexClass() external {
+        (IOperationsAdmin.TokenRoute memory tokenRoute, IOperationsAdmin.RouteClass routeClass) =
+            operationsAdmin.getRouteInfo(address(stablecoin), SECOND_LENDING_INDEX);
+        assertEq(tokenRoute.handler, address(0));
+        assertFalse(tokenRoute.depositsPaused);
+        assertEq(uint256(routeClass), uint256(IOperationsAdmin.RouteClass.Unregistered));
+
+        // The class belongs to the index, not the pair: registering it shows through an unassigned pair.
+        vm.prank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        (tokenRoute, routeClass) = operationsAdmin.getRouteInfo(address(stablecoin), SECOND_LENDING_INDEX);
+        assertEq(tokenRoute.handler, address(0));
+        assertFalse(tokenRoute.depositsPaused);
+        assertEq(uint256(routeClass), uint256(IOperationsAdmin.RouteClass.Lending));
     }
 
     /*//////////////////////////////////////////////////////////////

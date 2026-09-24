@@ -123,13 +123,20 @@ contract WithdrawAllRoutePairsTest is BaseDeploymentTest {
         // The cross pair is never resolved and its handler is never called.
         vm.expectCall(
             address(operationsAdmin),
-            abi.encodeCall(IOperationsAdmin.getTokenHandler, (address(tokenOne), ROUTE_TWO)),
+            abi.encodeCall(IOperationsAdmin.getRouteInfo, (address(tokenOne), ROUTE_TWO)),
             0
         );
         vm.expectCall(address(handlerOneTwo), abi.encodeWithSelector(ITokenLending.withdrawInterest.selector), 0);
-        // One lending-class lookup per pair, not one per combination: the cartesian form made four.
-        vm.expectCall(address(operationsAdmin), abi.encodeCall(IOperationsAdmin.isLendingRoute, (ROUTE_ONE)), 1);
-        vm.expectCall(address(operationsAdmin), abi.encodeCall(IOperationsAdmin.isLendingRoute, (ROUTE_TWO)), 1);
+        // One registry lookup per pair, not one per combination (the cartesian form made four), and
+        // that one lookup answers both the handler and the lending class.
+        vm.expectCall(
+            address(operationsAdmin), abi.encodeCall(IOperationsAdmin.getRouteInfo, (address(tokenOne), ROUTE_ONE)), 1
+        );
+        vm.expectCall(
+            address(operationsAdmin), abi.encodeCall(IOperationsAdmin.getRouteInfo, (address(tokenTwo), ROUTE_TWO)), 1
+        );
+        vm.expectCall(address(operationsAdmin), abi.encodeWithSelector(IOperationsAdmin.isLendingRoute.selector), 0);
+        vm.expectCall(address(operationsAdmin), abi.encodeWithSelector(IOperationsAdmin.getTokenHandler.selector), 0);
 
         vm.prank(USER);
         dcaManager.withdrawAllAccumulatedInterest(tokens, routeIndexes);

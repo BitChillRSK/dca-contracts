@@ -172,6 +172,18 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
     /**
      * @inheritdoc IOperationsAdmin
      */
+    function getRouteInfo(address token, uint256 routeIndex)
+        external
+        view
+        returns (TokenRoute memory tokenRoute, RouteClass routeClass)
+    {
+        uint32 route = routeIndex.toUint32();
+        return (s_tokenRoute[token][route], s_routeClass[route]);
+    }
+
+    /**
+     * @inheritdoc IOperationsAdmin
+     */
     function areDepositsPaused(address token, uint256 routeIndex) external view returns (bool) {
         return s_tokenRoute[token][routeIndex.toUint32()].depositsPaused;
     }
