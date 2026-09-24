@@ -45,7 +45,18 @@ interface IAavePoolLike {
         uint16 referralCode
     ) external;
     function FLASHLOAN_PREMIUM_TOTAL() external view returns (uint128);
-    function getConfiguration(address asset) external view returns (uint256);
+    function ADDRESSES_PROVIDER() external view returns (address);
+}
+
+interface IAaveAddressesProviderLike {
+    function getPoolDataProvider() external view returns (address);
+}
+
+/// @dev Aave's own decoder for the reserve bitmap. Used instead of shifting `getConfiguration` here,
+///      so a probe that is meant to catch a configuration change cannot itself hold a stale bit index.
+interface IAaveDataProviderLike {
+    function getFlashLoanEnabled(address asset) external view returns (bool);
+    function getPaused(address asset) external view returns (bool);
 }
 
 interface ISovrynFlashBorrowLike {
@@ -94,9 +105,6 @@ contract StandingApprovalProbe is Test {
     ///      underlying is DOC) and `LayerBankErc20Handler._lendingSpender()` (the Aave-v3 Pool).
     address internal constant ISUSD = 0xd8D25f03EBbA94E15Df2eD4d6D38276B595593c1;
     address internal constant LAYERBANK_POOL = 0x526D06c65777eA6D56d7a1Dd47cD79230dDf72E9;
-    address internal constant LAYERBANK_POOL_CONFIGURATOR = 0x72F712EFD09cc5683a07BE5dB7f3fd00Cc593922;
-    /// @dev Aave's `ReserveConfigurationMap` bit for "flash loans enabled on this reserve".
-    uint256 internal constant FLASH_LOAN_ENABLED_BIT = 80;
 
     address internal victim;
     address internal attacker;
@@ -272,42 +280,83 @@ contract StandingApprovalProbe is Test {
      *      2. A lending handler declares no `executeOperation` and no `fallback`, so the callback into it
      *         reverts and takes the flash loan with it. That is the precondition the handler headers
      *         state, and `StandingApprovalFallbackTest` asserts it against a real handler.
+     *
+     *      (1) is checked twice over, because a declarative check alone is easy to get wrong: once
+     *      through Aave's own `getFlashLoanEnabled`, and once by actually calling `flashLoanSimple` and
+     *      requiring the refusal to be `91`, `FLASHLOAN_DISABLED`, rather than any other Aave error. An
+     *      earlier draft shifted `getConfiguration` by a hand-written bit index and read the wrong bit
+     *      (80, the low bit of the borrow cap, rather than 63); it passed only because every live borrow
+     *      cap happened to be even. Neither check here carries a bit index.
      */
-    function test_layerBankFlashLoanFlag_isOffForEveryShippedStablecoin() public {
-        assertFalse(_flashLoanEnabled(DOC), "LayerBank enabled DOC flash loans; re-check the precondition");
-        assertFalse(_flashLoanEnabled(USDRIF), "LayerBank enabled USDRIF flash loans; re-check the precondition");
-        assertFalse(_flashLoanEnabled(USDT0), "LayerBank enabled USDT0 flash loans; re-check the precondition");
+    function test_layerBankFlashLoans_areDisabledForEveryShippedStablecoin() public {
+        _assertFlashLoansDisabled("DOC", DOC);
+        _assertFlashLoansDisabled("USDRIF", USDRIF);
+        _assertFlashLoansDisabled("USDT0", USDT0);
         console2.log("LayerBank flash-loan premium if ever enabled (bps)", IAavePoolLike(LAYERBANK_POOL).FLASHLOAN_PREMIUM_TOTAL());
     }
 
     /**
-     * @notice Sovryn's iSUSD can make itself call an arbitrary contract through `flashBorrowToken`, and
-     *         that entry point is disabled today.
-     * @dev bZx's loan tokens route a flash borrow through an arbitrary `target` call, which is the same
-     *      shape as the LayerBank case: reachable only if the approver answers. It is inert right now —
-     *      the logic proxy has no active target for the selector — but that is a Sovryn governance
-     *      setting, not a property of the code, so this assertion is here to fail loudly if it changes.
+     * @notice Sovryn's iSUSD registers no implementation for bZx's `flashBorrowToken`, which is what
+     *         keeps the standing iSUSD approval out of reach of that entry point.
+     * @dev This is **not** the same shape as the LayerBank case, and an earlier draft of this file said
+     *      it was. Aave's flash loan needs the victim to answer `executeOperation`, so declaring no
+     *      callback is a defence. bZx's `flashBorrowToken` instead lets its caller name both a `target`
+     *      and the calldata to send it, and the victim answers nothing: whether a standing iSUSD
+     *      allowance would be exposed turns on who `msg.sender` is at that `target` — the loan token
+     *      itself, or a separate relay contract. We have not established which, because the shipped
+     *      Sovryn source tree does not implement the function at all, so there is no live call path to
+     *      read. The defence here is therefore Sovryn governance, not BitChill's callback shape.
+     *
+     *      The assertion is on the exact refusal string, not merely on reverting. A reinstated
+     *      `flashBorrowToken` would also revert for this input — it lends 1e18 to the attacker, calls an
+     *      empty target and is never repaid — so a bare `assertFalse(ok)` would keep passing through
+     *      precisely the change it exists to catch.
      */
-    function test_sovrynFlashBorrow_isDisabled() public {
+    function test_sovrynFlashBorrow_isNotImplemented() public {
         vm.prank(attacker);
         (bool ok, bytes memory reason) = ISUSD.call(
             abi.encodeCall(ISovrynFlashBorrowLike.flashBorrowToken, (1e18, attacker, attacker, "", ""))
         );
         assertFalse(ok, "Sovryn flash borrow is live again; re-examine the standing iSUSD approval");
-        console2.log("Sovryn flashBorrowToken refusal", string(_revertReason(reason)));
+        assertEq(
+            _revertReason(reason),
+            "LoanTokenLogicProxy:target not active",
+            "iSUSD answered flashBorrowToken; re-examine the standing iSUSD approval"
+        );
     }
 
-    function _flashLoanEnabled(address asset) private view returns (bool) {
-        return (IAavePoolLike(LAYERBANK_POOL).getConfiguration(asset) >> FLASH_LOAN_ENABLED_BIT) & 1 == 1;
+    function _dataProvider() private view returns (IAaveDataProviderLike) {
+        address provider = IAavePoolLike(LAYERBANK_POOL).ADDRESSES_PROVIDER();
+        return IAaveDataProviderLike(IAaveAddressesProviderLike(provider).getPoolDataProvider());
     }
 
-    function _revertReason(bytes memory reason) private pure returns (bytes memory) {
-        if (reason.length < 68) return bytes("(no reason string)");
-        bytes memory trimmed = new bytes(reason.length - 68);
-        for (uint256 i; i < trimmed.length; ++i) {
-            trimmed[i] = reason[i + 68];
+    /// @dev Both halves of the check for one reserve: what the Pool reports, and what it actually does.
+    function _assertFlashLoansDisabled(string memory name, address asset) private {
+        assertFalse(
+            _dataProvider().getFlashLoanEnabled(asset),
+            string.concat("LayerBank enabled ", name, " flash loans; re-check the precondition")
+        );
+        assertFalse(_dataProvider().getPaused(asset), string.concat(name, " reserve is paused, so the refusal below would not be the flash-loan flag"));
+
+        vm.prank(attacker);
+        (bool ok, bytes memory reason) =
+            LAYERBANK_POOL.call(abi.encodeCall(IAavePoolLike.flashLoanSimple, (attacker, asset, 1e6, "", 0)));
+        assertFalse(ok, string.concat(name, " flash loan went through"));
+        assertEq(
+            _revertReason(reason),
+            "91", // Errors.FLASHLOAN_DISABLED
+            string.concat("expected ", name, " to refuse with FLASHLOAN_DISABLED, not some earlier check")
+        );
+    }
+
+    /// @dev Decodes an `Error(string)` payload. Decoded rather than sliced at a fixed offset: the string
+    ///      is right-padded to a word boundary, so slicing leaves trailing NULs that an `assertEq` sees.
+    function _revertReason(bytes memory reason) private pure returns (string memory) {
+        if (reason.length < 68) return "(no reason string)";
+        assembly {
+            reason := add(reason, 0x04) // step over the `Error(string)` selector
         }
-        return trimmed;
+        return abi.decode(reason, (string));
     }
 }
 
