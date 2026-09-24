@@ -1,6 +1,6 @@
 # R84 — no repeated registry reads
 
-Status: **implemented** · Assigned: yes · Optional/further-review: no
+Status: **implemented** · GitHub [#146](https://github.com/BitChillRSK/dca-contracts/pull/146) · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
