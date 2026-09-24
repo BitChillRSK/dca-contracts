@@ -1203,7 +1203,7 @@ a one-off harness kept at [`02884fe`](https://github.com/BitChillRSK/dca-contrac
 repriced for Rootstock: −1,389 Foundry / ≈ −2,089 Rootstock (default), −1,194 / ≈ **−1,894** (deploy).
 Errors unchanged. ABI change: none.
 
-### R85 - NatSpec delimiter ([spec](./R85-one-line-natspec-slash-style.md))
+### R85 - NatSpec delimiter ([spec](./R85-natspec-delimiter.md))
 
 After R84 and not deployment-bound: one NatSpec tag line uses `///`, not a three-line `/** */`
 wrapper, and NatSpec of two or more lines uses a `/** */` block, not a `///` run (the second half

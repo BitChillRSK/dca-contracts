@@ -153,7 +153,7 @@ limit. The rule covers every first-party `src/` file except the vendored interfa
 only — what a comment says and which side of a pair owns it are **Contract header NatSpec** above and
 [R10](./docs/relaunch/R10-natspec.md). Comments do not move an executable byte, so a delimiter change
 is proven by comparing metadata-stripped runtime, not `forge build --sizes` (see
-[R85](./docs/relaunch/R85-one-line-natspec-slash-style.md)).
+[R85](./docs/relaunch/R85-natspec-delimiter.md)).
 
 ## Tests and done-gate
 
