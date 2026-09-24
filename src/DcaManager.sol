@@ -3,7 +3,7 @@ pragma solidity 0.8.36;
 
 import {IDcaManager} from "./interfaces/IDcaManager.sol";
 import {BitChillOwnable} from "./BitChillOwnable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
 import {ITokenLending} from "./interfaces/ITokenLending.sol";
@@ -20,7 +20,7 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
  *      self-expiring five-block window that blocks only user mutations capable of invalidating a batch
  *      refreshed after activation. Governance can pause new deposits per route, not purchases or exits.
  */
-contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
+contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     using SafeCast for uint256;
 
     /*//////////////////////////////////////////////////////////////
