@@ -79,6 +79,12 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
      *      cover their purchase amount. Clamping here would return a short total that
      *      PurchaseRbtc still splits by the original planned weights, so one underfunded
      *      buyer would dilute every other buyer in the batch.
+     *
+     *      A run of adjacent rows for one buyer is read once and stored once: Rootstock charges a full
+     *      write each time a nonzero slot is stored, even twice in one transaction. Each row still
+     *      checks against the running balance, which is the value storage would hold had every row
+     *      been stored. `runUser` starts at the zero address, which holds no idle balance, so skipping
+     *      its store changes nothing.
      */
     function _batchRetrieveStablecoin(address[] memory users, uint256[] memory purchaseAmounts)
         internal
@@ -86,18 +92,26 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
         override
         returns (uint256 totalWithdrawn)
     {
+        address runUser;
+        uint256 runBalance;
         uint256 numOfPurchases = users.length;
         for (uint256 i; i < numOfPurchases; ++i) {
+            address user = users[i];
+            if (user != runUser) {
+                if (runUser != address(0)) s_idleBalances[runUser] = runBalance;
+                runUser = user;
+                runBalance = s_idleBalances[user];
+            }
             uint256 amount = purchaseAmounts[i];
-            uint256 idleBalance = s_idleBalances[users[i]];
-            if (amount > idleBalance) {
-                revert IdleErc20Handler__InsufficientIdleBalance(users[i], amount, idleBalance);
+            if (amount > runBalance) {
+                revert IdleErc20Handler__InsufficientIdleBalance(user, amount, runBalance);
             }
             unchecked {
-                s_idleBalances[users[i]] = idleBalance - amount;
+                runBalance -= amount;
             }
             totalWithdrawn += amount;
         }
+        if (runUser != address(0)) s_idleBalances[runUser] = runBalance;
     }
 
     /// @dev Clamp `amount` to the user's idle balance and debit it.

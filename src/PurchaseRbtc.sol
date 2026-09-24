@@ -73,16 +73,20 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
             _transferFee(purchaseToken, aggregatedFee);
         }
 
-        uint256 inputBalanceBefore = purchaseToken.balanceOf(address(this));
-        uint256 totalPurchasedRbtc = _purchaseRbtc(totalStablecoinAmountToSpend, minRbtcOut);
-        uint256 inputBalanceAfter = purchaseToken.balanceOf(address(this));
-        if (
-            inputBalanceAfter > inputBalanceBefore
-                || inputBalanceBefore - inputBalanceAfter != totalStablecoinAmountToSpend
-        ) {
-            revert PurchaseRbtc__InputAmountNotFullySpent(
-                totalStablecoinAmountToSpend, inputBalanceBefore, inputBalanceAfter
-            );
+        uint256 totalPurchasedRbtc;
+        // The two balances are scoped to this block because they are dead once consumption is proved.
+        {
+            uint256 inputBalanceBefore = purchaseToken.balanceOf(address(this));
+            totalPurchasedRbtc = _purchaseRbtc(totalStablecoinAmountToSpend, minRbtcOut);
+            uint256 inputBalanceAfter = purchaseToken.balanceOf(address(this));
+            if (
+                inputBalanceAfter > inputBalanceBefore
+                    || inputBalanceBefore - inputBalanceAfter != totalStablecoinAmountToSpend
+            ) {
+                revert PurchaseRbtc__InputAmountNotFullySpent(
+                    totalStablecoinAmountToSpend, inputBalanceBefore, inputBalanceAfter
+                );
+            }
         }
         if (totalPurchasedRbtc == 0) revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(purchaseToken));
         // Checked against the rBTC we measured ourselves receiving, so the bound holds on every purchase
@@ -92,21 +96,39 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
             revert PurchaseRbtc__BelowSwapperMinimum(totalPurchasedRbtc, minRbtcOut);
         }
 
-        uint256 numOfPurchases = buyers.length;
-        for (uint256 i; i < numOfPurchases; ++i) {
+        // Adjacent rows of one buyer are credited once, as a run: Rootstock charges a full write each
+        // time a nonzero slot is stored, even twice in one transaction. Any row order is correct; only
+        // adjacent rows share a write, so the caller groups each buyer's rows to save gas. The loop
+        // re-reads the token and the length rather than holding them, to stay within the stack.
+        address runBuyer;
+        uint256 runRbtc;
+        for (uint256 i; i < buyers.length; ++i) {
             // Planned nets are allocation weights only: they sum to totalNetStablecoinPlanned, so each row
             // takes its share of what actually moved even if the redemption paid less than planned. Both
             // shares floor, which can leave under one wei of rBTC per row uncredited; see IPurchaseRbtc.
             uint256 plannedNet = netStablecoinAmountsToSpend[i];
             address buyer = buyers[i];
             uint256 usersPurchasedRbtc = totalPurchasedRbtc * plannedNet / totalNetStablecoinPlanned;
-            uint256 usersStablecoinSpent = totalStablecoinAmountToSpend * plannedNet / totalNetStablecoinPlanned;
-            // Skip zero floor allocations so a never-credited user is not marked live.
-            if (usersPurchasedRbtc != 0) _creditRbtc(buyer, usersPurchasedRbtc);
             emit PurchaseRbtc__RbtcBought(
-                buyer, address(purchaseToken), usersPurchasedRbtc, scheduleIds[i], usersStablecoinSpent
+                buyer,
+                address(_purchaseToken()),
+                usersPurchasedRbtc,
+                scheduleIds[i],
+                totalStablecoinAmountToSpend * plannedNet / totalNetStablecoinPlanned
             );
+            if (buyer != runBuyer) {
+                // Skip a run of zero floor allocations so a never-credited user is not marked live.
+                if (runRbtc != 0) _creditRbtc(runBuyer, runRbtc);
+                runBuyer = buyer;
+                runRbtc = usersPurchasedRbtc;
+            } else {
+                // Cannot overflow: the floored row shares sum to at most totalPurchasedRbtc.
+                unchecked {
+                    runRbtc += usersPurchasedRbtc;
+                }
+            }
         }
+        if (runRbtc != 0) _creditRbtc(runBuyer, runRbtc);
         emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
             address(purchaseToken), totalPurchasedRbtc, totalStablecoinAmountToSpend
         );

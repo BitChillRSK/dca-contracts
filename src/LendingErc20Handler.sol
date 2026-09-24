@@ -199,23 +199,39 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
     ) internal virtual override returns (uint256) {
         uint256 exchangeRate = _exchangeRate();
         uint256 totalSharesToRedeem;
+        // A run of adjacent rows for one user is read once and stored once, before the protocol call:
+        // Rootstock charges a full write each time a nonzero slot is stored, even twice in one
+        // transaction. Each row still checks and logs against the running balance, which is the value
+        // storage would hold had every row been stored. `runUser` starts at the zero address, which
+        // holds no shares, so skipping its store changes nothing.
+        address runUser;
+        uint256 runShares;
 
         uint256 numOfPurchases = users.length;
         for (uint256 i; i < numOfPurchases; ++i) {
+            address user = users[i];
+            if (user != runUser) {
+                if (runUser != address(0)) s_shares[runUser] = runShares;
+                runUser = user;
+                runShares = s_shares[user];
+            }
             uint256 usersSharesToRedeem = _stablecoinToShares(purchaseAmounts[i], exchangeRate);
-            uint256 usersShares = s_shares[users[i]];
-            if (usersSharesToRedeem > usersShares) {
-                revert TokenLending__InsufficientShares(users[i], usersSharesToRedeem, usersShares);
+            if (usersSharesToRedeem > runShares) {
+                revert TokenLending__InsufficientShares(user, usersSharesToRedeem, runShares);
             }
+            uint256 newShares;
             unchecked {
-                _setUserShares(users[i], usersShares, usersShares - usersSharesToRedeem);
+                newShares = runShares - usersSharesToRedeem;
             }
+            _logUserShares(user, runShares, newShares);
+            runShares = newShares;
             totalSharesToRedeem += usersSharesToRedeem;
             // Per-user facts on this path are `UserSharesUpdated` (exact virtual debit) and, after
             // the protocol call, one measured `SharesRedeemedBatch`. Do not emit `SharesRedeemed`
             // here: that event's `underlyingAmount` is measured cash on single redeems, and the
             // planned gross is not measured cash.
         }
+        if (runUser != address(0)) s_shares[runUser] = runShares;
         uint256 stablecoinReceived = _measuredProtocolRedeem(totalSharesToRedeem, exchangeRate);
         if (stablecoinReceived > 0) {
             emit TokenLending__SharesRedeemedBatch(stablecoinReceived, totalSharesToRedeem);
@@ -289,11 +305,18 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
 
     /**
      * @dev Write the user's virtual share balance and emit the canonical transition.
-     *      No log when the balance is unchanged, so a zero-share debit is silent.
      *      Callers pass the already-loaded `previousShares` to avoid a second SLOAD.
      */
     function _setUserShares(address user, uint256 previousShares, uint256 newShares) private {
         s_shares[user] = newShares;
+        _logUserShares(user, previousShares, newShares);
+    }
+
+    /**
+     * @dev Emit the canonical share transition. No log when the balance is unchanged, so a zero-share
+     *      debit is silent. The batch path calls this per row and stores once per run.
+     */
+    function _logUserShares(address user, uint256 previousShares, uint256 newShares) private {
         if (previousShares != newShares) {
             emit TokenLending__UserSharesUpdated(user, previousShares, newShares);
         }
