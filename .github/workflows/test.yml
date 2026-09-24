@@ -78,3 +78,24 @@ jobs:
         env:
           STABLECOIN_TYPE: ${{ matrix.stablecoin }}
         run: make ${{ matrix.target }}
+
+  # The matrix above is FOUNDRY_PROFILE=ci (via_ir=false). R81's write counts are a codegen result,
+  # and the profile that ships is via_ir. A solc bump that split the packed stores only under IR
+  # would leave this matrix green. This job runs that one test under the deploy profile.
+  r81-deploy-codegen:
+    name: r81 packed writes (deploy)
+    runs-on: ubuntu-latest
+    env:
+      FOUNDRY_PROFILE: deploy
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
+        with:
+          version: v1.7.1
+
+      - name: Count packed-slot writes under via_ir
+        run: forge test --match-path test/gas/R81PackedSlotWritesGas.t.sol -vv

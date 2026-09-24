@@ -141,11 +141,12 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R77 | post-R74 gas encoding | none (accumulated-rBTC `claimable + 1` storage sentinel) |
 | R78 | post-R77 gas fast path | none (flat-fee batches skip the unused fee-bound storage word) |
 | R80 | post-R78, before relaunch deploy | remove `DcaManager__CadenceAnchorUpdated` (decided 2026-09-23); five-repo event cutover |
-| R81 | post-R80, before relaunch deploy | none (one `SSTORE` per packed slot: purchase row, create, fee setter) |
+| R81 | post-R80, before relaunch deploy | none (one `SSTORE` per packed slot: purchase row, create; fee setter measured and declined) |
 | R82 | post-R81, before relaunch deploy | none (`ReentrancyGuardTransient`; same guarded set) |
 | R83 | post-R82, before relaunch deploy | **standing vs per-use approvals** for the Uniswap router and the lending spender |
 | R84 | post-R83, before relaunch deploy | none (no repeated registry reads; the `getRouteInfo` view may be dropped, keeping the internal `withdrawTokenAndInterest` fix) |
-| R79 | post-R84, not deploy-bound | coordinate buyer-sorted batches with the swapper team; internal write coalescing |
+| R85 | after R84; not deployment-bound | none (one-line NatSpec uses `///`; comment-only) |
+| R79 | after R84; not deployment-bound | coalesce repeated-buyer writes (swapper sort + contiguous rBTC/share stores) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1095,12 +1096,21 @@ deploy/`via_ir` (1,946 under default). The write stays; indexers recompute from 
 
 From the [Rootstock gas audit](./ROOTSTOCK-GAS-AUDIT.md). The compiler writes each packed field as
 its own `SSTORE` unless the writes are adjacent with nothing that can revert, log, or call between
-them. Foundry prices the extra writes at ~100; Rootstock prices them at 5,000. Fix, without assembly:
+them. Foundry prices the extra writes at ~100; Rootstock prices them at 5,000. Shipped without assembly.
+Write counts are `SSTORE`s per slot (`vm.stopAndReturnStateDiff`). Rootstock figures are
+5,000 per removed `RESET` plus 200 per removed `SLOAD` of that slot. Foundry figures are Cancun
+regression deltas on the same harness, not the production bill.
 
-- Each purchase row writes `DcaSchedule` slot 0 once instead of twice: **−5,200 Rootstock gas per row**,
-  protocol-paid.
-- `createDcaSchedule` stops writing slot 0 five times: **−15,600** under deploy.
-- `setFeeRateParams` stops writing the fee word up to four times.
+- Each purchase row stores `DcaSchedule` slot 0 once. The two field assignments sit in a small helper;
+  inside `_rBtcPurchaseChecksEffects` the legacy compiler splits them. Steady-state (later) row,
+  Foundry **−184** (default) / **−315** (deploy). Rootstock **−5,200** per row on the default profile
+  (one `RESET`, one `SLOAD`) and **−5,400** under deploy (one `RESET`, two `SLOAD`s). Protocol-paid.
+- `createDcaSchedule` stores slots 0+1 once each on both profiles (1 write and 1 read of slot 0,
+  1 write and 0 reads of slot 1), down from 5+2 and 5+1. `routeIndex` is assigned before
+  `purchasePeriod`; declaration order still stores slot 0 twice under deploy. Foundry **−2,178** /
+  **−1,273**. Rootstock **−26,200** / **−20,800**.
+- `setFeeRateParams` merge measured (Foundry **−782** / **−496**, Rootstock **−16,200** /
+  **−15,600**) and declined: owner-only, at most yearly; keep the per-field if/write/emit shape.
 
 No ABI, event, or layout change. Ask: none.
 
@@ -1139,6 +1149,12 @@ plus a 200 read. Fixes, under deploy:
   `topUpFromInterest`, and each `withdrawAllAccumulatedInterest` pair: ≈ −950 each.
 
 The human may drop the view and keep only the internal fix. Ask: none.
+
+### R85 - one-line NatSpec uses `///` ([spec](./R85-one-line-natspec-slash-style.md))
+
+After R84 and not deployment-bound: one NatSpec tag line uses `///`, not a three-line `/** */`
+wrapper. Multi-line paragraphs stay in blocks. Write the rule into `AGENTS.md` and apply it across
+first-party `src/`. Comment-only; metadata-stripped runtime must stay byte-identical. Ask: none.
 
 ### R79 - coalesce repeated-buyer writes ([analysis](./R78-flat-fee-fast-path.md#r79-survivor-coalesce-repeated-buyer-writes))
 
