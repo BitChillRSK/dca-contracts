@@ -1,0 +1,83 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.36;
+
+import {Test} from "forge-std/Test.sol";
+import {SovrynDocHandlerMoc} from "src/sovryn/SovrynDocHandlerMoc.sol";
+import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {MockDecrementingStablecoin} from "test/mocks/MockDecrementingStablecoin.sol";
+import {MockIsusdToken} from "test/mocks/MockIsusdToken.sol";
+import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
+import "test/Constants.sol";
+
+/**
+ * @title StandingApprovalFallbackTest
+ * @notice The deposit path's allowance top-up, on a stablecoin that decrements an unbounded allowance.
+ * @dev The standing approval granted at construction is what every deposit normally spends, so the
+ *      top-up in `LendingErc20Handler._depositToken` only fires for a token that decrements far enough
+ *      to fall short. Runs on every lane: it builds its own handler and never reads the lane env.
+ *      `dcaManager` is this test contract so the `onlyDcaManager` entry points are callable directly.
+ */
+contract StandingApprovalFallbackTest is Test {
+    address internal constant USER = address(0xD0C0);
+    address internal constant FEE_COLLECTOR = address(0xFEE);
+    uint256 internal constant DEPOSIT_AMOUNT = 500 ether;
+
+    MockDecrementingStablecoin internal docToken;
+    MockIsusdToken internal iSusdToken;
+    MockMocProxy internal mocProxy;
+    SovrynDocHandlerMoc internal handler;
+
+    function setUp() public {
+        docToken = new MockDecrementingStablecoin(address(this));
+        iSusdToken = new MockIsusdToken(address(docToken));
+        mocProxy = new MockMocProxy(address(docToken));
+
+        handler = new SovrynDocHandlerMoc(
+            address(this),
+            address(docToken),
+            address(iSusdToken),
+            FEE_COLLECTOR,
+            address(mocProxy),
+            IFeeHandler.FeeSettings({
+                minFeeRate: MIN_FEE_RATE,
+                maxFeeRate: MAX_FEE_RATE_TEST,
+                feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
+                feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+            }),
+            address(this)
+        );
+
+        docToken.mint(USER, 10 * DEPOSIT_AMOUNT);
+        vm.prank(USER);
+        docToken.approve(address(handler), type(uint256).max);
+    }
+
+    /// @notice A decrementing token still deposits against the standing approval, which just shrinks.
+    function test_decrementingToken_spendsTheStandingApproval() public {
+        assertEq(docToken.allowance(address(handler), address(iSusdToken)), type(uint256).max);
+
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        assertEq(
+            docToken.allowance(address(handler), address(iSusdToken)),
+            type(uint256).max - DEPOSIT_AMOUNT,
+            "the standing allowance should have been spent, not rewritten"
+        );
+        assertGt(handler.getUserShares(USER), 0);
+    }
+
+    /// @notice Once the allowance no longer covers the deposit, the top-up restores it and the deposit lands.
+    function test_exhaustedAllowance_isToppedUpByTheDeposit() public {
+        vm.prank(address(handler));
+        docToken.approve(address(iSusdToken), DEPOSIT_AMOUNT - 1); // one wei short of the next deposit
+
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        assertGt(handler.getUserShares(USER), 0, "the top-up should have let the deposit through");
+        assertEq(
+            docToken.allowance(address(handler), address(iSusdToken)),
+            0,
+            "the top-up approves exactly the deposit, which the mint then spends in full"
+        );
+    }
+}

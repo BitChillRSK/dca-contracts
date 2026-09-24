@@ -68,6 +68,18 @@ contract TropykusDocHandlerMocTest is Test {
         docToken.mint(address(kDocToken), 10000 ether);
     }
 
+    /**
+     * @notice The kToken is approved once, at construction, and nobody else is.
+     * @dev `address(0)` is the canary: the approval reads `i_kToken`, assigned in the adapter
+     *      constructor, so an earlier call would have approved the zero address instead. MoC needs no
+     *      allowance at all — `redeemFreeDoc` burns the caller's own DOC — so the proxy's allowance here
+     *      is the one `setUp` grants, not one the handler sets for itself.
+     */
+    function test_standingLendingSpenderApproval() public {
+        assertEq(docToken.allowance(address(handler), address(kDocToken)), type(uint256).max);
+        assertEq(docToken.allowance(address(handler), address(0)), 0);
+    }
+
     function test_lengthOneBatch_flow() public {
         uint256 depositAmount = 500 ether;
         uint256 purchaseAmount = 100 ether;

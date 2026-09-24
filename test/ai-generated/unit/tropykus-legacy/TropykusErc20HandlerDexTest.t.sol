@@ -117,6 +117,19 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         assertGt(tropykusDexHandler.getSwapPath().length, 0);
     }
 
+    /**
+     * @notice Both of this leaf's spenders are approved once, at construction.
+     * @dev The zero-address assertion is the canary for the ordering rule: the lending approval reads
+     *      `i_kToken`, which only `TropykusErc20Handler`'s constructor assigns, so running it any earlier
+     *      would have approved `address(0)` instead.
+     */
+    function test_tropykusDex_standingSpenderApprovals() public {
+        address handlerAddress = address(tropykusDexHandler);
+        assertEq(stablecoin.allowance(handlerAddress, address(kToken)), type(uint256).max);
+        assertEq(stablecoin.allowance(handlerAddress, address(mockRouter)), type(uint256).max);
+        assertEq(stablecoin.allowance(handlerAddress, address(0)), 0);
+    }
+
     function test_tropykusDex_setAmountOutMinimumPercent_success() public {
         vm.prank(OWNER);
         tropykusDexHandler.setAmountOutMinimumPercent(0.98 ether);
