@@ -82,8 +82,8 @@ byte-identical on every deployable contract (same proof shape as R63 / R65).
 - No new behavior tests. Fork lanes still run before push per `AGENTS.md`; no fork-specific asserts.
 
 **Results:** `make check` green: nine lanes, 0 failures. `make fork-sovryn` passed 450, skipped 30, failed 0.
-`make fork-tropykus` passed 443, skipped 34, failed 0. The runtime comparison is recorded under
-**Success criteria**.
+`make fork-tropykus` passed 443, skipped 34, failed 0. All three were re-run on the final tree after the
+2026-09-24 widening, with the same counts. The runtime comparison is recorded under **Success criteria**.
 
 ## Success criteria
 
