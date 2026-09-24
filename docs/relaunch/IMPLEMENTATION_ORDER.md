@@ -145,7 +145,8 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R82 | post-R81, before relaunch deploy | none (`ReentrancyGuardTransient`; same guarded set) |
 | R83 | post-R82, before relaunch deploy | **standing vs per-use approvals** for the Uniswap router and the lending spender |
 | R84 | post-R83, before relaunch deploy | none (no repeated registry reads; the `getRouteInfo` view may be dropped, keeping the internal `withdrawTokenAndInterest` fix) |
-| R79 | post-R84, not deploy-bound | coordinate buyer-sorted batches with the swapper team; internal write coalescing |
+| R85 | after R84; not deployment-bound | none (one-line NatSpec uses `///`; comment-only) |
+| R79 | after R84; not deployment-bound | coalesce repeated-buyer writes (swapper sort + contiguous rBTC/share stores) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1148,6 +1149,12 @@ plus a 200 read. Fixes, under deploy:
   `topUpFromInterest`, and each `withdrawAllAccumulatedInterest` pair: ≈ −950 each.
 
 The human may drop the view and keep only the internal fix. Ask: none.
+
+### R85 - one-line NatSpec uses `///` ([spec](./R85-one-line-natspec-slash-style.md))
+
+After R84 and not deployment-bound: one NatSpec tag line uses `///`, not a three-line `/** */`
+wrapper. Multi-line paragraphs stay in blocks. Write the rule into `AGENTS.md` and apply it across
+first-party `src/`. Comment-only; metadata-stripped runtime must stay byte-identical. Ask: none.
 
 ### R79 - coalesce repeated-buyer writes ([analysis](./R78-flat-fee-fast-path.md#r79-survivor-coalesce-repeated-buyer-writes))
 
