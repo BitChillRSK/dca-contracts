@@ -351,9 +351,13 @@ contract StandingApprovalProbe is Test {
 
     /// @dev Decodes an `Error(string)` payload. Decoded rather than sliced at a fixed offset: the string
     ///      is right-padded to a word boundary, so slicing leaves trailing NULs that an `assertEq` sees.
+    ///      The length is rewritten before the pointer moves; shifting alone leaves the decoder reading a
+    ///      length word made of the old length's tail and the selector, which is enormous, so its bounds
+    ///      checks stop meaning anything on malformed data.
     function _revertReason(bytes memory reason) private pure returns (string memory) {
         if (reason.length < 68) return "(no reason string)";
         assembly {
+            mstore(add(reason, 0x04), sub(mload(reason), 0x04)) // length, minus the selector
             reason := add(reason, 0x04) // step over the `Error(string)` selector
         }
         return abi.decode(reason, (string));

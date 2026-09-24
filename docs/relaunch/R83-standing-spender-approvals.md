@@ -156,11 +156,12 @@ change it exists to catch. **The defence at Sovryn is Sovryn governance, not Bit
 The residual exposure if that changed is bounded by what the handler holds: the stablecoin in flight
 during a deposit or redeem, plus dust, since the position itself sits in iSUSD.
 
-So, with that precondition held, the standing allowance adds no third-party reachability at any of the
-three spenders. What it adds is exposure to the spender's own future code: nil for the router, which
-cannot change; a 24–48 h governance window at Sovryn; and, at LayerBank, an instant EOA-controlled
-upgrade — against a spender that already custodies the whole lending position, so the extra surface there
-is the stablecoin transiently held during a deposit or redeem, plus dust.
+So the standing allowance adds no third-party reachability through any entry point the three spenders
+expose today — for the router and the Pool because of the precondition above, and for iSUSD because the
+one entry point of that shape is not implemented. What it adds is exposure to the spender's own future
+code: nil for the router, which cannot change; a 24–48 h governance window at Sovryn; and, at LayerBank,
+an instant EOA-controlled upgrade — against a spender that already custodies the whole lending position,
+so the extra surface there is the stablecoin transiently held during a deposit or redeem, plus dust.
 
 ### Allowance-decrement facts
 
