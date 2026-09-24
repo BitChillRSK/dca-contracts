@@ -622,16 +622,15 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuard {
         unchecked {
             tokenBalance -= purchaseAmount;
         }
-        // Both fields share slot 0. Assigned in their own frame so the two updates compile to one
-        // store; written in this function, the same assignments are split. No anchor log: purchases
-        // emit RbtcBought, and the new anchor follows from the prior one and the period.
+        // No anchor log: purchases emit RbtcBought, and the new anchor follows from the prior one and the period.
         _storePurchaseProgress(dcaSchedule, tokenBalance, newAnchor.toUint48());
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, tokenBalance);
 
         return (buyer, purchaseAmount, routeIndex);
     }
 
-    /// @dev Slot 0 of a schedule. The two fields are assigned with nothing between them.
+    /// @dev Both fields live in slot 0. They merge into one store only in their own frame; inlined into
+    ///      the caller the compiler splits them, which costs a full storage write on Rootstock.
     function _storePurchaseProgress(DcaSchedule storage dcaSchedule, uint128 tokenBalance, uint48 cadenceAnchor)
         private
     {
