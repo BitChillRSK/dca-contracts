@@ -162,14 +162,19 @@ is proven by comparing metadata-stripped runtime, not `forge build --sizes` (see
 - **Done-gate:** `make check` (`forge build`, `make moc-none`, `make moc-layerbank`, `make moc-sovryn`, `STABLECOIN_TYPE=USDRIF make dex-none`, `STABLECOIN_TYPE=USDT0 make dex-none`, `STABLECOIN_TYPE=USDRIF make dex-sovryn`, `STABLECOIN_TYPE=USDRIF make dex-layerbank`, `STABLECOIN_TYPE=USDT0 make dex-layerbank`, and `make invariants-sovryn`).
 - **Scale the gate to the change.** Pick the tier from what the push changes against the branch's
   current remote tip, not from what the PR as a whole touches:
-  - No `.sol` file changed (docs, specs, `README.md`, `AGENTS.md`): run nothing.
+  - Only Markdown or other docs changed (specs, `README.md`, `AGENTS.md`): run nothing.
   - Only comments or NatSpec changed in `src/`: `forge build` under the default and `deploy` profiles,
     then compare metadata-stripped runtime and creation code against the parent (the
     [R85](./docs/relaunch/R85-natspec-delimiter.md) method). No test lanes, no forks.
-  - Only files under `test/` changed: the touched suites, under both profiles. No forks.
-  - Any executable change in `src/`, `script/`, `foundry.toml`, or the `Makefile`: the full gate below.
-  - A rebase or restack counts by the content its conflict resolutions changed. A clean replay of
-    already-gated commits onto an already-gated base needs only `forge build`.
+  - Only files under `test/` changed: the suites that import the changed files, under both profiles.
+    If a shared base, mock, or helper changed, `make check`. No forks.
+  - Any executable change in `src/`, `script/`, `foundry.toml`, `remappings.txt`, the `Makefile`,
+    `.github/`, or a `lib/` submodule pointer: the full gate below.
+  - A rebase or restack counts by the content its conflict resolutions changed, plus what the new base
+    brings. A clean replay of already-gated commits onto a base whose new commits are docs- or
+    comment-only needs only `forge build`. Onto a base with new executable commits, `make check`: the
+    combined tree has not been tested. Add the forks only if the PR's own executable code is on a
+    fork-tested path.
 - **Before push (executable changes):** `make check` is not enough. Also run `make fork-sovryn` and `make fork-tropykus` (need `RSK_MAINNET_RPC_URL` in `.env`). Fork tests are not in CI; Anvil lanes will not catch live-protocol mismatches (for example R1's batch event reports net DOC, while `makeBatchPurchasesOneUser` used to expect the requested gross). If the RPC is unset, stop and ask the human — do not push. Document the exact fork commands in the PR.
 - **CI (every PR):** `make moc-none`, `make moc-layerbank`, `make moc-sovryn`, `STABLECOIN_TYPE=USDRIF make dex-none`, `STABLECOIN_TYPE=USDT0 make dex-none`, `STABLECOIN_TYPE=USDRIF make dex-sovryn`, `STABLECOIN_TYPE=USDRIF make dex-layerbank`, `STABLECOIN_TYPE=USDT0 make dex-layerbank`, and `make invariants-sovryn`. Locally, `make ci` runs those lanes under `FOUNDRY_PROFILE=ci`. The unit lanes still `--no-match-test invariant` so the 64×512 stateful suite is not multiplied across every target. `ComparePurchaseMethods` stays excluded (Anvil early-return / mainnet-only). Local Tropykus targets (`make moc-tropykus` / `make dex-tropykus`) remain useful for mock-based coverage of the legacy handler through a second lending adapter; Tropykus is on neither production map, and index 4 stays burned. Tropykus fork tests pin a pre-pause block; see the fork-tests bullet below.
 - Defaults: `SWAP_TYPE=mocSwaps`, `LENDING_PROTOCOL=tropykus` (legacy local default), `STABLECOIN_TYPE=DOC`. Production MoC lanes are `none` / `layerbank` / `sovryn`. Dex paths often use `STABLECOIN_TYPE=USDRIF` (idle+DEX and LayerBank).
