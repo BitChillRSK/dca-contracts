@@ -4,9 +4,10 @@ Status: **implemented** · GitHub [#149](https://github.com/BitChillRSK/dca-cont
 
 ## Objective
 
-Every array parameter of an external, non-constructor function in `src/` is `calldata`, not `memory`.
-On the purchase path that runs all the way down, so the handler's batch arrays are never copied into
-memory. No ABI, event, storage, or behavior change. The same PR records the gas candidates the
+The handler's purchase batch arrays are `calldata`, not `memory`, all the way down the purchase path,
+so they are never copied into memory. The two Uniswap path setters were switched too, then reverted to
+`memory` because `calldata` made them dearer (see **Measured**). No ABI, event, storage, or behavior
+change. The same PR records the gas candidates the
 2026-09-25 purchase-path review deferred, in the [gas audit](./ROOTSTOCK-GAS-AUDIT.md#deferred-candidates-2026-09-25).
 
 ## Background
@@ -14,7 +15,8 @@ memory. No ABI, event, storage, or behavior change. The same PR records the gas 
 A review of the purchase path at `068a380` (R79 head) listed seven candidates. The human decided this
 one on 2026-09-25 as standard practice for read-only external arguments, whatever the saving. They
 asked for it on every eligible function, including the Uniswap path setters, and deferred the other
-six.
+six. On 2026-09-26, after seeing that `calldata` made each setter about 1,200 gas dearer, the human
+reverted the setters to `memory`.
 
 Only three external functions in `src/` take arrays in `memory`:
 
@@ -29,8 +31,9 @@ constructor argument, which cannot be `calldata`.
 Data location is not part of the ABI. Selectors, the ABI JSON and events are unchanged, so no consumer
 is affected.
 
-`DcaManager` already passes its `Batch calldata` into the handler call, so the purchase path starts
-from calldata on both sides of the call.
+`DcaManager` builds `buyers` and `purchaseAmounts` in memory from the schedules, and takes
+`scheduleIds` from its `Batch calldata`. Either way the handler call ABI-encodes them, so the handler
+receives all three as calldata.
 
 ## Open product decisions
 
@@ -51,21 +54,17 @@ from calldata on both sides of the call.
       - The balances are dead once invariant 12's check passes, which is the same reason
         `aggregatedFee` already sits in its own block.
       - The check itself is unchanged.
-- [x] `IPurchaseUniswap` and `PurchaseUniswap`: `setPurchasePathAllowed` and `setPurchasePath` take
-      `calldata` arrays.
-      - `_encodePurchasePath`, `_setPurchasePath` and `_setPurchasePathAllowed` stay `memory`, because
-        the constructor shares them.
-      - Each setter now copies its arrays at the call to each helper, where before the ABI decoder
-        copied them once. See **Measured**.
 - [x] Record the deferred candidates in `ROOTSTOCK-GAS-AUDIT.md`, with the reason each one waits.
 
 ## Out of scope
 
 - [ ] Any deferred candidate: the idle ledger, purchase-row event fields, fee sweeping,
       `FeeTransferred`, balance reuse, and `optimizer_runs`.
-- [ ] `calldata` variants of the Uniswap path helpers. A second, calldata-only copy of each would
-      remove the double copy, but it would duplicate the path encoding the constructor and both setters
-      rely on.
+- [ ] `calldata` on `setPurchasePathAllowed` and `setPurchasePath`. Switched, measured, and reverted on
+      2026-09-26. Their helpers `_encodePurchasePath`, `_setPurchasePath` and `_setPurchasePathAllowed`
+      take `memory` because the constructor shares them, so a `calldata` setter pays a copy at each
+      helper call. Copying once at the top of the setter still leaves it dearer than `memory`, and a
+      calldata-only copy of each helper would duplicate the path encoding. See **Measured**.
 - [ ] Constructors and return values, which cannot be `calldata`.
 
 ## Files likely touched
@@ -73,7 +72,6 @@ from calldata on both sides of the call.
 - `src/interfaces/IPurchaseRbtc.sol`, `src/PurchaseRbtc.sol`
 - `src/FeeHandler.sol`, `src/StablecoinSource.sol`
 - `src/idle/IdleErc20Handler.sol`, `src/LendingErc20Handler.sol`
-- `src/interfaces/IPurchaseUniswap.sol`, `src/PurchaseUniswap.sol`
 - Test harnesses that call or override the internal helpers. Internal code cannot create calldata, so:
   - external wrappers take `calldata`;
   - overrides match the new signature;
@@ -115,22 +113,28 @@ change.
   bounds-checked `CALLDATALOAD` with an extra stack slot to carry. The one-time decode copy it
   replaces is cheap for arrays this short. Nothing ships on the default profile.
 
-| Uniswap setter | deploy (`via_ir`, ships) | default (legacy) |
-|---|---:|---:|
-| `setPurchasePathAllowed(true)` | +1,156 | −175 |
-| `setPurchasePath` | +1,191 | −187 |
-| `setPurchasePathAllowed(false)` | +1,186 | −175 |
+The Uniswap setters were measured three ways on the same tree, `testPathPolicyConfigurationGas`,
+absolute Foundry gas (deploy / default):
 
-- **Under the shipped profile each setter costs about 1,200 more.** Each array is now copied into
-  memory once per helper, twice in all, where before the ABI decoder copied it once.
-- These are owner or swapper calls, made when a Dex route changes. The human chose `calldata` here as
-  a convention, not for gas.
+| Uniswap setter | `memory` (kept) | `calldata`, one local copy | `calldata`, copy per helper |
+|---|---:|---:|---:|
+| `setPurchasePathAllowed(true)` | **40,896** / 40,929 | 41,111 / 40,495 | 42,052 / 40,754 |
+| `setPurchasePath` | **43,390** / 42,714 | 43,605 / 42,268 | 44,581 / 42,527 |
+| `setPurchasePathAllowed(false)` | **16,479** / 16,313 | 16,694 / 15,879 | 17,665 / 16,138 |
+
+- **Under the shipped profile, `memory` is the cheapest.** Passing the `calldata` arrays straight to
+  the helpers copies them at each helper call, twice in all, for about 1,200 gas more per setter. One
+  local copy at the top of the setter recovers most of that, but is still 215 gas dearer than letting
+  the ABI decoder copy them.
+- **The setters stay `memory`**, byte-identical to `068a380`. They are owner or swapper calls, made
+  when a Dex route changes.
 
 ## Success criteria
 
-- [x] No external, non-constructor function in `src/` takes an array in `memory`.
-- [x] The purchase path's arrays stay `calldata` from `DcaManager` through the fee and retrieval
-      helpers.
+- [x] The only external, non-constructor functions in `src/` that take an array in `memory` are the
+      two Uniswap path setters, where `memory` measured cheapest.
+- [x] The purchase path's arrays stay `calldata` from the handler's `batchBuyRbtc` through the fee and
+      retrieval helpers.
 - [x] ABI and selectors unchanged.
 - [x] Measured before and after on both profiles; figures above.
 - [x] Deferred candidates recorded in the gas audit.

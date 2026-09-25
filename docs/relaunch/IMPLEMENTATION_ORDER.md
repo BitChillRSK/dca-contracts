@@ -147,7 +147,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R84 | post-R83, before relaunch deploy | none (no repeated registry reads; the `getRouteInfo` view may be dropped, keeping the internal `withdrawTokenAndInterest` fix) |
 | R85 | after R84; not deployment-bound | none (one-line NatSpec uses `///`, multi-line uses `/** */`; comment-only) |
 | R79 | after R85; not deployment-bound | **closed 2026-09-25 without implementation** (repeated-buyer write coalescing; about 1% of a batch; docs-only record) |
-| R86 | after R79, before relaunch deploy | none (`calldata` for every external array parameter, decided 2026-09-25; six deferred gas candidates recorded in the gas audit) |
+| R86 | after R79, before relaunch deploy | none (`calldata` for the purchase batch arrays, decided 2026-09-25; path setters kept `memory` 2026-09-26; six deferred gas candidates recorded in the gas audit) |
 | R87 | after R86, before relaunch deploy | **one verdict per deferred gas candidate, after measurement** (idle ledger, purchase-row event fields, fee sweep, `FeeTransferred`, balance reuse, `optimizer_runs`); no PR if none is approved |
 
 ### PR 1 - R23 toolchain and dependency baseline
@@ -1217,12 +1217,10 @@ first-party `src/`. Comment-only; metadata-stripped runtime must stay byte-ident
 After R79 and before relaunch deploy, because it changes shipped bytecode. The human decided it on
 2026-09-25: every array parameter of an external, non-constructor function in `src/` becomes
 `calldata`. That covers `PurchaseRbtc.batchBuyRbtc`, carried down through the fee and retrieval
-helpers, and the two Uniswap path setters. No ABI change.
+helpers. The two Uniswap path setters were switched too, then reverted to `memory` on 2026-09-26,
+because `calldata` made each one about 1,200 gas dearer. No ABI change.
 
-Measured under deploy (`via_ir`), which is what ships:
-- a 5-row purchase batch saves 849–1,184 gas;
-- each path setter costs about 1,200 more, because its arrays are now copied into memory once per
-  helper.
+Measured under deploy (`via_ir`), which is what ships, a 5-row purchase batch saves 849–1,184 gas.
 
 The same PR records the six purchase-path candidates the human deferred on 2026-09-25. Ask: none.
 
