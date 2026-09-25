@@ -100,8 +100,8 @@ interface IPurchaseUniswap {
      *      New paths after construction are approved here; the constructor path is approved at deploy.
      */
     function setPurchasePathAllowed(
-        address[] calldata intermediateTokens,
-        uint24[] calldata poolFeeRates,
+        address[] memory intermediateTokens,
+        uint24[] memory poolFeeRates,
         bool allowed
     ) external;
 
@@ -114,7 +114,7 @@ interface IPurchaseUniswap {
      *      allowlisted. Constructor installation does not use this function; it self-allowlists the
      *      initial path.
      */
-    function setPurchasePath(address[] calldata intermediateTokens, uint24[] calldata poolFeeRates) external;
+    function setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates) external;
 
     /**
      * @notice Set the swap-time oracle floor as a 1e18-scaled fraction of the oracle-implied rBTC.
