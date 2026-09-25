@@ -85,13 +85,9 @@ contract StandingApprovalFallbackTest is Test {
     /**
      * @notice A lending handler answers no flash-loan callback, which is what bounds its standing
      *         allowance to its own deposits.
-     * @dev Aave-style pools repay a flash loan from the `receiverAddress` the caller names rather than
-     *      from the caller, so an address that holds a standing allowance **and** answers
-     *      `executeOperation` can be made to pay a stranger's premium. LayerBank has flash loans
-     *      disabled on all three shipped reserves today, but that is their switch, not ours. Ours is
-     *      this: the handler declares no `executeOperation` and no `fallback`, so the callback reverts
-     *      and unwinds the loan. Adding either to a lending handler would hand that vector a live
-     *      target, which is why the leaf headers carry it as a precondition.
+     * @dev Aave-style pools repay a flash loan from the caller-named `receiverAddress`, so an approver
+     *      that answers `executeOperation` pays a stranger's premium. Declaring neither that nor a
+     *      `fallback` is the precondition the leaf headers carry.
      */
     function test_handlerAnswersNoFlashLoanCallback() public {
         (bool answered,) = address(handler).call(

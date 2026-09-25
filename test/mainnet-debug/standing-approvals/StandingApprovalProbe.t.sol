@@ -52,8 +52,7 @@ interface IAaveAddressesProviderLike {
     function getPoolDataProvider() external view returns (address);
 }
 
-/// @dev Aave's own decoder for the reserve bitmap. Used instead of shifting `getConfiguration` here,
-///      so a probe that is meant to catch a configuration change cannot itself hold a stale bit index.
+/// @dev Aave's own decoder for the reserve bitmap, so this probe holds no bit index of its own.
 interface IAaveDataProviderLike {
     function getFlashLoanEnabled(address asset) external view returns (bool);
     function getPaused(address asset) external view returns (bool);
@@ -272,21 +271,13 @@ contract StandingApprovalProbe is Test {
      *      therefore loses the premium on every call, repeatable up to its balance, without ever having
      *      asked for a loan.
      *
-     *      Two independent things keep that off a lending handler, and only the second is BitChill's:
+     *      LayerBank has the flag off for all three; that is their configuration, flippable by the same
+     *      EOA that can upgrade the Pool, so it is asserted rather than relied on. BitChill's own half of
+     *      the defence — a handler that answers no callback — is asserted in `StandingApprovalFallbackTest`.
      *
-     *      1. LayerBank has the reserve flash-loan flag off for DOC, USDRIF and USDT0. That is their
-     *         configuration, flippable by the same EOA that can upgrade the Pool, so it is asserted here
-     *         to fail loudly rather than relied on.
-     *      2. A lending handler declares no `executeOperation` and no `fallback`, so the callback into it
-     *         reverts and takes the flash loan with it. That is the precondition the handler headers
-     *         state, and `StandingApprovalFallbackTest` asserts it against a real handler.
-     *
-     *      (1) is checked twice over, because a declarative check alone is easy to get wrong: once
-     *      through Aave's own `getFlashLoanEnabled`, and once by actually calling `flashLoanSimple` and
-     *      requiring the refusal to be `91`, `FLASHLOAN_DISABLED`, rather than any other Aave error. An
-     *      earlier draft shifted `getConfiguration` by a hand-written bit index and read the wrong bit
-     *      (80, the low bit of the borrow cap, rather than 63); it passed only because every live borrow
-     *      cap happened to be even. Neither check here carries a bit index.
+     *      Assert via Aave's `getFlashLoanEnabled` and a real `flashLoanSimple` call, never by shifting
+     *      `getConfiguration` by a bit index written here: a wrong index reads a neighbouring field (bit
+     *      80 is the low bit of the borrow cap) and passes on whatever that field happens to hold.
      */
     function test_layerBankFlashLoans_areDisabledForEveryShippedStablecoin() public {
         _assertFlashLoansDisabled("DOC", DOC);
@@ -298,19 +289,13 @@ contract StandingApprovalProbe is Test {
     /**
      * @notice Sovryn's iSUSD registers no implementation for bZx's `flashBorrowToken`, which is what
      *         keeps the standing iSUSD approval out of reach of that entry point.
-     * @dev This is **not** the same shape as the LayerBank case, and an earlier draft of this file said
-     *      it was. Aave's flash loan needs the victim to answer `executeOperation`, so declaring no
-     *      callback is a defence. bZx's `flashBorrowToken` instead lets its caller name both a `target`
-     *      and the calldata to send it, and the victim answers nothing: whether a standing iSUSD
-     *      allowance would be exposed turns on who `msg.sender` is at that `target` — the loan token
-     *      itself, or a separate relay contract. We have not established which, because the shipped
-     *      Sovryn source tree does not implement the function at all, so there is no live call path to
-     *      read. The defence here is therefore Sovryn governance, not BitChill's callback shape.
+     * @dev Not the LayerBank shape: bZx lets its caller name both a `target` and the calldata sent to
+     *      it, so the approver answers nothing and no handler shape defends the allowance. Sovryn not
+     *      implementing the function is the whole defence.
      *
-     *      The assertion is on the exact refusal string, not merely on reverting. A reinstated
-     *      `flashBorrowToken` would also revert for this input — it lends 1e18 to the attacker, calls an
-     *      empty target and is never repaid — so a bare `assertFalse(ok)` would keep passing through
-     *      precisely the change it exists to catch.
+     *      Assert the exact refusal string. A reinstated `flashBorrowToken` would also revert on this
+     *      input — it lends, calls an empty target, and is never repaid — so a bare `assertFalse(ok)`
+     *      would pass through the one change this test exists to catch.
      */
     function test_sovrynFlashBorrow_isNotImplemented() public {
         vm.prank(attacker);
@@ -349,11 +334,10 @@ contract StandingApprovalProbe is Test {
         );
     }
 
-    /// @dev Decodes an `Error(string)` payload. Decoded rather than sliced at a fixed offset: the string
-    ///      is right-padded to a word boundary, so slicing leaves trailing NULs that an `assertEq` sees.
-    ///      The length is rewritten before the pointer moves; shifting alone leaves the decoder reading a
-    ///      length word made of the old length's tail and the selector, which is enormous, so its bounds
-    ///      checks stop meaning anything on malformed data.
+    /// @dev Decoded, not sliced at a fixed offset: the string is right-padded to a word boundary, so a
+    ///      slice keeps trailing NULs that an `assertEq` sees. The length must be rewritten before the
+    ///      pointer moves — shifting alone leaves a length word built from the old length and the
+    ///      selector, so the decoder's bounds checks stop meaning anything on malformed data.
     function _revertReason(bytes memory reason) private pure returns (string memory) {
         if (reason.length < 68) return "(no reason string)";
         assembly {

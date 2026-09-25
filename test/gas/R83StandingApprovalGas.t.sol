@@ -54,9 +54,8 @@ contract R83StandingApprovalGasTest is Test {
     MockMocProxy private s_mocProxy;
     SovrynDocHandlerMoc private s_lendingHandler;
     /// @dev Identical handler whose standing approval `setUp` revokes, so its deposit takes the top-up
-    ///      branch — the exact-approval round trip this PR removed. It needs its own iToken because the
-    ///      comparison is per allowance slot: both arms must start the test transaction from the state
-    ///      they model, or EIP-2200 net metering prices the second write to a slot at 100 gas.
+    ///      branch. It needs its own iToken: sharing an allowance slot would let EIP-2200 net metering
+    ///      price the second arm's write at 100 gas.
     MockIsusdToken private s_exactApprovalISusd;
     SovrynDocHandlerMoc private s_exactApprovalHandler;
 
@@ -132,11 +131,9 @@ contract R83StandingApprovalGasTest is Test {
 
     /**
      * @notice The lending deposit against the standing approval: no allowance slot is written.
-     * @dev Measured in its own transaction, as is its counterpart below, and the two are compared across
-     *      them rather than inside one. Both arms share the stablecoin contract and the depositor's
-     *      balance slot, so whichever ran first in a combined test paid the cold access and the first
-     *      dirty write for both: that made the delta swing by ~10,600 gas on call order alone, and by
-     *      ~5,600 even after the shared reads were warmed. One arm per transaction removes the question.
+     * @dev One arm per transaction, compared across the two. Both arms share the stablecoin contract and
+     *      the depositor's balance slot, so in a combined test whichever ran first paid the cold access
+     *      and the first dirty write for both, moving the delta by thousands of gas on call order alone.
      */
     function test_lendingDeposit_standingApproval_writesNoAllowanceSlot() public {
         bytes32 allowanceSlot = _allowanceSlot(address(s_lendingHandler), address(s_iSusd));

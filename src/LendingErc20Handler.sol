@@ -118,26 +118,14 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
 
     /**
      * @dev Grants the lending spender an unbounded stablecoin allowance, so no deposit pays for an
-     *      allowance write.
+     *      allowance write. A precondition, not a property this contract enforces: it holds only while
+     *      the spender pulls solely from its caller. Do not add a `fallback`, an `executeOperation`, or
+     *      any other callback a lending protocol may invoke on an arbitrary address. Check a new protocol
+     *      for an entry point that calls a target its caller names (bZx's `flashBorrowToken`) — no
+     *      handler shape defends against that one.
      *
-     *      What bounds that allowance is a precondition, not a guarantee this contract enforces. The
-     *      deposit and redeem entry points of both shipped lending protocols pull from their caller, so
-     *      only this handler's own deposit spends it. Aave-style pools also expose a flash loan, which
-     *      repays from the receiver address the *caller* names: that reaches an approver only if the
-     *      approver answers `executeOperation`. This contract declares no such hook and no `fallback`,
-     *      so such a call reverts. **Do not add a `fallback`, an `executeOperation`, or any other
-     *      callback a lending protocol may invoke on an arbitrary address.**
-     *
-     *      That rule is necessary but not sufficient, and a new adapter must check its own protocol
-     *      rather than assume it. A lender of the other shape — one that calls a target the caller names
-     *      with calldata the caller supplies, as bZx's `flashBorrowToken` does — spends an approver's
-     *      allowance without the approver answering anything, if the lender makes that call under its own
-     *      address. Nothing this contract declares or omits defends against that; only the protocol not
-     *      offering such an entry point does, which is the protocol owner's setting, not BitChill's.
-     *
-     *      Call this as the **last statement of the protocol adapter's constructor**, never from this
-     *      base's constructor: `_lendingSpender()` reads an immutable that only the adapter assigns,
-     *      and a base constructor runs first, where that immutable is still `address(0)`.
+     *      Must be the **last statement of the adapter's constructor**: `_lendingSpender()` reads an
+     *      immutable only the adapter assigns, and this base's constructor runs first.
      */
     function _approveLendingSpender() internal {
         i_stableToken.forceApprove(_lendingSpender(), type(uint256).max);
@@ -145,8 +133,8 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
 
     /**
      * @dev TokenHandler reverts unless the pull matches `depositAmount`, so the mint always uses the full request.
-     *      The standing allowance normally covers the pull, and the top-up below is the fallback for a
-     *      stablecoin that decrements even an unbounded allowance far enough to fall short.
+     *      The standing allowance normally covers the pull; the top-up below catches a stablecoin that
+     *      decrements even an unbounded allowance far enough to fall short.
      */
     function _depositToken(address user, uint256 depositAmount) internal virtual override {
         super._depositToken(user, depositAmount);

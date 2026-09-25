@@ -11,11 +11,10 @@ import {TropykusErc20Handler} from "./TropykusErc20Handler.sol";
  * @dev Constructor-only leaf. Only its immutable DcaManager moves principal, buys, or withdraws rBTC;
  *      the owner controls fees, oracle, path allowlist, and floor. The funding base is listed first so
  *      `i_stableToken` is set before `PurchaseUniswap` builds the path.
- *      Holds standing, unbounded stablecoin approvals to the Uniswap router and to the lending spender,
- *      both granted at construction. SwapRouter02 pulls only from the caller of the swap it is executing
- *      and is not upgradeable. The lending allowance rests on a precondition instead: this handler
- *      answers no protocol callback, so a pool entry point that repays from a caller-named address
- *      cannot reach it. Adding a `fallback` or an `executeOperation` here would break that.
+ *      Holds standing, unbounded stablecoin approvals, granted at construction: to SwapRouter02, which is
+ *      immutable and pulls only from the caller of the swap it executes, and to the lending spender.
+ *      Precondition for the lending one, not enforced here: the spender pulls only from its caller, and
+ *      this handler answers no protocol callback.
  */
 contract TropykusErc20HandlerDex is TropykusErc20Handler, PurchaseUniswap {
     /**

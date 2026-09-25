@@ -11,15 +11,12 @@ import {SovrynErc20Handler} from "./SovrynErc20Handler.sol";
  * @dev Constructor-only leaf. Only its immutable DcaManager moves principal, buys, or withdraws rBTC;
  *      the owner controls fees, oracle, path allowlist, and floor. The funding base is listed first so
  *      `i_stableToken` is set before `PurchaseUniswap` builds the path.
- *      Holds standing, unbounded stablecoin approvals to the Uniswap router and to iSUSD, both granted at
- *      construction. SwapRouter02 pulls only from the caller of the swap it is executing and is not
- *      upgradeable. The iSUSD allowance rests on a precondition instead: iSUSD's mint and burn entry
- *      points pull from their caller, and the one bZx entry point that would let a caller name both a
- *      target and its calldata, `flashBorrowToken`, is not implemented by the shipped loan-token logic.
- *      Were it reinstated, no shape this handler declares would defend the allowance, because such a call
- *      needs no answer from the approver — the defence there is Sovryn governance, not BitChill. iSUSD is
- *      upgradeable behind Sovryn's timelocks, and already custodies the lending position; what the
- *      standing approval adds is the stablecoin transiently held during a deposit or redeem, plus dust.
+ *      Holds standing, unbounded stablecoin approvals, granted at construction: to SwapRouter02, which is
+ *      immutable and pulls only from the caller of the swap it executes, and to the lending spender.
+ *      Precondition for the lending one, not enforced here: the spender pulls only from its caller, and
+ *      this handler answers no protocol callback.
+ *      Also relies on Sovryn not exposing bZx's `flashBorrowToken`, which no handler shape defends
+ *      against.
  */
 contract SovrynErc20HandlerDex is SovrynErc20Handler, PurchaseUniswap {
     /**

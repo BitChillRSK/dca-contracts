@@ -106,6 +106,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         }
         i_stablecoinToUsdScale = 10 ** (ORACLE_DECIMALS - stablecoinDecimals);
 
+        // Standing router allowance, so no purchase pays for an approval write. Last: it reads
+        // `_purchaseToken()`, whose immutable the funding base assigns before this constructor runs.
         _purchaseToken().forceApprove(address(i_swapRouter02), type(uint256).max);
     }
 
@@ -280,10 +282,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      *      requires every intermediate-token router balance to return to its pre-swap value. Comparing
      *      deltas, not zero balances, prevents donated tokens from blocking it.
      *
-     *      The router spends the standing allowance granted at construction, so no approval is written
-     *      here. The swap is still bounded by `stablecoinAmount`: an exact-input swap pulls exactly that
-     *      much from the payer on the first hop and funds every later hop from the router's own balance,
-     *      and the router pulls only from the caller of the swap it is executing.
+     *      The swap spends the standing router allowance, so no approval is written here; an exact-input
+     *      swap still pulls exactly `stablecoinAmount`, funding later hops from the router's own balance.
      */
     function _purchaseRbtc(uint256 stablecoinAmount, uint256 minRbtcOut)
         internal

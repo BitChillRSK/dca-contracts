@@ -71,9 +71,8 @@ contract TropykusDocHandlerMocTest is Test {
     /**
      * @notice The kToken is approved once, at construction, and nobody else is.
      * @dev `== max` carries the ordering rule: the approval reads `i_kToken`, assigned in the adapter
-     *      constructor, and an earlier call would approve the zero address, which this token refuses
-     *      outright. MoC needs no allowance at all — `redeemFreeDoc` burns the caller's own DOC — so the
-     *      proxy's allowance here is the one `setUp` grants, not one the handler sets for itself.
+     *      constructor, so an earlier call would approve `address(0)`. MoC needs no allowance at all, so
+     *      the proxy's allowance here is the one `setUp` grants, not one the handler sets for itself.
      */
     function test_standingLendingSpenderApproval() public {
         assertEq(docToken.allowance(address(handler), address(kDocToken)), type(uint256).max);
