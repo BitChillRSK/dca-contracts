@@ -147,6 +147,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R84 | post-R83, before relaunch deploy | none (no repeated registry reads; the `getRouteInfo` view may be dropped, keeping the internal `withdrawTokenAndInterest` fix) |
 | R85 | after R84; not deployment-bound | none (one-line NatSpec uses `///`, multi-line uses `/** */`; comment-only) |
 | R79 | after R85; not deployment-bound | **closed 2026-09-25 without implementation** (repeated-buyer write coalescing; about 1% of a batch; docs-only record) |
+| R86 | after R79, before relaunch deploy | none (`calldata` for every external array parameter, decided 2026-09-25; six deferred gas candidates recorded in the gas audit) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1210,9 +1211,36 @@ wrapper, and NatSpec of two or more lines uses a `/** */` block, not a `///` run
 was added to scope by the human on 2026-09-24). Write the rule into `AGENTS.md` and apply it across
 first-party `src/`. Comment-only; metadata-stripped runtime must stay byte-identical. Ask: none.
 
+### R86 - `calldata` for external array parameters ([spec](./R86-calldata-array-parameters.md))
+
+After R79 and before relaunch deploy, because it changes shipped bytecode. The human decided it on
+2026-09-25: every array parameter of an external, non-constructor function in `src/` becomes
+`calldata`. That covers `PurchaseRbtc.batchBuyRbtc`, carried down through the fee and retrieval
+helpers, and the two Uniswap path setters. No ABI change.
+
+Measured under deploy (`via_ir`), which is what ships:
+- a 5-row purchase batch saves 849–1,184 gas;
+- each path setter costs about 1,200 more, because its arrays are now copied into memory once per
+  helper.
+
+The same PR records the six purchase-path candidates the human deferred on 2026-09-25. Ask: none.
+
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:
+
+- **Gas candidates deferred 2026-09-25 — not queued.** The purchase-path review behind
+  [R86](./R86-calldata-array-parameters.md) deferred six candidates, and none has a spec:
+  - the idle ledger;
+  - purchase-row event fields;
+  - fee sweeping;
+  - `FeeTransferred`;
+  - reusing the lending redeem's balance reading;
+  - `optimizer_runs`.
+
+  Each one's saving and reason to wait, and for `optimizer_runs` what to check about the R81 helpers,
+  is in [the gas audit](./ROOTSTOCK-GAS-AUDIT.md#deferred-candidates-2026-09-25). Reopening one needs
+  its own spec.
 
 - **R12 compound interest into a chosen schedule — reopened 2026-08-31 as [R54](./R54-schedule-top-up-from-interest.md).** The original rejection is quoted here because it should not be reused: "The existing explicit withdraw-interest then deposit flow is legible and user-controlled. An atomic compound path must reconcile per-handler shares with per-route/per-schedule principal and adds a new cash-moving entry point to immutable handlers for convenience, not solvency." That describes an in-handler design which was never proposed — R12 was always `DcaManager`-only, with no handler call and no token movement. The unrecorded real blocker was EIP-170, and it was genuine: the function does not fit unoptimized. R53 removes it.
 - **R13 cooperative / user-initiated migration — rejected (option a stands).** Manual exit/re-entry was the recorded gate answer on 2026-08-26. R53 voided the bytecode half of reason 2; reasons 1, 3, and 4 still hold. Closed with no follow-up PR in [#111](https://github.com/BitChillRSK/dca-contracts/pull/111) — see [R53](./R53-optimizer-baseline.md#bytecode-scarcity-decisions-closed).

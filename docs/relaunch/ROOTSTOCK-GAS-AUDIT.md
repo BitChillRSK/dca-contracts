@@ -106,6 +106,78 @@ adjacent with nothing that can revert, log, or call between them. Cancun prices 
   700-gas call per pair, but it is how the batch skips instead of reverting on an empty pair. It is
   behavior, not an optimization.
 
+## Deferred candidates (2026-09-25)
+
+On 2026-09-25 the purchase path was reviewed again at `068a380` (R79 head). The model behind it came
+from the 98 live swapper batches of the old contracts:
+- **The live fit.** Each batch cost about 740k fixed plus about 40k per row; the median batch had 7 rows.
+- **Where the fixed part goes.** Most of it is the venue: the MoC redeem, the Tropykus redeem.
+- **A relaunch row, counted from source.** About 24k: three `RESET`s, about 1.2k of reads,
+  3.4k–5.8k of events, and about 3k of compute.
+
+The review produced seven candidates:
+- **One shipped.** `calldata` for the handler's batch arrays became
+  [R86](./R86-calldata-array-parameters.md).
+- **Six deferred.** The human deferred the other six rather than closing them. They sit here so a
+  later pass does not re-derive them. Reopening one needs its own spec.
+
+Figures are Rootstock gas, estimated from source; none of the six has been measured.
+
+- **Remove `IdleErc20Handler.s_idleBalances`.** This is the only candidate above about 2% of a batch.
+  - **Saving:**
+    - Protocol: about 5.3k per idle purchase row (one `RESET` plus its read), about 5–6% of a 10-row idle
+      MoC batch, and more on Dex.
+    - Users: about 5.2k per idle deposit or withdrawal, and about 20k on a first deposit.
+  - **Why it waits:**
+    - It can never disagree with `DcaManager`: deposits, purchases and withdrawals move both by the
+      same amount, and route bindings are add-only. So the saving costs no accuracy.
+    - What it does cost is the one limit an idle handler enforces on its own. If `DcaManager` ever
+      overstated a schedule's balance, the ledger still stops that user at their own deposits.
+      Without it, an idle handler spends whatever it is told from the pooled balance, in contracts
+      with no upgrade and no pause.
+    - It also gives every handler the same rule, "no user takes out more than they put in". Lending
+      handlers must keep `s_shares` anyway, so an auditor can check that rule handler by handler.
+  - **Money:** about $0.13 per 10-row batch, or about $20 a year across three weekly idle routes.
+- **Trim purchase-row event fields.**
+  - **Saving:** about 2.4k per lending row, about 2%:
+    - per-row `TokenLending__UserSharesUpdated` in lending batches, about 1.7k;
+    - `PurchaseRbtc__RbtcBought`'s `tokenSpent` topic and `amountSpent` word, about 0.7k.
+  - **Why it waits:** each field can be derived, but consumers read each one. That is the argument
+    [R80](./R80-remove-cadence-anchor-event.md) used to keep `TokenBalanceUpdated`. Every event change
+    is a five-repo cutover, so it can only land before relaunch deploy.
+- **Keep fees in the handler and sweep them**, instead of a `safeTransfer` every batch.
+  - **Saving:** about 10k per batch, about 1%.
+  - **Why it waits:**
+    - It adds a fee counter, a sweep entry point, and a custody rule that separates fee balance from
+      users' pooled idle balance.
+    - A lending-only version needs no counter, but then idle and lending handlers pay fees differently.
+- **Drop `FeeHandler__FeeTransferred`.** It repeats the ERC-20 `Transfer` to the collector.
+  - **Saving:** about 1.8k per batch (`LOG3` with one data word).
+  - **Why it waits:** the edit is small, but removing an event is a monitoring and indexer cutover like
+    R80's, for about 0.2% of a batch.
+- **Reuse the lending redeem's post-balance as the purchase's pre-balance.**
+  - **Saving:** one stablecoin `balanceOf`, about 1.2k per lending batch.
+  - **Why it waits:**
+    - Today, invariant 11's measurement in `LendingErc20Handler` and invariant 12's in `PurchaseRbtc`
+      are each self-contained.
+    - Sharing the reading ties them together across two layers. A later change to either check could
+      then quietly weaken the other.
+- **Raise `optimizer_runs` above 200.**
+  - **Saving:** compute only. Unmeasured; probably under 0.1% of a batch.
+  - **Why it waits:**
+    - It changes every deployed byte and re-baselines every recorded Foundry figure.
+    - It grows runtime size and deploy cost.
+    - [#104](https://github.com/BitChillRSK/dca-contracts/pull/104) settled 200.
+  - **When it is measured, also check whether a higher value makes the R81 helpers unnecessary.**
+    `_storeNewSchedule` and `_storePurchaseProgress` exist only to make the compiler store each packed
+    schedule slot once. To test that:
+    1. Put their assignments back inline in `createDcaSchedule` and `_rBtcPurchaseChecksEffects`.
+    2. Count writes per slot with `test/gas/R81PackedSlotWritesGas.t.sol` on both profiles.
+  - **The opposite can also happen.** `_storePurchaseProgress` merges its two writes only in its own
+    frame. If a higher value lets the inliner fold it into the caller, the writes split again, at 5,000
+    per row on Rootstock. The same R81 tests catch that, so run them at any new setting even if the
+    helpers stay.
+
 ## Documentation corrections
 
 - The "~2,300 gas ≈ 1.4 cents" figure for the reentrancy guard is its **Cancun** net cost. On Rootstock
