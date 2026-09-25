@@ -1,6 +1,15 @@
 # R84 — no repeated registry reads
 
-Status: **implemented** · GitHub [#146](https://github.com/BitChillRSK/dca-contracts/pull/146) · Assigned: yes · Optional/further-review: no
+Status: **implemented, trimmed to the `withdrawTokenAndInterest` fix** · GitHub [#146](https://github.com/BitChillRSK/dca-contracts/pull/146) · Assigned: yes · Optional/further-review: no
+
+**Decision (human, 2026-09-25): ship only the `withdrawTokenAndInterest` handler reuse.** The savings
+fall on user paths that run rarely, at about 1% of each call and under a cent. On such paths a change
+ships only if it improves the code on its own merits. Reusing the handler `_withdrawToken` just paid
+out through passes that test. The `getRouteInfo` view does not: it would add permanent registry surface
+that overlaps three existing getters, and it would spread handler resolution across three more
+call sites, for about 950 gas a call. The view and the three paths it would have served are therefore
+**Out of scope**, as the Open product decisions below already allowed. The Objective and Background
+record the original four-path proposal as written.
 
 ## Objective
 
@@ -52,66 +61,49 @@ selector instead of two. This spec takes the single view.
 ## Measured
 
 [`test/gas/R84RegistryReadsGas.t.sol`](../../test/gas/R84RegistryReadsGas.t.sol), against the real
-`OperationsAdmin` and `DcaManager` with stub handlers that move no tokens. It counts `OperationsAdmin`
-calls and the storage reads behind them with `vm.startStateDiffRecording`, and pins the new counts.
-The same file was run on the unchanged `src/` for the "before" column.
+`OperationsAdmin` and `DcaManager` with a stub lending handler that moves no tokens. It counts
+`OperationsAdmin` calls and the storage reads behind them with `vm.startStateDiffRecording`, pins the
+new count, and checks that principal and interest reach the same handler. The same file was run on the
+unchanged `src/` for the "before" column.
 
-Before each measured call the test warms `OperationsAdmin` and every registry slot the paths read,
+Before the measured call the test warms `OperationsAdmin` and the two registry slots the path reads,
 through getters that exist on both sides. Cancun then prices every registry call and read the same way
-before and after (100 + 100), and the delta converts to Rootstock by repricing only what was added or
-removed: a removed warm call is −600 (700 on Rootstock), a removed warm `SLOAD` −100, an added one +100.
-Without warming, the route-class slot that `getRouteInfo` now reads on the deposit paths is cold in the
-test (2,100 on Cancun), and Foundry shows create and deposit **+1,388** (default). Rootstock charges a flat
-200 per `SLOAD` warm or cold, so that figure says nothing about production.
+before and after (100 + 100), and the delta converts to Rootstock by repricing only what was removed: a
+removed warm call is −600 (700 on Rootstock), a removed warm `SLOAD` −100.
 
 Foundry gas is the whole measured call, including the test's call overhead, which cancels in the delta.
 
 | Path | Profile | Foundry (Cancun) | Δ | Registry calls | Registry `SLOAD`s | Rootstock Δ (derived) |
 |---|---|---:|---:|---|---|---:|
-| `createDcaSchedule` | default | 78,574 → 77,962 | −612 | 2 → 1 | 2 → 2 | ≈ −1,212 |
-| | deploy | 78,168 → 77,817 | −351 | 2 → 1 | 2 → 2 | ≈ **−951** |
-| `depositToken` | default | 21,902 → 21,290 | −612 | 2 → 1 | 2 → 2 | ≈ −1,212 |
-| | deploy | 21,089 → 20,726 | −363 | 2 → 1 | 2 → 2 | ≈ **−963** |
-| `topUpFromInterest` | default | 32,497 → 32,079 | −418 | 2 → 1 | 2 → 2 | ≈ −1,018 |
-| | deploy | 31,600 → 31,249 | −351 | 2 → 1 | 2 → 2 | ≈ **−951** |
-| `withdrawAllAccumulatedInterest`, one lending pair | default | 47,385 → 46,960 | −425 | 2 → 1 | 2 → 2 | ≈ −1,025 |
-| | deploy | 46,670 → 46,329 | −341 | 2 → 1 | 2 → 2 | ≈ **−941** |
-| `withdrawAllAccumulatedInterest`, lending + idle + unassigned | default | 51,983 → 51,845 | −138 | 5 → 3 | 5 → 6 | ≈ −1,238 |
-| | deploy | 50,697 → 50,800 | +103 | 5 → 3 | 5 → 6 | ≈ **−997** |
-| `withdrawTokenAndInterest` | default | 78,675 → 77,270 | −1,405 | 3 → 2 | 3 → 2 | ≈ −2,105 |
-| | deploy | 77,371 → 76,203 | −1,168 | 3 → 2 | 3 → 2 | ≈ **−1,868** |
+| `withdrawTokenAndInterest` | default | 75,798 → 74,409 | −1,389 | 3 → 2 | 3 → 2 | ≈ −2,089 |
+| | deploy | 74,698 → 73,504 | −1,194 | 3 → 2 | 3 → 2 | ≈ **−1,894** |
 
-The derived figures agree with the audit harness above to within 30 gas. One case costs more: an
-unassigned pair in `withdrawAllAccumulatedInterest` used to stop after reading the handler, and now
-also reads the route class in the same call (+200 on Rootstock for the extra `SLOAD`). A user names an
-unassigned pair only by mistake, and each lending or idle pair in the same call saves about 950, so the
-mixed call above still comes out ≈ −1,000.
+These match the audit harness in Background exactly. The four-path version of this PR measured −1,405 /
+−1,168 on the same path. The removed work is the same one call and one `SLOAD`; the ±26 gas difference
+comes from the codegen around the other, now-reverted changes.
 
 ## Open product decisions
 
 **none.** The `withdrawTokenAndInterest` change is internal. If the human judges roughly 950 user gas
 per call not worth an additive `OperationsAdmin` view, ship that change alone and record the
-`getRouteInfo` part as closed in `IMPLEMENTATION_ORDER.md`.
+`getRouteInfo` part as closed in `IMPLEMENTATION_ORDER.md`. Taken on 2026-09-25: see the decision under
+the Status line.
 
 ## Scope
 
 - [x] `_withdrawToken` also returns the `ITokenHandler` it resolved. `withdrawTokenAndInterest` passes
       that handler to `_withdrawInterest` instead of calling `_handler` again. The route-class check
       and its error are unchanged.
-- [x] Add `getRouteInfo(address token, uint256 routeIndex) external view returns (TokenRoute memory
-      tokenRoute, RouteClass routeClass)` to `IOperationsAdmin` and `OperationsAdmin`, bounded with
-      `toUint32()` like its siblings. Place it next to `getTokenHandler`, in the same order in the
-      interface and the implementation.
-- [x] Route these three through one `getRouteInfo` call each, keeping today's order of checks, errors,
-      and skips:
-  - `_handlerForDeposit`: `TokenNotAccepted`, then `DepositsPaused`.
-  - `topUpFromInterest`: `TokenDoesNotYieldInterest`, then `TokenNotAccepted`.
-  - `withdrawAllAccumulatedInterest`: skip an unassigned pair, then skip an idle route.
-- [x] Keep `getTokenHandler`, `areDepositsPaused`, and `isLendingRoute`, since other paths and consumers
-      read them.
+- [x] No `OperationsAdmin` change.
 - [x] Update `docs/relaunch/README.md` Status and `IMPLEMENTATION_ORDER.md`.
 
 ## Out of scope
+
+- [ ] Dropped 2026-09-25: an `OperationsAdmin.getRouteInfo(token, routeIndex)` view returning
+      `(TokenRoute, RouteClass)` in one call.
+- [ ] Dropped 2026-09-25: routing `_handlerForDeposit` (`createDcaSchedule`, `depositToken`),
+      `topUpFromInterest`, and each `withdrawAllAccumulatedInterest` pair through that view. They keep
+      their two registry calls, each asking a different question.
 
 - [ ] Changing `_handler` for paths that resolve a route only once (purchase, delete, withdraw, rBTC).
 - [ ] Folding `withdrawTokenAndInterest`'s route-class check into `_withdrawToken`. That would add a
@@ -122,28 +114,22 @@ per call not worth an additive `OperationsAdmin` view, ship that change alone an
 ## Files likely touched
 
 - `src/DcaManager.sol`
-- `src/OperationsAdmin.sol`, `src/interfaces/IOperationsAdmin.sol`
-- the `OperationsAdmin` and `DcaManager` unit tests for deposits, pauses, top-up, and interest
+- `test/gas/R84RegistryReadsGas.t.sol`
 
 ## Required tests
 
-- Unit: `getRouteInfo` returns the assigned handler, pause flag, and route class. It returns a zero
-  handler for an unassigned pair and rejects an index above `uint32` like its siblings.
-- Deposit, top-up, and interest-withdrawal behavior is unchanged:
-  - a paused pair still reverts `DcaManager__DepositsPaused`;
-  - an unassigned pair still reverts `DcaManager__TokenNotAccepted`, or is skipped on the batch path;
-  - an idle route still reverts `DcaManager__TokenDoesNotYieldInterest`, or is skipped.
-- `withdrawTokenAndInterest` withdraws principal and interest through the same handler as before.
-- Foundry gas for each of the four paths (labelled Foundry) plus the Rootstock derivation.
+- `withdrawTokenAndInterest` withdraws principal and interest through the same handler as before,
+  with two registry calls instead of three.
+- Its existing errors are unchanged: an idle route still reverts `DcaManager__TokenDoesNotYieldInterest`.
+- Foundry gas for `withdrawTokenAndInterest` (labelled Foundry) plus the Rootstock derivation.
 - `make check`, `make check-deploy`; fork lanes per `AGENTS.md`.
 
 ## Success criteria
 
-- [x] None of the four paths reads the same registry fact (handler, deposit pause, route class) for
-      the same route more than once.
-- [x] The three `getRouteInfo` paths make one `OperationsAdmin` call per route.
-      `withdrawTokenAndInterest` makes two: one handler lookup and one route-class lookup.
-- [x] Errors, skips, and their order are unchanged.
+- [x] `withdrawTokenAndInterest` resolves the handler once and makes two `OperationsAdmin` calls: one
+      handler lookup and one route-class lookup.
+- [x] Its errors and their order are unchanged.
+- [x] No other path and no ABI changes.
 - [x] The saving is stated on both schedules.
 
 ## Reviewer checklist
@@ -156,8 +142,6 @@ per call not worth an additive `OperationsAdmin` view, ship that change alone an
 
 ## ABI / deploy / cutover impact
 
-- ABI: additive, one new `OperationsAdmin` view; no existing selector changes. None if only the
-  `withdrawTokenAndInterest` change ships.
+- ABI: none. Only the `withdrawTokenAndInterest` change ships.
 - Scripts: none.
-- Cutover: per `AGENTS.md` **Consumer follow-up**, a new public selector on `OperationsAdmin` needs an
-  informational `front-end` issue. No other consumer is affected.
+- Cutover: none.

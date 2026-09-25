@@ -1193,13 +1193,15 @@ plus a 200 read. Fixes, under deploy:
 
 The human may drop the view and keep only the internal fix. Ask: none.
 
-**Implemented with the view.** Measured in Foundry with `test/gas/R84RegistryReadsGas.t.sol`, registry
-pre-warmed so both sides price its calls alike, then repriced for Rootstock. Under deploy:
-`withdrawTokenAndInterest` −1,168 Foundry / ≈ **−1,868** Rootstock (registry calls 3 → 2);
-`createDcaSchedule` −351 / ≈ −951, `depositToken` −363 / ≈ −963, `topUpFromInterest` −351 / ≈ −951, and
-each `withdrawAllAccumulatedInterest` lending pair −341 / ≈ −941 (calls 2 → 1 each). An unassigned pair
-in the interest batch now also reads the route class (+200 Rootstock). Errors, skips, and their order are
-unchanged. The ABI change is one additive view, `OperationsAdmin.getRouteInfo`.
+**Implemented without the view (decided 2026-09-25).** The savings fall on rarely run user paths, at
+about 1% of each call and under a cent, so only an edit that improves the code on its own merits ships.
+`withdrawTokenAndInterest` now withdraws interest from the handler `_withdrawToken` just paid out
+through, so registry calls go 3 → 2. The additive `getRouteInfo` view and the three paths it would have
+served (deposit routing, `topUpFromInterest`, the interest batch) are closed: the view would add
+permanent registry surface that overlaps three existing getters. Measured in Foundry with
+`test/gas/R84RegistryReadsGas.t.sol`, registry pre-warmed so both sides price its calls alike, then
+repriced for Rootstock: −1,389 Foundry / ≈ −2,089 Rootstock (default), −1,194 / ≈ **−1,894** (deploy).
+Errors unchanged. ABI change: none.
 
 ### R85 - one-line NatSpec uses `///` ([spec](./R85-one-line-natspec-slash-style.md))
 
