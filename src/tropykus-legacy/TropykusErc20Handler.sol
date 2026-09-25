@@ -15,12 +15,16 @@ abstract contract TropykusErc20Handler is LendingErc20Handler {
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Tropykus kToken exchange-rate scale (1e18).
-    /// @return Always `1e18` for this protocol.
+    /**
+     * @notice Tropykus kToken exchange-rate scale (1e18).
+     * @return Always `1e18` for this protocol.
+     */
     uint256 public constant EXCHANGE_RATE_DECIMALS = 1e18;
 
-    /// @notice Tropykus kToken this handler mints and redeems.
-    /// @return The constructor-supplied kToken.
+    /**
+     * @notice Tropykus kToken this handler mints and redeems.
+     * @return The constructor-supplied kToken.
+     */
     IkToken public immutable i_kToken;
 
     /*//////////////////////////////////////////////////////////////
@@ -67,9 +71,7 @@ abstract contract TropykusErc20Handler is LendingErc20Handler {
         return address(i_kToken);
     }
 
-    /**
-     * @dev The kToken credited is the balance actually gained, never `mint()`'s return value.
-     */
+    /// @dev The kToken credited is the balance actually gained, never `mint()`'s return value.
     function _protocolDeposit(uint256 stablecoinAmount) internal override returns (uint256 mintedShares) {
         uint256 prevKtokenBalance = i_kToken.balanceOf(address(this));
         if (i_kToken.mint(stablecoinAmount) != 0) revert TokenLending__LendingProtocolDepositFailed();

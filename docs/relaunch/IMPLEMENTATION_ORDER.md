@@ -145,7 +145,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R82 | post-R81, before relaunch deploy | none (`ReentrancyGuardTransient`; same guarded set) |
 | R83 | post-R82, before relaunch deploy | **answered 2026-09-24: standing approvals on every Dex handler and every lending adapter** |
 | R84 | post-R83, before relaunch deploy | none (no repeated registry reads; the `getRouteInfo` view may be dropped, keeping the internal `withdrawTokenAndInterest` fix) |
-| R85 | after R84; not deployment-bound | none (one-line NatSpec uses `///`; comment-only) |
+| R85 | after R84; not deployment-bound | none (one-line NatSpec uses `///`, multi-line uses `/** */`; comment-only) |
 | R79 | after R84; not deployment-bound | coalesce repeated-buyer writes (swapper sort + contiguous rBTC/share stores) |
 
 ### PR 1 - R23 toolchain and dependency baseline
@@ -1203,10 +1203,11 @@ a one-off harness kept at [`02884fe`](https://github.com/BitChillRSK/dca-contrac
 repriced for Rootstock: −1,389 Foundry / ≈ −2,089 Rootstock (default), −1,194 / ≈ **−1,894** (deploy).
 Errors unchanged. ABI change: none.
 
-### R85 - one-line NatSpec uses `///` ([spec](./R85-one-line-natspec-slash-style.md))
+### R85 - NatSpec delimiter ([spec](./R85-natspec-delimiter.md))
 
 After R84 and not deployment-bound: one NatSpec tag line uses `///`, not a three-line `/** */`
-wrapper. Multi-line paragraphs stay in blocks. Write the rule into `AGENTS.md` and apply it across
+wrapper, and NatSpec of two or more lines uses a `/** */` block, not a `///` run (the second half
+was added to scope by the human on 2026-09-24). Write the rule into `AGENTS.md` and apply it across
 first-party `src/`. Comment-only; metadata-stripped runtime must stay byte-identical. Ask: none.
 
 ### R79 - coalesce repeated-buyer writes ([analysis](./R78-flat-fee-fast-path.md#r79-survivor-coalesce-repeated-buyer-writes))

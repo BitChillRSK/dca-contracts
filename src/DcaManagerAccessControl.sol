@@ -13,8 +13,10 @@ abstract contract DcaManagerAccessControl is IDcaManagerAccessControl {
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice The DcaManager allowed to call this handler's entry points.
-    /// @return The constructor-supplied DcaManager address.
+    /**
+     * @notice The DcaManager allowed to call this handler's entry points.
+     * @return The constructor-supplied DcaManager address.
+     */
     address public immutable i_dcaManager;
 
     /*//////////////////////////////////////////////////////////////
@@ -30,9 +32,7 @@ abstract contract DcaManagerAccessControl is IDcaManagerAccessControl {
                                CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @param dcaManagerAddress The DcaManager allowed to call handler entry points.
-     */
+    /// @param dcaManagerAddress The DcaManager allowed to call handler entry points.
     constructor(address dcaManagerAddress) {
         i_dcaManager = dcaManagerAddress;
     }

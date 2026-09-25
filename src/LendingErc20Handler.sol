@@ -52,9 +52,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
                            EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @inheritdoc ITokenLending
-     */
+    /// @inheritdoc ITokenLending
     function withdrawInterest(address user, uint256 stablecoinLockedInDcaSchedules) external override onlyDcaManager {
         uint256 exchangeRate = _exchangeRate();
         uint256 totalStablecoinInLending = _sharesToStablecoin(s_shares[user], exchangeRate);
@@ -69,9 +67,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
         emit TokenLending__InterestWithdrawn(user, address(i_stableToken), stablecoinReceived);
     }
 
-    /**
-     * @inheritdoc ITokenLending
-     */
+    /// @inheritdoc ITokenLending
     function getAccruedInterest(address user, uint256 stablecoinLockedInDcaSchedules)
         external
         override
@@ -90,16 +86,12 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
                                 GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @inheritdoc ITokenLending
-     */
+    /// @inheritdoc ITokenLending
     function getUserShares(address user) external view override returns (uint256) {
         return s_shares[user];
     }
 
-    /**
-     * @inheritdoc ITokenLending
-     */
+    /// @inheritdoc ITokenLending
     function quoteAccruedInterest(address user, uint256 stablecoinLockedInDcaSchedules)
         external
         view
@@ -110,9 +102,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
         return _accruedInterest(user, stablecoinLockedInDcaSchedules, _viewExchangeRate());
     }
 
-    /**
-     * @dev Advertise `ITokenHandler` (via TokenHandler) and `ITokenLending`.
-     */
+    /// @dev Advertise `ITokenHandler` (via TokenHandler) and `ITokenLending`.
     function supportsInterface(bytes4 interfaceID) public view virtual override returns (bool) {
         return interfaceID == type(ITokenLending).interfaceId || super.supportsInterface(interfaceID);
     }
@@ -121,15 +111,15 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Never add a `fallback` or `executeOperation` here: an Aave-style flash loan naming this
-    ///      handler as receiver would repay itself from this allowance.
+    /**
+     * @dev Never add a `fallback` or `executeOperation` here: an Aave-style flash loan naming this
+     *      handler as receiver would repay itself from this allowance.
+     */
     function _approveLendingSpender() internal {
         i_stableToken.forceApprove(_lendingSpender(), type(uint256).max);
     }
 
-    /**
-     * @dev TokenHandler reverts unless the pull matches `depositAmount`, so the mint always uses the full request.
-     */
+    /// @dev TokenHandler reverts unless the pull matches `depositAmount`, so the mint always uses the full request.
     function _depositToken(address user, uint256 depositAmount) internal virtual override {
         super._depositToken(user, depositAmount);
         uint256 mintedAmount = _protocolDeposit(depositAmount);
@@ -156,9 +146,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
         return super._withdrawToken(user, withdrawalAmount);
     }
 
-    /**
-     * @dev The stablecoin this handler lends out.
-     */
+    /// @dev The stablecoin this handler lends out.
     function _purchaseToken() internal view override returns (IERC20) {
         return i_stableToken;
     }
@@ -257,9 +245,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
      */
     function _viewExchangeRate() internal view virtual returns (uint256);
 
-    /**
-     * @dev Address that must be approved to pull stablecoin on deposit.
-     */
+    /// @dev Address that must be approved to pull stablecoin on deposit.
     function _lendingSpender() internal view virtual returns (address);
 
     /**

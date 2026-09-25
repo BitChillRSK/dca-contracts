@@ -26,28 +26,38 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Wrapped rBTC token this route swaps into and unwraps on withdraw.
-    /// @return The constructor-supplied WRBTC.
+    /**
+     * @notice Wrapped rBTC token this route swaps into and unwraps on withdraw.
+     * @return The constructor-supplied WRBTC.
+     */
     IWRBTC public immutable i_wrBtcToken;
-    /// @notice Uniswap V3 SwapRouter02 used to buy WRBTC.
-    /// @return The constructor-supplied router.
+    /**
+     * @notice Uniswap V3 SwapRouter02 used to buy WRBTC.
+     * @return The constructor-supplied router.
+     */
     IUniswapV3SwapRouter public immutable i_swapRouter02;
     ICoinPairPrice internal s_mocOracle;
     uint256 internal constant HUNDRED_PERCENT = 1 ether;
     /// @notice decimals of the MoC BTC/USD price. Hardcoded because the oracle exposes no `decimals()`.
     uint256 internal constant ORACLE_DECIMALS = 18;
-    /// @notice `10 ** (ORACLE_DECIMALS - stablecoin decimals)`, which lifts a stablecoin amount into the oracle's USD units
-    /// @dev Fixed at deploy because the handler's stablecoin is immutable, so a 6-decimal stablecoin
-    ///      and an 18-decimal one both reach the oracle's units. Above 18 the constructor reverts.
+    /**
+     * @notice `10 ** (ORACLE_DECIMALS - stablecoin decimals)`, which lifts a stablecoin amount into the oracle's USD units
+     * @dev Fixed at deploy because the handler's stablecoin is immutable, so a 6-decimal stablecoin
+     *      and an 18-decimal one both reach the oracle's units. Above 18 the constructor reverts.
+     */
     uint256 internal immutable i_stablecoinToUsdScale;
-    /// @notice The swap-time oracle floor: the fraction of oracle-implied rBTC the router must pay.
-    /// @dev Deliberately loose. It is the bound that holds when the caller's `minRbtcOut` is absent,
-    /// stale, or hostile, not the operational tightness of a healthy batch — the swapper derives that
-    /// from a live quote per batch and can only tighten from here.
+    /**
+     * @notice The swap-time oracle floor: the fraction of oracle-implied rBTC the router must pay.
+     * @dev Deliberately loose. It is the bound that holds when the caller's `minRbtcOut` is absent,
+     * stale, or hostile, not the operational tightness of a healthy batch — the swapper derives that
+     * from a live quote per batch and can only tighten from here.
+     */
     uint128 internal s_amountOutMinimumPercent;
-    /// @notice The lowest swap-time floor the owner may configure. Bounds the setter; never used at swap time.
-    /// @dev Separate from the live floor so governance's emergency range need not weaken normal execution.
-    ///      Both are 1e18-scaled and packed together as `uint128`.
+    /**
+     * @notice The lowest swap-time floor the owner may configure. Bounds the setter; never used at swap time.
+     * @dev Separate from the live floor so governance's emergency range need not weaken normal execution.
+     *      Both are 1e18-scaled and packed together as `uint128`.
+     */
     uint128 internal s_amountOutMinimumSafetyCheck;
     bytes internal s_swapPath;
     /// @dev Active path's intermediate tokens, retained so purchases can detect router-stranded balances.
@@ -123,9 +133,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         _withdrawRbtc(user, rbtcBalance);
     }
 
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
+    /// @inheritdoc IPurchaseUniswap
     function setPurchasePathAllowed(
         address[] memory intermediateTokens,
         uint24[] memory poolFeeRates,
@@ -142,9 +150,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         _setPurchasePathAllowed(pathHash, encodedPath, intermediateTokens, poolFeeRates, allowed);
     }
 
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
+    /// @inheritdoc IPurchaseUniswap
     function setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
         external
         override
@@ -162,27 +168,21 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         _setPurchasePath(intermediateTokens, poolFeeRates, newPath);
     }
 
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
+    /// @inheritdoc IPurchaseUniswap
     function setAmountOutMinimumPercent(uint256 amountOutMinimumPercent) external onlyOwner {
         _validateSlippageSettings(amountOutMinimumPercent, s_amountOutMinimumSafetyCheck);
         emit PurchaseUniswap__AmountOutMinimumPercentUpdated(s_amountOutMinimumPercent, amountOutMinimumPercent);
         s_amountOutMinimumPercent = amountOutMinimumPercent.toUint128();
     }
 
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
+    /// @inheritdoc IPurchaseUniswap
     function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external onlyOwner {
         _validateSlippageSettings(s_amountOutMinimumPercent, amountOutMinimumSafetyCheck);
         emit PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(s_amountOutMinimumSafetyCheck, amountOutMinimumSafetyCheck);
         s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint128();
     }
 
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
+    /// @inheritdoc IPurchaseUniswap
     function updateMocOracle(address newOracle) external override onlyOwner {
         if (newOracle == address(0)) {
             revert PurchaseUniswap__InvalidOracleAddress();
@@ -200,37 +200,27 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
                                 GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
+    /// @inheritdoc IPurchaseUniswap
     function getAmountOutMinimumPercent() external view returns (uint256) {
         return s_amountOutMinimumPercent;
     }
 
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
+    /// @inheritdoc IPurchaseUniswap
     function getAmountOutMinimumSafetyCheck() external view returns (uint256) {
         return s_amountOutMinimumSafetyCheck;
     }
 
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
+    /// @inheritdoc IPurchaseUniswap
     function getMocOracle() external view returns (ICoinPairPrice) {
         return s_mocOracle;
     }
 
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
+    /// @inheritdoc IPurchaseUniswap
     function getSwapPath() external view returns (bytes memory) {
         return s_swapPath;
     }
 
-    /**
-     * @inheritdoc IPurchaseUniswap
-     */
+    /// @inheritdoc IPurchaseUniswap
     function isPurchasePathAllowed(bytes32 pathHash) external view returns (bool) {
         return s_purchasePathAllowed[pathHash];
     }

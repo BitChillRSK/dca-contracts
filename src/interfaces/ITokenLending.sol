@@ -15,15 +15,19 @@ interface ITokenLending is ITokenHandler {
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Canonical per-user virtual lending-share balance after a successful mint or burn.
-    /// @dev Only `user` is indexed. `newShares` equals `getUserShares(user)` after the call.
-    ///      Reverted mutations produce no lasting log. Idle handlers do not emit this.
+    /**
+     * @notice Canonical per-user virtual lending-share balance after a successful mint or burn.
+     * @dev Only `user` is indexed. `newShares` equals `getUserShares(user)` after the call.
+     *      Reverted mutations produce no lasting log. Idle handlers do not emit this.
+     */
     event TokenLending__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares);
-    /// @notice One user's shares were redeemed for measured stablecoin.
-    /// @dev Emitted only on single-user redeems (`withdraw` / interest). `underlyingAmount` is the
-    ///      stablecoin this handler measured receiving for that user. Batch purchases do not emit
-    ///      this: each row's exact share debit is `UserSharesUpdated`, and measured cash for the
-    ///      whole redeem is `SharesRedeemedBatch`.
+    /**
+     * @notice One user's shares were redeemed for measured stablecoin.
+     * @dev Emitted only on single-user redeems (`withdraw` / interest). `underlyingAmount` is the
+     *      stablecoin this handler measured receiving for that user. Batch purchases do not emit
+     *      this: each row's exact share debit is `UserSharesUpdated`, and measured cash for the
+     *      whole redeem is `SharesRedeemedBatch`.
+     */
     event TokenLending__SharesRedeemed(
         address indexed user, uint256 underlyingAmount, uint256 sharesAmountRedeemed
     );
@@ -56,13 +60,17 @@ interface ITokenLending is ITokenHandler {
     error TokenLending__LendingProtocolRedeemFailed(uint256 errorCode);
     /// @notice A positive share redemption produced no stablecoin; the call is rolled back.
     error TokenLending__ZeroStablecoinReceived(uint256 stablecoinAttempted);
-    /// @notice Batch redeem asked for more of this user's shares than the handler tracks.
-    /// @dev Same outcome as a 0.8 underflow on `s_shares[user] -=`; the named error is for the swapper.
+    /**
+     * @notice Batch redeem asked for more of this user's shares than the handler tracks.
+     * @dev Same outcome as a 0.8 underflow on `s_shares[user] -=`; the named error is for the swapper.
+     */
     error TokenLending__InsufficientShares(address user, uint256 requested, uint256 available);
-    /// @notice The lending protocol did not consume exactly the receipt shares BitChill debited.
-    /// @dev `balanceBefore` / `balanceAfter` are the handler's external receipt-share balances
-    ///      around the protocol call (iToken/kToken `balanceOf`, or aToken `scaledBalanceOf`).
-    ///      Covers zero, partial, excessive, and increasing balances without an arithmetic panic.
+    /**
+     * @notice The lending protocol did not consume exactly the receipt shares BitChill debited.
+     * @dev `balanceBefore` / `balanceAfter` are the handler's external receipt-share balances
+     *      around the protocol call (iToken/kToken `balanceOf`, or aToken `scaledBalanceOf`).
+     *      Covers zero, partial, excessive, and increasing balances without an arithmetic panic.
+     */
     error TokenLending__ShareConsumptionMismatch(
         uint256 intendedDecrease, uint256 balanceBefore, uint256 balanceAfter
     );

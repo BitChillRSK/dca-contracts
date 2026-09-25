@@ -18,16 +18,22 @@ abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20H
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Aave's liquidity-index scale (RAY). Fixed for this protocol; not a constructor
-    ///         arg (passing Tropykus/Sovryn's 1e18 would size withdrawals 1e9× too large).
-    /// @return Always `1e27` for this protocol.
+    /**
+     * @notice Aave's liquidity-index scale (RAY). Fixed for this protocol; not a constructor
+     *         arg (passing Tropykus/Sovryn's 1e18 would size withdrawals 1e9× too large).
+     * @return Always `1e27` for this protocol.
+     */
     uint256 public constant EXCHANGE_RATE_DECIMALS = 1e27;
 
-    /// @notice LayerBank aToken for this handler's stablecoin.
-    /// @return The constructor-supplied aToken.
+    /**
+     * @notice LayerBank aToken for this handler's stablecoin.
+     * @return The constructor-supplied aToken.
+     */
     ILayerBankAToken public immutable i_aToken;
-    /// @notice LayerBank Pool this handler supplies to and withdraws from.
-    /// @return The pool read from `aToken.POOL()` at construction.
+    /**
+     * @notice LayerBank Pool this handler supplies to and withdraws from.
+     * @return The pool read from `aToken.POOL()` at construction.
+     */
     ILayerBankPool public immutable i_pool;
 
     /*//////////////////////////////////////////////////////////////
@@ -76,16 +82,12 @@ abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20H
         return address(i_pool);
     }
 
-    /**
-     * @dev Aave liquidity index including pending interest, RAY (1e27) scale.
-     */
+    /// @dev Aave liquidity index including pending interest, RAY (1e27) scale.
     function _normalizedIncome() internal view returns (uint256) {
         return i_pool.getReserveNormalizedIncome(address(i_stableToken));
     }
 
-    /**
-     * @dev The shares credited are the aTokens actually gained, never a Pool return.
-     */
+    /// @dev The shares credited are the aTokens actually gained, never a Pool return.
     function _protocolDeposit(uint256 stablecoinAmount) internal override returns (uint256 mintedShares) {
         uint256 prevShares = i_aToken.scaledBalanceOf(address(this));
         i_pool.supply(address(i_stableToken), stablecoinAmount, address(this), 0);

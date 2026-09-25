@@ -24,10 +24,12 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Handler and deposit pause share one mapping value, so assigning a handler and pausing
-    ///      its pair dirty the same slot. Every route-index argument below is bounded to `uint32`,
-    ///      the width a packed `DcaSchedule` can store, so no caller can read or write a route no
-    ///      schedule could ever name.
+    /**
+     * @dev Handler and deposit pause share one mapping value, so assigning a handler and pausing
+     *      its pair dirty the same slot. Every route-index argument below is bounded to `uint32`,
+     *      the width a packed `DcaSchedule` can store, so no caller can read or write a route no
+     *      schedule could ever name.
+     */
     mapping(address token => mapping(uint256 routeIndex => TokenRoute)) private s_tokenRoute;
     mapping(uint256 routeIndex => RouteClass) private s_routeClass;
     mapping(address swapper => bool) private s_swappers;
@@ -121,17 +123,13 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
         emit OperationsAdmin__DepositsPauseSet(token, route, paused);
     }
 
-    /**
-     * @inheritdoc IOperationsAdmin
-     */
+    /// @inheritdoc IOperationsAdmin
     function addSwapper(address swapper) external onlyOwner {
         s_swappers[swapper] = true;
         emit OperationsAdmin__SwapperAdded(swapper);
     }
 
-    /**
-     * @inheritdoc IOperationsAdmin
-     */
+    /// @inheritdoc IOperationsAdmin
     function revokeSwapper(address swapper) external onlyOwner {
         s_swappers[swapper] = false;
         emit OperationsAdmin__SwapperRevoked(swapper);
@@ -141,37 +139,27 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
                                 GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @inheritdoc IOperationsAdmin
-     */
+    /// @inheritdoc IOperationsAdmin
     function isSwapper(address account) external view returns (bool) {
         return s_swappers[account];
     }
 
-    /**
-     * @inheritdoc IOperationsAdmin
-     */
+    /// @inheritdoc IOperationsAdmin
     function isLendingRoute(uint256 index) external view returns (bool) {
         return s_routeClass[index.toUint32()] == RouteClass.Lending;
     }
 
-    /**
-     * @inheritdoc IOperationsAdmin
-     */
+    /// @inheritdoc IOperationsAdmin
     function getRouteClass(uint256 index) external view returns (RouteClass) {
         return s_routeClass[index.toUint32()];
     }
 
-    /**
-     * @inheritdoc IOperationsAdmin
-     */
+    /// @inheritdoc IOperationsAdmin
     function getTokenHandler(address token, uint256 routeIndex) external view returns (address) {
         return s_tokenRoute[token][routeIndex.toUint32()].handler;
     }
 
-    /**
-     * @inheritdoc IOperationsAdmin
-     */
+    /// @inheritdoc IOperationsAdmin
     function areDepositsPaused(address token, uint256 routeIndex) external view returns (bool) {
         return s_tokenRoute[token][routeIndex.toUint32()].depositsPaused;
     }

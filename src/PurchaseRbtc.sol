@@ -17,19 +17,19 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Encoded claimable rBTC. `0` means never credited; a live value is `claimable + 1`
-    ///      (including post-withdraw sentinel `1`). Keeps the slot nonzero so the next credit after a
-    ///      full withdrawal is a cheaper nonzero-to-nonzero SSTORE. Getters and withdrawals decode.
-    ///      Private so leaves cannot bypass `_creditRbtc` / `_claimableRbtc` / `_withdrawRbtcChecksEffects`.
+    /**
+     * @dev Encoded claimable rBTC. `0` means never credited; a live value is `claimable + 1`
+     *      (including post-withdraw sentinel `1`). Keeps the slot nonzero so the next credit after a
+     *      full withdrawal is a cheaper nonzero-to-nonzero SSTORE. Getters and withdrawals decode.
+     *      Private so leaves cannot bypass `_creditRbtc` / `_claimableRbtc` / `_withdrawRbtcChecksEffects`.
+     */
     mapping(address user => uint256 encodedAmount) private s_usersAccumulatedRbtc;
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @dev Allow the contract to receive native rBTC from MoC or from unwrapping WRBTC.
-     */
+    /// @dev Allow the contract to receive native rBTC from MoC or from unwrapping WRBTC.
     receive() external payable {}
 
     /**
@@ -112,9 +112,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
         );
     }
 
-    /**
-     * @inheritdoc IPurchaseRbtc
-     */
+    /// @inheritdoc IPurchaseRbtc
     function withdrawAccumulatedRbtc(address user) external virtual override onlyDcaManager {
         uint256 rbtcBalance = _withdrawRbtcChecksEffects(user);
         _withdrawRbtc(user, rbtcBalance);
@@ -124,9 +122,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
                                 GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @inheritdoc IPurchaseRbtc
-     */
+    /// @inheritdoc IPurchaseRbtc
     function getAccumulatedRbtcBalance(address user) external view override returns (uint256) {
         return _claimableRbtc(user);
     }
@@ -135,9 +131,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @dev Decode claimable rBTC, revert if none, and leave the post-withdraw sentinel. Caller then pays.
-     */
+    /// @dev Decode claimable rBTC, revert if none, and leave the post-withdraw sentinel. Caller then pays.
     function _withdrawRbtcChecksEffects(address user) internal returns (uint256 rbtcBalance) {
         uint256 stored = s_usersAccumulatedRbtc[user];
         // `0` = never credited; `1` = fully withdrawn sentinel. Both mean nothing to pay.
@@ -160,9 +154,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
         }
     }
 
-    /**
-     * @dev Pay `rbtcBalance` native rBTC to `user`. Reverts if the call fails.
-     */
+    /// @dev Pay `rbtcBalance` native rBTC to `user`. Reverts if the call fails.
     function _withdrawRbtc(address user, uint256 rbtcBalance) internal {
         (bool sent,) = user.call{value: rbtcBalance}("");
         if (!sent) revert PurchaseRbtc__rBtcWithdrawalFailed();
@@ -179,9 +171,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
                             PRIVATE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @dev Encode and store a positive rBTC credit. Live slots hold `claimable + 1`.
-     */
+    /// @dev Encode and store a positive rBTC credit. Live slots hold `claimable + 1`.
     function _creditRbtc(address buyer, uint256 amount) private {
         uint256 stored = s_usersAccumulatedRbtc[buyer];
         s_usersAccumulatedRbtc[buyer] = (stored == 0 ? 1 : stored) + amount;

@@ -21,10 +21,12 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Two slots. The collector starts its own word because it cannot fit in the 12 bytes left by
-    ///      Ownable2Step's `_pendingOwner`. A uint112 bound then starts the next word; both bounds and
-    ///      both uint16 rates fill that word exactly. The bound width remains wider than the uint96
-    ///      purchase amount of any schedule.
+    /**
+     * @dev Two slots. The collector starts its own word because it cannot fit in the 12 bytes left by
+     *      Ownable2Step's `_pendingOwner`. A uint112 bound then starts the next word; both bounds and
+     *      both uint16 rates fill that word exactly. The bound width remains wider than the uint96
+     *      purchase amount of any schedule.
+     */
     address internal s_feeCollector; // Address to which the fees charged to the user will be sent
     uint112 internal s_feePurchaseLowerBound; // Spending below lower bound gets the maximum fee rate
     uint112 internal s_feePurchaseUpperBound; // Spending above upper bound gets the minimum fee rate
@@ -182,8 +184,10 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         }
     }
 
-    /// @dev When the linear variable fee rate is in use, batches load the settings once and keep the
-    ///      four scalars on the stack across rows.
+    /**
+     * @dev When the linear variable fee rate is in use, batches load the settings once and keep the
+     *      four scalars on the stack across rows.
+     */
     function _calculateVariableFeeAndNetAmounts(
         uint256[] memory purchaseAmounts,
         uint256 minFeeRate,

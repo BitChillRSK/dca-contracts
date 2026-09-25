@@ -14,12 +14,16 @@ abstract contract SovrynErc20Handler is LendingErc20Handler {
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Sovryn iToken exchange-rate scale (1e18).
-    /// @return Always `1e18` for this protocol.
+    /**
+     * @notice Sovryn iToken exchange-rate scale (1e18).
+     * @return Always `1e18` for this protocol.
+     */
     uint256 public constant EXCHANGE_RATE_DECIMALS = 1e18;
 
-    /// @notice Sovryn iSUSD (or equivalent iToken) this handler mints and burns.
-    /// @return The constructor-supplied iToken.
+    /**
+     * @notice Sovryn iSUSD (or equivalent iToken) this handler mints and burns.
+     * @return The constructor-supplied iToken.
+     */
     IiSusdToken public immutable i_iSusdToken;
 
     /*//////////////////////////////////////////////////////////////
@@ -62,9 +66,7 @@ abstract contract SovrynErc20Handler is LendingErc20Handler {
         return address(i_iSusdToken);
     }
 
-    /**
-     * @dev The iSUSD credited is the balance actually gained, never `mint()`'s return value.
-     */
+    /// @dev The iSUSD credited is the balance actually gained, never `mint()`'s return value.
     function _protocolDeposit(uint256 stablecoinAmount) internal override returns (uint256 mintedShares) {
         uint256 prevIsusdBalance = i_iSusdToken.balanceOf(address(this));
         i_iSusdToken.mint(address(this), stablecoinAmount);

@@ -42,9 +42,7 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
                                 GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @inheritdoc IIdleErc20Handler
-     */
+    /// @inheritdoc IIdleErc20Handler
     function getUsersIdleTokenBalance(address user) external view override returns (uint256) {
         return s_idleBalances[user];
     }
@@ -63,9 +61,7 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
         s_idleBalances[user] += depositAmount;
     }
 
-    /**
-     * @dev Clamp to the caller's idle balance, then pay that amount from the pooled stablecoin.
-     */
+    /// @dev Clamp to the caller's idle balance, then pay that amount from the pooled stablecoin.
     function _withdrawToken(address user, uint256 withdrawalAmount) internal virtual override returns (uint256) {
         uint256 requested = withdrawalAmount;
         withdrawalAmount = _debitIdleBalance(user, withdrawalAmount);
@@ -73,9 +69,7 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
         return super._withdrawToken(user, withdrawalAmount);
     }
 
-    /**
-     * @dev The stablecoin this handler holds idle.
-     */
+    /// @dev The stablecoin this handler holds idle.
     function _purchaseToken() internal view override returns (IERC20) {
         return i_stableToken;
     }
@@ -106,9 +100,7 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
         }
     }
 
-    /**
-     * @dev Clamp `amount` to the user's idle balance and debit it.
-     */
+    /// @dev Clamp `amount` to the user's idle balance and debit it.
     function _debitIdleBalance(address user, uint256 amount) internal returns (uint256) {
         uint256 idleBalance = s_idleBalances[user];
         if (idleBalance < amount) {

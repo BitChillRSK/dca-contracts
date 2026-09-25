@@ -11,10 +11,12 @@ interface IFeeHandler {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
     //////////////////////////////////////////////////////////////*/
-    /// @notice The four parameters that interpolate a purchase fee between `maxFeeRate` and `minFeeRate`.
-    /// @dev Two uint112 bounds plus two uint16 rates occupy one storage word. The bounds remain wider
-    ///      than a schedule's uint96 purchase amount. `setFeeRateParams` accepts uint256 values for
-    ///      owner ergonomics and checked-casts them at the write; `_validateFeeSettings` runs first.
+    /**
+     * @notice The four parameters that interpolate a purchase fee between `maxFeeRate` and `minFeeRate`.
+     * @dev Two uint112 bounds plus two uint16 rates occupy one storage word. The bounds remain wider
+     *      than a schedule's uint96 purchase amount. `setFeeRateParams` accepts uint256 values for
+     *      owner ergonomics and checked-casts them at the write; `_validateFeeSettings` runs first.
+     */
     struct FeeSettings {
         uint16 minFeeRate; // the lowest possible fee
         uint16 maxFeeRate; // the highest possible fee
@@ -35,8 +37,10 @@ interface IFeeHandler {
     event FeeHandler__PurchaseUpperBoundSet(uint256 feePurchaseUpperBound);
     /// @notice Owner set the address that receives purchase fees.
     event FeeHandler__FeeCollectorAddressSet(address indexed feeCollector);
-    /// @notice A purchase fee was transferred to the collector.
-    /// @dev One log per batch for the aggregated fee. A zero fee is not logged.
+    /**
+     * @notice A purchase fee was transferred to the collector.
+     * @dev One log per batch for the aggregated fee. A zero fee is not logged.
+     */
     event FeeHandler__FeeTransferred(address indexed token, address indexed collector, uint256 amount);
 
     /*//////////////////////////////////////////////////////////////

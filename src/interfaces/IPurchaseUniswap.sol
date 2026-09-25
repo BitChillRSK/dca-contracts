@@ -35,8 +35,10 @@ interface IPurchaseUniswap {
     event PurchaseUniswap__NewPathSet(
         address[] intermediateTokens, uint24[] poolFeeRates, bytes newPath
     );
-    /// @notice Exact encoded path derived from `intermediateTokens` / `poolFeeRates` was allowed or revoked.
-    /// @dev Construction emits `allowed = true` for the initial path. Later writes are owner-only.
+    /**
+     * @notice Exact encoded path derived from `intermediateTokens` / `poolFeeRates` was allowed or revoked.
+     * @dev Construction emits `allowed = true` for the initial path. Later writes are owner-only.
+     */
     event PurchaseUniswap__PurchasePathAllowedSet(
         bytes32 pathHash, bytes encodedPath, address[] intermediateTokens, uint24[] poolFeeRates, bool allowed
     );
@@ -75,9 +77,11 @@ interface IPurchaseUniswap {
     error PurchaseUniswap__UnauthorizedPurchasePathSetter(address caller);
     /// @notice `pathHash` is not allowlisted on this handler.
     error PurchaseUniswap__PurchasePathNotAllowed(bytes32 pathHash);
-    /// @notice A later hop stopped short and left an intermediate token in the shared router.
-    /// @dev The comparison is against the router's own pre-swap balance, not zero, so dust anyone can send
-    ///      to a public contract does not block purchases.
+    /**
+     * @notice A later hop stopped short and left an intermediate token in the shared router.
+     * @dev The comparison is against the router's own pre-swap balance, not zero, so dust anyone can send
+     *      to a public contract does not block purchases.
+     */
     error PurchaseUniswap__IntermediateBalanceChangedInRouter(
         address token, uint256 balanceBefore, uint256 balanceAfter
     );
