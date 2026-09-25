@@ -45,7 +45,7 @@ contract UsdrifHelperConfig is Script {
 
     function getRootstockMainnetConfig() public pure returns (NetworkConfig memory config) {
         address[] memory intermediateTokens = new address[](1);
-        intermediateTokens[0] = 0xAf368c91793CB22739386DFCbBb2F1A9e4bCBeBf; // rUSDT on mainnet
+        intermediateTokens[0] = USDT0_MAINNET; // USDRIF -0.05%-> USDT0 -0.30%-> WRBTC
 
         uint24[] memory poolFeeRates = new uint24[](2);
         poolFeeRates[0] = 500;

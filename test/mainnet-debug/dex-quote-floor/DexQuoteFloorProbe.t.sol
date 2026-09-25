@@ -36,10 +36,6 @@ contract DexQuoteFloorProbe is Test {
     address internal constant USDRIF = 0x3A15461d8aE0F0Fb5Fa2629e9DA7D66A794a6e37;
     address internal constant USDT0 = 0x779Ded0c9e1022225f8E0630b35a9b54bE713736;
     address internal constant RUSDT = 0xef213441A85dF4d7ACbDaE0Cf78004e1E486bB96; // DOC hop
-    /// @dev The deploy config calls this "rUSDT", but the address is 6-decimal `USDT`, a different token
-    ///      from the 18-decimal `rUSDT` the DOC path hops through. Recorded here as deployed; renaming or
-    ///      re-approving a path is R52's surface, not R51's.
-    address internal constant USDT_USDRIF_HOP = 0xAf368c91793CB22739386DFCbBb2F1A9e4bCBeBf;
 
     /// @dev The shipped swap-time floor, read from the deploy constants so this table always measures the
     ///      value the handlers actually enforce. $1 peg, 18-decimal oracle.
@@ -80,10 +76,10 @@ contract DexQuoteFloorProbe is Test {
         _table("LEGACY DOC dex path (never deployed; MoC is DOC's only venue)", DOC, 18, path, "DOC-500-rUSDT-500-WRBTC");
     }
 
-    /// @dev LayerBank USDRIF: USDRIF -0.05%-> USDT -0.30%-> WRBTC. 0.35% in fee tiers.
+    /// @dev LayerBank USDRIF: USDRIF -0.05%-> USDT0 -0.30%-> WRBTC. 0.35% in fee tiers.
     function test_quoteVsFloor_layerBankUsdrif() public {
-        bytes memory path = abi.encodePacked(USDRIF, uint24(500), USDT_USDRIF_HOP, uint24(3000), WRBTC);
-        _table("LayerBank USDRIF", USDRIF, 18, path, "USDRIF-500-USDT(6dp)-3000-WRBTC");
+        bytes memory path = abi.encodePacked(USDRIF, uint24(500), USDT0, uint24(3000), WRBTC);
+        _table("LayerBank USDRIF", USDRIF, 18, path, "USDRIF-500-USDT0-3000-WRBTC");
     }
 
     /// @dev LayerBank USDT0: direct USDT0 -0.30%-> WRBTC, 6 decimals in, 18-decimal WRBTC out.

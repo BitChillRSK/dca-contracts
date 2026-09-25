@@ -62,8 +62,8 @@ string constant USDT0_STRING = "USDT0";
 // Swap-time oracle floor. Deliberately loose: the swapper's per-batch `minRbtcOut` is the operational
 // bound, and this is what holds when that minimum is absent, stale, or hostile. Derived from the live
 // quote table (`make probe-dex-quote-floor`, block 9198813): the worst realistic-size fill was LayerBank
-// USDRIF at 99.27% of oracle for a $1,000 batch, so 97% leaves ~227 bps for peg drift, oracle drift, and
-// pool movement between quote and inclusion, while capping a compromised-swapper loss at 3%.
+// USDRIF (via USDT0) at 99.58% of oracle for a $1,000 batch, so 97% leaves ~258 bps for peg drift, oracle
+// drift, and pool movement between quote and inclusion, while capping a compromised-swapper loss at 3%.
 uint256 constant DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT = 0.97 ether; // 97%
 // The wall the owner cannot cross in one transaction when widening the floor above.
 uint256 constant DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK = 0.95 ether; // 95%

@@ -305,7 +305,7 @@ contract DeployFinal is DeployBase {
 
     function _usdrifMainnet() private pure returns (UsdrifHelperConfig.NetworkConfig memory config) {
         address[] memory intermediateTokens = new address[](1);
-        intermediateTokens[0] = 0xAf368c91793CB22739386DFCbBb2F1A9e4bCBeBf;
+        intermediateTokens[0] = USDT0_MAINNET; // USDRIF -0.05%-> USDT0 -0.30%-> WRBTC
         uint24[] memory poolFeeRates = new uint24[](2);
         poolFeeRates[0] = 500;
         poolFeeRates[1] = 3000;
