@@ -628,8 +628,8 @@ contract LendingErc20HandlerHarness is LendingErc20Handler {
     }
 
     function batchRetrieveStablecoin(
-        address[] memory users,
-        uint256[] memory purchaseAmounts
+        address[] calldata users,
+        uint256[] calldata purchaseAmounts
     ) external returns (uint256) {
         return _batchRetrieveStablecoin(users, purchaseAmounts);
     }

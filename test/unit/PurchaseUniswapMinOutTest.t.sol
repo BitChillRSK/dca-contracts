@@ -367,8 +367,12 @@ contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
     function calculateFee(uint256 grossAmount) external view returns (uint256) {
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = grossAmount;
-        (uint256 fee,,) = _calculateFeeAndNetAmounts(amounts);
-        return fee;
+        return this.calculateBatchFee(amounts);
+    }
+
+    /// @dev External so the batch fee helper receives the `calldata` array it takes in production.
+    function calculateBatchFee(uint256[] calldata amounts) external view returns (uint256 fee) {
+        (fee,,) = _calculateFeeAndNetAmounts(amounts);
     }
 
     function purchaseRbtc(uint256 stablecoinAmountToSpend, uint256 minRbtcOut) external returns (uint256) {
@@ -384,7 +388,7 @@ contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
     }
 
     /// @dev The stablecoin is minted straight to the harness, so a batch "retrieves" exactly what it asked for.
-    function _batchRetrieveStablecoin(address[] memory, uint256[] memory purchaseAmounts)
+    function _batchRetrieveStablecoin(address[] calldata, uint256[] calldata purchaseAmounts)
         internal
         pure
         override

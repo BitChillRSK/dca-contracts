@@ -40,9 +40,9 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
      *      rBTC credited and the stablecoin reported as spent are shares of what actually moved.
      */
     function batchBuyRbtc(
-        address[] memory buyers,
-        uint64[] memory scheduleIds,
-        uint256[] memory purchaseAmounts,
+        address[] calldata buyers,
+        uint64[] calldata scheduleIds,
+        uint256[] calldata purchaseAmounts,
         uint256 minRbtcOut
     ) external override onlyDcaManager {
         uint256[] memory netStablecoinAmountsToSpend;
@@ -73,16 +73,20 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
             _transferFee(purchaseToken, aggregatedFee);
         }
 
-        uint256 inputBalanceBefore = purchaseToken.balanceOf(address(this));
-        uint256 totalPurchasedRbtc = _purchaseRbtc(totalStablecoinAmountToSpend, minRbtcOut);
-        uint256 inputBalanceAfter = purchaseToken.balanceOf(address(this));
-        if (
-            inputBalanceAfter > inputBalanceBefore
-                || inputBalanceBefore - inputBalanceAfter != totalStablecoinAmountToSpend
-        ) {
-            revert PurchaseRbtc__InputAmountNotFullySpent(
-                totalStablecoinAmountToSpend, inputBalanceBefore, inputBalanceAfter
-            );
+        uint256 totalPurchasedRbtc;
+        // The input balances are scoped to this block because they are dead once consumption is proved.
+        {
+            uint256 inputBalanceBefore = purchaseToken.balanceOf(address(this));
+            totalPurchasedRbtc = _purchaseRbtc(totalStablecoinAmountToSpend, minRbtcOut);
+            uint256 inputBalanceAfter = purchaseToken.balanceOf(address(this));
+            if (
+                inputBalanceAfter > inputBalanceBefore
+                    || inputBalanceBefore - inputBalanceAfter != totalStablecoinAmountToSpend
+            ) {
+                revert PurchaseRbtc__InputAmountNotFullySpent(
+                    totalStablecoinAmountToSpend, inputBalanceBefore, inputBalanceAfter
+                );
+            }
         }
         if (totalPurchasedRbtc == 0) revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(purchaseToken));
         // Checked against the rBTC we measured ourselves receiving, so the bound holds on every purchase

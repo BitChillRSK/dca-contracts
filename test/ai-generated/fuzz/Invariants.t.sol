@@ -526,14 +526,14 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
      *      honest if the signature drifts again.
      */
     function batchBuyRbtc(
-        address[] memory buyers,
-        uint64[] memory scheduleIds,
-        uint256[] memory purchaseAmounts,
+        address[] calldata buyers,
+        uint64[] calldata scheduleIds,
+        uint256[] calldata purchaseAmounts,
         uint256 minRbtcOut
     ) external onlyDcaManager {
         uint256 totalPurchasedRbtc;
         for (uint256 i = 0; i < buyers.length; i++) {
-            totalPurchasedRbtc += _buyRbtcInternal(buyers[i], scheduleIds[i], purchaseAmounts[i]);
+            totalPurchasedRbtc += _buyRbtcInternal(buyers[i:i + 1], scheduleIds[i], purchaseAmounts[i:i + 1]);
         }
         // The real pipeline checks before crediting; a revert here undoes the credits above, so the
         // all-or-nothing outcome the caller sees is the same.
@@ -570,16 +570,14 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
      * @dev Properly simulates: stablecoin -> rBTC conversion with correct balance accounting
      */
     function _buyRbtcInternal(
-        address buyer,
+        address[] calldata buyerOne,
         uint64 scheduleId,
-        uint256 purchaseAmount
+        uint256[] calldata amountOne
     ) internal returns (uint256) {
         // Retrieve the stablecoin the purchase will spend (length-1 batch — the only purchase path)
-        address[] memory buyersOne = new address[](1);
-        buyersOne[0] = buyer;
-        uint256[] memory amountsOne = new uint256[](1);
-        amountsOne[0] = purchaseAmount;
-        uint256 retrieved = _batchRetrieveStablecoin(buyersOne, amountsOne);
+        uint256 retrieved = _batchRetrieveStablecoin(buyerOne, amountOne);
+        address buyer = buyerOne[0];
+        uint256 purchaseAmount = amountOne[0];
         
         // ✅ SIMULATE: Consume the stablecoin retrieved (as it would be used for actual rBTC purchase)
         // In real protocol, this stablecoin gets sent to DEX/MoC and consumed
@@ -653,14 +651,14 @@ contract SovrynHandlerWrapper is SovrynErc20Handler {
      *      honest if the signature drifts again.
      */
     function batchBuyRbtc(
-        address[] memory buyers,
-        uint64[] memory scheduleIds,
-        uint256[] memory purchaseAmounts,
+        address[] calldata buyers,
+        uint64[] calldata scheduleIds,
+        uint256[] calldata purchaseAmounts,
         uint256 minRbtcOut
     ) external onlyDcaManager {
         uint256 totalPurchasedRbtc;
         for (uint256 i = 0; i < buyers.length; i++) {
-            totalPurchasedRbtc += _buyRbtcInternal(buyers[i], scheduleIds[i], purchaseAmounts[i]);
+            totalPurchasedRbtc += _buyRbtcInternal(buyers[i:i + 1], scheduleIds[i], purchaseAmounts[i:i + 1]);
         }
         // The real pipeline checks before crediting; a revert here undoes the credits above, so the
         // all-or-nothing outcome the caller sees is the same.
@@ -696,16 +694,14 @@ contract SovrynHandlerWrapper is SovrynErc20Handler {
      * @notice Internal function for rBTC purchase logic
      */
     function _buyRbtcInternal(
-        address buyer,
+        address[] calldata buyerOne,
         uint64 scheduleId,
-        uint256 purchaseAmount
+        uint256[] calldata amountOne
     ) internal returns (uint256) {
         // Retrieve the stablecoin the purchase will spend (length-1 batch — the only purchase path)
-        address[] memory buyersOne = new address[](1);
-        buyersOne[0] = buyer;
-        uint256[] memory amountsOne = new uint256[](1);
-        amountsOne[0] = purchaseAmount;
-        uint256 retrieved = _batchRetrieveStablecoin(buyersOne, amountsOne);
+        uint256 retrieved = _batchRetrieveStablecoin(buyerOne, amountOne);
+        address buyer = buyerOne[0];
+        uint256 purchaseAmount = amountOne[0];
         
         // ✅ SIMULATE: Consume the stablecoin retrieved (as it would be used for actual rBTC purchase)
         // In real protocol, this stablecoin gets sent to DEX/MoC and consumed

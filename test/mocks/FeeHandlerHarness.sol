@@ -13,11 +13,11 @@ contract FeeHandlerHarness is FeeHandler {
     function exposedCalculateFee(uint256 amount) external view returns (uint256) {
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = amount;
-        (uint256 fee,,) = _calculateFeeAndNetAmounts(amounts);
+        (uint256 fee,,) = this.exposedCalculateFeeAndNetAmounts(amounts);
         return fee;
     }
 
-    function exposedCalculateFeeAndNetAmounts(uint256[] memory purchaseAmounts)
+    function exposedCalculateFeeAndNetAmounts(uint256[] calldata purchaseAmounts)
         external
         view
         returns (uint256 aggregatedFee, uint256[] memory netAmountsToSpend, uint256 totalAmountToSpend)

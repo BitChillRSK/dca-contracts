@@ -194,8 +194,8 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
      *      weights, so clamping one row would dilute every other buyer in the batch.
      */
     function _batchRetrieveStablecoin(
-        address[] memory users,
-        uint256[] memory purchaseAmounts
+        address[] calldata users,
+        uint256[] calldata purchaseAmounts
     ) internal virtual override returns (uint256) {
         uint256 exchangeRate = _exchangeRate();
         uint256 totalSharesToRedeem;

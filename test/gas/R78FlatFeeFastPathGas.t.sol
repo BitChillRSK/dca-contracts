@@ -13,10 +13,9 @@ contract R78OptimizedFeeHandlerGasHarness is FeeHandler {
         view
         returns (uint256 gasUsed, uint256 aggregatedFee, uint256 totalAmountToSpend, bytes32 netAmountsHash)
     {
-        uint256[] memory amounts = purchaseAmounts;
         uint256[] memory netAmounts;
         uint256 gasBefore = gasleft();
-        (aggregatedFee, netAmounts, totalAmountToSpend) = _calculateFeeAndNetAmounts(amounts);
+        (aggregatedFee, netAmounts, totalAmountToSpend) = _calculateFeeAndNetAmounts(purchaseAmounts);
         gasUsed = gasBefore - gasleft();
         netAmountsHash = keccak256(abi.encode(netAmounts));
     }

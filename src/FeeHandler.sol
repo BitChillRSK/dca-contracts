@@ -125,7 +125,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
      * @return netAmountsToSpend  An array with the net amounts (purchase amount minus fee) for each user.
      * @return totalAmountToSpend The aggregated net amount that will actually be used to buy rBTC after fee is charged.
      */
-    function _calculateFeeAndNetAmounts(uint256[] memory purchaseAmounts)
+    function _calculateFeeAndNetAmounts(uint256[] calldata purchaseAmounts)
         internal
         view
         returns (uint256 aggregatedFee, uint256[] memory netAmountsToSpend, uint256 totalAmountToSpend)
@@ -160,7 +160,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
 
     /// @dev When the linear variable fee rate is not in use, apply the flat fee rate to all amounts.
     function _calculateFlatFeeAndNetAmounts(
-        uint256[] memory purchaseAmounts,
+        uint256[] calldata purchaseAmounts,
         uint256 feeRate
     )
         private
@@ -189,7 +189,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
      *      four scalars on the stack across rows.
      */
     function _calculateVariableFeeAndNetAmounts(
-        uint256[] memory purchaseAmounts,
+        uint256[] calldata purchaseAmounts,
         uint256 minFeeRate,
         uint256 maxFeeRate,
         uint256 feePurchaseLowerBound,

@@ -66,9 +66,9 @@ interface IPurchaseRbtc {
      *      consume exactly the net stablecoin passed to it; otherwise the entire batch reverts.
      */
     function batchBuyRbtc(
-        address[] memory buyers,
-        uint64[] memory scheduleIds,
-        uint256[] memory purchaseAmounts,
+        address[] calldata buyers,
+        uint64[] calldata scheduleIds,
+        uint256[] calldata purchaseAmounts,
         uint256 minRbtcOut
     ) external;
 

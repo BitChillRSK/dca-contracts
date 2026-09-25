@@ -417,8 +417,8 @@ contract TropykusTestHandler is TropykusErc20Handler {
     ) {}
     
     function testBatchRetrieveStablecoin(
-        address[] memory users,
-        uint256[] memory purchaseAmounts
+        address[] calldata users,
+        uint256[] calldata purchaseAmounts
     ) external returns (uint256) {
         return _batchRetrieveStablecoin(users, purchaseAmounts);
     }
