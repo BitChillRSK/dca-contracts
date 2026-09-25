@@ -34,7 +34,7 @@ import "test/Constants.sol";
  *      Each deposit arm is measured in its own transaction, so neither pays the other's cold access —
  *      see the note on the standing-approval test. Default profile: 139,362 pre-R83 against 115,882
  *      standing, **−23,480**. Deploy profile: 136,381 against 113,501, **−22,880**. Recovering a
- *      cleared allowance costs 3,934 / 3,645 for one spender, once per clearing rather than per deposit.
+ *      cleared allowance costs 3,889 / 3,491, once per clearing rather than per deposit.
  *
  *      A `gasleft()` delta is execution before refunds, so that is what Cancun charges up front, and
  *      roughly 19,900 of it comes back as a refund there — which is why the removed round trip never
@@ -150,10 +150,8 @@ contract R83StandingApprovalGasTest is Test {
 
     /**
      * @notice The pre-R83 deposit shape: the allowance slot written twice, on every deposit, for good.
-     * @dev The arm the saving is measured against, reconstructed in a subclass rather than quoted from
-     *      an earlier branch, so it is re-derived on every run and cannot drift. It makes the same two
-     *      writes and the same `approve` call as the code R83 replaced; only their order differs, which
-     *      the Cancun schedule does not price.
+     * @dev Reconstructed in a subclass rather than quoted from an earlier branch, so the baseline is
+     *      re-derived on every run and cannot drift.
      */
     function test_lendingDeposit_preR83Shape_writesTheAllowanceSlotTwice() public {
         bytes32 allowanceSlot = _allowanceSlot(address(s_preR83Handler), address(s_preR83ISusd));
@@ -169,23 +167,19 @@ contract R83StandingApprovalGasTest is Test {
         assertGt(s_preR83Handler.getUserShares(USER), 0);
     }
 
-    /**
-     * @notice Restoring a cleared allowance writes the spender's slot once.
-     * @dev Bounds what recovery costs and pins that it is off the deposit path: the arm above shows the
-     *      deposit writing nothing, so a handler pays this at most once per clearing, not per deposit.
-     */
-    function test_restoreStandingApprovals_writesTheAllowanceSlotOnce() public {
+    /// @notice Restoring a cleared allowance writes the spender's slot once, off the deposit path.
+    function test_restoreLendingApproval_writesTheAllowanceSlotOnce() public {
         bytes32 allowanceSlot = _allowanceSlot(address(s_lendingHandler), address(s_iSusd));
         vm.prank(address(s_lendingHandler));
         s_stablecoin.approve(address(s_iSusd), 0);
 
         vm.startStateDiffRecording();
         uint256 gasBefore = gasleft();
-        s_lendingHandler.restoreStandingApprovals();
+        s_lendingHandler.restoreLendingApproval();
         uint256 gasUsed = gasBefore - gasleft();
         uint256 writes = _slotWrites(vm.stopAndReturnStateDiff(), address(s_stablecoin), allowanceSlot);
 
-        console2.log("R83 restoreStandingApprovals, one spender (Foundry gas)", gasUsed);
+        console2.log("R83 restoreLendingApproval (Foundry gas)", gasUsed);
         assertEq(writes, 1, "the restore should write the slot once");
         assertEq(
             s_stablecoin.allowance(address(s_lendingHandler), address(s_iSusd)),

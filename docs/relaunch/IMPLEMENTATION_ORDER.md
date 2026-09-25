@@ -1168,10 +1168,13 @@ Shipped: `LendingErc20Handler._approveLendingSpender()` called as the last state
 LayerBank, and Tropykus constructors; `PurchaseUniswap`'s constructor approves the router. Neither
 runtime path reads or writes an allowance any more. Because a constructor grant is one-shot, and nothing
 here can rule out a clearing — two of the three shipped stablecoins are upgradeable proxies, so whether
-an allowance survives is the issuer's decision — `StablecoinSource` carries an unpermissioned
-`restoreStandingApprovals()` (declared on `IStandingApprovals`) that re-grants `max` to the constructor's own immutable
-spenders — the only new ABI, and the only way back from a cleared allowance on a handler that cannot be
-upgraded. Live decrement facts: USDRIF preserves a `max` allowance (saving ~10,400 per use), DOC and
+an allowance survives is the issuer's decision — each site carries an unpermissioned restore next to the
+constructor statement it mirrors: `restoreLendingApproval()` (declared on `ITokenLending`) and
+`restoreSwapRouterApproval()` (declared on `IPurchaseUniswap`), each re-granting `max` to that
+constructor's own immutable spender. They are the only new ABI, and the only way back from a cleared
+allowance on a handler that cannot be upgraded. Adding one to `ITokenLending` moves
+`type(ITokenLending).interfaceId`, which every in-repo site computes from the same source and no
+consumer hardcodes. Live decrement facts: USDRIF preserves a `max` allowance (saving ~10,400 per use), DOC and
 USDT0 decrement it (~5,400). Allowance-slot writes **2 → 0** per deposit; Foundry, execution before
 refunds: **−23,480** (default) / **−22,880** (deploy) against a live reconstruction of the pre-R83
 deposit, and zero writes on the Dex batch. One 20,000 `SET` per standing approval at deploy; break-even

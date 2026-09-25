@@ -117,12 +117,7 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         assertGt(tropykusDexHandler.getSwapPath().length, 0);
     }
 
-    /**
-     * @notice Both of this leaf's spenders are approved once, at construction.
-     * @dev `== max` to the real spender is what carries the ordering rule: the approval reads an
-     *      immutable only the adapter's constructor assigns, so running it earlier would approve
-     *      `address(0)`.
-     */
+    /// @notice Both of this leaf's spenders are approved once, at construction.
     function test_tropykusDex_standingSpenderApprovals() public {
         address handlerAddress = address(tropykusDexHandler);
         assertEq(stablecoin.allowance(handlerAddress, address(kToken)), type(uint256).max);

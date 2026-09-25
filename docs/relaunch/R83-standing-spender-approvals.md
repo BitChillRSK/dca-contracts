@@ -200,23 +200,36 @@ slots read on mainnet), so whether an allowance survives is the token issuer's d
 No token has done it, and none is expected to — the claim is that the handlers have no answer if one
 does, not that one will.
 
-`StablecoinSource` therefore implements one unpermissioned external function,
-`restoreStandingApprovals()`, which re-grants `max` to every spender the constructor chose. It is
-declared on its own interface, `IStandingApprovals`, because the caller-facing rules belong to the
-surface a script or an operator calls through, and an abstract base is not one. It is not advertised
-through ERC-165: only `ITokenHandler` and `ITokenLending` are, because `OperationsAdmin` routes on them,
-and nothing queries this one. It is safe to leave unpermissioned because
-it takes no arguments and reads no storage a caller controls: it restores the same allowance to the same
-**immutable** spenders, so it can widen nothing and name nobody new, and calling it repeatedly is
-indistinguishable from calling it once.
+Each site therefore gets its own unpermissioned external function, next to the constructor statement it
+mirrors:
 
-The two halves are declared separately — `_grantFundingApprovals` on the funding side,
-`_grantPurchaseApprovals` on the purchase route — and each is implemented on one side only, so a leaf
-inherits a single implementation of each and needs no override. They are declared, not defaulted to a
-no-op, so a new funding base or purchase route does not compile until it states what it holds. Neither
-is ever called from a constructor: virtual dispatch there would run before the other side has assigned
-the immutables it reads, which is the same trap the adapter-constructor ordering rule exists for. Each
-side instead shares a single non-virtual statement with its own constructor.
+| Function | Declared on | Implemented in | Calls |
+|---|---|---|---|
+| `restoreLendingApproval()` | `ITokenLending` | `LendingErc20Handler` | `_approveLendingSpender()` |
+| `restoreSwapRouterApproval()` | `IPurchaseUniswap` | `PurchaseUniswap` | `_approveSwapRouter()` |
+
+Both are `external`, take no arguments, and have no access control. Each is safe to leave unpermissioned
+because it reads no storage a caller controls: it re-grants `max` to the same **immutable** spender the
+constructor already chose, so it can widen nothing and name nobody new, and calling it repeatedly is
+indistinguishable from calling it once. Each is declared on the interface that owns the surface it
+belongs to, per `AGENTS.md`, and reached through `@inheritdoc`; the constructors keep calling the
+non-virtual helpers directly. A leaf that lends and swaps inherits one of each along a single path, so
+no leaf needs an `override` and every leaf stays constructor-only.
+
+Two functions rather than one spanning both sides. A single restore would have to live on the one base
+both sides inherit, `StablecoinSource`, dispatching into a virtual hook per side — which is an abstract
+contract owning a caller-facing surface, an extra interface with no other member, and two hooks whose
+only job is to be empty on the routes that approve nobody. Splitting it puts each function where its
+spender already is, and a handler that approves nobody simply does not carry one.
+
+**ERC-165.** Adding a function to `ITokenLending` changes `type(ITokenLending).interfaceId`, which
+`OperationsAdmin` checks when routing a handler (`src/OperationsAdmin.sol:91`). Every in-repo site
+computes that id from the same source, so they move together; the effect is that a lending handler must
+now also implement the restore to be accepted as a lending route, which is a tightening, not a break.
+Searched all eight sibling consumer repos for a hardcoded id (`supportsInterface`, `interfaceId`,
+`ITokenLending`): no consumer reads ERC-165 at all, so nothing off-chain is pinned to the old value.
+`IPurchaseUniswap` is not advertised through ERC-165 in the first place — only `ITokenHandler` and
+`ITokenLending` are, because those are the two `OperationsAdmin` routes on.
 
 **This supersedes three points recorded here earlier as deliberately unchanged.**
 
@@ -229,14 +242,14 @@ side instead shares a single non-virtual statement with its own constructor.
   the Dex path. Both are now redundant: the restore is a better answer to the same problem, because it
   fixes the allowance for every later call rather than for the one in hand. That takes about 900
   Rootstock gas off every deposit and every batch (a flat 700 call plus a 200 read).
-- *"A permissionless `restoreStandingApprovals()` is beyond what this item was assigned."* Overruled by
+- *"A permissionless restore is beyond what this item was assigned."* Overruled by
   the human on 2026-09-25, who ruled it in scope for this item. Recorded here because the objection was
   about scope and the deployed ABI, not about the design, and the review trail should show which.
 
 The trade the removal makes: a cleared allowance no longer heals on the next call, so deposits or buys
 on the affected handler revert until someone sends one restore transaction. That is a liveness
 dependency on a third party, not a loss — no funds move and no state is corrupted — and any address can
-clear it, including the swapper bot. Measured at 3,934 Foundry gas for one spender, once per clearing.
+clear it, including the swapper bot. Measured at 3,889 Foundry gas, once per clearing.
 
 **What this deliberately is not:** a revoke, a rotate, or any other owner lever over the approvals. The
 function can only restore the constructor's own grants. A handler still has no way to reduce an
@@ -256,7 +269,7 @@ its own item if it is ever wanted.
     under both profiles and silently reads `address(0)`: the audit harness reproduced this with solc
     0.8.36. With an OZ token the approval would then revert at deploy; with another token it could
     approve the zero address. (The `allowance < depositAmount` repair this line originally asked to keep
-    was later removed in favour of `restoreStandingApprovals()` — see **Recoverability**.)
+    was later removed in favour of `restoreLendingApproval()` — see **Recoverability**.)
   - **Dex:** in the `PurchaseUniswap` constructor, after `i_swapRouter02` is assigned, approve the
     router once for the handler classes the human chose. Then drop the per-batch `forceApprove` there.
     Reading `_purchaseToken()` there is safe: the constructor already depends on the funding base being
@@ -270,14 +283,15 @@ its own item if it is ever wanted.
 
 - [ ] Approval changes for any other spender or token.
 - [ ] Any change to invariant 11 or 12 measurement.
-- [ ] Revoking or rotating standing approvals. `restoreStandingApprovals()` only re-grants what the
-      constructor granted; it is not an admin lever and adds no owner surface.
+- [ ] Revoking or rotating standing approvals. The two restore functions only re-grant what the
+      constructor granted; neither is an admin lever and neither adds an owner surface.
 
 ## Files likely touched
 
 - `src/PurchaseUniswap.sol`
 - `src/LendingErc20Handler.sol`
-- `src/StablecoinSource.sol` and `src/interfaces/IStandingApprovals.sol` (the restore and its surface)
+- `src/interfaces/ITokenLending.sol` and `src/interfaces/IPurchaseUniswap.sol` (the two restore
+  declarations, on the interfaces that own each surface)
 - `src/sovryn/SovrynErc20Handler.sol`, `src/layerbank/LayerBankErc20Handler.sol`,
   `src/tropykus-legacy/TropykusErc20Handler.sol` (the constructor call to the approval helper)
 - the Dex / lending leaf headers that gain the standing-approval `@dev` line
@@ -295,8 +309,9 @@ its own item if it is ever wanted.
     was set.
 - A deposit or batch with the standing approval succeeds and leaves invariant 12's delta check green.
   A deposit still works when a mock token decrements `max`, and an allowance cleared from outside stops
-  the path until any address calls `restoreStandingApprovals()` — with the failed call asserted first,
-  so the recovery is not proved on a path that was never broken.
+  the path until any address calls the matching restore — with the failed call asserted first, so the
+  recovery is not proved on a path that was never broken. One test calls both functions on a leaf that
+  lends and swaps, and one asserts a lending MoC leaf approves its lending spender and nobody else.
 - Fork: the allowance-decrement facts for DOC, USDRIF, and USDT0 (Anvil can read them; it does not
   price them).
 - A Foundry gas figure per site, labelled Foundry, plus the Rootstock storage derivation from
@@ -321,7 +336,9 @@ its own item if it is ever wanted.
 
 ## ABI / deploy / cutover impact
 
-- ABI: one addition, `restoreStandingApprovals()`, on every handler leaf. Unpermissioned, no arguments,
-  no return value. Nothing is removed or changed, so no consumer needs to do anything.
+- ABI: two additions — `restoreLendingApproval()` on every lending leaf, `restoreSwapRouterApproval()`
+  on every Dex leaf. Unpermissioned, no arguments, no return value. Nothing is removed or changed.
+  `type(ITokenLending).interfaceId` moves with the new declaration; no consumer reads ERC-165, so no
+  consumer needs to do anything.
 - Scripts: none, unless a constructor argument is added (it should not be).
 - Cutover: none for consumers. The standing approvals are part of the audited deploy state.

@@ -574,9 +574,6 @@ contract LendingErc20HandlerRedeemTest is Test {
  *      can be shown to leave both the book and the protocol-side count unchanged.
  */
 contract LendingErc20HandlerHarness is LendingErc20Handler {
-    /// @dev Harness: no purchase-side standing approval.
-    function _grantPurchaseApprovals() internal override {}
-
     using SafeERC20 for IERC20;
 
     uint256 public exchangeRate = 1e18;

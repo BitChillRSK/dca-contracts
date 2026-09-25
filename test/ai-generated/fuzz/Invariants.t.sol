@@ -493,9 +493,6 @@ contract InvariantTest is StdInvariant, Test {
  * @dev Properly simulates rBTC accounting - handler's balance decreases when users buy rBTC
  */
 contract TropykusHandlerWrapper is TropykusErc20Handler {
-    /// @dev Harness: no purchase-side standing approval.
-    function _grantPurchaseApprovals() internal override {}
-
     // Track users' accumulated RBTC for testing
     mapping(address user => uint256 amount) internal s_usersAccumulatedRbtc;
     
@@ -623,9 +620,6 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
  * @dev Provides the missing Sovryn wrapper for invariant testing
  */
 contract SovrynHandlerWrapper is SovrynErc20Handler {
-    /// @dev Harness: no purchase-side standing approval.
-    function _grantPurchaseApprovals() internal override {}
-
     // Track users' accumulated RBTC for testing
     mapping(address user => uint256 amount) internal s_usersAccumulatedRbtc;
     

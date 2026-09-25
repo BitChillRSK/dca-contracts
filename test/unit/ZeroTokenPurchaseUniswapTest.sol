@@ -29,9 +29,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  *      test file, and all of `src/`, compiles under `via_ir=true`.
  */
 contract ZeroTokenPurchaseUniswap is PurchaseUniswap {
-    /// @dev Harness: no funding-side standing approval.
-    function _grantFundingApprovals() internal override {}
-
     constructor(
         address dcaManagerAddress,
         address feeCollector,

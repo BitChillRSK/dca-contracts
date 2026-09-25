@@ -145,9 +145,6 @@ contract IdleErc20HandlerTest is HandlerTestHarness {
  * @notice Concrete IdleErc20Handler for deposit/withdraw/take unit tests.
  */
 contract IdleTestHandler is IdleErc20Handler {
-    /// @dev Harness: no purchase-side standing approval.
-    function _grantPurchaseApprovals() internal override {}
-
     constructor(
         address dcaManagerAddress,
         address stableTokenAddress,

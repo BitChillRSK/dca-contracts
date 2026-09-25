@@ -69,9 +69,6 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      *      weakening the floor through rounding. The funding base must precede this base in the leaf's
      *      inheritance list because path construction reads its immutable stablecoin; a zero value reverts.
      *      The initial path is allowlisted here, while later paths require owner approval.
-     *      The router is granted a standing stablecoin allowance here, so no batch pays for an allowance
-     *      write. It is the last statement because it reads the purchase token, which the decimals check
-     *      above has just proved is a live ERC20.
      */
     constructor(
         UniswapSettings memory uniswapSettings,
@@ -106,9 +103,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         }
         i_stablecoinToUsdScale = 10 ** (ORACLE_DECIMALS - stablecoinDecimals);
 
-        // Standing router allowance, so no purchase pays for an approval write. Last: it reads
-        // `_purchaseToken()`, whose immutable the funding base assigns before this constructor runs.
-        _approveSwapRouter();
+        _approveSwapRouter(); // last: it reads `_purchaseToken()`, assigned by the funding base's constructor
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -196,6 +191,11 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         s_mocOracle = ICoinPairPrice(newOracle);
     }
 
+    /// @inheritdoc IPurchaseUniswap
+    function restoreSwapRouterApproval() external override {
+        _approveSwapRouter();
+    }
+
     /*//////////////////////////////////////////////////////////////
                                 GETTERS
     //////////////////////////////////////////////////////////////*/
@@ -281,20 +281,11 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         _purchaseToken().forceApprove(address(i_swapRouter02), type(uint256).max);
     }
 
-    /// @dev The purchase half of `restoreStandingApprovals`.
-    function _grantPurchaseApprovals() internal override {
-        _approveSwapRouter();
-    }
-
     /**
      * @dev Uses the stricter of the oracle and caller floors, and credits only the measured WRBTC delta.
      *      PurchaseRbtc proves the exact stablecoin input left this handler. This venue-specific layer also
      *      requires every intermediate-token router balance to return to its pre-swap value. Comparing
      *      deltas, not zero balances, prevents donated tokens from blocking it.
-     *
-     *      The swap spends the standing router allowance, so no approval is read or written here; an
-     *      exact-input swap pulls exactly `stablecoinAmount`, funding later hops from the router's own
-     *      balance.
      */
     function _purchaseRbtc(uint256 stablecoinAmount, uint256 minRbtcOut)
         internal

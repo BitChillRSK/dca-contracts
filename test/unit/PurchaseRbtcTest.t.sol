@@ -565,11 +565,6 @@ contract PurchaseRbtcTest is Test {
 }
 
 contract PurchaseRbtcHarness is PurchaseRbtc {
-    /// @dev Harness: no funding-side standing approval.
-    function _grantFundingApprovals() internal override {}
-    /// @dev Harness: no purchase-side standing approval.
-    function _grantPurchaseApprovals() internal override {}
-
     IERC20 internal immutable i_token;
     uint256 public lastPurchaseAmount;
     uint256 public feeCollectorBalanceOnPurchase;

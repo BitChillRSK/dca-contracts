@@ -271,9 +271,9 @@ contract StandingApprovalProbe is Test {
      *      therefore loses the premium on every call, repeatable up to its balance, without ever having
      *      asked for a loan.
      *
-     *      LayerBank has the flag off for all three; that is their configuration, flippable by the same
-     *      EOA that can upgrade the Pool, so it is asserted rather than relied on. BitChill's own half of
-     *      the defence — a handler that answers no callback — is asserted in `StandingApprovalRecoveryTest`.
+     *      The flag is LayerBank's configuration, flippable by the same EOA that can upgrade the Pool, so
+     *      it is asserted rather than relied on. BitChill's own half of the defence — a handler that
+     *      answers no callback — is asserted in `StandingApprovalRecoveryTest`.
      *
      *      Assert via Aave's `getFlashLoanEnabled` and a real `flashLoanSimple` call, never by shifting
      *      `getConfiguration` by a bit index written here: a wrong index reads a neighbouring field (bit
@@ -335,9 +335,7 @@ contract StandingApprovalProbe is Test {
     }
 
     /// @dev Decoded, not sliced at a fixed offset: the string is right-padded to a word boundary, so a
-    ///      slice keeps trailing NULs that an `assertEq` sees. The length must be rewritten before the
-    ///      pointer moves — shifting alone leaves a length word built from the old length and the
-    ///      selector, so the decoder's bounds checks stop meaning anything on malformed data.
+    ///      slice keeps trailing NULs that an `assertEq` sees.
     function _revertReason(bytes memory reason) private pure returns (string memory) {
         if (reason.length < 68) return "(no reason string)";
         assembly {

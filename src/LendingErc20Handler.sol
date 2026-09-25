@@ -81,6 +81,11 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
         return _accruedInterest(user, stablecoinLockedInDcaSchedules, _exchangeRate());
     }
 
+    /// @inheritdoc ITokenLending
+    function restoreLendingApproval() external override {
+        _approveLendingSpender();
+    }
+
     /*//////////////////////////////////////////////////////////////
                                 GETTERS
     //////////////////////////////////////////////////////////////*/
@@ -117,28 +122,17 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Grants the lending spender an unbounded stablecoin allowance, so no deposit pays for an
-     *      allowance write. A precondition, not a property this contract enforces: it holds only while
-     *      the spender pulls solely from its caller. Do not add a `fallback`, an `executeOperation`, or
-     *      any other callback a lending protocol may invoke on an arbitrary address. Check a new protocol
-     *      for an entry point that calls a target its caller names (bZx's `flashBorrowToken`) — no
-     *      handler shape defends against that one.
-     *
-     *      Must be the **last statement of the adapter's constructor**: `_lendingSpender()` reads an
-     *      immutable only the adapter assigns, and this base's constructor runs first.
+     * @dev Do not add a `fallback`, an `executeOperation`, or any other callback a lending protocol may
+     *      invoke on an arbitrary address, and check a new protocol for a caller-named target (bZx's
+     *      `flashBorrowToken`), which no handler shape defends. Must be the adapter constructor's **last
+     *      statement**: `_lendingSpender()` reads an immutable only the adapter assigns.
      */
     function _approveLendingSpender() internal {
         i_stableToken.forceApprove(_lendingSpender(), type(uint256).max);
     }
 
-    /// @dev The funding half of `restoreStandingApprovals`.
-    function _grantFundingApprovals() internal override {
-        _approveLendingSpender();
-    }
-
     /**
      * @dev TokenHandler reverts unless the pull matches `depositAmount`, so the mint always uses the full request.
-     *      The lending protocol's own pull spends the standing allowance; nothing here reads or writes it.
      */
     function _depositToken(address user, uint256 depositAmount) internal virtual override {
         super._depositToken(user, depositAmount);

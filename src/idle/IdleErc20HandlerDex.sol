@@ -11,9 +11,9 @@ import {IdleErc20Handler} from "./IdleErc20Handler.sol";
  * @dev Constructor-only leaf. Only its immutable DcaManager moves principal, buys, or withdraws rBTC;
  *      the owner controls fees, oracle, path allowlist, and floor. The funding base is listed first so
  *      `i_stableToken` is set before `PurchaseUniswap` builds the path.
- *      Holds a standing, unbounded stablecoin approval to SwapRouter02, granted at construction and
- *      restorable by anyone through `restoreStandingApprovals`. The router is immutable and pulls only
- *      from the caller of the swap it executes.
+ *      Holds a standing max stablecoin approval to SwapRouter02, set at construction and restorable by
+ *      anyone through `restoreSwapRouterApproval`; precondition: the router pulls only from the caller of
+ *      the swap it executes.
  */
 contract IdleErc20HandlerDex is IdleErc20Handler, PurchaseUniswap {
     /**

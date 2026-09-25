@@ -94,6 +94,13 @@ interface ITokenLending is ITokenHandler {
      */
     function getAccruedInterest(address user, uint256 stablecoinLockedInDcaSchedules) external returns (uint256);
 
+    /**
+     * @notice Re-grant the lending spender the unbounded stablecoin allowance set at construction.
+     * @dev Anyone may call it: it re-grants `max` to the constructor's own immutable spender, so it
+     *      authorizes nothing new. The constructor grant is otherwise one-shot.
+     */
+    function restoreLendingApproval() external;
+
     /*//////////////////////////////////////////////////////////////
                                 GETTERS
     //////////////////////////////////////////////////////////////*/

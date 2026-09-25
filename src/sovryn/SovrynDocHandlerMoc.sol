@@ -11,12 +11,9 @@ import {SovrynErc20Handler} from "./SovrynErc20Handler.sol";
  * @dev Constructor-only leaf. Only its immutable DcaManager moves principal, buys, or withdraws rBTC;
  *      the owner controls fee settings and collection. MoC redeems at its protocol price, so this
  *      route has no pool-slippage floor.
- *      Holds a standing, unbounded stablecoin approval to the lending spender, granted at construction
- *      and restorable by anyone through `restoreStandingApprovals`.
- *      Precondition, not enforced here: the spender pulls only from its caller, and this handler answers
- *      no protocol callback.
- *      Also relies on Sovryn not exposing bZx's `flashBorrowToken`, which no handler shape defends
- *      against.
+ *      Holds a standing max stablecoin approval to the lending spender, set at construction and restorable
+ *      by anyone through `restoreLendingApproval`; precondition: the spender pulls only from its caller,
+ *      this handler answers no protocol callback, and Sovryn keeps `flashBorrowToken` disabled.
  */
 contract SovrynDocHandlerMoc is SovrynErc20Handler, PurchaseMoc {
     /**
