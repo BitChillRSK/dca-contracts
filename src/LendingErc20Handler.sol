@@ -122,9 +122,10 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Do not add a `fallback`, an `executeOperation`, or any other callback a lending protocol may
-     *      invoke on an arbitrary address, and check a new protocol for any entry point that makes it call
-     *      a target the caller names; no handler shape defends against that.
+     * @dev Precondition, not enforced here: the spender pulls only from its caller, and this handler
+     *      answers no protocol callback. So do not add a `fallback`, an `executeOperation`, or any other
+     *      callback a lending protocol may invoke on an arbitrary address, and check a new protocol for
+     *      an entry point that makes it call a target the caller names, which no handler shape defends.
      */
     function _approveLendingSpender() internal {
         i_stableToken.forceApprove(_lendingSpender(), type(uint256).max);

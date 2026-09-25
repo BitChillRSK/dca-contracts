@@ -11,9 +11,7 @@ import {TropykusErc20Handler} from "./TropykusErc20Handler.sol";
  * @dev Constructor-only leaf. Only its immutable DcaManager moves principal, buys, or withdraws rBTC;
  *      the owner controls fees, oracle, path allowlist, and floor. The funding base is listed first so
  *      `i_stableToken` is set before `PurchaseUniswap` builds the path.
- *      Holds standing max stablecoin approvals to SwapRouter02 and the lending spender, set at construction
- *      and restorable by anyone through `restoreSwapRouterApproval` and `restoreLendingApproval`;
- *      precondition: each spender pulls only from its caller and this handler answers no protocol callback.
+ *      Holds standing max approvals to SwapRouter02 and the lending spender, restorable by anyone.
  */
 contract TropykusErc20HandlerDex is TropykusErc20Handler, PurchaseUniswap {
     /**

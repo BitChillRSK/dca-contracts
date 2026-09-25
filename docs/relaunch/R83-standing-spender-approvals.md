@@ -140,8 +140,8 @@ Two independent things keep that off a lending handler, and only the second is B
    `receive()` — so the Pool's callback into it reverts and unwinds the flash loan.
 
 (2) is the one we own, so it is stated as a precondition in `LendingErc20Handler._approveLendingSpender`
-and in every lending leaf header, and asserted against a real handler by
-`test/unit/StandingApprovalRecoveryTest.t.sol`.
+— the one place in `src/` that carries it, next to the grant it qualifies — and asserted against a real
+handler by `test/unit/StandingApprovalRecoveryTest.t.sol`.
 
 **Sovryn is not the same shape, and an earlier draft of this section said it was.** bZx's
 `flashBorrowToken` lets its caller name both a `target` and the calldata sent to it; the approver answers
@@ -276,7 +276,9 @@ its own item if it is ever wanted.
     earlier in the leaf's inheritance list, and the router is this contract's own immutable, assigned
     earlier in the same constructor. Leave invariant 12's exact-consumption check exactly as it is.
 - [x] State in each affected contract's header `@dev` that the handler holds a standing approval to
-      that spender (`AGENTS.md` **Say what is enforced, and what is only assumed**).
+      that spender — one line per leaf, identical across siblings. The precondition that approval rests
+      on (`AGENTS.md` **Say what is enforced, and what is only assumed**) is stated once, on
+      `LendingErc20Handler._approveLendingSpender`, rather than repeated in seven headers.
 - [x] Update `docs/relaunch/README.md` Status and `IMPLEMENTATION_ORDER.md`.
 
 ## Out of scope

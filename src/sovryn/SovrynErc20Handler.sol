@@ -47,7 +47,7 @@ abstract contract SovrynErc20Handler is LendingErc20Handler {
         )
     {
         i_iSusdToken = IiSusdToken(iSusdTokenAddress);
-        _approveLendingSpender(); // last: the helper reads the immutable assigned on the line above
+        _approveLendingSpender();
     }
 
     /*//////////////////////////////////////////////////////////////
