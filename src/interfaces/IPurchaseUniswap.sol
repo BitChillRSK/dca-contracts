@@ -137,6 +137,13 @@ interface IPurchaseUniswap {
      */
     function updateMocOracle(address newOracle) external;
 
+    /**
+     * @notice Re-grant SwapRouter02 the unbounded stablecoin allowance set at construction.
+     * @dev Anyone may call it: it re-grants `max` to the constructor's own immutable router, so it
+     *      authorizes nothing new.
+     */
+    function restoreSwapRouterApproval() external;
+
     /*//////////////////////////////////////////////////////////////
                                 GETTERS
     //////////////////////////////////////////////////////////////*/

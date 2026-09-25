@@ -21,7 +21,7 @@ PROBE_VERBOSITY ?= -vv
 PROBE_MATCH ?=
 
 # Targets
-.PHONY: all test moc dex help check ci check-deploy build build-deploy slither moc-none moc-layerbank moc-tropykus moc-sovryn dex-none dex-tropykus dex-sovryn dex-layerbank invariants invariants-sovryn fork fork-none fork-tropykus fork-sovryn fork-layerbank fork-dex-path probe-sovryn-exit-fee probe-moc-redeem-free-doc probe-dex-quote-floor coverage license-check
+.PHONY: all test moc dex help check ci check-deploy build build-deploy slither moc-none moc-layerbank moc-tropykus moc-sovryn dex-none dex-tropykus dex-sovryn dex-layerbank invariants invariants-sovryn fork fork-none fork-tropykus fork-sovryn fork-layerbank fork-dex-path probe-sovryn-exit-fee probe-moc-redeem-free-doc probe-dex-quote-floor probe-standing-approvals coverage license-check
 
 all: help
 
@@ -215,6 +215,20 @@ probe-moc-redeem-free-doc:
 		$(if $(PROBE_MATCH),--match-test $(PROBE_MATCH),) \
 		--fork-url $$RSK_MAINNET_RPC_URL $(PROBE_VERBOSITY) -j 1
 
+# R83 standing-approval evidence (excluded from check/fork/CI). Records whether DOC, USDRIF and USDT0
+# decrement an unbounded allowance, and whether anyone but the approver can spend a standing one.
+probe-standing-approvals:
+	@echo "Probing live allowance-decrement and standing-approval reachability..."
+	@set -a; [ -f .env ] && . ./.env; set +a; \
+	if [ -z "$$RSK_MAINNET_RPC_URL" ]; then \
+		echo "error: RSK_MAINNET_RPC_URL is not set. Add it to .env or export it."; \
+		exit 1; \
+	fi; \
+	SWAP_TYPE=dexSwaps LENDING_PROTOCOL=none EXPECTED_LENDING_PROTOCOL=none STABLECOIN_TYPE=USDRIF \
+	forge test --match-path "test/mainnet-debug/standing-approvals/**" \
+		$(if $(PROBE_MATCH),--match-test $(PROBE_MATCH),) \
+		--fork-url $$RSK_MAINNET_RPC_URL $(PROBE_VERBOSITY) -j 1
+
 # R51 Dex quote-vs-floor table (excluded from check/fork/CI). Prices every shipped path against the live
 # pools at FORK_BLOCK_DEX_QUOTE and compares each row with the oracle-derived governance floor.
 probe-dex-quote-floor:
@@ -288,6 +302,7 @@ help:
 	@echo "  make probe-sovryn-exit-fee     # Live iSUSD burn: is SIP-0094's 0.1% fee charging?"
 	@echo "  make probe-moc-redeem-free-doc # R71: live MoC redeemFreeDoc alone (no redeemDocRequest)"
 	@echo "  make probe-dex-quote-floor     # R51: live Dex pool quotes vs the oracle floor, at a pinned block"
+	@echo "  make probe-standing-approvals  # R83: allowance-decrement facts and standing-approval reachability"
 	@echo ""
 	@echo "Environment variables:"
 	@echo "  SWAP_TYPE: mocSwaps (default) or dexSwaps"

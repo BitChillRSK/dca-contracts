@@ -213,6 +213,38 @@ contract FinalDeploymentTest is Test {
         assertEq(stack.dcaManager.owner(), SAFE);
     }
 
+    /**
+     * @notice Every production handler holds a standing allowance to its own spender, and to nobody else.
+     * @dev `== max` to the real spender is what carries the ordering rule: the approval reads an
+     *      immutable only the adapter's constructor assigns, so running it earlier would approve
+     *      `address(0)`.
+     */
+    function test_finalStack_standingSpenderApprovals() public {
+        DeployFinalHarness harness =
+            new DeployFinalHarness(DeployBase.Environment.MAINNET, SAFE, address(this));
+        DeployFinal.FinalStack memory stack = harness.deployStack(_mockConfig(address(this)));
+
+        // Lending spenders: LayerBank's Pool and Sovryn's iToken, one per lending leaf.
+        _assertStandingApproval(stack.docLayerBank, doc, docAToken.POOL());
+        _assertStandingApproval(stack.usdrifLayerBank, usdrif, usdrifAToken.POOL());
+        _assertStandingApproval(stack.usdt0LayerBank, usdt0, usdt0AToken.POOL());
+        _assertStandingApproval(stack.docSovryn, doc, address(iSusd));
+
+        // The Uniswap router, on every Dex leaf, idle and lending alike.
+        _assertStandingApproval(stack.usdrifIdle, usdrif, address(router));
+        _assertStandingApproval(stack.usdt0Idle, usdt0, address(router));
+        _assertStandingApproval(stack.usdrifLayerBank, usdrif, address(router));
+        _assertStandingApproval(stack.usdt0LayerBank, usdt0, address(router));
+
+        // A MoC leaf buys by redeeming its own DOC and never swaps, so it approves no router.
+        assertEq(doc.allowance(stack.docSovryn, address(router)), 0, "MoC leaf approved the router");
+        assertEq(doc.allowance(stack.docLayerBank, address(router)), 0, "MoC leaf approved the router");
+        // The idle DOC leaf neither lends nor swaps, so it holds no standing allowance at all.
+        assertEq(doc.allowance(stack.docIdle, address(mocProxy)), 0, "MoC redemption needs no allowance");
+        assertEq(doc.allowance(stack.docIdle, address(router)), 0, "idle MoC leaf approved the router");
+        assertEq(doc.allowance(stack.docIdle, address(0)), 0, "idle MoC leaf approved the zero address");
+    }
+
     function test_finalStack_testnetStyle_keepsBroadcasterAsOwner() public {
         DeployFinalHarness harness =
             new DeployFinalHarness(DeployBase.Environment.TESTNET, address(this), address(this));
@@ -260,6 +292,11 @@ contract FinalDeploymentTest is Test {
     function _assertCommonHandlerWiring(address handler, address manager, address stablecoin) internal {
         assertEq(DcaManagerAccessControl(handler).i_dcaManager(), manager);
         assertEq(address(TokenHandler(handler).i_stableToken()), stablecoin);
+    }
+
+    function _assertStandingApproval(address handler, MockStablecoin token, address spender) internal {
+        assertEq(token.allowance(handler, spender), type(uint256).max, "spender is not standing-approved");
+        assertEq(token.allowance(handler, address(0)), 0, "approval ran before the spender was assigned");
     }
 
     function _assertMocWiring(address handler) internal {

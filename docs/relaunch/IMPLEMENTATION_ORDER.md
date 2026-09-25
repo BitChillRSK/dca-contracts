@@ -143,7 +143,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R80 | post-R78, before relaunch deploy | remove `DcaManager__CadenceAnchorUpdated` (decided 2026-09-23); five-repo event cutover |
 | R81 | post-R80, before relaunch deploy | none (one `SSTORE` per packed slot: purchase row, create; fee setter measured and declined) |
 | R82 | post-R81, before relaunch deploy | none (`ReentrancyGuardTransient`; same guarded set) |
-| R83 | post-R82, before relaunch deploy | **standing vs per-use approvals** for the Uniswap router and the lending spender |
+| R83 | post-R82, before relaunch deploy | **answered 2026-09-24: standing approvals on every Dex handler and every lending adapter** |
 | R84 | post-R83, before relaunch deploy | none (no repeated registry reads; the `getRouteInfo` view may be dropped, keeping the internal `withdrawTokenAndInterest` fix) |
 | R85 | after R84; not deployment-bound | none (one-line NatSpec uses `///`; comment-only) |
 | R79 | after R84; not deployment-bound | coalesce repeated-buyer writes (swapper sort + contiguous rBTC/share stores) |
@@ -1144,8 +1144,41 @@ upgradeability, and admins, SwapRouter02 included. The main exposure is idle dep
 `IdleErc20HandlerDex`.
 
 Lending approvals must be set at the end of each adapter's constructor. The base constructor would
-read the spender immutable as `address(0)`. A "keep exact" answer on both closes the item with no
-code change.
+read the spender immutable as `address(0)`.
+
+**Answered 2026-09-24: standing approvals on both sites** — every Dex handler, idle and lending alike,
+and every lending adapter. The exposure question resolved on evidence rather than on judgement. Every
+deposit, redeem and swap entry point on the three live spenders pulls only from its own caller:
+SwapRouter02's verified source has just two
+`transferFrom` sites (`pay`, whose payer is the swap's `msg.sender`, and `pull`, whose `from` is
+`msg.sender`), and its callback — the one place a payer is caller-supplied — is reachable only by a
+factory-derived pool, which calls back whoever invoked `swap`. A fork probe
+([`StandingApprovalProbe`](../../test/mainnet-debug/standing-approvals/StandingApprovalProbe.t.sol),
+`make probe-standing-approvals`) fails every attacker route against a victim holding a standing `max`
+allowance — `pull`, `exactInput`, a forged callback, and a pool-relayed callback — and the same holds for
+iSUSD `mint` and LayerBank `supply`. The exception is Aave's flash loan, which repays from a
+caller-named receiver: LayerBank has it disabled on all three reserves (their switch), and a lending
+handler answers no `executeOperation` and has no `fallback`, so the callback reverts (ours, and carried
+as a precondition in the headers). With that held, a standing allowance adds no third-party reachability; it adds
+exposure only to the spender's own future code. That is nil for the router (not upgradeable, no admin),
+a 24–48 h Bitocracy timelock at Sovryn, and an instant EOA upgrade at LayerBank — whose Pool already
+custodies the whole position, leaving only transient deposit-time stablecoin and dust as new surface.
+
+Shipped: `LendingErc20Handler._approveLendingSpender()` called as the last statement of the Sovryn,
+LayerBank, and Tropykus constructors; `PurchaseUniswap`'s constructor approves the router. Neither
+runtime path reads or writes an allowance any more. Because a constructor grant is one-shot, and nothing
+here can rule out a clearing — two of the three shipped stablecoins are upgradeable proxies, so whether
+an allowance survives is the issuer's decision — each site carries an unpermissioned restore next to the
+constructor statement it mirrors: `restoreLendingApproval()` (declared on `ITokenLending`) and
+`restoreSwapRouterApproval()` (declared on `IPurchaseUniswap`), each re-granting `max` to that
+constructor's own immutable spender. They are the only new ABI, and the only way back from a cleared
+allowance on a handler that cannot be upgraded. Adding one to `ITokenLending` moves
+`type(ITokenLending).interfaceId`, which every in-repo site computes from the same source and no
+consumer hardcodes. Live decrement facts: USDRIF preserves a `max` allowance (saving ~10,400 per use), DOC and
+USDT0 decrement it (~5,400). Allowance-slot writes **2 → 0** per deposit; Foundry, execution before
+refunds: **−23,480** (default) / **−22,880** (deploy) against a live reconstruction of the pre-R83
+deposit, and zero writes on the Dex batch. One 20,000 `SET` per standing approval at deploy; break-even
+≈ 2–4 uses.
 
 ### R84 - no repeated registry reads ([spec](./R84-no-repeated-registry-reads.md))
 

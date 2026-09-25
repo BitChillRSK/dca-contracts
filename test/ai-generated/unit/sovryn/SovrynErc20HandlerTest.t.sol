@@ -354,20 +354,25 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
     }
 
     /**
-     * @notice A stale non-zero allowance below the next deposit must not brick deposits (R44).
-     * @dev `depositToken` re-approves the lending spender whenever the standing allowance is too
-     *      small. OpenZeppelin v4 `safeApprove` refused any non-zero -> non-zero change, so a
-     *      partial leftover allowance permanently reverted every later deposit for that token.
-     *      v5 removed `safeApprove`; `forceApprove` zeroes first, so the deposit goes through.
-     *      Reverting this to a v4-style approve makes this test fail.
+     * @notice A stale non-zero allowance below the next deposit must not brick deposits (R44, R83).
+     * @dev OpenZeppelin v4 `safeApprove` refused any non-zero -> non-zero change, so a partial leftover
+     *      allowance permanently reverted every later deposit. `forceApprove` zeroes first; reverting the
+     *      restore to a v4-style approve fails here.
      */
-    function test_sovryn_depositSucceedsWithStaleNonZeroAllowance() public {
+    function test_sovryn_staleNonZeroAllowanceIsRestorable() public {
         // Leave a residual allowance that is non-zero but below the next deposit.
         vm.prank(address(sovrynHandler));
         stablecoin.approve(address(iSusdToken), DEPOSIT_AMOUNT / 2);
         assertEq(stablecoin.allowance(address(sovrynHandler), address(iSusdToken)), DEPOSIT_AMOUNT / 2);
 
         uint256 sharesBefore = sovrynHandler.getUserShares(USER);
+
+        sovrynHandler.restoreLendingApproval();
+        assertEq(
+            stablecoin.allowance(address(sovrynHandler), address(iSusdToken)),
+            type(uint256).max,
+            "the restore refused a non-zero -> non-zero change"
+        );
 
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);

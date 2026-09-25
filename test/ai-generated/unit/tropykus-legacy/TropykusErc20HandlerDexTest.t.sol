@@ -117,6 +117,14 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
         assertGt(tropykusDexHandler.getSwapPath().length, 0);
     }
 
+    /// @notice Both of this leaf's spenders are approved once, at construction.
+    function test_tropykusDex_standingSpenderApprovals() public {
+        address handlerAddress = address(tropykusDexHandler);
+        assertEq(stablecoin.allowance(handlerAddress, address(kToken)), type(uint256).max);
+        assertEq(stablecoin.allowance(handlerAddress, address(mockRouter)), type(uint256).max);
+        assertEq(stablecoin.allowance(handlerAddress, address(0)), 0);
+    }
+
     function test_tropykusDex_setAmountOutMinimumPercent_success() public {
         vm.prank(OWNER);
         tropykusDexHandler.setAmountOutMinimumPercent(0.98 ether);

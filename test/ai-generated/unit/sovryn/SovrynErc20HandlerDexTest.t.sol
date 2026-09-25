@@ -116,6 +116,14 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
         assertGt(sovrynDexHandler.getSwapPath().length, 0);
     }
 
+    /// @notice Both of this leaf's spenders are approved once, at construction — this leaf is not on the
+    ///         production map, so `FinalDeploymentTest` never builds it.
+    function test_sovrynDex_standingSpenderApprovals() public {
+        address handlerAddress = address(sovrynDexHandler);
+        assertEq(stablecoin.allowance(handlerAddress, address(iSusdToken)), type(uint256).max);
+        assertEq(stablecoin.allowance(handlerAddress, address(mockRouter)), type(uint256).max);
+    }
+
     function test_sovrynDex_setAmountOutMinimumPercent_success() public {
         vm.prank(OWNER);
         sovrynDexHandler.setAmountOutMinimumPercent(0.98 ether);

@@ -102,6 +102,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
             revert PurchaseUniswap__UnsupportedStablecoinDecimals(stablecoinDecimals);
         }
         i_stablecoinToUsdScale = 10 ** (ORACLE_DECIMALS - stablecoinDecimals);
+
+        _approveSwapRouter();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -189,6 +191,11 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         s_mocOracle = ICoinPairPrice(newOracle);
     }
 
+    /// @inheritdoc IPurchaseUniswap
+    function restoreSwapRouterApproval() external override {
+        _approveSwapRouter();
+    }
+
     /*//////////////////////////////////////////////////////////////
                                 GETTERS
     //////////////////////////////////////////////////////////////*/
@@ -269,6 +276,10 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         emit PurchaseUniswap__PurchasePathAllowedSet(pathHash, encodedPath, intermediateTokens, poolFeeRates, allowed);
     }
 
+    function _approveSwapRouter() internal {
+        _purchaseToken().forceApprove(address(i_swapRouter02), type(uint256).max);
+    }
+
     /**
      * @dev Uses the stricter of the oracle and caller floors, and credits only the measured WRBTC delta.
      *      PurchaseRbtc proves the exact stablecoin input left this handler. This venue-specific layer also
@@ -280,9 +291,6 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         override
         returns (uint256 amountOut)
     {
-        IERC20 purchaseToken = _purchaseToken();
-        purchaseToken.forceApprove(address(i_swapRouter02), stablecoinAmount);
-
         uint256 amountOutLowerBound = _getAmountOutLowerBound(stablecoinAmount);
         uint256 amountOutMinimum = minRbtcOut > amountOutLowerBound ? minRbtcOut : amountOutLowerBound;
 

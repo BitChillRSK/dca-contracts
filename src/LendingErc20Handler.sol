@@ -81,6 +81,11 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
         return _accruedInterest(user, stablecoinLockedInDcaSchedules, _exchangeRate());
     }
 
+    /// @inheritdoc ITokenLending
+    function restoreLendingApproval() external override {
+        _approveLendingSpender();
+    }
+
     /*//////////////////////////////////////////////////////////////
                                 GETTERS
     //////////////////////////////////////////////////////////////*/
@@ -116,15 +121,17 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev Never add a `fallback` or `executeOperation` here: an Aave-style flash loan naming this
+    ///      handler as receiver would repay itself from this allowance.
+    function _approveLendingSpender() internal {
+        i_stableToken.forceApprove(_lendingSpender(), type(uint256).max);
+    }
+
     /**
      * @dev TokenHandler reverts unless the pull matches `depositAmount`, so the mint always uses the full request.
      */
     function _depositToken(address user, uint256 depositAmount) internal virtual override {
         super._depositToken(user, depositAmount);
-        address spender = _lendingSpender();
-        if (i_stableToken.allowance(address(this), spender) < depositAmount) {
-            i_stableToken.forceApprove(spender, depositAmount);
-        }
         uint256 mintedAmount = _protocolDeposit(depositAmount);
         if (mintedAmount == 0) revert TokenLending__LendingProtocolDepositFailed();
         uint256 previousShares = s_shares[user];
