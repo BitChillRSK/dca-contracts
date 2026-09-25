@@ -133,7 +133,12 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         _withdrawRbtc(user, rbtcBalance);
     }
 
-    /// @inheritdoc IPurchaseUniswap
+    /**
+     * @inheritdoc IPurchaseUniswap
+     * @dev The arrays are `memory` on purpose. The path helpers they reach are shared with the
+     *      constructor, which can only pass `memory`, so `calldata` here would be copied at each helper
+     *      call. That measured dearer than the single copy the ABI decoder makes.
+     */
     function setPurchasePathAllowed(
         address[] memory intermediateTokens,
         uint24[] memory poolFeeRates,
@@ -150,7 +155,12 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         _setPurchasePathAllowed(pathHash, encodedPath, intermediateTokens, poolFeeRates, allowed);
     }
 
-    /// @inheritdoc IPurchaseUniswap
+    /**
+     * @inheritdoc IPurchaseUniswap
+     * @dev The arrays are `memory` on purpose. The path helpers they reach are shared with the
+     *      constructor, which can only pass `memory`, so `calldata` here would be copied at each helper
+     *      call. That measured dearer than the single copy the ABI decoder makes.
+     */
     function setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
         external
         override

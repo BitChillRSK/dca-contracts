@@ -105,6 +105,18 @@ adjacent with nothing that can revert, log, or call between them. Cancun prices 
 - **`withdrawAllAccumulatedRbtc` pre-checks each pair's balance before withdrawing.** That is an extra
   700-gas call per pair, but it is how the batch skips instead of reverting on an empty pair. It is
   behavior, not an optimization.
+- **The Uniswap path setters keep `memory` arrays, not `calldata`.** `setPurchasePathAllowed` and
+  `setPurchasePath` pass their arrays to `_encodePurchasePath`, `_setPurchasePath` and
+  `_setPurchasePathAllowed`. The constructor shares those helpers and can only pass `memory`, so a
+  `calldata` setter copies its arrays again at each helper call.
+  - [R86](./R86-calldata-array-parameters.md) measured three variants under deploy (`via_ir`). Taking
+    `setPurchasePath` as the example: `memory` 43,390, `calldata` with one local copy 43,605 (+215),
+    and `calldata` copied at each helper 44,581 (+1,191). The other setter behaves the same.
+  - Compute only, so the deltas are the same on Rootstock.
+  - A `calldata`-only copy of each helper would remove the extra copy, but it would duplicate the path
+    encoding that the constructor and both setters rely on.
+  - These are owner or swapper calls, made when a Dex route changes. Closed; the source comment on
+    each setter says the same.
 
 ## Deferred candidates (2026-09-25)
 
