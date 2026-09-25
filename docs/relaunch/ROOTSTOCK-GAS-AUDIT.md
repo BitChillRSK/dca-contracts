@@ -119,7 +119,8 @@ The review produced seven candidates:
 - **One shipped.** `calldata` for the handler's batch arrays became
   [R86](./R86-calldata-array-parameters.md).
 - **Six deferred.** The human deferred the other six rather than closing them. They sit here so a
-  later pass does not re-derive them. Reopening one needs its own spec.
+  later pass does not re-derive them. [R87](./R87-deferred-gas-candidates.md) measures each one and
+  asks the human for a verdict.
 
 Figures are Rootstock gas, estimated from source; none of the six has been measured.
 
