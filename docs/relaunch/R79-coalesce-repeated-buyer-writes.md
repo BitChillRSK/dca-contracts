@@ -78,7 +78,8 @@ Every `PurchaseRbtc__RbtcBought` the deployed handlers emitted, read from Rootst
 | batches with at least one repeated buyer | 47 |
 
 Over that history the change would have saved `118 × 10,670 − 896 × 210 ≈ 1.07 million` gas, about
-**10,700 gas per batch**. 53 of the 100 batches had no repeated buyer and would have cost more.
+**10,700 gas per batch**. The 53 batches with no repeated buyer would each have cost slightly more:
+about 210 gas per row, so about 2,000 for a 10-row batch, roughly 0.2% of a batch.
 
 ## Why it was not implemented
 
@@ -104,14 +105,17 @@ The saving is real and above break-even, but it does not pay for itself:
   depends on flush placement before external calls. The 632 lines of specialized tests that justify it
   would also have to be maintained.
 
-There is also no batch-capacity problem for it to solve: no live batch has approached a gas or size
-limit.
+There is also no batch-capacity problem for it to solve. No live batch has approached a gas or size
+limit, and if one did, the swapper could split it into smaller batches with no contract change.
 
 ## When to reopen
 
-Reopen only with new data showing one of these:
+The contracts are immutable, so R79 can only come back as part of a redeploy already planned for
+other reasons. Nothing below is grounds to redeploy for R79 alone. At such a redeploy, reconsider it
+only with new data showing one of these:
 
-- a batch hitting a block gas or size limit, where per-row storage is the binding cost;
+- batches regularly near a block gas or size limit, where splitting them into more transactions has
+  become materially expensive and per-row storage is the binding cost;
 - a sustained repeat rate and batch volume large enough that the yearly saving becomes material
   against the audit cost, at the gas and BTC prices of that time.
 
