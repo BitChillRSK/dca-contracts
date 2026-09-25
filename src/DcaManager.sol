@@ -266,7 +266,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
 
     /**
      * @inheritdoc IDcaManager
-     * @dev The route index is captured from the schedule before the handler call.
+     * @dev The route index is captured from the schedule before the handler call, and interest is
+     *      withdrawn from the handler that just paid out the principal.
      */
     function withdrawTokenAndInterest(address token, uint64 scheduleId, uint256 withdrawalAmount)
         external
@@ -274,9 +275,9 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         whenUserMutationsAllowed
         nonReentrant
     {
-        uint256 routeIndex = _withdrawToken(token, scheduleId, withdrawalAmount);
+        (uint256 routeIndex, ITokenHandler tokenHandler) = _withdrawToken(token, scheduleId, withdrawalAmount);
         _checkTokenYieldsInterest(token, routeIndex);
-        _withdrawInterest(ITokenLending(address(_handler(token, routeIndex))), token, routeIndex);
+        _withdrawInterest(ITokenLending(address(tokenHandler)), token, routeIndex);
     }
 
     /**
@@ -765,10 +766,11 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
      * @dev Withdraw principal from one schedule. Debits the requested amount, not what the handler
      *      paid out. `type(uint256).max` means this schedule's whole `tokenBalance`.
      * @return routeIndex The schedule's stored route, captured before the handler call.
+     * @return tokenHandler The handler that paid out, so a caller need not resolve it again.
      */
     function _withdrawToken(address token, uint64 scheduleId, uint256 withdrawalAmount)
         private
-        returns (uint256 routeIndex)
+        returns (uint256 routeIndex, ITokenHandler tokenHandler)
     {
         DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
         uint256 tokenBalance = dcaSchedule.tokenBalance;
@@ -786,7 +788,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         dcaSchedule.tokenBalance = newTokenBalance.toUint128();
         // Lending success means the external share claim was fully consumed; cash may still be net of
         // a fee. The measured return is deliberately unused for the principal debit.
-        _handler(token, routeIndex).withdrawToken(msg.sender, withdrawalAmount);
+        tokenHandler = _handler(token, routeIndex);
+        tokenHandler.withdrawToken(msg.sender, withdrawalAmount);
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
     }
 
