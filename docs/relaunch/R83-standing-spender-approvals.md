@@ -141,7 +141,7 @@ Two independent things keep that off a lending handler, and only the second is B
 
 (2) is the one we own, so it is stated as a precondition in `LendingErc20Handler._approveLendingSpender`
 and in every lending leaf header, and asserted against a real handler by
-`test/unit/StandingApprovalFallbackTest.t.sol`.
+`test/unit/StandingApprovalRecoveryTest.t.sol`.
 
 **Sovryn is not the same shape, and an earlier draft of this section said it was.** bZx's
 `flashBorrowToken` lets its caller name both a `target` and the calldata sent to it; the approver answers
@@ -177,55 +177,65 @@ Live, same probe, same block:
 
 Per lending deposit, allowance-slot writes go **2 → 0** in the steady state: the pre-R83 shape approved
 the exact deposit and had the pull spend it back to zero, on every deposit, for good. Foundry execution
-before refunds (`test/gas/R83StandingApprovalGas.t.sol`): **117,141** default / **114,865** deploy for
-the standing-approval deposit, against **140,151** / **137,380** for the one deposit that repairs a
-cleared allowance — a **−23,010** / **−22,515** gap. Read that gap as a lower bound on the steady-state
-saving, not as the saving itself: the repair arm writes the slot once and restores `max`, where the
-pre-R83 shape wrote it twice and did so again on the next deposit. Each arm is
-measured in its own transaction: sharing one made the delta swing by ~10,600 gas on call order alone,
-because whichever arm ran first paid the cold access to the stablecoin and the depositor's balance for
-both. Cancun refunds
-roughly 19,900 of the removed round trip, which is why it never showed up as an Ethereum problem.
-Rootstock does not: `SET` 20,000 + `CLEAR` 5,000 − `REFUND` 15,000 = **10,000** net, plus a flat 700 for
-the `approve` call. The same test pins the Dex batch at **zero** allowance-slot writes. Against that, each
-handler pays one 20,000 `SET` per standing approval at deploy, once, by the deployer, and both runtime
-paths now carry one `allowance()` read — about 900 Rootstock gas, a flat 700 call plus a 200 read. On the
-Dex path that read is new, and it costs 1,259 Foundry gas per **batch**, not per buyer.
+before refunds (`test/gas/R83StandingApprovalGas.t.sol`): **115,882** default / **113,501** deploy for
+the standing-approval deposit, against **139,362** / **136,381** for the pre-R83 shape — a **−23,480** /
+**−22,880** gap. That baseline is a live arm, not a figure quoted from an earlier branch: the test
+subclasses the leaf to restore the old deposit body, so the comparison is re-derived on every run and
+cannot drift. Each arm is measured in its own transaction; sharing one made the delta swing by ~10,600
+gas on call order alone, because whichever ran first paid the cold access to the stablecoin and the
+depositor's balance for both. Cancun refunds roughly 19,900 of the removed round trip, which is why it
+never showed up as an Ethereum problem. Rootstock does not: `SET` 20,000 + `CLEAR` 5,000 − `REFUND`
+15,000 = **10,000** net, plus a flat 700 for the `approve` call. The same test pins the Dex batch at
+**zero** allowance-slot writes. Against that, each handler pays one 20,000 `SET` per standing approval
+at deploy, once, by the deployer. Neither runtime path reads the allowance at all.
 
-## Recoverability, and what it supersedes
+## Recoverability, and the function that provides it
 
 Moving the grant into the constructor made it a **one-shot**: if anything outside the handler clears a
-standing allowance, nothing in the contract grants it again. The lending path still healed itself,
-through the deposit top-up. The Dex path did not — before this item every purchase re-approved the
-router, and replacing that with a constructor grant left a cleared router allowance bricking every later
-purchase, with no owner function and no upgrade to fix it. That is a regression this item introduced.
+standing allowance, nothing in the contract grants it again, and the affected path stays dead. Handlers
+are not upgradeable and hold no owner-side approval lever.
 
 It is reachable rather than theoretical: USDRIF and USDT0 are both upgradeable proxies (EIP-1967
-implementation slots read on mainnet), so the token, not BitChill, can decide what happens to an
-allowance. Handlers are not upgradeable and hold no owner-side approval lever.
+implementation slots read on mainnet), so the token, not BitChill, decides what happens to an allowance.
 
-Both paths therefore call one shared helper, `StablecoinSource._ensureStandingAllowance`, which re-grants
-`max` when the allowance no longer covers the amount in hand, and is a no-op otherwise.
+`StablecoinSource` therefore carries one unpermissioned external function, `restoreStandingApprovals()`,
+which re-grants `max` to every spender the constructor chose. It is safe to leave unpermissioned because
+it takes no arguments and reads no storage a caller controls: it restores the same allowance to the same
+**immutable** spenders, so it can widen nothing and name nobody new, and calling it repeatedly is
+indistinguishable from calling it once.
 
-**This supersedes two points recorded here earlier as deliberately unchanged.**
+The two halves are declared separately — `_grantFundingApprovals` on the funding side,
+`_grantPurchaseApprovals` on the purchase route — and each is implemented on one side only, so a leaf
+inherits a single implementation of each and needs no override. They are declared, not defaulted to a
+no-op, so a new funding base or purchase route does not compile until it states what it holds. Neither
+is ever called from a constructor: virtual dispatch there would run before the other side has assigned
+the immutables it reads, which is the same trap the adapter-constructor ordering rule exists for. Each
+side instead shares a single non-virtual statement with its own constructor.
+
+**This supersedes three points recorded here earlier as deliberately unchanged.**
 
 - *"The top-up re-approves the exact amount, not `max`."* Rejected then on the grounds that no runtime
   path should widen an allowance. That reasoning was too narrow: re-granting `max` to the **same
   immutable spender the constructor already granted** restores the audited state rather than widening
-  anything, and the helper cannot name a different spender. Approving the exact amount would also leave
-  the path permanently degraded after a clear, paying the full round trip on every later deposit.
-- *"The `allowance()` read stays on the deposit path."* Kept, but now for a better reason than the one
-  given then. It is not a leftover of the old fallback; it is what makes both paths self-healing, and
-  the same read is now on the Dex path too, deliberately. About 900 Rootstock gas, once per deposit and
-  once per batch purchase.
+  anything. Approving the exact amount would also leave the path permanently degraded after a clear,
+  paying the full round trip on every later deposit.
+- *"The `allowance()` read stays on the deposit path."* Removed, along with the matching read added to
+  the Dex path. Both are now redundant: the restore is a better answer to the same problem, because it
+  fixes the allowance for every later call rather than for the one in hand. That takes about 900
+  Rootstock gas off every deposit and every batch (a flat 700 call plus a 200 read).
+- *"A permissionless `restoreStandingApprovals()` is beyond what this item was assigned."* Overruled by
+  the human on 2026-09-25, who ruled it in scope for this item. Recorded here because the objection was
+  about scope and the deployed ABI, not about the design, and the review trail should show which.
 
-A reviewer proposed the opposite trade — drop both reads and add a permissionless
-`restoreStandingApprovals()`. Not taken here, for two reasons. It puts a new external function on the
-ABI of seven non-upgradeable deployed contracts, which is beyond what this item was assigned. And
-whether that function should be permissionless is a product question, not a review fix: every other
-maintenance surface on these handlers (fees, oracle, path allowlist, floor) is owner-gated, and a
-permissionless restore would also be an undo button for any future emergency response that works by
-revoking an allowance. Worth its own item and its own gate.
+The trade the removal makes: a cleared allowance no longer heals on the next call, so deposits or buys
+on the affected handler revert until someone sends one restore transaction. That is a liveness
+dependency on a third party, not a loss — no funds move and no state is corrupted — and any address can
+clear it, including the swapper bot. Measured at 3,934 Foundry gas for one spender, once per clearing.
+
+**What this deliberately is not:** a revoke, a rotate, or any other owner lever over the approvals. The
+function can only restore the constructor's own grants. A handler still has no way to reduce an
+allowance, so an emergency response that works by revoking one is still not available here, and is still
+its own item if it is ever wanted.
 
 ## Scope
 
@@ -239,8 +249,8 @@ revoking an allowance. Worth its own item and its own gate.
     constructor assigns, and a base constructor runs first. Calling the virtual hook there compiles
     under both profiles and silently reads `address(0)`: the audit harness reproduced this with solc
     0.8.36. With an OZ token the approval would then revert at deploy; with another token it could
-    approve the zero address. Keep the existing `allowance < depositAmount` check as the repair for
-    a token that decrements.
+    approve the zero address. (The `allowance < depositAmount` repair this line originally asked to keep
+    was later removed in favour of `restoreStandingApprovals()` — see **Recoverability**.)
   - **Dex:** in the `PurchaseUniswap` constructor, after `i_swapRouter02` is assigned, approve the
     router once for the handler classes the human chose. Then drop the per-batch `forceApprove` there.
     Reading `_purchaseToken()` there is safe: the constructor already depends on the funding base being
@@ -254,7 +264,8 @@ revoking an allowance. Worth its own item and its own gate.
 
 - [ ] Approval changes for any other spender or token.
 - [ ] Any change to invariant 11 or 12 measurement.
-- [ ] Revoking or rotating standing approvals (no new admin surface unless the human asks for it).
+- [ ] Revoking or rotating standing approvals. `restoreStandingApprovals()` only re-grants what the
+      constructor granted; it is not an admin lever and adds no owner surface.
 
 ## Files likely touched
 
@@ -276,7 +287,9 @@ revoking an allowance. Worth its own item and its own gate.
   - the allowance to `address(0)` is zero, which proves the approval did not run before the immutable
     was set.
 - A deposit or batch with the standing approval succeeds and leaves invariant 12's delta check green.
-  The fallback top-up still works when a mock token decrements `max`.
+  A deposit still works when a mock token decrements `max`, and an allowance cleared from outside stops
+  the path until any address calls `restoreStandingApprovals()` — with the failed call asserted first,
+  so the recovery is not proved on a path that was never broken.
 - Fork: the allowance-decrement facts for DOC, USDRIF, and USDT0 (Anvil can read them; it does not
   price them).
 - A Foundry gas figure per site, labelled Foundry, plus the Rootstock storage derivation from
@@ -301,6 +314,7 @@ revoking an allowance. Worth its own item and its own gate.
 
 ## ABI / deploy / cutover impact
 
-- ABI: none.
+- ABI: one addition, `restoreStandingApprovals()`, on every handler leaf. Unpermissioned, no arguments,
+  no return value. Nothing is removed or changed, so no consumer needs to do anything.
 - Scripts: none, unless a constructor argument is added (it should not be).
 - Cutover: none for consumers. The standing approvals are part of the audited deploy state.

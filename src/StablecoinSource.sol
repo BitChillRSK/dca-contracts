@@ -2,7 +2,6 @@
 pragma solidity 0.8.36;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title StablecoinSource
@@ -12,33 +11,38 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
  *      Declaring the seam once lets the six leaves drop forwarding resolvers, and keeps the
  *      token the purchase reports as spent tied to the token the handler actually holds.
  *      It is also the only base both the lending side and the purchase side inherit, so the
- *      standing-allowance repair they share is declared here.
+ *      standing-approval restore that spans them is declared here.
  */
 abstract contract StablecoinSource {
-    using SafeERC20 for IERC20;
+    /*//////////////////////////////////////////////////////////////
+                           EXTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Re-grant every standing approval this handler was given at construction.
+     * @dev Unpermissioned, and safe to be: it restores the same unbounded allowance to the same
+     *      immutable spenders the constructor already chose, so it can widen nothing and name nobody
+     *      new. Needed because those grants are made only at construction: were an allowance cleared
+     *      from outside, the path would otherwise stay dead on a handler that cannot be upgraded.
+     */
+    function restoreStandingApprovals() external {
+        _grantFundingApprovals();
+        _grantPurchaseApprovals();
+    }
 
     /*//////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Restores a standing allowance that no longer covers `amount`, and is a no-op otherwise.
-     *      Both spenders are granted `type(uint256).max` at construction, so this never fires in the
-     *      ordinary course — reaching it by spending alone would take ~2**256 wei of cumulative flow.
-     *      It fires when something outside this contract clears the allowance, which two of the three
-     *      shipped stablecoins can do: they sit behind upgradeable proxies. Without it the affected
-     *      path is bricked for good, because the grant happens only in the constructor.
-     *
-     *      Re-grants `max` rather than `amount`, so the path returns to the zero-write steady state the
-     *      standing approval exists for instead of paying a write on every later call. That widens
-     *      nothing: it restores the same allowance to the same immutable spender the constructor
-     *      already granted, and cannot name a different one.
+     * @dev Standing approvals the funding side holds. Declared, not defaulted to a no-op, so a new
+     *      funding base or purchase route does not compile until it states what it holds. Keep one
+     *      half per side: a leaf then inherits a single implementation of each and need not merge them.
      */
-    function _ensureStandingAllowance(IERC20 token, address spender, uint256 amount) internal {
-        if (token.allowance(address(this), spender) < amount) {
-            token.forceApprove(spender, type(uint256).max);
-        }
-    }
+    function _grantFundingApprovals() internal virtual;
+
+    /// @dev Standing approvals the purchase route holds. See the funding half.
+    function _grantPurchaseApprovals() internal virtual;
 
     /**
      * @dev The stablecoin this handler holds or lends out, spent by the purchase and reported in

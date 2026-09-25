@@ -16,6 +16,8 @@ import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import {MockMocOracle} from "test/mocks/MockMocOracle.sol";
 import {MockSwapRouter02} from "test/mocks/MockSwapRouter02.sol";
 import {MockWrbtcToken} from "test/mocks/MockWrbtcToken.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {handlerBatchBuyOne} from "test/utils/BatchBuyOne.sol";
 import "test/Constants.sol";
 
@@ -30,8 +32,9 @@ import "test/Constants.sol";
  *
  *      The write counts are the durable evidence; the gas figures are same-build Cancun regression pins.
  *      Each deposit arm is measured in its own transaction, so neither pays the other's cold access —
- *      see the note on the standing-approval test. Default profile: 140,559 exact against 117,114
- *      standing, **−23,445**. Deploy profile: 137,731 against 114,865, **−22,866**.
+ *      see the note on the standing-approval test. Default profile: 139,362 pre-R83 against 115,882
+ *      standing, **−23,480**. Deploy profile: 136,381 against 113,501, **−22,880**. Recovering a
+ *      cleared allowance costs 3,934 / 3,645 for one spender, once per clearing rather than per deposit.
  *
  *      A `gasleft()` delta is execution before refunds, so that is what Cancun charges up front, and
  *      roughly 19,900 of it comes back as a refund there — which is why the removed round trip never
@@ -53,11 +56,10 @@ contract R83StandingApprovalGasTest is Test {
     MockIsusdToken private s_iSusd;
     MockMocProxy private s_mocProxy;
     SovrynDocHandlerMoc private s_lendingHandler;
-    /// @dev Identical handler whose standing approval `setUp` revokes, so its deposit takes the top-up
-    ///      branch. It needs its own iToken: sharing an allowance slot would let EIP-2200 net metering
-    ///      price the second arm's write at 100 gas.
-    MockIsusdToken private s_exactApprovalISusd;
-    SovrynDocHandlerMoc private s_exactApprovalHandler;
+    /// @dev The pre-R83 deposit shape, the arm the saving is measured against. It needs its own iToken:
+    ///      sharing an allowance slot would let EIP-2200 net metering price its write at 100 gas.
+    MockIsusdToken private s_preR83ISusd;
+    PreR83SovrynDocHandlerMoc private s_preR83Handler;
 
     MockWrbtcToken private s_wrBtc;
     MockSwapRouter02 private s_router;
@@ -82,18 +84,20 @@ contract R83StandingApprovalGasTest is Test {
             address(this)
         );
 
-        s_exactApprovalISusd = new MockIsusdToken(address(s_stablecoin));
-        s_exactApprovalHandler = new SovrynDocHandlerMoc(
+        s_preR83ISusd = new MockIsusdToken(address(s_stablecoin));
+        s_preR83Handler = new PreR83SovrynDocHandlerMoc(
             address(this),
             address(s_stablecoin),
-            address(s_exactApprovalISusd),
+            address(s_preR83ISusd),
             FEE_COLLECTOR,
             address(s_mocProxy),
             _feeSettings(),
             address(this)
         );
-        vm.prank(address(s_exactApprovalHandler));
-        s_stablecoin.approve(address(s_exactApprovalISusd), 0);
+        // Undo the standing grant the leaf still makes in its constructor, so this arm starts from the
+        // zero allowance the pre-R83 code left behind after every deposit.
+        vm.prank(address(s_preR83Handler));
+        s_stablecoin.approve(address(s_preR83ISusd), 0);
 
         s_wrBtc = new MockWrbtcToken();
         s_router = new MockSwapRouter02(s_wrBtc, BTC_PRICE);
@@ -121,10 +125,10 @@ contract R83StandingApprovalGasTest is Test {
 
         s_stablecoin.mint(USER, 100 * DEPOSIT_AMOUNT);
         s_stablecoin.mint(address(s_iSusd), 100 * DEPOSIT_AMOUNT);
-        s_stablecoin.mint(address(s_exactApprovalISusd), 100 * DEPOSIT_AMOUNT);
+        s_stablecoin.mint(address(s_preR83ISusd), 100 * DEPOSIT_AMOUNT);
         vm.startPrank(USER);
         s_stablecoin.approve(address(s_lendingHandler), type(uint256).max);
-        s_stablecoin.approve(address(s_exactApprovalHandler), type(uint256).max);
+        s_stablecoin.approve(address(s_preR83Handler), type(uint256).max);
         s_stablecoin.approve(address(s_dexHandler), type(uint256).max);
         vm.stopPrank();
     }
@@ -145,31 +149,52 @@ contract R83StandingApprovalGasTest is Test {
     }
 
     /**
-     * @notice The deposit that repairs a cleared allowance: one write, and only the once.
-     * @dev Not a reconstruction. `setUp` revokes this handler's standing approval, so the deposit takes
-     *      the real repair branch in `LendingErc20Handler._depositToken`.
-     *
-     *      This is the arm the per-deposit saving is measured against, but it is not the pre-R83 shape:
-     *      that approved the exact deposit and had the pull spend it back to zero, so it wrote this slot
-     *      **twice on every deposit**, for good. The repair writes once and restores `max`, so the next
-     *      deposit is back to the zero-write arm above. The steady-state saving is therefore the whole
-     *      of the old round trip, and this number is only what recovering from a cleared allowance costs.
+     * @notice The pre-R83 deposit shape: the allowance slot written twice, on every deposit, for good.
+     * @dev The arm the saving is measured against, reconstructed in a subclass rather than quoted from
+     *      an earlier branch, so it is re-derived on every run and cannot drift. It makes the same two
+     *      writes and the same `approve` call as the code R83 replaced; only their order differs, which
+     *      the Cancun schedule does not price.
      */
-    function test_lendingDeposit_repairAfterClear_writesTheAllowanceSlotOnce() public {
-        bytes32 allowanceSlot = _allowanceSlot(address(s_exactApprovalHandler), address(s_exactApprovalISusd));
-        (uint256 gasUsed, uint256 writes) = _measureDeposit(s_exactApprovalHandler, allowanceSlot);
+    function test_lendingDeposit_preR83Shape_writesTheAllowanceSlotTwice() public {
+        bytes32 allowanceSlot = _allowanceSlot(address(s_preR83Handler), address(s_preR83ISusd));
+        (uint256 gasUsed, uint256 writes) = _measureDeposit(s_preR83Handler, allowanceSlot);
 
-        console2.log("R83 lending deposit, repair after clear (Foundry gas)", gasUsed);
-        assertEq(writes, 1, "the repair should grant max once, not write per deposit");
+        console2.log("R83 lending deposit, pre-R83 exact approval (Foundry gas)", gasUsed);
+        assertEq(writes, 2, "the pre-R83 shape wrote the slot on the grant and again on the pull");
         assertEq(
-            s_stablecoin.allowance(address(s_exactApprovalHandler), address(s_exactApprovalISusd)),
-            type(uint256).max,
-            "the repair should leave the standing allowance restored"
+            s_stablecoin.allowance(address(s_preR83Handler), address(s_preR83ISusd)),
+            0,
+            "the pull should have spent the exact approval back to zero"
         );
-        assertGt(s_exactApprovalHandler.getUserShares(USER), 0);
+        assertGt(s_preR83Handler.getUserShares(USER), 0);
     }
 
-    /// @notice The Dex batch purchase writes no allowance slot; it pays one allowance read per batch.
+    /**
+     * @notice Restoring a cleared allowance writes the spender's slot once.
+     * @dev Bounds what recovery costs and pins that it is off the deposit path: the arm above shows the
+     *      deposit writing nothing, so a handler pays this at most once per clearing, not per deposit.
+     */
+    function test_restoreStandingApprovals_writesTheAllowanceSlotOnce() public {
+        bytes32 allowanceSlot = _allowanceSlot(address(s_lendingHandler), address(s_iSusd));
+        vm.prank(address(s_lendingHandler));
+        s_stablecoin.approve(address(s_iSusd), 0);
+
+        vm.startStateDiffRecording();
+        uint256 gasBefore = gasleft();
+        s_lendingHandler.restoreStandingApprovals();
+        uint256 gasUsed = gasBefore - gasleft();
+        uint256 writes = _slotWrites(vm.stopAndReturnStateDiff(), address(s_stablecoin), allowanceSlot);
+
+        console2.log("R83 restoreStandingApprovals, one spender (Foundry gas)", gasUsed);
+        assertEq(writes, 1, "the restore should write the slot once");
+        assertEq(
+            s_stablecoin.allowance(address(s_lendingHandler), address(s_iSusd)),
+            type(uint256).max,
+            "the restore should leave the standing allowance at max"
+        );
+    }
+
+    /// @notice The Dex batch purchase neither reads nor writes the router allowance slot.
     function test_dexPurchase_writesNoAllowanceSlot() public {
         bytes32 allowanceSlot = _allowanceSlot(address(s_dexHandler), address(s_router));
         s_dexHandler.depositToken(USER, DEPOSIT_AMOUNT);
@@ -241,5 +266,40 @@ contract R83StandingApprovalGasTest is Test {
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
             feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
         });
+    }
+}
+
+/**
+ * @title PreR83SovrynDocHandlerMoc
+ * @notice The deposit shape R83 replaced, kept only so the gas test has a live baseline.
+ * @dev Approves the exact deposit and lets the protocol pull spend it back to zero: one `SET` on the
+ *      grant and one `CLEAR` on the pull, on every deposit. Never deployed.
+ */
+contract PreR83SovrynDocHandlerMoc is SovrynDocHandlerMoc {
+    using SafeERC20 for IERC20;
+
+    constructor(
+        address dcaManagerAddress,
+        address docTokenAddress,
+        address iSusdTokenAddress,
+        address feeCollector,
+        address mocProxyAddress,
+        IFeeHandler.FeeSettings memory feeSettings,
+        address initialOwner
+    )
+        SovrynDocHandlerMoc(
+            dcaManagerAddress,
+            docTokenAddress,
+            iSusdTokenAddress,
+            feeCollector,
+            mocProxyAddress,
+            feeSettings,
+            initialOwner
+        )
+    {}
+
+    function _depositToken(address user, uint256 depositAmount) internal override {
+        i_stableToken.forceApprove(_lendingSpender(), depositAmount);
+        super._depositToken(user, depositAmount);
     }
 }

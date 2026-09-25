@@ -131,14 +131,17 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
         i_stableToken.forceApprove(_lendingSpender(), type(uint256).max);
     }
 
+    /// @dev The funding half of `restoreStandingApprovals`.
+    function _grantFundingApprovals() internal override {
+        _approveLendingSpender();
+    }
+
     /**
      * @dev TokenHandler reverts unless the pull matches `depositAmount`, so the mint always uses the full request.
-     *      The standing allowance normally covers the pull, and the repair below is what keeps this path
-     *      recoverable if anything outside this contract clears it.
+     *      The pull spends the standing allowance; nothing here reads or writes it.
      */
     function _depositToken(address user, uint256 depositAmount) internal virtual override {
         super._depositToken(user, depositAmount);
-        _ensureStandingAllowance(i_stableToken, _lendingSpender(), depositAmount);
         uint256 mintedAmount = _protocolDeposit(depositAmount);
         if (mintedAmount == 0) revert TokenLending__LendingProtocolDepositFailed();
         uint256 previousShares = s_shares[user];

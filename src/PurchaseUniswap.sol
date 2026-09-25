@@ -108,7 +108,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
 
         // Standing router allowance, so no purchase pays for an approval write. Last: it reads
         // `_purchaseToken()`, whose immutable the funding base assigns before this constructor runs.
-        _purchaseToken().forceApprove(address(i_swapRouter02), type(uint256).max);
+        _approveSwapRouter();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -276,25 +276,31 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         emit PurchaseUniswap__PurchasePathAllowedSet(pathHash, encodedPath, intermediateTokens, poolFeeRates, allowed);
     }
 
+    /// @dev Grants SwapRouter02 an unbounded stablecoin allowance, so no batch pays for one.
+    function _approveSwapRouter() internal {
+        _purchaseToken().forceApprove(address(i_swapRouter02), type(uint256).max);
+    }
+
+    /// @dev The purchase half of `restoreStandingApprovals`.
+    function _grantPurchaseApprovals() internal override {
+        _approveSwapRouter();
+    }
+
     /**
      * @dev Uses the stricter of the oracle and caller floors, and credits only the measured WRBTC delta.
      *      PurchaseRbtc proves the exact stablecoin input left this handler. This venue-specific layer also
      *      requires every intermediate-token router balance to return to its pre-swap value. Comparing
      *      deltas, not zero balances, prevents donated tokens from blocking it.
      *
-     *      The swap spends the standing router allowance, so no approval is written here in the ordinary
-     *      course; an exact-input swap pulls exactly `stablecoinAmount`, funding later hops from the
-     *      router's own balance. The repair call keeps this path recoverable on its own, matching the
-     *      lending side: the router grant is made once, in the constructor, so without it an allowance
-     *      cleared from outside would brick every later purchase.
+     *      The swap spends the standing router allowance, so no approval is read or written here; an
+     *      exact-input swap pulls exactly `stablecoinAmount`, funding later hops from the router's own
+     *      balance.
      */
     function _purchaseRbtc(uint256 stablecoinAmount, uint256 minRbtcOut)
         internal
         override
         returns (uint256 amountOut)
     {
-        _ensureStandingAllowance(_purchaseToken(), address(i_swapRouter02), stablecoinAmount);
-
         uint256 amountOutLowerBound = _getAmountOutLowerBound(stablecoinAmount);
         uint256 amountOutMinimum = minRbtcOut > amountOutLowerBound ? minRbtcOut : amountOutLowerBound;
 

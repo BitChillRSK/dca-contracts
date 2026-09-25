@@ -10,6 +10,7 @@ import {PurchaseMoc} from "src/PurchaseMoc.sol";
  * @notice Idle DOC + MoC: deposits stay on the handler; buys redeem DOC for rBTC at Money on Chain.
  * @dev Constructor-only leaf. Only its immutable DcaManager moves principal, buys, or withdraws rBTC;
  *      the owner controls fee settings and collection. It has no pause or owner rescue path.
+ *      Neither side of this leaf approves a spender, so `restoreStandingApprovals` does nothing here.
  */
 contract IdleDocHandlerMoc is IdleErc20Handler, PurchaseMoc {
     /**

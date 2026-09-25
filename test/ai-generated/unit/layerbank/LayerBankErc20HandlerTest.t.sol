@@ -454,6 +454,9 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
 }
 
 contract LayerBankTestHandler is LayerBankErc20Handler {
+    /// @dev Harness: no purchase-side standing approval.
+    function _grantPurchaseApprovals() internal override {}
+
     constructor(
         address dcaManagerAddress,
         address stableTokenAddress,

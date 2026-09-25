@@ -73,6 +73,9 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
         return super._withdrawToken(user, withdrawalAmount);
     }
 
+    /// @dev This handler holds the stablecoin itself and approves nobody to pull it.
+    function _grantFundingApprovals() internal override {}
+
     /**
      * @dev The stablecoin this handler holds idle.
      */

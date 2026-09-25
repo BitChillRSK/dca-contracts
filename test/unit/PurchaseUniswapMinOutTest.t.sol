@@ -347,6 +347,9 @@ abstract contract PurchaseTokenBase {
 }
 
 contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
+    /// @dev Harness: no funding-side standing approval.
+    function _grantFundingApprovals() internal override {}
+
     constructor(
         MockStablecoinWithDecimals token,
         IFeeHandler.FeeSettings memory feeSettings,

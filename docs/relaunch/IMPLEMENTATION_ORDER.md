@@ -1165,13 +1165,16 @@ a 24–48 h Bitocracy timelock at Sovryn, and an instant EOA upgrade at LayerBan
 custodies the whole position, leaving only transient deposit-time stablecoin and dust as new surface.
 
 Shipped: `LendingErc20Handler._approveLendingSpender()` called as the last statement of the Sovryn,
-LayerBank, and Tropykus constructors; `PurchaseUniswap`'s constructor approves the router and its
-`_purchaseRbtc` no longer writes an allowance. The deposit's `allowance < depositAmount` top-up stays as
-the fallback for a decrementing token. Live decrement facts: USDRIF preserves a `max` allowance (saving
-~10,400 per use), DOC and USDT0 decrement it (~5,400). Allowance-slot writes **2 → 0** per deposit in the
-steady state; Foundry, execution before refunds: **−23,010** (default) / **−22,515** (deploy) against the
-one deposit that repairs a cleared allowance, which is a lower bound on the saving, and zero writes on
-the Dex batch. One 20,000 `SET` per standing approval at deploy; break-even ≈ 2–4 uses. No ABI change.
+LayerBank, and Tropykus constructors; `PurchaseUniswap`'s constructor approves the router. Neither
+runtime path reads or writes an allowance any more. Because a constructor grant is one-shot, and two of
+the three shipped stablecoins are upgradeable proxies that could clear one, `StablecoinSource` carries an
+unpermissioned `restoreStandingApprovals()` that re-grants `max` to the constructor's own immutable
+spenders — the only new ABI, and the only way back from a cleared allowance on a handler that cannot be
+upgraded. Live decrement facts: USDRIF preserves a `max` allowance (saving ~10,400 per use), DOC and
+USDT0 decrement it (~5,400). Allowance-slot writes **2 → 0** per deposit; Foundry, execution before
+refunds: **−23,480** (default) / **−22,880** (deploy) against a live reconstruction of the pre-R83
+deposit, and zero writes on the Dex batch. One 20,000 `SET` per standing approval at deploy; break-even
+≈ 2–4 uses.
 
 ### R84 - no repeated registry reads ([spec](./R84-no-repeated-registry-reads.md))
 

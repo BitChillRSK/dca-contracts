@@ -33,6 +33,9 @@ abstract contract PurchaseMoc is PurchaseRbtc {
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev MoC burns the stablecoin this handler already holds, so this route approves nobody.
+    function _grantPurchaseApprovals() internal override {}
+
     /**
      * @dev Redeem free DOC at MoC and return the handler's native-balance delta. MoC reverts bubble;
      *      PurchaseRbtc separately proves that MoC consumed the complete DOC amount supplied here.
