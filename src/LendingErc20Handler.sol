@@ -123,9 +123,8 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
 
     /**
      * @dev Do not add a `fallback`, an `executeOperation`, or any other callback a lending protocol may
-     *      invoke on an arbitrary address, and check a new protocol for a caller-named target (bZx's
-     *      `flashBorrowToken`), which no handler shape defends. Must be the adapter constructor's **last
-     *      statement**: `_lendingSpender()` reads an immutable only the adapter assigns.
+     *      invoke on an arbitrary address, and check a new protocol for any entry point that makes it call
+     *      a target the caller names; no handler shape defends against that.
      */
     function _approveLendingSpender() internal {
         i_stableToken.forceApprove(_lendingSpender(), type(uint256).max);

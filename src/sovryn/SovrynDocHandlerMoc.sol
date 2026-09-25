@@ -12,8 +12,8 @@ import {SovrynErc20Handler} from "./SovrynErc20Handler.sol";
  *      the owner controls fee settings and collection. MoC redeems at its protocol price, so this
  *      route has no pool-slippage floor.
  *      Holds a standing max stablecoin approval to the lending spender, set at construction and restorable
- *      by anyone through `restoreLendingApproval`; precondition: the spender pulls only from its caller,
- *      this handler answers no protocol callback, and Sovryn keeps `flashBorrowToken` disabled.
+ *      by anyone through `restoreLendingApproval`; precondition: the spender pulls only from its caller and
+ *      this handler answers no protocol callback.
  */
 contract SovrynDocHandlerMoc is SovrynErc20Handler, PurchaseMoc {
     /**

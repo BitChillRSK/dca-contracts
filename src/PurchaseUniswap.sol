@@ -103,7 +103,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         }
         i_stablecoinToUsdScale = 10 ** (ORACLE_DECIMALS - stablecoinDecimals);
 
-        _approveSwapRouter(); // last: it reads `_purchaseToken()`, assigned by the funding base's constructor
+        _approveSwapRouter();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -276,7 +276,6 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         emit PurchaseUniswap__PurchasePathAllowedSet(pathHash, encodedPath, intermediateTokens, poolFeeRates, allowed);
     }
 
-    /// @dev Grants SwapRouter02 an unbounded stablecoin allowance, so no batch pays for one.
     function _approveSwapRouter() internal {
         _purchaseToken().forceApprove(address(i_swapRouter02), type(uint256).max);
     }

@@ -13,8 +13,7 @@ import {SovrynErc20Handler} from "./SovrynErc20Handler.sol";
  *      `i_stableToken` is set before `PurchaseUniswap` builds the path.
  *      Holds standing max stablecoin approvals to SwapRouter02 and the lending spender, set at construction
  *      and restorable by anyone through `restoreSwapRouterApproval` and `restoreLendingApproval`;
- *      precondition: each spender pulls only from its caller, this handler answers no protocol callback,
- *      and Sovryn keeps `flashBorrowToken` disabled.
+ *      precondition: each spender pulls only from its caller and this handler answers no protocol callback.
  */
 contract SovrynErc20HandlerDex is SovrynErc20Handler, PurchaseUniswap {
     /**
