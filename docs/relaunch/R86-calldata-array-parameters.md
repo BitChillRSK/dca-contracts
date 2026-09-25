@@ -108,10 +108,37 @@ change.
 | Dex, LayerBank, USDRIF | **−1,039** | +784 |
 
 - **The shipped bytecode saves about 850–1,200 gas per 5-row batch**, roughly 0.1% of a batch.
-  Only the 5-row shape was measured, so how this scales with row count is not established.
 - **Under legacy codegen the purchase costs more.** Each index into a calldata array is a
   bounds-checked `CALLDATALOAD` with an extra stack slot to carry. The one-time decode copy it
   replaces is cheap for arrays this short. Nothing ships on the default profile.
+
+Scaling was measured on 2026-09-26 with a throwaway, uncommitted test. It creates one schedule per row,
+five per user, then times a single `DcaManager.batchBuyRbtc` call with `gasleft()` on the `deploy`
+profile, at `068a380` and at `70f3a14`. The 5-row column matches the table above to within 1 gas.
+
+| `DcaManager.batchBuyRbtc`, deploy | 1 row | 5 rows | 50 rows |
+|---|---:|---:|---:|
+| MoC, idle, DOC | −700 | −986 | −4,265 |
+| MoC, Sovryn, DOC | −730 | −1,184 | −6,356 |
+| Dex, idle, USDRIF | −629 | −848 | −3,369 |
+
+- **The saving grows with the batch** and holds from 1 row up. Past the fixed part it saves roughly
+  55–115 gas per row. No shipped purchase shape costs more.
+
+Runtime sizes at `068a380` → `70f3a14` on the `deploy` profile (`forge build --sizes`):
+
+| Contract | Change (bytes) | Margin left |
+|---|---:|---:|
+| `IdleDocHandlerMoc` | −494 | 18,828 |
+| `SovrynDocHandlerMoc` | −530 | 15,903 |
+| `LayerBankDocHandlerMoc` | −520 | 15,647 |
+| `IdleErc20HandlerDex` | −51 | 14,194 |
+| `SovrynErc20HandlerDex` | −63 | 11,589 |
+| `LayerBankErc20HandlerDex` | +64 | 11,198 |
+| `DcaManager` | 0 | 13,309 |
+
+- **Only `LayerBankErc20HandlerDex` grows**, by 64 bytes. That is a one-time deployment cost of
+  about 12,800 gas, with no per-purchase effect.
 
 The Uniswap setters were measured three ways on the same tree, `testPathPolicyConfigurationGas`,
 absolute Foundry gas (deploy / default):
