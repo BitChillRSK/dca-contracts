@@ -11,7 +11,7 @@ import {SovrynErc20Handler} from "./SovrynErc20Handler.sol";
  * @dev Constructor-only leaf. Only its immutable DcaManager moves principal, buys, or withdraws rBTC;
  *      the owner controls fees, oracle, path allowlist, and floor. The funding base is listed first so
  *      `i_stableToken` is set before `PurchaseUniswap` builds the path.
- *      Holds standing max approvals to SwapRouter02 and the lending spender, restorable by anyone.
+ *      Holds standing max stablecoin approvals to SwapRouter02 and the iSUSD token, restorable by anyone.
  */
 contract SovrynErc20HandlerDex is SovrynErc20Handler, PurchaseUniswap {
     /**

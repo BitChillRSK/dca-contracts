@@ -11,7 +11,7 @@ import {PurchaseMoc} from "src/PurchaseMoc.sol";
  * @dev Constructor-only leaf. Only its immutable DcaManager moves principal, buys, or withdraws rBTC;
  *      the owner controls fee settings and collection. MoC redeems at its protocol price, so this
  *      route has no pool-slippage floor.
- *      Holds a standing max approval to the lending spender, restorable by anyone.
+ *      Holds a standing max DOC approval to the kToken, restorable by anyone.
  */
 contract TropykusDocHandlerMoc is TropykusErc20Handler, PurchaseMoc {
     /**
