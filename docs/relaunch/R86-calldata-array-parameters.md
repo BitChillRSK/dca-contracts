@@ -1,6 +1,6 @@
 # R86 — `calldata` for external array parameters
 
-Status: **implemented** · Assigned: yes · Optional/further-review: no
+Status: **implemented** · GitHub [#149](https://github.com/BitChillRSK/dca-contracts/pull/149) · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
