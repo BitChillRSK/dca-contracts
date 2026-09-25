@@ -618,7 +618,7 @@ contract PurchaseRbtcHarness is PurchaseRbtc {
         return rbtcOut;
     }
 
-    function _batchRetrieveStablecoin(address[] memory, uint256[] memory purchaseAmounts)
+    function _batchRetrieveStablecoin(address[] calldata, uint256[] calldata purchaseAmounts)
         internal
         view
         override

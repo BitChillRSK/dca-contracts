@@ -30,7 +30,7 @@ abstract contract StablecoinSource {
      * @return The total amount actually available to spend.
      */
     function _batchRetrieveStablecoin(
-        address[] memory buyers,
-        uint256[] memory purchaseAmounts
+        address[] calldata buyers,
+        uint256[] calldata purchaseAmounts
     ) internal virtual returns (uint256);
 }

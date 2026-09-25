@@ -135,8 +135,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
 
     /// @inheritdoc IPurchaseUniswap
     function setPurchasePathAllowed(
-        address[] memory intermediateTokens,
-        uint24[] memory poolFeeRates,
+        address[] calldata intermediateTokens,
+        uint24[] calldata poolFeeRates,
         bool allowed
     ) external onlyOwner {
         bytes memory encodedPath = _encodePurchasePath(intermediateTokens, poolFeeRates);
@@ -151,7 +151,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     /// @inheritdoc IPurchaseUniswap
-    function setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
+    function setPurchasePath(address[] calldata intermediateTokens, uint24[] calldata poolFeeRates)
         external
         override
     {

@@ -33,7 +33,7 @@ contract StubPurchaseHandler is IERC165, ITokenHandler, IPurchaseRbtc {
         return amount;
     }
 
-    function batchBuyRbtc(address[] memory buyers, uint64[] memory, uint256[] memory, uint256) external override {
+    function batchBuyRbtc(address[] calldata buyers, uint64[] calldata, uint256[] calldata, uint256) external override {
         rowsBought += buyers.length;
     }
 

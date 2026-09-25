@@ -153,7 +153,7 @@ contract IdleTestHandler is IdleErc20Handler {
         address initialOwner
     ) IdleErc20Handler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, initialOwner) {}
 
-    function testBatchRetrieveStablecoin(address[] memory users, uint256[] memory purchaseAmounts)
+    function testBatchRetrieveStablecoin(address[] calldata users, uint256[] calldata purchaseAmounts)
         external
         returns (uint256)
     {

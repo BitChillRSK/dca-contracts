@@ -408,8 +408,8 @@ contract SovrynTestHandler is SovrynErc20Handler {
      * @dev This allows us to test the internal batch redemption logic
      */
     function testBatchRetrieveStablecoin(
-        address[] memory users,
-        uint256[] memory purchaseAmounts
+        address[] calldata users,
+        uint256[] calldata purchaseAmounts
     ) external returns (uint256) {
         return _batchRetrieveStablecoin(users, purchaseAmounts);
     }

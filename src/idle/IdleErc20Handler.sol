@@ -80,7 +80,7 @@ abstract contract IdleErc20Handler is TokenHandler, IIdleErc20Handler, Stablecoi
      *      PurchaseRbtc still splits by the original planned weights, so one underfunded
      *      buyer would dilute every other buyer in the batch.
      */
-    function _batchRetrieveStablecoin(address[] memory users, uint256[] memory purchaseAmounts)
+    function _batchRetrieveStablecoin(address[] calldata users, uint256[] calldata purchaseAmounts)
         internal
         virtual
         override
