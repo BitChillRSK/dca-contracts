@@ -60,13 +60,18 @@ selector instead of two. This spec takes the single view.
 
 ## Measured
 
-[`test/gas/R84RegistryReadsGas.t.sol`](../../test/gas/R84RegistryReadsGas.t.sol), against the real
-`OperationsAdmin` and `DcaManager` with a stub lending handler that moves no tokens. It counts
-`OperationsAdmin` calls and the storage reads behind them with `vm.startStateDiffRecording`, pins the
-new count, and checks that principal and interest reach the same handler. The same file was run on the
-unchanged `src/` for the "before" column.
+Measured with a one-off harness, `test/gas/R84RegistryReadsGas.t.sol`, that did not ship: it is kept
+at [`02884fe`](https://github.com/BitChillRSK/dca-contracts/blob/02884fe88467d9bed7e11306b64d91cf46ea9713/test/gas/R84RegistryReadsGas.t.sol). It ran against the real `OperationsAdmin` and `DcaManager` with a stub lending
+handler that moves no tokens, and counted `OperationsAdmin` calls and the storage reads behind them
+with `vm.startStateDiffRecording`. The same file was run on the unchanged `src/` for the "before"
+column. It was dropped from the PR because it would have been a gas pin on a change that ships for
+clarity: its stub implements four handler interfaces and breaks whenever one grows, and its
+same-handler assertions pass on the old code too, since only one handler is registered. The behaviour
+is already covered by the `withdrawTokenAndInterest` cases in `FullWithdrawalTest`,
+`StablecoinLendingTest`, `ProtectedPurchaseWindowTest`, `SchedulePauseTest`, `ScheduleOwnershipTest`,
+and, for the idle-route revert, `IdleDcaManagerTest`.
 
-Before the measured call the test warms `OperationsAdmin` and the two registry slots the path reads,
+Before the measured call the harness warmed `OperationsAdmin` and the two registry slots the path reads,
 through getters that exist on both sides. Cancun then prices every registry call and read the same way
 before and after (100 + 100), and the delta converts to Rootstock by repricing only what was removed: a
 removed warm call is −600 (700 on Rootstock), a removed warm `SLOAD` −100.
@@ -104,7 +109,8 @@ the Status line.
 - [ ] Dropped 2026-09-25: routing `_handlerForDeposit` (`createDcaSchedule`, `depositToken`),
       `topUpFromInterest`, and each `withdrawAllAccumulatedInterest` pair through that view. They keep
       their two registry calls, each asking a different question.
-
+- [ ] Dropped 2026-09-25: a committed gas or call-count test. The measurement below is reproducible
+      from the harness kept in history; see **Measured**.
 - [ ] Changing `_handler` for paths that resolve a route only once (purchase, delete, withdraw, rBTC).
 - [ ] Folding `withdrawTokenAndInterest`'s route-class check into `_withdrawToken`. That would add a
       read to plain `withdrawToken`, and it is unmeasured.
@@ -114,14 +120,13 @@ the Status line.
 ## Files likely touched
 
 - `src/DcaManager.sol`
-- `test/gas/R84RegistryReadsGas.t.sol`
 
 ## Required tests
 
-- `withdrawTokenAndInterest` withdraws principal and interest through the same handler as before,
-  with two registry calls instead of three.
-- Its existing errors are unchanged: an idle route still reverts `DcaManager__TokenDoesNotYieldInterest`.
-- Foundry gas for `withdrawTokenAndInterest` (labelled Foundry) plus the Rootstock derivation.
+- The existing `withdrawTokenAndInterest` tests pass unchanged: principal and interest are withdrawn
+  through the schedule's handler, and an idle route still reverts `DcaManager__TokenDoesNotYieldInterest`.
+- Foundry gas for `withdrawTokenAndInterest` (labelled Foundry) plus the Rootstock derivation, recorded
+  under **Measured** rather than pinned by a committed test.
 - `make check`, `make check-deploy`; fork lanes per `AGENTS.md`.
 
 ## Success criteria

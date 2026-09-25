@@ -1199,7 +1199,7 @@ about 1% of each call and under a cent, so only an edit that improves the code o
 through, so registry calls go 3 → 2. The additive `getRouteInfo` view and the three paths it would have
 served (deposit routing, `topUpFromInterest`, the interest batch) are closed: the view would add
 permanent registry surface that overlaps three existing getters. Measured in Foundry with
-`test/gas/R84RegistryReadsGas.t.sol`, registry pre-warmed so both sides price its calls alike, then
+a one-off harness kept at [`02884fe`](https://github.com/BitChillRSK/dca-contracts/blob/02884fe88467d9bed7e11306b64d91cf46ea9713/test/gas/R84RegistryReadsGas.t.sol) and not shipped, registry pre-warmed so both sides price its calls alike, then
 repriced for Rootstock: −1,389 Foundry / ≈ −2,089 Rootstock (default), −1,194 / ≈ **−1,894** (deploy).
 Errors unchanged. ABI change: none.
 
