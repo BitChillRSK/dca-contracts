@@ -31,7 +31,8 @@ harness that the implementing PRs must re-measure with Foundry:
   `reference.conf` / `config/main.conf` (activation heights).
 
 The stub handler moves no tokens, so handler-side storage (`s_idleBalances`, `s_shares`,
-`s_usersAccumulatedRbtc`) was reasoned from source, not traced. R79 already covers that side.
+`s_usersAccumulatedRbtc`) was reasoned from source, not traced. R79 covered that side and was closed
+without implementation (about 1% of a batch; see [R79](./R79-coalesce-repeated-buyer-writes.md)).
 
 ## Findings → specs
 
@@ -62,7 +63,8 @@ adjacent with nothing that can revert, log, or call between them. Cancun prices 
   (+298 / +938 Foundry, compute, which transfers) is a real net cost. The human accepted it on
   2026-09-18 as a cost transfer from swapper to user. No change.
 - **R79** (repeated-buyer write coalescing) and **R80** (cadence event) were already priced on
-  Rootstock in R78's deferred record.
+  Rootstock in R78's deferred record. R79 was later closed without implementation; see
+  [its record](./R79-coalesce-repeated-buyer-writes.md).
 
 ## Confirmed sound on Rootstock
 

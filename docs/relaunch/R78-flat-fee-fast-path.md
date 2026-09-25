@@ -81,6 +81,11 @@ See [`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SCHEDULE.md) for the constants
 
 ### R79 survivor: coalesce repeated-buyer writes
 
+**Closed 2026-09-25.** [R79](./R79-coalesce-repeated-buyer-writes.md) implemented and measured this,
+then withdrew it. The 40,000 below is the dense five-row single-buyer case. Over live history the
+average is about 10,700 per batch, about 1% of a batch, which does not justify the change to immutable
+balance accounting. The analysis below is kept as written.
+
 **Candidate.** Have the swapper sort each handler batch by buyer. In the contract, accumulate one
 contiguous buyer run and flush it once to `_creditRbtc`; do the same for `_setUserShares` on lending
 handlers. Because `_setUserShares` currently couples the write with the canonical transition event,

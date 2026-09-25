@@ -146,7 +146,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R83 | post-R82, before relaunch deploy | **answered 2026-09-24: standing approvals on every Dex handler and every lending adapter** |
 | R84 | post-R83, before relaunch deploy | none (no repeated registry reads; the `getRouteInfo` view may be dropped, keeping the internal `withdrawTokenAndInterest` fix) |
 | R85 | after R84; not deployment-bound | none (one-line NatSpec uses `///`, multi-line uses `/** */`; comment-only) |
-| R79 | after R84; not deployment-bound | coalesce repeated-buyer writes (swapper sort + contiguous rBTC/share stores) |
+| R79 | after R85; not deployment-bound | **closed 2026-09-25 without implementation** (repeated-buyer write coalescing; about 1% of a batch; docs-only record) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1210,12 +1210,6 @@ wrapper, and NatSpec of two or more lines uses a `/** */` block, not a `///` run
 was added to scope by the human on 2026-09-24). Write the rule into `AGENTS.md` and apply it across
 first-party `src/`. Comment-only; metadata-stripped runtime must stay byte-identical. Ask: none.
 
-### R79 - coalesce repeated-buyer writes ([analysis](./R78-flat-fee-fast-path.md#r79-survivor-coalesce-repeated-buyer-writes))
-
-After R84 and not deployment-bound: coordinate buyer sorting with the swapper and coalesce contiguous
-rBTC/share writes (approximately 40,000 Rootstock gas on five same-buyer lending rows). Write the full
-R79 spec only when assigned.
-
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:
@@ -1226,6 +1220,14 @@ There is no optional-late queue. Items either have an ordered spec above or are 
 - **Owner sweep — rejected.** A pooled balance cannot prove which tokens are harmless dust versus user liabilities. Governance must not gain a path around signer-only withdrawals.
 - **Handler per-user storage packing — rejected.** Each mapping value is already one slot and contains a financial amount. Narrowing it saves no slot across mapping entries.
 - **Address-keyed bool bitmaps — rejected.** `s_swappers` and `s_handlerAssigned` are sparse address keys; they never share a word, so a bitmap is extra math for the same SLOAD. R50 packs the `(token, routeIndex)` handler+pause pair instead.
+- **R79 repeated-buyer write coalescing — closed 2026-09-25 without implementation.** Implemented,
+  fuzzed, and measured in [#148](https://github.com/BitChillRSK/dca-contracts/pull/148), then
+  withdrawn: ≈ −10,700 Rootstock gas per batch over live history, about 1% of a batch, a few cents per
+  batch and a couple of dollars a year of swapper gas. That does not justify moving balance writes in
+  three immutable accounting loops to deferred run-level state, with a saving that depends on the
+  swapper's row order. Reasons, measurements, and reopen conditions:
+  [R79](./R79-coalesce-repeated-buyer-writes.md); code at the tag
+  [`archive/r79-coalesced-writes`](https://github.com/BitChillRSK/dca-contracts/tree/archive/r79-coalesced-writes).
 - **SPDX change — reopened 2026-08-31, answered 2026-09-07.** The earlier rejection argued that re-licensing "requires an explicit legal/product process outside the contract implementation stack" and then closed the decision on that basis, which is self-defeating: that is a reason to route the question to a human, not to answer it. See **Licensing — decided**.
 
 ## Licensing — decided
