@@ -175,30 +175,57 @@ Live, same probe, same block:
 
 ### Measured cost
 
-Per lending deposit, Foundry execution before refunds (`test/gas/R83StandingApprovalGas.t.sol`):
-**−23,445** default, **−22,866** under deploy, with allowance-slot writes going **2 → 0**. Each arm is
+Per lending deposit, allowance-slot writes go **2 → 0** in the steady state: the pre-R83 shape approved
+the exact deposit and had the pull spend it back to zero, on every deposit, for good. Foundry execution
+before refunds (`test/gas/R83StandingApprovalGas.t.sol`): **117,141** default / **114,865** deploy for
+the standing-approval deposit, against **140,151** / **137,380** for the one deposit that repairs a
+cleared allowance — a **−23,010** / **−22,515** gap. Read that gap as a lower bound on the steady-state
+saving, not as the saving itself: the repair arm writes the slot once and restores `max`, where the
+pre-R83 shape wrote it twice and did so again on the next deposit. Each arm is
 measured in its own transaction: sharing one made the delta swing by ~10,600 gas on call order alone,
 because whichever arm ran first paid the cold access to the stablecoin and the depositor's balance for
 both. Cancun refunds
 roughly 19,900 of the removed round trip, which is why it never showed up as an Ethereum problem.
 Rootstock does not: `SET` 20,000 + `CLEAR` 5,000 − `REFUND` 15,000 = **10,000** net, plus a flat 700 for
 the `approve` call. The same test pins the Dex batch at **zero** allowance-slot writes. Against that, each
-handler pays one 20,000 `SET` per standing approval at deploy, once, by the deployer.
+handler pays one 20,000 `SET` per standing approval at deploy, once, by the deployer, and both runtime
+paths now carry one `allowance()` read — about 900 Rootstock gas, a flat 700 call plus a 200 read. On the
+Dex path that read is new, and it costs 1,259 Foundry gas per **batch**, not per buyer.
 
-## Reviewed and kept as-is
+## Recoverability, and what it supersedes
 
-Two review points were considered and deliberately not changed.
+Moving the grant into the constructor made it a **one-shot**: if anything outside the handler clears a
+standing allowance, nothing in the contract grants it again. The lending path still healed itself,
+through the deposit top-up. The Dex path did not — before this item every purchase re-approved the
+router, and replacing that with a constructor grant left a cleared router allowance bricking every later
+purchase, with no owner function and no upgrade to fix it. That is a regression this item introduced.
 
-**The deposit top-up re-approves the exact amount, not `max`.** If it ever fired, the handler would go
-back to paying the allowance round trip on every deposit rather than restoring the standing approval.
-That branch needs roughly 2²⁵⁶ wei of cumulative spend to become reachable, so it is unreachable in
-practice; and keeping the runtime fallback exact means no runtime path can ever widen an allowance —
-the unbounded one is granted once, in construction, which is the state that gets audited. The spec
-assigned "keep the existing top-up", and this is why keeping it unchanged is the right reading.
+It is reachable rather than theoretical: USDRIF and USDT0 are both upgradeable proxies (EIP-1967
+implementation slots read on mainnet), so the token, not BitChill, can decide what happens to an
+allowance. Handlers are not upgradeable and hold no owner-side approval lever.
 
-**The `allowance()` read stays on the deposit path**, about 900 Rootstock gas (a 700 call plus a 200
-read). Dropping it would save that on every deposit but would delete the fallback above. It is present
-in both the before and after shapes, so it does not affect any figure quoted here.
+Both paths therefore call one shared helper, `StablecoinSource._ensureStandingAllowance`, which re-grants
+`max` when the allowance no longer covers the amount in hand, and is a no-op otherwise.
+
+**This supersedes two points recorded here earlier as deliberately unchanged.**
+
+- *"The top-up re-approves the exact amount, not `max`."* Rejected then on the grounds that no runtime
+  path should widen an allowance. That reasoning was too narrow: re-granting `max` to the **same
+  immutable spender the constructor already granted** restores the audited state rather than widening
+  anything, and the helper cannot name a different spender. Approving the exact amount would also leave
+  the path permanently degraded after a clear, paying the full round trip on every later deposit.
+- *"The `allowance()` read stays on the deposit path."* Kept, but now for a better reason than the one
+  given then. It is not a leftover of the old fallback; it is what makes both paths self-healing, and
+  the same read is now on the Dex path too, deliberately. About 900 Rootstock gas, once per deposit and
+  once per batch purchase.
+
+A reviewer proposed the opposite trade — drop both reads and add a permissionless
+`restoreStandingApprovals()`. Not taken here, for two reasons. It puts a new external function on the
+ABI of seven non-upgradeable deployed contracts, which is beyond what this item was assigned. And
+whether that function should be permissionless is a product question, not a review fix: every other
+maintenance surface on these handlers (fees, oracle, path allowlist, floor) is owner-gated, and a
+permissionless restore would also be an undo button for any future emergency response that works by
+revoking an allowance. Worth its own item and its own gate.
 
 ## Scope
 
@@ -212,7 +239,7 @@ in both the before and after shapes, so it does not affect any figure quoted her
     constructor assigns, and a base constructor runs first. Calling the virtual hook there compiles
     under both profiles and silently reads `address(0)`: the audit harness reproduced this with solc
     0.8.36. With an OZ token the approval would then revert at deploy; with another token it could
-    approve the zero address. Keep the existing `allowance < depositAmount` top-up as the fallback for
+    approve the zero address. Keep the existing `allowance < depositAmount` check as the repair for
     a token that decrements.
   - **Dex:** in the `PurchaseUniswap` constructor, after `i_swapRouter02` is assigned, approve the
     router once for the handler classes the human chose. Then drop the per-batch `forceApprove` there.

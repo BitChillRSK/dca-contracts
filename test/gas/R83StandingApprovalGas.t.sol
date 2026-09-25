@@ -145,21 +145,31 @@ contract R83StandingApprovalGasTest is Test {
     }
 
     /**
-     * @notice The exact-approval shape this PR replaced, for comparison: two allowance-slot writes.
+     * @notice The deposit that repairs a cleared allowance: one write, and only the once.
      * @dev Not a reconstruction. `setUp` revokes this handler's standing approval, so the deposit takes
-     *      the real top-up branch in `LendingErc20Handler._depositToken`, which is the pre-R83
-     *      `0 -> amount -> 0` round trip exactly as it used to run.
+     *      the real repair branch in `LendingErc20Handler._depositToken`.
+     *
+     *      This is the arm the per-deposit saving is measured against, but it is not the pre-R83 shape:
+     *      that approved the exact deposit and had the pull spend it back to zero, so it wrote this slot
+     *      **twice on every deposit**, for good. The repair writes once and restores `max`, so the next
+     *      deposit is back to the zero-write arm above. The steady-state saving is therefore the whole
+     *      of the old round trip, and this number is only what recovering from a cleared allowance costs.
      */
-    function test_lendingDeposit_exactApproval_writesTheAllowanceSlotTwice() public {
+    function test_lendingDeposit_repairAfterClear_writesTheAllowanceSlotOnce() public {
         bytes32 allowanceSlot = _allowanceSlot(address(s_exactApprovalHandler), address(s_exactApprovalISusd));
         (uint256 gasUsed, uint256 writes) = _measureDeposit(s_exactApprovalHandler, allowanceSlot);
 
-        console2.log("R83 lending deposit, exact approval    (Foundry gas)", gasUsed);
-        assertEq(writes, 2, "the exact-approval arm should set the allowance and spend it to zero");
+        console2.log("R83 lending deposit, repair after clear (Foundry gas)", gasUsed);
+        assertEq(writes, 1, "the repair should grant max once, not write per deposit");
+        assertEq(
+            s_stablecoin.allowance(address(s_exactApprovalHandler), address(s_exactApprovalISusd)),
+            type(uint256).max,
+            "the repair should leave the standing allowance restored"
+        );
         assertGt(s_exactApprovalHandler.getUserShares(USER), 0);
     }
 
-    /// @notice The Dex batch purchase writes no allowance slot at all.
+    /// @notice The Dex batch purchase writes no allowance slot; it pays one allowance read per batch.
     function test_dexPurchase_writesNoAllowanceSlot() public {
         bytes32 allowanceSlot = _allowanceSlot(address(s_dexHandler), address(s_router));
         s_dexHandler.depositToken(USER, DEPOSIT_AMOUNT);
