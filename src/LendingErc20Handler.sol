@@ -121,12 +121,8 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @dev Precondition, not enforced here: the spender pulls only from its caller, and this handler
-     *      answers no protocol callback. So do not add a `fallback`, an `executeOperation`, or any other
-     *      callback a lending protocol may invoke on an arbitrary address, and check a new protocol for
-     *      an entry point that makes it call a target the caller names, which no handler shape defends.
-     */
+    /// @dev Never add a `fallback` or `executeOperation` here: an Aave-style flash loan naming this
+    ///      handler as receiver would repay itself from this allowance.
     function _approveLendingSpender() internal {
         i_stableToken.forceApprove(_lendingSpender(), type(uint256).max);
     }
