@@ -289,8 +289,9 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     function topUpFromInterest(address token, uint64 scheduleId, uint256 amount) external override nonReentrant {
         DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
         uint256 routeIndex = dcaSchedule.routeIndex;
+        _checkTokenYieldsInterest(token, routeIndex);
 
-        uint256 accruedInterest = _lendingHandler(token, routeIndex).getAccruedInterest(
+        uint256 accruedInterest = ITokenLending(address(_handler(token, routeIndex))).getAccruedInterest(
             msg.sender, _lockedPrincipal(msg.sender, token, routeIndex)
         );
         if (accruedInterest == 0) revert DcaManager__NoInterestToTopUpWith(token, routeIndex);
@@ -324,13 +325,12 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     {
         uint256 numOfPairs = _requirePairedWithdrawalArrays(tokens, routeIndexes);
         for (uint256 i; i < numOfPairs; ++i) {
-            (IOperationsAdmin.TokenRoute memory tokenRoute, IOperationsAdmin.RouteClass routeClass) =
-                i_operationsAdmin.getRouteInfo(tokens[i], routeIndexes[i]);
-            if (tokenRoute.handler == address(0)) continue;
+            address tokenHandlerAddress = i_operationsAdmin.getTokenHandler(tokens[i], routeIndexes[i]);
+            if (tokenHandlerAddress == address(0)) continue;
             // Skip idle routes so a mixed idle+lending call still withdraws interest
             // from the indexes that yield. Unassigned pairs already continued above.
-            if (routeClass != IOperationsAdmin.RouteClass.Lending) continue;
-            _withdrawInterest(ITokenLending(tokenRoute.handler), tokens[i], routeIndexes[i]);
+            if (!_tokenYieldsInterest(routeIndexes[i])) continue;
+            _withdrawInterest(ITokenLending(tokenHandlerAddress), tokens[i], routeIndexes[i]);
         }
     }
 
@@ -741,15 +741,16 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     /**
      * @dev Resolve the handler for a deposit, rejecting the call if governance paused deposits.
      *      Only `depositToken` and `createDcaSchedule` route through here, and both do so before
-     *      any token moves, so a paused pair never takes cash it would have to refund. No other path
-     *      checks the pause: purchases, edits, deletion, withdrawals, and interest top-ups and
-     *      withdrawals must stay available on a paused route.
+     *      any token moves, so a paused pair never takes cash it would have to refund. Every other
+     *      caller keeps using `_handler`: purchases, edits, deletion, and withdrawals must stay
+     *      available on a paused route.
      */
     function _handlerForDeposit(address token, uint256 routeIndex) private view returns (ITokenHandler) {
-        (IOperationsAdmin.TokenRoute memory tokenRoute,) = i_operationsAdmin.getRouteInfo(token, routeIndex);
-        if (tokenRoute.handler == address(0)) revert DcaManager__TokenNotAccepted(token, routeIndex);
-        if (tokenRoute.depositsPaused) revert DcaManager__DepositsPaused(token, routeIndex);
-        return ITokenHandler(tokenRoute.handler);
+        ITokenHandler tokenHandler = _handler(token, routeIndex);
+        if (i_operationsAdmin.areDepositsPaused(token, routeIndex)) {
+            revert DcaManager__DepositsPaused(token, routeIndex);
+        }
+        return tokenHandler;
     }
 
     /**
@@ -795,8 +796,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     /**
      * @dev Withdraw interest from an already-resolved lending handler.
      *      Callers must already have established that `routeIndex` is a lending
-     *      route (`_checkTokenYieldsInterest` to revert, or the route class from
-     *      `getRouteInfo` to skip). This helper does not re-check.
+     *      route (`_checkTokenYieldsInterest` to revert, or `_tokenYieldsInterest`
+     *      to skip). This helper does not re-check.
      */
     function _withdrawInterest(ITokenLending tokenLending, address token, uint256 routeIndex) private {
         tokenLending.withdrawInterest(msg.sender, _lockedPrincipal(msg.sender, token, routeIndex));
@@ -821,22 +822,16 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     }
 
     /**
-     * @dev Resolve the lending handler for a token and route in one registry call. Reverts with
-     *      `TokenDoesNotYieldInterest` for a route that is not lending, then with `TokenNotAccepted`
-     *      if no handler is assigned.
-     */
-    function _lendingHandler(address token, uint256 routeIndex) private view returns (ITokenLending) {
-        (IOperationsAdmin.TokenRoute memory tokenRoute, IOperationsAdmin.RouteClass routeClass) =
-            i_operationsAdmin.getRouteInfo(token, routeIndex);
-        if (routeClass != IOperationsAdmin.RouteClass.Lending) revert DcaManager__TokenDoesNotYieldInterest(token);
-        if (tokenRoute.handler == address(0)) revert DcaManager__TokenNotAccepted(token, routeIndex);
-        return ITokenLending(tokenRoute.handler);
-    }
-
-    /**
      * @dev Revert unless `routeIndex` is a lending route.
      */
     function _checkTokenYieldsInterest(address token, uint256 routeIndex) private view {
-        if (!i_operationsAdmin.isLendingRoute(routeIndex)) revert DcaManager__TokenDoesNotYieldInterest(token);
+        if (!_tokenYieldsInterest(routeIndex)) revert DcaManager__TokenDoesNotYieldInterest(token);
+    }
+
+    /**
+     * @dev Whether a route index was registered as lending.
+     */
+    function _tokenYieldsInterest(uint256 routeIndex) private view returns (bool) {
+        return i_operationsAdmin.isLendingRoute(routeIndex);
     }
 }
