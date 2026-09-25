@@ -111,15 +111,15 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Never add a `fallback` or `executeOperation` here: an Aave-style flash loan naming this
-    ///      handler as receiver would repay itself from this allowance.
+    /**
+     * @dev Never add a `fallback` or `executeOperation` here: an Aave-style flash loan naming this
+     *      handler as receiver would repay itself from this allowance.
+     */
     function _approveLendingSpender() internal {
         i_stableToken.forceApprove(_lendingSpender(), type(uint256).max);
     }
 
-    /**
-     * @dev TokenHandler reverts unless the pull matches `depositAmount`, so the mint always uses the full request.
-     */
+    /// @dev TokenHandler reverts unless the pull matches `depositAmount`, so the mint always uses the full request.
     function _depositToken(address user, uint256 depositAmount) internal virtual override {
         super._depositToken(user, depositAmount);
         uint256 mintedAmount = _protocolDeposit(depositAmount);

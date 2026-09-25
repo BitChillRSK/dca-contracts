@@ -85,6 +85,18 @@ byte-identical on every deployable contract (same proof shape as R63 / R65).
 `make fork-tropykus` passed 443, skipped 34, failed 0. All three were re-run on the final tree after the
 2026-09-24 widening, with the same counts. The runtime comparison is recorded under **Success criteria**.
 
+**Rebase onto the reworked R84 (2026-09-25).** R83 and R84 were revised under this PR, and R85 was
+rebased onto the new R84 head (`16a34e3`). The rebase carried the rule into the new code as far as its
+commits reached, but the standing-approval rework left two comments in `LendingErc20Handler` breaking
+it: `_depositToken`'s `@dev` shrank to one line inside a block, and the new `_approveLendingSpender` had
+a two-line `///` run. A follow-up commit applies the rule to both. The scans below were re-run on the
+rebased tree, and the byte-identity and `devdoc` / `userdoc` / `abi` comparisons were re-run against
+`16a34e3` on both profiles: 43 `src/` artifacts, all identical, with full `deployedBytecode` differing
+on the ten deployable contracts only through the metadata hash. Gates on the rebased tree: `make check`
+green (nine lanes, 0 failures), `make fork-sovryn` 447 passed / 30 skipped / 0 failed, `make fork-tropykus`
+440 passed / 34 skipped / 0 failed. Each fork lane has three fewer tests than the earlier run because the
+R84 rework deleted its gas harness and the `getRouteInfo` tests.
+
 ## Success criteria
 
 - [x] `AGENTS.md` states the delimiter rule.
