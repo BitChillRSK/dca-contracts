@@ -51,6 +51,8 @@ contract StubLendingHandler is IERC165, ITokenHandler, ITokenLending, IPurchaseR
 
     function batchBuyRbtc(address[] memory, uint64[] memory, uint256[] memory, uint256) external override {}
 
+    function restoreLendingApproval() external override {}
+
     function withdrawAccumulatedRbtc(address) external override {}
 
     function getAccumulatedRbtcBalance(address) external pure override returns (uint256) {
