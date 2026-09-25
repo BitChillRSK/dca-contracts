@@ -195,11 +195,17 @@ Moving the grant into the constructor made it a **one-shot**: if anything outsid
 standing allowance, nothing in the contract grants it again, and the affected path stays dead. Handlers
 are not upgradeable and hold no owner-side approval lever.
 
-It is reachable rather than theoretical: USDRIF and USDT0 are both upgradeable proxies (EIP-1967
-implementation slots read on mainnet), so the token, not BitChill, decides what happens to an allowance.
+Nothing here can rule it out: USDRIF and USDT0 are both upgradeable proxies (EIP-1967 implementation
+slots read on mainnet), so whether an allowance survives is the token issuer's decision, not BitChill's.
+No token has done it, and none is expected to — the claim is that the handlers have no answer if one
+does, not that one will.
 
-`StablecoinSource` therefore carries one unpermissioned external function, `restoreStandingApprovals()`,
-which re-grants `max` to every spender the constructor chose. It is safe to leave unpermissioned because
+`StablecoinSource` therefore implements one unpermissioned external function,
+`restoreStandingApprovals()`, which re-grants `max` to every spender the constructor chose. It is
+declared on its own interface, `IStandingApprovals`, because the caller-facing rules belong to the
+surface a script or an operator calls through, and an abstract base is not one. It is not advertised
+through ERC-165: only `ITokenHandler` and `ITokenLending` are, because `OperationsAdmin` routes on them,
+and nothing queries this one. It is safe to leave unpermissioned because
 it takes no arguments and reads no storage a caller controls: it restores the same allowance to the same
 **immutable** spenders, so it can widen nothing and name nobody new, and calling it repeatedly is
 indistinguishable from calling it once.
@@ -271,6 +277,7 @@ its own item if it is ever wanted.
 
 - `src/PurchaseUniswap.sol`
 - `src/LendingErc20Handler.sol`
+- `src/StablecoinSource.sol` and `src/interfaces/IStandingApprovals.sol` (the restore and its surface)
 - `src/sovryn/SovrynErc20Handler.sol`, `src/layerbank/LayerBankErc20Handler.sol`,
   `src/tropykus-legacy/TropykusErc20Handler.sol` (the constructor call to the approval helper)
 - the Dex / lending leaf headers that gain the standing-approval `@dev` line

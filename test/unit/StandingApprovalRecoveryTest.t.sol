@@ -3,6 +3,7 @@ pragma solidity 0.8.36;
 
 import {Test} from "forge-std/Test.sol";
 import {SovrynDocHandlerMoc} from "src/sovryn/SovrynDocHandlerMoc.sol";
+import {IdleDocHandlerMoc} from "src/idle/IdleDocHandlerMoc.sol";
 import {SovrynErc20HandlerDex} from "src/sovryn/SovrynErc20HandlerDex.sol";
 import {IdleErc20HandlerDex} from "src/idle/IdleErc20HandlerDex.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
@@ -25,8 +26,9 @@ import "test/Constants.sol";
  * @notice R83: that a standing approval cleared from outside the handler is recoverable by anyone, and
  *         that the callback shape keeping the lending allowance out of reach is still absent.
  * @dev The grants are made only in the constructor, so without `restoreStandingApprovals` a cleared
- *      allowance would be terminal on a handler that cannot be upgraded. It is reachable: two of the
- *      three shipped stablecoins sit behind upgradeable proxies.
+ *      allowance would be terminal on a handler that cannot be upgraded. Nothing here can rule that
+ *      out: two of the three shipped stablecoins sit behind upgradeable proxies, so whether an
+ *      allowance survives is the token issuer's decision.
  *      Runs on every lane — it builds its own handlers and never reads the lane env. `dcaManager` is
  *      this test contract, so the `onlyDcaManager` entry points are callable directly.
  */
@@ -52,6 +54,9 @@ contract StandingApprovalRecoveryTest is Test {
     /// @dev The only shipped shape that holds both halves at once, so one call has two spenders to fix.
     MockIsusdToken internal bothHalvesISusd;
     SovrynErc20HandlerDex internal bothHalvesHandler;
+
+    /// @dev The one shipped shape that approves nobody, where the call is a no-op on both halves.
+    IdleDocHandlerMoc internal noApprovalHandler;
 
     function setUp() public {
         docToken = new MockDecrementingStablecoin(address(this));
@@ -97,11 +102,16 @@ contract StandingApprovalRecoveryTest is Test {
             address(this)
         );
 
+        noApprovalHandler = new IdleDocHandlerMoc(
+            address(this), address(docToken), FEE_COLLECTOR, address(mocProxy), _feeSettings(), address(this)
+        );
+
         docToken.mint(USER, 20 * DEPOSIT_AMOUNT);
         vm.startPrank(USER);
         docToken.approve(address(handler), type(uint256).max);
         docToken.approve(address(dexHandler), type(uint256).max);
         docToken.approve(address(bothHalvesHandler), type(uint256).max);
+        docToken.approve(address(noApprovalHandler), type(uint256).max);
         vm.stopPrank();
     }
 
@@ -128,8 +138,7 @@ contract StandingApprovalRecoveryTest is Test {
         vm.prank(address(handler));
         docToken.approve(address(iSusdToken), 0);
 
-        (bool deposited,) =
-            address(handler).call(abi.encodeCall(handler.depositToken, (USER, DEPOSIT_AMOUNT)));
+        (bool deposited,) = address(handler).call(abi.encodeCall(handler.depositToken, (USER, DEPOSIT_AMOUNT)));
         assertFalse(deposited, "a cleared allowance should stop the deposit, not pass silently");
 
         vm.prank(STRANGER);
@@ -155,11 +164,8 @@ contract StandingApprovalRecoveryTest is Test {
         vm.prank(address(dexHandler));
         docToken.approve(address(router), 0);
 
-        (bool bought,) = address(dexHandler).call(
-            abi.encodeCall(
-                IPurchaseRbtc.batchBuyRbtc, (_buyers(), _scheduleIds(), _amounts(), 0)
-            )
-        );
+        (bool bought,) = address(dexHandler)
+            .call(abi.encodeCall(IPurchaseRbtc.batchBuyRbtc, (_buyers(), _scheduleIds(), _amounts(), 0)));
         assertFalse(bought, "a cleared allowance should stop the buy, not pass silently");
 
         vm.prank(STRANGER);
@@ -207,6 +213,35 @@ contract StandingApprovalRecoveryTest is Test {
     }
 
     /**
+     * @notice On a leaf that approves nobody, the call succeeds and grants nothing.
+     * @dev Both halves are reached: the funding side holds the stablecoin itself and the MoC route burns
+     *      it, so neither has a spender. The leaf still carries the function, so it must not revert and
+     *      must not invent an approval — including to `address(0)`, which is what an approval made
+     *      before an immutable was assigned would look like.
+     */
+    function test_restoreStandingApprovals_grantsNothingWhereNobodyIsApproved() public {
+        vm.prank(STRANGER);
+        noApprovalHandler.restoreStandingApprovals();
+
+        assertEq(
+            docToken.allowance(address(noApprovalHandler), address(mocProxy)),
+            0,
+            "the MoC route should hold no allowance"
+        );
+        assertEq(
+            docToken.allowance(address(noApprovalHandler), address(0)), 0, "an approval was granted to the zero address"
+        );
+
+        // Still a working handler afterwards, so the assertions above are not about a dead contract.
+        noApprovalHandler.depositToken(USER, DEPOSIT_AMOUNT);
+        assertEq(
+            docToken.balanceOf(address(noApprovalHandler)),
+            DEPOSIT_AMOUNT,
+            "the idle handler should hold the deposit itself"
+        );
+    }
+
+    /**
      * @notice A lending handler answers no flash-loan callback, which is what bounds its standing
      *         allowance to its own deposits.
      * @dev Aave-style pools repay a flash loan from the caller-named `receiverAddress`, so an approver
@@ -214,16 +249,17 @@ contract StandingApprovalRecoveryTest is Test {
      *      `fallback` is the precondition the leaf headers carry.
      */
     function test_handlerAnswersNoFlashLoanCallback() public {
-        (bool answered,) = address(handler).call(
-            abi.encodeWithSignature(
-                "executeOperation(address,uint256,uint256,address,bytes)",
-                address(docToken),
-                DEPOSIT_AMOUNT,
-                0,
-                address(this),
-                ""
-            )
-        );
+        (bool answered,) = address(handler)
+            .call(
+                abi.encodeWithSignature(
+                    "executeOperation(address,uint256,uint256,address,bytes)",
+                    address(docToken),
+                    DEPOSIT_AMOUNT,
+                    0,
+                    address(this),
+                    ""
+                )
+            );
         assertFalse(answered, "the handler answered a flash-loan callback");
 
         // Nor does it accept unknown calldata through a fallback, which would decode as a false return.

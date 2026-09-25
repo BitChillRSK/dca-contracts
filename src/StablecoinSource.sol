@@ -2,6 +2,7 @@
 pragma solidity 0.8.36;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IStandingApprovals} from "src/interfaces/IStandingApprovals.sol";
 
 /**
  * @title StablecoinSource
@@ -11,20 +12,14 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  *      Declaring the seam once lets the six leaves drop forwarding resolvers, and keeps the
  *      token the purchase reports as spent tied to the token the handler actually holds.
  *      It is also the only base both the lending side and the purchase side inherit, so the
- *      standing-approval restore that spans them is declared here.
+ *      standing-approval restore that spans them is implemented here.
  */
-abstract contract StablecoinSource {
+abstract contract StablecoinSource is IStandingApprovals {
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @notice Re-grant every standing approval this handler was given at construction.
-     * @dev Unpermissioned, and safe to be: it restores the same unbounded allowance to the same
-     *      immutable spenders the constructor already chose, so it can widen nothing and name nobody
-     *      new. Needed because those grants are made only at construction: were an allowance cleared
-     *      from outside, the path would otherwise stay dead on a handler that cannot be upgraded.
-     */
+    /// @inheritdoc IStandingApprovals
     function restoreStandingApprovals() external {
         _grantFundingApprovals();
         _grantPurchaseApprovals();

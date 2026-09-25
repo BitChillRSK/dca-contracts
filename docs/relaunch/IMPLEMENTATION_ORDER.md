@@ -1166,9 +1166,10 @@ custodies the whole position, leaving only transient deposit-time stablecoin and
 
 Shipped: `LendingErc20Handler._approveLendingSpender()` called as the last statement of the Sovryn,
 LayerBank, and Tropykus constructors; `PurchaseUniswap`'s constructor approves the router. Neither
-runtime path reads or writes an allowance any more. Because a constructor grant is one-shot, and two of
-the three shipped stablecoins are upgradeable proxies that could clear one, `StablecoinSource` carries an
-unpermissioned `restoreStandingApprovals()` that re-grants `max` to the constructor's own immutable
+runtime path reads or writes an allowance any more. Because a constructor grant is one-shot, and nothing
+here can rule out a clearing — two of the three shipped stablecoins are upgradeable proxies, so whether
+an allowance survives is the issuer's decision — `StablecoinSource` carries an unpermissioned
+`restoreStandingApprovals()` (declared on `IStandingApprovals`) that re-grants `max` to the constructor's own immutable
 spenders — the only new ABI, and the only way back from a cleared allowance on a handler that cannot be
 upgraded. Live decrement facts: USDRIF preserves a `max` allowance (saving ~10,400 per use), DOC and
 USDT0 decrement it (~5,400). Allowance-slot writes **2 → 0** per deposit; Foundry, execution before

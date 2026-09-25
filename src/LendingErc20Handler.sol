@@ -138,7 +138,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
 
     /**
      * @dev TokenHandler reverts unless the pull matches `depositAmount`, so the mint always uses the full request.
-     *      The pull spends the standing allowance; nothing here reads or writes it.
+     *      The lending protocol's own pull spends the standing allowance; nothing here reads or writes it.
      */
     function _depositToken(address user, uint256 depositAmount) internal virtual override {
         super._depositToken(user, depositAmount);
