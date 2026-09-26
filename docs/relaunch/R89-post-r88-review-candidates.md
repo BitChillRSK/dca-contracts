@@ -1,6 +1,6 @@
 # R89 — implement the post-R88 review candidates
 
-Status: **implemented** · Assigned: yes · Optional/further-review: no
+Status: **review follow-up in progress** · Assigned: yes · Optional/further-review: no
 
 GitHub [#154](https://github.com/BitChillRSK/dca-contracts/pull/154), stacked on R88 ([#153](https://github.com/BitChillRSK/dca-contracts/pull/153)).
 
@@ -56,25 +56,19 @@ One commit per item.
     `uint96` purchase amount, so a sum is below `n · 2⁹⁶`;
   - `amount * feeRate` in `_calculateFeeAtRate`: below `2⁹⁶ · MAX_FEE_RATE_CAP`;
   - the idle `totalWithdrawn` sum: below `n · 2⁹⁶`;
-  - the lending `totalSharesToRedeem` sum: each debit is capped by that user's remaining booked
-    shares, so the total is at most the shares the handler books, which its receipt balance backs.
-    `_measuredProtocolRedeem` would also refuse any total the market did not burn exactly;
   - `totalPurchasedRbtc * plannedNet`: rBTC measured as received is below Rootstock's native supply
-    (about `2⁸⁵` wei, the bound R87 used for `_creditRbtc`), times a `uint96` weight;
-  - `totalStablecoinAmountToSpend * plannedNet`: the pipeline has just proved the handler's balance fell
-    by exactly that amount, so it is at most the stablecoin's supply, times a `uint96` weight. This is
-    the one bound that rests on a token property (supply below `2¹⁶⁰` base units) rather than on our own
-    widths, and it feeds only `RbtcBought.amountSpent`. The review marked it optional; the human chose
-    to include it.
-  Divisions stay as they are: a zero divisor still panics inside `unchecked`.
+    (about `2⁸⁵` wei, the bound R87 used for `_creditRbtc`), times a `uint96` weight.
+  Divisions stay as they are: a zero divisor still panics inside `unchecked`. The first push also made
+  the lending `totalSharesToRedeem` sum and the `amountSpent` product unchecked; review put both back
+  (see **Review follow-up**).
 - [x] **5. Off-purchase-path arithmetic of the same kind runs `unchecked`.** Found while implementing
   item 4, so they get their own commit:
   - `_lockedPrincipal`'s sum: each `tokenBalance` is `uint128`, and a user holds fewer than `2¹⁶`
     schedules per token, because `maxSchedulesPerToken` is a `uint16`;
   - the interest subtractions in `withdrawInterest` and `_accruedInterest`, which run only after the
-    comparison that guards them;
-  - the share credit in `_depositToken`: a user's booked shares are measured mint deltas less exact
-    burns, so they are bounded by the receipt token's supply.
+    comparison that guards them.
+  The first push also made `_depositToken`'s share credit unchecked; it is checked again for the same
+  reason as the lending sum (see **Review follow-up**).
 - [x] **6. `PurchaseUniswap` checks for a zero stablecoin once, in its constructor.** `i_stableToken` is
   immutable, but `_encodePurchasePath` re-checks it on every owner path call, and the constructor has
   to keep path encoding above its `decimals()` read so that check fires first. Check at the top of the
@@ -120,8 +114,40 @@ One commit per item.
   so it measures each lane's script-deployed handler. It pins per-slot read counts for items 1–3 and
   logs the lane's 10-row batch for item 4. Add bound tests to the suites that already own each harness:
   `FeeHandlerTest` for the fee loops, `IdleErc20HandlerTest` for the idle sum, and `PurchaseRbtcTest`
-  for both allocation products. Each drives its block to the stated bound and compares it with
+  for the rBTC allocation product. Each drives its block to the stated bound and compares it with
   full-width arithmetic.
+- [ ] **11. `assignTokenHandler` reads the route class once.** It reads `s_routeClass[route]` for the
+  registration check and again for the lending/idle split. The `supportsInterface` calls between them
+  keep `via_ir` from merging the two, so the second is a real `SLOAD` (200 on Rootstock). Load it into a
+  local once. The checks and their order do not change. Found in review.
+- [ ] **12. Two widening adds in `DcaManager` run `unchecked`.** Both overflow checks survive `via_ir`
+  and can never fire. Found in review.
+  - `uint256(settings.scheduleNonce) + 1` in `createDcaSchedule` adds one to a widened `uint64`. The
+    `toUint64()` around it stays, so nonce exhaustion still reverts (R50).
+  - `block.number + PROTECTED_PURCHASE_WINDOW_BLOCKS` in `activateProtectedPurchaseWindow` adds 5 to a
+    block height.
+
+## Review follow-up (2026-09-26)
+
+An external review of the first push raised four points. All four are accepted.
+
+1. **The `amountSpent` product is checked again.** Its bound was the stablecoin's supply being below
+   `2¹⁶⁰` base units, which no code enforces for a stablecoin listed later. A wrap would publish a
+   wrong `RbtcBought.amountSpent` without failing, and the check costs tens of gas per row. The rBTC
+   product stays unchecked: Rootstock's native supply is a hard bound.
+2. **The lending `totalSharesToRedeem` sum is checked again, and so is `_depositToken`'s share credit.**
+   - The review corrected this spec: an exact-burn check would not catch a wrapped total, because the
+     market would be asked to burn the wrapped value and would burn exactly that.
+   - The real bound on both is that booked shares sum to measured receipt-token mints less exact
+     burns, so the handler's receipt balance backs them. That rests on the lending market's receipt
+     token behaving. This spec already refuses `unchecked` math on market-derived values (see
+     **Considered, not implemented**): a market that malfunctions must revert, not wrap.
+   - The review named only the batch sum. The deposit credit rests on the same backing, so it goes
+     back too.
+3. **Two missed candidates are implemented** as items 11 and 12. The review's cached route class and
+   two `unchecked` widening adds each remove a check or read that can never matter.
+4. **A duplicated `@dev` line in `PurchaseRbtcTest.t.sol`**, introduced by item 10's test commit, is
+   removed.
 
 ## Results (2026-09-26)
 
@@ -215,6 +241,8 @@ ends at 13,077 bytes under `deploy`, far below EIP-170.
 | `unchecked` exchange-rate and oracle arithmetic (`TokenLending` share conversions, LayerBank's ray division, the Uniswap oracle floor) | Would save a check per call | These inputs come from a market or an oracle. If a market malfunctions it must revert, not wrap, and this repo controls no bound on them. |
 | `unchecked` balance deltas that can fall (`TokenHandler` deposit/withdraw, `_measuredProtocolRedeem`'s cash delta, the Uniswap WRBTC delta) | Would save a check per call | The checked subtraction is what refuses a balance that fell across the call. Where a guard already exists (MoC's native delta, the exact-consumption comparisons), the subtraction is already `unchecked`. |
 | `unchecked` `requested +=` in the lending zero-cash path | Runs only on a path that reverts | Saves nothing. |
+| `unchecked` `amountSpent` product (shipped in the first push, reverted) | Tens of gas per row | Its bound is a stablecoin supply below `2¹⁶⁰`, which nothing enforces for a later listing, and a wrap would publish a wrong event field silently. |
+| `unchecked` lending `totalSharesToRedeem` sum and `_depositToken` share credit (shipped in the first push, reverted) | Tens of gas per row or deposit | Their bound is that the market's receipt token backs the booked shares. That is a market property, and a malfunctioning market must revert, not wrap. |
 
 ### Already decided (not reopened)
 
@@ -240,13 +268,13 @@ ends at 13,077 bytes under `deploy`, far below EIP-170.
 
 ## Files likely touched
 
-- `src/DcaManager.sol` (items 1, 3, 5)
+- `src/DcaManager.sol` (items 1, 3, 5, 12)
 - `src/LendingErc20Handler.sol` (items 2, 4, 5)
 - `src/FeeHandler.sol` (item 4)
 - `src/idle/IdleErc20Handler.sol` (item 4)
 - `src/PurchaseRbtc.sol` (items 4, 8)
 - `src/PurchaseUniswap.sol`, `src/interfaces/IPurchaseUniswap.sol` (item 6)
-- `src/OperationsAdmin.sol`, `src/interfaces/IOperationsAdmin.sol`, `src/interfaces/IStablecoinSource.sol`
+- `src/OperationsAdmin.sol` (items 7, 11), `src/interfaces/IOperationsAdmin.sol`, `src/interfaces/IStablecoinSource.sol`
   (new), `src/interfaces/ITokenHandler.sol`, `src/interfaces/IPurchaseRbtc.sol`, `src/StablecoinSource.sol`
   (item 7)
 - `src/interfaces/IDcaManager.sol` (item 8)
@@ -270,19 +298,22 @@ ends at 13,077 bytes under `deploy`, far below EIP-170.
 - Item 7: a mismatched stablecoin reverts with the new error, and a handler with no `i_stableToken()`
   still reverts. The error-precedence tests keep their order: code, class, and ERC-165 checks fire first.
 - Item 6: `PurchaseUniswapZeroTokenTest` still expects `PurchaseUniswap__ZeroPurchaseToken`.
-- Item 4: bound tests at `type(uint96).max` amounts, the 500 bps cap, rBTC at `2⁸⁵`, and a delivered
-  stablecoin total of `2¹⁶⁰ − 1`, each checked against full-width arithmetic (`Math.mulDiv` for the
-  products).
+- Item 4: bound tests at `type(uint96).max` amounts, the 500 bps cap, and rBTC at `2⁸⁵`, each checked
+  against full-width arithmetic (`Math.mulDiv` for the rBTC product).
+- Item 11: a read-count pin on `s_routeClass[route]` during `assignTokenHandler`, on every lane.
+- Item 12: the existing nonce-cap test still reverts at `type(uint64).max`, and the protected-window
+  tests pass unchanged.
 - No fork-specific assertions are added.
 
 ## Success criteria
 
-- [x] Items 1–10 are implemented, one commit each, and nothing from **Out of scope** ships.
-- [x] Read-count pins show items 1–3 removing the reads listed under **Results**, on both profiles.
-- [x] Every `unchecked` block states its bound in a source comment. The item 4 blocks that rest on a width
-  or a supply (the fee loops, the idle sum, both allocation products) are tested at that bound against
-  full-width arithmetic. The lending sum is also re-checked at run time, because the market must burn
-  exactly that total, and item 5's subtractions sit behind the comparison that guards them.
+- [ ] Items 1–12 are implemented, one commit each, and nothing from **Out of scope** ships.
+- [ ] Read-count pins show items 1–3 and 11 removing the reads listed under **Results**, on both
+  profiles.
+- [ ] Every `unchecked` block states its bound in a source comment. The item 4 blocks that rest on a width
+  or a supply (the fee loops, the idle sum, the rBTC allocation product) are tested at that bound
+  against full-width arithmetic. Item 5's subtractions sit behind the comparison that guards them. No
+  `unchecked` block rests on a lending market's or a stablecoin's behavior.
 - [x] No selector, event, or storage-layout change; one new `OperationsAdmin` custom error.
 - [x] Every figure under **Results** names its schedule (Foundry or Rootstock) and its profile.
 
