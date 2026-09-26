@@ -76,7 +76,8 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
     function assignTokenHandler(address token, uint256 routeIndex, address handler) external onlyOwner {
         uint32 route = routeIndex.toUint32();
         if (handler.code.length == 0) revert OperationsAdmin__EoaCannotBeHandler(handler);
-        if (s_routeClass[route] == RouteClass.Unregistered) {
+        RouteClass routeClass = s_routeClass[route];
+        if (routeClass == RouteClass.Unregistered) {
             revert OperationsAdmin__RouteNotRegistered(routeIndex);
         }
         if (s_tokenRoute[token][route].handler != address(0)) {
@@ -89,7 +90,7 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
             revert OperationsAdmin__ContractIsNotTokenHandler(handler);
         }
 
-        bool isLending = s_routeClass[route] == RouteClass.Lending;
+        bool isLending = routeClass == RouteClass.Lending;
         bool supportsLending = tokenHandler.supportsInterface(type(ITokenLending).interfaceId);
         if (isLending) {
             if (!supportsLending) revert OperationsAdmin__ContractIsNotTokenLending(handler);
