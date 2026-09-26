@@ -27,7 +27,7 @@ contract PurchaseRbtcTest is Test {
     event PurchaseRbtc__SuccessfulRbtcBatchPurchase(
         address indexed token, uint256 totalPurchasedRbtc, uint256 totalStablecoinAmountSpent
     );
-    event FeeHandler__FeeTransferred(address indexed token, address indexed collector, uint256 amount);
+    event Transfer(address indexed from, address indexed to, uint256 value);
 
     uint16 internal constant FLAT_FEE_RATE = 100; // 1%
     uint256 internal constant BPS_DENOMINATOR = 10_000;
@@ -94,8 +94,8 @@ contract PurchaseRbtcTest is Test {
         uint256 fee = _fee(requested);
         uint256 net = requested - fee;
 
-        vm.expectEmit(true, true, false, true, address(harness));
-        emit FeeHandler__FeeTransferred(address(token), feeCollector, fee);
+        vm.expectEmit(true, true, false, true, address(token));
+        emit Transfer(address(harness), feeCollector, fee);
         vm.expectEmit(true, true, true, true, address(harness));
         emit PurchaseRbtc__RbtcBought(buyerA, address(token), RBTC_OUT, scheduleA, net);
         vm.expectEmit(true, true, true, true, address(harness));
@@ -106,7 +106,7 @@ contract PurchaseRbtcTest is Test {
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), RBTC_OUT);
     }
 
-    function test_lengthOneBatch_zeroFeeDoesNotEmitFeeTransferred() public {
+    function test_lengthOneBatch_zeroFeeDoesNotTransferToCollector() public {
         harness.setFeeRateParams(0, 0, 1000 ether, 100_000 ether);
         uint256 requested = 100 ether;
 
@@ -114,9 +114,12 @@ contract PurchaseRbtcTest is Test {
         harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested), NO_MIN_RBTC_OUT);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 sig = FeeHandler__FeeTransferred.selector;
+        bytes32 sig = Transfer.selector;
         for (uint256 i; i < logs.length; ++i) {
-            assertTrue(logs[i].topics[0] != sig, "FeeTransferred emitted on a zero-fee purchase");
+            if (logs[i].topics[0] != sig) continue;
+            if (logs[i].emitter != address(token)) continue;
+            if (address(uint160(uint256(logs[i].topics[2]))) != feeCollector) continue;
+            revert("collector Transfer emitted on a zero-fee purchase");
         }
         assertEq(token.balanceOf(feeCollector), 0);
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), RBTC_OUT);
