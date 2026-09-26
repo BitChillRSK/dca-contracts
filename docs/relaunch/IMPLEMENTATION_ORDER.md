@@ -1227,15 +1227,19 @@ The same PR records the six purchase-path candidates the human deferred on 2026-
 ### R87 - consider the deferred gas candidates ([spec](./R87-deferred-gas-candidates.md))
 
 After R86 and before relaunch deploy. The six candidates in
-[the gas audit's deferred record](./ROOTSTOCK-GAS-AUDIT.md#deferred-candidates-2026-09-25) are
-measured on Rootstock first, on both profiles. For `optimizer_runs`, that includes the R81 packed-write
-check with the helpers as they are and inlined. The human then decides each one.
+[the gas audit's deferred record](./ROOTSTOCK-GAS-AUDIT.md#deferred-candidates-2026-09-25) receive
+Rootstock decision figures first. The verdict run used the shipping deploy profile; because its throwaway
+harness was not retained, the implementation PR must retain reproducible evidence, measure both profiles,
+and re-record the conversions. For `optimizer_runs`, that includes the R81 packed-write check with the
+helpers as they are and inlined. The human then decides each one.
 
-Approved candidates ship in one PR, one commit each. If none is approved, R87 opens no branch and no
-PR. Ask: the six verdicts, all at once, after measuring.
+The verdicts are recorded in a docs-only PR. Approved candidates ship in a follow-up R87 implementation
+PR, one commit each. Ask: the six verdicts, all at once, after measuring.
 
 **Decided 2026-09-26** ([verdicts](./R87-deferred-gas-candidates.md#verdicts-2026-09-26)): remove the
-idle ledger, drop `FeeHandler__FeeTransferred`, and add an `unchecked` credit in `_creditRbtc`. Every
+idle ledger after its per-user ghost, aggregate solvency, enumeration, cross-user, and transition-coverage
+proofs pass; drop `FeeHandler__FeeTransferred` and monitor the stablecoin's standard `Transfer`; and add
+an `unchecked` credit in `_creditRbtc` under the explicit received-rBTC and native-supply bound. Every
 other candidate, and assembly in the purchase path, is closed.
 
 ## Closed non-implementation decisions

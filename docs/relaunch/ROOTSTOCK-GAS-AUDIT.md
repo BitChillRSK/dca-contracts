@@ -136,10 +136,11 @@ The review produced seven candidates:
 
 Figures are Rootstock gas, estimated from source; none of the six has been measured.
 
-**Decided 2026-09-26.** R87 measured all six; the verdicts and measured figures are in
+**Decided 2026-09-26.** R87 measured the candidates; the verdicts, proof obligations, and figures are in
 [R87 § Verdicts](./R87-deferred-gas-candidates.md#verdicts-2026-09-26). Approved: remove the idle ledger
-and drop `FeeHandler__FeeTransferred`. Kept as they are: event fields and `optimizer_runs` 200. Rejected:
-the fee sweep and balance reuse. The estimates below are kept as the record the decision started from.
+after the stronger accounting proof passes, drop `FeeHandler__FeeTransferred`, and add the bounded
+`unchecked` credit. Kept as they are: event fields and `optimizer_runs` 200. Rejected: the fee sweep and
+balance reuse. The estimates below are kept as the record the decision started from.
 
 - **Remove `IdleErc20Handler.s_idleBalances`.** This is the only candidate above about 2% of a batch.
   - **Saving:**
@@ -147,12 +148,17 @@ the fee sweep and balance reuse. The estimates below are kept as the record the 
       MoC batch, and more on Dex.
     - Users: about 5.2k per idle deposit or withdrawal, and about 20k on a first deposit.
   - **Why it waits:**
-    - It can never disagree with `DcaManager`: deposits, purchases and withdrawals move both by the
-      same amount, and route bindings are add-only. So the saving costs no accuracy.
-    - What it does cost is the one limit an idle handler enforces on its own. If `DcaManager` ever
+    - It is correlated shadow state: deposits, purchases and withdrawals move it from the same
+      DcaManager-supplied user and amount as the schedule liability, and route bindings are add-only.
+      It can expose a DcaManager over-debit, but it is not an independent reconciliation source.
+    - Removing it costs the one limit an idle handler enforces on its own. If `DcaManager` ever
       overstated a schedule's balance, the ledger still stops that user at their own deposits.
       Without it, an idle handler spends whatever it is told from the pooled balance, in contracts
       with no upgrade and no pause.
+    - That containment is incomplete on withdrawal and deletion: DcaManager deducts the requested
+      liability and ignores the clamped amount the handler returns, so a mismatch can underpay the user
+      and destroy the remainder of the claim. R87 accepts that residual risk only behind its stronger
+      per-user, aggregate, enumeration, cross-user, and transition-coverage proof gate.
     - It also gives every handler the same rule, "no user takes out more than they put in". Lending
       handlers must keep `s_shares` anyway, so an auditor can check that rule handler by handler.
   - **Money:** about $0.13 per 10-row batch, or about $20 a year across three weekly idle routes.
