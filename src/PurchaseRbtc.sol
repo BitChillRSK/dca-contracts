@@ -177,8 +177,8 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
 
     /**
      * @dev Encode and store a positive rBTC credit. Live slots hold `claimable + 1`.
-     *      The add is unchecked: credits are shares of rBTC this handler measured receiving, and
-     *      what users accumulate is tiny next to `type(uint256).max`.
+     *      The add is unchecked: credits are shares of rBTC this handler measured receiving,
+     *      which are tiny compared to `type(uint256).max`.
      */
     function _creditRbtc(address buyer, uint256 amount) private {
         uint256 stored = s_usersAccumulatedRbtc[buyer];
