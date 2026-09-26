@@ -150,6 +150,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R86 | after R79, before relaunch deploy | none (`calldata` for the purchase batch arrays, decided 2026-09-25; path setters kept `memory` 2026-09-26; six deferred gas candidates recorded in the gas audit) |
 | R87 | after R86, before relaunch deploy | **one verdict per deferred gas candidate, after measurement** (idle ledger, purchase-row event fields, fee sweep, `FeeTransferred`, balance reuse, `optimizer_runs`); no PR if none is approved |
 | R88 | after R87, before relaunch deploy if either Solidity candidate ships | **decided 2026-09-26:** reject shared scale declaration; **inline** LayerBank `_normalizedIncome` (source-only); cheatcode rename waits for an independently justified `forge-std` upgrade |
+| R89 | after R88, before relaunch deploy | **decided 2026-09-26:** implement every post-R88 review candidate (redundant reads, bounded `unchecked`, Dex constructor zero-token check, handler/token match on assignment, stale NatSpec, stray `IStablecoin`); record the rejected ones |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1253,6 +1254,15 @@ would change the getter ABI or leave a duplicate public name); **inline** LayerB
 deploy size-neutral, not a shipped gas claim); keep the R87 gas-test `snapshot` / `revertTo` warning
 until an independently justified compatible `forge-std` upgrade exposes `snapshotState` /
 `revertToState`.
+
+### R89 - implement the post-R88 review candidates ([spec](./R89-post-r88-review-candidates.md))
+
+After R88 and before relaunch deploy. A whole-protocol review, excluding `tropykus-legacy`, measured on
+the `deploy` profile with per-slot read counts, turned up redundant reads, compiler checks that cannot
+fire, a stale constructor ordering constraint, a missing handler/token check on assignment, stale idle
+NatSpec, and a stray interface file. **Decided 2026-09-26:** implement all of them, one commit each. The
+spec records every candidate the review weighed and did not ship, with its reason, and lists what earlier
+specs already decided. Ask: none.
 
 ## Closed non-implementation decisions
 
