@@ -9,6 +9,7 @@ import {StablecoinSource} from "src/StablecoinSource.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
 
 /**
@@ -32,6 +33,10 @@ contract PurchaseRbtcTest is Test {
     uint16 internal constant FLAT_FEE_RATE = 100; // 1%
     uint256 internal constant BPS_DENOMINATOR = 10_000;
     uint256 internal constant RBTC_OUT = 1 ether;
+    /// @dev Above Rootstock's whole native supply (21M rBTC is about 2^84.1 wei).
+    uint256 internal constant BOUND_RBTC_OUT = 2 ** 85;
+    /// @dev The stablecoin-supply bound the `amountSpent` product rests on.
+    uint256 internal constant BOUND_DELIVERED = 2 ** 160 - 1;
 
     address internal buyerA = address(0xA11CE);
     address internal buyerB = address(0xB0B);
@@ -56,7 +61,64 @@ contract PurchaseRbtcTest is Test {
         harness.setRbtcOut(RBTC_OUT);
     }
 
-    /// @dev R39 removed `buyRbtc`; a length-1 batch is the one-schedule path. The batch charges the fee
+    /// @dev Both allocation products run unchecked. Drive them to the bounds the source states: uint96
+    ///      weights, rBTC at 2^85 (above Rootstock's whole native supply), and a delivered stablecoin total
+    ///      just under 2^160 base units. Every row's credit and `amountSpent` must match full-width mulDiv.
+    function test_allocationProducts_matchFullWidthAtTheirBounds() public {
+        harness.setRbtcOut(BOUND_RBTC_OUT);
+        harness.setRetrieveOverride(BOUND_DELIVERED);
+        token.mint(address(harness), BOUND_DELIVERED);
+        (address[] memory buyers, uint64[] memory ids, uint256[] memory amounts) = _uint96BoundBatch(8);
+
+        vm.recordLogs();
+        harness.batchBuyRbtc(buyers, ids, amounts, NO_MIN_RBTC_OUT);
+        _assertRowsMatchFullWidth(vm.getRecordedLogs(), buyers, amounts);
+    }
+
+    function _uint96BoundBatch(uint256 rows)
+        private
+        pure
+        returns (address[] memory buyers, uint64[] memory ids, uint256[] memory amounts)
+    {
+        buyers = new address[](rows);
+        ids = new uint64[](rows);
+        amounts = new uint256[](rows);
+        for (uint256 i; i < rows; ++i) {
+            buyers[i] = address(uint160(0x1000 + i));
+            ids[i] = uint64(i + 1);
+            amounts[i] = uint256(type(uint96).max) - i;
+        }
+    }
+
+    function _assertRowsMatchFullWidth(Vm.Log[] memory logs, address[] memory buyers, uint256[] memory amounts)
+        private
+    {
+        uint256 totalFee;
+        uint256 totalNet;
+        for (uint256 i; i < amounts.length; ++i) {
+            totalFee += _fee(amounts[i]);
+            totalNet += amounts[i] - _fee(amounts[i]);
+        }
+        uint256 spent = BOUND_DELIVERED - totalFee;
+        uint256 row;
+        for (uint256 j; j < logs.length; ++j) {
+            if (logs[j].topics[0] != PurchaseRbtc__RbtcBought.selector) continue;
+            _assertRowMatchesFullWidth(logs[j], buyers[row], amounts[row] - _fee(amounts[row]), totalNet, spent);
+            ++row;
+        }
+        assertEq(row, buyers.length, "one RbtcBought per row");
+    }
+
+    function _assertRowMatchesFullWidth(Vm.Log memory log, address buyer, uint256 net, uint256 totalNet, uint256 spent)
+        private
+    {
+        (uint256 rbtcBought, uint256 amountSpent) = abi.decode(log.data, (uint256, uint256));
+        assertEq(rbtcBought, Math.mulDiv(BOUND_RBTC_OUT, net, totalNet), "row rBTC");
+        assertEq(amountSpent, Math.mulDiv(spent, net, totalNet), "row amountSpent");
+        assertEq(harness.getAccumulatedRbtcBalance(buyer), rbtcBought, "credited rBTC");
+    }
+
+    /// @dev R39 removed `buyRbtc`; a length-1 batch is the one-schedule path.    /// @dev R39 removed `buyRbtc`; a length-1 batch is the one-schedule path. The batch charges the fee
     ///      on the planned amount, so a short retrieval eats into the net spend rather than the fee.
     function test_lengthOneBatch_usesActualRetrievedWhenBelowRequest() public {
         uint256 requested = 100 ether;
