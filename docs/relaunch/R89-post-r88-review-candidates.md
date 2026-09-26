@@ -2,6 +2,8 @@
 
 Status: **implemented** · Assigned: yes · Optional/further-review: no
 
+GitHub [#154](https://github.com/BitChillRSK/dca-contracts/pull/154), stacked on R88 ([#153](https://github.com/BitChillRSK/dca-contracts/pull/153)).
+
 ## Objective
 
 Ship the gas and code-quality improvements found by a whole-protocol review after R88, and record every
