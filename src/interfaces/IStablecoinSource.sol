@@ -7,10 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  * @title IStablecoinSource
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice The stablecoin a handler is built for.
- * @dev Declared once, here, for both halves of a handler: `ITokenHandler` (deposit and withdraw) and
- *      `IPurchaseRbtc` (purchases) extend it, and `StablecoinSource` answers it with one public immutable.
- *      A public state variable can override only a single declaration, so neither half declares the
- *      getter itself.
+ * @dev `ITokenHandler` and `IPurchaseRbtc` both extend this, so one public immutable answers both.
  */
 interface IStablecoinSource {
     /*//////////////////////////////////////////////////////////////
