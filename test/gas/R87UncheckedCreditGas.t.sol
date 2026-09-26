@@ -13,7 +13,8 @@ import {Test, console2} from "forge-std/Test.sol";
  *
  *      Isolates the add inside `_creditRbtc` (live encoding `claimable + 1`). Warm re-credit onto a
  *      nonzero slot is the production case. Foundry saving is tens of gas; Rootstock compute for the
- *      same arithmetic is in that ballpark. The overflow bound is Rootstock native supply (~2^85 wei).
+ *      same arithmetic is in that ballpark. Overflow is impossible: user accumulations stay tiny next
+ *      to `type(uint256).max`.
  */
 contract R87UncheckedCreditGasTest is Test {
     uint256 internal constant AMOUNT = 1 ether;
