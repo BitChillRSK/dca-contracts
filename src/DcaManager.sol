@@ -137,7 +137,11 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
 
         // One load of the packed scalars, and the id this schedule will carry.
         ProtocolSettings memory settings = s_protocolSettings;
-        uint64 scheduleId = (uint256(settings.scheduleNonce) + 1).toUint64();
+        uint64 scheduleId;
+        // A widened uint64 plus one cannot overflow; `toUint64` still reverts once the nonce is exhausted.
+        unchecked {
+            scheduleId = (uint256(settings.scheduleNonce) + 1).toUint64();
+        }
 
         _validatePurchasePeriod(purchasePeriod, settings.minPurchasePeriod);
         _validateDeposit(depositAmount);
@@ -354,7 +358,10 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
             revert DcaManager__ProtectedPurchaseWindowStillActive(userMutationsAllowedFromBlock);
         }
 
-        userMutationsAllowedFromBlock = block.number + PROTECTED_PURCHASE_WINDOW_BLOCKS;
+        // A block height cannot come within five of 2^256.
+        unchecked {
+            userMutationsAllowedFromBlock = block.number + PROTECTED_PURCHASE_WINDOW_BLOCKS;
+        }
         s_userMutationsAllowedFromBlock = userMutationsAllowedFromBlock;
         emit DcaManager__ProtectedPurchaseWindowActivated(msg.sender, userMutationsAllowedFromBlock);
     }
