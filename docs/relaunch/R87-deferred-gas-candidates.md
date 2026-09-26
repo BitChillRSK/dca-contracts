@@ -84,7 +84,7 @@ ghost and schedule assertions.
 
 `SafeERC20.safeTransfer` does not emit an event itself; the listed stablecoin emits the standard ERC-20
 `Transfer`. For each successful batch transaction, monitoring filters the stablecoin's `Transfer` by
-`from = handler`, `to = current fee collector`, and `value = aggregate fee`. Handler addresses make the
+`from = handler` and `to = current fee collector`, and reads the aggregate fee from `value`. Handler addresses make the
 signal unambiguous across routes. This decision relies on every listed stablecoin continuing to emit the
 standard event; a token that does not is not compatible with this monitoring replacement.
 
