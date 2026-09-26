@@ -199,8 +199,9 @@ packed-field write, which the gas audit closed.
 
 `via_ir` places code differently for item 2 on the LayerBank Dex leaf (+126), and item 4 more than
 takes it back. Items 8 and 9 leave metadata-stripped runtime and creation code byte-identical on all
-ten deployable contracts, under both profiles. The largest artifact, LayerBank Dex, ends at 13,077
-bytes under `deploy`, far below EIP-170.
+ten deployable contracts, under both profiles. So does item 7's revision, which moved the getter onto
+`IStablecoinSource`: it changes types, not code, so it adds no row. The largest artifact, LayerBank Dex,
+ends at 13,077 bytes under `deploy`, far below EIP-170.
 
 ## Considered, not implemented
 
