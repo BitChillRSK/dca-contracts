@@ -757,13 +757,17 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         tokenLending.withdrawInterest(msg.sender, _lockedPrincipal(msg.sender, token, routeIndex));
     }
 
-    /// @dev Sum locked principal for one user, token, and route without copying the schedule array.
+    /**
+     * @dev Sum locked principal for one user, token, and route. The ids are copied to memory once:
+     *      they pack four to a word, and indexing the storage array would re-read its length and
+     *      the id's word on every iteration.
+     */
     function _lockedPrincipal(address user, address token, uint256 routeIndex)
         private
         view
         returns (uint256 lockedTokenAmount)
     {
-        uint64[] storage scheduleIds = s_scheduleIds[user][token];
+        uint64[] memory scheduleIds = s_scheduleIds[user][token];
         uint256 numOfSchedules = scheduleIds.length;
         for (uint256 i; i < numOfSchedules; ++i) {
             DcaSchedule storage dcaSchedule = s_dcaSchedules[token][scheduleIds[i]];
