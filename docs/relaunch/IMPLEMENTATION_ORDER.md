@@ -1265,10 +1265,15 @@ spec records every candidate the review weighed and did not ship, with its reaso
 specs already decided. Ask: none.
 
 **Implemented** ([results](./R89-post-r88-review-candidates.md#results-2026-09-26)). On the `deploy`
-profile, 10-row batches save 4,140–4,236 gas on Rootstock (compute).
+profile, 10-row batches save 2,853–3,795 gas on Rootstock (compute).
 `withdrawAllAccumulatedInterest` saves about 4,160 at 10 schedules, and each lending withdraw or create
-saves about 190–520. Every handler's runtime shrinks by 93–120 bytes; `DcaManager` grows by 255 and
-`OperationsAdmin` by 111. The only ABI addition is `OperationsAdmin__HandlerTokenMismatch`.
+saves about 210–520. An external review of the first push put three `unchecked` blocks back to checked:
+the `amountSpent` product, whose bound is an unenforced stablecoin supply, and the lending share sum
+and deposit credit, whose bound is the market's receipt token. It also added a cached route class in
+`assignTokenHandler` and two `unchecked` widening adds (spec items 11–12). Runtime size under `deploy`:
+- handlers change by −117 to +40 bytes (LayerBank Dex is a `via_ir` layout effect);
+- `DcaManager` grows by 241 and `OperationsAdmin` by 88.
+The only ABI addition is `OperationsAdmin__HandlerTokenMismatch`.
 
 ## Closed non-implementation decisions
 

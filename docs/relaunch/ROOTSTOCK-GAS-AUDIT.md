@@ -206,20 +206,24 @@ started from. Reproducible Foundry pins live in `test/gas/R87*.t.sol` (run under
 
 ## Post-R88 review (2026-09-26)
 
-A second pass after R88 found three redundant reads the first pass missed. It ran Foundry on the `deploy`
+A second pass after R88 found three redundant reads the first pass missed, and a review of that pass
+found a fourth. It ran Foundry on the `deploy`
 profile and counted reads per slot with `vm.startStateDiffRecording`. The purchase path came out clean:
 under `via_ir` each slot is read once, apart from the slot-0 read-modify-write closed above.
-[R89](./R89-post-r88-review-candidates.md) removes the three reads:
+[R89](./R89-post-r88-review-candidates.md) removes all four:
 
 | # | Finding | Who pays | Path measured | Foundry (`deploy`) | Rootstock |
 |---|---|---|---|---:|---:|
-| 8 | `_lockedPrincipal` indexes the id array in storage, re-reading the length and the id's word every iteration | user, interest paths | `withdrawAllAccumulatedInterest`, 10 schedules | −2,359 | **≈ −4,160** |
-| 9 | `_redeemShares` re-reads the booked shares its callers already loaded | user, lending withdraw and interest | `withdrawToken`, lending | −159 | **≈ −260** |
-| 10 | `_validatePurchasePeriod` re-reads the settings word `createDcaSchedule` already loaded | user, per create | `createDcaSchedule`, lending route | −146 | **≈ −250** |
+| 8 | `_lockedPrincipal` indexes the id array in storage, re-reading the length and the id's word every iteration | user, interest paths | `withdrawAllAccumulatedInterest`, 10 schedules | −2,362 | **≈ −4,160** |
+| 9 | `_redeemShares` re-reads the booked shares its callers already loaded | user, lending withdraw and interest | `withdrawToken`, lending | −162 | **≈ −260** |
+| 10 | `_validatePurchasePeriod` re-reads the settings word `createDcaSchedule` already loaded | user, per create | `createDcaSchedule`, every route | −113 | **≈ −210** |
+| 11 | `assignTokenHandler` re-reads the route class after its `supportsInterface` calls | owner, per assignment | the read alone | −100 | **−200** |
 
-Row 8's path figure includes the booked-shares re-read row 9 removes on the same path. R89 also makes
-purchase-path arithmetic whose bound the code enforces `unchecked`. That saves about 4,150–4,240 per
-10-row batch, all compute, so the saving is the same on Rootstock. Figures, bounds, and the candidates
+Row 8's path figure includes the booked-shares re-read row 9 removes on the same path. Row 11's path
+still costs more than before R89, because R89's handler/token check adds a call into the handler. R89
+also makes purchase-path arithmetic whose bound our own widths enforce `unchecked`. That saves about
+2,850–3,800 per 10-row batch, all compute, so the saving is the same on Rootstock. Sums whose only
+bound is a stablecoin's supply or a lending market's receipt token stay checked. Figures, bounds, and the candidates
 it declined are in the spec. `test/gas/R89ReviewCandidatesGas.t.sol` pins the reads on both profiles.
 
 ## Documentation corrections

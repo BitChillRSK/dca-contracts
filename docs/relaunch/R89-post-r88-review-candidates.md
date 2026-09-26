@@ -1,6 +1,6 @@
 # R89 — implement the post-R88 review candidates
 
-Status: **review follow-up in progress** · Assigned: yes · Optional/further-review: no
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
 GitHub [#154](https://github.com/BitChillRSK/dca-contracts/pull/154), stacked on R88 ([#153](https://github.com/BitChillRSK/dca-contracts/pull/153)).
 
@@ -116,11 +116,11 @@ One commit per item.
   `FeeHandlerTest` for the fee loops, `IdleErc20HandlerTest` for the idle sum, and `PurchaseRbtcTest`
   for the rBTC allocation product. Each drives its block to the stated bound and compares it with
   full-width arithmetic.
-- [ ] **11. `assignTokenHandler` reads the route class once.** It reads `s_routeClass[route]` for the
+- [x] **11. `assignTokenHandler` reads the route class once.** It reads `s_routeClass[route]` for the
   registration check and again for the lending/idle split. The `supportsInterface` calls between them
   keep `via_ir` from merging the two, so the second is a real `SLOAD` (200 on Rootstock). Load it into a
   local once. The checks and their order do not change. Found in review.
-- [ ] **12. Two widening adds in `DcaManager` run `unchecked`.** Both overflow checks survive `via_ir`
+- [x] **12. Two widening adds in `DcaManager` run `unchecked`.** Both overflow checks survive `via_ir`
   and can never fire. Found in review.
   - `uint256(settings.scheduleNonce) + 1` in `createDcaSchedule` adds one to a widened `uint64`. The
     `toUint64()` around it stays, so nonce exhaustion still reverts (R50).
@@ -161,36 +161,53 @@ priced the same on both.
 
 | Path | Lane | Foundry before → after | Foundry Δ | Reads removed | Rootstock Δ |
 |---|---|---:|---:|---:|---:|
-| `batchBuyRbtc`, 10 rows | idle MoC (DOC) | 464,131 → 459,991 | −4,140 | 0 | **−4,140** |
-| | Sovryn MoC (DOC) | 599,021 → 594,785 | −4,236 | 0 | **−4,236** |
-| | LayerBank MoC (DOC) | 608,256 → 604,020 | −4,236 | 0 | **−4,236** |
-| | idle Dex (USDRIF) | 497,263 → 493,090 | −4,173 | 0 | **−4,173** |
-| | LayerBank Dex (USDRIF) | 641,622 → 637,470 | −4,152 | 0 | **−4,152** |
-| `withdrawAllAccumulatedInterest`, one lending pair, 10 schedules | Sovryn MoC | 62,969 → 60,610 | −2,359 | 18 | **≈ −4,160** |
+| `batchBuyRbtc`, 10 rows | idle MoC (DOC) | 464,131 → 460,336 | −3,795 | 0 | **−3,795** |
+| | Sovryn MoC (DOC) | 599,021 → 596,085 | −2,936 | 0 | **−2,936** |
+| | LayerBank MoC (DOC) | 608,256 → 605,320 | −2,936 | 0 | **−2,936** |
+| | idle Dex (USDRIF) | 497,263 → 493,843 | −3,420 | 0 | **−3,420** |
+| | LayerBank Dex (USDRIF) | 641,622 → 638,769 | −2,853 | 0 | **−2,853** |
+| `withdrawAllAccumulatedInterest`, one lending pair, 10 schedules | Sovryn MoC | 62,969 → 60,607 | −2,362 | 18 | **≈ −4,160** |
 | | LayerBank MoC / Dex | 65,744 → 63,382 | −2,362 | 18 | **≈ −4,160** |
-| `withdrawTokenAndInterest`, one schedule | Sovryn MoC | 124,309 → 124,097 | −212 | 3 | **≈ −510** |
+| `withdrawTokenAndInterest`, one schedule | Sovryn MoC | 124,309 → 124,091 | −218 | 3 | **≈ −520** |
 | | LayerBank MoC | 132,341 → 132,123 | −218 | 3 | **≈ −520** |
-| `withdrawToken`, lending | Sovryn MoC | 76,069 → 75,910 | −159 | 1 | **≈ −260** |
+| `withdrawToken`, lending | Sovryn MoC | 76,069 → 75,907 | −162 | 1 | **≈ −260** |
 | | LayerBank MoC | 81,326 → 81,164 | −162 | 1 | **≈ −260** |
-| `createDcaSchedule` | lending routes | 169,934 → 169,788 | −146 | 1 | **≈ −250** |
-| | idle routes | 106,973 → 106,882 | −91 | 1 | **≈ −190** |
+| `createDcaSchedule` | every lane | 169,934 → 169,821 (Sovryn MoC) | −113 | 1 | **≈ −210** |
+| `activateProtectedPurchaseWindow` | every lane | 35,067 → 35,046 | −21 | 0 | **−21** |
+| `assignTokenHandler` (owner) | every lane | 50,391 → 50,922 (Sovryn MoC) | +501 to +707 | 1 | **≈ +1,000 to +1,210** |
 
-- **Batch.** Item 4 saves about 420 per row. A 10-row relaunch batch is about 1M on Rootstock (the gas
-  audit's live fit, with its relaunch row), so that is about 0.4%, or about a cent at R87's
-  conversion.
+- **Batch.** Item 4 saves about 285–380 per row. A 10-row relaunch batch is about 1M on
+  Rootstock (the gas audit's live fit, with its relaunch row), so that is about 0.3–0.4%, under a cent
+  at R87's conversion.
+- **What the review follow-up gave back.** Against the first push, a 10-row batch costs 345–753 more
+  on idle routes and about 1,300 more on lending routes. Reverting each restored check on its own, on
+  the same build:
+  - the `amountSpent` product costs 345 on idle MoC, 753 on idle Dex (its only restored check), and
+    750 on Sovryn MoC and LayerBank Dex;
+  - the lending sum costs 550.
+  The deposit share credit is off the batch path; its check costs tens of gas per lending deposit.
 - **Removed reads per path.** In `withdrawAllAccumulatedInterest`, 17 are id-array re-reads (item 1)
   and one is the booked-shares re-read (item 2). `withdrawTokenAndInterest` removes two booked-shares
-  re-reads and one id-array re-read. `withdrawToken` removes one booked-shares re-read, and
-  `createDcaSchedule` one settings re-read (item 3).
+  re-reads and one id-array re-read. `withdrawToken` removes one booked-shares re-read,
+  `createDcaSchedule` one settings re-read (item 3), and `assignTokenHandler` one route-class re-read
+  (item 11).
+- **`assignTokenHandler` costs more overall.** Item 7's `i_stableToken()` is a third call into the same
+  handler. That is 700 on Rootstock against Foundry's 100, and item 11's saved read (200) comes off it.
+  It is owner-only, once per token-route pair.
 - **More schedules, more saving.** `_lockedPrincipal`'s saving grows with the caller's schedule count:
   under `deploy` it removes N + (N − ⌈N/4⌉) reads for N schedules on the token, and under `default`
   it removes N. `topUpFromInterest` and the `getInterestAccrued` view run the same loop.
-- **Item 5.** It is compute only (tens of gas per call) and is inside the non-batch figures above.
+- **Items 5 and 12.** Compute only, tens of gas per call, and inside the figures above.
+  `createDcaSchedule` saves the same on every route: now that the deposit credit is checked again, only
+  items 3 and 12 touch it.
 
-`default` profile, as same-build Foundry pins: 10-row batches −5,982 (idle) and −6,092 (lending);
-`withdrawAllAccumulatedInterest` −810, with 11 reads removed there, because legacy codegen still reads
-one id word per id; `withdrawTokenAndInterest` −321; `withdrawToken` −192; `createDcaSchedule` −99 (idle)
-and −165 (lending).
+`default` profile, as same-build Foundry pins:
+- 10-row batches: −4,812 (idle) and −4,172 (lending);
+- `withdrawAllAccumulatedInterest`: −810, with 11 reads removed there, because legacy codegen still
+  reads one id word per id;
+- `withdrawTokenAndInterest` −321, `withdrawToken` −192, `createDcaSchedule` −168,
+  `activateProtectedPurchaseWindow` −78;
+- `assignTokenHandler`: +536 to +647.
 
 ### Read-count pins (per slot, `vm.startStateDiffRecording`)
 
@@ -201,6 +218,7 @@ and −165 (lending).
 | `withdrawToken`: the user's booked shares | 2 | 1 | 1 |
 | `withdrawTokenAndInterest`: the user's booked shares | 4 | 2 | 2 |
 | `createDcaSchedule`: the settings word | 3 | 2 | 2 |
+| `assignTokenHandler`: the route's class | 2 | 1 | 1 |
 
 The before column is the same on both profiles. Two reads of the settings word remain after the
 change: the one load, and the read inside the nonce's read-modify-write. The latter is the compiler's
@@ -219,15 +237,19 @@ packed-field write, which the gas audit closed.
 | 5 off-path `unchecked` | −10 | | | | −20 | −20 | −20 | −20 |
 | 6 zero-stablecoin check | | | | −32 | | −32 | | −32 |
 | 7 handler/token match | | +111 | | | | | | |
-| **Total** | **+255** | **+111** | **−110** | **−120** | **−106** | **−110** | **−93** | **−110** |
+| Review: three checks restored | | | +40 | +3 | +29 | +15 | +16 | +150 |
+| 11 route class | | −23 | | | | | | |
+| 12 widening adds | −14 | | | | | | | |
+| **Total** | **+241** | **+88** | **−70** | **−117** | **−77** | **−95** | **−77** | **+40** |
 
-`default`: DcaManager +115, OperationsAdmin +185, every handler −103 to −145.
+`default`: DcaManager +98, OperationsAdmin +165, every handler −80 to −124.
 
-`via_ir` places code differently for item 2 on the LayerBank Dex leaf (+126), and item 4 more than
-takes it back. Items 8 and 9 leave metadata-stripped runtime and creation code byte-identical on all
-ten deployable contracts, under both profiles. So does item 7's revision, which moved the getter onto
+`via_ir` lays out the LayerBank Dex leaf differently for item 2 (+126) and for the restored checks
+(+150). Item 4 takes back only part of that, so that leaf ends 40 bytes above #153 under `deploy`.
+Items 8 and 9 leave metadata-stripped runtime and creation code byte-identical on all ten deployable
+contracts, under both profiles. So does item 7's revision, which moved the getter onto
 `IStablecoinSource`: it changes types, not code, so it adds no row. The largest artifact, LayerBank Dex,
-ends at 13,077 bytes under `deploy`, far below EIP-170.
+ends at 13,227 bytes under `deploy`, far below EIP-170's 24,576.
 
 ## Considered, not implemented
 
@@ -307,10 +329,10 @@ ends at 13,077 bytes under `deploy`, far below EIP-170.
 
 ## Success criteria
 
-- [ ] Items 1–12 are implemented, one commit each, and nothing from **Out of scope** ships.
-- [ ] Read-count pins show items 1–3 and 11 removing the reads listed under **Results**, on both
+- [x] Items 1–12 are implemented, one commit each, and nothing from **Out of scope** ships.
+- [x] Read-count pins show items 1–3 and 11 removing the reads listed under **Results**, on both
   profiles.
-- [ ] Every `unchecked` block states its bound in a source comment. The item 4 blocks that rest on a width
+- [x] Every `unchecked` block states its bound in a source comment. The item 4 blocks that rest on a width
   or a supply (the fee loops, the idle sum, the rBTC allocation product) are tested at that bound
   against full-width arithmetic. Item 5's subtractions sit behind the comparison that guards them. No
   `unchecked` block rests on a lending market's or a stablecoin's behavior.
