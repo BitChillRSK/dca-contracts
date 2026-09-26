@@ -1278,6 +1278,16 @@ handler leaf rejects one at construction, not only idle Dex. That changes constr
 code is byte-identical. The ABI changes are the new `OperationsAdmin__HandlerTokenMismatch` and the
 constructor error `PurchaseUniswap__ZeroPurchaseToken`, replaced by `StablecoinSource__ZeroStablecoin`.
 
+### R90 - final optimization and handler-structure decisions ([spec](./R90-final-optimization-decisions.md))
+
+After R89, in a separate PR. PR 154 stays executable-scope closed. Revisit R89's remaining candidate
+table with the owner's code-quality bar: reproduce the Dex oracle/live-floor packing prototype,
+measure the locally bounded lending zero-cash sum, and prototype moving fee ownership from the funding
+branch to the purchase branch without changing any concrete ABI or storage slot. Record final verdicts
+for the candidates that remain rejected as well as the approved subset. Ask: the oracle packing,
+zero-cash unchecked sum, conditional FeeHandler ownership move, and whether to override any keep-rejected
+recommendation — all together after the final evidence table.
+
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:
