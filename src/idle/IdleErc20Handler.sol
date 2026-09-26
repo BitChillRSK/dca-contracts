@@ -51,7 +51,10 @@ abstract contract IdleErc20Handler is TokenHandler {
     {
         uint256 numOfPurchases = purchaseAmounts.length;
         for (uint256 i; i < numOfPurchases; ++i) {
-            totalWithdrawn += purchaseAmounts[i];
+            // Each amount is a schedule's uint96 purchase amount, so the sum cannot approach 2^256.
+            unchecked {
+                totalWithdrawn += purchaseAmounts[i];
+            }
         }
     }
 }

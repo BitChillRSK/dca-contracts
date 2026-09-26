@@ -203,10 +203,12 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
             if (usersSharesToRedeem > usersShares) {
                 revert TokenLending__InsufficientShares(users[i], usersSharesToRedeem, usersShares);
             }
+            // Each debit is capped by this user's remaining booked shares, so the total is at most the
+            // shares this handler has booked, each one a measured receipt-token mint.
             unchecked {
                 _setUserShares(users[i], usersShares, usersShares - usersSharesToRedeem);
+                totalSharesToRedeem += usersSharesToRedeem;
             }
-            totalSharesToRedeem += usersSharesToRedeem;
             // Per-user facts on this path are `UserSharesUpdated` (exact virtual debit) and, after
             // the protocol call, one measured `SharesRedeemedBatch`. Do not emit `SharesRedeemed`
             // here: that event's `underlyingAmount` is measured cash on single redeems, and the
