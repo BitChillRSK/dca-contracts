@@ -15,11 +15,17 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
  *      asked for so a benchmark can assert the manager actually ran the deposit path.
  *
  *      Passes `OperationsAdmin.assignTokenHandler`'s ERC-165 gate for an idle route: it answers
- *      `ITokenHandler` and must not answer `ITokenLending`, which idle routes reject.
+ *      `ITokenHandler` and must not answer `ITokenLending`, which idle routes reject. It also reports
+ *      the token it is assigned for, which that function checks against its `token` argument.
  */
 contract StubPurchaseHandler is IERC165, ITokenHandler, IPurchaseRbtc {
+    address public immutable i_stableToken;
     uint256 public deposits;
     uint256 public rowsBought;
+
+    constructor(address stableToken) {
+        i_stableToken = stableToken;
+    }
 
     function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
         return interfaceId == type(ITokenHandler).interfaceId || interfaceId == type(IERC165).interfaceId;

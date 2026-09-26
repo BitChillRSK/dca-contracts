@@ -113,8 +113,8 @@ contract DepositsPauseTest is DcaDappTest {
 
     /// @dev An incident on one pair must not stop deposits anywhere else.
     function testPausingAnotherPairLeavesThisOneOpen() external {
-        DummyTokenHandler otherTokenStub = new DummyTokenHandler();
         address otherToken = makeAddr("r48DepositOtherToken");
+        DummyTokenHandler otherTokenStub = new DummyTokenHandler(otherToken);
 
         vm.startPrank(OWNER);
         operationsAdmin.assignTokenHandler(otherToken, IDLE_INDEX, address(otherTokenStub));
@@ -127,7 +127,7 @@ contract DepositsPauseTest is DcaDappTest {
 
     /// @dev Same token, a second route: only the named pair closes.
     function testPausingASecondRouteLeavesTheLiveOneOpen() external {
-        DummyTokenHandler otherRouteStub = new DummyTokenHandler();
+        DummyTokenHandler otherRouteStub = new DummyTokenHandler(address(stablecoin));
 
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(SECOND_IDLE_INDEX, false);

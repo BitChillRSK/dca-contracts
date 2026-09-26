@@ -14,17 +14,38 @@ contract DummyERC165Contract {
 }
 
 /// @dev ERC-165 `ITokenHandler` stub for OperationsAdmin assignment tests. Not a funded handler.
+///      Reports the stablecoin it was built for, which `assignTokenHandler` checks against `token`.
 contract DummyTokenHandler {
+    address public immutable i_stableToken;
+
+    constructor(address stableToken) {
+        i_stableToken = stableToken;
+    }
+
     function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
         return interfaceId == type(ITokenHandler).interfaceId;
     }
 }
 
 /// @dev ERC-165 `ITokenHandler` + `ITokenLending` stub for lending-route assignment tests.
+///      Reports the stablecoin it was built for, which `assignTokenHandler` checks against `token`.
 contract DummyLendingHandler {
+    address public immutable i_stableToken;
+
+    constructor(address stableToken) {
+        i_stableToken = stableToken;
+    }
+
     function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
         return interfaceId == type(ITokenHandler).interfaceId
             || interfaceId == type(ITokenLending).interfaceId;
+    }
+}
+
+/// @dev Advertises `ITokenHandler` but has no `i_stableToken()`, so assignment cannot check its stablecoin.
+contract DummyTokenHandlerWithoutStablecoin {
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return interfaceId == type(ITokenHandler).interfaceId;
     }
 }
 

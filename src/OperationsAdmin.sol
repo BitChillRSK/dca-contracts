@@ -6,6 +6,7 @@ import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
 import {ITokenLending} from "./interfaces/ITokenLending.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {BitChillOwnable} from "./BitChillOwnable.sol";
+import {StablecoinSource} from "./StablecoinSource.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 /**
@@ -70,8 +71,8 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
     /**
      * @inheritdoc IOperationsAdmin
      * @dev Recovery from a mistaken assignment uses a new route because this registry cannot prove a
-     *      handler is empty. ERC-165 separates lending from idle handlers, and one handler address may
-     *      back only one pair.
+     *      handler is empty. ERC-165 separates lending from idle handlers, the handler's own stablecoin
+     *      must be `token`, and one handler address may back only one pair.
      */
     function assignTokenHandler(address token, uint256 routeIndex, address handler) external onlyOwner {
         uint32 route = routeIndex.toUint32();
@@ -95,6 +96,9 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
             if (!supportsLending) revert OperationsAdmin__ContractIsNotTokenLending(handler);
         } else if (supportsLending) {
             revert OperationsAdmin__LendingHandlerOnIdleRoute(handler);
+        }
+        if (address(StablecoinSource(handler).i_stableToken()) != token) {
+            revert OperationsAdmin__HandlerTokenMismatch(token, handler);
         }
 
         s_tokenRoute[token][route].handler = handler;
