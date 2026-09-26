@@ -46,6 +46,8 @@ contract IdleAccountingProofTest is Test {
     uint256 internal deletions;
 
     mapping(address user => uint256 liability) internal ghostLiability;
+    /// @dev Enumeration proof phases: 0 untouched, 1 live under creation-id scan, 2 seen once in a user list.
+    mapping(uint64 scheduleId => uint8 phase) internal enumPhase;
 
     function setUp() public {
         vm.prank(OWNER);
@@ -235,9 +237,13 @@ contract IdleAccountingProofTest is Test {
 
     function _assertCreationIdEnumeration() private {
         uint64 nonce = uint64(dcaManager.getSchedulesCreatedCount());
-        uint256 liveSeen;
         address[3] memory users = [ALICE, BOB, CAROL];
 
+        for (uint64 id = 1; id <= nonce; ++id) {
+            enumPhase[id] = 0;
+        }
+
+        uint256 liveCount;
         for (uint64 id = 1; id <= nonce; ++id) {
             (bool ok, IDcaManager.DcaSchedule memory schedule) = _tryGetSchedule(id);
             if (!ok) continue;
@@ -250,20 +256,30 @@ contract IdleAccountingProofTest is Test {
                 }
             }
             assertTrue(ownerKnown, "live schedule owner not in the actor set");
-            ++liveSeen;
+            enumPhase[id] = 1;
+            ++liveCount;
         }
 
         uint256 enumerated;
         for (uint256 i; i < users.length; ++i) {
             (uint64[] memory ids,) = dcaManager.getDcaSchedules(users[i], address(doc));
-            enumerated += ids.length;
             for (uint256 j; j < ids.length; ++j) {
-                IDcaManager.DcaSchedule memory s = dcaManager.getDcaSchedule(address(doc), ids[j]);
+                uint64 id = ids[j];
+                assertEq(enumPhase[id], 1, "enumerated id missing from creation scan or duplicated");
+                enumPhase[id] = 2;
+                IDcaManager.DcaSchedule memory s = dcaManager.getDcaSchedule(address(doc), id);
                 assertEq(s.user, users[i], "enumeration owner mismatch");
                 assertEq(s.routeIndex, IDLE_INDEX);
+                ++enumerated;
             }
         }
-        assertEq(liveSeen, enumerated, "creation-id scan disagreed with per-user lists");
+        assertEq(enumerated, liveCount, "creation-id scan disagreed with per-user lists");
+
+        for (uint64 id = 1; id <= nonce; ++id) {
+            uint8 phase = enumPhase[id];
+            if (phase == 0) continue; // deleted / never assigned
+            assertEq(phase, 2, "live creation id not enumerated exactly once");
+        }
     }
 
     /*//////////////////////////////////////////////////////////////

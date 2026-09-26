@@ -2,61 +2,87 @@
 pragma solidity 0.8.36;
 
 import {Test, console2} from "forge-std/Test.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
-import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
-import {PurchaseRbtcHarness} from "test/unit/PurchaseRbtcTest.t.sol";
-import {NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
 
 /**
  * @title R87UncheckedCreditGas
- * @notice Pins that `_creditRbtc`'s unchecked add still credits correctly; logs Foundry gas.
+ * @notice Old-vs-new accumulated-rBTC encoding add: checked baseline vs production `unchecked`.
  * @dev Reproduce:
  *
  *          forge test --match-path test/gas/R87UncheckedCreditGas.t.sol -vv
  *          FOUNDRY_PROFILE=deploy forge test --match-path test/gas/R87UncheckedCreditGas.t.sol -vv
  *
- *      The overflow check itself is ~45 Foundry gas; Rootstock compute is in that ballpark. The
- *      accepted bound is Rootstock native supply (~2^85 wei) << uint256.
+ *      Isolates the add inside `_creditRbtc` (live encoding `claimable + 1`). Warm re-credit onto a
+ *      nonzero slot is the production case. Foundry saving is tens of gas; Rootstock compute for the
+ *      same arithmetic is in that ballpark. The overflow bound is Rootstock native supply (~2^85 wei).
  */
 contract R87UncheckedCreditGasTest is Test {
-    uint16 internal constant FLAT_FEE_RATE = 100;
-    uint256 internal constant RBTC_OUT = 1 ether;
-    uint256 internal constant GROSS = 100 ether;
+    uint256 internal constant AMOUNT = 1 ether;
+    address internal constant BUYER = address(0xA11CE);
 
-    address internal buyer = address(0xA11CE);
-    MockStablecoin internal token;
-    PurchaseRbtcHarness internal harness;
+    CheckedCreditHarness internal checked;
+    UncheckedCreditHarness internal uncheckedAdd;
 
     function setUp() public {
-        token = new MockStablecoin(address(this));
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
-            minFeeRate: FLAT_FEE_RATE,
-            maxFeeRate: FLAT_FEE_RATE,
-            feePurchaseLowerBound: 1000 ether,
-            feePurchaseUpperBound: 100_000 ether
-        });
-        harness = new PurchaseRbtcHarness(address(this), address(token), address(0xFEE), feeSettings, address(this));
-        token.mint(address(harness), 1_000_000 ether);
-        harness.setRbtcOut(RBTC_OUT);
-        vm.deal(address(harness), 20 * RBTC_OUT);
+        checked = new CheckedCreditHarness();
+        uncheckedAdd = new UncheckedCreditHarness();
+        // Warm both slots onto a live encoding so the measured call is nonzero→nonzero.
+        checked.credit(BUYER, AMOUNT);
+        uncheckedAdd.credit(BUYER, AMOUNT);
     }
 
-    function test_gas_uncheckedCreditStillAccumulates() public {
-        address[] memory buyers = new address[](1);
-        buyers[0] = buyer;
-        uint64[] memory scheduleIds = new uint64[](1);
-        scheduleIds[0] = 1;
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = GROSS;
+    function test_gas_uncheckedCreditSavesOverflowCheck() public {
+        uint256 snap = vm.snapshot();
 
-        uint256 gasBefore = gasleft();
-        harness.batchBuyRbtc(buyers, scheduleIds, amounts, NO_MIN_RBTC_OUT);
-        uint256 gasUsed = gasBefore - gasleft();
+        uint256 gasUncheckedBefore = gasleft();
+        uncheckedAdd.credit(BUYER, AMOUNT);
+        uint256 gasUnchecked = gasUncheckedBefore - gasleft();
+        assertEq(uncheckedAdd.raw(BUYER), 1 + 2 * AMOUNT, "unchecked encoding");
 
-        console2.log("Foundry gas length-1 batch with unchecked credit:", gasUsed);
-        assertEq(harness.getAccumulatedRbtcBalance(buyer), RBTC_OUT);
+        vm.revertTo(snap);
 
-        harness.batchBuyRbtc(buyers, scheduleIds, amounts, NO_MIN_RBTC_OUT);
-        assertEq(harness.getAccumulatedRbtcBalance(buyer), 2 * RBTC_OUT);
+        uint256 gasCheckedBefore = gasleft();
+        checked.credit(BUYER, AMOUNT);
+        uint256 gasChecked = gasCheckedBefore - gasleft();
+        assertEq(checked.raw(BUYER), 1 + 2 * AMOUNT, "checked encoding");
+
+        uint256 saving = gasChecked - gasUnchecked;
+        console2.log("Foundry gas checked credit add:", gasChecked);
+        console2.log("Foundry gas unchecked credit add:", gasUnchecked);
+        console2.log("Foundry saving:", saving);
+        assertGt(gasChecked, gasUnchecked, "checked add should cost more");
+        assertLt(saving, 200, "saving larger than an overflow check; harness drifted");
+        // ~45 was the decision estimate; via-IR can shrink the checked path further.
+        assertApproxEqAbs(saving, 45, 50, "unchecked-add Foundry saving drifted");
+        assertGt(saving, 0);
+    }
+}
+
+/// @dev Pre-removal shape: checked add on `(stored == 0 ? 1 : stored) + amount`.
+contract CheckedCreditHarness {
+    mapping(address => uint256) private s_usersAccumulatedRbtc;
+
+    function credit(address buyer, uint256 amount) external {
+        uint256 stored = s_usersAccumulatedRbtc[buyer];
+        s_usersAccumulatedRbtc[buyer] = (stored == 0 ? 1 : stored) + amount;
+    }
+
+    function raw(address buyer) external view returns (uint256) {
+        return s_usersAccumulatedRbtc[buyer];
+    }
+}
+
+/// @dev Production shape after R87.
+contract UncheckedCreditHarness {
+    mapping(address => uint256) private s_usersAccumulatedRbtc;
+
+    function credit(address buyer, uint256 amount) external {
+        uint256 stored = s_usersAccumulatedRbtc[buyer];
+        unchecked {
+            s_usersAccumulatedRbtc[buyer] = (stored == 0 ? 1 : stored) + amount;
+        }
+    }
+
+    function raw(address buyer) external view returns (uint256) {
+        return s_usersAccumulatedRbtc[buyer];
     }
 }

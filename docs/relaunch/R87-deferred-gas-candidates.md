@@ -195,7 +195,7 @@ advance:
 
 - [ ] Only human-approved candidates are implemented.
 - [ ] Protocol invariants in `AGENTS.md` still hold, unless an approved candidate changes one and says so.
-- [ ] Final Rootstock figures are reproducible and show how they were derived on both profiles.
+- [x] Final Rootstock figures are reproducible and show how they were derived on both profiles.
 - [ ] Consumer issues are opened for every removed event, getter, or error.
 
 ## ABI / deploy / cutover impact
