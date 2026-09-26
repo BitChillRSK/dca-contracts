@@ -1285,8 +1285,8 @@ table with the owner's code-quality bar: reproduce the Dex oracle/live-floor pac
 measure the locally bounded lending zero-cash sum, and prototype moving fee ownership from the funding
 branch to the purchase branch without changing any concrete ABI or storage slot. Record final verdicts
 for the candidates that remain rejected as well as the approved subset. Ask: the oracle packing,
-zero-cash unchecked sum, conditional FeeHandler ownership move, and whether to override any keep-rejected
-recommendation — all together after the final evidence table.
+zero-cash unchecked sum, conditional FeeHandler ownership move, whether to override any keep-rejected
+recommendation, and whether to make the repo `forge fmt`-clean and enforce it — all together after the final evidence table.
 
 ## Closed non-implementation decisions
 

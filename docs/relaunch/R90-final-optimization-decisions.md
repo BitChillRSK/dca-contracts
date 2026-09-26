@@ -128,6 +128,9 @@ Present the candidate matrix and any refreshed measurements, then ask the human 
 3. Move `FeeHandler` out of `TokenHandler` if the prototype preserves concrete ABI/layout and has no
    meaningful gas or size regression?
 4. Override any of the seven **keep rejected / keep checked** recommendations in the matrix?
+5. Make the repo `forge fmt`-clean? `src/` is not today, so `make check` skips `forge fmt --check`
+   (see the `Makefile`). If yes: one format-only commit (metadata-stripped bytecode must be identical)
+   and a `forge fmt --check` step in `make check` and CI.
 
 ## Scope
 
@@ -139,6 +142,8 @@ Present the candidate matrix and any refreshed measurements, then ask the human 
   external selector, event, error, or storage slot. Compare concrete ABI/method identifiers, storage
   layout, metadata-stripped creation/runtime code, deployed size, and representative gas on all live
   idle/Sovryn/LayerBank MoC and Dex leaves.
+- [ ] Measure how much of `src/`, `test/`, and `script/` `forge fmt` would change, and check whether any
+  of it fights the repo's existing layout.
 - [ ] Present one final evidence table and obtain the human's answers to all open product decisions.
 - [ ] Implement only the approved subset, one commit per candidate, and record rejected verdicts with
   their final reason.
