@@ -6,22 +6,36 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 /**
  * @title StablecoinSource
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Shared declaration of the purchase-path funding hooks.
- * @dev PurchaseRbtc consumes these; LendingErc20Handler and IdleErc20Handler implement them.
- *      Declaring the seam once lets the six leaves drop forwarding resolvers, and keeps the
- *      token the purchase reports as spent tied to the token the handler actually holds.
+ * @notice Shared stablecoin immutable and batch-funding hook for handlers and purchase routes.
+ * @dev Owns `i_stableToken` so deposit/withdraw (`TokenHandler`) and the purchase pipeline
+ *      (`PurchaseRbtc`) name the same token without a virtual bridge. Lending and idle bases
+ *      implement `_batchRetrieveStablecoin`; the leaves drop forwarding resolvers.
  */
 abstract contract StablecoinSource {
     /*//////////////////////////////////////////////////////////////
-                           INTERNAL FUNCTIONS
+                            STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev The stablecoin this handler holds or lends out, spent by the purchase and reported in
-     *      fees, errors, and events. Implemented against the handler's own stablecoin so the
-     *      purchase route cannot name a different token.
+     * @notice The stablecoin this handler deposits, withdraws, and spends on purchases.
+     * @return The constructor-supplied ERC20.
      */
-    function _purchaseToken() internal view virtual returns (IERC20);
+    IERC20 public immutable i_stableToken;
+
+    /*//////////////////////////////////////////////////////////////
+                               CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @param tokenAddress The stablecoin this handler holds or lends out.
+     */
+    constructor(address tokenAddress) {
+        i_stableToken = IERC20(tokenAddress);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           INTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     /**
      * @dev Retrieve several buyers' stablecoin for a batch purchase.

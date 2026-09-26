@@ -2,8 +2,6 @@
 pragma solidity 0.8.36;
 
 import {TokenHandler} from "src/TokenHandler.sol";
-import {StablecoinSource} from "src/StablecoinSource.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title IdleErc20Handler
@@ -16,7 +14,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  *      another user's pooled cash is refused only by schedule ownership and the manager's balance
  *      checks, not by a shadow book here.
  */
-abstract contract IdleErc20Handler is TokenHandler, StablecoinSource {
+abstract contract IdleErc20Handler is TokenHandler {
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
@@ -39,11 +37,6 @@ abstract contract IdleErc20Handler is TokenHandler, StablecoinSource {
     /*//////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-
-    /// @dev The stablecoin this handler holds idle.
-    function _purchaseToken() internal view override returns (IERC20) {
-        return i_stableToken;
-    }
 
     /**
      * @dev Sum the batch's purchase amounts. Cash already sits on this handler; DcaManager debits

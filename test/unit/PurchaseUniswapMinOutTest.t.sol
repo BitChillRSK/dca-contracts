@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {PurchaseUniswap} from "../../src/PurchaseUniswap.sol";
 import {FeeHandler} from "../../src/FeeHandler.sol";
 import {DcaManagerAccessControl} from "../../src/DcaManagerAccessControl.sol";
+import {StablecoinSource} from "../../src/StablecoinSource.sol";
 import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
 import {IPurchaseUniswap} from "../../src/interfaces/IPurchaseUniswap.sol";
 import {ICoinPairPrice} from "../../src/interfaces/ICoinPairPrice.sol";
@@ -335,13 +336,13 @@ contract PurchaseUniswapMinOutTest is Test {
 }
 
 /**
- * @notice Holds the purchase token in a base constructor, the way `TokenHandler` does for the real handlers,
- *         so `PurchaseUniswap`'s constructor can already read `_purchaseToken()`.
+ * @notice Sets `i_stableToken` in a base constructor, the way `TokenHandler` does for the real handlers,
+ *         so `PurchaseUniswap`'s constructor can already read it.
  */
-abstract contract PurchaseTokenBase {
+abstract contract PurchaseTokenBase is StablecoinSource {
     MockStablecoinWithDecimals internal immutable i_token;
 
-    constructor(MockStablecoinWithDecimals token) {
+    constructor(MockStablecoinWithDecimals token) StablecoinSource(address(token)) {
         i_token = token;
     }
 }
@@ -381,10 +382,6 @@ contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
 
     function mintStablecoin(uint256 amount) external {
         i_token.mint(address(this), amount);
-    }
-
-    function _purchaseToken() internal view override returns (IERC20) {
-        return IERC20(address(i_token));
     }
 
     /// @dev The stablecoin is minted straight to the harness, so a batch "retrieves" exactly what it asked for.

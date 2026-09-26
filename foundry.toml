@@ -43,7 +43,7 @@ via_ir = true
 runs = 1000
 
 # ZeroTokenPurchaseUniswapTest.sol's ZeroTokenPurchaseUniswap has a deliberately always-reverting
-# constructor (its _purchaseToken() override is pure, hardcoded to address(0)), which trips a known
+# constructor (`StablecoinSource(address(0))`), which trips a known
 # solc/via_ir limitation (https://github.com/ethereum/solidity/issues/11642): the optimizer proves the
 # revert is unconditional and dead-code-eliminates the immutable assignment after it, then a later
 # checker reports error 1284 ("immutables read but never assigned"). Restructuring the real

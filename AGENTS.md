@@ -31,7 +31,7 @@ FeeHandler          fee math (inherited by TokenHandler and PurchaseRbtc)
 TokenHandler        deposit/withdraw stablecoin (owns FeeHandler)
 TokenLending        share ↔ underlying conversion (no TokenHandler inherit)
 LendingErc20Handler TokenHandler + TokenLending; per-user shares, withdraw clamp, interest, exact-sum batch redeem
-StablecoinSource    funding-hook + _purchaseToken declarations (PurchaseRbtc consumes; lending/idle implement)
+StablecoinSource    shared `i_stableToken` + batch-funding hook (TokenHandler and PurchaseRbtc inherit; idle/lending implement retrieve)
 PurchaseRbtc        shared buy/batch pipeline; accumulated rBTC; withdraw to signer
 PurchaseMoc         MoC redeem DOC → rBTC (_purchaseRbtc only)
 PurchaseUniswap     Uniswap V3 → WRBTC (_purchaseRbtc + WRBTC unwrap on withdraw)
@@ -127,7 +127,8 @@ Everything else is single-sourced on the interface:
   and Tropykus's at once.
 - Constructor-only leaves carry the header even though they carry no banners, and sibling leaves state
   the same fact the same way: the four `*Erc20HandlerDex` contracts each say `Constructor-only leaf` and
-  the funding-base-first constructor ordering in `@dev`, not one of them in `@notice`.
+  that funding-first `is` order is house style only (`i_stableToken` lives on shared `StablecoinSource`),
+  in `@dev`, not one of them in `@notice`.
 
 **Do not name a token in a contract that does not name it itself.** `PurchaseUniswap`, `IdleErc20Handler`,
 `LendingErc20Handler`, `TokenHandler` and their interfaces are constructed with whatever stablecoin they

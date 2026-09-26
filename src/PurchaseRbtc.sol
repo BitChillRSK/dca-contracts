@@ -69,7 +69,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
                 totalStablecoinAmountToSpend -= aggregatedFee;
             }
 
-            purchaseToken = _purchaseToken();
+            purchaseToken = i_stableToken;
             _transferFee(purchaseToken, aggregatedFee);
         }
 

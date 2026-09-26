@@ -5,10 +5,10 @@ import {Test, Vm} from "forge-std/Test.sol";
 import {PurchaseRbtc} from "src/PurchaseRbtc.sol";
 import {FeeHandler} from "src/FeeHandler.sol";
 import {DcaManagerAccessControl} from "src/DcaManagerAccessControl.sol";
+import {StablecoinSource} from "src/StablecoinSource.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
 
 /**
@@ -568,7 +568,6 @@ contract PurchaseRbtcTest is Test {
 }
 
 contract PurchaseRbtcHarness is PurchaseRbtc {
-    IERC20 internal immutable i_token;
     uint256 public lastPurchaseAmount;
     uint256 public feeCollectorBalanceOnPurchase;
     uint256 public purchaseCalls;
@@ -585,9 +584,11 @@ contract PurchaseRbtcHarness is PurchaseRbtc {
         address feeCollector,
         FeeSettings memory feeSettings,
         address initialOwner
-    ) FeeHandler(feeCollector, feeSettings, initialOwner) DcaManagerAccessControl(dcaManagerAddress) {
-        i_token = IERC20(tokenAddress);
-    }
+    )
+        FeeHandler(feeCollector, feeSettings, initialOwner)
+        DcaManagerAccessControl(dcaManagerAddress)
+        StablecoinSource(tokenAddress)
+    {}
 
     function setRbtcOut(uint256 amount) external {
         rbtcOut = amount;
@@ -607,17 +608,13 @@ contract PurchaseRbtcHarness is PurchaseRbtc {
         revertOnPurchase = shouldRevert;
     }
 
-    function _purchaseToken() internal view override returns (IERC20) {
-        return i_token;
-    }
-
     function _purchaseRbtc(uint256 stablecoinAmount, uint256 /* minRbtcOut */) internal override returns (uint256) {
         if (revertOnPurchase) revert("route-called");
         purchaseCalls++;
         lastPurchaseAmount = stablecoinAmount;
-        feeCollectorBalanceOnPurchase = i_token.balanceOf(s_feeCollector);
+        feeCollectorBalanceOnPurchase = i_stableToken.balanceOf(s_feeCollector);
         uint256 inputToConsume = usePurchaseInputOverride ? purchaseInputOverride : stablecoinAmount;
-        require(i_token.transfer(address(0xBEEF), inputToConsume));
+        require(i_stableToken.transfer(address(0xBEEF), inputToConsume));
         return rbtcOut;
     }
 

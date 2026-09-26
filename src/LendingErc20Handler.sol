@@ -4,7 +4,6 @@ pragma solidity 0.8.36;
 import {ITokenLending} from "src/interfaces/ITokenLending.sol";
 import {TokenHandler} from "src/TokenHandler.sol";
 import {TokenLending} from "src/TokenLending.sol";
-import {StablecoinSource} from "src/StablecoinSource.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -15,7 +14,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
  *         redeem for lending handlers. Protocol adapters implement the exchange-rate and
  *         mint/redeem hooks.
  */
-abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinSource {
+abstract contract LendingErc20Handler is TokenHandler, TokenLending {
     using SafeERC20 for IERC20;
 
     /*//////////////////////////////////////////////////////////////
@@ -144,11 +143,6 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending, StablecoinS
         // Pay out what the redemption actually produced, which may be less than requested
         withdrawalAmount = _redeemShares(user, withdrawalAmount, exchangeRate);
         return super._withdrawToken(user, withdrawalAmount);
-    }
-
-    /// @dev The stablecoin this handler lends out.
-    function _purchaseToken() internal view override returns (IERC20) {
-        return i_stableToken;
     }
 
     /**

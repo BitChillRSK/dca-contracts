@@ -76,8 +76,9 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      * @param amountOutMinimumSafetyCheck The lowest floor the owner may later configure
      *        (deploy default: `DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK`, 95%)
      * @dev Caches the stablecoin-to-18-decimal oracle scale; tokens above 18 decimals revert rather than
-     *      weakening the floor through rounding. The funding base must precede this base in the leaf's
-     *      inheritance list because path construction reads its immutable stablecoin; a zero value reverts.
+     *      weakening the floor through rounding. Path construction reads `i_stableToken` on the shared
+     *      `StablecoinSource` base, which C3 initializes before this constructor regardless of whether
+     *      the leaf lists the funding base or this purchase base first; a zero value still reverts.
      *      The initial path is allowlisted here, while later paths require owner approval.
      */
     constructor(
@@ -107,7 +108,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         _setPurchasePath(intermediateTokens, poolFeeRates, newPath);
         _setPurchasePathAllowed(pathHash, newPath, intermediateTokens, poolFeeRates, true);
 
-        uint8 stablecoinDecimals = IERC20Metadata(address(_purchaseToken())).decimals();
+        uint8 stablecoinDecimals = IERC20Metadata(address(i_stableToken)).decimals();
         if (stablecoinDecimals > ORACLE_DECIMALS) {
             revert PurchaseUniswap__UnsupportedStablecoinDecimals(stablecoinDecimals);
         }
@@ -277,7 +278,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     function _approveSwapRouter() internal {
-        _purchaseToken().forceApprove(address(i_swapRouter02), type(uint256).max);
+        i_stableToken.forceApprove(address(i_swapRouter02), type(uint256).max);
     }
 
     /**
@@ -347,8 +348,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      * @dev Uniswap V3 `exactInput` bytes: this handler's stablecoin, then each
      *      `(fee, intermediateToken)`, then the last fee and WRBTC. Empty
      *      `intermediateTokens` is a direct pair. `poolFeeRates.length` must be
-     *      `intermediateTokens.length + 1`. Reverts if `_purchaseToken()` is still
-     *      unset, so a reversed inheritance `is` list fails at deploy.
+     *      `intermediateTokens.length + 1`. Reverts if `i_stableToken` is the zero
+     *      address (explicit reject), which also catches a missing StablecoinSource init.
      */
     function _encodePurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
         private
@@ -359,7 +360,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
             revert PurchaseUniswap__WrongNumberOfTokensOrFeeRates(intermediateTokens.length, poolFeeRates.length);
         }
 
-        address purchaseToken = address(_purchaseToken());
+        address purchaseToken = address(i_stableToken);
         if (purchaseToken == address(0)) revert PurchaseUniswap__ZeroPurchaseToken();
 
         newPath = abi.encodePacked(purchaseToken);

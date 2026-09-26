@@ -9,9 +9,10 @@ import {LayerBankErc20Handler} from "./LayerBankErc20Handler.sol";
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Token-agnostic LayerBank lending + Uniswap V3 purchase handler.
  * @dev Constructor-only leaf. Only its immutable DcaManager moves principal, buys, or withdraws rBTC;
- *      the owner controls fees, oracle, path allowlist, and floor. The funding base is listed first so
- *      `i_stableToken` is set before `PurchaseUniswap` builds the path.
- *      Holds standing max stablecoin approvals to SwapRouter02 and the LayerBank Pool, restorable by anyone.
+ *      the owner controls fees, oracle, path allowlist, and floor. Funding base is listed first as house
+ *      style; `i_stableToken` lives on shared `StablecoinSource`, so path construction does not depend
+ *      on that order. Holds standing max stablecoin approvals to SwapRouter02 and the LayerBank Pool,
+ *      restorable by anyone.
  */
 contract LayerBankErc20HandlerDex is LayerBankErc20Handler, PurchaseUniswap {
     /**

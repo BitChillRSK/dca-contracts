@@ -7,24 +7,15 @@ import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
 import {FeeHandler} from "./FeeHandler.sol";
 import {DcaManagerAccessControl} from "./DcaManagerAccessControl.sol";
+import {StablecoinSource} from "./StablecoinSource.sol";
 
 /**
  * @title TokenHandler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Base contract for depositing and withdrawing a handler's stablecoin. Owns FeeHandler.
  */
-abstract contract TokenHandler is ITokenHandler, ERC165, FeeHandler, DcaManagerAccessControl {
+abstract contract TokenHandler is ITokenHandler, ERC165, FeeHandler, DcaManagerAccessControl, StablecoinSource {
     using SafeERC20 for IERC20;
-
-    /*//////////////////////////////////////////////////////////////
-                            STATE VARIABLES
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice The stablecoin this handler deposits and withdraws.
-     * @return The constructor-supplied ERC20.
-     */
-    IERC20 public immutable i_stableToken;
 
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
@@ -43,9 +34,11 @@ abstract contract TokenHandler is ITokenHandler, ERC165, FeeHandler, DcaManagerA
         address feeCollector,
         FeeSettings memory feeSettings,
         address initialOwner
-    ) FeeHandler(feeCollector, feeSettings, initialOwner) DcaManagerAccessControl(dcaManagerAddress) {
-        i_stableToken = IERC20(tokenAddress);
-    }
+    )
+        FeeHandler(feeCollector, feeSettings, initialOwner)
+        DcaManagerAccessControl(dcaManagerAddress)
+        StablecoinSource(tokenAddress)
+    {}
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS

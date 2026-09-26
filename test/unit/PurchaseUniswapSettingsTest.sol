@@ -372,7 +372,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
 
     function testSwapPathStartsWithPurchaseToken() public onlyDexSwaps {
         bytes memory initialPath = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
-        assertEq(_firstTokenInPath(initialPath), address(stablecoin), "initial path must start with _purchaseToken()");
+        assertEq(_firstTokenInPath(initialPath), address(stablecoin), "initial path must start with i_stableToken");
 
         address[] memory intermediateTokens = new address[](1);
         intermediateTokens[0] = makeAddr("r31Intermediate");
@@ -388,7 +388,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(intermediateTokens, poolFeeRates);
 
         bytes memory updatedPath = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
-        assertEq(_firstTokenInPath(updatedPath), address(stablecoin), "updated path must start with _purchaseToken()");
+        assertEq(_firstTokenInPath(updatedPath), address(stablecoin), "updated path must start with i_stableToken");
     }
 
     function _firstTokenInPath(bytes memory path) private pure returns (address token) {

@@ -4,10 +4,8 @@ pragma solidity 0.8.36;
 import {Test, console2, Vm} from "forge-std/Test.sol";
 import {IdleErc20Handler} from "src/idle/IdleErc20Handler.sol";
 import {TokenHandler} from "src/TokenHandler.sol";
-import {StablecoinSource} from "src/StablecoinSource.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "test/Constants.sol";
 
 /**
@@ -153,7 +151,7 @@ contract IdleGasHarness is IdleErc20Handler {
  * @dev Pre-removal idle funding path only: deposit books `s_idleBalances`, batch debit reads and
  *      writes that map. Withdraw clamp is omitted — this harness exists to price batch funding.
  */
-contract IdleLedgerBaselineHarness is TokenHandler, StablecoinSource {
+contract IdleLedgerBaselineHarness is TokenHandler {
     mapping(address user => uint256 balance) internal s_idleBalances;
 
     constructor(
@@ -167,10 +165,6 @@ contract IdleLedgerBaselineHarness is TokenHandler, StablecoinSource {
     function _depositToken(address user, uint256 depositAmount) internal override {
         super._depositToken(user, depositAmount);
         s_idleBalances[user] += depositAmount;
-    }
-
-    function _purchaseToken() internal view override returns (IERC20) {
-        return i_stableToken;
     }
 
     function _batchRetrieveStablecoin(address[] calldata users, uint256[] calldata purchaseAmounts)
