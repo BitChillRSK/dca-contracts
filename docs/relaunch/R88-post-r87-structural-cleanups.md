@@ -1,6 +1,6 @@
 # R88 — consider the post-R87 structural cleanups
 
-Status: **not started** · Assigned: no · Optional/further-review: yes
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
@@ -27,9 +27,21 @@ Ask after presenting the measurements and artifact comparison:
    `TokenLending`?
 2. Inline LayerBank's single-use `_normalizedIncome()` forwarding helper into `_viewExchangeRate()`?
 
+## Verdicts (2026-09-26)
+
+Measured on throwaway edits against `#152` head (`ab17a52`), under both the default and `deploy`
+(`via_ir`) profiles. Metadata-stripped creation/runtime sizes and ABI/`methodIdentifiers` compared for
+the six lending leaves. No Solidity from the rejected candidate remains.
+
+| Candidate | Evidence | Verdict | Why |
+|---|---|---|---|
+| Shared `public immutable EXCHANGE_RATE_DECIMALS` on `TokenLending` | Selector `71506977` and leaf constructors unchanged; stripped runtime **grows** on every lending leaf (Sovryn/Tropykus **+24** both profiles; LayerBank MoC **+40** default / **+28** deploy; LayerBank Dex **+40** default / **+163** deploy) | **No** | A shared field would stay named `i_exchangeRateDecimals`; exposing that directly would change the getter ABI, while keeping a separate `EXCHANGE_RATE_DECIMALS()` would undermine the consolidation. Together with the size regression, there is no worthwhile refactor. |
+| Inline `_normalizedIncome()` into `_viewExchangeRate()` | Sole caller confirmed. Default profile **−9** stripped runtime/creation on both LayerBank leaves. Deploy profile size-neutral but not byte-identical (~1.1–1.3k JUMP/offset bytes reshuffled under `via_ir`) | **Yes** | Source simplification only. Do not claim a shipped bytecode or gas improvement. |
+| Replace R87 gas-test `snapshot` / `revertTo` | Current `forge-std` has no `snapshotState` / `revertToState` | **Defer** | No dependency bump solely for the deprecation warning; rename when an independently justified compatible upgrade exposes the replacements. |
+
 ## Scope
 
-- [ ] Evaluate a shared exchange-rate scale declaration.
+- [x] Evaluate a shared exchange-rate scale declaration.
   - Keep each protocol scale hardcoded by its adapter (`1e18` for Sovryn/Tropykus, `1e27` for LayerBank);
     do not add a leaf-constructor argument or deployment knob.
   - Preserve every concrete constructor ABI and the existing public
@@ -39,24 +51,25 @@ Ask after presenting the measurements and artifact comparison:
     without a measurement.
   - Keep the protocol-specific reason for each hardcoded scale visible next to the adapter even if the
     getter's declaration moves to the shared base.
-- [ ] Evaluate inlining `LayerBankErc20Handler._normalizedIncome()` into `_viewExchangeRate()`.
+- [x] Evaluate inlining `LayerBankErc20Handler._normalizedIncome()` into `_viewExchangeRate()`.
   - Confirm there is no other caller or override.
   - Compare metadata-stripped creation/runtime code under both profiles; if the compiler already inlines
     it identically, treat this as source readability only.
-- [ ] Record one verdict per candidate, including why any rejected source simplification stays.
-- [ ] Dependency-gated test cleanup: when a separately justified `forge-std` upgrade makes
+- [x] Record one verdict per candidate, including why any rejected source simplification stays.
+- [x] Dependency-gated test cleanup: when a separately justified `forge-std` upgrade makes
   `snapshotState()` / `revertToState()` available, replace `snapshot()` / `revertTo()` in the R87 gas
   tests and rerun them under both profiles. Do not upgrade `forge-std` only to silence this warning.
+  **Recorded: defer** — current `forge-std` still lacks the replacements.
 
 ## Out of scope
 
-- [ ] Reopening any gas candidate R87 rejected or kept.
-- [ ] A new common “handler core” around `FeeHandler`, `DcaManagerAccessControl`, and
+- [x] Reopening any gas candidate R87 rejected or kept.
+- [x] A new common “handler core” around `FeeHandler`, `DcaManagerAccessControl`, and
   `StablecoinSource`; it adds an inheritance layer without deleting state or a virtual seam.
-- [ ] Removing the real protocol/route hooks: `_lendingSpender`, `_viewExchangeRate`,
+- [x] Removing the real protocol/route hooks: `_lendingSpender`, `_viewExchangeRate`,
   `_receiptSharesBalance`, `_protocolDeposit`, `_protocolRedeem`, `_batchRetrieveStablecoin`, or
   `_purchaseRbtc`.
-- [ ] A standalone `forge-std` bump for deprecated test cheatcodes.
+- [x] A standalone `forge-std` bump for deprecated test cheatcodes.
 
 ## Files likely touched
 
@@ -66,12 +79,15 @@ Decision record:
 - `docs/relaunch/README.md`
 - `docs/relaunch/IMPLEMENTATION_ORDER.md`
 
-Only if approved in a later implementation PR:
+Approved implementation (candidate 2 only):
+
+- `src/layerbank/LayerBankErc20Handler.sol`
+
+Not touched (candidate 1 rejected; cheatcode rename deferred):
 
 - `src/TokenLending.sol`
 - `src/LendingErc20Handler.sol`
 - `src/sovryn/SovrynErc20Handler.sol`
-- `src/layerbank/LayerBankErc20Handler.sol`
 - `src/tropykus-legacy/TropykusErc20Handler.sol`
 - matching unit, deployment, gas, and fork tests that reference `EXCHANGE_RATE_DECIMALS`
 - `test/gas/R87FeeTransferredRemovalGas.t.sol` and
@@ -87,10 +103,10 @@ Only if approved in a later implementation PR:
 
 ## Success criteria
 
-- [ ] Both structural candidates have before/after artifact evidence and explicit human verdicts.
-- [ ] No constructor ABI, getter selector/value, exchange-rate scale, or protocol invariant changes.
-- [ ] Any implementation contains only approved candidates.
-- [ ] The deprecated cheatcode warning is either removed under an already-approved compatible dependency
+- [x] Both structural candidates have before/after artifact evidence and explicit human verdicts.
+- [x] No constructor ABI, getter selector/value, exchange-rate scale, or protocol invariant changes.
+- [x] Any implementation contains only approved candidates.
+- [x] The deprecated cheatcode warning is either removed under an already-approved compatible dependency
   or remains documented without forcing a dependency bump.
 
 ## Reviewer checklist
@@ -103,7 +119,7 @@ Only if approved in a later implementation PR:
 
 ## ABI / deploy / cutover impact
 
-- ABI: intended none; prove concrete constructors and `EXCHANGE_RATE_DECIMALS()` are unchanged.
+- ABI: none. Inlining a private helper does not change any public surface; candidate 1 was rejected
+  before it could move `EXCHANGE_RATE_DECIMALS()`.
 - Scripts: none.
-- Cutover: none; no consumer issue unless the evidence reveals an unexpected ABI change, in which case
-  do not implement the candidate under this spec.
+- Cutover: none; no consumer issue.

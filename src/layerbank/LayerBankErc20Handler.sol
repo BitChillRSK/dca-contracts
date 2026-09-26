@@ -74,17 +74,13 @@ abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20H
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev Aave liquidity index including pending interest, RAY (1e27) scale.
     function _viewExchangeRate() internal view override returns (uint256) {
-        return _normalizedIncome();
+        return i_pool.getReserveNormalizedIncome(address(i_stableToken));
     }
 
     function _lendingSpender() internal view override returns (address) {
         return address(i_pool);
-    }
-
-    /// @dev Aave liquidity index including pending interest, RAY (1e27) scale.
-    function _normalizedIncome() internal view returns (uint256) {
-        return i_pool.getReserveNormalizedIncome(address(i_stableToken));
     }
 
     /// @dev The shares credited are the aTokens actually gained, never a Pool return.

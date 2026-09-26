@@ -22,7 +22,7 @@ That duplication already produced the R27 Tropykus gaps. Do not “fix Tropykus 
 
 | Seam | Tropykus | Sovryn | LayerBank |
 | --- | --- | --- | --- |
-| Exchange rate | `exchangeRateCurrent()` / `exchangeRateStored()` | `tokenPrice()` | `_normalizedIncome()` (RAY `1e27`) |
+| Exchange rate | `exchangeRateCurrent()` / `exchangeRateStored()` | `tokenPrice()` | `_viewExchangeRate()` → Pool `getReserveNormalizedIncome` (RAY `1e27`) |
 | Deposit | `mint(amount)` → Compound code | `mint(this, amount)` | `pool.supply(...)` |
 | Share measurement | `kToken.balanceOf` | `iSusd.balanceOf` | `aToken.scaledBalanceOf` |
 | Redeem | `redeem(shares)`, always to handler | `burn(this, shares)` | `pool.withdraw(..., this)` |

@@ -149,7 +149,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R79 | after R85; not deployment-bound | **closed 2026-09-25 without implementation** (repeated-buyer write coalescing; about 1% of a batch; docs-only record) |
 | R86 | after R79, before relaunch deploy | none (`calldata` for the purchase batch arrays, decided 2026-09-25; path setters kept `memory` 2026-09-26; six deferred gas candidates recorded in the gas audit) |
 | R87 | after R86, before relaunch deploy | **one verdict per deferred gas candidate, after measurement** (idle ledger, purchase-row event fields, fee sweep, `FeeTransferred`, balance reuse, `optimizer_runs`); no PR if none is approved |
-| R88 | after R87, before relaunch deploy if either Solidity candidate ships | **two verdicts after artifact comparison** (shared exchange-rate scale declaration; inline LayerBank's single-use normalized-income helper); deprecated snapshot cheatcodes wait for an independently justified compatible `forge-std` upgrade |
+| R88 | after R87, before relaunch deploy if either Solidity candidate ships | **decided 2026-09-26:** reject shared scale declaration; **inline** LayerBank `_normalizedIncome` (source-only); cheatcode rename waits for an independently justified `forge-std` upgrade |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1246,19 +1246,23 @@ is closed.
 
 ### R88 - consider the post-R87 structural cleanups ([spec](./R88-post-r87-structural-cleanups.md))
 
-After R87. Review two source-structure candidates found by the final audit: make the exchange-rate scale
-one shared public immutable while preserving every concrete getter/constructor ABI and each adapter's
-hardcoded protocol value; and inline LayerBank's single-use `_normalizedIncome()` forwarding helper.
-Present metadata-stripped artifact, size, ABI, and gas evidence before asking for one verdict per
-candidate. Do not create a generic handler-core layer or remove genuine protocol/route hooks.
-
-The R87 gas tests continue using `snapshot()` / `revertTo()` while the repository's current `forge-std`
-lacks their replacements. Rename them opportunistically after an independently justified compatible
-dependency upgrade; do not bump `forge-std` solely to silence a deprecation warning.
+After R87. **Decided 2026-09-26** ([verdicts](./R88-post-r87-structural-cleanups.md#verdicts-2026-09-26)):
+reject a shared `EXCHANGE_RATE_DECIMALS` on `TokenLending` (size regression; renaming the immutable
+would change the getter ABI or leave a duplicate public name); **inline** LayerBank's single-use
+`_normalizedIncome()` into `_viewExchangeRate()` as source simplification only (default −9 bytes;
+deploy size-neutral, not a shipped gas claim); keep the R87 gas-test `snapshot` / `revertTo` warning
+until an independently justified compatible `forge-std` upgrade exposes `snapshotState` /
+`revertToState`.
 
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:
+
+- **R88 shared exchange-rate scale declaration — rejected 2026-09-26.** A shared field would remain
+  named `i_exchangeRateDecimals`; exposing that changes the getter ABI, and keeping a separate
+  `EXCHANGE_RATE_DECIMALS()` undermines consolidation. Measured stripped size also grew on every
+  lending leaf. Adapter-local constants and `TokenLending.i_exchangeRateDecimals` stay. See
+  [R88](./R88-post-r87-structural-cleanups.md#verdicts-2026-09-26).
 
 - **Gas candidates deferred 2026-09-25 — queued as [R87](./R87-deferred-gas-candidates.md).** The
   purchase-path review behind [R86](./R86-calldata-array-parameters.md) deferred six candidates:
