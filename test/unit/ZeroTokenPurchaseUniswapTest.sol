@@ -13,7 +13,7 @@ import {IWRBTC} from "../../src/interfaces/IWRBTC.sol";
 import {IUniswapV3SwapRouter} from "../../src/interfaces/IUniswapV3SwapRouter.sol";
 
 /**
- * @notice Proves `PurchaseUniswap` rejects a zero `i_stableToken` at path construction.
+ * @notice Proves `PurchaseUniswap`'s constructor rejects a zero `i_stableToken`.
  * @dev Split out of PurchaseUniswapSettingsTest.sol (R60) because this contract's constructor is
  *      deliberately, provably always-reverting — `StablecoinSource(address(0))` leaves the immutable
  *      unset — which trips a known solc/via_ir compiler limitation

@@ -65,7 +65,7 @@ interface IPurchaseUniswap {
     error PurchaseUniswap__InvalidOracleAddress();
     /// @notice MoC oracle `getPriceInfo` reported an invalid price.
     error PurchaseUniswap__OutdatedPrice();
-    /// @notice The handler's stablecoin is still the zero address, so a path cannot be built.
+    /// @notice The handler was constructed with a zero stablecoin address, which no path can start from.
     error PurchaseUniswap__ZeroPurchaseToken();
     /// @notice The handler's stablecoin has more than 18 decimals, so min-out cannot be scaled.
     error PurchaseUniswap__UnsupportedStablecoinDecimals(uint8 stablecoinDecimals);
