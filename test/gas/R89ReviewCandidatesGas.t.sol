@@ -5,13 +5,15 @@ import {console2, Vm} from "forge-std/Test.sol";
 import {stdStorage, StdStorage} from "forge-std/StdStorage.sol";
 import {DcaDappTest} from "test/unit/DcaDappTest.t.sol";
 import {IDcaManager} from "src/interfaces/IDcaManager.sol";
+import {OperationsAdmin} from "src/OperationsAdmin.sol";
 import {ITokenLending} from "src/interfaces/ITokenLending.sol";
 import {scheduleIdAt} from "test/utils/ScheduleAt.sol";
 import "test/Constants.sol";
 
 /**
  * @title R89ReviewCandidatesGas
- * @notice Read-count pins for the redundant reads R89 removed, plus the lane's 10-row batch figure.
+ * @notice Read-count pins for the redundant reads R89 removed, plus logged figures for its compute-only
+ *         changes.
  * @dev Reproduce on every local lane and both profiles, for example:
  *
  *          SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn forge test --match-path test/gas/R89ReviewCandidatesGas.t.sol -vv
@@ -31,6 +33,8 @@ contract R89ReviewCandidatesGasTest is DcaDappTest {
     /// @dev `s_scheduleIds` and `s_protocolSettings` in DcaManager (`forge inspect DcaManager storageLayout`).
     uint256 private constant SCHEDULE_IDS_SLOT = 3;
     uint256 private constant PROTOCOL_SETTINGS_SLOT = 4;
+    /// @dev `s_routeClass` in OperationsAdmin (`forge inspect OperationsAdmin storageLayout`).
+    uint256 private constant ROUTE_CLASS_SLOT = 3;
 
     address[] private s_buyers;
 
@@ -183,6 +187,44 @@ contract R89ReviewCandidatesGasTest is DcaDappTest {
         dcaManager.batchBuyRbtc(batch);
         uint256 gasUsed = gasBefore - gasleft();
         console2.log("batchBuyRbtc, 10 rows: gas", gasUsed);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                      ITEM 11: assignTokenHandler
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev One read of the route's class (was two: the registration check and the lending/idle split).
+    ///      A fresh registry takes the lane's real handler, so the pin runs on every lane.
+    function test_assignTokenHandler_readsRouteClassOnce() public {
+        OperationsAdmin registry = new OperationsAdmin(address(this));
+        if (s_routeIndex != IDLE_INDEX) {
+            registry.registerRoute(s_routeIndex, operationsAdmin.isLendingRoute(s_routeIndex));
+        }
+
+        vm.startStateDiffRecording();
+        uint256 gasBefore = gasleft();
+        registry.assignTokenHandler(address(stablecoin), s_routeIndex, address(stablecoinHandler));
+        uint256 gasUsed = gasBefore - gasleft();
+        Vm.AccountAccess[] memory accesses = vm.stopAndReturnStateDiff();
+
+        bytes32 routeClassSlot = keccak256(abi.encode(s_routeIndex, ROUTE_CLASS_SLOT));
+        uint256 routeClassReads = _reads(accesses, address(registry), routeClassSlot);
+        console2.log("assignTokenHandler: gas", gasUsed);
+        console2.log("  route-class reads", routeClassReads);
+        assertEq(routeClassReads, 1, "route class re-read");
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        ITEM 12: widening adds
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Logged figure only, like the batch. `createDcaSchedule`'s figure above includes the nonce add.
+    function test_activateProtectedPurchaseWindow() public {
+        vm.prank(SWAPPER);
+        uint256 gasBefore = gasleft();
+        dcaManager.activateProtectedPurchaseWindow();
+        uint256 gasUsed = gasBefore - gasleft();
+        console2.log("activateProtectedPurchaseWindow: gas", gasUsed);
     }
 
     /*//////////////////////////////////////////////////////////////
