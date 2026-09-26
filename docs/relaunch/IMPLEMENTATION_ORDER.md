@@ -1234,6 +1234,10 @@ check with the helpers as they are and inlined. The human then decides each one.
 Approved candidates ship in one PR, one commit each. If none is approved, R87 opens no branch and no
 PR. Ask: the six verdicts, all at once, after measuring.
 
+**Decided 2026-09-26** ([verdicts](./R87-deferred-gas-candidates.md#verdicts-2026-09-26)): remove the
+idle ledger, drop `FeeHandler__FeeTransferred`, and add an `unchecked` credit in `_creditRbtc`. Every
+other candidate, and assembly in the purchase path, is closed.
+
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:

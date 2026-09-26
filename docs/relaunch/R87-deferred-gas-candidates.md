@@ -1,6 +1,6 @@
 # R87 — consider the deferred gas candidates
 
-Status: **not started** · Assigned: yes · Optional/further-review: no
+Status: **decided 2026-09-26; implementation pending** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
@@ -9,6 +9,34 @@ review deferred. Any candidate the human approves ships in this item's PR.
 
 **If the human approves none, R87 opens no branch and no PR.** The deferred record in the gas audit
 stays as it is, and the chat ends with the verdicts reported to the human.
+
+## Verdicts (2026-09-26)
+
+Measured on a throwaway Foundry harness (not shipped) under the deploy profile at `c305e8d` (R86 head).
+It ran one 10-row batch per lane (MoC idle, Sovryn and LayerBank DOC, Dex idle and LayerBank USDRIF),
+counted reads and writes per slot with `vm.startStateDiffRecording`, and converted to Rootstock gas
+with [`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SCHEDULE.md). A 10-row batch is about 1.0M Rootstock
+gas, about $2.50 at 0.03 gwei.
+
+The rule applied: a saving that deletes code is taken even when small. A saving that adds code must
+clear about 1% **and** a meaningful dollar amount. These contracts are meant to be final, so nothing
+rejected here is revisited later.
+
+| Candidate | Measured Rootstock saving | Verdict | Why |
+|---|---|---|---|
+| Remove `IdleErc20Handler.s_idleBalances` | ≈5.75k per idle row (one `SLOAD`, one `RESET`), ≈5.7% of a 10-row idle batch; users ≈5.5k per idle deposit or withdrawal, ≈20k on a first deposit | **Remove** | Deletes code. The ledger always equals the sum of that user's idle schedule balances: every `tokenBalance` writer moves it by the same amount, and route bindings are write-once and add-only. So its check can never fire. Ship with an invariant test: idle handler stablecoin balance ≥ Σ idle schedule balances. |
+| Drop `FeeHandler__FeeTransferred` | 1,804 per batch | **Drop** | Deletes code. The same-call ERC-20 `Transfer` to the collector carries the same data, and BitChill pays for it every batch. The consumer cutover is already under way. |
+| Trim purchase-row event fields | `TokenLending__UserSharesUpdated` 1,742 per lending row; `RbtcBought`'s `tokenSpent` + `amountSpent` ≈650 per row | Keep | Events stay rich. |
+| Keep fees in the handler and sweep them | 14.0k per lending batch (no counter); 8.5k per idle batch (counter) | Reject | ≈1–1.4%, about $3 a year even with a yearly sweep. Adds an entry point, a counter, a custody rule, and a "never pay out `balanceOf(this)`" rule for lending code. |
+| Reuse the redeem's post-balance as the purchase's pre-balance | 1,550 per lending batch | Reject | ≈0.15%. Changes the `_batchRetrieveStablecoin` signature, gives invariant 12 two code paths (idle has no redeem measurement), and couples invariants 11 and 12 across layers. |
+| Raise `optimizer_runs` | 10,000: −2.8k to −3.5k per batch; 1,000,000: −4.1k to −5.4k per batch | Keep 200 | Deploy gas +3.3M / +6M, break-even 11–14 years. `DcaManager` grows 11,267 → 16,179 bytes; `LayerBankErc20HandlerDex` headroom shrinks 11,198 → 6,154 bytes. Writes per slot identical and the R81 tests pass at every value, so the R81 helpers stay. |
+| Assembly in the purchase path (added by the human) | `PurchaseRbtc` row loop ≈720 per row (≈0.7%); whole path estimated ≈1.5–2k per row | Reject | Compute is ≈4.2k of a ≈24k row, so even deleting all of it caps at ≈4%. It would override invariant 5, copy the rBTC encoding out of its helpers (invariant 13), and hand-maintain event and storage layout the compiler checks today. |
+| `unchecked` credit add in `_creditRbtc` (added by the human) | ≈45 per row | **Add** | For consistency with the protocol's other justified `unchecked` blocks, not for gas. Each credit is a share of rBTC the contract measured receiving, so the sum stays near rBTC's supply (≈2⁸⁵); OpenZeppelin's ERC-20 uses the same argument. Stays inside `_creditRbtc`, so invariant 13 holds. |
+
+Approved for implementation: removing the idle ledger (with its invariant test), dropping
+`FeeHandler__FeeTransferred`, and the `unchecked` credit add. Each ships in its own commit in the R87
+PR, with consumer issues for the removed event, the removed `getUsersIdleTokenBalance` getter, and the
+idle `AmountAdjusted` event and error that go with the ledger.
 
 ## Background
 

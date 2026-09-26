@@ -136,6 +136,11 @@ The review produced seven candidates:
 
 Figures are Rootstock gas, estimated from source; none of the six has been measured.
 
+**Decided 2026-09-26.** R87 measured all six; the verdicts and measured figures are in
+[R87 § Verdicts](./R87-deferred-gas-candidates.md#verdicts-2026-09-26). Approved: remove the idle ledger
+and drop `FeeHandler__FeeTransferred`. Kept as they are: event fields and `optimizer_runs` 200. Rejected:
+the fee sweep and balance reuse. The estimates below are kept as the record the decision started from.
+
 - **Remove `IdleErc20Handler.s_idleBalances`.** This is the only candidate above about 2% of a batch.
   - **Saving:**
     - Protocol: about 5.3k per idle purchase row (one `RESET` plus its read), about 5–6% of a 10-row idle
