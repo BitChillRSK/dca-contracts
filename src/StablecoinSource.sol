@@ -27,6 +27,7 @@ abstract contract StablecoinSource is IStablecoinSource {
      * @param tokenAddress The stablecoin this handler holds or lends out.
      */
     constructor(address tokenAddress) {
+        if (tokenAddress == address(0)) revert StablecoinSource__ZeroStablecoin();
         i_stableToken = IERC20(tokenAddress);
     }
 

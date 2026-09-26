@@ -335,7 +335,8 @@ Later ownership changes (new Safe, recovered wallet) are the same two steps: cur
 The relaunch deployment profile is **`[profile.deploy]`** (`FOUNDRY_PROFILE=deploy`): solc `0.8.36`,
 Cancun, `optimizer = true`, `optimizer_runs = 200`, and — unlike every other profile in this repo —
 `via_ir = true`, compiled across `src/`, `test/`, and `script/` with exactly one file excluded
-(`test/unit/ZeroTokenPurchaseUniswapTest.sol`; see R60). Every broadcast command above **requires**
+(`test/ai-generated/unit/layerbank/LayerBankErc20HandlerDexTest.t.sol`; see `foundry.toml`). Every
+broadcast command above **requires**
 `FOUNDRY_PROFILE=deploy` in its environment — `forge script` reads compiler settings from whichever
 profile is active, and without it a broadcast silently compiles and deploys the `[profile.default]`
 (no-IR) artifact instead, which is not what `make check-deploy` validated.

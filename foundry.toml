@@ -42,15 +42,7 @@ via_ir = true
 [profile.deploy.fuzz]
 runs = 1000
 
-# ZeroTokenPurchaseUniswapTest.sol's ZeroTokenPurchaseUniswap has a deliberately always-reverting
-# constructor (`StablecoinSource(address(0))`), which trips a known
-# solc/via_ir limitation (https://github.com/ethereum/solidity/issues/11642): the optimizer proves the
-# revert is unconditional and dead-code-eliminates the immutable assignment after it, then a later
-# checker reports error 1284 ("immutables read but never assigned"). Restructuring the real
-# PurchaseUniswap constructor cannot fix this — the bug is specific to this always-reverting derived
-# test contract.
-#
-# LayerBankErc20HandlerDexTest.t.sol trips a *different* via_ir/Yul stack-too-deep ("Variable size is
+# LayerBankErc20HandlerDexTest.t.sol trips a via_ir/Yul stack-too-deep ("Variable size is
 # 1 too deep in the stack ... memoryguard was present"): it is the one HandlerTestHarness subclass that
 # is simultaneously a Dex handler and a LayerBank lending handler, and via_ir compiles a contract's full
 # inherited call graph together — that combination overflows the Yul optimizer's stack allocator for
@@ -58,19 +50,15 @@ runs = 1000
 # pre-existing (reproduces on a clean checkout of this branch's base, unrelated to R73) via bisection
 # with `forge build --skip`.
 #
-# These two files are the only ones excluded from [profile.deploy]'s via_ir; every other test file and
-# all of src/ still compile under IR, and both files' assertions still run — under legacy codegen — as
-# part of `make check-deploy`.
+# This file is the only one excluded from [profile.deploy]'s via_ir; every other test file and all of
+# src/ still compile under IR, and its assertions still run — under legacy codegen — as part of
+# `make check-deploy`.
 [[profile.deploy.additional_compiler_profiles]]
 name = "legacy-codegen"
 via_ir = false
 optimizer = true            # required: this extra profile does not inherit [profile.deploy]'s
 optimizer_runs = 200        # optimizer settings, and without them legacy codegen builds fail
                              # stack-too-deep (see docs/relaunch/R55-solx-and-ir-evaluation.md)
-
-[[profile.deploy.compilation_restrictions]]
-paths = "test/unit/ZeroTokenPurchaseUniswapTest.sol"
-via_ir = false
 
 [[profile.deploy.compilation_restrictions]]
 paths = "test/ai-generated/unit/layerbank/LayerBankErc20HandlerDexTest.t.sol"
