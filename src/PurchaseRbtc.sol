@@ -106,9 +106,8 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
             uint256 plannedNet = netStablecoinAmountsToSpend[i];
             address buyer = buyers[i];
             uint256 usersPurchasedRbtc;
-            // The rBTC total was measured as received, so it is below the native supply (about 2^85 wei), and
-            // each weight is a uint96 purchase amount net of fee. A zero divisor still panics. The stablecoin
-            // product below stays checked: only the token's supply bounds it, and nothing here enforces that.
+            // Received rBTC is below the native supply (about 2^85 wei) and each weight is a uint96. The
+            // stablecoin product stays checked: nothing here bounds the token's supply.
             unchecked {
                 usersPurchasedRbtc = totalPurchasedRbtc * plannedNet / totalNetStablecoinPlanned;
             }

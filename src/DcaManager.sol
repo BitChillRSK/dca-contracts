@@ -358,7 +358,6 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
             revert DcaManager__ProtectedPurchaseWindowStillActive(userMutationsAllowedFromBlock);
         }
 
-        // A block height cannot come within five of 2^256.
         unchecked {
             userMutationsAllowedFromBlock = block.number + PROTECTED_PURCHASE_WINDOW_BLOCKS;
         }
@@ -627,7 +626,6 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
             revert DcaManager__ScheduleIdIndexMismatch(token, scheduleId, index);
         }
 
-        // numOfSchedules > index >= 0 by the check above, so numOfSchedules >= 1.
         uint256 lastIndex;
         unchecked {
             lastIndex = numOfSchedules - 1;

@@ -171,8 +171,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
             uint256 fee = _calculateFeeAtRate(amount, feeRate);
 
             uint256 net;
-            // Fee rates are capped at 5%, so the fee cannot exceed its input amount. Each amount is a
-            // schedule's uint96 purchase amount, so neither sum can approach 2^256.
+            // The fee is at most 5% of a uint96 amount, so neither the subtraction nor the sums can overflow.
             unchecked {
                 net = amount - fee;
                 aggregatedFee += fee;
@@ -210,8 +209,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
             );
 
             uint256 net;
-            // Fee rates are capped at 5%, so the fee cannot exceed its input amount. Each amount is a
-            // schedule's uint96 purchase amount, so neither sum can approach 2^256.
+            // The fee is at most 5% of a uint96 amount, so neither the subtraction nor the sums can overflow.
             unchecked {
                 net = amount - fee;
                 aggregatedFee += fee;
