@@ -1264,6 +1264,12 @@ NatSpec, and a stray interface file. **Decided 2026-09-26:** implement all of th
 spec records every candidate the review weighed and did not ship, with its reason, and lists what earlier
 specs already decided. Ask: none.
 
+**Implemented** ([results](./R89-post-r88-review-candidates.md#results-2026-09-26)). On the `deploy`
+profile, 10-row batches save 4,140–4,236 gas on Rootstock (compute).
+`withdrawAllAccumulatedInterest` saves about 4,160 at 10 schedules, and each lending withdraw or create
+saves about 190–520. Every handler's runtime shrinks by 93–120 bytes; `DcaManager` grows by 255 and
+`OperationsAdmin` by 111. The only ABI addition is `OperationsAdmin__HandlerTokenMismatch`.
+
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:

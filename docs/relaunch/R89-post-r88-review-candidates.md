@@ -1,6 +1,6 @@
 # R89 — implement the post-R88 review candidates
 
-Status: **assigned** · Assigned: yes · Optional/further-review: no
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
@@ -37,18 +37,18 @@ outside the gas/code-quality brief, and record the rest here.
 
 One commit per item.
 
-- [ ] **1. `_lockedPrincipal` copies the id array to memory.** It walks a `uint64[] storage`, so every
+- [x] **1. `_lockedPrincipal` copies the id array to memory.** It walks a `uint64[] storage`, so every
   `scheduleIds[i]` re-reads the length for the bounds check and re-reads the packed word: 1 + 2N reads
   where 1 + ⌈N/4⌉ suffice. The storage pointer, and the comment "without copying the schedule array",
   date from before R64, when the array held whole `DcaDetails` structs. Change the one keyword and fix
   the comment.
-- [ ] **2. `_redeemShares` takes the shares its callers already loaded.** `withdrawInterest` and
+- [x] **2. `_redeemShares` takes the shares its callers already loaded.** `withdrawInterest` and
   `_withdrawToken` read `s_shares[user]` and `_redeemShares` reads it again; `via_ir` keeps both reads.
   Pass the value in, as `_setUserShares(previousShares)` already does. Update the one test-harness call.
-- [ ] **3. `_validatePurchasePeriod` takes the minimum.** It re-reads `s_protocolSettings`, which makes
+- [x] **3. `_validatePurchasePeriod` takes the minimum.** It re-reads `s_protocolSettings`, which makes
   the "One load of the packed scalars" comment in `createDcaSchedule` untrue. Create passes
   `settings.minPurchasePeriod`; update passes a direct read. The revert order does not change.
-- [ ] **4. Purchase-path arithmetic that cannot overflow runs `unchecked`.** Each bound follows from a
+- [x] **4. Purchase-path arithmetic that cannot overflow runs `unchecked`.** Each bound follows from a
   width or a cap the code already enforces:
   - fee-loop sums (`aggregatedFee`, `totalAmountToSpend`), flat and variable: each row is a schedule's
     `uint96` purchase amount, so a sum is below `n · 2⁹⁶`;
@@ -65,7 +65,7 @@ One commit per item.
     widths, and it feeds only `RbtcBought.amountSpent`. The review marked it optional; the human chose
     to include it.
   Divisions stay as they are: a zero divisor still panics inside `unchecked`.
-- [ ] **5. Off-purchase-path arithmetic of the same kind runs `unchecked`.** Found while implementing
+- [x] **5. Off-purchase-path arithmetic of the same kind runs `unchecked`.** Found while implementing
   item 4, so they get their own commit:
   - `_lockedPrincipal`'s sum: each `tokenBalance` is `uint128`, and a user holds fewer than `2¹⁶`
     schedules per token, because `maxSchedulesPerToken` is a `uint16`;
@@ -73,12 +73,12 @@ One commit per item.
     comparison that guards them;
   - the share credit in `_depositToken`: a user's booked shares are measured mint deltas less exact
     burns, so they are bounded by the receipt token's supply.
-- [ ] **6. `PurchaseUniswap` checks for a zero stablecoin once, in its constructor.** `i_stableToken` is
+- [x] **6. `PurchaseUniswap` checks for a zero stablecoin once, in its constructor.** `i_stableToken` is
   immutable, but `_encodePurchasePath` re-checks it on every owner path call, and the constructor has
   to keep path encoding above its `decimals()` read so that check fires first. Check at the top of the
   constructor instead; the encoder uses `i_stableToken` directly and the ordering comment goes. The
   error and its selector do not change.
-- [ ] **7. `assignTokenHandler` refuses a handler built for another stablecoin.** Assignment is add-only
+- [x] **7. `assignTokenHandler` refuses a handler built for another stablecoin.** Assignment is add-only
   and burns the handler address (R47), so one mistyped `token` permanently occupies a `(token, route)`
   pair with a handler that would pull a different stablecoin from depositors. This is the same kind of
   one-argument, permanent mistake R13/R31 closed for route class. The deploy tests check each script's
@@ -87,18 +87,100 @@ One commit per item.
   `OperationsAdmin__HandlerTokenMismatch(token, handler)`. Do not add `i_stableToken` to
   `ITokenHandler`: that would change the ERC-165 id every handler advertises and every consumer that
   hardcodes it. `StablecoinSource` already declares the public getter.
-- [ ] **8. Stale idle-ledger NatSpec.** R87 removed the idle ledger, but two comments still describe it:
+- [x] **8. Stale idle-ledger NatSpec.** R87 removed the idle ledger, but two comments still describe it:
   - `IDcaManager.withdrawToken`'s `@dev` still says an idle route "pays short only if the handler's own
     ledger disagrees", and `@inheritdoc` carries that sentence into the verified `DcaManager`;
   - `PurchaseRbtc.batchBuyRbtc`'s `@dev` still says the idle handler "reverts rather than
     under-deliver", which described the deleted `InsufficientIdleBalance` revert.
-- [ ] **9. Delete the resurrected `src/interfaces/IStablecoin.sol`.** R61 (`430cfbd`) moved it to
+- [x] **9. Delete the resurrected `src/interfaces/IStablecoin.sol`.** R61 (`430cfbd`) moved it to
   `test/interfaces/`. `938f86b`, a DcaManager header-docs commit, re-added it by accident, and R72 then
   relicensed the stray copy. Nothing in `src/` or `script/` imports it, and the mocks import the test
   copy.
-- [ ] **10. Retained evidence.** Add `test/gas/R89ReviewCandidatesGas.t.sol` with read-count pins for
-  items 1–3 and printed batch figures for item 4, plus bound tests for item 4's arithmetic at its
-  extremes, compared against a full-width reference.
+- [x] **10. Retained evidence.** Add `test/gas/R89ReviewCandidatesGas.t.sol`, built on `DcaDappTest`
+  so it measures each lane's script-deployed handler. It pins per-slot read counts for items 1–3 and
+  logs the lane's 10-row batch for item 4. Add bound tests to the suites that already own each harness:
+  `FeeHandlerTest` for the fee loops, `IdleErc20HandlerTest` for the idle sum, and `PurchaseRbtcTest`
+  for both allocation products. Each drives its block to the stated bound and compares it with
+  full-width arithmetic.
+
+## Results (2026-09-26)
+
+Measured with `test/gas/R89ReviewCandidatesGas.t.sol` on each lane's script-deployed handler, on this
+branch's head and on the parent PR's `src/` (`e557bd9`, #153) with the same test file. Rootstock
+figures add 100 for every removed warm re-read, because Foundry charges 100 for it and Rootstock 200
+([schedule](./ROOTSTOCK-GAS-SCHEDULE.md)). Everything else these items change is compute, which is
+priced the same on both.
+
+### Gas, `deploy` profile (ships)
+
+| Path | Lane | Foundry before → after | Foundry Δ | Reads removed | Rootstock Δ |
+|---|---|---:|---:|---:|---:|
+| `batchBuyRbtc`, 10 rows | idle MoC (DOC) | 464,131 → 459,991 | −4,140 | 0 | **−4,140** |
+| | Sovryn MoC (DOC) | 599,021 → 594,785 | −4,236 | 0 | **−4,236** |
+| | LayerBank MoC (DOC) | 608,256 → 604,020 | −4,236 | 0 | **−4,236** |
+| | idle Dex (USDRIF) | 497,263 → 493,090 | −4,173 | 0 | **−4,173** |
+| | LayerBank Dex (USDRIF) | 641,622 → 637,470 | −4,152 | 0 | **−4,152** |
+| `withdrawAllAccumulatedInterest`, one lending pair, 10 schedules | Sovryn MoC | 62,969 → 60,610 | −2,359 | 18 | **≈ −4,160** |
+| | LayerBank MoC / Dex | 65,744 → 63,382 | −2,362 | 18 | **≈ −4,160** |
+| `withdrawTokenAndInterest`, one schedule | Sovryn MoC | 124,309 → 124,097 | −212 | 3 | **≈ −510** |
+| | LayerBank MoC | 132,341 → 132,123 | −218 | 3 | **≈ −520** |
+| `withdrawToken`, lending | Sovryn MoC | 76,069 → 75,910 | −159 | 1 | **≈ −260** |
+| | LayerBank MoC | 81,326 → 81,164 | −162 | 1 | **≈ −260** |
+| `createDcaSchedule` | lending routes | 169,934 → 169,788 | −146 | 1 | **≈ −250** |
+| | idle routes | 106,973 → 106,882 | −91 | 1 | **≈ −190** |
+
+- **Batch.** Item 4 saves about 420 per row. A 10-row relaunch batch is about 1M on Rootstock (the gas
+  audit's live fit, with its relaunch row), so that is about 0.4%, or about a cent at R87's
+  conversion.
+- **Removed reads per path.** In `withdrawAllAccumulatedInterest`, 17 are id-array re-reads (item 1)
+  and one is the booked-shares re-read (item 2). `withdrawTokenAndInterest` removes two booked-shares
+  re-reads and one id-array re-read. `withdrawToken` removes one booked-shares re-read, and
+  `createDcaSchedule` one settings re-read (item 3).
+- **More schedules, more saving.** `_lockedPrincipal`'s saving grows with the caller's schedule count:
+  under `deploy` it removes N + (N − ⌈N/4⌉) reads for N schedules on the token, and under `default`
+  it removes N. `topUpFromInterest` and the `getInterestAccrued` view run the same loop.
+- **Item 5.** It is compute only (tens of gas per call) and is inside the non-batch figures above.
+
+`default` profile, as same-build Foundry pins: 10-row batches −5,982 (idle) and −6,092 (lending);
+`withdrawAllAccumulatedInterest` −810, with 11 reads removed there, because legacy codegen still reads
+one id word per id; `withdrawTokenAndInterest` −321; `withdrawToken` −192; `createDcaSchedule` −99 (idle)
+and −165 (lending).
+
+### Read-count pins (per slot, `vm.startStateDiffRecording`)
+
+| Pin | Before | After (`default`) | After (`deploy`) |
+|---|---:|---:|---:|
+| `_lockedPrincipal`, 10 ids: array length | 11 | 1 | 1 |
+| `_lockedPrincipal`, 10 ids: id words (3 packed) | 10 | 10 | 3 |
+| `withdrawToken`: the user's booked shares | 2 | 1 | 1 |
+| `withdrawTokenAndInterest`: the user's booked shares | 4 | 2 | 2 |
+| `createDcaSchedule`: the settings word | 3 | 2 | 2 |
+
+The before column is the same on both profiles. Two reads of the settings word remain after the
+change: the one load, and the read inside the nonce's read-modify-write. The latter is the compiler's
+packed-field write, which the gas audit closed.
+
+### Runtime size (bytes, metadata included), per commit
+
+`deploy`:
+
+| Item | DcaManager | OperationsAdmin | Idle MoC | Idle Dex | Sovryn MoC | Sovryn Dex | LayerBank MoC | LayerBank Dex |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 `_lockedPrincipal` | +254 | | | | | | | |
+| 2 `_redeemShares` | | | | | +5 | +5 | +5 | +126 |
+| 3 `_validatePurchasePeriod` | +11 | | | | | | | |
+| 4 purchase-path `unchecked` | | | −110 | −88 | −91 | −63 | −78 | −184 |
+| 5 off-path `unchecked` | −10 | | | | −20 | −20 | −20 | −20 |
+| 6 zero-stablecoin check | | | | −32 | | −32 | | −32 |
+| 7 handler/token match | | +111 | | | | | | |
+| **Total** | **+255** | **+111** | **−110** | **−120** | **−106** | **−110** | **−93** | **−110** |
+
+`default`: DcaManager +115, OperationsAdmin +185, every handler −103 to −145.
+
+`via_ir` places code differently for item 2 on the LayerBank Dex leaf (+126), and item 4 more than
+takes it back. Items 8 and 9 leave metadata-stripped runtime and creation code byte-identical on all
+ten deployable contracts, under both profiles. The largest artifact, LayerBank Dex, ends at 13,077
+bytes under `deploy`, far below EIP-170.
 
 ## Considered, not implemented
 
@@ -131,9 +213,9 @@ One commit per item.
 
 ## Out of scope
 
-- [ ] Any candidate in **Considered, not implemented** or **Already decided**.
-- [ ] Assembly anywhere in the purchase path (invariant 5).
-- [ ] Any storage-layout, selector, or event change. The one ABI addition is item 7's custom error.
+- [x] Any candidate in **Considered, not implemented** or **Already decided**.
+- [x] Assembly anywhere in the purchase path (invariant 5).
+- [x] Any storage-layout, selector, or event change. The one ABI addition is item 7's custom error.
 
 ## Files likely touched
 
@@ -150,7 +232,8 @@ One commit per item.
 - `test/unit/ZeroTokenPurchaseUniswapTest.sol` (item 6 wording)
 - `test/unit/OperationsAdminTest.t.sol`, `test/gas/StubPurchaseHandler.sol`, and any test that assigns a
   handler under a token it was not built for (item 7)
-- `test/gas/R89ReviewCandidatesGas.t.sol`, `test/unit/UncheckedArithmeticBoundsTest.t.sol` (item 10)
+- `test/gas/R89ReviewCandidatesGas.t.sol`, `test/ai-generated/unit/FeeHandlerTest.t.sol`,
+  `test/ai-generated/unit/idle/IdleErc20HandlerTest.t.sol`, `test/unit/PurchaseRbtcTest.t.sol` (item 10)
 - `docs/relaunch/README.md`, `docs/relaunch/IMPLEMENTATION_ORDER.md`,
   `docs/relaunch/ROOTSTOCK-GAS-AUDIT.md`
 
@@ -164,17 +247,21 @@ One commit per item.
 - Item 7: a mismatched stablecoin reverts with the new error, and a handler with no `i_stableToken()`
   still reverts. The error-precedence tests keep their order: code, class, and ERC-165 checks fire first.
 - Item 6: `PurchaseUniswapZeroTokenTest` still expects `PurchaseUniswap__ZeroPurchaseToken`.
-- Item 4: bound tests at `type(uint96).max` amounts, the 500 bps cap, and an rBTC total at the native-supply
-  bound, each checked against a full-width reference.
+- Item 4: bound tests at `type(uint96).max` amounts, the 500 bps cap, rBTC at `2⁸⁵`, and a delivered
+  stablecoin total of `2¹⁶⁰ − 1`, each checked against full-width arithmetic (`Math.mulDiv` for the
+  products).
 - No fork-specific assertions are added.
 
 ## Success criteria
 
-- [ ] Items 1–10 are implemented, one commit each, and nothing from **Out of scope** ships.
-- [ ] Read-count pins show items 1–3 removing the reads listed under **Results**, on both profiles.
-- [ ] Every `unchecked` block states its bound in a source comment and has a test at its extremes.
-- [ ] No selector, event, or storage-layout change; one new `OperationsAdmin` custom error.
-- [ ] Every figure under **Results** names its schedule (Foundry or Rootstock) and its profile.
+- [x] Items 1–10 are implemented, one commit each, and nothing from **Out of scope** ships.
+- [x] Read-count pins show items 1–3 removing the reads listed under **Results**, on both profiles.
+- [x] Every `unchecked` block states its bound in a source comment. The item 4 blocks that rest on a width
+  or a supply (the fee loops, the idle sum, both allocation products) are tested at that bound against
+  full-width arithmetic. The lending sum is also re-checked at run time, because the market must burn
+  exactly that total, and item 5's subtractions sit behind the comparison that guards them.
+- [x] No selector, event, or storage-layout change; one new `OperationsAdmin` custom error.
+- [x] Every figure under **Results** names its schedule (Foundry or Rootstock) and its profile.
 
 ## Reviewer checklist
 
