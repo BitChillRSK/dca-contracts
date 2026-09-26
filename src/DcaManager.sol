@@ -139,7 +139,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         ProtocolSettings memory settings = s_protocolSettings;
         uint64 scheduleId = (uint256(settings.scheduleNonce) + 1).toUint64();
 
-        _validatePurchasePeriod(purchasePeriod);
+        _validatePurchasePeriod(purchasePeriod, settings.minPurchasePeriod);
         _validateDeposit(depositAmount);
         _handlerForDeposit(token, route).depositToken(msg.sender, depositAmount);
         // The remaining two checks sit after the pull: the minimum purchase amount, validated against
@@ -204,7 +204,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         nonReentrant
     {
         DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
-        _validatePurchasePeriod(newPurchasePeriod);
+        _validatePurchasePeriod(newPurchasePeriod, s_protocolSettings.minPurchasePeriod);
         uint256 previousPurchasePeriod = dcaSchedule.purchasePeriod;
         dcaSchedule.purchasePeriod = newPurchasePeriod.toUint32();
         emit DcaManager__PurchasePeriodUpdated(msg.sender, scheduleId, previousPurchasePeriod, newPurchasePeriod);
@@ -648,9 +648,12 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         }
     }
 
-    /// @dev The period must meet the protocol minimum and preserve the midnight cadence grid.
-    function _validatePurchasePeriod(uint256 purchasePeriod) private view {
-        if (purchasePeriod < s_protocolSettings.minPurchasePeriod) {
+    /**
+     * @dev The period must meet the protocol minimum and preserve the midnight cadence grid. The caller
+     *      supplies the minimum so creation can take it from the settings word it already loaded.
+     */
+    function _validatePurchasePeriod(uint256 purchasePeriod, uint256 minPurchasePeriod) private pure {
+        if (purchasePeriod < minPurchasePeriod) {
             revert DcaManager__PurchasePeriodMustBeGreaterThanMinimum();
         }
         if (purchasePeriod % 1 days != 0) revert DcaManager__PurchasePeriodMustBeWholeDays();
