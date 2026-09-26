@@ -73,7 +73,7 @@ One commit per item.
   immutable, but `_encodePurchasePath` re-checks it on every owner path call, and the constructor has
   to keep path encoding above its `decimals()` read so that check fires first. Check at the top of the
   constructor instead; the encoder uses `i_stableToken` directly and the ordering comment goes. The
-  error and its selector do not change.
+  error and its selector do not change here; item 13 then moves the check to `StablecoinSource`.
 - [x] **7. `assignTokenHandler` refuses a handler built for another stablecoin.** Assignment is add-only
   and burns the handler address (R47), so one mistyped `token` permanently occupies a `(token, route)`
   pair with a handler that would pull a different stablecoin from depositors. This is the same kind of
@@ -126,6 +126,21 @@ One commit per item.
     `toUint64()` around it stays, so nonce exhaustion still reverts (R50).
   - `block.number + PROTECTED_PURCHASE_WINDOW_BLOCKS` in `activateProtectedPurchaseWindow` adds 5 to a
     block height.
+- [x] **13. `StablecoinSource` rejects a zero stablecoin.** It stores `i_stableToken` for every
+  handler, but only `PurchaseUniswap` refused a zero one. Found in the owner's review (2026-09-27).
+  - Before this item, only the idle Dex leaf reached that check, and the idle MoC leaf deployed with a
+    zero stablecoin. The lending leaves' constructors run before `PurchaseUniswap`'s, so they failed on
+    the token or the market instead. Sovryn's approval reverted with
+    `SafeERC20FailedOperation(address(0))`, and LayerBank's underlying check with
+    `LayerBankErc20Handler__UnderlyingMismatch()`.
+  - Item 7 already stops such a handler from being assigned, since its `i_stableToken()` cannot equal
+    an accepted token. So this is a deploy-time diagnostic, not a new guard.
+  - The check moves into `StablecoinSource`'s constructor as `StablecoinSource__ZeroStablecoin()`,
+    declared on `IStablecoinSource`. `PurchaseUniswap__ZeroPurchaseToken` goes.
+  - Only constructors change, so runtime code should not move.
+  - `ZeroTokenPurchaseUniswapTest` tested the old check through a test-only contract whose constructor
+    always reverts. That needs a `via_ir` exemption in `foundry.toml` (solc error 1284, R60). A test
+    that deploys each production leaf with a zero stablecoin replaces it, and the exemption goes.
 
 ## Review follow-up (2026-09-26)
 
@@ -286,7 +301,8 @@ ends at 13,227 bytes under `deploy`, far below EIP-170's 24,576.
 
 - [x] Any candidate in **Considered, not implemented** or **Already decided**.
 - [x] Assembly anywhere in the purchase path (invariant 5).
-- [x] Any storage-layout, selector, or event change. The one ABI addition is item 7's custom error.
+- [x] Any storage-layout, selector, or event change. The ABI changes are item 7's custom error and item
+  13's swap of one constructor error for another.
 
 ## Files likely touched
 
@@ -295,14 +311,17 @@ ends at 13,227 bytes under `deploy`, far below EIP-170's 24,576.
 - `src/FeeHandler.sol` (item 4)
 - `src/idle/IdleErc20Handler.sol` (item 4)
 - `src/PurchaseRbtc.sol` (items 4, 8)
-- `src/PurchaseUniswap.sol`, `src/interfaces/IPurchaseUniswap.sol` (item 6)
+- `src/PurchaseUniswap.sol`, `src/interfaces/IPurchaseUniswap.sol` (items 6, 13)
 - `src/OperationsAdmin.sol` (items 7, 11), `src/interfaces/IOperationsAdmin.sol`, `src/interfaces/IStablecoinSource.sol`
   (new), `src/interfaces/ITokenHandler.sol`, `src/interfaces/IPurchaseRbtc.sol`, `src/StablecoinSource.sol`
   (item 7)
 - `src/interfaces/IDcaManager.sol` (item 8)
 - `src/interfaces/IStablecoin.sol` (item 9, deleted)
 - `test/unit/LendingErc20HandlerRedeemTest.t.sol` (item 2 harness call)
-- `test/unit/ZeroTokenPurchaseUniswapTest.sol` (item 6 wording)
+- `test/unit/ZeroTokenPurchaseUniswapTest.sol` (item 6 wording; deleted by item 13)
+- `src/StablecoinSource.sol`, `src/interfaces/IStablecoinSource.sol`, `test/unit/ZeroStablecoinTest.t.sol`
+  (new), `test/unit/PurchaseUniswapSettingsTest.sol` (a pointer comment), `foundry.toml` (the
+  exemption), `README.md` (which names the exempt file) (item 13)
 - `test/unit/OperationsAdminTest.t.sol`, `test/gas/StubPurchaseHandler.sol`, any test that assigns a
   handler under a token it was not built for, and any test stub that implements `ITokenHandler` (item 7)
 - `test/gas/R89ReviewCandidatesGas.t.sol`, `test/ai-generated/unit/FeeHandlerTest.t.sol`,
@@ -319,7 +338,9 @@ ends at 13,227 bytes under `deploy`, far below EIP-170's 24,576.
   `FOUNDRY_PROFILE=deploy`.
 - Item 7: a mismatched stablecoin reverts with the new error, and a handler with no `i_stableToken()`
   still reverts. The error-precedence tests keep their order: code, class, and ERC-165 checks fire first.
-- Item 6: `PurchaseUniswapZeroTokenTest` still expects `PurchaseUniswap__ZeroPurchaseToken`.
+- Item 13: each of the six production leaves, deployed with a zero stablecoin, reverts with
+  `StablecoinSource__ZeroStablecoin`, under both profiles. With the exemption gone, `make check-deploy`
+  compiles every test file but `LayerBankErc20HandlerDexTest.t.sol` under `via_ir`.
 - Item 4: bound tests at `type(uint96).max` amounts, the 500 bps cap, and rBTC at `2⁸⁵`, each checked
   against full-width arithmetic (`Math.mulDiv` for the rBTC product).
 - Item 11: a read-count pin on `s_routeClass[route]` during `assignTokenHandler`, on every lane.
@@ -329,14 +350,15 @@ ends at 13,227 bytes under `deploy`, far below EIP-170's 24,576.
 
 ## Success criteria
 
-- [x] Items 1–12 are implemented, one commit each, and nothing from **Out of scope** ships.
+- [x] Items 1–13 are implemented, one commit each, and nothing from **Out of scope** ships.
 - [x] Read-count pins show items 1–3 and 11 removing the reads listed under **Results**, on both
   profiles.
-- [x] Every `unchecked` block states its bound in a source comment. The item 4 blocks that rest on a width
-  or a supply (the fee loops, the idle sum, the rBTC allocation product) are tested at that bound
-  against full-width arithmetic. Item 5's subtractions sit behind the comparison that guards them. No
-  `unchecked` block rests on a lending market's or a stablecoin's behavior.
-- [x] No selector, event, or storage-layout change; one new `OperationsAdmin` custom error.
+- [x] Every `unchecked` block this PR adds either sits right below the comparison that guards it (item
+  5's subtractions) or states its bound in a source comment. The item 4 blocks that rest on a width or
+  a supply (the fee loops, the idle sum, the rBTC allocation product) are tested at that bound against
+  full-width arithmetic. No `unchecked` block rests on a lending market's or a stablecoin's behavior.
+- [x] No selector, event, or storage-layout change. One new `OperationsAdmin` custom error, and one
+  constructor error renamed and moved to `StablecoinSource`.
 - [x] Every figure under **Results** names its schedule (Foundry or Rootstock) and its profile.
 
 ## Reviewer checklist
@@ -357,10 +379,11 @@ ends at 13,227 bytes under `deploy`, far below EIP-170's 24,576.
   The `ITokenHandler` and `IPurchaseRbtc` interface ABIs now list `i_stableToken()`, which every
   handler already exposed, so no deployed contract's ABI changes and `ITokenHandler`'s ERC-165 id
   does not move.
-  `PurchaseUniswap__ZeroPurchaseToken` now fires at the top of the constructor instead of during path
-  encoding; its selector is unchanged.
+  Item 13 replaces `PurchaseUniswap__ZeroPurchaseToken()` with `StablecoinSource__ZeroStablecoin()`.
+  Both are constructor-only, so no transaction to a deployed contract can return either.
 - Scripts: none. Every deploy script already constructs each handler with the stablecoin it assigns,
   and the deployment tests prove it. Item 7 turns that into a property the contract enforces.
-- Cutover: `bitchill-monitoring` should regenerate its `abi.json` for the new error. That goes as a
-  comment on its running relaunch issue, following R47's new owner-only error. There is no other
+- Cutover: `bitchill-monitoring` should regenerate its `abi.json` for the new error and the swapped
+  constructor error. That goes as a comment on its running relaunch issue, following R47's new
+  owner-only error. There is no other
   consumer surface.
