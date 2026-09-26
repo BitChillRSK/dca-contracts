@@ -1273,7 +1273,10 @@ and deposit credit, whose bound is the market's receipt token. It also added a c
 `assignTokenHandler` and two `unchecked` widening adds (spec items 11–12). Runtime size under `deploy`:
 - handlers change by −117 to +40 bytes (LayerBank Dex is a `via_ir` layout effect);
 - `DcaManager` grows by 241 and `OperationsAdmin` by 88.
-The only ABI addition is `OperationsAdmin__HandlerTokenMismatch`.
+The owner's review then moved the zero-stablecoin check into `StablecoinSource` (item 13), so every
+handler leaf rejects one at construction, not only idle Dex. That changes constructors only; runtime
+code is byte-identical. The ABI changes are the new `OperationsAdmin__HandlerTokenMismatch` and the
+constructor error `PurchaseUniswap__ZeroPurchaseToken`, replaced by `StablecoinSource__ZeroStablecoin`.
 
 ## Closed non-implementation decisions
 

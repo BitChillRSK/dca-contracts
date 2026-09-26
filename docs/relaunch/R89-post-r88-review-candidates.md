@@ -263,7 +263,10 @@ packed-field write, which the gas audit closed.
 (+150). Item 4 takes back only part of that, so that leaf ends 40 bytes above #153 under `deploy`.
 Items 8 and 9 leave metadata-stripped runtime and creation code byte-identical on all ten deployable
 contracts, under both profiles. So does item 7's revision, which moved the getter onto
-`IStablecoinSource`: it changes types, not code, so it adds no row. The largest artifact, LayerBank Dex,
+`IStablecoinSource`: it changes types, not code, so it adds no row. Item 13 changes constructors only:
+metadata-stripped runtime is byte-identical on all ten, under both profiles, and creation code moves
+by −12 to +27 bytes under `deploy` (−121 to +39 under default). It changes no transaction on a
+deployed contract. The largest artifact, LayerBank Dex,
 ends at 13,227 bytes under `deploy`, far below EIP-170's 24,576.
 
 ## Considered, not implemented
@@ -377,8 +380,8 @@ ends at 13,227 bytes under `deploy`, far below EIP-170's 24,576.
 - ABI: one new custom error, `OperationsAdmin__HandlerTokenMismatch(address token, address handler)`,
   reachable only from owner-only `assignTokenHandler`. No selector, event, or storage-layout change.
   The `ITokenHandler` and `IPurchaseRbtc` interface ABIs now list `i_stableToken()`, which every
-  handler already exposed, so no deployed contract's ABI changes and `ITokenHandler`'s ERC-165 id
-  does not move.
+  handler already exposed, so the getter changes no deployed contract's ABI and `ITokenHandler`'s
+  ERC-165 id does not move.
   Item 13 replaces `PurchaseUniswap__ZeroPurchaseToken()` with `StablecoinSource__ZeroStablecoin()`.
   Both are constructor-only, so no transaction to a deployed contract can return either.
 - Scripts: none. Every deploy script already constructs each handler with the stablecoin it assigns,
