@@ -149,6 +149,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R79 | after R85; not deployment-bound | **closed 2026-09-25 without implementation** (repeated-buyer write coalescing; about 1% of a batch; docs-only record) |
 | R86 | after R79, before relaunch deploy | none (`calldata` for the purchase batch arrays, decided 2026-09-25; path setters kept `memory` 2026-09-26; six deferred gas candidates recorded in the gas audit) |
 | R87 | after R86, before relaunch deploy | **one verdict per deferred gas candidate, after measurement** (idle ledger, purchase-row event fields, fee sweep, `FeeTransferred`, balance reuse, `optimizer_runs`); no PR if none is approved |
+| R88 | after R87, before relaunch deploy if either Solidity candidate ships | **two verdicts after artifact comparison** (shared exchange-rate scale declaration; inline LayerBank's single-use normalized-income helper); deprecated snapshot cheatcodes wait for an independently justified compatible `forge-std` upgrade |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1242,6 +1243,18 @@ enumeration, cross-user, and transition-coverage proofs pass; drop `FeeHandler__
 monitor the stablecoin's standard `Transfer`; and add an `unchecked` credit in `_creditRbtc` under the
 explicit received-rBTC and native-supply bound. Every other candidate, and assembly in the purchase path,
 is closed.
+
+### R88 - consider the post-R87 structural cleanups ([spec](./R88-post-r87-structural-cleanups.md))
+
+After R87. Review two source-structure candidates found by the final audit: make the exchange-rate scale
+one shared public immutable while preserving every concrete getter/constructor ABI and each adapter's
+hardcoded protocol value; and inline LayerBank's single-use `_normalizedIncome()` forwarding helper.
+Present metadata-stripped artifact, size, ABI, and gas evidence before asking for one verdict per
+candidate. Do not create a generic handler-core layer or remove genuine protocol/route hooks.
+
+The R87 gas tests continue using `snapshot()` / `revertTo()` while the repository's current `forge-std`
+lacks their replacements. Rename them opportunistically after an independently justified compatible
+dependency upgrade; do not bump `forge-std` solely to silence a deprecation warning.
 
 ## Closed non-implementation decisions
 
