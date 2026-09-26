@@ -73,6 +73,10 @@ contract DeployFinal is DeployBase {
         address mocOracle;
         address[] usdrifIntermediateTokens;
         uint24[] usdrifPoolFeeRates;
+        /// @dev A second USDRIF path approved at deploy, so the swapper can activate whichever pays more.
+        ///      Empty fee rates skip it.
+        address[] usdrifAltIntermediateTokens;
+        uint24[] usdrifAltPoolFeeRates;
         address[] usdt0IntermediateTokens;
         uint24[] usdt0PoolFeeRates;
         uint256 amountOutMinimumPercent;
@@ -122,6 +126,9 @@ contract DeployFinal is DeployBase {
         s_stack.usdt0Idle = _newDexIdle(address(dcaManager), owner, true);
         s_stack.usdt0LayerBank = _newDexLayerBank(address(dcaManager), owner, true);
 
+        _allowUsdrifAltPath(s_stack.usdrifIdle);
+        _allowUsdrifAltPath(s_stack.usdrifLayerBank);
+
         operationsAdmin.assignTokenHandler(s_cfg.doc, IDLE_INDEX, s_stack.docIdle);
         operationsAdmin.assignTokenHandler(s_cfg.doc, LAYERBANK_INDEX, s_stack.docLayerBank);
         operationsAdmin.assignTokenHandler(s_cfg.doc, SOVRYN_INDEX, s_stack.docSovryn);
@@ -159,6 +166,8 @@ contract DeployFinal is DeployBase {
         s_cfg.mocOracle = config.mocOracle;
         s_cfg.usdrifIntermediateTokens = config.usdrifIntermediateTokens;
         s_cfg.usdrifPoolFeeRates = config.usdrifPoolFeeRates;
+        s_cfg.usdrifAltIntermediateTokens = config.usdrifAltIntermediateTokens;
+        s_cfg.usdrifAltPoolFeeRates = config.usdrifAltPoolFeeRates;
         s_cfg.usdt0IntermediateTokens = config.usdt0IntermediateTokens;
         s_cfg.usdt0PoolFeeRates = config.usdt0PoolFeeRates;
         s_cfg.amountOutMinimumPercent = config.amountOutMinimumPercent;
@@ -234,6 +243,14 @@ contract DeployFinal is DeployBase {
         );
     }
 
+    /// @dev Runs while the broadcaster still owns the handler: afterwards only the Safe can approve a path.
+    function _allowUsdrifAltPath(address handler) private {
+        if (s_cfg.usdrifAltPoolFeeRates.length == 0) return;
+        IPurchaseUniswap(handler).setPurchasePathAllowed(
+            s_cfg.usdrifAltIntermediateTokens, s_cfg.usdrifAltPoolFeeRates, true
+        );
+    }
+
     function _docFeeSettings() private view returns (IFeeHandler.FeeSettings memory) {
         return IFeeHandler.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
@@ -270,6 +287,14 @@ contract DeployFinal is DeployBase {
         uint24[] memory usdt0Fees = new uint24[](1);
         usdt0Fees[0] = 3000;
 
+        // USDRIF -0.05%-> 6-decimal USDT -0.30%-> WRBTC. Its USDRIF pool is thin: it can pay more than the
+        // default USDT0 hop on small batches, and cannot fill large ones.
+        address[] memory usdrifAltIntermediate = new address[](1);
+        usdrifAltIntermediate[0] = 0xAf368c91793CB22739386DFCbBb2F1A9e4bCBeBf;
+        uint24[] memory usdrifAltFees = new uint24[](2);
+        usdrifAltFees[0] = 500;
+        usdrifAltFees[1] = 3000;
+
         config = FinalNetworkConfig({
             doc: moc.docTokenAddress,
             mocProxy: moc.mocProxyAddress,
@@ -284,6 +309,8 @@ contract DeployFinal is DeployBase {
             mocOracle: dex.mocOracleAddress,
             usdrifIntermediateTokens: dex.swapIntermediateTokens,
             usdrifPoolFeeRates: dex.swapPoolFeeRates,
+            usdrifAltIntermediateTokens: usdrifAltIntermediate,
+            usdrifAltPoolFeeRates: usdrifAltFees,
             usdt0IntermediateTokens: usdt0Intermediate,
             usdt0PoolFeeRates: usdt0Fees,
             amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
