@@ -106,15 +106,13 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
             uint256 plannedNet = netStablecoinAmountsToSpend[i];
             address buyer = buyers[i];
             uint256 usersPurchasedRbtc;
-            uint256 usersStablecoinSpent;
-            // Neither product can overflow, since each weight is a uint96 purchase amount net of fee. The rBTC
-            // total was measured as received, so it is below the native supply (about 2^85 wei). The
-            // stablecoin total was just proved to have left this contract, so it is at most the token's
-            // supply, and the product fits for any supply under 2^160 base units. A zero divisor still panics.
+            // The rBTC total was measured as received, so it is below the native supply (about 2^85 wei), and
+            // each weight is a uint96 purchase amount net of fee. A zero divisor still panics. The stablecoin
+            // product below stays checked: only the token's supply bounds it, and nothing here enforces that.
             unchecked {
                 usersPurchasedRbtc = totalPurchasedRbtc * plannedNet / totalNetStablecoinPlanned;
-                usersStablecoinSpent = totalStablecoinAmountToSpend * plannedNet / totalNetStablecoinPlanned;
             }
+            uint256 usersStablecoinSpent = totalStablecoinAmountToSpend * plannedNet / totalNetStablecoinPlanned;
             // Skip zero floor allocations so a never-credited user is not marked live.
             if (usersPurchasedRbtc != 0) _creditRbtc(buyer, usersPurchasedRbtc);
             emit PurchaseRbtc__RbtcBought(
