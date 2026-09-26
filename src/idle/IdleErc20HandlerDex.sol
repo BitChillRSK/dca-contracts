@@ -9,9 +9,8 @@ import {IdleErc20Handler} from "./IdleErc20Handler.sol";
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Token-agnostic idle stablecoin + Uniswap V3 purchase handler.
  * @dev Constructor-only leaf. Only its immutable DcaManager moves principal, buys, or withdraws rBTC;
- *      the owner controls fees, oracle, path allowlist, and floor. The funding base is listed first so
- *      `i_stableToken` is set before `PurchaseUniswap` builds the path.
- *      Holds a standing max stablecoin approval to SwapRouter02, restorable by anyone.
+ *      the owner controls fees, oracle, path allowlist, and floor. Holds a standing max stablecoin
+ *      approval to SwapRouter02, restorable by anyone.
  */
 contract IdleErc20HandlerDex is IdleErc20Handler, PurchaseUniswap {
     /**

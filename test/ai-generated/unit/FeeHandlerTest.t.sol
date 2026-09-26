@@ -26,7 +26,7 @@ contract FeeHandlerTest is Test {
     event FeeHandler__PurchaseLowerBoundSet(uint256 feePurchaseLowerBound);
     event FeeHandler__PurchaseUpperBoundSet(uint256 feePurchaseUpperBound);
     event FeeHandler__FeeCollectorAddressSet(address indexed feeCollector);
-    event FeeHandler__FeeTransferred(address indexed token, address indexed collector, uint256 amount);
+    event Transfer(address indexed from, address indexed to, uint256 value);
 
     function setUp() public {
         IFeeHandler.FeeSettings memory settings = IFeeHandler.FeeSettings({
@@ -273,26 +273,28 @@ contract FeeHandlerTest is Test {
         assertEq(feeHandler.getFeeCollectorAddress(), newCollector);
     }
 
-    function test_transferFee_emitsWhenNonZero() public {
+    function test_transferFee_transfersWhenNonZero() public {
         MockStablecoin token = new MockStablecoin(address(this));
         uint256 fee = 1 ether;
         token.mint(address(feeHandler), fee);
-        vm.expectEmit(true, true, false, true, address(feeHandler));
-        emit FeeHandler__FeeTransferred(address(token), FEE_COLLECTOR, fee);
+        vm.expectEmit(true, true, false, true, address(token));
+        emit Transfer(address(feeHandler), FEE_COLLECTOR, fee);
         feeHandler.exposedTransferFee(token, fee);
         assertEq(token.balanceOf(FEE_COLLECTOR), fee);
     }
 
-    function test_transferFee_zeroDoesNotEmitOrTransfer() public {
+    function test_transferFee_zeroDoesNotTransfer() public {
         MockStablecoin token = new MockStablecoin(address(this));
         token.mint(address(feeHandler), 1 ether);
         uint256 collectorBefore = token.balanceOf(FEE_COLLECTOR);
         vm.recordLogs();
         feeHandler.exposedTransferFee(token, 0);
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 sig = FeeHandler__FeeTransferred.selector;
+        bytes32 sig = Transfer.selector;
         for (uint256 i; i < logs.length; ++i) {
-            assertTrue(logs[i].topics[0] != sig, "FeeTransferred emitted for a zero fee");
+            if (logs[i].topics[0] != sig) continue;
+            if (logs[i].emitter != address(token)) continue;
+            revert("Transfer emitted for a zero fee");
         }
         assertEq(token.balanceOf(FEE_COLLECTOR), collectorBefore);
         assertEq(token.balanceOf(address(feeHandler)), 1 ether);

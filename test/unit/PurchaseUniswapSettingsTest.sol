@@ -20,7 +20,10 @@ import {ownableUnauthorized} from "../utils/OzRevert.sol";
 import {scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 contract PurchaseUniswapSettingsTest is DcaDappTest {
-    uint256 private constant SLIPPAGE_SLOT = 7;
+    /// @dev Idle Dex: Ownable (0–1), fees (2–3), accumulated rBTC (4), oracle (5), slippage pair (6).
+    ///      Lending Dex inserts `s_shares` at 4 and shifts the Uniswap words up by one.
+    uint256 private constant IDLE_SLIPPAGE_SLOT = 6;
+    uint256 private constant LENDING_SLIPPAGE_SLOT = 7;
 
     event PurchaseUniswap__AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
     event PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(uint256 oldValue, uint256 newValue);
@@ -35,14 +38,14 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
     /// Slippage Settings Tests ///
     ///////////////////////////////
 
-    /// @dev The two 1e18-scaled fractions are uint128s in one slot. The Dex handler's storage is
-    ///      Ownable2Step (0, 1), the fee word and bounds (2, 3), shares (4), accumulated rBTC (5),
-    ///      the oracle (6), then this pair.
+    /// @dev The two 1e18-scaled fractions are uint128s in one slot. See `IDLE_SLIPPAGE_SLOT` /
+    ///      `LENDING_SLIPPAGE_SLOT` for the layout after the idle ledger removal.
     function testSlippagePercentsShareOneSlot() public onlyDexSwaps {
         uint256 percent = IPurchaseUniswap(address(stablecoinHandler)).getAmountOutMinimumPercent();
         uint256 safetyCheck = IPurchaseUniswap(address(stablecoinHandler)).getAmountOutMinimumSafetyCheck();
+        uint256 slippageSlot = isLendingLane ? LENDING_SLIPPAGE_SLOT : IDLE_SLIPPAGE_SLOT;
 
-        uint256 packed = uint256(vm.load(address(stablecoinHandler), bytes32(SLIPPAGE_SLOT)));
+        uint256 packed = uint256(vm.load(address(stablecoinHandler), bytes32(slippageSlot)));
         assertEq(uint128(packed), percent, "the swap-time floor is not the low half of the slot");
         assertEq(uint128(packed >> 128), safetyCheck, "the safety check is not the high half of the slot");
 
@@ -50,7 +53,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         vm.prank(OWNER);
         IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumPercent(0.98 ether);
 
-        packed = uint256(vm.load(address(stablecoinHandler), bytes32(SLIPPAGE_SLOT)));
+        packed = uint256(vm.load(address(stablecoinHandler), bytes32(slippageSlot)));
         assertEq(uint128(packed), 0.98 ether, "the setter did not write the low half");
         assertEq(uint128(packed >> 128), safetyCheck, "the setter disturbed the safety check");
     }
@@ -369,7 +372,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
 
     function testSwapPathStartsWithPurchaseToken() public onlyDexSwaps {
         bytes memory initialPath = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
-        assertEq(_firstTokenInPath(initialPath), address(stablecoin), "initial path must start with _purchaseToken()");
+        assertEq(_firstTokenInPath(initialPath), address(stablecoin), "initial path must start with i_stableToken");
 
         address[] memory intermediateTokens = new address[](1);
         intermediateTokens[0] = makeAddr("r31Intermediate");
@@ -385,7 +388,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(intermediateTokens, poolFeeRates);
 
         bytes memory updatedPath = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
-        assertEq(_firstTokenInPath(updatedPath), address(stablecoin), "updated path must start with _purchaseToken()");
+        assertEq(_firstTokenInPath(updatedPath), address(stablecoin), "updated path must start with i_stableToken");
     }
 
     function _firstTokenInPath(bytes memory path) private pure returns (address token) {

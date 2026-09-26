@@ -5,13 +5,13 @@ import {HandlerTestHarness} from "../HandlerTestHarness.t.sol";
 import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {IdleErc20Handler} from "src/idle/IdleErc20Handler.sol";
-import {IIdleErc20Handler} from "src/idle/IIdleErc20Handler.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "test/Constants.sol";
 
 /**
  * @title IdleErc20HandlerTest
- * @notice Unit tests for idle (non-lending) deposit/withdraw accounting.
+ * @notice Unit tests for idle (non-lending) deposit/withdraw accounting after the per-user ledger
+ *         removal. Schedule liability lives in DcaManager; this handler only holds pooled cash.
  */
 contract IdleErc20HandlerTest is HandlerTestHarness {
     IdleTestHandler public idleHandler;
@@ -51,10 +51,9 @@ contract IdleErc20HandlerTest is HandlerTestHarness {
         handler.depositToken(USER, DEPOSIT_AMOUNT);
 
         assertEq(stablecoin.balanceOf(address(handler)), DEPOSIT_AMOUNT);
-        assertEq(idleHandler.getUsersIdleTokenBalance(USER), DEPOSIT_AMOUNT);
     }
 
-    function test_idle_withdraw_debitsOnlyCaller() public {
+    function test_idle_withdraw_paysRequestedFromPool() public {
         address other = address(0xBEEF);
         stablecoin.mint(other, DEPOSIT_AMOUNT);
         vm.prank(other);
@@ -66,44 +65,11 @@ contract IdleErc20HandlerTest is HandlerTestHarness {
         handler.withdrawToken(USER, WITHDRAWAL_AMOUNT);
         vm.stopPrank();
 
-        assertEq(idleHandler.getUsersIdleTokenBalance(USER), DEPOSIT_AMOUNT - WITHDRAWAL_AMOUNT);
-        assertEq(idleHandler.getUsersIdleTokenBalance(other), DEPOSIT_AMOUNT);
         assertEq(stablecoin.balanceOf(address(handler)), DEPOSIT_AMOUNT * 2 - WITHDRAWAL_AMOUNT);
+        assertEq(stablecoin.balanceOf(USER), USER_INITIAL_BALANCE - DEPOSIT_AMOUNT + WITHDRAWAL_AMOUNT);
     }
 
-    function test_idle_withdraw_clampsToOwnBalance() public {
-        address other = address(0xBEEF);
-        stablecoin.mint(other, DEPOSIT_AMOUNT);
-        vm.prank(other);
-        stablecoin.approve(address(handler), type(uint256).max);
-
-        vm.startPrank(address(dcaManager));
-        handler.depositToken(USER, DEPOSIT_AMOUNT);
-        handler.depositToken(other, DEPOSIT_AMOUNT);
-
-        uint256 userBalanceBefore = stablecoin.balanceOf(USER);
-        vm.expectEmit(true, false, false, true, address(handler));
-        emit IIdleErc20Handler.IdleErc20Handler__AmountAdjusted(USER, DEPOSIT_AMOUNT * 2, DEPOSIT_AMOUNT);
-        handler.withdrawToken(USER, DEPOSIT_AMOUNT * 2);
-        vm.stopPrank();
-
-        assertEq(stablecoin.balanceOf(USER), userBalanceBefore + DEPOSIT_AMOUNT);
-        assertEq(idleHandler.getUsersIdleTokenBalance(USER), 0);
-        assertEq(idleHandler.getUsersIdleTokenBalance(other), DEPOSIT_AMOUNT);
-        assertEq(stablecoin.balanceOf(address(handler)), DEPOSIT_AMOUNT);
-        assertEq(stablecoin.balanceOf(other), 0);
-    }
-
-
-    function test_idle_withdraw_revertsWhenIdleIsZero() public {
-        vm.prank(address(dcaManager));
-        vm.expectRevert(
-            abi.encodeWithSelector(IIdleErc20Handler.IdleErc20Handler__ZeroStablecoinPaid.selector, DEPOSIT_AMOUNT)
-        );
-        handler.withdrawToken(USER, DEPOSIT_AMOUNT);
-    }
-
-    function test_idle_batchRetrieveStablecoin_revertsIfInsufficient() public {
+    function test_idle_batchRetrieveStablecoin_sumsPurchaseAmounts() public {
         address user1 = makeAddr("user1");
         address user2 = makeAddr("user2");
         stablecoin.mint(user1, DEPOSIT_AMOUNT);
@@ -122,21 +88,13 @@ contract IdleErc20HandlerTest is HandlerTestHarness {
         users[0] = user1;
         users[1] = user2;
         uint256[] memory amounts = new uint256[](2);
-        amounts[0] = DEPOSIT_AMOUNT * 2;
-        amounts[1] = DEPOSIT_AMOUNT / 2;
+        amounts[0] = DEPOSIT_AMOUNT / 2;
+        amounts[1] = DEPOSIT_AMOUNT / 4;
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdleErc20Handler.IdleErc20Handler__InsufficientIdleBalance.selector,
-                user1,
-                DEPOSIT_AMOUNT * 2,
-                DEPOSIT_AMOUNT
-            )
-        );
-        idleHandler.testBatchRetrieveStablecoin(users, amounts);
-
-        assertEq(idleHandler.getUsersIdleTokenBalance(user1), DEPOSIT_AMOUNT);
-        assertEq(idleHandler.getUsersIdleTokenBalance(user2), DEPOSIT_AMOUNT);
+        uint256 total = idleHandler.testBatchRetrieveStablecoin(users, amounts);
+        assertEq(total, amounts[0] + amounts[1]);
+        // Funding is bookkeeping only: cash stays on the handler until MoC / Uniswap spends it.
+        assertEq(stablecoin.balanceOf(address(handler)), DEPOSIT_AMOUNT * 2);
     }
 }
 

@@ -37,11 +37,6 @@ interface IFeeHandler {
     event FeeHandler__PurchaseUpperBoundSet(uint256 feePurchaseUpperBound);
     /// @notice Owner set the address that receives purchase fees.
     event FeeHandler__FeeCollectorAddressSet(address indexed feeCollector);
-    /**
-     * @notice A purchase fee was transferred to the collector.
-     * @dev One log per batch for the aggregated fee. A zero fee is not logged.
-     */
-    event FeeHandler__FeeTransferred(address indexed token, address indexed collector, uint256 amount);
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS

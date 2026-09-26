@@ -1,6 +1,6 @@
 # R87 — consider the deferred gas candidates
 
-Status: **decided 2026-09-26; implementation pending** · Assigned: yes · Optional/further-review: no
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
@@ -37,7 +37,21 @@ is revisited later.
 | Raise `optimizer_runs` | 10,000: −2.8k to −3.5k per batch; 1,000,000: −4.1k to −5.4k per batch | Keep 200 | Deploy gas +3.3M / +6M, break-even 11–14 years. `DcaManager` grows 11,267 → 16,179 bytes; `LayerBankErc20HandlerDex` headroom shrinks 11,198 → 6,154 bytes. Writes per slot identical and the R81 tests pass at every value, so the R81 helpers stay. |
 | Assembly in the purchase path (added by the human) | `PurchaseRbtc` row loop ≈720 per row (≈0.7%); whole path estimated ≈1.5–2k per row | Reject | Compute is ≈4.2k of a ≈24k row, so even deleting all of it caps at ≈4%. It would override invariant 5, copy the rBTC encoding out of its helpers (invariant 13), and hand-maintain event and storage layout the compiler checks today. |
 | `unchecked` credit add in `_creditRbtc` (added by the human) | ≈45 per row | **Add** | The check is redundant: credits are shares of rBTC the handler measured receiving, total claims cannot exceed handler cash, and the stored `claimable + 1` value is bounded by Rootstock's native supply (about 2⁸⁵ wei), far below `uint256`. The block stays inside `_creditRbtc`, so invariant 13 holds. |
+| Move `i_stableToken` onto `StablecoinSource` (human-approved late, 2026-09-26) | not measured; treat as **0** | **Do** (code quality) | Deletes the trivial `_purchaseToken()` virtual bridge. Deposit/withdraw and the purchase pipeline already share one stablecoin; putting the immutable on the common base makes that by construction. Strengthens the “spend token == held token” invariant; **not** a gas candidate unless re-measured. |
 
+### Late approval: shared `i_stableToken` (2026-09-26)
+
+The human approved this as a code-quality follow-up on the R87 implementation branch after reviewing the
+idle-ledger simplification. It was not in the original deferred list; the “no unlisted candidates”
+out-of-scope rule is waived for this one item only.
+
+- `StablecoinSource` owns `i_stableToken` and its constructor; `TokenHandler` and `PurchaseRbtc` both
+  inherit it (diamond).
+- Drop `_purchaseToken()`; purchase code reads `i_stableToken` directly.
+- Idle/lending bases no longer re-list `StablecoinSource` or implement a one-line token resolver.
+- Funding-first Dex `is` order is house style only: C3 initializes `StablecoinSource` before
+  `PurchaseUniswap` regardless of leaf order. `ZeroTokenPurchaseUniswapTest` proves explicit zero-token
+  rejection; `ReversedDexInheritanceTest` proves reversed `is` order still deploys with a correct path.
 ### Idle-ledger proof and accepted residual risk
 
 For an idle handler `H`, define a user's liability as the sum of `tokenBalance` across every live
@@ -147,16 +161,19 @@ measurements are done:
   - cost;
   - recommendation.
 - [x] **Record the product verdicts in a docs-only PR.**
-- [ ] **Implement the approved candidates in a follow-up R87 PR:**
+- [x] **Implement the approved candidates in a follow-up R87 PR:**
   - Branch from this verdict PR's head after it merges or from the latest open relaunch PR's head.
   - Implement each approved candidate in its own commit, with the proof and tests above.
   - Retain reproducible gas evidence and measure both profiles.
   - Open consumer issues for every removed event, getter, or error (`AGENTS.md` **Consumer follow-up**).
-
+- [x] **Late human-approved code-quality candidate (2026-09-26):** move `i_stableToken` onto
+  `StablecoinSource`, drop `_purchaseToken()`, correct constructor-order NatSpec / tests. Not a gas
+  claim unless measured.
 ## Out of scope
 
 - [ ] New candidates the deferred record does not list. Report them to the human; do not implement
-  them.
+  them. **Exception (2026-09-26):** the shared-`i_stableToken` / drop-`_purchaseToken` refactor above,
+  which the human approved explicitly on the implementation branch.
 - [ ] Anything already closed: R79, the slot-0 re-reads, the two OperationsAdmin calls per batch,
   and `TokenBalanceUpdated`.
 
@@ -171,11 +188,15 @@ advance:
 - fee sweep and `FeeTransferred`: `src/FeeHandler.sol`, `src/interfaces/IFeeHandler.sol`,
   `src/PurchaseRbtc.sol`
 - balance reuse: `src/LendingErc20Handler.sol`, `src/StablecoinSource.sol`, `src/PurchaseRbtc.sol`
+- shared `i_stableToken` (late): `src/StablecoinSource.sol`, `src/TokenHandler.sol`,
+  `src/PurchaseRbtc.sol`, `src/PurchaseUniswap.sol`, `src/idle/IdleErc20Handler.sol`,
+  `src/LendingErc20Handler.sol`, four `*Erc20HandlerDex` headers, `src/interfaces/ITokenHandler.sol`,
+  `test/unit/ZeroTokenPurchaseUniswapTest.sol`, `test/unit/ReversedDexInheritanceTest.t.sol`,
+  `AGENTS.md`
 - optimizer: `foundry.toml`, `src/DcaManager.sol`
 - `docs/relaunch/ROOTSTOCK-GAS-AUDIT.md`, `docs/relaunch/README.md`,
   `docs/relaunch/IMPLEMENTATION_ORDER.md`
 - the matching tests under `test/`, plus new ones under `test/gas/`
-
 ## Required tests
 
 - **This verdict PR:** docs only; no build required.
@@ -188,14 +209,15 @@ advance:
 
 - [x] Every candidate has a Rootstock decision figure and a verdict from the human.
 - [x] The verdict PR records the accepted safety tradeoffs and implementation gates.
-- [ ] The follow-up PR carries only the approved candidates and updates the gas audit to match what it
+- [x] The follow-up PR carries only the approved candidates and updates the gas audit to match what it
   ships.
-
+- [x] Late shared-`i_stableToken` move is documented as code quality (not a gas claim) with corrected
+  constructor-order NatSpec and a reversed-`is` regression test.
 ## Reviewer checklist
 
 - [ ] Only human-approved candidates are implemented.
 - [ ] Protocol invariants in `AGENTS.md` still hold, unless an approved candidate changes one and says so.
-- [ ] Final Rootstock figures are reproducible and show how they were derived on both profiles.
+- [x] Final Rootstock figures are reproducible and show how they were derived on both profiles.
 - [ ] Consumer issues are opened for every removed event, getter, or error.
 
 ## ABI / deploy / cutover impact

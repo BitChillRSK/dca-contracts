@@ -129,12 +129,12 @@ contract FeeOnTransferDepositTest is Test {
 
         // Full rollback: no schedule, no idle credit, no cash moved, no transfer fee paid.
         assertEq(scheduleCount(dcaManager, USER, address(token)), 0);
-        assertEq(idleHandler.getUsersIdleTokenBalance(USER), 0);
+        assertEq(_idleLiability(USER), 0);
         assertEq(token.balanceOf(USER), userBefore);
         assertEq(token.balanceOf(FOT_FEE_RECIPIENT), 0);
 
         // Another user's funds are untouched.
-        assertEq(idleHandler.getUsersIdleTokenBalance(OTHER), otherIdleBefore);
+        assertEq(_idleLiability(OTHER), otherIdleBefore);
         assertEq(scheduleAt(dcaManager, OTHER, address(token), 0).tokenBalance, otherIdleBefore);
     }
 
@@ -153,10 +153,10 @@ contract FeeOnTransferDepositTest is Test {
 
         // The first, fee-free deposit survives; the second one credits nothing at all.
         assertEq(scheduleAt(dcaManager, USER, address(token), 0).tokenBalance, REQUESTED);
-        assertEq(idleHandler.getUsersIdleTokenBalance(USER), REQUESTED);
+        assertEq(_idleLiability(USER), REQUESTED);
         assertEq(token.balanceOf(USER), userBefore);
         assertEq(token.balanceOf(FOT_FEE_RECIPIENT), 0);
-        assertEq(idleHandler.getUsersIdleTokenBalance(OTHER), otherIdleBefore);
+        assertEq(_idleLiability(OTHER), otherIdleBefore);
     }
 
     function test_zeroReceivedDeposit_revertsWithTheSameError() public {
@@ -187,7 +187,7 @@ contract FeeOnTransferDepositTest is Test {
         dcaManager.createDcaSchedule(address(token), REQUESTED, REQUESTED, MIN_PURCHASE_PERIOD, IDLE_INDEX);
 
         assertEq(scheduleCount(dcaManager, USER, address(token)), 0);
-        assertEq(idleHandler.getUsersIdleTokenBalance(USER), 0);
+        assertEq(_idleLiability(USER), 0);
         assertEq(token.balanceOf(USER), userBefore);
     }
 
@@ -222,9 +222,9 @@ contract FeeOnTransferDepositTest is Test {
         IDcaManager.DcaSchedule memory schedule = scheduleAt(dcaManager, USER, address(token), 0);
         assertEq(schedule.tokenBalance, REQUESTED);
         assertEq(schedule.purchaseAmount, REQUESTED);
-        assertEq(idleHandler.getUsersIdleTokenBalance(USER), REQUESTED);
+        assertEq(_idleLiability(USER), REQUESTED);
         assertEq(token.balanceOf(USER), userBefore - REQUESTED);
-        assertEq(idleHandler.getUsersIdleTokenBalance(OTHER), otherIdleBefore);
+        assertEq(_idleLiability(OTHER), otherIdleBefore);
     }
 
     function test_depositToken_creditsRequested_whenTokenIsOneToOne() public {
@@ -235,7 +235,7 @@ contract FeeOnTransferDepositTest is Test {
         dcaManager.depositToken(address(token), scheduleId, REQUESTED);
 
         assertEq(scheduleAt(dcaManager, USER, address(token), 0).tokenBalance, REQUESTED * 2);
-        assertEq(idleHandler.getUsersIdleTokenBalance(USER), REQUESTED * 2);
+        assertEq(_idleLiability(USER), REQUESTED * 2);
         assertEq(token.balanceOf(USER), userBefore - REQUESTED);
     }
 
@@ -255,7 +255,7 @@ contract FeeOnTransferDepositTest is Test {
 
         uint256 afterBuy = REQUESTED - MIN_PURCHASE_AMOUNT;
         assertEq(scheduleAt(dcaManager, USER, address(token), 0).tokenBalance, afterBuy);
-        assertEq(idleHandler.getUsersIdleTokenBalance(USER), afterBuy);
+        assertEq(_idleLiability(USER), afterBuy);
         assertGt(dcaManager.getAccumulatedRbtcBalance(USER, address(token), IDLE_INDEX), 0);
 
         uint256 userBalanceBefore = token.balanceOf(USER);
@@ -264,10 +264,10 @@ contract FeeOnTransferDepositTest is Test {
 
         // R20: principal falls by the requested amount even if outbound FOT pays the user less.
         assertEq(scheduleAt(dcaManager, USER, address(token), 0).tokenBalance, 0);
-        assertEq(idleHandler.getUsersIdleTokenBalance(USER), 0);
+        assertEq(_idleLiability(USER), 0);
         assertLt(token.balanceOf(USER) - userBalanceBefore, afterBuy);
         assertGt(token.balanceOf(USER), userBalanceBefore);
-        assertEq(idleHandler.getUsersIdleTokenBalance(OTHER), otherIdleBefore);
+        assertEq(_idleLiability(OTHER), otherIdleBefore);
     }
 
     function test_deleteDcaSchedule_reportsHandlerSpent_notUserReceived() public {
@@ -282,7 +282,7 @@ contract FeeOnTransferDepositTest is Test {
         vm.prank(USER);
         dcaManager.deleteDcaSchedule(address(token), scheduleId, 0);
 
-        assertEq(idleHandler.getUsersIdleTokenBalance(USER), 0);
+        assertEq(_idleLiability(USER), 0);
         uint256 userGained = token.balanceOf(USER) - userBefore;
         assertLt(userGained, REQUESTED);
         assertGt(userGained, 0);
@@ -396,7 +396,16 @@ contract FeeOnTransferDepositTest is Test {
         _createIdleSchedule(who, purchaseAmount, IDLE_INDEX);
         credited = scheduleAt(dcaManager, who, address(token), 0).tokenBalance;
         assertEq(credited, REQUESTED);
-        assertEq(idleHandler.getUsersIdleTokenBalance(who), REQUESTED);
+        assertEq(_idleLiability(who), REQUESTED);
+    }
+
+    function _idleLiability(address who) private view returns (uint256 sum) {
+        (, IDcaManager.DcaSchedule[] memory schedules) = dcaManager.getDcaSchedules(who, address(token));
+        for (uint256 i; i < schedules.length; ++i) {
+            if (schedules[i].routeIndex == IDLE_INDEX) {
+                sum += schedules[i].tokenBalance;
+            }
+        }
     }
 
     function _createTropykus(address who, uint256 purchaseAmount) private returns (uint256 underlying) {

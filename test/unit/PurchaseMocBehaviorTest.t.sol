@@ -14,7 +14,6 @@ import "../Constants.sol";
  */
 contract PurchaseMocBehaviorTest is Test {
     struct PurchaseState {
-        uint256 userIdleBalance;
         uint256 handlerDoc;
         uint256 mocDoc;
         uint256 feeCollectorDoc;
@@ -114,7 +113,6 @@ contract PurchaseMocBehaviorTest is Test {
         handler.batchBuyRbtc(buyers, scheduleIds, amounts, 0);
 
         PurchaseState memory afterRevert = _snapshot();
-        assertEq(afterRevert.userIdleBalance, before.userIdleBalance);
         assertEq(afterRevert.handlerDoc, before.handlerDoc);
         assertEq(afterRevert.mocDoc, before.mocDoc);
         assertEq(afterRevert.feeCollectorDoc, before.feeCollectorDoc);
@@ -143,7 +141,6 @@ contract PurchaseMocBehaviorTest is Test {
     }
 
     function _snapshot() private view returns (PurchaseState memory state) {
-        state.userIdleBalance = handler.getUsersIdleTokenBalance(buyer);
         state.handlerDoc = doc.balanceOf(address(handler));
         state.mocDoc = doc.balanceOf(address(moc));
         state.feeCollectorDoc = doc.balanceOf(address(0xFEE));

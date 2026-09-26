@@ -31,7 +31,7 @@ FeeHandler          fee math (inherited by TokenHandler and PurchaseRbtc)
 TokenHandler        deposit/withdraw stablecoin (owns FeeHandler)
 TokenLending        share ↔ underlying conversion (no TokenHandler inherit)
 LendingErc20Handler TokenHandler + TokenLending; per-user shares, withdraw clamp, interest, exact-sum batch redeem
-StablecoinSource    funding-hook + _purchaseToken declarations (PurchaseRbtc consumes; lending/idle implement)
+StablecoinSource    shared `i_stableToken` + batch-funding hook (TokenHandler and PurchaseRbtc inherit; idle/lending implement retrieve)
 PurchaseRbtc        shared buy/batch pipeline; accumulated rBTC; withdraw to signer
 PurchaseMoc         MoC redeem DOC → rBTC (_purchaseRbtc only)
 PurchaseUniswap     Uniswap V3 → WRBTC (_purchaseRbtc + WRBTC unwrap on withdraw)
@@ -48,7 +48,7 @@ Handlers = LendingErc20Handler + a Purchase*  (lending adapters) or TokenHandler
                              test-only: no live deploy branch builds one, on either map
 ```
 
-- `src/interfaces/` — shared first-party ABIs; keep in sync with implementations. Protocol-specific interfaces (`IiSusdToken`, `IkToken`, `IIdleErc20Handler`, `ILayerBankAToken`, `ILayerBankPool`, `ILayerBankErc20Handler`) live next to their handlers. Lending handlers share `ITokenLending` directly — R16 removed the empty per-protocol lending interfaces, so do not add one for a new handler unless it actually declares something (errors, events, or protocol-specific views — same bar as Idle).
+- `src/interfaces/` — shared first-party ABIs; keep in sync with implementations. Protocol-specific interfaces (`IiSusdToken`, `IkToken`, `ILayerBankAToken`, `ILayerBankPool`, `ILayerBankErc20Handler`) live next to their handlers. Idle has no protocol-specific interface after R87 removed the per-user ledger surface. Lending handlers share `ITokenLending` directly — R16 removed the empty per-protocol lending interfaces, so do not add one for a new handler unless it actually declares something (errors, events, or protocol-specific views — same bar Idle now meets by having none).
 - `test/unit/DcaDappTest.t.sol` — shared harness; **requires** `SWAP_TYPE` and `LENDING_PROTOCOL` (no fallback).
 - `test/unit/`, `test/mocks/`, `test/ai-generated/` — unit / mocks / extra + fuzz. Dedicated handler tests: `test/ai-generated/unit/sovryn/`, `test/ai-generated/unit/tropykus-legacy/`, `test/ai-generated/unit/idle/`, `test/ai-generated/unit/layerbank/`.
 - `script/` — deploy helpers. Do not `--broadcast` or talk to live contracts. `TROPYKUS_INDEX` deliberately lives in `test/Constants.sol`, not `script/Constants.sol`, so a `script/` file that names a Tropykus route does not compile; `TROPYKUS_STRING` stays in `script/Constants.sol` because the helper configs select mocks with it. Do not move the index back or re-add a Tropykus arm to a live branch — both live branches reject `Protocol.TROPYKUS`. A new production handler ships its deploy path in the same PR: extend `DeployMocSwaps` / `DeployDexSwaps` when it belongs in the main index map, or add a `Deploy<Handler>.s.sol` add-on (see `DeployUsdrifHandler`, `DeployIdleHandler`, `DeployLayerBankHandler`). DcaManager and deployment tests must construct that handler through the script (`DcaDappTest`, `BaseDeploymentTest`, `NewHandlerDeploymentTest`). `new Handler(...)` is only for test subclasses that expose internals, or handler-level tests that set `dcaManager` to the test contract so they can call `onlyDcaManager` entry points.
@@ -126,8 +126,8 @@ Everything else is single-sourced on the interface:
   implementation cannot live on an interface several share — `ITokenLending` is Sovryn's, LayerBank's,
   and Tropykus's at once.
 - Constructor-only leaves carry the header even though they carry no banners, and sibling leaves state
-  the same fact the same way: the four `*Erc20HandlerDex` contracts each say `Constructor-only leaf` and
-  the funding-base-first constructor ordering in `@dev`, not one of them in `@notice`.
+  the same fact the same way: the four `*Erc20HandlerDex` contracts each say `Constructor-only leaf`
+  and their approval/lifecycle model in `@dev`, not one of them in `@notice`.
 
 **Do not name a token in a contract that does not name it itself.** `PurchaseUniswap`, `IdleErc20Handler`,
 `LendingErc20Handler`, `TokenHandler` and their interfaces are constructed with whatever stablecoin they

@@ -9,9 +9,8 @@ import {TropykusErc20Handler} from "./TropykusErc20Handler.sol";
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Test-only Tropykus lending + Uniswap V3 handler; excluded from production deployment.
  * @dev Constructor-only leaf. Only its immutable DcaManager moves principal, buys, or withdraws rBTC;
- *      the owner controls fees, oracle, path allowlist, and floor. The funding base is listed first so
- *      `i_stableToken` is set before `PurchaseUniswap` builds the path.
- *      Holds standing max stablecoin approvals to SwapRouter02 and the kToken, restorable by anyone.
+ *      the owner controls fees, oracle, path allowlist, and floor. Holds standing max stablecoin
+ *      approvals to SwapRouter02 and the kToken, restorable by anyone.
  */
 contract TropykusErc20HandlerDex is TropykusErc20Handler, PurchaseUniswap {
     /**

@@ -146,12 +146,9 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         );
     }
 
-    /// @dev Transfer `fee` of `token` to the collector and emit `FeeTransferred`. No-op when `fee` is 0.
     function _transferFee(IERC20 token, uint256 fee) internal {
         if (fee == 0) return;
-        address collector = s_feeCollector;
-        token.safeTransfer(collector, fee);
-        emit FeeHandler__FeeTransferred(address(token), collector, fee);
+        token.safeTransfer(s_feeCollector, fee);
     }
 
     /*//////////////////////////////////////////////////////////////

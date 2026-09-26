@@ -69,7 +69,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
                 totalStablecoinAmountToSpend -= aggregatedFee;
             }
 
-            purchaseToken = _purchaseToken();
+            purchaseToken = i_stableToken;
             _transferFee(purchaseToken, aggregatedFee);
         }
 
@@ -175,9 +175,15 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
                             PRIVATE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Encode and store a positive rBTC credit. Live slots hold `claimable + 1`.
+    /**
+     * @dev Encode and store a positive rBTC credit. Live slots hold `claimable + 1`.
+     *      The add is unchecked: credits are shares of rBTC this handler measured receiving,
+     *      which are tiny compared to `type(uint256).max`.
+     */
     function _creditRbtc(address buyer, uint256 amount) private {
         uint256 stored = s_usersAccumulatedRbtc[buyer];
-        s_usersAccumulatedRbtc[buyer] = (stored == 0 ? 1 : stored) + amount;
+        unchecked {
+            s_usersAccumulatedRbtc[buyer] = (stored == 0 ? 1 : stored) + amount;
+        }
     }
 }
