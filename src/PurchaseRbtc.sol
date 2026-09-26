@@ -35,9 +35,11 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
     /**
      * @inheritdoc IPurchaseRbtc
      * @dev Spends the stablecoin the retrieval actually delivered, never the gross amount it was asked
-     *      for: a lending handler can come back short when it redeems its shares, while the idle handler
-     *      reverts rather than under-deliver. Planned net amounts are only allocation weights: both the
-     *      rBTC credited and the stablecoin reported as spent are shares of what actually moved.
+     *      for: a lending handler can come back short when it redeems its shares. Idle retrieval only sums
+     *      the request, because the cash already sits on the handler; if it is not all there, the fee
+     *      transfer, the venue's pull, or the exact-consumption check reverts the batch. Planned net
+     *      amounts are only allocation weights: both the rBTC credited and the stablecoin reported as
+     *      spent are shares of what actually moved.
      */
     function batchBuyRbtc(
         address[] calldata buyers,
