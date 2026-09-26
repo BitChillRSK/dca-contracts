@@ -1236,11 +1236,12 @@ helpers as they are and inlined. The human then decides each one.
 The verdicts are recorded in a docs-only PR. Approved candidates ship in a follow-up R87 implementation
 PR, one commit each. Ask: the six verdicts, all at once, after measuring.
 
-**Decided 2026-09-26** ([verdicts](./R87-deferred-gas-candidates.md#verdicts-2026-09-26)): remove the
-idle ledger after its per-user ghost, aggregate solvency, enumeration, cross-user, and transition-coverage
-proofs pass; drop `FeeHandler__FeeTransferred` and monitor the stablecoin's standard `Transfer`; and add
-an `unchecked` credit in `_creditRbtc` under the explicit received-rBTC and native-supply bound. Every
-other candidate, and assembly in the purchase path, is closed.
+**Decided 2026-09-26** ([verdicts](./R87-deferred-gas-candidates.md#verdicts-2026-09-26)); **implemented** in
+the stacked follow-up PR: remove the idle ledger after its per-user ghost, aggregate solvency,
+enumeration, cross-user, and transition-coverage proofs pass; drop `FeeHandler__FeeTransferred` and
+monitor the stablecoin's standard `Transfer`; and add an `unchecked` credit in `_creditRbtc` under the
+explicit received-rBTC and native-supply bound. Every other candidate, and assembly in the purchase path,
+is closed.
 
 ## Closed non-implementation decisions
 

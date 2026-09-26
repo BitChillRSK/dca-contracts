@@ -137,10 +137,12 @@ The review produced seven candidates:
 Figures are Rootstock gas, estimated from source; none of the six has been measured.
 
 **Decided 2026-09-26.** R87 measured the candidates; the verdicts, proof obligations, and figures are in
-[R87 § Verdicts](./R87-deferred-gas-candidates.md#verdicts-2026-09-26). Approved: remove the idle ledger
-after the stronger accounting proof passes, drop `FeeHandler__FeeTransferred`, and add the bounded
-`unchecked` credit. Kept as they are: event fields and `optimizer_runs` 200. Rejected: the fee sweep and
-balance reuse. The estimates below are kept as the record the decision started from.
+[R87 § Verdicts](./R87-deferred-gas-candidates.md#verdicts-2026-09-26). **Implemented** in the R87
+follow-up PR: remove the idle ledger (after the accounting proof), drop `FeeHandler__FeeTransferred`,
+and add the bounded `unchecked` credit. Kept as they are: event fields and `optimizer_runs` 200.
+Rejected: the fee sweep and balance reuse. The estimates below are kept as the record the decision
+started from. Reproducible Foundry pins live in `test/gas/R87*.t.sol` (run under default and
+`FOUNDRY_PROFILE=deploy`).
 
 - **Remove `IdleErc20Handler.s_idleBalances`.** This is the only candidate above about 2% of a batch.
   - **Saving:**

@@ -1,6 +1,6 @@
 # R87 — consider the deferred gas candidates
 
-Status: **decided 2026-09-26; implementation pending** · Assigned: yes · Optional/further-review: no
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
@@ -147,7 +147,7 @@ measurements are done:
   - cost;
   - recommendation.
 - [x] **Record the product verdicts in a docs-only PR.**
-- [ ] **Implement the approved candidates in a follow-up R87 PR:**
+- [x] **Implement the approved candidates in a follow-up R87 PR:**
   - Branch from this verdict PR's head after it merges or from the latest open relaunch PR's head.
   - Implement each approved candidate in its own commit, with the proof and tests above.
   - Retain reproducible gas evidence and measure both profiles.
@@ -188,7 +188,7 @@ advance:
 
 - [x] Every candidate has a Rootstock decision figure and a verdict from the human.
 - [x] The verdict PR records the accepted safety tradeoffs and implementation gates.
-- [ ] The follow-up PR carries only the approved candidates and updates the gas audit to match what it
+- [x] The follow-up PR carries only the approved candidates and updates the gas audit to match what it
   ships.
 
 ## Reviewer checklist
