@@ -86,9 +86,27 @@ One commit per item.
   one-argument, permanent mistake R13/R31 closed for route class. The deploy tests check each script's
   handler (`FinalDeploymentTest` and the add-on deployment tests), but an owner's later manual
   assignment is not checked on chain. Read `i_stableToken()` from the handler and revert with a new
-  `OperationsAdmin__HandlerTokenMismatch(token, handler)`. Do not add `i_stableToken` to
-  `ITokenHandler`: that would change the ERC-165 id every handler advertises and every consumer that
-  hardcodes it. `StablecoinSource` already declares the public getter.
+  `OperationsAdmin__HandlerTokenMismatch(token, handler)`.
+  - The getter joins the handler interface, as R70 did for `IDcaManager.i_operationsAdmin()`, so any
+    contract that implements `ITokenHandler` must also answer the check, and `OperationsAdmin` calls it
+    through `ITokenHandler`, not through the abstract `StablecoinSource`.
+  - It is declared on a new `IStablecoinSource`, which `ITokenHandler` extends and `StablecoinSource`
+    implements, not in `ITokenHandler` itself. `TokenHandler` inherits both `ITokenHandler` and
+    `StablecoinSource`, and solc (error 6480) refuses two unrelated bases that both define the getter
+    when one of them is a public state variable, which cannot be overridden. The purchase side
+    (`PurchaseRbtc`) reads the same immutable, so it stays on `StablecoinSource`.
+  - `IPurchaseRbtc` extends `IStablecoinSource` too. `PurchaseRbtc` spends that stablecoin, so its
+    interface names it, and the inheritance graph requires it: `TokenHandler` reaches
+    `IStablecoinSource` through its least-derived base (`ITokenHandler`) and `PurchaseRbtc` through its
+    most-derived one (`StablecoinSource`), so every leaf fails C3 linearization (solc error 5005) until
+    both halves reach it through their interface.
+  - Every handler already exposed `i_stableToken()`; only the two interfaces' ABIs list it now.
+  - `type(ITokenHandler).interfaceId` counts only the functions an interface declares itself, so the
+    ERC-165 id does not change. It would not have mattered before relaunch either: handlers and
+    `OperationsAdmin` compute the id from the same source and ship together (R54 changed
+    `ITokenLending`'s id on that basis), and no consumer repo hardcodes it.
+  - *Revised after the first push.* The first version called the getter through `StablecoinSource` and
+    kept it off the interface to preserve the ERC-165 id, which is not a constraint before relaunch.
 - [x] **8. Stale idle-ledger NatSpec.** R87 removed the idle ledger, but two comments still describe it:
   - `IDcaManager.withdrawToken`'s `@dev` still says an idle route "pays short only if the handler's own
     ledger disagrees", and `@inheritdoc` carries that sentence into the verified `DcaManager`;
@@ -227,13 +245,15 @@ bytes under `deploy`, far below EIP-170.
 - `src/idle/IdleErc20Handler.sol` (item 4)
 - `src/PurchaseRbtc.sol` (items 4, 8)
 - `src/PurchaseUniswap.sol`, `src/interfaces/IPurchaseUniswap.sol` (item 6)
-- `src/OperationsAdmin.sol`, `src/interfaces/IOperationsAdmin.sol` (item 7)
+- `src/OperationsAdmin.sol`, `src/interfaces/IOperationsAdmin.sol`, `src/interfaces/IStablecoinSource.sol`
+  (new), `src/interfaces/ITokenHandler.sol`, `src/interfaces/IPurchaseRbtc.sol`, `src/StablecoinSource.sol`
+  (item 7)
 - `src/interfaces/IDcaManager.sol` (item 8)
 - `src/interfaces/IStablecoin.sol` (item 9, deleted)
 - `test/unit/LendingErc20HandlerRedeemTest.t.sol` (item 2 harness call)
 - `test/unit/ZeroTokenPurchaseUniswapTest.sol` (item 6 wording)
-- `test/unit/OperationsAdminTest.t.sol`, `test/gas/StubPurchaseHandler.sol`, and any test that assigns a
-  handler under a token it was not built for (item 7)
+- `test/unit/OperationsAdminTest.t.sol`, `test/gas/StubPurchaseHandler.sol`, any test that assigns a
+  handler under a token it was not built for, and any test stub that implements `ITokenHandler` (item 7)
 - `test/gas/R89ReviewCandidatesGas.t.sol`, `test/ai-generated/unit/FeeHandlerTest.t.sol`,
   `test/ai-generated/unit/idle/IdleErc20HandlerTest.t.sol`, `test/unit/PurchaseRbtcTest.t.sol` (item 10)
 - `docs/relaunch/README.md`, `docs/relaunch/IMPLEMENTATION_ORDER.md`,
@@ -280,6 +300,9 @@ bytes under `deploy`, far below EIP-170.
 
 - ABI: one new custom error, `OperationsAdmin__HandlerTokenMismatch(address token, address handler)`,
   reachable only from owner-only `assignTokenHandler`. No selector, event, or storage-layout change.
+  The `ITokenHandler` and `IPurchaseRbtc` interface ABIs now list `i_stableToken()`, which every
+  handler already exposed, so no deployed contract's ABI changes and `ITokenHandler`'s ERC-165 id
+  does not move.
   `PurchaseUniswap__ZeroPurchaseToken` now fires at the top of the constructor instead of during path
   encoding; its selector is unchanged.
 - Scripts: none. Every deploy script already constructs each handler with the stablecoin it assigns,
