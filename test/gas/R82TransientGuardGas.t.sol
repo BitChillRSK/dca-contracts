@@ -3,6 +3,7 @@ pragma solidity 0.8.36;
 
 import {Test, console2, Vm} from "forge-std/Test.sol";
 import {IERC165} from "lib/forge-std/src/interfaces/IERC165.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {DcaManager} from "src/DcaManager.sol";
 import {OperationsAdmin} from "src/OperationsAdmin.sol";
 import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
@@ -15,7 +16,7 @@ import {reentrantCall} from "../utils/OzRevert.sol";
 contract ReenteringDepositHandler is IERC165, ITokenHandler, IPurchaseRbtc {
     DcaManager private immutable i_manager;
     /// @dev Reported so `OperationsAdmin.assignTokenHandler` can check it against the assigned token.
-    address public immutable i_stableToken;
+    IERC20 public immutable i_stableToken;
     address private s_token;
     uint64 private s_scheduleId;
     bool private s_armed;
@@ -23,7 +24,7 @@ contract ReenteringDepositHandler is IERC165, ITokenHandler, IPurchaseRbtc {
 
     constructor(DcaManager manager, address stableToken) {
         i_manager = manager;
-        i_stableToken = stableToken;
+        i_stableToken = IERC20(stableToken);
     }
 
     function arm(address token, uint64 scheduleId) external {

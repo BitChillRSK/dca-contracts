@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
+import {IStablecoinSource} from "./IStablecoinSource.sol";
+
 /**
  * @title IPurchaseRbtc
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Shared rBTC purchase and signer-withdrawal surface. Called only by DcaManager.
  */
-interface IPurchaseRbtc {
+interface IPurchaseRbtc is IStablecoinSource {
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/

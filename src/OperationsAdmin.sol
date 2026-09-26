@@ -6,7 +6,6 @@ import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
 import {ITokenLending} from "./interfaces/ITokenLending.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {BitChillOwnable} from "./BitChillOwnable.sol";
-import {StablecoinSource} from "./StablecoinSource.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 /**
@@ -97,7 +96,7 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
         } else if (supportsLending) {
             revert OperationsAdmin__LendingHandlerOnIdleRoute(handler);
         }
-        if (address(StablecoinSource(handler).i_stableToken()) != token) {
+        if (address(ITokenHandler(handler).i_stableToken()) != token) {
             revert OperationsAdmin__HandlerTokenMismatch(token, handler);
         }
 

@@ -2,6 +2,7 @@
 pragma solidity 0.8.36;
 
 import {IERC165} from "lib/forge-std/src/interfaces/IERC165.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
 import {ITokenLending} from "src/interfaces/ITokenLending.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
@@ -19,12 +20,12 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
  *      the token it is assigned for, which that function checks against its `token` argument.
  */
 contract StubPurchaseHandler is IERC165, ITokenHandler, IPurchaseRbtc {
-    address public immutable i_stableToken;
+    IERC20 public immutable i_stableToken;
     uint256 public deposits;
     uint256 public rowsBought;
 
     constructor(address stableToken) {
-        i_stableToken = stableToken;
+        i_stableToken = IERC20(stableToken);
     }
 
     function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
