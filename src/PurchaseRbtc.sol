@@ -5,7 +5,6 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {DcaManagerAccessControl} from "./DcaManagerAccessControl.sol";
 import {FeeHandler} from "./FeeHandler.sol";
 import {StablecoinSource} from "./StablecoinSource.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title PurchaseRbtc
@@ -50,7 +49,6 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
         uint256[] memory netStablecoinAmountsToSpend;
         uint256 totalNetStablecoinPlanned;
         uint256 totalStablecoinAmountToSpend;
-        IERC20 purchaseToken;
 
         // `aggregatedFee` is scoped to this block because it is dead once the fee is paid.
         {
@@ -71,16 +69,15 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
                 totalStablecoinAmountToSpend -= aggregatedFee;
             }
 
-            purchaseToken = i_stableToken;
-            _transferFee(purchaseToken, aggregatedFee);
+            _transferFee(i_stableToken, aggregatedFee);
         }
 
         uint256 totalPurchasedRbtc;
         // The input balances are scoped to this block because they are dead once consumption is proved.
         {
-            uint256 inputBalanceBefore = purchaseToken.balanceOf(address(this));
+            uint256 inputBalanceBefore = i_stableToken.balanceOf(address(this));
             totalPurchasedRbtc = _purchaseRbtc(totalStablecoinAmountToSpend, minRbtcOut);
-            uint256 inputBalanceAfter = purchaseToken.balanceOf(address(this));
+            uint256 inputBalanceAfter = i_stableToken.balanceOf(address(this));
             if (
                 inputBalanceAfter > inputBalanceBefore
                     || inputBalanceBefore - inputBalanceAfter != totalStablecoinAmountToSpend
@@ -90,7 +87,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
                 );
             }
         }
-        if (totalPurchasedRbtc == 0) revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(purchaseToken));
+        if (totalPurchasedRbtc == 0) revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(i_stableToken));
         // Checked against the rBTC we measured ourselves receiving, so the bound holds on every purchase
         // venue and never trusts an integrator return value. Equality passes. Where the venue applies a
         // floor of its own, it is enforced there and the stricter of the two decides.
@@ -106,8 +103,9 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
             uint256 plannedNet = netStablecoinAmountsToSpend[i];
             address buyer = buyers[i];
             uint256 usersPurchasedRbtc;
-            // Received rBTC is below the native supply (about 2^85 wei) and each weight is a uint96. The
-            // stablecoin product stays checked: nothing here bounds the token's supply.
+            // The rBTC total was measured as received, so it is below the native supply (about 2^85 wei), and
+            // each weight is a uint96 purchase amount net of fee. A zero divisor still panics. The stablecoin
+            // product below stays checked: only the token's supply bounds it, and nothing here enforces that.
             unchecked {
                 usersPurchasedRbtc = totalPurchasedRbtc * plannedNet / totalNetStablecoinPlanned;
             }
@@ -115,11 +113,11 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
             // Skip zero floor allocations so a never-credited user is not marked live.
             if (usersPurchasedRbtc != 0) _creditRbtc(buyer, usersPurchasedRbtc);
             emit PurchaseRbtc__RbtcBought(
-                buyer, address(purchaseToken), usersPurchasedRbtc, scheduleIds[i], usersStablecoinSpent
+                buyer, address(i_stableToken), usersPurchasedRbtc, scheduleIds[i], usersStablecoinSpent
             );
         }
         emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
-            address(purchaseToken), totalPurchasedRbtc, totalStablecoinAmountToSpend
+            address(i_stableToken), totalPurchasedRbtc, totalStablecoinAmountToSpend
         );
     }
 

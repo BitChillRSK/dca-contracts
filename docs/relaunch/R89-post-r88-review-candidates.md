@@ -141,6 +141,9 @@ One commit per item.
   - `ZeroTokenPurchaseUniswapTest` tested the old check through a test-only contract whose constructor
     always reverts. That needs a `via_ir` exemption in `foundry.toml` (solc error 1284, R60). A test
     that deploys each production leaf with a zero stablecoin replaces it, and the exemption goes.
+- [x] **14. Drop the `purchaseToken` local in `batchBuyRbtc`.** After R87 put `i_stableToken` on
+  `StablecoinSource`, the local only cached that immutable. Use `i_stableToken` directly. Human
+  (2026-09-27): ship for code quality; withdraw the earlier deferral in **Considered, not implemented**.
 
 ## Review follow-up (2026-09-26)
 
@@ -266,14 +269,13 @@ contracts, under both profiles. So does item 7's revision, which moved the gette
 `IStablecoinSource`: it changes types, not code, so it adds no row. Item 13 changes constructors only:
 metadata-stripped runtime is byte-identical on all ten, under both profiles, and creation code moves
 by −12 to +27 bytes under `deploy` (−121 to +39 under default). It changes no transaction on a
-deployed contract. The largest artifact, LayerBank Dex,
-ends at 13,227 bytes under `deploy`, far below EIP-170's 24,576.
+deployed contract. Item 14 is a readability cleanup (no gas claim); the largest artifact, LayerBank
+Dex, stays far below EIP-170's 24,576.
 
 ## Considered, not implemented
 
 | Candidate | Evidence | Why not |
 |---|---|---|
-| Drop the `purchaseToken` local in `batchBuyRbtc` and use `i_stableToken` directly | `deploy` gas identical; runtime **+121** bytes on `LayerBankErc20HandlerDex` (`deploy`), **+155** (default) | Reads slightly cleaner but grows the artifact that ships and saves nothing. This is the size-regression reason R88 used to reject the shared scale declaration. |
 | Pass the batch's gross total into `_batchRetrieveStablecoin` so idle need not re-sum | After item 4, the idle sum costs tens of gas per batch | Changes the hook signature, which R87 declined to change, for tens of gas. |
 | Remove the length re-reads in `deleteDcaSchedule`'s swap-pop | A few hundred gas on a rare user call | Needs assembly or a memory round trip that costs more than it saves. Deletion's writes are already closed by the gas audit. |
 | Pack `s_mocOracle` beside the Dex slippage settings | One `SLOAD` (200 on Rootstock) per Dex batch, under 0.1% | A storage-layout change across four Dex leaves for a single read. |
@@ -313,7 +315,7 @@ ends at 13,227 bytes under `deploy`, far below EIP-170's 24,576.
 - `src/LendingErc20Handler.sol` (items 2, 4, 5)
 - `src/FeeHandler.sol` (item 4)
 - `src/idle/IdleErc20Handler.sol` (item 4)
-- `src/PurchaseRbtc.sol` (items 4, 8)
+- `src/PurchaseRbtc.sol` (items 4, 8, 14)
 - `src/PurchaseUniswap.sol`, `src/interfaces/IPurchaseUniswap.sol` (items 6, 13)
 - `src/OperationsAdmin.sol` (items 7, 11), `src/interfaces/IOperationsAdmin.sol`, `src/interfaces/IStablecoinSource.sol`
   (new), `src/interfaces/ITokenHandler.sol`, `src/interfaces/IPurchaseRbtc.sol`, `src/StablecoinSource.sol`
