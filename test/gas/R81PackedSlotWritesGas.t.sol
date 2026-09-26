@@ -49,7 +49,7 @@ contract R81PackedSlotWritesGasTest is Test {
         s_operationsAdmin.addSwapper(s_swapper);
         s_manager = new DcaManager(address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, address(this));
         s_manager.setTokenMinPurchaseAmount(s_token, MIN_PURCHASE_AMOUNT);
-        s_operationsAdmin.assignTokenHandler(s_token, ROUTE_INDEX, address(new StubPurchaseHandler()));
+        s_operationsAdmin.assignTokenHandler(s_token, ROUTE_INDEX, address(new StubPurchaseHandler(s_token)));
 
         for (uint256 i; i < 5; ++i) {
             _create(makeAddr(string(abi.encodePacked("buyer", vm.toString(i)))));

@@ -624,7 +624,7 @@ contract LendingErc20HandlerHarness is LendingErc20Handler {
     }
 
     function redeemShares(address user, uint256 stablecoinAmount) external returns (uint256) {
-        return _redeemShares(user, stablecoinAmount, _exchangeRate());
+        return _redeemShares(user, s_shares[user], stablecoinAmount, _exchangeRate());
     }
 
     function batchRetrieveStablecoin(

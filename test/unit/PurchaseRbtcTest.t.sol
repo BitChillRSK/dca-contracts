@@ -9,6 +9,7 @@ import {StablecoinSource} from "src/StablecoinSource.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
 
 /**
@@ -32,6 +33,8 @@ contract PurchaseRbtcTest is Test {
     uint16 internal constant FLAT_FEE_RATE = 100; // 1%
     uint256 internal constant BPS_DENOMINATOR = 10_000;
     uint256 internal constant RBTC_OUT = 1 ether;
+    /// @dev Above Rootstock's whole native supply (21M rBTC is about 2^84.1 wei).
+    uint256 internal constant BOUND_RBTC_OUT = 2 ** 85;
 
     address internal buyerA = address(0xA11CE);
     address internal buyerB = address(0xB0B);
@@ -54,6 +57,64 @@ contract PurchaseRbtcTest is Test {
         harness = new PurchaseRbtcHarness(address(this), address(token), feeCollector, feeSettings, address(this));
         token.mint(address(harness), 1_000_000 ether);
         harness.setRbtcOut(RBTC_OUT);
+    }
+
+    /**
+     * @dev The rBTC allocation product runs unchecked. Drive it to the bound the source states: uint96
+     *      weights and rBTC at 2^85 (above Rootstock's whole native supply). Every row's credit must match
+     *      full-width mulDiv. The retrieval delivers the full request, so each row's `amountSpent` is its
+     *      planned net.
+     */
+    function test_rbtcAllocationProduct_matchesFullWidthAtItsBound() public {
+        harness.setRbtcOut(BOUND_RBTC_OUT);
+        (address[] memory buyers, uint64[] memory ids, uint256[] memory amounts) = _uint96BoundBatch(8);
+        uint256 requested;
+        for (uint256 i; i < amounts.length; ++i) {
+            requested += amounts[i];
+        }
+        token.mint(address(harness), requested);
+
+        vm.recordLogs();
+        harness.batchBuyRbtc(buyers, ids, amounts, NO_MIN_RBTC_OUT);
+        _assertRowsMatchFullWidth(vm.getRecordedLogs(), buyers, amounts);
+    }
+
+    function _uint96BoundBatch(uint256 rows)
+        private
+        pure
+        returns (address[] memory buyers, uint64[] memory ids, uint256[] memory amounts)
+    {
+        buyers = new address[](rows);
+        ids = new uint64[](rows);
+        amounts = new uint256[](rows);
+        for (uint256 i; i < rows; ++i) {
+            buyers[i] = address(uint160(0x1000 + i));
+            ids[i] = uint64(i + 1);
+            amounts[i] = uint256(type(uint96).max) - i;
+        }
+    }
+
+    function _assertRowsMatchFullWidth(Vm.Log[] memory logs, address[] memory buyers, uint256[] memory amounts)
+        private
+    {
+        uint256 totalNet;
+        for (uint256 i; i < amounts.length; ++i) {
+            totalNet += amounts[i] - _fee(amounts[i]);
+        }
+        uint256 row;
+        for (uint256 j; j < logs.length; ++j) {
+            if (logs[j].topics[0] != PurchaseRbtc__RbtcBought.selector) continue;
+            _assertRowMatchesFullWidth(logs[j], buyers[row], amounts[row] - _fee(amounts[row]), totalNet);
+            ++row;
+        }
+        assertEq(row, buyers.length, "one RbtcBought per row");
+    }
+
+    function _assertRowMatchesFullWidth(Vm.Log memory log, address buyer, uint256 net, uint256 totalNet) private {
+        (uint256 rbtcBought, uint256 amountSpent) = abi.decode(log.data, (uint256, uint256));
+        assertEq(rbtcBought, Math.mulDiv(BOUND_RBTC_OUT, net, totalNet), "row rBTC");
+        assertEq(amountSpent, net, "row amountSpent");
+        assertEq(harness.getAccumulatedRbtcBalance(buyer), rbtcBought, "credited rBTC");
     }
 
     /// @dev R39 removed `buyRbtc`; a length-1 batch is the one-schedule path. The batch charges the fee

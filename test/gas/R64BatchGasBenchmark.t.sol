@@ -169,7 +169,7 @@ contract R64BatchGasBenchmarkTest is Test {
             for (uint256 s; s < SIZES; ++s) {
                 address token = address(uint160(uint256(keccak256(abi.encode("R64.token", d, s)))));
                 s_tokens[d][s] = token;
-                s_handlers[d][s] = new StubPurchaseHandler();
+                s_handlers[d][s] = new StubPurchaseHandler(token);
                 if (d == 0) s_designA.setTokenMinPurchaseAmount(token, MIN_PURCHASE_AMOUNT);
                 else if (d == 1) s_designB.setTokenMinPurchaseAmount(token, MIN_PURCHASE_AMOUNT);
                 else if (d == 2) s_designC.setTokenMinPurchaseAmount(token, MIN_PURCHASE_AMOUNT);

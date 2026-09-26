@@ -137,9 +137,13 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
 
         // One load of the packed scalars, and the id this schedule will carry.
         ProtocolSettings memory settings = s_protocolSettings;
-        uint64 scheduleId = (uint256(settings.scheduleNonce) + 1).toUint64();
+        uint64 scheduleId;
+        // A widened uint64 plus one cannot overflow; `toUint64` still reverts once the nonce is exhausted.
+        unchecked {
+            scheduleId = (uint256(settings.scheduleNonce) + 1).toUint64();
+        }
 
-        _validatePurchasePeriod(purchasePeriod);
+        _validatePurchasePeriod(purchasePeriod, settings.minPurchasePeriod);
         _validateDeposit(depositAmount);
         _handlerForDeposit(token, route).depositToken(msg.sender, depositAmount);
         // The remaining two checks sit after the pull: the minimum purchase amount, validated against
@@ -204,7 +208,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         nonReentrant
     {
         DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
-        _validatePurchasePeriod(newPurchasePeriod);
+        _validatePurchasePeriod(newPurchasePeriod, s_protocolSettings.minPurchasePeriod);
         uint256 previousPurchasePeriod = dcaSchedule.purchasePeriod;
         dcaSchedule.purchasePeriod = newPurchasePeriod.toUint32();
         emit DcaManager__PurchasePeriodUpdated(msg.sender, scheduleId, previousPurchasePeriod, newPurchasePeriod);
@@ -354,7 +358,9 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
             revert DcaManager__ProtectedPurchaseWindowStillActive(userMutationsAllowedFromBlock);
         }
 
-        userMutationsAllowedFromBlock = block.number + PROTECTED_PURCHASE_WINDOW_BLOCKS;
+        unchecked {
+            userMutationsAllowedFromBlock = block.number + PROTECTED_PURCHASE_WINDOW_BLOCKS;
+        }
         s_userMutationsAllowedFromBlock = userMutationsAllowedFromBlock;
         emit DcaManager__ProtectedPurchaseWindowActivated(msg.sender, userMutationsAllowedFromBlock);
     }
@@ -620,7 +626,6 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
             revert DcaManager__ScheduleIdIndexMismatch(token, scheduleId, index);
         }
 
-        // numOfSchedules > index >= 0 by the check above, so numOfSchedules >= 1.
         uint256 lastIndex;
         unchecked {
             lastIndex = numOfSchedules - 1;
@@ -648,9 +653,12 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         }
     }
 
-    /// @dev The period must meet the protocol minimum and preserve the midnight cadence grid.
-    function _validatePurchasePeriod(uint256 purchasePeriod) private view {
-        if (purchasePeriod < s_protocolSettings.minPurchasePeriod) {
+    /**
+     * @dev The period must meet the protocol minimum and preserve the midnight cadence grid. The caller
+     *      supplies the minimum so creation can take it from the settings word it already loaded.
+     */
+    function _validatePurchasePeriod(uint256 purchasePeriod, uint256 minPurchasePeriod) private pure {
+        if (purchasePeriod < minPurchasePeriod) {
             revert DcaManager__PurchasePeriodMustBeGreaterThanMinimum();
         }
         if (purchasePeriod % 1 days != 0) revert DcaManager__PurchasePeriodMustBeWholeDays();
@@ -757,18 +765,25 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         tokenLending.withdrawInterest(msg.sender, _lockedPrincipal(msg.sender, token, routeIndex));
     }
 
-    /// @dev Sum locked principal for one user, token, and route without copying the schedule array.
+    /**
+     * @dev Sum locked principal for one user, token, and route. The ids are copied to memory once:
+     *      they pack four to a word, and indexing the storage array would re-read its length and
+     *      the id's word on every iteration.
+     */
     function _lockedPrincipal(address user, address token, uint256 routeIndex)
         private
         view
         returns (uint256 lockedTokenAmount)
     {
-        uint64[] storage scheduleIds = s_scheduleIds[user][token];
+        uint64[] memory scheduleIds = s_scheduleIds[user][token];
         uint256 numOfSchedules = scheduleIds.length;
         for (uint256 i; i < numOfSchedules; ++i) {
             DcaSchedule storage dcaSchedule = s_dcaSchedules[token][scheduleIds[i]];
             if (dcaSchedule.routeIndex == routeIndex) {
-                lockedTokenAmount += dcaSchedule.tokenBalance;
+                // Fewer than 2^16 uint128 balances, since the schedule cap is a uint16.
+                unchecked {
+                    lockedTokenAmount += dcaSchedule.tokenBalance;
+                }
             }
         }
     }

@@ -5,7 +5,6 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {DcaManagerAccessControl} from "./DcaManagerAccessControl.sol";
 import {FeeHandler} from "./FeeHandler.sol";
 import {StablecoinSource} from "./StablecoinSource.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title PurchaseRbtc
@@ -35,9 +34,11 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
     /**
      * @inheritdoc IPurchaseRbtc
      * @dev Spends the stablecoin the retrieval actually delivered, never the gross amount it was asked
-     *      for: a lending handler can come back short when it redeems its shares, while the idle handler
-     *      reverts rather than under-deliver. Planned net amounts are only allocation weights: both the
-     *      rBTC credited and the stablecoin reported as spent are shares of what actually moved.
+     *      for: a lending handler can come back short when it redeems its shares. Idle retrieval only sums
+     *      the request, because the cash already sits on the handler; if it is not all there, the fee
+     *      transfer, the venue's pull, or the exact-consumption check reverts the batch. Planned net
+     *      amounts are only allocation weights: both the rBTC credited and the stablecoin reported as
+     *      spent are shares of what actually moved.
      */
     function batchBuyRbtc(
         address[] calldata buyers,
@@ -48,7 +49,6 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
         uint256[] memory netStablecoinAmountsToSpend;
         uint256 totalNetStablecoinPlanned;
         uint256 totalStablecoinAmountToSpend;
-        IERC20 purchaseToken;
 
         // `aggregatedFee` is scoped to this block because it is dead once the fee is paid.
         {
@@ -60,8 +60,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
             // Retrieve the stablecoin to spend: the net amount destined for rBTC plus the fee BitChill
             // charges. What comes back is what the retrieval delivered, which a lending handler can leave
             // short of the request.
-            totalStablecoinAmountToSpend =
-                _batchRetrieveStablecoin(buyers, purchaseAmounts);
+            totalStablecoinAmountToSpend = _batchRetrieveStablecoin(buyers, purchaseAmounts);
             if (totalStablecoinAmountToSpend <= aggregatedFee) {
                 revert PurchaseRbtc__StablecoinRetrievedBelowFee(totalStablecoinAmountToSpend, aggregatedFee);
             }
@@ -69,16 +68,15 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
                 totalStablecoinAmountToSpend -= aggregatedFee;
             }
 
-            purchaseToken = i_stableToken;
-            _transferFee(purchaseToken, aggregatedFee);
+            _transferFee(i_stableToken, aggregatedFee);
         }
 
         uint256 totalPurchasedRbtc;
         // The input balances are scoped to this block because they are dead once consumption is proved.
         {
-            uint256 inputBalanceBefore = purchaseToken.balanceOf(address(this));
+            uint256 inputBalanceBefore = i_stableToken.balanceOf(address(this));
             totalPurchasedRbtc = _purchaseRbtc(totalStablecoinAmountToSpend, minRbtcOut);
-            uint256 inputBalanceAfter = purchaseToken.balanceOf(address(this));
+            uint256 inputBalanceAfter = i_stableToken.balanceOf(address(this));
             if (
                 inputBalanceAfter > inputBalanceBefore
                     || inputBalanceBefore - inputBalanceAfter != totalStablecoinAmountToSpend
@@ -88,7 +86,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
                 );
             }
         }
-        if (totalPurchasedRbtc == 0) revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(purchaseToken));
+        if (totalPurchasedRbtc == 0) revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(i_stableToken));
         // Checked against the rBTC we measured ourselves receiving, so the bound holds on every purchase
         // venue and never trusts an integrator return value. Equality passes. Where the venue applies a
         // floor of its own, it is enforced there and the stricter of the two decides.
@@ -103,16 +101,21 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
             // shares floor, which can leave under one wei of rBTC per row uncredited; see IPurchaseRbtc.
             uint256 plannedNet = netStablecoinAmountsToSpend[i];
             address buyer = buyers[i];
-            uint256 usersPurchasedRbtc = totalPurchasedRbtc * plannedNet / totalNetStablecoinPlanned;
+            uint256 usersPurchasedRbtc;
+            // Can't overflow: the rBTC total is under the native supply (< 2^85 wei) and each weight is a uint96.
+            // The stablecoin product below stays checked because nothing here bounds the token's supply.
+            unchecked {
+                usersPurchasedRbtc = totalPurchasedRbtc * plannedNet / totalNetStablecoinPlanned;
+            }
             uint256 usersStablecoinSpent = totalStablecoinAmountToSpend * plannedNet / totalNetStablecoinPlanned;
             // Skip zero floor allocations so a never-credited user is not marked live.
             if (usersPurchasedRbtc != 0) _creditRbtc(buyer, usersPurchasedRbtc);
             emit PurchaseRbtc__RbtcBought(
-                buyer, address(purchaseToken), usersPurchasedRbtc, scheduleIds[i], usersStablecoinSpent
+                buyer, address(i_stableToken), usersPurchasedRbtc, scheduleIds[i], usersStablecoinSpent
             );
         }
         emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
-            address(purchaseToken), totalPurchasedRbtc, totalStablecoinAmountToSpend
+            address(i_stableToken), totalPurchasedRbtc, totalStablecoinAmountToSpend
         );
     }
 
