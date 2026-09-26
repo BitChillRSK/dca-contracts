@@ -20,7 +20,7 @@ import "test/Constants.sol";
  *      Per-row Rootstock conversion of the removed work: one SLOAD (200) + one RESET (5_000) =
  *      5_200, counted from the baseline's mapping writes (not from the Foundry gas delta). A 10-row
  *      batch therefore saves 52_000 Rootstock gas on the ledger alone. Foundry prints a smaller
- *      Cancun figure because the deposit in `setUp` leaves the slots warm.
+ *      Cancun figure because the deposits earlier in this test leave the slots warm.
  */
 contract R87IdleLedgerRemovalGasTest is Test {
     uint256 internal constant DEPOSIT = 100 ether;

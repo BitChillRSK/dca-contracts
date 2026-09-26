@@ -175,10 +175,12 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
                             PRIVATE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Encode and store a positive rBTC credit. Live slots hold `claimable + 1`.
-    ///      The add is unchecked: credits are shares of rBTC this handler measured receiving, total
-    ///      claims cannot exceed handler cash, and `claimable + 1` is bounded by Rootstock's native
-    ///      supply (about 2^85 wei), far below `uint256`.
+    /**
+     * @dev Encode and store a positive rBTC credit. Live slots hold `claimable + 1`.
+     *      The add is unchecked: credits are shares of rBTC this handler measured receiving, total
+     *      claims cannot exceed handler cash, and `claimable + 1` is bounded by Rootstock's native
+     *      supply (about 2^85 wei), far below `uint256`.
+     */
     function _creditRbtc(address buyer, uint256 amount) private {
         uint256 stored = s_usersAccumulatedRbtc[buyer];
         unchecked {

@@ -127,7 +127,7 @@ Everything else is single-sourced on the interface:
   and Tropykus's at once.
 - Constructor-only leaves carry the header even though they carry no banners, and sibling leaves state
   the same fact the same way: the four `*Erc20HandlerDex` contracts each say `Constructor-only leaf` and
-  that funding-first `is` order is house style only (`i_stableToken` lives on shared `StablecoinSource`),
+  that funding-first inheritance is conventional (shared stablecoin → order-independent path construction),
   in `@dev`, not one of them in `@notice`.
 
 **Do not name a token in a contract that does not name it itself.** `PurchaseUniswap`, `IdleErc20Handler`,

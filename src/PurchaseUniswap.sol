@@ -76,10 +76,9 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      * @param amountOutMinimumSafetyCheck The lowest floor the owner may later configure
      *        (deploy default: `DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK`, 95%)
      * @dev Caches the stablecoin-to-18-decimal oracle scale; tokens above 18 decimals revert rather than
-     *      weakening the floor through rounding. Path construction reads `i_stableToken` on the shared
-     *      `StablecoinSource` base, which C3 initializes before this constructor regardless of whether
-     *      the leaf lists the funding base or this purchase base first; a zero value still reverts.
-     *      The initial path is allowlisted here, while later paths require owner approval.
+     *      weakening the floor through rounding. Path construction reads shared `i_stableToken` (order-
+     *      independent); a zero value reverts. The initial path is allowlisted here; later paths need
+     *      owner approval.
      */
     constructor(
         UniswapSettings memory uniswapSettings,
@@ -348,8 +347,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      * @dev Uniswap V3 `exactInput` bytes: this handler's stablecoin, then each
      *      `(fee, intermediateToken)`, then the last fee and WRBTC. Empty
      *      `intermediateTokens` is a direct pair. `poolFeeRates.length` must be
-     *      `intermediateTokens.length + 1`. Reverts if `i_stableToken` is the zero
-     *      address (explicit reject), which also catches a missing StablecoinSource init.
+     *      `intermediateTokens.length + 1`. Reverts if `i_stableToken` is zero.
      */
     function _encodePurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
         private

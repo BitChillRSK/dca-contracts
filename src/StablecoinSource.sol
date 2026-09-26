@@ -7,9 +7,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  * @title StablecoinSource
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Shared stablecoin immutable and batch-funding hook for handlers and purchase routes.
- * @dev Owns `i_stableToken` so deposit/withdraw (`TokenHandler`) and the purchase pipeline
- *      (`PurchaseRbtc`) name the same token without a virtual bridge. Lending and idle bases
- *      implement `_batchRetrieveStablecoin`; the leaves drop forwarding resolvers.
+ * @dev Owns `i_stableToken` so deposit/withdraw and the purchase pipeline name the same token.
+ *      Lending and idle bases implement `_batchRetrieveStablecoin`.
  */
 abstract contract StablecoinSource {
     /*//////////////////////////////////////////////////////////////

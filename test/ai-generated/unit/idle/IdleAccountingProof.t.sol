@@ -347,7 +347,7 @@ contract IdleAccountingProofTest is Test {
         }
     }
 
-    function _totalIdleLiability() private returns (uint256 sum) {
+    function _totalIdleLiability() private view returns (uint256 sum) {
         uint64 nonce = uint64(dcaManager.getSchedulesCreatedCount());
         for (uint64 id = 1; id <= nonce; ++id) {
             (bool ok, IDcaManager.DcaSchedule memory schedule) = _tryGetSchedule(id);
@@ -357,7 +357,7 @@ contract IdleAccountingProofTest is Test {
         }
     }
 
-    function _tryGetSchedule(uint64 id) private returns (bool ok, IDcaManager.DcaSchedule memory schedule) {
+    function _tryGetSchedule(uint64 id) private view returns (bool ok, IDcaManager.DcaSchedule memory schedule) {
         try dcaManager.getDcaSchedule(address(doc), id) returns (IDcaManager.DcaSchedule memory s) {
             return (true, s);
         } catch {
