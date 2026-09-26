@@ -9,9 +9,8 @@ import {LayerBankErc20Handler} from "./LayerBankErc20Handler.sol";
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Token-agnostic LayerBank lending + Uniswap V3 purchase handler.
  * @dev Constructor-only leaf. Only its immutable DcaManager moves principal, buys, or withdraws rBTC;
- *      the owner controls fees, oracle, path allowlist, and floor. Funding-first inheritance is
- *      conventional; the shared stablecoin makes path construction order-independent. Holds standing
- *      max stablecoin approvals to SwapRouter02 and the LayerBank Pool, restorable by anyone.
+ *      the owner controls fees, oracle, path allowlist, and floor. Holds standing max stablecoin
+ *      approvals to SwapRouter02 and the LayerBank Pool, restorable by anyone.
  */
 contract LayerBankErc20HandlerDex is LayerBankErc20Handler, PurchaseUniswap {
     /**

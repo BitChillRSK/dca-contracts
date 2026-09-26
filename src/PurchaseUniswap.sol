@@ -76,9 +76,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      * @param amountOutMinimumSafetyCheck The lowest floor the owner may later configure
      *        (deploy default: `DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK`, 95%)
      * @dev Caches the stablecoin-to-18-decimal oracle scale; tokens above 18 decimals revert rather than
-     *      weakening the floor through rounding. Path construction reads shared `i_stableToken` (order-
-     *      independent); a zero value reverts. The initial path is allowlisted here; later paths need
-     *      owner approval.
+     *      weakening the floor through rounding. Path construction reads `i_stableToken`; a zero value
+     *      reverts. The initial path is allowlisted here; later paths need owner approval.
      */
     constructor(
         UniswapSettings memory uniswapSettings,
