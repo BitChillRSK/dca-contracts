@@ -54,12 +54,16 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
     /// @inheritdoc ITokenLending
     function withdrawInterest(address user, uint256 stablecoinLockedInDcaSchedules) external override onlyDcaManager {
         uint256 exchangeRate = _exchangeRate();
-        uint256 totalStablecoinInLending = _sharesToStablecoin(s_shares[user], exchangeRate);
+        uint256 usersShares = s_shares[user];
+        uint256 totalStablecoinInLending = _sharesToStablecoin(usersShares, exchangeRate);
         if (totalStablecoinInLending <= stablecoinLockedInDcaSchedules) {
             return; // No interest to withdraw
         }
-        uint256 stablecoinInterestAmount = totalStablecoinInLending - stablecoinLockedInDcaSchedules;
-        uint256 stablecoinReceived = _redeemShares(user, stablecoinInterestAmount, exchangeRate);
+        uint256 stablecoinInterestAmount;
+        unchecked {
+            stablecoinInterestAmount = totalStablecoinInLending - stablecoinLockedInDcaSchedules;
+        }
+        uint256 stablecoinReceived = _redeemShares(user, usersShares, stablecoinInterestAmount, exchangeRate);
         if (stablecoinReceived > 0) {
             i_stableToken.safeTransfer(user, stablecoinReceived);
         }
@@ -133,7 +137,8 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
      */
     function _withdrawToken(address user, uint256 withdrawalAmount) internal virtual override returns (uint256) {
         uint256 exchangeRate = _exchangeRate();
-        uint256 totalStablecoinInLending = _sharesToStablecoin(s_shares[user], exchangeRate);
+        uint256 usersShares = s_shares[user];
+        uint256 totalStablecoinInLending = _sharesToStablecoin(usersShares, exchangeRate);
 
         if (totalStablecoinInLending < withdrawalAmount) {
             emit TokenLending__WithdrawalAmountAdjusted(user, withdrawalAmount, totalStablecoinInLending);
@@ -141,7 +146,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
         }
 
         // Pay out what the redemption actually produced, which may be less than requested
-        withdrawalAmount = _redeemShares(user, withdrawalAmount, exchangeRate);
+        withdrawalAmount = _redeemShares(user, usersShares, withdrawalAmount, exchangeRate);
         return super._withdrawToken(user, withdrawalAmount);
     }
 
@@ -150,12 +155,12 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
      *      Clamp to this user's book, never the handler's pooled balance: schedule accounting can
      *      sit ahead of share-backed underlying, and purchases have no outer withdraw clamp.
      *      Zero shares is a no-op. A positive burn that pays nothing reverts and rolls back.
+     *      Callers pass the `usersShares` they already loaded to avoid a second SLOAD.
      */
-    function _redeemShares(address user, uint256 stablecoinAmount, uint256 exchangeRate)
+    function _redeemShares(address user, uint256 usersShares, uint256 stablecoinAmount, uint256 exchangeRate)
         internal
         returns (uint256 stablecoinReceived)
     {
-        uint256 usersShares = s_shares[user];
         uint256 sharesToRedeem = _stablecoinToShares(stablecoinAmount, exchangeRate);
         if (sharesToRedeem > usersShares) {
             uint256 oldSharesToRedeem = sharesToRedeem;
@@ -276,9 +281,11 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
         returns (uint256)
     {
         uint256 totalStablecoinInLending = _sharesToStablecoin(s_shares[user], exchangeRate);
-        return totalStablecoinInLending > stablecoinLockedInDcaSchedules
-            ? totalStablecoinInLending - stablecoinLockedInDcaSchedules
-            : 0;
+        unchecked {
+            return totalStablecoinInLending > stablecoinLockedInDcaSchedules
+                ? totalStablecoinInLending - stablecoinLockedInDcaSchedules
+                : 0;
+        }
     }
 
     /**

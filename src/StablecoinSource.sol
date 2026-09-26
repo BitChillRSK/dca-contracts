@@ -2,6 +2,7 @@
 pragma solidity 0.8.36;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IStablecoinSource} from "./interfaces/IStablecoinSource.sol";
 
 /**
  * @title StablecoinSource
@@ -10,16 +11,13 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  * @dev Owns `i_stableToken` so deposit/withdraw and the purchase pipeline name the same token.
  *      Lending and idle bases implement `_batchRetrieveStablecoin`.
  */
-abstract contract StablecoinSource {
+abstract contract StablecoinSource is IStablecoinSource {
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @notice The stablecoin this handler deposits, withdraws, and spends on purchases.
-     * @return The constructor-supplied ERC20.
-     */
-    IERC20 public immutable i_stableToken;
+    /// @inheritdoc IStablecoinSource
+    IERC20 public immutable override i_stableToken;
 
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
@@ -29,6 +27,7 @@ abstract contract StablecoinSource {
      * @param tokenAddress The stablecoin this handler holds or lends out.
      */
     constructor(address tokenAddress) {
+        if (tokenAddress == address(0)) revert StablecoinSource__ZeroStablecoin();
         i_stableToken = IERC20(tokenAddress);
     }
 

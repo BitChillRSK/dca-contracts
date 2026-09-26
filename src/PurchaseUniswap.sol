@@ -76,8 +76,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      * @param amountOutMinimumSafetyCheck The lowest floor the owner may later configure
      *        (deploy default: `DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK`, 95%)
      * @dev Caches the stablecoin-to-18-decimal oracle scale; tokens above 18 decimals revert rather than
-     *      weakening the floor through rounding. Path construction reads `i_stableToken`; a zero value
-     *      reverts. The initial path is allowlisted here; later paths need owner approval.
+     *      weakening the floor through rounding. The initial path is allowlisted here; later paths need
+     *      owner approval.
      */
     constructor(
         UniswapSettings memory uniswapSettings,
@@ -97,8 +97,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint128();
 
         // The initial owner is not the deployer, so the constructor cannot call the onlyOwner setters
-        // and must install the first path itself. This must stay above the `decimals()` read below:
-        // encoding reverts on a zero purchase token, before that read reaches an empty address.
+        // and must install the first path itself.
         address[] memory intermediateTokens = uniswapSettings.swapIntermediateTokens;
         uint24[] memory poolFeeRates = uniswapSettings.swapPoolFeeRates;
         bytes memory newPath = _encodePurchasePath(intermediateTokens, poolFeeRates);
@@ -346,7 +345,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      * @dev Uniswap V3 `exactInput` bytes: this handler's stablecoin, then each
      *      `(fee, intermediateToken)`, then the last fee and WRBTC. Empty
      *      `intermediateTokens` is a direct pair. `poolFeeRates.length` must be
-     *      `intermediateTokens.length + 1`. Reverts if `i_stableToken` is zero.
+     *      `intermediateTokens.length + 1`.
      */
     function _encodePurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
         private
@@ -357,10 +356,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
             revert PurchaseUniswap__WrongNumberOfTokensOrFeeRates(intermediateTokens.length, poolFeeRates.length);
         }
 
-        address purchaseToken = address(i_stableToken);
-        if (purchaseToken == address(0)) revert PurchaseUniswap__ZeroPurchaseToken();
-
-        newPath = abi.encodePacked(purchaseToken);
+        newPath = abi.encodePacked(address(i_stableToken));
         for (uint256 i = 0; i < intermediateTokens.length; ++i) {
             newPath = abi.encodePacked(newPath, poolFeeRates[i], intermediateTokens[i]);
         }

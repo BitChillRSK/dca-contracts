@@ -169,15 +169,15 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         for (uint256 i; i < len; ++i) {
             uint256 amount = purchaseAmounts[i];
             uint256 fee = _calculateFeeAtRate(amount, feeRate);
-            aggregatedFee += fee;
 
             uint256 net;
-            // Fee rates are capped at 5%, so the fee cannot exceed its input amount.
+            // The fee is at most 5% of a uint96 amount, so neither the subtraction nor the sums can overflow.
             unchecked {
                 net = amount - fee;
+                aggregatedFee += fee;
+                totalAmountToSpend += net;
             }
             netAmountsToSpend[i] = net;
-            totalAmountToSpend += net;
         }
     }
 
@@ -207,15 +207,15 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
                 feePurchaseLowerBound,
                 feePurchaseUpperBound
             );
-            aggregatedFee += fee;
 
             uint256 net;
-            // Fee rates are capped at 5%, so the fee cannot exceed its input amount.
+            // The fee is at most 5% of a uint96 amount, so neither the subtraction nor the sums can overflow.
             unchecked {
                 net = amount - fee;
+                aggregatedFee += fee;
+                totalAmountToSpend += net;
             }
             netAmountsToSpend[i] = net;
-            totalAmountToSpend += net;
         }
     }
 
@@ -245,9 +245,14 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         return _calculateFeeAtRate(purchaseAmount, feeRate);
     }
 
-    /// @dev Apply one basis-point rate. Shared by the flat and variable fee rate paths.
+    /**
+     * @dev Apply one basis-point rate. Shared by the flat and variable fee rate paths. The product cannot
+     *      overflow: the amount is a uint96 purchase amount and the rate is at most `MAX_FEE_RATE_CAP`.
+     */
     function _calculateFeeAtRate(uint256 amount, uint256 feeRate) private pure returns (uint256) {
-        return amount * feeRate / BPS_DENOMINATOR;
+        unchecked {
+            return amount * feeRate / BPS_DENOMINATOR;
+        }
     }
 
     /// @dev Validate the fee settings.

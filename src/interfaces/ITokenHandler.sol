@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
+import {IStablecoinSource} from "./IStablecoinSource.sol";
+
 /**
  * @title ITokenHandler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Deposit and withdraw the handler's stablecoin. Called only by DcaManager.
  */
-interface ITokenHandler {
+interface ITokenHandler is IStablecoinSource {
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/

@@ -329,6 +329,56 @@ contract FeeHandlerTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
+                        UNCHECKED ARITHMETIC BOUNDS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev The fee multiplication and both loop sums run unchecked, bounded by uint96 purchase amounts and
+    ///      the 500 bps cap. Drive a long batch at those bounds, flat and across the whole variable band,
+    ///      and compare every output with full-width arithmetic.
+    function test_calculateFeeAndNetAmounts_uint96RowsAtCapMatchFullWidth() public {
+        uint256 rows = 256;
+        uint256[] memory amounts = new uint256[](rows);
+        uint256 step = uint256(type(uint96).max) / rows;
+        for (uint256 i; i < rows; ++i) {
+            amounts[i] = uint256(type(uint96).max) - i * step;
+        }
+
+        feeHandler.testSetFeeRateParams(FEE_RATE_CAP, FEE_RATE_CAP, 1, type(uint112).max);
+        _assertFeesMatchFullWidth(amounts, FEE_RATE_CAP, FEE_RATE_CAP, 1, type(uint112).max);
+
+        uint112 upper = uint112(type(uint96).max);
+        uint112 lower = uint112(step);
+        feeHandler.testSetFeeRateParams(0, FEE_RATE_CAP, lower, upper);
+        _assertFeesMatchFullWidth(amounts, 0, FEE_RATE_CAP, lower, upper);
+    }
+
+    function _assertFeesMatchFullWidth(
+        uint256[] memory amounts,
+        uint256 minRate,
+        uint256 maxRate,
+        uint256 lower,
+        uint256 upper
+    ) private {
+        (uint256 aggregatedFee, uint256[] memory nets, uint256 totalNet) =
+            feeHandler.exposedCalculateFeeAndNetAmounts(amounts);
+        uint256 expectedFees;
+        uint256 expectedNets;
+        for (uint256 i; i < amounts.length; ++i) {
+            uint256 amount = amounts[i];
+            uint256 rate;
+            if (amount >= upper) rate = minRate;
+            else if (amount <= lower) rate = maxRate;
+            else rate = maxRate - (amount - lower) * (maxRate - minRate) / (upper - lower);
+            uint256 fee = amount * rate / BPS_DENOMINATOR;
+            assertEq(nets[i], amount - fee, "row net");
+            expectedFees += fee;
+            expectedNets += amount - fee;
+        }
+        assertEq(aggregatedFee, expectedFees, "aggregated fee");
+        assertEq(totalNet, expectedNets, "total net");
+    }
+
+    /*//////////////////////////////////////////////////////////////
                             STORAGE PACKING
     //////////////////////////////////////////////////////////////*/
 

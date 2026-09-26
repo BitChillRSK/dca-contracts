@@ -96,6 +96,19 @@ contract IdleErc20HandlerTest is HandlerTestHarness {
         // Funding is bookkeeping only: cash stays on the handler until MoC / Uniswap spends it.
         assertEq(stablecoin.balanceOf(address(handler)), DEPOSIT_AMOUNT * 2);
     }
+
+    /// @dev The sum runs unchecked because every row is a schedule's uint96 purchase amount. A long batch
+    ///      of rows at that bound must still match full-width arithmetic.
+    function test_idle_batchRetrieveStablecoin_uint96RowsMatchFullWidth() public {
+        uint256 rows = 256;
+        address[] memory users = new address[](rows);
+        uint256[] memory amounts = new uint256[](rows);
+        for (uint256 i; i < rows; ++i) {
+            users[i] = address(uint160(0x1000 + i));
+            amounts[i] = type(uint96).max;
+        }
+        assertEq(idleHandler.testBatchRetrieveStablecoin(users, amounts), rows * uint256(type(uint96).max));
+    }
 }
 
 /**

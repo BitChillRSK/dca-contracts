@@ -412,7 +412,3 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         path = abi.encodePacked(path, poolFeeRates[poolFeeRates.length - 1], address(wrBtcToken));
     }
 }
-
-// ZeroTokenPurchaseUniswap and its test moved to ZeroTokenPurchaseUniswapTest.sol (R60): that
-// contract's constructor is deliberately always-reverting, which trips a known solc/via_ir limitation
-// (see that file's doc comment) and must be excluded from IR compilation on its own.
