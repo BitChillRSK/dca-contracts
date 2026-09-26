@@ -59,7 +59,10 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
         if (totalStablecoinInLending <= stablecoinLockedInDcaSchedules) {
             return; // No interest to withdraw
         }
-        uint256 stablecoinInterestAmount = totalStablecoinInLending - stablecoinLockedInDcaSchedules;
+        uint256 stablecoinInterestAmount;
+        unchecked {
+            stablecoinInterestAmount = totalStablecoinInLending - stablecoinLockedInDcaSchedules;
+        }
         uint256 stablecoinReceived = _redeemShares(user, usersShares, stablecoinInterestAmount, exchangeRate);
         if (stablecoinReceived > 0) {
             i_stableToken.safeTransfer(user, stablecoinReceived);
@@ -125,7 +128,10 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
         uint256 mintedAmount = _protocolDeposit(depositAmount);
         if (mintedAmount == 0) revert TokenLending__LendingProtocolDepositFailed();
         uint256 previousShares = s_shares[user];
-        _setUserShares(user, previousShares, previousShares + mintedAmount);
+        // Booked shares are measured mints less exact burns, so they stay below the receipt token's supply.
+        unchecked {
+            _setUserShares(user, previousShares, previousShares + mintedAmount);
+        }
     }
 
     /**
@@ -280,9 +286,11 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
         returns (uint256)
     {
         uint256 totalStablecoinInLending = _sharesToStablecoin(s_shares[user], exchangeRate);
-        return totalStablecoinInLending > stablecoinLockedInDcaSchedules
-            ? totalStablecoinInLending - stablecoinLockedInDcaSchedules
-            : 0;
+        unchecked {
+            return totalStablecoinInLending > stablecoinLockedInDcaSchedules
+                ? totalStablecoinInLending - stablecoinLockedInDcaSchedules
+                : 0;
+        }
     }
 
     /**

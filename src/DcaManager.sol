@@ -775,7 +775,10 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         for (uint256 i; i < numOfSchedules; ++i) {
             DcaSchedule storage dcaSchedule = s_dcaSchedules[token][scheduleIds[i]];
             if (dcaSchedule.routeIndex == routeIndex) {
-                lockedTokenAmount += dcaSchedule.tokenBalance;
+                // Fewer than 2^16 uint128 balances, since the schedule cap is a uint16.
+                unchecked {
+                    lockedTokenAmount += dcaSchedule.tokenBalance;
+                }
             }
         }
     }
