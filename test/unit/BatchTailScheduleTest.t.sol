@@ -144,7 +144,7 @@ contract BatchTailScheduleTest is Test {
         // Idle books are 1:1, so the exact-balance purchase the lending route rejects goes through.
         idleHandler.batchBuyRbtc(_one(ALICE), _oneId(1), _one(ALICE_DEPOSIT), NO_MIN_RBTC_OUT);
 
-        assertEq(idleHandler.getUsersIdleTokenBalance(ALICE), 0);
+        assertEq(docToken.balanceOf(address(idleHandler)), 0);
         assertGt(idleHandler.getAccumulatedRbtcBalance(ALICE), 0);
     }
 

@@ -68,7 +68,6 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         IDcaManager.DcaSchedule memory schedule = scheduleAt(dcaManager, USER, address(docToken), 0);
         assertEq(schedule.routeIndex, IDLE_INDEX);
         assertEq(schedule.tokenBalance, DEPOSIT);
-        assertEq(handler.getUsersIdleTokenBalance(USER), DEPOSIT);
         assertEq(docToken.balanceOf(address(handler)), DEPOSIT);
         assertFalse(operationsAdmin.isLendingRoute(IDLE_INDEX));
     }
@@ -82,16 +81,16 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         batchBuyOne(dcaManager, address(docToken), scheduleId, IDLE_INDEX);
 
         assertGt(dcaManager.getAccumulatedRbtcBalance(USER, address(docToken), IDLE_INDEX), 0);
-        assertEq(handler.getUsersIdleTokenBalance(USER), DEPOSIT - PURCHASE);
         assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, DEPOSIT - PURCHASE);
+        assertEq(docToken.balanceOf(address(handler)), DEPOSIT - PURCHASE);
 
         uint256 userDocBefore = docToken.balanceOf(USER);
         vm.prank(USER);
         dcaManager.withdrawToken(address(docToken), scheduleId, DEPOSIT - PURCHASE);
 
         assertEq(docToken.balanceOf(USER), userDocBefore + DEPOSIT - PURCHASE);
-        assertEq(handler.getUsersIdleTokenBalance(USER), 0);
         assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, 0);
+        assertEq(docToken.balanceOf(address(handler)), 0);
 
         uint256 userRbtcBefore = USER.balance;
         vm.prank(USER);
@@ -144,7 +143,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         assertGt(interest, 0);
 
         uint256 userDocBefore = docToken.balanceOf(USER);
-        uint256 idleBalanceBefore = handler.getUsersIdleTokenBalance(USER);
+        uint256 idleCashBefore = docToken.balanceOf(address(handler));
         address[] memory tokens = new address[](2);
         tokens[0] = address(docToken);
         tokens[1] = address(docToken);
@@ -154,7 +153,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         vm.prank(USER);
         dcaManager.withdrawAllAccumulatedInterest(tokens, indexes);
 
-        assertEq(handler.getUsersIdleTokenBalance(USER), idleBalanceBefore);
+        assertEq(docToken.balanceOf(address(handler)), idleCashBefore);
         assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, DEPOSIT);
         assertEq(scheduleAt(dcaManager, USER, address(docToken), 1).tokenBalance, DEPOSIT);
         assertGt(docToken.balanceOf(USER), userDocBefore);

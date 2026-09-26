@@ -56,13 +56,11 @@ contract IdleDocHandlerMocTest is Test {
 
         handler.depositToken(USER, depositAmount);
         assertEq(docToken.balanceOf(address(handler)), depositAmount);
-        assertEq(handler.getUsersIdleTokenBalance(USER), depositAmount);
 
         handlerBatchBuyOne(IPurchaseRbtc(address(handler)), USER, scheduleId, purchaseAmount);
 
         uint256 rbtcAccrued = handler.getAccumulatedRbtcBalance(USER);
         assertGt(rbtcAccrued, 0);
-        assertEq(handler.getUsersIdleTokenBalance(USER), depositAmount - purchaseAmount);
         assertEq(docToken.balanceOf(address(handler)), depositAmount - purchaseAmount);
 
         handler.withdrawAccumulatedRbtc(USER);
@@ -105,8 +103,6 @@ contract IdleDocHandlerMocTest is Test {
         assertLe(accrued1 + accrued2, expectedTotal);
         assertGt(accrued1 + accrued2, expectedTotal * 95 / 100);
 
-        assertEq(handler.getUsersIdleTokenBalance(user1), deposit1 - purchaseAmounts[0]);
-        assertEq(handler.getUsersIdleTokenBalance(user2), deposit2 - purchaseAmounts[1]);
         assertEq(docToken.balanceOf(address(handler)), deposit1 + deposit2 - purchaseAmounts[0] - purchaseAmounts[1]);
     }
 
@@ -116,6 +112,5 @@ contract IdleDocHandlerMocTest is Test {
 
         // The only ERC20 this test deployed is DOC; it stays on the handler minus the purchase.
         assertEq(docToken.balanceOf(address(handler)), 400 ether);
-        assertEq(handler.getUsersIdleTokenBalance(USER), 400 ether);
     }
 }

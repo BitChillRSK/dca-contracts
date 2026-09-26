@@ -6,7 +6,6 @@ import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {IPurchaseUniswap} from "src/interfaces/IPurchaseUniswap.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
-import {IIdleErc20Handler} from "src/idle/IIdleErc20Handler.sol";
 import {IWRBTC} from "src/interfaces/IWRBTC.sol";
 import {IUniswapV3SwapRouter} from "../../../../src/interfaces/IUniswapV3SwapRouter.sol";
 import {ICoinPairPrice} from "src/interfaces/ICoinPairPrice.sol";
@@ -88,7 +87,6 @@ contract IdleErc20HandlerDexTest is HandlerTestHarness {
     function test_idleDex_depositPurchaseWithdraw() public {
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);
-        assertEq(idleDexHandler.getUsersIdleTokenBalance(USER), DEPOSIT_AMOUNT);
         assertEq(stablecoin.balanceOf(address(handler)), DEPOSIT_AMOUNT);
 
         uint64 scheduleId = 1;
@@ -97,7 +95,6 @@ contract IdleErc20HandlerDexTest is HandlerTestHarness {
 
         uint256 rbtcAccrued = idleDexHandler.getAccumulatedRbtcBalance(USER);
         assertGt(rbtcAccrued, 0);
-        assertEq(idleDexHandler.getUsersIdleTokenBalance(USER), DEPOSIT_AMOUNT - PURCHASE_AMOUNT);
         assertEq(stablecoin.balanceOf(address(handler)), DEPOSIT_AMOUNT - PURCHASE_AMOUNT);
 
         vm.prank(address(dcaManager));
@@ -106,9 +103,9 @@ contract IdleErc20HandlerDexTest is HandlerTestHarness {
         assertGt(USER.balance, 0);
     }
 
-    /// @notice Idle batch retrieval reverts on shortfall (does not clamp). Same rule as the MoC idle
-    ///         leaf; a Uniswap batch must not silently change that and dilute other buyers.
-    function test_idleDex_batchBuy_revertsIfBuyerShort() public {
+    /// @notice A batch that asks for more cash than the handler holds fails at the venue. Both
+    ///         buyers stay uncredited; there is no per-user idle book to clamp against.
+    function test_idleDex_batchBuy_revertsIfHandlerCashShort() public {
         address user1 = makeAddr("user1");
         address user2 = makeAddr("user2");
         stablecoin.mint(user1, DEPOSIT_AMOUNT);
@@ -133,19 +130,11 @@ contract IdleErc20HandlerDexTest is HandlerTestHarness {
         purchaseAmounts[0] = DEPOSIT_AMOUNT * 2;
         purchaseAmounts[1] = DEPOSIT_AMOUNT / 2;
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdleErc20Handler.IdleErc20Handler__InsufficientIdleBalance.selector,
-                user1,
-                DEPOSIT_AMOUNT * 2,
-                DEPOSIT_AMOUNT
-            )
-        );
+        vm.expectRevert();
         vm.prank(address(dcaManager));
         idleDexHandler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT);
 
-        assertEq(idleDexHandler.getUsersIdleTokenBalance(user1), DEPOSIT_AMOUNT);
-        assertEq(idleDexHandler.getUsersIdleTokenBalance(user2), DEPOSIT_AMOUNT);
+        assertEq(stablecoin.balanceOf(address(handler)), DEPOSIT_AMOUNT * 2);
         assertEq(idleDexHandler.getAccumulatedRbtcBalance(user1), 0);
         assertEq(idleDexHandler.getAccumulatedRbtcBalance(user2), 0);
     }
