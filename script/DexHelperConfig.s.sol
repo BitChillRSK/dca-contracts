@@ -149,7 +149,7 @@ contract DexHelperConfig is Script {
         } else if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING))) {
             intermediateTokens = new address[](1);
             poolFeeRates = new uint24[](2);
-            intermediateTokens[0] = 0xAf368c91793CB22739386DFCbBb2F1A9e4bCBeBf; // rUSDT hop for USDRIF
+            intermediateTokens[0] = USDT0_MAINNET; // USDRIF -0.05%-> USDT0 -0.30%-> WRBTC
             poolFeeRates[0] = 500;
             poolFeeRates[1] = 3000;
             stablecoinAddress = 0x3A15461d8aE0F0Fb5Fa2629e9DA7D66A794a6e37; // USDRIF token on mainnet

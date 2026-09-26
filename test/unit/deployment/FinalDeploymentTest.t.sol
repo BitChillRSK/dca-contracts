@@ -140,6 +140,17 @@ contract FinalDeploymentTest is Test {
         assertEq(stack.dcaManager.getMinPurchasePeriod(), 7 days);
         assertEq(stack.dcaManager.getMaxSchedulesPerToken(), 10);
 
+        // Both USDRIF handlers keep the default path active and approve the second one before the Safe owns them.
+        bytes memory defaultPath =
+            abi.encodePacked(address(usdrif), uint24(500), address(intermediate), uint24(3000), address(wrbtc));
+        bytes memory altPath = abi.encodePacked(address(usdrif), uint24(500), address(usdt0), uint24(3000), address(wrbtc));
+        address[2] memory usdrifHandlers = [stack.usdrifIdle, stack.usdrifLayerBank];
+        for (uint256 i; i < usdrifHandlers.length; ++i) {
+            PurchaseUniswap purchase = PurchaseUniswap(payable(usdrifHandlers[i]));
+            assertEq(purchase.getSwapPath(), defaultPath, "default path is not active");
+            assertTrue(purchase.isPurchasePathAllowed(keccak256(altPath)), "second USDRIF path not approved");
+        }
+
         _assertHandlerOwnerPending(stack.docIdle, SAFE);
         _assertHandlerOwnerPending(stack.docLayerBank, SAFE);
         _assertHandlerOwnerPending(stack.docSovryn, SAFE);
@@ -319,6 +330,9 @@ contract FinalDeploymentTest is Test {
         usdrifFees[0] = 500;
         usdrifFees[1] = 3000;
 
+        address[] memory usdrifAltIntermediate = new address[](1);
+        usdrifAltIntermediate[0] = address(usdt0);
+
         address[] memory usdt0Intermediate = new address[](0);
         uint24[] memory usdt0Fees = new uint24[](1);
         usdt0Fees[0] = 3000;
@@ -337,6 +351,8 @@ contract FinalDeploymentTest is Test {
             mocOracle: address(oracle),
             usdrifIntermediateTokens: usdrifIntermediate,
             usdrifPoolFeeRates: usdrifFees,
+            usdrifAltIntermediateTokens: usdrifAltIntermediate,
+            usdrifAltPoolFeeRates: usdrifFees,
             usdt0IntermediateTokens: usdt0Intermediate,
             usdt0PoolFeeRates: usdt0Fees,
             amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,

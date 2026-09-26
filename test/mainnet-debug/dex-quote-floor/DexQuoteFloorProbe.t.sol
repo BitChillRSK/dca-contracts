@@ -11,9 +11,9 @@ import "../../Constants.sol";
  * @title DexQuoteFloorProbe
  * @notice R51 relaunch evidence: for every shipped Dex path, what the live pool actually pays for the
  *         batch's post-BitChill-fee input, and how that compares with the oracle-derived governance floor.
- * @dev The shipped Dex set is LayerBank USDRIF and LayerBank USDT0. DOC is deliberately not in it — DOC buys
- *      rBTC through MoC redemption only — and its row below is kept as evidence about a legacy path that must
- *      never be deployed, not as a candidate awaiting calibration.
+ * @dev The shipped Dex set is LayerBank USDRIF (a default and an alternate path) and LayerBank USDT0. DOC
+ *      is deliberately not in it — DOC buys rBTC through MoC redemption only — and its row below is kept as
+ *      evidence about a legacy path that must never be deployed, not as a candidate awaiting calibration.
  * @dev Run with `make probe-dex-quote-floor`, which pins `FORK_BLOCK_DEX_QUOTE` so the table reproduces.
  *      This is the first single-block observation the R51 spec gates the contracts PR on. It is *not* the
  *      multi-block calibration that gates Dex relaunch: that extends this table across recent blocks and
@@ -36,9 +36,7 @@ contract DexQuoteFloorProbe is Test {
     address internal constant USDRIF = 0x3A15461d8aE0F0Fb5Fa2629e9DA7D66A794a6e37;
     address internal constant USDT0 = 0x779Ded0c9e1022225f8E0630b35a9b54bE713736;
     address internal constant RUSDT = 0xef213441A85dF4d7ACbDaE0Cf78004e1E486bB96; // DOC hop
-    /// @dev The deploy config calls this "rUSDT", but the address is 6-decimal `USDT`, a different token
-    ///      from the 18-decimal `rUSDT` the DOC path hops through. Recorded here as deployed; renaming or
-    ///      re-approving a path is R52's surface, not R51's.
+    /// @dev 6-decimal `USDT`, a different token from the 18-decimal `rUSDT` above. USDRIF's alternate hop.
     address internal constant USDT_USDRIF_HOP = 0xAf368c91793CB22739386DFCbBb2F1A9e4bCBeBf;
 
     /// @dev The shipped swap-time floor, read from the deploy constants so this table always measures the
@@ -80,10 +78,19 @@ contract DexQuoteFloorProbe is Test {
         _table("LEGACY DOC dex path (never deployed; MoC is DOC's only venue)", DOC, 18, path, "DOC-500-rUSDT-500-WRBTC");
     }
 
-    /// @dev LayerBank USDRIF: USDRIF -0.05%-> USDT -0.30%-> WRBTC. 0.35% in fee tiers.
+    /// @dev LayerBank USDRIF default: USDRIF -0.05%-> USDT0 -0.30%-> WRBTC. 0.35% in fee tiers.
     function test_quoteVsFloor_layerBankUsdrif() public {
+        bytes memory path = abi.encodePacked(USDRIF, uint24(500), USDT0, uint24(3000), WRBTC);
+        _table("LayerBank USDRIF (default)", USDRIF, 18, path, "USDRIF-500-USDT0-3000-WRBTC");
+    }
+
+    /**
+     * @dev LayerBank USDRIF alternate, approved at deploy for the swapper to activate:
+     *      USDRIF -0.05%-> USDT(6dp) -0.30%-> WRBTC. Its USDRIF pool is thin.
+     */
+    function test_quoteVsFloor_layerBankUsdrifAlternate() public {
         bytes memory path = abi.encodePacked(USDRIF, uint24(500), USDT_USDRIF_HOP, uint24(3000), WRBTC);
-        _table("LayerBank USDRIF", USDRIF, 18, path, "USDRIF-500-USDT(6dp)-3000-WRBTC");
+        _table("LayerBank USDRIF (alternate)", USDRIF, 18, path, "USDRIF-500-USDT(6dp)-3000-WRBTC");
     }
 
     /// @dev LayerBank USDT0: direct USDT0 -0.30%-> WRBTC, 6 decimals in, 18-decimal WRBTC out.
