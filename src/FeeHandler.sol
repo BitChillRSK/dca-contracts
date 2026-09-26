@@ -146,10 +146,6 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         );
     }
 
-    /**
-     * @dev Transfer `fee` of `token` to the collector. No-op when `fee` is 0. Monitoring reads the
-     *      stablecoin's standard ERC-20 `Transfer` (from = this handler, to = current collector).
-     */
     function _transferFee(IERC20 token, uint256 fee) internal {
         if (fee == 0) return;
         token.safeTransfer(s_feeCollector, fee);
