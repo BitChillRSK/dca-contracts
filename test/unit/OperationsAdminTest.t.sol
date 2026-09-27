@@ -597,11 +597,8 @@ contract OperationsAdminTest is DcaDappTest {
         assertEq(operationsAdmin.getTokenHandler(ownToken, IDLE_INDEX), address(idleStub));
     }
 
-    /**
-     * @dev The handler this lane deploys through the scripts, against a fresh registry: another
-     *      stablecoin is refused, and so is its own, because its DcaManager is pinned to the lane's
-     *      registry rather than the fresh one.
-     */
+    /// @dev A fresh registry refuses the lane's handler even for its own stablecoin: its DcaManager is
+    ///      pinned to the lane's registry.
     function testDeployedHandlerIsAssignableOnlyForItsOwnStablecoinAndRegistry() external {
         OperationsAdmin freshAdmin = new OperationsAdmin(address(this));
         if (s_routeIndex != IDLE_INDEX) {
@@ -631,8 +628,7 @@ contract OperationsAdminTest is DcaDappTest {
         assertEq(operationsAdmin.getTokenHandler(address(stablecoin), s_routeIndex), address(stablecoinHandler));
     }
 
-    /// @dev A handler pinned to anything but a DcaManager, such as an older deployment without the
-    ///      registry getter, fails closed and does not consume its address.
+    /// @dev A handler pinned to a non-DcaManager fails closed and does not consume its address.
     function testHandlerPinnedToANonDcaManagerIsRejected() external {
         address token = makeAddr("r101PinnedElsewhereToken");
         DummyTokenHandler idleStub = new DummyTokenHandler(token, address(stablecoin));

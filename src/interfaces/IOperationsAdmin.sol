@@ -91,8 +91,8 @@ interface IOperationsAdmin {
      * @param routeIndex The registered route index (idle or lending). Must fit `uint32`.
      * @param handler The TokenHandler for that token and route, not yet assigned anywhere in this admin.
      * @dev Requires ERC-165 `ITokenHandler`; lending routes also require `ILendingHandler`, while idle
-     *      routes reject it. The handler's `i_stableToken()` must be `token`, and its `i_dcaManager()` must be
-     *      pinned to this registry. One handler address may back only one pair.
+     *      routes reject it. The handler's `i_stableToken()` must be `token`, and its
+     *      `i_dcaManager()` must be pinned to this registry. One handler address may back only one pair.
      */
     function assignTokenHandler(address token, uint256 routeIndex, address handler) external;
 

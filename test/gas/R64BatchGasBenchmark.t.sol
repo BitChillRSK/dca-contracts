@@ -153,8 +153,6 @@ contract R64BatchGasBenchmarkTest is Test {
             for (uint256 s; s < SIZES; ++s) {
                 address token = address(uint160(uint256(keccak256(abi.encode("R64.token", d, s)))));
                 s_tokens[d][s] = token;
-                // The prototypes keep their registry private; design A pins the same one, which is
-                // all `assignTokenHandler` reads through the stub.
                 s_handlers[d][s] = new StubPurchaseHandler(token, address(s_designA));
                 if (d == 0) s_designA.setTokenMinPurchaseAmount(token, MIN_PURCHASE_AMOUNT);
                 else if (d == 1) s_designB.setTokenMinPurchaseAmount(token, MIN_PURCHASE_AMOUNT);

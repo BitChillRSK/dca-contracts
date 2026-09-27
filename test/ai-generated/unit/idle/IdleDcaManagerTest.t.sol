@@ -9,7 +9,6 @@ import {IOperationsAdmin} from "src/interfaces/IOperationsAdmin.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
-import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "test/Constants.sol";
 import {batchBuyOne} from "test/utils/BatchBuyOne.sol";
@@ -122,19 +121,6 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         vm.prank(USER);
         vm.expectRevert(encodedRevert);
         dcaManager.withdrawTokenAndInterest(address(docToken), scheduleId, MIN_PURCHASE_AMOUNT);
-    }
-
-    /// @dev The route class is checked before principal moves: the handler is never asked to pay out,
-    ///      and an amount over the balance still reports the route, not the amount.
-    function test_withdrawTokenAndInterest_atIndexZero_revertsBeforePrincipalMoves() public {
-        vm.prank(USER);
-        dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
-        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(docToken), 0);
-
-        vm.expectCall(address(handler), abi.encodeWithSelector(ITokenHandler.withdrawToken.selector), 0);
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__TokenIsNotLent.selector, address(docToken)));
-        vm.prank(USER);
-        dcaManager.withdrawTokenAndInterest(address(docToken), scheduleId, DEPOSIT + 1);
     }
 
     function test_withdrawAllAccumulatedInterest_skipsIdleAndWithdrawsLending() public {

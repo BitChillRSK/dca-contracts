@@ -73,9 +73,8 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
      * @inheritdoc IOperationsAdmin
      * @dev Recovery from a mistaken assignment uses a new route because this registry cannot prove a
      *      handler is empty. ERC-165 separates lending from idle handlers, the handler's own stablecoin
-     *      must be `token`, its DcaManager must be the one pinned to this registry, and one handler
-     *      address may back only one pair. A handler built for another DcaManager would take the pair
-     *      for good while every deposit through it reverts.
+     *      must be `token`, and one handler address may back only one pair. A handler pinned to another
+     *      DcaManager would take the pair for good while every deposit through it reverts.
      */
     function assignTokenHandler(address token, uint256 routeIndex, address handler) external onlyOwner {
         uint32 route = routeIndex.toUint32();

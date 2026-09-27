@@ -119,9 +119,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
 
     /**
      * @inheritdoc IDcaManager
-     * @dev Every argument check runs before the deposit is pulled, so a rejected argument reverts
-     *      before any token moves; an overflowing argument or an exhausted counter reverts with SafeCast
-     *      data.
+     * @dev Argument checks run before the pull; an overflowing argument or an exhausted counter
+     *      reverts with SafeCast data.
      */
     function createDcaSchedule(
         address token,
@@ -148,13 +147,11 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
 
         _validatePurchasePeriod(purchasePeriod, settings.minPurchasePeriod);
         _validateDeposit(depositAmount);
-        ITokenHandler tokenHandler = _handlerForDeposit(token, route);
         _validatePurchaseAmount(token, purchaseAmount, depositAmount);
-        tokenHandler.depositToken(msg.sender, depositAmount);
+        _handlerForDeposit(token, route).depositToken(msg.sender, depositAmount);
 
-        // The max-schedules bound sits after the pull, next to the push it guards: checked before the
-        // handler call, the push would read the list's length again. A failure still reverts the whole
-        // call, so the deposit is returned.
+        // Checked after the pull, beside the push it guards: checking earlier makes the push reread
+        // the list's length.
         uint64[] storage scheduleIds = s_scheduleIds[msg.sender][token];
         if (scheduleIds.length >= settings.maxSchedulesPerToken) {
             revert DcaManager__MaxSchedulesPerTokenReached(token);
@@ -256,13 +253,13 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         whenUserMutationsAllowed
         nonReentrant
     {
-        _withdrawToken(_callersSchedule(token, scheduleId), token, scheduleId, withdrawalAmount);
+        _withdrawToken(token, scheduleId, withdrawalAmount);
     }
 
     /**
      * @inheritdoc IDcaManager
-     * @dev The route must be lending before any principal moves. Interest is withdrawn from the
-     *      handler that just paid out the principal.
+     * @dev The route index is captured from the schedule before the handler call, and interest is
+     *      withdrawn from the handler that just paid out the principal.
      */
     function withdrawTokenAndInterest(address token, uint64 scheduleId, uint256 withdrawalAmount)
         external
@@ -270,10 +267,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         whenUserMutationsAllowed
         nonReentrant
     {
-        DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
-        _checkTokenIsLent(token, dcaSchedule.routeIndex);
-        (uint256 routeIndex, ITokenHandler tokenHandler) =
-            _withdrawToken(dcaSchedule, token, scheduleId, withdrawalAmount);
+        (uint256 routeIndex, ITokenHandler tokenHandler) = _withdrawToken(token, scheduleId, withdrawalAmount);
+        _checkTokenIsLent(token, routeIndex);
         _withdrawInterest(ILendingHandler(address(tokenHandler)), token, routeIndex);
     }
 
@@ -299,8 +294,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         uint256 purchaseAmount = dcaSchedule.purchaseAmount;
         uint128 newTokenBalance = (tokenBalance + amount).toUint128();
         // The credit must buy at least one more purchase than the balance could already fund, so
-        // interest cannot be moved over in dust. `purchaseAmount` is never zero: every write meets a
-        // non-zero token minimum.
+        // interest cannot be moved over in dust. `purchaseAmount` is never zero: every write meets the
+        // token minimum.
         if (newTokenBalance / purchaseAmount == tokenBalance / purchaseAmount) {
             revert DcaManager__TopUpDoesNotFundAnotherPurchase(token, scheduleId, amount);
         }
@@ -712,16 +707,16 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     }
 
     /**
-     * @dev Withdraw principal from a schedule the caller resolved through `_callersSchedule`. Debits
-     *      the requested amount, not what the handler paid out. `type(uint256).max` means this
-     *      schedule's whole `tokenBalance`.
+     * @dev Withdraw principal from one schedule. Debits the requested amount, not what the handler
+     *      paid out. `type(uint256).max` means this schedule's whole `tokenBalance`.
      * @return routeIndex The schedule's stored route, captured before the handler call.
      * @return tokenHandler The handler that paid out, so a caller need not resolve it again.
      */
-    function _withdrawToken(DcaSchedule storage dcaSchedule, address token, uint64 scheduleId, uint256 withdrawalAmount)
+    function _withdrawToken(address token, uint64 scheduleId, uint256 withdrawalAmount)
         private
         returns (uint256 routeIndex, ITokenHandler tokenHandler)
     {
+        DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
         uint128 tokenBalance = dcaSchedule.tokenBalance;
         if (withdrawalAmount == type(uint256).max) withdrawalAmount = tokenBalance;
         if (withdrawalAmount == 0) revert DcaManager__WithdrawalAmountMustBeGreaterThanZero();
