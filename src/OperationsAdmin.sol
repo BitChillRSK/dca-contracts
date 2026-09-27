@@ -94,9 +94,8 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
             revert OperationsAdmin__ContractIsNotTokenHandler(handler);
         }
 
-        bool isLending = routeClass == RouteClass.Lending;
         bool supportsLending = tokenHandler.supportsInterface(type(ILendingHandler).interfaceId);
-        if (isLending) {
+        if (routeClass == RouteClass.Lending) {
             if (!supportsLending) revert OperationsAdmin__ContractIsNotLendingHandler(handler);
         } else if (supportsLending) {
             revert OperationsAdmin__LendingHandlerOnIdleRoute(handler);
