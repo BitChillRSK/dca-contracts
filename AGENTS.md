@@ -28,8 +28,8 @@ Do not Grep/`Glob` `out/`, `cache/`, or `lib/` (see `.cursorignore`). Open a `li
 DcaManager          user + swapper entry; schedules; single- and multi-handler purchases
 OperationsAdmin     roles; token × lending-index → handler
 FeeHandler          fee math (owned by PurchaseRbtc; MoC / Uniswap route fee construction)
-TokenHandler        deposit/withdraw stablecoin
-LendingErc20Handler TokenHandler + ITokenLending; share ↔ underlying conversion, per-user shares, withdraw clamp, interest, exact-sum batch redeem
+TokenHandler        deposit stablecoin; withdraw hook (idle pays from its balance, lending redeems straight to the user)
+LendingErc20Handler TokenHandler + ITokenLending; share ↔ underlying conversion, per-user shares, withdraw clamp, interest, exact-sum batch redeem (exits pay the user from the market)
 StablecoinSource    shared `i_stableToken` + batch-funding hook (TokenHandler and PurchaseRbtc inherit; idle/lending implement retrieve)
 PurchaseRbtc        shared buy/batch pipeline; accumulated rBTC; withdraw to signer
 PurchaseMoc         MoC redeem DOC → rBTC (_purchaseRbtc only)
