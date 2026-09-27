@@ -419,32 +419,22 @@ contract InvariantTest is StdInvariant, Test {
     }
 
     /**
-     * @notice Interest should never decrease for users
+     * @notice BitChill's per-user virtual lending shares never exceed the handler's receipt tokens.
+     * @dev Replaces the old `invariant_interestOnlyIncreases`, which asserted `uint256 >= 0` and so
+     *      encoded nothing. Withdrawals and purchases burn both books together; a credit that outran
+     *      the external mint (or a burn that skipped the virtual ledger) would fail this.
      */
-    function invariant_interestOnlyIncreases() public {
+    function invariant_virtualSharesNeverExceedReceiptShares() public {
+        uint256 totalVirtualShares;
         for (uint256 i = 0; i < s_users.length; i++) {
-            address user = s_users[i];
-
-            try dcaManager.getDcaSchedules(user, address(stablecoin)) returns (
-                uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules
-            ) {
-                if (schedules.length > 0) {
-                    uint256 totalDeposited = 0;
-                    for (uint256 j = 0; j < schedules.length; j++) {
-                        if (schedules[j].routeIndex == s_routeIndex) {
-                            totalDeposited += schedules[j].tokenBalance;
-                        }
-                    }
-
-                    if (totalDeposited > 0) {
-                        uint256 lendingBalance = ILendingHandler(address(handler)).getUserShares(user);
-                        assertGe(lendingBalance, 0);
-                    }
-                }
-            } catch {
-                // User has no schedules, skip
-            }
+            totalVirtualShares += ILendingHandler(address(handler)).getUserShares(s_users[i]);
         }
+
+        uint256 receiptShares = s_routeIndex == TROPYKUS_INDEX
+            ? kToken.balanceOf(address(handler))
+            : iSusdToken.balanceOf(address(handler));
+
+        assertLe(totalVirtualShares, receiptShares, "virtual lending shares exceed receipt shares held");
     }
 }
 
