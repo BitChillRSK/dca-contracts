@@ -127,9 +127,7 @@ contract GettersTest is DcaDappTest {
     }
 
     function test_dcaManager_getInterestAccrued_reverts_tokenDoesNotYieldInterest() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(IDcaManager.DcaManager__TokenDoesNotYieldInterest.selector, address(stablecoin))
-        );
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__TokenIsNotLent.selector, address(stablecoin)));
         dcaManager.getInterestAccrued(USER, address(stablecoin), 0);
     }
 

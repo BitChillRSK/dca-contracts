@@ -11,7 +11,8 @@ This PR makes two gas and redundancy edits, each proven equivalent at every reac
    `Math.mulDiv(stablecoinAmount, i_exchangeRateDecimals, exchangeRate, Math.Rounding.Ceil)`.
 2. `OperationsAdmin.isLendingRoute` is deleted. It returns `getRouteClass(i) == Lending`, and its
    one production caller, `DcaManager._tokenYieldsInterest`, now makes that comparison itself, and is
-   renamed `_isLendingRoute` (its reverting twin `_checkTokenYieldsInterest` becomes `_checkLendingRoute`).
+   renamed `_isLendingRoute`. Its reverting twin `_checkTokenYieldsInterest` becomes `_checkTokenIsLent`,
+   and the error it raises, `DcaManager__TokenDoesNotYieldInterest`, becomes `DcaManager__TokenIsNotLent`.
 
 ## Background
 
@@ -65,10 +66,15 @@ The human asked on 2026-09-27 whether `_tokenYieldsInterest` should become `_tok
 `_isTokenLent`. The `is…` prefix is the right form for a boolean. The subject, though, is the route:
 the function takes a route index, ignores the token, and asks `OperationsAdmin` for the route's class.
 So it is `_isLendingRoute(routeIndex)`, the same question the deleted external view answered, now asked
-privately. The reverting form is `_checkLendingRoute(token, routeIndex)`.
+privately.
 
-`DcaManager__TokenDoesNotYieldInterest(token)` keeps its name. It is what a user sees, and it describes
-the user's outcome, not the helper's check: that token earns no interest on that route.
+The reverting form takes the token and reports it, so it is named for what the user is told:
+`_checkTokenIsLent(token, routeIndex)` reverts `DcaManager__TokenIsNotLent(token)`. The human renamed the
+error on 2026-09-27. `TokenDoesNotYieldInterest` read as a property of the asset, as if DOC were being
+told apart from a yield-bearing stablecoin such as USDe. What it actually reports is that this schedule's
+route does not lend the token. The rename changes only the error selector
+(`0xa92cfdc4` → `0x9f87d123`). With that one substitution, `DcaManager`'s runtime and creation bytecode
+are identical on both profiles, and every other contract is byte-identical.
 
 ### Prototype measurements (2026-09-27)
 
@@ -131,7 +137,8 @@ The consumer check found no caller. GitHub code search over every `BitChillRSK` 
 - [x] Delete `isLendingRoute` from `IOperationsAdmin` and `OperationsAdmin`.
       `DcaManager._tokenYieldsInterest`, renamed `_isLendingRoute`, returns
       `i_operationsAdmin.getRouteClass(routeIndex) == IOperationsAdmin.RouteClass.Lending`;
-      `_checkTokenYieldsInterest` becomes `_checkLendingRoute`.
+      `_checkTokenYieldsInterest` becomes `_checkTokenIsLent`.
+- [x] Rename `DcaManager__TokenDoesNotYieldInterest(address)` to `DcaManager__TokenIsNotLent(address)`.
 - [x] Tests:
   - Delete `isLendingRoute` assertions that duplicate an adjacent `getRouteClass` assertion.
   - Convert the rest to `getRouteClass` with the exact class (`Idle` or `Unregistered`, not
@@ -144,7 +151,6 @@ The consumer check found no caller. GitHub code search over every `BitChillRSK` 
 
 - [ ] Changing `_sharesToStablecoin`, or any other `mulDiv` site.
 - [ ] Any other `OperationsAdmin` view. R84 keeps `getTokenHandler` and `areDepositsPaused` separate.
-- [ ] Renaming `DcaManager__TokenDoesNotYieldInterest`.
 
 ## Files likely touched
 
@@ -176,7 +182,7 @@ parent per test.
 ## Success criteria
 
 - [x] Conversion equivalence fuzzed; overflow pin green.
-- [x] No `isLendingRoute` left in `src/`, `test/`, or `script/`.
+- [x] No `isLendingRoute` or `TokenDoesNotYieldInterest` left in `src/`, `test/`, or `script/`.
 - [x] Gas and size pins recorded under both profiles.
 - [x] `make check` and the fork lanes green.
 
@@ -189,8 +195,13 @@ parent per test.
 
 ## ABI / deploy / cutover impact
 
-- ABI: `OperationsAdmin.isLendingRoute(uint256)` (selector `0xb021edc6`) is removed. No event or error
-  changes.
+- ABI: `OperationsAdmin.isLendingRoute(uint256)` (selector `0xb021edc6`) is removed.
+  `DcaManager__TokenDoesNotYieldInterest(address)` (`0xa92cfdc4`) becomes `DcaManager__TokenIsNotLent(address)`
+  (`0x9f87d123`). No event changes.
 - Scripts: none. The scripts already use `getRouteClass`.
-- Cutover: nothing for consumers to handle unless one calls `isLendingRoute`. The implementation checks
-  each consumer repo before opening the PR and opens an issue only where a caller exists.
+- Cutover:
+  - No consumer calls `isLendingRoute`.
+  - The front end decodes the old error name and maps it to a friendly message:
+    [front-end#27](https://github.com/BitChillRSK/front-end/issues/27).
+  - `swapper-bot` and `bitchill-monitoring` carry the name only in a stale `abi.json` and never hit this
+    revert. Their pending ABI regenerations pick it up.

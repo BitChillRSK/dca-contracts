@@ -447,9 +447,7 @@ contract TopUpFromInterestTest is DcaDappTest {
         uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
 
         vm.prank(USER);
-        vm.expectRevert(
-            abi.encodeWithSelector(IDcaManager.DcaManager__TokenDoesNotYieldInterest.selector, address(stablecoin))
-        );
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__TokenIsNotLent.selector, address(stablecoin)));
         dcaManager.topUpFromInterest(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
     }
 
