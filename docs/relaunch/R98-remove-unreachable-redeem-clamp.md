@@ -6,8 +6,10 @@ Status: **implemented** · GitHub [#164](https://github.com/BitChillRSK/dca-cont
 
 Delete the dead `sharesToRedeem > usersShares` branch inside `LendingHandler._redeemShares`, its
 `LendingHandler__AmountToRedeemAdjusted` event, and the test-only entry that exercised it. Make the
-helper `private`. Keep the outer withdrawal clamp and the batch `InsufficientShares` check. Prove the
-bound through the real principal and interest withdrawal paths.
+helper `private`. Keep the share debit **checked** (the removed clamp used to guard an `unchecked`
+subtract; a broken future caller must revert, not wrap). Keep the outer withdrawal clamp and the
+batch `InsufficientShares` check. Prove the bound through the real principal and interest withdrawal
+paths (including fuzzes over non-round rates).
 
 ## Background
 
@@ -82,6 +84,8 @@ Forks: no new fork-specific assertions; run as the executable-change gate.
 - [x] No `AmountToRedeemAdjusted` in `src/` or first-party tests.
 - [x] `_redeemShares` is `private` and unreachable from subclasses without going through the
       production withdraw / interest paths.
+- [x] Share debit is checked (no `unchecked` around `usersShares - sharesToRedeem`); fuzzes prove
+      `withdrawToken` / `withdrawInterest` never debit more than the book.
 - [x] Outer withdraw clamp and batch insufficient-shares behaviour unchanged.
 - [x] `make check` and both fork lanes green.
 - [x] Monitoring cutover issue opened or updated.
@@ -89,8 +93,8 @@ Forks: no new fork-specific assertions; run as the executable-change gate.
 ## Reviewer checklist
 
 - [ ] Matches **Scope**; nothing from **Out of scope**.
-- [ ] Invariants 1 and 11 unchanged; unchecked share debit is still safe because both callers bound
-      the amount.
+- [ ] Invariants 1 and 11 unchanged; share debit is **checked** so a caller that broke the amount
+      bound reverts instead of wrapping the book; fuzzes cover non-round rates on both withdraw paths.
 - [ ] No relaunch ticket ids in `src/` comments.
 - [ ] Consumer issue URL in the PR cutover note.
 

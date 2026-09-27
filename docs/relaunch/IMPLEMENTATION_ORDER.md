@@ -159,7 +159,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R95 | after R94, before relaunch deploy | **decided 2026-09-27:** merge `TokenLending` into the lending base and rename it `LendingHandler` / `ILendingHandler` (prefix `LendingHandler__`); scale visibility, R85 slip, declaration order, relative imports (runtime identical up to renamed topics/selectors); record the verdict on every candidate of the PRs 138–160 review |
 | R96 | after R95, before relaunch deploy | **decided 2026-09-27:** `ceilDiv` share conversion; drop `OperationsAdmin.isLendingRoute` for `getRouteClass`; private helper renamed `_isLendingRoute`; `DcaManager__TokenDoesNotYieldInterest` → `DcaManager__TokenIsNotLent` |
 | R97 | — | **closed 2026-09-27 without merging** ([#163](https://github.com/BitChillRSK/dca-contracts/pull/163)): redeem-to-user saves gas only on user-paid exits and adds a `receiver` mode to every adapter; R28's always-redeem-onto-the-handler stands |
-| R98 | after R96, before relaunch deploy | none (remove unreachable inner redeem clamp + `AmountToRedeemAdjusted`; `_redeemShares` private) |
+| R98 | after R96, before relaunch deploy | none (remove unreachable inner redeem clamp + `AmountToRedeemAdjusted`; `_redeemShares` private; share debit checked) |
 | R99 | after R98, before relaunch deploy | none (centralize measured deposit-share accounting into `LendingHandler._depositToken`) |
 | R100 | after R99; not deployment-bound | none (invariant suite honesty + integrated lending/purchase coverage) |
 
@@ -1355,9 +1355,10 @@ recipient-side measurement note. Ask: none.
 ### R98 - remove the unreachable inner redeem clamp ([spec](./R98-remove-unreachable-redeem-clamp.md))
 
 After R96, before relaunch deploy. Drop the dead `sharesToRedeem > usersShares` branch in
-`_redeemShares`, delete `LendingHandler__AmountToRedeemAdjusted`, make the helper `private`, and
-prove the bound through `withdrawToken` / `withdrawInterest`. Keep the outer withdrawal clamp and
-batch `InsufficientShares`. Ask: none.
+`_redeemShares`, delete `LendingHandler__AmountToRedeemAdjusted`, make the helper `private`, keep the
+share debit **checked** (no wrap if a future caller broke the bound), and prove the bound through
+`withdrawToken` / `withdrawInterest` (including fuzzes). Keep the outer withdrawal clamp and batch
+`InsufficientShares`. Ask: none.
 
 ### R99 - centralize measured deposit-share accounting ([spec](./R99-centralize-deposit-share-accounting.md))
 
