@@ -1,6 +1,6 @@
 # R94 — Store known schedule credits before the handler pull
 
-Status: **not started** · Assigned: yes · Optional/further-review: no · Stack on: [#159](https://github.com/BitChillRSK/dca-contracts/pull/159)
+Status: **implemented** · Assigned: yes · Optional/further-review: no · Stack on: [#159](https://github.com/BitChillRSK/dca-contracts/pull/159)
 
 ## Objective
 
@@ -22,36 +22,40 @@ reads slot 1 for the owner check, calls out for interest, then reads `purchaseAm
 word again. `_withdrawToken` subtracts an amount already checked against a `uint128` balance, so
 `SafeCast.toUint128()` cannot fail.
 
-Expected Rootstock saving is one flat `SLOAD` (200) per deposit, per create, and — when the deploy
-profile inlines the owner check — per top-up. Withdrawal is tens of gas of compute on both schedules.
-Figures are pinned by this PR's state-diff tests before any production claim.
-
 ## Open product decisions
 
 **none.** The implement / closed split was locked 2026-09-27.
 
 ## Scope
 
-- [ ] **1. `depositToken`:** load balance and route, compute the new balance, store `tokenBalance`, then
+- [x] **1. `depositToken`:** load balance and route, compute the new balance, store `tokenBalance`, then
       call the handler with the route in a local. Emit after the call. Source comment states the durable
       reason (known credit; packed store after the call would reload the word). No relaunch ticket ids
       in `src/` comments.
-- [ ] **2. `createDcaSchedule`:** assign `s_protocolSettings.scheduleNonce` before `_handlerForDeposit`,
+- [x] **2. `createDcaSchedule`:** assign `s_protocolSettings.scheduleNonce` before `_handlerForDeposit`,
       with no external call between the settings load and that store. Leave `_storeNewSchedule` after the
       pull (fresh writes; the schedule must not exist before tokens arrive). A token callback during the
       pull may observe the nonce one id ahead of the stored schedule; the pull and the nonce store revert
       together.
-- [ ] **3. `_withdrawToken`:** keep the balance in a `uint128` and assign the subtraction result
+- [x] **3. `_withdrawToken`:** keep the balance in a `uint128` and assign the subtraction result
       directly. Keep the comparison against `withdrawalAmount`. Do not change the revert set.
-- [ ] **4. `topUpFromInterest`:** read `purchaseAmount` immediately after the owner check and before
+- [x] **4. `topUpFromInterest`:** read `purchaseAmount` immediately after the owner check and before
       `_checkTokenYieldsInterest` / `getAccruedInterest`. Leave the `tokenBalance` read and its store
       after the interest call (slot 0 is reloaded for that write on purpose).
-- [ ] **5. State-diff pins** under default and `FOUNDRY_PROFILE=deploy`: schedule slot 0 reads once on
-      deposit; protocol-settings slot reads once on create (load+store, no reload after the pull);
-      schedule slot 1 read count on top-up. If the top-up pin shows no read removed under deploy, keep
-      the hoist and do not claim the gas.
-- [ ] **6. Docs:** this spec, `IMPLEMENTATION_ORDER.md`, `README.md` Status, and closed-decision
+- [x] **5. State-diff pins** under default and `FOUNDRY_PROFILE=deploy` (see **Measured pins**).
+- [x] **6. Docs:** this spec, `IMPLEMENTATION_ORDER.md`, `README.md` Status, and closed-decision
       entries for every canvas "Closed" row (cross-link earlier closures; add any new one).
+
+## Measured pins (2026-09-27)
+
+`test/gas/R94DcaManagerStoreBeforePullGas.t.sol`, parent = R93 head vs this PR:
+
+| Path | Slot | default reads | deploy reads | Gas claim |
+|---|---|---:|---:|---|
+| `depositToken` | schedule slot 0 | 2 (unchanged) | 2 (unchanged) | **None.** Store-before-pull kept for the durable ordering reason; counted reads match parent. |
+| `createDcaSchedule` | `s_protocolSettings` | 2 | **1** (was 2) | **≈ −200 Rootstock** (one warm re-read removed under deploy; Foundry ≈ −120). |
+| `topUpFromInterest` | schedule slot 1 | 2 (unchanged) | 2 (unchanged) | **None.** Hoist kept; owner check not inlined with `purchaseAmount` on deploy. |
+| `_withdrawToken` | n/a | n/a | n/a | Tens of compute gas (dropped `SafeCast.toUint128()`); revert set unchanged. |
 
 ## Out of scope
 
@@ -79,11 +83,13 @@ Figures are pinned by this PR's state-diff tests before any production claim.
 ## Files likely touched
 
 - `src/DcaManager.sol`
-- `test/gas/R94DcaManagerStoreBeforePullGas.t.sol` (and a small lending stub if the top-up pin needs one)
+- `test/gas/R94DcaManagerStoreBeforePullGas.t.sol` (and an in-file lending stub for the top-up pin)
+- `test/gas/R89ReviewCandidatesGas.t.sol` (create settings-read pin follows the post-R94 deploy count)
 - `docs/relaunch/R94-dcamanager-store-before-pull.md`
+- `docs/relaunch/R89-post-r88-review-candidates.md` (footnote that deploy settings reads are now 1)
 - `docs/relaunch/IMPLEMENTATION_ORDER.md`
 - `docs/relaunch/README.md`
-- `docs/relaunch/ROOTSTOCK-GAS-AUDIT.md` (cross-link / closed-decision note as needed)
+- `docs/relaunch/ROOTSTOCK-GAS-AUDIT.md`
 
 ## Required tests
 
@@ -108,15 +114,14 @@ make fork-tropykus
 
 ## Success criteria
 
-- [ ] The four `DcaManager` edits match **Scope**; nothing from **Out of scope** ships.
-- [ ] Deposit pin: schedule slot 0 is read once under default and deploy.
-- [ ] Create pin: protocol-settings slot is read once under default and deploy (no post-pull reload).
-- [ ] Top-up pin: slot 1 read count recorded under both profiles; gas claimed only if a read was removed
-      under deploy.
-- [ ] Withdrawal no longer calls `toUint128()` on the subtraction result; revert set unchanged.
-- [ ] Closed-decision table is in this spec and reflected in `IMPLEMENTATION_ORDER.md` /
+- [x] The four `DcaManager` edits match **Scope**; nothing from **Out of scope** ships.
+- [x] Deposit pin: schedule slot 0 read count recorded (2 on both profiles; no gas claim).
+- [x] Create pin: protocol-settings slot reads once under deploy (2 under default); ≈ −200 Rootstock claimed.
+- [x] Top-up pin: slot 1 stays at 2 reads under both profiles; hoist kept; no gas claim.
+- [x] Withdrawal no longer calls `toUint128()` on the subtraction result; revert set unchanged.
+- [x] Closed-decision table is in this spec and reflected in `IMPLEMENTATION_ORDER.md` /
       `README.md`.
-- [ ] No ABI, event, error, or storage-layout change; no purchase-path edit.
+- [x] No ABI, event, error, or storage-layout change; no purchase-path edit.
 - [x] `make check`, `make check-deploy`, `make fork-sovryn`, and `make fork-tropykus` green.
 - [ ] README Status points at this PR; next unassigned prompt recorded.
 
@@ -128,6 +133,7 @@ make fork-tropykus
 - [ ] Extra files beyond this list are named in the PR.
 - [ ] No unrelated refactors; history is reviewable.
 - [ ] No relaunch ticket ids in `src/` comments.
+- [ ] Gas claims match **Measured pins** (create only under deploy).
 
 ## ABI / deploy / cutover impact
 
