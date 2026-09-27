@@ -21,6 +21,9 @@ import "test/Constants.sol";
  *      Idle: oracle+percent slot 5, safety slot 6. Lending Dex inserts `s_shares` at 4, so those
  *      become 6 and 7. Each removed cold SLOAD is 2,100 Foundry / 200 Rootstock; warm re-reads are
  *      100 Foundry / 200 Rootstock. Quote Rootstock from the read count, not the Cancun cold delta.
+ *
+ *      Do not `vm.skip` in `setUp` after `super.setUp()`: CI's pinned forge reports that as
+ *      `FAIL: FOUNDRY::SKIP` (see StablecoinLendingTest). Gate each test instead.
  */
 contract R90OraclePackingGasTest is DcaDappTest {
     uint256 private constant ROWS = 10;
@@ -33,12 +36,9 @@ contract R90OraclePackingGasTest is DcaDappTest {
 
     function setUp() public override {
         super.setUp();
-        if (block.chainid != ANVIL_CHAIN_ID) {
-            vm.skip(true);
-            return;
-        }
-        if (!isDexSwaps) {
-            vm.skip(true);
+        // Extra buyers are Dex-lane fixtures only. On MoC / fork lanes leave `s_buyers` empty;
+        // each test skips before reading them.
+        if (block.chainid != ANVIL_CHAIN_ID || !isDexSwaps) {
             return;
         }
         s_buyers.push(USER);
@@ -55,7 +55,13 @@ contract R90OraclePackingGasTest is DcaDappTest {
         }
     }
 
-    function test_batchBuyRbtc_readsPackedOracleFloorOnce() public {
+    modifier onlyLocalDexLane() {
+        if (block.chainid != ANVIL_CHAIN_ID) vm.skip(true);
+        if (!isDexSwaps) vm.skip(true);
+        _;
+    }
+
+    function test_batchBuyRbtc_readsPackedOracleFloorOnce() public onlyLocalDexLane {
         uint64[] memory scheduleIds = new uint64[](ROWS);
         for (uint256 i; i < ROWS; ++i) {
             scheduleIds[i] = scheduleIdAt(dcaManager, s_buyers[i], address(stablecoin), 0);
@@ -88,7 +94,7 @@ contract R90OraclePackingGasTest is DcaDappTest {
         assertEq(safetyReads, 0, "purchase must not read the safety floor");
     }
 
-    function test_setAmountOutMinimumPercent_readsBothSettingSlots() public {
+    function test_setAmountOutMinimumPercent_readsBothSettingSlots() public onlyLocalDexLane {
         uint256 oracleSlot = isLendingLane ? LENDING_ORACLE_SLOT : IDLE_ORACLE_SLOT;
         uint256 safetySlot = isLendingLane ? LENDING_SAFETY_SLOT : IDLE_SAFETY_SLOT;
         uint256 newPercent = DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT * 999 / 1000;
@@ -110,7 +116,7 @@ contract R90OraclePackingGasTest is DcaDappTest {
         assertGe(oracleReads, 1, "setter must touch the packed oracle+percent word");
     }
 
-    function test_setAmountOutMinimumSafetyCheck_readsBothSettingSlots() public {
+    function test_setAmountOutMinimumSafetyCheck_readsBothSettingSlots() public onlyLocalDexLane {
         uint256 oracleSlot = isLendingLane ? LENDING_ORACLE_SLOT : IDLE_ORACLE_SLOT;
         uint256 safetySlot = isLendingLane ? LENDING_SAFETY_SLOT : IDLE_SAFETY_SLOT;
         uint256 newSafety = DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK * 999 / 1000;
