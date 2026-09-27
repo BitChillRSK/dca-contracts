@@ -1,6 +1,6 @@
 # R97 — Redeem lending exits straight to the user
 
-Status: **implemented** · Assigned: yes · Optional/further-review: no · Stack on: R96
+Status: **implemented** · GitHub [#163](https://github.com/BitChillRSK/dca-contracts/pull/163) · Assigned: yes · Optional/further-review: no · Stack on: R96 ([#162](https://github.com/BitChillRSK/dca-contracts/pull/162))
 
 ## Objective
 
