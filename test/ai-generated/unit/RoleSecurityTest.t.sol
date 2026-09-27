@@ -16,6 +16,7 @@ import {IUniswapV3SwapRouter} from "../../../src/interfaces/IUniswapV3SwapRouter
 import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
 import {ITokenHandler} from "../../../src/interfaces/ITokenHandler.sol";
 import {IDcaManager} from "../../../src/interfaces/IDcaManager.sol";
+import {IOperationsAdmin} from "../../../src/interfaces/IOperationsAdmin.sol";
 import "../../Constants.sol";
 import {batchBuyOne, toBatch} from "../../utils/BatchBuyOne.sol";
 import {ownableUnauthorized} from "../../utils/OzRevert.sol";
@@ -198,7 +199,7 @@ contract RoleSecurityTest is Test {
 
         vm.prank(OWNER);
         operationsAdmin.registerRoute(newIndex, true);
-        assertTrue(operationsAdmin.isLendingRoute(newIndex));
+        assertEq(uint256(operationsAdmin.getRouteClass(newIndex)), uint256(IOperationsAdmin.RouteClass.Lending));
     }
 
     /*//////////////////////////////////////////////////////////////

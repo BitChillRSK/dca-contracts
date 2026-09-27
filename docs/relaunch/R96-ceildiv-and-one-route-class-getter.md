@@ -1,16 +1,18 @@
 # R96 — `ceilDiv` share conversion and one route-class getter
 
-Status: **not started** · Assigned: yes · Optional/further-review: no · Stack on: R95
+Status: **implemented** · GitHub [#162](https://github.com/BitChillRSK/dca-contracts/pull/162) · Assigned: yes · Optional/further-review: no · Stack on: R95 ([#161](https://github.com/BitChillRSK/dca-contracts/pull/161))
 
 ## Objective
 
 This PR makes two gas and redundancy edits, each proven equivalent at every reachable input:
 
-1. `LendingErc20Handler._stablecoinToShares` computes
+1. `LendingHandler._stablecoinToShares` computes
    `Math.ceilDiv(stablecoinAmount * i_exchangeRateDecimals, exchangeRate)` instead of
    `Math.mulDiv(stablecoinAmount, i_exchangeRateDecimals, exchangeRate, Math.Rounding.Ceil)`.
 2. `OperationsAdmin.isLendingRoute` is deleted. It returns `getRouteClass(i) == Lending`, and its
-   one production caller, `DcaManager._tokenYieldsInterest`, now makes that comparison itself.
+   one production caller, `DcaManager._tokenYieldsInterest`, now makes that comparison itself, and is
+   renamed `_isLendingRoute`. Its reverting twin `_checkTokenYieldsInterest` becomes `_checkTokenIsLent`,
+   and the error it raises, `DcaManager__TokenDoesNotYieldInterest`, becomes `DcaManager__TokenIsNotLent`.
 
 ## Background
 
@@ -58,6 +60,22 @@ Only `getRouteClass` separates an unregistered index from an idle one, and the d
 The review first rejected removing it as ABI churn. The human reopened it on 2026-09-27 as redundant
 code, and measurement then showed it is cheaper too.
 
+### Naming the private helper
+
+The human asked on 2026-09-27 whether `_tokenYieldsInterest` should become `_tokenIsLent` or
+`_isTokenLent`. The `is…` prefix is the right form for a boolean. The subject, though, is the route:
+the function takes a route index, ignores the token, and asks `OperationsAdmin` for the route's class.
+So it is `_isLendingRoute(routeIndex)`, the same question the deleted external view answered, now asked
+privately.
+
+The reverting form takes the token and reports it, so it is named for what the user is told:
+`_checkTokenIsLent(token, routeIndex)` reverts `DcaManager__TokenIsNotLent(token)`. The human renamed the
+error on 2026-09-27. `TokenDoesNotYieldInterest` read as a property of the asset, as if DOC were being
+told apart from a yield-bearing stablecoin such as USDe. What it actually reports is that this schedule's
+route does not lend the token. The rename changes only the error selector
+(`0xa92cfdc4` → `0x9f87d123`). With that one substitution, `DcaManager`'s runtime and creation bytecode
+are identical on both profiles, and every other contract is byte-identical.
+
 ### Prototype measurements (2026-09-27)
 
 These are Foundry gas figures from throwaway worktrees. Both edits are pure computation with the same
@@ -73,18 +91,55 @@ storage reads, so they carry over 1:1 to Rootstock. The implementation re-measur
 
 `DcaManager` grows because it now ABI-decodes and range-checks an enum instead of a `bool`.
 
+## Measured pins (2026-09-27)
+
+These are measured on this branch against its parent R95 (`b16e9c8`) on the MoC Sovryn and LayerBank
+lanes, per test, with `--fuzz-seed 1`. Every changed test is cheaper, and the two lanes agree. Nothing
+reads or writes storage differently, so each delta carries over 1:1 to Rootstock.
+
+| Test | `default` | `deploy` (ships) |
+|---|---:|---:|
+| `testSinglePurchase` (one lending row) | −423 | −115 |
+| `testBatchPurchasesOneUser` | −4,653 | −1,140 |
+| `R89ReviewCandidatesGasTest.test_withdrawToken_readsBookedSharesOnce` | −402 | −242 |
+| `StablecoinLendingTest.testWithdrawInterest` | −609 | −753 |
+| `StablecoinLendingTest.testWithdrawTokenAndInterest` | −1,032 | −855 |
+| `GettersTest.test_operationsAdmin_isSwapper` | — | −66 |
+
+Under `deploy`, the mechanisms are:
+- `ceilDiv` saves about 93 per converted lending row and about 100 per exit conversion.
+- Each interest-route check saves about 217.
+- `OperationsAdmin`'s smaller dispatcher saves 22 per `isSwapper` call, so every batch is 22 cheaper
+  on every route, idle included.
+
+Runtime size in bytes:
+
+| Contract | `default` | `deploy` |
+|---|---:|---:|
+| Each lending leaf (Sovryn, LayerBank, Tropykus; MoC and Dex) | −298 | −88 |
+| `OperationsAdmin` | −94 (3,339 → 3,245) | −83 (2,603 → 2,520) |
+| `DcaManager` | +75 (13,206 → 13,281) | +64 (11,447 → 11,511) |
+
+The idle leaves are byte-identical.
+
+The consumer check found no caller. GitHub code search over every `BitChillRSK` repository finds no
+`isLendingRoute` or `getRouteClass` outside this repo. The same search does find the old front end's
+`withdrawAllAccumulatedInterest`, so the index covers the consumer repos.
+
 ## Open product decisions
 
 **none** (decided 2026-09-27).
 
 ## Scope
 
-- [ ] `_stablecoinToShares` uses `Math.ceilDiv(stablecoinAmount * i_exchangeRateDecimals, exchangeRate)`.
+- [x] `_stablecoinToShares` uses `Math.ceilDiv(stablecoinAmount * i_exchangeRateDecimals, exchangeRate)`.
       Its `@dev` states the reachable bound and that an overflow reverts.
-- [ ] Delete `isLendingRoute` from `IOperationsAdmin` and `OperationsAdmin`.
-      `DcaManager._tokenYieldsInterest` returns
-      `i_operationsAdmin.getRouteClass(routeIndex) == IOperationsAdmin.RouteClass.Lending`.
-- [ ] Tests:
+- [x] Delete `isLendingRoute` from `IOperationsAdmin` and `OperationsAdmin`.
+      `DcaManager._tokenYieldsInterest`, renamed `_isLendingRoute`, returns
+      `i_operationsAdmin.getRouteClass(routeIndex) == IOperationsAdmin.RouteClass.Lending`;
+      `_checkTokenYieldsInterest` becomes `_checkTokenIsLent`.
+- [x] Rename `DcaManager__TokenDoesNotYieldInterest(address)` to `DcaManager__TokenIsNotLent(address)`.
+- [x] Tests:
   - Delete `isLendingRoute` assertions that duplicate an adjacent `getRouteClass` assertion.
   - Convert the rest to `getRouteClass` with the exact class (`Idle` or `Unregistered`, not
     "not lending").
@@ -96,11 +151,10 @@ storage reads, so they carry over 1:1 to Rootstock. The implementation re-measur
 
 - [ ] Changing `_sharesToStablecoin`, or any other `mulDiv` site.
 - [ ] Any other `OperationsAdmin` view. R84 keeps `getTokenHandler` and `areDepositsPaused` separate.
-- [ ] Renaming `_tokenYieldsInterest` / `_checkTokenYieldsInterest`.
 
 ## Files likely touched
 
-- `src/LendingErc20Handler.sol`
+- `src/LendingHandler.sol`
 - `src/OperationsAdmin.sol`, `src/interfaces/IOperationsAdmin.sol`, `src/DcaManager.sol`
 - Tests that call `isLendingRoute`:
   - `test/unit/`: `OperationsAdminTest`, `WithdrawAllRoutePairsTest`,
@@ -109,14 +163,14 @@ storage reads, so they carry over 1:1 to Rootstock. The implementation re-measur
   - `test/gas/R89ReviewCandidatesGas`;
   - `test/ai-generated/unit/`: `GettersTest`, `RoleSecurityTest`, `idle/IdleDcaManagerTest`,
     `layerbank/LayerBankDcaManagerTest`.
-- The conversion test's home: `test/unit/LendingErc20HandlerRedeemTest.t.sol`'s harness exposes the helper.
+- The conversion test's home: `test/unit/LendingHandlerRedeemTest.t.sol`'s harness exposes the helper.
 - `docs/relaunch/R96-ceildiv-and-one-route-class-getter.md`, `README.md`, `IMPLEMENTATION_ORDER.md`
 
 ## Required tests
 
 ```text
 SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=DOC \
-  forge test --match-path test/unit/LendingErc20HandlerRedeemTest.t.sol -vv
+  forge test --match-path test/unit/LendingHandlerRedeemTest.t.sol -vv
 make check
 make fork-sovryn
 make fork-tropykus
@@ -127,10 +181,10 @@ parent per test.
 
 ## Success criteria
 
-- [ ] Conversion equivalence fuzzed; overflow pin green.
-- [ ] No `isLendingRoute` left in `src/`, `test/`, or `script/`.
-- [ ] Gas and size pins recorded under both profiles.
-- [ ] `make check` and the fork lanes green.
+- [x] Conversion equivalence fuzzed; overflow pin green.
+- [x] No `isLendingRoute` or `TokenDoesNotYieldInterest` left in `src/`, `test/`, or `script/`.
+- [x] Gas and size pins recorded under both profiles.
+- [x] `make check` and the fork lanes green.
 
 ## Reviewer checklist
 
@@ -141,8 +195,13 @@ parent per test.
 
 ## ABI / deploy / cutover impact
 
-- ABI: `OperationsAdmin.isLendingRoute(uint256)` (selector `0xb021edc6`) is removed. No event or error
-  changes.
+- ABI: `OperationsAdmin.isLendingRoute(uint256)` (selector `0xb021edc6`) is removed.
+  `DcaManager__TokenDoesNotYieldInterest(address)` (`0xa92cfdc4`) becomes `DcaManager__TokenIsNotLent(address)`
+  (`0x9f87d123`). No event changes.
 - Scripts: none. The scripts already use `getRouteClass`.
-- Cutover: nothing for consumers to handle unless one calls `isLendingRoute`. The implementation checks
-  each consumer repo before opening the PR and opens an issue only where a caller exists.
+- Cutover:
+  - No consumer calls `isLendingRoute`.
+  - The front end decodes the old error name and maps it to a friendly message:
+    [front-end#27](https://github.com/BitChillRSK/front-end/issues/27).
+  - `swapper-bot` and `bitchill-monitoring` carry the name only in a stale `abi.json` and never hit this
+    revert. Their pending ABI regenerations pick it up.

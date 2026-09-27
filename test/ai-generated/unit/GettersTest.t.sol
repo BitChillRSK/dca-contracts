@@ -127,9 +127,7 @@ contract GettersTest is DcaDappTest {
     }
 
     function test_dcaManager_getInterestAccrued_reverts_tokenDoesNotYieldInterest() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(IDcaManager.DcaManager__TokenDoesNotYieldInterest.selector, address(stablecoin))
-        );
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__TokenIsNotLent.selector, address(stablecoin)));
         dcaManager.getInterestAccrued(USER, address(stablecoin), 0);
     }
 
@@ -153,14 +151,6 @@ contract GettersTest is DcaDappTest {
         // Test non-existent handler
         address nonExistentHandler = operationsAdmin.getTokenHandler(address(0x999), 1);
         assertEq(nonExistentHandler, address(0));
-    }
-
-    function test_operationsAdmin_isLendingRoute() public {
-        assertTrue(operationsAdmin.isLendingRoute(TROPYKUS_INDEX));
-        assertTrue(operationsAdmin.isLendingRoute(SOVRYN_INDEX));
-        assertTrue(operationsAdmin.isLendingRoute(LAYERBANK_INDEX));
-        assertFalse(operationsAdmin.isLendingRoute(IDLE_INDEX));
-        assertFalse(operationsAdmin.isLendingRoute(999));
     }
 
     function test_operationsAdmin_getRouteClass() public {
@@ -414,10 +404,10 @@ contract GettersTest is DcaDappTest {
         assertEq(dcaManager.getMinPurchasePeriod(), MIN_PURCHASE_PERIOD);
         assertEq(dcaManager.getMaxSchedulesPerToken(), MAX_SCHEDULES_PER_TOKEN);
 
-        assertTrue(operationsAdmin.isLendingRoute(TROPYKUS_INDEX));
-        assertTrue(operationsAdmin.isLendingRoute(SOVRYN_INDEX));
-        assertTrue(operationsAdmin.isLendingRoute(LAYERBANK_INDEX));
-        assertFalse(operationsAdmin.isLendingRoute(IDLE_INDEX));
+        assertEq(uint256(operationsAdmin.getRouteClass(TROPYKUS_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
+        assertEq(uint256(operationsAdmin.getRouteClass(SOVRYN_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
+        assertEq(uint256(operationsAdmin.getRouteClass(LAYERBANK_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
+        assertEq(uint256(operationsAdmin.getRouteClass(IDLE_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle));
 
         // Test fee bounds consistency
         IFeeHandler.FeeSettings memory settings = IFeeHandler(address(stablecoinHandler)).getFeeSettings();
@@ -432,9 +422,8 @@ contract GettersTest is DcaDappTest {
             dcaManager.getDcaSchedules(USER, address(0));
         assertEq(schedules.length, 0);
 
-        assertFalse(operationsAdmin.isLendingRoute(IDLE_INDEX));
         assertEq(uint256(operationsAdmin.getRouteClass(IDLE_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle));
-        assertFalse(operationsAdmin.isLendingRoute(999));
+        assertEq(uint256(operationsAdmin.getRouteClass(999)), uint256(IOperationsAdmin.RouteClass.Unregistered));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -468,7 +457,7 @@ contract GettersTest is DcaDappTest {
         assertLt(gasBefore - gasAfter, 10000);
 
         gasBefore = gasleft();
-        operationsAdmin.isLendingRoute(1);
+        operationsAdmin.getRouteClass(1);
         gasAfter = gasleft();
         assertLt(gasBefore - gasAfter, 10000);
     }

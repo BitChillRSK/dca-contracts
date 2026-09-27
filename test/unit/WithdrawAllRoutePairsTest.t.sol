@@ -126,8 +126,8 @@ contract WithdrawAllRoutePairsTest is BaseDeploymentTest {
         );
         vm.expectCall(address(handlerOneTwo), abi.encodeWithSelector(ILendingHandler.withdrawInterest.selector), 0);
         // One lending-class lookup per pair, not one per combination: the cartesian form made four.
-        vm.expectCall(address(operationsAdmin), abi.encodeCall(IOperationsAdmin.isLendingRoute, (ROUTE_ONE)), 1);
-        vm.expectCall(address(operationsAdmin), abi.encodeCall(IOperationsAdmin.isLendingRoute, (ROUTE_TWO)), 1);
+        vm.expectCall(address(operationsAdmin), abi.encodeCall(IOperationsAdmin.getRouteClass, (ROUTE_ONE)), 1);
+        vm.expectCall(address(operationsAdmin), abi.encodeCall(IOperationsAdmin.getRouteClass, (ROUTE_TWO)), 1);
 
         vm.prank(USER);
         dcaManager.withdrawAllAccumulatedInterest(tokens, routeIndexes);

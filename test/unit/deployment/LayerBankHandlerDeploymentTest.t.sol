@@ -76,7 +76,7 @@ contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
         address registeredHandler =
             operationsAdmin.getTokenHandler(helperConfig.getStablecoinAddress(), LAYERBANK_INDEX);
         assertEq(registeredHandler, layerbankHandlerAddress, "LayerBank handler not registered in OperationsAdmin");
-        assertTrue(operationsAdmin.isLendingRoute(LAYERBANK_INDEX));
+        assertEq(uint256(operationsAdmin.getRouteClass(LAYERBANK_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
         assertEq(layerbankHandler.EXCHANGE_RATE_DECIMALS(), 1e27);
     }
 

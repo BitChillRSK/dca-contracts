@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
-import {Test, Vm} from "forge-std/Test.sol";
+import {Test, Vm, stdError} from "forge-std/Test.sol";
 import {LendingHandler} from "src/LendingHandler.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
 import {MockStablecoin} from "../mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import "../Constants.sol";
 
 /**
@@ -27,6 +28,7 @@ contract LendingHandlerRedeemTest is Test {
     event LendingHandler__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares);
 
     uint256 internal constant RATE_SCALE = 1e18;
+    uint256 internal constant RAY = 1e27;
     uint256 internal constant USER_A_DEPOSIT = 100 ether;
     uint256 internal constant USER_B_DEPOSIT = 50 ether;
     uint256 internal constant OVERSTATED_REQUEST = 1000 ether;
@@ -39,7 +41,7 @@ contract LendingHandlerRedeemTest is Test {
     function setUp() public {
         stablecoin = new MockStablecoin(address(this));
         // dcaManager = this, so tests can call onlyDcaManager entry points directly
-        harness = new LendingHandlerHarness(address(this), address(stablecoin));
+        harness = new LendingHandlerHarness(address(this), address(stablecoin), RATE_SCALE);
 
         stablecoin.mint(userA, USER_A_DEPOSIT);
         stablecoin.mint(userB, USER_B_DEPOSIT);
@@ -552,6 +554,38 @@ contract LendingHandlerRedeemTest is Test {
     /// @dev Gas snapshot for the PR body: 1 / 10 / 200 row batchRetrieve under the harness.
     ///      Warm one call first so cold-storage startup does not dominate the short measurements
     ///      (after dropping per-row `SharesRedeemed`, a cold 1-row call can exceed a warm 10-row).
+    /**
+     * @dev R96: the share conversion is a checked `ceilDiv`. Wherever `amount * scale` fits in 256 bits
+     *      it equals OpenZeppelin's rounded `mulDiv`, at the 1e18 scale (Sovryn, Tropykus) and at RAY
+     *      (LayerBank). Every caller stays inside that domain: a `uint96` purchase row, or an amount
+     *      already bounded by `_sharesToStablecoin(shares, rate) = shares * rate / scale`.
+     */
+    function testFuzz_stablecoinToShares_equalsRoundedMulDivWhereverTheProductFits(
+        uint256 amount,
+        uint256 rate,
+        bool ray
+    ) public {
+        uint256 scale = ray ? RAY : RATE_SCALE;
+        amount = bound(amount, 0, type(uint256).max / scale);
+        rate = bound(rate, 1, type(uint256).max);
+        LendingHandlerHarness h = ray ? new LendingHandlerHarness(address(this), address(stablecoin), RAY) : harness;
+
+        assertEq(h.stablecoinToShares(amount, rate), Math.mulDiv(amount, scale, rate, Math.Rounding.Ceil));
+    }
+
+    /// @dev Outside that domain the checked product reverts instead of wrapping.
+    function test_stablecoinToShares_productOverflowReverts() public {
+        uint256 overflowing = type(uint256).max / RATE_SCALE + 1;
+        vm.expectRevert(stdError.arithmeticError);
+        harness.stablecoinToShares(overflowing, RATE_SCALE);
+    }
+
+    /// @dev A zero rate panics exactly as the rounded `mulDiv` did.
+    function test_stablecoinToShares_zeroRateReverts() public {
+        vm.expectRevert(stdError.divisionError);
+        harness.stablecoinToShares(1 ether, 0);
+    }
+
     function test_gas_batchRetrieve_rowCounts() public {
         _fundAndDeposit(userA, 10_000 ether);
         uint256 rowAmount = 1 ether;
@@ -606,8 +640,8 @@ contract LendingHandlerHarness is LendingHandler {
     bool public increaseBalanceOnRedeem;
     bool public revertOnRedeem;
 
-    constructor(address dcaManagerAddress, address stableTokenAddress)
-        LendingHandler(dcaManagerAddress, stableTokenAddress, 1e18)
+    constructor(address dcaManagerAddress, address stableTokenAddress, uint256 exchangeRateDecimals)
+        LendingHandler(dcaManagerAddress, stableTokenAddress, exchangeRateDecimals)
     {}
 
     function setExchangeRate(uint256 rate) external {
@@ -637,6 +671,10 @@ contract LendingHandlerHarness is LendingHandler {
     function creditShares(address user, uint256 shares) external {
         s_shares[user] += shares;
         protocolShares += shares;
+    }
+
+    function stablecoinToShares(uint256 stablecoinAmount, uint256 rate) external view returns (uint256) {
+        return _stablecoinToShares(stablecoinAmount, rate);
     }
 
     function redeemShares(address user, uint256 stablecoinAmount) external returns (uint256) {

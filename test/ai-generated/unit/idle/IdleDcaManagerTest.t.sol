@@ -5,6 +5,7 @@ import {BaseDeploymentTest} from "test/unit/deployment/BaseDeploymentTest.t.sol"
 import {DeployIdleHandler} from "script/DeployIdleHandler.s.sol";
 import {IdleDocHandlerMoc} from "src/idle/IdleDocHandlerMoc.sol";
 import {IDcaManager} from "src/interfaces/IDcaManager.sol";
+import {IOperationsAdmin} from "src/interfaces/IOperationsAdmin.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
@@ -69,7 +70,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         assertEq(schedule.routeIndex, IDLE_INDEX);
         assertEq(schedule.tokenBalance, DEPOSIT);
         assertEq(docToken.balanceOf(address(handler)), DEPOSIT);
-        assertFalse(operationsAdmin.isLendingRoute(IDLE_INDEX));
+        assertEq(uint256(operationsAdmin.getRouteClass(IDLE_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle));
     }
 
     function test_buyAndWithdraw_spendIdleDoc() public {
@@ -105,7 +106,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(docToken), 0);
 
         bytes memory encodedRevert =
-            abi.encodeWithSelector(IDcaManager.DcaManager__TokenDoesNotYieldInterest.selector, address(docToken));
+            abi.encodeWithSelector(IDcaManager.DcaManager__TokenIsNotLent.selector, address(docToken));
 
         vm.expectRevert(encodedRevert);
         dcaManager.getInterestAccrued(USER, address(docToken), IDLE_INDEX);
@@ -185,9 +186,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         // Counting idle as well locks 3*DEPOSIT against ~2*DEPOSIT lent → 0 interest.
         assertLt(interest, DEPOSIT);
         assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, DEPOSIT);
-        vm.expectRevert(
-            abi.encodeWithSelector(IDcaManager.DcaManager__TokenDoesNotYieldInterest.selector, address(docToken))
-        );
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__TokenIsNotLent.selector, address(docToken)));
         dcaManager.getInterestAccrued(USER, address(docToken), IDLE_INDEX);
     }
 
@@ -214,7 +213,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         uint64 lendingScheduleId = scheduleIdAt(dcaManager, USER, address(docToken), 1);
 
         bytes memory encodedRevert =
-            abi.encodeWithSelector(IDcaManager.DcaManager__TokenDoesNotYieldInterest.selector, address(docToken));
+            abi.encodeWithSelector(IDcaManager.DcaManager__TokenIsNotLent.selector, address(docToken));
         vm.prank(USER);
         vm.expectRevert(encodedRevert);
         dcaManager.withdrawTokenAndInterest(address(docToken), idleScheduleId, MIN_PURCHASE_AMOUNT);

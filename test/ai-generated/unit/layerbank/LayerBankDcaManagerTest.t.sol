@@ -75,7 +75,7 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
         assertEq(schedule.tokenBalance, DEPOSIT);
         assertGt(handler.getUserShares(USER), 0);
         assertEq(docToken.balanceOf(address(handler)), 0);
-        assertTrue(operationsAdmin.isLendingRoute(LAYERBANK_INDEX));
+        assertEq(uint256(operationsAdmin.getRouteClass(LAYERBANK_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
     }
 
     function test_buyAndWithdraw_spendLayerBankDoc() public {
