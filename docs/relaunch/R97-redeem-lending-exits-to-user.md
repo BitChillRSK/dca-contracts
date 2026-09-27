@@ -1,6 +1,12 @@
 # R97 — Redeem lending exits straight to the user
 
-Status: **not started** · Assigned: yes · Optional/further-review: no · Stack on: R96
+Status: **closed without implementation** · GitHub [#163](https://github.com/BitChillRSK/dca-contracts/pull/163) (closed) · Assigned: no · Optional/further-review: no
+
+## Closed
+
+Closed on 2026-09-27 by the human, after the implementation ([#163](https://github.com/BitChillRSK/dca-contracts/pull/163)) was measured and green. The savings are real but land only on user-paid exits, so the change had to pay for itself in simpler code, and it does not: `_protocolRedeem` regains the `receiver` parameter R28 removed, which acts as a mode (user on exits, the handler on batches) that every adapter implements; the Tropykus adapter needs a measure-and-forward branch because `redeem` has no receiver; `TokenHandler__TokenWithdrawn` is emitted by each subclass instead of the base; and exits measure the user's balance instead of the handler's. Net about +30 lines in the redeem path invariant 11 rests on. R28's "always redeem onto the handler" stands.
+
+The rest of this spec is kept as the record of what was proposed and measured.
 
 ## Objective
 
