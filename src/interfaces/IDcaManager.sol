@@ -182,7 +182,7 @@ interface IDcaManager {
     /// @notice The user already has the maximum number of schedules for this token.
     error DcaManager__MaxSchedulesPerTokenReached(address token);
     /// @notice Interest was requested on a route that is not registered as lending.
-    error DcaManager__TokenDoesNotYieldInterest(address token);
+    error DcaManager__TokenIsNotLent(address token);
     /// @notice Caller is not on the OperationsAdmin swapper allowlist.
     error DcaManager__UnauthorizedSwapper(address sender);
     /// @notice A new protected purchase window cannot start until the current one ends.

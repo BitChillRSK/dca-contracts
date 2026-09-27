@@ -270,7 +270,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         nonReentrant
     {
         (uint256 routeIndex, ITokenHandler tokenHandler) = _withdrawToken(token, scheduleId, withdrawalAmount);
-        _checkLendingRoute(token, routeIndex);
+        _checkTokenIsLent(token, routeIndex);
         _withdrawInterest(ILendingHandler(address(tokenHandler)), token, routeIndex);
     }
 
@@ -283,7 +283,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     function topUpFromInterest(address token, uint64 scheduleId, uint256 amount) external override nonReentrant {
         DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
         uint256 routeIndex = dcaSchedule.routeIndex;
-        _checkLendingRoute(token, routeIndex);
+        _checkTokenIsLent(token, routeIndex);
 
         uint256 accruedInterest = ILendingHandler(address(_handler(token, routeIndex)))
             .getAccruedInterest(msg.sender, _lockedPrincipal(msg.sender, token, routeIndex));
@@ -453,7 +453,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         override
         returns (uint256)
     {
-        _checkLendingRoute(token, routeIndex);
+        _checkTokenIsLent(token, routeIndex);
         return ILendingHandler(address(_handler(token, routeIndex)))
             .quoteAccruedInterest(user, _lockedPrincipal(user, token, routeIndex));
     }
@@ -743,7 +743,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     /**
      * @dev Withdraw interest from an already-resolved lending handler.
      *      Callers must already have established that `routeIndex` is a lending
-     *      route (`_checkLendingRoute` to revert, or `_isLendingRoute` to skip).
+     *      route (`_checkTokenIsLent` to revert, or `_isLendingRoute` to skip).
      *      This helper does not re-check.
      */
     function _withdrawInterest(ILendingHandler lendingHandler, address token, uint256 routeIndex) private {
@@ -773,9 +773,9 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         }
     }
 
-    /// @dev Revert unless `routeIndex` is a lending route.
-    function _checkLendingRoute(address token, uint256 routeIndex) private view {
-        if (!_isLendingRoute(routeIndex)) revert DcaManager__TokenDoesNotYieldInterest(token);
+    /// @dev Revert unless `token` is lent on `routeIndex`, i.e. the route is a lending route.
+    function _checkTokenIsLent(address token, uint256 routeIndex) private view {
+        if (!_isLendingRoute(routeIndex)) revert DcaManager__TokenIsNotLent(token);
     }
 
     /// @dev Whether `routeIndex` was registered as a lending route.

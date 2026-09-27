@@ -157,7 +157,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R93 | after R92, before relaunch deploy | none (report already-measured receipt shares on zero-cash reverts; delete the diagnostic-only batch loop) |
 | R94 | after R93, before relaunch deploy | none (create nonce before pull; drop withdrawal downcast; deposit store-before-pull and top-up hoist measured and reverted; record closed canvas leftovers) |
 | R95 | after R94, before relaunch deploy | **decided 2026-09-27:** merge `TokenLending` into the lending base and rename it `LendingHandler` / `ILendingHandler` (prefix `LendingHandler__`); scale visibility, R85 slip, declaration order, relative imports (runtime identical up to renamed topics/selectors); record the verdict on every candidate of the PRs 138–160 review |
-| R96 | after R95, before relaunch deploy | **decided 2026-09-27:** `ceilDiv` share conversion; drop `OperationsAdmin.isLendingRoute` for `getRouteClass`; private helper renamed `_isLendingRoute` |
+| R96 | after R95, before relaunch deploy | **decided 2026-09-27:** `ceilDiv` share conversion; drop `OperationsAdmin.isLendingRoute` for `getRouteClass`; private helper renamed `_isLendingRoute`; `DcaManager__TokenDoesNotYieldInterest` → `DcaManager__TokenIsNotLent` |
 | R97 | after R96, before relaunch deploy | **decided 2026-09-27:** lending exits redeem straight to the user (reverses R28's PR 19 call); `TokenHandler._withdrawToken` abstract, idle keeps the transfer |
 
 ### PR 1 - R23 toolchain and dependency baseline
@@ -1336,7 +1336,9 @@ candidate from the 2026-09-27 review of PRs 138–160. Ask: none (decided 2026-0
 
 After R95, before relaunch deploy. `_stablecoinToShares` uses a checked `ceilDiv` (equivalent at every
 reachable input; about −1,000 per 10-row lending batch under deploy). `OperationsAdmin.isLendingRoute`
-is removed; `DcaManager` compares `getRouteClass` itself, in a helper renamed `_isLendingRoute`. Ask: none (decided 2026-09-27).
+is removed; `DcaManager` compares `getRouteClass` itself, in a helper renamed `_isLendingRoute`. The
+interest-route revert becomes `DcaManager__TokenIsNotLent` (raised by `_checkTokenIsLent`). Ask: none
+(decided 2026-09-27).
 
 ### R97 - redeem lending exits straight to the user ([spec](./R97-redeem-lending-exits-to-user.md))
 
