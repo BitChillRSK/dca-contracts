@@ -1,6 +1,6 @@
 # R94 — Store known schedule credits before the handler pull
 
-Status: **implemented** · Assigned: yes · Optional/further-review: no · Stack on: [#159](https://github.com/BitChillRSK/dca-contracts/pull/159)
+Status: **implemented** · GitHub [#160](https://github.com/BitChillRSK/dca-contracts/pull/160) · Assigned: yes · Optional/further-review: no · Stack on: [#159](https://github.com/BitChillRSK/dca-contracts/pull/159)
 
 ## Objective
 
@@ -123,7 +123,7 @@ make fork-tropykus
       `README.md`.
 - [x] No ABI, event, error, or storage-layout change; no purchase-path edit.
 - [x] `make check`, `make check-deploy`, `make fork-sovryn`, and `make fork-tropykus` green.
-- [ ] README Status points at this PR; next unassigned prompt recorded.
+- [x] README Status points at this PR; next unassigned prompt recorded.
 
 ## Reviewer checklist
 
