@@ -13,19 +13,18 @@ import "../Constants.sol";
 
 /**
  * @title LendingHandlerRedeemTest
- * @notice Base-level regressions for `_redeemShares`: the per-user share clamp (R21) and the
- *         positive-share zero-payout revert (PR 63 review; R15 dust stays deferred).
+ * @notice Base-level regressions for single-user and batch lending redeems: the outer withdraw
+ *         clamp, interest bounds, and the positive-share zero-payout revert.
  */
 contract LendingHandlerRedeemTest is Test {
-    event LendingHandler__AmountToRedeemAdjusted(
-        address indexed user,
-        uint256 originalSharesAmount,
-        uint256 adjustedSharesAmount,
-        uint256 originalStablecoinAmount,
-        uint256 adjustedStablecoinAmount
+    event LendingHandler__WithdrawalAmountAdjusted(
+        address indexed user, uint256 originalAmount, uint256 adjustedAmount
     );
     event LendingHandler__SharesRedeemed(address indexed user, uint256 underlyingAmount, uint256 sharesAmountRedeemed);
     event LendingHandler__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares);
+    event LendingHandler__InterestWithdrawn(
+        address indexed user, address indexed token, uint256 underlyingAmountWithdrawn
+    );
 
     uint256 internal constant RATE_SCALE = 1e18;
     uint256 internal constant RAY = 1e27;
@@ -51,42 +50,116 @@ contract LendingHandlerRedeemTest is Test {
         stablecoin.approve(address(harness), type(uint256).max);
     }
 
-    function test_redeemShares_clampsToTheUsersOwnBook() public {
+    function test_withdrawToken_overstatedRequest_clampsViaOuterClamp() public {
         harness.depositToken(userA, USER_A_DEPOSIT);
         harness.depositToken(userB, USER_B_DEPOSIT);
 
-        uint256 userAShares = harness.getUserShares(userA);
         uint256 userBShares = harness.getUserShares(userB);
-        uint256 requestedShares = _stablecoinToSharesUp(OVERSTATED_REQUEST, RATE_SCALE);
-        uint256 adjustedStablecoin = userAShares * RATE_SCALE / RATE_SCALE;
-
-        assertGt(requestedShares, userAShares);
+        uint256 userStableBefore = stablecoin.balanceOf(userA);
 
         vm.expectEmit(true, true, true, true, address(harness));
-        emit LendingHandler__AmountToRedeemAdjusted(
-            userA, requestedShares, userAShares, OVERSTATED_REQUEST, adjustedStablecoin
-        );
+        emit LendingHandler__WithdrawalAmountAdjusted(userA, OVERSTATED_REQUEST, USER_A_DEPOSIT);
 
-        uint256 received = harness.redeemShares(userA, OVERSTATED_REQUEST);
+        uint256 received = harness.withdrawToken(userA, OVERSTATED_REQUEST);
 
-        assertEq(received, adjustedStablecoin);
-        assertGt(received, 0);
+        assertEq(received, USER_A_DEPOSIT);
+        assertEq(stablecoin.balanceOf(userA), userStableBefore + USER_A_DEPOSIT);
         assertEq(harness.getUserShares(userA), 0);
         assertEq(harness.getUserShares(userB), userBShares);
     }
 
-    function test_redeemShares_zeroSharesIsANoOp() public {
+    function test_withdrawInterest_amountNeverExceedsShareBackedMinusLocked() public {
+        harness.depositToken(userA, USER_A_DEPOSIT);
+        harness.setExchangeRate(2e18);
+
+        uint256 userStableBefore = stablecoin.balanceOf(userA);
+        uint256 sharesBefore = harness.getUserShares(userA);
+
+        vm.expectEmit(true, true, true, true, address(harness));
+        emit LendingHandler__InterestWithdrawn(userA, address(stablecoin), USER_A_DEPOSIT);
+
+        harness.withdrawInterest(userA, USER_A_DEPOSIT);
+
+        assertEq(stablecoin.balanceOf(userA), userStableBefore + USER_A_DEPOSIT);
+        // Remaining shares still back exactly the locked principal at the new rate.
+        assertEq(harness.getUserShares(userA) * 2e18 / RATE_SCALE, USER_A_DEPOSIT);
+        assertLt(harness.getUserShares(userA), sharesBefore);
+    }
+
+    /**
+     * @dev Production withdraw callers bound the amount so `ceil(amount × scale / rate) ≤ book`.
+     *      Fuzzes non-round rates and overstated requests through the outer clamp; the book must
+     *      never grow and the debit must equal the ceil of the capped amount.
+     */
+    function testFuzz_withdrawToken_debitNeverExceedsBook(uint256 shares, uint256 rate, uint256 request) public {
+        rate = bound(rate, 1, type(uint128).max);
+        shares = bound(shares, 0, type(uint256).max / rate);
+        harness.setExchangeRate(rate);
+        if (shares > 0) {
+            harness.creditShares(userA, shares);
+        }
+
+        uint256 shareBacked = shares * rate / RATE_SCALE;
+        uint256 bookBefore = harness.getUserShares(userA);
+        assertEq(bookBefore, shares);
+
+        uint256 received = harness.withdrawToken(userA, request);
+        uint256 bookAfter = harness.getUserShares(userA);
+        assertLe(bookAfter, bookBefore);
+
+        uint256 capped = request > shareBacked ? shareBacked : request;
+        uint256 expectedDebit = capped == 0 ? 0 : harness.stablecoinToShares(capped, rate);
+        assertLe(expectedDebit, bookBefore);
+        assertEq(bookBefore - bookAfter, expectedDebit);
+        assertEq(received, expectedDebit == 0 ? 0 : expectedDebit * rate / RATE_SCALE);
+    }
+
+    /**
+     * @dev Interest redeems at most share-backed minus locked. Same ceil bound as principal;
+     *      locked spans [0, shareBacked] so the no-interest early return is covered too.
+     */
+    function testFuzz_withdrawInterest_debitNeverExceedsBook(uint256 shares, uint256 rate, uint256 locked) public {
+        rate = bound(rate, 1, type(uint128).max);
+        shares = bound(shares, 1, type(uint256).max / rate);
+        harness.setExchangeRate(rate);
+        harness.creditShares(userA, shares);
+
+        uint256 shareBacked = shares * rate / RATE_SCALE;
+        locked = bound(locked, 0, shareBacked);
+
+        uint256 bookBefore = harness.getUserShares(userA);
+        uint256 userStableBefore = stablecoin.balanceOf(userA);
+        harness.withdrawInterest(userA, locked);
+        uint256 bookAfter = harness.getUserShares(userA);
+        assertLe(bookAfter, bookBefore);
+
+        if (shareBacked <= locked) {
+            assertEq(bookAfter, bookBefore);
+            assertEq(stablecoin.balanceOf(userA), userStableBefore);
+            return;
+        }
+
+        uint256 interest = shareBacked - locked;
+        uint256 expectedDebit = harness.stablecoinToShares(interest, rate);
+        assertLe(expectedDebit, bookBefore);
+        assertEq(bookBefore - bookAfter, expectedDebit);
+        assertEq(stablecoin.balanceOf(userA), userStableBefore + expectedDebit * rate / RATE_SCALE);
+    }
+
+    function test_withdrawToken_zeroAmountIsANoOp() public {
         harness.depositToken(userA, USER_A_DEPOSIT);
         uint256 sharesBefore = harness.getUserShares(userA);
         uint256 protocolSharesBefore = harness.protocolShares();
+        uint256 userStableBefore = stablecoin.balanceOf(userA);
 
         vm.recordLogs();
-        uint256 received = harness.redeemShares(userA, 0);
+        uint256 received = harness.withdrawToken(userA, 0);
 
         assertEq(received, 0);
         assertEq(harness.protocolRedeemCalls(), 0);
         assertEq(harness.getUserShares(userA), sharesBefore);
         assertEq(harness.protocolShares(), protocolSharesBefore);
+        assertEq(stablecoin.balanceOf(userA), userStableBefore);
         _assertNoShareMutationEvents();
     }
 
@@ -101,14 +174,14 @@ contract LendingHandlerRedeemTest is Test {
         _assertLastUserSharesUpdated(userA, previousShares, expectedShares);
     }
 
-    function test_redeemShares_emitsUserSharesUpdated() public {
+    function test_withdrawToken_emitsUserSharesUpdated() public {
         harness.depositToken(userA, USER_A_DEPOSIT);
         uint256 previousShares = harness.getUserShares(userA);
         uint256 redeemAmount = 40 ether;
         uint256 sharesToRedeem = _stablecoinToSharesUp(redeemAmount, RATE_SCALE);
 
         vm.recordLogs();
-        uint256 received = harness.redeemShares(userA, redeemAmount);
+        uint256 received = harness.withdrawToken(userA, redeemAmount);
 
         assertEq(received, redeemAmount);
         assertEq(harness.getUserShares(userA), previousShares - sharesToRedeem);
@@ -264,7 +337,7 @@ contract LendingHandlerRedeemTest is Test {
         vm.recordLogs();
         harness.depositToken(userA, USER_A_DEPOSIT);
         harness.depositToken(userB, USER_B_DEPOSIT);
-        harness.redeemShares(userA, 25 ether);
+        harness.withdrawToken(userA, 25 ether);
 
         address[] memory users = new address[](2);
         users[0] = userA;
@@ -344,19 +417,20 @@ contract LendingHandlerRedeemTest is Test {
         assertTrue(found, "LendingHandler__UserSharesUpdated not emitted");
     }
 
-    function test_redeemShares_dustReportsRedeemedSharesAndRollsBack() public {
-        // 1 share at rate 1 / 1e18 floors to 0 wei of stablecoin
-        harness.setExchangeRate(1);
-        harness.creditShares(userA, 1);
+    function test_withdrawToken_dustReportsRedeemedSharesAndRollsBack() public {
+        // Positive share burn that pays nothing: deposit at 1:1, then refuse payout.
+        harness.depositToken(userA, USER_A_DEPOSIT);
         harness.setPayOut(false);
 
         uint256 bookBefore = harness.getUserShares(userA);
         uint256 protocolBefore = harness.protocolShares();
-        assertEq(bookBefore, 1);
-        assertEq(bookBefore * 1 / RATE_SCALE, 0);
+        uint256 redeemAmount = 40 ether;
+        uint256 expectedShares = _stablecoinToSharesUp(redeemAmount, RATE_SCALE);
 
-        vm.expectRevert(abi.encodeWithSelector(ILendingHandler.LendingHandler__ZeroStablecoinReceived.selector, 1));
-        harness.redeemShares(userA, 1);
+        vm.expectRevert(
+            abi.encodeWithSelector(ILendingHandler.LendingHandler__ZeroStablecoinReceived.selector, expectedShares)
+        );
+        harness.withdrawToken(userA, redeemAmount);
 
         assertEq(harness.getUserShares(userA), bookBefore);
         assertEq(harness.protocolShares(), protocolBefore);
@@ -403,27 +477,28 @@ contract LendingHandlerRedeemTest is Test {
         assertEq(harness.getAccruedInterest(userA, USER_A_DEPOSIT), 0);
     }
 
-    function test_redeemShares_exactShareConsumptionMatchesExternalDelta() public {
+    function test_withdrawToken_exactShareConsumptionMatchesExternalDelta() public {
         harness.depositToken(userA, USER_A_DEPOSIT);
         uint256 bookBefore = harness.getUserShares(userA);
         uint256 protocolBefore = harness.protocolShares();
         uint256 redeemAmount = 40 ether;
         uint256 expectedDebit = _stablecoinToSharesUp(redeemAmount, RATE_SCALE);
 
-        uint256 received = harness.redeemShares(userA, redeemAmount);
+        uint256 received = harness.withdrawToken(userA, redeemAmount);
 
         assertEq(received, redeemAmount);
         assertEq(bookBefore - harness.getUserShares(userA), expectedDebit);
         assertEq(protocolBefore - harness.protocolShares(), expectedDebit);
     }
 
-    function test_redeemShares_partialShareBurnWithPositiveCashRevertsAndRollsBack() public {
+    function test_withdrawToken_partialShareBurnWithPositiveCashRevertsAndRollsBack() public {
         harness.depositToken(userA, USER_A_DEPOSIT);
         harness.setBurnBps(5_000);
 
         uint256 bookBefore = harness.getUserShares(userA);
         uint256 protocolBefore = harness.protocolShares();
         uint256 stableBefore = stablecoin.balanceOf(address(harness));
+        uint256 userStableBefore = stablecoin.balanceOf(userA);
         uint256 redeemAmount = 40 ether;
         uint256 intended = _stablecoinToSharesUp(redeemAmount, RATE_SCALE);
         uint256 afterPartial = protocolBefore - intended / 2;
@@ -436,11 +511,12 @@ contract LendingHandlerRedeemTest is Test {
                 afterPartial
             )
         );
-        harness.redeemShares(userA, redeemAmount);
+        harness.withdrawToken(userA, redeemAmount);
 
         assertEq(harness.getUserShares(userA), bookBefore);
         assertEq(harness.protocolShares(), protocolBefore);
         assertEq(stablecoin.balanceOf(address(harness)), stableBefore);
+        assertEq(stablecoin.balanceOf(userA), userStableBefore);
     }
 
     function test_batchRetrieve_partialShareBurnRevertsAndRollsBack() public {
@@ -476,7 +552,7 @@ contract LendingHandlerRedeemTest is Test {
         assertEq(harness.protocolShares(), protocolBefore);
     }
 
-    function test_redeemShares_liquidityShortageRevertsUnchanged() public {
+    function test_withdrawToken_liquidityShortageRevertsUnchanged() public {
         harness.depositToken(userA, USER_A_DEPOSIT);
         harness.setRevertOnRedeem(true);
 
@@ -484,14 +560,14 @@ contract LendingHandlerRedeemTest is Test {
         uint256 protocolBefore = harness.protocolShares();
 
         vm.expectRevert(bytes("Harness: insufficient liquidity"));
-        harness.redeemShares(userA, 40 ether);
+        harness.withdrawToken(userA, 40 ether);
 
         assertEq(harness.getUserShares(userA), bookBefore);
         assertEq(harness.protocolShares(), protocolBefore);
         assertEq(harness.protocolRedeemCalls(), 0);
     }
 
-    function test_redeemShares_overBurnHitsNamedMismatch() public {
+    function test_withdrawToken_overBurnHitsNamedMismatch() public {
         harness.depositToken(userA, USER_A_DEPOSIT);
         harness.setOverBurn(true);
 
@@ -507,12 +583,12 @@ contract LendingHandlerRedeemTest is Test {
                 protocolBefore - (intended + 1)
             )
         );
-        harness.redeemShares(userA, redeemAmount);
+        harness.withdrawToken(userA, redeemAmount);
 
         assertEq(harness.protocolShares(), protocolBefore);
     }
 
-    function test_redeemShares_increasingReceiptBalanceHitsNamedMismatch() public {
+    function test_withdrawToken_increasingReceiptBalanceHitsNamedMismatch() public {
         harness.depositToken(userA, USER_A_DEPOSIT);
         harness.setIncreaseBalanceOnRedeem(true);
 
@@ -528,7 +604,7 @@ contract LendingHandlerRedeemTest is Test {
                 protocolBefore + 1
             )
         );
-        harness.redeemShares(userA, redeemAmount);
+        harness.withdrawToken(userA, redeemAmount);
 
         assertEq(harness.protocolShares(), protocolBefore);
     }
@@ -675,10 +751,6 @@ contract LendingHandlerHarness is LendingHandler {
 
     function stablecoinToShares(uint256 stablecoinAmount, uint256 rate) external view returns (uint256) {
         return _stablecoinToShares(stablecoinAmount, rate);
-    }
-
-    function redeemShares(address user, uint256 stablecoinAmount) external returns (uint256) {
-        return _redeemShares(user, s_shares[user], stablecoinAmount, _exchangeRate());
     }
 
     function batchRetrieveStablecoin(address[] calldata users, uint256[] calldata purchaseAmounts)

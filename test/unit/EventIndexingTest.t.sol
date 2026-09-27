@@ -189,9 +189,6 @@ contract EventIndexingTest is DcaDappTest {
         if (sig == keccak256("LendingHandler__SharesRedeemedBatch(uint256,uint256)")) return (true, 0);
         if (sig == keccak256("LendingHandler__InterestWithdrawn(address,address,uint256)")) return (true, 2);
         if (sig == keccak256("LendingHandler__WithdrawalAmountAdjusted(address,uint256,uint256)")) return (true, 1);
-        if (sig == keccak256("LendingHandler__AmountToRedeemAdjusted(address,uint256,uint256,uint256,uint256)")) {
-            return (true, 1);
-        }
         if (sig == keccak256("TokenHandler__TokenDeposited(address,address,uint256)")) return (true, 2);
         if (sig == keccak256("TokenHandler__TokenWithdrawn(address,address,uint256)")) return (true, 2);
         if (sig == keccak256("PurchaseRbtc__rBtcWithdrawn(address,uint256)")) return (true, 1);
