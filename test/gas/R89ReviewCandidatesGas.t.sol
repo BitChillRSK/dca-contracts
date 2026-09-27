@@ -67,6 +67,8 @@ contract R89ReviewCandidatesGasTest is DcaDappTest {
     ///      on every iteration (1 + 2 × 10 = 21 reads). The memory copy reads the length once; `via_ir`
     ///      then reads each packed word once (3), while legacy codegen still reads one word per id (10).
     function test_lockedPrincipal_readsEachIdWordOnce() public {
+        // Extra schedules mint mock DOC; fork lanes use live DOC without a test minter.
+        if (block.chainid != ANVIL_CHAIN_ID) vm.skip(true);
         if (!operationsAdmin.isLendingRoute(s_routeIndex)) vm.skip(true);
         _fillUserSchedules(MAX_SCHEDULES_PER_TOKEN);
         updateExchangeRate(180 days);
@@ -148,6 +150,8 @@ contract R89ReviewCandidatesGasTest is DcaDappTest {
     /// @dev Creation loads the settings word once and rewrites it for the nonce; the period check no
     ///      longer adds a read of its own.
     function test_createDcaSchedule_readsSettingsWordWithoutTheValidatorsExtraRead() public {
+        // Mints mock DOC for a fresh buyer; fork lanes use live DOC without a test minter.
+        if (block.chainid != ANVIL_CHAIN_ID) vm.skip(true);
         address buyer = makeAddr("r89Creator");
         stablecoin.mint(buyer, AMOUNT_TO_DEPOSIT);
         vm.prank(buyer);
