@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
-import {IDcaManagerAccessControl} from "src/interfaces/IDcaManagerAccessControl.sol";
+import {IDcaManagerAccessControl} from "./interfaces/IDcaManagerAccessControl.sol";
 
 /**
  * @title DcaManagerAccessControl

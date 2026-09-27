@@ -295,7 +295,9 @@ Dex, stays far below EIP-170's 24,576.
   `SchedulePackingTest.testDepositRevertsUint128MaxPlusOneBeforeTokensMove`
   ([R18](./R18-storage-packing.md)).
 - An unchecked cadence-anchor downcast; unchecked truncation is out of scope under R18 and R50.
-- Merging `TokenLending` into `LendingErc20Handler` ([R28](./R28-lending-erc20-handler.md)).
+- Merging `TokenLending` into `LendingErc20Handler` ([R28](./R28-lending-erc20-handler.md)). Reopened
+  and shipped by [R95](./R95-merge-token-lending.md) on 2026-09-27: R28 forbade lifting handler state
+  into `TokenLending`, not merging the conversion math into its only child.
 - Merging `getAccruedInterest` into `quoteAccruedInterest`, and the `_exchangeRate` hook
   ([R54](./R54-schedule-top-up-from-interest.md), [R88](./R88-post-r87-structural-cleanups.md)).
 - The purchase row's slot-0 read-modify-write ([R81](./R81-one-write-per-packed-slot.md), gas audit).

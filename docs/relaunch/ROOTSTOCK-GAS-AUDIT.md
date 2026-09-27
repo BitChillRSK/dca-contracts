@@ -82,6 +82,10 @@ adjacent with nothing that can revert, log, or call between them. Cancun prices 
 
 ## Closed without a spec
 
+- **Redeeming lending exits straight to the user** (no handler round trip; ≈ −15,000 Rootstock per
+  exit). Implemented as [R97](./R97-redeem-lending-exits-to-user.md) and closed 2026-09-27: user-paid
+  and off the purchase path, and it makes the adapter layer more complex. See the register entry in
+  [`IMPLEMENTATION_ORDER.md`](./IMPLEMENTATION_ORDER.md#closed-non-implementation-decisions).
 - **`deleteDcaSchedule` swap-and-pop writes the id-array word twice** when the moved id and the popped
   slot share a word (four ids per word). That is +5,000 user gas on a rare call. Assigning then
   popping, in either order, is two read-modify-writes of the same word, and merging them needs

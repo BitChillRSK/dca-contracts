@@ -8,7 +8,7 @@ import {IdleDocHandlerMoc} from "../../src/idle/IdleDocHandlerMoc.sol";
 import {TropykusDocHandlerMoc} from "../../src/tropykus-legacy/TropykusDocHandlerMoc.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
-import {ITokenLending} from "../../src/interfaces/ITokenLending.sol";
+import {ILendingHandler} from "../../src/interfaces/ILendingHandler.sol";
 import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
 import {MockFeeOnTransferStablecoin} from "../mocks/MockFeeOnTransferStablecoin.sol";
 import {MockKdocToken} from "../mocks/MockKdocToken.sol";
@@ -351,7 +351,7 @@ contract FeeOnTransferDepositTest is Test {
         vm.prank(SWAPPER);
         vm.expectRevert(
             abi.encodeWithSelector(
-                ITokenLending.TokenLending__InsufficientShares.selector, USER, requestedShares, availableShares
+                ILendingHandler.LendingHandler__InsufficientShares.selector, USER, requestedShares, availableShares
             )
         );
         dcaManager.batchBuyRbtc(toBatch(ids, address(token), TROPYKUS_INDEX));

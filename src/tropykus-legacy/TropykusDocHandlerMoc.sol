@@ -2,7 +2,7 @@
 pragma solidity 0.8.36;
 
 import {TropykusErc20Handler} from "./TropykusErc20Handler.sol";
-import {PurchaseMoc} from "src/PurchaseMoc.sol";
+import {PurchaseMoc} from "../PurchaseMoc.sol";
 
 /**
  * @title TropykusDocHandlerMoc

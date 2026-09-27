@@ -26,6 +26,9 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
+    uint256 internal constant HUNDRED_PERCENT = 1 ether;
+    /// @notice decimals of the MoC BTC/USD price. Hardcoded because the oracle exposes no `decimals()`.
+    uint256 internal constant ORACLE_DECIMALS = 18;
     /**
      * @notice Wrapped rBTC token this route swaps into and unwraps on withdraw.
      * @return The constructor-supplied WRBTC.
@@ -37,21 +40,18 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      */
     IUniswapV3SwapRouter public immutable i_swapRouter02;
     /**
+     * @notice `10 ** (ORACLE_DECIMALS - stablecoin decimals)`, which lifts a stablecoin amount into the oracle's USD units
+     * @dev Fixed at deploy because the handler's stablecoin is immutable, so a 6-decimal stablecoin
+     *      and an 18-decimal one both reach the oracle's units. Above 18 the constructor reverts.
+     */
+    uint256 internal immutable i_stablecoinToUsdScale;
+    /**
      * @notice MoC BTC/USD oracle used for the swap-time floor.
      * @dev Packed with the live floor: address (20) + `uint64` percent (8) share one word. The safety
      *      check occupies the next word alone. Purchase reads the packed word once; rare setters may
      *      touch both words.
      */
     ICoinPairPrice internal s_mocOracle;
-    uint256 internal constant HUNDRED_PERCENT = 1 ether;
-    /// @notice decimals of the MoC BTC/USD price. Hardcoded because the oracle exposes no `decimals()`.
-    uint256 internal constant ORACLE_DECIMALS = 18;
-    /**
-     * @notice `10 ** (ORACLE_DECIMALS - stablecoin decimals)`, which lifts a stablecoin amount into the oracle's USD units
-     * @dev Fixed at deploy because the handler's stablecoin is immutable, so a 6-decimal stablecoin
-     *      and an 18-decimal one both reach the oracle's units. Above 18 the constructor reverts.
-     */
-    uint256 internal immutable i_stablecoinToUsdScale;
     /**
      * @notice The swap-time oracle floor: the fraction of oracle-implied rBTC the router must pay.
      * @dev Deliberately loose. It is the bound that holds when the caller's `minRbtcOut` is absent,

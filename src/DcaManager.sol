@@ -6,9 +6,9 @@ import {BitChillOwnable} from "./BitChillOwnable.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
-import {ITokenLending} from "./interfaces/ITokenLending.sol";
+import {ILendingHandler} from "./interfaces/ILendingHandler.sol";
 import {IOperationsAdmin} from "./interfaces/IOperationsAdmin.sol";
-import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
+import {IPurchaseRbtc} from "./interfaces/IPurchaseRbtc.sol";
 
 /**
  * @title DcaManager
@@ -271,7 +271,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     {
         (uint256 routeIndex, ITokenHandler tokenHandler) = _withdrawToken(token, scheduleId, withdrawalAmount);
         _checkTokenYieldsInterest(token, routeIndex);
-        _withdrawInterest(ITokenLending(address(tokenHandler)), token, routeIndex);
+        _withdrawInterest(ILendingHandler(address(tokenHandler)), token, routeIndex);
     }
 
     /**
@@ -285,7 +285,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         uint256 routeIndex = dcaSchedule.routeIndex;
         _checkTokenYieldsInterest(token, routeIndex);
 
-        uint256 accruedInterest = ITokenLending(address(_handler(token, routeIndex)))
+        uint256 accruedInterest = ILendingHandler(address(_handler(token, routeIndex)))
             .getAccruedInterest(msg.sender, _lockedPrincipal(msg.sender, token, routeIndex));
         if (accruedInterest == 0) revert DcaManager__NoInterestToTopUpWith(token, routeIndex);
         if (amount > accruedInterest) {
@@ -321,7 +321,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
             // Skip idle routes so a mixed idle+lending call still withdraws interest
             // from the indexes that yield. Unassigned pairs already continued above.
             if (!_tokenYieldsInterest(routeIndexes[i])) continue;
-            _withdrawInterest(ITokenLending(tokenHandlerAddress), tokens[i], routeIndexes[i]);
+            _withdrawInterest(ILendingHandler(tokenHandlerAddress), tokens[i], routeIndexes[i]);
         }
     }
 
@@ -454,7 +454,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         returns (uint256)
     {
         _checkTokenYieldsInterest(token, routeIndex);
-        return ITokenLending(address(_handler(token, routeIndex)))
+        return ILendingHandler(address(_handler(token, routeIndex)))
             .quoteAccruedInterest(user, _lockedPrincipal(user, token, routeIndex));
     }
 
@@ -746,8 +746,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
      *      route (`_checkTokenYieldsInterest` to revert, or `_tokenYieldsInterest`
      *      to skip). This helper does not re-check.
      */
-    function _withdrawInterest(ITokenLending tokenLending, address token, uint256 routeIndex) private {
-        tokenLending.withdrawInterest(msg.sender, _lockedPrincipal(msg.sender, token, routeIndex));
+    function _withdrawInterest(ILendingHandler lendingHandler, address token, uint256 routeIndex) private {
+        lendingHandler.withdrawInterest(msg.sender, _lockedPrincipal(msg.sender, token, routeIndex));
     }
 
     /**

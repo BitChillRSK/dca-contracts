@@ -9,7 +9,7 @@ import {FeeHandler} from "../../../../src/FeeHandler.sol";
 import {MockIsusdToken} from "../../../mocks/MockIsusdToken.sol";
 import {MockStablecoin} from "../../../mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ITokenLending} from "../../../../src/interfaces/ITokenLending.sol";
+import {ILendingHandler} from "../../../../src/interfaces/ILendingHandler.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import "../../../Constants.sol";
 
@@ -315,7 +315,7 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
      * @notice The assetBalanceOf + profitOf preflight is gone (R1): a lending-protocol view is never a
      * ceiling on what a redemption will pay. Over-redeeming must still fail, just from real accounting
      * rather than from a view — here the per-user share exceeds the balance we track for that user.
-     * Named `TokenLending__InsufficientShares` instead of a 0.8 underflow panic.
+     * Named `LendingHandler__InsufficientShares` instead of a 0.8 underflow panic.
      */
     function test_sovryn_batchRetrieveStablecoin_exceedsBalance_reverts() public {
         address user1 = makeAddr("user1");
@@ -341,7 +341,9 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
         uint256 requested = Math.mulDiv(totalIsusdToRedeem, amounts[0], excessiveAmount, Math.Rounding.Ceil);
 
         vm.expectRevert(
-            abi.encodeWithSelector(ITokenLending.TokenLending__InsufficientShares.selector, user1, requested, available)
+            abi.encodeWithSelector(
+                ILendingHandler.LendingHandler__InsufficientShares.selector, user1, requested, available
+            )
         );
         sovrynHandler.testBatchRetrieveStablecoin(users, amounts);
     }

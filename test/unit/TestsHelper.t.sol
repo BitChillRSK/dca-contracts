@@ -4,7 +4,7 @@ pragma solidity 0.8.36;
 
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
-import {ITokenLending} from "../../src/interfaces/ITokenLending.sol";
+import {ILendingHandler} from "../../src/interfaces/ILendingHandler.sol";
 import "../Constants.sol";
 
 contract DummyERC165Contract {
@@ -27,7 +27,7 @@ contract DummyTokenHandler {
     }
 }
 
-/// @dev ERC-165 `ITokenHandler` + `ITokenLending` stub for lending-route assignment tests.
+/// @dev ERC-165 `ITokenHandler` + `ILendingHandler` stub for lending-route assignment tests.
 ///      Reports the stablecoin it was built for, which `assignTokenHandler` checks against `token`.
 contract DummyLendingHandler {
     address public immutable i_stableToken;
@@ -37,7 +37,7 @@ contract DummyLendingHandler {
     }
 
     function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
-        return interfaceId == type(ITokenHandler).interfaceId || interfaceId == type(ITokenLending).interfaceId;
+        return interfaceId == type(ITokenHandler).interfaceId || interfaceId == type(ILendingHandler).interfaceId;
     }
 }
 

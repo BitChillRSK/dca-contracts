@@ -51,9 +51,9 @@ interface IOperationsAdmin {
     error OperationsAdmin__EoaCannotBeHandler(address newHandler);
     /// @notice `handler` does not ERC-165 advertise `ITokenHandler`.
     error OperationsAdmin__ContractIsNotTokenHandler(address newHandler);
-    /// @notice A lending route requires ERC-165 `ITokenLending`.
-    error OperationsAdmin__ContractIsNotTokenLending(address handler);
-    /// @notice An idle route rejects a handler that advertises `ITokenLending`.
+    /// @notice A lending route requires ERC-165 `ILendingHandler`.
+    error OperationsAdmin__ContractIsNotLendingHandler(address handler);
+    /// @notice An idle route rejects a handler that advertises `ILendingHandler`.
     error OperationsAdmin__LendingHandlerOnIdleRoute(address handler);
     /// @notice `handler` holds a different stablecoin than the `token` it is being assigned for.
     error OperationsAdmin__HandlerTokenMismatch(address token, address handler);
@@ -88,7 +88,7 @@ interface IOperationsAdmin {
      * @param token The stablecoin whose handler is being assigned.
      * @param routeIndex The registered route index (idle or lending). Must fit `uint32`.
      * @param handler The TokenHandler for that token and route, not yet assigned anywhere in this admin.
-     * @dev Requires ERC-165 `ITokenHandler`; lending routes also require `ITokenLending`, while idle
+     * @dev Requires ERC-165 `ITokenHandler`; lending routes also require `ILendingHandler`, while idle
      *      routes reject it. The handler's `i_stableToken()` must be `token`. One handler address may
      *      back only one pair.
      */

@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
-import {LendingErc20Handler} from "src/LendingErc20Handler.sol";
+import {LendingHandler} from "../LendingHandler.sol";
 import {IkToken} from "./IkToken.sol";
 
 /**
  * @title TropykusErc20Handler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Tropykus adapter: Compound-style kToken mint/redeem. Share accounting lives on LendingErc20Handler.
+ * @notice Tropykus adapter: Compound-style kToken mint/redeem. Share accounting lives on LendingHandler.
  * @dev Test-only adapter, excluded from production deployment; local and fork lanes retain coverage.
  */
-abstract contract TropykusErc20Handler is LendingErc20Handler {
+abstract contract TropykusErc20Handler is LendingHandler {
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
@@ -37,7 +37,7 @@ abstract contract TropykusErc20Handler is LendingErc20Handler {
      * @param kTokenAddress Tropykus kToken for that stablecoin.
      */
     constructor(address dcaManagerAddress, address stableTokenAddress, address kTokenAddress)
-        LendingErc20Handler(dcaManagerAddress, stableTokenAddress, EXCHANGE_RATE_DECIMALS)
+        LendingHandler(dcaManagerAddress, stableTokenAddress, EXCHANGE_RATE_DECIMALS)
     {
         i_kToken = IkToken(kTokenAddress);
         _approveLendingSpender();
@@ -62,7 +62,7 @@ abstract contract TropykusErc20Handler is LendingErc20Handler {
     /// @dev The kToken credited is the balance actually gained, never `mint()`'s return value.
     function _protocolDeposit(uint256 stablecoinAmount) internal override returns (uint256 mintedShares) {
         uint256 prevKtokenBalance = i_kToken.balanceOf(address(this));
-        if (i_kToken.mint(stablecoinAmount) != 0) revert TokenLending__LendingProtocolDepositFailed();
+        if (i_kToken.mint(stablecoinAmount) != 0) revert LendingHandler__LendingProtocolDepositFailed();
         mintedShares = i_kToken.balanceOf(address(this)) - prevKtokenBalance;
     }
 
@@ -72,7 +72,7 @@ abstract contract TropykusErc20Handler is LendingErc20Handler {
      */
     function _protocolRedeem(uint256 sharesAmount, uint256) internal override {
         uint256 result = i_kToken.redeem(sharesAmount);
-        if (result != 0) revert TokenLending__LendingProtocolRedeemFailed(result);
+        if (result != 0) revert LendingHandler__LendingProtocolRedeemFailed(result);
     }
 
     function _receiptSharesBalance() internal override returns (uint256) {

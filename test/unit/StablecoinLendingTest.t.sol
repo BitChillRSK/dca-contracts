@@ -18,7 +18,7 @@ contract StablecoinLendingTest is DcaDappTest {
     uint256 constant SHARE_TOKEN_STARTING_EXCHANGE_RATE = 2e16;
 
     // Events
-    event TokenLending__InterestWithdrawn(address indexed user, address indexed token, uint256 amount);
+    event LendingHandler__InterestWithdrawn(address indexed user, address indexed token, uint256 amount);
 
     // No `setUp` override: `vm.skip(true)` at the end of a `setUp` that already ran `super.setUp()`
     // is reported as `FAIL: FOUNDRY::SKIP` by some Foundry builds (CI pins `version: stable`, which
@@ -211,7 +211,7 @@ contract StablecoinLendingTest is DcaDappTest {
         address[] memory tokens = new address[](1);
         tokens[0] = address(stablecoin);
         vm.expectEmit(true, true, false, false);
-        emit TokenLending__InterestWithdrawn(USER, address(stablecoin), withdrawableInterest);
+        emit LendingHandler__InterestWithdrawn(USER, address(stablecoin), withdrawableInterest);
         dcaManager.withdrawAllAccumulatedInterest(tokens, routeIndexes);
         uint256 userStablecoinBalanceAfterInterestWithdrawal = stablecoin.balanceOf(USER);
         console2.log("userStablecoinBalanceAfterInterestWithdrawal:", userStablecoinBalanceAfterInterestWithdrawal);
@@ -269,7 +269,7 @@ contract StablecoinLendingTest is DcaDappTest {
 
         vm.prank(USER);
         vm.expectEmit(true, true, false, false);
-        emit TokenLending__InterestWithdrawn(USER, address(stablecoin), withdrawableInterest);
+        emit LendingHandler__InterestWithdrawn(USER, address(stablecoin), withdrawableInterest);
         dcaManager.withdrawAllAccumulatedInterest(tokens, routeIndexes);
 
         assertApproxEqRel(
@@ -358,7 +358,7 @@ contract StablecoinLendingTest is DcaDappTest {
     //     console2.log("Attempted withdrawal amount:", attemptedWithdrawalAmount);
 
     //     vm.expectEmit(true, true, true, true);
-    //     emit TokenLending__WithdrawalAmountAdjusted(USER, attemptedWithdrawalAmount, stablecoinInLendingProtocol);
+    //     emit LendingHandler__WithdrawalAmountAdjusted(USER, attemptedWithdrawalAmount, stablecoinInLendingProtocol);
 
     //     vm.prank(USER);
     //     dcaManager.withdrawToken(address(stablecoin), address(stablecoin), 0, attemptedWithdrawalAmount);

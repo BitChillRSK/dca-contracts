@@ -3,7 +3,7 @@ pragma solidity 0.8.36;
 
 import {IOperationsAdmin} from "./interfaces/IOperationsAdmin.sol";
 import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
-import {ITokenLending} from "./interfaces/ITokenLending.sol";
+import {ILendingHandler} from "./interfaces/ILendingHandler.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {BitChillOwnable} from "./BitChillOwnable.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
@@ -91,9 +91,9 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
         }
 
         bool isLending = routeClass == RouteClass.Lending;
-        bool supportsLending = tokenHandler.supportsInterface(type(ITokenLending).interfaceId);
+        bool supportsLending = tokenHandler.supportsInterface(type(ILendingHandler).interfaceId);
         if (isLending) {
-            if (!supportsLending) revert OperationsAdmin__ContractIsNotTokenLending(handler);
+            if (!supportsLending) revert OperationsAdmin__ContractIsNotLendingHandler(handler);
         } else if (supportsLending) {
             revert OperationsAdmin__LendingHandlerOnIdleRoute(handler);
         }

@@ -37,7 +37,7 @@ release gates without requiring the historical implementation notes.
    - Handles deposits and withdrawals of stablecoins
 
 3. **Lending Integration**
-   - `TokenLending` / `LendingErc20Handler`: share ↔ underlying conversion and per-user virtual shares
+   - `LendingHandler`: share ↔ underlying conversion and per-user virtual shares
    - Production lending adapters: LayerBank (index 1), Sovryn (index 2 for DOC)
    - Idle handlers (index 0) hold the stablecoin without lending
 
@@ -173,7 +173,7 @@ make moc-layerbank
 make moc-sovryn
 
 # Legacy Tropykus mocks. Tropykus is on neither live map (index 4 is burned); these lanes
-# exercise LendingErc20Handler through a second adapter.
+# exercise LendingHandler through a second adapter.
 make moc-tropykus
 
 # Run tests with USDRIF and Tropykus (legacy lane)

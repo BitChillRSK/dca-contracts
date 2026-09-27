@@ -1,0 +1,148 @@
+# R96 — `ceilDiv` share conversion and one route-class getter
+
+Status: **not started** · Assigned: yes · Optional/further-review: no · Stack on: R95
+
+## Objective
+
+This PR makes two gas and redundancy edits, each proven equivalent at every reachable input:
+
+1. `LendingErc20Handler._stablecoinToShares` computes
+   `Math.ceilDiv(stablecoinAmount * i_exchangeRateDecimals, exchangeRate)` instead of
+   `Math.mulDiv(stablecoinAmount, i_exchangeRateDecimals, exchangeRate, Math.Rounding.Ceil)`.
+2. `OperationsAdmin.isLendingRoute` is deleted. It returns `getRouteClass(i) == Lending`, and its
+   one production caller, `DcaManager._tokenYieldsInterest`, now makes that comparison itself.
+
+## Background
+
+Both items come from the 2026-09-27 review of PRs 138–160 (see
+[R95 **Review disposition**](./R95-merge-token-lending.md#review-disposition-2026-09-27), items 8 and
+12). They meet the [R87](./R87-deferred-gas-candidates.md)/[R89](./R89-post-r88-review-candidates.md)
+bar: remove redundant work at any size, once equivalence is proven.
+
+### `ceilDiv`
+
+OpenZeppelin's rounded `mulDiv` computes a 512-bit product and then runs `mulmod` for the rounding
+bit. When the 256-bit product `stablecoinAmount * scale` does not overflow, it returns exactly
+`ceilDiv(stablecoinAmount * scale, exchangeRate)`:
+- **Zero numerator:** both return 0.
+- **Positive numerator:** `(p − 1) / r + 1 = ⌈p / r⌉`.
+- **Zero rate:** both panic `0x12`.
+
+The one difference is a product above `2^256 − 1`. `mulDiv` would still divide, while the checked
+multiply panics `0x11`. That input is unreachable:
+
+| Caller | Bound on `stablecoinAmount` | Largest product |
+|---|---|---|
+| `_batchRetrieveStablecoin` | a schedule's `uint96 purchaseAmount` | `2^96 × 1e27 < 2^186` (LayerBank RAY is the largest scale) |
+| `_redeemShares` via `_withdrawToken` | clamped to `_sharesToStablecoin(shares, rate) = shares × rate / scale` before the conversion | `≤ shares × rate`, a product already computed checked, so `< 2^256` |
+| `_redeemShares` via `withdrawInterest` | `total − locked`, where `total = shares × rate / scale` | same bound |
+
+If a future caller ever passes an amount whose product with the scale overflows, the call reverts; it does
+not wrap. That matches R89's rule that market-sourced arithmetic stays checked.
+
+### One route-class getter
+
+`OperationsAdmin` stores one fact per route index: its `RouteClass`. Two views read it:
+- `isLendingRoute(i)`, which is `getRouteClass(i) == RouteClass.Lending`;
+- `getRouteClass(i)`.
+
+Only `getRouteClass` separates an unregistered index from an idle one, and the deploy scripts and the
+`README.md` runbook rely on that: they call `registerRoute` only while the class is `Unregistered`. So
+`getRouteClass` stays. [R13](./R13-operations-admin-lifecycle.md)'s sketch had only `isLendingRoute`.
+`getRouteClass` was added in the same commit for operators, and no spec decided to keep both.
+
+`isLendingRoute` has one production caller, `DcaManager._tokenYieldsInterest`. That function gates
+`withdrawTokenAndInterest`, `topUpFromInterest`, `withdrawAllAccumulatedInterest` (once per pair), and
+`getInterestAccrued`.
+
+The review first rejected removing it as ABI churn. The human reopened it on 2026-09-27 as redundant
+code, and measurement then showed it is cheaper too.
+
+### Prototype measurements (2026-09-27)
+
+These are Foundry gas figures from throwaway worktrees. Both edits are pure computation with the same
+storage reads, so they carry over 1:1 to Rootstock. The implementation re-measures them on this branch
+(**Measured pins**).
+
+| Edit | Profile | Gas | Runtime |
+|---|---|---|---|
+| `ceilDiv` | `deploy` | −1,002 per 10-row lending batch; −102 per lending withdrawal (−204 on `withdrawTokenAndInterest`) | −88 B per lending leaf |
+| `ceilDiv` | `default` | −4,230 per 10-row lending batch; −423 per lending withdrawal | — |
+| Drop `isLendingRoute` | `deploy` | −217 per interest-route check; −22 per purchase batch (cheaper `isSwapper` dispatch) | `OperationsAdmin` −83 B, `DcaManager` +64 B |
+| Drop `isLendingRoute` | `default` | −62 per interest-route check | `OperationsAdmin` −94 B, `DcaManager` +75 B |
+
+`DcaManager` grows because it now ABI-decodes and range-checks an enum instead of a `bool`.
+
+## Open product decisions
+
+**none** (decided 2026-09-27).
+
+## Scope
+
+- [ ] `_stablecoinToShares` uses `Math.ceilDiv(stablecoinAmount * i_exchangeRateDecimals, exchangeRate)`.
+      Its `@dev` states the reachable bound and that an overflow reverts.
+- [ ] Delete `isLendingRoute` from `IOperationsAdmin` and `OperationsAdmin`.
+      `DcaManager._tokenYieldsInterest` returns
+      `i_operationsAdmin.getRouteClass(routeIndex) == IOperationsAdmin.RouteClass.Lending`.
+- [ ] Tests:
+  - Delete `isLendingRoute` assertions that duplicate an adjacent `getRouteClass` assertion.
+  - Convert the rest to `getRouteClass` with the exact class (`Idle` or `Unregistered`, not
+    "not lending").
+  - Point R38's call-count test at `getRouteClass`.
+  - Add a conversion test: a fuzzed equivalence with rounded `mulDiv` over the reachable domain,
+    and a pin that a product overflow panics `0x11`.
+
+## Out of scope
+
+- [ ] Changing `_sharesToStablecoin`, or any other `mulDiv` site.
+- [ ] Any other `OperationsAdmin` view. R84 keeps `getTokenHandler` and `areDepositsPaused` separate.
+- [ ] Renaming `_tokenYieldsInterest` / `_checkTokenYieldsInterest`.
+
+## Files likely touched
+
+- `src/LendingErc20Handler.sol`
+- `src/OperationsAdmin.sol`, `src/interfaces/IOperationsAdmin.sol`, `src/DcaManager.sol`
+- Tests that call `isLendingRoute`:
+  - `test/unit/`: `OperationsAdminTest`, `WithdrawAllRoutePairsTest`,
+    `deployment/IdleHandlerDeploymentTest`, `deployment/NewHandlerDeploymentTest`,
+    `deployment/LayerBankHandlerDeploymentTest`;
+  - `test/gas/R89ReviewCandidatesGas`;
+  - `test/ai-generated/unit/`: `GettersTest`, `RoleSecurityTest`, `idle/IdleDcaManagerTest`,
+    `layerbank/LayerBankDcaManagerTest`.
+- The conversion test's home: `test/unit/LendingErc20HandlerRedeemTest.t.sol`'s harness exposes the helper.
+- `docs/relaunch/R96-ceildiv-and-one-route-class-getter.md`, `README.md`, `IMPLEMENTATION_ORDER.md`
+
+## Required tests
+
+```text
+SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=DOC \
+  forge test --match-path test/unit/LendingErc20HandlerRedeemTest.t.sol -vv
+make check
+make fork-sovryn
+make fork-tropykus
+```
+
+Gas pins are measured under both profiles on the MoC/Sovryn lane, comparing this branch against its
+parent per test.
+
+## Success criteria
+
+- [ ] Conversion equivalence fuzzed; overflow pin green.
+- [ ] No `isLendingRoute` left in `src/`, `test/`, or `script/`.
+- [ ] Gas and size pins recorded under both profiles.
+- [ ] `make check` and the fork lanes green.
+
+## Reviewer checklist
+
+- [ ] Matches **Scope**; nothing from **Out of scope**.
+- [ ] The overflow bound holds for every `_stablecoinToShares` caller.
+- [ ] Converted test assertions are at least as strict as before.
+- [ ] Protocol invariants in `AGENTS.md` still hold.
+
+## ABI / deploy / cutover impact
+
+- ABI: `OperationsAdmin.isLendingRoute(uint256)` (selector `0xb021edc6`) is removed. No event or error
+  changes.
+- Scripts: none. The scripts already use `getRouteClass`.
+- Cutover: nothing for consumers to handle unless one calls `isLendingRoute`. The implementation checks
+  each consumer repo before opening the PR and opens an issue only where a caller exists.

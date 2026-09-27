@@ -156,6 +156,9 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R92 | after R91, before relaunch deploy | none (FeeHandler off `TokenHandler`; solve default-profile Dex stack-too-deep) |
 | R93 | after R92, before relaunch deploy | none (report already-measured receipt shares on zero-cash reverts; delete the diagnostic-only batch loop) |
 | R94 | after R93, before relaunch deploy | none (create nonce before pull; drop withdrawal downcast; deposit store-before-pull and top-up hoist measured and reverted; record closed canvas leftovers) |
+| R95 | after R94, before relaunch deploy | **decided 2026-09-27:** merge `TokenLending` into the lending base and rename it `LendingHandler` / `ILendingHandler` (prefix `LendingHandler__`); scale visibility, R85 slip, declaration order, relative imports (runtime identical up to renamed topics/selectors); record the verdict on every candidate of the PRs 138–160 review |
+| R96 | after R95, before relaunch deploy | **decided 2026-09-27:** `ceilDiv` share conversion; drop `OperationsAdmin.isLendingRoute` for `getRouteClass` |
+| R97 | — | **closed 2026-09-27 without merging** ([#163](https://github.com/BitChillRSK/dca-contracts/pull/163)): redeem-to-user saves gas only on user-paid exits and adds a `receiver` mode to every adapter; R28's always-redeem-onto-the-handler stands |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -288,7 +291,7 @@ Land before R26 and deploy/CI so neither PR freezes the old helper names.
 
 "Lending token" is not DeFi nomenclature and reads backwards — `_stablecoinToLendingToken` sounds like "the token being lent", which is the stablecoin. Aave says `aToken`, Compound (Tropykus's fork parent) says `cToken`; the recognized generic is ERC-4626's **shares**. Rename the receipt-token noun to `shares` across `ITokenLending`, `TokenLending`, and the handlers: `getUsersLendingTokenBalance` → `getUserShares`, `_stablecoinToLendingToken` / `_lendingTokenToStablecoin` → `_stablecoinToShares` / `_sharesToStablecoin`, `TokenLending__LendingTokenRedeemed(Batch)` → `…SharesRedeemed(Batch)`, `TokenLending__InsufficientLendingTokenBalance` → `TokenLending__InsufficientShares`, and Sovryn's `_redeemLendingToken` → `_redeemShares`.
 
-Keep `ITokenLending` / `TokenLending` / `LENDING_PROTOCOL` / `LendingProtocol*Failed` — "lending" as a domain word is fine; only "lending **token**" is wrong. Keep `stablecoin` as the asset noun; do not adopt 4626's `assets`.
+Keep `ITokenLending` / `TokenLending` / `LENDING_PROTOCOL` / `LendingProtocol*Failed` — "lending" as a domain word is fine; only "lending **token**" is wrong. *(2026-09-27: [R95](./R95-merge-token-lending.md) renamed the pair `ILendingHandler` / `LendingHandler`, keeping "lending".)* Keep `stablecoin` as the asset noun; do not adopt 4626's `assets`.
 
 Land before R22 deploy/CI (now PR 28) for the same reason R25 did: that PR splits the harness where 76 of the 295 matching lines live, so renaming afterwards writes them twice. **R9 (now PR 29) is the ABI freeze** and already specifies `TokenLending__UserSharesUpdated(…, previousShares, newShares)`; until this PR reworded it, the R9 entry below also required a test asserting `newShares == getUsersLendingTokenBalance(user)` — two names for one quantity. Settle the noun before that lands. See `R26-share-terminology.md`.
 
@@ -331,7 +334,7 @@ The split is intentional: authority/fund lifecycle, configuration behavior, hand
 
 The R28 snapshot measured runtime bytecode at 21,081 bytes for `DcaManager`, 24,243 for `SovrynErc20HandlerDex`, and 24,366 for `TropykusErc20HandlerDex` — unoptimized, like every figure recorded before #104 ([Measurement basis](./README.md#measurement-basis)). R30 changed those numbers; R31 must re-measure actual base/head sizes rather than carrying the snapshot forward as a promise.
 
-Deliberate non-candidates remain excluded: do not merge `TokenLending` into `LendingErc20Handler`, absorb Idle into the lending base, add speculative adapter layers, or introduce proxies, delegatecall, owner rescue, or a withdrawal `to` parameter.
+Deliberate non-candidates remain excluded (the `TokenLending` merge was reopened and shipped by [R95](./R95-merge-token-lending.md) on 2026-09-27): do not merge `TokenLending` into `LendingErc20Handler`, absorb Idle into the lending base, add speculative adapter layers, or introduce proxies, delegatecall, owner rescue, or a withdrawal `to` parameter.
 
 ### PR 23 - R33 Uniswap slippage validation
 
@@ -1319,6 +1322,31 @@ the canvas closed leftovers (Idle fold, shared scale, purchase slot-0 further co
 OperationsAdmin view, Uniswap path `calldata`, `BitChillOwnable` off `FeeHandler`). Ask: none
 (locked 2026-09-27).
 
+### R95 - merge `TokenLending`, rename the lending base, and source-order cleanups ([spec](./R95-merge-token-lending.md))
+
+After R94, before relaunch deploy. Delete `TokenLending`; `LendingHandler is TokenHandler,
+ILendingHandler` (formerly `LendingErc20Handler` / `ITokenLending`) holds the scale immutable (now
+explicitly `internal`) and both conversion helpers. Errors and events take the `LendingHandler__` prefix;
+`bitchill-monitoring` follows up. Also the `PurchaseRbtc` `///` slip, constants → immutables → storage in
+`PurchaseUniswap` and `FeeHandler`, and relative `src/` imports. Runtime identical on both profiles up
+to the renamed topics and selectors. Records the verdict on every
+candidate from the 2026-09-27 review of PRs 138–160. Ask: none (decided 2026-09-27).
+
+### R96 - `ceilDiv` share conversion and one route-class getter ([spec](./R96-ceildiv-and-one-route-class-getter.md))
+
+After R95, before relaunch deploy. `_stablecoinToShares` uses a checked `ceilDiv` (equivalent at every
+reachable input; about −1,000 per 10-row lending batch under deploy). `OperationsAdmin.isLendingRoute`
+is removed; `DcaManager` compares `getRouteClass` itself. Ask: none (decided 2026-09-27).
+
+### R97 - redeem lending exits straight to the user ([spec](./R97-redeem-lending-exits-to-user.md))
+
+After R96, before relaunch deploy. Principal and interest exits redeem with the user as receiver and
+measure the user's balance; batch funding still redeems onto the handler. **Closed 2026-09-27 without
+merging** ([#163](https://github.com/BitChillRSK/dca-contracts/pull/163)); see the spec's **Closed** section. As proposed: `TokenHandler._withdrawToken`
+becomes abstract and idle keeps the transfer body. About −15,000 Rootstock gas per lending exit and
+−28,000 on `withdrawTokenAndInterest`. Reverses R28's PR 19 "always redeem onto the handler" and R21's
+recipient-side measurement note. Ask: none.
+
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:
@@ -1326,7 +1354,8 @@ There is no optional-late queue. Items either have an ordered spec above or are 
 - **R88 shared exchange-rate scale declaration — rejected 2026-09-26.** A shared field would remain
   named `i_exchangeRateDecimals`; exposing that changes the getter ABI, and keeping a separate
   `EXCHANGE_RATE_DECIMALS()` undermines consolidation. Measured stripped size also grew on every
-  lending leaf. Adapter-local constants and `TokenLending.i_exchangeRateDecimals` stay. See
+  lending leaf. Adapter-local constants and the `i_exchangeRateDecimals` immutable (on
+  `LendingHandler` since [R95](./R95-merge-token-lending.md)) stay. See
   [R88](./R88-post-r87-structural-cleanups.md#verdicts-2026-09-26). Reaffirmed 2026-09-27 under
   [R94](./R94-dcamanager-store-before-pull.md#closed-decisions-2026-09-27).
 
@@ -1365,6 +1394,17 @@ There is no optional-late queue. Items either have an ordered spec above or are 
   swapper's row order. Reasons, measurements, and reopen conditions:
   [R79](./R79-coalesce-repeated-buyer-writes.md); code at the tag
   [`archive/r79-coalesced-writes`](https://github.com/BitChillRSK/dca-contracts/tree/archive/r79-coalesced-writes).
+- **R97 redeem lending exits straight to the user — closed 2026-09-27 without merging.** Implemented,
+  measured, and green in [#163](https://github.com/BitChillRSK/dca-contracts/pull/163): ≈ −15,000
+  Rootstock gas per lending exit, ≈ −27,500 on `withdrawTokenAndInterest`. The saving is user-paid and
+  off the purchase path, so it had to simplify the code, and it does the opposite: `_protocolRedeem`
+  regains the `receiver` parameter R28 removed (a mode every adapter implements), Tropykus needs a
+  measure-and-forward branch, the withdraw event moves from the base into each subclass, and exits
+  measure the user's balance instead of the handler's. Do not re-propose a recipient on the redeem hook
+  (Sovryn `burn(user)`, LayerBank `withdraw(..., user)`, or any variant) for gas. Reopen only if exits
+  become protocol-paid, or if a correctness change needs the recipient anyway. Reasons and
+  measurements: [R97](./R97-redeem-lending-exits-to-user.md); code on the branch
+  `perf/r97-redeem-exits-to-user`.
 - **SPDX change — reopened 2026-08-31, answered 2026-09-07.** The earlier rejection argued that re-licensing "requires an explicit legal/product process outside the contract implementation stack" and then closed the decision on that basis, which is self-defeating: that is a reason to route the question to a human, not to answer it. See **Licensing — decided**.
 
 ## Licensing — decided

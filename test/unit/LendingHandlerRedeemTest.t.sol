@@ -2,36 +2,36 @@
 pragma solidity 0.8.36;
 
 import {Test, Vm} from "forge-std/Test.sol";
-import {LendingErc20Handler} from "src/LendingErc20Handler.sol";
+import {LendingHandler} from "src/LendingHandler.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
-import {ITokenLending} from "src/interfaces/ITokenLending.sol";
+import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
 import {MockStablecoin} from "../mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../Constants.sol";
 
 /**
- * @title LendingErc20HandlerRedeemTest
+ * @title LendingHandlerRedeemTest
  * @notice Base-level regressions for `_redeemShares`: the per-user share clamp (R21) and the
  *         positive-share zero-payout revert (PR 63 review; R15 dust stays deferred).
  */
-contract LendingErc20HandlerRedeemTest is Test {
-    event TokenLending__AmountToRedeemAdjusted(
+contract LendingHandlerRedeemTest is Test {
+    event LendingHandler__AmountToRedeemAdjusted(
         address indexed user,
         uint256 originalSharesAmount,
         uint256 adjustedSharesAmount,
         uint256 originalStablecoinAmount,
         uint256 adjustedStablecoinAmount
     );
-    event TokenLending__SharesRedeemed(address indexed user, uint256 underlyingAmount, uint256 sharesAmountRedeemed);
-    event TokenLending__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares);
+    event LendingHandler__SharesRedeemed(address indexed user, uint256 underlyingAmount, uint256 sharesAmountRedeemed);
+    event LendingHandler__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares);
 
     uint256 internal constant RATE_SCALE = 1e18;
     uint256 internal constant USER_A_DEPOSIT = 100 ether;
     uint256 internal constant USER_B_DEPOSIT = 50 ether;
     uint256 internal constant OVERSTATED_REQUEST = 1000 ether;
 
-    LendingErc20HandlerHarness internal harness;
+    LendingHandlerHarness internal harness;
     MockStablecoin internal stablecoin;
     address internal userA = address(0xA11CE);
     address internal userB = address(0xB0B);
@@ -39,7 +39,7 @@ contract LendingErc20HandlerRedeemTest is Test {
     function setUp() public {
         stablecoin = new MockStablecoin(address(this));
         // dcaManager = this, so tests can call onlyDcaManager entry points directly
-        harness = new LendingErc20HandlerHarness(address(this), address(stablecoin));
+        harness = new LendingHandlerHarness(address(this), address(stablecoin));
 
         stablecoin.mint(userA, USER_A_DEPOSIT);
         stablecoin.mint(userB, USER_B_DEPOSIT);
@@ -61,7 +61,7 @@ contract LendingErc20HandlerRedeemTest is Test {
         assertGt(requestedShares, userAShares);
 
         vm.expectEmit(true, true, true, true, address(harness));
-        emit TokenLending__AmountToRedeemAdjusted(
+        emit LendingHandler__AmountToRedeemAdjusted(
             userA, requestedShares, userAShares, OVERSTATED_REQUEST, adjustedStablecoin
         );
 
@@ -151,8 +151,8 @@ contract LendingErc20HandlerRedeemTest is Test {
         assertGt(received, 0);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 sharesRedeemedTopic = TokenLending__SharesRedeemed.selector;
-        bytes32 batchTopic = ITokenLending.TokenLending__SharesRedeemedBatch.selector;
+        bytes32 sharesRedeemedTopic = LendingHandler__SharesRedeemed.selector;
+        bytes32 batchTopic = ILendingHandler.LendingHandler__SharesRedeemedBatch.selector;
         bool sawBatch;
         for (uint256 i; i < logs.length; ++i) {
             assertTrue(logs[i].topics[0] != sharesRedeemedTopic, "SharesRedeemed must not fire on batch");
@@ -237,7 +237,7 @@ contract LendingErc20HandlerRedeemTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                ITokenLending.TokenLending__InsufficientShares.selector,
+                ILendingHandler.LendingHandler__InsufficientShares.selector,
                 userA,
                 _stablecoinToSharesUp(amounts[0], RATE_SCALE),
                 sharesA
@@ -285,8 +285,8 @@ contract LendingErc20HandlerRedeemTest is Test {
 
     function _assertNoShareMutationEvents() private {
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 sharesRedeemedTopic = TokenLending__SharesRedeemed.selector;
-        bytes32 sharesUpdatedTopic = TokenLending__UserSharesUpdated.selector;
+        bytes32 sharesRedeemedTopic = LendingHandler__SharesRedeemed.selector;
+        bytes32 sharesUpdatedTopic = LendingHandler__UserSharesUpdated.selector;
         for (uint256 i; i < logs.length; ++i) {
             assertTrue(logs[i].topics[0] != sharesRedeemedTopic, "SharesRedeemed emitted on a zero-share no-op");
             assertTrue(logs[i].topics[0] != sharesUpdatedTopic, "UserSharesUpdated emitted on a zero-share no-op");
@@ -295,7 +295,7 @@ contract LendingErc20HandlerRedeemTest is Test {
 
     function _replayUserShares(address a, address b) private returns (uint256 sharesA, uint256 sharesB) {
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 sig = TokenLending__UserSharesUpdated.selector;
+        bytes32 sig = LendingHandler__UserSharesUpdated.selector;
         for (uint256 i; i < logs.length; ++i) {
             if (logs[i].topics[0] != sig) continue;
             address user = address(uint160(uint256(logs[i].topics[1])));
@@ -307,7 +307,7 @@ contract LendingErc20HandlerRedeemTest is Test {
 
     function _assertSequentialShareDebits(uint256 start, uint256 firstDebit, uint256 secondDebit) private {
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 sig = TokenLending__UserSharesUpdated.selector;
+        bytes32 sig = LendingHandler__UserSharesUpdated.selector;
         uint256 seen;
         for (uint256 i; i < logs.length; ++i) {
             if (logs[i].topics[0] != sig) continue;
@@ -328,7 +328,7 @@ contract LendingErc20HandlerRedeemTest is Test {
 
     function _assertLastUserSharesUpdated(address expectedUser, uint256 previousShares, uint256 newShares) private {
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 sig = TokenLending__UserSharesUpdated.selector;
+        bytes32 sig = LendingHandler__UserSharesUpdated.selector;
         bool found;
         for (uint256 i; i < logs.length; ++i) {
             if (logs[i].topics[0] != sig) continue;
@@ -339,7 +339,7 @@ contract LendingErc20HandlerRedeemTest is Test {
             assertEq(next, newShares);
             found = true;
         }
-        assertTrue(found, "TokenLending__UserSharesUpdated not emitted");
+        assertTrue(found, "LendingHandler__UserSharesUpdated not emitted");
     }
 
     function test_redeemShares_dustReportsRedeemedSharesAndRollsBack() public {
@@ -353,7 +353,7 @@ contract LendingErc20HandlerRedeemTest is Test {
         assertEq(bookBefore, 1);
         assertEq(bookBefore * 1 / RATE_SCALE, 0);
 
-        vm.expectRevert(abi.encodeWithSelector(ITokenLending.TokenLending__ZeroStablecoinReceived.selector, 1));
+        vm.expectRevert(abi.encodeWithSelector(ILendingHandler.LendingHandler__ZeroStablecoinReceived.selector, 1));
         harness.redeemShares(userA, 1);
 
         assertEq(harness.getUserShares(userA), bookBefore);
@@ -382,7 +382,7 @@ contract LendingErc20HandlerRedeemTest is Test {
         assertTrue(expectedShares != amounts[0] + amounts[1], "test must separate share and stablecoin units");
 
         vm.expectRevert(
-            abi.encodeWithSelector(ITokenLending.TokenLending__ZeroStablecoinReceived.selector, expectedShares)
+            abi.encodeWithSelector(ILendingHandler.LendingHandler__ZeroStablecoinReceived.selector, expectedShares)
         );
         harness.batchRetrieveStablecoin(users, amounts);
 
@@ -428,7 +428,10 @@ contract LendingErc20HandlerRedeemTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                ITokenLending.TokenLending__ShareConsumptionMismatch.selector, intended, protocolBefore, afterPartial
+                ILendingHandler.LendingHandler__ShareConsumptionMismatch.selector,
+                intended,
+                protocolBefore,
+                afterPartial
             )
         );
         harness.redeemShares(userA, redeemAmount);
@@ -458,7 +461,7 @@ contract LendingErc20HandlerRedeemTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                ITokenLending.TokenLending__ShareConsumptionMismatch.selector,
+                ILendingHandler.LendingHandler__ShareConsumptionMismatch.selector,
                 intended,
                 protocolBefore,
                 protocolBefore - intended / 2
@@ -496,7 +499,7 @@ contract LendingErc20HandlerRedeemTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                ITokenLending.TokenLending__ShareConsumptionMismatch.selector,
+                ILendingHandler.LendingHandler__ShareConsumptionMismatch.selector,
                 intended,
                 protocolBefore,
                 protocolBefore - (intended + 1)
@@ -517,7 +520,7 @@ contract LendingErc20HandlerRedeemTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                ITokenLending.TokenLending__ShareConsumptionMismatch.selector,
+                ILendingHandler.LendingHandler__ShareConsumptionMismatch.selector,
                 intended,
                 protocolBefore,
                 protocolBefore + 1
@@ -586,11 +589,11 @@ contract LendingErc20HandlerRedeemTest is Test {
 }
 
 /**
- * @notice Minimal LendingErc20Handler: 1:1 mint at the current rate, optional silent-zero redeem.
+ * @notice Minimal LendingHandler: 1:1 mint at the current rate, optional silent-zero redeem.
  * @dev `dcaManager` is the test contract. Protocol shares live on this mock so a reverted redeem
  *      can be shown to leave both the book and the protocol-side count unchanged.
  */
-contract LendingErc20HandlerHarness is LendingErc20Handler {
+contract LendingHandlerHarness is LendingHandler {
     using SafeERC20 for IERC20;
 
     uint256 public exchangeRate = 1e18;
@@ -604,7 +607,7 @@ contract LendingErc20HandlerHarness is LendingErc20Handler {
     bool public revertOnRedeem;
 
     constructor(address dcaManagerAddress, address stableTokenAddress)
-        LendingErc20Handler(dcaManagerAddress, stableTokenAddress, 1e18)
+        LendingHandler(dcaManagerAddress, stableTokenAddress, 1e18)
     {}
 
     function setExchangeRate(uint256 rate) external {

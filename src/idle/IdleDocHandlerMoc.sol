@@ -2,7 +2,7 @@
 pragma solidity 0.8.36;
 
 import {IdleErc20Handler} from "./IdleErc20Handler.sol";
-import {PurchaseMoc} from "src/PurchaseMoc.sol";
+import {PurchaseMoc} from "../PurchaseMoc.sol";
 
 /**
  * @title IdleDocHandlerMoc
