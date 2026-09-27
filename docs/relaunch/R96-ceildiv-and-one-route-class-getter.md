@@ -6,11 +6,12 @@ Status: **implemented** · GitHub [#162](https://github.com/BitChillRSK/dca-cont
 
 This PR makes two gas and redundancy edits, each proven equivalent at every reachable input:
 
-1. `LendingErc20Handler._stablecoinToShares` computes
+1. `LendingHandler._stablecoinToShares` computes
    `Math.ceilDiv(stablecoinAmount * i_exchangeRateDecimals, exchangeRate)` instead of
    `Math.mulDiv(stablecoinAmount, i_exchangeRateDecimals, exchangeRate, Math.Rounding.Ceil)`.
 2. `OperationsAdmin.isLendingRoute` is deleted. It returns `getRouteClass(i) == Lending`, and its
-   one production caller, `DcaManager._tokenYieldsInterest`, now makes that comparison itself.
+   one production caller, `DcaManager._tokenYieldsInterest`, now makes that comparison itself, and is
+   renamed `_isLendingRoute` (its reverting twin `_checkTokenYieldsInterest` becomes `_checkLendingRoute`).
 
 ## Background
 
@@ -57,6 +58,17 @@ Only `getRouteClass` separates an unregistered index from an idle one, and the d
 
 The review first rejected removing it as ABI churn. The human reopened it on 2026-09-27 as redundant
 code, and measurement then showed it is cheaper too.
+
+### Naming the private helper
+
+The human asked on 2026-09-27 whether `_tokenYieldsInterest` should become `_tokenIsLent` or
+`_isTokenLent`. The `is…` prefix is the right form for a boolean. The subject, though, is the route:
+the function takes a route index, ignores the token, and asks `OperationsAdmin` for the route's class.
+So it is `_isLendingRoute(routeIndex)`, the same question the deleted external view answered, now asked
+privately. The reverting form is `_checkLendingRoute(token, routeIndex)`.
+
+`DcaManager__TokenDoesNotYieldInterest(token)` keeps its name. It is what a user sees, and it describes
+the user's outcome, not the helper's check: that token earns no interest on that route.
 
 ### Prototype measurements (2026-09-27)
 
@@ -117,8 +129,9 @@ The consumer check found no caller. GitHub code search over every `BitChillRSK` 
 - [x] `_stablecoinToShares` uses `Math.ceilDiv(stablecoinAmount * i_exchangeRateDecimals, exchangeRate)`.
       Its `@dev` states the reachable bound and that an overflow reverts.
 - [x] Delete `isLendingRoute` from `IOperationsAdmin` and `OperationsAdmin`.
-      `DcaManager._tokenYieldsInterest` returns
-      `i_operationsAdmin.getRouteClass(routeIndex) == IOperationsAdmin.RouteClass.Lending`.
+      `DcaManager._tokenYieldsInterest`, renamed `_isLendingRoute`, returns
+      `i_operationsAdmin.getRouteClass(routeIndex) == IOperationsAdmin.RouteClass.Lending`;
+      `_checkTokenYieldsInterest` becomes `_checkLendingRoute`.
 - [x] Tests:
   - Delete `isLendingRoute` assertions that duplicate an adjacent `getRouteClass` assertion.
   - Convert the rest to `getRouteClass` with the exact class (`Idle` or `Unregistered`, not
@@ -131,11 +144,11 @@ The consumer check found no caller. GitHub code search over every `BitChillRSK` 
 
 - [ ] Changing `_sharesToStablecoin`, or any other `mulDiv` site.
 - [ ] Any other `OperationsAdmin` view. R84 keeps `getTokenHandler` and `areDepositsPaused` separate.
-- [ ] Renaming `_tokenYieldsInterest` / `_checkTokenYieldsInterest`.
+- [ ] Renaming `DcaManager__TokenDoesNotYieldInterest`.
 
 ## Files likely touched
 
-- `src/LendingErc20Handler.sol`
+- `src/LendingHandler.sol`
 - `src/OperationsAdmin.sol`, `src/interfaces/IOperationsAdmin.sol`, `src/DcaManager.sol`
 - Tests that call `isLendingRoute`:
   - `test/unit/`: `OperationsAdminTest`, `WithdrawAllRoutePairsTest`,
@@ -144,14 +157,14 @@ The consumer check found no caller. GitHub code search over every `BitChillRSK` 
   - `test/gas/R89ReviewCandidatesGas`;
   - `test/ai-generated/unit/`: `GettersTest`, `RoleSecurityTest`, `idle/IdleDcaManagerTest`,
     `layerbank/LayerBankDcaManagerTest`.
-- The conversion test's home: `test/unit/LendingErc20HandlerRedeemTest.t.sol`'s harness exposes the helper.
+- The conversion test's home: `test/unit/LendingHandlerRedeemTest.t.sol`'s harness exposes the helper.
 - `docs/relaunch/R96-ceildiv-and-one-route-class-getter.md`, `README.md`, `IMPLEMENTATION_ORDER.md`
 
 ## Required tests
 
 ```text
 SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=DOC \
-  forge test --match-path test/unit/LendingErc20HandlerRedeemTest.t.sol -vv
+  forge test --match-path test/unit/LendingHandlerRedeemTest.t.sol -vv
 make check
 make fork-sovryn
 make fork-tropykus

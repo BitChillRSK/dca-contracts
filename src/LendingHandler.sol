@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
-import {ITokenLending} from "./interfaces/ITokenLending.sol";
+import {ILendingHandler} from "./interfaces/ILendingHandler.sol";
 import {TokenHandler} from "./TokenHandler.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
- * @title LendingErc20Handler
+ * @title LendingHandler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Shared per-user share accounting, share ↔ stablecoin conversion, withdraw clamp,
  *         interest, and exact-sum batch redeem for lending handlers. Protocol adapters implement
  *         the exchange-rate and mint/redeem hooks.
  */
-abstract contract LendingErc20Handler is TokenHandler, ITokenLending {
+abstract contract LendingHandler is TokenHandler, ILendingHandler {
     using SafeERC20 for IERC20;
 
     /*//////////////////////////////////////////////////////////////
@@ -45,7 +45,7 @@ abstract contract LendingErc20Handler is TokenHandler, ITokenLending {
                            EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc ITokenLending
+    /// @inheritdoc ILendingHandler
     function withdrawInterest(address user, uint256 stablecoinLockedInDcaSchedules) external override onlyDcaManager {
         uint256 exchangeRate = _exchangeRate();
         uint256 usersShares = s_shares[user];
@@ -58,10 +58,10 @@ abstract contract LendingErc20Handler is TokenHandler, ITokenLending {
             stablecoinInterestAmount = totalStablecoinInLending - stablecoinLockedInDcaSchedules;
         }
         uint256 stablecoinReceived = _redeemShares(user, usersShares, stablecoinInterestAmount, exchangeRate);
-        emit TokenLending__InterestWithdrawn(user, address(i_stableToken), stablecoinReceived);
+        emit LendingHandler__InterestWithdrawn(user, address(i_stableToken), stablecoinReceived);
     }
 
-    /// @inheritdoc ITokenLending
+    /// @inheritdoc ILendingHandler
     function getAccruedInterest(address user, uint256 stablecoinLockedInDcaSchedules)
         external
         override
@@ -71,7 +71,7 @@ abstract contract LendingErc20Handler is TokenHandler, ITokenLending {
         return _accruedInterest(user, stablecoinLockedInDcaSchedules, _exchangeRate());
     }
 
-    /// @inheritdoc ITokenLending
+    /// @inheritdoc ILendingHandler
     function restoreLendingApproval() external override {
         _approveLendingSpender();
     }
@@ -80,12 +80,12 @@ abstract contract LendingErc20Handler is TokenHandler, ITokenLending {
                                 GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc ITokenLending
+    /// @inheritdoc ILendingHandler
     function getUserShares(address user) external view override returns (uint256) {
         return s_shares[user];
     }
 
-    /// @inheritdoc ITokenLending
+    /// @inheritdoc ILendingHandler
     function quoteAccruedInterest(address user, uint256 stablecoinLockedInDcaSchedules)
         external
         view
@@ -96,9 +96,9 @@ abstract contract LendingErc20Handler is TokenHandler, ITokenLending {
         return _accruedInterest(user, stablecoinLockedInDcaSchedules, _viewExchangeRate());
     }
 
-    /// @dev Advertise `ITokenHandler` (via TokenHandler) and `ITokenLending`.
+    /// @dev Advertise `ITokenHandler` (via TokenHandler) and `ILendingHandler`.
     function supportsInterface(bytes4 interfaceID) public view virtual override returns (bool) {
-        return interfaceID == type(ITokenLending).interfaceId || super.supportsInterface(interfaceID);
+        return interfaceID == type(ILendingHandler).interfaceId || super.supportsInterface(interfaceID);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -117,7 +117,7 @@ abstract contract LendingErc20Handler is TokenHandler, ITokenLending {
     function _depositToken(address user, uint256 depositAmount) internal virtual override {
         super._depositToken(user, depositAmount);
         uint256 mintedAmount = _protocolDeposit(depositAmount);
-        if (mintedAmount == 0) revert TokenLending__LendingProtocolDepositFailed();
+        if (mintedAmount == 0) revert LendingHandler__LendingProtocolDepositFailed();
         uint256 previousShares = s_shares[user];
         _setUserShares(user, previousShares, previousShares + mintedAmount);
     }
@@ -138,7 +138,7 @@ abstract contract LendingErc20Handler is TokenHandler, ITokenLending {
         uint256 totalStablecoinInLending = _sharesToStablecoin(usersShares, exchangeRate);
 
         if (totalStablecoinInLending < withdrawalAmount) {
-            emit TokenLending__WithdrawalAmountAdjusted(user, withdrawalAmount, totalStablecoinInLending);
+            emit LendingHandler__WithdrawalAmountAdjusted(user, withdrawalAmount, totalStablecoinInLending);
             withdrawalAmount = totalStablecoinInLending;
         }
 
@@ -164,7 +164,7 @@ abstract contract LendingErc20Handler is TokenHandler, ITokenLending {
             uint256 oldStablecoinAmount = stablecoinAmount;
             sharesToRedeem = usersShares;
             stablecoinAmount = _sharesToStablecoin(sharesToRedeem, exchangeRate);
-            emit TokenLending__AmountToRedeemAdjusted(
+            emit LendingHandler__AmountToRedeemAdjusted(
                 user, oldSharesToRedeem, sharesToRedeem, oldStablecoinAmount, stablecoinAmount
             );
         }
@@ -176,9 +176,9 @@ abstract contract LendingErc20Handler is TokenHandler, ITokenLending {
         }
         stablecoinReceived = _measuredProtocolRedeem(sharesToRedeem, exchangeRate, user);
         if (stablecoinReceived == 0) {
-            revert TokenLending__ZeroStablecoinReceived(sharesToRedeem);
+            revert LendingHandler__ZeroStablecoinReceived(sharesToRedeem);
         }
-        emit TokenLending__SharesRedeemed(user, stablecoinReceived, sharesToRedeem);
+        emit LendingHandler__SharesRedeemed(user, stablecoinReceived, sharesToRedeem);
     }
 
     /**
@@ -203,7 +203,7 @@ abstract contract LendingErc20Handler is TokenHandler, ITokenLending {
             uint256 usersSharesToRedeem = _stablecoinToShares(purchaseAmounts[i], exchangeRate);
             uint256 usersShares = s_shares[users[i]];
             if (usersSharesToRedeem > usersShares) {
-                revert TokenLending__InsufficientShares(users[i], usersSharesToRedeem, usersShares);
+                revert LendingHandler__InsufficientShares(users[i], usersSharesToRedeem, usersShares);
             }
             unchecked {
                 _setUserShares(users[i], usersShares, usersShares - usersSharesToRedeem);
@@ -216,10 +216,10 @@ abstract contract LendingErc20Handler is TokenHandler, ITokenLending {
         }
         uint256 stablecoinReceived = _measuredProtocolRedeem(totalSharesToRedeem, exchangeRate, address(this));
         if (stablecoinReceived > 0) {
-            emit TokenLending__SharesRedeemedBatch(stablecoinReceived, totalSharesToRedeem);
+            emit LendingHandler__SharesRedeemedBatch(stablecoinReceived, totalSharesToRedeem);
             return stablecoinReceived;
         }
-        revert TokenLending__ZeroStablecoinReceived(totalSharesToRedeem);
+        revert LendingHandler__ZeroStablecoinReceived(totalSharesToRedeem);
     }
 
     /**
@@ -325,7 +325,7 @@ abstract contract LendingErc20Handler is TokenHandler, ITokenLending {
     function _setUserShares(address user, uint256 previousShares, uint256 newShares) private {
         s_shares[user] = newShares;
         if (previousShares != newShares) {
-            emit TokenLending__UserSharesUpdated(user, previousShares, newShares);
+            emit LendingHandler__UserSharesUpdated(user, previousShares, newShares);
         }
     }
 
@@ -345,7 +345,7 @@ abstract contract LendingErc20Handler is TokenHandler, ITokenLending {
         _protocolRedeem(sharesAmount, exchangeRate, receiver);
         uint256 sharesAfter = _receiptSharesBalance();
         if (sharesAfter >= sharesBefore || sharesBefore - sharesAfter != sharesAmount) {
-            revert TokenLending__ShareConsumptionMismatch(sharesAmount, sharesBefore, sharesAfter);
+            revert LendingHandler__ShareConsumptionMismatch(sharesAmount, sharesBefore, sharesAfter);
         }
         received = i_stableToken.balanceOf(receiver) - stablecoinBalanceBefore;
     }

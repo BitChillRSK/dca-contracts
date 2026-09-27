@@ -19,7 +19,7 @@ contract RedeemToUserTest is DcaDappTest {
     bytes32 private constant TRANSFER_TOPIC = keccak256("Transfer(address,address,uint256)");
     bytes32 private constant TOKEN_WITHDRAWN_TOPIC = keccak256("TokenHandler__TokenWithdrawn(address,address,uint256)");
     bytes32 private constant INTEREST_WITHDRAWN_TOPIC =
-        keccak256("TokenLending__InterestWithdrawn(address,address,uint256)");
+        keccak256("LendingHandler__InterestWithdrawn(address,address,uint256)");
 
     function testWithdrawTokenPaysTheUserStraightFromTheMarket() external onlyLendingLane {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);

@@ -8,7 +8,7 @@ import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
 import {ITokenHandler} from "../../../src/interfaces/ITokenHandler.sol";
 import {IPurchaseRbtc} from "../../../src/interfaces/IPurchaseRbtc.sol";
 import {IPurchaseUniswap} from "../../../src/interfaces/IPurchaseUniswap.sol";
-import {ITokenLending} from "../../../src/interfaces/ITokenLending.sol";
+import {ILendingHandler} from "../../../src/interfaces/ILendingHandler.sol";
 import {ICoinPairPrice} from "../../../src/interfaces/ICoinPairPrice.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {PurchaseUniswap} from "../../../src/PurchaseUniswap.sol";
@@ -216,8 +216,8 @@ contract GettersTest is DcaDappTest {
             IERC165(address(stablecoinHandler)).supportsInterface(type(ITokenHandler).interfaceId);
         assertTrue(supportsTokenHandler);
 
-        bool supportsLending = IERC165(address(stablecoinHandler)).supportsInterface(type(ITokenLending).interfaceId);
-        assertEq(supportsLending, isLendingLane, "lending handlers advertise ITokenLending; idle must not");
+        bool supportsLending = IERC165(address(stablecoinHandler)).supportsInterface(type(ILendingHandler).interfaceId);
+        assertEq(supportsLending, isLendingLane, "lending handlers advertise ILendingHandler; idle must not");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -268,34 +268,34 @@ contract GettersTest is DcaDappTest {
                         TOKEN LENDING GETTERS TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_tokenLending_getUserShares() public {
+    function test_lendingHandler_getUserShares() public {
         if (s_routeIndex > 0) {
-            uint256 balance = ITokenLending(address(stablecoinHandler)).getUserShares(USER);
+            uint256 balance = ILendingHandler(address(stablecoinHandler)).getUserShares(USER);
             assertGe(balance, 0);
         }
     }
 
-    function test_tokenLending_getAccruedInterest() public {
+    function test_lendingHandler_getAccruedInterest() public {
         if (s_routeIndex > 0) {
             vm.prank(address(dcaManager));
-            uint256 interest = ITokenLending(address(stablecoinHandler)).getAccruedInterest(USER, AMOUNT_TO_DEPOSIT);
+            uint256 interest = ILendingHandler(address(stablecoinHandler)).getAccruedInterest(USER, AMOUNT_TO_DEPOSIT);
             assertGe(interest, 0);
         }
     }
 
     /// @dev The quote is DcaManager-only like its sibling, and never reports more than the figure a
     ///      top-up is bounded by — the ordering the pair relies on, checked on every lending lane.
-    function test_tokenLending_quoteAccruedInterest() public {
+    function test_lendingHandler_quoteAccruedInterest() public {
         if (s_routeIndex == 0) return;
 
         vm.prank(address(dcaManager));
-        uint256 quoted = ITokenLending(address(stablecoinHandler)).quoteAccruedInterest(USER, AMOUNT_TO_DEPOSIT);
+        uint256 quoted = ILendingHandler(address(stablecoinHandler)).quoteAccruedInterest(USER, AMOUNT_TO_DEPOSIT);
         vm.prank(address(dcaManager));
-        uint256 spendable = ITokenLending(address(stablecoinHandler)).getAccruedInterest(USER, AMOUNT_TO_DEPOSIT);
+        uint256 spendable = ILendingHandler(address(stablecoinHandler)).getAccruedInterest(USER, AMOUNT_TO_DEPOSIT);
         assertLe(quoted, spendable, "the quote ran ahead of what a top-up would accept");
 
         vm.expectRevert(IDcaManagerAccessControl.DcaManagerAccessControl__OnlyDcaManagerCanCall.selector);
-        ITokenLending(address(stablecoinHandler)).quoteAccruedInterest(USER, AMOUNT_TO_DEPOSIT);
+        ILendingHandler(address(stablecoinHandler)).quoteAccruedInterest(USER, AMOUNT_TO_DEPOSIT);
     }
 
     /*//////////////////////////////////////////////////////////////

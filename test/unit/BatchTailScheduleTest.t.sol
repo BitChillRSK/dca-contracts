@@ -7,7 +7,7 @@ import {IdleDocHandlerMoc} from "src/idle/IdleDocHandlerMoc.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockIsusdToken} from "test/mocks/MockIsusdToken.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
-import {ITokenLending} from "src/interfaces/ITokenLending.sol";
+import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import "test/Constants.sol";
 import {NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
@@ -18,12 +18,12 @@ import {NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
  *
  * @dev **This documents a known rough edge, not a desired property. R43 decided to keep it.**
  *
- * `LendingErc20Handler._stablecoinToShares` rounds the share debit **up** (deliberately: the per-user share
+ * `LendingHandler._stablecoinToShares` rounds the share debit **up** (deliberately: the per-user share
  * book must never drift above the shares the handler actually holds), while `depositToken` credits the
  * floor-rounded amount the lending protocol actually minted. So whenever the exchange rate does not
  * divide the deposit evenly — i.e. essentially always in production — spending the full remaining
  * balance asks for one more share than the user owns, and `_batchRetrieveStablecoin` reverts with
- * `TokenLending__InsufficientShares` rather than clamping.
+ * `LendingHandler__InsufficientShares` rather than clamping.
  *
  * Two consequences worth keeping visible:
  *   1. No draining loop is needed. A single purchase of the exact remaining balance is already short.
@@ -107,7 +107,7 @@ contract BatchTailScheduleTest is Test {
         uint256 aliceShares = lendingHandler.getUserShares(ALICE);
         vm.expectRevert(
             abi.encodeWithSelector(
-                ITokenLending.TokenLending__InsufficientShares.selector, ALICE, aliceShares + 1, aliceShares
+                ILendingHandler.LendingHandler__InsufficientShares.selector, ALICE, aliceShares + 1, aliceShares
             )
         );
         lendingHandler.batchBuyRbtc(_one(ALICE), _oneId(1), _one(ALICE_DEPOSIT), NO_MIN_RBTC_OUT);
@@ -135,7 +135,7 @@ contract BatchTailScheduleTest is Test {
         uint256 bobShares = lendingHandler.getUserShares(BOB);
         vm.expectRevert(
             abi.encodeWithSelector(
-                ITokenLending.TokenLending__InsufficientShares.selector, ALICE, aliceShares + 1, aliceShares
+                ILendingHandler.LendingHandler__InsufficientShares.selector, ALICE, aliceShares + 1, aliceShares
             )
         );
         lendingHandler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT);

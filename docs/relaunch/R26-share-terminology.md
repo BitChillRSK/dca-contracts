@@ -52,7 +52,7 @@ Keep **stablecoin** as the asset noun. Do not adopt ERC-4626's `assets` — that
 
 **Explicitly keep** — "lending" is a fine domain word; only "lending *token*" is wrong:
 
-- `ITokenLending`, `TokenLending`, `TokenLending__` event prefix
+- `ITokenLending`, `TokenLending`, `TokenLending__` event prefix *(2026-09-27: [R95](./R95-merge-token-lending.md) merged `TokenLending` into the lending base and renamed the pair `ILendingHandler` / `LendingHandler`, prefix `LendingHandler__`. "Lending" stays.)*
 - `TokenLending__LendingProtocolDepositFailed` / `…RedeemFailed`
 - `LENDING_PROTOCOL`, `EXPECTED_LENDING_PROTOCOL`, `make moc-*` / `fork-*` lane names. (R35 later renamed DcaManager/test `lendingProtocolIndex` / `s_lendingProtocolIndex` to `routeIndex` / `s_routeIndex`; the env-var lane names stay.)
 

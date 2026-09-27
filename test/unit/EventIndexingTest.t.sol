@@ -3,7 +3,7 @@ pragma solidity 0.8.36;
 
 import {Vm} from "forge-std/Test.sol";
 import {DcaDappTest} from "./DcaDappTest.t.sol";
-import {ITokenLending} from "src/interfaces/ITokenLending.sol";
+import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import "../Constants.sol";
 import {scheduleIdAt} from "test/utils/ScheduleAt.sol";
@@ -14,7 +14,7 @@ import {scheduleIdAt} from "test/utils/ScheduleAt.sol";
  *         transitions replay to `getUserShares`; a non-zero purchase fee pays the collector via ERC-20 `Transfer`.
  */
 contract EventIndexingTest is DcaDappTest {
-    event TokenLending__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares);
+    event LendingHandler__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares);
     event Transfer(address indexed from, address indexed to, uint256 value);
 
     bytes32 private constant OWNERSHIP_TRANSFERRED = keccak256("OwnershipTransferred(address,address)");
@@ -31,7 +31,7 @@ contract EventIndexingTest is DcaDappTest {
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         uint256 replayed = _latestUserShares(logs, USER);
-        assertEq(replayed, ITokenLending(address(stablecoinHandler)).getUserShares(USER));
+        assertEq(replayed, ILendingHandler(address(stablecoinHandler)).getUserShares(USER));
         assertGt(replayed, 0);
         _assertFirstPartyIndexing(logs);
     }
@@ -42,7 +42,7 @@ contract EventIndexingTest is DcaDappTest {
         }
         vm.recordLogs();
         depositStablecoin();
-        bytes32 sig = TokenLending__UserSharesUpdated.selector;
+        bytes32 sig = LendingHandler__UserSharesUpdated.selector;
         Vm.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i; i < logs.length; ++i) {
             assertTrue(logs[i].topics[0] != sig, "idle handler emitted UserSharesUpdated");
@@ -142,7 +142,7 @@ contract EventIndexingTest is DcaDappTest {
     }
 
     function _latestUserShares(Vm.Log[] memory logs, address user) private pure returns (uint256 newShares) {
-        bytes32 sig = TokenLending__UserSharesUpdated.selector;
+        bytes32 sig = LendingHandler__UserSharesUpdated.selector;
         bool found;
         for (uint256 i; i < logs.length; ++i) {
             if (logs[i].topics[0] != sig) continue;
@@ -150,7 +150,7 @@ contract EventIndexingTest is DcaDappTest {
             (, newShares) = abi.decode(logs[i].data, (uint256, uint256));
             found = true;
         }
-        require(found, "TokenLending__UserSharesUpdated not emitted");
+        require(found, "LendingHandler__UserSharesUpdated not emitted");
     }
 
     function _assertFirstPartyIndexing(Vm.Log[] memory logs) private {
@@ -184,12 +184,12 @@ contract EventIndexingTest is DcaDappTest {
         if (sig == keccak256("DcaManager__MaxSchedulesPerTokenModified(uint256)")) return (true, 0);
         if (sig == keccak256("DcaManager__MinPurchasePeriodModified(uint256)")) return (true, 0);
         if (sig == keccak256("DcaManager__TokenMinPurchaseAmountSet(address,uint256)")) return (true, 1);
-        if (sig == keccak256("TokenLending__UserSharesUpdated(address,uint256,uint256)")) return (true, 1);
-        if (sig == keccak256("TokenLending__SharesRedeemed(address,uint256,uint256)")) return (true, 1);
-        if (sig == keccak256("TokenLending__SharesRedeemedBatch(uint256,uint256)")) return (true, 0);
-        if (sig == keccak256("TokenLending__InterestWithdrawn(address,address,uint256)")) return (true, 2);
-        if (sig == keccak256("TokenLending__WithdrawalAmountAdjusted(address,uint256,uint256)")) return (true, 1);
-        if (sig == keccak256("TokenLending__AmountToRedeemAdjusted(address,uint256,uint256,uint256,uint256)")) {
+        if (sig == keccak256("LendingHandler__UserSharesUpdated(address,uint256,uint256)")) return (true, 1);
+        if (sig == keccak256("LendingHandler__SharesRedeemed(address,uint256,uint256)")) return (true, 1);
+        if (sig == keccak256("LendingHandler__SharesRedeemedBatch(uint256,uint256)")) return (true, 0);
+        if (sig == keccak256("LendingHandler__InterestWithdrawn(address,address,uint256)")) return (true, 2);
+        if (sig == keccak256("LendingHandler__WithdrawalAmountAdjusted(address,uint256,uint256)")) return (true, 1);
+        if (sig == keccak256("LendingHandler__AmountToRedeemAdjusted(address,uint256,uint256,uint256,uint256)")) {
             return (true, 1);
         }
         if (sig == keccak256("TokenHandler__TokenDeposited(address,address,uint256)")) return (true, 2);

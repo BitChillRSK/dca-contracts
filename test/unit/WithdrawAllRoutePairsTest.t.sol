@@ -7,7 +7,7 @@ import {LayerBankDocHandlerMoc} from "../../src/layerbank/LayerBankDocHandlerMoc
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {IOperationsAdmin} from "../../src/interfaces/IOperationsAdmin.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
-import {ITokenLending} from "../../src/interfaces/ITokenLending.sol";
+import {ILendingHandler} from "../../src/interfaces/ILendingHandler.sol";
 import {MockStablecoin} from "../mocks/MockStablecoin.sol";
 import "../Constants.sol";
 import {scheduleAt} from "test/utils/ScheduleAt.sol";
@@ -124,7 +124,7 @@ contract WithdrawAllRoutePairsTest is BaseDeploymentTest {
             abi.encodeCall(IOperationsAdmin.getTokenHandler, (address(tokenOne), ROUTE_TWO)),
             0
         );
-        vm.expectCall(address(handlerOneTwo), abi.encodeWithSelector(ITokenLending.withdrawInterest.selector), 0);
+        vm.expectCall(address(handlerOneTwo), abi.encodeWithSelector(ILendingHandler.withdrawInterest.selector), 0);
         // One lending-class lookup per pair, not one per combination: the cartesian form made four.
         vm.expectCall(address(operationsAdmin), abi.encodeCall(IOperationsAdmin.getRouteClass, (ROUTE_ONE)), 1);
         vm.expectCall(address(operationsAdmin), abi.encodeCall(IOperationsAdmin.getRouteClass, (ROUTE_TWO)), 1);
@@ -173,8 +173,8 @@ contract WithdrawAllRoutePairsTest is BaseDeploymentTest {
         uint256[] memory routeIndexes = new uint256[](1);
         routeIndexes[0] = ROUTE_ONE;
 
-        vm.expectCall(address(handlerOneTwo), abi.encodeWithSelector(ITokenLending.withdrawInterest.selector), 0);
-        vm.expectCall(address(handlerTwoTwo), abi.encodeWithSelector(ITokenLending.withdrawInterest.selector), 0);
+        vm.expectCall(address(handlerOneTwo), abi.encodeWithSelector(ILendingHandler.withdrawInterest.selector), 0);
+        vm.expectCall(address(handlerTwoTwo), abi.encodeWithSelector(ILendingHandler.withdrawInterest.selector), 0);
 
         vm.prank(USER);
         dcaManager.withdrawAllAccumulatedInterest(tokens, routeIndexes);

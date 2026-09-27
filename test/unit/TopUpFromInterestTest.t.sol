@@ -6,7 +6,7 @@ import {Test, console2} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
-import {ITokenLending} from "../../src/interfaces/ITokenLending.sol";
+import {ILendingHandler} from "../../src/interfaces/ILendingHandler.sol";
 import "../Constants.sol";
 import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
@@ -139,7 +139,7 @@ contract TopUpFromInterestTest is DcaDappTest {
         uint256 accruedInterest = _accruedInterest();
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
         uint256 handlerStablecoinBefore = stablecoin.balanceOf(address(stablecoinHandler));
-        uint256 userSharesBefore = ITokenLending(address(stablecoinHandler)).getUserShares(USER);
+        uint256 userSharesBefore = ILendingHandler(address(stablecoinHandler)).getUserShares(USER);
 
         vm.recordLogs();
         _topUp(SCHEDULE_INDEX, accruedInterest);
@@ -150,7 +150,7 @@ contract TopUpFromInterestTest is DcaDappTest {
             assertTrue(logs[i].emitter != address(stablecoin), "the stablecoin moved during a top-up");
         }
         assertEq(
-            ITokenLending(address(stablecoinHandler)).getUserShares(USER),
+            ILendingHandler(address(stablecoinHandler)).getUserShares(USER),
             userSharesBefore,
             "the top-up minted or burnt lending shares"
         );

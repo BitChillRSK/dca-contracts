@@ -398,7 +398,7 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
 
     /**
      * @notice Test that batchBuyRbtc funds the purchase by redeeming the buyer's lending shares
-     * @dev Covers the shared PurchaseRbtc pipeline resolving _batchRetrieveStablecoin to LendingErc20Handler
+     * @dev Covers the shared PurchaseRbtc pipeline resolving _batchRetrieveStablecoin to LendingHandler
      */
     function test_tropykusDex_lengthOneBatchRedeemsSharesForPurchase() public {
         // Setup: User deposits tokens first
@@ -427,7 +427,7 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
 
     /**
      * @notice Test that batchBuyRbtc funds the purchase by redeeming every buyer's lending shares
-     * @dev Covers the shared PurchaseRbtc pipeline resolving _batchRetrieveStablecoin to LendingErc20Handler
+     * @dev Covers the shared PurchaseRbtc pipeline resolving _batchRetrieveStablecoin to LendingHandler
      */
     function test_tropykusDex_batchBuyRbtcRedeemsSharesForPurchase() public {
         // Setup: Multiple users deposit tokens
