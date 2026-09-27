@@ -331,7 +331,7 @@ contract DcaManagerEdgeCasesTest is Test {
     }
 
     function test_createDcaSchedule_reverts_invalidPurchasePeriod() public {
-        vm.expectRevert(IDcaManager.DcaManager__PurchasePeriodMustBeGreaterThanMinimum.selector);
+        vm.expectRevert(IDcaManager.DcaManager__PurchasePeriodMustBeAtLeastMinimum.selector);
         vm.prank(USER);
         dcaManager.createDcaSchedule(
             address(stablecoin),
@@ -450,7 +450,7 @@ contract DcaManagerEdgeCasesTest is Test {
         // Get the schedule ID after creation
         vm.prank(USER);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
-        vm.expectRevert(IDcaManager.DcaManager__PurchasePeriodMustBeGreaterThanMinimum.selector);
+        vm.expectRevert(IDcaManager.DcaManager__PurchasePeriodMustBeAtLeastMinimum.selector);
         vm.prank(USER);
         dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, MIN_PURCHASE_PERIOD - 1);
     }

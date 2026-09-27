@@ -87,8 +87,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      * @dev Caches the stablecoin-to-18-decimal oracle scale; tokens above 18 decimals revert rather than
      *      weakening the floor through rounding. The initial path is allowlisted here; later paths need
      *      owner approval. Fee config arrives as one memory struct so Dex leaves stay under the
-     *      legacy-codegen stack limit after FeeHandler moves off the funding base; ownership stays
-     *      a separate argument because it also covers oracle, path allowlist, and floor setters.
+     *      legacy-codegen stack limit; ownership stays a separate argument because it also covers
+     *      oracle, path allowlist, and floor setters.
      */
     constructor(
         UniswapSettings memory uniswapSettings,

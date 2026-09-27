@@ -13,11 +13,8 @@ abstract contract DcaManagerAccessControl is IDcaManagerAccessControl {
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @notice The DcaManager allowed to call this handler's entry points.
-     * @return The constructor-supplied DcaManager address.
-     */
-    address public immutable i_dcaManager;
+    /// @inheritdoc IDcaManagerAccessControl
+    address public immutable override i_dcaManager;
 
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS

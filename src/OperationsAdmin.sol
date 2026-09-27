@@ -2,6 +2,8 @@
 pragma solidity 0.8.36;
 
 import {IOperationsAdmin} from "./interfaces/IOperationsAdmin.sol";
+import {IDcaManager} from "./interfaces/IDcaManager.sol";
+import {IDcaManagerAccessControl} from "./interfaces/IDcaManagerAccessControl.sol";
 import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
 import {ILendingHandler} from "./interfaces/ILendingHandler.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
@@ -71,7 +73,8 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
      * @inheritdoc IOperationsAdmin
      * @dev Recovery from a mistaken assignment uses a new route because this registry cannot prove a
      *      handler is empty. ERC-165 separates lending from idle handlers, the handler's own stablecoin
-     *      must be `token`, and one handler address may back only one pair.
+     *      must be `token`, and one handler address may back only one pair. A handler pinned to another
+     *      DcaManager would take the pair for good while every deposit through it reverts.
      */
     function assignTokenHandler(address token, uint256 routeIndex, address handler) external onlyOwner {
         uint32 route = routeIndex.toUint32();
@@ -90,15 +93,18 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
             revert OperationsAdmin__ContractIsNotTokenHandler(handler);
         }
 
-        bool isLending = routeClass == RouteClass.Lending;
         bool supportsLending = tokenHandler.supportsInterface(type(ILendingHandler).interfaceId);
-        if (isLending) {
+        if (routeClass == RouteClass.Lending) {
             if (!supportsLending) revert OperationsAdmin__ContractIsNotLendingHandler(handler);
         } else if (supportsLending) {
             revert OperationsAdmin__LendingHandlerOnIdleRoute(handler);
         }
         if (address(ITokenHandler(handler).i_stableToken()) != token) {
             revert OperationsAdmin__HandlerTokenMismatch(token, handler);
+        }
+        address dcaManager = IDcaManagerAccessControl(handler).i_dcaManager();
+        if (address(IDcaManager(dcaManager).i_operationsAdmin()) != address(this)) {
+            revert OperationsAdmin__HandlerDcaManagerMismatch(handler, dcaManager);
         }
 
         s_tokenRoute[token][route].handler = handler;

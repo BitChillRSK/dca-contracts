@@ -17,6 +17,8 @@ contract ReenteringDepositHandler is IERC165, ITokenHandler, IPurchaseRbtc {
     DcaManager private immutable i_manager;
     /// @dev Reported so `OperationsAdmin.assignTokenHandler` can check it against the assigned token.
     IERC20 public immutable i_stableToken;
+    /// @dev Reported for `OperationsAdmin.assignTokenHandler`'s DcaManager check.
+    address public immutable i_dcaManager;
     address private s_token;
     uint64 private s_scheduleId;
     bool private s_armed;
@@ -24,6 +26,7 @@ contract ReenteringDepositHandler is IERC165, ITokenHandler, IPurchaseRbtc {
 
     constructor(DcaManager manager, address stableToken) {
         i_manager = manager;
+        i_dcaManager = address(manager);
         i_stableToken = IERC20(stableToken);
     }
 

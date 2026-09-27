@@ -46,8 +46,6 @@ interface ILendingHandler is ITokenHandler {
 
     /// @notice The lending protocol accepted a deposit call but this handler gained no shares.
     error LendingHandler__LendingProtocolDepositFailed();
-    /// @notice The lending protocol's redemption call reported failure with a non-zero error code.
-    error LendingHandler__LendingProtocolRedeemFailed(uint256 errorCode);
     /// @notice A zero-cash redemption reports its consumed receipt shares before the call rolls back.
     error LendingHandler__ZeroStablecoinReceived(uint256 sharesRedeemed);
     /**

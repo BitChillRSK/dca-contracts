@@ -120,8 +120,7 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
      * @dev TokenHandler reverts unless the pull matches `depositAmount`, so the mint always uses
      *      the full request. Credited shares are the measured receipt-share gain, never a
      *      protocol return value. A declining receipt-share balance panics on the checked
-     *      subtraction (same as the former adapter-local deltas); a flat balance reverts
-     *      `LendingHandler__LendingProtocolDepositFailed`.
+     *      subtraction; a flat balance reverts `LendingHandler__LendingProtocolDepositFailed`.
      */
     function _depositToken(address user, uint256 depositAmount) internal virtual override {
         super._depositToken(user, depositAmount);

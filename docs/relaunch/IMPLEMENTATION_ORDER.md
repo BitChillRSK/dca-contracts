@@ -162,6 +162,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R98 | after R96, before relaunch deploy | none (remove unreachable inner redeem clamp + `AmountToRedeemAdjusted`; `_redeemShares` private; share debit checked) |
 | R99 | after R98, before relaunch deploy | none (centralize measured deposit-share accounting into `LendingHandler._depositToken`) |
 | R100 | after R99; not deployment-bound | none (invariant suite honesty + integrated lending/purchase coverage) |
+| R101 | after R100, before relaunch deploy | **decided 2026-09-27:** registry checks a handler's DcaManager pin; min-purchase check before the create pull; dead top-up guard dropped; Tropykus-only redeem error off `ILendingHandler`; `…MustBeAtLeastMinimum` renames; stale NatSpec; lending-exit balance reuse and the `withdrawTokenAndInterest` reorder closed |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1371,6 +1372,17 @@ ABI change. Ask: none.
 After R99; not deployment-bound. Fix the tautological interest invariant, correct
 `README_INVARIANTS.md`, and exercise the production lending + purchase pipeline together. Ask: none.
 
+### R101 - post-R100 review cleanups ([spec](./R101-post-r100-review-cleanups.md), [#167](https://github.com/BitChillRSK/dca-contracts/pull/167))
+
+After R100, before relaunch deploy. The 2026-09-27 pass over the R100 tip found no purchase-path gas
+left. It ships: `assignTokenHandler` requires the handler's `i_dcaManager()` to pin this registry
+(new `OperationsAdmin__HandlerDcaManagerMismatch`); `_validatePurchaseAmount` runs before the create
+pull (max-schedules stays after it: +450 under deploy otherwise); the unreachable
+`purchaseAmount == 0` top-up guard is removed; `LendingHandler__LendingProtocolRedeemFailed` moves to
+`ITropykusErc20Handler`; the two `…MustBeGreaterThanMinimum` errors become `…MustBeAtLeastMinimum`;
+stale NatSpec is fixed. It closes reusing the lending redeem's balance reading, and the
+`withdrawTokenAndInterest` route-check reorder (dropped after review). Ask: none (decided 2026-09-27).
+
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:
@@ -1429,6 +1441,19 @@ There is no optional-late queue. Items either have an ordered spec above or are 
   become protocol-paid, or if a correctness change needs the recipient anyway. Reasons and
   measurements: [R97](./R97-redeem-lending-exits-to-user.md); code on the branch
   `perf/r97-redeem-exits-to-user`.
+- **Reuse the lending redeem's stablecoin balance in the withdrawal transfer — closed 2026-09-27
+  (R101).** `_measuredProtocolRedeem` ends with a stablecoin `balanceOf` and
+  `TokenHandler._withdrawToken` starts with another, so a lending exit reads the handler's balance
+  twice in a row. Removing that saves about 1,000 Rootstock gas per exit, but it is user-paid and ties
+  the redeem measurement to the transfer measurement across layers, the same objection as R87's
+  rejected balance reuse. See [R101](./R101-post-r100-review-cleanups.md#verdicts).
+- **Check the route class before principal moves in `withdrawTokenAndInterest` — closed 2026-09-28
+  (R101, implemented then dropped after review).** An idle call already reverts the whole
+  transaction, so no principal stays withdrawn; the reorder only changes which of two true errors an
+  over-balance amount reports and skips a handler call the revert undoes. It cost a second slot-0
+  read on every successful lending exit (+109 under deploy, about one 200-gas SLOAD on Rootstock),
+  user-paid, and a storage parameter on `_withdrawToken`. Reopen only if that call gains an effect a
+  revert cannot undo. See [R101](./R101-post-r100-review-cleanups.md#verdicts).
 - **SPDX change — reopened 2026-08-31, answered 2026-09-07.** The earlier rejection argued that re-licensing "requires an explicit legal/product process outside the contract implementation stack" and then closed the decision on that basis, which is self-defeating: that is a reason to route the question to a human, not to answer it. See **Licensing — decided**.
 
 ## Licensing — decided

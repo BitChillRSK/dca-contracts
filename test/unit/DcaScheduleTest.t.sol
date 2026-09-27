@@ -81,7 +81,7 @@ contract DcaScheduleTest is DcaDappTest {
 
     function testCannotCreateAZeroTokenScheduleEvenIfAHandlerWasAssigned() external {
         uint256 zeroTokenRoute = 10;
-        DummyTokenHandler zeroTokenHandler = new DummyTokenHandler(address(0));
+        DummyTokenHandler zeroTokenHandler = new DummyTokenHandler(address(0), address(dcaManager));
 
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(zeroTokenRoute, false);

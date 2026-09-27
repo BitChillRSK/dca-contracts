@@ -33,7 +33,7 @@
 ```
 make check
 make fork-sovryn
-make fork-tropykus
+make fork-layerbank
 ```
 
 ## ABI changes

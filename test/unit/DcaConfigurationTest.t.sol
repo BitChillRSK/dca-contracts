@@ -161,26 +161,46 @@ contract DcaConfigurationTest is DcaDappTest {
         assertEq(0, scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).tokenBalance);
     }
 
-    function testPurchaseAmountMustBeGreaterThanMin() external {
+    function testPurchaseAmountMustBeAtLeastMin() external {
         uint256 minPurchaseAmount = dcaManager.getTokenMinPurchaseAmount(address(stablecoin));
         vm.prank(USER);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         bytes memory encodedRevert = abi.encodeWithSelector(
-            IDcaManager.DcaManager__PurchaseAmountMustBeGreaterThanMinimum.selector,
-            address(stablecoin),
-            minPurchaseAmount
+            IDcaManager.DcaManager__PurchaseAmountMustBeAtLeastMinimum.selector, address(stablecoin), minPurchaseAmount
         );
         vm.expectRevert(encodedRevert);
         vm.prank(USER);
         dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, minPurchaseAmount - 1);
     }
 
-    function testPurchasePeriodMustBeGreaterThanMin() external {
+    function testPurchasePeriodMustBeAtLeastMin() external {
         vm.prank(USER);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        vm.expectRevert(IDcaManager.DcaManager__PurchasePeriodMustBeGreaterThanMinimum.selector);
+        vm.expectRevert(IDcaManager.DcaManager__PurchasePeriodMustBeAtLeastMinimum.selector);
         vm.prank(USER);
         dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, MIN_PURCHASE_PERIOD - 1);
+    }
+
+    function testCreateRevertsBelowMinPurchaseAmountBeforeTokensMove() external {
+        uint256 minPurchaseAmount = dcaManager.getTokenMinPurchaseAmount(address(stablecoin));
+        uint256 userBefore = stablecoin.balanceOf(USER);
+
+        vm.startPrank(USER);
+        stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
+        vm.expectCall(address(stablecoinHandler), abi.encodeWithSelector(ITokenHandler.depositToken.selector), 0);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDcaManager.DcaManager__PurchaseAmountMustBeAtLeastMinimum.selector,
+                address(stablecoin),
+                minPurchaseAmount
+            )
+        );
+        dcaManager.createDcaSchedule(
+            address(stablecoin), AMOUNT_TO_DEPOSIT, minPurchaseAmount - 1, MIN_PURCHASE_PERIOD, s_routeIndex
+        );
+        vm.stopPrank();
+
+        assertEq(stablecoin.balanceOf(USER), userBefore, "a rejected create pulled tokens");
     }
 
     function testMaxSchedulesPerTokenCannotBeExceeded() external {
@@ -281,7 +301,7 @@ contract DcaConfigurationTest is DcaDappTest {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
 
         bytes memory encodedRevert = abi.encodeWithSelector(
-            IDcaManager.DcaManager__PurchaseAmountMustBeGreaterThanMinimum.selector, address(stablecoin), customAmount
+            IDcaManager.DcaManager__PurchaseAmountMustBeAtLeastMinimum.selector, address(stablecoin), customAmount
         );
         vm.expectRevert(encodedRevert);
         dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, customAmount - 1);

@@ -214,6 +214,10 @@ contract R89ReviewCandidatesGasTest is DcaDappTest {
                 s_routeIndex, operationsAdmin.getRouteClass(s_routeIndex) == IOperationsAdmin.RouteClass.Lending
             );
         }
+        // The lane's handler answers to the lane's registry; point its DcaManager at this one.
+        vm.mockCall(
+            address(dcaManager), abi.encodeCall(IDcaManager.i_operationsAdmin, ()), abi.encode(address(registry))
+        );
 
         vm.startStateDiffRecording();
         uint256 gasBefore = gasleft();

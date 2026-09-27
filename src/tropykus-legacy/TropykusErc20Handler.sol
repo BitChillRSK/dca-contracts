@@ -3,6 +3,7 @@ pragma solidity 0.8.36;
 
 import {LendingHandler} from "../LendingHandler.sol";
 import {IkToken} from "./IkToken.sol";
+import {ITropykusErc20Handler} from "./ITropykusErc20Handler.sol";
 
 /**
  * @title TropykusErc20Handler
@@ -10,7 +11,7 @@ import {IkToken} from "./IkToken.sol";
  * @notice Tropykus adapter: Compound-style kToken mint/redeem. Share accounting lives on LendingHandler.
  * @dev Test-only adapter, excluded from production deployment; local and fork lanes retain coverage.
  */
-abstract contract TropykusErc20Handler is LendingHandler {
+abstract contract TropykusErc20Handler is LendingHandler, ITropykusErc20Handler {
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
@@ -70,7 +71,7 @@ abstract contract TropykusErc20Handler is LendingHandler {
      */
     function _protocolRedeem(uint256 sharesAmount, uint256) internal override {
         uint256 result = i_kToken.redeem(sharesAmount);
-        if (result != 0) revert LendingHandler__LendingProtocolRedeemFailed(result);
+        if (result != 0) revert TropykusErc20Handler__LendingProtocolRedeemFailed(result);
     }
 
     function _receiptSharesBalance() internal override returns (uint256) {

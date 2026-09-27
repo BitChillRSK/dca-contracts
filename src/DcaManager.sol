@@ -119,8 +119,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
 
     /**
      * @inheritdoc IDcaManager
-     * @dev Widths and the bumped nonce are checked before the deposit is pulled, so an overflowing
-     *      argument or an exhausted counter reverts with SafeCast data before any token moves.
+     * @dev Argument checks run before the pull; an overflowing argument or an exhausted counter
+     *      reverts with SafeCast data.
      */
     function createDcaSchedule(
         address token,
@@ -147,17 +147,15 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
 
         _validatePurchasePeriod(purchasePeriod, settings.minPurchasePeriod);
         _validateDeposit(depositAmount);
-        _handlerForDeposit(token, route).depositToken(msg.sender, depositAmount);
-        // The remaining two checks sit after the pull: the minimum purchase amount, validated against
-        // the credited request that the handler guarantees equals the amount asked for, and the
-        // max-schedules bound below. Both revert the whole call, so a failure returns the deposit.
         _validatePurchaseAmount(token, purchaseAmount, depositAmount);
+        _handlerForDeposit(token, route).depositToken(msg.sender, depositAmount);
 
+        // Checked after the pull, beside the push it guards: checking earlier makes the push reread
+        // the list's length.
         uint64[] storage scheduleIds = s_scheduleIds[msg.sender][token];
         if (scheduleIds.length >= settings.maxSchedulesPerToken) {
             revert DcaManager__MaxSchedulesPerTokenReached(token);
         }
-
         // A new id addresses empty storage, so the zero cadence anchor and paused flag are left unset.
         _storeNewSchedule(s_dcaSchedules[token][scheduleId], deposit, period, route, msg.sender, purchase);
         scheduleIds.push(scheduleId);
@@ -296,9 +294,9 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         uint256 purchaseAmount = dcaSchedule.purchaseAmount;
         uint128 newTokenBalance = (tokenBalance + amount).toUint128();
         // The credit must buy at least one more purchase than the balance could already fund, so
-        // interest cannot be moved over in dust. A schedule that spends nothing per purchase can
-        // never clear that bar, and has nothing to top up for.
-        if (purchaseAmount == 0 || newTokenBalance / purchaseAmount == tokenBalance / purchaseAmount) {
+        // interest cannot be moved over in dust. `purchaseAmount` is never zero: every write meets the
+        // token minimum.
+        if (newTokenBalance / purchaseAmount == tokenBalance / purchaseAmount) {
             revert DcaManager__TopUpDoesNotFundAnotherPurchase(token, scheduleId, amount);
         }
 
@@ -630,7 +628,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         }
 
         if (purchaseAmount < minPurchaseAmount) {
-            revert DcaManager__PurchaseAmountMustBeGreaterThanMinimum(token, minPurchaseAmount);
+            revert DcaManager__PurchaseAmountMustBeAtLeastMinimum(token, minPurchaseAmount);
         }
         if (purchaseAmount > tokenBalance) {
             revert DcaManager__PurchaseAmountExceedsBalance(token, purchaseAmount, tokenBalance);
@@ -643,7 +641,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
      */
     function _validatePurchasePeriod(uint256 purchasePeriod, uint256 minPurchasePeriod) private pure {
         if (purchasePeriod < minPurchasePeriod) {
-            revert DcaManager__PurchasePeriodMustBeGreaterThanMinimum();
+            revert DcaManager__PurchasePeriodMustBeAtLeastMinimum();
         }
         if (purchasePeriod % 1 days != 0) revert DcaManager__PurchasePeriodMustBeWholeDays();
     }
