@@ -1,6 +1,6 @@
 # R90 — final optimization and handler-structure decisions
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **in progress** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
@@ -100,6 +100,73 @@ R89 item 14 owns this change; do not implement it again here. The human approved
 measurement found LayerBank Dex runtime +121 bytes under `deploy` (+155 default). R90 records it only
 because it motivated reopening the rest of the table.
 
+## Evidence reproduced on R90 base (2026-09-27)
+
+Base: `perf/r89-post-r88-review-candidates` @ `46bb8a8` (PR #154 head). Profiles: `[profile.default]`
+and shipping `[profile.deploy]`. Rootstock conversions use flat `SLOAD = 200`
+(`ROOTSTOCK-GAS-SCHEDULE.md`); Foundry cold-load deltas are regression pins only.
+
+### Dex oracle/floor packing
+
+| Metric | Before | After | Delta |
+|---|---:|---:|---:|
+| Idle Dex 10-row batch Foundry gas (`deploy`) | 493,843 | 491,740 | −2,103 |
+| Same batch, Rootstock (replace one cold SLOAD 2,100 → 200; carry compute) | — | — | ≈ **−203** |
+| Idle Dex runtime (`deploy`, metadata-included) | 9,806 | 9,839 | **+33** |
+| Sovryn Dex runtime (`deploy`) | 12,828 | 12,860 | **+32** |
+| LayerBank Dex runtime (`deploy`, IR artifact) | 13,092 | 13,259 | **+167** |
+| Default-profile Dex runtimes | 12,643 / 16,396 / 16,653 | 12,653 / 16,406 / 16,663 | **+10** each |
+
+Layout after packing (idle; lending inserts `s_shares` at 4 and shifts by one):
+
+- slot N: `s_mocOracle` (20) + `s_amountOutMinimumPercent` `uint64` (8)
+- slot N+1: `s_amountOutMinimumSafetyCheck` `uint64` (8)
+- `s_swapPath` and later fields keep their slot numbers
+
+State-diff on a successful idle Dex batch: packed oracle+percent word **1 read under
+`deploy`/`via_ir`**, **2 reads under default/legacy** (one SLOAD per field even when packed);
+safety word **0 reads**. The ≈−203 Rootstock saving is therefore on the **shipping** artifact only.
+Each floor setter reads both setting words (was one shared word for both `uint128`s) → rare
+governance path ≈ **+200 Rootstock** per setter. Checked `toUint64()` retained; `1 ether` still
+accepted; values above it keep the existing custom errors.
+
+### Lending zero-cash diagnostic sum
+
+`unchecked { requested += purchaseAmounts[i]; }` on the revert-only path under `deploy`:
+
+| Leaf | Before | After | Delta |
+|---|---:|---:|---:|
+| SovrynDocHandlerMoc | 8,532 | 8,524 | **−8** |
+| LayerBankDocHandlerMoc | 8,788 | 8,780 | **−8** |
+| TropykusDocHandlerMoc | 8,764 | 8,756 | **−8** |
+| IdleDocHandlerMoc | 5,242 | 5,242 | 0 (no lending path) |
+
+No successful-path gas change. Same `uint96` row bound as Idle's unchecked sum.
+
+### FeeHandler ownership move (prototype)
+
+Moved `FeeHandler` off `TokenHandler` onto `PurchaseRbtc` (fee args routed through `PurchaseMoc` /
+`PurchaseUniswap`). Concrete leaf constructor parameter lists unchanged.
+
+| Check | Result |
+|---|---|
+| Storage layout (IdleDoc / SovrynDoc under default; Idle Dex under `deploy`) | **Identical** slot/offset/type vs R89 base |
+| `[profile.deploy]` (`via_ir`) | Dex leaves compile; layout preserved |
+| `[profile.default]` (`via_ir = false`, what `make check` uses) | **`IdleErc20HandlerDex` stack-too-deep** at the leaf constructor |
+| Test/script churn | Every abstract-base test harness that constructs `IdleErc20Handler` /
+`LendingErc20Handler` / protocol adapters must drop fee args; leaves stay ABI-stable |
+
+Updated recommendation: **reject** unless the human accepts either (a) making day-to-day `make check`
+depend on via-IR for Dex leaves, or (b) a further constructor/stack refactor beyond this candidate's
+scope. Layout and shipping-profile compile are fine; the default-profile stack break is the blocker.
+
+### `forge fmt`
+
+`forge fmt --check` reports **118** files needing changes: **19** `src/`, **89** `test/`, **10**
+`script/`. Diffs are whitespace/wrapping (including trailing blank lines and multi-line returns). No
+fight with section-banner conventions spotted in the sample; a format-only commit would still need the
+R85 metadata-stripped bytecode identity check on every touched `src/` file.
+
 ## Candidate matrix and recommendations
 
 | Candidate | Known effect / cost | Recommendation |
@@ -109,7 +176,7 @@ because it motivated reopening the rest of the table.
 | Pass a gross total into `_batchRetrieveStablecoin` | Avoids the idle sum and could reuse the total for the lending zero-cash error | **Keep rejected.** It gives the hook both rows and a caller-maintained claimed total that can disagree, changes every implementation/harness, and saves only tiny idle compute. |
 | Remove swap-pop array-length/bounds re-reads | A few hundred gas on rare deletion | **Keep rejected.** The length is already cached; removing the remaining compiler bounds checks needs assembly/unsafe storage access, while a memory round trip costs more. |
 | Fold `IdleErc20Handler` into `TokenHandler` | Deletes a very small abstract class; no state/read/check removal | **Keep rejected.** It would make idle funding the default behavior of the base that lending must override. The slim class is the useful name and proof boundary for pooled idle custody. |
-| Move `FeeHandler` out of `TokenHandler` and initialize it solely through the purchase branch | Expected runtime/gas neutrality; broad constructor-chain and test churn | **Prototype, then likely implement for code quality.** Fees are calculated and paid by `PurchaseRbtc`, not deposit/withdraw custody. This removes one unnecessary shared-base edge and fee arguments from funding/protocol constructors, but only ship if concrete ABIs, layout, gas, and artifact growth remain acceptable. |
+| Move `FeeHandler` out of `TokenHandler` and initialize it solely through the purchase branch | Layout preserved; deploy profile compiles; **default profile stack-too-deep on Dex leaves** | **Reject** (updated after prototype). |
 | `unchecked` exchange-rate/oracle arithmetic | One or more checks per call | **Keep checked.** Values come from markets or an oracle; a malfunction must revert rather than wrap. |
 | `unchecked` falling balance deltas | One check per measured transfer/redeem/swap | **Keep checked.** The checked subtraction is the assertion that the balance moved in the required direction. |
 | `unchecked` `amountSpent` allocation product | 345–753 Foundry gas per 10-row batch in R89's measurements | **Keep checked.** Its proof needs an unenforced future-token supply bound; overflow would silently corrupt event telemetry. |
@@ -121,33 +188,51 @@ to implement before the gates below are answered.
 
 ## Open product decisions
 
-Present the candidate matrix and any refreshed measurements, then ask the human all of these together:
+Human answers (2026-09-27), locked for this PR:
 
-1. Pack the Dex oracle with the narrowed live slippage floor?
-2. Make the lending zero-cash diagnostic sum unchecked?
-3. Move `FeeHandler` out of `TokenHandler` if the prototype preserves concrete ABI/layout and has no
-   meaningful gas or size regression?
-4. Override any of the seven **keep rejected / keep checked** recommendations in the matrix?
-5. Make the repo `forge fmt`-clean? `src/` is not today, so `make check` skips `forge fmt --check`
-   (see the `Makefile`). If yes: one format-only commit (metadata-stripped bytecode must be identical)
-   and a `forge fmt --check` step in `make check` and CI.
+1. Pack the Dex oracle with the narrowed live slippage floor? **Yes — implemented** (`1b54321`,
+   `0883bb7`).
+2. Make the lending zero-cash diagnostic sum unchecked? **Yes — implemented** (`cdd7d73`).
+3. Move `FeeHandler` out of `TokenHandler`? **Deferred to a dedicated follow-up PR** (approved to
+   implement for diagram cleanup; default-profile Dex stack-too-deep must be solved there, not here).
+4. Override keep-rejected / keep-checked rows?
+   - Gross total into `_batchRetrieveStablecoin`: **keep rejected.**
+   - Swap-pop bounds: **still open** — human asked to see the candidate code before deciding; not in
+     this PR either way.
+   - Fold `IdleErc20Handler`; keep-checked market/delta/`amountSpent`/lending-share arithmetic:
+     **no override — stay rejected / checked.**
+5. Make the repo `forge fmt`-clean? **Deferred to a dedicated follow-up PR** (format-only; enforce in
+   `make check`/CI; metadata-stripped bytecode identity on `src/`). Not mixed into this PR.
+
+## Verdicts (2026-09-27)
+
+| Candidate | Verdict |
+|---|---|
+| Pack Dex oracle + live floor | **Shipped** in this PR |
+| Unchecked lending zero-cash sum | **Shipped** in this PR |
+| FeeHandler ownership move | **Follow-up PR** (approved; stack-too-deep to fix there) |
+| Gross total into `_batchRetrieveStablecoin` | **Rejected** |
+| Swap-pop array bounds assembly | **Open** (sketch for human; not shipping here) |
+| Fold `IdleErc20Handler` into `TokenHandler` | **Rejected** |
+| Unchecked market / falling-delta / `amountSpent` / lending share sums | **Keep checked** |
+| `forge fmt` + CI enforce | **Follow-up PR** |
 
 ## Scope
 
-- [ ] Reproduce the oracle-packing gas, storage-access, layout, and artifact measurements on R90's real
+- [x] Reproduce the oracle-packing gas, storage-access, layout, and artifact measurements on R90's real
   base under both profiles before asking for the product verdict.
-- [ ] Measure the two governance floor setters as storage accesses and convert them to Rootstock.
-- [ ] Reproduce the lending diagnostic-sum artifact delta under both profiles.
-- [ ] Prototype moving `FeeHandler` off `TokenHandler` without changing any concrete constructor ABI,
+- [x] Measure the two governance floor setters as storage accesses and convert them to Rootstock.
+- [x] Reproduce the lending diagnostic-sum artifact delta under both profiles.
+- [x] Prototype moving `FeeHandler` off `TokenHandler` without changing any concrete constructor ABI,
   external selector, event, error, or storage slot. Compare concrete ABI/method identifiers, storage
   layout, metadata-stripped creation/runtime code, deployed size, and representative gas on all live
   idle/Sovryn/LayerBank MoC and Dex leaves.
-- [ ] Measure how much of `src/`, `test/`, and `script/` `forge fmt` would change, and check whether any
+- [x] Measure how much of `src/`, `test/`, and `script/` `forge fmt` would change, and check whether any
   of it fights the repo's existing layout.
-- [ ] Present one final evidence table and obtain the human's answers to all open product decisions.
-- [ ] Implement only the approved subset, one commit per candidate, and record rejected verdicts with
-  their final reason.
-- [ ] Update `ROOTSTOCK-GAS-AUDIT.md`, this spec's verdict section, `IMPLEMENTATION_ORDER.md`, and
+- [x] Present one final evidence table and obtain the human's answers to all open product decisions.
+- [x] Implement only the approved subset for this PR (packing + unchecked), one commit per candidate,
+  and record deferred/rejected verdicts with their final reason.
+- [x] Update `ROOTSTOCK-GAS-AUDIT.md`, this spec's verdict section, `IMPLEMENTATION_ORDER.md`, and
   `README.md` with the measurements and decisions.
 
 ## Out of scope

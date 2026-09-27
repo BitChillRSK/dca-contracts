@@ -226,6 +226,14 @@ also makes purchase-path arithmetic whose bound our own widths enforce `unchecke
 bound is a stablecoin's supply or a lending market's receipt token stay checked. Figures, bounds, and the candidates
 it declined are in the spec. `test/gas/R89ReviewCandidatesGas.t.sol` pins the reads on both profiles.
 
+## R90 packing follow-up (2026-09-27)
+
+Dex oracle + live floor packing (`uint64` beside `s_mocOracle`) and the unchecked lending zero-cash
+sum shipped in R90. **Rootstock:** ≈ −203 per Dex batch under the shipping `via_ir` artifact (one fewer
+`SLOAD` at 200). Legacy codegen still issues two SLOADs of the packed word, so the save is deploy-only.
+FeeHandler ownership move and `forge fmt` are deferred to R92 / R91. See
+[R90](./R90-final-optimization-decisions.md#verdicts-2026-09-27).
+
 ## Documentation corrections
 
 - The "~2,300 gas ≈ 1.4 cents" figure for the reentrancy guard is its **Cancun** net cost. On Rootstock

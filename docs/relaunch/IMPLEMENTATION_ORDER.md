@@ -151,6 +151,9 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R87 | after R86, before relaunch deploy | **one verdict per deferred gas candidate, after measurement** (idle ledger, purchase-row event fields, fee sweep, `FeeTransferred`, balance reuse, `optimizer_runs`); no PR if none is approved |
 | R88 | after R87, before relaunch deploy if either Solidity candidate ships | **decided 2026-09-26:** reject shared scale declaration; **inline** LayerBank `_normalizedIncome` (source-only); cheatcode rename waits for an independently justified `forge-std` upgrade |
 | R89 | after R88, before relaunch deploy | **decided 2026-09-26:** implement every post-R88 review candidate (redundant reads, bounded `unchecked`, Dex constructor zero-token check, handler/token match on assignment, stale NatSpec, stray `IStablecoin`); record the rejected ones |
+| R90 | after R89, before relaunch deploy | **decided 2026-09-27:** ship oracle packing + unchecked lending zero-cash sum; defer FeeHandler move and `forge fmt` to R91/R92; keep-rejected/checked rows stand except swap-pop still open |
+| R91 | after R90; not deployment-bound | none (`forge fmt` one-shot + CI enforce; metadata-stripped bytecode identity) |
+| R92 | after R91, before relaunch deploy | none (FeeHandler off `TokenHandler`; solve default-profile Dex stack-too-deep) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1280,13 +1283,11 @@ constructor error `PurchaseUniswap__ZeroPurchaseToken`, replaced by `StablecoinS
 
 ### R90 - final optimization and handler-structure decisions ([spec](./R90-final-optimization-decisions.md))
 
-After R89, in a separate PR. PR 154 stays executable-scope closed. Revisit R89's remaining candidate
-table with the owner's code-quality bar: reproduce the Dex oracle/live-floor packing prototype,
-measure the locally bounded lending zero-cash sum, and prototype moving fee ownership from the funding
-branch to the purchase branch without changing any concrete ABI or storage slot. Record final verdicts
-for the candidates that remain rejected as well as the approved subset. Ask: the oracle packing,
-zero-cash unchecked sum, conditional FeeHandler ownership move, whether to override any keep-rejected
-recommendation, and whether to make the repo `forge fmt`-clean and enforce it — all together after the final evidence table.
+After R89, in a separate PR. Ships Dex oracle/live-floor packing and the unchecked lending zero-cash
+sum. FeeHandler ownership move and `forge fmt` enforcement are **approved but deferred** to their own
+PRs (diagram cleanup / format-only; do not mix into R90). Gross-total `_batchRetrieveStablecoin` and
+Idle fold stay rejected; keep-checked arithmetic stays checked. Swap-pop bounds still open pending a
+human look at the assembly sketch. Ask: none remaining for this PR's executable subset.
 
 ## Closed non-implementation decisions
 
