@@ -169,8 +169,7 @@ contract R89ReviewCandidatesGasTest is DcaDappTest {
         uint256 settingsReads = _reads(accesses, address(dcaManager), bytes32(PROTOCOL_SETTINGS_SLOT));
         console2.log("createDcaSchedule: gas", gasUsed);
         console2.log("  settings-word reads", settingsReads);
-        // R89 removed the validator's extra settings load (3 → 2). R94 then stores the nonce before
-        // the handler pull, so under deploy (`via_ir`) the load and store merge to one counted read.
+        // via_ir merges the load with the early nonce store.
         if (_viaIr()) {
             assertEq(settingsReads, 1, "settings word re-read under deploy");
         } else {

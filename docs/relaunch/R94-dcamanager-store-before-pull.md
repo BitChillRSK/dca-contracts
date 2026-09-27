@@ -4,60 +4,54 @@ Status: **implemented** · GitHub [#160](https://github.com/BitChillRSK/dca-cont
 
 ## Objective
 
-On `DcaManager` user paths that reload a packed word across an external call: store the new schedule
-nonce before the create pull, hoist the top-up `purchaseAmount` read ahead of the interest call, and
-drop the impossible `toUint128()` on withdrawal. Pin the read claims under default and
-`FOUNDRY_PROFILE=deploy`. Record the companion closed decisions so a later pass does not reopen them.
-`depositToken` store-before-pull was tried and **reverted** after measurement showed no saving.
+Store `createDcaSchedule`'s new schedule nonce before the handler pull, and drop the impossible
+`toUint128()` on withdrawal. Pin the create settings-read under default and `FOUNDRY_PROFILE=deploy`
+(via the existing R89 gas pin). Record the companion closed decisions so a later pass does not reopen
+them. Deposit store-before-pull and the top-up `purchaseAmount` hoist were tried and **reverted**
+after measurement.
 
 ## Background
 
-Locked 2026-09-27 in the overlooked-optimizations canvas. Contracts are not proxies and have not
-deployed, so reordering a store ahead of a call that cannot change its value is safe. The canvas
-candidates were: credit `tokenBalance` before the deposit pull; bump `scheduleNonce` before the create
-pull; hoist top-up `purchaseAmount` before the interest call; drop withdrawal `toUint128()`.
+Locked 2026-09-27 in the overlooked-optimizations canvas. Four code candidates were measured
+edit-by-edit under both profiles (`deploy` / `via_ir` ships): early create nonce store, deposit
+store-before-pull, top-up `purchaseAmount` hoist, and withdrawal downcast drop.
 
 ## Open product decisions
 
-**none.** The implement / closed split was locked 2026-09-27. Deposit store-before-pull was dropped
-after measurement in review (same turn as #160).
+**none.**
 
 ## Scope
 
-- [x] **1. `depositToken` store-before-pull — tried, reverted.** Counted schedule slot-0 reads stayed at
-      2 under both profiles; Foundry gas was flat. The reorder needed a `routeIndex` local only to keep
-      the route load above the early store, for no measured win. Left as call-then-credit (no local).
-- [x] **2. `createDcaSchedule`:** assign `s_protocolSettings.scheduleNonce` before `_handlerForDeposit`,
+- [x] **`createDcaSchedule`:** assign `s_protocolSettings.scheduleNonce` before `_handlerForDeposit`,
       with no external call between the settings load and that store. Leave `_storeNewSchedule` after the
-      pull (fresh writes; the schedule must not exist before tokens arrive). A token callback during the
-      pull may observe the nonce one id ahead of the stored schedule; the pull and the nonce store revert
-      together.
-- [x] **3. `_withdrawToken`:** keep the balance in a `uint128` and assign the subtraction result
-      directly. Keep the comparison against `withdrawalAmount`. Do not change the revert set.
-- [x] **4. `topUpFromInterest`:** read `purchaseAmount` immediately after the owner check and before
-      `_checkTokenYieldsInterest` / `getAccruedInterest`. Leave the `tokenBalance` read and its store
-      after the interest call (slot 0 is reloaded for that write on purpose). No gas claim (see pins).
-- [x] **5. State-diff pins** under default and `FOUNDRY_PROFILE=deploy` (see **Measured pins**).
-- [x] **6. Docs:** this spec, `IMPLEMENTATION_ORDER.md`, `README.md` Status, and closed-decision
-      entries for every canvas "Closed" row (cross-link earlier closures; add any new one).
+      pull.
+- [x] **`_withdrawToken`:** keep the balance in a `uint128` and assign the subtraction result directly
+      (no `SafeCast.toUint128()`). Keep the comparison against `withdrawalAmount`.
+- [x] **`depositToken` store-before-pull — reverted.** No saving under shipping `via_ir`.
+- [x] **`topUpFromInterest` `purchaseAmount` hoist — reverted.** On deploy: +3 Foundry gas and ~5 B
+      bytecode; nothing can change `purchaseAmount` during the interest call anyway.
+- [x] **Docs:** closed-decision table for every canvas "Closed" row; pin create via R89 gas test.
 
 ## Measured pins (2026-09-27)
 
-`test/gas/R94DcaManagerStoreBeforePullGas.t.sol`, parent = R93 head vs this PR:
+Edit-by-edit Foundry gas on PR head vs undoing one edit (auditor scratch worktree). Rootstock for a
+removed warm re-read is 200.
 
-| Path | Slot | default reads | deploy reads | Gas claim |
-|---|---|---:|---:|---|
-| `depositToken` store-before-pull | schedule slot 0 | tried 2 vs parent 3 | tried 2 vs parent 2 | **Reverted.** Only legacy codegen dropped a counted read; shipping `via_ir` did not. |
-| `createDcaSchedule` | `s_protocolSettings` | 2 | **1** (was 2) | **≈ −200 Rootstock** (one warm re-read removed under deploy; Foundry ≈ −120). |
-| `topUpFromInterest` | schedule slot 1 | 2 (unchanged) | 2 (unchanged) | **None.** Hoist kept; owner check not inlined with `purchaseAmount` on deploy. |
-| `_withdrawToken` | n/a | n/a | n/a | Tens of compute gas (dropped `SafeCast.toUint128()`); revert set unchanged. |
+| Edit | default | deploy | Verdict |
+|---|---:|---:|---|
+| `createDcaSchedule` nonce before pull | 99,044 vs 99,043 | 98,870 vs 98,990 (**−120**) | **Keep.** ≈ −200 Rootstock. |
+| `_withdrawToken` no `toUint128()` | 9,123 vs 9,250 (**−127**) | 8,803 vs 8,864 (**−61**) | **Keep.** +1 B bytecode. |
+| `topUpFromInterest` `purchaseAmount` hoist | 14,277 vs 14,283 (−6) | 13,664 vs 13,661 (**+3**) | **Reverted.** |
+| `depositToken` store-before-pull | counted reads only helped legacy | deploy reads unchanged | **Reverted.** |
+
+Create settings-read pin (lives in `test/gas/R89ReviewCandidatesGas.t.sol`): **2** under default, **1**
+under deploy.
 
 ## Out of scope
 
 - [ ] Folding `IdleErc20Handler` into `TokenHandler` (keep the class; see **Closed decisions**).
 - [ ] One public exchange-rate scale (keep adapter constant + `TokenLending` immutable; R88).
-- [ ] Further collapse of purchase-row schedule slot 0 loads beyond R81 (feeding pause/period/route
-      into the write helper risks splitting the store).
+- [ ] Further collapse of purchase-row schedule slot 0 loads beyond R81.
 - [ ] Joining `isSwapper` and `getTokenHandler` into one OperationsAdmin view.
 - [ ] Switching Uniswap path setters to `calldata` (measured slower; R86).
 - [ ] Moving `BitChillOwnable` off `FeeHandler`.
@@ -68,19 +62,19 @@ after measurement in review (same turn as #160).
 
 | Item | Decision | Why |
 |---|---|---|
-| Fold `IdleErc20Handler` into `TokenHandler` | Keep the class | `TokenHandler` parents both idle and lending. Idle sum as the default batch funding would be a rule lending must override (same diagram lie the fee move removed). The short file is where the no-ledger residual risk is stated. Also rejected under [R90](./R90-final-optimization-decisions.md). |
-| One public exchange-rate scale | Keep constant + immutable | Adapter constant is a pushed literal; `TokenLending`'s immutable serves both 1e18 and 1e27. R88's public immutable grew every lending leaf. Constructor passes the constant in, so the two names cannot drift. See [R88](./R88-post-r87-structural-cleanups.md). |
-| Schedule slot 0 loaded four times per purchase row | Already fixed (R81) | R81 collapsed field reads to one load and the update to one store. One further load remains inside the write helper to preserve pause, period, and route. Feeding those fields in risks splitting the store (5,000 gas/row to save 200). |
-| Two OperationsAdmin calls on a single-handler batch | Leave | `isSwapper` then `getTokenHandler` ≈ 950 Rootstock gas once per batch. Joining them needs a view that answers authorization and routing together. See [ROOTSTOCK-GAS-AUDIT.md](./ROOTSTOCK-GAS-AUDIT.md). |
-| Uniswap path setters as `calldata` | Leave on `memory` | Measured slower (R86): `setPurchasePath` 43,390 memory vs 43,605 one copy vs 44,581 per-helper copy. Constructor-shared helpers cannot take `calldata`. |
-| Move `BitChillOwnable` off `FeeHandler` | Leave | Dex owner setters for the oracle, floor, and path would force the fee setters to move too, and the storage layout would change, for no hot-path gas. |
-| `depositToken` store-before-pull | **Reverted after measure** | No counted `SLOAD` removed under either profile; the `routeIndex` local existed only to support the reorder. |
+| Fold `IdleErc20Handler` into `TokenHandler` | Keep the class | Idle funding as `TokenHandler`'s default would be a rule lending must override. Also rejected under [R90](./R90-final-optimization-decisions.md). |
+| One public exchange-rate scale | Keep constant + immutable | See [R88](./R88-post-r87-structural-cleanups.md). |
+| Schedule slot 0 loaded four times per purchase row | Already fixed (R81) | Feeding pause/period/route into the write helper risks splitting the store (5,000/row to save 200). |
+| Two OperationsAdmin calls on a single-handler batch | Leave | Joining them needs a view that answers authorization and routing together. |
+| Uniswap path setters as `calldata` | Leave on `memory` | Measured slower (R86). |
+| Move `BitChillOwnable` off `FeeHandler` | Leave | Would force Dex setter moves and a layout change for no hot-path gas. |
+| `depositToken` store-before-pull | **Reverted after measure** | No deploy saving. |
+| `topUpFromInterest` `purchaseAmount` hoist | **Reverted after measure** | Costs gas/bytes under deploy; interest call cannot change `purchaseAmount`. |
 
 ## Files likely touched
 
 - `src/DcaManager.sol`
-- `test/gas/R94DcaManagerStoreBeforePullGas.t.sol` (and an in-file lending stub for the top-up pin)
-- `test/gas/R89ReviewCandidatesGas.t.sol` (create settings-read pin follows the post-R94 deploy count)
+- `test/gas/R89ReviewCandidatesGas.t.sol` (create settings-read pin: 1 under deploy, 2 under default)
 - `docs/relaunch/R94-dcamanager-store-before-pull.md`
 - `docs/relaunch/R89-post-r88-review-candidates.md` (footnote that deploy settings reads are now 1)
 - `docs/relaunch/IMPLEMENTATION_ORDER.md`
@@ -89,19 +83,11 @@ after measurement in review (same turn as #160).
 
 ## Required tests
 
-Existing deposit, create, withdraw, and top-up suites must pass unchanged (including revert cases where
-the handler or the interest check fails and storage rolls back).
-
-State-diff pins:
-
 ```text
-forge test --match-path test/gas/R94DcaManagerStoreBeforePullGas.t.sol -vv
-FOUNDRY_PROFILE=deploy forge test --match-path test/gas/R94DcaManagerStoreBeforePullGas.t.sol -vv
-```
-
-Full executable gate before push:
-
-```text
+SWAP_TYPE=mocSwaps LENDING_PROTOCOL=none STABLECOIN_TYPE=DOC \
+  forge test --match-path test/gas/R89ReviewCandidatesGas.t.sol --match-test test_createDcaSchedule -vv
+FOUNDRY_PROFILE=deploy SWAP_TYPE=mocSwaps LENDING_PROTOCOL=none STABLECOIN_TYPE=DOC \
+  forge test --match-path test/gas/R89ReviewCandidatesGas.t.sol --match-test test_createDcaSchedule -vv
 make check
 make check-deploy
 make fork-sovryn
@@ -110,29 +96,20 @@ make fork-tropykus
 
 ## Success criteria
 
-- [x] Deposit store-before-pull measured and reverted; create / top-up / withdraw edits match **Scope**.
-- [x] Create pin: protocol-settings slot reads once under deploy (2 under default); ≈ −200 Rootstock claimed.
-- [x] Top-up pin: slot 1 stays at 2 reads under both profiles; hoist kept; no gas claim.
-- [x] Withdrawal no longer calls `toUint128()` on the subtraction result; revert set unchanged.
-- [x] Closed-decision table is in this spec and reflected in `IMPLEMENTATION_ORDER.md` /
-      `README.md`.
+- [x] Create early nonce store and withdrawal downcast ship; deposit and top-up candidates reverted.
+- [x] Create settings pin: 1 under deploy, 2 under default (R89 gas test).
+- [x] Closed-decision table reflected in `IMPLEMENTATION_ORDER.md` / `README.md`.
 - [x] No ABI, event, error, or storage-layout change; no purchase-path edit.
-- [x] `make check`, `make check-deploy`, `make fork-sovryn`, and `make fork-tropykus` green (pre-revert
-      gate; deposit revert is call-order only — re-run targeted pins + `forge build` after).
-- [x] README Status points at this PR; next unassigned prompt recorded.
+- [x] Gate green; README Status points at this PR.
 
 ## Reviewer checklist
 
 - [ ] Matches **Scope**; nothing from **Out of scope**.
-- [ ] Protocol invariants in `AGENTS.md` still hold (no invariant change).
-- [ ] Tests match **Required tests**; pins run under both profiles.
-- [ ] Extra files beyond this list are named in the PR.
-- [ ] No unrelated refactors; history is reviewable.
+- [ ] Gas claims match **Measured pins** (create + withdraw only).
 - [ ] No relaunch ticket ids in `src/` comments.
-- [ ] Gas claims match **Measured pins** (create only under deploy).
 
 ## ABI / deploy / cutover impact
 
 - ABI: none.
 - Scripts: none.
-- Cutover: none. No consumer issue.
+- Cutover: none.

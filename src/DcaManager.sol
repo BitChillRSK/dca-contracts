@@ -135,9 +135,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         uint32 period = purchasePeriod.toUint32();
         uint32 route = routeIndex.toUint32();
 
-        // One load of the packed scalars, and the id this schedule will carry. The nonce is stored
-        // before the pull so the settings word is not reloaded after the external call; the schedule
-        // itself is still written only after tokens arrive.
+        // One load of the packed scalars, and the id this schedule will carry. Stored before the
+        // pull so the settings word is not reloaded after it.
         ProtocolSettings memory settings = s_protocolSettings;
         uint64 scheduleId;
         // A widened uint64 plus one cannot overflow; `toUint64` still reverts once the nonce is exhausted.
@@ -283,11 +282,6 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
      */
     function topUpFromInterest(address token, uint64 scheduleId, uint256 amount) external override nonReentrant {
         DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
-        // `purchaseAmount` shares slot 1 with the owner the check just read. Capture it before the
-        // interest call so that word is not reloaded afterward. `tokenBalance` stays after the call:
-        // interest is summed against the principal before the credit, so slot 0 is reloaded for that
-        // write on purpose.
-        uint256 purchaseAmount = dcaSchedule.purchaseAmount;
         uint256 routeIndex = dcaSchedule.routeIndex;
         _checkTokenYieldsInterest(token, routeIndex);
 
@@ -299,6 +293,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         }
 
         uint256 tokenBalance = dcaSchedule.tokenBalance;
+        uint256 purchaseAmount = dcaSchedule.purchaseAmount;
         uint128 newTokenBalance = (tokenBalance + amount).toUint128();
         // The credit must buy at least one more purchase than the balance could already fund, so
         // interest cannot be moved over in dust. A schedule that spends nothing per purchase can
@@ -730,8 +725,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         if (withdrawalAmount > tokenBalance) {
             revert DcaManager__WithdrawalAmountExceedsBalance(token, withdrawalAmount, tokenBalance);
         }
-        // Subtract the requested withdrawal amount, not the amount the handler paid out. The result
-        // fits in uint128 because withdrawalAmount is already bounded by tokenBalance.
+        // Subtract the requested withdrawal amount, not the amount the handler paid out.
+        // Fits in uint128: withdrawalAmount <= tokenBalance.
         uint128 newTokenBalance;
         unchecked {
             newTokenBalance = uint128(uint256(tokenBalance) - withdrawalAmount);

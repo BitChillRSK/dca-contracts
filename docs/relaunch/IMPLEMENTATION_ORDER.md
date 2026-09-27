@@ -155,7 +155,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R91 | after R90; not deployment-bound | none (`forge fmt` one-shot + CI enforce; metadata-stripped bytecode identity) |
 | R92 | after R91, before relaunch deploy | none (FeeHandler off `TokenHandler`; solve default-profile Dex stack-too-deep) |
 | R93 | after R92, before relaunch deploy | none (report already-measured receipt shares on zero-cash reverts; delete the diagnostic-only batch loop) |
-| R94 | after R93, before relaunch deploy | none (store known deposit/nonce credits before the handler pull; hoist top-up `purchaseAmount`; drop withdrawal downcast; record closed canvas leftovers) |
+| R94 | after R93, before relaunch deploy | none (create nonce before pull; drop withdrawal downcast; deposit store-before-pull and top-up hoist measured and reverted; record closed canvas leftovers) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1313,9 +1313,8 @@ without adding work to the successful path. The selector and encoded type stay u
 ### R94 - store known credits before the handler pull ([spec](./R94-dcamanager-store-before-pull.md))
 
 After R93, before relaunch deploy. `createDcaSchedule` stores the schedule nonce before the handler
-pull; `topUpFromInterest` reads `purchaseAmount` before the interest call; `_withdrawToken` drops the
-impossible `toUint128()`. `depositToken` store-before-pull was measured (no counted-read drop) and
-reverted. Measured under deploy: create drops one settings re-read (≈ −200 Rootstock). Also records
+pull (≈ −200 Rootstock under deploy); `_withdrawToken` drops the impossible `toUint128()`. Deposit
+store-before-pull and the top-up `purchaseAmount` hoist were measured and **reverted**. Also records
 the canvas closed leftovers (Idle fold, shared scale, purchase slot-0 further collapse, joined
 OperationsAdmin view, Uniswap path `calldata`, `BitChillOwnable` off `FeeHandler`). Ask: none
 (locked 2026-09-27).
