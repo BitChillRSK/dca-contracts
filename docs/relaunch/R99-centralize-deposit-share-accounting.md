@@ -27,7 +27,9 @@ and the deposit-path DRY stay separately reviewable.
 ## Scope
 
 - [x] `LendingHandler._depositToken` measures `mintedShares` via `_receiptSharesBalance()` around
-      `_protocolDeposit(depositAmount)`.
+      `_protocolDeposit(depositAmount)`. The delta uses checked subtraction (a declining balance
+      panics, same as the former adapter-local arithmetic); only a flat balance maps to
+      `LendingHandler__LendingProtocolDepositFailed`.
 - [x] `_protocolDeposit` returns nothing useful (or is `void`) and only performs the protocol mint /
       supply; adapters drop their local before/after balance arithmetic.
 - [x] LayerBank still uses `scaledBalanceOf` through `_receiptSharesBalance` — no behaviour change.
@@ -74,6 +76,8 @@ make fork-tropykus
 - [ ] Matches **Scope**; nothing from **Out of scope**.
 - [ ] Invariant 1 (balance-delta cash on the stablecoin pull) unchanged; share credits still measured,
       never taken from a protocol return.
+- [ ] Negative receipt-share delta still panics via checked subtraction; only zero mint uses
+      `LendingHandler__LendingProtocolDepositFailed`.
 - [ ] No relaunch ticket ids in `src/` comments.
 
 ## ABI / deploy / cutover impact
