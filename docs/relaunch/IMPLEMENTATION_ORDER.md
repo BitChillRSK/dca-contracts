@@ -1312,13 +1312,12 @@ without adding work to the successful path. The selector and encoded type stay u
 
 ### R94 - store known credits before the handler pull ([spec](./R94-dcamanager-store-before-pull.md))
 
-After R93, before relaunch deploy. `depositToken` and `createDcaSchedule` store the known
-`tokenBalance` credit / schedule nonce before the handler pull; `topUpFromInterest` reads
-`purchaseAmount` before the interest call; `_withdrawToken` drops the impossible `toUint128()`.
-Measured under deploy: create drops one settings re-read (≈ −200 Rootstock); deposit and top-up
-keep their ordering edits but do not drop a counted read, so those gas figures are not claimed.
-Also records the canvas closed leftovers (Idle fold, shared scale, purchase slot-0 further collapse,
-joined OperationsAdmin view, Uniswap path `calldata`, `BitChillOwnable` off `FeeHandler`). Ask: none
+After R93, before relaunch deploy. `createDcaSchedule` stores the schedule nonce before the handler
+pull; `topUpFromInterest` reads `purchaseAmount` before the interest call; `_withdrawToken` drops the
+impossible `toUint128()`. `depositToken` store-before-pull was measured (no counted-read drop) and
+reverted. Measured under deploy: create drops one settings re-read (≈ −200 Rootstock). Also records
+the canvas closed leftovers (Idle fold, shared scale, purchase slot-0 further collapse, joined
+OperationsAdmin view, Uniswap path `calldata`, `BitChillOwnable` off `FeeHandler`). Ask: none
 (locked 2026-09-27).
 
 ## Closed non-implementation decisions

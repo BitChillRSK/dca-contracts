@@ -21,9 +21,9 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
  *
  *      Read counts come from `vm.startStateDiffRecording`. A removed warm re-read is 100 Foundry /
  *      200 Rootstock. Create under deploy is the one pin that drops a counted read (settings slot
- *      2 → 1). Deposit and top-up keep their hoists / store-before-pull for the durable ordering
- *      reason; their counted reads stay at 2 on both profiles, so this suite does not claim those
- *      200 Rootstock figures.
+ *      2 → 1). Deposit store-before-pull was measured and reverted (reads stayed at 2). Top-up hoist
+ *      is kept; its counted reads stay at 2 on both profiles, so this suite does not claim that
+ *      200 Rootstock figure.
  */
 contract R94DcaManagerStoreBeforePullGasTest is Test {
     uint256 private constant MIN_PURCHASE_PERIOD = 1 days;
@@ -74,9 +74,14 @@ contract R94DcaManagerStoreBeforePullGasTest is Test {
 
         uint256 reads = _readCount(accesses, address(s_manager), slot0);
         console2.log("R94 deposit schedule slot0 reads", reads);
-        // Balance + route field reads of the packed word; the store-before-pull does not drop a
-        // counted read under either profile (parent was also 2).
-        assertEq(reads, 2, "deposit schedule slot 0 read count drifted");
+        // Call-then-credit: balance + route, then the packed store's RMW after the pull. Legacy
+        // codegen counts that RMW as a third read (3); deploy (`via_ir`) keeps it at 2. Store-before-
+        // pull was 2 on both profiles but saved nothing under deploy, so it was reverted.
+        if (_isDeployProfile()) {
+            assertEq(reads, 2, "deposit schedule slot 0 read count drifted under deploy");
+        } else {
+            assertEq(reads, 3, "deposit schedule slot 0 read count drifted on default");
+        }
         assertEq(s_manager.getDcaSchedule(s_token, scheduleId).tokenBalance, DEPOSIT_AMOUNT * 2);
     }
 

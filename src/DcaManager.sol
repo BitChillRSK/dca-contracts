@@ -174,13 +174,9 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     function depositToken(address token, uint64 scheduleId, uint256 depositAmount) external override nonReentrant {
         _validateDeposit(depositAmount);
         DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
-        // The credited amount is known before the pull (the handler reverts unless it receives exactly
-        // what was asked). Storing after the call would reload the packed slot that also holds the
-        // anchor, pause, period, and route.
         uint128 newTokenBalance = (uint256(dcaSchedule.tokenBalance) + depositAmount.toUint128()).toUint128();
-        uint32 routeIndex = dcaSchedule.routeIndex;
+        _handlerForDeposit(token, dcaSchedule.routeIndex).depositToken(msg.sender, depositAmount);
         dcaSchedule.tokenBalance = newTokenBalance;
-        _handlerForDeposit(token, routeIndex).depositToken(msg.sender, depositAmount);
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
     }
 

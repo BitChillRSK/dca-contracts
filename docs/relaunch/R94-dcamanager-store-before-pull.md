@@ -4,34 +4,29 @@ Status: **implemented** · GitHub [#160](https://github.com/BitChillRSK/dca-cont
 
 ## Objective
 
-On three `DcaManager` user paths, stop reloading a packed storage word the call already holds: store the
-known deposit credit and the new schedule nonce before the handler pull, hoist the top-up
-`purchaseAmount` read ahead of the interest call, and drop the impossible `toUint128()` on withdrawal.
-Pin the three read claims under default and `FOUNDRY_PROFILE=deploy`. Record the companion closed
-decisions so a later pass does not reopen them.
+On `DcaManager` user paths that reload a packed word across an external call: store the new schedule
+nonce before the create pull, hoist the top-up `purchaseAmount` read ahead of the interest call, and
+drop the impossible `toUint128()` on withdrawal. Pin the read claims under default and
+`FOUNDRY_PROFILE=deploy`. Record the companion closed decisions so a later pass does not reopen them.
+`depositToken` store-before-pull was tried and **reverted** after measurement showed no saving.
 
 ## Background
 
 Locked 2026-09-27 in the overlooked-optimizations canvas. Contracts are not proxies and have not
-deployed, so reordering a store ahead of a call that cannot change its value is safe. R41 already
-reverts unless the handler receives the requested deposit amount, so waiting to credit
-`tokenBalance` learns nothing — and the credit shares slot 0 with the anchor, pause, period, and
-route, so a packed store after the external call reloads that word. The same reload hits
-`s_protocolSettings` when `createDcaSchedule` writes the nonce after the pull. `topUpFromInterest`
-reads slot 1 for the owner check, calls out for interest, then reads `purchaseAmount` from the same
-word again. `_withdrawToken` subtracts an amount already checked against a `uint128` balance, so
-`SafeCast.toUint128()` cannot fail.
+deployed, so reordering a store ahead of a call that cannot change its value is safe. The canvas
+candidates were: credit `tokenBalance` before the deposit pull; bump `scheduleNonce` before the create
+pull; hoist top-up `purchaseAmount` before the interest call; drop withdrawal `toUint128()`.
 
 ## Open product decisions
 
-**none.** The implement / closed split was locked 2026-09-27.
+**none.** The implement / closed split was locked 2026-09-27. Deposit store-before-pull was dropped
+after measurement in review (same turn as #160).
 
 ## Scope
 
-- [x] **1. `depositToken`:** load balance and route, compute the new balance, store `tokenBalance`, then
-      call the handler with the route in a local. Emit after the call. Source comment states the durable
-      reason (known credit; packed store after the call would reload the word). No relaunch ticket ids
-      in `src/` comments.
+- [x] **1. `depositToken` store-before-pull — tried, reverted.** Counted schedule slot-0 reads stayed at
+      2 under both profiles; Foundry gas was flat. The reorder needed a `routeIndex` local only to keep
+      the route load above the early store, for no measured win. Left as call-then-credit (no local).
 - [x] **2. `createDcaSchedule`:** assign `s_protocolSettings.scheduleNonce` before `_handlerForDeposit`,
       with no external call between the settings load and that store. Leave `_storeNewSchedule` after the
       pull (fresh writes; the schedule must not exist before tokens arrive). A token callback during the
@@ -41,7 +36,7 @@ word again. `_withdrawToken` subtracts an amount already checked against a `uint
       directly. Keep the comparison against `withdrawalAmount`. Do not change the revert set.
 - [x] **4. `topUpFromInterest`:** read `purchaseAmount` immediately after the owner check and before
       `_checkTokenYieldsInterest` / `getAccruedInterest`. Leave the `tokenBalance` read and its store
-      after the interest call (slot 0 is reloaded for that write on purpose).
+      after the interest call (slot 0 is reloaded for that write on purpose). No gas claim (see pins).
 - [x] **5. State-diff pins** under default and `FOUNDRY_PROFILE=deploy` (see **Measured pins**).
 - [x] **6. Docs:** this spec, `IMPLEMENTATION_ORDER.md`, `README.md` Status, and closed-decision
       entries for every canvas "Closed" row (cross-link earlier closures; add any new one).
@@ -52,7 +47,7 @@ word again. `_withdrawToken` subtracts an amount already checked against a `uint
 
 | Path | Slot | default reads | deploy reads | Gas claim |
 |---|---|---:|---:|---|
-| `depositToken` | schedule slot 0 | 2 (unchanged) | 2 (unchanged) | **None.** Store-before-pull kept for the durable ordering reason; counted reads match parent. |
+| `depositToken` store-before-pull | schedule slot 0 | tried 2 vs parent 3 | tried 2 vs parent 2 | **Reverted.** Only legacy codegen dropped a counted read; shipping `via_ir` did not. |
 | `createDcaSchedule` | `s_protocolSettings` | 2 | **1** (was 2) | **≈ −200 Rootstock** (one warm re-read removed under deploy; Foundry ≈ −120). |
 | `topUpFromInterest` | schedule slot 1 | 2 (unchanged) | 2 (unchanged) | **None.** Hoist kept; owner check not inlined with `purchaseAmount` on deploy. |
 | `_withdrawToken` | n/a | n/a | n/a | Tens of compute gas (dropped `SafeCast.toUint128()`); revert set unchanged. |
@@ -79,6 +74,7 @@ word again. `_withdrawToken` subtracts an amount already checked against a `uint
 | Two OperationsAdmin calls on a single-handler batch | Leave | `isSwapper` then `getTokenHandler` ≈ 950 Rootstock gas once per batch. Joining them needs a view that answers authorization and routing together. See [ROOTSTOCK-GAS-AUDIT.md](./ROOTSTOCK-GAS-AUDIT.md). |
 | Uniswap path setters as `calldata` | Leave on `memory` | Measured slower (R86): `setPurchasePath` 43,390 memory vs 43,605 one copy vs 44,581 per-helper copy. Constructor-shared helpers cannot take `calldata`. |
 | Move `BitChillOwnable` off `FeeHandler` | Leave | Dex owner setters for the oracle, floor, and path would force the fee setters to move too, and the storage layout would change, for no hot-path gas. |
+| `depositToken` store-before-pull | **Reverted after measure** | No counted `SLOAD` removed under either profile; the `routeIndex` local existed only to support the reorder. |
 
 ## Files likely touched
 
@@ -114,15 +110,15 @@ make fork-tropykus
 
 ## Success criteria
 
-- [x] The four `DcaManager` edits match **Scope**; nothing from **Out of scope** ships.
-- [x] Deposit pin: schedule slot 0 read count recorded (2 on both profiles; no gas claim).
+- [x] Deposit store-before-pull measured and reverted; create / top-up / withdraw edits match **Scope**.
 - [x] Create pin: protocol-settings slot reads once under deploy (2 under default); ≈ −200 Rootstock claimed.
 - [x] Top-up pin: slot 1 stays at 2 reads under both profiles; hoist kept; no gas claim.
 - [x] Withdrawal no longer calls `toUint128()` on the subtraction result; revert set unchanged.
 - [x] Closed-decision table is in this spec and reflected in `IMPLEMENTATION_ORDER.md` /
       `README.md`.
 - [x] No ABI, event, error, or storage-layout change; no purchase-path edit.
-- [x] `make check`, `make check-deploy`, `make fork-sovryn`, and `make fork-tropykus` green.
+- [x] `make check`, `make check-deploy`, `make fork-sovryn`, and `make fork-tropykus` green (pre-revert
+      gate; deposit revert is call-order only — re-run targeted pins + `forge build` after).
 - [x] README Status points at this PR; next unassigned prompt recorded.
 
 ## Reviewer checklist
