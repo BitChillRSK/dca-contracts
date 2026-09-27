@@ -2,7 +2,6 @@
 pragma solidity 0.8.36;
 
 import {PurchaseRbtc} from "./PurchaseRbtc.sol";
-import {IPurchaseRbtc} from "./interfaces/IPurchaseRbtc.sol";
 import {IWRBTC} from "./interfaces/IWRBTC.sol";
 import {IUniswapV3SwapRouter} from "./interfaces/IUniswapV3SwapRouter.sol";
 import {ICoinPairPrice} from "./interfaces/ICoinPairPrice.sol";
@@ -131,20 +130,6 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
                            EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
     /**
-     * @inheritdoc IPurchaseRbtc
-     * @dev Unwraps WRBTC to native rBTC before paying the signer.
-     */
-    function withdrawAccumulatedRbtc(address user) external override onlyDcaManager {
-        uint256 rbtcBalance = _withdrawRbtcChecksEffects(user);
-
-        // Unwrap rBTC
-        i_wrBtcToken.withdraw(rbtcBalance);
-
-        // Transfer RBTC from this contract back to the user
-        _withdrawRbtc(user, rbtcBalance);
-    }
-
-    /**
      * @inheritdoc IPurchaseUniswap
      * @dev The arrays are `memory` on purpose. The path helpers they reach are shared with the
      *      constructor, which can only pass `memory`, so `calldata` here would be copied at each helper
@@ -249,45 +234,6 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Writes `s_swapPath` and its intermediate tokens together, then emits
-     *      `PurchaseUniswap__NewPathSet`. `newPath` must be
-     *      `_encodePurchasePath(intermediateTokens, poolFeeRates)`; the event's components are how
-     *      off-chain reconstructs the route. The two writes are one statement pair on purpose: the
-     *      purchase checks the router against the active path's intermediate tokens, and a path
-     *      activation that left the previous set behind would check the wrong tokens.
-     */
-    function _setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates, bytes memory newPath)
-        internal
-    {
-        s_swapPath = newPath;
-        s_swapIntermediateTokens = intermediateTokens;
-        emit PurchaseUniswap__NewPathSet(intermediateTokens, poolFeeRates, newPath);
-    }
-
-    /**
-     * @dev Raw allowlist write and `PurchaseUniswap__PurchasePathAllowedSet`.
-     *      The caller must already have rejected a no-op permission write and, when
-     *      `allowed` is false, revocation of `keccak256(s_swapPath)`, so every emit is a
-     *      real transition and the active path stays allowed. `encodedPath` must be
-     *      `_encodePurchasePath(intermediateTokens, poolFeeRates)` and `pathHash` must be
-     *      `keccak256(encodedPath)`.
-     */
-    function _setPurchasePathAllowed(
-        bytes32 pathHash,
-        bytes memory encodedPath,
-        address[] memory intermediateTokens,
-        uint24[] memory poolFeeRates,
-        bool allowed
-    ) internal {
-        s_purchasePathAllowed[pathHash] = allowed;
-        emit PurchaseUniswap__PurchasePathAllowedSet(pathHash, encodedPath, intermediateTokens, poolFeeRates, allowed);
-    }
-
-    function _approveSwapRouter() internal {
-        i_stableToken.forceApprove(address(i_swapRouter02), type(uint256).max);
-    }
-
-    /**
      * @dev Uses the stricter of the oracle and caller floors, and credits only the measured WRBTC delta.
      *      PurchaseRbtc proves the exact stablecoin input left this handler. This venue-specific layer also
      *      requires every intermediate-token router balance to return to its pre-swap value. Comparing
@@ -343,9 +289,54 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
             (stablecoinAmountToSpend * i_stablecoinToUsdScale * s_amountOutMinimumPercent) / currentPrice;
     }
 
+    /// @dev Purchases accumulate WRBTC; unwrap the withdrawal to native rBTC before paying the signer.
+    function _withdrawRbtc(address user, uint256 rbtcBalance) internal override {
+        i_wrBtcToken.withdraw(rbtcBalance);
+        super._withdrawRbtc(user, rbtcBalance);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             PRIVATE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @dev Writes `s_swapPath` and its intermediate tokens together, then emits
+     *      `PurchaseUniswap__NewPathSet`. `newPath` must be
+     *      `_encodePurchasePath(intermediateTokens, poolFeeRates)`; the event's components are how
+     *      off-chain reconstructs the route. The two writes are one statement pair on purpose: the
+     *      purchase checks the router against the active path's intermediate tokens, and a path
+     *      activation that left the previous set behind would check the wrong tokens.
+     */
+    function _setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates, bytes memory newPath)
+        private
+    {
+        s_swapPath = newPath;
+        s_swapIntermediateTokens = intermediateTokens;
+        emit PurchaseUniswap__NewPathSet(intermediateTokens, poolFeeRates, newPath);
+    }
+
+    /**
+     * @dev Raw allowlist write and `PurchaseUniswap__PurchasePathAllowedSet`.
+     *      The caller must already have rejected a no-op permission write and, when
+     *      `allowed` is false, revocation of `keccak256(s_swapPath)`, so every emit is a
+     *      real transition and the active path stays allowed. `encodedPath` must be
+     *      `_encodePurchasePath(intermediateTokens, poolFeeRates)` and `pathHash` must be
+     *      `keccak256(encodedPath)`.
+     */
+    function _setPurchasePathAllowed(
+        bytes32 pathHash,
+        bytes memory encodedPath,
+        address[] memory intermediateTokens,
+        uint24[] memory poolFeeRates,
+        bool allowed
+    ) private {
+        s_purchasePathAllowed[pathHash] = allowed;
+        emit PurchaseUniswap__PurchasePathAllowedSet(pathHash, encodedPath, intermediateTokens, poolFeeRates, allowed);
+    }
+
+    function _approveSwapRouter() private {
+        i_stableToken.forceApprove(address(i_swapRouter02), type(uint256).max);
+    }
 
     /**
      * @dev Uniswap V3 `exactInput` bytes: this handler's stablecoin, then each
