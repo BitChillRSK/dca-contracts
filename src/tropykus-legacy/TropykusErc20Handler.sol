@@ -59,11 +59,9 @@ abstract contract TropykusErc20Handler is LendingHandler {
         return address(i_kToken);
     }
 
-    /// @dev The kToken credited is the balance actually gained, never `mint()`'s return value.
-    function _protocolDeposit(uint256 stablecoinAmount) internal override returns (uint256 mintedShares) {
-        uint256 prevKtokenBalance = i_kToken.balanceOf(address(this));
+    /// @dev Mint only; the base credits the measured kToken gain, never `mint()`'s return value.
+    function _protocolDeposit(uint256 stablecoinAmount) internal override {
         if (i_kToken.mint(stablecoinAmount) != 0) revert LendingHandler__LendingProtocolDepositFailed();
-        mintedShares = i_kToken.balanceOf(address(this)) - prevKtokenBalance;
     }
 
     /**

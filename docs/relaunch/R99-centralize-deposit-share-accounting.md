@@ -1,6 +1,6 @@
 # R99 — Centralize measured deposit-share accounting
 
-Status: **not started** · Assigned: no · Optional/further-review: no · Stack on: R98
+Status: **implemented** · Assigned: yes · Optional/further-review: no · Stack on: R98
 
 ## Objective
 
@@ -26,12 +26,12 @@ and the deposit-path DRY stay separately reviewable.
 
 ## Scope
 
-- [ ] `LendingHandler._depositToken` measures `mintedShares` via `_receiptSharesBalance()` around
+- [x] `LendingHandler._depositToken` measures `mintedShares` via `_receiptSharesBalance()` around
       `_protocolDeposit(depositAmount)`.
-- [ ] `_protocolDeposit` returns nothing useful (or is `void`) and only performs the protocol mint /
+- [x] `_protocolDeposit` returns nothing useful (or is `void`) and only performs the protocol mint /
       supply; adapters drop their local before/after balance arithmetic.
-- [ ] LayerBank still uses `scaledBalanceOf` through `_receiptSharesBalance` — no behaviour change.
-- [ ] Existing deposit / `UserSharesUpdated` tests still pass; add a harness assertion that the
+- [x] LayerBank still uses `scaledBalanceOf` through `_receiptSharesBalance` — no behaviour change.
+- [x] Existing deposit / `UserSharesUpdated` tests still pass; add a harness assertion that the
       credited shares equal the measured external delta.
 
 ## Out of scope
@@ -64,10 +64,10 @@ make fork-tropykus
 
 ## Success criteria
 
-- [ ] One measured-mint implementation in the base; adapters have no deposit balance delta math.
-- [ ] Metadata-stripped behaviour identical aside from any incidental bytecode reshape (no ABI,
+- [x] One measured-mint implementation in the base; adapters have no deposit balance delta math.
+- [x] Metadata-stripped behaviour identical aside from any incidental bytecode reshape (no ABI,
       storage, or event change).
-- [ ] `make check` and both fork lanes green.
+- [x] `make check` and both fork lanes green.
 
 ## Reviewer checklist
 
