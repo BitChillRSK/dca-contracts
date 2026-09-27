@@ -158,6 +158,15 @@ is proven by comparing metadata-stripped runtime, not `forge build --sizes` (see
 
 - Targeted tests for the spec first. Document exact commands in the PR.
 - **Foundry gas ≠ Rootstock gas.** Foundry/`revm` prices execution like Ethereum Cancun (EIP-2929 cold/warm, EIP-3529 refunds). Rootstock (`rskj`) does not: flat `SLOAD = 200`, Petersburg SSTORE (`SET`/`RESET`/`CLEAR`/`REFUND`), refund cap `gasUsed / 2`. Any gas claim about production must be converted using [`docs/relaunch/ROOTSTOCK-GAS-SCHEDULE.md`](./docs/relaunch/ROOTSTOCK-GAS-SCHEDULE.md), and specs must label which schedule each figure is on. Foundry numbers remain valid as same-build regression pins when labelled as such. **Never rank or accept an optimization that changes SLOAD/SSTORE counts from the Foundry delta alone:** identify the exact reads and current→new writes in both variants, price those operations on Rootstock, and carry over only compute/memory/log deltas whose schedules match. In particular, repeated writes to one nonzero slot cost 5,000 each on Rootstock even when Foundry reports ~100, while `SET − REFUND = RESET` makes clear/set versus keep-nonzero system-neutral. Count writes **per slot**, not just total gas (`vm.startStateDiffRecording`): a packed field write the compiler did not merge, or a slot restored to its value within the same transaction, costs ~100 in Foundry and 5,000 on Rootstock. A repeat call into an already-touched contract costs 100 in Foundry and 700 on Rootstock. [`ROOTSTOCK-GAS-AUDIT.md`](./docs/relaunch/ROOTSTOCK-GAS-AUDIT.md) records the `src/`-wide review against this rule.
+- **Where a gas saving lands decides its bar.** Purchase-path savings (swapper-paid, every tick) ship
+  once equivalence is proven. A saving only on user-paid, off-purchase paths (exits, interest,
+  schedule edits, admin setters) ships only if the code also gets simpler or clearer; if it adds a
+  parameter, mode, branch, or duplicated responsibility, decline it however large the number. Settled
+  cases: [R97](./docs/relaunch/R97-redeem-lending-exits-to-user.md) (redeem exits to the user) and
+  `setFeeRateParams` in the [gas audit](./docs/relaunch/ROOTSTOCK-GAS-AUDIT.md#closed-without-a-spec).
+  Check the **Closed non-implementation decisions** register in
+  [`IMPLEMENTATION_ORDER.md`](./docs/relaunch/IMPLEMENTATION_ORDER.md#closed-non-implementation-decisions)
+  before proposing any optimization.
 - **Done-gate:** `make check` (`forge build`, `make moc-none`, `make moc-layerbank`, `make moc-sovryn`, `STABLECOIN_TYPE=USDRIF make dex-none`, `STABLECOIN_TYPE=USDT0 make dex-none`, `STABLECOIN_TYPE=USDRIF make dex-sovryn`, `STABLECOIN_TYPE=USDRIF make dex-layerbank`, `STABLECOIN_TYPE=USDT0 make dex-layerbank`, and `make invariants-sovryn`).
 - **Scale the gate to the change.** Pick the tier from what the push changes against the branch's
   current remote tip, not from what the PR as a whole touches:

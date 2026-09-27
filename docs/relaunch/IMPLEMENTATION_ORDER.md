@@ -1396,6 +1396,17 @@ There is no optional-late queue. Items either have an ordered spec above or are 
   swapper's row order. Reasons, measurements, and reopen conditions:
   [R79](./R79-coalesce-repeated-buyer-writes.md); code at the tag
   [`archive/r79-coalesced-writes`](https://github.com/BitChillRSK/dca-contracts/tree/archive/r79-coalesced-writes).
+- **R97 redeem lending exits straight to the user — closed 2026-09-27 without merging.** Implemented,
+  measured, and green in [#163](https://github.com/BitChillRSK/dca-contracts/pull/163): ≈ −15,000
+  Rootstock gas per lending exit, ≈ −27,500 on `withdrawTokenAndInterest`. The saving is user-paid and
+  off the purchase path, so it had to simplify the code, and it does the opposite: `_protocolRedeem`
+  regains the `receiver` parameter R28 removed (a mode every adapter implements), Tropykus needs a
+  measure-and-forward branch, the withdraw event moves from the base into each subclass, and exits
+  measure the user's balance instead of the handler's. Do not re-propose a recipient on the redeem hook
+  (Sovryn `burn(user)`, LayerBank `withdraw(..., user)`, or any variant) for gas. Reopen only if exits
+  become protocol-paid, or if a correctness change needs the recipient anyway. Reasons and
+  measurements: [R97](./R97-redeem-lending-exits-to-user.md); code on the branch
+  `perf/r97-redeem-exits-to-user`.
 - **SPDX change — reopened 2026-08-31, answered 2026-09-07.** The earlier rejection argued that re-licensing "requires an explicit legal/product process outside the contract implementation stack" and then closed the decision on that basis, which is self-defeating: that is a reason to route the question to a human, not to answer it. See **Licensing — decided**.
 
 ## Licensing — decided
