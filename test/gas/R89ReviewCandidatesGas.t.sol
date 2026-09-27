@@ -40,8 +40,9 @@ contract R89ReviewCandidatesGasTest is DcaDappTest {
 
     function setUp() public override {
         super.setUp();
+        // Do not `vm.skip` here after `super.setUp()` — CI forge reports that as
+        // `FAIL: FOUNDRY::SKIP`. Leave fixtures empty off Anvil; tests that need buyers skip first.
         if (block.chainid != ANVIL_CHAIN_ID) {
-            vm.skip(true);
             return;
         }
         s_buyers.push(USER);
@@ -174,6 +175,7 @@ contract R89ReviewCandidatesGasTest is DcaDappTest {
     /// @dev Logged figure only: the `unchecked` saving is compute, so it shows as a lower total here and
     ///      carries over to Rootstock unchanged.
     function test_batchBuyRbtc_tenRows() public {
+        if (block.chainid != ANVIL_CHAIN_ID) vm.skip(true);
         uint64[] memory scheduleIds = new uint64[](ROWS);
         for (uint256 i; i < ROWS; ++i) {
             scheduleIds[i] = scheduleIdAt(dcaManager, s_buyers[i], address(stablecoin), 0);
