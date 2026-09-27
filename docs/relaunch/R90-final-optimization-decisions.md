@@ -1,6 +1,6 @@
 # R90 — final optimization and handler-structure decisions
 
-Status: **in progress** · Assigned: yes · Optional/further-review: no
+Status: **in progress** · Assigned: [PR #155](https://github.com/BitChillRSK/dca-contracts/pull/155) · Optional/further-review: no
 
 ## Objective
 
