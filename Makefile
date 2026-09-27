@@ -21,7 +21,7 @@ PROBE_VERBOSITY ?= -vv
 PROBE_MATCH ?=
 
 # Targets
-.PHONY: all test moc dex help check ci check-deploy build build-deploy slither moc-none moc-layerbank moc-tropykus moc-sovryn dex-none dex-tropykus dex-sovryn dex-layerbank invariants invariants-sovryn fork fork-none fork-tropykus fork-sovryn fork-layerbank fork-dex-path probe-sovryn-exit-fee probe-moc-redeem-free-doc probe-dex-quote-floor probe-standing-approvals coverage license-check
+.PHONY: all test moc dex help check ci check-deploy build build-deploy slither moc-none moc-layerbank moc-tropykus moc-sovryn dex-none dex-tropykus dex-sovryn dex-layerbank invariants invariants-sovryn fork fork-none fork-tropykus fork-sovryn fork-layerbank fork-dex-path probe-sovryn-exit-fee probe-moc-redeem-free-doc probe-dex-quote-floor probe-standing-approvals coverage license-check fmt-check
 
 all: help
 
@@ -49,9 +49,14 @@ license-check:
 	fi
 	@echo "OK: every src/**/*.sol is BUSL-1.1."
 
+# R91: first-party tree is forge-fmt-clean (vendored ABIs ignored in foundry.toml [fmt]).
+fmt-check:
+	@echo "Checking forge fmt..."
+	@forge fmt --check
+
 # Local "am I done" gate. Mirrors required CI lanes and includes the local Tropykus mock lane.
-# Does not run forge fmt --check (src is not fmt-clean). Run `make slither` explicitly when needed.
-check: build license-check
+# Run `make slither` explicitly when needed.
+check: build license-check fmt-check
 	$(MAKE) moc-none
 	$(MAKE) moc-layerbank
 	$(MAKE) moc-sovryn
@@ -62,7 +67,7 @@ check: build license-check
 	STABLECOIN_TYPE=USDT0 $(MAKE) dex-layerbank
 	$(MAKE) invariants-sovryn
 
-ci:
+ci: fmt-check
 	FOUNDRY_PROFILE=ci $(MAKE) build
 	FOUNDRY_PROFILE=ci $(MAKE) moc-none
 	FOUNDRY_PROFILE=ci $(MAKE) moc-layerbank
