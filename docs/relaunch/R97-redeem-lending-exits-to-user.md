@@ -38,7 +38,7 @@ After this PR, the lending exit measures the user's balance. `AGENTS.md` invaria
 that: "or the user's balance when paying the user". The class R21 describes is a stablecoin that
 credits the recipient nothing, such as one with a 100% outbound fee:
 - **Before:** that token would have let a withdrawal report success while paying the user nothing.
-- **After:** it reverts `TokenLending__ZeroStablecoinReceived` and leaves the position intact.
+- **After:** it reverts `LendingHandler__ZeroStablecoinReceived` and leaves the position intact.
 
 R21 itself says that token "would in isolation be better served by reverting". The listed stablecoins are
 plain ERC-20s, and a handler's stablecoin is fixed at construction. Idle withdrawals keep measuring the
@@ -121,7 +121,7 @@ market → handler → user, and passes here.
 
 ## Scope
 
-- [x] **Redeem hooks.** `LendingErc20Handler`:
+- [x] **Redeem hooks.** `LendingHandler`:
   - `_protocolRedeem(uint256 sharesAmount, uint256 exchangeRate, address receiver)`;
   - `_measuredProtocolRedeem(..., address receiver)` measures `i_stableToken.balanceOf(receiver)`
     around the redeem;
@@ -143,10 +143,10 @@ market → handler → user, and passes here.
     address(this)` it measures its own stablecoin delta and forwards it. The batch path reads
     nothing extra.
 - [x] **Tests.**
-  - The `LendingErc20HandlerRedeemTest` harness implements the new hook.
+  - The `LendingHandlerRedeemTest` harness implements the new hook.
   - A new test pins that a lending exit never moves cash through the handler: no stablecoin
     `Transfer` to or from the handler on Sovryn and LayerBank. It also pins that the user's balance
-    rises by the amount `TokenHandler__TokenWithdrawn` / `TokenLending__InterestWithdrawn` report.
+    rises by the amount `TokenHandler__TokenWithdrawn` / `LendingHandler__InterestWithdrawn` report.
 
 ## Out of scope
 
@@ -157,10 +157,10 @@ market → handler → user, and passes here.
 
 ## Files likely touched
 
-- `src/LendingErc20Handler.sol`, `src/TokenHandler.sol`, `src/idle/IdleErc20Handler.sol`
+- `src/LendingHandler.sol`, `src/TokenHandler.sol`, `src/idle/IdleErc20Handler.sol`
 - `src/sovryn/SovrynErc20Handler.sol`, `src/layerbank/LayerBankErc20Handler.sol`,
   `src/tropykus-legacy/TropykusErc20Handler.sol`
-- `test/unit/LendingErc20HandlerRedeemTest.t.sol`, a new `test/unit/RedeemToUserTest.t.sol`
+- `test/unit/LendingHandlerRedeemTest.t.sol`, a new `test/unit/RedeemToUserTest.t.sol`
 - `test/gas/R87IdleLedgerRemovalGas.t.sol`: its pre-R87 baseline harness inherited `TokenHandler`
   for the withdraw body, which has moved, so it now builds on `IdleErc20Handler`. It prices batch
   funding only, and that is unchanged.
