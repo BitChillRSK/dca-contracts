@@ -1,6 +1,6 @@
 # R100 — Invariant suite honesty and integrated lending/purchase coverage
 
-Status: **in progress** · Assigned: this PR · Optional/further-review: no · Stack on: R99
+Status: **assigned** · Assigned: [#166](https://github.com/BitChillRSK/dca-contracts/pull/166) · Optional/further-review: no · Stack on: R99 (#165)
 
 ## Objective
 
