@@ -1,6 +1,6 @@
 # R93 — Report redeemed shares on zero-cash failures
 
-Status: **assigned** · Assigned: yes · Optional/further-review: no · Stack on: [#157](https://github.com/BitChillRSK/dca-contracts/pull/157)
+Status: **implemented** · GitHub [#159](https://github.com/BitChillRSK/dca-contracts/pull/159) · Assigned: yes · Optional/further-review: no · Stack on: [#157](https://github.com/BitChillRSK/dca-contracts/pull/157)
 
 ## Objective
 
