@@ -41,8 +41,8 @@ abstract contract StablecoinSource is IStablecoinSource {
      * @param purchaseAmounts Amount charged to each buyer.
      * @return The total amount actually available to spend.
      */
-    function _batchRetrieveStablecoin(
-        address[] calldata buyers,
-        uint256[] calldata purchaseAmounts
-    ) internal virtual returns (uint256);
+    function _batchRetrieveStablecoin(address[] calldata buyers, uint256[] calldata purchaseAmounts)
+        internal
+        virtual
+        returns (uint256);
 }

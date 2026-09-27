@@ -1289,6 +1289,17 @@ PRs (diagram cleanup / format-only; do not mix into R90). Gross-total `_batchRet
 Idle fold stay rejected; keep-checked arithmetic stays checked. Swap-pop bounds assembly **rejected**
 (packed `uint64[]`; rare path). Ask: none remaining for this PR's executable subset.
 
+### R91 - `forge fmt` one-shot and CI enforce ([spec](./R91-forge-fmt.md))
+
+After R90; not deployment-bound. Format the first-party tree, ignore vendored ABIs in
+`foundry.toml` `[fmt]`, wire `make fmt-check` into `make check` and CI, and prove metadata-stripped
+creation/runtime identity on every deployable contract under both profiles. Ask: none.
+
+### R92 - FeeHandler ownership move ([spec](./R92-feehandler-ownership.md) — write before Solidity)
+
+After R91, before relaunch deploy. Move `FeeHandler` off `TokenHandler` onto the purchase branch;
+solve default-profile Dex stack-too-deep. Ask: none (approved under R90).
+
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:

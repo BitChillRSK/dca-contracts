@@ -84,9 +84,8 @@ contract DeployUsdrifHandler is DeployBase {
     }
 
     function run(UsdrifHelperConfig existingConfig) external returns (address) {
-        UsdrifHelperConfig helperConfig = address(existingConfig) != address(0)
-            ? existingConfig
-            : new UsdrifHelperConfig();
+        UsdrifHelperConfig helperConfig =
+            address(existingConfig) != address(0) ? existingConfig : new UsdrifHelperConfig();
 
         UsdrifHelperConfig.NetworkConfig memory networkConfig = helperConfig.getNetworkConfig();
 
@@ -185,9 +184,7 @@ contract DeployUsdrifHandler is DeployBase {
             console.log("tokenAddress:", tokenAddress);
             console.log("index:", LAYERBANK_INDEX);
             console.log("handlerAddress:", handler);
-            console.log(
-                "minPurchaseAmount:", isUsdt0Live ? USDT0_MIN_PURCHASE_AMOUNT : MIN_PURCHASE_AMOUNT
-            );
+            console.log("minPurchaseAmount:", isUsdt0Live ? USDT0_MIN_PURCHASE_AMOUNT : MIN_PURCHASE_AMOUNT);
             return;
         }
         if (operationsAdmin.getRouteClass(LAYERBANK_INDEX) == IOperationsAdmin.RouteClass.Unregistered) {

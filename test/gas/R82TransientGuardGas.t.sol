@@ -96,7 +96,8 @@ contract R82TransientGuardGasTest is Test {
         s_buyer = makeAddr("buyer");
 
         OperationsAdmin operationsAdmin = new OperationsAdmin(address(this));
-        s_manager = new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, address(this));
+        s_manager =
+            new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, address(this));
         s_manager.setTokenMinPurchaseAmount(s_token, MIN_PURCHASE_AMOUNT);
         s_handler = new ReenteringDepositHandler(s_manager, s_token);
         operationsAdmin.assignTokenHandler(s_token, ROUTE_INDEX, address(s_handler));

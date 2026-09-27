@@ -101,9 +101,7 @@ interface IDcaManager {
      * @dev `userMutationsAllowedFromBlock` is not indexed: it is a scalar rather than an address or
      *      schedule id. Guarded user mutations are refused before this block and available from it.
      */
-    event DcaManager__ProtectedPurchaseWindowActivated(
-        address indexed swapper, uint256 userMutationsAllowedFromBlock
-    );
+    event DcaManager__ProtectedPurchaseWindowActivated(address indexed swapper, uint256 userMutationsAllowedFromBlock);
     /**
      * @notice Accrued lending interest was credited to one schedule's spendable balance.
      * @dev No tokens move: the position stays in the lending protocol and only this schedule's
@@ -192,7 +190,9 @@ interface IDcaManager {
     /// @notice This user mutation is unavailable until the protected purchase window ends.
     error DcaManager__UserMutationsLocked(uint256 userMutationsAllowedFromBlock);
     /// @notice A batch row's schedule is on a different route than this batch's `routeIndex`.
-    error DcaManager__RouteIndexMismatch(address token, uint64 scheduleId, uint256 actualRouteIndex, uint256 expectedRouteIndex);
+    error DcaManager__RouteIndexMismatch(
+        address token, uint64 scheduleId, uint256 actualRouteIndex, uint256 expectedRouteIndex
+    );
     /// @notice Constructor `operationsAdmin` has no code.
     error DcaManager__OperationsAdminIsNotAContract(address operationsAdmin);
     /// @notice Governance paused new deposits for this token and route.
@@ -205,7 +205,9 @@ interface IDcaManager {
     /// @notice The caller has accrued no interest on this schedule's route, so there is nothing to credit.
     error DcaManager__NoInterestToTopUpWith(address token, uint256 routeIndex);
     /// @notice The requested top-up is more interest than the caller has accrued on this route.
-    error DcaManager__TopUpExceedsAccruedInterest(address token, uint256 routeIndex, uint256 amount, uint256 accruedInterest);
+    error DcaManager__TopUpExceedsAccruedInterest(
+        address token, uint256 routeIndex, uint256 amount, uint256 accruedInterest
+    );
     /// @notice The requested top-up would not raise the schedule's balance past another whole purchase.
     error DcaManager__TopUpDoesNotFundAnotherPurchase(address token, uint64 scheduleId, uint256 amount);
 
@@ -466,10 +468,7 @@ interface IDcaManager {
      * @param routeIndex Route of the handler.
      * @return Accumulated rBTC balance in wei.
      */
-    function getAccumulatedRbtcBalance(address user, address token, uint256 routeIndex)
-        external
-        view
-        returns (uint256);
+    function getAccumulatedRbtcBalance(address user, address token, uint256 routeIndex) external view returns (uint256);
 
     /**
      * @notice Lending interest a user has accrued on one token and route, above locked principal.
@@ -481,10 +480,7 @@ interface IDcaManager {
      *      can trail the spendable ceiling, never exceed it. This guarantees the quote satisfies the
      *      upper bound; `topUpFromInterest` still requires it to cross the next purchase boundary.
      */
-    function getInterestAccrued(address user, address token, uint256 routeIndex)
-        external
-        view
-        returns (uint256);
+    function getInterestAccrued(address user, address token, uint256 routeIndex) external view returns (uint256);
 
     /**
      * @notice Block from which guarded user mutations are allowed after the latest protected window.

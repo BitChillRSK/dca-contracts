@@ -64,8 +64,12 @@ interface IFeeHandler {
      * @dev The only mutation path for these four values: there are no individual bound or rate
      *      setters. Writes each field that changed and emits only those events.
      */
-    function setFeeRateParams(uint256 minFeeRate, uint256 maxFeeRate, uint256 feePurchaseLowerBound, uint256 feePurchaseUpperBound)
-        external;
+    function setFeeRateParams(
+        uint256 minFeeRate,
+        uint256 maxFeeRate,
+        uint256 feePurchaseLowerBound,
+        uint256 feePurchaseUpperBound
+    ) external;
 
     /**
      * @notice Set the address that receives purchase fees.

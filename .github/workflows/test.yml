@@ -21,6 +21,19 @@ jobs:
       - name: src/ is BUSL-1.1
         run: make license-check
 
+  # R91: first-party tree is forge-fmt-clean (vendored ABIs ignored in foundry.toml).
+  fmt-check:
+    name: fmt-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
+        with:
+          version: v1.7.1
+      - name: forge fmt --check
+        run: make fmt-check
+
   test:
     name: ${{ matrix.target }} (${{ matrix.stablecoin }})
     runs-on: ubuntu-latest

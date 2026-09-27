@@ -89,8 +89,7 @@ contract FinalDeploymentTest is Test {
     }
 
     function test_finalStack_mainnetStyle_sevenHandlersAndSafePending() public {
-        DeployFinalHarness harness =
-            new DeployFinalHarness(DeployBase.Environment.MAINNET, SAFE, address(this));
+        DeployFinalHarness harness = new DeployFinalHarness(DeployBase.Environment.MAINNET, SAFE, address(this));
         DeployFinal.FinalStack memory stack = harness.deployStack(_mockConfig(address(this)));
 
         assertEq(stack.operationsAdmin.owner(), address(this));
@@ -101,8 +100,7 @@ contract FinalDeploymentTest is Test {
 
         assertEq(uint256(stack.operationsAdmin.getRouteClass(IDLE_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle));
         assertEq(
-            uint256(stack.operationsAdmin.getRouteClass(LAYERBANK_INDEX)),
-            uint256(IOperationsAdmin.RouteClass.Lending)
+            uint256(stack.operationsAdmin.getRouteClass(LAYERBANK_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending)
         );
         assertEq(
             uint256(stack.operationsAdmin.getRouteClass(SOVRYN_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending)
@@ -121,14 +119,10 @@ contract FinalDeploymentTest is Test {
         assertEq(stack.operationsAdmin.getTokenHandler(address(usdt0), IDLE_INDEX), stack.usdt0Idle);
         assertEq(stack.operationsAdmin.getTokenHandler(address(usdt0), LAYERBANK_INDEX), stack.usdt0LayerBank);
         assertEq(
-            stack.operationsAdmin.getTokenHandler(address(doc), TROPYKUS_INDEX),
-            address(0),
-            "no DOC Tropykus handler"
+            stack.operationsAdmin.getTokenHandler(address(doc), TROPYKUS_INDEX), address(0), "no DOC Tropykus handler"
         );
         assertEq(
-            stack.operationsAdmin.getTokenHandler(address(usdrif), SOVRYN_INDEX),
-            address(0),
-            "no USDRIF Sovryn handler"
+            stack.operationsAdmin.getTokenHandler(address(usdrif), SOVRYN_INDEX), address(0), "no USDRIF Sovryn handler"
         );
 
         assertTrue(stack.operationsAdmin.isSwapper(swapper));
@@ -143,7 +137,8 @@ contract FinalDeploymentTest is Test {
         // Both USDRIF handlers keep the default path active and approve the second one before the Safe owns them.
         bytes memory defaultPath =
             abi.encodePacked(address(usdrif), uint24(500), address(intermediate), uint24(3000), address(wrbtc));
-        bytes memory altPath = abi.encodePacked(address(usdrif), uint24(500), address(usdt0), uint24(3000), address(wrbtc));
+        bytes memory altPath =
+            abi.encodePacked(address(usdrif), uint24(500), address(usdt0), uint24(3000), address(wrbtc));
         address[2] memory usdrifHandlers = [stack.usdrifIdle, stack.usdrifLayerBank];
         for (uint256 i; i < usdrifHandlers.length; ++i) {
             PurchaseUniswap purchase = PurchaseUniswap(payable(usdrifHandlers[i]));
@@ -231,8 +226,7 @@ contract FinalDeploymentTest is Test {
      *      `address(0)`.
      */
     function test_finalStack_standingSpenderApprovals() public {
-        DeployFinalHarness harness =
-            new DeployFinalHarness(DeployBase.Environment.MAINNET, SAFE, address(this));
+        DeployFinalHarness harness = new DeployFinalHarness(DeployBase.Environment.MAINNET, SAFE, address(this));
         DeployFinal.FinalStack memory stack = harness.deployStack(_mockConfig(address(this)));
 
         // Lending spenders: LayerBank's Pool and Sovryn's iToken, one per lending leaf.
@@ -269,15 +263,13 @@ contract FinalDeploymentTest is Test {
     }
 
     function test_run_revertsWhenNotLive() public {
-        DeployFinalHarness harness =
-            new DeployFinalHarness(DeployBase.Environment.LOCAL, address(this), address(this));
+        DeployFinalHarness harness = new DeployFinalHarness(DeployBase.Environment.LOCAL, address(this), address(this));
         vm.expectRevert(DeployFinal.DeployFinal__NotALivePath.selector);
         harness.run();
     }
 
     function test_deployStack_revertsOnZeroSwapper() public {
-        DeployFinalHarness harness =
-            new DeployFinalHarness(DeployBase.Environment.MAINNET, SAFE, address(this));
+        DeployFinalHarness harness = new DeployFinalHarness(DeployBase.Environment.MAINNET, SAFE, address(this));
         DeployFinal.FinalNetworkConfig memory config = _mockConfig(address(this));
         config.initialSwapper = address(0);
         vm.expectRevert(abi.encodeWithSelector(DeployFinal.DeployFinal__ZeroAddress.selector, "initialSwapper"));
@@ -285,13 +277,10 @@ contract FinalDeploymentTest is Test {
     }
 
     function test_deployStack_revertsOnMissingLayerBankAToken() public {
-        DeployFinalHarness harness =
-            new DeployFinalHarness(DeployBase.Environment.MAINNET, SAFE, address(this));
+        DeployFinalHarness harness = new DeployFinalHarness(DeployBase.Environment.MAINNET, SAFE, address(this));
         DeployFinal.FinalNetworkConfig memory config = _mockConfig(address(this));
         config.docLayerBankAToken = address(0);
-        vm.expectRevert(
-            abi.encodeWithSelector(DeployFinal.DeployFinal__IncompleteMap.selector, "docLayerBankAToken")
-        );
+        vm.expectRevert(abi.encodeWithSelector(DeployFinal.DeployFinal__IncompleteMap.selector, "docLayerBankAToken"));
         harness.deployStack(config);
     }
 

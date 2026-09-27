@@ -12,20 +12,19 @@ import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/Test.sol";
 
 contract MocHelperConfig is Script {
-
     struct NetworkConfig {
         // DOC token address (MoC is only for DOC)
         address docTokenAddress;
-        
+
         // Share token addresses by protocol
-        address kDocAddress;  // The share token for Tropykus (kDOC) — legacy tests only
+        address kDocAddress; // The share token for Tropykus (kDOC) — legacy tests only
         address iSusdAddress; // The share token for Sovryn (iSUSD)
         address layerbankATokenAddress; // LayerBank lRooDOC aToken; handler reads Pool from aToken.POOL()
-        
+
         // MoC protocol
         address mocProxyAddress;
     }
-    
+
     string stablecoinType;
     address mockShareTokenAddress;
     NetworkConfig public activeNetworkConfig;
@@ -38,16 +37,16 @@ contract MocHelperConfig is Script {
         // Log environment variables
         console.log("MocHelperConfig constructor called");
         console.log("LENDING_PROTOCOL from env:", vm.envString("LENDING_PROTOCOL"));
-        
+
         // Initialize stablecoin type from environment or use default
         try vm.envString("STABLECOIN_TYPE") returns (string memory coinType) {
             stablecoinType = coinType;
         } catch {
             stablecoinType = DOC_STRING;
         }
-        
+
         console.log("Using stablecoin type:", stablecoinType);
-        
+
         if (block.chainid == RSK_MAINNET_CHAIN_ID) {
             activeNetworkConfig = getRootstockMainnetConfig();
         } else if (block.chainid == RSK_TESTNET_CHAIN_ID) {
@@ -55,7 +54,7 @@ contract MocHelperConfig is Script {
         } else {
             activeNetworkConfig = getOrCreateAnvilConfig();
         }
-        
+
         // Log the resulting network configuration
         console.log("Network config created:");
         console.log("  docTokenAddress:", activeNetworkConfig.docTokenAddress);
@@ -86,7 +85,7 @@ contract MocHelperConfig is Script {
 
     function getOrCreateAnvilConfig() public returns (NetworkConfig memory anvilNetworkConfig) {
         console.log("getOrCreateAnvilConfig called");
-        
+
         if (activeNetworkConfig.docTokenAddress != address(0)) {
             console.log("Returning existing activeNetworkConfig");
             return activeNetworkConfig;
@@ -95,7 +94,7 @@ contract MocHelperConfig is Script {
         // Read the current lending protocol from environment
         string memory lendingProtocol = vm.envString("LENDING_PROTOCOL");
         console.log("lendingProtocol:", lendingProtocol);
-        
+
         bool lendingProtocolIsTropykus =
             keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(TROPYKUS_STRING));
         bool lendingProtocolIsSovryn =
@@ -124,11 +123,11 @@ contract MocHelperConfig is Script {
         if (!isBroadcasting) {
             vm.startBroadcast();
         }
-        
+
         // Create mock DOC token
         MockStablecoin mockDocToken = new MockStablecoin(msg.sender);
         address mockDocTokenAddress = address(mockDocToken);
-        
+
         address mockLayerbankAToken;
         if (lendingProtocolIsTropykus) {
             MockKdocToken mockShareToken = new MockKdocToken(mockDocTokenAddress);
@@ -153,9 +152,9 @@ contract MocHelperConfig is Script {
         } else {
             revert("Invalid lending protocol");
         }
-        
+
         MockMocProxy mockMocProxy = new MockMocProxy(mockDocTokenAddress);
-        
+
         // Only stop the broadcast if we started it
         if (!isBroadcasting) {
             vm.stopBroadcast();
@@ -163,7 +162,7 @@ contract MocHelperConfig is Script {
 
         emit HelperConfig__CreatedMockStablecoin(mockDocTokenAddress);
         emit HelperConfig__CreatedMockMocProxy(address(mockMocProxy));
-        
+
         address kDocAddress = lendingProtocolIsTropykus ? mockShareTokenAddress : address(0);
         address iSusdAddress = lendingProtocolIsSovryn ? mockShareTokenAddress : address(0);
 
@@ -185,7 +184,7 @@ contract MocHelperConfig is Script {
     function getActiveNetworkConfig() public view returns (NetworkConfig memory) {
         return activeNetworkConfig;
     }
-    
+
     function getStablecoinAddress() public view returns (address) {
         return activeNetworkConfig.docTokenAddress;
     }
@@ -194,7 +193,7 @@ contract MocHelperConfig is Script {
         // Read current lending protocol from environment
         string memory lendingProtocol = vm.envString("LENDING_PROTOCOL");
         console.log("getShareTokenAddress - Current lending protocol:", lendingProtocol);
-        
+
         // Read current stablecoin type from environment or use stored value
         string memory currentStablecoinType;
         try vm.envString("STABLECOIN_TYPE") returns (string memory coinType) {
@@ -203,7 +202,7 @@ contract MocHelperConfig is Script {
             currentStablecoinType = stablecoinType;
         }
         console.log("getShareTokenAddress - Current stablecoin type:", currentStablecoinType);
-        
+
         bool lendingProtocolIsTropykus =
             keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(TROPYKUS_STRING));
         bool lendingProtocolIsSovryn =
@@ -230,7 +229,9 @@ contract MocHelperConfig is Script {
             return activeNetworkConfig.iSusdAddress;
         }
         if (lendingProtocolIsLayerbank) {
-            console.log("getShareTokenAddress - Returning layerbankATokenAddress:", activeNetworkConfig.layerbankATokenAddress);
+            console.log(
+                "getShareTokenAddress - Returning layerbankATokenAddress:", activeNetworkConfig.layerbankATokenAddress
+            );
             return activeNetworkConfig.layerbankATokenAddress;
         }
         console.log("getShareTokenAddress - ERROR: Unsupported lending protocol");

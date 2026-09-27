@@ -6,11 +6,10 @@ interface IMocStateV1 {
     function setBtcPriceProvider(address _btcPriceProvider) external;
     function getMoCPriceProvider() external view returns (address);
     function setMoCPriceProvider(address _mocPriceProvider) external;
-    function getBitcoinPrice() external view returns(uint256);
+    function getBitcoinPrice() external view returns (uint256);
 }
 
 interface IChangeContract {
     function execute() external;
 }
-
 

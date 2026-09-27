@@ -14,7 +14,7 @@ contract StablecoinHandlerTest is DcaDappTest {
     // Events
     event TokenHandler__MinPurchaseAmountModified(uint256 indexed newMinPurchaseAmount);
     event FeeHandler__FeeCollectorAddressSet(address indexed feeCollector);
-    
+
     function setUp() public override {
         super.setUp();
     }
@@ -45,4 +45,4 @@ contract StablecoinHandlerTest is DcaDappTest {
         IFeeHandler(address(stablecoinHandler)).setFeeCollectorAddress(newFeeCollector);
         assertEq(IFeeHandler(address(stablecoinHandler)).getFeeCollectorAddress(), newFeeCollector);
     }
-} 
+}

@@ -202,8 +202,8 @@ Human answers (2026-09-27), locked for this PR:
      memory round trip costs more. Rare delete path; not worth the hazard.
    - Fold `IdleErc20Handler`; keep-checked market/delta/`amountSpent`/lending-share arithmetic:
      **no override — stay rejected / checked.**
-5. Make the repo `forge fmt`-clean? **Deferred to a dedicated follow-up PR** (format-only; enforce in
-   `make check`/CI; metadata-stripped bytecode identity on `src/`). Not mixed into this PR.
+5. Make the repo `forge fmt`-clean? **Yes — R91** (format-only; enforce in `make check`/CI;
+   metadata-stripped bytecode identity on `src/`; vendored ABIs ignored).
 
 ## Verdicts (2026-09-27)
 
@@ -216,7 +216,7 @@ Human answers (2026-09-27), locked for this PR:
 | Swap-pop array bounds assembly | **Rejected** — packed `uint64[]` makes safe assembly ugly; rare path; memory round trip worse |
 | Fold `IdleErc20Handler` into `TokenHandler` | **Rejected** |
 | Unchecked market / falling-delta / `amountSpent` / lending share sums | **Keep checked** |
-| `forge fmt` + CI enforce | **Follow-up PR** |
+| `forge fmt` + CI enforce | **R91** |
 
 ## Scope
 

@@ -66,9 +66,8 @@ contract IdleAccountingProofTest is Test {
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
             feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
         });
-        handler = new IdleDocHandlerMoc(
-            address(dcaManager), address(doc), FEE_COLLECTOR, address(moc), feeSettings, OWNER
-        );
+        handler =
+            new IdleDocHandlerMoc(address(dcaManager), address(doc), FEE_COLLECTOR, address(moc), feeSettings, OWNER);
 
         vm.startPrank(OWNER);
         operationsAdmin.addSwapper(SWAPPER);

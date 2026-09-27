@@ -46,9 +46,7 @@ interface IPurchaseRbtc is IStablecoinSource {
      * @dev A successful venue call must reduce the handler's purchase-token balance by `expectedAmount`.
      *      Any smaller, larger, or negative delta reverts the entire batch and all earlier accounting.
      */
-    error PurchaseRbtc__InputAmountNotFullySpent(
-        uint256 expectedAmount, uint256 balanceBefore, uint256 balanceAfter
-    );
+    error PurchaseRbtc__InputAmountNotFullySpent(uint256 expectedAmount, uint256 balanceBefore, uint256 balanceAfter);
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS

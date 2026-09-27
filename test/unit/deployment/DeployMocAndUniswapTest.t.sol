@@ -20,8 +20,10 @@ contract DeployMocAndUniswapTest is Test {
         }
         // Both stacks share STABLECOIN_TYPE; MoC+Sovryn rejects USDRIF/USDT0, and the Dex live map
         // rejects DOC. This harness only works for DOC on a lending lane that has MoC shares.
-        if (keccak256(abi.encodePacked(vm.envOr("STABLECOIN_TYPE", DOC_STRING))) != keccak256(abi.encodePacked(DOC_STRING)))
-        {
+        if (
+            keccak256(abi.encodePacked(vm.envOr("STABLECOIN_TYPE", DOC_STRING)))
+                != keccak256(abi.encodePacked(DOC_STRING))
+        ) {
             vm.skip(true);
             return;
         }

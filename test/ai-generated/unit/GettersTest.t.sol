@@ -29,7 +29,6 @@ import {UNUSED_SCHEDULE_ID} from "test/utils/BatchBuyOne.sol";
  * @dev Tests normal functionality, edge cases, and revert conditions for every getter across the entire codebase
  */
 contract GettersTest is DcaDappTest {
-    
     /*//////////////////////////////////////////////////////////////
                                SETUP
     //////////////////////////////////////////////////////////////*/
@@ -44,7 +43,8 @@ contract GettersTest is DcaDappTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_dcaManager_getDcaSchedules() public {
-        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) = dcaManager.getDcaSchedules(USER, address(stablecoin));
+        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) =
+            dcaManager.getDcaSchedules(USER, address(stablecoin));
         assertEq(schedules.length, 1); // Created in setup
         assertEq(schedules[0].tokenBalance, AMOUNT_TO_DEPOSIT);
         assertEq(schedules[0].purchaseAmount, AMOUNT_TO_SPEND);
@@ -62,7 +62,8 @@ contract GettersTest is DcaDappTest {
         IDcaManager.DcaSchedule memory asThirdParty = scheduleAt(dcaManager, USER, address(stablecoin), 0);
         vm.prank(OWNER);
         uint64 asThirdPartyId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
-        (uint64[] memory enumeratedIds, IDcaManager.DcaSchedule[] memory enumerated) = dcaManager.getDcaSchedules(USER, address(stablecoin));
+        (uint64[] memory enumeratedIds, IDcaManager.DcaSchedule[] memory enumerated) =
+            dcaManager.getDcaSchedules(USER, address(stablecoin));
 
         assertEq(asUser.tokenBalance, AMOUNT_TO_DEPOSIT);
         assertEq(asUser.purchaseAmount, AMOUNT_TO_SPEND);
@@ -104,8 +105,7 @@ contract GettersTest is DcaDappTest {
 
     function test_dcaManager_getAccumulatedRbtcBalance_matchesHandler() public {
         super.makeSinglePurchase();
-        uint256 fromManager =
-            dcaManager.getAccumulatedRbtcBalance(USER, address(stablecoin), s_routeIndex);
+        uint256 fromManager = dcaManager.getAccumulatedRbtcBalance(USER, address(stablecoin), s_routeIndex);
         uint256 fromHandler = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
         assertEq(fromManager, fromHandler);
         assertGt(fromManager, 0);
@@ -113,9 +113,8 @@ contract GettersTest is DcaDappTest {
 
     function test_dcaManager_getAccumulatedRbtcBalance_reverts_unknownTokenProtocol() public {
         address unknownToken = makeAddr("unknownToken");
-        bytes memory encodedRevert = abi.encodeWithSelector(
-            IDcaManager.DcaManager__TokenNotAccepted.selector, unknownToken, s_routeIndex
-        );
+        bytes memory encodedRevert =
+            abi.encodeWithSelector(IDcaManager.DcaManager__TokenNotAccepted.selector, unknownToken, s_routeIndex);
         vm.expectRevert(encodedRevert);
         dcaManager.getAccumulatedRbtcBalance(USER, unknownToken, s_routeIndex);
     }
@@ -128,13 +127,17 @@ contract GettersTest is DcaDappTest {
     }
 
     function test_dcaManager_getInterestAccrued_reverts_tokenDoesNotYieldInterest() public {
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__TokenDoesNotYieldInterest.selector, address(stablecoin)));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDcaManager.DcaManager__TokenDoesNotYieldInterest.selector, address(stablecoin))
+        );
         dcaManager.getInterestAccrued(USER, address(stablecoin), 0);
     }
 
     function test_dcaManager_getDcaSchedule_reverts_inexistentId() public {
         vm.expectRevert(
-            abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), UNUSED_SCHEDULE_ID)
+            abi.encodeWithSelector(
+                IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), UNUSED_SCHEDULE_ID
+            )
         );
         dcaManager.getDcaSchedule(address(stablecoin), UNUSED_SCHEDULE_ID);
     }
@@ -146,7 +149,7 @@ contract GettersTest is DcaDappTest {
     function test_operationsAdmin_getTokenHandler() public {
         address handler = operationsAdmin.getTokenHandler(address(stablecoin), s_routeIndex);
         assertEq(handler, address(stablecoinHandler));
-        
+
         // Test non-existent handler
         address nonExistentHandler = operationsAdmin.getTokenHandler(address(0x999), 1);
         assertEq(nonExistentHandler, address(0));
@@ -203,11 +206,11 @@ contract GettersTest is DcaDappTest {
     function test_dcaManager_getMinPurchaseAmount() public {
         uint256 minAmount = dcaManager.getTokenMinPurchaseAmount(address(stablecoin));
         assertGt(minAmount, 0);
-        
+
         uint256 raised = minAmount * 2;
         vm.prank(OWNER);
         dcaManager.setTokenMinPurchaseAmount(address(stablecoin), raised);
-        
+
         assertEq(dcaManager.getTokenMinPurchaseAmount(address(stablecoin)), raised);
     }
 
@@ -215,9 +218,10 @@ contract GettersTest is DcaDappTest {
         // Test ERC165 support
         bool supportsERC165 = IERC165(address(stablecoinHandler)).supportsInterface(0x01ffc9a7);
         assertTrue(supportsERC165);
-        
+
         // Test ITokenHandler interface support
-        bool supportsTokenHandler = IERC165(address(stablecoinHandler)).supportsInterface(type(ITokenHandler).interfaceId);
+        bool supportsTokenHandler =
+            IERC165(address(stablecoinHandler)).supportsInterface(type(ITokenHandler).interfaceId);
         assertTrue(supportsTokenHandler);
 
         bool supportsLending = IERC165(address(stablecoinHandler)).supportsInterface(type(ITokenLending).interfaceId);
@@ -246,7 +250,9 @@ contract GettersTest is DcaDappTest {
                 return;
             }
 
-            try IPurchaseUniswap(address(stablecoinHandler)).getAmountOutMinimumSafetyCheck() returns (uint256 safetyCheck) {
+            try IPurchaseUniswap(address(stablecoinHandler)).getAmountOutMinimumSafetyCheck() returns (
+                uint256 safetyCheck
+            ) {
                 assertEq(safetyCheck, DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK);
             } catch {
                 return;
@@ -308,21 +314,29 @@ contract GettersTest is DcaDappTest {
         // Test that the docHandler has the correct DCA manager address
         // The public immutable creates an automatic getter
         if (s_routeIndex == TROPYKUS_INDEX) {
-            try TropykusErc20Handler(payable(address(stablecoinHandler))).i_dcaManager() returns (address dcaManagerAddr) {
+            try TropykusErc20Handler(payable(address(stablecoinHandler))).i_dcaManager() returns (
+                address dcaManagerAddr
+            ) {
                 assertEq(dcaManagerAddr, address(dcaManager));
             } catch {
                 // Try the Dex version
-                try TropykusErc20HandlerDex(payable(address(stablecoinHandler))).i_dcaManager() returns (address dcaManagerAddr) {
+                try TropykusErc20HandlerDex(payable(address(stablecoinHandler))).i_dcaManager() returns (
+                    address dcaManagerAddr
+                ) {
                     assertEq(dcaManagerAddr, address(dcaManager));
                 } catch {
                     // Handler might not expose this getter
                 }
             }
         } else if (s_routeIndex == SOVRYN_INDEX) {
-            try SovrynErc20Handler(payable(address(stablecoinHandler))).i_dcaManager() returns (address dcaManagerAddr) {
+            try SovrynErc20Handler(payable(address(stablecoinHandler))).i_dcaManager() returns (
+                address dcaManagerAddr
+            ) {
                 assertEq(dcaManagerAddr, address(dcaManager));
             } catch {
-                try SovrynErc20HandlerDex(payable(address(stablecoinHandler))).i_dcaManager() returns (address dcaManagerAddr) {
+                try SovrynErc20HandlerDex(payable(address(stablecoinHandler))).i_dcaManager() returns (
+                    address dcaManagerAddr
+                ) {
                     assertEq(dcaManagerAddr, address(dcaManager));
                 } catch {
                     // Handler might not expose this getter
@@ -339,7 +353,8 @@ contract GettersTest is DcaDappTest {
 
     function test_getters_withZeroAddress() public {
         // Test getters with zero address inputs where applicable
-        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) = dcaManager.getDcaSchedules(address(0), address(stablecoin));
+        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) =
+            dcaManager.getDcaSchedules(address(0), address(stablecoin));
         assertEq(schedules.length, 0);
 
         uint256 balance = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(address(0));
@@ -348,8 +363,9 @@ contract GettersTest is DcaDappTest {
 
     function test_getters_withNonExistentToken() public {
         address fakeToken = address(0x999);
-        
-        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) = dcaManager.getDcaSchedules(USER, fakeToken);
+
+        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) =
+            dcaManager.getDcaSchedules(USER, fakeToken);
         assertEq(schedules.length, 0);
 
         address handler = operationsAdmin.getTokenHandler(fakeToken, 1);
@@ -358,7 +374,8 @@ contract GettersTest is DcaDappTest {
 
     function test_getters_singleScheduleMatchesArray() public {
         IDcaManager.DcaSchedule memory single = scheduleAt(dcaManager, USER, address(stablecoin), 0);
-        (uint64[] memory enumeratedIds, IDcaManager.DcaSchedule[] memory enumerated) = dcaManager.getDcaSchedules(USER, address(stablecoin));
+        (uint64[] memory enumeratedIds, IDcaManager.DcaSchedule[] memory enumerated) =
+            dcaManager.getDcaSchedules(USER, address(stablecoin));
 
         assertEq(enumerated.length, 1);
         assertEq(single.tokenBalance, enumerated[0].tokenBalance);
@@ -374,10 +391,11 @@ contract GettersTest is DcaDappTest {
         assertEq(dcaManager.getMinPurchasePeriod(), MIN_PURCHASE_PERIOD);
         assertEq(dcaManager.getMaxSchedulesPerToken(), MAX_SCHEDULES_PER_TOKEN);
         assertNotEq(address(dcaManager.i_operationsAdmin()), address(0));
-        
+
         // Test empty arrays for new users
         address newUser = makeAddr("newUser");
-        (uint64[] memory emptySchedulesIds, IDcaManager.DcaSchedule[] memory emptySchedules) = dcaManager.getDcaSchedules(newUser, address(stablecoin));
+        (uint64[] memory emptySchedulesIds, IDcaManager.DcaSchedule[] memory emptySchedules) =
+            dcaManager.getDcaSchedules(newUser, address(stablecoin));
         assertEq(emptySchedules.length, 0);
     }
 
@@ -385,7 +403,7 @@ contract GettersTest is DcaDappTest {
         // Test that view functions don't have access control restrictions
         vm.prank(makeAddr("randomUser"));
         assertNotEq(address(dcaManager.i_operationsAdmin()), address(0));
-        
+
         vm.prank(makeAddr("randomUser"));
         uint256 minPeriod = dcaManager.getMinPurchasePeriod();
         assertEq(minPeriod, MIN_PURCHASE_PERIOD);
@@ -395,7 +413,7 @@ contract GettersTest is DcaDappTest {
         // Verify that related getters return consistent values
         assertEq(dcaManager.getMinPurchasePeriod(), MIN_PURCHASE_PERIOD);
         assertEq(dcaManager.getMaxSchedulesPerToken(), MAX_SCHEDULES_PER_TOKEN);
-        
+
         assertTrue(operationsAdmin.isLendingRoute(TROPYKUS_INDEX));
         assertTrue(operationsAdmin.isLendingRoute(SOVRYN_INDEX));
         assertTrue(operationsAdmin.isLendingRoute(LAYERBANK_INDEX));
@@ -408,11 +426,12 @@ contract GettersTest is DcaDappTest {
 
     function test_getters_boundaryConditions() public {
         // Test boundary conditions for various getters
-        
+
         // Test with address(0) as token
-        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) = dcaManager.getDcaSchedules(USER, address(0));
+        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) =
+            dcaManager.getDcaSchedules(USER, address(0));
         assertEq(schedules.length, 0);
-        
+
         assertFalse(operationsAdmin.isLendingRoute(IDLE_INDEX));
         assertEq(uint256(operationsAdmin.getRouteClass(IDLE_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle));
         assertFalse(operationsAdmin.isLendingRoute(999));
@@ -442,12 +461,12 @@ contract GettersTest is DcaDappTest {
         dcaManager.getMinPurchasePeriod(); // Use a different getter
         uint256 gasAfter = gasleft();
         assertLt(gasBefore - gasAfter, 10000); // Should be very cheap
-        
+
         gasBefore = gasleft();
         dcaManager.getMinPurchasePeriod();
         gasAfter = gasleft();
         assertLt(gasBefore - gasAfter, 10000);
-        
+
         gasBefore = gasleft();
         operationsAdmin.isLendingRoute(1);
         gasAfter = gasleft();

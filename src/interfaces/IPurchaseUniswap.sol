@@ -32,9 +32,7 @@ interface IPurchaseUniswap {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice An approved Uniswap V3 path was activated by construction, a swapper, or this handler's owner.
-    event PurchaseUniswap__NewPathSet(
-        address[] intermediateTokens, uint24[] poolFeeRates, bytes newPath
-    );
+    event PurchaseUniswap__NewPathSet(address[] intermediateTokens, uint24[] poolFeeRates, bytes newPath);
     /**
      * @notice Exact encoded path derived from `intermediateTokens` / `poolFeeRates` was allowed or revoked.
      * @dev Construction emits `allowed = true` for the initial path. Later writes are owner-only.
@@ -97,11 +95,8 @@ interface IPurchaseUniswap {
      *      Emits the derived bytes and hash. The active path cannot be revoked. A repeated write reverts.
      *      New paths after construction are approved here; the constructor path is approved at deploy.
      */
-    function setPurchasePathAllowed(
-        address[] memory intermediateTokens,
-        uint24[] memory poolFeeRates,
-        bool allowed
-    ) external;
+    function setPurchasePathAllowed(address[] memory intermediateTokens, uint24[] memory poolFeeRates, bool allowed)
+        external;
 
     /**
      * @notice Replace the Uniswap V3 path from this handler's stablecoin to WRBTC.

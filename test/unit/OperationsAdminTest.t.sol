@@ -46,9 +46,7 @@ contract OperationsAdminTest is DcaDappTest {
 
         vm.expectRevert(encodedRevert);
         vm.prank(OWNER);
-        operationsAdmin.assignTokenHandler(
-            address(stablecoin), SECOND_LENDING_INDEX, address(dummyERC165Contract)
-        );
+        operationsAdmin.assignTokenHandler(address(stablecoin), SECOND_LENDING_INDEX, address(dummyERC165Contract));
 
         vm.expectRevert();
         vm.prank(OWNER);
@@ -76,9 +74,7 @@ contract OperationsAdminTest is DcaDappTest {
     ///      so this error is unchanged by R47.
     function testDuplicateHandlerAssignmentReverts() external {
         bytes memory encodedRevert = abi.encodeWithSelector(
-            IOperationsAdmin.OperationsAdmin__HandlerAlreadyAssigned.selector,
-            address(stablecoin),
-            s_routeIndex
+            IOperationsAdmin.OperationsAdmin__HandlerAlreadyAssigned.selector, address(stablecoin), s_routeIndex
         );
         vm.expectRevert(encodedRevert);
         vm.prank(OWNER);
@@ -156,15 +152,11 @@ contract OperationsAdminTest is DcaDappTest {
 
     function testReregisteringAnyIndexReverts() external {
         vm.startPrank(OWNER);
-        vm.expectRevert(
-            abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__RouteAlreadyRegistered.selector, 0)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__RouteAlreadyRegistered.selector, 0));
         operationsAdmin.registerRoute(0, false);
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IOperationsAdmin.OperationsAdmin__RouteAlreadyRegistered.selector, s_routeIndex
-            )
+            abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__RouteAlreadyRegistered.selector, s_routeIndex)
         );
         operationsAdmin.registerRoute(s_routeIndex, true);
         vm.stopPrank();
@@ -172,16 +164,12 @@ contract OperationsAdminTest is DcaDappTest {
 
     function testIsLendingRouteReadsRecordedClass() external {
         assertFalse(operationsAdmin.isLendingRoute(0));
-        assertEq(
-            uint256(operationsAdmin.getRouteClass(0)), uint256(IOperationsAdmin.RouteClass.Idle)
-        );
+        assertEq(uint256(operationsAdmin.getRouteClass(0)), uint256(IOperationsAdmin.RouteClass.Idle));
         assertTrue(operationsAdmin.isLendingRoute(TROPYKUS_INDEX));
         assertTrue(operationsAdmin.isLendingRoute(SOVRYN_INDEX));
         assertTrue(operationsAdmin.isLendingRoute(LAYERBANK_INDEX));
         assertFalse(operationsAdmin.isLendingRoute(999));
-        assertEq(
-            uint256(operationsAdmin.getRouteClass(999)), uint256(IOperationsAdmin.RouteClass.Unregistered)
-        );
+        assertEq(uint256(operationsAdmin.getRouteClass(999)), uint256(IOperationsAdmin.RouteClass.Unregistered));
     }
 
     function testRegisterRouteEmitsAndClassifies() external {
@@ -196,9 +184,7 @@ contract OperationsAdminTest is DcaDappTest {
         vm.prank(OWNER);
         operationsAdmin.registerRoute(SECOND_IDLE_INDEX, false);
         assertFalse(operationsAdmin.isLendingRoute(SECOND_IDLE_INDEX));
-        assertEq(
-            uint256(operationsAdmin.getRouteClass(SECOND_IDLE_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle)
-        );
+        assertEq(uint256(operationsAdmin.getRouteClass(SECOND_IDLE_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle));
     }
 
     function testMistakenClassificationRecoveredAtNewIndex() external {
@@ -226,9 +212,7 @@ contract OperationsAdminTest is DcaDappTest {
         vm.startPrank(OWNER);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IOperationsAdmin.OperationsAdmin__HandlerAlreadyAssigned.selector,
-                address(stablecoin),
-                s_routeIndex
+                IOperationsAdmin.OperationsAdmin__HandlerAlreadyAssigned.selector, address(stablecoin), s_routeIndex
             )
         );
         operationsAdmin.assignTokenHandler(address(stablecoin), s_routeIndex, address(unusedHandler));
@@ -276,9 +260,7 @@ contract OperationsAdminTest is DcaDappTest {
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
         vm.expectEmit(true, true, true, true);
-        emit OperationsAdmin__TokenHandlerAssigned(
-            address(stablecoin), SECOND_LENDING_INDEX, address(newHandler)
-        );
+        emit OperationsAdmin__TokenHandlerAssigned(address(stablecoin), SECOND_LENDING_INDEX, address(newHandler));
         operationsAdmin.assignTokenHandler(address(stablecoin), SECOND_LENDING_INDEX, address(newHandler));
         vm.stopPrank();
 
@@ -315,7 +297,11 @@ contract OperationsAdminTest is DcaDappTest {
         uint256 ownerWalletBefore = stablecoin.balanceOf(OWNER);
 
         vm.prank(OWNER);
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__NotScheduleOwner.selector, address(stablecoin), userScheduleId, USER));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDcaManager.DcaManager__NotScheduleOwner.selector, address(stablecoin), userScheduleId, USER
+            )
+        );
         dcaManager.withdrawToken(address(stablecoin), userScheduleId, userRemaining);
 
         vm.prank(OWNER);
@@ -614,9 +600,7 @@ contract OperationsAdminTest is DcaDappTest {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IOperationsAdmin.OperationsAdmin__HandlerTokenMismatch.selector,
-                otherToken,
-                address(stablecoinHandler)
+                IOperationsAdmin.OperationsAdmin__HandlerTokenMismatch.selector, otherToken, address(stablecoinHandler)
             )
         );
         freshAdmin.assignTokenHandler(otherToken, s_routeIndex, address(stablecoinHandler));
@@ -670,9 +654,7 @@ contract OperationsAdminTest is DcaDappTest {
     function testPausingAnUnregisteredRouteReverts() external {
         vm.expectRevert(
             abi.encodeWithSelector(
-                IOperationsAdmin.OperationsAdmin__HandlerNotAssigned.selector,
-                address(stablecoin),
-                SECOND_LENDING_INDEX
+                IOperationsAdmin.OperationsAdmin__HandlerNotAssigned.selector, address(stablecoin), SECOND_LENDING_INDEX
             )
         );
         vm.prank(OWNER);
@@ -735,9 +717,7 @@ contract OperationsAdminTest is DcaDappTest {
     function testRegisterRouteRevertsUint32MaxPlusOne() external {
         uint256 overflowing = uint256(type(uint32).max) + 1;
         vm.prank(OWNER);
-        vm.expectRevert(
-            abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 32, overflowing)
-        );
+        vm.expectRevert(abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 32, overflowing));
         operationsAdmin.registerRoute(overflowing, true);
     }
 
@@ -745,9 +725,7 @@ contract OperationsAdminTest is DcaDappTest {
         uint256 overflowing = uint256(type(uint32).max) + 1;
         DummyTokenHandler stub = new DummyTokenHandler(address(stablecoin));
         vm.prank(OWNER);
-        vm.expectRevert(
-            abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 32, overflowing)
-        );
+        vm.expectRevert(abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 32, overflowing));
         operationsAdmin.assignTokenHandler(address(stablecoin), overflowing, address(stub));
     }
 

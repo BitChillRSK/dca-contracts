@@ -37,8 +37,7 @@ contract DummyLendingHandler {
     }
 
     function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
-        return interfaceId == type(ITokenHandler).interfaceId
-            || interfaceId == type(ITokenLending).interfaceId;
+        return interfaceId == type(ITokenHandler).interfaceId || interfaceId == type(ITokenLending).interfaceId;
     }
 }
 
@@ -56,7 +55,6 @@ contract FeeCalculator {
     uint256 internal s_feePurchaseUpperBound = FEE_PURCHASE_UPPER_BOUND;
 
     function calculateFee(uint256 purchaseAmount) external view returns (uint256) {
-
         if (s_minFeeRate == s_maxFeeRate) {
             return purchaseAmount * s_minFeeRate / BPS_DENOMINATOR;
         }
@@ -69,9 +67,8 @@ contract FeeCalculator {
             feeRate = s_maxFeeRate;
         } else {
             // Calculate the linear fee rate
-            feeRate = s_maxFeeRate
-                - ((purchaseAmount - s_feePurchaseLowerBound) * (s_maxFeeRate - s_minFeeRate))
-                    / (s_feePurchaseUpperBound - s_feePurchaseLowerBound);
+            feeRate = s_maxFeeRate - ((purchaseAmount - s_feePurchaseLowerBound) * (s_maxFeeRate - s_minFeeRate))
+                / (s_feePurchaseUpperBound - s_feePurchaseLowerBound);
         }
         return purchaseAmount * feeRate / BPS_DENOMINATOR;
     }

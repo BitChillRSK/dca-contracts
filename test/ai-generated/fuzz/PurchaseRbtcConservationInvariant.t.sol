@@ -124,9 +124,8 @@ contract PurchaseRbtcConservationInvariantTest is StdInvariant, Test {
 
         // dcaManager = the fuzz handler, so it can call the `onlyDcaManager` entry points directly.
         address predictedFuzzHandler = vm.computeCreateAddress(address(this), vm.getNonce(address(this)) + 1);
-        harness = new PurchaseRbtcHarness(
-            predictedFuzzHandler, address(token), address(0xFEE), feeSettings, address(this)
-        );
+        harness =
+            new PurchaseRbtcHarness(predictedFuzzHandler, address(token), address(0xFEE), feeSettings, address(this));
         fuzzHandler = new PurchaseRbtcConservationHandler(harness, s_buyers);
         assertEq(address(fuzzHandler), predictedFuzzHandler, "dcaManager wiring missed the fuzz handler");
 

@@ -81,7 +81,9 @@ abstract contract TokenHandler is ITokenHandler, ERC165, FeeHandler, DcaManagerA
         uint256 balanceBefore = i_stableToken.balanceOf(address(this));
         i_stableToken.safeTransferFrom(user, address(this), depositAmount);
         uint256 depositedAmount = i_stableToken.balanceOf(address(this)) - balanceBefore;
-        if (depositedAmount != depositAmount) revert TokenHandler__DepositAmountMismatch(depositAmount, depositedAmount);
+        if (depositedAmount != depositAmount) {
+            revert TokenHandler__DepositAmountMismatch(depositAmount, depositedAmount);
+        }
         emit TokenHandler__TokenDeposited(address(i_stableToken), user, depositAmount);
     }
 

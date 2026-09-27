@@ -31,7 +31,7 @@ contract InvariantTest is StdInvariant, Test {
     /*//////////////////////////////////////////////////////////////
                             CONTRACTS
     //////////////////////////////////////////////////////////////*/
-    
+
     DcaManager public dcaManager;
     OperationsAdmin public operationsAdmin;
     IPurchaseRbtc public handler;
@@ -39,24 +39,24 @@ contract InvariantTest is StdInvariant, Test {
     MockKdocToken public kToken;
     MockIsusdToken public iSusdToken;
     Handler public fuzzHandler;
-    
+
     /*//////////////////////////////////////////////////////////////
                             TEST CONFIGURATION
     //////////////////////////////////////////////////////////////*/
-    
+
     uint256 constant NUM_USERS = 10;
     uint256 constant USER_INITIAL_BALANCE = 100000 ether; // 100k tokens per user
     uint256 constant HANDLER_INITIAL_BALANCE = 1000000 ether; // 1M tokens for handler operations
-    
+
     address public constant OWNER = address(0x1111);
     address public constant ADMIN = address(0x2222);
     address public constant SWAPPER = address(0x3333);
     address public constant FEE_COLLECTOR = address(0x4444);
-    
+
     address[] public s_users;
     uint256 public deploymentTimestamp;
     uint256 public s_routeIndex;
-    
+
     /*//////////////////////////////////////////////////////////////
                            TEST CONSTANTS
     //////////////////////////////////////////////////////////////*/
@@ -64,7 +64,7 @@ contract InvariantTest is StdInvariant, Test {
 
     function setUp() external {
         deploymentTimestamp = block.timestamp;
-        
+
         // Setup lending protocol from environment variable (like unit tests)
         string memory lendingProtocol;
         try vm.envString("LENDING_PROTOCOL") returns (string memory protocol) {
@@ -72,7 +72,7 @@ contract InvariantTest is StdInvariant, Test {
         } catch {
             lendingProtocol = TROPYKUS_STRING; // Default to Tropykus
         }
-        
+
         // Set route index from the lending-protocol env lane
         if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(TROPYKUS_STRING))) {
             s_routeIndex = TROPYKUS_INDEX;
@@ -81,26 +81,26 @@ contract InvariantTest is StdInvariant, Test {
         } else {
             revert("Invalid lending protocol");
         }
-        
+
         // Deploy core contracts
         vm.prank(OWNER);
         operationsAdmin = new OperationsAdmin(OWNER);
-        
+
         vm.prank(OWNER);
         dcaManager = new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, OWNER);
-        
+
         stablecoin = new MockStablecoin(address(this));
 
         vm.prank(OWNER);
         dcaManager.setTokenMinPurchaseAmount(address(stablecoin), MIN_PURCHASE_AMOUNT);
-        
+
         // Setup swappers and lending routes
         vm.startPrank(OWNER);
         operationsAdmin.addSwapper(SWAPPER);
         operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
         operationsAdmin.registerRoute(SOVRYN_INDEX, true);
         vm.stopPrank();
-        
+
         // Deploy appropriate handler wrapper based on lending protocol
         IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
@@ -108,81 +108,61 @@ contract InvariantTest is StdInvariant, Test {
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
             feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
         });
-        
+
         if (s_routeIndex == TROPYKUS_INDEX) {
             kToken = new MockKdocToken(address(stablecoin));
-            handler = IPurchaseRbtc(address(new TropykusHandlerWrapper(
-                address(dcaManager),
-                address(stablecoin),
-                address(kToken),
-                FEE_COLLECTOR,
-                feeSettings,
-                OWNER
-            )));
+            handler = IPurchaseRbtc(
+                address(
+                    new TropykusHandlerWrapper(
+                        address(dcaManager), address(stablecoin), address(kToken), FEE_COLLECTOR, feeSettings, OWNER
+                    )
+                )
+            );
             // Give kToken sufficient balance for operations
             stablecoin.mint(address(kToken), HANDLER_INITIAL_BALANCE);
         } else {
             iSusdToken = new MockIsusdToken(address(stablecoin));
-            handler = IPurchaseRbtc(address(new SovrynHandlerWrapper(
-                address(dcaManager),
-                address(stablecoin),
-                address(iSusdToken),
-                FEE_COLLECTOR,
-                feeSettings,
-                OWNER
-            )));
+            handler = IPurchaseRbtc(
+                address(
+                    new SovrynHandlerWrapper(
+                        address(dcaManager), address(stablecoin), address(iSusdToken), FEE_COLLECTOR, feeSettings, OWNER
+                    )
+                )
+            );
             // Give iSusdToken sufficient balance for operations
             stablecoin.mint(address(iSusdToken), HANDLER_INITIAL_BALANCE);
         }
-        
+
         vm.prank(OWNER);
-        operationsAdmin.assignTokenHandler(
-            address(stablecoin),
-            s_routeIndex,
-            address(handler)
-        );
-        
+        operationsAdmin.assignTokenHandler(address(stablecoin), s_routeIndex, address(handler));
+
         // Setup users and balances
         for (uint256 i = 0; i < NUM_USERS; i++) {
             address user = address(uint160(0x10000 + i));
             s_users.push(user);
             stablecoin.mint(user, USER_INITIAL_BALANCE);
-            
+
             vm.prank(user);
             stablecoin.approve(address(handler), type(uint256).max);
         }
-        
+
         // Deploy and target the invariant handler
         fuzzHandler = new Handler(
-            dcaManager,
-            operationsAdmin,
-            ITokenHandler(address(handler)),
-            handler,
-            stablecoin,
-            s_users,
-            s_routeIndex
+            dcaManager, operationsAdmin, ITokenHandler(address(handler)), handler, stablecoin, s_users, s_routeIndex
         );
-        
+
         targetContract(address(fuzzHandler));
     }
 
     function test_invariantHandlerCreatesScheduleAtSelectedRoute() public {
-        fuzzHandler.createDcaSchedule(
-            0,
-            MIN_PURCHASE_AMOUNT,
-            MIN_PURCHASE_AMOUNT,
-            MIN_PURCHASE_PERIOD
-        );
-        assertEq(
-            fuzzHandler.createScheduleSuccesses(),
-            1,
-            "Handler never created a schedule at the selected route"
-        );
-        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) = dcaManager.getDcaSchedules(s_users[0], address(stablecoin));
+        fuzzHandler.createDcaSchedule(0, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD);
+        assertEq(fuzzHandler.createScheduleSuccesses(), 1, "Handler never created a schedule at the selected route");
+        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) =
+            dcaManager.getDcaSchedules(s_users[0], address(stablecoin));
         assertEq(schedules.length, 1);
         assertEq(schedules[0].routeIndex, s_routeIndex);
     }
-    
+
     /// @dev The pause action reaches the chain and records its ghost entry, so a failure of
     ///      `invariant_pausedSchedulesNeverPurchase` means the protocol moved, not the harness.
     function test_invariantHandlerPausesAndRecordsGhost() public {
@@ -190,9 +170,7 @@ contract InvariantTest is StdInvariant, Test {
         assertEq(fuzzHandler.createScheduleSuccesses(), 1, "Handler never created a schedule to pause");
 
         fuzzHandler.pauseSchedule(0, 0);
-        assertTrue(
-            scheduleAt(dcaManager, s_users[0], address(stablecoin), 0).paused, "Handler did not pause on-chain"
-        );
+        assertTrue(scheduleAt(dcaManager, s_users[0], address(stablecoin), 0).paused, "Handler did not pause on-chain");
         assertEq(fuzzHandler.everPausedScheduleIdsLength(), 1, "Handler did not record the pause ghost");
 
         fuzzHandler.unpauseSchedule(0, 0);
@@ -252,22 +230,22 @@ contract InvariantTest is StdInvariant, Test {
     /*//////////////////////////////////////////////////////////////
                             INVARIANT TESTS
     //////////////////////////////////////////////////////////////*/
-    
+
     /**
      * @notice The sum of all users' deposited tokens should match the total tokens in the lending protocol
      */
     function invariant_totalDepositedTokensMatchesLendingProtocol() public {
         uint256 totalUserDeposits = 0;
         uint256 totalLendingBalances = 0;
-        
+
         // Sum all user deposits across all schedules AND their lending balances
         for (uint256 i = 0; i < s_users.length; i++) {
             address user = s_users[i];
-            
+
             // Get user's shares balance
             uint256 userLendingBalance = ITokenLending(address(handler)).getUserShares(user);
             totalLendingBalances += userLendingBalance;
-            
+
             // Get all schedules for this user with the stablecoin
             try dcaManager.getDcaSchedules(user, address(stablecoin)) returns (
                 uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules
@@ -279,7 +257,7 @@ contract InvariantTest is StdInvariant, Test {
                 continue;
             }
         }
-        
+
         // Convert shares balances to stablecoin equivalent
         uint256 totalStablecoinInLendingProtocol = 0;
         if (totalLendingBalances > 0) {
@@ -289,7 +267,7 @@ contract InvariantTest is StdInvariant, Test {
                 totalStablecoinInLendingProtocol = totalLendingBalances * iSusdToken.tokenPrice() / 1e18;
             }
         }
-        
+
         // ✅ CORRECTED INVARIANT: Lending protocol balance should be >= user deposits
         // because interest accrues over time. The only time they're exactly equal
         // is immediately after deposits with no time passing.
@@ -315,12 +293,12 @@ contract InvariantTest is StdInvariant, Test {
             // We just assert it's non-negative.
             assertGe(totalStablecoinInLendingProtocol, 0);
         }
-        
+
         console2.log("Total user deposits:", totalUserDeposits);
         console2.log("Total in lending protocol:", totalStablecoinInLendingProtocol);
         console2.log("Total lending balances (kTokens):", totalLendingBalances);
     }
-    
+
     // No rBTC invariant lives here, deliberately. The handlers this suite targets are the wrappers at
     // the bottom of this file: they reimplement `batchBuyRbtc` to credit each row directly, so
     // `PurchaseRbtc`'s allocation never executes and its attribution cannot be observed. They also
@@ -339,7 +317,7 @@ contract InvariantTest is StdInvariant, Test {
     function invariant_userBalancesReasonable() public {
         for (uint256 i = 0; i < s_users.length; i++) {
             address user = s_users[i];
-            
+
             // Query balances (not capped anymore, but useful for logging)
             stablecoin.balanceOf(user);
             handler.getAccumulatedRbtcBalance(user);
@@ -364,7 +342,7 @@ contract InvariantTest is StdInvariant, Test {
             }
         }
     }
-    
+
     /**
      * @notice The lending protocol exchange rate should only increase over time (interest accrual)
      */
@@ -382,7 +360,7 @@ contract InvariantTest is StdInvariant, Test {
             console2.log("Current token price:", previousRate);
         }
     }
-    
+
     /**
      * @notice Handler contracts should never hold any stablecoin tokens
      */
@@ -391,7 +369,7 @@ contract InvariantTest is StdInvariant, Test {
         assertEq(handlerBalance, 0);
         console2.log("Handler token balance:", handlerBalance);
     }
-    
+
     /**
      * @notice Coverage guard: the pause invariant below must not be silently vacuous.
      * @dev It was, when it first landed. The pause action originally took a fuzzed `bool`, and the
@@ -448,9 +426,7 @@ contract InvariantTest is StdInvariant, Test {
 
                 assertTrue(schedules[j].paused, "a schedule the ghost holds paused is active on-chain");
                 assertEq(
-                    schedules[j].cadenceAnchor,
-                    cadenceAnchorAtPause,
-                    "a paused schedule advanced its cadence anchor"
+                    schedules[j].cadenceAnchor, cadenceAnchorAtPause, "a paused schedule advanced its cadence anchor"
                 );
                 break;
             }
@@ -463,7 +439,7 @@ contract InvariantTest is StdInvariant, Test {
     function invariant_interestOnlyIncreases() public {
         for (uint256 i = 0; i < s_users.length; i++) {
             address user = s_users[i];
-            
+
             try dcaManager.getDcaSchedules(user, address(stablecoin)) returns (
                 uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules
             ) {
@@ -474,7 +450,7 @@ contract InvariantTest is StdInvariant, Test {
                             totalDeposited += schedules[j].tokenBalance;
                         }
                     }
-                    
+
                     if (totalDeposited > 0) {
                         uint256 lendingBalance = ITokenLending(address(handler)).getUserShares(user);
                         assertGe(lendingBalance, 0);
@@ -495,7 +471,7 @@ contract InvariantTest is StdInvariant, Test {
 contract TropykusHandlerWrapper is TropykusErc20Handler {
     // Track users' accumulated RBTC for testing
     mapping(address user => uint256 amount) internal s_usersAccumulatedRbtc;
-    
+
     constructor(
         address dcaManagerAddress,
         address stableTokenAddress,
@@ -503,20 +479,17 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
         address feeCollector,
         FeeSettings memory feeSettings,
         address initialOwner
-    ) TropykusErc20Handler(
-        dcaManagerAddress,
-        stableTokenAddress,
-        kTokenAddress,
-        feeCollector,
-        feeSettings,
-        initialOwner
-    ) {}
-    
+    )
+        TropykusErc20Handler(
+            dcaManagerAddress, stableTokenAddress, kTokenAddress, feeCollector, feeSettings, initialOwner
+        )
+    {}
+
     /**
      * @notice Allow the contract to receive and hold rBTC
      */
     receive() external payable {}
-    
+
     /**
      * @notice Mock implementation of batchBuyRbtc for testing
      * @dev Must track `IPurchaseRbtc.batchBuyRbtc` exactly. DcaManager reaches these wrappers through an
@@ -541,44 +514,43 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
             revert IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum(totalPurchasedRbtc, minRbtcOut);
         }
     }
-    
+
     /**
      * @notice Get the accumulated rBTC balance for a specific user
      */
     function getAccumulatedRbtcBalance(address user) external view returns (uint256) {
         return s_usersAccumulatedRbtc[user];
     }
-    
+
     /**
      * @notice Withdraw accumulated rBTC - transfers rBTC from handler to user
      */
     function withdrawAccumulatedRbtc(address user) external onlyDcaManager {
         uint256 rbtcBalance = s_usersAccumulatedRbtc[user];
         if (rbtcBalance == 0) return;
-        
+
         s_usersAccumulatedRbtc[user] = 0;
-        
+
         // Actually transfer rBTC (this properly decreases handler balance)
-        (bool success, ) = payable(user).call{value: rbtcBalance}("");
+        (bool success,) = payable(user).call{value: rbtcBalance}("");
         require(success, "rBTC transfer failed");
-        
+
         emit PurchaseRbtc__rBtcWithdrawn(user, rbtcBalance);
     }
-    
+
     /**
      * @notice Internal function for rBTC purchase logic
      * @dev Properly simulates: stablecoin -> rBTC conversion with correct balance accounting
      */
-    function _buyRbtcInternal(
-        address[] calldata buyerOne,
-        uint64 scheduleId,
-        uint256[] calldata amountOne
-    ) internal returns (uint256) {
+    function _buyRbtcInternal(address[] calldata buyerOne, uint64 scheduleId, uint256[] calldata amountOne)
+        internal
+        returns (uint256)
+    {
         // Retrieve the stablecoin the purchase will spend (length-1 batch — the only purchase path)
         uint256 retrieved = _batchRetrieveStablecoin(buyerOne, amountOne);
         address buyer = buyerOne[0];
         uint256 purchaseAmount = amountOne[0];
-        
+
         // ✅ SIMULATE: Consume the stablecoin retrieved (as it would be used for actual rBTC purchase)
         // In real protocol, this stablecoin gets sent to DEX/MoC and consumed
         // We simulate this by transferring it away (burn it)
@@ -586,21 +558,21 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
         if (handlerBalance > 0) {
             i_stableToken.transfer(address(0xdead), handlerBalance); // Burn the stablecoin
         }
-        
+
         // Mock conversion: 1 stablecoin = 0.00003 rBTC (roughly $50k BTC price)
         uint256 rbtcAmount = (retrieved * 3e16) / 1e18; // 0.03 rBTC per token
-        
+
         // Ensure handler has enough rBTC (should have been allocated in setUp)
         require(address(this).balance >= rbtcAmount, "Handler insufficient rBTC balance");
-        
+
         // Add to user's rBTC balance
         s_usersAccumulatedRbtc[buyer] += rbtcAmount;
-        
+
         emit PurchaseRbtc__RbtcBought(buyer, address(i_stableToken), rbtcAmount, scheduleId, purchaseAmount);
 
         return rbtcAmount;
     }
-    
+
     // Events for testing
     event PurchaseRbtc__RbtcBought(
         address indexed user,
@@ -613,14 +585,14 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
 }
 
 /**
- * @title SovrynHandlerWrapper  
+ * @title SovrynHandlerWrapper
  * @notice Concrete implementation of SovrynErc20Handler for testing
  * @dev Provides the missing Sovryn wrapper for invariant testing
  */
 contract SovrynHandlerWrapper is SovrynErc20Handler {
     // Track users' accumulated RBTC for testing
     mapping(address user => uint256 amount) internal s_usersAccumulatedRbtc;
-    
+
     constructor(
         address dcaManagerAddress,
         address stableTokenAddress,
@@ -628,20 +600,17 @@ contract SovrynHandlerWrapper is SovrynErc20Handler {
         address feeCollector,
         FeeSettings memory feeSettings,
         address initialOwner
-    ) SovrynErc20Handler(
-        dcaManagerAddress,
-        stableTokenAddress,
-        iSusdTokenAddress,
-        feeCollector,
-        feeSettings,
-        initialOwner
-    ) {}
-    
+    )
+        SovrynErc20Handler(
+            dcaManagerAddress, stableTokenAddress, iSusdTokenAddress, feeCollector, feeSettings, initialOwner
+        )
+    {}
+
     /**
      * @notice Allow the contract to receive and hold rBTC
      */
     receive() external payable {}
-    
+
     /**
      * @notice Mock implementation of batchBuyRbtc for testing
      * @dev Must track `IPurchaseRbtc.batchBuyRbtc` exactly. DcaManager reaches these wrappers through an
@@ -666,43 +635,42 @@ contract SovrynHandlerWrapper is SovrynErc20Handler {
             revert IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum(totalPurchasedRbtc, minRbtcOut);
         }
     }
-    
+
     /**
      * @notice Get the accumulated rBTC balance for a specific user
      */
     function getAccumulatedRbtcBalance(address user) external view returns (uint256) {
         return s_usersAccumulatedRbtc[user];
     }
-    
+
     /**
      * @notice Withdraw accumulated rBTC - transfers rBTC from handler to user
      */
     function withdrawAccumulatedRbtc(address user) external onlyDcaManager {
         uint256 rbtcBalance = s_usersAccumulatedRbtc[user];
         if (rbtcBalance == 0) return;
-        
+
         s_usersAccumulatedRbtc[user] = 0;
-        
+
         // Actually transfer rBTC (this properly decreases handler balance)
-        (bool success, ) = payable(user).call{value: rbtcBalance}("");
+        (bool success,) = payable(user).call{value: rbtcBalance}("");
         require(success, "rBTC transfer failed");
-        
+
         emit PurchaseRbtc__rBtcWithdrawn(user, rbtcBalance);
     }
-    
+
     /**
      * @notice Internal function for rBTC purchase logic
      */
-    function _buyRbtcInternal(
-        address[] calldata buyerOne,
-        uint64 scheduleId,
-        uint256[] calldata amountOne
-    ) internal returns (uint256) {
+    function _buyRbtcInternal(address[] calldata buyerOne, uint64 scheduleId, uint256[] calldata amountOne)
+        internal
+        returns (uint256)
+    {
         // Retrieve the stablecoin the purchase will spend (length-1 batch — the only purchase path)
         uint256 retrieved = _batchRetrieveStablecoin(buyerOne, amountOne);
         address buyer = buyerOne[0];
         uint256 purchaseAmount = amountOne[0];
-        
+
         // ✅ SIMULATE: Consume the stablecoin retrieved (as it would be used for actual rBTC purchase)
         // In real protocol, this stablecoin gets sent to DEX/MoC and consumed
         // We simulate this by transferring it away (burn it)
@@ -710,21 +678,21 @@ contract SovrynHandlerWrapper is SovrynErc20Handler {
         if (handlerBalance > 0) {
             i_stableToken.transfer(address(0xdead), handlerBalance); // Burn the stablecoin
         }
-        
+
         // Mock conversion: 1 stablecoin = 0.00003 rBTC
         uint256 rbtcAmount = (retrieved * 3e16) / 1e18; // 0.03 rBTC per token
-        
+
         // Ensure handler has enough rBTC (should have been allocated in setUp)
         require(address(this).balance >= rbtcAmount, "Handler insufficient rBTC balance");
-        
-        // Add to user's rBTC balance  
+
+        // Add to user's rBTC balance
         s_usersAccumulatedRbtc[buyer] += rbtcAmount;
-        
+
         emit PurchaseRbtc__RbtcBought(buyer, address(i_stableToken), rbtcAmount, scheduleId, purchaseAmount);
 
         return rbtcAmount;
     }
-    
+
     // Events for testing
     event PurchaseRbtc__RbtcBought(
         address indexed user,

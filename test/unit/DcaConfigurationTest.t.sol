@@ -49,7 +49,9 @@ contract DcaConfigurationTest is DcaDappTest {
         vm.startPrank(USER);
         uint64 wrongScheduleId = UNUSED_SCHEDULE_ID;
         vm.expectRevert(
-            abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), wrongScheduleId)
+            abi.encodeWithSelector(
+                IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), wrongScheduleId
+            )
         );
         dcaManager.updatePurchaseAmount(address(stablecoin), wrongScheduleId, AMOUNT_TO_SPEND);
         vm.stopPrank();
@@ -60,7 +62,11 @@ contract DcaConfigurationTest is DcaDappTest {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         address stranger = makeAddr("notTheOwner");
         vm.prank(stranger);
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__NotScheduleOwner.selector, address(stablecoin), scheduleId, USER));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDcaManager.DcaManager__NotScheduleOwner.selector, address(stablecoin), scheduleId, USER
+            )
+        );
         dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
     }
 
@@ -85,7 +91,9 @@ contract DcaConfigurationTest is DcaDappTest {
         vm.startPrank(USER);
         uint64 wrongScheduleId = UNUSED_SCHEDULE_ID;
         vm.expectRevert(
-            abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), wrongScheduleId)
+            abi.encodeWithSelector(
+                IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), wrongScheduleId
+            )
         );
         dcaManager.updatePurchasePeriod(address(stablecoin), wrongScheduleId, MIN_PURCHASE_PERIOD);
         vm.stopPrank();
@@ -96,7 +104,11 @@ contract DcaConfigurationTest is DcaDappTest {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         address stranger = makeAddr("notTheOwner");
         vm.prank(stranger);
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__NotScheduleOwner.selector, address(stablecoin), scheduleId, USER));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDcaManager.DcaManager__NotScheduleOwner.selector, address(stablecoin), scheduleId, USER
+            )
+        );
         dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, MIN_PURCHASE_PERIOD);
     }
 
@@ -173,9 +185,8 @@ contract DcaConfigurationTest is DcaDappTest {
 
     function testMaxSchedulesPerTokenCannotBeExceeded() external {
         uint256 maxSchedulesPerToken = dcaManager.getMaxSchedulesPerToken();
-        bytes memory encodedRevert = abi.encodeWithSelector(
-            IDcaManager.DcaManager__MaxSchedulesPerTokenReached.selector, address(stablecoin)
-        );
+        bytes memory encodedRevert =
+            abi.encodeWithSelector(IDcaManager.DcaManager__MaxSchedulesPerTokenReached.selector, address(stablecoin));
         for (uint256 i; i < maxSchedulesPerToken; ++i) {
             vm.startPrank(USER);
             stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
@@ -207,9 +218,8 @@ contract DcaConfigurationTest is DcaDappTest {
         vm.prank(OWNER);
         dcaManager.modifyMaxSchedulesPerToken(loweredMax);
 
-        bytes memory encodedRevert = abi.encodeWithSelector(
-            IDcaManager.DcaManager__MaxSchedulesPerTokenReached.selector, address(stablecoin)
-        );
+        bytes memory encodedRevert =
+            abi.encodeWithSelector(IDcaManager.DcaManager__MaxSchedulesPerTokenReached.selector, address(stablecoin));
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
         vm.expectRevert(encodedRevert);
@@ -255,9 +265,7 @@ contract DcaConfigurationTest is DcaDappTest {
 
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IDcaManager.DcaManager__TokenMinPurchaseAmountNotSet.selector, address(stablecoin)
-            )
+            abi.encodeWithSelector(IDcaManager.DcaManager__TokenMinPurchaseAmountNotSet.selector, address(stablecoin))
         );
         vm.prank(USER);
         dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
@@ -268,10 +276,10 @@ contract DcaConfigurationTest is DcaDappTest {
         vm.startPrank(OWNER);
         dcaManager.setTokenMinPurchaseAmount(address(stablecoin), customAmount);
         vm.stopPrank();
-        
+
         vm.startPrank(USER);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        
+
         bytes memory encodedRevert = abi.encodeWithSelector(
             IDcaManager.DcaManager__PurchaseAmountMustBeGreaterThanMinimum.selector, address(stablecoin), customAmount
         );

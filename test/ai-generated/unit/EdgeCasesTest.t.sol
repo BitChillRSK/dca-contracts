@@ -27,7 +27,10 @@ contract EdgeCasesTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Deploy common mocks for handlers expecting DOC/kDOC
-    function _deployTropykusMocHandler(bool fundProxy) internal returns (TropykusDocHandlerMoc, MockStablecoin, MockKdocToken, MockMocProxy) {
+    function _deployTropykusMocHandler(bool fundProxy)
+        internal
+        returns (TropykusDocHandlerMoc, MockStablecoin, MockKdocToken, MockMocProxy)
+    {
         MockStablecoin doc = new MockStablecoin(address(this));
         MockKdocToken kdoc = new MockKdocToken(address(doc));
         MockMocProxy mocProxy = new MockMocProxy(address(doc));
@@ -76,7 +79,17 @@ contract EdgeCasesTest is Test {
     /*//////////////////////////////////////////////////////////////
                        PurchaseUniswap setters reverts
     //////////////////////////////////////////////////////////////*/
-    function _deployDexHandler() internal returns (TropykusErc20HandlerDex, MockStablecoin, MockKdocToken, MockSwapRouter02, MockWrbtcToken, MockMocOracle) {
+    function _deployDexHandler()
+        internal
+        returns (
+            TropykusErc20HandlerDex,
+            MockStablecoin,
+            MockKdocToken,
+            MockSwapRouter02,
+            MockWrbtcToken,
+            MockMocOracle
+        )
+    {
         // Stablecoin & kDOC mocks
         MockStablecoin doc = new MockStablecoin(address(this));
         MockKdocToken kdoc = new MockKdocToken(address(doc));
@@ -114,7 +127,7 @@ contract EdgeCasesTest is Test {
     }
 
     function test_setPurchasePath_reverts_on_length_mismatch() public {
-        (TropykusErc20HandlerDex dex,, ,, ,) = _deployDexHandler();
+        (TropykusErc20HandlerDex dex,,,,,) = _deployDexHandler();
         address[] memory tokens = new address[](1);
         tokens[0] = address(0x1);
         uint24[] memory fees = new uint24[](3);
@@ -126,19 +139,19 @@ contract EdgeCasesTest is Test {
     }
 
     function test_setAmountOutMinimumPercent_reverts_when_too_high() public {
-        (TropykusErc20HandlerDex dex,, ,, ,) = _deployDexHandler();
+        (TropykusErc20HandlerDex dex,,,,,) = _deployDexHandler();
         vm.expectRevert();
         dex.setAmountOutMinimumPercent(1.1 ether);
     }
 
     function test_setAmountOutMinimumSafetyCheck_reverts_when_too_high() public {
-        (TropykusErc20HandlerDex dex,, ,, ,) = _deployDexHandler();
+        (TropykusErc20HandlerDex dex,,,,,) = _deployDexHandler();
         vm.expectRevert();
         dex.setAmountOutMinimumSafetyCheck(1.1 ether);
     }
 
     function test_updateMocOracle_reverts_on_zero_address() public {
-        (TropykusErc20HandlerDex dex,, ,, ,) = _deployDexHandler();
+        (TropykusErc20HandlerDex dex,,,,,) = _deployDexHandler();
         vm.expectRevert();
         dex.updateMocOracle(address(0));
     }

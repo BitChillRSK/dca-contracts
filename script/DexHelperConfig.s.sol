@@ -19,7 +19,8 @@ contract DexHelperConfig is Script {
     string stablecoinType;
     bool lendingProtocolIsTropykus =
         keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(TROPYKUS_STRING));
-    bool lendingProtocolIsSovryn = keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(SOVRYN_STRING));
+    bool lendingProtocolIsSovryn =
+        keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(SOVRYN_STRING));
     bool lendingProtocolIsLayerbank =
         keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(LAYERBANK_STRING));
     bool lendingProtocolIsNone =
@@ -28,12 +29,12 @@ contract DexHelperConfig is Script {
     struct NetworkConfig {
         // Stablecoin address
         address stablecoinAddress;
-        
+
         // Share token addresses by protocol
-        address tropykusShareToken;  // Legacy Tropykus shares (kDOC, kUSDRIF); local/fork lanes only
-        address sovrynShareToken;    // The share token for Sovryn (e.g., iSUSD)
-        address layerbankAToken;     // LayerBank aToken; handler reads Pool from aToken.POOL()
-        
+        address tropykusShareToken; // Legacy Tropykus shares (kDOC, kUSDRIF); local/fork lanes only
+        address sovrynShareToken; // The share token for Sovryn (e.g., iSUSD)
+        address layerbankAToken; // LayerBank aToken; handler reads Pool from aToken.POOL()
+
         // Swap-related addresses
         address wrbtcTokenAddress;
         address swapRouter02Address; // @notice NOT DEPLOYED ON RSK TESTNET!!
@@ -63,7 +64,7 @@ contract DexHelperConfig is Script {
         } catch {
             stablecoinType = DOC_STRING;
         }
-        
+
         if (block.chainid == RSK_MAINNET_CHAIN_ID) {
             activeNetworkConfig = getRootstockMainnetConfig();
         } else if (block.chainid == RSK_TESTNET_CHAIN_ID) {
@@ -80,7 +81,7 @@ contract DexHelperConfig is Script {
         address tropykusShareToken;
         address sovrynShareToken;
         address layerbankAToken;
-        
+
         // Configure based on stablecoin type. LayerBank USDRIF/USDT0 is mainnet-only.
         if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDT0_STRING))) {
             intermediateTokens = new address[](0);
@@ -135,7 +136,7 @@ contract DexHelperConfig is Script {
         address tropykusShareToken;
         address sovrynShareToken;
         address layerbankAToken;
-        
+
         // Configure based on stablecoin type. USDT0 swaps direct WRBTC at 0.3% (looked up 2026-08-28);
         // the 0.05% USDT0/WRBTC pool exists but is empty. Do not hop through rUSDT as if it were USDT0.
         if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDT0_STRING))) {
@@ -174,7 +175,7 @@ contract DexHelperConfig is Script {
             sovrynShareToken: sovrynShareToken,
             layerbankAToken: layerbankAToken,
             wrbtcTokenAddress: 0x542fDA317318eBF1d3DEAf76E0b632741A7e677d, // WRBTC token on mainnet
-            swapRouter02Address: 0x0B14ff67f0014046b4b99057Aec4509640b3947A, 
+            swapRouter02Address: 0x0B14ff67f0014046b4b99057Aec4509640b3947A,
             swapIntermediateTokens: intermediateTokens,
             swapPoolFeeRates: poolFeeRates,
             mocOracleAddress: 0xe2927A0620b82A66D67F678FC9b826B0E01B1bFD,
@@ -207,7 +208,7 @@ contract DexHelperConfig is Script {
         // Create mock tokens based on the selected stablecoin type
         MockStablecoin mockStablecoin = new MockStablecoin(msg.sender);
         address mockStablecoinAddress = address(mockStablecoin);
-        
+
         address mockShareTokenAddress;
         address mockLayerbankAToken;
         if (lendingProtocolIsTropykus) {
@@ -238,7 +239,7 @@ contract DexHelperConfig is Script {
         MockStablecoin mockIntermediateToken = new MockStablecoin(msg.sender);
         MockMocOracle mockMocOracle = new MockMocOracle();
         MockMocProxy mockMocProxy = new MockMocProxy(mockStablecoinAddress);
-        
+
         // Only stop the broadcast if we started it
         if (!isBroadcasting) {
             vm.stopBroadcast();
@@ -253,7 +254,7 @@ contract DexHelperConfig is Script {
 
         address[] memory intermediateTokens;
         uint24[] memory poolFeeRates;
-        
+
         // Set different pool fees based on stablecoin type, even for mocks. USDT0 is a direct WRBTC hop.
         if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDT0_STRING))) {
             intermediateTokens = new address[](0);

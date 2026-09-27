@@ -132,11 +132,7 @@ contract FullWithdrawalTest is DcaDappTest {
             assertEq(_scheduleBalance(i), scheduleBalance, "another schedule's principal was touched");
         }
         if (isLendingLane) {
-            assertGt(
-                stablecoinHandler.getUserShares(USER),
-                0,
-                "the shares backing the remaining schedules were burnt"
-            );
+            assertGt(stablecoinHandler.getUserShares(USER), 0, "the shares backing the remaining schedules were burnt");
         }
     }
 
@@ -149,8 +145,7 @@ contract FullWithdrawalTest is DcaDappTest {
         uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
 
         vm.prank(USER);
-        dcaManager.withdrawTokenAndInterest(address(stablecoin), scheduleId, type(uint256).max
-        );
+        dcaManager.withdrawTokenAndInterest(address(stablecoin), scheduleId, type(uint256).max);
 
         assertEq(_scheduleBalance(SCHEDULE_INDEX), 0, "the schedule was not emptied");
         assertApproxEqRel(

@@ -144,11 +144,10 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      *      constructor, which can only pass `memory`, so `calldata` here would be copied at each helper
      *      call. That measured dearer than the single copy the ABI decoder makes.
      */
-    function setPurchasePathAllowed(
-        address[] memory intermediateTokens,
-        uint24[] memory poolFeeRates,
-        bool allowed
-    ) external onlyOwner {
+    function setPurchasePathAllowed(address[] memory intermediateTokens, uint24[] memory poolFeeRates, bool allowed)
+        external
+        onlyOwner
+    {
         bytes memory encodedPath = _encodePurchasePath(intermediateTokens, poolFeeRates);
         bytes32 pathHash = keccak256(encodedPath);
         if (!allowed && keccak256(s_swapPath) == pathHash) {
@@ -166,10 +165,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      *      constructor, which can only pass `memory`, so `calldata` here would be copied at each helper
      *      call. That measured dearer than the single copy the ABI decoder makes.
      */
-    function setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
-        external
-        override
-    {
+    function setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates) external override {
         bytes memory newPath = _encodePurchasePath(intermediateTokens, poolFeeRates);
         bytes32 pathHash = keccak256(newPath);
         if (!s_purchasePathAllowed[pathHash]) {
@@ -193,7 +189,9 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     /// @inheritdoc IPurchaseUniswap
     function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external onlyOwner {
         _validateSlippageSettings(s_amountOutMinimumPercent, amountOutMinimumSafetyCheck);
-        emit PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(s_amountOutMinimumSafetyCheck, amountOutMinimumSafetyCheck);
+        emit PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(
+            s_amountOutMinimumSafetyCheck, amountOutMinimumSafetyCheck
+        );
         s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint64();
     }
 
@@ -252,11 +250,9 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      *      purchase checks the router against the active path's intermediate tokens, and a path
      *      activation that left the previous set behind would check the wrong tokens.
      */
-    function _setPurchasePath(
-        address[] memory intermediateTokens,
-        uint24[] memory poolFeeRates,
-        bytes memory newPath
-    ) internal {
+    function _setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates, bytes memory newPath)
+        internal
+    {
         s_swapPath = newPath;
         s_swapIntermediateTokens = intermediateTokens;
         emit PurchaseUniswap__NewPathSet(intermediateTokens, poolFeeRates, newPath);
@@ -291,19 +287,12 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      *      requires every intermediate-token router balance to return to its pre-swap value. Comparing
      *      deltas, not zero balances, prevents donated tokens from blocking it.
      */
-    function _purchaseRbtc(uint256 stablecoinAmount, uint256 minRbtcOut)
-        internal
-        override
-        returns (uint256 amountOut)
-    {
+    function _purchaseRbtc(uint256 stablecoinAmount, uint256 minRbtcOut) internal override returns (uint256 amountOut) {
         uint256 amountOutLowerBound = _getAmountOutLowerBound(stablecoinAmount);
         uint256 amountOutMinimum = minRbtcOut > amountOutLowerBound ? minRbtcOut : amountOutLowerBound;
 
         IUniswapV3SwapRouter.ExactInputParams memory params = IUniswapV3SwapRouter.ExactInputParams({
-            path: s_swapPath,
-            recipient: address(this),
-            amountIn: stablecoinAmount,
-            amountOutMinimum: amountOutMinimum
+            path: s_swapPath, recipient: address(this), amountIn: stablecoinAmount, amountOutMinimum: amountOutMinimum
         });
 
         address[] memory intermediateTokens = s_swapIntermediateTokens;
@@ -337,7 +326,11 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      *      params have no deadline, and a deadline derived here from `block.timestamp` would be tautological;
      *      a binding deadline would have to come from the swapper as a new batch argument.
      */
-    function _getAmountOutLowerBound(uint256 stablecoinAmountToSpend) internal view returns (uint256 minimumRbtcAmount) {
+    function _getAmountOutLowerBound(uint256 stablecoinAmountToSpend)
+        internal
+        view
+        returns (uint256 minimumRbtcAmount)
+    {
         (uint256 currentPrice, bool isValid,) = s_mocOracle.getPriceInfo();
         if (!isValid) revert PurchaseUniswap__OutdatedPrice();
         minimumRbtcAmount =

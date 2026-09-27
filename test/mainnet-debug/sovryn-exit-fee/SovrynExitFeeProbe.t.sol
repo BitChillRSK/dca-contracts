@@ -130,10 +130,7 @@ contract SovrynExitFeeWithdrawalProbe is DcaDappTest {
         console2.log("10 bps of requested would be", AMOUNT_TO_DEPOSIT / 1000);
         if (AMOUNT_TO_DEPOSIT > paid) {
             console2.log("haircut DOC", AMOUNT_TO_DEPOSIT - paid);
-            console2.log(
-                "haircut bps (approx)",
-                ((AMOUNT_TO_DEPOSIT - paid) * BPS_DENOMINATOR) / AMOUNT_TO_DEPOSIT
-            );
+            console2.log("haircut bps (approx)", ((AMOUNT_TO_DEPOSIT - paid) * BPS_DENOMINATOR) / AMOUNT_TO_DEPOSIT);
         }
     }
 }

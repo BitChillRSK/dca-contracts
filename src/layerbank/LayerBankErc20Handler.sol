@@ -115,11 +115,7 @@ abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20H
      *      the target; when it undershoots, one more wei is enough. Callers only pass
      *      `sharesAmount >= 1` (`_redeemShares` no-ops a zero debit), so the result is never zero.
      */
-    function _underlyingForExactScaledBurn(uint256 sharesAmount, uint256 index)
-        private
-        view
-        returns (uint256 amount)
-    {
+    function _underlyingForExactScaledBurn(uint256 sharesAmount, uint256 index) private view returns (uint256 amount) {
         amount = _sharesToStablecoin(sharesAmount, index);
         if (_rayDiv(amount, index) < sharesAmount) {
             unchecked {

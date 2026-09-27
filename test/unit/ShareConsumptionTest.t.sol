@@ -57,9 +57,8 @@ contract ShareConsumptionTest is DcaDappTest {
     function _receiptShares() private returns (uint256) {
         if (s_routeIndex == LAYERBANK_INDEX) {
             // DcaDappTest leaves `shareToken` unset for LayerBank (aToken is not IShareToken).
-            return LayerBankErc20Handler(payable(address(stablecoinHandler))).i_aToken().scaledBalanceOf(
-                address(stablecoinHandler)
-            );
+            return LayerBankErc20Handler(payable(address(stablecoinHandler))).i_aToken()
+                .scaledBalanceOf(address(stablecoinHandler));
         }
         return shareToken.balanceOf(address(stablecoinHandler));
     }

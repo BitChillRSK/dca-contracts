@@ -31,9 +31,7 @@ contract TwoStepOwnershipTest is Test {
 
     function setUp() public {
         operationsAdmin = new OperationsAdmin(OWNER);
-        dcaManager = new DcaManager(
-            address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, OWNER
-        );
+        dcaManager = new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, OWNER);
 
         MockStablecoin docToken = new MockStablecoin(address(this));
         MockMocProxy mocProxy = new MockMocProxy(address(docToken));
@@ -63,9 +61,7 @@ contract TwoStepOwnershipTest is Test {
         new OperationsAdmin(address(0));
 
         vm.expectRevert(ownableInvalidOwner(address(0)));
-        new DcaManager(
-            address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, address(0)
-        );
+        new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, address(0));
 
         MockStablecoin docToken = new MockStablecoin(address(this));
         MockMocProxy mocProxy = new MockMocProxy(address(docToken));

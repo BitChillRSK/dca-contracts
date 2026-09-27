@@ -32,10 +32,7 @@ contract R87FeeTransferredRemovalGasTest is Test {
     function setUp() public {
         token = new MockStablecoin(address(this));
         IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
-            minFeeRate: 100,
-            maxFeeRate: 100,
-            feePurchaseLowerBound: 1000 ether,
-            feePurchaseUpperBound: 100_000 ether
+            minFeeRate: 100, maxFeeRate: 100, feePurchaseLowerBound: 1000 ether, feePurchaseUpperBound: 100_000 ether
         });
         current = new FeeTransferCurrent(address(0xFEE), feeSettings, address(this));
         baseline = new FeeTransferBaseline(address(0xFEE), feeSettings, address(this));

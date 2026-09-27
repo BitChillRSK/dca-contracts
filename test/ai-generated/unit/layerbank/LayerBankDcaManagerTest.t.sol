@@ -18,7 +18,6 @@ import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
  * @dev Goes through DeployMocSwaps (via BaseDeploymentTest) and DeployLayerBankHandler.
  */
 contract LayerBankDcaManagerTest is BaseDeploymentTest {
-
     address internal constant USER = address(0x4444);
     address internal constant SWAPPER = address(0x3333);
 
@@ -38,15 +37,14 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
         super.setUp();
 
         handler = LayerBankDocHandlerMoc(
-            payable(
-                new DeployLayerBankHandler().deployMocksAndHandler(
-                    address(dcaManager),
-                    helperConfig.getStablecoinAddress(),
-                    helperConfig.getActiveNetworkConfig().mocProxyAddress,
-                    makeAddr(FEE_COLLECTOR_STRING),
-                    operationsAdmin.owner()
-                )
-            )
+            payable(new DeployLayerBankHandler()
+                    .deployMocksAndHandler(
+                        address(dcaManager),
+                        helperConfig.getStablecoinAddress(),
+                        helperConfig.getActiveNetworkConfig().mocProxyAddress,
+                        makeAddr(FEE_COLLECTOR_STRING),
+                        operationsAdmin.owner()
+                    ))
         );
         docToken = MockStablecoin(helperConfig.getStablecoinAddress());
         mocProxy = MockMocProxy(helperConfig.getActiveNetworkConfig().mocProxyAddress);

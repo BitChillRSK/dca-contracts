@@ -130,7 +130,9 @@ contract PurchaseRbtcTest is Test {
         vm.expectEmit(true, true, true, true, address(harness));
         emit PurchaseRbtc__RbtcBought(buyerA, address(token), RBTC_OUT, scheduleA, spent);
 
-        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested), NO_MIN_RBTC_OUT);
+        harness.batchBuyRbtc(
+            _oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested), NO_MIN_RBTC_OUT
+        );
 
         assertEq(harness.lastPurchaseAmount(), spent);
         assertEq(token.balanceOf(feeCollector), fee);
@@ -142,7 +144,9 @@ contract PurchaseRbtcTest is Test {
         uint256 fee = _fee(requested);
         uint256 net = requested - fee;
 
-        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested), NO_MIN_RBTC_OUT);
+        harness.batchBuyRbtc(
+            _oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested), NO_MIN_RBTC_OUT
+        );
 
         assertEq(harness.purchaseCalls(), 1);
         assertEq(harness.lastPurchaseAmount(), net);
@@ -162,7 +166,9 @@ contract PurchaseRbtcTest is Test {
         vm.expectEmit(true, true, true, true, address(harness));
         emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(address(token), RBTC_OUT, net);
 
-        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested), NO_MIN_RBTC_OUT);
+        harness.batchBuyRbtc(
+            _oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested), NO_MIN_RBTC_OUT
+        );
 
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), RBTC_OUT);
     }
@@ -172,7 +178,9 @@ contract PurchaseRbtcTest is Test {
         uint256 requested = 100 ether;
 
         vm.recordLogs();
-        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested), NO_MIN_RBTC_OUT);
+        harness.batchBuyRbtc(
+            _oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested), NO_MIN_RBTC_OUT
+        );
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bytes32 sig = Transfer.selector;
@@ -192,7 +200,9 @@ contract PurchaseRbtcTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(IPurchaseRbtc.PurchaseRbtc__RbtcBatchPurchaseFailed.selector, address(token))
         );
-        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(100 ether), NO_MIN_RBTC_OUT);
+        harness.batchBuyRbtc(
+            _oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(100 ether), NO_MIN_RBTC_OUT
+        );
 
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), 0);
     }
@@ -443,9 +453,7 @@ contract PurchaseRbtcTest is Test {
         (address[] memory buyers, uint64[] memory scheduleIds, uint256[] memory amounts) = _twoBuyerBatch();
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, RBTC_OUT, RBTC_OUT + 1
-            )
+            abi.encodeWithSelector(IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, RBTC_OUT, RBTC_OUT + 1)
         );
         harness.batchBuyRbtc(buyers, scheduleIds, amounts, RBTC_OUT + 1);
     }
@@ -454,9 +462,8 @@ contract PurchaseRbtcTest is Test {
     function test_minRbtcOut_violationRollsBackFeeAndCredits() public {
         (address[] memory buyers, uint64[] memory scheduleIds, uint256[] memory amounts) = _twoBuyerBatch();
 
-        (bool ok,) = address(harness).call(
-            abi.encodeCall(IPurchaseRbtc.batchBuyRbtc, (buyers, scheduleIds, amounts, RBTC_OUT + 1))
-        );
+        (bool ok,) = address(harness)
+            .call(abi.encodeCall(IPurchaseRbtc.batchBuyRbtc, (buyers, scheduleIds, amounts, RBTC_OUT + 1)));
 
         // `vm.recordLogs` keeps the logs of reverted frames, so the proof that nothing was emitted is
         // that nothing they report happened: no credit and no fee survive the call.
@@ -474,9 +481,7 @@ contract PurchaseRbtcTest is Test {
         harness.setRetrieveOverride(150 ether); // the rows planned 300 ether of gross spend
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, RBTC_OUT, RBTC_OUT + 1
-            )
+            abi.encodeWithSelector(IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, RBTC_OUT, RBTC_OUT + 1)
         );
         harness.batchBuyRbtc(buyers, scheduleIds, amounts, RBTC_OUT + 1);
 
@@ -496,9 +501,7 @@ contract PurchaseRbtcTest is Test {
         harness.batchBuyRbtc(buyers, scheduleIds, amounts, 1);
     }
 
-    function testFuzz_minRbtcOut_passesExactlyWhenAtOrBelowMeasuredOutput(uint256 measured, uint256 minRbtcOut)
-        public
-    {
+    function testFuzz_minRbtcOut_passesExactlyWhenAtOrBelowMeasuredOutput(uint256 measured, uint256 minRbtcOut) public {
         measured = bound(measured, 1, 100 ether);
         minRbtcOut = bound(minRbtcOut, 0, 200 ether);
         harness.setRbtcOut(measured);
@@ -506,9 +509,7 @@ contract PurchaseRbtcTest is Test {
 
         if (minRbtcOut > measured) {
             vm.expectRevert(
-                abi.encodeWithSelector(
-                    IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, measured, minRbtcOut
-                )
+                abi.encodeWithSelector(IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, measured, minRbtcOut)
             );
         }
         harness.batchBuyRbtc(buyers, scheduleIds, amounts, minRbtcOut);
@@ -521,7 +522,9 @@ contract PurchaseRbtcTest is Test {
     /// @dev Full withdraw pays the complete claim, getter stays 0, and raw storage keeps sentinel 1.
     function test_fullWithdraw_leavesSentinelAndPaysCompleteClaim() public {
         vm.deal(address(harness), RBTC_OUT);
-        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(100 ether), NO_MIN_RBTC_OUT);
+        harness.batchBuyRbtc(
+            _oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(100 ether), NO_MIN_RBTC_OUT
+        );
 
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), RBTC_OUT);
         assertEq(_rawAccumulatedRbtc(buyerA), RBTC_OUT + 1);
@@ -537,10 +540,14 @@ contract PurchaseRbtcTest is Test {
     /// @dev After a full withdraw, the next credit lands on the sentinel and stays fully withdrawable.
     function test_recreditAfterFullWithdraw_creditsAndPaysAgain() public {
         vm.deal(address(harness), 2 * RBTC_OUT);
-        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(100 ether), NO_MIN_RBTC_OUT);
+        harness.batchBuyRbtc(
+            _oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(100 ether), NO_MIN_RBTC_OUT
+        );
         harness.withdrawAccumulatedRbtc(buyerA);
 
-        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(100 ether), NO_MIN_RBTC_OUT);
+        harness.batchBuyRbtc(
+            _oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(100 ether), NO_MIN_RBTC_OUT
+        );
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), RBTC_OUT);
         assertEq(_rawAccumulatedRbtc(buyerA), RBTC_OUT + 1);
 
@@ -557,7 +564,9 @@ contract PurchaseRbtcTest is Test {
         harness.withdrawAccumulatedRbtc(buyerA);
 
         vm.deal(address(harness), RBTC_OUT);
-        harness.batchBuyRbtc(_oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(100 ether), NO_MIN_RBTC_OUT);
+        harness.batchBuyRbtc(
+            _oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(100 ether), NO_MIN_RBTC_OUT
+        );
         harness.withdrawAccumulatedRbtc(buyerA);
 
         vm.expectRevert(IPurchaseRbtc.PurchaseRbtc__NoAccumulatedRbtcToWithdraw.selector);
@@ -669,7 +678,14 @@ contract PurchaseRbtcHarness is PurchaseRbtc {
         revertOnPurchase = shouldRevert;
     }
 
-    function _purchaseRbtc(uint256 stablecoinAmount, uint256 /* minRbtcOut */) internal override returns (uint256) {
+    function _purchaseRbtc(
+        uint256 stablecoinAmount,
+        uint256 /* minRbtcOut */
+    )
+        internal
+        override
+        returns (uint256)
+    {
         if (revertOnPurchase) revert("route-called");
         purchaseCalls++;
         lastPurchaseAmount = stablecoinAmount;

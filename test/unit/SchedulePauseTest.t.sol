@@ -86,7 +86,11 @@ contract SchedulePauseTest is DcaDappTest {
 
         address stranger = makeAddr("r19Stranger");
         vm.prank(stranger);
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__NotScheduleOwner.selector, address(stablecoin), scheduleId, USER));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDcaManager.DcaManager__NotScheduleOwner.selector, address(stablecoin), scheduleId, USER
+            )
+        );
         dcaManager.setSchedulePaused(address(stablecoin), scheduleId, true);
 
         assertFalse(_isPaused(SCHEDULE_INDEX), "a stranger paused someone else's schedule");
@@ -94,7 +98,11 @@ contract SchedulePauseTest is DcaDappTest {
 
     function testPausingAnInexistentScheduleReverts() external {
         vm.prank(USER);
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), UNUSED_SCHEDULE_ID));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), UNUSED_SCHEDULE_ID
+            )
+        );
         dcaManager.setSchedulePaused(address(stablecoin), UNUSED_SCHEDULE_ID, true);
 
         assertFalse(_isPaused(SCHEDULE_INDEX));
@@ -114,7 +122,11 @@ contract SchedulePauseTest is DcaDappTest {
         dcaManager.deleteDcaSchedule(address(stablecoin), deletedScheduleId, SCHEDULE_INDEX);
 
         IDcaManager.DcaSchedule memory moved = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        assertEq(scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX), movedScheduleId, "swap-pop did not move the last schedule here");
+        assertEq(
+            scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX),
+            movedScheduleId,
+            "swap-pop did not move the last schedule here"
+        );
         assertTrue(moved.paused, "the pause did not travel with the schedule");
     }
 
@@ -135,11 +147,7 @@ contract SchedulePauseTest is DcaDappTest {
         IDcaManager.DcaSchedule memory unchangedSchedule =
             scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         assertEq(unchangedSchedule.tokenBalance, before.tokenBalance, "a paused schedule was debited");
-        assertEq(
-            unchangedSchedule.cadenceAnchor,
-            before.cadenceAnchor,
-            "a paused schedule consumed a period"
-        );
+        assertEq(unchangedSchedule.cadenceAnchor, before.cadenceAnchor, "a paused schedule consumed a period");
         assertEq(
             IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER),
             rbtcBefore,
@@ -154,7 +162,8 @@ contract SchedulePauseTest is DcaDappTest {
         uint256 pausedIndex = NUM_OF_SCHEDULES - 1;
         _setPaused(pausedIndex, true);
 
-        (uint64[] memory beforeIds, IDcaManager.DcaSchedule[] memory before) = dcaManager.getDcaSchedules(USER, address(stablecoin));
+        (uint64[] memory beforeIds, IDcaManager.DcaSchedule[] memory before) =
+            dcaManager.getDcaSchedules(USER, address(stablecoin));
         uint256 rbtcBefore = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
 
         uint64[] memory scheduleIds = new uint64[](NUM_OF_SCHEDULES);
@@ -165,18 +174,13 @@ contract SchedulePauseTest is DcaDappTest {
         bytes memory pausedRevert = _schedulePausedRevert(pausedIndex);
         vm.prank(SWAPPER);
         vm.expectRevert(pausedRevert);
-        dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, address(stablecoin), s_routeIndex)
-        );
+        dcaManager.batchBuyRbtc(toBatch(scheduleIds, address(stablecoin), s_routeIndex));
 
-        (uint64[] memory afterSchedulesIds, IDcaManager.DcaSchedule[] memory afterSchedules) = dcaManager.getDcaSchedules(USER, address(stablecoin));
+        (uint64[] memory afterSchedulesIds, IDcaManager.DcaSchedule[] memory afterSchedules) =
+            dcaManager.getDcaSchedules(USER, address(stablecoin));
         for (uint256 i; i < NUM_OF_SCHEDULES; ++i) {
             assertEq(afterSchedules[i].tokenBalance, before[i].tokenBalance, "a batch row kept its debit");
-            assertEq(
-                afterSchedules[i].cadenceAnchor,
-                before[i].cadenceAnchor,
-                "a batch row kept its timestamp"
-            );
+            assertEq(afterSchedules[i].cadenceAnchor, before[i].cadenceAnchor, "a batch row kept its timestamp");
         }
         assertEq(
             IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER),
