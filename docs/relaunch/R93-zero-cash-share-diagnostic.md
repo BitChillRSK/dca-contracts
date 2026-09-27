@@ -33,13 +33,13 @@ attempted stablecoin to receipt shares redeemed before rollback.
 
 ## Scope
 
-- [ ] Rename the error parameter to `sharesRedeemed` and document that the whole call rolls back.
-- [ ] Single-user zero-cash reverts report `sharesToRedeem`.
-- [ ] Batch zero-cash reverts report the already-available `totalSharesToRedeem` and delete the
+- [x] Rename the error parameter to `sharesRedeemed` and document that the whole call rolls back.
+- [x] Single-user zero-cash reverts report `sharesToRedeem`.
+- [x] Batch zero-cash reverts report the already-available `totalSharesToRedeem` and delete the
       diagnostic-only stablecoin sum and its second loop.
-- [ ] Pin the new meaning at a non-1:1 exchange rate, including the positive-share / zero-stablecoin
+- [x] Pin the new meaning at a non-1:1 exchange rate, including the positive-share / zero-stablecoin
       dust case and a multi-row batch whose purchase-amount sum differs from its share sum.
-- [ ] Record the deployed-runtime delta against the R92 head under both default and deploy profiles.
+- [x] Record the deployed-runtime delta against the R92 head under both default and deploy profiles.
 
 ## Out of scope
 
@@ -93,20 +93,40 @@ live adapter's successful redemption path unchanged.
 
 ## Success criteria
 
-- [ ] No loop exists solely to construct `TokenLending__ZeroStablecoinReceived` revert data.
-- [ ] Both single and batch errors report the exact receipt shares consumed before rollback.
-- [ ] The error selector and encoded parameter type remain unchanged.
-- [ ] Successful-path storage access, arithmetic, and behavior remain unchanged.
-- [ ] Focused, full default/deploy, and fork gates pass.
+- [x] No loop exists solely to construct `TokenLending__ZeroStablecoinReceived` revert data.
+- [x] Both single and batch errors report the exact receipt shares consumed before rollback.
+- [x] The error selector and encoded parameter type remain unchanged.
+- [x] Successful-path storage access, arithmetic, and behavior remain unchanged.
+- [x] Focused, full default/deploy, and fork gates pass.
 
 ## Reviewer checklist
 
-- [ ] Matches **Scope**; nothing from **Out of scope**.
-- [ ] Protocol invariants in `AGENTS.md` still hold; exact external share consumption is what makes
+- [x] Matches **Scope**; nothing from **Out of scope**.
+- [x] Protocol invariants in `AGENTS.md` still hold; exact external share consumption is what makes
       the diagnostic authoritative.
-- [ ] Tests use a non-1:1 rate so stablecoin and share units cannot be confused.
-- [ ] Files beyond this list are limited to direct dependencies and are named in the PR.
-- [ ] No unrelated refactors; history is reviewable.
+- [x] Tests use a non-1:1 rate so stablecoin and share units cannot be confused.
+- [x] Files beyond this list are limited to direct dependencies and are named in the PR.
+- [x] No unrelated refactors; history is reviewable.
+
+## Results
+
+The diagnostic-only batch loop is gone. Single and batch zero-cash failures now encode the exact
+receipt-share debit that `_measuredProtocolRedeem` observed, while the revert restores both the
+virtual books and the protocol balance. The selector and its single `uint256` parameter type are
+unchanged.
+
+Against R92 head `b5a598d`, the lending MoC leaves changed as follows:
+
+| Handler | Default runtime | Delta | Deploy runtime | Delta |
+|---|---:|---:|---:|---:|
+| `SovrynDocHandlerMoc` | 10,867 bytes | -52 | 8,485 bytes | -39 |
+| `LayerBankDocHandlerMoc` | 11,135 bytes | -52 | 8,741 bytes | -39 |
+| `TropykusDocHandlerMoc` | 11,007 bytes | -52 | 8,717 bytes | -39 |
+
+The focused shared-base suite passed 21 tests, the dedicated LayerBank suite passed 47, and the
+dedicated Tropykus suite passed 43. `make check` and `make check-deploy` each passed 940 tests plus the
+13-test invariant suite. `make fork-sovryn`, `make fork-layerbank`, and the pinned
+`make fork-tropykus` gate all passed.
 
 ## ABI / deploy / cutover impact
 
