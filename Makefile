@@ -50,6 +50,8 @@ license-check:
 	@echo "OK: every src/**/*.sol is BUSL-1.1."
 
 # R91: first-party tree is forge-fmt-clean (vendored ABIs ignored in foundry.toml [fmt]).
+# Format with the same forge as CI (`.github/workflows/test.yml` pins `version: v1.7.1`);
+# a newer/older local forge can rewrite wrapping and trip this check.
 fmt-check:
 	@echo "Checking forge fmt..."
 	@forge fmt --check

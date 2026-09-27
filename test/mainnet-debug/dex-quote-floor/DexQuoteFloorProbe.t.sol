@@ -205,8 +205,8 @@ contract SwapProbe {
         IUniswapV3SwapRouter(SWAP_ROUTER_02)
             .exactInput(
                 IUniswapV3SwapRouter.ExactInputParams({
-                    path: path, recipient: address(this), amountIn: amountIn, amountOutMinimum: 0
-                })
+                path: path, recipient: address(this), amountIn: amountIn, amountOutMinimum: 0
+            })
             );
         uint256 amountOut = IERC20(WRBTC).balanceOf(address(this)) - wrbtcBefore;
         // A V3 swap that hits the tick price limit fills only part of the order and keeps the rest of the
