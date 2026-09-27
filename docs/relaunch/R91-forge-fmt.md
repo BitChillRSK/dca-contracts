@@ -1,6 +1,6 @@
 # R91 — `forge fmt` one-shot and CI enforce
 
-Status: **implemented** · Assigned: yes · Optional/further-review: no
+Status: **implemented** · GitHub [#156](https://github.com/BitChillRSK/dca-contracts/pull/156) · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
