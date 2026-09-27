@@ -30,8 +30,7 @@ contract IdleDocHandlerMoc is IdleErc20Handler, PurchaseMoc {
     )
         IdleErc20Handler(dcaManagerAddress, docTokenAddress)
         PurchaseMoc(
-            mocProxyAddress,
-            FeeConstructionArgs({feeCollector: feeCollector, feeSettings: feeSettings, initialOwner: initialOwner})
+            mocProxyAddress, FeeHandlerConfig({feeCollector: feeCollector, feeSettings: feeSettings}), initialOwner
         )
     {}
 }

@@ -36,9 +36,10 @@ contract IdleErc20HandlerDex is IdleErc20Handler, PurchaseUniswap {
         IdleErc20Handler(dcaManagerAddress, stableTokenAddress)
         PurchaseUniswap(
             uniswapSettings,
-            FeeConstructionArgs({feeCollector: feeCollector, feeSettings: feeSettings, initialOwner: initialOwner}),
+            FeeHandlerConfig({feeCollector: feeCollector, feeSettings: feeSettings}),
             amountOutMinimumPercent,
-            amountOutMinimumSafetyCheck
+            amountOutMinimumSafetyCheck,
+            initialOwner
         )
     {}
 }

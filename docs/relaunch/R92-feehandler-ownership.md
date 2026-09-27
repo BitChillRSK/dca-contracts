@@ -43,9 +43,11 @@ default-profile Dex stack-too-deep without adopting via-IR for `make check`.
       fee parameters. Leaves keep the same public constructor parameter lists and pass fee args into
       the purchase base instead of the funding base.
 - [x] Solve default-profile Dex stack-too-deep without enabling `via_ir` on `[profile.default]`.
-      **Approach used:** pack fee constructor inputs into `IFeeHandler.FeeConstructionArgs` so Dex
-      leaves pass one memory pointer into `PurchaseUniswap` / `PurchaseMoc` instead of three loose
-      fee args. Default profile compiles all Dex leaves (no stack-too-deep).
+      **Approach used:** pack fee-domain constructor inputs into `IFeeHandler.FeeHandlerConfig`
+      (`feeCollector` + `FeeSettings`) so Dex leaves pass one memory pointer into
+      `PurchaseUniswap` / `PurchaseMoc` instead of two loose fee args. `initialOwner` stays a
+      separate argument — ownership is not a fee concept. Default profile compiles all Dex leaves
+      (no stack-too-deep).
 - [x] Update NatSpec / `AGENTS.md` layout: fees belong on the purchase branch; `TokenHandler` no
       longer "owns FeeHandler".
 - [x] Update abstract-base test harnesses that construct `IdleErc20Handler` / `LendingErc20Handler` /
@@ -134,7 +136,8 @@ make fork-tropykus
 
 Method identifiers identical vs R91 tip on all six production MoC/Dex leaves checked.
 Storage layout identical (IdleDoc / SovrynDoc / IdleDex): FeeHandler slots 0–3, then shares/rBTC/Dex
-state unchanged. Stack fix: `FeeConstructionArgs` packing (no via-IR on default).
+state unchanged. Stack fix: `FeeHandlerConfig` packing of collector + settings only; `initialOwner`
+stays separate (no via-IR on default).
 
 Also gates two R89 gas pins that mint mock DOC with `block.chainid != ANVIL` skips so forks no
 longer hit live-DOC `MinterRole` (incomplete leftover from R91's FOUNDRY::SKIP fix).

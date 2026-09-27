@@ -28,9 +28,10 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
                                CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    /// @param feeArgs Collector, interpolated fee settings, and the address that owns them after deploy.
-    constructor(FeeConstructionArgs memory feeArgs)
-        FeeHandler(feeArgs.feeCollector, feeArgs.feeSettings, feeArgs.initialOwner)
+    /// @param feeHandlerConfig Collector and interpolated fee settings.
+    /// @param initialOwner Address that owns this handler immediately after deploy.
+    constructor(FeeHandlerConfig memory feeHandlerConfig, address initialOwner)
+        FeeHandler(feeHandlerConfig.feeCollector, feeHandlerConfig.feeSettings, initialOwner)
     {}
 
     /*//////////////////////////////////////////////////////////////

@@ -194,7 +194,7 @@ Human answers (2026-09-27), locked for this PR:
    `0883bb7`).
 2. Make the lending zero-cash diagnostic sum unchecked? **Yes — implemented** (`cdd7d73`).
 3. Move `FeeHandler` out of `TokenHandler`? **Deferred to R92** (approved to implement for diagram
-   cleanup; default-profile Dex stack-too-deep solved there via `FeeConstructionArgs` packing —
+   cleanup; default-profile Dex stack-too-deep solved there via `FeeHandlerConfig` packing —
    [#157](https://github.com/BitChillRSK/dca-contracts/pull/157)).
 4. Override keep-rejected / keep-checked rows?
    - Gross total into `_batchRetrieveStablecoin`: **keep rejected.**

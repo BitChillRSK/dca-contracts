@@ -25,14 +25,14 @@ interface IFeeHandler {
     }
 
     /**
-     * @notice Constructor bundle for `FeeHandler`: collector, interpolated rates, and initial owner.
+     * @notice Fee-domain constructor inputs: collector and the four interpolated rate parameters.
      * @dev One memory pointer on the purchase-base constructor call, so Dex leaves stay under the
-     *      legacy-codegen stack limit when fee args move off the funding base.
+     *      legacy-codegen stack limit when fee args move off the funding base. Ownership stays a
+     *      separate `initialOwner` argument — it governs more than fees (oracle, paths, floors).
      */
-    struct FeeConstructionArgs {
+    struct FeeHandlerConfig {
         address feeCollector;
         FeeSettings feeSettings;
-        address initialOwner;
     }
 
     /*//////////////////////////////////////////////////////////////

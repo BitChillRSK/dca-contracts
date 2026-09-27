@@ -357,9 +357,10 @@ contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
         DcaManagerAccessControl(msg.sender)
         PurchaseUniswap(
             uniswapSettings,
-            FeeConstructionArgs({feeCollector: address(0xFEE), feeSettings: feeSettings, initialOwner: msg.sender}),
+            FeeHandlerConfig({feeCollector: address(0xFEE), feeSettings: feeSettings}),
             amountOutMinimumPercent,
-            amountOutMinimumSafetyCheck
+            amountOutMinimumSafetyCheck,
+            msg.sender
         )
     {}
 
