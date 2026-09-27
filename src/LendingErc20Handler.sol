@@ -1,25 +1,28 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
-import {ITokenLending} from "src/interfaces/ITokenLending.sol";
-import {TokenHandler} from "src/TokenHandler.sol";
-import {TokenLending} from "src/TokenLending.sol";
+import {ITokenLending} from "./interfaces/ITokenLending.sol";
+import {TokenHandler} from "./TokenHandler.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @title LendingErc20Handler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Shared per-user share accounting, withdraw clamp, interest, and exact-sum batch
- *         redeem for lending handlers. Protocol adapters implement the exchange-rate and
- *         mint/redeem hooks.
+ * @notice Shared per-user share accounting, share ↔ stablecoin conversion, withdraw clamp,
+ *         interest, and exact-sum batch redeem for lending handlers. Protocol adapters implement
+ *         the exchange-rate and mint/redeem hooks.
  */
-abstract contract LendingErc20Handler is TokenHandler, TokenLending {
+abstract contract LendingErc20Handler is TokenHandler, ITokenLending {
     using SafeERC20 for IERC20;
 
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
+
+    /// @dev Scale of the protocol exchange rate; each adapter passes its own constant.
+    uint256 internal immutable i_exchangeRateDecimals;
 
     mapping(address user => uint256 balance) internal s_shares;
 
@@ -34,8 +37,9 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
      */
     constructor(address dcaManagerAddress, address stableTokenAddress, uint256 exchangeRateDecimals)
         TokenHandler(dcaManagerAddress, stableTokenAddress)
-        TokenLending(exchangeRateDecimals)
-    {}
+    {
+        i_exchangeRateDecimals = exchangeRateDecimals;
+    }
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
@@ -253,6 +257,37 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
      *      declare `balanceOf` without that mutability.
      */
     function _receiptSharesBalance() internal virtual returns (uint256);
+
+    /**
+     * @dev Convert stablecoin to shares. Rounds up so the virtual share debit is never below
+     *      what the lending protocol may burn for the same stablecoin amount (keeps sum of
+     *      per-user shares <= shares the handler actually holds). Round-down would allow the
+     *      books to drift above reality.
+     * @param stablecoinAmount Amount of stablecoin to convert.
+     * @param exchangeRate Stablecoin per share, scaled by `i_exchangeRateDecimals`.
+     * @return sharesAmount Corresponding shares, rounded up.
+     */
+    function _stablecoinToShares(uint256 stablecoinAmount, uint256 exchangeRate)
+        internal
+        view
+        returns (uint256 sharesAmount)
+    {
+        sharesAmount = Math.mulDiv(stablecoinAmount, i_exchangeRateDecimals, exchangeRate, Math.Rounding.Ceil);
+    }
+
+    /**
+     * @dev Convert shares to stablecoin (round down).
+     * @param sharesAmount Amount of shares to convert.
+     * @param exchangeRate Stablecoin per share, scaled by `i_exchangeRateDecimals`.
+     * @return stablecoinAmount Corresponding stablecoin.
+     */
+    function _sharesToStablecoin(uint256 sharesAmount, uint256 exchangeRate)
+        internal
+        view
+        returns (uint256 stablecoinAmount)
+    {
+        stablecoinAmount = sharesAmount * exchangeRate / i_exchangeRateDecimals;
+    }
 
     /*//////////////////////////////////////////////////////////////
                             PRIVATE FUNCTIONS

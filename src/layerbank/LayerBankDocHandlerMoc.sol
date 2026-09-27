@@ -2,7 +2,7 @@
 pragma solidity 0.8.36;
 
 import {LayerBankErc20Handler} from "./LayerBankErc20Handler.sol";
-import {PurchaseMoc} from "src/PurchaseMoc.sol";
+import {PurchaseMoc} from "../PurchaseMoc.sol";
 
 /**
  * @title LayerBankDocHandlerMoc

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
-import {PurchaseMoc} from "src/PurchaseMoc.sol";
+import {PurchaseMoc} from "../PurchaseMoc.sol";
 import {SovrynErc20Handler} from "./SovrynErc20Handler.sol";
 
 /**

@@ -8,7 +8,7 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
 import {ITokenLending} from "./interfaces/ITokenLending.sol";
 import {IOperationsAdmin} from "./interfaces/IOperationsAdmin.sol";
-import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
+import {IPurchaseRbtc} from "./interfaces/IPurchaseRbtc.sol";
 
 /**
  * @title DcaManager

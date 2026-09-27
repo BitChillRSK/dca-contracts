@@ -37,7 +37,7 @@ release gates without requiring the historical implementation notes.
    - Handles deposits and withdrawals of stablecoins
 
 3. **Lending Integration**
-   - `TokenLending` / `LendingErc20Handler`: share ↔ underlying conversion and per-user virtual shares
+   - `LendingErc20Handler`: share ↔ underlying conversion and per-user virtual shares
    - Production lending adapters: LayerBank (index 1), Sovryn (index 2 for DOC)
    - Idle handlers (index 0) hold the stablecoin without lending
 

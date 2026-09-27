@@ -29,8 +29,7 @@ DcaManager          user + swapper entry; schedules; single- and multi-handler p
 OperationsAdmin     roles; token × lending-index → handler
 FeeHandler          fee math (owned by PurchaseRbtc; MoC / Uniswap route fee construction)
 TokenHandler        deposit/withdraw stablecoin
-TokenLending        share ↔ underlying conversion (no TokenHandler inherit)
-LendingErc20Handler TokenHandler + TokenLending; per-user shares, withdraw clamp, interest, exact-sum batch redeem
+LendingErc20Handler TokenHandler + ITokenLending; share ↔ underlying conversion, per-user shares, withdraw clamp, interest, exact-sum batch redeem
 StablecoinSource    shared `i_stableToken` + batch-funding hook (TokenHandler and PurchaseRbtc inherit; idle/lending implement retrieve)
 PurchaseRbtc        shared buy/batch pipeline; accumulated rBTC; withdraw to signer
 PurchaseMoc         MoC redeem DOC → rBTC (_purchaseRbtc only)

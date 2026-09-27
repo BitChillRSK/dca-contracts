@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
-import {TokenHandler} from "src/TokenHandler.sol";
+import {TokenHandler} from "../TokenHandler.sol";
 
 /**
  * @title IdleErc20Handler

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
-import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
+import {IPurchaseRbtc} from "./interfaces/IPurchaseRbtc.sol";
 import {DcaManagerAccessControl} from "./DcaManagerAccessControl.sol";
 import {FeeHandler} from "./FeeHandler.sol";
 import {StablecoinSource} from "./StablecoinSource.sol";
@@ -28,8 +28,10 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
                                CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    /// @param feeHandlerConfig Collector and interpolated fee settings.
-    /// @param initialOwner Address that owns this handler immediately after deploy.
+    /**
+     * @param feeHandlerConfig Collector and interpolated fee settings.
+     * @param initialOwner Address that owns this handler immediately after deploy.
+     */
     constructor(FeeHandlerConfig memory feeHandlerConfig, address initialOwner)
         FeeHandler(feeHandlerConfig.feeCollector, feeHandlerConfig.feeSettings, initialOwner)
     {}

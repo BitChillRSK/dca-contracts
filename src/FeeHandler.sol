@@ -21,6 +21,10 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
+    uint256 internal constant BPS_DENOMINATOR = 10_000; // rates are basis points, so a rate times an amount divides by this denominator
+    /// @notice Hard ceiling on fee rates (5%). Owner cannot set max (or a flat min==max) above this.
+    uint256 internal constant MAX_FEE_RATE_CAP = 500;
+
     /**
      * @dev Two slots. The collector starts its own word because it cannot fit in the 12 bytes left by
      *      Ownable2Step's `_pendingOwner`. A uint112 bound then starts the next word; both bounds and
@@ -32,9 +36,6 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     uint112 internal s_feePurchaseUpperBound; // Spending above upper bound gets the minimum fee rate
     uint16 internal s_minFeeRate; // Minimum fee rate
     uint16 internal s_maxFeeRate; // Maximum fee rate
-    uint256 internal constant BPS_DENOMINATOR = 10_000; // rates are basis points, so a rate times an amount divides by this denominator
-    /// @notice Hard ceiling on fee rates (5%). Owner cannot set max (or a flat min==max) above this.
-    uint256 internal constant MAX_FEE_RATE_CAP = 500;
 
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR

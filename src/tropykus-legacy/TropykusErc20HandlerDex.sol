@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
-import {PurchaseUniswap} from "src/PurchaseUniswap.sol";
+import {PurchaseUniswap} from "../PurchaseUniswap.sol";
 import {TropykusErc20Handler} from "./TropykusErc20Handler.sol";
 
 /**

@@ -18,7 +18,7 @@ import {NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
  *
  * @dev **This documents a known rough edge, not a desired property. R43 decided to keep it.**
  *
- * `TokenLending._stablecoinToShares` rounds the share debit **up** (deliberately: the per-user share
+ * `LendingErc20Handler._stablecoinToShares` rounds the share debit **up** (deliberately: the per-user share
  * book must never drift above the shares the handler actually holds), while `depositToken` credits the
  * floor-rounded amount the lending protocol actually minted. So whenever the exchange rate does not
  * divide the deposit evenly — i.e. essentially always in production — spending the full remaining

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
-import {LendingErc20Handler} from "src/LendingErc20Handler.sol";
+import {LendingErc20Handler} from "../LendingErc20Handler.sol";
 import {IkToken} from "./IkToken.sol";
 
 /**
