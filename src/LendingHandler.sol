@@ -280,14 +280,9 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     }
 
     /**
-     * @dev Redeem shares for stablecoin, sized by the share count this contract debits.
-     *      Both callers already bound `stablecoinAmount`: principal withdrawals clamp to this
-     *      user's share-backed underlying first, and interest withdrawals redeem at most that
-     *      same underlying minus locked principal. So `ceil(amount × scale / rate)` never exceeds
-     *      `usersShares`. The debit is checked anyway — a future caller that broke the bound would
-     *      revert rather than wrap the book. Batch shortfalls revert in `_batchRetrieveStablecoin`.
-     *      Zero shares is a no-op. A positive burn that pays nothing reverts and rolls back.
-     *      Callers pass the `usersShares` they already loaded to avoid a second SLOAD.
+     * @dev Redeems stablecoin by debiting the corresponding rounded-up shares. Callers bound the
+     *      amount to the user's share-backed underlying; checked subtraction makes violations revert.
+     *      Zero shares is a no-op, and a positive burn with no payout reverts.
      */
     function _redeemShares(address user, uint256 usersShares, uint256 stablecoinAmount, uint256 exchangeRate)
         private
