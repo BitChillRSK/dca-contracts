@@ -9,7 +9,6 @@ import {MockMocOracle} from "../test/mocks/MockMocOracle.sol";
 import {MockLayerBankAToken, MockLayerBankPool} from "../test/mocks/MockLayerBank.sol";
 import "./Constants.sol";
 
-
 contract UsdrifHelperConfig is Script {
     struct NetworkConfig {
         address usdrifTokenAddress;
@@ -28,7 +27,7 @@ contract UsdrifHelperConfig is Script {
     }
 
     NetworkConfig internal activeNetworkConfig;
-    
+
     // Event for mock creation tracking in tests
     event HelperConfig__CreatedMockToken(string tokenName, address tokenAddress);
 
@@ -60,9 +59,9 @@ contract UsdrifHelperConfig is Script {
             swapRouter02Address: 0x0B14ff67f0014046b4b99057Aec4509640b3947A, // SwapRouter02 on mainnet
             swapIntermediateTokens: intermediateTokens,
             swapPoolFeeRates: poolFeeRates,
-            mocOracleAddress: 0xe2927A0620b82A66D67F678FC9b826B0E01B1bFD,  // MoC Oracle on mainnet
-            operationsAdminAddress: 0x07623b4bfA188687B683CbF242C12A7d4bD7D355, // OperationsAdmin 
-            dcaManagerAddress: 0x6287F0Ef7dcb288603B484d666785c59f7F6aa70,  // DcaManager
+            mocOracleAddress: 0xe2927A0620b82A66D67F678FC9b826B0E01B1bFD, // MoC Oracle on mainnet
+            operationsAdminAddress: 0x07623b4bfA188687B683CbF242C12A7d4bD7D355, // OperationsAdmin
+            dcaManagerAddress: 0x6287F0Ef7dcb288603B484d666785c59f7F6aa70, // DcaManager
             amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
             amountOutMinimumSafetyCheck: DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK
         });
@@ -85,17 +84,17 @@ contract UsdrifHelperConfig is Script {
             swapRouter02Address: 0x0000000000000000000000000000000000000000, // Replace if exists on testnet
             swapIntermediateTokens: intermediateTokens,
             swapPoolFeeRates: poolFeeRates,
-            mocOracleAddress: 0x0000000000000000000000000000000000000000,  // Replace with MoC Oracle on testnet
+            mocOracleAddress: 0x0000000000000000000000000000000000000000, // Replace with MoC Oracle on testnet
             operationsAdminAddress: 0x0000000000000000000000000000000000000000, // Placeholder for OperationsAdmin
-            dcaManagerAddress: 0x0000000000000000000000000000000000000000,  // Placeholder for DcaManager
+            dcaManagerAddress: 0x0000000000000000000000000000000000000000, // Placeholder for DcaManager
             amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
             amountOutMinimumSafetyCheck: DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK
         });
     }
-    
-    function getOrCreateAnvilConfig(address adminOpsAddress, address dcaManagerAddress) 
-        public 
-        returns (NetworkConfig memory config) 
+
+    function getOrCreateAnvilConfig(address adminOpsAddress, address dcaManagerAddress)
+        public
+        returns (NetworkConfig memory config)
     {
         // Check if we already have a configuration
         if (activeNetworkConfig.wrbtcTokenAddress != address(0)) {
@@ -124,7 +123,7 @@ contract UsdrifHelperConfig is Script {
         // Deploy mock tokens
         MockStablecoin mockUsdrifToken = new MockStablecoin(msg.sender);
         emit HelperConfig__CreatedMockToken("USDRIF", address(mockUsdrifToken));
-        
+
         MockLayerBankAToken mockAToken = new MockLayerBankAToken(address(mockUsdrifToken));
         MockLayerBankPool mockPool = new MockLayerBankPool(mockAToken);
         mockAToken.setPool(address(mockPool));
@@ -200,8 +199,9 @@ contract UsdrifHelperConfig is Script {
     }
 
     function getATokenAddress() public view returns (address) {
-        return isUsdt0()
-            ? activeNetworkConfig.layerbankUsdt0ATokenAddress
-            : activeNetworkConfig.layerbankUsdrifATokenAddress;
+        return
+            isUsdt0()
+                ? activeNetworkConfig.layerbankUsdt0ATokenAddress
+                : activeNetworkConfig.layerbankUsdrifATokenAddress;
     }
 }

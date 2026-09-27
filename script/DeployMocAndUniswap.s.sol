@@ -28,6 +28,7 @@ import "./Constants.sol";
  */
 contract DeployMocAndUniswap is DeployBase {
     error DeployMocAndUniswap__NotALivePath();
+
     // Define a struct to hold all deployment results
     struct DeployedContracts {
         // MoC contracts
@@ -35,14 +36,14 @@ contract DeployMocAndUniswap is DeployBase {
         address handlerMoc;
         DcaManager dcaManMoc;
         MocHelperConfig helpConfMoc;
-        
+
         // Uniswap contracts
         OperationsAdmin adOpsUni;
         address handlerUni;
         DcaManager dcaManUni;
         DexHelperConfig helpConfUni;
     }
-    
+
     // Struct for DeployDexSwaps parameters to avoid stack too deep errors
     struct DexDeployParams {
         Protocol protocol;
@@ -54,9 +55,9 @@ contract DeployMocAndUniswap is DeployBase {
         uint256 amountOutMinimumPercent;
         uint256 amountOutMinimumSafetyCheck;
     }
-    
+
     string stablecoinType;
-    
+
     constructor() {
         // Initialize stablecoin type from environment or use default
         try vm.envString("STABLECOIN_TYPE") returns (string memory coinType) {
@@ -65,38 +66,31 @@ contract DeployMocAndUniswap is DeployBase {
             stablecoinType = DOC_STRING;
         }
     }
-    
+
     // Split the deployment into smaller functions to avoid stack too deep errors
-    function deployMocContracts() 
-        private 
-        returns (
-            OperationsAdmin adOpsMoc,
-            address handlerMoc,
-            DcaManager dcaManMoc,
-            MocHelperConfig helpConfMoc
-        ) 
+    function deployMocContracts()
+        private
+        returns (OperationsAdmin adOpsMoc, address handlerMoc, DcaManager dcaManMoc, MocHelperConfig helpConfMoc)
     {
         helpConfMoc = new MocHelperConfig();
         MocHelperConfig.NetworkConfig memory networkConfig = helpConfMoc.getActiveNetworkConfig();
-        
+
         address owner = adminAddresses[environment];
         vm.startBroadcast(owner);
         adOpsMoc = new OperationsAdmin(owner);
-        dcaManMoc = new DcaManager(
-            address(adOpsMoc), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, owner
-        );
+        dcaManMoc = new DcaManager(address(adOpsMoc), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, owner);
         dcaManMoc.setTokenMinPurchaseAmount(networkConfig.docTokenAddress, MIN_PURCHASE_AMOUNT);
-        
+
         // Get fee collector address
         address feeCollector = getFeeCollector(environment);
-        
+
         // Get token addresses from network config
         address docTokenAddress = networkConfig.docTokenAddress;
         address mocProxy = networkConfig.mocProxyAddress;
-        
+
         // Select the appropriate shares based on protocol
         address shareToken;
-        
+
         if (protocol == Protocol.TROPYKUS) {
             shareToken = networkConfig.kDocAddress;
         } else if (protocol == Protocol.SOVRYN) {
@@ -115,7 +109,7 @@ contract DeployMocAndUniswap is DeployBase {
 
         // Deploy MoC handler
         DeployMocSwaps deployMocSwapContracts = new DeployMocSwaps();
-        
+
         // Create a DeployParams struct to pass to deployDocHandlerMoc
         DeployMocSwaps.DeployParams memory params = DeployMocSwaps.DeployParams({
             protocol: protocol,
@@ -125,44 +119,37 @@ contract DeployMocAndUniswap is DeployBase {
             mocProxy: mocProxy,
             feeCollector: feeCollector
         });
-        
+
         handlerMoc = deployMocSwapContracts.deployDocHandlerMoc(params);
         console.log("MoC handler deployed at:", handlerMoc);
     }
-    
-    function deployUniswapContracts() 
-        private 
-        returns (
-            OperationsAdmin adOpsUni,
-            address handlerUni,
-            DcaManager dcaManUni,
-            DexHelperConfig helpConfUni
-        ) 
+
+    function deployUniswapContracts()
+        private
+        returns (OperationsAdmin adOpsUni, address handlerUni, DcaManager dcaManUni, DexHelperConfig helpConfUni)
     {
         helpConfUni = new DexHelperConfig();
         DexHelperConfig.NetworkConfig memory networkConfig = helpConfUni.getActiveNetworkConfig();
-        
+
         address owner = adminAddresses[environment];
         vm.startBroadcast(owner);
         adOpsUni = new OperationsAdmin(owner);
-        dcaManUni = new DcaManager(
-            address(adOpsUni), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, owner
-        );
-        
+        dcaManUni = new DcaManager(address(adOpsUni), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, owner);
+
         // Get fee collector address
         address feeCollector = getFeeCollector(environment);
-        
+
         // Get token addresses from network config
         address stablecoinAddress = networkConfig.stablecoinAddress;
         uint256 minPurchaseAmount = keccak256(abi.encodePacked(stablecoinType))
-                == keccak256(abi.encodePacked(USDT0_STRING))
+            == keccak256(abi.encodePacked(USDT0_STRING))
             ? USDT0_MIN_PURCHASE_AMOUNT
             : MIN_PURCHASE_AMOUNT;
         dcaManUni.setTokenMinPurchaseAmount(stablecoinAddress, minPurchaseAmount);
-        
+
         // Select the appropriate shares based on protocol
         address shareToken;
-        
+
         if (protocol == Protocol.TROPYKUS) {
             shareToken = networkConfig.tropykusShareToken;
         } else if (protocol == Protocol.SOVRYN) {
@@ -176,7 +163,7 @@ contract DeployMocAndUniswap is DeployBase {
         } else {
             revert("Unsupported lending protocol");
         }
-        
+
         // Create Uniswap settings from the network config
         IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
             wrBtcToken: IWRBTC(networkConfig.wrbtcTokenAddress),
@@ -185,7 +172,7 @@ contract DeployMocAndUniswap is DeployBase {
             swapPoolFeeRates: networkConfig.swapPoolFeeRates,
             mocOracle: ICoinPairPrice(networkConfig.mocOracleAddress)
         });
-        
+
         vm.stopBroadcast();
 
         // Create deployment parameters struct
@@ -217,21 +204,19 @@ contract DeployMocAndUniswap is DeployBase {
         console.log("Uniswap handler deployed at:", handlerUni);
     }
 
-    function run()
-        external
-        returns (DeployedContracts memory contracts)
-    {
+    function run() external returns (DeployedContracts memory contracts) {
         if (_isLiveEnvironment()) revert DeployMocAndUniswap__NotALivePath();
 
         console.log("Deploying both MoC and Uniswap handlers for comparison");
         console.log("Using stablecoin type:", stablecoinType);
-        
+
         // Deploy MoC contracts
         (contracts.adOpsMoc, contracts.handlerMoc, contracts.dcaManMoc, contracts.helpConfMoc) = deployMocContracts();
-        
+
         // Deploy Uniswap contracts
-        (contracts.adOpsUni, contracts.handlerUni, contracts.dcaManUni, contracts.helpConfUni) = deployUniswapContracts();
-        
+        (contracts.adOpsUni, contracts.handlerUni, contracts.dcaManUni, contracts.helpConfUni) =
+            deployUniswapContracts();
+
         return contracts;
     }
 }

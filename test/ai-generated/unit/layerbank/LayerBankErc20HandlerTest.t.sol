@@ -18,7 +18,6 @@ import "test/Constants.sol";
  * @notice Unit tests for LayerBankErc20Handler using the shared handler harness.
  */
 contract LayerBankErc20HandlerTest is HandlerTestHarness {
-
     MockLayerBankAToken public aToken;
     MockLayerBankPool public pool;
     LayerBankTestHandler public layerbankHandler;
@@ -76,7 +75,9 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         });
 
         vm.expectRevert(ILayerBankErc20Handler.LayerBankErc20Handler__PoolNotSet.selector);
-        new LayerBankTestHandler(address(dcaManager), address(stablecoin), address(unset), FEE_COLLECTOR, feeSettings, OWNER);
+        new LayerBankTestHandler(
+            address(dcaManager), address(stablecoin), address(unset), FEE_COLLECTOR, feeSettings, OWNER
+        );
     }
 
     function test_layerbank_constructor_revertsIfUnderlyingMismatch() public {
@@ -318,14 +319,11 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         uint256 excessiveAmount = DEPOSIT_AMOUNT * 2;
         uint256 available = layerbankHandler.getUserShares(user1);
         uint256 exchangeRate = aToken.getNormalizedIncome();
-        uint256 totalAtokenToRedeem =
-            Math.mulDiv(excessiveAmount, aToken.RAY(), exchangeRate, Math.Rounding.Ceil);
+        uint256 totalAtokenToRedeem = Math.mulDiv(excessiveAmount, aToken.RAY(), exchangeRate, Math.Rounding.Ceil);
         uint256 requested = Math.mulDiv(totalAtokenToRedeem, amounts[0], excessiveAmount, Math.Rounding.Ceil);
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                ITokenLending.TokenLending__InsufficientShares.selector, user1, requested, available
-            )
+            abi.encodeWithSelector(ITokenLending.TokenLending__InsufficientShares.selector, user1, requested, available)
         );
         layerbankHandler.testBatchRetrieveStablecoin(users, amounts);
     }
@@ -349,9 +347,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
 
         aToken.setSilentZeroPayout(true);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(ITokenLending.TokenLending__ZeroStablecoinReceived.selector, amounts[0])
-        );
+        vm.expectRevert(abi.encodeWithSelector(ITokenLending.TokenLending__ZeroStablecoinReceived.selector, amounts[0]));
         layerbankHandler.testBatchRetrieveStablecoin(users, amounts);
 
         assertEq(layerbankHandler.getUserShares(user1), aTokenBalanceBefore);
@@ -413,8 +409,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
             );
         }
 
-        uint256 virtualBooks =
-            layerbankHandler.getUserShares(USER) + layerbankHandler.getUserShares(user2);
+        uint256 virtualBooks = layerbankHandler.getUserShares(USER) + layerbankHandler.getUserShares(user2);
         uint256 actualScaled = aToken.scaledBalanceOf(address(handler));
         assertEq(virtualBooks, actualScaled, "exact consumption must keep books == scaledBalanceOf");
         assertGt(virtualBooks, 0, "solvency test must leave a live position");
@@ -432,7 +427,9 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         vm.prank(address(dcaManager));
         handler.withdrawToken(USER, WITHDRAWAL_AMOUNT);
 
-        assertEq(bookBefore - layerbankHandler.getUserShares(USER), scaledBefore - aToken.scaledBalanceOf(address(handler)));
+        assertEq(
+            bookBefore - layerbankHandler.getUserShares(USER), scaledBefore - aToken.scaledBalanceOf(address(handler))
+        );
         assertEq(stablecoin.balanceOf(USER) - userBefore, WITHDRAWAL_AMOUNT / 2);
     }
 
@@ -463,19 +460,14 @@ contract LayerBankTestHandler is LayerBankErc20Handler {
         address initialOwner
     )
         LayerBankErc20Handler(
-            dcaManagerAddress,
-            stableTokenAddress,
-            aTokenAddress,
-            feeCollector,
-            feeSettings,
-            initialOwner
+            dcaManagerAddress, stableTokenAddress, aTokenAddress, feeCollector, feeSettings, initialOwner
         )
     {}
 
-    function testBatchRetrieveStablecoin(
-        address[] calldata users,
-        uint256[] calldata purchaseAmounts
-    ) external returns (uint256) {
+    function testBatchRetrieveStablecoin(address[] calldata users, uint256[] calldata purchaseAmounts)
+        external
+        returns (uint256)
+    {
         return _batchRetrieveStablecoin(users, purchaseAmounts);
     }
 }

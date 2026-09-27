@@ -70,11 +70,11 @@ contract DeployDexSwaps is DeployBase {
         if (params.protocol == Protocol.TROPYKUS) {
             return address(
                 new TropykusErc20HandlerDex(
-                    params.dcaManager, 
-                    params.tokenAddress, 
-                    params.shareToken, 
-                    params.uniswapSettings, 
-                    params.feeCollector, 
+                    params.dcaManager,
+                    params.tokenAddress,
+                    params.shareToken,
+                    params.uniswapSettings,
+                    params.feeCollector,
                     feeSettings,
                     params.amountOutMinimumPercent,
                     params.amountOutMinimumSafetyCheck,
@@ -85,11 +85,11 @@ contract DeployDexSwaps is DeployBase {
         if (params.protocol == Protocol.SOVRYN) {
             return address(
                 new SovrynErc20HandlerDex(
-                    params.dcaManager, 
-                    params.tokenAddress, 
-                    params.shareToken, 
-                    params.uniswapSettings, 
-                    params.feeCollector, 
+                    params.dcaManager,
+                    params.tokenAddress,
+                    params.shareToken,
+                    params.uniswapSettings,
+                    params.feeCollector,
                     feeSettings,
                     params.amountOutMinimumPercent,
                     params.amountOutMinimumSafetyCheck,
@@ -197,16 +197,16 @@ contract DeployDexSwaps is DeployBase {
         DexHelperConfig.NetworkConfig memory networkConfig = helperConfig.getActiveNetworkConfig();
 
         string memory stablecoinType = _stablecoinType();
-        
+
         console.log("Using stablecoin type:", stablecoinType);
         bool isUSDRIF = _isUsdrif(stablecoinType);
         bool isUSDT0 = _isUsdt0(stablecoinType);
-        
+
         address stablecoinAddress = helperConfig.getStablecoinAddress();
         console.log("Stablecoin address:", stablecoinAddress);
-        
+
         bool isSovryn = protocol == Protocol.SOVRYN;
-        
+
         if (isSovryn && (isUSDRIF || isUSDT0)) {
             revert("Sovryn does not list this stablecoin");
         }
@@ -214,17 +214,13 @@ contract DeployDexSwaps is DeployBase {
         _beginLiveAwareBroadcast(msg.sender);
 
         OperationsAdmin operationsAdmin = new OperationsAdmin(deployOwner);
-        DcaManager dcaManager = new DcaManager(
-            address(operationsAdmin),
-            MIN_PURCHASE_PERIOD,
-            MAX_SCHEDULES_PER_TOKEN,
-            deployOwner
-        );
+        DcaManager dcaManager =
+            new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, deployOwner);
         dcaManager.setTokenMinPurchaseAmount(
             stablecoinAddress, isUSDT0 ? USDT0_MIN_PURCHASE_AMOUNT : MIN_PURCHASE_AMOUNT
         );
         address feeCollector = getFeeCollector(environment);
-        
+
         address docHandlerDexAddress;
 
         IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({

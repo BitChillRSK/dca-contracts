@@ -178,9 +178,7 @@ contract DeployFinal is DeployBase {
 
     function _newDocIdle(address dcaManager, address owner) private returns (address) {
         return address(
-            new IdleDocHandlerMoc(
-                dcaManager, s_cfg.doc, s_cfg.feeCollector, s_cfg.mocProxy, _docFeeSettings(), owner
-            )
+            new IdleDocHandlerMoc(dcaManager, s_cfg.doc, s_cfg.feeCollector, s_cfg.mocProxy, _docFeeSettings(), owner)
         );
     }
 
@@ -246,9 +244,8 @@ contract DeployFinal is DeployBase {
     /// @dev Runs while the broadcaster still owns the handler: afterwards only the Safe can approve a path.
     function _allowUsdrifAltPath(address handler) private {
         if (s_cfg.usdrifAltPoolFeeRates.length == 0) return;
-        IPurchaseUniswap(handler).setPurchasePathAllowed(
-            s_cfg.usdrifAltIntermediateTokens, s_cfg.usdrifAltPoolFeeRates, true
-        );
+        IPurchaseUniswap(handler)
+            .setPurchasePathAllowed(s_cfg.usdrifAltIntermediateTokens, s_cfg.usdrifAltPoolFeeRates, true);
     }
 
     function _docFeeSettings() private view returns (IFeeHandler.FeeSettings memory) {

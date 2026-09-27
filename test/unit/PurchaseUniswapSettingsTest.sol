@@ -213,11 +213,11 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
     function testUpdateOracle() public onlyDexSwaps {
         // Create a new mock oracle
         MockMocOracle newMocOracle = new MockMocOracle();
-        
+
         // Store the current oracle for comparison
         ICoinPairPrice currentOracle = IPurchaseUniswap(address(stablecoinHandler)).getMocOracle();
         address oldOracleAddress = address(currentOracle);
-        
+
         // Expect the event with the correct parameters
         vm.expectEmit(true, true, false, false);
         emit PurchaseUniswap__OracleUpdated(oldOracleAddress, address(newMocOracle));
@@ -225,13 +225,13 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         // Update the oracle
         vm.prank(OWNER);
         IPurchaseUniswap(address(stablecoinHandler)).updateMocOracle(address(newMocOracle));
-        
+
         // Verify the oracle was updated
         address updatedOracleAddress = address(IPurchaseUniswap(address(stablecoinHandler)).getMocOracle());
         assertEq(updatedOracleAddress, address(newMocOracle), "Oracle address should be updated");
         assertNotEq(updatedOracleAddress, oldOracleAddress, "Oracle address should be different from the old one");
     }
-    
+
     function testUpdateOracleRevertsIfZeroAddress() public onlyDexSwaps {
         // Try to update with zero address
         vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__InvalidOracleAddress.selector);
@@ -271,11 +271,11 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
             OWNER
         );
     }
-    
+
     function testOnlyOwnerCanUpdateOracle() public onlyDexSwaps {
         // Create a new mock oracle
         MockMocOracle newMocOracle = new MockMocOracle();
-        
+
         // Try to update oracle as non-owner
         vm.expectRevert(ownableUnauthorized(USER));
         vm.prank(USER);
@@ -293,16 +293,15 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
         vm.stopPrank();
-        
+
         // Create a mock oracle that returns invalid prices
         MockMocOracle invalidOracle = new MockMocOracle();
         invalidOracle.setInvalidPrice();
-        
+
         // Update the oracle to use our invalid one
         vm.prank(OWNER);
         IPurchaseUniswap(address(stablecoinHandler)).updateMocOracle(address(invalidOracle));
-        
-        
+
         // Try to make a purchase, which should revert due to invalid price
         vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__OutdatedPrice.selector);
         buyRbtcOne(scheduleId);
@@ -315,66 +314,62 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
     function testSetPurchasePath() public onlyDexSwaps {
         address[] memory intermediateTokens = new address[](1);
         intermediateTokens[0] = makeAddr("newIntermediateToken");
-        
+
         uint24[] memory poolFeeRates = new uint24[](2);
         poolFeeRates[0] = 100; // 0.01%
         poolFeeRates[1] = 300; // 0.03%
-        
+
         bytes memory oldPath = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
         bytes memory expectedPath = _encodeSwapPath(intermediateTokens, poolFeeRates);
         vm.prank(OWNER);
-        IPurchaseUniswap(address(stablecoinHandler)).setPurchasePathAllowed(
-            intermediateTokens, poolFeeRates, true
-        );
+        IPurchaseUniswap(address(stablecoinHandler)).setPurchasePathAllowed(intermediateTokens, poolFeeRates, true);
 
         vm.expectEmit(false, false, false, true);
         emit PurchaseUniswap__NewPathSet(intermediateTokens, poolFeeRates, expectedPath);
 
         vm.prank(OWNER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(intermediateTokens, poolFeeRates);
-        
+
         bytes memory newPath = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
         assertNotEq(keccak256(newPath), keccak256(oldPath), "Path should be updated");
         assertEq(newPath, expectedPath);
     }
-    
+
     function testSetPurchasePathRevertsWithWrongArrayLengths() public onlyDexSwaps {
         // Create test data with mismatched lengths
         address[] memory intermediateTokens = new address[](2);
         intermediateTokens[0] = makeAddr("token1");
         intermediateTokens[1] = makeAddr("token2");
-        
+
         uint24[] memory poolFeeRates = new uint24[](2); // Should be 3 for 2 intermediate tokens
         poolFeeRates[0] = 100;
         poolFeeRates[1] = 300;
-        
+
         // Try to set the path with mismatched arrays
-        vm.expectRevert(abi.encodeWithSelector(
-            IPurchaseUniswap.PurchaseUniswap__WrongNumberOfTokensOrFeeRates.selector, 
-            intermediateTokens.length, 
-            poolFeeRates.length
-        ));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPurchaseUniswap.PurchaseUniswap__WrongNumberOfTokensOrFeeRates.selector,
+                intermediateTokens.length,
+                poolFeeRates.length
+            )
+        );
         vm.prank(OWNER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(intermediateTokens, poolFeeRates);
     }
-    
+
     function testUnauthorizedCannotSetPurchasePath() public onlyDexSwaps {
         address[] memory intermediateTokens = new address[](1);
         intermediateTokens[0] = makeAddr("token");
-        
+
         uint24[] memory poolFeeRates = new uint24[](2);
         poolFeeRates[0] = 100;
         poolFeeRates[1] = 300;
 
         vm.prank(OWNER);
-        IPurchaseUniswap(address(stablecoinHandler)).setPurchasePathAllowed(
-            intermediateTokens, poolFeeRates, true
-        );
-        
+        IPurchaseUniswap(address(stablecoinHandler)).setPurchasePathAllowed(intermediateTokens, poolFeeRates, true);
+
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IPurchaseUniswap.PurchaseUniswap__UnauthorizedPurchasePathSetter.selector, USER
-            )
+            abi.encodeWithSelector(IPurchaseUniswap.PurchaseUniswap__UnauthorizedPurchasePathSetter.selector, USER)
         );
         vm.prank(USER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(intermediateTokens, poolFeeRates);
@@ -391,9 +386,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         poolFeeRates[1] = 300;
 
         vm.prank(OWNER);
-        IPurchaseUniswap(address(stablecoinHandler)).setPurchasePathAllowed(
-            intermediateTokens, poolFeeRates, true
-        );
+        IPurchaseUniswap(address(stablecoinHandler)).setPurchasePathAllowed(intermediateTokens, poolFeeRates, true);
         vm.prank(OWNER);
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(intermediateTokens, poolFeeRates);
 

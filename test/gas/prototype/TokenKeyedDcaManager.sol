@@ -92,11 +92,7 @@ contract TokenKeyedDcaManager is ReentrancyGuard {
         _;
     }
 
-    constructor(
-        address operationsAdminAddress,
-        uint256 minPurchasePeriod,
-        uint256 maxSchedulesPerToken
-    ) {
+    constructor(address operationsAdminAddress, uint256 minPurchasePeriod, uint256 maxSchedulesPerToken) {
         i_operationsAdmin = OperationsAdmin(operationsAdminAddress);
         s_protocolSettings = IDcaManager.ProtocolSettings({
             minPurchasePeriod: minPurchasePeriod.toUint32(),
@@ -108,7 +104,6 @@ contract TokenKeyedDcaManager is ReentrancyGuard {
     function setTokenMinPurchaseAmount(address token, uint256 minPurchaseAmount) external {
         s_tokenMinPurchaseAmounts[token] = minPurchaseAmount;
     }
-
 
     function createDcaSchedule(
         address token,
@@ -181,9 +176,8 @@ contract TokenKeyedDcaManager is ReentrancyGuard {
             buyers[i] = buyer;
             purchaseAmounts[i] = schedulePurchaseAmount;
         }
-        IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex))).batchBuyRbtc(
-            buyers, batch.scheduleIds, purchaseAmounts, batch.minRbtcOut
-        );
+        IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex)))
+            .batchBuyRbtc(buyers, batch.scheduleIds, purchaseAmounts, batch.minRbtcOut);
     }
 
     function getSchedule(uint64 scheduleId, address token) external view returns (Schedule memory) {
@@ -202,10 +196,7 @@ contract TokenKeyedDcaManager is ReentrancyGuard {
      * @dev Existence and the token check are one comparison: a row naming a schedule of another
      *      stablecoin lands on an empty struct, whose `user` is `address(0)`.
      */
-    function _rBtcPurchaseChecksEffects(uint64 scheduleId, address token)
-        private
-        returns (address, uint256, uint256)
-    {
+    function _rBtcPurchaseChecksEffects(uint64 scheduleId, address token) private returns (address, uint256, uint256) {
         Schedule storage dcaScheduleStorage = s_dcaSchedules[scheduleId][token];
         Schedule memory dcaSchedule = dcaScheduleStorage;
 

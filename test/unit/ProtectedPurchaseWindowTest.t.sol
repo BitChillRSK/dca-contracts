@@ -12,9 +12,7 @@ import {scheduleAt, scheduleIdAt, scheduleCount} from "test/utils/ScheduleAt.sol
  * @notice Coverage for the swapper-activated, five-block batch preparation window.
  */
 contract ProtectedPurchaseWindowTest is DcaDappTest {
-    event DcaManager__ProtectedPurchaseWindowActivated(
-        address indexed swapper, uint256 userMutationsAllowedFromBlock
-    );
+    event DcaManager__ProtectedPurchaseWindowActivated(address indexed swapper, uint256 userMutationsAllowedFromBlock);
 
     function testSwapperActivatesFiveBlockWindowAndEventIndexesOnlySwapper() external {
         assertEq(dcaManager.getUserMutationsAllowedFromBlock(), 0);
@@ -79,8 +77,7 @@ contract ProtectedPurchaseWindowTest is DcaDappTest {
             abi.encodeCall(IDcaManager.withdrawToken, (address(stablecoin), scheduleId, 1)), expectedRevert
         );
         _assertUserCallRevertsLocked(
-            abi.encodeCall(IDcaManager.withdrawTokenAndInterest, (address(stablecoin), scheduleId, 1)),
-            expectedRevert
+            abi.encodeCall(IDcaManager.withdrawTokenAndInterest, (address(stablecoin), scheduleId, 1)), expectedRevert
         );
 
         address[] memory tokens = new address[](1);
@@ -119,9 +116,7 @@ contract ProtectedPurchaseWindowTest is DcaDappTest {
         uint256 balanceBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
         uint256 allowedFromBlock = _activateWindow();
 
-        vm.expectRevert(
-            abi.encodeWithSelector(IDcaManager.DcaManager__UserMutationsLocked.selector, allowedFromBlock)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__UserMutationsLocked.selector, allowedFromBlock));
         vm.prank(USER);
         dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, AMOUNT_TO_SPEND * 2);
 
@@ -169,10 +164,7 @@ contract ProtectedPurchaseWindowTest is DcaDappTest {
         uint64[] memory scheduleIds = new uint64[](1);
         scheduleIds[0] = secondScheduleId;
         batches[0] = IDcaManager.Batch({
-            scheduleIds: scheduleIds,
-            token: address(stablecoin),
-            routeIndex: s_routeIndex,
-            minRbtcOut: 0
+            scheduleIds: scheduleIds, token: address(stablecoin), routeIndex: s_routeIndex, minRbtcOut: 0
         });
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtcAcrossHandlers(batches);

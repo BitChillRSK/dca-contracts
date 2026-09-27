@@ -97,11 +97,7 @@ contract UserKeyedDcaManager is ReentrancyGuard {
         _;
     }
 
-    constructor(
-        address operationsAdminAddress,
-        uint256 minPurchasePeriod,
-        uint256 maxSchedulesPerToken
-    ) {
+    constructor(address operationsAdminAddress, uint256 minPurchasePeriod, uint256 maxSchedulesPerToken) {
         i_operationsAdmin = OperationsAdmin(operationsAdminAddress);
         s_protocolSettings = IDcaManager.ProtocolSettings({
             minPurchasePeriod: minPurchasePeriod.toUint32(),
@@ -113,7 +109,6 @@ contract UserKeyedDcaManager is ReentrancyGuard {
     function setTokenMinPurchaseAmount(address token, uint256 minPurchaseAmount) external {
         s_tokenMinPurchaseAmounts[token] = minPurchaseAmount;
     }
-
 
     function createDcaSchedule(
         address token,
@@ -186,9 +181,8 @@ contract UserKeyedDcaManager is ReentrancyGuard {
             if (schedulePurchaseAmount != batch.purchaseAmounts[i]) revert Prototype__PurchaseAmountMismatch();
             if (scheduleRouteIndex != batch.routeIndex) revert Prototype__RouteIndexMismatch();
         }
-        IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex))).batchBuyRbtc(
-            batch.buyers, batch.scheduleIds, batch.purchaseAmounts, batch.minRbtcOut
-        );
+        IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex)))
+            .batchBuyRbtc(batch.buyers, batch.scheduleIds, batch.purchaseAmounts, batch.minRbtcOut);
     }
 
     function getSchedule(uint64 scheduleId, address user) external view returns (Schedule memory) {

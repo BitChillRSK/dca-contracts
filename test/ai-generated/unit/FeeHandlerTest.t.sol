@@ -40,10 +40,7 @@ contract FeeHandlerTest is Test {
 
     function test_constructor_reverts_invalidRates() public {
         IFeeHandler.FeeSettings memory settings = IFeeHandler.FeeSettings({
-            minFeeRate: 300,
-            maxFeeRate: 200,
-            feePurchaseLowerBound: LOWER_BOUND,
-            feePurchaseUpperBound: UPPER_BOUND
+            minFeeRate: 300, maxFeeRate: 200, feePurchaseLowerBound: LOWER_BOUND, feePurchaseUpperBound: UPPER_BOUND
         });
 
         vm.expectRevert(IFeeHandler.FeeHandler__MinFeeRateCannotBeHigherThanMax.selector);
@@ -311,19 +308,19 @@ contract FeeHandlerTest is Test {
     // Test to ensure monotonicity: higher purchase amounts should have lower or equal fee rates
     function test_feeMonotonicity() public {
         uint256[] memory amounts = new uint256[](5);
-        amounts[0] = 50 ether;   // below lower bound
-        amounts[1] = 100 ether;  // at lower bound
-        amounts[2] = 550 ether;  // middle
+        amounts[0] = 50 ether; // below lower bound
+        amounts[1] = 100 ether; // at lower bound
+        amounts[2] = 550 ether; // middle
         amounts[3] = 1000 ether; // at upper bound
         amounts[4] = 2000 ether; // above upper bound
-        
+
         for (uint256 i = 0; i < amounts.length - 1; i++) {
             uint256 fee1 = feeHandler.exposedCalculateFee(amounts[i]);
             uint256 fee2 = feeHandler.exposedCalculateFee(amounts[i + 1]);
-            
+
             uint256 rate1 = fee1 * BPS_DENOMINATOR / amounts[i];
             uint256 rate2 = fee2 * BPS_DENOMINATOR / amounts[i + 1];
-            
+
             assertGe(rate1, rate2, "Fee rate should decrease or stay equal with higher amounts");
         }
     }
@@ -422,9 +419,7 @@ contract FeeHandlerTest is Test {
 
     function test_setFeeRateParams_revertsOnUncastableBound() public {
         uint256 overflowing = uint256(type(uint112).max) + 1;
-        vm.expectRevert(
-            abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 112, overflowing)
-        );
+        vm.expectRevert(abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 112, overflowing));
         feeHandler.setFeeRateParams(MIN_FEE_RATE, MAX_FEE_RATE, LOWER_BOUND, overflowing);
     }
 }

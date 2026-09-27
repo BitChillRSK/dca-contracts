@@ -23,9 +23,7 @@ contract LendingErc20HandlerRedeemTest is Test {
         uint256 originalStablecoinAmount,
         uint256 adjustedStablecoinAmount
     );
-    event TokenLending__SharesRedeemed(
-        address indexed user, uint256 underlyingAmount, uint256 sharesAmountRedeemed
-    );
+    event TokenLending__SharesRedeemed(address indexed user, uint256 underlyingAmount, uint256 sharesAmountRedeemed);
     event TokenLending__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares);
 
     uint256 internal constant RATE_SCALE = 1e18;
@@ -47,7 +45,9 @@ contract LendingErc20HandlerRedeemTest is Test {
             feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
         });
         // dcaManager = this, so tests can call onlyDcaManager entry points directly
-        harness = new LendingErc20HandlerHarness(address(this), address(stablecoin), address(0xFEE), feeSettings, address(this));
+        harness = new LendingErc20HandlerHarness(
+            address(this), address(stablecoin), address(0xFEE), feeSettings, address(this)
+        );
 
         stablecoin.mint(userA, USER_A_DEPOSIT);
         stablecoin.mint(userB, USER_B_DEPOSIT);
@@ -166,8 +166,7 @@ contract LendingErc20HandlerRedeemTest is Test {
             assertTrue(logs[i].topics[0] != sharesRedeemedTopic, "SharesRedeemed must not fire on batch");
             if (logs[i].topics[0] == batchTopic) {
                 sawBatch = true;
-                (uint256 underlyingAmount, uint256 sharesAmountRedeemed) =
-                    abi.decode(logs[i].data, (uint256, uint256));
+                (uint256 underlyingAmount, uint256 sharesAmountRedeemed) = abi.decode(logs[i].data, (uint256, uint256));
                 assertEq(underlyingAmount, received);
                 assertEq(
                     sharesAmountRedeemed,
@@ -196,8 +195,7 @@ contract LendingErc20HandlerRedeemTest is Test {
         amounts[0] = 25 ether + 1;
         amounts[1] = 40 ether + 7;
 
-        uint256 expectedBurn =
-            _stablecoinToSharesUp(amounts[0], rate) + _stablecoinToSharesUp(amounts[1], rate);
+        uint256 expectedBurn = _stablecoinToSharesUp(amounts[0], rate) + _stablecoinToSharesUp(amounts[1], rate);
         uint256 received = harness.batchRetrieveStablecoin(users, amounts);
 
         assertEq(sharesABefore - harness.getUserShares(userA), _stablecoinToSharesUp(amounts[0], rate));
@@ -407,10 +405,7 @@ contract LendingErc20HandlerRedeemTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                ITokenLending.TokenLending__ShareConsumptionMismatch.selector,
-                intended,
-                protocolBefore,
-                afterPartial
+                ITokenLending.TokenLending__ShareConsumptionMismatch.selector, intended, protocolBefore, afterPartial
             )
         );
         harness.redeemShares(userA, redeemAmount);
@@ -436,8 +431,7 @@ contract LendingErc20HandlerRedeemTest is Test {
         amounts[0] = 10 ether;
         amounts[1] = 15 ether;
 
-        uint256 intended =
-            _stablecoinToSharesUp(amounts[0], RATE_SCALE) + _stablecoinToSharesUp(amounts[1], RATE_SCALE);
+        uint256 intended = _stablecoinToSharesUp(amounts[0], RATE_SCALE) + _stablecoinToSharesUp(amounts[1], RATE_SCALE);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -627,10 +621,10 @@ contract LendingErc20HandlerHarness is LendingErc20Handler {
         return _redeemShares(user, s_shares[user], stablecoinAmount, _exchangeRate());
     }
 
-    function batchRetrieveStablecoin(
-        address[] calldata users,
-        uint256[] calldata purchaseAmounts
-    ) external returns (uint256) {
+    function batchRetrieveStablecoin(address[] calldata users, uint256[] calldata purchaseAmounts)
+        external
+        returns (uint256)
+    {
         return _batchRetrieveStablecoin(users, purchaseAmounts);
     }
 
@@ -670,9 +664,7 @@ contract LendingErc20HandlerHarness is LendingErc20Handler {
         }
 
         if (!payOut) return;
-        uint256 amount = toBurn > 0
-            ? _sharesToStablecoin(toBurn, rate)
-            : _sharesToStablecoin(sharesAmount, rate);
+        uint256 amount = toBurn > 0 ? _sharesToStablecoin(toBurn, rate) : _sharesToStablecoin(sharesAmount, rate);
         if (amount > 0) {
             MockStablecoin(address(i_stableToken)).mint(address(this), amount);
         }

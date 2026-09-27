@@ -58,18 +58,14 @@ contract VersionedRouteAccountingTest is BaseDeploymentTest {
 
         DeployLayerBankHandler deployer = new DeployLayerBankHandler();
         handlerV1 = LayerBankDocHandlerMoc(
-            payable(
-                deployer.deployMocksAndHandler(
+            payable(deployer.deployMocksAndHandler(
                     address(dcaManager), docTokenAddress, mocProxyAddress, makeAddr(FEE_COLLECTOR_STRING), OWNER
-                )
-            )
+                ))
         );
         handlerV2 = LayerBankDocHandlerMoc(
-            payable(
-                deployer.deployMocksAndHandler(
+            payable(deployer.deployMocksAndHandler(
                     address(dcaManager), docTokenAddress, mocProxyAddress, makeAddr(FEE_COLLECTOR_STRING), OWNER
-                )
-            )
+                ))
         );
 
         vm.startPrank(OWNER);

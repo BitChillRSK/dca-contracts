@@ -33,17 +33,21 @@ contract StablecoinLendingTest is DcaDappTest {
     function testDepositedStablecoinIsLent() external onlyShareTokenLane {
         // Check initial balances
         uint256 ltStablecoinBalanceBeforeDeposit = stablecoin.balanceOf(address(shareToken));
-        
+
         super.depositStablecoin();
-        
+
         // Check if stablecoin has been transferred from the handler to the shares
         uint256 ltStablecoinBalanceAfterDeposit = stablecoin.balanceOf(address(shareToken));
-        
+
         // Check that the stablecoin handler has 0 balance (all stablecoin was sent to shares)
         assertEq(stablecoin.balanceOf(address(stablecoinHandler)), 0, "Stablecoin balance in handler should be 0");
-        
+
         // Check that the correct amount was added to the shares
-        assertEq(ltStablecoinBalanceAfterDeposit - ltStablecoinBalanceBeforeDeposit, AMOUNT_TO_DEPOSIT, "Incorrect amount deposited in shares");
+        assertEq(
+            ltStablecoinBalanceAfterDeposit - ltStablecoinBalanceBeforeDeposit,
+            AMOUNT_TO_DEPOSIT,
+            "Incorrect amount deposited in shares"
+        );
     }
 
     function testStablecoinDepositIncreasesSharesBalance() external onlyShareTokenLane {
@@ -51,9 +55,8 @@ contract StablecoinLendingTest is DcaDappTest {
         super.depositStablecoin();
         uint256 postSharesBalance = stablecoinHandler.getUserShares(USER);
 
-        uint256 exchangeRate = s_routeIndex == TROPYKUS_INDEX 
-            ? shareToken.exchangeRateCurrent() 
-            : shareToken.tokenPrice();
+        uint256 exchangeRate =
+            s_routeIndex == TROPYKUS_INDEX ? shareToken.exchangeRateCurrent() : shareToken.tokenPrice();
 
         // Check that the actual shares (the one used by the stablecoin handler) has the correct balance
         assertApproxEqRel(
@@ -71,7 +74,7 @@ contract StablecoinLendingTest is DcaDappTest {
         uint256 postSharesBalance = stablecoinHandler.getUserShares(USER);
         uint256 exchangeRate =
             s_routeIndex == TROPYKUS_INDEX ? shareToken.exchangeRateCurrent() : shareToken.tokenPrice();
-        
+
         assertApproxEqAbs(
             shareToken.balanceOf(address(stablecoinHandler)),
             0,
@@ -92,9 +95,8 @@ contract StablecoinLendingTest is DcaDappTest {
 
         // On fork tests we need to simulate some operation on Tropykus so that the exchange rate gets updated
         if (block.chainid != ANVIL_CHAIN_ID) {
-            startingExchangeRate = s_routeIndex == TROPYKUS_INDEX
-                ? shareToken.exchangeRateCurrent()
-                : shareToken.tokenPrice();
+            startingExchangeRate =
+                s_routeIndex == TROPYKUS_INDEX ? shareToken.exchangeRateCurrent() : shareToken.tokenPrice();
             updateExchangeRate(1 days);
         }
         uint256 exchangeRate =
@@ -121,9 +123,8 @@ contract StablecoinLendingTest is DcaDappTest {
         uint256 startingExchangeRate = SHARE_TOKEN_STARTING_EXCHANGE_RATE;
         // On fork tests we need to simulate some operation on Tropykus so that the exchange rate gets updated
         if (block.chainid != ANVIL_CHAIN_ID) {
-            startingExchangeRate = s_routeIndex == TROPYKUS_INDEX
-                ? shareToken.exchangeRateCurrent()
-                : shareToken.tokenPrice();
+            startingExchangeRate =
+                s_routeIndex == TROPYKUS_INDEX ? shareToken.exchangeRateCurrent() : shareToken.tokenPrice();
         }
 
         super.makeSeveralPurchasesWithSeveralSchedules();
@@ -135,16 +136,12 @@ contract StablecoinLendingTest is DcaDappTest {
 
         // @notice In this test we don't use assertEq because calculating the exact number on the right hand side would be too much hassle
         // However, we check that the shares spent to redeem stablecoin to make the rBTC purchases is lower than the amount we would have
-        // needed if the exchange rate were constant and greater than the amount necessary if all the redemptions had been made at the latest 
+        // needed if the exchange rate were constant and greater than the amount necessary if all the redemptions had been made at the latest
         // exchange rate (since as time passes fewer tokens are necessary to redeem each stablecoin)
         assertLt(
-            prevSharesBalance - postSharesBalance,
-            NUM_OF_SCHEDULES * AMOUNT_TO_SPEND * 1e18 / startingExchangeRate
+            prevSharesBalance - postSharesBalance, NUM_OF_SCHEDULES * AMOUNT_TO_SPEND * 1e18 / startingExchangeRate
         );
-        assertGt(
-            prevSharesBalance - postSharesBalance, 
-            NUM_OF_SCHEDULES * AMOUNT_TO_SPEND * 1e18 / exchangeRate
-        );
+        assertGt(prevSharesBalance - postSharesBalance, NUM_OF_SCHEDULES * AMOUNT_TO_SPEND * 1e18 / exchangeRate);
 
         // @notice Similarly, here we check that the remaining shares balance of the stablecoin Token Handler contract is lower
         // than it would have been if the redemptions had been made at the highest exchange rate but greater than
@@ -155,7 +152,8 @@ contract StablecoinLendingTest is DcaDappTest {
         );
         assertGt(
             shareToken.balanceOf(address(stablecoinHandler)),
-            AMOUNT_TO_DEPOSIT * 1e18 / startingExchangeRate - NUM_OF_SCHEDULES * AMOUNT_TO_SPEND * 1e18 / startingExchangeRate
+            AMOUNT_TO_DEPOSIT * 1e18 / startingExchangeRate - NUM_OF_SCHEDULES * AMOUNT_TO_SPEND * 1e18
+                / startingExchangeRate
         );
     }
 
@@ -167,9 +165,8 @@ contract StablecoinLendingTest is DcaDappTest {
         uint256 startingExchangeRate = SHARE_TOKEN_STARTING_EXCHANGE_RATE;
         // On fork tests we need to simulate some operation on Tropykus so that the exchange rate gets updated
         if (block.chainid != ANVIL_CHAIN_ID) {
-            startingExchangeRate = s_routeIndex == TROPYKUS_INDEX
-                ? shareToken.exchangeRateCurrent()
-                : shareToken.tokenPrice();
+            startingExchangeRate =
+                s_routeIndex == TROPYKUS_INDEX ? shareToken.exchangeRateCurrent() : shareToken.tokenPrice();
         }
 
         super.makeBatchPurchasesOneUser(); // Batched purchases add up to an amount of AMOUNT_TO_SPEND, this function makes two batch purchases
@@ -205,8 +202,7 @@ contract StablecoinLendingTest is DcaDappTest {
     function testWithdrawInterest() external onlyLendingLane {
         updateExchangeRate(10 days);
 
-        uint256 withdrawableInterest =
-            dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        uint256 withdrawableInterest = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
         uint256 userStablecoinBalanceBeforeInterestWithdrawal = stablecoin.balanceOf(USER);
         // assertGt(withdrawableInterest, 0);
         vm.prank(USER);
@@ -277,9 +273,7 @@ contract StablecoinLendingTest is DcaDappTest {
         dcaManager.withdrawAllAccumulatedInterest(tokens, routeIndexes);
 
         assertApproxEqRel(
-            stablecoin.balanceOf(USER) - userBalanceBeforeWithdrawal,
-            withdrawableInterest,
-            _lendingRedeemCashRelTol()
+            stablecoin.balanceOf(USER) - userBalanceBeforeWithdrawal, withdrawableInterest, _lendingRedeemCashRelTol()
         );
     }
 
@@ -301,9 +295,7 @@ contract StablecoinLendingTest is DcaDappTest {
         dcaManager.withdrawAllAccumulatedInterest(tokens, routeIndexes);
 
         assertApproxEqRel(
-            stablecoin.balanceOf(USER) - userBalanceBeforeWithdrawal,
-            withdrawableInterest,
-            _lendingRedeemCashRelTol()
+            stablecoin.balanceOf(USER) - userBalanceBeforeWithdrawal, withdrawableInterest, _lendingRedeemCashRelTol()
         );
         uint256 remainingInterest = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
         if (remainingInterest == 1) remainingInterest--; // Handle Sovryn's precision loss
@@ -318,8 +310,7 @@ contract StablecoinLendingTest is DcaDappTest {
         // On fork tests we need to simulate some operation on Tropykus so that the exchange rate gets updated
         updateExchangeRate(10 days);
 
-        uint256 withdrawableInterest =
-            dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        uint256 withdrawableInterest = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
         uint256 userStablecoinBalanceBeforeInterestWithdrawal = stablecoin.balanceOf(USER);
         assertGt(withdrawableInterest, 0);
 
@@ -377,4 +368,4 @@ contract StablecoinLendingTest is DcaDappTest {
     //     // Verify shares balance is now 0
     //     assertEq(stablecoinHandler.getUserShares(USER), 0);
     // }
-} 
+}

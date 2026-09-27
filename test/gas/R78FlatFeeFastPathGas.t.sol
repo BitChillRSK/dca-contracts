@@ -90,10 +90,8 @@ contract R78BaselineFeeHandlerGasHarness is FeeHandler {
 
         uint256 feeRate;
         unchecked {
-            feeRate = maxFeeRate
-                - ((purchaseAmount - feePurchaseLowerBound)
-                    * (maxFeeRate - minFeeRate))
-                    / (feePurchaseUpperBound - feePurchaseLowerBound);
+            feeRate = maxFeeRate - ((purchaseAmount - feePurchaseLowerBound) * (maxFeeRate - minFeeRate))
+                / (feePurchaseUpperBound - feePurchaseLowerBound);
         }
         return _baselineCalculateFeeAtRate(purchaseAmount, feeRate);
     }

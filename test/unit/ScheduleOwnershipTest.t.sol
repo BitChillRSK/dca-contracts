@@ -45,7 +45,8 @@ contract ScheduleOwnershipTest is DcaDappTest {
 
     /// @dev What anybody gets for an id no schedule of this stablecoin holds.
     function _inexistent(uint64 scheduleId) private view returns (bytes memory) {
-        return abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), scheduleId);
+        return
+            abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), scheduleId);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -115,7 +116,9 @@ contract ScheduleOwnershipTest is DcaDappTest {
         this.testAStrangerCannotDeleteAnotherUsersSchedule();
 
         IDcaManager.DcaSchedule memory unchanged = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        assertEq(scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX), idBefore, "a stranger moved the id");
+        assertEq(
+            scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX), idBefore, "a stranger moved the id"
+        );
         assertEq(unchanged.tokenBalance, before.tokenBalance, "a stranger moved the balance");
         assertEq(unchanged.purchaseAmount, before.purchaseAmount);
         assertEq(unchanged.purchasePeriod, before.purchasePeriod);
@@ -180,7 +183,8 @@ contract ScheduleOwnershipTest is DcaDappTest {
         );
         vm.stopPrank();
 
-        (uint64[] memory strangerSchedulesIds, IDcaManager.DcaSchedule[] memory strangerSchedules) = dcaManager.getDcaSchedules(s_stranger, address(stablecoin));
+        (uint64[] memory strangerSchedulesIds, IDcaManager.DcaSchedule[] memory strangerSchedules) =
+            dcaManager.getDcaSchedules(s_stranger, address(stablecoin));
         assertEq(strangerSchedules.length, 1);
         assertTrue(strangerSchedulesIds[0] != usersId, "two live schedules share an id");
         // The first user's schedule still names them as its owner. Reading is public, so what an id

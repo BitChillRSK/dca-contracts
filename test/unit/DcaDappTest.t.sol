@@ -45,7 +45,7 @@ contract DcaDappTest is Test {
     IShareToken shareToken;
     MockWrbtcToken wrBtcToken;
     FeeCalculator feeCalculator;
-    
+
     // Helper configs from deployment
     MocHelperConfig mocHelperConfig;
     DexHelperConfig dexHelperConfig;
@@ -70,7 +70,7 @@ contract DcaDappTest is Test {
     uint256 constant NUM_OF_SCHEDULES = 5;
     /// @dev Monday 2026-01-05 09:00 UTC exercises weekday cadence and non-midnight execution.
     uint256 internal constant UTC_FIXTURE_START = 1767603600;
-    
+
     string swapType = vm.envString("SWAP_TYPE");
     bool isMocSwaps = keccak256(abi.encodePacked(swapType)) == keccak256(abi.encodePacked("mocSwaps"));
     bool isDexSwaps = keccak256(abi.encodePacked(swapType)) == keccak256(abi.encodePacked("dexSwaps"));
@@ -134,11 +134,9 @@ contract DcaDappTest is Test {
     // TokenHandler
     event TokenHandler__TokenDeposited(address indexed token, address indexed user, uint256 amount);
     event TokenHandler__TokenWithdrawn(address indexed token, address indexed user, uint256 amount);
-    
+
     // TokenLending
-    event TokenLending__SharesRedeemed(
-        address indexed user, uint256 underlyingAmount, uint256 sharesAmountRedeemed
-    );
+    event TokenLending__SharesRedeemed(address indexed user, uint256 underlyingAmount, uint256 sharesAmountRedeemed);
 
     // IPurchaseRbtc
     event PurchaseRbtc__RbtcBought(
@@ -161,9 +159,7 @@ contract DcaDappTest is Test {
     event MockMocProxy__DocRedeemed(address indexed user, uint256 docAmount, uint256 btcAmount);
 
     //TokenLending
-    event TokenLending__WithdrawalAmountAdjusted(
-        address indexed user, uint256 originalAmount, uint256 adjustedAmount
-    );
+    event TokenLending__WithdrawalAmountAdjusted(address indexed user, uint256 originalAmount, uint256 adjustedAmount);
     event TokenLending__SharesRedeemedBatch(uint256 underlyingAmount, uint256 sharesAmountRedeemed);
 
     modifier onlyDexSwaps() {
@@ -211,11 +207,11 @@ contract DcaDappTest is Test {
         } catch {
             stablecoinType = DOC_STRING;
         }
-        
+
         bool isUSDRIF = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING));
         bool isUSDT0 = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDT0_STRING));
         bool isDexStable = isUSDRIF || isUSDT0;
-        
+
         // Skip test if Sovryn + USDRIF/USDT0 combination (not supported)
         if (isSovryn && isDexStable) {
             console2.log("Skipping test: this stablecoin is not supported by Sovryn");
@@ -252,7 +248,7 @@ contract DcaDappTest is Test {
         } else {
             revert("Lending protocol not allowed");
         }
-        
+
         // Deal rBTC funds to user
         vm.deal(USER, STARTING_RBTC_USER_BALANCE);
         s_btcPrice = BTC_PRICE;
@@ -286,9 +282,7 @@ contract DcaDappTest is Test {
             } else if (block.chainid == RSK_MAINNET_CHAIN_ID) {
                 // Fork tests
                 vm.store(
-                    MOC_IN_RATE_MAINNET,
-                    bytes32(uint256(214)),
-                    bytes32(uint256(uint160(DUMMY_COMMISSION_RECEIVER)))
+                    MOC_IN_RATE_MAINNET, bytes32(uint256(214)), bytes32(uint256(uint160(DUMMY_COMMISSION_RECEIVER)))
                 );
 
                 // Fork tests - use token holders instead of minting
@@ -299,7 +293,7 @@ contract DcaDappTest is Test {
                     // Set USER to USDRIF holder address
                     USER = USDRIF_HOLDER;
                 }
-                
+
                 // Get BTC price from oracle
                 mocOracle = ICoinPairPrice(MOC_ORACLE_MAINNET);
                 s_btcPrice = mocOracle.getPrice() / 1e18;
@@ -328,7 +322,7 @@ contract DcaDappTest is Test {
             DeployDexSwaps deployContracts = new DeployDexSwaps();
             (operationsAdmin, stablecoinHandlerAddress, dcaManager, dexHelperConfig) = deployContracts.run();
             stablecoinHandler = IStablecoinHandler(stablecoinHandlerAddress);
-            
+
             address stablecoinAddress = dexHelperConfig.getStablecoinAddress();
             address wrBtcTokenAddress = dexHelperConfig.getActiveNetworkConfig().wrbtcTokenAddress;
             address swapRouter02Address = dexHelperConfig.getActiveNetworkConfig().swapRouter02Address;
@@ -357,7 +351,7 @@ contract DcaDappTest is Test {
                 //     abi.encodeWithSignature(string(abi.encodePacked(tokenConfig.mintFunctionName, "(uint256)")), RBTC_TO_MINT_DOC)
                 // );
                 // require(success, "Mint function call failed");
-                
+
                 // Fork tests - use token holders instead of minting
                 if (keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(DOC_STRING))) {
                     // Set USER to DOC holder address
@@ -375,23 +369,23 @@ contract DcaDappTest is Test {
                 mocOracle = ICoinPairPrice(MOC_ORACLE_MAINNET);
                 s_btcPrice = mocOracle.getPrice() / 1e18;
                 _overrideMocPriceProvider(MOC_STATEV1_MAINNET);
-            // } else if (block.chainid == RSK_TESTNET_CHAIN_ID) {
-            // THERE ARE NO UNSIWAP CONTRACTS ON RSK TESTNET, SO THIS BRANCH CAN'T BE TESTED
-            //     vm.store(
-            //         address(MOC_IN_RATE_TESTNET),
-            //         bytes32(uint256(214)),
-            //         bytes32(uint256(uint160(DUMMY_COMMISSION_RECEIVER)))
-            //     );
-            //     vm.prank(USER);
-            //     // Use the appropriate mint function based on token type
-            //     (bool success, ) = address(mocProxy).call{value: 0.21 ether}(
-            //         abi.encodeWithSignature(string(abi.encodePacked(tokenConfig.mintFunctionName, "(uint256)")), RBTC_TO_MINT_DOC)
-            //     );
-            //     require(success, "Mint function call failed");
+                // } else if (block.chainid == RSK_TESTNET_CHAIN_ID) {
+                // THERE ARE NO UNSIWAP CONTRACTS ON RSK TESTNET, SO THIS BRANCH CAN'T BE TESTED
+                //     vm.store(
+                //         address(MOC_IN_RATE_TESTNET),
+                //         bytes32(uint256(214)),
+                //         bytes32(uint256(uint160(DUMMY_COMMISSION_RECEIVER)))
+                //     );
+                //     vm.prank(USER);
+                //     // Use the appropriate mint function based on token type
+                //     (bool success, ) = address(mocProxy).call{value: 0.21 ether}(
+                //         abi.encodeWithSignature(string(abi.encodePacked(tokenConfig.mintFunctionName, "(uint256)")), RBTC_TO_MINT_DOC)
+                //     );
+                //     require(success, "Mint function call failed");
 
-            //     mocOracle = ICoinPairPrice(MOC_ORACLE_TESTNET);
-            //     s_btcPrice = mocOracle.getPrice() / 1e18;
-            // _overrideMocPriceProvider(MOC_STATEV1_TESTNET);
+                //     mocOracle = ICoinPairPrice(MOC_ORACLE_TESTNET);
+                //     s_btcPrice = mocOracle.getPrice() / 1e18;
+                // _overrideMocPriceProvider(MOC_STATEV1_TESTNET);
             }
         } else {
             revert("Invalid deploy environment");
@@ -465,7 +459,8 @@ contract DcaDappTest is Test {
 
     function depositStablecoin() internal returns (uint256, uint256) {
         vm.startPrank(USER);
-        uint256 userBalanceBeforeDeposit = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
+        uint256 userBalanceBeforeDeposit =
+            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.expectEmit(true, true, true, false);
@@ -517,7 +512,8 @@ contract DcaDappTest is Test {
                 address(stablecoin), stablecoinToDeposit, purchaseAmount, purchasePeriod, s_routeIndex
             );
             _assertCreatedEventIdMatchesStorage();
-            uint256 userBalanceAfterDeposit = scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).tokenBalance;
+            uint256 userBalanceAfterDeposit =
+                scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).tokenBalance;
             assertEq(stablecoinToDeposit, userBalanceAfterDeposit - userBalanceBeforeDeposit);
             assertEq(purchaseAmount, scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).purchaseAmount);
             assertEq(purchasePeriod, scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).purchasePeriod);
@@ -549,9 +545,11 @@ contract DcaDappTest is Test {
 
     function makeSinglePurchase() internal {
         vm.startPrank(USER);
-        uint256 stablecoinBalanceBeforePurchase = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
+        uint256 stablecoinBalanceBeforePurchase =
+            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
         uint256 rbtcBalanceBeforePurchase = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
-        (uint64[] memory dcaDetailsIds, IDcaManager.DcaSchedule[] memory dcaDetails) = dcaManager.getDcaSchedules(USER, address(stablecoin));
+        (uint64[] memory dcaDetailsIds, IDcaManager.DcaSchedule[] memory dcaDetails) =
+            dcaManager.getDcaSchedules(USER, address(stablecoin));
         vm.stopPrank();
 
         uint256 fee = feeCalculator.calculateFee(AMOUNT_TO_SPEND);
@@ -565,20 +563,16 @@ contract DcaDappTest is Test {
             vm.expectEmit(true, true, true, false); // Amounts may not match to the last wei on fork tests
         }
         emit PurchaseRbtc__RbtcBought(
-            USER,
-            address(stablecoin),
-            netPurchaseAmount / s_btcPrice,
-            dcaDetailsIds[SCHEDULE_INDEX],
-            netPurchaseAmount
+            USER, address(stablecoin), netPurchaseAmount / s_btcPrice, dcaDetailsIds[SCHEDULE_INDEX], netPurchaseAmount
         );
         buyRbtcOne(dcaDetailsIds[SCHEDULE_INDEX]);
 
         vm.startPrank(USER);
-        uint256 stablecoinBalanceAfterPurchase = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
+        uint256 stablecoinBalanceAfterPurchase =
+            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
         uint256 rbtcBalanceAfterPurchase = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
-        uint256 expectedAnchor = _expectedCadenceAnchor(
-            dcaDetails[SCHEDULE_INDEX].cadenceAnchor, dcaDetails[SCHEDULE_INDEX].purchasePeriod
-        );
+        uint256 expectedAnchor =
+            _expectedCadenceAnchor(dcaDetails[SCHEDULE_INDEX].cadenceAnchor, dcaDetails[SCHEDULE_INDEX].purchasePeriod);
         assertEq(
             scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).cadenceAnchor,
             expectedAnchor,
@@ -628,10 +622,8 @@ contract DcaDappTest is Test {
         returns (uint256 scheduleStablecoinSpent)
     {
         vm.startPrank(USER);
-        uint256 schedulePurchaseAmount =
-            scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).purchaseAmount;
-        uint256 schedulePurchasePeriod =
-            scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).purchasePeriod;
+        uint256 schedulePurchaseAmount = scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).purchaseAmount;
+        uint256 schedulePurchasePeriod = scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).purchasePeriod;
         vm.stopPrank();
         uint256 fee = feeCalculator.calculateFee(schedulePurchaseAmount);
         uint256 netPurchaseAmount = schedulePurchaseAmount - fee;
@@ -650,8 +642,7 @@ contract DcaDappTest is Test {
             vm.startPrank(USER);
             uint256 stablecoinBalanceAfterPurchase =
                 scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).tokenBalance;
-            uint256 rbtcBalanceAfterPurchase =
-                IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
+            uint256 rbtcBalanceAfterPurchase = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
             vm.stopPrank();
 
             // Check that stablecoin was subtracted and rBTC was added to user's balances
@@ -720,9 +711,7 @@ contract DcaDappTest is Test {
         }
 
         vm.prank(SWAPPER);
-        dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, address(stablecoin), s_routeIndex)
-        );
+        dcaManager.batchBuyRbtc(toBatch(scheduleIds, address(stablecoin), s_routeIndex));
 
         if (isLendingLane) {
             _assertBatchRedemptionReported(totalNetPurchaseAmount + totalFee);
@@ -754,10 +743,8 @@ contract DcaDappTest is Test {
         vm.warp(block.timestamp + 5 weeks); // warp to a time far in the future so all schedules are long due for a new purchase
         vm.recordLogs();
         vm.prank(SWAPPER);
-        dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, address(stablecoin), s_routeIndex)
-        );
-        
+        dcaManager.batchBuyRbtc(toBatch(scheduleIds, address(stablecoin), s_routeIndex));
+
         uint256 postStablecoinHandlerBalance2;
 
         if (isMocSwaps) {
@@ -827,13 +814,13 @@ contract DcaDappTest is Test {
         GovernorMock mockGovernor = new GovernorMock();
         bytes32 slotGovernor = bytes32(uint256(155));
         vm.store(MOC_STATEV1_MAINNET, slotGovernor, bytes32(uint256(uint160(address(mockGovernor)))));
-        
+
         // 2) Read current provider price and clone it to the mock with the same price
         address btcPriceProviderAddr = mocStateV1.getBtcPriceProvider();
         MockMocPriceProvider btcPriceProvider = MockMocPriceProvider(btcPriceProviderAddr);
         (bytes32 price,) = btcPriceProvider.peek();
         MockMocPriceProvider mockMocBtcPriceProvider = new MockMocPriceProvider(uint256(price));
-        
+
         // 2) Do the same for MoC price provider
         address mocPriceProviderAddr = mocStateV1.getMoCPriceProvider();
         MockMocPriceProvider mocPriceProvider = MockMocPriceProvider(mocPriceProviderAddr);
@@ -847,7 +834,7 @@ contract DcaDappTest is Test {
         mocStateV1.setMoCPriceProvider(address(mockMocMocPriceProvider));
 
         // Make the mock oracle the one for Uniswap interactions as well
-        if(isDexSwaps) {
+        if (isDexSwaps) {
             vm.prank(OWNER);
             IPurchaseUniswap(address(stablecoinHandler)).updateMocOracle(address(mockMocBtcPriceProvider));
         }
@@ -861,18 +848,18 @@ contract DcaDappTest is Test {
     function getShareTokenAddress(string memory _stablecoinType, uint256 routeIndex) internal view returns (address) {
         bool isUSDRIF = keccak256(abi.encodePacked(_stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING));
         bool isUSDT0 = keccak256(abi.encodePacked(_stablecoinType)) == keccak256(abi.encodePacked(USDT0_STRING));
-        
+
         // Check if this stablecoin is supported by Sovryn
         if (routeIndex == SOVRYN_INDEX && (isUSDRIF || isUSDT0)) {
             revert("Share token not available for the selected combination");
         }
-        
+
         address shareTokenAddress = address(0);
-        
+
         // Try to get the shares address from the helper configs
         if (isMocSwaps && address(mocHelperConfig) != address(0)) {
             MocHelperConfig.NetworkConfig memory networkConfig = mocHelperConfig.getActiveNetworkConfig();
-            
+
             if (routeIndex == TROPYKUS_INDEX) {
                 shareTokenAddress = networkConfig.kDocAddress;
             } else if (routeIndex == SOVRYN_INDEX) {
@@ -885,7 +872,7 @@ contract DcaDappTest is Test {
                 shareTokenAddress = dexHelperConfig.getShareTokenAddress();
             }
         }
-        
+
         // If we couldn't get the shares address from the helper configs, try to get it from the handler
         if (shareTokenAddress == address(0) && address(stablecoinHandler) != address(0)) {
             if (routeIndex == TROPYKUS_INDEX) {
@@ -895,25 +882,29 @@ contract DcaDappTest is Test {
                     revert("Failed to get Tropykus shares from handler");
                 }
             } else if (routeIndex == SOVRYN_INDEX) {
-                try SovrynDocHandlerMoc(payable(address(stablecoinHandler))).i_iSusdToken() returns (IiSusdToken iSusdToken) {
+                try SovrynDocHandlerMoc(payable(address(stablecoinHandler))).i_iSusdToken() returns (
+                    IiSusdToken iSusdToken
+                ) {
                     shareTokenAddress = address(iSusdToken);
                 } catch {
                     revert("Failed to get Sovryn shares from handler");
                 }
             } else if (routeIndex == LAYERBANK_INDEX) {
-                try LayerBankDocHandlerMoc(payable(address(stablecoinHandler))).i_aToken() returns (ILayerBankAToken aToken) {
+                try LayerBankDocHandlerMoc(payable(address(stablecoinHandler))).i_aToken() returns (
+                    ILayerBankAToken aToken
+                ) {
                     shareTokenAddress = address(aToken);
                 } catch {
                     revert("Failed to get LayerBank aToken from handler");
                 }
             }
         }
-        
+
         // If we still couldn't get the shares address, revert
         if (shareTokenAddress == address(0)) {
             revert("Share token not available for the selected combination");
         }
-        
+
         return shareTokenAddress;
     }
 }

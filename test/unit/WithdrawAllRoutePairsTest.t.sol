@@ -89,11 +89,9 @@ contract WithdrawAllRoutePairsTest is BaseDeploymentTest {
         returns (LayerBankDocHandlerMoc)
     {
         return LayerBankDocHandlerMoc(
-            payable(
-                deployer.deployMocksAndHandler(
+            payable(deployer.deployMocksAndHandler(
                     address(dcaManager), token, mocProxy, makeAddr(FEE_COLLECTOR_STRING), OWNER
-                )
-            )
+                ))
         );
     }
 

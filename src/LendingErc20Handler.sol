@@ -192,10 +192,12 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
      *      Shortfalls revert rather than clamp: PurchaseRbtc still allocates by the planned
      *      weights, so clamping one row would dilute every other buyer in the batch.
      */
-    function _batchRetrieveStablecoin(
-        address[] calldata users,
-        uint256[] calldata purchaseAmounts
-    ) internal virtual override returns (uint256) {
+    function _batchRetrieveStablecoin(address[] calldata users, uint256[] calldata purchaseAmounts)
+        internal
+        virtual
+        override
+        returns (uint256)
+    {
         uint256 exchangeRate = _exchangeRate();
         uint256 totalSharesToRedeem;
 
@@ -309,10 +311,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
      *      succeeds; positive cash with a partial burn reverts. Compare before/after without
      *      subtracting when the balance did not decrease, so a flat or rising balance cannot panic.
      */
-    function _measuredProtocolRedeem(uint256 sharesAmount, uint256 exchangeRate)
-        private
-        returns (uint256 received)
-    {
+    function _measuredProtocolRedeem(uint256 sharesAmount, uint256 exchangeRate) private returns (uint256 received) {
         uint256 sharesBefore = _receiptSharesBalance();
         uint256 stablecoinBalanceBefore = i_stableToken.balanceOf(address(this));
         _protocolRedeem(sharesAmount, exchangeRate);

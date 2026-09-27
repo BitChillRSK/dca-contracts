@@ -260,9 +260,7 @@ contract PurchaseUniswapMinOutTest is Test {
         vm.expectRevert(bytes("Too little received"));
         _buyOne(harness, gross, NO_MIN_RBTC_OUT);
 
-        assertEq(
-            harness.getAmountOutMinimumSafetyCheck(), SAFETY, "retightening the floor must not move the wall"
-        );
+        assertEq(harness.getAmountOutMinimumSafetyCheck(), SAFETY, "retightening the floor must not move the wall");
     }
 
     /// @dev The wall is what a compromised swapper cannot get under. Even after the owner widens the floor

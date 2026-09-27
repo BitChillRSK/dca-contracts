@@ -220,9 +220,7 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
     ///      already there, so the before-balance is the pool minus the fee just paid.
     function _expectShortFillRevert() private {
         uint256 netAmount = _netAmountToSpend();
-        uint256 inputBalanceBefore = isNone
-            ? stablecoin.balanceOf(address(stablecoinHandler)) - _fee()
-            : netAmount;
+        uint256 inputBalanceBefore = isNone ? stablecoin.balanceOf(address(stablecoinHandler)) - _fee() : netAmount;
         uint256 unspent = netAmount - (netAmount * SHORT_FILL_PERCENT) / FULL_FILL_PERCENT;
         vm.expectRevert(
             abi.encodeWithSelector(

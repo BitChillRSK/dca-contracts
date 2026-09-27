@@ -64,4 +64,15 @@ optimizer_runs = 200        # optimizer settings, and without them legacy codege
 paths = "test/ai-generated/unit/layerbank/LayerBankErc20HandlerDexTest.t.sol"
 via_ir = false
 
-# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+# Vendored ABIs stay byte-diffable against upstream (AGENTS.md). Only IkToken is currently
+# fmt-dirty; the rest are listed so a future upstream sync cannot be "fixed" by `forge fmt`.
+[fmt]
+ignore = [
+    "src/interfaces/IMocProxy.sol",
+    "src/interfaces/IWRBTC.sol",
+    "src/interfaces/ICoinPairPrice.sol",
+    "src/tropykus-legacy/IkToken.sol",
+    "src/sovryn/IiSusdToken.sol",
+    "src/layerbank/ILayerBankPool.sol",
+    "src/layerbank/ILayerBankAToken.sol",
+]

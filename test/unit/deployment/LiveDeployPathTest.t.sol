@@ -150,9 +150,7 @@ contract LiveDeployPathTest is Test {
         assertEq(dcaManager.pendingOwner(), SAFE);
         assertEq(Ownable(handler).owner(), address(this));
         assertEq(BitChillOwnable(handler).pendingOwner(), SAFE);
-        assertEq(
-            uint256(operationsAdmin.getRouteClass(LAYERBANK_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending)
-        );
+        assertEq(uint256(operationsAdmin.getRouteClass(LAYERBANK_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
         assertEq(uint256(operationsAdmin.getRouteClass(SOVRYN_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
 
         vm.prank(SAFE);
@@ -172,9 +170,7 @@ contract LiveDeployPathTest is Test {
         if (handler != address(0)) {
             assertEq(BitChillOwnable(handler).pendingOwner(), SAFE);
             assertTrue(
-                IPurchaseUniswap(handler).isPurchasePathAllowed(
-                    keccak256(IPurchaseUniswap(handler).getSwapPath())
-                ),
+                IPurchaseUniswap(handler).isPurchasePathAllowed(keccak256(IPurchaseUniswap(handler).getSwapPath())),
                 "constructor path is allowlisted at construction"
             );
         }
@@ -197,9 +193,8 @@ contract LiveDeployPathTest is Test {
             address idleHandler = operationsAdmin.getTokenHandler(token, IDLE_INDEX);
             assertNotEq(idleHandler, address(0), "live dex path must assign IdleErc20HandlerDex at index 0");
             assertTrue(
-                IPurchaseUniswap(idleHandler).isPurchasePathAllowed(
-                    keccak256(IPurchaseUniswap(idleHandler).getSwapPath())
-                ),
+                IPurchaseUniswap(idleHandler)
+                    .isPurchasePathAllowed(keccak256(IPurchaseUniswap(idleHandler).getSwapPath())),
                 "idle dex constructor path is allowlisted"
             );
 
@@ -210,9 +205,7 @@ contract LiveDeployPathTest is Test {
                 );
                 assertNotEq(handler, address(0), "live dex path must deploy the LayerBank handler for this stable");
                 assertTrue(
-                    IPurchaseUniswap(handler).isPurchasePathAllowed(
-                        keccak256(IPurchaseUniswap(handler).getSwapPath())
-                    ),
+                    IPurchaseUniswap(handler).isPurchasePathAllowed(keccak256(IPurchaseUniswap(handler).getSwapPath())),
                     "constructor path is allowlisted at construction"
                 );
             } else if (protocolHash == keccak256(abi.encodePacked(NONE_STRING))) {
@@ -246,16 +239,20 @@ contract LiveDeployPathTest is Test {
             vm.skip(true);
             return;
         }
-        if (keccak256(abi.encodePacked(vm.envString("LENDING_PROTOCOL"))) == keccak256(abi.encodePacked(TROPYKUS_STRING)))
-        {
+        if (
+            keccak256(abi.encodePacked(vm.envString("LENDING_PROTOCOL")))
+                == keccak256(abi.encodePacked(TROPYKUS_STRING))
+        ) {
             vm.skip(true);
         }
     }
 
     /// @notice Tropykus is test-only on the Dex map and must fail loudly, not deploy quietly.
     function test_dexLive_revertsForTropykus() public {
-        if (keccak256(abi.encodePacked(vm.envString("LENDING_PROTOCOL")))
-            != keccak256(abi.encodePacked(TROPYKUS_STRING))) {
+        if (
+            keccak256(abi.encodePacked(vm.envString("LENDING_PROTOCOL")))
+                != keccak256(abi.encodePacked(TROPYKUS_STRING))
+        ) {
             vm.skip(true);
             return;
         }
@@ -294,10 +291,7 @@ contract LiveDeployPathTest is Test {
             vm.skip(true); // live dex path allowlists USDRIF / USDT0 only
             return;
         }
-        if (
-            protocolHash == keccak256(abi.encodePacked(SOVRYN_STRING))
-                && (isUSDRIF || isUSDT0)
-        ) {
+        if (protocolHash == keccak256(abi.encodePacked(SOVRYN_STRING)) && (isUSDRIF || isUSDT0)) {
             vm.skip(true);
             return;
         }
@@ -321,9 +315,7 @@ contract AddonPendingOwnerTest is BaseDeploymentTest {
 
         DeployIdleHandler idleDeployer = new DeployIdleHandler();
         vm.expectRevert(
-            abi.encodeWithSelector(
-                DeployBase.DeployBase__OwnershipTransferPending.selector, makeAddr("incoming")
-            )
+            abi.encodeWithSelector(DeployBase.DeployBase__OwnershipTransferPending.selector, makeAddr("incoming"))
         );
         idleDeployer.run(helperConfig, address(operationsAdmin), address(dcaManager));
     }
@@ -334,9 +326,7 @@ contract AddonPendingOwnerTest is BaseDeploymentTest {
 
         DeployLayerBankHandler layerbankDeployer = new DeployLayerBankHandler();
         vm.expectRevert(
-            abi.encodeWithSelector(
-                DeployBase.DeployBase__OwnershipTransferPending.selector, makeAddr("incoming")
-            )
+            abi.encodeWithSelector(DeployBase.DeployBase__OwnershipTransferPending.selector, makeAddr("incoming"))
         );
         layerbankDeployer.run(helperConfig, address(operationsAdmin), address(dcaManager));
     }
@@ -349,9 +339,7 @@ contract AddonPendingOwnerTest is BaseDeploymentTest {
         usdrifHelperConfig.updateProtocolAddresses(address(operationsAdmin), address(dcaManager));
         DeployUsdrifHandler usdrifDeployer = new DeployUsdrifHandler();
         vm.expectRevert(
-            abi.encodeWithSelector(
-                DeployBase.DeployBase__OwnershipTransferPending.selector, makeAddr("incoming")
-            )
+            abi.encodeWithSelector(DeployBase.DeployBase__OwnershipTransferPending.selector, makeAddr("incoming"))
         );
         usdrifDeployer.run(usdrifHelperConfig);
     }

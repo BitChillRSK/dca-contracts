@@ -179,8 +179,7 @@ contract StandingApprovalProbe is Test {
 
         // a. `pull` names msg.sender as the payer, so it pulls from the attacker, who holds nothing.
         vm.prank(attacker);
-        (bool pulled,) =
-            SWAP_ROUTER_02.call(abi.encodeCall(ISwapRouter02Extras.pull, (USDRIF, funded)));
+        (bool pulled,) = SWAP_ROUTER_02.call(abi.encodeCall(ISwapRouter02Extras.pull, (USDRIF, funded)));
         assertFalse(pulled, "router.pull moved someone else's tokens");
 
         // b. `exactInput` builds its callback data itself; `payer` is always msg.sender.
@@ -207,9 +206,8 @@ contract StandingApprovalProbe is Test {
 
         // d. The one caller the router would trust is a real pool — but a pool calls back whoever
         //    invoked `swap`, never the router, so an attacker-initiated swap can never reach (c).
-        address pool = IUniswapV3FactoryLike(ISwapRouter02Extras(SWAP_ROUTER_02).factory()).getPool(
-            USDRIF, USDT_USDRIF_HOP, USDRIF_HOP_FEE
-        );
+        address pool = IUniswapV3FactoryLike(ISwapRouter02Extras(SWAP_ROUTER_02).factory())
+            .getPool(USDRIF, USDT_USDRIF_HOP, USDRIF_HOP_FEE);
         assertTrue(pool != address(0), "USDRIF hop pool not found");
         PoolCallbackRelay relay = new PoolCallbackRelay(SWAP_ROUTER_02);
         vm.prank(USDRIF_HOLDER);
@@ -250,8 +248,7 @@ contract StandingApprovalProbe is Test {
 
         // `supply(asset, amount, onBehalfOf, referral)` credits `onBehalfOf` but pulls from msg.sender.
         vm.prank(attacker);
-        (bool supplied,) =
-            LAYERBANK_POOL.call(abi.encodeCall(IAavePoolLike.supply, (USDRIF, funded, attacker, 0)));
+        (bool supplied,) = LAYERBANK_POOL.call(abi.encodeCall(IAavePoolLike.supply, (USDRIF, funded, attacker, 0)));
         assertFalse(supplied, "LayerBank supplied against someone else's allowance");
         assertEq(IERC20(USDRIF).balanceOf(victim), funded, "a standing pool allowance was spendable");
     }
@@ -283,7 +280,10 @@ contract StandingApprovalProbe is Test {
         _assertFlashLoansDisabled("DOC", DOC);
         _assertFlashLoansDisabled("USDRIF", USDRIF);
         _assertFlashLoansDisabled("USDT0", USDT0);
-        console2.log("LayerBank flash-loan premium if ever enabled (bps)", IAavePoolLike(LAYERBANK_POOL).FLASHLOAN_PREMIUM_TOTAL());
+        console2.log(
+            "LayerBank flash-loan premium if ever enabled (bps)",
+            IAavePoolLike(LAYERBANK_POOL).FLASHLOAN_PREMIUM_TOTAL()
+        );
     }
 
     /**
@@ -299,9 +299,8 @@ contract StandingApprovalProbe is Test {
      */
     function test_sovrynFlashBorrow_isNotImplemented() public {
         vm.prank(attacker);
-        (bool ok, bytes memory reason) = ISUSD.call(
-            abi.encodeCall(ISovrynFlashBorrowLike.flashBorrowToken, (1e18, attacker, attacker, "", ""))
-        );
+        (bool ok, bytes memory reason) =
+            ISUSD.call(abi.encodeCall(ISovrynFlashBorrowLike.flashBorrowToken, (1e18, attacker, attacker, "", "")));
         assertFalse(ok, "Sovryn flash borrow is live again; re-examine the standing iSUSD approval");
         assertEq(
             _revertReason(reason),
@@ -321,7 +320,10 @@ contract StandingApprovalProbe is Test {
             _dataProvider().getFlashLoanEnabled(asset),
             string.concat("LayerBank enabled ", name, " flash loans; re-check the precondition")
         );
-        assertFalse(_dataProvider().getPaused(asset), string.concat(name, " reserve is paused, so the refusal below would not be the flash-loan flag"));
+        assertFalse(
+            _dataProvider().getPaused(asset),
+            string.concat(name, " reserve is paused, so the refusal below would not be the flash-loan flag")
+        );
 
         vm.prank(attacker);
         (bool ok, bytes memory reason) =

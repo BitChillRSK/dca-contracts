@@ -50,8 +50,7 @@ contract DeployIdleHandler is DeployBase {
         external
         returns (address)
     {
-        MocHelperConfig helperConfig =
-            address(existingConfig) != address(0) ? existingConfig : new MocHelperConfig();
+        MocHelperConfig helperConfig = address(existingConfig) != address(0) ? existingConfig : new MocHelperConfig();
 
         if (operationsAdminAddress == address(0) || dcaManagerAddress == address(0)) {
             revert("OperationsAdmin and DcaManager addresses must be set");

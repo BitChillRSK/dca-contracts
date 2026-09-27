@@ -17,7 +17,7 @@ contract SovrynDocHandlerMocTest is Test {
 
     MockStablecoin internal docToken;
     MockIsusdToken internal iSusdToken;
-    MockMocProxy   internal mocProxy;
+    MockMocProxy internal mocProxy;
     SovrynDocHandlerMoc internal handler;
 
     function setUp() public {
@@ -108,4 +108,4 @@ contract SovrynDocHandlerMocTest is Test {
         assertLe(totalAccrued, expectedTotal);
         assertGt(totalAccrued, expectedTotal * 95 / 100);
     }
-} 
+}

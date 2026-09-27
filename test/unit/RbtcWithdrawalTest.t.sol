@@ -28,7 +28,8 @@ contract RbtcWithdrawalTest is DcaDappTest {
         uint256 netPurchaseAmount = AMOUNT_TO_SPEND - fee;
 
         vm.prank(USER);
-        (uint64[] memory dcaDetailsIds, IDcaManager.DcaSchedule[] memory dcaDetails) = dcaManager.getDcaSchedules(USER, address(stablecoin));
+        (uint64[] memory dcaDetailsIds, IDcaManager.DcaSchedule[] memory dcaDetails) =
+            dcaManager.getDcaSchedules(USER, address(stablecoin));
 
         buyRbtcOne(dcaDetailsIds[SCHEDULE_INDEX]);
 
@@ -124,7 +125,8 @@ contract RbtcWithdrawalTest is DcaDappTest {
     /// @notice A pair whose route has no handler is skipped, and the pairs after it still execute.
     function testWithdrawAllRbtcSkipsUnregisteredPairAndKeepsGoing() external {
         vm.prank(USER);
-        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) = dcaManager.getDcaSchedules(USER, address(stablecoin));
+        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) =
+            dcaManager.getDcaSchedules(USER, address(stablecoin));
         buyRbtcOne(schedulesIds[SCHEDULE_INDEX]);
 
         uint256 accumulatedRbtc = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
@@ -148,7 +150,8 @@ contract RbtcWithdrawalTest is DcaDappTest {
     /// @notice Naming the same pair twice pays once: the second pass finds a zero balance and skips.
     function testWithdrawAllRbtcWithDuplicatePairPaysOnce() external {
         vm.prank(USER);
-        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) = dcaManager.getDcaSchedules(USER, address(stablecoin));
+        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) =
+            dcaManager.getDcaSchedules(USER, address(stablecoin));
         buyRbtcOne(schedulesIds[SCHEDULE_INDEX]);
 
         uint256 accumulatedRbtc = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);

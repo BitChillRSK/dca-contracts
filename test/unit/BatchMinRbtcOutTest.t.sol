@@ -129,9 +129,7 @@ contract BatchMinRbtcOutTest is DcaDappTest {
             vm.expectRevert();
         } else {
             vm.expectRevert(
-                abi.encodeWithSelector(
-                    IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, measured, minRbtcOut
-                )
+                abi.encodeWithSelector(IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, measured, minRbtcOut)
             );
         }
     }
@@ -159,9 +157,7 @@ contract BatchMinRbtcOutTest is DcaDappTest {
 
         IDcaManager.Batch memory batch = _batch(type(uint256).max);
         vm.prank(SWAPPER);
-        (bool ok, bytes memory returnData) = address(dcaManager).call(
-            abi.encodeCall(IDcaManager.batchBuyRbtc, (batch))
-        );
+        (bool ok, bytes memory returnData) = address(dcaManager).call(abi.encodeCall(IDcaManager.batchBuyRbtc, (batch)));
 
         assertFalse(ok, "an unreachable minimum must revert");
         assertEq(

@@ -24,7 +24,6 @@ import "./Constants.sol";
  *      reverts `HandlerAlreadyAssigned` — do not skip. Map: idle=0 / LayerBank=1 / Sovryn=2.
  */
 contract DeployLayerBankHandler is DeployBase {
-
     struct DeployParams {
         address dcaManager;
         address tokenAddress;
@@ -86,8 +85,7 @@ contract DeployLayerBankHandler is DeployBase {
         external
         returns (address)
     {
-        MocHelperConfig helperConfig =
-            address(existingConfig) != address(0) ? existingConfig : new MocHelperConfig();
+        MocHelperConfig helperConfig = address(existingConfig) != address(0) ? existingConfig : new MocHelperConfig();
 
         if (operationsAdminAddress == address(0) || dcaManagerAddress == address(0)) {
             revert("OperationsAdmin and DcaManager addresses must be set");
@@ -146,9 +144,7 @@ contract DeployLayerBankHandler is DeployBase {
         return layerbankHandler;
     }
 
-    function _maybeAssign(OperationsAdmin operationsAdmin, address docTokenAddress, address layerbankHandler)
-        internal
-    {
+    function _maybeAssign(OperationsAdmin operationsAdmin, address docTokenAddress, address layerbankHandler) internal {
         bool isOwner = msg.sender == operationsAdmin.owner();
 
         if (!isOwner) {

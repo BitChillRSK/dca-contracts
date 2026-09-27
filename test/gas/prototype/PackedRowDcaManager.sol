@@ -98,11 +98,7 @@ contract PackedRowDcaManager is ReentrancyGuard {
         _;
     }
 
-    constructor(
-        address operationsAdminAddress,
-        uint256 minPurchasePeriod,
-        uint256 maxSchedulesPerToken
-    ) {
+    constructor(address operationsAdminAddress, uint256 minPurchasePeriod, uint256 maxSchedulesPerToken) {
         i_operationsAdmin = OperationsAdmin(operationsAdminAddress);
         s_protocolSettings = IDcaManager.ProtocolSettings({
             minPurchasePeriod: minPurchasePeriod.toUint32(),
@@ -114,7 +110,6 @@ contract PackedRowDcaManager is ReentrancyGuard {
     function setTokenMinPurchaseAmount(address token, uint256 minPurchaseAmount) external {
         s_tokenMinPurchaseAmounts[token] = minPurchaseAmount;
     }
-
 
     function createDcaSchedule(
         address token,
@@ -191,9 +186,8 @@ contract PackedRowDcaManager is ReentrancyGuard {
             scheduleIds[i] = scheduleId;
             purchaseAmounts[i] = schedulePurchaseAmount;
         }
-        IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex))).batchBuyRbtc(
-            buyers, scheduleIds, purchaseAmounts, batch.minRbtcOut
-        );
+        IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex)))
+            .batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, batch.minRbtcOut);
     }
 
     function getSchedule(uint64 scheduleId, address user, address token) external view returns (Schedule memory) {

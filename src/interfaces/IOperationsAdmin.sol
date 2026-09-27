@@ -34,9 +34,7 @@ interface IOperationsAdmin {
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
     /// @notice A handler was assigned to a `(token, routeIndex)` pair. Add-only.
-    event OperationsAdmin__TokenHandlerAssigned(
-        address indexed token, uint256 routeIndex, address indexed handler
-    );
+    event OperationsAdmin__TokenHandlerAssigned(address indexed token, uint256 routeIndex, address indexed handler);
     /// @notice A route index was classified as idle (`lends == false`) or lending. One-shot.
     event OperationsAdmin__RouteRegistered(uint256 index, bool lends);
     /// @notice `swapper` was added to the allowlist. Idempotent.

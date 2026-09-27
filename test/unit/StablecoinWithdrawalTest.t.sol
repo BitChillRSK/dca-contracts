@@ -46,7 +46,11 @@ contract StablecoinWithdrawalTest is DcaDappTest {
     function testCannotWithdrawFromInexistentSchedule() external {
         vm.startPrank(USER);
         uint64 wrongScheduleId = UNUSED_SCHEDULE_ID;
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), wrongScheduleId));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), wrongScheduleId
+            )
+        );
         dcaManager.withdrawToken(address(stablecoin), wrongScheduleId, AMOUNT_TO_DEPOSIT);
         vm.stopPrank();
     }
@@ -56,9 +60,11 @@ contract StablecoinWithdrawalTest is DcaDappTest {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         address stranger = makeAddr("notTheOwner");
         vm.prank(stranger);
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__NotScheduleOwner.selector, address(stablecoin), scheduleId, USER));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDcaManager.DcaManager__NotScheduleOwner.selector, address(stablecoin), scheduleId, USER
+            )
+        );
         dcaManager.withdrawToken(address(stablecoin), scheduleId, AMOUNT_TO_DEPOSIT);
     }
-
-
-} 
+}

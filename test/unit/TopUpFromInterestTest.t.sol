@@ -198,7 +198,9 @@ contract TopUpFromInterestTest is DcaDappTest {
         // Crediting the first schedule raised the route's locked principal, so the interest still
         // available is what is left of the pot.
         uint256 remainingInterest = _accruedInterest();
-        assertApproxEqAbs(remainingInterest, accruedInterest - firstCredit, DUST, "the pot did not shrink by the credit");
+        assertApproxEqAbs(
+            remainingInterest, accruedInterest - firstCredit, DUST, "the pot did not shrink by the credit"
+        );
 
         uint256 secondSlack = _neededToFundAnotherPurchase(SCHEDULE_INDEX + 1);
         assertGt(remainingInterest, secondSlack, "not enough left to cross the second schedule's boundary");
@@ -218,9 +220,8 @@ contract TopUpFromInterestTest is DcaDappTest {
     function testInterestQuoteIsReadableByStaticCall() external onlyLendingLane {
         _accrueAndOpenSlack(SCHEDULE_INDEX);
 
-        (bool success, bytes memory returnData) = address(dcaManager).staticcall(
-            abi.encodeCall(IDcaManager.getInterestAccrued, (USER, address(stablecoin), s_routeIndex))
-        );
+        (bool success, bytes memory returnData) = address(dcaManager)
+            .staticcall(abi.encodeCall(IDcaManager.getInterestAccrued, (USER, address(stablecoin), s_routeIndex)));
 
         assertTrue(success, "the accrued-interest quote is no longer readable without a transaction");
         assertEq(abi.decode(returnData, (uint256)), _accruedInterest(), "the staticcall read a different figure");
@@ -321,7 +322,10 @@ contract TopUpFromInterestTest is DcaDappTest {
 
         assertEq(_schedule(SCHEDULE_INDEX).tokenBalance, 0, "the sentinel left principal behind");
         assertApproxEqRel(
-            stablecoin.balanceOf(USER) - userStablecoinBefore, credited, _lendingRedeemCashRelTol(), "the exit paid less than the ledger"
+            stablecoin.balanceOf(USER) - userStablecoinBefore,
+            credited,
+            _lendingRedeemCashRelTol(),
+            "the exit paid less than the ledger"
         );
     }
 
@@ -338,7 +342,10 @@ contract TopUpFromInterestTest is DcaDappTest {
         dcaManager.deleteDcaSchedule(address(stablecoin), scheduleId, SCHEDULE_INDEX);
 
         assertApproxEqRel(
-            stablecoin.balanceOf(USER) - userStablecoinBefore, credited, _lendingRedeemCashRelTol(), "deletion paid less than the ledger"
+            stablecoin.balanceOf(USER) - userStablecoinBefore,
+            credited,
+            _lendingRedeemCashRelTol(),
+            "deletion paid less than the ledger"
         );
     }
 
@@ -454,7 +461,11 @@ contract TopUpFromInterestTest is DcaDappTest {
         uint256 accruedInterest = _accruedInterest();
 
         vm.prank(USER);
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), wrongScheduleId));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), wrongScheduleId
+            )
+        );
         dcaManager.topUpFromInterest(address(stablecoin), wrongScheduleId, accruedInterest);
     }
 
@@ -467,7 +478,9 @@ contract TopUpFromInterestTest is DcaDappTest {
         dcaManager.deleteDcaSchedule(address(stablecoin), scheduleId, SCHEDULE_INDEX);
 
         vm.prank(USER);
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), scheduleId));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), scheduleId)
+        );
         dcaManager.topUpFromInterest(address(stablecoin), scheduleId, 1);
     }
 
@@ -481,7 +494,11 @@ contract TopUpFromInterestTest is DcaDappTest {
         uint256 accruedInterest = _accruedInterest();
 
         vm.prank(attacker);
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__NotScheduleOwner.selector, address(stablecoin), scheduleId, USER));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDcaManager.DcaManager__NotScheduleOwner.selector, address(stablecoin), scheduleId, USER
+            )
+        );
         dcaManager.topUpFromInterest(address(stablecoin), scheduleId, accruedInterest);
 
         assertEq(_schedule(SCHEDULE_INDEX).tokenBalance, balanceBefore, "another account moved the schedule");

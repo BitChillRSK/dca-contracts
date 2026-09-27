@@ -82,9 +82,7 @@ contract NetRedemptionTest is DcaDappTest {
         uint256 creditedBefore = _accumulatedRbtc();
 
         vm.prank(SWAPPER);
-        dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, address(stablecoin), s_routeIndex)
-        );
+        dcaManager.batchBuyRbtc(toBatch(scheduleIds, address(stablecoin), s_routeIndex));
 
         uint256 received = address(stablecoinHandler).balance - handlerRbtcBefore;
         uint256 credited = _accumulatedRbtc() - creditedBefore;
@@ -198,9 +196,7 @@ contract NetRedemptionTest is DcaDappTest {
 
         vm.recordLogs();
         vm.prank(SWAPPER);
-        dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, address(stablecoin), s_routeIndex)
-        );
+        dcaManager.batchBuyRbtc(toBatch(scheduleIds, address(stablecoin), s_routeIndex));
 
         (uint256 perUserSpentTotal, uint256 batchSpent) = _batchSpendFromLogs();
 
@@ -246,9 +242,7 @@ contract NetRedemptionTest is DcaDappTest {
             )
         );
         vm.prank(SWAPPER);
-        dcaManager.batchBuyRbtc(
-            toBatch(scheduleIds, address(stablecoin), s_routeIndex)
-        );
+        dcaManager.batchBuyRbtc(toBatch(scheduleIds, address(stablecoin), s_routeIndex));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -422,8 +416,7 @@ contract NetRedemptionTest is DcaDappTest {
         uint256[] memory balancesBefore = new uint256[](n);
         uint256[] memory anchorsBefore = new uint256[](n);
         for (uint256 i; i < n; ++i) {
-            IDcaManager.DcaSchedule memory schedule =
-                scheduleAt(dcaManager, USER, address(stablecoin), i);
+            IDcaManager.DcaSchedule memory schedule = scheduleAt(dcaManager, USER, address(stablecoin), i);
             balancesBefore[i] = schedule.tokenBalance;
             anchorsBefore[i] = schedule.cadenceAnchor;
         }
@@ -441,8 +434,7 @@ contract NetRedemptionTest is DcaDappTest {
         dcaManager.batchBuyRbtc(toBatch(scheduleIds, address(stablecoin), s_routeIndex));
 
         for (uint256 i; i < n; ++i) {
-            IDcaManager.DcaSchedule memory schedule =
-                scheduleAt(dcaManager, USER, address(stablecoin), i);
+            IDcaManager.DcaSchedule memory schedule = scheduleAt(dcaManager, USER, address(stablecoin), i);
             assertEq(schedule.tokenBalance, balancesBefore[i], "schedule balance rolled back");
             assertEq(schedule.cadenceAnchor, anchorsBefore[i], "schedule cadence anchor rolled back");
         }

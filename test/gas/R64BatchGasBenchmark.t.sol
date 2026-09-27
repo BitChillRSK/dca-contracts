@@ -126,33 +126,17 @@ contract R64BatchGasBenchmarkTest is Test {
         s_routeIdRegistry = new RouteIdRegistry();
         s_routeIdRegistry.addSwapper(s_swapper);
 
-        s_designA = new DcaManager(
-            address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, address(this)
-        );
-        s_designB = new NestedIndexedDcaManager(
-            address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN
-        );
-        s_designC = new FlatKeyedDcaManager(
-            address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN
-        );
-        s_designD = new UserKeyedDcaManager(
-            address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN
-        );
-        s_designE = new TokenKeyedDcaManager(
-            address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN
-        );
-        s_designF = new RouteIdDcaManager(
-            address(s_routeIdRegistry), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN
-        );
-        s_designG = new TripleKeyedDcaManager(
-            address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN
-        );
-        s_designH = new PackedRowDcaManager(
-            address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN
-        );
-        s_designI = new UserTokenIdDcaManager(
-            address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN
-        );
+        s_designA =
+            new DcaManager(address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, address(this));
+        s_designB =
+            new NestedIndexedDcaManager(address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN);
+        s_designC = new FlatKeyedDcaManager(address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN);
+        s_designD = new UserKeyedDcaManager(address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN);
+        s_designE = new TokenKeyedDcaManager(address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN);
+        s_designF = new RouteIdDcaManager(address(s_routeIdRegistry), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN);
+        s_designG = new TripleKeyedDcaManager(address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN);
+        s_designH = new PackedRowDcaManager(address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN);
+        s_designI = new UserTokenIdDcaManager(address(s_operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN);
         s_managers = [
             address(s_designA),
             address(s_designB),
@@ -179,8 +163,12 @@ contract R64BatchGasBenchmarkTest is Test {
                 else if (d == 6) s_designG.setTokenMinPurchaseAmount(token, MIN_PURCHASE_AMOUNT);
                 else if (d == 7) s_designH.setTokenMinPurchaseAmount(token, MIN_PURCHASE_AMOUNT);
                 else s_designI.setTokenMinPurchaseAmount(token, MIN_PURCHASE_AMOUNT);
-                if (d == 5) s_routeIdsF[s] = s_routeIdRegistry.assignTokenHandler(token, uint32(ROUTE_INDEX), address(s_handlers[d][s]));
-                else s_operationsAdmin.assignTokenHandler(token, ROUTE_INDEX, address(s_handlers[d][s]));
+                if (d == 5) {
+                    s_routeIdsF[s] =
+                        s_routeIdRegistry.assignTokenHandler(token, uint32(ROUTE_INDEX), address(s_handlers[d][s]));
+                } else {
+                    s_operationsAdmin.assignTokenHandler(token, ROUTE_INDEX, address(s_handlers[d][s]));
+                }
             }
         }
 
@@ -188,15 +176,33 @@ contract R64BatchGasBenchmarkTest is Test {
             s_buyers.push(address(uint160(uint256(keccak256(abi.encode("R64.buyer", i))))));
             uint256 group = _groupOf(i);
             vm.startPrank(s_buyers[i]);
-            s_designA.createDcaSchedule(s_tokens[0][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-            s_designB.createDcaSchedule(s_tokens[1][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-            s_designC.createDcaSchedule(s_tokens[2][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-            s_designD.createDcaSchedule(s_tokens[3][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-            s_designE.createDcaSchedule(s_tokens[4][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-            s_designF.createDcaSchedule(s_tokens[5][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-            s_designG.createDcaSchedule(s_tokens[6][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-            s_designH.createDcaSchedule(s_tokens[7][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-            s_designI.createDcaSchedule(s_tokens[8][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+            s_designA.createDcaSchedule(
+                s_tokens[0][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX
+            );
+            s_designB.createDcaSchedule(
+                s_tokens[1][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX
+            );
+            s_designC.createDcaSchedule(
+                s_tokens[2][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX
+            );
+            s_designD.createDcaSchedule(
+                s_tokens[3][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX
+            );
+            s_designE.createDcaSchedule(
+                s_tokens[4][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX
+            );
+            s_designF.createDcaSchedule(
+                s_tokens[5][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX
+            );
+            s_designG.createDcaSchedule(
+                s_tokens[6][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX
+            );
+            s_designH.createDcaSchedule(
+                s_tokens[7][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX
+            );
+            s_designI.createDcaSchedule(
+                s_tokens[8][group], DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX
+            );
             vm.stopPrank();
         }
 
@@ -259,8 +265,8 @@ contract R64BatchGasBenchmarkTest is Test {
         // is unchanged. The band is 10% because this assertion has to hold under both profiles and via-IR
         // takes about 6% off a cold path; a keying change moves these by ~50%, which is the drift it
         // exists to catch.
-        assertApproxEqRel(createGas[1], 99_000, 0.10e18, "prototype B no longer reproduces the pre-R64 create");
-        assertApproxEqRel(deleteGas[1], 11_122, 0.10e18, "prototype B no longer reproduces the pre-R64 delete");
+        assertApproxEqRel(createGas[1], 99_000, 0.1e18, "prototype B no longer reproduces the pre-R64 create");
+        assertApproxEqRel(deleteGas[1], 11_122, 0.1e18, "prototype B no longer reproduces the pre-R64 delete");
     }
 
     /// @dev One create and one delete on `design`, as the same fresh user, measured separately.
@@ -268,15 +274,25 @@ contract R64BatchGasBenchmarkTest is Test {
         address token = s_tokens[design][0];
 
         createGas = gasleft();
-        if (design == 0) s_designA.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-        else if (design == 1) s_designB.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-        else if (design == 2) s_designC.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-        else if (design == 3) s_designD.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-        else if (design == 4) s_designE.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-        else if (design == 5) s_designF.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-        else if (design == 6) s_designG.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-        else if (design == 7) s_designH.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
-        else s_designI.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+        if (design == 0) {
+            s_designA.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+        } else if (design == 1) {
+            s_designB.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+        } else if (design == 2) {
+            s_designC.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+        } else if (design == 3) {
+            s_designD.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+        } else if (design == 4) {
+            s_designE.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+        } else if (design == 5) {
+            s_designF.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+        } else if (design == 6) {
+            s_designG.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+        } else if (design == 7) {
+            s_designH.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+        } else {
+            s_designI.createDcaSchedule(token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);
+        }
         createGas -= gasleft();
 
         uint64 scheduleId = _lastCreatedId(design, user, token);
@@ -327,9 +343,7 @@ contract R64BatchGasBenchmarkTest is Test {
 
         uint256 expected = balanceBefore - PURCHASE_AMOUNT;
         assertEq(scheduleAt(s_designA, buyer, s_tokens[0][group], 0).tokenBalance, expected, "A debited wrongly");
-        assertEq(
-            s_designB.getDcaSchedules(buyer, s_tokens[1][group])[0].tokenBalance, expected, "B debited wrongly"
-        );
+        assertEq(s_designB.getDcaSchedules(buyer, s_tokens[1][group])[0].tokenBalance, expected, "B debited wrongly");
         assertEq(s_designC.getSchedule(scheduleId).tokenBalance, expected, "C debited wrongly");
         assertEq(s_designD.getSchedule(scheduleId, buyer).tokenBalance, expected, "D debited wrongly");
         assertEq(s_designE.getSchedule(scheduleId, s_tokens[4][group]).tokenBalance, expected, "E debited wrongly");
@@ -346,7 +360,9 @@ contract R64BatchGasBenchmarkTest is Test {
 
         for (uint256 d = 1; d < DESIGNS; ++d) {
             assertEq(
-                s_handlers[d][group].rowsBought(), s_handlers[0][group].rowsBought(), "designs bought a different row count"
+                s_handlers[d][group].rowsBought(),
+                s_handlers[0][group].rowsBought(),
+                "designs bought a different row count"
             );
         }
     }
@@ -437,21 +453,13 @@ contract R64BatchGasBenchmarkTest is Test {
         if (design == 0) {
             return abi.encodeCall(
                 IDcaManager.batchBuyRbtc,
-                (
-                    IDcaManager.Batch({
-                        scheduleIds: scheduleIds,
-                        token: token,
-                        routeIndex: ROUTE_INDEX,
-                        minRbtcOut: 0
-                    })
-                )
+                (IDcaManager.Batch({scheduleIds: scheduleIds, token: token, routeIndex: ROUTE_INDEX, minRbtcOut: 0}))
             );
         }
         if (design == 1) {
             return abi.encodeCall(
                 NestedIndexedDcaManager.batchBuyRbtc,
-                (
-                    NestedIndexedDcaManager.Batch({
+                (NestedIndexedDcaManager.Batch({
                         buyers: buyers,
                         token: token,
                         scheduleIndexes: scheduleIndexes,
@@ -459,49 +467,36 @@ contract R64BatchGasBenchmarkTest is Test {
                         purchaseAmounts: purchaseAmounts,
                         routeIndex: ROUTE_INDEX,
                         minRbtcOut: 0
-                    })
-                )
+                    }))
             );
         }
         if (design == 2) {
             return abi.encodeCall(
                 FlatKeyedDcaManager.batchBuyRbtc,
-                (
-                    FlatKeyedDcaManager.Batch({
-                        scheduleIds: scheduleIds,
-                        token: token,
-                        routeIndex: ROUTE_INDEX,
-                        minRbtcOut: 0
-                    })
-                )
+                (FlatKeyedDcaManager.Batch({
+                        scheduleIds: scheduleIds, token: token, routeIndex: ROUTE_INDEX, minRbtcOut: 0
+                    }))
             );
         }
         if (design == 3) {
             return abi.encodeCall(
                 UserKeyedDcaManager.batchBuyRbtc,
-                (
-                    UserKeyedDcaManager.Batch({
+                (UserKeyedDcaManager.Batch({
                         scheduleIds: scheduleIds,
                         buyers: buyers,
                         purchaseAmounts: purchaseAmounts,
                         token: token,
                         routeIndex: ROUTE_INDEX,
                         minRbtcOut: 0
-                    })
-                )
+                    }))
             );
         }
         if (design == 4) {
             return abi.encodeCall(
                 TokenKeyedDcaManager.batchBuyRbtc,
-                (
-                    TokenKeyedDcaManager.Batch({
-                        scheduleIds: scheduleIds,
-                        token: token,
-                        routeIndex: ROUTE_INDEX,
-                        minRbtcOut: 0
-                    })
-                )
+                (TokenKeyedDcaManager.Batch({
+                        scheduleIds: scheduleIds, token: token, routeIndex: ROUTE_INDEX, minRbtcOut: 0
+                    }))
             );
         }
         if (design == 5) {
@@ -513,15 +508,9 @@ contract R64BatchGasBenchmarkTest is Test {
         if (design == 6) {
             return abi.encodeCall(
                 TripleKeyedDcaManager.batchBuyRbtc,
-                (
-                    TripleKeyedDcaManager.Batch({
-                        scheduleIds: scheduleIds,
-                        buyers: buyers,
-                        token: token,
-                        routeIndex: ROUTE_INDEX,
-                        minRbtcOut: 0
-                    })
-                )
+                (TripleKeyedDcaManager.Batch({
+                        scheduleIds: scheduleIds, buyers: buyers, token: token, routeIndex: ROUTE_INDEX, minRbtcOut: 0
+                    }))
             );
         }
         if (design == 7) {
@@ -531,27 +520,14 @@ contract R64BatchGasBenchmarkTest is Test {
             }
             return abi.encodeCall(
                 PackedRowDcaManager.batchBuyRbtc,
-                (
-                    PackedRowDcaManager.Batch({
-                        rows: packedRows,
-                        token: token,
-                        routeIndex: ROUTE_INDEX,
-                        minRbtcOut: 0
-                    })
-                )
+                (PackedRowDcaManager.Batch({rows: packedRows, token: token, routeIndex: ROUTE_INDEX, minRbtcOut: 0}))
             );
         }
         return abi.encodeCall(
             UserTokenIdDcaManager.batchBuyRbtc,
-            (
-                UserTokenIdDcaManager.Batch({
-                    scheduleIds: scheduleIds,
-                    buyers: buyers,
-                    token: token,
-                    routeIndex: ROUTE_INDEX,
-                    minRbtcOut: 0
-                })
-            )
+            (UserTokenIdDcaManager.Batch({
+                    scheduleIds: scheduleIds, buyers: buyers, token: token, routeIndex: ROUTE_INDEX, minRbtcOut: 0
+                }))
         );
     }
 

@@ -28,16 +28,14 @@ contract ModifiersTest is DcaDappTest {
     function testSetOperationsAdminSelectorIsAbsent() external {
         assertEq(SET_OPERATIONS_ADMIN_SELECTOR, bytes4(keccak256("setOperationsAdmin(address)")));
 
-        (bool callSucceeded, bytes memory returnData) = address(dcaManager).call(
-            abi.encodeWithSelector(SET_OPERATIONS_ADMIN_SELECTOR, address(dcaManager))
-        );
+        (bool callSucceeded, bytes memory returnData) =
+            address(dcaManager).call(abi.encodeWithSelector(SET_OPERATIONS_ADMIN_SELECTOR, address(dcaManager)));
         assertFalse(callSucceeded);
         assertEq(returnData.length, 0);
 
         vm.prank(OWNER);
-        (bool ownerCallSucceeded, bytes memory ownerReturnData) = address(dcaManager).call(
-            abi.encodeWithSelector(SET_OPERATIONS_ADMIN_SELECTOR, address(dcaManager))
-        );
+        (bool ownerCallSucceeded, bytes memory ownerReturnData) =
+            address(dcaManager).call(abi.encodeWithSelector(SET_OPERATIONS_ADMIN_SELECTOR, address(dcaManager)));
         assertFalse(ownerCallSucceeded);
         assertEq(ownerReturnData.length, 0);
 
@@ -58,9 +56,7 @@ contract ModifiersTest is DcaDappTest {
 
     function testConstructorRevertsIfOperationsAdminIsEoa() external {
         address eoa = makeAddr("notAContract");
-        vm.expectRevert(
-            abi.encodeWithSelector(IDcaManager.DcaManager__OperationsAdminIsNotAContract.selector, eoa)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__OperationsAdminIsNotAContract.selector, eoa));
         new DcaManager(eoa, MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, OWNER);
     }
 

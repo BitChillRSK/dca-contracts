@@ -25,15 +25,15 @@ contract TropykusDocHandlerMocTest is Test {
 
     // Mocks / system under test
     MockStablecoin internal docToken;
-    MockKdocToken  internal kDocToken;
-    MockMocProxy   internal mocProxy;
+    MockKdocToken internal kDocToken;
+    MockMocProxy internal mocProxy;
     TropykusDocHandlerMoc internal handler;
 
     function setUp() public {
         // Deploy mocks
         docToken = new MockStablecoin(address(this));
         kDocToken = new MockKdocToken(address(docToken));
-        mocProxy  = new MockMocProxy(address(docToken));
+        mocProxy = new MockMocProxy(address(docToken));
 
         // Give the MoC proxy some RBTC to redeem
         vm.deal(address(mocProxy), 100 ether);
@@ -41,7 +41,7 @@ contract TropykusDocHandlerMocTest is Test {
         // Deploy the handler – set dcaManager to this test contract so we can
         // invoke onlyDcaManager functions directly.
         handler = new TropykusDocHandlerMoc(
-            address(this),           // dcaManagerAddress
+            address(this), // dcaManagerAddress
             address(docToken),
             address(kDocToken),
             FEE_COLLECTOR,
@@ -148,4 +148,4 @@ contract TropykusDocHandlerMocTest is Test {
         assertLe(totalAccrued, expectedRbtc);
         assertGt(totalAccrued, expectedRbtc * 95 / 100); // at least 95% after fees
     }
-} 
+}

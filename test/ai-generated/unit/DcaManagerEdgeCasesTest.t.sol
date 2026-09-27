@@ -25,11 +25,10 @@ import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
  * @dev Covers item 5-A from the coverage plan: DCA Manager edge paths
  */
 contract DcaManagerEdgeCasesTest is Test {
-    
     /*//////////////////////////////////////////////////////////////
                                CONTRACTS
     //////////////////////////////////////////////////////////////*/
-    
+
     DcaManager public dcaManager;
     OperationsAdmin public operationsAdmin;
     MockStablecoin public stablecoin;
@@ -37,42 +36,42 @@ contract DcaManagerEdgeCasesTest is Test {
     TropykusErc20HandlerDex public handler;
     MockWrbtcToken public wrbtcToken;
     MockMocOracle public mocOracle;
-    
+
     /*//////////////////////////////////////////////////////////////
                                TEST ACCOUNTS
     //////////////////////////////////////////////////////////////*/
-    
+
     address public constant OWNER = address(0x1111);
     address public constant ADMIN = address(0x2222);
     address public constant SWAPPER = address(0x3333);
     address public constant USER = address(0x4444);
     address public constant FEE_COLLECTOR = address(0x5555);
-    
+
     /*//////////////////////////////////////////////////////////////
                                SETUP
     //////////////////////////////////////////////////////////////*/
-    
+
     function setUp() public {
         // Deploy contracts
         vm.prank(OWNER);
         operationsAdmin = new OperationsAdmin(OWNER);
-        
+
         vm.prank(OWNER);
         dcaManager = new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, OWNER);
-        
+
         stablecoin = new MockStablecoin(address(this));
         vm.prank(OWNER);
         dcaManager.setTokenMinPurchaseAmount(address(stablecoin), MIN_PURCHASE_AMOUNT);
         kToken = new MockKdocToken(address(stablecoin));
         wrbtcToken = new MockWrbtcToken();
         mocOracle = new MockMocOracle();
-        
+
         // Setup roles
         vm.startPrank(OWNER);
         operationsAdmin.addSwapper(SWAPPER);
         operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
         vm.stopPrank();
-        
+
         // Deploy and register handler
         IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
@@ -80,11 +79,11 @@ contract DcaManagerEdgeCasesTest is Test {
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
             feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
         });
-        
+
         address[] memory intermediateTokens = new address[](0);
         uint24[] memory poolFeeRates = new uint24[](1);
         poolFeeRates[0] = 3000;
-        
+
         IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
             wrBtcToken: IWRBTC(address(wrbtcToken)),
             swapRouter02: IUniswapV3SwapRouter(address(0x777)),
@@ -92,7 +91,7 @@ contract DcaManagerEdgeCasesTest is Test {
             swapPoolFeeRates: poolFeeRates,
             mocOracle: ICoinPairPrice(address(mocOracle))
         });
-        
+
         vm.prank(OWNER);
         handler = new TropykusErc20HandlerDex(
             address(dcaManager),
@@ -105,149 +104,152 @@ contract DcaManagerEdgeCasesTest is Test {
             DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
             OWNER
         );
-        
+
         vm.prank(OWNER);
-        operationsAdmin.assignTokenHandler(
-            address(stablecoin),
-            TROPYKUS_INDEX,
-            address(handler)
-        );
-        
+        operationsAdmin.assignTokenHandler(address(stablecoin), TROPYKUS_INDEX, address(handler));
+
         // Setup user
         stablecoin.mint(USER, 10000 ether);
         vm.prank(USER);
         stablecoin.approve(address(handler), type(uint256).max);
     }
-    
+
     /*//////////////////////////////////////////////////////////////
                            DELETE DCA SCHEDULE EDGE CASES
     //////////////////////////////////////////////////////////////*/
-    
+
     function test_deleteDcaSchedule_reverts_wrongId() public {
         // Create a schedule first
         vm.prank(USER);
         dcaManager.createDcaSchedule(
             address(stablecoin),
-            500 ether,           // depositAmount
-            100 ether,           // purchaseAmount (less than half of deposit)
+            500 ether, // depositAmount
+            100 ether, // purchaseAmount (less than half of deposit)
             MIN_PURCHASE_PERIOD, // purchasePeriod
-            TROPYKUS_INDEX       // routeIndex
+            TROPYKUS_INDEX // routeIndex
         );
-        
+
         // Try to delete with wrong ID
         uint64 wrongId = UNUSED_SCHEDULE_ID;
-        
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), wrongId));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), wrongId)
+        );
         vm.prank(USER);
         dcaManager.deleteDcaSchedule(address(stablecoin), wrongId, type(uint256).max);
     }
-    
+
     function test_deleteDcaSchedule_reverts_deletedId() public {
         // Create a schedule first
         vm.prank(USER);
         dcaManager.createDcaSchedule(
             address(stablecoin),
-            500 ether,           // depositAmount
-            100 ether,           // purchaseAmount (less than half of deposit)
+            500 ether, // depositAmount
+            100 ether, // purchaseAmount (less than half of deposit)
             MIN_PURCHASE_PERIOD, // purchasePeriod
-            TROPYKUS_INDEX       // routeIndex
+            TROPYKUS_INDEX // routeIndex
         );
-        
+
         // Deleting the same schedule twice: the id is retired by the first call
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
         vm.prank(USER);
         dcaManager.deleteDcaSchedule(address(stablecoin), scheduleId, 0);
 
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), scheduleId));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), scheduleId)
+        );
         vm.prank(USER);
         dcaManager.deleteDcaSchedule(address(stablecoin), scheduleId, type(uint256).max);
     }
-    
+
     function test_deleteDcaSchedule_reverts_notOwner() public {
         // Create a schedule as USER
         vm.prank(USER);
         dcaManager.createDcaSchedule(
             address(stablecoin),
-            500 ether,           // depositAmount
-            100 ether,           // purchaseAmount (less than half of deposit)
+            500 ether, // depositAmount
+            100 ether, // purchaseAmount (less than half of deposit)
             MIN_PURCHASE_PERIOD, // purchasePeriod
-            TROPYKUS_INDEX       // routeIndex
+            TROPYKUS_INDEX // routeIndex
         );
-        
+
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
-        
+
         // Try to delete as different user
         address otherUser = address(0x9999);
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__NotScheduleOwner.selector, address(stablecoin), scheduleId, USER));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDcaManager.DcaManager__NotScheduleOwner.selector, address(stablecoin), scheduleId, USER
+            )
+        );
         vm.prank(otherUser);
         dcaManager.deleteDcaSchedule(address(stablecoin), scheduleId, type(uint256).max);
     }
-    
+
     /*//////////////////////////////////////////////////////////////
                            BUY RBTC EDGE CASES
     //////////////////////////////////////////////////////////////*/
-    
+
     // NOTE: This test is disabled because it requires a complete swap execution
     // which depends on proper Uniswap mock setup that's complex in this test environment.
     // The time period validation is already tested in the integration tests in DcaDappTest.
     function skip_test_singleScheduleBatch_reverts_beforePeriodElapsed() public {
-        // Create schedule 
+        // Create schedule
         vm.prank(USER);
         dcaManager.createDcaSchedule(
             address(stablecoin),
-            500 ether,           // depositAmount
-            100 ether,           // purchaseAmount (less than half of deposit)
+            500 ether, // depositAmount
+            100 ether, // purchaseAmount (less than half of deposit)
             MIN_PURCHASE_PERIOD, // purchasePeriod
-            TROPYKUS_INDEX       // routeIndex
+            TROPYKUS_INDEX // routeIndex
         );
-        
+
         // This test would require a successful first purchase to set cadenceAnchor
         // Then test that immediate second purchase fails due to time period validation
         // However, this requires complex Uniswap mock setup that's already covered
         // in the DcaDappTest integration tests where the full environment is set up properly
     }
-    
+
     function test_singleScheduleBatch_reverts_invalidScheduleId() public {
         // Create schedule
         vm.prank(USER);
         dcaManager.createDcaSchedule(
             address(stablecoin),
-            500 ether,           // depositAmount
-            100 ether,           // purchaseAmount (less than half of deposit)
+            500 ether, // depositAmount
+            100 ether, // purchaseAmount (less than half of deposit)
             MIN_PURCHASE_PERIOD, // purchasePeriod
-            TROPYKUS_INDEX       // routeIndex
+            TROPYKUS_INDEX // routeIndex
         );
-        
+
         uint64 wrongId = UNUSED_SCHEDULE_ID;
-        
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), wrongId));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), wrongId)
+        );
         vm.prank(SWAPPER);
         batchBuyOne(dcaManager, address(stablecoin), wrongId, TROPYKUS_INDEX);
     }
-    
+
     function test_createSchedule_reverts_insufficientBalance() public {
         // Create schedule with purchase amount above the deposit (should fail validation)
         bytes memory encodedRevert = abi.encodeWithSelector(
-            IDcaManager.DcaManager__PurchaseAmountExceedsBalance.selector,
-            address(stablecoin),
-            501 ether,
-            500 ether
+            IDcaManager.DcaManager__PurchaseAmountExceedsBalance.selector, address(stablecoin), 501 ether, 500 ether
         );
         vm.expectRevert(encodedRevert);
         vm.prank(USER);
         dcaManager.createDcaSchedule(
             address(stablecoin),
-            500 ether,  // depositAmount
+            500 ether, // depositAmount
             501 ether, // purchaseAmount exceeds deposit
             MIN_PURCHASE_PERIOD,
             TROPYKUS_INDEX
         );
     }
-    
+
     /*//////////////////////////////////////////////////////////////
                            WITHDRAW TOKEN EDGE CASES
     //////////////////////////////////////////////////////////////*/
-    
+
     function test_withdrawToken_reverts_moreThanBalance() public {
         // Create schedule and deposit tokens
         vm.prank(USER);
@@ -258,7 +260,7 @@ contract DcaManagerEdgeCasesTest is Test {
             MIN_PURCHASE_PERIOD,
             TROPYKUS_INDEX
         );
-        
+
         // Get the schedule ID after creation
         vm.prank(USER);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
@@ -266,7 +268,7 @@ contract DcaManagerEdgeCasesTest is Test {
         vm.prank(USER);
         dcaManager.withdrawToken(address(stablecoin), scheduleId, 600 ether); // More than deposited
     }
-    
+
     function test_withdrawToken_reverts_zeroAmount() public {
         // Create a schedule first
         vm.prank(USER);
@@ -277,7 +279,7 @@ contract DcaManagerEdgeCasesTest is Test {
             MIN_PURCHASE_PERIOD,
             TROPYKUS_INDEX
         );
-        
+
         // Get the schedule ID after creation
         vm.prank(USER);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
@@ -288,13 +290,7 @@ contract DcaManagerEdgeCasesTest is Test {
 
     function test_withdrawTokenAndInterest_succeedsOnLendingScheduleWithoutCallerIndex() public {
         vm.prank(USER);
-        dcaManager.createDcaSchedule(
-            address(stablecoin),
-            500 ether,
-            100 ether,
-            MIN_PURCHASE_PERIOD,
-            TROPYKUS_INDEX
-        );
+        dcaManager.createDcaSchedule(address(stablecoin), 500 ether, 100 ether, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
 
         IDcaManager.DcaSchedule memory schedule = scheduleAt(dcaManager, USER, address(stablecoin), 0);
         assertEq(schedule.routeIndex, TROPYKUS_INDEX);
@@ -305,11 +301,11 @@ contract DcaManagerEdgeCasesTest is Test {
 
         assertEq(scheduleAt(dcaManager, USER, address(stablecoin), 0).tokenBalance, 400 ether);
     }
-    
+
     /*//////////////////////////////////////////////////////////////
                            SCHEDULE CREATION EDGE CASES
     //////////////////////////////////////////////////////////////*/
-    
+
     function test_createDcaSchedule_reverts_zeroPurchaseAmount() public {
         vm.expectRevert();
         vm.prank(USER);
@@ -321,7 +317,7 @@ contract DcaManagerEdgeCasesTest is Test {
             TROPYKUS_INDEX
         );
     }
-    
+
     function test_createDcaSchedule_reverts_zeroDepositAmount() public {
         vm.expectRevert();
         vm.prank(USER);
@@ -333,7 +329,7 @@ contract DcaManagerEdgeCasesTest is Test {
             TROPYKUS_INDEX
         );
     }
-    
+
     function test_createDcaSchedule_reverts_invalidPurchasePeriod() public {
         vm.expectRevert(IDcaManager.DcaManager__PurchasePeriodMustBeGreaterThanMinimum.selector);
         vm.prank(USER);
@@ -345,7 +341,7 @@ contract DcaManagerEdgeCasesTest is Test {
             TROPYKUS_INDEX
         );
     }
-    
+
     function test_createDcaSchedule_reverts_maxSchedulesExceeded() public {
         // Create maximum number of schedules
         for (uint256 i = 0; i < MAX_SCHEDULES_PER_TOKEN; i++) {
@@ -353,27 +349,29 @@ contract DcaManagerEdgeCasesTest is Test {
             dcaManager.createDcaSchedule(
                 address(stablecoin),
                 100 ether, // depositAmount
-                50 ether,  // purchaseAmount
+                50 ether, // purchaseAmount
                 MIN_PURCHASE_PERIOD,
                 TROPYKUS_INDEX
             );
         }
-        
+
         // Try to create one more
-        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__MaxSchedulesPerTokenReached.selector, address(stablecoin)));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDcaManager.DcaManager__MaxSchedulesPerTokenReached.selector, address(stablecoin))
+        );
         vm.prank(USER);
         dcaManager.createDcaSchedule(
             address(stablecoin),
             100 ether, // depositAmount
-            50 ether,  // purchaseAmount
+            50 ether, // purchaseAmount
             MIN_PURCHASE_PERIOD,
             TROPYKUS_INDEX
         );
     }
-    
+
     function test_createDcaSchedule_reverts_invalidRoute() public {
         uint256 invalidRouteIndex = 999;
-        
+
         vm.expectRevert();
         vm.prank(USER);
         dcaManager.createDcaSchedule(
@@ -384,22 +382,20 @@ contract DcaManagerEdgeCasesTest is Test {
             invalidRouteIndex
         );
     }
-    
+
     /*//////////////////////////////////////////////////////////////
                            BATCH OPERATIONS EDGE CASES
     //////////////////////////////////////////////////////////////*/
-    
+
     function test_batchBuyRbtc_reverts_emptyArrays() public {
         address[] memory emptyUsers = new address[](0);
         uint64[] memory emptyIds = new uint64[](0);
-        
+
         vm.expectRevert(IDcaManager.DcaManager__EmptyBatchPurchaseArrays.selector);
         vm.prank(SWAPPER);
-        dcaManager.batchBuyRbtc(
-            toBatch(emptyIds, address(stablecoin), TROPYKUS_INDEX)
-        );
+        dcaManager.batchBuyRbtc(toBatch(emptyIds, address(stablecoin), TROPYKUS_INDEX));
     }
-    
+
     /// @dev A batch carries one array, so its rows can no longer disagree in length with anything.
     ///      What is left to reject is a batch with no rows at all.
     function test_batchBuyRbtc_reverts_emptyBatch() public {
@@ -409,11 +405,11 @@ contract DcaManagerEdgeCasesTest is Test {
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(toBatch(ids, address(stablecoin), TROPYKUS_INDEX));
     }
-    
+
     /*//////////////////////////////////////////////////////////////
                            SCHEDULE MODIFICATION EDGE CASES
     //////////////////////////////////////////////////////////////*/
-    
+
     function test_updatePurchaseAmount_reverts_zeroAmount() public {
         // Create a schedule first
         vm.prank(USER);
@@ -424,7 +420,7 @@ contract DcaManagerEdgeCasesTest is Test {
             MIN_PURCHASE_PERIOD,
             TROPYKUS_INDEX
         );
-        
+
         // Get the schedule ID after creation
         vm.prank(USER);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
@@ -432,14 +428,14 @@ contract DcaManagerEdgeCasesTest is Test {
         vm.prank(USER);
         dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, 0);
     }
-    
+
     function test_updatePurchaseAmount_reverts_inexistentScheduleId() public {
         uint64 fakeScheduleId = UNUSED_SCHEDULE_ID;
         vm.expectRevert();
         vm.prank(USER);
         dcaManager.updatePurchaseAmount(address(stablecoin), fakeScheduleId, 100 ether);
     }
-    
+
     function test_updatePurchasePeriod_reverts_invalidPeriod() public {
         // Create a schedule first
         vm.prank(USER);
@@ -450,7 +446,7 @@ contract DcaManagerEdgeCasesTest is Test {
             MIN_PURCHASE_PERIOD,
             TROPYKUS_INDEX
         );
-        
+
         // Get the schedule ID after creation
         vm.prank(USER);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
@@ -458,11 +454,11 @@ contract DcaManagerEdgeCasesTest is Test {
         vm.prank(USER);
         dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, MIN_PURCHASE_PERIOD - 1);
     }
-    
+
     /*//////////////////////////////////////////////////////////////
                            RBTC WITHDRAWAL EDGE CASES
     //////////////////////////////////////////////////////////////*/
-    
+
     function test_withdrawAllAccumulatedRbtc_emptyArray_reverts() public {
         uint256[] memory emptyRoutes = new uint256[](0);
         address[] memory emptyTokens = new address[](0);
@@ -480,21 +476,15 @@ contract DcaManagerEdgeCasesTest is Test {
         vm.expectRevert(IDcaManager.DcaManager__ArraysLengthMismatch.selector);
         dcaManager.withdrawAllAccumulatedRbtc(tokens, emptyRoutes);
     }
-    
+
     function test_withdrawAllAccumulatedRbtc_invalidRoute_skips() public {
         // First create a DCA schedule so user has deposited tokens
         vm.prank(USER);
-        dcaManager.createDcaSchedule(
-            address(stablecoin),
-            500 ether,
-            100 ether,
-            MIN_PURCHASE_PERIOD,
-            TROPYKUS_INDEX
-        );
-        
+        dcaManager.createDcaSchedule(address(stablecoin), 500 ether, 100 ether, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
+
         uint256[] memory invalidProtocols = new uint256[](1);
         invalidProtocols[0] = 999; // Invalid protocol
-        
+
         address[] memory tokens = new address[](1);
         tokens[0] = address(stablecoin);
         // Should not revert, just skip invalid combinations
@@ -520,11 +510,11 @@ contract DcaManagerEdgeCasesTest is Test {
         dcaManager.withdrawAllAccumulatedRbtc(tokens, routes);
         dcaManager.withdrawAllAccumulatedInterest(tokens, routes);
     }
-    
+
     /*//////////////////////////////////////////////////////////////
                            DEPOSIT TOKEN EDGE CASES
     //////////////////////////////////////////////////////////////*/
-    
+
     function test_depositToken_reverts_zeroAmount() public {
         // Create a schedule first
         vm.prank(USER);
@@ -535,7 +525,7 @@ contract DcaManagerEdgeCasesTest is Test {
             MIN_PURCHASE_PERIOD,
             TROPYKUS_INDEX
         );
-        
+
         // Get the schedule ID after creation
         vm.prank(USER);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
@@ -543,34 +533,34 @@ contract DcaManagerEdgeCasesTest is Test {
         vm.prank(USER);
         dcaManager.depositToken(address(stablecoin), scheduleId, 0);
     }
-    
+
     function test_depositToken_reverts_inexistentScheduleId() public {
         uint64 fakeScheduleId = UNUSED_SCHEDULE_ID;
         vm.expectRevert();
         vm.prank(USER);
         dcaManager.depositToken(address(stablecoin), fakeScheduleId, 100 ether);
     }
-    
+
     /*//////////////////////////////////////////////////////////////
                            FUZZ TESTS
     //////////////////////////////////////////////////////////////*/
-    
+
     function test_inexistentScheduleOperationsRevert() public {
         uint64 fakeScheduleId = UNUSED_SCHEDULE_ID;
         // Every id-addressed operation rejects a schedule the caller does not hold.
         vm.expectRevert();
         vm.prank(USER);
         dcaManager.depositToken(address(stablecoin), fakeScheduleId, 100 ether);
-        
+
         vm.expectRevert();
         vm.prank(USER);
         dcaManager.updatePurchaseAmount(address(stablecoin), fakeScheduleId, 100 ether);
-        
+
         vm.expectRevert();
         vm.prank(USER);
         dcaManager.updatePurchasePeriod(address(stablecoin), fakeScheduleId, MIN_PURCHASE_PERIOD);
     }
-    
+
     function testFuzz_invalidAmounts(uint256 seed) public {
         // Test with zero amounts
         vm.expectRevert();
@@ -582,7 +572,7 @@ contract DcaManagerEdgeCasesTest is Test {
             MIN_PURCHASE_PERIOD,
             TROPYKUS_INDEX
         );
-        
+
         vm.expectRevert();
         vm.prank(USER);
         dcaManager.createDcaSchedule(
@@ -592,7 +582,7 @@ contract DcaManagerEdgeCasesTest is Test {
             MIN_PURCHASE_PERIOD,
             TROPYKUS_INDEX
         );
-        
+
         // Test with invalid purchase amounts (more than deposit)
         uint256 deposit = bound(seed, 100 ether, 1000 ether);
         uint256 purchaseAmount = deposit + 1;
@@ -606,12 +596,6 @@ contract DcaManagerEdgeCasesTest is Test {
             )
         );
         vm.prank(USER);
-        dcaManager.createDcaSchedule(
-            address(stablecoin),
-            deposit,
-            purchaseAmount,
-            MIN_PURCHASE_PERIOD,
-            TROPYKUS_INDEX
-        );
+        dcaManager.createDcaSchedule(address(stablecoin), deposit, purchaseAmount, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
     }
 }

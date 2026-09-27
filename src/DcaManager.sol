@@ -162,13 +162,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         _storeNewSchedule(s_dcaSchedules[token][scheduleId], deposit, period, route, msg.sender, purchase);
         scheduleIds.push(scheduleId);
         emit DcaManager__DcaScheduleCreated(
-            msg.sender,
-            token,
-            scheduleId,
-            depositAmount,
-            purchaseAmount,
-            purchasePeriod,
-            routeIndex
+            msg.sender, token, scheduleId, depositAmount, purchaseAmount, purchasePeriod, routeIndex
         );
     }
 
@@ -291,9 +285,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         uint256 routeIndex = dcaSchedule.routeIndex;
         _checkTokenYieldsInterest(token, routeIndex);
 
-        uint256 accruedInterest = ITokenLending(address(_handler(token, routeIndex))).getAccruedInterest(
-            msg.sender, _lockedPrincipal(msg.sender, token, routeIndex)
-        );
+        uint256 accruedInterest = ITokenLending(address(_handler(token, routeIndex)))
+            .getAccruedInterest(msg.sender, _lockedPrincipal(msg.sender, token, routeIndex));
         if (accruedInterest == 0) revert DcaManager__NoInterestToTopUpWith(token, routeIndex);
         if (amount > accruedInterest) {
             revert DcaManager__TopUpExceedsAccruedInterest(token, routeIndex, amount, accruedInterest);
@@ -338,7 +331,11 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     }
 
     /// @inheritdoc IDcaManager
-    function withdrawAllAccumulatedRbtc(address[] calldata tokens, uint256[] calldata routeIndexes) external override nonReentrant {
+    function withdrawAllAccumulatedRbtc(address[] calldata tokens, uint256[] calldata routeIndexes)
+        external
+        override
+        nonReentrant
+    {
         uint256 numOfPairs = _requirePairedWithdrawalArrays(tokens, routeIndexes);
         for (uint256 i; i < numOfPairs; ++i) {
             address tokenHandlerAddress = i_operationsAdmin.getTokenHandler(tokens[i], routeIndexes[i]);
@@ -457,9 +454,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         returns (uint256)
     {
         _checkTokenYieldsInterest(token, routeIndex);
-        return ITokenLending(address(_handler(token, routeIndex))).quoteAccruedInterest(
-            user, _lockedPrincipal(user, token, routeIndex)
-        );
+        return ITokenLending(address(_handler(token, routeIndex)))
+            .quoteAccruedInterest(user, _lockedPrincipal(user, token, routeIndex));
     }
 
     /// @inheritdoc IDcaManager
@@ -524,9 +520,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
             buyers[i] = buyer;
             purchaseAmounts[i] = schedulePurchaseAmount;
         }
-        IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex))).batchBuyRbtc(
-            buyers, batch.scheduleIds, purchaseAmounts, batch.minRbtcOut
-        );
+        IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex)))
+            .batchBuyRbtc(buyers, batch.scheduleIds, purchaseAmounts, batch.minRbtcOut);
     }
 
     /**
@@ -538,10 +533,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
      *      the schedule. The route comparison stays with the caller, which is where its error is raised.
      * @return The schedule's owner, purchase amount and route index.
      */
-    function _rBtcPurchaseChecksEffects(address token, uint64 scheduleId)
-        private
-        returns (address, uint256, uint256)
-    {
+    function _rBtcPurchaseChecksEffects(address token, uint64 scheduleId) private returns (address, uint256, uint256) {
         // Read the two packed schedule slots through a storage pointer instead of copying every field.
         DcaSchedule storage dcaSchedule = s_dcaSchedules[token][scheduleId];
 
@@ -604,11 +596,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     }
 
     /// @dev The single owner check for user mutators. A zero owner means the key addresses no schedule.
-    function _callersSchedule(address token, uint64 scheduleId)
-        private
-        view
-        returns (DcaSchedule storage dcaSchedule)
-    {
+    function _callersSchedule(address token, uint64 scheduleId) private view returns (DcaSchedule storage dcaSchedule) {
         dcaSchedule = s_dcaSchedules[token][scheduleId];
         address owner = dcaSchedule.user;
         if (owner == address(0)) revert DcaManager__InexistentSchedule(token, scheduleId);
@@ -635,11 +623,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     }
 
     /// @dev Purchase amount must be at least the token's configured minimum and at most `tokenBalance`.
-    function _validatePurchaseAmount(
-        address token,
-        uint256 purchaseAmount,
-        uint256 tokenBalance
-    ) private view {
+    function _validatePurchaseAmount(address token, uint256 purchaseAmount, uint256 tokenBalance) private view {
         uint256 minPurchaseAmount = s_tokenMinPurchaseAmounts[token];
         if (minPurchaseAmount == 0) {
             revert DcaManager__TokenMinPurchaseAmountNotSet(token);

@@ -346,12 +346,9 @@ contract DexPathFailoverTest is DcaDappTest {
         _assertPurchasePathAllowedSetLog(logs[uint256(allowedIdx)].data, mids, fees, path);
     }
 
-    function _assertNewPathSetLog(
-        bytes memory data,
-        address[] memory mids,
-        uint24[] memory fees,
-        bytes memory path
-    ) private {
+    function _assertNewPathSetLog(bytes memory data, address[] memory mids, uint24[] memory fees, bytes memory path)
+        private
+    {
         (address[] memory logMids, uint24[] memory logFees, bytes memory logPath) =
             abi.decode(data, (address[], uint24[], bytes));
         assertEq(logMids, mids);
@@ -415,10 +412,7 @@ contract DexPathFailoverTest is DcaDappTest {
         fees = dexHelperConfig.getActiveNetworkConfig().swapPoolFeeRates;
     }
 
-    function _alternatePath()
-        private
-        returns (address[] memory mids, uint24[] memory fees, bytes memory path)
-    {
+    function _alternatePath() private returns (address[] memory mids, uint24[] memory fees, bytes memory path) {
         mids = new address[](1);
         mids[0] = makeAddr("r52-intermediate");
         fees = new uint24[](2);

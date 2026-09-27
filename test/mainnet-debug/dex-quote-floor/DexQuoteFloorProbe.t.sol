@@ -75,7 +75,9 @@ contract DexQuoteFloorProbe is Test {
      */
     function test_quoteVsFloor_legacyDocDexPath_neverToBeDeployed() public {
         bytes memory path = abi.encodePacked(DOC, uint24(500), RUSDT, uint24(500), WRBTC);
-        _table("LEGACY DOC dex path (never deployed; MoC is DOC's only venue)", DOC, 18, path, "DOC-500-rUSDT-500-WRBTC");
+        _table(
+            "LEGACY DOC dex path (never deployed; MoC is DOC's only venue)", DOC, 18, path, "DOC-500-rUSDT-500-WRBTC"
+        );
     }
 
     /// @dev LayerBank USDRIF default: USDRIF -0.05%-> USDT0 -0.30%-> WRBTC. 0.35% in fee tiers.
@@ -154,7 +156,9 @@ contract DexQuoteFloorProbe is Test {
         // The tolerance the bot must leave under this quote to turn it into `minRbtcOut` and still clear the
         // floor: any tighter bound is inert, because the floor reverts first.
         if (amountOut > floor) {
-            console2.log("   bot tolerance before the floor binds (bps)", (amountOut - floor) * BPS_DENOMINATOR / amountOut);
+            console2.log(
+                "   bot tolerance before the floor binds (bps)", (amountOut - floor) * BPS_DENOMINATOR / amountOut
+            );
         } else {
             console2.log("   bot tolerance before the floor binds (bps)", uint256(0));
         }
@@ -177,9 +181,8 @@ contract DexQuoteFloorProbe is Test {
     {
         deal(tokenIn, address(probe), amountIn);
 
-        (bool ok, bytes memory returnData) = address(probe).call(
-            abi.encodeCall(SwapProbe.quote, (tokenIn, path, amountIn))
-        );
+        (bool ok, bytes memory returnData) =
+            address(probe).call(abi.encodeCall(SwapProbe.quote, (tokenIn, path, amountIn)));
         assertFalse(ok, "the probe must always revert");
         if (returnData.length != 64) return (false, 0, 0);
         (amountOut, amountInSpent) = abi.decode(returnData, (uint256, uint256));
@@ -199,14 +202,12 @@ contract SwapProbe {
 
         uint256 wrbtcBefore = IERC20(WRBTC).balanceOf(address(this));
         uint256 tokenInBefore = IERC20(tokenIn).balanceOf(address(this));
-        IUniswapV3SwapRouter(SWAP_ROUTER_02).exactInput(
-            IUniswapV3SwapRouter.ExactInputParams({
-                path: path,
-                recipient: address(this),
-                amountIn: amountIn,
-                amountOutMinimum: 0
-            })
-        );
+        IUniswapV3SwapRouter(SWAP_ROUTER_02)
+            .exactInput(
+                IUniswapV3SwapRouter.ExactInputParams({
+                    path: path, recipient: address(this), amountIn: amountIn, amountOutMinimum: 0
+                })
+            );
         uint256 amountOut = IERC20(WRBTC).balanceOf(address(this)) - wrbtcBefore;
         // A V3 swap that hits the tick price limit fills only part of the order and keeps the rest of the
         // input. Reporting the spend makes a starved pool distinguishable from a merely expensive one.

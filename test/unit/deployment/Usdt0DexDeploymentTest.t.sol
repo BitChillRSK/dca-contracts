@@ -75,9 +75,7 @@ contract Usdt0DexDeploymentTest is Test {
         assertEq(dcaManager.getTokenMinPurchaseAmount(usdt0), 25e6);
         assertTrue(dcaManager.getTokenMinPurchaseAmount(usdt0) != 25 ether);
         assertEq(operationsAdmin.getTokenHandler(usdt0, LAYERBANK_INDEX), handler);
-        assertTrue(
-            IPurchaseUniswap(handler).isPurchasePathAllowed(keccak256(IPurchaseUniswap(handler).getSwapPath()))
-        );
+        assertTrue(IPurchaseUniswap(handler).isPurchasePathAllowed(keccak256(IPurchaseUniswap(handler).getSwapPath())));
         assertEq(LayerBankErc20HandlerDex(payable(handler)).i_aToken().UNDERLYING_ASSET_ADDRESS(), usdt0);
     }
 
@@ -88,7 +86,9 @@ contract Usdt0DexDeploymentTest is Test {
 
         deployer.maybeAssign(operationsAdmin, dcaManager, usdt0, handler, true);
 
-        assertEq(dcaManager.getTokenMinPurchaseAmount(usdt0), 0, "non-owner add-on must not set the min; Safe runbook has to");
+        assertEq(
+            dcaManager.getTokenMinPurchaseAmount(usdt0), 0, "non-owner add-on must not set the min; Safe runbook has to"
+        );
         assertEq(operationsAdmin.getTokenHandler(usdt0, LAYERBANK_INDEX), address(0));
     }
 
@@ -97,9 +97,7 @@ contract Usdt0DexDeploymentTest is Test {
         returns (OperationsAdmin operationsAdmin, DcaManager dcaManager, address handler, address usdt0)
     {
         operationsAdmin = new OperationsAdmin(owner);
-        dcaManager = new DcaManager(
-            address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, owner
-        );
+        dcaManager = new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, owner);
         (handler, usdt0) = _deploySixDecimalHandler(address(dcaManager), owner);
     }
 

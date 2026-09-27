@@ -95,11 +95,7 @@ contract RouteIdDcaManager is ReentrancyGuard {
         _;
     }
 
-    constructor(
-        address registryAddress,
-        uint256 minPurchasePeriod,
-        uint256 maxSchedulesPerToken
-    ) {
+    constructor(address registryAddress, uint256 minPurchasePeriod, uint256 maxSchedulesPerToken) {
         i_registry = RouteIdRegistry(registryAddress);
         s_protocolSettings = IDcaManager.ProtocolSettings({
             minPurchasePeriod: minPurchasePeriod.toUint32(),
@@ -112,7 +108,6 @@ contract RouteIdDcaManager is ReentrancyGuard {
     function setTokenMinPurchaseAmount(address token, uint256 minPurchaseAmount) external {
         s_tokenMinPurchaseAmounts[token] = minPurchaseAmount;
     }
-
 
     function createDcaSchedule(
         address token,

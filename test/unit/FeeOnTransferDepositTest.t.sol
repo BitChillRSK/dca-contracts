@@ -53,9 +53,7 @@ contract FeeOnTransferDepositTest is Test {
         operationsAdmin = new OperationsAdmin(OWNER);
 
         vm.prank(OWNER);
-        dcaManager = new DcaManager(
-            address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, OWNER
-        );
+        dcaManager = new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, OWNER);
 
         // Starts 1:1; each test opts into the transfer fee where it wants one.
         token = new MockFeeOnTransferStablecoin();
@@ -79,13 +77,7 @@ contract FeeOnTransferDepositTest is Test {
         );
         kToken = new MockKdocToken(address(token));
         tropykusHandler = new TropykusDocHandlerMoc(
-            address(dcaManager),
-            address(token),
-            address(kToken),
-            FEE_COLLECTOR,
-            address(mocProxy),
-            feeSettings,
-            OWNER
+            address(dcaManager), address(token), address(kToken), FEE_COLLECTOR, address(mocProxy), feeSettings, OWNER
         );
 
         vm.startPrank(OWNER);

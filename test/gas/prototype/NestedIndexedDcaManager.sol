@@ -99,11 +99,7 @@ contract NestedIndexedDcaManager is ReentrancyGuard {
         _;
     }
 
-    constructor(
-        address operationsAdminAddress,
-        uint256 minPurchasePeriod,
-        uint256 maxSchedulesPerToken
-    ) {
+    constructor(address operationsAdminAddress, uint256 minPurchasePeriod, uint256 maxSchedulesPerToken) {
         i_operationsAdmin = OperationsAdmin(operationsAdminAddress);
         s_protocolSettings = IDcaManager.ProtocolSettings({
             minPurchasePeriod: minPurchasePeriod.toUint32(),
@@ -115,7 +111,6 @@ contract NestedIndexedDcaManager is ReentrancyGuard {
     function setTokenMinPurchaseAmount(address token, uint256 minPurchaseAmount) external {
         s_tokenMinPurchaseAmounts[token] = minPurchaseAmount;
     }
-
 
     function createDcaSchedule(
         address token,
@@ -188,15 +183,13 @@ contract NestedIndexedDcaManager is ReentrancyGuard {
                 || numOfPurchases != batch.purchaseAmounts.length
         ) revert Prototype__ArraysLengthMismatch();
         for (uint256 i; i < numOfPurchases; ++i) {
-            (uint256 schedulePurchaseAmount, uint256 scheduleRouteIndex) = _rBtcPurchaseChecksEffects(
-                batch.buyers[i], batch.token, batch.scheduleIndexes[i], batch.scheduleIds[i]
-            );
+            (uint256 schedulePurchaseAmount, uint256 scheduleRouteIndex) =
+                _rBtcPurchaseChecksEffects(batch.buyers[i], batch.token, batch.scheduleIndexes[i], batch.scheduleIds[i]);
             if (schedulePurchaseAmount != batch.purchaseAmounts[i]) revert Prototype__PurchaseAmountMismatch();
             if (scheduleRouteIndex != batch.routeIndex) revert Prototype__RouteIndexMismatch();
         }
-        IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex))).batchBuyRbtc(
-            batch.buyers, batch.scheduleIds, batch.purchaseAmounts, batch.minRbtcOut
-        );
+        IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex)))
+            .batchBuyRbtc(batch.buyers, batch.scheduleIds, batch.purchaseAmounts, batch.minRbtcOut);
     }
 
     /// @dev The counterpart of `DcaManager.getSchedulesCreatedCount`, so a benchmark can warm the
@@ -279,5 +272,4 @@ contract NestedIndexedDcaManager is ReentrancyGuard {
         if (purchaseAmount < minPurchaseAmount) revert Prototype__PurchaseAmountBelowMinimum();
         if (purchaseAmount > tokenBalance) revert Prototype__PurchaseAmountExceedsBalance();
     }
-
 }

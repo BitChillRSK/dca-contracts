@@ -27,9 +27,8 @@ contract DepositsPauseTest is DcaDappTest {
     }
 
     function _depositsPausedRevert() private view returns (bytes memory) {
-        return abi.encodeWithSelector(
-            IDcaManager.DcaManager__DepositsPaused.selector, address(stablecoin), s_routeIndex
-        );
+        return
+            abi.encodeWithSelector(IDcaManager.DcaManager__DepositsPaused.selector, address(stablecoin), s_routeIndex);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -42,8 +41,7 @@ contract DepositsPauseTest is DcaDappTest {
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
         uint256 handlerStablecoinBefore = stablecoin.balanceOf(address(stablecoinHandler));
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        uint256 scheduleBalanceBefore =
-            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
+        uint256 scheduleBalanceBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
 
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
@@ -57,10 +55,7 @@ contract DepositsPauseTest is DcaDappTest {
             handlerStablecoinBefore,
             "the handler took cash on a paused route"
         );
-        assertEq(
-            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance,
-            scheduleBalanceBefore
-        );
+        assertEq(scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance, scheduleBalanceBefore);
     }
 
     function testPausedRouteRejectsScheduleCreation() external {
@@ -201,8 +196,7 @@ contract DepositsPauseTest is DcaDappTest {
         dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, newPurchasePeriod);
         vm.stopPrank();
 
-        IDcaManager.DcaSchedule memory schedule =
-            scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
+        IDcaManager.DcaSchedule memory schedule = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         assertEq(schedule.purchaseAmount, newPurchaseAmount);
         assertEq(schedule.purchasePeriod, newPurchasePeriod);
     }

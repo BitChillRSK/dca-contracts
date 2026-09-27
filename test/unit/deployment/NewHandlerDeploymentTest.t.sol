@@ -25,7 +25,7 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
     address public usdrifHandlerAddress;
     LayerBankErc20HandlerDex public usdrifHandler;
     UsdrifHelperConfig public usdrifHelperConfig;
-    
+
     function setUp() public override {
         // Parent deploys MoC DOC. Skip on USDRIF/USDT0 lanes (vm.skip in the parent does not stop this setUp).
         string memory coinType = vm.envOr("STABLECOIN_TYPE", DOC_STRING);
@@ -34,10 +34,10 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
             return;
         }
         super.setUp();
-        
+
         usdrifHelperConfig = new UsdrifHelperConfig();
         usdrifHelperConfig.updateProtocolAddresses(address(operationsAdmin), address(dcaManager));
-        
+
         UsdrifHelperConfig.NetworkConfig memory config = usdrifHelperConfig.getNetworkConfig();
         IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
             wrBtcToken: IWRBTC(config.wrbtcTokenAddress),
@@ -74,10 +74,10 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
         operationsAdmin.assignTokenHandler(config.usdrifTokenAddress, LAYERBANK_INDEX, usdrifHandlerAddress);
         vm.stopPrank();
     }
-    
+
     function testUsdrifHandlerDeployment() public {
         assertNotEq(usdrifHandlerAddress, address(0), "USDRIF handler not deployed");
-        
+
         assertEq(usdrifHandler.i_dcaManager(), address(dcaManager), "USDRIF handler doesn't reference DcaManager");
         assertNotEq(address(usdrifHandler.i_aToken()), address(0), "LayerBank aToken not set");
         assertEq(
@@ -85,10 +85,10 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
             usdrifHelperConfig.getNetworkConfig().usdrifTokenAddress,
             "aToken underlying must be USDRIF"
         );
-        
+
         assertEq(usdrifHandler.owner(), makeAddr(OWNER_STRING), "USDRIF handler owner not set correctly");
         assertEq(usdrifHandler.pendingOwner(), address(0), "USDRIF handler pending owner must be zero after deploy");
-        
+
         UsdrifHelperConfig.NetworkConfig memory config = usdrifHelperConfig.getNetworkConfig();
         address registeredHandler = operationsAdmin.getTokenHandler(config.usdrifTokenAddress, LAYERBANK_INDEX);
         assertEq(registeredHandler, usdrifHandlerAddress, "USDRIF handler not registered in OperationsAdmin");
@@ -136,11 +136,7 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
             0,
             "purchase through the deployed USDRIF route credited no rBTC"
         );
-        assertEq(
-            usdrif.balanceOf(usdrifHandlerAddress),
-            0,
-            "a complete fill leaves no stablecoin on the handler"
-        );
+        assertEq(usdrif.balanceOf(usdrifHandlerAddress), 0, "a complete fill leaves no stablecoin on the handler");
     }
 
     function test_run_revertsOnForkWithoutRealDeployment() public {

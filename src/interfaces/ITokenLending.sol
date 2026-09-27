@@ -28,9 +28,7 @@ interface ITokenLending is ITokenHandler {
      *      this: each row's exact share debit is `UserSharesUpdated`, and measured cash for the
      *      whole redeem is `SharesRedeemedBatch`.
      */
-    event TokenLending__SharesRedeemed(
-        address indexed user, uint256 underlyingAmount, uint256 sharesAmountRedeemed
-    );
+    event TokenLending__SharesRedeemed(address indexed user, uint256 underlyingAmount, uint256 sharesAmountRedeemed);
     /// @notice A batch redemption's measured stablecoin and share totals.
     event TokenLending__SharesRedeemedBatch(uint256 underlyingAmount, uint256 sharesAmountRedeemed);
     /// @notice Interest was paid out to `user` in `token`.
@@ -38,9 +36,7 @@ interface ITokenLending is ITokenHandler {
         address indexed user, address indexed token, uint256 underlyingAmountWithdrawn
     );
     /// @notice A withdrawal was clamped to the user's share-backed stablecoin.
-    event TokenLending__WithdrawalAmountAdjusted(
-        address indexed user, uint256 originalAmount, uint256 adjustedAmount
-    );
+    event TokenLending__WithdrawalAmountAdjusted(address indexed user, uint256 originalAmount, uint256 adjustedAmount);
     /// @notice A single-user redeem was clamped to the shares this handler books for that user.
     event TokenLending__AmountToRedeemAdjusted(
         address indexed user,
@@ -71,9 +67,7 @@ interface ITokenLending is ITokenHandler {
      *      around the protocol call (iToken/kToken `balanceOf`, or aToken `scaledBalanceOf`).
      *      Covers zero, partial, excessive, and increasing balances without an arithmetic panic.
      */
-    error TokenLending__ShareConsumptionMismatch(
-        uint256 intendedDecrease, uint256 balanceBefore, uint256 balanceAfter
-    );
+    error TokenLending__ShareConsumptionMismatch(uint256 intendedDecrease, uint256 balanceBefore, uint256 balanceAfter);
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
@@ -131,8 +125,5 @@ interface ITokenLending is ITokenHandler {
      *      because a stored rate only trails a current one. The quote therefore never exceeds the
      *      top-up ceiling; DcaManager separately enforces its minimum purchase-boundary rule.
      */
-    function quoteAccruedInterest(address user, uint256 stablecoinLockedInDcaSchedules)
-        external
-        view
-        returns (uint256);
+    function quoteAccruedInterest(address user, uint256 stablecoinLockedInDcaSchedules) external view returns (uint256);
 }

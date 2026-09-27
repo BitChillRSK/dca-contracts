@@ -27,13 +27,7 @@ function batchBuyOne(IDcaManager dcaManager, address token, uint64 scheduleId, u
 /**
  * @notice `batchBuyOne` with an explicit caller minimum (R51).
  */
-function batchBuyOne(
-    IDcaManager dcaManager,
-    address token,
-    uint64 scheduleId,
-    uint256 routeIndex,
-    uint256 minRbtcOut
-) {
+function batchBuyOne(IDcaManager dcaManager, address token, uint64 scheduleId, uint256 routeIndex, uint256 minRbtcOut) {
     uint64[] memory scheduleIds = new uint64[](1);
     scheduleIds[0] = scheduleId;
     dcaManager.batchBuyRbtc(toBatch(scheduleIds, token, routeIndex, minRbtcOut));

@@ -63,11 +63,12 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IFeeHandler
-    function setFeeRateParams(uint256 minFeeRate, uint256 maxFeeRate, uint256 feePurchaseLowerBound, uint256 feePurchaseUpperBound)
-        external
-        override
-        onlyOwner
-    {
+    function setFeeRateParams(
+        uint256 minFeeRate,
+        uint256 maxFeeRate,
+        uint256 feePurchaseLowerBound,
+        uint256 feePurchaseUpperBound
+    ) external override onlyOwner {
         _validateFeeSettings(minFeeRate, maxFeeRate, feePurchaseLowerBound, feePurchaseUpperBound);
 
         if (s_minFeeRate != minFeeRate) {
@@ -138,11 +139,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         }
 
         return _calculateVariableFeeAndNetAmounts(
-            purchaseAmounts,
-            minFeeRate,
-            maxFeeRate,
-            s_feePurchaseLowerBound,
-            s_feePurchaseUpperBound
+            purchaseAmounts, minFeeRate, maxFeeRate, s_feePurchaseLowerBound, s_feePurchaseUpperBound
         );
     }
 
@@ -156,10 +153,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev When the linear variable fee rate is not in use, apply the flat fee rate to all amounts.
-    function _calculateFlatFeeAndNetAmounts(
-        uint256[] calldata purchaseAmounts,
-        uint256 feeRate
-    )
+    function _calculateFlatFeeAndNetAmounts(uint256[] calldata purchaseAmounts, uint256 feeRate)
         private
         pure
         returns (uint256 aggregatedFee, uint256[] memory netAmountsToSpend, uint256 totalAmountToSpend)
@@ -191,22 +185,13 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         uint256 maxFeeRate,
         uint256 feePurchaseLowerBound,
         uint256 feePurchaseUpperBound
-    )
-        private
-        pure
-        returns (uint256 aggregatedFee, uint256[] memory netAmountsToSpend, uint256 totalAmountToSpend)
-    {
+    ) private pure returns (uint256 aggregatedFee, uint256[] memory netAmountsToSpend, uint256 totalAmountToSpend) {
         uint256 len = purchaseAmounts.length;
         netAmountsToSpend = new uint256[](len);
         for (uint256 i; i < len; ++i) {
             uint256 amount = purchaseAmounts[i];
-            uint256 fee = _calculateVariableFee(
-                amount,
-                minFeeRate,
-                maxFeeRate,
-                feePurchaseLowerBound,
-                feePurchaseUpperBound
-            );
+            uint256 fee =
+                _calculateVariableFee(amount, minFeeRate, maxFeeRate, feePurchaseLowerBound, feePurchaseUpperBound);
 
             uint256 net;
             // The fee is at most 5% of a uint96 amount, so neither the subtraction nor the sums can overflow.
@@ -237,10 +222,8 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
 
         uint256 feeRate;
         unchecked {
-            feeRate = maxFeeRate
-                - ((purchaseAmount - feePurchaseLowerBound)
-                    * (maxFeeRate - minFeeRate))
-                    / (feePurchaseUpperBound - feePurchaseLowerBound);
+            feeRate = maxFeeRate - ((purchaseAmount - feePurchaseLowerBound) * (maxFeeRate - minFeeRate))
+                / (feePurchaseUpperBound - feePurchaseLowerBound);
         }
         return _calculateFeeAtRate(purchaseAmount, feeRate);
     }
@@ -264,6 +247,8 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     ) private pure {
         if (maxFeeRate > MAX_FEE_RATE_CAP) revert FeeHandler__MaxFeeRateExceedsCap();
         if (minFeeRate > maxFeeRate) revert FeeHandler__MinFeeRateCannotBeHigherThanMax();
-        if (feePurchaseLowerBound >= feePurchaseUpperBound) revert FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound();
+        if (feePurchaseLowerBound >= feePurchaseUpperBound) {
+            revert FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound();
+        }
     }
 }

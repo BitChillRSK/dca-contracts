@@ -15,7 +15,6 @@ import {IFeeHandler} from "../src/interfaces/IFeeHandler.sol";
 import {console} from "forge-std/Test.sol";
 import "./Constants.sol";
 
-
 contract DeployMocSwaps is DeployBase {
     // Struct to group deployment parameters to avoid stack too deep errors
     struct DeployParams {
@@ -123,9 +122,8 @@ contract DeployMocSwaps is DeployBase {
         _beginLiveAwareBroadcast(msg.sender);
 
         OperationsAdmin operationsAdmin = new OperationsAdmin(deployOwner);
-        DcaManager dcaManager = new DcaManager(
-            address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, deployOwner
-        );
+        DcaManager dcaManager =
+            new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, deployOwner);
         dcaManager.setTokenMinPurchaseAmount(docTokenAddress, MIN_PURCHASE_AMOUNT);
         address feeCollector = getFeeCollector(environment);
         address docHandlerMocAddress;
@@ -189,9 +187,7 @@ contract DeployMocSwaps is DeployBase {
                 if (protocol == Protocol.LAYERBANK) {
                     revert("LayerBank aToken not available on this network");
                 }
-                console.log(
-                    "Warning: LayerBank aToken not available; index 1 is now immutable Lending with no handler"
-                );
+                console.log("Warning: LayerBank aToken not available; index 1 is now immutable Lending with no handler");
             } else {
                 address layerbankHandler = deployDocHandlerMoc(
                     DeployParams({

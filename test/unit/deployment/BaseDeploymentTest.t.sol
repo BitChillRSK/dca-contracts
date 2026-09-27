@@ -20,7 +20,7 @@ contract BaseDeploymentTest is Test {
     MocHelperConfig public helperConfig;
     address OWNER = makeAddr(OWNER_STRING);
     address ADMIN = makeAddr(ADMIN_STRING);
-    
+
     // For validating the handler type
     TropykusDocHandlerMoc public tropykusHandler;
     SovrynDocHandlerMoc public sovrynHandler;
@@ -54,17 +54,17 @@ contract BaseDeploymentTest is Test {
         operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
         vm.stopPrank();
     }
-    
+
     function testCoreProtocolDeployment() public {
         // Verify OperationsAdmin deployment
         assertNotEq(address(operationsAdmin), address(0), "OperationsAdmin not deployed");
-        
+
         // Verify DcaManager deployment
         assertNotEq(address(dcaManager), address(0), "DcaManager not deployed");
-        
+
         // Verify DocHandler deployment
         assertNotEq(docHandlerMocAddress, address(0), "DocHandler not deployed");
-        
+
         // Check ownership
         assertEq(operationsAdmin.owner(), makeAddr(OWNER_STRING), "OperationsAdmin owner not set correctly");
         assertEq(operationsAdmin.pendingOwner(), address(0), "OperationsAdmin pending owner must be zero after deploy");
@@ -75,17 +75,35 @@ contract BaseDeploymentTest is Test {
             address(operationsAdmin),
             "DcaManager OperationsAdmin must be the constructor registry"
         );
-        
+
         // Verify DcaManager reference in handler
         string memory lendingProtocol = vm.envString("LENDING_PROTOCOL");
         if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(TROPYKUS_STRING))) {
-            assertEq(tropykusHandler.i_dcaManager(), address(dcaManager), "TropykusHandler doesn't reference DcaManager");
-            assertEq(TropykusDocHandlerMoc(payable(docHandlerMocAddress)).owner(), makeAddr(OWNER_STRING), "Handler owner not set correctly");
-            assertEq(TropykusDocHandlerMoc(payable(docHandlerMocAddress)).pendingOwner(), address(0), "Handler pending owner must be zero after deploy");
+            assertEq(
+                tropykusHandler.i_dcaManager(), address(dcaManager), "TropykusHandler doesn't reference DcaManager"
+            );
+            assertEq(
+                TropykusDocHandlerMoc(payable(docHandlerMocAddress)).owner(),
+                makeAddr(OWNER_STRING),
+                "Handler owner not set correctly"
+            );
+            assertEq(
+                TropykusDocHandlerMoc(payable(docHandlerMocAddress)).pendingOwner(),
+                address(0),
+                "Handler pending owner must be zero after deploy"
+            );
         } else if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(SOVRYN_STRING))) {
             assertEq(sovrynHandler.i_dcaManager(), address(dcaManager), "SovrynHandler doesn't reference DcaManager");
-            assertEq(SovrynDocHandlerMoc(payable(docHandlerMocAddress)).owner(), makeAddr(OWNER_STRING), "Handler owner not set correctly");
-            assertEq(SovrynDocHandlerMoc(payable(docHandlerMocAddress)).pendingOwner(), address(0), "Handler pending owner must be zero after deploy");
+            assertEq(
+                SovrynDocHandlerMoc(payable(docHandlerMocAddress)).owner(),
+                makeAddr(OWNER_STRING),
+                "Handler owner not set correctly"
+            );
+            assertEq(
+                SovrynDocHandlerMoc(payable(docHandlerMocAddress)).pendingOwner(),
+                address(0),
+                "Handler pending owner must be zero after deploy"
+            );
         } else {
             assertEq(Ownable(docHandlerMocAddress).owner(), makeAddr(OWNER_STRING), "Handler owner not set correctly");
             assertEq(
