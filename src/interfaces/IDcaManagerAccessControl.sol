@@ -4,10 +4,20 @@ pragma solidity 0.8.36;
 /**
  * @title IDcaManagerAccessControl
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice The revert a handler raises when a caller other than its pinned DcaManager reaches an
- *         `onlyDcaManager` entry point.
+ * @notice The DcaManager a handler is pinned to, and the revert it raises when any other caller
+ *         reaches an `onlyDcaManager` entry point.
  */
 interface IDcaManagerAccessControl {
+    /*//////////////////////////////////////////////////////////////
+                                GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice The DcaManager allowed to call this handler's entry points.
+     * @return The constructor-supplied DcaManager address.
+     */
+    function i_dcaManager() external view returns (address);
+
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/

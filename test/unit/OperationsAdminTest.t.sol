@@ -214,7 +214,7 @@ contract OperationsAdminTest is DcaDappTest {
 
     function testMistakenHandlerAssignmentRecoveredAtNewIndex() external {
         address oldHandler = operationsAdmin.getTokenHandler(address(stablecoin), s_routeIndex);
-        DummyLendingHandler unusedHandler = new DummyLendingHandler(address(stablecoin));
+        DummyLendingHandler unusedHandler = new DummyLendingHandler(address(stablecoin), address(dcaManager));
 
         vm.startPrank(OWNER);
         vm.expectRevert(
@@ -233,8 +233,8 @@ contract OperationsAdminTest is DcaDappTest {
     }
 
     function testIdleHandlerAtNonZeroIndexLeavesOriginalIdleResolvable() external {
-        DummyTokenHandler idleAtZero = new DummyTokenHandler(address(stablecoin));
-        DummyTokenHandler idleAtTen = new DummyTokenHandler(address(stablecoin));
+        DummyTokenHandler idleAtZero = new DummyTokenHandler(address(stablecoin), address(dcaManager));
+        DummyTokenHandler idleAtTen = new DummyTokenHandler(address(stablecoin), address(dcaManager));
 
         vm.startPrank(OWNER);
         if (operationsAdmin.getTokenHandler(address(stablecoin), IDLE_INDEX) == address(0)) {
@@ -243,7 +243,7 @@ contract OperationsAdminTest is DcaDappTest {
         operationsAdmin.registerRoute(SECOND_IDLE_INDEX, false);
         operationsAdmin.assignTokenHandler(address(stablecoin), SECOND_IDLE_INDEX, address(idleAtTen));
 
-        DummyTokenHandler extra = new DummyTokenHandler(address(stablecoin));
+        DummyTokenHandler extra = new DummyTokenHandler(address(stablecoin), address(dcaManager));
         vm.expectRevert(
             abi.encodeWithSelector(
                 IOperationsAdmin.OperationsAdmin__HandlerAlreadyAssigned.selector,
@@ -262,7 +262,7 @@ contract OperationsAdminTest is DcaDappTest {
 
     function testOldRouteStillPaysUserAfterNewHandlerRegistered() external {
         address oldHandler = operationsAdmin.getTokenHandler(address(stablecoin), s_routeIndex);
-        DummyLendingHandler newHandler = new DummyLendingHandler(address(stablecoin));
+        DummyLendingHandler newHandler = new DummyLendingHandler(address(stablecoin), address(dcaManager));
 
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
@@ -323,7 +323,7 @@ contract OperationsAdminTest is DcaDappTest {
         assertEq(scheduleAt(dcaManager, USER, address(stablecoin), 0).tokenBalance, userRemaining);
         assertEq(stablecoin.balanceOf(USER), userWalletBefore);
 
-        DummyLendingHandler dummy = new DummyLendingHandler(address(stablecoin));
+        DummyLendingHandler dummy = new DummyLendingHandler(address(stablecoin), address(dcaManager));
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
         operationsAdmin.assignTokenHandler(address(stablecoin), SECOND_LENDING_INDEX, address(dummy));
@@ -337,7 +337,7 @@ contract OperationsAdminTest is DcaDappTest {
 
     function testLendingHandlerRejectedAtIdleIndexZero() external {
         address otherToken = makeAddr("r31IdleZeroToken");
-        DummyLendingHandler lendingStub = new DummyLendingHandler(otherToken);
+        DummyLendingHandler lendingStub = new DummyLendingHandler(otherToken, address(dcaManager));
         vm.expectRevert(
             abi.encodeWithSelector(
                 IOperationsAdmin.OperationsAdmin__LendingHandlerOnIdleRoute.selector, address(lendingStub)
@@ -349,7 +349,7 @@ contract OperationsAdminTest is DcaDappTest {
 
     function testLendingHandlerRejectedAtRegisteredIdleIndex() external {
         address otherToken = makeAddr("r31IdleIndexToken");
-        DummyLendingHandler lendingStub = new DummyLendingHandler(otherToken);
+        DummyLendingHandler lendingStub = new DummyLendingHandler(otherToken, address(dcaManager));
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(SECOND_IDLE_INDEX, false);
         vm.expectRevert(
@@ -363,7 +363,7 @@ contract OperationsAdminTest is DcaDappTest {
 
     function testIdleHandlerRejectedAtLendingIndex() external {
         address otherToken = makeAddr("r31LendingToken");
-        DummyTokenHandler idleStub = new DummyTokenHandler(otherToken);
+        DummyTokenHandler idleStub = new DummyTokenHandler(otherToken, address(dcaManager));
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
         vm.expectRevert(
@@ -383,7 +383,7 @@ contract OperationsAdminTest is DcaDappTest {
     ///      handler keys shares by user alone, so the second route would read the first's principal as yield.
     function testHandlerAddressCannotBackTwoLendingRoutes() external {
         address token = makeAddr("r47SameTokenLending");
-        DummyLendingHandler lendingStub = new DummyLendingHandler(token);
+        DummyLendingHandler lendingStub = new DummyLendingHandler(token, address(dcaManager));
 
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
@@ -405,7 +405,7 @@ contract OperationsAdminTest is DcaDappTest {
     /// @dev Idle handlers hold balances keyed by user only, so the rule is not lending-specific.
     function testHandlerAddressCannotBackTwoIdleRoutes() external {
         address token = makeAddr("r47SameTokenIdle");
-        DummyTokenHandler idleStub = new DummyTokenHandler(token);
+        DummyTokenHandler idleStub = new DummyTokenHandler(token, address(dcaManager));
 
         vm.startPrank(OWNER);
         operationsAdmin.assignTokenHandler(token, IDLE_INDEX, address(idleStub));
@@ -427,7 +427,7 @@ contract OperationsAdminTest is DcaDappTest {
     function testHandlerAddressCannotBeReusedForASecondToken() external {
         address firstToken = makeAddr("r47FirstToken");
         address secondToken = makeAddr("r47SecondToken");
-        DummyLendingHandler lendingStub = new DummyLendingHandler(firstToken);
+        DummyLendingHandler lendingStub = new DummyLendingHandler(firstToken, address(dcaManager));
 
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
@@ -449,7 +449,7 @@ contract OperationsAdminTest is DcaDappTest {
     function testHandlerAddressCannotBeReusedAcrossRouteClasses() external {
         address firstToken = makeAddr("r47ClassFirstToken");
         address secondToken = makeAddr("r47ClassSecondToken");
-        DummyLendingHandler lendingStub = new DummyLendingHandler(firstToken);
+        DummyLendingHandler lendingStub = new DummyLendingHandler(firstToken, address(dcaManager));
 
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
@@ -469,8 +469,8 @@ contract OperationsAdminTest is DcaDappTest {
     /// @dev Versioned routes stay usable: distinct instances are what ops must deploy per pair.
     function testDistinctHandlerInstancesRemainAssignable() external {
         address token = makeAddr("r47DistinctInstances");
-        DummyLendingHandler firstStub = new DummyLendingHandler(token);
-        DummyLendingHandler secondStub = new DummyLendingHandler(token);
+        DummyLendingHandler firstStub = new DummyLendingHandler(token, address(dcaManager));
+        DummyLendingHandler secondStub = new DummyLendingHandler(token, address(dcaManager));
 
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
@@ -486,7 +486,7 @@ contract OperationsAdminTest is DcaDappTest {
     /// @dev Only a successful assignment consumes the address: a class-rejected handler is still assignable.
     function testRevertedAssignmentDoesNotConsumeHandlerAddress() external {
         address token = makeAddr("r47RevertedAssignment");
-        DummyTokenHandler idleStub = new DummyTokenHandler(token);
+        DummyTokenHandler idleStub = new DummyTokenHandler(token, address(dcaManager));
 
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
@@ -505,8 +505,8 @@ contract OperationsAdminTest is DcaDappTest {
 
     function testMatchingClassAssignmentsSucceed() external {
         address otherToken = makeAddr("r31OtherToken");
-        DummyTokenHandler idleStub = new DummyTokenHandler(otherToken);
-        DummyLendingHandler lendingStub = new DummyLendingHandler(otherToken);
+        DummyTokenHandler idleStub = new DummyTokenHandler(otherToken, address(dcaManager));
+        DummyLendingHandler lendingStub = new DummyLendingHandler(otherToken, address(dcaManager));
 
         vm.startPrank(OWNER);
         operationsAdmin.assignTokenHandler(otherToken, IDLE_INDEX, address(idleStub));
@@ -526,8 +526,8 @@ contract OperationsAdminTest is DcaDappTest {
     function testHandlerBuiltForAnotherTokenIsRejected() external {
         address token = makeAddr("r89AssignedToken");
         address otherToken = makeAddr("r89OtherToken");
-        DummyTokenHandler idleStub = new DummyTokenHandler(otherToken);
-        DummyLendingHandler lendingStub = new DummyLendingHandler(otherToken);
+        DummyTokenHandler idleStub = new DummyTokenHandler(otherToken, address(dcaManager));
+        DummyLendingHandler lendingStub = new DummyLendingHandler(otherToken, address(dcaManager));
 
         vm.startPrank(OWNER);
         vm.expectRevert(
@@ -553,7 +553,8 @@ contract OperationsAdminTest is DcaDappTest {
     /// @dev The stablecoin is checked last, so a handler wrong on both counts reports its class first.
     function testClassMismatchIsReportedBeforeTokenMismatch() external {
         address token = makeAddr("r89ClassFirstToken");
-        DummyLendingHandler lendingStub = new DummyLendingHandler(makeAddr("r89ClassFirstOtherToken"));
+        DummyLendingHandler lendingStub =
+            new DummyLendingHandler(makeAddr("r89ClassFirstOtherToken"), address(dcaManager));
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -580,7 +581,7 @@ contract OperationsAdminTest is DcaDappTest {
     function testTokenMismatchDoesNotConsumeHandlerAddress() external {
         address ownToken = makeAddr("r89OwnToken");
         address wrongToken = makeAddr("r89WrongToken");
-        DummyTokenHandler idleStub = new DummyTokenHandler(ownToken);
+        DummyTokenHandler idleStub = new DummyTokenHandler(ownToken, address(dcaManager));
 
         vm.startPrank(OWNER);
         vm.expectRevert(
@@ -596,9 +597,12 @@ contract OperationsAdminTest is DcaDappTest {
         assertEq(operationsAdmin.getTokenHandler(ownToken, IDLE_INDEX), address(idleStub));
     }
 
-    /// @dev The handler this lane deploys through the scripts, against a fresh registry: only the
-    ///      stablecoin it was constructed for is accepted, on whichever route class the lane uses.
-    function testDeployedHandlerIsAssignableOnlyForItsOwnStablecoin() external {
+    /**
+     * @dev The handler this lane deploys through the scripts, against a fresh registry: another
+     *      stablecoin is refused, and so is its own, because its DcaManager is pinned to the lane's
+     *      registry rather than the fresh one.
+     */
+    function testDeployedHandlerIsAssignableOnlyForItsOwnStablecoinAndRegistry() external {
         OperationsAdmin freshAdmin = new OperationsAdmin(address(this));
         if (s_routeIndex != IDLE_INDEX) {
             freshAdmin.registerRoute(
@@ -614,8 +618,30 @@ contract OperationsAdminTest is DcaDappTest {
         );
         freshAdmin.assignTokenHandler(otherToken, s_routeIndex, address(stablecoinHandler));
 
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__HandlerDcaManagerMismatch.selector,
+                address(stablecoinHandler),
+                address(dcaManager)
+            )
+        );
         freshAdmin.assignTokenHandler(address(stablecoin), s_routeIndex, address(stablecoinHandler));
-        assertEq(freshAdmin.getTokenHandler(address(stablecoin), s_routeIndex), address(stablecoinHandler));
+
+        assertEq(freshAdmin.getTokenHandler(address(stablecoin), s_routeIndex), address(0));
+        assertEq(operationsAdmin.getTokenHandler(address(stablecoin), s_routeIndex), address(stablecoinHandler));
+    }
+
+    /// @dev A handler pinned to anything but a DcaManager, such as an older deployment without the
+    ///      registry getter, fails closed and does not consume its address.
+    function testHandlerPinnedToANonDcaManagerIsRejected() external {
+        address token = makeAddr("r101PinnedElsewhereToken");
+        DummyTokenHandler idleStub = new DummyTokenHandler(token, address(stablecoin));
+
+        vm.expectRevert();
+        vm.prank(OWNER);
+        operationsAdmin.assignTokenHandler(token, IDLE_INDEX, address(idleStub));
+
+        assertEq(operationsAdmin.getTokenHandler(token, IDLE_INDEX), address(0));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -701,8 +727,8 @@ contract OperationsAdminTest is DcaDappTest {
     /// @dev The flag is keyed per pair: a second token and a second route stay open.
     function testPauseIsScopedToOnePair() external {
         address otherToken = makeAddr("r48OtherToken");
-        DummyTokenHandler otherTokenStub = new DummyTokenHandler(otherToken);
-        DummyTokenHandler otherRouteStub = new DummyTokenHandler(address(stablecoin));
+        DummyTokenHandler otherTokenStub = new DummyTokenHandler(otherToken, address(dcaManager));
+        DummyTokenHandler otherRouteStub = new DummyTokenHandler(address(stablecoin), address(dcaManager));
 
         vm.startPrank(OWNER);
         operationsAdmin.assignTokenHandler(otherToken, IDLE_INDEX, address(otherTokenStub));
@@ -732,7 +758,7 @@ contract OperationsAdminTest is DcaDappTest {
 
     function testAssignTokenHandlerRevertsUint32MaxPlusOne() external {
         uint256 overflowing = uint256(type(uint32).max) + 1;
-        DummyTokenHandler stub = new DummyTokenHandler(address(stablecoin));
+        DummyTokenHandler stub = new DummyTokenHandler(address(stablecoin), address(dcaManager));
         vm.prank(OWNER);
         vm.expectRevert(abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 32, overflowing));
         operationsAdmin.assignTokenHandler(address(stablecoin), overflowing, address(stub));

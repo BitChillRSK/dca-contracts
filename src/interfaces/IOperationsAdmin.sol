@@ -57,6 +57,8 @@ interface IOperationsAdmin {
     error OperationsAdmin__LendingHandlerOnIdleRoute(address handler);
     /// @notice `handler` holds a different stablecoin than the `token` it is being assigned for.
     error OperationsAdmin__HandlerTokenMismatch(address token, address handler);
+    /// @notice `handler` answers to a DcaManager that is not pinned to this registry.
+    error OperationsAdmin__HandlerDcaManagerMismatch(address handler, address dcaManager);
     /// @notice This route index is already classified and cannot be changed.
     error OperationsAdmin__RouteAlreadyRegistered(uint256 index);
     /// @notice Handler assignment requires a registered route index.
@@ -89,8 +91,8 @@ interface IOperationsAdmin {
      * @param routeIndex The registered route index (idle or lending). Must fit `uint32`.
      * @param handler The TokenHandler for that token and route, not yet assigned anywhere in this admin.
      * @dev Requires ERC-165 `ITokenHandler`; lending routes also require `ILendingHandler`, while idle
-     *      routes reject it. The handler's `i_stableToken()` must be `token`. One handler address may
-     *      back only one pair.
+     *      routes reject it. The handler's `i_stableToken()` must be `token`, and its `i_dcaManager()` must be
+     *      pinned to this registry. One handler address may back only one pair.
      */
     function assignTokenHandler(address token, uint256 routeIndex, address handler) external;
 

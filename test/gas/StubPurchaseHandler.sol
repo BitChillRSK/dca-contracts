@@ -17,15 +17,18 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
  *
  *      Passes `OperationsAdmin.assignTokenHandler`'s ERC-165 gate for an idle route: it answers
  *      `ITokenHandler` and must not answer `ILendingHandler`, which idle routes reject. It also reports
- *      the token it is assigned for, which that function checks against its `token` argument.
+ *      the token it is assigned for and the DcaManager it answers to, which that function checks
+ *      against its `token` argument and against its own registry.
  */
 contract StubPurchaseHandler is IERC165, ITokenHandler, IPurchaseRbtc {
     IERC20 public immutable i_stableToken;
+    address public immutable i_dcaManager;
     uint256 public deposits;
     uint256 public rowsBought;
 
-    constructor(address stableToken) {
+    constructor(address stableToken, address dcaManager) {
         i_stableToken = IERC20(stableToken);
+        i_dcaManager = dcaManager;
     }
 
     function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {

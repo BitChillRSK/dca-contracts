@@ -137,13 +137,13 @@ interface IDcaManager {
     /// @notice Requested withdrawal exceeds this schedule's `tokenBalance`.
     error DcaManager__WithdrawalAmountExceedsBalance(address token, uint256 amount, uint256 balance);
     /// @notice Purchase amount is below the token's configured minimum.
-    error DcaManager__PurchaseAmountMustBeGreaterThanMinimum(address token, uint256 minPurchaseAmount);
+    error DcaManager__PurchaseAmountMustBeAtLeastMinimum(address token, uint256 minPurchaseAmount);
     /// @notice No minimum purchase amount has been set for this token.
     error DcaManager__TokenMinPurchaseAmountNotSet(address token);
     /// @notice Per-token minimum purchase amount must be greater than zero.
     error DcaManager__TokenMinPurchaseAmountMustBeGreaterThanZero(address token);
     /// @notice Purchase period is below the protocol minimum.
-    error DcaManager__PurchasePeriodMustBeGreaterThanMinimum();
+    error DcaManager__PurchasePeriodMustBeAtLeastMinimum();
     /// @notice Protocol minimum purchase period cannot be set below one UTC day.
     error DcaManager__MinPurchasePeriodMustBeAtLeastOneDay();
     /// @notice Purchase period must be a whole number of UTC days.
@@ -171,9 +171,9 @@ interface IDcaManager {
     error DcaManager__ScheduleIdIndexMismatch(address token, uint64 scheduleId, uint256 scheduleIdIndex);
     /// @notice The schedule's remaining principal cannot cover one purchase.
     error DcaManager__ScheduleBalanceNotEnoughForPurchase(address token, uint64 scheduleId, uint256 remainingBalance);
-    /// @notice Parallel arrays (batch purchase or withdraw-all pairs) have different lengths.
+    /// @notice A withdraw-all call's token and route arrays have different lengths.
     error DcaManager__ArraysLengthMismatch();
-    /// @notice `batchBuyRbtc` was called with empty id/buyer arrays.
+    /// @notice A purchase batch, alone or inside `batchBuyRbtcAcrossHandlers`, names no schedule ids.
     error DcaManager__EmptyBatchPurchaseArrays();
     /// @notice `batchBuyRbtcAcrossHandlers` was called without any handler batches.
     error DcaManager__EmptyHandlerBatches();
