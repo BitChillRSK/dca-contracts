@@ -12,7 +12,7 @@ import {PurchaseRbtc} from "src/PurchaseRbtc.sol";
 import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
-import {ITokenLending} from "src/interfaces/ITokenLending.sol";
+import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
 import {IDcaManager} from "src/interfaces/IDcaManager.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockKdocToken} from "test/mocks/MockKdocToken.sol";
@@ -228,7 +228,7 @@ contract InvariantTest is StdInvariant, Test {
             address user = s_users[i];
 
             // Get user's shares balance
-            uint256 userLendingBalance = ITokenLending(address(handler)).getUserShares(user);
+            uint256 userLendingBalance = ILendingHandler(address(handler)).getUserShares(user);
             totalLendingBalances += userLendingBalance;
 
             // Get all schedules for this user with the stablecoin
@@ -437,7 +437,7 @@ contract InvariantTest is StdInvariant, Test {
                     }
 
                     if (totalDeposited > 0) {
-                        uint256 lendingBalance = ITokenLending(address(handler)).getUserShares(user);
+                        uint256 lendingBalance = ILendingHandler(address(handler)).getUserShares(user);
                         assertGe(lendingBalance, 0);
                     }
                 }

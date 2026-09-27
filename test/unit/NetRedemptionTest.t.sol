@@ -5,7 +5,7 @@ pragma solidity 0.8.36;
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {Vm} from "forge-std/Test.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
-import {ITokenLending} from "../../src/interfaces/ITokenLending.sol";
+import {ILendingHandler} from "../../src/interfaces/ILendingHandler.sol";
 import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {MockIsusdToken} from "../mocks/MockIsusdToken.sol";
@@ -220,7 +220,7 @@ contract NetRedemptionTest is DcaDappTest {
         // Purchases here are AMOUNT_TO_SPEND / NUM_OF_SCHEDULES = 40 DOC, below FEE_PURCHASE_LOWER_BOUND, so
         // they pay the max rate (200 bps locally): 4 DOC of fees on a 200 DOC batch. Withholding 99.5%
         // leaves 1 DOC redeemed, which is below the fee but still above zero — a zero payout would revert
-        // earlier with TokenLending__ZeroStablecoinReceived, which is a different failure.
+        // earlier with LendingHandler__ZeroStablecoinReceived, which is a different failure.
         MockIsusdToken(address(shareToken)).setExitFeeBps(RUG_EXIT_FEE_BPS);
 
         (address[] memory users,, uint64[] memory scheduleIds, uint256[] memory purchaseAmounts) = _batchArrays();
@@ -363,7 +363,7 @@ contract NetRedemptionTest is DcaDappTest {
 
     /// @dev user and token are indexed; the amount is the only data word
     function _interestWithdrawnEventAmount() internal returns (uint256 amount) {
-        bytes32 sig = keccak256("TokenLending__InterestWithdrawn(address,address,uint256)");
+        bytes32 sig = keccak256("LendingHandler__InterestWithdrawn(address,address,uint256)");
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bool found;
         for (uint256 i; i < logs.length; ++i) {
@@ -372,7 +372,7 @@ contract NetRedemptionTest is DcaDappTest {
                 found = true;
             }
         }
-        assertTrue(found, "no TokenLending__InterestWithdrawn log recorded");
+        assertTrue(found, "no LendingHandler__InterestWithdrawn log recorded");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -385,7 +385,7 @@ contract NetRedemptionTest is DcaDappTest {
     function test_sovryn_partialShareBurnOnWithdrawRevertsAndRollsBack() public onlySovrynMocMocks {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 scheduleBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
-        uint256 userSharesBefore = ITokenLending(address(stablecoinHandler)).getUserShares(USER);
+        uint256 userSharesBefore = ILendingHandler(address(stablecoinHandler)).getUserShares(USER);
         uint256 iTokenBefore = shareToken.balanceOf(address(stablecoinHandler));
         uint256 userDocBefore = stablecoin.balanceOf(USER);
 
@@ -396,7 +396,7 @@ contract NetRedemptionTest is DcaDappTest {
         dcaManager.withdrawToken(address(stablecoin), scheduleId, WITHDRAWAL_AMOUNT);
 
         assertEq(scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance, scheduleBefore);
-        assertEq(ITokenLending(address(stablecoinHandler)).getUserShares(USER), userSharesBefore);
+        assertEq(ILendingHandler(address(stablecoinHandler)).getUserShares(USER), userSharesBefore);
         assertEq(shareToken.balanceOf(address(stablecoinHandler)), iTokenBefore);
         assertEq(stablecoin.balanceOf(USER), userDocBefore);
     }
@@ -423,7 +423,7 @@ contract NetRedemptionTest is DcaDappTest {
 
         address feeCollector = IFeeHandler(address(stablecoinHandler)).getFeeCollectorAddress();
         uint256 feeCollectorBefore = stablecoin.balanceOf(feeCollector);
-        uint256 userSharesBefore = ITokenLending(address(stablecoinHandler)).getUserShares(USER);
+        uint256 userSharesBefore = ILendingHandler(address(stablecoinHandler)).getUserShares(USER);
         uint256 iTokenBefore = shareToken.balanceOf(address(stablecoinHandler));
         uint256 handlerDocBefore = stablecoin.balanceOf(address(stablecoinHandler));
         uint256 userDocBefore = stablecoin.balanceOf(USER);
@@ -439,7 +439,7 @@ contract NetRedemptionTest is DcaDappTest {
             assertEq(schedule.cadenceAnchor, anchorsBefore[i], "schedule cadence anchor rolled back");
         }
         assertEq(stablecoin.balanceOf(feeCollector), feeCollectorBefore, "fee collector rolled back");
-        assertEq(ITokenLending(address(stablecoinHandler)).getUserShares(USER), userSharesBefore);
+        assertEq(ILendingHandler(address(stablecoinHandler)).getUserShares(USER), userSharesBefore);
         assertEq(shareToken.balanceOf(address(stablecoinHandler)), iTokenBefore);
         assertEq(stablecoin.balanceOf(address(stablecoinHandler)), handlerDocBefore);
         assertEq(stablecoin.balanceOf(USER), userDocBefore);
@@ -454,12 +454,12 @@ contract NetRedemptionTest is DcaDappTest {
 
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 iTokenBefore = shareToken.balanceOf(address(stablecoinHandler));
-        uint256 userSharesBefore = ITokenLending(address(stablecoinHandler)).getUserShares(USER);
+        uint256 userSharesBefore = ILendingHandler(address(stablecoinHandler)).getUserShares(USER);
 
         vm.prank(USER);
         dcaManager.withdrawToken(address(stablecoin), scheduleId, WITHDRAWAL_AMOUNT);
 
-        uint256 sharesDebited = userSharesBefore - ITokenLending(address(stablecoinHandler)).getUserShares(USER);
+        uint256 sharesDebited = userSharesBefore - ILendingHandler(address(stablecoinHandler)).getUserShares(USER);
         assertEq(iTokenBefore - shareToken.balanceOf(address(stablecoinHandler)), sharesDebited);
         assertGt(sharesDebited, 0);
     }

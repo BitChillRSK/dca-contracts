@@ -361,7 +361,7 @@ contract OperationsAdminTest is DcaDappTest {
         operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IOperationsAdmin.OperationsAdmin__ContractIsNotTokenLending.selector, address(idleStub)
+                IOperationsAdmin.OperationsAdmin__ContractIsNotLendingHandler.selector, address(idleStub)
             )
         );
         operationsAdmin.assignTokenHandler(otherToken, SECOND_LENDING_INDEX, address(idleStub));
@@ -485,7 +485,7 @@ contract OperationsAdminTest is DcaDappTest {
         operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IOperationsAdmin.OperationsAdmin__ContractIsNotTokenLending.selector, address(idleStub)
+                IOperationsAdmin.OperationsAdmin__ContractIsNotLendingHandler.selector, address(idleStub)
             )
         );
         operationsAdmin.assignTokenHandler(token, SECOND_LENDING_INDEX, address(idleStub));

@@ -4,13 +4,13 @@ pragma solidity 0.8.36;
 import {ITokenHandler} from "./ITokenHandler.sol";
 
 /**
- * @title ITokenLending
+ * @title ILendingHandler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Lending-handler surface: per-user virtual shares, interest, and share-transition events.
  * @dev Idle handlers do not implement this. OperationsAdmin requires it on lending routes and
  *      rejects it on idle routes.
  */
-interface ITokenLending is ITokenHandler {
+interface ILendingHandler is ITokenHandler {
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
@@ -20,7 +20,7 @@ interface ITokenLending is ITokenHandler {
      * @dev Only `user` is indexed. `newShares` equals `getUserShares(user)` after the call.
      *      Reverted mutations produce no lasting log. Idle handlers do not emit this.
      */
-    event TokenLending__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares);
+    event LendingHandler__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares);
     /**
      * @notice One user's shares were redeemed for measured stablecoin.
      * @dev Emitted only on single-user redeems (`withdraw` / interest). `underlyingAmount` is the
@@ -28,17 +28,19 @@ interface ITokenLending is ITokenHandler {
      *      this: each row's exact share debit is `UserSharesUpdated`, and measured cash for the
      *      whole redeem is `SharesRedeemedBatch`.
      */
-    event TokenLending__SharesRedeemed(address indexed user, uint256 underlyingAmount, uint256 sharesAmountRedeemed);
+    event LendingHandler__SharesRedeemed(address indexed user, uint256 underlyingAmount, uint256 sharesAmountRedeemed);
     /// @notice A batch redemption's measured stablecoin and share totals.
-    event TokenLending__SharesRedeemedBatch(uint256 underlyingAmount, uint256 sharesAmountRedeemed);
+    event LendingHandler__SharesRedeemedBatch(uint256 underlyingAmount, uint256 sharesAmountRedeemed);
     /// @notice Interest was paid out to `user` in `token`.
-    event TokenLending__InterestWithdrawn(
+    event LendingHandler__InterestWithdrawn(
         address indexed user, address indexed token, uint256 underlyingAmountWithdrawn
     );
     /// @notice A withdrawal was clamped to the user's share-backed stablecoin.
-    event TokenLending__WithdrawalAmountAdjusted(address indexed user, uint256 originalAmount, uint256 adjustedAmount);
+    event LendingHandler__WithdrawalAmountAdjusted(
+        address indexed user, uint256 originalAmount, uint256 adjustedAmount
+    );
     /// @notice A single-user redeem was clamped to the shares this handler books for that user.
-    event TokenLending__AmountToRedeemAdjusted(
+    event LendingHandler__AmountToRedeemAdjusted(
         address indexed user,
         uint256 originalSharesAmount,
         uint256 adjustedSharesAmount,
@@ -51,23 +53,25 @@ interface ITokenLending is ITokenHandler {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice The lending protocol accepted a deposit call but this handler gained no shares.
-    error TokenLending__LendingProtocolDepositFailed();
+    error LendingHandler__LendingProtocolDepositFailed();
     /// @notice The lending protocol's redemption call reported failure with a non-zero error code.
-    error TokenLending__LendingProtocolRedeemFailed(uint256 errorCode);
+    error LendingHandler__LendingProtocolRedeemFailed(uint256 errorCode);
     /// @notice A zero-cash redemption reports its consumed receipt shares before the call rolls back.
-    error TokenLending__ZeroStablecoinReceived(uint256 sharesRedeemed);
+    error LendingHandler__ZeroStablecoinReceived(uint256 sharesRedeemed);
     /**
      * @notice Batch redeem asked for more of this user's shares than the handler tracks.
      * @dev Same outcome as a 0.8 underflow on `s_shares[user] -=`; the named error is for the swapper.
      */
-    error TokenLending__InsufficientShares(address user, uint256 requested, uint256 available);
+    error LendingHandler__InsufficientShares(address user, uint256 requested, uint256 available);
     /**
      * @notice The lending protocol did not consume exactly the receipt shares BitChill debited.
      * @dev `balanceBefore` / `balanceAfter` are the handler's external receipt-share balances
      *      around the protocol call (iToken/kToken `balanceOf`, or aToken `scaledBalanceOf`).
      *      Covers zero, partial, excessive, and increasing balances without an arithmetic panic.
      */
-    error TokenLending__ShareConsumptionMismatch(uint256 intendedDecrease, uint256 balanceBefore, uint256 balanceAfter);
+    error LendingHandler__ShareConsumptionMismatch(
+        uint256 intendedDecrease, uint256 balanceBefore, uint256 balanceAfter
+    );
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS

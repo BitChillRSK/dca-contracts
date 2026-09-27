@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
-import {LendingErc20Handler} from "../LendingErc20Handler.sol";
+import {LendingHandler} from "../LendingHandler.sol";
 import {ILayerBankAToken} from "./ILayerBankAToken.sol";
 import {ILayerBankErc20Handler} from "./ILayerBankErc20Handler.sol";
 import {ILayerBankPool} from "./ILayerBankPool.sol";
@@ -9,11 +9,11 @@ import {ILayerBankPool} from "./ILayerBankPool.sol";
 /**
  * @title LayerBankErc20Handler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice LayerBank adapter: Aave-v3 Pool supply/withdraw. Share accounting lives on LendingErc20Handler.
+ * @notice LayerBank adapter: Aave-v3 Pool supply/withdraw. Share accounting lives on LendingHandler.
  * @dev Supply and withdraw go through the Pool. Shares are aToken scaled amounts; rebasing
  *      `balanceOf` is never mixed into their accounting.
  */
-abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20Handler {
+abstract contract LayerBankErc20Handler is LendingHandler, ILayerBankErc20Handler {
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
@@ -46,7 +46,7 @@ abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20H
      * @param aTokenAddress LayerBank aToken for that stablecoin.
      */
     constructor(address dcaManagerAddress, address stableTokenAddress, address aTokenAddress)
-        LendingErc20Handler(dcaManagerAddress, stableTokenAddress, EXCHANGE_RATE_DECIMALS)
+        LendingHandler(dcaManagerAddress, stableTokenAddress, EXCHANGE_RATE_DECIMALS)
     {
         i_aToken = ILayerBankAToken(aTokenAddress);
         if (i_aToken.UNDERLYING_ASSET_ADDRESS() != stableTokenAddress) {

@@ -7,7 +7,7 @@ import {IdleDocHandlerMoc} from "src/idle/IdleDocHandlerMoc.sol";
 import {IDcaManager} from "src/interfaces/IDcaManager.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
-import {ITokenLending} from "src/interfaces/ITokenLending.sol";
+import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "test/Constants.sol";
 import {batchBuyOne} from "test/utils/BatchBuyOne.sol";
@@ -243,7 +243,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         }
         if (
             docHandlerMocAddress != address(0)
-                && IERC165(docHandlerMocAddress).supportsInterface(type(ITokenLending).interfaceId)
+                && IERC165(docHandlerMocAddress).supportsInterface(type(ILendingHandler).interfaceId)
         ) {
             return (docHandlerMocAddress, LAYERBANK_INDEX);
         }

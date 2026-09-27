@@ -29,13 +29,13 @@ DcaManager          user + swapper entry; schedules; single- and multi-handler p
 OperationsAdmin     roles; token × lending-index → handler
 FeeHandler          fee math (owned by PurchaseRbtc; MoC / Uniswap route fee construction)
 TokenHandler        deposit/withdraw stablecoin
-LendingErc20Handler TokenHandler + ITokenLending; share ↔ underlying conversion, per-user shares, withdraw clamp, interest, exact-sum batch redeem
+LendingHandler      TokenHandler + ILendingHandler; share ↔ underlying conversion, per-user shares, withdraw clamp, interest, exact-sum batch redeem
 StablecoinSource    shared `i_stableToken` + batch-funding hook (TokenHandler and PurchaseRbtc inherit; idle/lending implement retrieve)
 PurchaseRbtc        shared buy/batch pipeline; accumulated rBTC; withdraw to signer
 PurchaseMoc         MoC redeem DOC → rBTC (_purchaseRbtc only)
 PurchaseUniswap     Uniswap V3 → WRBTC (_purchaseRbtc + WRBTC unwrap on withdraw)
 
-Handlers = LendingErc20Handler + a Purchase*  (lending adapters) or TokenHandler + a Purchase* (idle):
+Handlers = LendingHandler + a Purchase*  (lending adapters) or TokenHandler + a Purchase* (idle):
   src/idle/              IdleErc20Handler ─┬─ IdleDocHandlerMoc (+ PurchaseMoc)  index 0 (DOC)
                                           └─ IdleErc20HandlerDex (+ PurchaseUniswap)  index 0 (USDRIF / USDT0)
   src/layerbank/         LayerBankErc20Handler ─┬─ LayerBankDocHandlerMoc (+ PurchaseMoc) index 1
@@ -47,7 +47,7 @@ Handlers = LendingErc20Handler + a Purchase*  (lending adapters) or TokenHandler
                              test-only: no live deploy branch builds one, on either map
 ```
 
-- `src/interfaces/` — shared first-party ABIs; keep in sync with implementations. Protocol-specific interfaces (`IiSusdToken`, `IkToken`, `ILayerBankAToken`, `ILayerBankPool`, `ILayerBankErc20Handler`) live next to their handlers. Idle has no protocol-specific interface after R87 removed the per-user ledger surface. Lending handlers share `ITokenLending` directly — R16 removed the empty per-protocol lending interfaces, so do not add one for a new handler unless it actually declares something (errors, events, or protocol-specific views — same bar Idle now meets by having none).
+- `src/interfaces/` — shared first-party ABIs; keep in sync with implementations. Protocol-specific interfaces (`IiSusdToken`, `IkToken`, `ILayerBankAToken`, `ILayerBankPool`, `ILayerBankErc20Handler`) live next to their handlers. Idle has no protocol-specific interface after R87 removed the per-user ledger surface. Lending handlers share `ILendingHandler` directly — R16 removed the empty per-protocol lending interfaces, so do not add one for a new handler unless it actually declares something (errors, events, or protocol-specific views — same bar Idle now meets by having none).
 - `test/unit/DcaDappTest.t.sol` — shared harness; **requires** `SWAP_TYPE` and `LENDING_PROTOCOL` (no fallback).
 - `test/unit/`, `test/mocks/`, `test/ai-generated/` — unit / mocks / extra + fuzz. Dedicated handler tests: `test/ai-generated/unit/sovryn/`, `test/ai-generated/unit/tropykus-legacy/`, `test/ai-generated/unit/idle/`, `test/ai-generated/unit/layerbank/`.
 - `script/` — deploy helpers. Do not `--broadcast` or talk to live contracts. `TROPYKUS_INDEX` deliberately lives in `test/Constants.sol`, not `script/Constants.sol`, so a `script/` file that names a Tropykus route does not compile; `TROPYKUS_STRING` stays in `script/Constants.sol` because the helper configs select mocks with it. Do not move the index back or re-add a Tropykus arm to a live branch — both live branches reject `Protocol.TROPYKUS`. A new production handler ships its deploy path in the same PR: extend `DeployMocSwaps` / `DeployDexSwaps` when it belongs in the main index map, or add a `Deploy<Handler>.s.sol` add-on (see `DeployUsdrifHandler`, `DeployIdleHandler`, `DeployLayerBankHandler`). DcaManager and deployment tests must construct that handler through the script (`DcaDappTest`, `BaseDeploymentTest`, `NewHandlerDeploymentTest`). `new Handler(...)` is only for test subclasses that expose internals, or handler-level tests that set `dcaManager` to the test contract so they can call `onlyDcaManager` entry points.
@@ -122,14 +122,14 @@ Everything else is single-sourced on the interface:
 - Two cases where no interface owns the claim, so it stays on the implementation. An interface that
   declares no functions (`IDcaManagerAccessControl`, `ILayerBankErc20Handler`) is a home
   for errors and events, not a surface: its `@notice` says what it carries. And a fact true of one
-  implementation cannot live on an interface several share — `ITokenLending` is Sovryn's, LayerBank's,
+  implementation cannot live on an interface several share — `ILendingHandler` is Sovryn's, LayerBank's,
   and Tropykus's at once.
 - Constructor-only leaves carry the header even though they carry no banners, and sibling leaves state
   the same fact the same way: the four `*Erc20HandlerDex` contracts each say `Constructor-only leaf`
   and their approval/lifecycle model in `@dev`, not one of them in `@notice`.
 
 **Do not name a token in a contract that does not name it itself.** `PurchaseUniswap`, `IdleErc20Handler`,
-`LendingErc20Handler`, `TokenHandler` and their interfaces are constructed with whatever stablecoin they
+`LendingHandler`, `TokenHandler` and their interfaces are constructed with whatever stablecoin they
 are given; a comment listing DOC, USDRIF, or USDT0 there is a snapshot of a listing decision that will
 rot, and on the Uniswap path naming DOC is simply wrong — DOC is redeemed at MoC and never swapped.
 State the property the code relies on (a decimal bound, a peg assumption) instead of the roster that
