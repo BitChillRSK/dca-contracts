@@ -12,7 +12,6 @@ R100 tip, and ship the ones that make the code more correct or clearer:
 - a dead top-up guard removed;
 - a Tropykus-only error moved off the shared lending interface;
 - accurate error names;
-- the interest-route check before principal moves in `withdrawTokenAndInterest`;
 - stale or history-bearing NatSpec fixed.
 
 ## Background
@@ -31,19 +30,19 @@ user-paid gas when the gain is real, and the cost is recorded here.
 
 **none** — the human asked on 2026-09-27 to implement every reasonable item, including the error rename
 (consumer issues instead of a veto) and the `withdrawTokenAndInterest` reorder if it makes the code
-more correct.
+more correct. Review showed it does not (see G), and the human dropped it on 2026-09-28.
 
 ## Verdicts
 
 | # | Candidate | Verdict | Why |
 |---|---|---|---|
 | E | `assignTokenHandler` checks the handler's `i_dcaManager()` pins this registry | **Ship** | Same reasoning as R89 item 7's stablecoin check. Add-on handler scripts take `dcaManager` as a parameter, and assignment is a separate owner step. A handler built for another DcaManager, such as the pre-relaunch one, passes every other check and takes its `(token, route)` pair and its address for good, while every deposit through it reverts. It fails closed, so no funds are at risk, but the pair is burned. |
-| A | `createDcaSchedule` runs its checks before the pull | **Ship the minimum-purchase half; keep max-schedules after the pull** | The old comment justified both checks by the credited amount. Since the credit became the requested amount, the pull tells them nothing. Moving `_validatePurchaseAmount` before the pull is free (−6 under deploy). Moving the max-schedules bound too costs **+450** under deploy on this user-paid path: the push after the handler call has to reread the list's length. So that bound stays next to the push it guards, with a comment that gives this reason instead of the expired one. |
+| A | `createDcaSchedule` runs its checks before the pull | **Ship the minimum-purchase half; keep max-schedules after the pull** | The old comment justified both checks by the credited amount. Since the credit became the requested amount, the pull tells them nothing. `_validatePurchaseAmount` now runs with the other argument checks, before the handler lookup, at no gas cost under deploy. Review settled that order (2026-09-28): period and deposit already beat `TokenNotAccepted` / `DepositsPaused`, so the amount check should too. A token with neither a minimum nor a handler now reports `TokenMinPurchaseAmountNotSet` instead of `TokenNotAccepted`; both are true. Moving the max-schedules bound too costs **+450** under deploy on this user-paid path: the push after the handler call has to reread the list's length. So that bound stays next to the push it guards, with a comment that gives this reason instead of the expired one. |
 | B | Drop `purchaseAmount == 0 \|\|` in `topUpFromInterest` | **Ship** | Unreachable: every write of `purchaseAmount` meets a non-zero token minimum (`_validatePurchaseAmount`). No test reached it. Same kind of removal as R98. |
 | C | Move `LendingHandler__LendingProtocolRedeemFailed` off `ILendingHandler` | **Ship** as `TropykusErc20Handler__LendingProtocolRedeemFailed` on a new `ITropykusErc20Handler` | Only the test-only Tropykus adapter raises it. Every shipped Sovryn and LayerBank handler listed an error it can never raise. `AGENTS.md`: a fact true of one implementation cannot live on a shared interface. R61 deferred this only because R61 was a no-ABI-change PR. Follows the `ILayerBankErc20Handler` precedent. |
 | D | Stale or history-bearing NatSpec | **Ship** | `ArraysLengthMismatch` still named batch-purchase arrays, but only withdraw-all raises it since R64. `EmptyBatchPurchaseArrays` named an id/buyer pair that no longer exists and omitted `batchBuyRbtcAcrossHandlers`. `LendingHandler._depositToken` compared itself with "the former adapter-local deltas". `IFeeHandler.FeeHandlerConfig` and the `PurchaseUniswap` constructor described FeeHandler "moving off the funding base" (R92 history). |
 | F | `…MustBeGreaterThanMinimum` → `…MustBeAtLeastMinimum` | **Ship** | Both checks accept an amount equal to the minimum, so the old names were wrong. The sibling is already `MinPurchasePeriodMustBeAtLeastOneDay`. Front-end and monitoring get issues rather than a veto. |
-| G | `withdrawTokenAndInterest` checks the route class before moving principal | **Ship** | Before, an idle schedule withdrew principal and then reverted `TokenIsNotLent`. The call was atomic, so no state leaked, but the handler was called for nothing, and an over-balance amount reported the amount instead of the real problem. `_withdrawToken` now takes the schedule the caller already resolved, so the check comes first with no second owner check. Cost: **+109** under deploy on the lending success path (a second slot-0 read across the route-class call). This is user-paid, and accepted because it makes the code more correct. |
+| G | `withdrawTokenAndInterest` checks the route class before moving principal | **Closed** (implemented, then dropped after review 2026-09-28) | Not a correctness fix. An idle call already reverts the whole transaction, so no principal stays withdrawn. The reorder changes only which error an over-balance amount reports (`TokenIsNotLent` instead of `WithdrawalAmountExceedsBalance`, both true) and skips a handler call the revert undoes anyway. It cost a second read of schedule slot 0 on every successful lending exit (+109 under deploy, about one 200-gas SLOAD on Rootstock), user-paid, and it added a storage parameter to `_withdrawToken`. Passing `routeIndex` in as well would avoid the read, but makes the helper more complex for the same non-fix. Recorded in the closed register. |
 | — | Reuse `_measuredProtocolRedeem`'s stablecoin balance in `TokenHandler._withdrawToken` | **Closed** | About −1,000 Rootstock per lending exit, but user-paid, and it couples the redeem measurement to the transfer measurement across layers, as in R87's rejected balance reuse. Recorded in the closed register. |
 
 ## Scope
@@ -54,16 +53,14 @@ more correct.
       `IDcaManager(handler.i_dcaManager()).i_operationsAdmin() == this`; the check runs after the
       stablecoin check. A handler pinned to a non-DcaManager reverts without data, fails closed, and
       does not consume its address.
-- [x] A: `_validatePurchaseAmount` runs before `depositToken`, after the handler lookup (so
-      `TokenNotAccepted` and `DepositsPaused` keep their precedence). Max-schedules stays after the pull
-      with its reason stated.
+- [x] A: `_validatePurchasePeriod` → `_validateDeposit` → `_validatePurchaseAmount` →
+      `_handlerForDeposit` → `depositToken`. Max-schedules stays after the pull with its gas reason
+      stated.
 - [x] B: remove the dead `purchaseAmount == 0` disjunct and its comment sentence.
 - [x] C: `ITropykusErc20Handler` holds `TropykusErc20Handler__LendingProtocolRedeemFailed(uint256)`;
       `ILendingHandler` drops `LendingHandler__LendingProtocolRedeemFailed`.
 - [x] D: the five NatSpec fixes above.
 - [x] F: rename both errors in `IDcaManager`, `DcaManager`, and tests.
-- [x] G: `_withdrawToken(DcaSchedule storage, …)`; `withdrawTokenAndInterest` calls `_checkTokenIsLent`
-      first.
 - [x] `AGENTS.md`: `IDcaManagerAccessControl` now declares a function, so `ITropykusErc20Handler` joins
       `ILayerBankErc20Handler` as the errors-only example, and joins the list of protocol-specific
       interfaces.
@@ -71,6 +68,7 @@ more correct.
 ## Out of scope
 
 - [x] The lending-exit double `balanceOf` (closed above).
+- [x] G, the `withdrawTokenAndInterest` reorder (closed above).
 - [x] Any purchase-path change.
 - [x] Moving the max-schedules check before the pull (measured, declined above).
 
@@ -86,8 +84,7 @@ more correct.
   `DcaScheduleTest`), `test/gas/StubPurchaseHandler.sol`, `test/gas/R64BatchGasBenchmark.t.sol`,
   `test/gas/R81PackedSlotWritesGas.t.sol`, `test/gas/R82TransientGuardGas.t.sol`,
   `test/gas/R89ReviewCandidatesGas.t.sol` (stubs report `i_dcaManager`)
-- `test/unit/DcaConfigurationTest.t.sol`, `test/ai-generated/unit/DcaManagerEdgeCasesTest.t.sol`,
-  `test/ai-generated/unit/idle/IdleDcaManagerTest.t.sol`
+- `test/unit/DcaConfigurationTest.t.sol`, `test/ai-generated/unit/DcaManagerEdgeCasesTest.t.sol`
 - `AGENTS.md`, `docs/relaunch/IMPLEMENTATION_ORDER.md`, `docs/relaunch/README.md`
 
 ## Required tests
@@ -96,7 +93,7 @@ more correct.
 make check
 make check-deploy
 make fork-sovryn
-make fork-tropykus
+make fork-layerbank
 FOUNDRY_PROFILE=deploy SWAP_TYPE=mocSwaps LENDING_PROTOCOL={none,sovryn} STABLECOIN_TYPE=DOC \
   forge test --match-path test/gas/R89ReviewCandidatesGas.t.sol -vv
 ```
@@ -107,8 +104,6 @@ Assert:
   refused by a fresh registry for its own stablecoin with `HandlerDcaManagerMismatch`.
 - `testHandlerPinnedToANonDcaManagerIsRejected`: fails closed, and the address is not consumed.
 - `testCreateRevertsBelowMinPurchaseAmountBeforeTokensMove`: `depositToken` is never called.
-- `test_withdrawTokenAndInterest_atIndexZero_revertsBeforePrincipalMoves`: `withdrawToken` is never
-  called, and an over-balance amount still reports `TokenIsNotLent`.
 
 Forks: no new fork-specific assertions.
 
@@ -116,32 +111,31 @@ Forks: no new fork-specific assertions.
 
 | Call | Lane | Before | After | Δ |
 |---|---|---:|---:|---:|
-| `createDcaSchedule` | idle | 106,740 | 106,734 | −6 |
-| `createDcaSchedule` | Sovryn | 169,792 | 169,786 | −6 |
-| `withdrawToken` | Sovryn | 75,763 | 75,757 | −6 |
-| `withdrawTokenAndInterest` | Sovryn | 123,647 | 123,756 | +109 |
+| `createDcaSchedule` | idle | 106,740 | 106,740 | 0 |
+| `createDcaSchedule` | Sovryn | 169,792 | 169,792 | 0 |
 | `assignTokenHandler` | idle | 50,854 | 52,014 | +1,160 |
 | `assignTokenHandler` | Sovryn | 50,900 | 52,104 | +1,204 |
 
 The after figure for `assignTokenHandler` mocks the DcaManager's registry getter to point at the fresh
 registry, so the real call costs slightly more. It is one-time and owner-paid: on Rootstock, two more
-external calls at a flat 700 each. Rejected variant: moving the max-schedules bound before the pull as
+external calls at a flat 700 each. `withdrawToken` and `withdrawTokenAndInterest` are unchanged
+(75,763 / 123,647). Rejected variant: moving the max-schedules bound before the pull as
 well measured 107,190 / 170,243 (+450).
 
 ## Success criteria
 
 - [x] Every candidate in **Verdicts** is shipped or closed with its reason.
 - [x] No purchase-path change, and every invariant in `AGENTS.md` still holds.
-- [x] `make check`, `make check-deploy`, `make fork-sovryn`, and `make fork-tropykus` green.
+- [x] `make check`, `make check-deploy`, `make fork-sovryn`, and `make fork-layerbank` green.
 - [x] Consumer issues opened for the renamed and moved errors and the new registry error.
 
 ## Reviewer checklist
 
 - [ ] Matches **Scope**; nothing from **Out of scope**.
-- [ ] The create error order is unchanged: `TokenNotAccepted` and `DepositsPaused` still come before the
-      amount checks.
-- [ ] `_callersSchedule` is still the single owner check (invariant 8); `withdrawTokenAndInterest` calls
-      it once.
+- [ ] Create runs every argument check (period, deposit, purchase amount) before the handler lookup;
+      only max-schedules follows the pull.
+- [ ] `src/` comments this PR touches give only a durable reason the code does not say.
+- [ ] `withdrawTokenAndInterest` and `_withdrawToken` are unchanged from R100.
 - [ ] No relaunch ticket IDs in `src/` comments.
 
 ## ABI / deploy / cutover impact

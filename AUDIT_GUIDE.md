@@ -138,7 +138,7 @@ git submodule update --init --recursive
 make check
 make check-deploy
 make fork-sovryn
-make fork-tropykus
+make fork-layerbank
 make fork-dex-path
 make slither
 make aderyn
