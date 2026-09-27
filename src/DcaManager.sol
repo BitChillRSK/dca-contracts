@@ -780,6 +780,6 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
 
     /// @dev Whether a route index was registered as lending.
     function _tokenYieldsInterest(uint256 routeIndex) private view returns (bool) {
-        return i_operationsAdmin.isLendingRoute(routeIndex);
+        return i_operationsAdmin.getRouteClass(routeIndex) == IOperationsAdmin.RouteClass.Lending;
     }
 }

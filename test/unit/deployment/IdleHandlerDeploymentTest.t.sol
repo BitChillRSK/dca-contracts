@@ -3,6 +3,7 @@ pragma solidity 0.8.36;
 
 import {BaseDeploymentTest} from "./BaseDeploymentTest.t.sol";
 import {DeployIdleHandler} from "../../../script/DeployIdleHandler.s.sol";
+import {IOperationsAdmin} from "../../../src/interfaces/IOperationsAdmin.sol";
 import {IdleDocHandlerMoc} from "../../../src/idle/IdleDocHandlerMoc.sol";
 import {console} from "forge-std/Test.sol";
 import "../../Constants.sol";
@@ -42,6 +43,10 @@ contract IdleHandlerDeploymentTest is BaseDeploymentTest {
 
         address registeredHandler = operationsAdmin.getTokenHandler(helperConfig.getStablecoinAddress(), IDLE_INDEX);
         assertEq(registeredHandler, idleHandlerAddress, "Idle handler not registered in OperationsAdmin");
-        assertFalse(operationsAdmin.isLendingRoute(IDLE_INDEX), "Index 0 must be idle");
+        assertEq(
+            uint256(operationsAdmin.getRouteClass(IDLE_INDEX)),
+            uint256(IOperationsAdmin.RouteClass.Idle),
+            "Index 0 must be idle"
+        );
     }
 }

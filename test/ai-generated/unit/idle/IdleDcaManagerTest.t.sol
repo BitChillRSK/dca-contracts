@@ -5,6 +5,7 @@ import {BaseDeploymentTest} from "test/unit/deployment/BaseDeploymentTest.t.sol"
 import {DeployIdleHandler} from "script/DeployIdleHandler.s.sol";
 import {IdleDocHandlerMoc} from "src/idle/IdleDocHandlerMoc.sol";
 import {IDcaManager} from "src/interfaces/IDcaManager.sol";
+import {IOperationsAdmin} from "src/interfaces/IOperationsAdmin.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import {ITokenLending} from "src/interfaces/ITokenLending.sol";
@@ -69,7 +70,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         assertEq(schedule.routeIndex, IDLE_INDEX);
         assertEq(schedule.tokenBalance, DEPOSIT);
         assertEq(docToken.balanceOf(address(handler)), DEPOSIT);
-        assertFalse(operationsAdmin.isLendingRoute(IDLE_INDEX));
+        assertEq(uint256(operationsAdmin.getRouteClass(IDLE_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle));
     }
 
     function test_buyAndWithdraw_spendIdleDoc() public {

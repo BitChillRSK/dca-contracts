@@ -92,7 +92,9 @@ contract OperationsAdminTest is DcaDappTest {
 
         vm.prank(OWNER);
         operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
-        assertTrue(operationsAdmin.isLendingRoute(SECOND_LENDING_INDEX));
+        assertEq(
+            uint256(operationsAdmin.getRouteClass(SECOND_LENDING_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending)
+        );
     }
 
     function testOwnerCannotRenounceOwnership() external {
@@ -112,7 +114,6 @@ contract OperationsAdminTest is DcaDappTest {
         emit OperationsAdmin__RouteRegistered(0, false);
         OperationsAdmin freshAdmin = new OperationsAdmin(OWNER);
         assertEq(uint256(freshAdmin.getRouteClass(0)), uint256(IOperationsAdmin.RouteClass.Idle));
-        assertFalse(freshAdmin.isLendingRoute(0));
         assertEq(freshAdmin.owner(), OWNER);
         assertEq(freshAdmin.pendingOwner(), address(0));
     }
@@ -162,13 +163,11 @@ contract OperationsAdminTest is DcaDappTest {
         vm.stopPrank();
     }
 
-    function testIsLendingRouteReadsRecordedClass() external {
-        assertFalse(operationsAdmin.isLendingRoute(0));
+    function testGetRouteClassReadsRecordedClass() external {
         assertEq(uint256(operationsAdmin.getRouteClass(0)), uint256(IOperationsAdmin.RouteClass.Idle));
-        assertTrue(operationsAdmin.isLendingRoute(TROPYKUS_INDEX));
-        assertTrue(operationsAdmin.isLendingRoute(SOVRYN_INDEX));
-        assertTrue(operationsAdmin.isLendingRoute(LAYERBANK_INDEX));
-        assertFalse(operationsAdmin.isLendingRoute(999));
+        assertEq(uint256(operationsAdmin.getRouteClass(TROPYKUS_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
+        assertEq(uint256(operationsAdmin.getRouteClass(SOVRYN_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
+        assertEq(uint256(operationsAdmin.getRouteClass(LAYERBANK_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
         assertEq(uint256(operationsAdmin.getRouteClass(999)), uint256(IOperationsAdmin.RouteClass.Unregistered));
     }
 
@@ -177,20 +176,23 @@ contract OperationsAdminTest is DcaDappTest {
         emit OperationsAdmin__RouteRegistered(SECOND_LENDING_INDEX, true);
         vm.prank(OWNER);
         operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
-        assertTrue(operationsAdmin.isLendingRoute(SECOND_LENDING_INDEX));
+        assertEq(
+            uint256(operationsAdmin.getRouteClass(SECOND_LENDING_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending)
+        );
 
         vm.expectEmit(false, false, false, true);
         emit OperationsAdmin__RouteRegistered(SECOND_IDLE_INDEX, false);
         vm.prank(OWNER);
         operationsAdmin.registerRoute(SECOND_IDLE_INDEX, false);
-        assertFalse(operationsAdmin.isLendingRoute(SECOND_IDLE_INDEX));
         assertEq(uint256(operationsAdmin.getRouteClass(SECOND_IDLE_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle));
     }
 
     function testMistakenClassificationRecoveredAtNewIndex() external {
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(SECOND_LENDING_INDEX, false);
-        assertFalse(operationsAdmin.isLendingRoute(SECOND_LENDING_INDEX));
+        assertEq(
+            uint256(operationsAdmin.getRouteClass(SECOND_LENDING_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle)
+        );
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -201,8 +203,13 @@ contract OperationsAdminTest is DcaDappTest {
 
         operationsAdmin.registerRoute(SECOND_LENDING_INDEX + 1, true);
         vm.stopPrank();
-        assertTrue(operationsAdmin.isLendingRoute(SECOND_LENDING_INDEX + 1));
-        assertFalse(operationsAdmin.isLendingRoute(SECOND_LENDING_INDEX));
+        assertEq(
+            uint256(operationsAdmin.getRouteClass(SECOND_LENDING_INDEX + 1)),
+            uint256(IOperationsAdmin.RouteClass.Lending)
+        );
+        assertEq(
+            uint256(operationsAdmin.getRouteClass(SECOND_LENDING_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle)
+        );
     }
 
     function testMistakenHandlerAssignmentRecoveredAtNewIndex() external {
@@ -249,8 +256,8 @@ contract OperationsAdminTest is DcaDappTest {
 
         assertTrue(operationsAdmin.getTokenHandler(address(stablecoin), IDLE_INDEX) != address(0));
         assertEq(operationsAdmin.getTokenHandler(address(stablecoin), SECOND_IDLE_INDEX), address(idleAtTen));
-        assertFalse(operationsAdmin.isLendingRoute(IDLE_INDEX));
-        assertFalse(operationsAdmin.isLendingRoute(SECOND_IDLE_INDEX));
+        assertEq(uint256(operationsAdmin.getRouteClass(IDLE_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle));
+        assertEq(uint256(operationsAdmin.getRouteClass(SECOND_IDLE_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle));
     }
 
     function testOldRouteStillPaysUserAfterNewHandlerRegistered() external {
@@ -594,7 +601,9 @@ contract OperationsAdminTest is DcaDappTest {
     function testDeployedHandlerIsAssignableOnlyForItsOwnStablecoin() external {
         OperationsAdmin freshAdmin = new OperationsAdmin(address(this));
         if (s_routeIndex != IDLE_INDEX) {
-            freshAdmin.registerRoute(s_routeIndex, operationsAdmin.isLendingRoute(s_routeIndex));
+            freshAdmin.registerRoute(
+                s_routeIndex, operationsAdmin.getRouteClass(s_routeIndex) == IOperationsAdmin.RouteClass.Lending
+            );
         }
         address otherToken = makeAddr("r89DeployedOtherToken");
 
@@ -744,9 +753,6 @@ contract OperationsAdminTest is DcaDappTest {
 
         vm.expectRevert(_routeIndexOverflow(overflowing));
         operationsAdmin.getTokenHandler(address(stablecoin), overflowing);
-
-        vm.expectRevert(_routeIndexOverflow(overflowing));
-        operationsAdmin.isLendingRoute(overflowing);
 
         vm.expectRevert(_routeIndexOverflow(overflowing));
         operationsAdmin.getRouteClass(overflowing);

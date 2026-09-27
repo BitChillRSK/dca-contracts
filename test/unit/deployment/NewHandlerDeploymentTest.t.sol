@@ -92,7 +92,7 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
         UsdrifHelperConfig.NetworkConfig memory config = usdrifHelperConfig.getNetworkConfig();
         address registeredHandler = operationsAdmin.getTokenHandler(config.usdrifTokenAddress, LAYERBANK_INDEX);
         assertEq(registeredHandler, usdrifHandlerAddress, "USDRIF handler not registered in OperationsAdmin");
-        assertTrue(operationsAdmin.isLendingRoute(LAYERBANK_INDEX));
+        assertEq(uint256(operationsAdmin.getRouteClass(LAYERBANK_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
         assertTrue(
             IPurchaseUniswap(usdrifHandlerAddress).isPurchasePathAllowed(keccak256(usdrifHandler.getSwapPath())),
             "constructor path is allowlisted at construction"

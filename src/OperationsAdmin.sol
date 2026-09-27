@@ -149,11 +149,6 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
     }
 
     /// @inheritdoc IOperationsAdmin
-    function isLendingRoute(uint256 index) external view returns (bool) {
-        return s_routeClass[index.toUint32()] == RouteClass.Lending;
-    }
-
-    /// @inheritdoc IOperationsAdmin
     function getRouteClass(uint256 index) external view returns (RouteClass) {
         return s_routeClass[index.toUint32()];
     }

@@ -6,6 +6,7 @@ import {stdStorage, StdStorage} from "forge-std/StdStorage.sol";
 import {DcaDappTest} from "test/unit/DcaDappTest.t.sol";
 import {IDcaManager} from "src/interfaces/IDcaManager.sol";
 import {OperationsAdmin} from "src/OperationsAdmin.sol";
+import {IOperationsAdmin} from "src/interfaces/IOperationsAdmin.sol";
 import {ITokenLending} from "src/interfaces/ITokenLending.sol";
 import {scheduleIdAt} from "test/utils/ScheduleAt.sol";
 import "test/Constants.sol";
@@ -69,7 +70,7 @@ contract R89ReviewCandidatesGasTest is DcaDappTest {
     function test_lockedPrincipal_readsEachIdWordOnce() public {
         // Extra schedules mint mock DOC; fork lanes use live DOC without a test minter.
         if (block.chainid != ANVIL_CHAIN_ID) vm.skip(true);
-        if (!operationsAdmin.isLendingRoute(s_routeIndex)) vm.skip(true);
+        if (operationsAdmin.getRouteClass(s_routeIndex) != IOperationsAdmin.RouteClass.Lending) vm.skip(true);
         _fillUserSchedules(MAX_SCHEDULES_PER_TOKEN);
         updateExchangeRate(180 days);
 
@@ -106,7 +107,7 @@ contract R89ReviewCandidatesGasTest is DcaDappTest {
 
     /// @dev One handler call, one read of the user's booked shares (was two).
     function test_withdrawToken_readsBookedSharesOnce() public {
-        if (!operationsAdmin.isLendingRoute(s_routeIndex)) vm.skip(true);
+        if (operationsAdmin.getRouteClass(s_routeIndex) != IOperationsAdmin.RouteClass.Lending) vm.skip(true);
         bytes32 sharesSlot = _userSharesSlot(USER);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
 
@@ -125,7 +126,7 @@ contract R89ReviewCandidatesGasTest is DcaDappTest {
 
     /// @dev Two handler calls (principal, then interest), one read each (was two each).
     function test_withdrawTokenAndInterest_readsBookedSharesOncePerCall() public {
-        if (!operationsAdmin.isLendingRoute(s_routeIndex)) vm.skip(true);
+        if (operationsAdmin.getRouteClass(s_routeIndex) != IOperationsAdmin.RouteClass.Lending) vm.skip(true);
         updateExchangeRate(180 days);
         bytes32 sharesSlot = _userSharesSlot(USER);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
@@ -209,7 +210,9 @@ contract R89ReviewCandidatesGasTest is DcaDappTest {
     function test_assignTokenHandler_readsRouteClassOnce() public {
         OperationsAdmin registry = new OperationsAdmin(address(this));
         if (s_routeIndex != IDLE_INDEX) {
-            registry.registerRoute(s_routeIndex, operationsAdmin.isLendingRoute(s_routeIndex));
+            registry.registerRoute(
+                s_routeIndex, operationsAdmin.getRouteClass(s_routeIndex) == IOperationsAdmin.RouteClass.Lending
+            );
         }
 
         vm.startStateDiffRecording();

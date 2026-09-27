@@ -262,7 +262,9 @@ abstract contract LendingErc20Handler is TokenHandler, ITokenLending {
      * @dev Convert stablecoin to shares. Rounds up so the virtual share debit is never below
      *      what the lending protocol may burn for the same stablecoin amount (keeps sum of
      *      per-user shares <= shares the handler actually holds). Round-down would allow the
-     *      books to drift above reality.
+     *      books to drift above reality. The product `stablecoinAmount * i_exchangeRateDecimals`
+     *      is checked: callers pass a `uint96` purchase amount or an amount already bounded by
+     *      `_sharesToStablecoin`, so it fits, and an overflow would revert rather than wrap.
      * @param stablecoinAmount Amount of stablecoin to convert.
      * @param exchangeRate Stablecoin per share, scaled by `i_exchangeRateDecimals`.
      * @return sharesAmount Corresponding shares, rounded up.
@@ -272,7 +274,7 @@ abstract contract LendingErc20Handler is TokenHandler, ITokenLending {
         view
         returns (uint256 sharesAmount)
     {
-        sharesAmount = Math.mulDiv(stablecoinAmount, i_exchangeRateDecimals, exchangeRate, Math.Rounding.Ceil);
+        sharesAmount = Math.ceilDiv(stablecoinAmount * i_exchangeRateDecimals, exchangeRate);
     }
 
     /**
