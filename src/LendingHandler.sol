@@ -284,7 +284,8 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
      *      Both callers already bound `stablecoinAmount`: principal withdrawals clamp to this
      *      user's share-backed underlying first, and interest withdrawals redeem at most that
      *      same underlying minus locked principal. So `ceil(amount × scale / rate)` never exceeds
-     *      `usersShares`. Batch shortfalls revert in `_batchRetrieveStablecoin` instead.
+     *      `usersShares`. The debit is checked anyway — a future caller that broke the bound would
+     *      revert rather than wrap the book. Batch shortfalls revert in `_batchRetrieveStablecoin`.
      *      Zero shares is a no-op. A positive burn that pays nothing reverts and rolls back.
      *      Callers pass the `usersShares` they already loaded to avoid a second SLOAD.
      */
@@ -296,9 +297,7 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
         if (sharesToRedeem == 0) {
             return 0;
         }
-        unchecked {
-            _setUserShares(user, usersShares, usersShares - sharesToRedeem);
-        }
+        _setUserShares(user, usersShares, usersShares - sharesToRedeem);
         stablecoinReceived = _measuredProtocolRedeem(sharesToRedeem, exchangeRate);
         if (stablecoinReceived == 0) {
             revert LendingHandler__ZeroStablecoinReceived(sharesToRedeem);

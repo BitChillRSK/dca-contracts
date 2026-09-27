@@ -37,7 +37,9 @@ Sibling cleanups from the same 2026-09-27 review are [R99](./R99-centralize-depo
 
 - [x] In `_redeemShares`: drop the `sharesToRedeem > usersShares` branch and its emit; make the
       helper `private` (move it under **PRIVATE FUNCTIONS**); refresh the NatSpec so it no longer
-      claims a clamp or names a deleted `_retrieveStablecoin` rationale.
+      claims a clamp or names a deleted `_retrieveStablecoin` rationale. Review follow-up: keep the
+      share debit **checked** (the removed clamp used to guard the old `unchecked`; a broken future
+      caller must revert, not wrap) and fuzz the bound through `withdrawToken` / `withdrawInterest`.
 - [x] Delete `LendingHandler__AmountToRedeemAdjusted` from `ILendingHandler`.
 - [x] Replace `test_redeemShares_clampsToTheUsersOwnBook` with tests that go through
       `withdrawToken` / `withdrawInterest` (outer clamp still fires; interest amount stays

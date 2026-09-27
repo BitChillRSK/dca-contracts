@@ -86,6 +86,66 @@ contract LendingHandlerRedeemTest is Test {
         assertLt(harness.getUserShares(userA), sharesBefore);
     }
 
+    /**
+     * @dev Production withdraw callers bound the amount so `ceil(amount × scale / rate) ≤ book`.
+     *      Fuzzes non-round rates and overstated requests through the outer clamp; the book must
+     *      never grow and the debit must equal the ceil of the capped amount.
+     */
+    function testFuzz_withdrawToken_debitNeverExceedsBook(uint256 shares, uint256 rate, uint256 request) public {
+        rate = bound(rate, 1, type(uint128).max);
+        shares = bound(shares, 0, type(uint256).max / rate);
+        harness.setExchangeRate(rate);
+        if (shares > 0) {
+            harness.creditShares(userA, shares);
+        }
+
+        uint256 shareBacked = shares * rate / RATE_SCALE;
+        uint256 bookBefore = harness.getUserShares(userA);
+        assertEq(bookBefore, shares);
+
+        uint256 received = harness.withdrawToken(userA, request);
+        uint256 bookAfter = harness.getUserShares(userA);
+        assertLe(bookAfter, bookBefore);
+
+        uint256 capped = request > shareBacked ? shareBacked : request;
+        uint256 expectedDebit = capped == 0 ? 0 : harness.stablecoinToShares(capped, rate);
+        assertLe(expectedDebit, bookBefore);
+        assertEq(bookBefore - bookAfter, expectedDebit);
+        assertEq(received, expectedDebit == 0 ? 0 : expectedDebit * rate / RATE_SCALE);
+    }
+
+    /**
+     * @dev Interest redeems at most share-backed minus locked. Same ceil bound as principal;
+     *      locked spans [0, shareBacked] so the no-interest early return is covered too.
+     */
+    function testFuzz_withdrawInterest_debitNeverExceedsBook(uint256 shares, uint256 rate, uint256 locked) public {
+        rate = bound(rate, 1, type(uint128).max);
+        shares = bound(shares, 1, type(uint256).max / rate);
+        harness.setExchangeRate(rate);
+        harness.creditShares(userA, shares);
+
+        uint256 shareBacked = shares * rate / RATE_SCALE;
+        locked = bound(locked, 0, shareBacked);
+
+        uint256 bookBefore = harness.getUserShares(userA);
+        uint256 userStableBefore = stablecoin.balanceOf(userA);
+        harness.withdrawInterest(userA, locked);
+        uint256 bookAfter = harness.getUserShares(userA);
+        assertLe(bookAfter, bookBefore);
+
+        if (shareBacked <= locked) {
+            assertEq(bookAfter, bookBefore);
+            assertEq(stablecoin.balanceOf(userA), userStableBefore);
+            return;
+        }
+
+        uint256 interest = shareBacked - locked;
+        uint256 expectedDebit = harness.stablecoinToShares(interest, rate);
+        assertLe(expectedDebit, bookBefore);
+        assertEq(bookBefore - bookAfter, expectedDebit);
+        assertEq(stablecoin.balanceOf(userA), userStableBefore + expectedDebit * rate / RATE_SCALE);
+    }
+
     function test_withdrawToken_zeroAmountIsANoOp() public {
         harness.depositToken(userA, USER_A_DEPOSIT);
         uint256 sharesBefore = harness.getUserShares(userA);
