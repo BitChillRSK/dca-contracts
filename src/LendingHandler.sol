@@ -145,40 +145,6 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     }
 
     /**
-     * @dev Redeem shares for stablecoin, sized by the share count this contract debits.
-     *      Clamp to this user's book, never the handler's pooled balance: schedule accounting can
-     *      sit ahead of share-backed underlying, and purchases have no outer withdraw clamp.
-     *      Zero shares is a no-op. A positive burn that pays nothing reverts and rolls back.
-     *      Callers pass the `usersShares` they already loaded to avoid a second SLOAD.
-     */
-    function _redeemShares(address user, uint256 usersShares, uint256 stablecoinAmount, uint256 exchangeRate)
-        internal
-        returns (uint256 stablecoinReceived)
-    {
-        uint256 sharesToRedeem = _stablecoinToShares(stablecoinAmount, exchangeRate);
-        if (sharesToRedeem > usersShares) {
-            uint256 oldSharesToRedeem = sharesToRedeem;
-            uint256 oldStablecoinAmount = stablecoinAmount;
-            sharesToRedeem = usersShares;
-            stablecoinAmount = _sharesToStablecoin(sharesToRedeem, exchangeRate);
-            emit LendingHandler__AmountToRedeemAdjusted(
-                user, oldSharesToRedeem, sharesToRedeem, oldStablecoinAmount, stablecoinAmount
-            );
-        }
-        if (sharesToRedeem == 0) {
-            return 0;
-        }
-        unchecked {
-            _setUserShares(user, usersShares, usersShares - sharesToRedeem);
-        }
-        stablecoinReceived = _measuredProtocolRedeem(sharesToRedeem, exchangeRate);
-        if (stablecoinReceived == 0) {
-            revert LendingHandler__ZeroStablecoinReceived(sharesToRedeem);
-        }
-        emit LendingHandler__SharesRedeemed(user, stablecoinReceived, sharesToRedeem);
-    }
-
-    /**
      * @dev Retrieve several users' stablecoin in one protocol redemption.
      *      Each row uses the same ceil(stablecoin → shares) as a single redeem; the protocol
      *      burn is exactly the sum of those debits so virtual books and the lending position
@@ -311,6 +277,33 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
                 ? totalStablecoinInLending - stablecoinLockedInDcaSchedules
                 : 0;
         }
+    }
+
+    /**
+     * @dev Redeem shares for stablecoin, sized by the share count this contract debits.
+     *      Both callers already bound `stablecoinAmount`: principal withdrawals clamp to this
+     *      user's share-backed underlying first, and interest withdrawals redeem at most that
+     *      same underlying minus locked principal. So `ceil(amount × scale / rate)` never exceeds
+     *      `usersShares`. Batch shortfalls revert in `_batchRetrieveStablecoin` instead.
+     *      Zero shares is a no-op. A positive burn that pays nothing reverts and rolls back.
+     *      Callers pass the `usersShares` they already loaded to avoid a second SLOAD.
+     */
+    function _redeemShares(address user, uint256 usersShares, uint256 stablecoinAmount, uint256 exchangeRate)
+        private
+        returns (uint256 stablecoinReceived)
+    {
+        uint256 sharesToRedeem = _stablecoinToShares(stablecoinAmount, exchangeRate);
+        if (sharesToRedeem == 0) {
+            return 0;
+        }
+        unchecked {
+            _setUserShares(user, usersShares, usersShares - sharesToRedeem);
+        }
+        stablecoinReceived = _measuredProtocolRedeem(sharesToRedeem, exchangeRate);
+        if (stablecoinReceived == 0) {
+            revert LendingHandler__ZeroStablecoinReceived(sharesToRedeem);
+        }
+        emit LendingHandler__SharesRedeemed(user, stablecoinReceived, sharesToRedeem);
     }
 
     /**

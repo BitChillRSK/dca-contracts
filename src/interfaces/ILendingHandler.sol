@@ -39,14 +39,6 @@ interface ILendingHandler is ITokenHandler {
     event LendingHandler__WithdrawalAmountAdjusted(
         address indexed user, uint256 originalAmount, uint256 adjustedAmount
     );
-    /// @notice A single-user redeem was clamped to the shares this handler books for that user.
-    event LendingHandler__AmountToRedeemAdjusted(
-        address indexed user,
-        uint256 originalSharesAmount,
-        uint256 adjustedSharesAmount,
-        uint256 originalStablecoinAmount,
-        uint256 adjustedStablecoinAmount
-    );
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
