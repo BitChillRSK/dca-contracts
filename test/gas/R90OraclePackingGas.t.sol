@@ -80,7 +80,11 @@ contract R90OraclePackingGasTest is DcaDappTest {
         console2.log("  oracle+percent slot reads", oracleReads);
         console2.log("  safety-slot reads", safetyReads);
 
-        assertEq(oracleReads, 1, "packed oracle+percent word should be read once per batch");
+        // Shipping `[profile.deploy]` (`via_ir`) loads the packed word once. Legacy codegen still
+        // issues one SLOAD per field even when they share a slot, so Rootstock's flat 200 applies
+        // twice there and the packing win is deploy-only. Count the reads; do not treat a Cancun
+        // cold→warm delta as the production bill.
+        assertEq(oracleReads, _viaIr() ? 1 : 2, "packed oracle+percent word re-read");
         assertEq(safetyReads, 0, "purchase must not read the safety floor");
     }
 
@@ -140,5 +144,10 @@ contract R90OraclePackingGasTest is DcaDappTest {
                 if (access.account == account && access.slot == slot && !access.isWrite && !access.reverted) ++n;
             }
         }
+    }
+
+    /// @dev `deploy` is the only `via_ir` profile (foundry.toml); every other profile is legacy codegen.
+    function _viaIr() private view returns (bool) {
+        return keccak256(bytes(vm.envOr("FOUNDRY_PROFILE", string("default")))) == keccak256("deploy");
     }
 }
