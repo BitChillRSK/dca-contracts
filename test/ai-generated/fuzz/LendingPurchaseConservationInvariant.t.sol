@@ -86,9 +86,7 @@ contract LendingPurchaseConservationHandler is Test {
 
         uint256 handlerBalBefore = address(i_handler).balance;
         i_handler.batchBuyRbtc(buyers, scheduleIds, amounts, 0);
-        unchecked {
-            s_rbtcReceivedGhost += address(i_handler).balance - handlerBalBefore;
-        }
+        s_rbtcReceivedGhost += address(i_handler).balance - handlerBalBefore;
         ++s_buySuccesses;
     }
 
@@ -99,9 +97,7 @@ contract LendingPurchaseConservationHandler is Test {
 
         uint256 userBalBefore = user.balance;
         i_handler.withdrawAccumulatedRbtc(user);
-        unchecked {
-            s_rbtcWithdrawnGhost += user.balance - userBalBefore;
-        }
+        s_rbtcWithdrawnGhost += user.balance - userBalBefore;
         ++s_withdrawSuccesses;
     }
 
