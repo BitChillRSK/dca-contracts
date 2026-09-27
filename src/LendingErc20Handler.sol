@@ -222,7 +222,10 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
         }
         uint256 requested;
         for (uint256 i; i < numOfPurchases; ++i) {
-            requested += purchaseAmounts[i];
+            // Each amount is a uint96 schedule purchase amount, so the sum cannot overflow.
+            unchecked {
+                requested += purchaseAmounts[i];
+            }
         }
         revert TokenLending__ZeroStablecoinReceived(requested);
     }
