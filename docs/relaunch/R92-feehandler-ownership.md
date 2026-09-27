@@ -1,6 +1,6 @@
 # R92 — FeeHandler ownership move
 
-Status: **implemented** · Assigned: yes · Optional/further-review: no
+Status: **implemented** · GitHub [#157](https://github.com/BitChillRSK/dca-contracts/pull/157) · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
