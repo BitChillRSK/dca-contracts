@@ -1,18 +1,20 @@
-# R95 — Merge `TokenLending` into `LendingErc20Handler`, and source-order cleanups
+# R95 — Merge `TokenLending` into the lending base, rename it `LendingHandler`, and source-order cleanups
 
 Status: **implemented** · GitHub [#161](https://github.com/BitChillRSK/dca-contracts/pull/161) · Assigned: yes · Optional/further-review: no · Stack on: [#160](https://github.com/BitChillRSK/dca-contracts/pull/160)
 
 ## Objective
 
 Delete `src/TokenLending.sol` and move its scale immutable and its two share ↔ stablecoin conversion
-helpers into `LendingErc20Handler`, which then inherits `ITokenLending` directly. In the same pass, fix
-four source-only inconsistencies:
+helpers into `LendingErc20Handler`, which then inherits `ITokenLending` directly. Then rename the pair
+`LendingHandler` / `ILendingHandler` (see **Naming**). In the same pass, fix four source-only
+inconsistencies:
 - give the scale immutable an explicit visibility;
 - convert the `PurchaseRbtc` constructor's two-line `///` run to `/** */`;
 - declare constants, then immutables, then storage in `PurchaseUniswap` and `FeeHandler`;
 - make every first-party `src/` import relative.
 
-Runtime bytecode is identical under both profiles, so this PR changes no behavior.
+Behavior is unchanged. The only bytecode difference is the renamed event topics and error selectors
+(see **Measured pins**).
 
 This spec also records the verdict on every candidate from the 2026-09-27 review of PRs 138–160 (see
 **Review disposition**). [R96](./R96-ceildiv-and-one-route-class-getter.md) and
@@ -42,10 +44,30 @@ a reader can diff (`AGENTS.md` **Section headers and function order**).
 
 Decided by the human on 2026-09-27: "Right now I don't see why they should be two different files."
 
+### Naming
+
+Decided by the human on 2026-09-27, after the merge: the base is `LendingHandler`, its interface
+`ILendingHandler`. The base knows nothing about ERC20-versus-DOC or DEX-versus-MoC; those words name the
+protocol leaves (`SovrynErc20HandlerDex`, `LayerBankDocHandlerMoc`, …) in the protocol directories.
+`LendingHandler` / `ILendingHandler` then pairs with `TokenHandler` / `ITokenHandler`.
+
+Errors and events carry their interface's name as prefix (`TokenHandler__`, `DcaManager__`), so the
+prefix follows the interface: `TokenLending__*` → `LendingHandler__*`, and
+`OperationsAdmin__ContractIsNotTokenLending` → `OperationsAdmin__ContractIsNotLendingHandler`. An
+earlier draft of this spec kept the old prefix to spare `bitchill-monitoring`. The human overruled that:
+consumer breakage is a follow-up issue, not a reason to keep an incoherent name. Function selectors, and
+therefore `type(ILendingHandler).interfaceId`, are unchanged.
+
+Renamed alongside: `test/unit/LendingErc20HandlerRedeemTest.t.sol` → `LendingHandlerRedeemTest.t.sol`,
+its harness, the `GettersTest` `test_tokenLending_*` cases, and `DcaManager._withdrawInterest`'s
+`tokenLending` parameter.
+
+[R26](./R26-share-terminology.md) said to keep `ITokenLending` / `TokenLending` because "lending" is a
+fine domain word. That still holds: the rename keeps "lending" and drops "token", which described the
+file split this PR removes.
+
 ### What does not change
 
-- **The `TokenLending__` prefix on errors and events.** It names the `ITokenLending` surface, and
-  renaming it would change selectors and topics for `bitchill-monitoring`.
 - **[R88](./R88-post-r87-structural-cleanups.md)'s rejection of a shared public scale.** Adapters
   keep their own `EXCHANGE_RATE_DECIMALS` constant. The immutable they pass through the constructor
   only moves to a different contract. It stays `internal`, so there is no new getter.
@@ -75,14 +97,16 @@ Decided by the human on 2026-09-27: "Right now I don't see why they should be tw
 
 ## Scope
 
-- [x] `LendingErc20Handler`:
-  - inherits `TokenHandler, ITokenLending`;
+- [x] `LendingErc20Handler`, renamed `LendingHandler`:
+  - inherits `TokenHandler, ILendingHandler`;
   - declares `uint256 internal immutable i_exchangeRateDecimals;` and sets it in its constructor;
   - holds `_stablecoinToShares` and `_sharesToStablecoin` unchanged, at the end of
     **INTERNAL FUNCTIONS**;
   - imports `Math`;
   - `@notice` names the conversion.
 - [x] Delete `src/TokenLending.sol`.
+- [x] Rename `ITokenLending` → `ILendingHandler`, the `TokenLending__` prefix → `LendingHandler__`, and
+      `OperationsAdmin__ContractIsNotTokenLending` → `…ContractIsNotLendingHandler` (see **Naming**).
 - [x] `PurchaseRbtc` constructor NatSpec uses `/** */`.
 - [x] `PurchaseUniswap` and `FeeHandler`: constants, then immutables, then storage in slot order.
 - [x] Every `src/` import that used the `src/` root is relative.
@@ -91,18 +115,31 @@ Decided by the human on 2026-09-27: "Right now I don't see why they should be tw
   - `README.md` architecture list;
   - `src/layerbank/README.md`;
   - the `BatchTailScheduleTest` header comment;
-  - the R28, R89, and `IMPLEMENTATION_ORDER.md` records that called the merge decided against;
+  - the R28, R89, and `IMPLEMENTATION_ORDER.md` records that called the merge decided against, and
+    R26's "keep `ITokenLending`" line;
   - R96 and R97 specs, and their order rows.
 
 ## Out of scope
 
 - [ ] Any executable change: `mulDiv` → `ceilDiv` ([R96](./R96-ceildiv-and-one-route-class-getter.md)),
       `isLendingRoute` removal (R96), redeem-to-user ([R97](./R97-redeem-lending-exits-to-user.md)).
-- [ ] Renaming `TokenLending__` errors or events.
 - [ ] A shared or public exchange-rate scale (R88 stands).
 - [ ] Reordering any other declaration, or any storage-layout change.
 
 ## Measured pins (2026-09-27)
+
+### Rename
+
+Parent `9054761`, the merge commit below, against the rename commit, both profiles. Metadata-stripped
+runtime and creation code were compared after substituting each old topic or selector with its new
+value. Via-IR sometimes emits a selector as `PUSH4 (sel >> 1); SHL 225`, so both sides first rewrite
+those shifts to the `SHL 224` form. Every contract matches:
+- `DcaManager` and both idle leaves are identical outright;
+- `OperationsAdmin` and the six lending leaves are identical after 1 or 11–13 substitutions.
+
+No size changed. Gas cannot move: a topic or selector is a push of the same width.
+
+### Merge
 
 This follows the metadata-stripped comparison method from [R85](./R85-natspec-delimiter.md). Every
 `src/` contract with bytecode was compared against the parent (`c2ed0a7`, #160 head). That is 9
@@ -151,11 +188,17 @@ Rootstock prices here come from [`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SC
 | 15 | `PurchaseUniswap` declarations split the packed oracle/floor pair; `FeeHandler` constants after storage | **Ship** | This PR. |
 | 16 | [R84](./R84-no-repeated-registry-reads.md)'s deposit route view, reconsidered as replacing `areDepositsPaused` with one route-struct getter | **Keep R84's decision** | It would answer R84's surface objection, and R84 measured about −1,084 per create or deposit. That is about 1% of a rarely used call for an `OperationsAdmin` ABI change. |
 | 17 | Every other item decided in PRs 138–160 | **Keep** | The reasoning still holds under Rootstock pricing. The review rechecked: [R79](./R79-coalesce-repeated-buyer-writes.md) coalescing; R87's fee sweep, event trims, balance reuse, and `optimizer_runs`; R90's idle fold; R94's `BitChillOwnable` move; R59's no path decoding; [R81](./R81-one-write-per-packed-slot.md); [R86](./R86-calldata-array-parameters.md). |
+| 18 | Rename the lending base `LendingHandler` / `ILendingHandler`, and the error/event prefix with it | **Ship** | This PR, raised by the human after review (see **Naming**). |
+| 19 | Rename `DcaManager._tokenYieldsInterest` | **Ship as `_isLendingRoute`** | [R96](./R96-ceildiv-and-one-route-class-getter.md), which already rewrites its body. It takes a route index and asks for the route class, so it is named after the route; `_checkTokenYieldsInterest` becomes `_checkLendingRoute`. |
 
 ## Files likely touched
 
-- `src/LendingErc20Handler.sol`
+- `src/LendingErc20Handler.sol` → `src/LendingHandler.sol`
+- `src/interfaces/ITokenLending.sol` → `src/interfaces/ILendingHandler.sol`
 - `src/TokenLending.sol` (deleted)
+- Rename only: `src/DcaManager.sol`, `src/OperationsAdmin.sol`, `src/interfaces/IOperationsAdmin.sol`,
+  the three lending adapter bases, `src/layerbank/ILayerBankErc20Handler.sol`, and every test that names
+  the interface, its errors, or its events.
 - `src/PurchaseRbtc.sol`, `src/PurchaseUniswap.sol`, `src/FeeHandler.sol`
 - Imports only:
   - `src/DcaManager.sol`, `src/DcaManagerAccessControl.sol`;
@@ -164,9 +207,10 @@ Rootstock prices here come from [`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SC
     `*Erc20HandlerDex` leaves.
 - `AGENTS.md`, `README.md`, `src/layerbank/README.md`
 - `test/unit/BatchTailScheduleTest.t.sol` (comment only)
+- `test/unit/LendingErc20HandlerRedeemTest.t.sol` → `test/unit/LendingHandlerRedeemTest.t.sol`
 - `docs/relaunch/R95-merge-token-lending.md`, `R96-ceildiv-and-one-route-class-getter.md`,
   `R97-redeem-lending-exits-to-user.md`, `README.md`, `IMPLEMENTATION_ORDER.md`,
-  `R28-lending-erc20-handler.md`, `R89-post-r88-review-candidates.md`
+  `R28-lending-erc20-handler.md`, `R89-post-r88-review-candidates.md`, `R26-share-terminology.md`
 
 ## Required tests
 
@@ -175,17 +219,20 @@ forge build
 FOUNDRY_PROFILE=deploy forge build
 # Compare metadata-stripped runtime and creation for every src/ contract against the parent
 # (R85 method; strip the CBOR tail using its trailing 2-byte length).
+# Rename: the same comparison, with old -> new topic/selector substitution.
 make check
 ```
 
-Fork lanes are not required: runtime is byte-identical on both profiles, and deploy creation code is
-identical too.
+Fork lanes are not required: runtime is identical on both profiles up to the renamed topic and selector
+constants.
 
 ## Success criteria
 
-- [x] `src/TokenLending.sol` is gone. `LendingErc20Handler is TokenHandler, ITokenLending` holds the
-      scale and both helpers.
-- [x] Runtime identical on every contract under both profiles; `deploy` (`via_ir`) creation identical.
+- [x] `src/TokenLending.sol` is gone. `LendingHandler is TokenHandler, ILendingHandler` holds the scale
+      and both helpers.
+- [x] No `TokenLending` or `LendingErc20Handler` name left in `src/`, `test/`, `script/`, `AGENTS.md`, or
+      `README.md`.
+- [x] Runtime identical on every contract under both profiles, up to the renamed topics and selectors.
 - [x] `make check` green.
 - [x] No `src/` import uses the `src/` root; no `///` run in `src/` outside the vendored interfaces.
 - [x] Every review candidate has a verdict here.
@@ -194,11 +241,18 @@ identical too.
 
 - [ ] Matches **Scope**; nothing from **Out of scope**.
 - [ ] Bytecode identity reproduced on both profiles.
-- [ ] Protocol invariants in `AGENTS.md` still hold. Nothing executable changed.
+- [ ] Protocol invariants in `AGENTS.md` still hold. Nothing executable changed beyond the renamed
+      topic and selector constants.
 - [ ] No relaunch ticket ids in `src/` comments.
 
 ## ABI / deploy / cutover impact
 
-- ABI: none. `ITokenLending` is unchanged. `LendingErc20Handler` already exposed exactly that surface.
+- ABI: events and errors renamed, so their topics and selectors change: the eleven `TokenLending__*`
+  members of `ILendingHandler` and `OperationsAdmin__ContractIsNotLendingHandler`. Functions, their
+  selectors, and the ERC-165 interface id are unchanged.
 - Scripts: none.
-- Cutover: none. No consumer references the `TokenLending` contract.
+- Consumers: `bitchill-monitoring` subscribes to `TokenLending__InterestWithdrawn` by name and topic. It
+  must also decode `LendingHandler__InterestWithdrawn(address,address,uint256)` for relaunch handlers,
+  and keep the old name for history. Tracked in a follow-up issue there. No other `BitChillRSK` repository
+  names these events or errors.
+- Cutover: none beyond the monitoring update.
