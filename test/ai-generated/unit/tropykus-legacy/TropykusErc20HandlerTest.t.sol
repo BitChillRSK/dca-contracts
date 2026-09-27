@@ -241,10 +241,12 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
         uint256 userBalanceBefore = stablecoin.balanceOf(USER);
 
         kToken.setSilentZeroPayout(true);
+        uint256 sharesToRedeem =
+            Math.mulDiv(WITHDRAWAL_AMOUNT, EXCHANGE_RATE_DECIMALS, kToken.exchangeRateCurrent(), Math.Rounding.Ceil);
 
         vm.prank(address(dcaManager));
         vm.expectRevert(
-            abi.encodeWithSelector(ITokenLending.TokenLending__ZeroStablecoinReceived.selector, WITHDRAWAL_AMOUNT)
+            abi.encodeWithSelector(ITokenLending.TokenLending__ZeroStablecoinReceived.selector, sharesToRedeem)
         );
         handler.withdrawToken(USER, WITHDRAWAL_AMOUNT);
 
@@ -266,8 +268,8 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
 
         kToken.setSilentZeroPayout(true);
 
-        // the accrued amount is derived from exchangeRateStored while the redeem uses exchangeRateCurrent, so
-        // the revert argument is not predictable here; that the guard fires at all is what matters
+        // The share debit depends on the accrued amount and a live rate call, so this test only needs
+        // to prove that the shared zero-cash guard fires and rolls the redemption back.
         vm.prank(address(dcaManager));
         vm.expectRevert();
         tropykusHandler.withdrawInterest(USER, DEPOSIT_AMOUNT / 2);
@@ -375,8 +377,12 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
         uint256 kTokenBalanceBefore = tropykusHandler.getUserShares(user1);
 
         kToken.setSilentZeroPayout(true);
+        uint256 sharesToRedeem =
+            Math.mulDiv(amounts[0], EXCHANGE_RATE_DECIMALS, kToken.exchangeRateCurrent(), Math.Rounding.Ceil);
 
-        vm.expectRevert(abi.encodeWithSelector(ITokenLending.TokenLending__ZeroStablecoinReceived.selector, amounts[0]));
+        vm.expectRevert(
+            abi.encodeWithSelector(ITokenLending.TokenLending__ZeroStablecoinReceived.selector, sharesToRedeem)
+        );
         tropykusHandler.testBatchRetrieveStablecoin(users, amounts);
 
         assertEq(tropykusHandler.getUserShares(user1), kTokenBalanceBefore);

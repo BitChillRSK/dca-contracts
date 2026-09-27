@@ -169,7 +169,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
         }
         stablecoinReceived = _measuredProtocolRedeem(sharesToRedeem, exchangeRate);
         if (stablecoinReceived == 0) {
-            revert TokenLending__ZeroStablecoinReceived(stablecoinAmount);
+            revert TokenLending__ZeroStablecoinReceived(sharesToRedeem);
         }
         emit TokenLending__SharesRedeemed(user, stablecoinReceived, sharesToRedeem);
     }
@@ -212,14 +212,7 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
             emit TokenLending__SharesRedeemedBatch(stablecoinReceived, totalSharesToRedeem);
             return stablecoinReceived;
         }
-        uint256 requested;
-        for (uint256 i; i < numOfPurchases; ++i) {
-            // Each amount is a uint96 schedule purchase amount, so the sum cannot overflow.
-            unchecked {
-                requested += purchaseAmounts[i];
-            }
-        }
-        revert TokenLending__ZeroStablecoinReceived(requested);
+        revert TokenLending__ZeroStablecoinReceived(totalSharesToRedeem);
     }
 
     /**

@@ -249,10 +249,12 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
 
         aToken.setSilentZeroPayout(true);
         pool.setWithdrawReturnOverride(WITHDRAWAL_AMOUNT, true);
+        uint256 sharesToRedeem =
+            Math.mulDiv(WITHDRAWAL_AMOUNT, aToken.RAY(), aToken.getNormalizedIncome(), Math.Rounding.Ceil);
 
         vm.prank(address(dcaManager));
         vm.expectRevert(
-            abi.encodeWithSelector(ITokenLending.TokenLending__ZeroStablecoinReceived.selector, WITHDRAWAL_AMOUNT)
+            abi.encodeWithSelector(ITokenLending.TokenLending__ZeroStablecoinReceived.selector, sharesToRedeem)
         );
         handler.withdrawToken(USER, WITHDRAWAL_AMOUNT);
 
@@ -347,8 +349,11 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         uint256 aTokenBalanceBefore = layerbankHandler.getUserShares(user1);
 
         aToken.setSilentZeroPayout(true);
+        uint256 sharesToRedeem = Math.mulDiv(amounts[0], aToken.RAY(), aToken.getNormalizedIncome(), Math.Rounding.Ceil);
 
-        vm.expectRevert(abi.encodeWithSelector(ITokenLending.TokenLending__ZeroStablecoinReceived.selector, amounts[0]));
+        vm.expectRevert(
+            abi.encodeWithSelector(ITokenLending.TokenLending__ZeroStablecoinReceived.selector, sharesToRedeem)
+        );
         layerbankHandler.testBatchRetrieveStablecoin(users, amounts);
 
         assertEq(layerbankHandler.getUserShares(user1), aTokenBalanceBefore);
