@@ -154,6 +154,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R90 | after R89, before relaunch deploy | **decided 2026-09-27:** ship oracle packing + unchecked lending zero-cash sum; defer FeeHandler move and `forge fmt` to R91/R92; reject swap-pop bounds assembly and the other keep-rejected/checked rows |
 | R91 | after R90; not deployment-bound | none (`forge fmt` one-shot + CI enforce; metadata-stripped bytecode identity) |
 | R92 | after R91, before relaunch deploy | none (FeeHandler off `TokenHandler`; solve default-profile Dex stack-too-deep) |
+| R93 | after R92, before relaunch deploy | none (report already-measured receipt shares on zero-cash reverts; delete the diagnostic-only batch loop) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1299,6 +1300,14 @@ creation/runtime identity on every deployable contract under both profiles. Ask:
 
 After R91, before relaunch deploy. Move `FeeHandler` off `TokenHandler` onto the purchase branch;
 solve default-profile Dex stack-too-deep. Ask: none (approved under R90).
+
+### R93 - zero-cash receipt-share diagnostic ([spec](./R93-zero-cash-share-diagnostic.md))
+
+After R92, before relaunch deploy. Replace the reconstructed stablecoin-attempted payload on
+`TokenLending__ZeroStablecoinReceived(uint256)` with the exact receipt shares the protocol consumed
+before rollback. The single and batch paths already hold that value; delete the batch's second loop
+without adding work to the successful path. The selector and encoded type stay unchanged. Ask: none
+(approved during PR 155 review).
 
 ## Closed non-implementation decisions
 
