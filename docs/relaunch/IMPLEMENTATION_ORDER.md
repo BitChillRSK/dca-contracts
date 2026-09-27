@@ -158,7 +158,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R94 | after R93, before relaunch deploy | none (create nonce before pull; drop withdrawal downcast; deposit store-before-pull and top-up hoist measured and reverted; record closed canvas leftovers) |
 | R95 | after R94, before relaunch deploy | **decided 2026-09-27:** merge `TokenLending` into the lending base and rename it `LendingHandler` / `ILendingHandler` (prefix `LendingHandler__`); scale visibility, R85 slip, declaration order, relative imports (runtime identical up to renamed topics/selectors); record the verdict on every candidate of the PRs 138–160 review |
 | R96 | after R95, before relaunch deploy | **decided 2026-09-27:** `ceilDiv` share conversion; drop `OperationsAdmin.isLendingRoute` for `getRouteClass`; private helper renamed `_isLendingRoute`; `DcaManager__TokenDoesNotYieldInterest` → `DcaManager__TokenIsNotLent` |
-| R97 | after R96, before relaunch deploy | **decided 2026-09-27:** lending exits redeem straight to the user (reverses R28's PR 19 call); `TokenHandler._withdrawToken` abstract, idle keeps the transfer |
+| R97 | — | **closed 2026-09-27 without merging** ([#163](https://github.com/BitChillRSK/dca-contracts/pull/163)): redeem-to-user saves gas only on user-paid exits and adds a `receiver` mode to every adapter; R28's always-redeem-onto-the-handler stands |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1343,10 +1343,11 @@ interest-route revert becomes `DcaManager__TokenIsNotLent` (raised by `_checkTok
 ### R97 - redeem lending exits straight to the user ([spec](./R97-redeem-lending-exits-to-user.md))
 
 After R96, before relaunch deploy. Principal and interest exits redeem with the user as receiver and
-measure the user's balance; batch funding still redeems onto the handler. `TokenHandler._withdrawToken`
+measure the user's balance; batch funding still redeems onto the handler. **Closed 2026-09-27 without
+merging** ([#163](https://github.com/BitChillRSK/dca-contracts/pull/163)); see the spec's **Closed** section. As proposed: `TokenHandler._withdrawToken`
 becomes abstract and idle keeps the transfer body. About −15,000 Rootstock gas per lending exit and
 −28,000 on `withdrawTokenAndInterest`. Reverses R28's PR 19 "always redeem onto the handler" and R21's
-recipient-side measurement note, with the human's approval. Ask: none (decided 2026-09-27).
+recipient-side measurement note. Ask: none.
 
 ## Closed non-implementation decisions
 

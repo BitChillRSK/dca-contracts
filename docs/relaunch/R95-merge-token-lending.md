@@ -18,7 +18,8 @@ Behavior is unchanged. The only bytecode difference is the renamed event topics 
 
 This spec also records the verdict on every candidate from the 2026-09-27 review of PRs 138–160 (see
 **Review disposition**). [R96](./R96-ceildiv-and-one-route-class-getter.md) and
-[R97](./R97-redeem-lending-exits-to-user.md) carry the two executable follow-ups.
+[R97](./R97-redeem-lending-exits-to-user.md) carried the two executable follow-ups; R97 was later closed
+without merging (row 1).
 
 ## Background
 
@@ -172,7 +173,7 @@ Rootstock prices here come from [`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SC
 
 | # | Candidate | Verdict | Where / why |
 |---|---|---|---|
-| 1 | Redeem lending exits straight to the user, instead of redeeming onto the handler and transferring | **Ship** | [R97](./R97-redeem-lending-exits-to-user.md). About −15,000 Rootstock gas per lending principal exit and −28,000 on `withdrawTokenAndInterest`. Reverses R28's PR 19 call, which was made before Rootstock pricing. |
+| 1 | Redeem lending exits straight to the user, instead of redeeming onto the handler and transferring | **Rejected** (was Ship) | [R97](./R97-redeem-lending-exits-to-user.md) implemented it (about −15,000 Rootstock gas per lending exit, −28,000 on `withdrawTokenAndInterest`), then the human closed it: the savings are on user-paid exits and the code gets more complex (a `receiver` mode on every adapter, a Tropykus forward branch, the withdraw event per subclass). R28's PR 19 call stands. |
 | 2 | Merge `TokenLending` into `LendingErc20Handler` | **Ship** | This PR. Supersedes the smaller finding "move `ITokenLending` off `TokenLending`". |
 | 3 | `PurchaseRbtc` constructor `///` run | **Ship** | This PR. |
 | 4 | Pack the fee collector beside the fee rates and read it once per batch | **Not shipped** | At most one `SLOAD` (about 200 Rootstock) per batch, on the shipped profile only, and not measured. It costs a `FeeHandler` layout change and one more local in a fee function that has hit stack-too-deep before. [R78](./R78-flat-fee-fast-path.md) compared its layout with R77's older fee path, not with a collector-packed variant, so the question was never measured. Reopen only with a `deploy` measurement. |
@@ -182,7 +183,7 @@ Rootstock prices here come from [`ROOTSTOCK-GAS-SCHEDULE.md`](./ROOTSTOCK-GAS-SC
 | 8 | `Math.mulDiv(…, Ceil)` → `Math.ceilDiv(a * b, c)` in `_stablecoinToShares` | **Ship** | [R96](./R96-ceildiv-and-one-route-class-getter.md). Equivalent at every reachable input. Under `deploy`: −1,002 per 10-row lending batch and −88 B per lending leaf. |
 | 9 | Tighter id packing in the batch calldata | **Rejected** | About 50 gas per row once decoding is paid for (about 0.05% of a batch). Changes the swapper's purchase ABI that invariant 9 and [R64](./R64-batch-calldata-and-schedule-keying.md) settled, and `DcaManager` would unpack the ids again for events. |
 | 10 | Fold the protected-window block into `ProtocolSettings` | **Rejected** | At most one read on `updatePurchasePeriod`, a rarely used user path, possibly zero under `via_ir`. It is a layout change that the 2026-09-27 cold-path rule rules out. |
-| 11 | `withdrawInterest`'s `if (stablecoinReceived > 0)` can never be false | **Ship** | R97 deletes the transfer the `if` guards. |
+| 11 | `withdrawInterest`'s `if (stablecoinReceived > 0)` can never be false | **Rejected** | It only fell out of R97. On its own it removes a guard on a zero transfer: nothing to gain. |
 | 12 | `isLendingRoute` duplicates `getRouteClass` | **Ship: drop `isLendingRoute`** | [R96](./R96-ceildiv-and-one-route-class-getter.md). Initially rejected in review as ABI churn. The human reopened it as redundant code, and measurement found it saves gas too. Keep `getRouteClass`: only it separates an unregistered route from an idle one, which the deploy scripts need. |
 | 13 | `i_exchangeRateDecimals` had no explicit visibility | **Ship** | This PR. |
 | 14 | Mixed `src/` and relative imports | **Ship** | This PR (relative). |
