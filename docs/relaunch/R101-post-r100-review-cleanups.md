@@ -1,6 +1,6 @@
 # R101 — Post-R100 review cleanups
 
-Status: **implemented** · Assigned: yes · Optional/further-review: no · Stack on: R100 ([#166](https://github.com/BitChillRSK/dca-contracts/pull/166))
+Status: **implemented** · GitHub [#167](https://github.com/BitChillRSK/dca-contracts/pull/167) · Assigned: yes · Optional/further-review: no · Stack on: R100 ([#166](https://github.com/BitChillRSK/dca-contracts/pull/166))
 
 ## Objective
 
@@ -157,4 +157,8 @@ well measured 107,190 / 170,243 (+450).
   - `IDcaManagerAccessControl` now declares the existing `i_dcaManager()` getter. No selector changes,
     and ERC-165 `ITokenHandler` / `ILendingHandler` ids are unchanged.
 - Scripts: none. Deploy order already assigns handlers built with the new DcaManager.
-- Cutover: front-end and bitchill-monitoring issues, linked from the PR.
+- Cutover: [front-end#28](https://github.com/BitChillRSK/front-end/issues/28) for the renames;
+  [bitchill-monitoring#10](https://github.com/BitChillRSK/bitchill-monitoring/issues/10#issuecomment-5860381130)
+  for the renames and the new registry error;
+  [bitchill-monitoring#23](https://github.com/BitChillRSK/bitchill-monitoring/issues/23#issuecomment-5860381256)
+  for the moved lending error.

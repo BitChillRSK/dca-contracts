@@ -1372,7 +1372,7 @@ ABI change. Ask: none.
 After R99; not deployment-bound. Fix the tautological interest invariant, correct
 `README_INVARIANTS.md`, and exercise the production lending + purchase pipeline together. Ask: none.
 
-### R101 - post-R100 review cleanups ([spec](./R101-post-r100-review-cleanups.md))
+### R101 - post-R100 review cleanups ([spec](./R101-post-r100-review-cleanups.md), [#167](https://github.com/BitChillRSK/dca-contracts/pull/167))
 
 After R100, before relaunch deploy. The 2026-09-27 pass over the R100 tip found no purchase-path gas
 left. It ships: `assignTokenHandler` requires the handler's `i_dcaManager()` to pin this registry
