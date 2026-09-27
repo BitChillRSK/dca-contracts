@@ -1,6 +1,6 @@
 # R96 — `ceilDiv` share conversion and one route-class getter
 
-Status: **not started** · Assigned: yes · Optional/further-review: no · Stack on: R95
+Status: **implemented** · Assigned: yes · Optional/further-review: no · Stack on: R95
 
 ## Objective
 
@@ -73,18 +73,53 @@ storage reads, so they carry over 1:1 to Rootstock. The implementation re-measur
 
 `DcaManager` grows because it now ABI-decodes and range-checks an enum instead of a `bool`.
 
+## Measured pins (2026-09-27)
+
+These are measured on this branch against its parent R95 (`b16e9c8`) on the MoC Sovryn and LayerBank
+lanes, per test, with `--fuzz-seed 1`. Every changed test is cheaper, and the two lanes agree. Nothing
+reads or writes storage differently, so each delta carries over 1:1 to Rootstock.
+
+| Test | `default` | `deploy` (ships) |
+|---|---:|---:|
+| `testSinglePurchase` (one lending row) | −423 | −115 |
+| `testBatchPurchasesOneUser` | −4,653 | −1,140 |
+| `R89ReviewCandidatesGasTest.test_withdrawToken_readsBookedSharesOnce` | −402 | −242 |
+| `StablecoinLendingTest.testWithdrawInterest` | −609 | −753 |
+| `StablecoinLendingTest.testWithdrawTokenAndInterest` | −1,032 | −855 |
+| `GettersTest.test_operationsAdmin_isSwapper` | — | −66 |
+
+Under `deploy`, the mechanisms are:
+- `ceilDiv` saves about 93 per converted lending row and about 100 per exit conversion.
+- Each interest-route check saves about 217.
+- `OperationsAdmin`'s smaller dispatcher saves 22 per `isSwapper` call, so every batch is 22 cheaper
+  on every route, idle included.
+
+Runtime size in bytes:
+
+| Contract | `default` | `deploy` |
+|---|---:|---:|
+| Each lending leaf (Sovryn, LayerBank, Tropykus; MoC and Dex) | −298 | −88 |
+| `OperationsAdmin` | −94 (3,339 → 3,245) | −83 (2,603 → 2,520) |
+| `DcaManager` | +75 (13,206 → 13,281) | +64 (11,447 → 11,511) |
+
+The idle leaves are byte-identical.
+
+The consumer check found no caller. GitHub code search over every `BitChillRSK` repository finds no
+`isLendingRoute` or `getRouteClass` outside this repo. The same search does find the old front end's
+`withdrawAllAccumulatedInterest`, so the index covers the consumer repos.
+
 ## Open product decisions
 
 **none** (decided 2026-09-27).
 
 ## Scope
 
-- [ ] `_stablecoinToShares` uses `Math.ceilDiv(stablecoinAmount * i_exchangeRateDecimals, exchangeRate)`.
+- [x] `_stablecoinToShares` uses `Math.ceilDiv(stablecoinAmount * i_exchangeRateDecimals, exchangeRate)`.
       Its `@dev` states the reachable bound and that an overflow reverts.
-- [ ] Delete `isLendingRoute` from `IOperationsAdmin` and `OperationsAdmin`.
+- [x] Delete `isLendingRoute` from `IOperationsAdmin` and `OperationsAdmin`.
       `DcaManager._tokenYieldsInterest` returns
       `i_operationsAdmin.getRouteClass(routeIndex) == IOperationsAdmin.RouteClass.Lending`.
-- [ ] Tests:
+- [x] Tests:
   - Delete `isLendingRoute` assertions that duplicate an adjacent `getRouteClass` assertion.
   - Convert the rest to `getRouteClass` with the exact class (`Idle` or `Unregistered`, not
     "not lending").
@@ -127,10 +162,10 @@ parent per test.
 
 ## Success criteria
 
-- [ ] Conversion equivalence fuzzed; overflow pin green.
-- [ ] No `isLendingRoute` left in `src/`, `test/`, or `script/`.
-- [ ] Gas and size pins recorded under both profiles.
-- [ ] `make check` and the fork lanes green.
+- [x] Conversion equivalence fuzzed; overflow pin green.
+- [x] No `isLendingRoute` left in `src/`, `test/`, or `script/`.
+- [x] Gas and size pins recorded under both profiles.
+- [x] `make check` and the fork lanes green.
 
 ## Reviewer checklist
 
