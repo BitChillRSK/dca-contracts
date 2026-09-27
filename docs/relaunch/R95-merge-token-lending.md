@@ -55,7 +55,8 @@ Errors and events carry their interface's name as prefix (`TokenHandler__`, `Dca
 prefix follows the interface: `TokenLending__*` → `LendingHandler__*`, and
 `OperationsAdmin__ContractIsNotTokenLending` → `OperationsAdmin__ContractIsNotLendingHandler`. An
 earlier draft of this spec kept the old prefix to spare `bitchill-monitoring`. The human overruled that:
-consumer breakage is a follow-up issue, not a reason to keep an incoherent name. Function selectors, and
+consumer breakage is a follow-up issue
+([bitchill-monitoring#23](https://github.com/BitChillRSK/bitchill-monitoring/issues/23)), not a reason to keep an incoherent name. Function selectors, and
 therefore `type(ILendingHandler).interfaceId`, are unchanged.
 
 Renamed alongside: `test/unit/LendingErc20HandlerRedeemTest.t.sol` → `LendingHandlerRedeemTest.t.sol`,
@@ -253,6 +254,7 @@ constants.
 - Scripts: none.
 - Consumers: `bitchill-monitoring` subscribes to `TokenLending__InterestWithdrawn` by name and topic. It
   must also decode `LendingHandler__InterestWithdrawn(address,address,uint256)` for relaunch handlers,
-  and keep the old name for history. Tracked in a follow-up issue there. No other `BitChillRSK` repository
+  and keep the old name for history. Tracked in
+  [bitchill-monitoring#23](https://github.com/BitChillRSK/bitchill-monitoring/issues/23). No other `BitChillRSK` repository
   names these events or errors.
 - Cutover: none beyond the monitoring update.
