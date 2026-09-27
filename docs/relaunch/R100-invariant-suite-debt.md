@@ -1,6 +1,6 @@
 # R100 — Invariant suite honesty and integrated lending/purchase coverage
 
-Status: **not started** · Assigned: no · Optional/further-review: no · Stack on: R99
+Status: **assigned** · Assigned: [#166](https://github.com/BitChillRSK/dca-contracts/pull/166) · Optional/further-review: no · Stack on: R99 (#165)
 
 ## Objective
 
@@ -29,19 +29,19 @@ No `src/` change is required unless a real gap forces one. Prefer fixing tests a
 
 ## Scope
 
-- [ ] Replace or delete `invariant_interestOnlyIncreases` so the name matches a real property (or
+- [x] Replace or delete `invariant_interestOnlyIncreases` so the name matches a real property (or
       rename / drop it and update the coverage list).
-- [ ] Correct `README_INVARIANTS.md` so it no longer claims the tautological rBTC check proves
+- [x] Correct `README_INVARIANTS.md` so it no longer claims the tautological rBTC check proves
       solvency; document what the suite actually covers.
-- [ ] Add or extend coverage that runs the production lending handler + production `PurchaseRbtc`
+- [x] Add or extend coverage that runs the production lending handler + production `PurchaseRbtc`
       path under the invariant / conservation harness (minimal fixture change; do not rewrite the
       whole suite).
 
 ## Out of scope
 
-- [ ] R98 / R99 Solidity cleanups.
-- [ ] Broad invariant-suite rewrites unrelated to the three items above.
-- [ ] Claiming “blue-chip quality” as a success criterion.
+- [x] R98 / R99 Solidity cleanups.
+- [x] Broad invariant-suite rewrites unrelated to the three items above.
+- [x] Claiming “blue-chip quality” as a success criterion.
 
 ## Files likely touched
 
@@ -63,10 +63,10 @@ Forks: only if the PR changes `src/` or deployable scripts (unexpected here).
 
 ## Success criteria
 
-- [ ] No tautological `>= 0` invariant left under a name that implies a real property.
-- [ ] README matches the suite.
-- [ ] At least one path exercises production lending + purchase accounting together.
-- [ ] `make invariants-sovryn` green.
+- [x] No tautological `>= 0` invariant left under a name that implies a real property.
+- [x] README matches the suite.
+- [x] At least one path exercises production lending + purchase accounting together.
+- [x] `make invariants-sovryn` green.
 
 ## Reviewer checklist
 
