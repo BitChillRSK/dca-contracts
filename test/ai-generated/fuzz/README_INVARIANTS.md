@@ -70,11 +70,16 @@ withdraw / purchase are allowed and expected.
 
 ### `LendingPurchaseConservationInvariantTest` (production lending + purchase together)
 
-1. **Books never exceed handler balance** — claimable rBTC ≤ handler native balance after redeem /
-   credit / withdraw through the real `PurchaseRbtc` pipeline.
+1. **Native rBTC conservation** — MoC-paid rBTC (measured as handler balance gains) equals claimable
+   books on the handler plus measured withdrawals to users. Length-1 batches leave no floor dust.
 2. **Virtual shares ≤ receipt shares** — same lending-book bound as the main suite, on the real
    `SovrynDocHandlerMoc` leaf while purchases redeem through MoC.
 3. **No idle stablecoin on the handler** — DOC sits in iSUSD or is consumed by MoC / fees.
+
+Actions are restricted to `depositToken` / `buyRbtc` / `withdrawAccumulatedRbtc` via
+`targetContract` + `targetSelector` (so inherited `Test.failed()` and deployed mocks are not
+fuzzed). Production calls are not try/caught: empty cases return early, and `fail_on_revert`
+surfaces real handler regressions.
 
 ## Historical note
 
