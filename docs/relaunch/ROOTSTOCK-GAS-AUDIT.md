@@ -117,6 +117,16 @@ adjacent with nothing that can revert, log, or call between them. Cancun prices 
     encoding that the constructor and both setters rely on.
   - These are owner or swapper calls, made when a Dex route changes. Closed; the source comment on
     each setter says the same.
+- **Further collapse of purchase-row schedule slot 0 loads beyond R81** — feeding pause / period /
+  route into the write helper risks splitting the store (5,000 gas/row to save 200). Closed again
+  under [R94](./R94-dcamanager-store-before-pull.md#closed-decisions-2026-09-27).
+- **Move `BitChillOwnable` off `FeeHandler`** — would force Dex oracle/floor/path setters to move
+  with the fee setters and change layout, for no hot-path gas. Closed under
+  [R94](./R94-dcamanager-store-before-pull.md#closed-decisions-2026-09-27).
+- **Store-before-pull on `depositToken` / early `purchaseAmount` on top-up** — implemented in
+  [R94](./R94-dcamanager-store-before-pull.md) for durable ordering; measured pins show no counted
+  read removed under deploy, so those 200 Rootstock figures are not claimed. Create's early nonce
+  store does drop one settings re-read under deploy (≈ −200 Rootstock).
 
 ## Deferred candidates (2026-09-25)
 
