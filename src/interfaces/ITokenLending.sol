@@ -54,8 +54,8 @@ interface ITokenLending is ITokenHandler {
     error TokenLending__LendingProtocolDepositFailed();
     /// @notice The lending protocol's redemption call reported failure with a non-zero error code.
     error TokenLending__LendingProtocolRedeemFailed(uint256 errorCode);
-    /// @notice A positive share redemption produced no stablecoin; the call is rolled back.
-    error TokenLending__ZeroStablecoinReceived(uint256 stablecoinAttempted);
+    /// @notice A zero-cash redemption reports its consumed receipt shares before the call rolls back.
+    error TokenLending__ZeroStablecoinReceived(uint256 sharesRedeemed);
     /**
      * @notice Batch redeem asked for more of this user's shares than the handler tracks.
      * @dev Same outcome as a 0.8 underflow on `s_shares[user] -=`; the named error is for the swapper.

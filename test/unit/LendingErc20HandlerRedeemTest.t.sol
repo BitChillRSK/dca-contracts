@@ -342,7 +342,7 @@ contract LendingErc20HandlerRedeemTest is Test {
         assertTrue(found, "TokenLending__UserSharesUpdated not emitted");
     }
 
-    function test_redeemShares_dustSharesThatPayZeroRevertAndRollBack() public {
+    function test_redeemShares_dustReportsRedeemedSharesAndRollsBack() public {
         // 1 share at rate 1 / 1e18 floors to 0 wei of stablecoin
         harness.setExchangeRate(1);
         harness.creditShares(userA, 1);
@@ -353,10 +353,41 @@ contract LendingErc20HandlerRedeemTest is Test {
         assertEq(bookBefore, 1);
         assertEq(bookBefore * 1 / RATE_SCALE, 0);
 
-        vm.expectRevert(abi.encodeWithSelector(ITokenLending.TokenLending__ZeroStablecoinReceived.selector, 0));
+        vm.expectRevert(abi.encodeWithSelector(ITokenLending.TokenLending__ZeroStablecoinReceived.selector, 1));
         harness.redeemShares(userA, 1);
 
         assertEq(harness.getUserShares(userA), bookBefore);
+        assertEq(harness.protocolShares(), protocolBefore);
+    }
+
+    function test_batchRetrieve_zeroPayoutReportsExactShareSumAndRollsBack() public {
+        uint256 rate = 2e18;
+        harness.setExchangeRate(rate);
+        harness.depositToken(userA, USER_A_DEPOSIT);
+        harness.depositToken(userB, USER_B_DEPOSIT);
+        harness.setPayOut(false);
+
+        uint256 sharesABefore = harness.getUserShares(userA);
+        uint256 sharesBBefore = harness.getUserShares(userB);
+        uint256 protocolBefore = harness.protocolShares();
+
+        address[] memory users = new address[](2);
+        users[0] = userA;
+        users[1] = userB;
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = 11 ether + 1;
+        amounts[1] = 17 ether + 3;
+
+        uint256 expectedShares = _stablecoinToSharesUp(amounts[0], rate) + _stablecoinToSharesUp(amounts[1], rate);
+        assertTrue(expectedShares != amounts[0] + amounts[1], "test must separate share and stablecoin units");
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ITokenLending.TokenLending__ZeroStablecoinReceived.selector, expectedShares)
+        );
+        harness.batchRetrieveStablecoin(users, amounts);
+
+        assertEq(harness.getUserShares(userA), sharesABefore);
+        assertEq(harness.getUserShares(userB), sharesBBefore);
         assertEq(harness.protocolShares(), protocolBefore);
     }
 
