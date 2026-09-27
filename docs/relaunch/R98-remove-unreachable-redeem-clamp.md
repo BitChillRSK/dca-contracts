@@ -1,6 +1,6 @@
 # R98 — Remove the unreachable inner redeem clamp
 
-Status: **implemented** · Assigned: yes · Optional/further-review: no · Stack on: R96 ([#162](https://github.com/BitChillRSK/dca-contracts/pull/162))
+Status: **implemented** · GitHub [#164](https://github.com/BitChillRSK/dca-contracts/pull/164) · Assigned: yes · Optional/further-review: no · Stack on: R96 ([#162](https://github.com/BitChillRSK/dca-contracts/pull/162))
 
 ## Objective
 
