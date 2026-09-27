@@ -1,6 +1,6 @@
 # R95 — Merge `TokenLending` into `LendingErc20Handler`, and source-order cleanups
 
-Status: **implemented** · Assigned: yes · Optional/further-review: no · Stack on: [#160](https://github.com/BitChillRSK/dca-contracts/pull/160)
+Status: **implemented** · GitHub [#161](https://github.com/BitChillRSK/dca-contracts/pull/161) · Assigned: yes · Optional/further-review: no · Stack on: [#160](https://github.com/BitChillRSK/dca-contracts/pull/160)
 
 ## Objective
 
