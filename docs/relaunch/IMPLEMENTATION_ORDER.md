@@ -156,6 +156,9 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R92 | after R91, before relaunch deploy | none (FeeHandler off `TokenHandler`; solve default-profile Dex stack-too-deep) |
 | R93 | after R92, before relaunch deploy | none (report already-measured receipt shares on zero-cash reverts; delete the diagnostic-only batch loop) |
 | R94 | after R93, before relaunch deploy | none (create nonce before pull; drop withdrawal downcast; deposit store-before-pull and top-up hoist measured and reverted; record closed canvas leftovers) |
+| R95 | after R94, before relaunch deploy | **decided 2026-09-27:** merge `TokenLending` into `LendingErc20Handler`; scale visibility, R85 slip, declaration order, relative imports (runtime byte-identical); record the verdict on every candidate of the PRs 138–160 review |
+| R96 | after R95, before relaunch deploy | **decided 2026-09-27:** `ceilDiv` share conversion; drop `OperationsAdmin.isLendingRoute` for `getRouteClass` |
+| R97 | after R96, before relaunch deploy | **decided 2026-09-27:** lending exits redeem straight to the user (reverses R28's PR 19 call); `TokenHandler._withdrawToken` abstract, idle keeps the transfer |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -331,7 +334,7 @@ The split is intentional: authority/fund lifecycle, configuration behavior, hand
 
 The R28 snapshot measured runtime bytecode at 21,081 bytes for `DcaManager`, 24,243 for `SovrynErc20HandlerDex`, and 24,366 for `TropykusErc20HandlerDex` — unoptimized, like every figure recorded before #104 ([Measurement basis](./README.md#measurement-basis)). R30 changed those numbers; R31 must re-measure actual base/head sizes rather than carrying the snapshot forward as a promise.
 
-Deliberate non-candidates remain excluded: do not merge `TokenLending` into `LendingErc20Handler`, absorb Idle into the lending base, add speculative adapter layers, or introduce proxies, delegatecall, owner rescue, or a withdrawal `to` parameter.
+Deliberate non-candidates remain excluded (the `TokenLending` merge was reopened and shipped by [R95](./R95-merge-token-lending.md) on 2026-09-27): do not merge `TokenLending` into `LendingErc20Handler`, absorb Idle into the lending base, add speculative adapter layers, or introduce proxies, delegatecall, owner rescue, or a withdrawal `to` parameter.
 
 ### PR 23 - R33 Uniswap slippage validation
 
@@ -1319,6 +1322,28 @@ the canvas closed leftovers (Idle fold, shared scale, purchase slot-0 further co
 OperationsAdmin view, Uniswap path `calldata`, `BitChillOwnable` off `FeeHandler`). Ask: none
 (locked 2026-09-27).
 
+### R95 - merge `TokenLending` and source-order cleanups ([spec](./R95-merge-token-lending.md))
+
+After R94, before relaunch deploy. Delete `TokenLending`; `LendingErc20Handler is TokenHandler,
+ITokenLending` holds the scale immutable (now explicitly `internal`) and both conversion helpers. Also
+the `PurchaseRbtc` `///` slip, constants → immutables → storage in `PurchaseUniswap` and `FeeHandler`,
+and relative `src/` imports. Runtime byte-identical on both profiles. Records the verdict on every
+candidate from the 2026-09-27 review of PRs 138–160. Ask: none (decided 2026-09-27).
+
+### R96 - `ceilDiv` share conversion and one route-class getter ([spec](./R96-ceildiv-and-one-route-class-getter.md))
+
+After R95, before relaunch deploy. `_stablecoinToShares` uses a checked `ceilDiv` (equivalent at every
+reachable input; about −1,000 per 10-row lending batch under deploy). `OperationsAdmin.isLendingRoute`
+is removed; `DcaManager` compares `getRouteClass` itself. Ask: none (decided 2026-09-27).
+
+### R97 - redeem lending exits straight to the user ([spec](./R97-redeem-lending-exits-to-user.md))
+
+After R96, before relaunch deploy. Principal and interest exits redeem with the user as receiver and
+measure the user's balance; batch funding still redeems onto the handler. `TokenHandler._withdrawToken`
+becomes abstract and idle keeps the transfer body. About −15,000 Rootstock gas per lending exit and
+−28,000 on `withdrawTokenAndInterest`. Reverses R28's PR 19 "always redeem onto the handler" and R21's
+recipient-side measurement note, with the human's approval. Ask: none (decided 2026-09-27).
+
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:
@@ -1326,7 +1351,8 @@ There is no optional-late queue. Items either have an ordered spec above or are 
 - **R88 shared exchange-rate scale declaration — rejected 2026-09-26.** A shared field would remain
   named `i_exchangeRateDecimals`; exposing that changes the getter ABI, and keeping a separate
   `EXCHANGE_RATE_DECIMALS()` undermines consolidation. Measured stripped size also grew on every
-  lending leaf. Adapter-local constants and `TokenLending.i_exchangeRateDecimals` stay. See
+  lending leaf. Adapter-local constants and the `i_exchangeRateDecimals` immutable (on
+  `LendingErc20Handler` since [R95](./R95-merge-token-lending.md)) stay. See
   [R88](./R88-post-r87-structural-cleanups.md#verdicts-2026-09-26). Reaffirmed 2026-09-27 under
   [R94](./R94-dcamanager-store-before-pull.md#closed-decisions-2026-09-27).
 
