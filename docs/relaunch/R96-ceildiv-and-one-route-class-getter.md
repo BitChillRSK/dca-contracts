@@ -1,6 +1,6 @@
 # R96 — `ceilDiv` share conversion and one route-class getter
 
-Status: **implemented** · Assigned: yes · Optional/further-review: no · Stack on: R95
+Status: **implemented** · GitHub [#162](https://github.com/BitChillRSK/dca-contracts/pull/162) · Assigned: yes · Optional/further-review: no · Stack on: R95 ([#161](https://github.com/BitChillRSK/dca-contracts/pull/161))
 
 ## Objective
 
