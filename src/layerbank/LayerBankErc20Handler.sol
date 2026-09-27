@@ -79,7 +79,7 @@ abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20H
     }
 
     /**
-     * @dev Withdraw the underlying amount whose Aave half-up `rayDiv` maps back to exactly
+     * @dev Withdraw to `receiver` the underlying amount whose Aave half-up `rayDiv` maps back to exactly
      *      `sharesAmount` scaled shares. The Pool has no share-sized withdraw; BitChill sizes
      *      shares with a ceiling while Aave burns with nearest-RAY division, so the floored
      *      conversion can undershoot by one wei of underlying. Try floor, then floor + 1, and
@@ -88,9 +88,9 @@ abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20H
      *      live probe asserts that). Below RAY, floor-then-+1 is not always exact — any miss
      *      still reverts in the shared share-consumption check rather than orphaning a claim.
      */
-    function _protocolRedeem(uint256 sharesAmount, uint256 exchangeRate) internal override {
+    function _protocolRedeem(uint256 sharesAmount, uint256 exchangeRate, address receiver) internal override {
         uint256 amountOut = _underlyingForExactScaledBurn(sharesAmount, exchangeRate);
-        i_pool.withdraw(address(i_stableToken), amountOut, address(this));
+        i_pool.withdraw(address(i_stableToken), amountOut, receiver);
     }
 
     function _receiptSharesBalance() internal override returns (uint256) {

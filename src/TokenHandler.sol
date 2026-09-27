@@ -76,11 +76,10 @@ abstract contract TokenHandler is ITokenHandler, ERC165, DcaManagerAccessControl
         emit TokenHandler__TokenDeposited(address(i_stableToken), user, depositAmount);
     }
 
-    /// @dev Pay `withdrawalAmount` of the stablecoin to `user` and return the measured balance delta.
-    function _withdrawToken(address user, uint256 withdrawalAmount) internal virtual returns (uint256 withdrawnAmount) {
-        uint256 balanceBefore = i_stableToken.balanceOf(address(this));
-        i_stableToken.safeTransfer(user, withdrawalAmount);
-        withdrawnAmount = balanceBefore - i_stableToken.balanceOf(address(this));
-        emit TokenHandler__TokenWithdrawn(address(i_stableToken), user, withdrawnAmount);
-    }
+    /**
+     * @dev Pay up to `withdrawalAmount` of the stablecoin to `user`, emit `TokenHandler__TokenWithdrawn`,
+     *      and return the measured amount paid. Idle handlers pay from their own balance; lending
+     *      handlers redeem straight to the user.
+     */
+    function _withdrawToken(address user, uint256 withdrawalAmount) internal virtual returns (uint256 withdrawnAmount);
 }

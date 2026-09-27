@@ -424,6 +424,7 @@ contract LendingErc20HandlerRedeemTest is Test {
         uint256 bookBefore = harness.getUserShares(userA);
         uint256 protocolBefore = harness.protocolShares();
         uint256 stableBefore = stablecoin.balanceOf(address(harness));
+        uint256 userStableBefore = stablecoin.balanceOf(userA);
         uint256 redeemAmount = 40 ether;
         uint256 intended = _stablecoinToSharesUp(redeemAmount, RATE_SCALE);
         uint256 afterPartial = protocolBefore - intended / 2;
@@ -438,6 +439,7 @@ contract LendingErc20HandlerRedeemTest is Test {
         assertEq(harness.getUserShares(userA), bookBefore);
         assertEq(harness.protocolShares(), protocolBefore);
         assertEq(stablecoin.balanceOf(address(harness)), stableBefore);
+        assertEq(stablecoin.balanceOf(userA), userStableBefore);
     }
 
     function test_batchRetrieve_partialShareBurnRevertsAndRollsBack() public {
@@ -704,7 +706,7 @@ contract LendingErc20HandlerHarness is LendingErc20Handler {
         i_stableToken.safeTransfer(address(1), stablecoinAmount);
     }
 
-    function _protocolRedeem(uint256 sharesAmount, uint256 rate) internal override {
+    function _protocolRedeem(uint256 sharesAmount, uint256 rate, address receiver) internal override {
         if (revertOnRedeem) revert("Harness: insufficient liquidity");
         protocolRedeemCalls++;
 
@@ -724,7 +726,7 @@ contract LendingErc20HandlerHarness is LendingErc20Handler {
         if (!payOut) return;
         uint256 amount = toBurn > 0 ? _sharesToStablecoin(toBurn, rate) : _sharesToStablecoin(sharesAmount, rate);
         if (amount > 0) {
-            MockStablecoin(address(i_stableToken)).mint(address(this), amount);
+            MockStablecoin(address(i_stableToken)).mint(receiver, amount);
         }
     }
 }

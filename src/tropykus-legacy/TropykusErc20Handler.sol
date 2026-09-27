@@ -3,6 +3,8 @@ pragma solidity 0.8.36;
 
 import {LendingErc20Handler} from "../LendingErc20Handler.sol";
 import {IkToken} from "./IkToken.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title TropykusErc20Handler
@@ -11,6 +13,8 @@ import {IkToken} from "./IkToken.sol";
  * @dev Test-only adapter, excluded from production deployment; local and fork lanes retain coverage.
  */
 abstract contract TropykusErc20Handler is LendingErc20Handler {
+    using SafeERC20 for IERC20;
+
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
@@ -67,12 +71,18 @@ abstract contract TropykusErc20Handler is LendingErc20Handler {
     }
 
     /**
-     * @dev Redeem kTokens onto this contract. Burns the booked share count. Only the Compound
-     *      return code is raised here; the base measures cash and kToken deltas.
+     * @dev Redeem kTokens and pay `receiver`. Burns the booked share count. `redeem` has no
+     *      receiver, so cash lands here first and this contract forwards what it gained. Only the
+     *      Compound return code is raised here; the base measures cash and kToken deltas.
      */
-    function _protocolRedeem(uint256 sharesAmount, uint256) internal override {
+    function _protocolRedeem(uint256 sharesAmount, uint256, address receiver) internal override {
+        bool forward = receiver != address(this);
+        uint256 balanceBefore = forward ? i_stableToken.balanceOf(address(this)) : 0;
         uint256 result = i_kToken.redeem(sharesAmount);
         if (result != 0) revert TokenLending__LendingProtocolRedeemFailed(result);
+        if (forward) {
+            i_stableToken.safeTransfer(receiver, i_stableToken.balanceOf(address(this)) - balanceBefore);
+        }
     }
 
     function _receiptSharesBalance() internal override returns (uint256) {

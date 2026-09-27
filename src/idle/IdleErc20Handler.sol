@@ -2,6 +2,8 @@
 pragma solidity 0.8.36;
 
 import {TokenHandler} from "../TokenHandler.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title IdleErc20Handler
@@ -15,6 +17,8 @@ import {TokenHandler} from "../TokenHandler.sol";
  *      checks, not by a shadow book here.
  */
 abstract contract IdleErc20Handler is TokenHandler {
+    using SafeERC20 for IERC20;
+
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
@@ -30,6 +34,19 @@ abstract contract IdleErc20Handler is TokenHandler {
     /*//////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    /// @dev Pay `withdrawalAmount` from this contract's pooled cash and return the measured balance delta.
+    function _withdrawToken(address user, uint256 withdrawalAmount)
+        internal
+        virtual
+        override
+        returns (uint256 withdrawnAmount)
+    {
+        uint256 balanceBefore = i_stableToken.balanceOf(address(this));
+        i_stableToken.safeTransfer(user, withdrawalAmount);
+        withdrawnAmount = balanceBefore - i_stableToken.balanceOf(address(this));
+        emit TokenHandler__TokenWithdrawn(address(i_stableToken), user, withdrawnAmount);
+    }
 
     /**
      * @dev Sum the batch's purchase amounts. Cash already sits on this handler; DcaManager debits

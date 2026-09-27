@@ -3,7 +3,6 @@ pragma solidity 0.8.36;
 
 import {Test, console2, Vm} from "forge-std/Test.sol";
 import {IdleErc20Handler} from "src/idle/IdleErc20Handler.sol";
-import {TokenHandler} from "src/TokenHandler.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import "test/Constants.sol";
@@ -139,13 +138,15 @@ contract IdleGasHarness is IdleErc20Handler {
 
 /**
  * @dev Pre-removal idle funding path only: deposit books `s_idleBalances`, batch debit reads and
- *      writes that map. Withdraw clamp is omitted — this harness exists to price batch funding.
+ *      writes that map. Withdraw clamp is omitted — this harness exists to price batch funding. It
+ *      builds on `IdleErc20Handler` only for the idle withdraw body, which `TokenHandler` no longer
+ *      carries (R97), and overrides the batch funding it prices.
  */
-contract IdleLedgerBaselineHarness is TokenHandler {
+contract IdleLedgerBaselineHarness is IdleErc20Handler {
     mapping(address user => uint256 balance) internal s_idleBalances;
 
     constructor(address dcaManagerAddress, address stableTokenAddress)
-        TokenHandler(dcaManagerAddress, stableTokenAddress)
+        IdleErc20Handler(dcaManagerAddress, stableTokenAddress)
     {}
 
     function _depositToken(address user, uint256 depositAmount) internal override {
