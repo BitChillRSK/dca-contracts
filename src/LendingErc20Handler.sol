@@ -30,20 +30,10 @@ abstract contract LendingErc20Handler is TokenHandler, TokenLending {
     /**
      * @param dcaManagerAddress The DcaManager allowed to call deposit, withdraw, and interest.
      * @param stableTokenAddress The ERC20 stablecoin this handler lends.
-     * @param feeCollector Address that receives purchase fees.
-     * @param feeSettings Linear fee parameters.
      * @param exchangeRateDecimals Scale of the protocol exchange rate (adapter constant).
-     * @param initialOwner Address that owns fee configuration immediately after deploy.
      */
-    constructor(
-        address dcaManagerAddress,
-        address stableTokenAddress,
-        address feeCollector,
-        FeeSettings memory feeSettings,
-        uint256 exchangeRateDecimals,
-        address initialOwner
-    )
-        TokenHandler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, initialOwner)
+    constructor(address dcaManagerAddress, address stableTokenAddress, uint256 exchangeRateDecimals)
+        TokenHandler(dcaManagerAddress, stableTokenAddress)
         TokenLending(exchangeRateDecimals)
     {}
 

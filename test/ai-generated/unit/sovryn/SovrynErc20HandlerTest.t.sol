@@ -5,6 +5,7 @@ import {HandlerTestHarness} from "../HandlerTestHarness.t.sol";
 import {ITokenHandler} from "../../../../src/interfaces/ITokenHandler.sol";
 import {IFeeHandler} from "../../../../src/interfaces/IFeeHandler.sol";
 import {SovrynErc20Handler} from "../../../../src/sovryn/SovrynErc20Handler.sol";
+import {FeeHandler} from "../../../../src/FeeHandler.sol";
 import {MockIsusdToken} from "../../../mocks/MockIsusdToken.sol";
 import {MockStablecoin} from "../../../mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -378,7 +379,7 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
  * @notice Concrete implementation of SovrynErc20Handler for testing
  * @dev Implements abstract functions to make testing possible
  */
-contract SovrynTestHandler is SovrynErc20Handler {
+contract SovrynTestHandler is SovrynErc20Handler, FeeHandler {
     constructor(
         address dcaManagerAddress,
         address stableTokenAddress,
@@ -387,9 +388,8 @@ contract SovrynTestHandler is SovrynErc20Handler {
         FeeSettings memory feeSettings,
         address initialOwner
     )
-        SovrynErc20Handler(
-            dcaManagerAddress, stableTokenAddress, iSusdTokenAddress, feeCollector, feeSettings, initialOwner
-        )
+        SovrynErc20Handler(dcaManagerAddress, stableTokenAddress, iSusdTokenAddress)
+        FeeHandler(feeCollector, feeSettings, initialOwner)
     {}
 
     /**

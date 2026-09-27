@@ -5,6 +5,7 @@ import {HandlerTestHarness} from "../HandlerTestHarness.t.sol";
 import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {IdleErc20Handler} from "src/idle/IdleErc20Handler.sol";
+import {FeeHandler} from "src/FeeHandler.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "test/Constants.sol";
 
@@ -115,14 +116,14 @@ contract IdleErc20HandlerTest is HandlerTestHarness {
  * @title IdleTestHandler
  * @notice Concrete IdleErc20Handler for deposit/withdraw/take unit tests.
  */
-contract IdleTestHandler is IdleErc20Handler {
+contract IdleTestHandler is IdleErc20Handler, FeeHandler {
     constructor(
         address dcaManagerAddress,
         address stableTokenAddress,
         address feeCollector,
         FeeSettings memory feeSettings,
         address initialOwner
-    ) IdleErc20Handler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, initialOwner) {}
+    ) IdleErc20Handler(dcaManagerAddress, stableTokenAddress) FeeHandler(feeCollector, feeSettings, initialOwner) {}
 
     function testBatchRetrieveStablecoin(address[] calldata users, uint256[] calldata purchaseAmounts)
         external

@@ -24,6 +24,18 @@ interface IFeeHandler {
         uint112 feePurchaseUpperBound; // the purchase amount above which min fee is applied
     }
 
+    /**
+     * @notice Fee-domain constructor inputs: collector and the four interpolated rate parameters.
+     * @dev One memory pointer on the purchase-base constructor call, so Dex leaves stay under the
+     *      legacy-codegen stack limit when fee args move off the funding base. Ownership stays a
+     *      separate `initialOwner` argument — it is contract-level authority and may govern
+     *      settings beyond fees.
+     */
+    struct FeeHandlerConfig {
+        address feeCollector;
+        FeeSettings feeSettings;
+    }
+
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/

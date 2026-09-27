@@ -5,6 +5,7 @@ import {HandlerTestHarness} from "../HandlerTestHarness.t.sol";
 import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {LayerBankErc20Handler} from "src/layerbank/LayerBankErc20Handler.sol";
+import {FeeHandler} from "src/FeeHandler.sol";
 import {ILayerBankErc20Handler} from "src/layerbank/ILayerBankErc20Handler.sol";
 import {MockLayerBankAToken, MockLayerBankPool} from "test/mocks/MockLayerBank.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
@@ -450,7 +451,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
     }
 }
 
-contract LayerBankTestHandler is LayerBankErc20Handler {
+contract LayerBankTestHandler is LayerBankErc20Handler, FeeHandler {
     constructor(
         address dcaManagerAddress,
         address stableTokenAddress,
@@ -459,9 +460,8 @@ contract LayerBankTestHandler is LayerBankErc20Handler {
         FeeSettings memory feeSettings,
         address initialOwner
     )
-        LayerBankErc20Handler(
-            dcaManagerAddress, stableTokenAddress, aTokenAddress, feeCollector, feeSettings, initialOwner
-        )
+        LayerBankErc20Handler(dcaManagerAddress, stableTokenAddress, aTokenAddress)
+        FeeHandler(feeCollector, feeSettings, initialOwner)
     {}
 
     function testBatchRetrieveStablecoin(address[] calldata users, uint256[] calldata purchaseAmounts)

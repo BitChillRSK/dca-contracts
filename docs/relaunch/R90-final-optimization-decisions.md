@@ -193,8 +193,9 @@ Human answers (2026-09-27), locked for this PR:
 1. Pack the Dex oracle with the narrowed live slippage floor? **Yes — implemented** (`1b54321`,
    `0883bb7`).
 2. Make the lending zero-cash diagnostic sum unchecked? **Yes — implemented** (`cdd7d73`).
-3. Move `FeeHandler` out of `TokenHandler`? **Deferred to a dedicated follow-up PR** (approved to
-   implement for diagram cleanup; default-profile Dex stack-too-deep must be solved there, not here).
+3. Move `FeeHandler` out of `TokenHandler`? **Deferred to R92** (approved to implement for diagram
+   cleanup; default-profile Dex stack-too-deep solved there via `FeeHandlerConfig` packing —
+   [#157](https://github.com/BitChillRSK/dca-contracts/pull/157)).
 4. Override keep-rejected / keep-checked rows?
    - Gross total into `_batchRetrieveStablecoin`: **keep rejected.**
    - Swap-pop bounds assembly: **rejected** (2026-09-27). Length already cached; stripping the
@@ -211,7 +212,7 @@ Human answers (2026-09-27), locked for this PR:
 |---|---|
 | Pack Dex oracle + live floor | **Shipped** in this PR |
 | Unchecked lending zero-cash sum | **Shipped** in this PR |
-| FeeHandler ownership move | **Follow-up PR** (approved; stack-too-deep to fix there) |
+| FeeHandler ownership move | **R92** ([#157](https://github.com/BitChillRSK/dca-contracts/pull/157)) |
 | Gross total into `_batchRetrieveStablecoin` | **Rejected** |
 | Swap-pop array bounds assembly | **Rejected** — packed `uint64[]` makes safe assembly ugly; rare path; memory round trip worse |
 | Fold `IdleErc20Handler` into `TokenHandler` | **Rejected** |

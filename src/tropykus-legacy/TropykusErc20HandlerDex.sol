@@ -35,9 +35,13 @@ contract TropykusErc20HandlerDex is TropykusErc20Handler, PurchaseUniswap {
         uint256 amountOutMinimumSafetyCheck,
         address initialOwner
     )
-        TropykusErc20Handler(
-            dcaManagerAddress, stablecoinAddress, kTokenAddress, feeCollector, feeSettings, initialOwner
+        TropykusErc20Handler(dcaManagerAddress, stablecoinAddress, kTokenAddress)
+        PurchaseUniswap(
+            uniswapSettings,
+            FeeHandlerConfig({feeCollector: feeCollector, feeSettings: feeSettings}),
+            amountOutMinimumPercent,
+            amountOutMinimumSafetyCheck,
+            initialOwner
         )
-        PurchaseUniswap(uniswapSettings, amountOutMinimumPercent, amountOutMinimumSafetyCheck)
     {}
 }

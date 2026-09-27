@@ -35,14 +35,8 @@ contract R87IdleLedgerRemovalGasTest is Test {
 
     function setUp() public {
         token = new MockStablecoin(address(this));
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
-            minFeeRate: MIN_FEE_RATE,
-            maxFeeRate: MAX_FEE_RATE_TEST,
-            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
-        });
-        current = new IdleGasHarness(DCA, address(token), address(0xFEE), feeSettings, address(this));
-        baseline = new IdleLedgerBaselineHarness(DCA, address(token), address(0xFEE), feeSettings, address(this));
+        current = new IdleGasHarness(DCA, address(token));
+        baseline = new IdleLedgerBaselineHarness(DCA, address(token));
     }
 
     function test_gas_idleDepositWithdrawHaveNoPerUserLedgerWrites() public {
@@ -131,13 +125,9 @@ contract R87IdleLedgerRemovalGasTest is Test {
 }
 
 contract IdleGasHarness is IdleErc20Handler {
-    constructor(
-        address dcaManagerAddress,
-        address stableTokenAddress,
-        address feeCollector,
-        FeeSettings memory feeSettings,
-        address initialOwner
-    ) IdleErc20Handler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, initialOwner) {}
+    constructor(address dcaManagerAddress, address stableTokenAddress)
+        IdleErc20Handler(dcaManagerAddress, stableTokenAddress)
+    {}
 
     function exposedBatchRetrieve(address[] calldata users, uint256[] calldata purchaseAmounts)
         external
@@ -154,13 +144,9 @@ contract IdleGasHarness is IdleErc20Handler {
 contract IdleLedgerBaselineHarness is TokenHandler {
     mapping(address user => uint256 balance) internal s_idleBalances;
 
-    constructor(
-        address dcaManagerAddress,
-        address stableTokenAddress,
-        address feeCollector,
-        FeeSettings memory feeSettings,
-        address initialOwner
-    ) TokenHandler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, initialOwner) {}
+    constructor(address dcaManagerAddress, address stableTokenAddress)
+        TokenHandler(dcaManagerAddress, stableTokenAddress)
+    {}
 
     function _depositToken(address user, uint256 depositAmount) internal override {
         super._depositToken(user, depositAmount);

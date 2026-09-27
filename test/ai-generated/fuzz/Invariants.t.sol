@@ -102,32 +102,17 @@ contract InvariantTest is StdInvariant, Test {
         vm.stopPrank();
 
         // Deploy appropriate handler wrapper based on lending protocol
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
-            minFeeRate: MIN_FEE_RATE,
-            maxFeeRate: MAX_FEE_RATE_TEST,
-            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
-        });
-
         if (s_routeIndex == TROPYKUS_INDEX) {
             kToken = new MockKdocToken(address(stablecoin));
             handler = IPurchaseRbtc(
-                address(
-                    new TropykusHandlerWrapper(
-                        address(dcaManager), address(stablecoin), address(kToken), FEE_COLLECTOR, feeSettings, OWNER
-                    )
-                )
+                address(new TropykusHandlerWrapper(address(dcaManager), address(stablecoin), address(kToken)))
             );
             // Give kToken sufficient balance for operations
             stablecoin.mint(address(kToken), HANDLER_INITIAL_BALANCE);
         } else {
             iSusdToken = new MockIsusdToken(address(stablecoin));
             handler = IPurchaseRbtc(
-                address(
-                    new SovrynHandlerWrapper(
-                        address(dcaManager), address(stablecoin), address(iSusdToken), FEE_COLLECTOR, feeSettings, OWNER
-                    )
-                )
+                address(new SovrynHandlerWrapper(address(dcaManager), address(stablecoin), address(iSusdToken)))
             );
             // Give iSusdToken sufficient balance for operations
             stablecoin.mint(address(iSusdToken), HANDLER_INITIAL_BALANCE);
@@ -472,17 +457,8 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
     // Track users' accumulated RBTC for testing
     mapping(address user => uint256 amount) internal s_usersAccumulatedRbtc;
 
-    constructor(
-        address dcaManagerAddress,
-        address stableTokenAddress,
-        address kTokenAddress,
-        address feeCollector,
-        FeeSettings memory feeSettings,
-        address initialOwner
-    )
-        TropykusErc20Handler(
-            dcaManagerAddress, stableTokenAddress, kTokenAddress, feeCollector, feeSettings, initialOwner
-        )
+    constructor(address dcaManagerAddress, address stableTokenAddress, address kTokenAddress)
+        TropykusErc20Handler(dcaManagerAddress, stableTokenAddress, kTokenAddress)
     {}
 
     /**
@@ -593,17 +569,8 @@ contract SovrynHandlerWrapper is SovrynErc20Handler {
     // Track users' accumulated RBTC for testing
     mapping(address user => uint256 amount) internal s_usersAccumulatedRbtc;
 
-    constructor(
-        address dcaManagerAddress,
-        address stableTokenAddress,
-        address iSusdTokenAddress,
-        address feeCollector,
-        FeeSettings memory feeSettings,
-        address initialOwner
-    )
-        SovrynErc20Handler(
-            dcaManagerAddress, stableTokenAddress, iSusdTokenAddress, feeCollector, feeSettings, initialOwner
-        )
+    constructor(address dcaManagerAddress, address stableTokenAddress, address iSusdTokenAddress)
+        SovrynErc20Handler(dcaManagerAddress, stableTokenAddress, iSusdTokenAddress)
     {}
 
     /**

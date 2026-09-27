@@ -655,7 +655,7 @@ contract PurchaseRbtcHarness is PurchaseRbtc {
         FeeSettings memory feeSettings,
         address initialOwner
     )
-        FeeHandler(feeCollector, feeSettings, initialOwner)
+        PurchaseRbtc(FeeHandlerConfig({feeCollector: feeCollector, feeSettings: feeSettings}), initialOwner)
         DcaManagerAccessControl(dcaManagerAddress)
         StablecoinSource(tokenAddress)
     {}

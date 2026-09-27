@@ -38,16 +38,8 @@ contract LendingErc20HandlerRedeemTest is Test {
 
     function setUp() public {
         stablecoin = new MockStablecoin(address(this));
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
-            minFeeRate: MIN_FEE_RATE,
-            maxFeeRate: MAX_FEE_RATE_TEST,
-            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
-        });
         // dcaManager = this, so tests can call onlyDcaManager entry points directly
-        harness = new LendingErc20HandlerHarness(
-            address(this), address(stablecoin), address(0xFEE), feeSettings, address(this)
-        );
+        harness = new LendingErc20HandlerHarness(address(this), address(stablecoin));
 
         stablecoin.mint(userA, USER_A_DEPOSIT);
         stablecoin.mint(userB, USER_B_DEPOSIT);
@@ -580,13 +572,9 @@ contract LendingErc20HandlerHarness is LendingErc20Handler {
     bool public increaseBalanceOnRedeem;
     bool public revertOnRedeem;
 
-    constructor(
-        address dcaManagerAddress,
-        address stableTokenAddress,
-        address feeCollector,
-        FeeSettings memory feeSettings,
-        address initialOwner
-    ) LendingErc20Handler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, 1e18, initialOwner) {}
+    constructor(address dcaManagerAddress, address stableTokenAddress)
+        LendingErc20Handler(dcaManagerAddress, stableTokenAddress, 1e18)
+    {}
 
     function setExchangeRate(uint256 rate) external {
         exchangeRate = rate;

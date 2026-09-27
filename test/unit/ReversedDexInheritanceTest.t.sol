@@ -30,8 +30,14 @@ contract ReversedIdleErc20HandlerDex is PurchaseUniswap, IdleErc20Handler {
         uint256 amountOutMinimumSafetyCheck,
         address initialOwner
     )
-        IdleErc20Handler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, initialOwner)
-        PurchaseUniswap(uniswapSettings, amountOutMinimumPercent, amountOutMinimumSafetyCheck)
+        IdleErc20Handler(dcaManagerAddress, stableTokenAddress)
+        PurchaseUniswap(
+            uniswapSettings,
+            FeeHandlerConfig({feeCollector: feeCollector, feeSettings: feeSettings}),
+            amountOutMinimumPercent,
+            amountOutMinimumSafetyCheck,
+            initialOwner
+        )
     {}
 }
 

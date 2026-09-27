@@ -354,9 +354,14 @@ contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
         uint256 amountOutMinimumSafetyCheck
     )
         PurchaseTokenBase(token)
-        FeeHandler(address(0xFEE), feeSettings, msg.sender)
         DcaManagerAccessControl(msg.sender)
-        PurchaseUniswap(uniswapSettings, amountOutMinimumPercent, amountOutMinimumSafetyCheck)
+        PurchaseUniswap(
+            uniswapSettings,
+            FeeHandlerConfig({feeCollector: address(0xFEE), feeSettings: feeSettings}),
+            amountOutMinimumPercent,
+            amountOutMinimumSafetyCheck,
+            msg.sender
+        )
     {}
 
     function getAmountOutMinimum(uint256 stablecoinAmountToSpend) external view returns (uint256) {
