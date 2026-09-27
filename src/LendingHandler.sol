@@ -116,10 +116,18 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
         i_stableToken.forceApprove(_lendingSpender(), type(uint256).max);
     }
 
-    /// @dev TokenHandler reverts unless the pull matches `depositAmount`, so the mint always uses the full request.
+    /**
+     * @dev TokenHandler reverts unless the pull matches `depositAmount`, so the mint always uses
+     *      the full request. Credited shares are the measured receipt-share gain, never a
+     *      protocol return value. A declining receipt-share balance panics on the checked
+     *      subtraction (same as the former adapter-local deltas); a flat balance reverts
+     *      `LendingHandler__LendingProtocolDepositFailed`.
+     */
     function _depositToken(address user, uint256 depositAmount) internal virtual override {
         super._depositToken(user, depositAmount);
-        uint256 mintedAmount = _protocolDeposit(depositAmount);
+        uint256 sharesBefore = _receiptSharesBalance();
+        _protocolDeposit(depositAmount);
+        uint256 mintedAmount = _receiptSharesBalance() - sharesBefore;
         if (mintedAmount == 0) revert LendingHandler__LendingProtocolDepositFailed();
         uint256 previousShares = s_shares[user];
         _setUserShares(user, previousShares, previousShares + mintedAmount);
@@ -207,9 +215,9 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
 
     /**
      * @dev Mint shares against `stablecoinAmount` already held by this contract.
-     * @return mintedShares The share balance this contract actually gained.
+     *      Adapters call the protocol only. Receipt-share measurement lives in the base.
      */
-    function _protocolDeposit(uint256 stablecoinAmount) internal virtual returns (uint256 mintedShares);
+    function _protocolDeposit(uint256 stablecoinAmount) internal virtual;
 
     /**
      * @dev Burn `sharesAmount` at the lending protocol onto this contract.

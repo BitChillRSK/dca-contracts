@@ -71,11 +71,9 @@ abstract contract LayerBankErc20Handler is LendingHandler, ILayerBankErc20Handle
         return address(i_pool);
     }
 
-    /// @dev The shares credited are the aTokens actually gained, never a Pool return.
-    function _protocolDeposit(uint256 stablecoinAmount) internal override returns (uint256 mintedShares) {
-        uint256 prevShares = i_aToken.scaledBalanceOf(address(this));
+    /// @dev Supply only; the base credits the measured `scaledBalanceOf` gain, never a Pool return.
+    function _protocolDeposit(uint256 stablecoinAmount) internal override {
         i_pool.supply(address(i_stableToken), stablecoinAmount, address(this), 0);
-        mintedShares = i_aToken.scaledBalanceOf(address(this)) - prevShares;
     }
 
     /**

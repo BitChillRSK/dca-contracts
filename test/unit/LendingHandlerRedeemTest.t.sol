@@ -165,12 +165,16 @@ contract LendingHandlerRedeemTest is Test {
 
     function test_deposit_emitsUserSharesUpdatedWithMeasuredMint() public {
         uint256 previousShares = harness.getUserShares(userA);
+        uint256 protocolSharesBefore = harness.protocolShares();
         uint256 expectedShares = _stablecoinToSharesUp(USER_A_DEPOSIT, RATE_SCALE);
 
         vm.recordLogs();
         harness.depositToken(userA, USER_A_DEPOSIT);
 
-        assertEq(harness.getUserShares(userA), expectedShares);
+        uint256 credited = harness.getUserShares(userA) - previousShares;
+        uint256 measuredExternal = harness.protocolShares() - protocolSharesBefore;
+        assertEq(credited, measuredExternal, "credited shares must equal measured external delta");
+        assertEq(credited, expectedShares);
         _assertLastUserSharesUpdated(userA, previousShares, expectedShares);
     }
 
@@ -772,9 +776,8 @@ contract LendingHandlerHarness is LendingHandler {
         return protocolShares;
     }
 
-    function _protocolDeposit(uint256 stablecoinAmount) internal override returns (uint256 mintedShares) {
-        mintedShares = _stablecoinToShares(stablecoinAmount, exchangeRate);
-        protocolShares += mintedShares;
+    function _protocolDeposit(uint256 stablecoinAmount) internal override {
+        protocolShares += _stablecoinToShares(stablecoinAmount, exchangeRate);
         i_stableToken.safeTransfer(address(1), stablecoinAmount);
     }
 
