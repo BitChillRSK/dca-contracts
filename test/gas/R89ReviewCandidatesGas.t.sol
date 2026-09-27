@@ -7,7 +7,7 @@ import {DcaDappTest} from "test/unit/DcaDappTest.t.sol";
 import {IDcaManager} from "src/interfaces/IDcaManager.sol";
 import {OperationsAdmin} from "src/OperationsAdmin.sol";
 import {IOperationsAdmin} from "src/interfaces/IOperationsAdmin.sol";
-import {ITokenLending} from "src/interfaces/ITokenLending.sol";
+import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
 import {scheduleIdAt} from "test/utils/ScheduleAt.sol";
 import "test/Constants.sol";
 
@@ -262,7 +262,8 @@ contract R89ReviewCandidatesGasTest is DcaDappTest {
     /// @dev Found through the public getter, so the pin does not depend on each leaf's storage layout.
     function _userSharesSlot(address user) private returns (bytes32) {
         return bytes32(
-            stdstore.target(address(stablecoinHandler)).sig(ITokenLending.getUserShares.selector).with_key(user).find()
+            stdstore.target(address(stablecoinHandler)).sig(ILendingHandler.getUserShares.selector).with_key(user)
+                .find()
         );
     }
 

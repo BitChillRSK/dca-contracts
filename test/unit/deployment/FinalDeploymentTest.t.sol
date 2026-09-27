@@ -8,7 +8,7 @@ import {OperationsAdmin} from "../../../src/OperationsAdmin.sol";
 import {DcaManager} from "../../../src/DcaManager.sol";
 import {IOperationsAdmin} from "../../../src/interfaces/IOperationsAdmin.sol";
 import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
-import {ITokenLending} from "../../../src/interfaces/ITokenLending.sol";
+import {ILendingHandler} from "../../../src/interfaces/ILendingHandler.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {BitChillOwnable} from "../../../src/BitChillOwnable.sol";
 import {LayerBankDocHandlerMoc} from "../../../src/layerbank/LayerBankDocHandlerMoc.sol";
@@ -189,11 +189,11 @@ contract FinalDeploymentTest is Test {
         assertEq(docFees.feePurchaseLowerBound, FEE_PURCHASE_LOWER_BOUND);
         assertEq(docFees.maxFeeRate, MAX_FEE_RATE_PRODUCTION);
 
-        assertTrue(IERC165(stack.docLayerBank).supportsInterface(type(ITokenLending).interfaceId));
-        assertTrue(IERC165(stack.docSovryn).supportsInterface(type(ITokenLending).interfaceId));
-        assertTrue(IERC165(stack.usdrifLayerBank).supportsInterface(type(ITokenLending).interfaceId));
-        assertFalse(IERC165(stack.docIdle).supportsInterface(type(ITokenLending).interfaceId));
-        assertFalse(IERC165(stack.usdt0Idle).supportsInterface(type(ITokenLending).interfaceId));
+        assertTrue(IERC165(stack.docLayerBank).supportsInterface(type(ILendingHandler).interfaceId));
+        assertTrue(IERC165(stack.docSovryn).supportsInterface(type(ILendingHandler).interfaceId));
+        assertTrue(IERC165(stack.usdrifLayerBank).supportsInterface(type(ILendingHandler).interfaceId));
+        assertFalse(IERC165(stack.docIdle).supportsInterface(type(ILendingHandler).interfaceId));
+        assertFalse(IERC165(stack.usdt0Idle).supportsInterface(type(ILendingHandler).interfaceId));
 
         // Handler addresses must be unique because each may back only one token-route pair.
         address[7] memory handlers = [

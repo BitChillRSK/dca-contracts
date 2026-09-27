@@ -10,7 +10,7 @@ import {ILayerBankErc20Handler} from "src/layerbank/ILayerBankErc20Handler.sol";
 import {MockLayerBankAToken, MockLayerBankPool} from "test/mocks/MockLayerBank.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ITokenLending} from "src/interfaces/ITokenLending.sol";
+import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import "test/Constants.sol";
 
@@ -233,7 +233,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         aToken.setForceZeroMint(true);
 
         vm.prank(address(dcaManager));
-        vm.expectRevert(ITokenLending.TokenLending__LendingProtocolDepositFailed.selector);
+        vm.expectRevert(ILendingHandler.LendingHandler__LendingProtocolDepositFailed.selector);
         handler.depositToken(USER, DEPOSIT_AMOUNT);
 
         assertEq(layerbankHandler.getUserShares(USER), 0);
@@ -254,7 +254,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
 
         vm.prank(address(dcaManager));
         vm.expectRevert(
-            abi.encodeWithSelector(ITokenLending.TokenLending__ZeroStablecoinReceived.selector, sharesToRedeem)
+            abi.encodeWithSelector(ILendingHandler.LendingHandler__ZeroStablecoinReceived.selector, sharesToRedeem)
         );
         handler.withdrawToken(USER, WITHDRAWAL_AMOUNT);
 
@@ -326,7 +326,9 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         uint256 requested = Math.mulDiv(totalAtokenToRedeem, amounts[0], excessiveAmount, Math.Rounding.Ceil);
 
         vm.expectRevert(
-            abi.encodeWithSelector(ITokenLending.TokenLending__InsufficientShares.selector, user1, requested, available)
+            abi.encodeWithSelector(
+                ILendingHandler.LendingHandler__InsufficientShares.selector, user1, requested, available
+            )
         );
         layerbankHandler.testBatchRetrieveStablecoin(users, amounts);
     }
@@ -352,7 +354,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         uint256 sharesToRedeem = Math.mulDiv(amounts[0], aToken.RAY(), aToken.getNormalizedIncome(), Math.Rounding.Ceil);
 
         vm.expectRevert(
-            abi.encodeWithSelector(ITokenLending.TokenLending__ZeroStablecoinReceived.selector, sharesToRedeem)
+            abi.encodeWithSelector(ILendingHandler.LendingHandler__ZeroStablecoinReceived.selector, sharesToRedeem)
         );
         layerbankHandler.testBatchRetrieveStablecoin(users, amounts);
 

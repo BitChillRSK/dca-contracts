@@ -10,7 +10,7 @@ import {FeeHandler} from "../../../../src/FeeHandler.sol";
 import {MockKdocToken} from "../../../mocks/MockKdocToken.sol";
 import {MockStablecoin} from "../../../mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ITokenLending} from "../../../../src/interfaces/ITokenLending.sol";
+import {ILendingHandler} from "../../../../src/interfaces/ILendingHandler.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import "../../../Constants.sol";
 
@@ -206,7 +206,7 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
         kToken.setForceZeroMint(true);
 
         vm.prank(address(dcaManager));
-        vm.expectRevert(ITokenLending.TokenLending__LendingProtocolDepositFailed.selector);
+        vm.expectRevert(ILendingHandler.LendingHandler__LendingProtocolDepositFailed.selector);
         handler.depositToken(USER, DEPOSIT_AMOUNT);
 
         assertEq(tropykusHandler.getUserShares(USER), 0);
@@ -246,7 +246,7 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
 
         vm.prank(address(dcaManager));
         vm.expectRevert(
-            abi.encodeWithSelector(ITokenLending.TokenLending__ZeroStablecoinReceived.selector, sharesToRedeem)
+            abi.encodeWithSelector(ILendingHandler.LendingHandler__ZeroStablecoinReceived.selector, sharesToRedeem)
         );
         handler.withdrawToken(USER, WITHDRAWAL_AMOUNT);
 
@@ -354,7 +354,9 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
         uint256 requested = Math.mulDiv(totalKtokenToRedeem, amounts[0], excessiveAmount, Math.Rounding.Ceil);
 
         vm.expectRevert(
-            abi.encodeWithSelector(ITokenLending.TokenLending__InsufficientShares.selector, user1, requested, available)
+            abi.encodeWithSelector(
+                ILendingHandler.LendingHandler__InsufficientShares.selector, user1, requested, available
+            )
         );
         tropykusHandler.testBatchRetrieveStablecoin(users, amounts);
     }
@@ -381,7 +383,7 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
             Math.mulDiv(amounts[0], EXCHANGE_RATE_DECIMALS, kToken.exchangeRateCurrent(), Math.Rounding.Ceil);
 
         vm.expectRevert(
-            abi.encodeWithSelector(ITokenLending.TokenLending__ZeroStablecoinReceived.selector, sharesToRedeem)
+            abi.encodeWithSelector(ILendingHandler.LendingHandler__ZeroStablecoinReceived.selector, sharesToRedeem)
         );
         tropykusHandler.testBatchRetrieveStablecoin(users, amounts);
 

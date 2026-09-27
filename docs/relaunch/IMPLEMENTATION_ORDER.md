@@ -156,7 +156,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R92 | after R91, before relaunch deploy | none (FeeHandler off `TokenHandler`; solve default-profile Dex stack-too-deep) |
 | R93 | after R92, before relaunch deploy | none (report already-measured receipt shares on zero-cash reverts; delete the diagnostic-only batch loop) |
 | R94 | after R93, before relaunch deploy | none (create nonce before pull; drop withdrawal downcast; deposit store-before-pull and top-up hoist measured and reverted; record closed canvas leftovers) |
-| R95 | after R94, before relaunch deploy | **decided 2026-09-27:** merge `TokenLending` into `LendingErc20Handler`; scale visibility, R85 slip, declaration order, relative imports (runtime byte-identical); record the verdict on every candidate of the PRs 138–160 review |
+| R95 | after R94, before relaunch deploy | **decided 2026-09-27:** merge `TokenLending` into the lending base and rename it `LendingHandler` / `ILendingHandler` (prefix `LendingHandler__`); scale visibility, R85 slip, declaration order, relative imports (runtime identical up to renamed topics/selectors); record the verdict on every candidate of the PRs 138–160 review |
 | R96 | after R95, before relaunch deploy | **decided 2026-09-27:** `ceilDiv` share conversion; drop `OperationsAdmin.isLendingRoute` for `getRouteClass` |
 | R97 | after R96, before relaunch deploy | **decided 2026-09-27:** lending exits redeem straight to the user (reverses R28's PR 19 call); `TokenHandler._withdrawToken` abstract, idle keeps the transfer |
 
@@ -291,7 +291,7 @@ Land before R26 and deploy/CI so neither PR freezes the old helper names.
 
 "Lending token" is not DeFi nomenclature and reads backwards — `_stablecoinToLendingToken` sounds like "the token being lent", which is the stablecoin. Aave says `aToken`, Compound (Tropykus's fork parent) says `cToken`; the recognized generic is ERC-4626's **shares**. Rename the receipt-token noun to `shares` across `ITokenLending`, `TokenLending`, and the handlers: `getUsersLendingTokenBalance` → `getUserShares`, `_stablecoinToLendingToken` / `_lendingTokenToStablecoin` → `_stablecoinToShares` / `_sharesToStablecoin`, `TokenLending__LendingTokenRedeemed(Batch)` → `…SharesRedeemed(Batch)`, `TokenLending__InsufficientLendingTokenBalance` → `TokenLending__InsufficientShares`, and Sovryn's `_redeemLendingToken` → `_redeemShares`.
 
-Keep `ITokenLending` / `TokenLending` / `LENDING_PROTOCOL` / `LendingProtocol*Failed` — "lending" as a domain word is fine; only "lending **token**" is wrong. Keep `stablecoin` as the asset noun; do not adopt 4626's `assets`.
+Keep `ITokenLending` / `TokenLending` / `LENDING_PROTOCOL` / `LendingProtocol*Failed` — "lending" as a domain word is fine; only "lending **token**" is wrong. *(2026-09-27: [R95](./R95-merge-token-lending.md) renamed the pair `ILendingHandler` / `LendingHandler`, keeping "lending".)* Keep `stablecoin` as the asset noun; do not adopt 4626's `assets`.
 
 Land before R22 deploy/CI (now PR 28) for the same reason R25 did: that PR splits the harness where 76 of the 295 matching lines live, so renaming afterwards writes them twice. **R9 (now PR 29) is the ABI freeze** and already specifies `TokenLending__UserSharesUpdated(…, previousShares, newShares)`; until this PR reworded it, the R9 entry below also required a test asserting `newShares == getUsersLendingTokenBalance(user)` — two names for one quantity. Settle the noun before that lands. See `R26-share-terminology.md`.
 
@@ -1322,12 +1322,14 @@ the canvas closed leftovers (Idle fold, shared scale, purchase slot-0 further co
 OperationsAdmin view, Uniswap path `calldata`, `BitChillOwnable` off `FeeHandler`). Ask: none
 (locked 2026-09-27).
 
-### R95 - merge `TokenLending` and source-order cleanups ([spec](./R95-merge-token-lending.md))
+### R95 - merge `TokenLending`, rename the lending base, and source-order cleanups ([spec](./R95-merge-token-lending.md))
 
-After R94, before relaunch deploy. Delete `TokenLending`; `LendingErc20Handler is TokenHandler,
-ITokenLending` holds the scale immutable (now explicitly `internal`) and both conversion helpers. Also
-the `PurchaseRbtc` `///` slip, constants → immutables → storage in `PurchaseUniswap` and `FeeHandler`,
-and relative `src/` imports. Runtime byte-identical on both profiles. Records the verdict on every
+After R94, before relaunch deploy. Delete `TokenLending`; `LendingHandler is TokenHandler,
+ILendingHandler` (formerly `LendingErc20Handler` / `ITokenLending`) holds the scale immutable (now
+explicitly `internal`) and both conversion helpers. Errors and events take the `LendingHandler__` prefix;
+`bitchill-monitoring` follows up. Also the `PurchaseRbtc` `///` slip, constants → immutables → storage in
+`PurchaseUniswap` and `FeeHandler`, and relative `src/` imports. Runtime identical on both profiles up
+to the renamed topics and selectors. Records the verdict on every
 candidate from the 2026-09-27 review of PRs 138–160. Ask: none (decided 2026-09-27).
 
 ### R96 - `ceilDiv` share conversion and one route-class getter ([spec](./R96-ceildiv-and-one-route-class-getter.md))
@@ -1352,7 +1354,7 @@ There is no optional-late queue. Items either have an ordered spec above or are 
   named `i_exchangeRateDecimals`; exposing that changes the getter ABI, and keeping a separate
   `EXCHANGE_RATE_DECIMALS()` undermines consolidation. Measured stripped size also grew on every
   lending leaf. Adapter-local constants and the `i_exchangeRateDecimals` immutable (on
-  `LendingErc20Handler` since [R95](./R95-merge-token-lending.md)) stay. See
+  `LendingHandler` since [R95](./R95-merge-token-lending.md)) stay. See
   [R88](./R88-post-r87-structural-cleanups.md#verdicts-2026-09-26). Reaffirmed 2026-09-27 under
   [R94](./R94-dcamanager-store-before-pull.md#closed-decisions-2026-09-27).
 

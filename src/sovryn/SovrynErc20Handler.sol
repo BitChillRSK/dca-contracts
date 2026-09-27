@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
-import {LendingErc20Handler} from "../LendingErc20Handler.sol";
+import {LendingHandler} from "../LendingHandler.sol";
 import {IiSusdToken} from "./IiSusdToken.sol";
 
 /**
  * @title SovrynErc20Handler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Sovryn adapter: iSUSD mint/burn. Share accounting lives on LendingErc20Handler.
+ * @notice Sovryn adapter: iSUSD mint/burn. Share accounting lives on LendingHandler.
  */
-abstract contract SovrynErc20Handler is LendingErc20Handler {
+abstract contract SovrynErc20Handler is LendingHandler {
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
@@ -36,7 +36,7 @@ abstract contract SovrynErc20Handler is LendingErc20Handler {
      * @param iSusdTokenAddress Sovryn iSUSD (or equivalent iToken) for that stablecoin.
      */
     constructor(address dcaManagerAddress, address stableTokenAddress, address iSusdTokenAddress)
-        LendingErc20Handler(dcaManagerAddress, stableTokenAddress, EXCHANGE_RATE_DECIMALS)
+        LendingHandler(dcaManagerAddress, stableTokenAddress, EXCHANGE_RATE_DECIMALS)
     {
         i_iSusdToken = IiSusdToken(iSusdTokenAddress);
         _approveLendingSpender();

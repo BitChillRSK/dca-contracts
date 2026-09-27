@@ -4,7 +4,7 @@ pragma solidity 0.8.36;
 /**
  * @title ILayerBankErc20Handler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice LayerBank-specific constructor errors. Share events and errors stay on `ITokenLending`.
+ * @notice LayerBank-specific constructor errors. Share events and errors stay on `ILendingHandler`.
  */
 interface ILayerBankErc20Handler {
     /*//////////////////////////////////////////////////////////////

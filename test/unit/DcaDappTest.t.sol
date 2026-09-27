@@ -135,8 +135,8 @@ contract DcaDappTest is Test {
     event TokenHandler__TokenDeposited(address indexed token, address indexed user, uint256 amount);
     event TokenHandler__TokenWithdrawn(address indexed token, address indexed user, uint256 amount);
 
-    // TokenLending
-    event TokenLending__SharesRedeemed(address indexed user, uint256 underlyingAmount, uint256 sharesAmountRedeemed);
+    // LendingHandler
+    event LendingHandler__SharesRedeemed(address indexed user, uint256 underlyingAmount, uint256 sharesAmountRedeemed);
 
     // IPurchaseRbtc
     event PurchaseRbtc__RbtcBought(
@@ -158,9 +158,11 @@ contract DcaDappTest is Test {
     //MockMocProxy
     event MockMocProxy__DocRedeemed(address indexed user, uint256 docAmount, uint256 btcAmount);
 
-    //TokenLending
-    event TokenLending__WithdrawalAmountAdjusted(address indexed user, uint256 originalAmount, uint256 adjustedAmount);
-    event TokenLending__SharesRedeemedBatch(uint256 underlyingAmount, uint256 sharesAmountRedeemed);
+    //LendingHandler
+    event LendingHandler__WithdrawalAmountAdjusted(
+        address indexed user, uint256 originalAmount, uint256 adjustedAmount
+    );
+    event LendingHandler__SharesRedeemedBatch(uint256 underlyingAmount, uint256 sharesAmountRedeemed);
 
     modifier onlyDexSwaps() {
         if (!isDexSwaps) {
@@ -556,7 +558,7 @@ contract DcaDappTest is Test {
         uint256 netPurchaseAmount = AMOUNT_TO_SPEND - fee;
 
         // Lending purchases go through `_batchRetrieveStablecoin`, which does not emit
-        // `TokenLending__SharesRedeemed` (that event is single-redeem / measured cash only).
+        // `LendingHandler__SharesRedeemed` (that event is single-redeem / measured cash only).
         if (block.chainid == ANVIL_CHAIN_ID && isMocSwaps) {
             vm.expectEmit(true, true, true, true);
         } else {
@@ -779,7 +781,7 @@ contract DcaDappTest is Test {
         Vm.Log[] memory entries = vm.getRecordedLogs();
         bool found;
         for (uint256 i; i < entries.length; ++i) {
-            if (entries[i].topics[0] == TokenLending__SharesRedeemedBatch.selector) {
+            if (entries[i].topics[0] == LendingHandler__SharesRedeemedBatch.selector) {
                 (uint256 underlyingAmount,) = abi.decode(entries[i].data, (uint256, uint256));
                 // n−1 share dust × ~2 DOC wei/share at rates near 1–2e18, plus 1 wei conversion.
                 uint256 tol = 2 * NUM_OF_SCHEDULES + 1;
@@ -791,7 +793,7 @@ contract DcaDappTest is Test {
                 break;
             }
         }
-        assertTrue(found, "TokenLending__SharesRedeemedBatch not emitted");
+        assertTrue(found, "LendingHandler__SharesRedeemedBatch not emitted");
     }
 
     function updateExchangeRate(uint256 secondsPassed) internal {

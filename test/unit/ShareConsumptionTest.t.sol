@@ -2,7 +2,7 @@
 pragma solidity 0.8.36;
 
 import {DcaDappTest} from "./DcaDappTest.t.sol";
-import {ITokenLending} from "../../src/interfaces/ITokenLending.sol";
+import {ILendingHandler} from "../../src/interfaces/ILendingHandler.sol";
 import {LayerBankErc20Handler} from "../../src/layerbank/LayerBankErc20Handler.sol";
 import "../Constants.sol";
 import {scheduleIdAt} from "test/utils/ScheduleAt.sol";
@@ -29,13 +29,13 @@ contract ShareConsumptionTest is DcaDappTest {
 
     function test_withdraw_externalShareDeltaEqualsVirtualDebit() public onlyLending {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        uint256 bookBefore = ITokenLending(address(stablecoinHandler)).getUserShares(USER);
+        uint256 bookBefore = ILendingHandler(address(stablecoinHandler)).getUserShares(USER);
         uint256 receiptBefore = _receiptShares();
 
         vm.prank(USER);
         dcaManager.withdrawToken(address(stablecoin), scheduleId, WITHDRAWAL_AMOUNT);
 
-        uint256 bookDebit = bookBefore - ITokenLending(address(stablecoinHandler)).getUserShares(USER);
+        uint256 bookDebit = bookBefore - ILendingHandler(address(stablecoinHandler)).getUserShares(USER);
         uint256 receiptDebit = receiptBefore - _receiptShares();
         assertGt(bookDebit, 0);
         assertEq(bookDebit, receiptDebit);
@@ -43,12 +43,12 @@ contract ShareConsumptionTest is DcaDappTest {
 
     function test_singleSchedulePurchase_externalShareDeltaEqualsVirtualDebit() public onlyLending {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        uint256 bookBefore = ITokenLending(address(stablecoinHandler)).getUserShares(USER);
+        uint256 bookBefore = ILendingHandler(address(stablecoinHandler)).getUserShares(USER);
         uint256 receiptBefore = _receiptShares();
 
         buyRbtcOne(scheduleId);
 
-        uint256 bookDebit = bookBefore - ITokenLending(address(stablecoinHandler)).getUserShares(USER);
+        uint256 bookDebit = bookBefore - ILendingHandler(address(stablecoinHandler)).getUserShares(USER);
         uint256 receiptDebit = receiptBefore - _receiptShares();
         assertGt(bookDebit, 0);
         assertEq(bookDebit, receiptDebit);

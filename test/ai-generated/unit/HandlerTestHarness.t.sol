@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {ITokenHandler} from "../../../src/interfaces/ITokenHandler.sol";
 import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
-import {ITokenLending} from "../../../src/interfaces/ITokenLending.sol";
+import {ILendingHandler} from "../../../src/interfaces/ILendingHandler.sol";
 import {IPurchaseRbtc} from "../../../src/interfaces/IPurchaseRbtc.sol";
 import {IPurchaseUniswap} from "../../../src/interfaces/IPurchaseUniswap.sol";
 import {IDcaManagerAccessControl} from "../../../src/interfaces/IDcaManagerAccessControl.sol";
@@ -174,7 +174,7 @@ abstract contract HandlerTestHarness is Test {
         // Handler balance might go to lending protocol, so we check based on handler type
         if (supportsLending) {
             // For lending handlers, tokens go to lending protocol
-            uint256 lendingBalance = ITokenLending(address(handler)).getUserShares(USER);
+            uint256 lendingBalance = ILendingHandler(address(handler)).getUserShares(USER);
             assertGt(lendingBalance, 0);
         } else {
             // For non-lending handlers, tokens stay in handler
@@ -278,7 +278,7 @@ abstract contract HandlerTestHarness is Test {
     function test_handler_lending_depositAndAccrueInterest() public {
         if (!supportsLending) return;
 
-        ITokenLending lendingHandler = ITokenLending(address(handler));
+        ILendingHandler lendingHandler = ILendingHandler(address(handler));
 
         // Deposit tokens
         vm.prank(address(dcaManager));
@@ -300,7 +300,7 @@ abstract contract HandlerTestHarness is Test {
     function test_handler_lending_withdrawInterest() public {
         if (!supportsLending) return;
 
-        ITokenLending lendingHandler = ITokenLending(address(handler));
+        ILendingHandler lendingHandler = ILendingHandler(address(handler));
 
         // Deposit tokens
         vm.prank(address(dcaManager));
@@ -329,7 +329,7 @@ abstract contract HandlerTestHarness is Test {
     function test_handler_lending_bookDebitCoversProtocolBurn() public {
         if (!supportsLending) return;
 
-        ITokenLending lendingHandler = ITokenLending(address(handler));
+        ILendingHandler lendingHandler = ILendingHandler(address(handler));
 
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);
@@ -453,7 +453,7 @@ abstract contract HandlerTestHarness is Test {
 
     function test_handler_supportsInterface() public {
         assertTrue(IERC165(address(handler)).supportsInterface(type(ITokenHandler).interfaceId));
-        bool lending = IERC165(address(handler)).supportsInterface(type(ITokenLending).interfaceId);
+        bool lending = IERC165(address(handler)).supportsInterface(type(ILendingHandler).interfaceId);
         if (supportsLending) {
             assertTrue(lending);
         } else {
