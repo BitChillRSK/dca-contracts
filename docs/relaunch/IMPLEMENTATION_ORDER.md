@@ -155,6 +155,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R91 | after R90; not deployment-bound | none (`forge fmt` one-shot + CI enforce; metadata-stripped bytecode identity) |
 | R92 | after R91, before relaunch deploy | none (FeeHandler off `TokenHandler`; solve default-profile Dex stack-too-deep) |
 | R93 | after R92, before relaunch deploy | none (report already-measured receipt shares on zero-cash reverts; delete the diagnostic-only batch loop) |
+| R94 | after R93, before relaunch deploy | none (create nonce before pull; drop withdrawal downcast; deposit store-before-pull and top-up hoist measured and reverted; record closed canvas leftovers) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1309,6 +1310,15 @@ before rollback. The single and batch paths already hold that value; delete the 
 without adding work to the successful path. The selector and encoded type stay unchanged. Ask: none
 (approved during PR 155 review).
 
+### R94 - store known credits before the handler pull ([spec](./R94-dcamanager-store-before-pull.md))
+
+After R93, before relaunch deploy. `createDcaSchedule` stores the schedule nonce before the handler
+pull (≈ −200 Rootstock under deploy); `_withdrawToken` drops the impossible `toUint128()`. Deposit
+store-before-pull and the top-up `purchaseAmount` hoist were measured and **reverted**. Also records
+the canvas closed leftovers (Idle fold, shared scale, purchase slot-0 further collapse, joined
+OperationsAdmin view, Uniswap path `calldata`, `BitChillOwnable` off `FeeHandler`). Ask: none
+(locked 2026-09-27).
+
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:
@@ -1317,7 +1327,16 @@ There is no optional-late queue. Items either have an ordered spec above or are 
   named `i_exchangeRateDecimals`; exposing that changes the getter ABI, and keeping a separate
   `EXCHANGE_RATE_DECIMALS()` undermines consolidation. Measured stripped size also grew on every
   lending leaf. Adapter-local constants and `TokenLending.i_exchangeRateDecimals` stay. See
-  [R88](./R88-post-r87-structural-cleanups.md#verdicts-2026-09-26).
+  [R88](./R88-post-r87-structural-cleanups.md#verdicts-2026-09-26). Reaffirmed 2026-09-27 under
+  [R94](./R94-dcamanager-store-before-pull.md#closed-decisions-2026-09-27).
+
+- **Fold `IdleErc20Handler` into `TokenHandler` — rejected (R90, reaffirmed R94 2026-09-27).**
+  Idle funding as `TokenHandler`'s default batch rule would be a diagram lie lending must override.
+  The short class is where the no-ledger residual risk is stated.
+
+- **Move `BitChillOwnable` off `FeeHandler` — rejected 2026-09-27 (R94).** Dex owner setters for the
+  oracle, floor, and path would force the fee setters to move too and change storage layout, for no
+  hot-path gas. Ownership stays on `FeeHandler` after R92's purchase-branch move.
 
 - **Gas candidates deferred 2026-09-25 — queued as [R87](./R87-deferred-gas-candidates.md).** The
   purchase-path review behind [R86](./R86-calldata-array-parameters.md) deferred six candidates:

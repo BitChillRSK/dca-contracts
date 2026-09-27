@@ -169,7 +169,12 @@ contract R89ReviewCandidatesGasTest is DcaDappTest {
         uint256 settingsReads = _reads(accesses, address(dcaManager), bytes32(PROTOCOL_SETTINGS_SLOT));
         console2.log("createDcaSchedule: gas", gasUsed);
         console2.log("  settings-word reads", settingsReads);
-        assertEq(settingsReads, 2, "settings word re-read");
+        // via_ir merges the load with the early nonce store.
+        if (_viaIr()) {
+            assertEq(settingsReads, 1, "settings word re-read under deploy");
+        } else {
+            assertEq(settingsReads, 2, "settings word re-read on default");
+        }
     }
 
     /*//////////////////////////////////////////////////////////////

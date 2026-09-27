@@ -238,9 +238,11 @@ priced the same on both.
 | `createDcaSchedule`: the settings word | 3 | 2 | 2 |
 | `assignTokenHandler`: the route's class | 2 | 1 | 1 |
 
-The before column is the same on both profiles. Two reads of the settings word remain after the
-change: the one load, and the read inside the nonce's read-modify-write. The latter is the compiler's
-packed-field write, which the gas audit closed.
+The before column is the same on both profiles. Two reads of the settings word remained after R89:
+the one load, and the read inside the nonce's read-modify-write. The latter is the compiler's
+packed-field write, which the gas audit closed. [R94](./R94-dcamanager-store-before-pull.md) later
+stores the nonce before the handler pull; under deploy that merges to **1** counted read (default
+stays at 2). The R89 gas pin follows that post-R94 count.
 
 ### Runtime size (bytes, metadata included), per commit
 

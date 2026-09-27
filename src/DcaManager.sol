@@ -135,13 +135,15 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         uint32 period = purchasePeriod.toUint32();
         uint32 route = routeIndex.toUint32();
 
-        // One load of the packed scalars, and the id this schedule will carry.
+        // One load of the packed scalars, and the id this schedule will carry. Stored before the
+        // pull so the settings word is not reloaded after it.
         ProtocolSettings memory settings = s_protocolSettings;
         uint64 scheduleId;
         // A widened uint64 plus one cannot overflow; `toUint64` still reverts once the nonce is exhausted.
         unchecked {
             scheduleId = (uint256(settings.scheduleNonce) + 1).toUint64();
         }
+        s_protocolSettings.scheduleNonce = scheduleId;
 
         _validatePurchasePeriod(purchasePeriod, settings.minPurchasePeriod);
         _validateDeposit(depositAmount);
@@ -155,8 +157,6 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         if (scheduleIds.length >= settings.maxSchedulesPerToken) {
             revert DcaManager__MaxSchedulesPerTokenReached(token);
         }
-
-        s_protocolSettings.scheduleNonce = scheduleId;
 
         // A new id addresses empty storage, so the zero cadence anchor and paused flag are left unset.
         _storeNewSchedule(s_dcaSchedules[token][scheduleId], deposit, period, route, msg.sender, purchase);
@@ -719,19 +719,20 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         returns (uint256 routeIndex, ITokenHandler tokenHandler)
     {
         DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
-        uint256 tokenBalance = dcaSchedule.tokenBalance;
+        uint128 tokenBalance = dcaSchedule.tokenBalance;
         if (withdrawalAmount == type(uint256).max) withdrawalAmount = tokenBalance;
         if (withdrawalAmount == 0) revert DcaManager__WithdrawalAmountMustBeGreaterThanZero();
         if (withdrawalAmount > tokenBalance) {
             revert DcaManager__WithdrawalAmountExceedsBalance(token, withdrawalAmount, tokenBalance);
         }
-        // Subtract the requested withdrawal amount, not the amount the handler paid out
-        uint256 newTokenBalance;
+        // Subtract the requested withdrawal amount, not the amount the handler paid out.
+        // Fits in uint128: withdrawalAmount <= tokenBalance.
+        uint128 newTokenBalance;
         unchecked {
-            newTokenBalance = tokenBalance - withdrawalAmount;
+            newTokenBalance = uint128(uint256(tokenBalance) - withdrawalAmount);
         }
         routeIndex = dcaSchedule.routeIndex;
-        dcaSchedule.tokenBalance = newTokenBalance.toUint128();
+        dcaSchedule.tokenBalance = newTokenBalance;
         // Lending success means the external share claim was fully consumed; cash may still be net of
         // a fee. The measured return is deliberately unused for the principal debit.
         tokenHandler = _handler(token, routeIndex);
