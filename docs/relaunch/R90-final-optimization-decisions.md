@@ -197,8 +197,9 @@ Human answers (2026-09-27), locked for this PR:
    implement for diagram cleanup; default-profile Dex stack-too-deep must be solved there, not here).
 4. Override keep-rejected / keep-checked rows?
    - Gross total into `_batchRetrieveStablecoin`: **keep rejected.**
-   - Swap-pop bounds: **still open** — human asked to see the candidate code before deciding; not in
-     this PR either way.
+   - Swap-pop bounds assembly: **rejected** (2026-09-27). Length already cached; stripping the
+     remaining compiler bounds checks needs packed-`uint64[]` assembly (four ids per word), and a
+     memory round trip costs more. Rare delete path; not worth the hazard.
    - Fold `IdleErc20Handler`; keep-checked market/delta/`amountSpent`/lending-share arithmetic:
      **no override — stay rejected / checked.**
 5. Make the repo `forge fmt`-clean? **Deferred to a dedicated follow-up PR** (format-only; enforce in
@@ -212,7 +213,7 @@ Human answers (2026-09-27), locked for this PR:
 | Unchecked lending zero-cash sum | **Shipped** in this PR |
 | FeeHandler ownership move | **Follow-up PR** (approved; stack-too-deep to fix there) |
 | Gross total into `_batchRetrieveStablecoin` | **Rejected** |
-| Swap-pop array bounds assembly | **Open** (sketch for human; not shipping here) |
+| Swap-pop array bounds assembly | **Rejected** — packed `uint64[]` makes safe assembly ugly; rare path; memory round trip worse |
 | Fold `IdleErc20Handler` into `TokenHandler` | **Rejected** |
 | Unchecked market / falling-delta / `amountSpent` / lending share sums | **Keep checked** |
 | `forge fmt` + CI enforce | **Follow-up PR** |
