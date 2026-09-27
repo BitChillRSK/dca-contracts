@@ -36,6 +36,12 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      * @return The constructor-supplied router.
      */
     IUniswapV3SwapRouter public immutable i_swapRouter02;
+    /**
+     * @notice MoC BTC/USD oracle used for the swap-time floor.
+     * @dev Packed with the live floor: address (20) + `uint64` percent (8) share one word. The safety
+     *      check occupies the next word alone. Purchase reads the packed word once; rare setters may
+     *      touch both words.
+     */
     ICoinPairPrice internal s_mocOracle;
     uint256 internal constant HUNDRED_PERCENT = 1 ether;
     /// @notice decimals of the MoC BTC/USD price. Hardcoded because the oracle exposes no `decimals()`.
@@ -50,15 +56,16 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      * @notice The swap-time oracle floor: the fraction of oracle-implied rBTC the router must pay.
      * @dev Deliberately loose. It is the bound that holds when the caller's `minRbtcOut` is absent,
      * stale, or hostile, not the operational tightness of a healthy batch — the swapper derives that
-     * from a live quote per batch and can only tighten from here.
+     * from a live quote per batch and can only tighten from here. Narrowed to `uint64` because both
+     * setters already cap at `HUNDRED_PERCENT` (1e18), which fits.
      */
-    uint128 internal s_amountOutMinimumPercent;
+    uint64 internal s_amountOutMinimumPercent;
     /**
      * @notice The lowest swap-time floor the owner may configure. Bounds the setter; never used at swap time.
      * @dev Separate from the live floor so governance's emergency range need not weaken normal execution.
-     *      Both are 1e18-scaled and packed together as `uint128`.
+     *      Both are 1e18-scaled; the live floor packs with the oracle, this value starts the next word.
      */
-    uint128 internal s_amountOutMinimumSafetyCheck;
+    uint64 internal s_amountOutMinimumSafetyCheck;
     bytes internal s_swapPath;
     /// @dev Active path's intermediate tokens, retained so purchases can detect router-stranded balances.
     address[] internal s_swapIntermediateTokens;
@@ -93,8 +100,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
 
         _validateSlippageSettings(amountOutMinimumPercent, amountOutMinimumSafetyCheck);
 
-        s_amountOutMinimumPercent = amountOutMinimumPercent.toUint128();
-        s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint128();
+        s_amountOutMinimumPercent = amountOutMinimumPercent.toUint64();
+        s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint64();
 
         // The initial owner is not the deployer, so the constructor cannot call the onlyOwner setters
         // and must install the first path itself.
@@ -180,14 +187,14 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     function setAmountOutMinimumPercent(uint256 amountOutMinimumPercent) external onlyOwner {
         _validateSlippageSettings(amountOutMinimumPercent, s_amountOutMinimumSafetyCheck);
         emit PurchaseUniswap__AmountOutMinimumPercentUpdated(s_amountOutMinimumPercent, amountOutMinimumPercent);
-        s_amountOutMinimumPercent = amountOutMinimumPercent.toUint128();
+        s_amountOutMinimumPercent = amountOutMinimumPercent.toUint64();
     }
 
     /// @inheritdoc IPurchaseUniswap
     function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external onlyOwner {
         _validateSlippageSettings(s_amountOutMinimumPercent, amountOutMinimumSafetyCheck);
         emit PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(s_amountOutMinimumSafetyCheck, amountOutMinimumSafetyCheck);
-        s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint128();
+        s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint64();
     }
 
     /// @inheritdoc IPurchaseUniswap
