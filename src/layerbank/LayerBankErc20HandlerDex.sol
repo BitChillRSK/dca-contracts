@@ -35,9 +35,12 @@ contract LayerBankErc20HandlerDex is LayerBankErc20Handler, PurchaseUniswap {
         uint256 amountOutMinimumSafetyCheck,
         address initialOwner
     )
-        LayerBankErc20Handler(
-            dcaManagerAddress, stableTokenAddress, aTokenAddress, feeCollector, feeSettings, initialOwner
+        LayerBankErc20Handler(dcaManagerAddress, stableTokenAddress, aTokenAddress)
+        PurchaseUniswap(
+            uniswapSettings,
+            FeeConstructionArgs({feeCollector: feeCollector, feeSettings: feeSettings, initialOwner: initialOwner}),
+            amountOutMinimumPercent,
+            amountOutMinimumSafetyCheck
         )
-        PurchaseUniswap(uniswapSettings, amountOutMinimumPercent, amountOutMinimumSafetyCheck)
     {}
 }

@@ -35,21 +35,9 @@ abstract contract TropykusErc20Handler is LendingErc20Handler {
      * @param dcaManagerAddress The DcaManager allowed to call this handler.
      * @param stableTokenAddress The ERC20 stablecoin this handler lends.
      * @param kTokenAddress Tropykus kToken for that stablecoin.
-     * @param feeCollector Address that receives purchase fees.
-     * @param feeSettings Linear fee parameters.
-     * @param initialOwner Address that owns fee configuration immediately after deploy.
      */
-    constructor(
-        address dcaManagerAddress,
-        address stableTokenAddress,
-        address kTokenAddress,
-        address feeCollector,
-        FeeSettings memory feeSettings,
-        address initialOwner
-    )
-        LendingErc20Handler(
-            dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, EXCHANGE_RATE_DECIMALS, initialOwner
-        )
+    constructor(address dcaManagerAddress, address stableTokenAddress, address kTokenAddress)
+        LendingErc20Handler(dcaManagerAddress, stableTokenAddress, EXCHANGE_RATE_DECIMALS)
     {
         i_kToken = IkToken(kTokenAddress);
         _approveLendingSpender();

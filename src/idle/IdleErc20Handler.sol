@@ -22,17 +22,10 @@ abstract contract IdleErc20Handler is TokenHandler {
     /**
      * @param dcaManagerAddress The DcaManager allowed to call deposit and withdraw.
      * @param stableTokenAddress The ERC20 stablecoin this handler holds idle.
-     * @param feeCollector Address that receives purchase fees.
-     * @param feeSettings Linear fee parameters.
-     * @param initialOwner Address that owns fee configuration immediately after deploy.
      */
-    constructor(
-        address dcaManagerAddress,
-        address stableTokenAddress,
-        address feeCollector,
-        FeeSettings memory feeSettings,
-        address initialOwner
-    ) TokenHandler(dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, initialOwner) {}
+    constructor(address dcaManagerAddress, address stableTokenAddress)
+        TokenHandler(dcaManagerAddress, stableTokenAddress)
+    {}
 
     /*//////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS

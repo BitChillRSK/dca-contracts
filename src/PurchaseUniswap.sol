@@ -78,19 +78,22 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
 
     /**
      * @param uniswapSettings the settings for the uniswap router
+     * @param feeArgs Collector, fee settings, and initial owner for FeeHandler.
      * @param amountOutMinimumPercent The swap-time oracle floor
      *        (deploy default: `DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT`)
      * @param amountOutMinimumSafetyCheck The lowest floor the owner may later configure
      *        (deploy default: `DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK`, 95%)
      * @dev Caches the stablecoin-to-18-decimal oracle scale; tokens above 18 decimals revert rather than
      *      weakening the floor through rounding. The initial path is allowlisted here; later paths need
-     *      owner approval.
+     *      owner approval. Fee args arrive as one memory struct so Dex leaves stay under the
+     *      legacy-codegen stack limit after FeeHandler moves off the funding base.
      */
     constructor(
         UniswapSettings memory uniswapSettings,
+        FeeConstructionArgs memory feeArgs,
         uint256 amountOutMinimumPercent,
         uint256 amountOutMinimumSafetyCheck
-    ) {
+    ) PurchaseRbtc(feeArgs) {
         if (address(uniswapSettings.mocOracle) == address(0)) {
             revert PurchaseUniswap__InvalidOracleAddress();
         }

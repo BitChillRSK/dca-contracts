@@ -1,6 +1,6 @@
 # R92 — FeeHandler ownership move
 
-Status: **in progress** · Assigned: yes · Optional/further-review: no
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
@@ -35,30 +35,29 @@ default-profile Dex stack-too-deep without adopting via-IR for `make check`.
 
 ## Scope
 
-- [ ] Remove `FeeHandler` from `TokenHandler`'s inheritance and constructor. `TokenHandler` keeps
+- [x] Remove `FeeHandler` from `TokenHandler`'s inheritance and constructor. `TokenHandler` keeps
       `DcaManagerAccessControl` + `StablecoinSource` only (plus `ERC165` / `ITokenHandler`).
-- [ ] Give `PurchaseRbtc` a constructor that initializes `FeeHandler`. Route fee args through
+- [x] Give `PurchaseRbtc` a constructor that initializes `FeeHandler`. Route fee args through
       `PurchaseMoc` and `PurchaseUniswap` (not through `IdleErc20Handler` / `LendingErc20Handler`).
-- [ ] Slim `IdleErc20Handler`, `LendingErc20Handler`, and every protocol adapter constructor: drop
+- [x] Slim `IdleErc20Handler`, `LendingErc20Handler`, and every protocol adapter constructor: drop
       fee parameters. Leaves keep the same public constructor parameter lists and pass fee args into
       the purchase base instead of the funding base.
-- [ ] Solve default-profile Dex stack-too-deep without enabling `via_ir` on `[profile.default]`.
-      Preferred lever: pack fee constructor inputs into one memory struct for the purchase-base call
-      so the Dex leaf constructor passes fewer stack slots into `PurchaseUniswap`; extract
-      constructor body work only if still needed. Do not accept option (a) from R90 (via-IR for
-      day-to-day Dex `make check`).
-- [ ] Update NatSpec / `AGENTS.md` layout: fees belong on the purchase branch; `TokenHandler` no
+- [x] Solve default-profile Dex stack-too-deep without enabling `via_ir` on `[profile.default]`.
+      **Approach used:** pack fee constructor inputs into `IFeeHandler.FeeConstructionArgs` so Dex
+      leaves pass one memory pointer into `PurchaseUniswap` / `PurchaseMoc` instead of three loose
+      fee args. Default profile compiles all Dex leaves (no stack-too-deep).
+- [x] Update NatSpec / `AGENTS.md` layout: fees belong on the purchase branch; `TokenHandler` no
       longer "owns FeeHandler".
-- [ ] Update abstract-base test harnesses that construct `IdleErc20Handler` / `LendingErc20Handler` /
+- [x] Update abstract-base test harnesses that construct `IdleErc20Handler` / `LendingErc20Handler` /
       protocol adapters without a purchase leaf so they compile (drop fee args there). Leaves and
       deploy scripts stay ABI-stable — `script/` should not need constructor-shape edits.
-- [ ] Prove concrete constructor ABIs / method identifiers unchanged on every production leaf.
-- [ ] Record storage layout vs the R91 parent for IdleDoc, SovrynDoc, and Idle Dex under both
+- [x] Prove concrete constructor ABIs / method identifiers unchanged on every production leaf.
+- [x] Record storage layout vs the R91 parent for IdleDoc, SovrynDoc, and Idle Dex under both
       profiles. Prefer identity (R90 prototype). If a lending leaf shifts slots because FeeHandler
       leaves the funding-first C3 prefix, document the exact before/after and keep going: these
       contracts are not proxies and have not deployed. Do not invent a second FeeHandler inheritance
       on the funding side just to freeze slots.
-- [ ] Full executable gate: `make check`, `make check-deploy`, `make fork-sovryn`, `make fork-tropykus`.
+- [x] Full executable gate: `make check`, `make check-deploy`, `make fork-sovryn`, `make fork-tropykus`.
 
 ## Out of scope
 
@@ -115,14 +114,30 @@ Forks add no R92-specific live-state assertion; they are the Makefile gate.
 
 ## Success criteria
 
-- [ ] `TokenHandler` does not inherit or construct `FeeHandler`.
-- [ ] `FeeHandler` is initialized only through `PurchaseRbtc` (via `PurchaseMoc` / `PurchaseUniswap`).
-- [ ] Every concrete leaf constructor ABI / method-id set matches the R91 parent.
-- [ ] `[profile.default]` compiles all Dex leaves (no stack-too-deep); `via_ir` stays false there.
-- [ ] `make check`, `make check-deploy`, `make fork-sovryn`, and `make fork-tropykus` pass.
-- [ ] Storage layout vs parent is recorded; any slot shift is explained in the PR (pre-deploy only).
-- [ ] `AGENTS.md` layout no longer says TokenHandler owns FeeHandler.
-- [ ] No consumer-visible selector / event / error change; no consumer issue required.
+- [x] `TokenHandler` does not inherit or construct `FeeHandler`.
+- [x] `FeeHandler` is initialized only through `PurchaseRbtc` (via `PurchaseMoc` / `PurchaseUniswap`).
+- [x] Every concrete leaf constructor ABI / method-id set matches the R91 parent.
+- [x] `[profile.default]` compiles all Dex leaves (no stack-too-deep); `via_ir` stays false there.
+- [x] `make check`, `make check-deploy`, `make fork-sovryn`, and `make fork-tropykus` pass.
+- [x] Storage layout vs parent is recorded; any slot shift is explained in the PR (pre-deploy only).
+- [x] `AGENTS.md` layout no longer says TokenHandler owns FeeHandler.
+- [x] No consumer-visible selector / event / error change; no consumer issue required.
+
+## Tests run (this PR)
+
+```text
+make check
+make check-deploy
+make fork-sovryn
+make fork-tropykus
+```
+
+Method identifiers identical vs R91 tip on all six production MoC/Dex leaves checked.
+Storage layout identical (IdleDoc / SovrynDoc / IdleDex): FeeHandler slots 0–3, then shares/rBTC/Dex
+state unchanged. Stack fix: `FeeConstructionArgs` packing (no via-IR on default).
+
+Also gates two R89 gas pins that mint mock DOC with `block.chainid != ANVIL` skips so forks no
+longer hit live-DOC `MinterRole` (incomplete leftover from R91's FOUNDRY::SKIP fix).
 
 ## Reviewer checklist
 

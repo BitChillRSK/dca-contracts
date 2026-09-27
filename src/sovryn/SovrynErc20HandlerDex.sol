@@ -35,9 +35,12 @@ contract SovrynErc20HandlerDex is SovrynErc20Handler, PurchaseUniswap {
         uint256 amountOutMinimumSafetyCheck,
         address initialOwner
     )
-        SovrynErc20Handler(
-            dcaManagerAddress, stableTokenAddress, iSusdTokenAddress, feeCollector, feeSettings, initialOwner
+        SovrynErc20Handler(dcaManagerAddress, stableTokenAddress, iSusdTokenAddress)
+        PurchaseUniswap(
+            uniswapSettings,
+            FeeConstructionArgs({feeCollector: feeCollector, feeSettings: feeSettings, initialOwner: initialOwner}),
+            amountOutMinimumPercent,
+            amountOutMinimumSafetyCheck
         )
-        PurchaseUniswap(uniswapSettings, amountOutMinimumPercent, amountOutMinimumSafetyCheck)
     {}
 }

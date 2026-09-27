@@ -11,7 +11,7 @@ import {BitChillOwnable} from "./BitChillOwnable.sol";
  * @title FeeHandler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Interpolates a purchase fee between the configured rate bounds and pays it to the
- *         collector. Inherited by TokenHandler and PurchaseRbtc.
+ *         collector. Owned by the purchase branch (`PurchaseRbtc` and its MoC / Uniswap leaves).
  */
 abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     using SafeERC20 for IERC20;

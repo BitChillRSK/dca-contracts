@@ -25,6 +25,15 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
     mapping(address user => uint256 encodedAmount) private s_usersAccumulatedRbtc;
 
     /*//////////////////////////////////////////////////////////////
+                               CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
+
+    /// @param feeArgs Collector, interpolated fee settings, and the address that owns them after deploy.
+    constructor(FeeConstructionArgs memory feeArgs)
+        FeeHandler(feeArgs.feeCollector, feeArgs.feeSettings, feeArgs.initialOwner)
+    {}
+
+    /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 

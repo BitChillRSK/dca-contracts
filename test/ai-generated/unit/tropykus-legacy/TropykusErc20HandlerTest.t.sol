@@ -6,6 +6,7 @@ import {ITokenHandler} from "../../../../src/interfaces/ITokenHandler.sol";
 import {IFeeHandler} from "../../../../src/interfaces/IFeeHandler.sol";
 import {IPurchaseUniswap} from "../../../../src/interfaces/IPurchaseUniswap.sol";
 import {TropykusErc20Handler} from "../../../../src/tropykus-legacy/TropykusErc20Handler.sol";
+import {FeeHandler} from "../../../../src/FeeHandler.sol";
 import {MockKdocToken} from "../../../mocks/MockKdocToken.sol";
 import {MockStablecoin} from "../../../mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -387,7 +388,7 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
  * @notice Concrete implementation of TropykusErc20Handler for testing
  * @dev Implements abstract functions to make testing possible
  */
-contract TropykusTestHandler is TropykusErc20Handler {
+contract TropykusTestHandler is TropykusErc20Handler, FeeHandler {
     constructor(
         address dcaManagerAddress,
         address stableTokenAddress,
@@ -396,9 +397,8 @@ contract TropykusTestHandler is TropykusErc20Handler {
         FeeSettings memory feeSettings,
         address initialOwner
     )
-        TropykusErc20Handler(
-            dcaManagerAddress, stableTokenAddress, kTokenAddress, feeCollector, feeSettings, initialOwner
-        )
+        TropykusErc20Handler(dcaManagerAddress, stableTokenAddress, kTokenAddress)
+        FeeHandler(feeCollector, feeSettings, initialOwner)
     {}
 
     function testBatchRetrieveStablecoin(address[] calldata users, uint256[] calldata purchaseAmounts)

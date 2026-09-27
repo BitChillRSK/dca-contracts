@@ -44,21 +44,9 @@ abstract contract LayerBankErc20Handler is LendingErc20Handler, ILayerBankErc20H
      * @param dcaManagerAddress The DcaManager allowed to call this handler.
      * @param stableTokenAddress The ERC20 stablecoin this handler lends.
      * @param aTokenAddress LayerBank aToken for that stablecoin.
-     * @param feeCollector Address that receives purchase fees.
-     * @param feeSettings Linear fee parameters.
-     * @param initialOwner Address that owns fee configuration immediately after deploy.
      */
-    constructor(
-        address dcaManagerAddress,
-        address stableTokenAddress,
-        address aTokenAddress,
-        address feeCollector,
-        FeeSettings memory feeSettings,
-        address initialOwner
-    )
-        LendingErc20Handler(
-            dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, EXCHANGE_RATE_DECIMALS, initialOwner
-        )
+    constructor(address dcaManagerAddress, address stableTokenAddress, address aTokenAddress)
+        LendingErc20Handler(dcaManagerAddress, stableTokenAddress, EXCHANGE_RATE_DECIMALS)
     {
         i_aToken = ILayerBankAToken(aTokenAddress);
         if (i_aToken.UNDERLYING_ASSET_ADDRESS() != stableTokenAddress) {

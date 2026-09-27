@@ -34,21 +34,9 @@ abstract contract SovrynErc20Handler is LendingErc20Handler {
      * @param dcaManagerAddress The DcaManager allowed to call this handler.
      * @param stableTokenAddress The stablecoin this handler lends.
      * @param iSusdTokenAddress Sovryn iSUSD (or equivalent iToken) for that stablecoin.
-     * @param feeCollector Address that receives purchase fees.
-     * @param feeSettings Linear fee parameters.
-     * @param initialOwner Address that owns fee configuration immediately after deploy.
      */
-    constructor(
-        address dcaManagerAddress,
-        address stableTokenAddress,
-        address iSusdTokenAddress,
-        address feeCollector,
-        FeeSettings memory feeSettings,
-        address initialOwner
-    )
-        LendingErc20Handler(
-            dcaManagerAddress, stableTokenAddress, feeCollector, feeSettings, EXCHANGE_RATE_DECIMALS, initialOwner
-        )
+    constructor(address dcaManagerAddress, address stableTokenAddress, address iSusdTokenAddress)
+        LendingErc20Handler(dcaManagerAddress, stableTokenAddress, EXCHANGE_RATE_DECIMALS)
     {
         i_iSusdToken = IiSusdToken(iSusdTokenAddress);
         _approveLendingSpender();

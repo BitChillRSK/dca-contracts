@@ -27,8 +27,8 @@ Do not Grep/`Glob` `out/`, `cache/`, or `lib/` (see `.cursorignore`). Open a `li
 ```
 DcaManager          user + swapper entry; schedules; single- and multi-handler purchases
 OperationsAdmin     roles; token × lending-index → handler
-FeeHandler          fee math (inherited by TokenHandler and PurchaseRbtc)
-TokenHandler        deposit/withdraw stablecoin (owns FeeHandler)
+FeeHandler          fee math (owned by PurchaseRbtc; MoC / Uniswap route fee construction)
+TokenHandler        deposit/withdraw stablecoin
 TokenLending        share ↔ underlying conversion (no TokenHandler inherit)
 LendingErc20Handler TokenHandler + TokenLending; per-user shares, withdraw clamp, interest, exact-sum batch redeem
 StablecoinSource    shared `i_stableToken` + batch-funding hook (TokenHandler and PurchaseRbtc inherit; idle/lending implement retrieve)

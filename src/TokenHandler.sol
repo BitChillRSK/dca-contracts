@@ -5,16 +5,15 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
-import {FeeHandler} from "./FeeHandler.sol";
 import {DcaManagerAccessControl} from "./DcaManagerAccessControl.sol";
 import {StablecoinSource} from "./StablecoinSource.sol";
 
 /**
  * @title TokenHandler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Base contract for depositing and withdrawing a handler's stablecoin. Owns FeeHandler.
+ * @notice Base contract for depositing and withdrawing a handler's stablecoin.
  */
-abstract contract TokenHandler is ITokenHandler, ERC165, FeeHandler, DcaManagerAccessControl, StablecoinSource {
+abstract contract TokenHandler is ITokenHandler, ERC165, DcaManagerAccessControl, StablecoinSource {
     using SafeERC20 for IERC20;
 
     /*//////////////////////////////////////////////////////////////
@@ -24,18 +23,8 @@ abstract contract TokenHandler is ITokenHandler, ERC165, FeeHandler, DcaManagerA
     /**
      * @param dcaManagerAddress The DcaManager allowed to call deposit and withdraw.
      * @param tokenAddress The stablecoin this handler holds.
-     * @param feeCollector Address that receives purchase fees.
-     * @param feeSettings Linear fee parameters.
-     * @param initialOwner Address that owns fee configuration immediately after deploy.
      */
-    constructor(
-        address dcaManagerAddress,
-        address tokenAddress,
-        address feeCollector,
-        FeeSettings memory feeSettings,
-        address initialOwner
-    )
-        FeeHandler(feeCollector, feeSettings, initialOwner)
+    constructor(address dcaManagerAddress, address tokenAddress)
         DcaManagerAccessControl(dcaManagerAddress)
         StablecoinSource(tokenAddress)
     {}
