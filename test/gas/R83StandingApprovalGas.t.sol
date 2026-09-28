@@ -273,18 +273,14 @@ contract PreR83SovrynDocHandlerMoc is SovrynDocHandlerMoc {
     using SafeERC20 for IERC20;
 
     constructor(
-        address dcaManagerAddress,
-        address docTokenAddress,
-        address iTokenAddress,
+        address dcaManager,
+        address docToken,
+        address iToken,
         address feeCollector,
-        address mocProxyAddress,
+        address mocProxy,
         IPurchaseFees.FeeSettings memory feeSettings,
         address initialOwner
-    )
-        SovrynDocHandlerMoc(
-            dcaManagerAddress, docTokenAddress, iTokenAddress, feeCollector, mocProxyAddress, feeSettings, initialOwner
-        )
-    {}
+    ) SovrynDocHandlerMoc(dcaManager, docToken, iToken, feeCollector, mocProxy, feeSettings, initialOwner) {}
 
     function _depositToken(address user, uint256 depositAmount) internal override {
         i_stablecoin.forceApprove(_lendingSpender(), depositAmount);

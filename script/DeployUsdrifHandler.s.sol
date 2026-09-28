@@ -33,9 +33,9 @@ import "./Constants.sol";
  */
 contract DeployUsdrifHandler is DeployBase {
     struct DeployParams {
-        address dcaManagerAddress;
-        address tokenAddress;
-        address aTokenAddress;
+        address dcaManager;
+        address stablecoin;
+        address aToken;
         IPurchaseUniswap.UniswapSettings uniswapSettings;
         address feeCollector;
         IPurchaseFees.FeeSettings feeSettings;
@@ -47,9 +47,9 @@ contract DeployUsdrifHandler is DeployBase {
     function deployLayerBankHandlerDex(DeployParams memory params) public returns (address) {
         return address(
             new LayerBankHandlerDex(
-                params.dcaManagerAddress,
-                params.tokenAddress,
-                params.aTokenAddress,
+                params.dcaManager,
+                params.stablecoin,
+                params.aToken,
                 params.uniswapSettings,
                 params.feeCollector,
                 params.feeSettings,
@@ -63,13 +63,13 @@ contract DeployUsdrifHandler is DeployBase {
     /**
      * @notice Deploy Pool/aToken mocks and the dex handler. Used by tests on Anvil and on a fork.
      * @dev Does not `broadcast` or call `assignHandler`. `run()` broadcasts.
-     *      `params.aTokenAddress` is ignored; a fresh mock aToken is bound to `params.tokenAddress`.
+     *      `params.aToken` is ignored; a fresh mock aToken is bound to `params.stablecoin`.
      */
     function deployMocksAndHandler(DeployParams memory params) public returns (address handler) {
-        MockLayerBankAToken aToken = new MockLayerBankAToken(params.tokenAddress);
+        MockLayerBankAToken aToken = new MockLayerBankAToken(params.stablecoin);
         MockLayerBankPool pool = new MockLayerBankPool(aToken);
         aToken.setPool(address(pool));
-        params.aTokenAddress = address(aToken);
+        params.aToken = address(aToken);
         return deployLayerBankHandlerDex(params);
     }
 
@@ -89,20 +89,20 @@ contract DeployUsdrifHandler is DeployBase {
 
         UsdrifHelperConfig.NetworkConfig memory networkConfig = helperConfig.getNetworkConfig();
 
-        if (networkConfig.operationsAdminAddress == address(0) || networkConfig.dcaManagerAddress == address(0)) {
+        if (networkConfig.operationsAdmin == address(0) || networkConfig.dcaManager == address(0)) {
             revert("OperationsAdmin and DcaManager addresses must be set in UsdrifHelperConfig");
         }
 
         bool isUsdt0 = helperConfig.isUsdt0();
-        address tokenAddress = helperConfig.getTokenAddress();
+        address stablecoin = helperConfig.getToken();
 
-        console.log("OperationsAdmin address:", networkConfig.operationsAdminAddress);
-        console.log("DcaManager address:", networkConfig.dcaManagerAddress);
+        console.log("OperationsAdmin address:", networkConfig.operationsAdmin);
+        console.log("DcaManager address:", networkConfig.dcaManager);
         console.log("Stablecoin:", isUsdt0 ? USDT0_STRING : USDRIF_STRING);
-        console.log("Token address:", tokenAddress);
+        console.log("Token address:", stablecoin);
 
-        OperationsAdmin operationsAdmin = OperationsAdmin(networkConfig.operationsAdminAddress);
-        DcaManager dcaManager = DcaManager(networkConfig.dcaManagerAddress);
+        OperationsAdmin operationsAdmin = OperationsAdmin(networkConfig.operationsAdmin);
+        DcaManager dcaManager = DcaManager(networkConfig.dcaManager);
         _requireNoPendingOwner(operationsAdmin);
         _requireNoPendingOwner(dcaManager);
 
@@ -110,9 +110,9 @@ contract DeployUsdrifHandler is DeployBase {
 
         bool isUsdt0Live = isUsdt0 && _isLiveEnvironment();
         DeployParams memory params = DeployParams({
-            dcaManagerAddress: networkConfig.dcaManagerAddress,
-            tokenAddress: tokenAddress,
-            aTokenAddress: helperConfig.getATokenAddress(),
+            dcaManager: networkConfig.dcaManager,
+            stablecoin: stablecoin,
+            aToken: helperConfig.getAToken(),
             uniswapSettings: _uniswapSettings(networkConfig, isUsdt0),
             feeCollector: getFeeCollector(environment),
             feeSettings: feeSettingsForToken(isUsdt0Live),
@@ -125,7 +125,7 @@ contract DeployUsdrifHandler is DeployBase {
         if (environment == Environment.LOCAL) {
             handler = deployMocksAndHandler(params);
         } else if (environment == Environment.TESTNET || environment == Environment.MAINNET) {
-            if (params.aTokenAddress == address(0)) {
+            if (params.aToken == address(0)) {
                 revert("LayerBank aToken address is not configured for this network");
             }
             handler = deployLayerBankHandlerDex(params);
@@ -134,7 +134,7 @@ contract DeployUsdrifHandler is DeployBase {
         }
 
         console.log("LayerBank dex handler deployed at:", handler);
-        _maybeAssign(operationsAdmin, dcaManager, tokenAddress, handler, isUsdt0Live);
+        _maybeAssign(operationsAdmin, dcaManager, stablecoin, handler, isUsdt0Live);
 
         vm.stopBroadcast();
 
@@ -154,18 +154,18 @@ contract DeployUsdrifHandler is DeployBase {
             fees[0] = 3000;
         }
         return IPurchaseUniswap.UniswapSettings({
-            wrbtc: IWRBTC(networkConfig.wrbtcTokenAddress),
-            swapRouter: IUniswapV3SwapRouter(networkConfig.swapRouterAddress),
+            wrbtc: IWRBTC(networkConfig.wrbtc),
+            swapRouter: IUniswapV3SwapRouter(networkConfig.swapRouter),
             swapIntermediateTokens: intermediates,
             swapPoolFeeRates: fees,
-            mocOracle: ICoinPairPrice(networkConfig.mocOracleAddress)
+            mocOracle: ICoinPairPrice(networkConfig.mocOracle)
         });
     }
 
     function _maybeAssign(
         OperationsAdmin operationsAdmin,
         DcaManager dcaManager,
-        address tokenAddress,
+        address stablecoin,
         address handler,
         bool isUsdt0Live
     ) internal {
@@ -181,9 +181,9 @@ contract DeployUsdrifHandler is DeployBase {
             console.log("3. REQUIRED: dcaManager.setTokenMinPurchaseAmount(token, min)");
             console.log("   USDRIF: 25 ether; USDT0: 25e6. There is no protocol-wide default.");
             console.log("4. assignHandler(token, LAYERBANK_INDEX, handler)");
-            console.log("tokenAddress:", tokenAddress);
+            console.log("stablecoin:", stablecoin);
             console.log("index:", LAYERBANK_INDEX);
-            console.log("handlerAddress:", handler);
+            console.log("handler:", handler);
             console.log("minPurchaseAmount:", isUsdt0Live ? USDT0_MIN_PURCHASE_AMOUNT : MIN_PURCHASE_AMOUNT);
             return;
         }
@@ -191,9 +191,9 @@ contract DeployUsdrifHandler is DeployBase {
             operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
         }
         uint256 minPurchaseAmount = isUsdt0Live ? USDT0_MIN_PURCHASE_AMOUNT : MIN_PURCHASE_AMOUNT;
-        dcaManager.setTokenMinPurchaseAmount(tokenAddress, minPurchaseAmount);
+        dcaManager.setTokenMinPurchaseAmount(stablecoin, minPurchaseAmount);
         console.log("Token min purchase amount set to", minPurchaseAmount);
-        operationsAdmin.assignHandler(tokenAddress, LAYERBANK_INDEX, handler);
+        operationsAdmin.assignHandler(stablecoin, LAYERBANK_INDEX, handler);
         console.log("LayerBank dex handler registered with OperationsAdmin at index", LAYERBANK_INDEX);
     }
 }

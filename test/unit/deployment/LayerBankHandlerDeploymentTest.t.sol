@@ -9,7 +9,6 @@ import {console} from "forge-std/Test.sol";
 import "../../Constants.sol";
 
 contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
-    address public layerbankHandlerAddress;
     LayerBankDocHandlerMoc public layerbankHandler;
 
     function setUp() public override {
@@ -20,41 +19,39 @@ contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
         }
         super.setUp();
 
-        address docTokenAddress = helperConfig.getStablecoinAddress();
-        if (operationsAdmin.getHandler(docTokenAddress, LAYERBANK_INDEX) != address(0)) {
-            layerbankHandlerAddress = operationsAdmin.getHandler(docTokenAddress, LAYERBANK_INDEX);
-            layerbankHandler = LayerBankDocHandlerMoc(payable(layerbankHandlerAddress));
+        address docToken = helperConfig.getStablecoin();
+        if (operationsAdmin.getHandler(docToken, LAYERBANK_INDEX) != address(0)) {
+            layerbankHandler = LayerBankDocHandlerMoc(payable(operationsAdmin.getHandler(docToken, LAYERBANK_INDEX)));
             return;
         }
 
         DeployLayerBankHandler layerbankDeployer = new DeployLayerBankHandler();
         console.log("LayerBank handler deployer:", address(layerbankDeployer));
 
-        layerbankHandlerAddress = layerbankDeployer.deployMocksAndHandler(
-            address(dcaManager),
-            docTokenAddress,
-            helperConfig.getActiveNetworkConfig().mocProxyAddress,
-            makeAddr(FEE_COLLECTOR_STRING),
-            operationsAdmin.owner()
+        layerbankHandler = LayerBankDocHandlerMoc(
+            payable(layerbankDeployer.deployMocksAndHandler(
+                    address(dcaManager),
+                    docToken,
+                    helperConfig.getActiveNetworkConfig().mocProxy,
+                    makeAddr(FEE_COLLECTOR_STRING),
+                    operationsAdmin.owner()
+                ))
         );
-        layerbankHandler = LayerBankDocHandlerMoc(payable(layerbankHandlerAddress));
 
         vm.startPrank(OWNER);
         if (operationsAdmin.getRouteClass(LAYERBANK_INDEX) == IOperationsAdmin.RouteClass.Unregistered) {
             operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
         }
-        operationsAdmin.assignHandler(docTokenAddress, LAYERBANK_INDEX, layerbankHandlerAddress);
+        operationsAdmin.assignHandler(docToken, LAYERBANK_INDEX, address(layerbankHandler));
         vm.stopPrank();
     }
 
     function testLayerBankHandlerDeployment() public {
-        assertNotEq(layerbankHandlerAddress, address(0), "LayerBank handler not deployed");
+        assertNotEq(address(layerbankHandler), address(0), "LayerBank handler not deployed");
 
         assertEq(layerbankHandler.i_dcaManager(), address(dcaManager), "LayerBank handler doesn't reference DcaManager");
         assertEq(
-            address(layerbankHandler.i_stablecoin()),
-            helperConfig.getStablecoinAddress(),
-            "LayerBank handler DOC mismatch"
+            address(layerbankHandler.i_stablecoin()), helperConfig.getStablecoin(), "LayerBank handler DOC mismatch"
         );
         assertNotEq(address(layerbankHandler.i_aToken()), address(0), "LayerBank aToken not set");
         assertNotEq(address(layerbankHandler.i_pool()), address(0), "LayerBank Pool not set");
@@ -65,7 +62,7 @@ contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
         );
         assertEq(
             layerbankHandler.i_aToken().UNDERLYING_ASSET_ADDRESS(),
-            helperConfig.getStablecoinAddress(),
+            helperConfig.getStablecoin(),
             "aToken underlying must be DOC"
         );
         assertEq(layerbankHandler.owner(), makeAddr(OWNER_STRING), "LayerBank handler owner not set correctly");
@@ -73,8 +70,8 @@ contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
             layerbankHandler.pendingOwner(), address(0), "LayerBank handler pending owner must be zero after deploy"
         );
 
-        address registeredHandler = operationsAdmin.getHandler(helperConfig.getStablecoinAddress(), LAYERBANK_INDEX);
-        assertEq(registeredHandler, layerbankHandlerAddress, "LayerBank handler not registered in OperationsAdmin");
+        address registeredHandler = operationsAdmin.getHandler(helperConfig.getStablecoin(), LAYERBANK_INDEX);
+        assertEq(registeredHandler, address(layerbankHandler), "LayerBank handler not registered in OperationsAdmin");
         assertEq(uint256(operationsAdmin.getRouteClass(LAYERBANK_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
         assertEq(layerbankHandler.EXCHANGE_RATE_DECIMALS(), 1e27);
     }

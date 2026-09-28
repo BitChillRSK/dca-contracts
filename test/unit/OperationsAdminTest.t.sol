@@ -54,12 +54,12 @@ contract OperationsAdminTest is DcaDappTest {
     }
 
     function testUpdateTokenHandlerFailsIfAddressIsEoa() external {
-        address dummyAddress = makeAddr("dummyAddress");
+        address dummy = makeAddr("dummy");
         bytes memory encodedRevert =
-            abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__EoaCannotBeHandler.selector, dummyAddress);
+            abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__EoaCannotBeHandler.selector, dummy);
         vm.expectRevert(encodedRevert);
         vm.prank(OWNER);
-        operationsAdmin.assignHandler(address(stablecoin), s_routeIndex, dummyAddress);
+        operationsAdmin.assignHandler(address(stablecoin), s_routeIndex, dummy);
     }
 
     function testAssignTokenHandlerFailsIfRouteUnregistered() external {

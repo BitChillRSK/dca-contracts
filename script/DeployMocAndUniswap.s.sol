@@ -48,7 +48,7 @@ contract DeployMocAndUniswap is DeployBase {
     struct DexDeployParams {
         Protocol protocol;
         address dcaManager;
-        address tokenAddress;
+        address stablecoin;
         address shareToken;
         IPurchaseUniswap.UniswapSettings uniswapSettings;
         address feeCollector;
@@ -79,20 +79,20 @@ contract DeployMocAndUniswap is DeployBase {
         vm.startBroadcast(owner);
         adOpsMoc = new OperationsAdmin(owner);
         dcaManMoc = new DcaManager(address(adOpsMoc), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, owner);
-        dcaManMoc.setTokenMinPurchaseAmount(networkConfig.docTokenAddress, MIN_PURCHASE_AMOUNT);
+        dcaManMoc.setTokenMinPurchaseAmount(networkConfig.docToken, MIN_PURCHASE_AMOUNT);
 
         // Get fee collector address
         address feeCollector = getFeeCollector(environment);
 
         // Get token addresses from network config
-        address docTokenAddress = networkConfig.docTokenAddress;
-        address mocProxy = networkConfig.mocProxyAddress;
+        address docToken = networkConfig.docToken;
+        address mocProxy = networkConfig.mocProxy;
 
         // Select the appropriate shares based on protocol
         address shareToken;
 
         if (protocol == Protocol.TROPYKUS) {
-            shareToken = networkConfig.kDocAddress;
+            shareToken = networkConfig.kDoc;
         } else if (protocol == Protocol.SOVRYN) {
             // Check if this stablecoin is supported by Sovryn
             bool isUSDRIF = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING));
@@ -100,7 +100,7 @@ contract DeployMocAndUniswap is DeployBase {
             if (isUSDRIF || isUSDT0) {
                 revert("Sovryn does not list this stablecoin");
             }
-            shareToken = networkConfig.iSusdAddress;
+            shareToken = networkConfig.iToken;
         } else {
             revert("Unsupported lending protocol");
         }
@@ -114,7 +114,7 @@ contract DeployMocAndUniswap is DeployBase {
         DeployMocSwaps.DeployParams memory params = DeployMocSwaps.DeployParams({
             protocol: protocol,
             dcaManager: address(dcaManMoc),
-            tokenAddress: docTokenAddress,
+            stablecoin: docToken,
             shareToken: shareToken,
             mocProxy: mocProxy,
             feeCollector: feeCollector
@@ -140,12 +140,12 @@ contract DeployMocAndUniswap is DeployBase {
         address feeCollector = getFeeCollector(environment);
 
         // Get token addresses from network config
-        address stablecoinAddress = networkConfig.stablecoinAddress;
+        address stablecoin = networkConfig.stablecoin;
         uint256 minPurchaseAmount = keccak256(abi.encodePacked(stablecoinType))
             == keccak256(abi.encodePacked(USDT0_STRING))
             ? USDT0_MIN_PURCHASE_AMOUNT
             : MIN_PURCHASE_AMOUNT;
-        dcaManUni.setTokenMinPurchaseAmount(stablecoinAddress, minPurchaseAmount);
+        dcaManUni.setTokenMinPurchaseAmount(stablecoin, minPurchaseAmount);
 
         // Select the appropriate shares based on protocol
         address shareToken;
@@ -166,11 +166,11 @@ contract DeployMocAndUniswap is DeployBase {
 
         // Create Uniswap settings from the network config
         IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
-            wrbtc: IWRBTC(networkConfig.wrbtcTokenAddress),
-            swapRouter: IUniswapV3SwapRouter(networkConfig.swapRouterAddress),
+            wrbtc: IWRBTC(networkConfig.wrbtc),
+            swapRouter: IUniswapV3SwapRouter(networkConfig.swapRouter),
             swapIntermediateTokens: networkConfig.swapIntermediateTokens,
             swapPoolFeeRates: networkConfig.swapPoolFeeRates,
-            mocOracle: ICoinPairPrice(networkConfig.mocOracleAddress)
+            mocOracle: ICoinPairPrice(networkConfig.mocOracle)
         });
 
         vm.stopBroadcast();
@@ -179,7 +179,7 @@ contract DeployMocAndUniswap is DeployBase {
         DexDeployParams memory params = DexDeployParams({
             protocol: protocol,
             dcaManager: address(dcaManUni),
-            tokenAddress: stablecoinAddress,
+            stablecoin: stablecoin,
             shareToken: shareToken,
             uniswapSettings: uniswapSettings,
             feeCollector: feeCollector,
@@ -193,7 +193,7 @@ contract DeployMocAndUniswap is DeployBase {
             DeployDexSwaps.DeployParams({
                 protocol: params.protocol,
                 dcaManager: params.dcaManager,
-                tokenAddress: params.tokenAddress,
+                stablecoin: params.stablecoin,
                 shareToken: params.shareToken,
                 uniswapSettings: params.uniswapSettings,
                 feeCollector: params.feeCollector,

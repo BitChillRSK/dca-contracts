@@ -15,24 +15,24 @@ import {PurchaseMoc} from "../PurchaseMoc.sol";
  */
 contract LayerBankDocHandlerMoc is LayerBankHandler, PurchaseMoc {
     /**
-     * @param dcaManagerAddress The DcaManager allowed to call this handler.
-     * @param docTokenAddress Dollar On Chain token.
-     * @param aTokenAddress LayerBank aToken for DOC.
+     * @param dcaManager The DcaManager allowed to call this handler.
+     * @param docToken Dollar On Chain token.
+     * @param aToken LayerBank aToken for DOC.
      * @param feeCollector Address that receives purchase fees.
-     * @param mocProxyAddress Money on Chain proxy.
+     * @param mocProxy Money on Chain proxy.
      * @param feeSettings Linear fee parameters.
      * @param initialOwner Address that owns fee configuration immediately after deploy.
      */
     constructor(
-        address dcaManagerAddress,
-        address docTokenAddress,
-        address aTokenAddress,
+        address dcaManager,
+        address docToken,
+        address aToken,
         address feeCollector,
-        address mocProxyAddress,
+        address mocProxy,
         FeeSettings memory feeSettings,
         address initialOwner
     )
-        LayerBankHandler(dcaManagerAddress, docTokenAddress, aTokenAddress)
-        PurchaseMoc(mocProxyAddress, FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}), initialOwner)
+        LayerBankHandler(dcaManager, docToken, aToken)
+        PurchaseMoc(mocProxy, FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}), initialOwner)
     {}
 }

@@ -44,7 +44,7 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
                 .deployIdleDocHandlerMoc(
                     DeployIdleHandler.DeployParams({
                     dcaManager: address(dcaManager),
-                    tokenAddress: address(stablecoin),
+                    stablecoin: address(stablecoin),
                     mocProxy: address(mocProxy),
                     feeCollector: FEE_COLLECTOR,
                     initialOwner: OWNER

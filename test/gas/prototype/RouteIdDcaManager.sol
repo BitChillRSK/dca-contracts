@@ -95,8 +95,8 @@ contract RouteIdDcaManager is ReentrancyGuard {
         _;
     }
 
-    constructor(address registryAddress, uint256 minPurchasePeriod, uint256 maxSchedulesPerToken) {
-        i_registry = RouteIdRegistry(registryAddress);
+    constructor(address registry, uint256 minPurchasePeriod, uint256 maxSchedulesPerToken) {
+        i_registry = RouteIdRegistry(registry);
         s_protocolSettings = IDcaManager.ProtocolSettings({
             minPurchasePeriod: minPurchasePeriod.toUint32(),
             maxSchedulesPerToken: maxSchedulesPerToken.toUint16(),

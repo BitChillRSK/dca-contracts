@@ -40,8 +40,8 @@ contract DeployMocAndUniswapTest is Test {
         DeployMocAndUniswap deployer = new DeployMocAndUniswap();
         DeployMocAndUniswap.DeployedContracts memory deployed = deployer.run();
 
-        address doc = deployed.helpConfMoc.getStablecoinAddress();
-        address dexStable = deployed.helpConfUni.getStablecoinAddress();
+        address doc = deployed.helpConfMoc.getStablecoin();
+        address dexStable = deployed.helpConfUni.getStablecoin();
         assertEq(deployed.dcaManMoc.getTokenMinPurchaseAmount(doc), MIN_PURCHASE_AMOUNT);
         assertEq(deployed.dcaManUni.getTokenMinPurchaseAmount(dexStable), MIN_PURCHASE_AMOUNT);
         assertEq(deployed.dcaManMoc.owner(), makeAddr(OWNER_STRING));

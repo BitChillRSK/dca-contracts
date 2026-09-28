@@ -14,9 +14,9 @@ import {TropykusHandler} from "./TropykusHandler.sol";
  */
 contract TropykusHandlerDex is TropykusHandler, PurchaseUniswap {
     /**
-     * @param dcaManagerAddress The DcaManager allowed to call this handler.
-     * @param stablecoinAddress The stablecoin this handler lends.
-     * @param kTokenAddress Tropykus kToken for that stablecoin.
+     * @param dcaManager The DcaManager allowed to call this handler.
+     * @param stablecoin The stablecoin this handler lends.
+     * @param kToken Tropykus kToken for that stablecoin.
      * @param uniswapSettings Router, WRBTC, path, and MoC oracle.
      * @param feeCollector Address that receives purchase fees.
      * @param feeSettings Linear fee parameters.
@@ -25,9 +25,9 @@ contract TropykusHandlerDex is TropykusHandler, PurchaseUniswap {
      * @param initialOwner Address that owns fee/oracle configuration immediately after deploy.
      */
     constructor(
-        address dcaManagerAddress,
-        address stablecoinAddress,
-        address kTokenAddress,
+        address dcaManager,
+        address stablecoin,
+        address kToken,
         UniswapSettings memory uniswapSettings,
         address feeCollector,
         FeeSettings memory feeSettings,
@@ -35,7 +35,7 @@ contract TropykusHandlerDex is TropykusHandler, PurchaseUniswap {
         uint256 amountOutMinimumSafetyCheck,
         address initialOwner
     )
-        TropykusHandler(dcaManagerAddress, stablecoinAddress, kTokenAddress)
+        TropykusHandler(dcaManager, stablecoin, kToken)
         PurchaseUniswap(
             uniswapSettings,
             FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}),

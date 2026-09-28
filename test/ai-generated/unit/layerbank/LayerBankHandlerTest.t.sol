@@ -460,16 +460,13 @@ contract LayerBankHandlerTest is HandlerTestHarness {
 
 contract LayerBankTestHandler is LayerBankHandler, PurchaseFees {
     constructor(
-        address dcaManagerAddress,
-        address stablecoinAddress,
-        address aTokenAddress,
+        address dcaManager,
+        address stablecoin,
+        address aToken,
         address feeCollector,
         FeeSettings memory feeSettings,
         address initialOwner
-    )
-        LayerBankHandler(dcaManagerAddress, stablecoinAddress, aTokenAddress)
-        PurchaseFees(feeCollector, feeSettings, initialOwner)
-    {}
+    ) LayerBankHandler(dcaManager, stablecoin, aToken) PurchaseFees(feeCollector, feeSettings, initialOwner) {}
 
     function testBatchRetrieveStablecoin(address[] calldata users, uint256[] calldata purchaseAmounts)
         external

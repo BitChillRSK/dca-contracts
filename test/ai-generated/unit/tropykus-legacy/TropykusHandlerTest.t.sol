@@ -398,16 +398,13 @@ contract TropykusHandlerTest is HandlerTestHarness {
  */
 contract TropykusTestHandler is TropykusHandler, PurchaseFees {
     constructor(
-        address dcaManagerAddress,
-        address stablecoinAddress,
-        address kTokenAddress,
+        address dcaManager,
+        address stablecoin,
+        address kToken,
         address feeCollector,
         FeeSettings memory feeSettings,
         address initialOwner
-    )
-        TropykusHandler(dcaManagerAddress, stablecoinAddress, kTokenAddress)
-        PurchaseFees(feeCollector, feeSettings, initialOwner)
-    {}
+    ) TropykusHandler(dcaManager, stablecoin, kToken) PurchaseFees(feeCollector, feeSettings, initialOwner) {}
 
     function testBatchRetrieveStablecoin(address[] calldata users, uint256[] calldata purchaseAmounts)
         external

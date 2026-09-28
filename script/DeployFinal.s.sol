@@ -293,17 +293,17 @@ contract DeployFinal is DeployBase {
         usdrifAltFees[1] = 3000;
 
         config = FinalNetworkConfig({
-            doc: moc.docTokenAddress,
-            mocProxy: moc.mocProxyAddress,
-            docLayerBankAToken: moc.layerbankATokenAddress,
-            docSovrynShares: moc.iSusdAddress,
-            usdrif: dex.usdrifTokenAddress,
-            usdrifLayerBankAToken: dex.layerbankUsdrifATokenAddress,
-            usdt0: dex.usdt0TokenAddress,
-            usdt0LayerBankAToken: dex.layerbankUsdt0ATokenAddress,
-            wrbtc: dex.wrbtcTokenAddress,
-            swapRouter: dex.swapRouterAddress,
-            mocOracle: dex.mocOracleAddress,
+            doc: moc.docToken,
+            mocProxy: moc.mocProxy,
+            docLayerBankAToken: moc.layerbankAToken,
+            docSovrynShares: moc.iToken,
+            usdrif: dex.usdrifToken,
+            usdrifLayerBankAToken: dex.layerbankUsdrifAToken,
+            usdt0: dex.usdt0Token,
+            usdt0LayerBankAToken: dex.layerbankUsdt0AToken,
+            wrbtc: dex.wrbtc,
+            swapRouter: dex.swapRouter,
+            mocOracle: dex.mocOracle,
             usdrifIntermediateTokens: dex.swapIntermediateTokens,
             usdrifPoolFeeRates: dex.swapPoolFeeRates,
             usdrifAltIntermediateTokens: usdrifAltIntermediate,
@@ -319,11 +319,11 @@ contract DeployFinal is DeployBase {
 
     function _mocMainnet() private pure returns (MocHelperConfig.NetworkConfig memory) {
         return MocHelperConfig.NetworkConfig({
-            docTokenAddress: 0xe700691dA7b9851F2F35f8b8182c69c53CcaD9Db,
-            kDocAddress: 0x544Eb90e766B405134b3B3F62b6b4C23Fcd5fDa2,
-            iSusdAddress: 0xd8D25f03EBbA94E15Df2eD4d6D38276B595593c1,
-            layerbankATokenAddress: 0x3F04280C66314b78E9712A41BF8C1A214460cAa2,
-            mocProxyAddress: 0xf773B590aF754D597770937Fa8ea7AbDf2668370
+            docToken: 0xe700691dA7b9851F2F35f8b8182c69c53CcaD9Db,
+            kDoc: 0x544Eb90e766B405134b3B3F62b6b4C23Fcd5fDa2,
+            iToken: 0xd8D25f03EBbA94E15Df2eD4d6D38276B595593c1,
+            layerbankAToken: 0x3F04280C66314b78E9712A41BF8C1A214460cAa2,
+            mocProxy: 0xf773B590aF754D597770937Fa8ea7AbDf2668370
         });
     }
 
@@ -335,17 +335,17 @@ contract DeployFinal is DeployBase {
         poolFeeRates[1] = 3000;
 
         config = UsdrifHelperConfig.NetworkConfig({
-            usdrifTokenAddress: 0x3A15461d8aE0F0Fb5Fa2629e9DA7D66A794a6e37,
-            usdt0TokenAddress: USDT0_MAINNET,
-            layerbankUsdrifATokenAddress: LAYERBANK_USDRIF_ATOKEN,
-            layerbankUsdt0ATokenAddress: LAYERBANK_USDT0_ATOKEN,
-            wrbtcTokenAddress: 0x542fDA317318eBF1d3DEAf76E0b632741A7e677d,
-            swapRouterAddress: 0x0B14ff67f0014046b4b99057Aec4509640b3947A,
+            usdrifToken: 0x3A15461d8aE0F0Fb5Fa2629e9DA7D66A794a6e37,
+            usdt0Token: USDT0_MAINNET,
+            layerbankUsdrifAToken: LAYERBANK_USDRIF_ATOKEN,
+            layerbankUsdt0AToken: LAYERBANK_USDT0_ATOKEN,
+            wrbtc: 0x542fDA317318eBF1d3DEAf76E0b632741A7e677d,
+            swapRouter: 0x0B14ff67f0014046b4b99057Aec4509640b3947A,
             swapIntermediateTokens: intermediateTokens,
             swapPoolFeeRates: poolFeeRates,
-            mocOracleAddress: 0xe2927A0620b82A66D67F678FC9b826B0E01B1bFD,
-            operationsAdminAddress: address(0),
-            dcaManagerAddress: address(0),
+            mocOracle: 0xe2927A0620b82A66D67F678FC9b826B0E01B1bFD,
+            operationsAdmin: address(0),
+            dcaManager: address(0),
             amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
             amountOutMinimumSafetyCheck: DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK
         });

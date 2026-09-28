@@ -102,13 +102,13 @@ contract ComparePurchaseMethods is Test {
         MocHelperConfig.NetworkConfig memory mocConfig = deployedContracts.helpConfMoc.getActiveNetworkConfig();
 
         // Get the DOC token address
-        address docTokenAddress = mocConfig.docTokenAddress;
-        stablecoin = MockStablecoin(docTokenAddress);
-        mocProxy = MockMocProxy(mocConfig.mocProxyAddress);
+        address docToken = mocConfig.docToken;
+        stablecoin = MockStablecoin(docToken);
+        mocProxy = MockMocProxy(mocConfig.mocProxy);
 
         // Get Uniswap-specific contracts
         DexHelperConfig.NetworkConfig memory uniConfig = deployedContracts.helpConfUni.getActiveNetworkConfig();
-        wrbtcToken = MockWrbtcToken(uniConfig.wrbtcTokenAddress);
+        wrbtcToken = MockWrbtcToken(uniConfig.wrbtc);
         priceOracle = ICoinPairPrice(MOC_ORACLE);
 
         // Set up the test environment

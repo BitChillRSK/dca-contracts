@@ -23,7 +23,7 @@ contract DeployDexSwaps is DeployBase {
     struct DeployParams {
         Protocol protocol;
         address dcaManager;
-        address tokenAddress;
+        address stablecoin;
         address shareToken;
         IPurchaseUniswap.UniswapSettings uniswapSettings;
         address feeCollector;
@@ -57,7 +57,7 @@ contract DeployDexSwaps is DeployBase {
             return address(
                 new IdleHandlerDex(
                     params.dcaManager,
-                    params.tokenAddress,
+                    params.stablecoin,
                     params.uniswapSettings,
                     params.feeCollector,
                     feeSettings,
@@ -71,7 +71,7 @@ contract DeployDexSwaps is DeployBase {
             return address(
                 new TropykusHandlerDex(
                     params.dcaManager,
-                    params.tokenAddress,
+                    params.stablecoin,
                     params.shareToken,
                     params.uniswapSettings,
                     params.feeCollector,
@@ -86,7 +86,7 @@ contract DeployDexSwaps is DeployBase {
             return address(
                 new SovrynHandlerDex(
                     params.dcaManager,
-                    params.tokenAddress,
+                    params.stablecoin,
                     params.shareToken,
                     params.uniswapSettings,
                     params.feeCollector,
@@ -101,7 +101,7 @@ contract DeployDexSwaps is DeployBase {
             return address(
                 new LayerBankHandlerDex(
                     params.dcaManager,
-                    params.tokenAddress,
+                    params.stablecoin,
                     params.shareToken,
                     params.uniswapSettings,
                     params.feeCollector,
@@ -118,7 +118,7 @@ contract DeployDexSwaps is DeployBase {
     function _deployLiveDexHandlers(
         OperationsAdmin operationsAdmin,
         DcaManager dcaManager,
-        address stablecoinAddress,
+        address stablecoin,
         DexHelperConfig.NetworkConfig memory networkConfig,
         IPurchaseUniswap.UniswapSettings memory uniswapSettings,
         address feeCollector,
@@ -147,7 +147,7 @@ contract DeployDexSwaps is DeployBase {
             DeployParams({
                 protocol: Protocol.NONE,
                 dcaManager: address(dcaManager),
-                tokenAddress: stablecoinAddress,
+                stablecoin: stablecoin,
                 shareToken: address(0),
                 uniswapSettings: uniswapSettings,
                 feeCollector: feeCollector,
@@ -156,7 +156,7 @@ contract DeployDexSwaps is DeployBase {
             })
         );
         console.log("Idle dex handler deployed at:", idleHandler);
-        operationsAdmin.assignHandler(stablecoinAddress, IDLE_INDEX, idleHandler);
+        operationsAdmin.assignHandler(stablecoin, IDLE_INDEX, idleHandler);
         _proposeFinalOwner(idleHandler);
         if (protocol == Protocol.NONE) {
             selectedHandler = idleHandler;
@@ -173,7 +173,7 @@ contract DeployDexSwaps is DeployBase {
                 DeployParams({
                     protocol: Protocol.LAYERBANK,
                     dcaManager: address(dcaManager),
-                    tokenAddress: stablecoinAddress,
+                    stablecoin: stablecoin,
                     shareToken: layerbankAToken,
                     uniswapSettings: uniswapSettings,
                     feeCollector: feeCollector,
@@ -182,7 +182,7 @@ contract DeployDexSwaps is DeployBase {
                 })
             );
             console.log("LayerBank dex handler deployed at:", layerbankHandler);
-            operationsAdmin.assignHandler(stablecoinAddress, LAYERBANK_INDEX, layerbankHandler);
+            operationsAdmin.assignHandler(stablecoin, LAYERBANK_INDEX, layerbankHandler);
             _proposeFinalOwner(layerbankHandler);
             if (protocol == Protocol.LAYERBANK) {
                 selectedHandler = layerbankHandler;
@@ -202,8 +202,8 @@ contract DeployDexSwaps is DeployBase {
         bool isUSDRIF = _isUsdrif(stablecoinType);
         bool isUSDT0 = _isUsdt0(stablecoinType);
 
-        address stablecoinAddress = helperConfig.getStablecoinAddress();
-        console.log("Stablecoin address:", stablecoinAddress);
+        address stablecoin = helperConfig.getStablecoin();
+        console.log("Stablecoin address:", stablecoin);
 
         bool isSovryn = protocol == Protocol.SOVRYN;
 
@@ -216,68 +216,59 @@ contract DeployDexSwaps is DeployBase {
         OperationsAdmin operationsAdmin = new OperationsAdmin(deployOwner);
         DcaManager dcaManager =
             new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, deployOwner);
-        dcaManager.setTokenMinPurchaseAmount(
-            stablecoinAddress, isUSDT0 ? USDT0_MIN_PURCHASE_AMOUNT : MIN_PURCHASE_AMOUNT
-        );
+        dcaManager.setTokenMinPurchaseAmount(stablecoin, isUSDT0 ? USDT0_MIN_PURCHASE_AMOUNT : MIN_PURCHASE_AMOUNT);
         address feeCollector = getFeeCollector(environment);
 
-        address docHandlerDexAddress;
+        address docHandlerDex;
 
         IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
-            wrbtc: IWRBTC(networkConfig.wrbtcTokenAddress),
-            swapRouter: IUniswapV3SwapRouter(networkConfig.swapRouterAddress),
+            wrbtc: IWRBTC(networkConfig.wrbtc),
+            swapRouter: IUniswapV3SwapRouter(networkConfig.swapRouter),
             swapIntermediateTokens: networkConfig.swapIntermediateTokens,
             swapPoolFeeRates: networkConfig.swapPoolFeeRates,
-            mocOracle: ICoinPairPrice(networkConfig.mocOracleAddress)
+            mocOracle: ICoinPairPrice(networkConfig.mocOracle)
         });
 
         // For local or fork environments, deploy only the selected protocol's handler
         if (environment == Environment.LOCAL || environment == Environment.FORK) {
             console.log("Deploying single handler for local/fork environment");
 
-            address shareTokenAddress;
+            address shareToken;
             if (protocol != Protocol.NONE) {
-                shareTokenAddress = helperConfig.getShareTokenAddress();
-                if (shareTokenAddress == address(0)) {
+                shareToken = helperConfig.getShareToken();
+                if (shareToken == address(0)) {
                     revert("Share token not available for the selected combination");
                 }
-                console.log("Share token address:", shareTokenAddress);
+                console.log("Share token address:", shareToken);
             }
 
             DeployParams memory params = DeployParams({
                 protocol: protocol,
                 dcaManager: address(dcaManager),
-                tokenAddress: stablecoinAddress,
-                shareToken: shareTokenAddress,
+                stablecoin: stablecoin,
+                shareToken: shareToken,
                 uniswapSettings: uniswapSettings,
                 feeCollector: feeCollector,
                 amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
                 amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
             });
 
-            docHandlerDexAddress = deployDocHandlerDex(params);
+            docHandlerDex = deployDocHandlerDex(params);
         }
         // Live: idle + LayerBank Dex handlers for USDRIF / USDT0 (DOC stays on MoC).
         else if (environment == Environment.TESTNET || environment == Environment.MAINNET) {
-            docHandlerDexAddress = _deployLiveDexHandlers(
-                operationsAdmin,
-                dcaManager,
-                stablecoinAddress,
-                networkConfig,
-                uniswapSettings,
-                feeCollector,
-                isUSDRIF,
-                isUSDT0
+            docHandlerDex = _deployLiveDexHandlers(
+                operationsAdmin, dcaManager, stablecoin, networkConfig, uniswapSettings, feeCollector, isUSDRIF, isUSDT0
             );
         }
 
         _proposeFinalOwner(address(operationsAdmin));
         _proposeFinalOwner(address(dcaManager));
-        _proposeFinalOwner(docHandlerDexAddress);
+        _proposeFinalOwner(docHandlerDex);
 
         vm.stopBroadcast();
 
-        return (operationsAdmin, docHandlerDexAddress, dcaManager, helperConfig);
+        return (operationsAdmin, docHandlerDex, dcaManager, helperConfig);
     }
 
     function _stablecoinType() internal view returns (string memory stablecoinType) {

@@ -20,7 +20,7 @@ contract DeployMocSwaps is DeployBase {
     struct DeployParams {
         Protocol protocol;
         address dcaManager;
-        address tokenAddress;
+        address stablecoin;
         address shareToken;
         address mocProxy;
         address feeCollector;
@@ -38,7 +38,7 @@ contract DeployMocSwaps is DeployBase {
             return address(
                 new IdleDocHandlerMoc(
                     params.dcaManager,
-                    params.tokenAddress,
+                    params.stablecoin,
                     params.feeCollector,
                     params.mocProxy,
                     feeSettings,
@@ -50,7 +50,7 @@ contract DeployMocSwaps is DeployBase {
             return address(
                 new LayerBankDocHandlerMoc(
                     params.dcaManager,
-                    params.tokenAddress,
+                    params.stablecoin,
                     params.shareToken,
                     params.feeCollector,
                     params.mocProxy,
@@ -63,7 +63,7 @@ contract DeployMocSwaps is DeployBase {
             return address(
                 new TropykusDocHandlerMoc(
                     params.dcaManager,
-                    params.tokenAddress,
+                    params.stablecoin,
                     params.shareToken,
                     params.feeCollector,
                     params.mocProxy,
@@ -76,7 +76,7 @@ contract DeployMocSwaps is DeployBase {
             return address(
                 new SovrynDocHandlerMoc(
                     params.dcaManager,
-                    params.tokenAddress,
+                    params.stablecoin,
                     params.shareToken,
                     params.feeCollector,
                     params.mocProxy,
@@ -106,11 +106,11 @@ contract DeployMocSwaps is DeployBase {
 
         console.log("Using stablecoin type:", stablecoinType);
 
-        address docTokenAddress = helperConfig.getStablecoinAddress();
-        console.log("DOC token address:", docTokenAddress);
+        address docToken = helperConfig.getStablecoin();
+        console.log("DOC token address:", docToken);
 
-        address mocProxyAddress = networkConfig.mocProxyAddress;
-        console.log("MoC Proxy address:", mocProxyAddress);
+        address mocProxy = networkConfig.mocProxy;
+        console.log("MoC Proxy address:", mocProxy);
 
         bool isSovryn = protocol == Protocol.SOVRYN;
         bool isUSDRIF = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked("USDRIF"));
@@ -124,33 +124,33 @@ contract DeployMocSwaps is DeployBase {
         OperationsAdmin operationsAdmin = new OperationsAdmin(deployOwner);
         DcaManager dcaManager =
             new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, deployOwner);
-        dcaManager.setTokenMinPurchaseAmount(docTokenAddress, MIN_PURCHASE_AMOUNT);
+        dcaManager.setTokenMinPurchaseAmount(docToken, MIN_PURCHASE_AMOUNT);
         address feeCollector = getFeeCollector(environment);
-        address docHandlerMocAddress;
+        address docHandlerMoc;
 
         // For local or fork environments, deploy only the selected protocol's handler
         if (environment == Environment.LOCAL || environment == Environment.FORK) {
             console.log("Deploying single handler for local/fork environment");
 
-            address shareTokenAddress;
+            address shareToken;
             if (protocol != Protocol.NONE) {
-                shareTokenAddress = helperConfig.getShareTokenAddress();
-                if (shareTokenAddress == address(0)) {
+                shareToken = helperConfig.getShareToken();
+                if (shareToken == address(0)) {
                     revert("Share token not available for the selected combination");
                 }
-                console.log("Share token address:", shareTokenAddress);
+                console.log("Share token address:", shareToken);
             }
 
             DeployParams memory params = DeployParams({
                 protocol: protocol,
                 dcaManager: address(dcaManager),
-                tokenAddress: docTokenAddress,
-                shareToken: shareTokenAddress,
-                mocProxy: mocProxyAddress,
+                stablecoin: docToken,
+                shareToken: shareToken,
+                mocProxy: mocProxy,
                 feeCollector: feeCollector
             });
 
-            docHandlerMocAddress = deployDocHandlerMoc(params);
+            docHandlerMoc = deployDocHandlerMoc(params);
         }
         // Live networks: production map is idle=0, LayerBank=1, Sovryn=2. Tropykus is not registered.
         else if (environment == Environment.TESTNET || environment == Environment.MAINNET) {
@@ -169,20 +169,20 @@ contract DeployMocSwaps is DeployBase {
                 DeployParams({
                     protocol: Protocol.NONE,
                     dcaManager: address(dcaManager),
-                    tokenAddress: docTokenAddress,
+                    stablecoin: docToken,
                     shareToken: address(0),
-                    mocProxy: mocProxyAddress,
+                    mocProxy: mocProxy,
                     feeCollector: feeCollector
                 })
             );
             console.log("Idle handler deployed at:", idleHandler);
-            operationsAdmin.assignHandler(docTokenAddress, IDLE_INDEX, idleHandler);
+            operationsAdmin.assignHandler(docToken, IDLE_INDEX, idleHandler);
             _proposeFinalOwner(idleHandler);
             if (protocol == Protocol.NONE) {
-                docHandlerMocAddress = idleHandler;
+                docHandlerMoc = idleHandler;
             }
 
-            address layerbankAToken = networkConfig.layerbankATokenAddress;
+            address layerbankAToken = networkConfig.layerbankAToken;
             if (layerbankAToken == address(0)) {
                 if (protocol == Protocol.LAYERBANK) {
                     revert("LayerBank aToken not available on this network");
@@ -193,22 +193,22 @@ contract DeployMocSwaps is DeployBase {
                     DeployParams({
                         protocol: Protocol.LAYERBANK,
                         dcaManager: address(dcaManager),
-                        tokenAddress: docTokenAddress,
+                        stablecoin: docToken,
                         shareToken: layerbankAToken,
-                        mocProxy: mocProxyAddress,
+                        mocProxy: mocProxy,
                         feeCollector: feeCollector
                     })
                 );
                 console.log("LayerBank handler deployed at:", layerbankHandler);
-                operationsAdmin.assignHandler(docTokenAddress, LAYERBANK_INDEX, layerbankHandler);
+                operationsAdmin.assignHandler(docToken, LAYERBANK_INDEX, layerbankHandler);
                 _proposeFinalOwner(layerbankHandler);
                 if (protocol == Protocol.LAYERBANK) {
-                    docHandlerMocAddress = layerbankHandler;
+                    docHandlerMoc = layerbankHandler;
                 }
             }
 
             if (!isUSDRIF) {
-                address sovrynShareToken = networkConfig.iSusdAddress;
+                address sovrynShareToken = networkConfig.iToken;
                 if (sovrynShareToken == address(0)) {
                     if (protocol == Protocol.SOVRYN) {
                         revert("Sovryn shares not available for this stablecoin");
@@ -219,17 +219,17 @@ contract DeployMocSwaps is DeployBase {
                         DeployParams({
                             protocol: Protocol.SOVRYN,
                             dcaManager: address(dcaManager),
-                            tokenAddress: docTokenAddress,
+                            stablecoin: docToken,
                             shareToken: sovrynShareToken,
-                            mocProxy: mocProxyAddress,
+                            mocProxy: mocProxy,
                             feeCollector: feeCollector
                         })
                     );
                     console.log("Sovryn handler deployed at:", sovrynHandler);
-                    operationsAdmin.assignHandler(docTokenAddress, SOVRYN_INDEX, sovrynHandler);
+                    operationsAdmin.assignHandler(docToken, SOVRYN_INDEX, sovrynHandler);
                     _proposeFinalOwner(sovrynHandler);
                     if (protocol == Protocol.SOVRYN) {
-                        docHandlerMocAddress = sovrynHandler;
+                        docHandlerMoc = sovrynHandler;
                     }
                 }
             } else {
@@ -237,16 +237,16 @@ contract DeployMocSwaps is DeployBase {
             }
         }
 
-        if (docHandlerMocAddress == address(0)) {
+        if (docHandlerMoc == address(0)) {
             revert("Selected protocol handler was not deployed");
         }
 
         _proposeFinalOwner(address(operationsAdmin));
         _proposeFinalOwner(address(dcaManager));
-        _proposeFinalOwner(docHandlerMocAddress);
+        _proposeFinalOwner(docHandlerMoc);
 
         vm.stopBroadcast();
 
-        return (operationsAdmin, docHandlerMocAddress, dcaManager, helperConfig);
+        return (operationsAdmin, docHandlerMoc, dcaManager, helperConfig);
     }
 }

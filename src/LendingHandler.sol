@@ -31,12 +31,12 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @param dcaManagerAddress The DcaManager allowed to call deposit, withdraw, and interest.
-     * @param stablecoinAddress The ERC20 stablecoin this handler lends.
+     * @param dcaManager The DcaManager allowed to call deposit, withdraw, and interest.
+     * @param stablecoin The ERC20 stablecoin this handler lends.
      * @param exchangeRateDecimals Scale of the protocol exchange rate (adapter constant).
      */
-    constructor(address dcaManagerAddress, address stablecoinAddress, uint256 exchangeRateDecimals)
-        TokenHandler(dcaManagerAddress, stablecoinAddress)
+    constructor(address dcaManager, address stablecoin, uint256 exchangeRateDecimals)
+        TokenHandler(dcaManager, stablecoin)
     {
         i_exchangeRateDecimals = exchangeRateDecimals;
     }

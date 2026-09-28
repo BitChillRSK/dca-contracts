@@ -89,21 +89,19 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @param operationsAdminAddress The OperationsAdmin this manager is permanently pinned to.
+     * @param operationsAdmin The OperationsAdmin this manager is permanently pinned to.
      * @param minPurchasePeriod Minimum time between purchases, in seconds; at least one whole UTC day.
      * @param maxSchedulesPerToken Maximum number of schedules a user may hold per token.
      * @param initialOwner Address that owns this contract immediately after deploy.
      */
-    constructor(
-        address operationsAdminAddress,
-        uint256 minPurchasePeriod,
-        uint256 maxSchedulesPerToken,
-        address initialOwner
-    ) BitChillOwnable(initialOwner) validateMinPurchasePeriod(minPurchasePeriod) {
-        if (operationsAdminAddress.code.length == 0) {
-            revert DcaManager__OperationsAdminIsNotAContract(operationsAdminAddress);
+    constructor(address operationsAdmin, uint256 minPurchasePeriod, uint256 maxSchedulesPerToken, address initialOwner)
+        BitChillOwnable(initialOwner)
+        validateMinPurchasePeriod(minPurchasePeriod)
+    {
+        if (operationsAdmin.code.length == 0) {
+            revert DcaManager__OperationsAdminIsNotAContract(operationsAdmin);
         }
-        i_operationsAdmin = IOperationsAdmin(operationsAdminAddress);
+        i_operationsAdmin = IOperationsAdmin(operationsAdmin);
         s_protocolSettings = ProtocolSettings({
             minPurchasePeriod: minPurchasePeriod.toUint32(),
             maxSchedulesPerToken: maxSchedulesPerToken.toUint16(),

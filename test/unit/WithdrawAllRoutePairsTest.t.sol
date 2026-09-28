@@ -55,14 +55,14 @@ contract WithdrawAllRoutePairsTest is BaseDeploymentTest {
         }
         super.setUp();
 
-        tokenOne = MockStablecoin(helperConfig.getStablecoinAddress());
+        tokenOne = MockStablecoin(helperConfig.getStablecoin());
         tokenTwo = new MockStablecoin(OWNER);
-        address mocProxyAddress = helperConfig.getActiveNetworkConfig().mocProxyAddress;
+        address mocProxy = helperConfig.getActiveNetworkConfig().mocProxy;
 
         DeployLayerBankHandler deployer = new DeployLayerBankHandler();
-        handlerOneOne = _deployHandler(deployer, address(tokenOne), mocProxyAddress);
-        handlerTwoTwo = _deployHandler(deployer, address(tokenTwo), mocProxyAddress);
-        handlerOneTwo = _deployHandler(deployer, address(tokenOne), mocProxyAddress);
+        handlerOneOne = _deployHandler(deployer, address(tokenOne), mocProxy);
+        handlerTwoTwo = _deployHandler(deployer, address(tokenTwo), mocProxy);
+        handlerOneTwo = _deployHandler(deployer, address(tokenOne), mocProxy);
 
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(ROUTE_ONE, true);

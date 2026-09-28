@@ -383,16 +383,13 @@ contract SovrynHandlerTest is HandlerTestHarness {
  */
 contract SovrynTestHandler is SovrynHandler, PurchaseFees {
     constructor(
-        address dcaManagerAddress,
-        address stablecoinAddress,
-        address iTokenAddress,
+        address dcaManager,
+        address stablecoin,
+        address iToken,
         address feeCollector,
         FeeSettings memory feeSettings,
         address initialOwner
-    )
-        SovrynHandler(dcaManagerAddress, stablecoinAddress, iTokenAddress)
-        PurchaseFees(feeCollector, feeSettings, initialOwner)
-    {}
+    ) SovrynHandler(dcaManager, stablecoin, iToken) PurchaseFees(feeCollector, feeSettings, initialOwner) {}
 
     /**
      * @notice Expose _batchRetrieveStablecoin for testing

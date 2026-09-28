@@ -28,14 +28,14 @@ abstract contract SovrynHandler is LendingHandler {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @param dcaManagerAddress The DcaManager allowed to call this handler.
-     * @param stablecoinAddress The stablecoin this handler lends.
-     * @param iTokenAddress Sovryn iSUSD (or equivalent iToken) for that stablecoin.
+     * @param dcaManager The DcaManager allowed to call this handler.
+     * @param stablecoin The stablecoin this handler lends.
+     * @param iToken Sovryn iSUSD (or equivalent iToken) for that stablecoin.
      */
-    constructor(address dcaManagerAddress, address stablecoinAddress, address iTokenAddress)
-        LendingHandler(dcaManagerAddress, stablecoinAddress, EXCHANGE_RATE_DECIMALS)
+    constructor(address dcaManager, address stablecoin, address iToken)
+        LendingHandler(dcaManager, stablecoin, EXCHANGE_RATE_DECIMALS)
     {
-        i_iToken = IiSusdToken(iTokenAddress);
+        i_iToken = IiSusdToken(iToken);
         _approveLendingSpender();
     }
 

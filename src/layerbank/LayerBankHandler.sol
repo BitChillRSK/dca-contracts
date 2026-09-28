@@ -38,15 +38,15 @@ abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @param dcaManagerAddress The DcaManager allowed to call this handler.
-     * @param stablecoinAddress The ERC20 stablecoin this handler lends.
-     * @param aTokenAddress LayerBank aToken for that stablecoin.
+     * @param dcaManager The DcaManager allowed to call this handler.
+     * @param stablecoin The ERC20 stablecoin this handler lends.
+     * @param aToken LayerBank aToken for that stablecoin.
      */
-    constructor(address dcaManagerAddress, address stablecoinAddress, address aTokenAddress)
-        LendingHandler(dcaManagerAddress, stablecoinAddress, EXCHANGE_RATE_DECIMALS)
+    constructor(address dcaManager, address stablecoin, address aToken)
+        LendingHandler(dcaManager, stablecoin, EXCHANGE_RATE_DECIMALS)
     {
-        i_aToken = ILayerBankAToken(aTokenAddress);
-        if (i_aToken.UNDERLYING_ASSET_ADDRESS() != stablecoinAddress) {
+        i_aToken = ILayerBankAToken(aToken);
+        if (i_aToken.UNDERLYING_ASSET_ADDRESS() != stablecoin) {
             revert LayerBankHandler__UnderlyingMismatch();
         }
         address pool = i_aToken.POOL();

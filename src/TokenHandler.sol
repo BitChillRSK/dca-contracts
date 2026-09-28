@@ -21,12 +21,12 @@ abstract contract TokenHandler is ITokenHandler, ERC165, DcaManagerAccessControl
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @param dcaManagerAddress The DcaManager allowed to call deposit and withdraw.
-     * @param stablecoinAddress The stablecoin this handler holds.
+     * @param dcaManager The DcaManager allowed to call deposit and withdraw.
+     * @param stablecoin The stablecoin this handler holds.
      */
-    constructor(address dcaManagerAddress, address stablecoinAddress)
-        DcaManagerAccessControl(dcaManagerAddress)
-        StablecoinSource(stablecoinAddress)
+    constructor(address dcaManager, address stablecoin)
+        DcaManagerAccessControl(dcaManager)
+        StablecoinSource(stablecoin)
     {}
 
     /*//////////////////////////////////////////////////////////////

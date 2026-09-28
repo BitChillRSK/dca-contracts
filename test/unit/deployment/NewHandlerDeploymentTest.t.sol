@@ -22,7 +22,6 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
     uint256 internal constant DEPOSIT_AMOUNT = 2000 ether;
     uint256 internal constant PURCHASE_AMOUNT = 200 ether;
 
-    address public usdrifHandlerAddress;
     LayerBankHandlerDex public usdrifHandler;
     UsdrifHelperConfig public usdrifHelperConfig;
 
@@ -40,49 +39,50 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
 
         UsdrifHelperConfig.NetworkConfig memory config = usdrifHelperConfig.getNetworkConfig();
         IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
-            wrbtc: IWRBTC(config.wrbtcTokenAddress),
-            swapRouter: IUniswapV3SwapRouter(config.swapRouterAddress),
+            wrbtc: IWRBTC(config.wrbtc),
+            swapRouter: IUniswapV3SwapRouter(config.swapRouter),
             swapIntermediateTokens: config.swapIntermediateTokens,
             swapPoolFeeRates: config.swapPoolFeeRates,
-            mocOracle: ICoinPairPrice(config.mocOracleAddress)
+            mocOracle: ICoinPairPrice(config.mocOracle)
         });
 
         DeployUsdrifHandler usdrifDeployer = new DeployUsdrifHandler();
         console.log("USDRIF handler deployer:", address(usdrifDeployer));
 
         IPurchaseFees.FeeSettings memory feeSettings = usdrifDeployer.feeSettingsForToken(false);
-        usdrifHandlerAddress = usdrifDeployer.deployMocksAndHandler(
-            DeployUsdrifHandler.DeployParams({
-                dcaManagerAddress: address(dcaManager),
-                tokenAddress: config.usdrifTokenAddress,
-                aTokenAddress: address(0),
-                uniswapSettings: uniswapSettings,
-                feeCollector: makeAddr(FEE_COLLECTOR_STRING),
-                feeSettings: feeSettings,
-                amountOutMinimumPercent: config.amountOutMinimumPercent,
-                amountOutMinimumSafetyCheck: config.amountOutMinimumSafetyCheck,
-                initialOwner: operationsAdmin.owner()
-            })
+        usdrifHandler = LayerBankHandlerDex(
+            payable(usdrifDeployer.deployMocksAndHandler(
+                    DeployUsdrifHandler.DeployParams({
+                        dcaManager: address(dcaManager),
+                        stablecoin: config.usdrifToken,
+                        aToken: address(0),
+                        uniswapSettings: uniswapSettings,
+                        feeCollector: makeAddr(FEE_COLLECTOR_STRING),
+                        feeSettings: feeSettings,
+                        amountOutMinimumPercent: config.amountOutMinimumPercent,
+                        amountOutMinimumSafetyCheck: config.amountOutMinimumSafetyCheck,
+                        initialOwner: operationsAdmin.owner()
+                    })
+                ))
         );
-        usdrifHandler = LayerBankHandlerDex(payable(usdrifHandlerAddress));
 
         vm.startPrank(OWNER);
         if (operationsAdmin.getRouteClass(LAYERBANK_INDEX) == IOperationsAdmin.RouteClass.Unregistered) {
             operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
         }
-        dcaManager.setTokenMinPurchaseAmount(config.usdrifTokenAddress, MIN_PURCHASE_AMOUNT);
-        operationsAdmin.assignHandler(config.usdrifTokenAddress, LAYERBANK_INDEX, usdrifHandlerAddress);
+        dcaManager.setTokenMinPurchaseAmount(config.usdrifToken, MIN_PURCHASE_AMOUNT);
+        operationsAdmin.assignHandler(config.usdrifToken, LAYERBANK_INDEX, address(usdrifHandler));
         vm.stopPrank();
     }
 
     function testUsdrifHandlerDeployment() public {
-        assertNotEq(usdrifHandlerAddress, address(0), "USDRIF handler not deployed");
+        assertNotEq(address(usdrifHandler), address(0), "USDRIF handler not deployed");
 
         assertEq(usdrifHandler.i_dcaManager(), address(dcaManager), "USDRIF handler doesn't reference DcaManager");
         assertNotEq(address(usdrifHandler.i_aToken()), address(0), "LayerBank aToken not set");
         assertEq(
             usdrifHandler.i_aToken().UNDERLYING_ASSET_ADDRESS(),
-            usdrifHelperConfig.getNetworkConfig().usdrifTokenAddress,
+            usdrifHelperConfig.getNetworkConfig().usdrifToken,
             "aToken underlying must be USDRIF"
         );
 
@@ -90,11 +90,11 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
         assertEq(usdrifHandler.pendingOwner(), address(0), "USDRIF handler pending owner must be zero after deploy");
 
         UsdrifHelperConfig.NetworkConfig memory config = usdrifHelperConfig.getNetworkConfig();
-        address registeredHandler = operationsAdmin.getHandler(config.usdrifTokenAddress, LAYERBANK_INDEX);
-        assertEq(registeredHandler, usdrifHandlerAddress, "USDRIF handler not registered in OperationsAdmin");
+        address registeredHandler = operationsAdmin.getHandler(config.usdrifToken, LAYERBANK_INDEX);
+        assertEq(registeredHandler, address(usdrifHandler), "USDRIF handler not registered in OperationsAdmin");
         assertEq(uint256(operationsAdmin.getRouteClass(LAYERBANK_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
         assertTrue(
-            IPurchaseUniswap(usdrifHandlerAddress).isPurchasePathAllowed(keccak256(usdrifHandler.getSwapPath())),
+            IPurchaseUniswap(address(usdrifHandler)).isPurchasePathAllowed(keccak256(usdrifHandler.getSwapPath())),
             "constructor path is allowlisted at construction"
         );
     }
@@ -112,31 +112,31 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
         UsdrifHelperConfig.NetworkConfig memory config = usdrifHelperConfig.getNetworkConfig();
         address user = makeAddr(USER_STRING);
         address swapper = makeAddr(SWAPPER_STRING);
-        MockStablecoin usdrif = MockStablecoin(config.usdrifTokenAddress);
+        MockStablecoin usdrif = MockStablecoin(config.usdrifToken);
 
         vm.prank(OWNER);
         operationsAdmin.addSwapper(swapper);
         // The mock router wraps rBTC it holds into WRBTC for the handler, the way a real swap pays out.
-        vm.deal(config.swapRouterAddress, 1000 ether);
+        vm.deal(config.swapRouter, 1000 ether);
 
         usdrif.mint(user, DEPOSIT_AMOUNT);
         vm.startPrank(user);
-        usdrif.approve(usdrifHandlerAddress, DEPOSIT_AMOUNT);
+        usdrif.approve(address(usdrifHandler), DEPOSIT_AMOUNT);
         dcaManager.createDcaSchedule(
-            config.usdrifTokenAddress, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, LAYERBANK_INDEX
+            config.usdrifToken, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, LAYERBANK_INDEX
         );
         vm.stopPrank();
 
-        uint64 scheduleId = scheduleIdAt(dcaManager, user, config.usdrifTokenAddress, 0);
+        uint64 scheduleId = scheduleIdAt(dcaManager, user, config.usdrifToken, 0);
         vm.prank(swapper);
-        batchBuyOne(dcaManager, config.usdrifTokenAddress, scheduleId, LAYERBANK_INDEX);
+        batchBuyOne(dcaManager, config.usdrifToken, scheduleId, LAYERBANK_INDEX);
 
         assertGt(
-            IPurchaseRbtc(usdrifHandlerAddress).getAccumulatedRbtcBalance(user),
+            IPurchaseRbtc(address(usdrifHandler)).getAccumulatedRbtcBalance(user),
             0,
             "purchase through the deployed USDRIF route credited no rBTC"
         );
-        assertEq(usdrif.balanceOf(usdrifHandlerAddress), 0, "a complete fill leaves no stablecoin on the handler");
+        assertEq(usdrif.balanceOf(address(usdrifHandler)), 0, "a complete fill leaves no stablecoin on the handler");
     }
 
     function test_run_revertsOnForkWithoutRealDeployment() public {

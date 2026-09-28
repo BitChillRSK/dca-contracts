@@ -447,8 +447,8 @@ contract TropykusHandlerWrapper is TropykusHandler {
     // Track users' accumulated RBTC for testing
     mapping(address user => uint256 amount) internal s_usersAccumulatedRbtc;
 
-    constructor(address dcaManagerAddress, address stablecoinAddress, address kTokenAddress)
-        TropykusHandler(dcaManagerAddress, stablecoinAddress, kTokenAddress)
+    constructor(address dcaManager, address stablecoin, address kToken)
+        TropykusHandler(dcaManager, stablecoin, kToken)
     {}
 
     /**
@@ -559,9 +559,7 @@ contract SovrynHandlerWrapper is SovrynHandler {
     // Track users' accumulated RBTC for testing
     mapping(address user => uint256 amount) internal s_usersAccumulatedRbtc;
 
-    constructor(address dcaManagerAddress, address stablecoinAddress, address iTokenAddress)
-        SovrynHandler(dcaManagerAddress, stablecoinAddress, iTokenAddress)
-    {}
+    constructor(address dcaManager, address stablecoin, address iToken) SovrynHandler(dcaManager, stablecoin, iToken) {}
 
     /**
      * @notice Allow the contract to receive and hold rBTC

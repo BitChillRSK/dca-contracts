@@ -261,25 +261,22 @@ contract DcaDappTest is Test {
             stablecoinHandler = IStablecoinHandler(stablecoinHandlerAddress);
             MocHelperConfig.NetworkConfig memory networkConfig = mocHelperConfig.getActiveNetworkConfig();
 
-            address stablecoinAddress = mocHelperConfig.getStablecoinAddress();
-            address mocProxyAddress = networkConfig.mocProxyAddress;
-
-            stablecoin = MockStablecoin(stablecoinAddress);
-            mocProxy = MockMocProxy(mocProxyAddress);
+            stablecoin = MockStablecoin(mocHelperConfig.getStablecoin());
+            mocProxy = MockMocProxy(networkConfig.mocProxy);
 
             // Give the MoC proxy contract allowance
-            stablecoin.approve(mocProxyAddress, AMOUNT_TO_DEPOSIT);
+            stablecoin.approve(address(mocProxy), AMOUNT_TO_DEPOSIT);
 
             // Mint stablecoin for the user
             if (block.chainid == ANVIL_CHAIN_ID) {
                 // Local tests
                 // Deal rBTC funds to MoC contract
-                vm.deal(mocProxyAddress, 1000 ether);
+                vm.deal(address(mocProxy), 1000 ether);
 
                 // Give the MoC proxy contract allowance to move stablecoin from stablecoinHandler
                 // This is necessary for local tests because of how the mock contract works, but not for the live contract
                 vm.prank(address(stablecoinHandler));
-                stablecoin.approve(mocProxyAddress, type(uint256).max);
+                stablecoin.approve(address(mocProxy), type(uint256).max);
                 stablecoin.mint(USER, USER_TOTAL_AMOUNT);
             } else if (block.chainid == RSK_MAINNET_CHAIN_ID) {
                 // Fork tests
@@ -325,14 +322,10 @@ contract DcaDappTest is Test {
             (operationsAdmin, stablecoinHandlerAddress, dcaManager, dexHelperConfig) = deployContracts.run();
             stablecoinHandler = IStablecoinHandler(stablecoinHandlerAddress);
 
-            address stablecoinAddress = dexHelperConfig.getStablecoinAddress();
-            address wrbtcTokenAddress = dexHelperConfig.getActiveNetworkConfig().wrbtcTokenAddress;
-            address swapRouter02Address = dexHelperConfig.getActiveNetworkConfig().swapRouterAddress;
-            address mocProxyAddress = dexHelperConfig.getActiveNetworkConfig().mocProxyAddress;
-
-            stablecoin = MockStablecoin(stablecoinAddress);
-            wrbtc = MockWrbtcToken(wrbtcTokenAddress);
-            mocProxy = MockMocProxy(mocProxyAddress);
+            stablecoin = MockStablecoin(dexHelperConfig.getStablecoin());
+            wrbtc = MockWrbtcToken(dexHelperConfig.getActiveNetworkConfig().wrbtc);
+            address swapRouter02 = dexHelperConfig.getActiveNetworkConfig().swapRouter;
+            mocProxy = MockMocProxy(dexHelperConfig.getActiveNetworkConfig().mocProxy);
 
             // Mint stablecoin for the user
             if (block.chainid == ANVIL_CHAIN_ID) {
@@ -340,7 +333,7 @@ contract DcaDappTest is Test {
                 stablecoin.mint(USER, USER_TOTAL_AMOUNT);
                 // Deal 1000 rBTC to the mock SwapRouter02 contract, so that it can deposit rBTC on the mock WRBTC contract
                 // to simulate that the StablecoinHandlerDex contract has received WRBTC after calling the `exactInput()` function
-                vm.deal(swapRouter02Address, 1000 ether);
+                vm.deal(swapRouter02, 1000 ether);
             } else if (block.chainid == RSK_MAINNET_CHAIN_ID) {
                 vm.store(
                     address(MOC_IN_RATE_MAINNET),
@@ -396,7 +389,7 @@ contract DcaDappTest is Test {
         // Set the shares based on protocol and current stablecoin. Idle has none.
         // LayerBank's aToken is not IShareToken (kToken/iToken); lending-share math lives in layerbank tests.
         if (isShareTokenLane) {
-            shareToken = IShareToken(getShareTokenAddress(stablecoinType, s_routeIndex));
+            shareToken = IShareToken(getShareToken(stablecoinType, s_routeIndex));
             if (address(shareToken) == address(0)) {
                 vm.skip(true);
                 return;
@@ -847,7 +840,7 @@ contract DcaDappTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     // Helper function to get shares address based on stablecoin type and route index
-    function getShareTokenAddress(string memory _stablecoinType, uint256 routeIndex) internal view returns (address) {
+    function getShareToken(string memory _stablecoinType, uint256 routeIndex) internal view returns (address) {
         bool isUSDRIF = keccak256(abi.encodePacked(_stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING));
         bool isUSDT0 = keccak256(abi.encodePacked(_stablecoinType)) == keccak256(abi.encodePacked(USDT0_STRING));
 
@@ -856,30 +849,30 @@ contract DcaDappTest is Test {
             revert("Share token not available for the selected combination");
         }
 
-        address shareTokenAddress = address(0);
+        address shares = address(0);
 
         // Try to get the shares address from the helper configs
         if (isMocSwaps && address(mocHelperConfig) != address(0)) {
             MocHelperConfig.NetworkConfig memory networkConfig = mocHelperConfig.getActiveNetworkConfig();
 
             if (routeIndex == TROPYKUS_INDEX) {
-                shareTokenAddress = networkConfig.kDocAddress;
+                shares = networkConfig.kDoc;
             } else if (routeIndex == SOVRYN_INDEX) {
-                shareTokenAddress = networkConfig.iSusdAddress;
+                shares = networkConfig.iToken;
             } else if (routeIndex == LAYERBANK_INDEX) {
-                shareTokenAddress = networkConfig.layerbankATokenAddress;
+                shares = networkConfig.layerbankAToken;
             }
         } else if (isDexSwaps && address(dexHelperConfig) != address(0)) {
             if (routeIndex == TROPYKUS_INDEX || routeIndex == SOVRYN_INDEX || routeIndex == LAYERBANK_INDEX) {
-                shareTokenAddress = dexHelperConfig.getShareTokenAddress();
+                shares = dexHelperConfig.getShareToken();
             }
         }
 
         // If we couldn't get the shares address from the helper configs, try to get it from the handler
-        if (shareTokenAddress == address(0) && address(stablecoinHandler) != address(0)) {
+        if (shares == address(0) && address(stablecoinHandler) != address(0)) {
             if (routeIndex == TROPYKUS_INDEX) {
                 try TropykusDocHandlerMoc(payable(address(stablecoinHandler))).i_kToken() returns (IkToken kToken) {
-                    shareTokenAddress = address(kToken);
+                    shares = address(kToken);
                 } catch {
                     revert("Failed to get Tropykus shares from handler");
                 }
@@ -887,7 +880,7 @@ contract DcaDappTest is Test {
                 try SovrynDocHandlerMoc(payable(address(stablecoinHandler))).i_iToken() returns (
                     IiSusdToken iSusdToken
                 ) {
-                    shareTokenAddress = address(iSusdToken);
+                    shares = address(iSusdToken);
                 } catch {
                     revert("Failed to get Sovryn shares from handler");
                 }
@@ -895,7 +888,7 @@ contract DcaDappTest is Test {
                 try LayerBankDocHandlerMoc(payable(address(stablecoinHandler))).i_aToken() returns (
                     ILayerBankAToken aToken
                 ) {
-                    shareTokenAddress = address(aToken);
+                    shares = address(aToken);
                 } catch {
                     revert("Failed to get LayerBank aToken from handler");
                 }
@@ -903,10 +896,10 @@ contract DcaDappTest is Test {
         }
 
         // If we still couldn't get the shares address, revert
-        if (shareTokenAddress == address(0)) {
+        if (shares == address(0)) {
             revert("Share token not available for the selected combination");
         }
 
-        return shareTokenAddress;
+        return shares;
     }
 }

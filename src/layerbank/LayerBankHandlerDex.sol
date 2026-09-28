@@ -14,9 +14,9 @@ import {LayerBankHandler} from "./LayerBankHandler.sol";
  */
 contract LayerBankHandlerDex is LayerBankHandler, PurchaseUniswap {
     /**
-     * @param dcaManagerAddress The DcaManager allowed to call this handler.
-     * @param stablecoinAddress The stablecoin this handler lends.
-     * @param aTokenAddress LayerBank aToken for that stablecoin.
+     * @param dcaManager The DcaManager allowed to call this handler.
+     * @param stablecoin The stablecoin this handler lends.
+     * @param aToken LayerBank aToken for that stablecoin.
      * @param uniswapSettings Router, WRBTC, path, and MoC oracle.
      * @param feeCollector Address that receives purchase fees.
      * @param feeSettings Linear fee parameters.
@@ -25,9 +25,9 @@ contract LayerBankHandlerDex is LayerBankHandler, PurchaseUniswap {
      * @param initialOwner Address that owns fee/oracle configuration immediately after deploy.
      */
     constructor(
-        address dcaManagerAddress,
-        address stablecoinAddress,
-        address aTokenAddress,
+        address dcaManager,
+        address stablecoin,
+        address aToken,
         UniswapSettings memory uniswapSettings,
         address feeCollector,
         FeeSettings memory feeSettings,
@@ -35,7 +35,7 @@ contract LayerBankHandlerDex is LayerBankHandler, PurchaseUniswap {
         uint256 amountOutMinimumSafetyCheck,
         address initialOwner
     )
-        LayerBankHandler(dcaManagerAddress, stablecoinAddress, aTokenAddress)
+        LayerBankHandler(dcaManager, stablecoin, aToken)
         PurchaseUniswap(
             uniswapSettings,
             FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}),

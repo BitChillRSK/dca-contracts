@@ -20,7 +20,7 @@ import "./Constants.sol";
 contract DeployIdleHandler is DeployBase {
     struct DeployParams {
         address dcaManager;
-        address tokenAddress;
+        address stablecoin;
         address mocProxy;
         address feeCollector;
         address initialOwner;
@@ -37,7 +37,7 @@ contract DeployIdleHandler is DeployBase {
         return address(
             new IdleDocHandlerMoc(
                 params.dcaManager,
-                params.tokenAddress,
+                params.stablecoin,
                 params.feeCollector,
                 params.mocProxy,
                 feeSettings,
@@ -46,35 +46,35 @@ contract DeployIdleHandler is DeployBase {
         );
     }
 
-    function run(MocHelperConfig existingConfig, address operationsAdminAddress, address dcaManagerAddress)
+    function run(MocHelperConfig existingConfig, address operationsAdmin, address dcaManager)
         external
         returns (address)
     {
         MocHelperConfig helperConfig = address(existingConfig) != address(0) ? existingConfig : new MocHelperConfig();
 
-        if (operationsAdminAddress == address(0) || dcaManagerAddress == address(0)) {
+        if (operationsAdmin == address(0) || dcaManager == address(0)) {
             revert("OperationsAdmin and DcaManager addresses must be set");
         }
 
         MocHelperConfig.NetworkConfig memory networkConfig = helperConfig.getActiveNetworkConfig();
-        address docTokenAddress = helperConfig.getStablecoinAddress();
-        address mocProxyAddress = networkConfig.mocProxyAddress;
+        address docToken = helperConfig.getStablecoin();
+        address mocProxy = networkConfig.mocProxy;
 
-        console.log("OperationsAdmin address:", operationsAdminAddress);
-        console.log("DcaManager address:", dcaManagerAddress);
-        console.log("DOC token address:", docTokenAddress);
-        console.log("MoC Proxy address:", mocProxyAddress);
+        console.log("OperationsAdmin address:", operationsAdmin);
+        console.log("DcaManager address:", dcaManager);
+        console.log("DOC token address:", docToken);
+        console.log("MoC Proxy address:", mocProxy);
 
-        OperationsAdmin operationsAdmin = OperationsAdmin(operationsAdminAddress);
+        OperationsAdmin operationsAdmin = OperationsAdmin(operationsAdmin);
         _requireNoPendingOwner(operationsAdmin);
-        _requireNoPendingOwner(DcaManager(dcaManagerAddress));
+        _requireNoPendingOwner(DcaManager(dcaManager));
 
         vm.startBroadcast();
 
         DeployParams memory params = DeployParams({
-            dcaManager: dcaManagerAddress,
-            tokenAddress: docTokenAddress,
-            mocProxy: mocProxyAddress,
+            dcaManager: dcaManager,
+            stablecoin: docToken,
+            mocProxy: mocProxy,
             feeCollector: getFeeCollector(environment),
             initialOwner: operationsAdmin.owner()
         });
@@ -85,12 +85,12 @@ contract DeployIdleHandler is DeployBase {
         if (msg.sender != operationsAdmin.owner()) {
             console.log("Warning: Deployer is not the owner. Cannot register handler.");
             console.log("Please call operationsAdmin.assignHandler() as owner with:");
-            console.log("tokenAddress:", docTokenAddress);
+            console.log("stablecoin:", docToken);
             console.log("index: 0");
-            console.log("handlerAddress:", idleHandler);
+            console.log("handler:", idleHandler);
         } else {
             // Occupied `(token, IDLE_INDEX)` reverts `HandlerAlreadyAssigned` — do not skip.
-            operationsAdmin.assignHandler(docTokenAddress, IDLE_INDEX, idleHandler);
+            operationsAdmin.assignHandler(docToken, IDLE_INDEX, idleHandler);
             console.log("Idle DOC handler registered with OperationsAdmin at index", IDLE_INDEX);
         }
 
