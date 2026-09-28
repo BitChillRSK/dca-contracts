@@ -100,8 +100,8 @@ contract DeployLayerBankHandler is DeployBase {
         console.log("DOC token address:", docToken);
         console.log("MoC Proxy address:", mocProxy);
 
-        OperationsAdmin operationsAdmin = OperationsAdmin(operationsAdmin);
-        _requireNoPendingOwner(operationsAdmin);
+        OperationsAdmin opsAdmin = OperationsAdmin(operationsAdmin);
+        _requireNoPendingOwner(opsAdmin);
         _requireNoPendingOwner(DcaManager(dcaManager));
 
         vm.startBroadcast();
@@ -110,7 +110,7 @@ contract DeployLayerBankHandler is DeployBase {
 
         if (environment == Environment.LOCAL) {
             layerbankHandler = deployMocksAndHandler(
-                dcaManager, docToken, mocProxy, getFeeCollector(environment), operationsAdmin.owner()
+                dcaManager, docToken, mocProxy, getFeeCollector(environment), opsAdmin.owner()
             );
         } else if (environment == Environment.TESTNET || environment == Environment.MAINNET) {
             address aToken = networkConfig.layerbankAToken;
@@ -124,7 +124,7 @@ contract DeployLayerBankHandler is DeployBase {
                     aToken: aToken,
                     mocProxy: mocProxy,
                     feeCollector: getFeeCollector(environment),
-                    initialOwner: operationsAdmin.owner()
+                    initialOwner: opsAdmin.owner()
                 })
             );
         } else {
@@ -133,7 +133,7 @@ contract DeployLayerBankHandler is DeployBase {
         }
 
         console.log("LayerBank DOC handler deployed at:", layerbankHandler);
-        _maybeAssign(operationsAdmin, docToken, layerbankHandler);
+        _maybeAssign(opsAdmin, docToken, layerbankHandler);
 
         vm.stopBroadcast();
 

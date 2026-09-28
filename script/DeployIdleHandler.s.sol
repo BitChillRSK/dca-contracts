@@ -65,8 +65,8 @@ contract DeployIdleHandler is DeployBase {
         console.log("DOC token address:", docToken);
         console.log("MoC Proxy address:", mocProxy);
 
-        OperationsAdmin operationsAdmin = OperationsAdmin(operationsAdmin);
-        _requireNoPendingOwner(operationsAdmin);
+        OperationsAdmin opsAdmin = OperationsAdmin(operationsAdmin);
+        _requireNoPendingOwner(opsAdmin);
         _requireNoPendingOwner(DcaManager(dcaManager));
 
         vm.startBroadcast();
@@ -76,13 +76,13 @@ contract DeployIdleHandler is DeployBase {
             stablecoin: docToken,
             mocProxy: mocProxy,
             feeCollector: getFeeCollector(environment),
-            initialOwner: operationsAdmin.owner()
+            initialOwner: opsAdmin.owner()
         });
 
         address idleHandler = deployIdleDocHandlerMoc(params);
         console.log("Idle DOC handler deployed at:", idleHandler);
 
-        if (msg.sender != operationsAdmin.owner()) {
+        if (msg.sender != opsAdmin.owner()) {
             console.log("Warning: Deployer is not the owner. Cannot register handler.");
             console.log("Please call operationsAdmin.assignHandler() as owner with:");
             console.log("stablecoin:", docToken);
@@ -90,7 +90,7 @@ contract DeployIdleHandler is DeployBase {
             console.log("handler:", idleHandler);
         } else {
             // Occupied `(token, IDLE_INDEX)` reverts `HandlerAlreadyAssigned` — do not skip.
-            operationsAdmin.assignHandler(docToken, IDLE_INDEX, idleHandler);
+            opsAdmin.assignHandler(docToken, IDLE_INDEX, idleHandler);
             console.log("Idle DOC handler registered with OperationsAdmin at index", IDLE_INDEX);
         }
 
