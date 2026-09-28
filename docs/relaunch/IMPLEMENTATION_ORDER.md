@@ -163,6 +163,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R99 | after R98, before relaunch deploy | none (centralize measured deposit-share accounting into `LendingHandler._depositToken`) |
 | R100 | after R99; not deployment-bound | none (invariant suite honesty + integrated lending/purchase coverage) |
 | R101 | after R100, before relaunch deploy | **decided 2026-09-27:** registry checks a handler's DcaManager pin; min-purchase check before the create pull; dead top-up guard dropped; Tropykus-only redeem error off `ILendingHandler`; `…MustBeAtLeastMinimum` renames; stale NatSpec; lending-exit balance reuse and the `withdrawTokenAndInterest` reorder closed |
+| R102 | after R101, before relaunch deploy | none (`PurchaseUniswap` unwraps through `_withdrawRbtc`; encoding + path helpers `private`; NatSpec) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1382,6 +1383,13 @@ pull (max-schedules stays after it: +450 under deploy otherwise); the unreachabl
 `ITropykusErc20Handler`; the two `…MustBeGreaterThanMinimum` errors become `…MustBeAtLeastMinimum`;
 stale NatSpec is fixed. It closes reusing the lending redeem's balance reading, and the
 `withdrawTokenAndInterest` route-check reorder (dropped after review). Ask: none (decided 2026-09-27).
+
+### R102 - unwrap WRBTC through the withdraw seam ([spec](./R102-wrbtc-withdraw-seam.md))
+
+After R101, before relaunch deploy. `PurchaseUniswap` overrides `_withdrawRbtc` (unwrap, then `super`)
+instead of restating the guarded external withdraw; `_withdrawRbtcChecksEffects`, `_claimableRbtc`, and
+the single-caller path helpers become `private`; NatSpec that predates interest top-up and R101's early
+amount check is fixed. No ABI change. Ask: none.
 
 ## Closed non-implementation decisions
 
