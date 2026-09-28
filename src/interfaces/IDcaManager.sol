@@ -28,7 +28,7 @@ interface IDcaManager {
      *      sentinel. `getDcaSchedules` returns ids alongside these values.
      */
     struct DcaSchedule {
-        uint128 tokenBalance; // Stablecoin amount deposited by the user
+        uint128 tokenBalance; // Stablecoin principal the schedule can still spend or withdraw
         uint48 cadenceAnchor; // UTC midnight of the newest consumed cadence slot; zero before the first purchase
         bool paused; // Set by the schedule's user: purchases are refused while true, every other path stays open
         uint32 purchasePeriod; // Time between cadence slots in seconds; always whole UTC days
@@ -70,7 +70,7 @@ interface IDcaManager {
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
-    /// @notice A schedule's stablecoin principal changed after a deposit, withdrawal, or purchase debit.
+    /// @notice A schedule's stablecoin principal changed by a deposit, withdrawal, purchase, or interest top-up.
     event DcaManager__TokenBalanceUpdated(address indexed token, uint64 indexed scheduleId, uint256 amount);
     /// @notice The caller replaced a schedule's periodic purchase amount.
     event DcaManager__PurchaseAmountUpdated(
@@ -222,8 +222,8 @@ interface IDcaManager {
      * @param token The stablecoin to deposit.
      * @param depositAmount Amount requested from the caller. The handler reverts unless it receives
      *        exactly this amount, so the schedule is credited with the full request.
-     * @param purchaseAmount Stablecoin to spend periodically on rBTC. Validated against the credited
-     *        balance, which equals `depositAmount` once the handler pull succeeds.
+     * @param purchaseAmount Stablecoin to spend periodically on rBTC. At least the token minimum and at
+     *        most `depositAmount`; checked before any tokens move.
      * @param purchasePeriod Seconds between purchases. Must be a whole number of UTC days and at least
      *        the protocol minimum.
      * @param routeIndex OperationsAdmin route that will hold the funds (idle or lending).

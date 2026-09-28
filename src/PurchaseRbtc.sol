@@ -132,7 +132,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
     }
 
     /// @inheritdoc IPurchaseRbtc
-    function withdrawAccumulatedRbtc(address user) external virtual override onlyDcaManager {
+    function withdrawAccumulatedRbtc(address user) external override onlyDcaManager {
         uint256 rbtcBalance = _withdrawRbtcChecksEffects(user);
         _withdrawRbtc(user, rbtcBalance);
     }
@@ -150,31 +150,11 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Decode claimable rBTC, revert if none, and leave the post-withdraw sentinel. Caller then pays.
-    function _withdrawRbtcChecksEffects(address user) internal returns (uint256 rbtcBalance) {
-        uint256 stored = s_usersAccumulatedRbtc[user];
-        // `0` = never credited; `1` = fully withdrawn sentinel. Both mean nothing to pay.
-        if (stored <= 1) revert PurchaseRbtc__NoAccumulatedRbtcToWithdraw();
-
-        unchecked {
-            rbtcBalance = stored - 1;
-        }
-        s_usersAccumulatedRbtc[user] = 1;
-    }
-
     /**
-     * @dev Claimable rBTC for `user`. Decodes the `claimable + 1` encoding; `0` / sentinel `1` both
-     *      return 0 so callers never see dust.
+     * @dev Pay `rbtcBalance` native rBTC to `user`. Reverts if the call fails. A route whose purchases
+     *      accumulate wrapped rBTC overrides this to unwrap first.
      */
-    function _claimableRbtc(address user) internal view returns (uint256) {
-        uint256 stored = s_usersAccumulatedRbtc[user];
-        unchecked {
-            return stored == 0 ? 0 : stored - 1;
-        }
-    }
-
-    /// @dev Pay `rbtcBalance` native rBTC to `user`. Reverts if the call fails.
-    function _withdrawRbtc(address user, uint256 rbtcBalance) internal {
+    function _withdrawRbtc(address user, uint256 rbtcBalance) internal virtual {
         (bool sent,) = user.call{value: rbtcBalance}("");
         if (!sent) revert PurchaseRbtc__rBtcWithdrawalFailed();
         emit PurchaseRbtc__rBtcWithdrawn(user, rbtcBalance);
@@ -199,6 +179,29 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
         uint256 stored = s_usersAccumulatedRbtc[buyer];
         unchecked {
             s_usersAccumulatedRbtc[buyer] = (stored == 0 ? 1 : stored) + amount;
+        }
+    }
+
+    /// @dev Decode claimable rBTC, revert if none, and leave the post-withdraw sentinel. Caller then pays.
+    function _withdrawRbtcChecksEffects(address user) private returns (uint256 rbtcBalance) {
+        uint256 stored = s_usersAccumulatedRbtc[user];
+        // `0` = never credited; `1` = fully withdrawn sentinel. Both mean nothing to pay.
+        if (stored <= 1) revert PurchaseRbtc__NoAccumulatedRbtcToWithdraw();
+
+        unchecked {
+            rbtcBalance = stored - 1;
+        }
+        s_usersAccumulatedRbtc[user] = 1;
+    }
+
+    /**
+     * @dev Claimable rBTC for `user`. Decodes the `claimable + 1` encoding; `0` / sentinel `1` both
+     *      return 0 so callers never see dust.
+     */
+    function _claimableRbtc(address user) private view returns (uint256) {
+        uint256 stored = s_usersAccumulatedRbtc[user];
+        unchecked {
+            return stored == 0 ? 0 : stored - 1;
         }
     }
 }

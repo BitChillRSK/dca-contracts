@@ -163,6 +163,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R99 | after R98, before relaunch deploy | none (centralize measured deposit-share accounting into `LendingHandler._depositToken`) |
 | R100 | after R99; not deployment-bound | none (invariant suite honesty + integrated lending/purchase coverage) |
 | R101 | after R100, before relaunch deploy | **decided 2026-09-27:** registry checks a handler's DcaManager pin; min-purchase check before the create pull; dead top-up guard dropped; Tropykus-only redeem error off `ILendingHandler`; `…MustBeAtLeastMinimum` renames; stale NatSpec; lending-exit balance reuse and the `withdrawTokenAndInterest` reorder closed |
+| R102 | after R101, before relaunch deploy | none (`PurchaseUniswap` unwraps through `_withdrawRbtc`; encoding + path helpers `private`; NatSpec) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1383,6 +1384,15 @@ pull (max-schedules stays after it: +450 under deploy otherwise); the unreachabl
 stale NatSpec is fixed. It closes reusing the lending redeem's balance reading, and the
 `withdrawTokenAndInterest` route-check reorder (dropped after review). Ask: none (decided 2026-09-27).
 
+### R102 - unwrap WRBTC through the withdraw seam ([spec](./R102-wrbtc-withdraw-seam.md), [#168](https://github.com/BitChillRSK/dca-contracts/pull/168))
+
+After R101, before relaunch deploy. `PurchaseUniswap` overrides `_withdrawRbtc` (unwrap, then `super`)
+instead of restating the guarded external withdraw; `_withdrawRbtcChecksEffects`, `_claimableRbtc`, and
+the single-caller path helpers become `private`; NatSpec that predates interest top-up and R101's early
+amount check is fixed. No ABI change. Ask: none. Post-ship review (2026-09-28) closed fee-collector
+packing, the MoC balance local, and three cold-path leave-as-is items — see the closed register and
+[R102 § Post-ship review](./R102-wrbtc-withdraw-seam.md#post-ship-review-2026-09-28).
+
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:
@@ -1454,6 +1464,25 @@ There is no optional-late queue. Items either have an ordered spec above or are 
   read on every successful lending exit (+109 under deploy, about one 200-gas SLOAD on Rootstock),
   user-paid, and a storage parameter on `_withdrawToken`. Reopen only if that call gains an effect a
   revert cannot undo. See [R101](./R101-post-r100-review-cleanups.md#verdicts).
+- **Pack the fee collector beside the fee rates — closed 2026-09-28 (R95 item 4, post-R102 pass).**
+  R95 left this as "reopen with a deploy measurement." Layout closes it without one: the fee word is
+  already full (`uint112` × 2 + `uint16` × 2 = 256 bits); the collector is 160 bits; narrowing the
+  bounds to `uint96` frees only 32 bits; the 12 spare bytes beside Ownable2Step's `_pendingOwner`
+  cannot hold an address; packing into the Dex safety-check word still leaves a purchase-path
+  `SLOAD` because purchases never load that word. The path already does the minimum (fee word once,
+  collector when the fee is nonzero — ~200 Rootstock gas). See
+  [R102 post-ship review](./R102-wrbtc-withdraw-seam.md#post-ship-review-2026-09-28).
+- **Cache MoC's post-redeem `address(this).balance` in a local — closed 2026-09-28 (keep re-read).**
+  Compiles to `SELFBALANCE` (5 gas on Foundry and Rootstock), not `BALANCE` (400). Naming the
+  post-balance costs more stack shuffling than the extra read. Solc 0.8.36 / optimizer 200: the
+  re-read wins by 1–5 gas depending on profile and whether the redeem pays. Matches `096719a`. See
+  [R102 post-ship review](./R102-wrbtc-withdraw-seam.md#post-ship-review-2026-09-28).
+- **Owner no-op write guards, purchase-only `getTokenHandler`, and `Batch.routeIndex` as `uint32` —
+  closed 2026-09-28 without shipping.** Equality checks on `addSwapper` / `revokeSwapper` /
+  `setFeeCollectorAddress` are owner cold-path code for a rare 5,000-gas Rootstock `RESET`. A
+  purchase-only handler getter would duplicate the shared view for a few gas inside an external call.
+  Narrowing `Batch.routeIndex` does not shrink ABI calldata. Recorded under
+  [R102 post-ship review](./R102-wrbtc-withdraw-seam.md#post-ship-review-2026-09-28) items 7–9.
 - **SPDX change — reopened 2026-08-31, answered 2026-09-07.** The earlier rejection argued that re-licensing "requires an explicit legal/product process outside the contract implementation stack" and then closed the decision on that basis, which is self-defeating: that is a reason to route the question to a human, not to answer it. See **Licensing — decided**.
 
 ## Licensing — decided

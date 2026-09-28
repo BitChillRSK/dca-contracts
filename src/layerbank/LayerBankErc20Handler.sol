@@ -99,7 +99,8 @@ abstract contract LayerBankErc20Handler is LendingHandler, ILayerBankErc20Handle
      * @dev Underlying `a` such that Aave's `(a * RAY + index/2) / index` equals `sharesAmount`.
      *      Under the `index >= RAY` assumption on `_protocolRedeem`, floor never rayDivs above
      *      the target; when it undershoots, one more wei is enough. Callers only pass
-     *      `sharesAmount >= 1` (`_redeemShares` no-ops a zero debit), so the result is never zero.
+     *      `sharesAmount >= 1` (a single redeem no-ops a zero debit, and every batch row debits at
+     *      least one share), so the result is never zero.
      */
     function _underlyingForExactScaledBurn(uint256 sharesAmount, uint256 index) private view returns (uint256 amount) {
         amount = _sharesToStablecoin(sharesAmount, index);
