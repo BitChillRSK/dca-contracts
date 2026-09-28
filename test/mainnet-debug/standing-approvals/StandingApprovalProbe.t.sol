@@ -100,8 +100,8 @@ contract StandingApprovalProbe is Test {
 
     address internal constant USDT0_HOLDER = 0xaeF6fABf3b0C9e5F9d6D5170AfC703A633479Bbd;
 
-    /// @dev The two production lending spenders: `SovrynErc20Handler._lendingSpender()` (iSUSD, whose
-    ///      underlying is DOC) and `LayerBankErc20Handler._lendingSpender()` (the Aave-v3 Pool).
+    /// @dev The two production lending spenders: `SovrynHandler._lendingSpender()` (iSUSD, whose
+    ///      underlying is DOC) and `LayerBankHandler._lendingSpender()` (the Aave-v3 Pool).
     address internal constant ISUSD = 0xd8D25f03EBbA94E15Df2eD4d6D38276B595593c1;
     address internal constant LAYERBANK_POOL = 0x526D06c65777eA6D56d7a1Dd47cD79230dDf72E9;
 

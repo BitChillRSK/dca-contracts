@@ -6,7 +6,7 @@ import {DcaManager} from "src/DcaManager.sol";
 import {OperationsAdmin} from "src/OperationsAdmin.sol";
 import {BitChillOwnable} from "src/BitChillOwnable.sol";
 import {IdleDocHandlerMoc} from "src/idle/IdleDocHandlerMoc.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import {ownableUnauthorized, ownableInvalidOwner} from "test/utils/OzRevert.sol";
@@ -40,7 +40,7 @@ contract TwoStepOwnershipTest is Test {
             address(docToken),
             FEE_COLLECTOR,
             address(mocProxy),
-            IFeeHandler.FeeSettings({
+            IPurchaseFees.FeeSettings({
                 minFeeRate: MIN_FEE_RATE,
                 maxFeeRate: MAX_FEE_RATE_TEST,
                 feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -71,7 +71,7 @@ contract TwoStepOwnershipTest is Test {
             address(docToken),
             FEE_COLLECTOR,
             address(mocProxy),
-            IFeeHandler.FeeSettings({
+            IPurchaseFees.FeeSettings({
                 minFeeRate: MIN_FEE_RATE,
                 maxFeeRate: MAX_FEE_RATE_TEST,
                 feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,

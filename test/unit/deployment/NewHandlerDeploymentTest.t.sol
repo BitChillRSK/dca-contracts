@@ -4,9 +4,9 @@ pragma solidity 0.8.36;
 import {BaseDeploymentTest} from "./BaseDeploymentTest.t.sol";
 import {DeployUsdrifHandler} from "../../../script/DeployUsdrifHandler.s.sol";
 import {UsdrifHelperConfig} from "../../../script/UsdrifHelperConfig.s.sol";
-import {LayerBankErc20HandlerDex} from "../../../src/layerbank/LayerBankErc20HandlerDex.sol";
+import {LayerBankHandlerDex} from "../../../src/layerbank/LayerBankHandlerDex.sol";
 import {IPurchaseUniswap} from "../../../src/interfaces/IPurchaseUniswap.sol";
-import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "../../../src/interfaces/IPurchaseFees.sol";
 import {IWRBTC} from "../../../src/interfaces/IWRBTC.sol";
 import {IUniswapV3SwapRouter} from "../../../src/interfaces/IUniswapV3SwapRouter.sol";
 import {ICoinPairPrice} from "../../../src/interfaces/ICoinPairPrice.sol";
@@ -23,7 +23,7 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
     uint256 internal constant PURCHASE_AMOUNT = 200 ether;
 
     address public usdrifHandlerAddress;
-    LayerBankErc20HandlerDex public usdrifHandler;
+    LayerBankHandlerDex public usdrifHandler;
     UsdrifHelperConfig public usdrifHelperConfig;
 
     function setUp() public override {
@@ -50,7 +50,7 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
         DeployUsdrifHandler usdrifDeployer = new DeployUsdrifHandler();
         console.log("USDRIF handler deployer:", address(usdrifDeployer));
 
-        IFeeHandler.FeeSettings memory feeSettings = usdrifDeployer.feeSettingsForToken(false);
+        IPurchaseFees.FeeSettings memory feeSettings = usdrifDeployer.feeSettingsForToken(false);
         usdrifHandlerAddress = usdrifDeployer.deployMocksAndHandler(
             DeployUsdrifHandler.DeployParams({
                 dcaManagerAddress: address(dcaManager),
@@ -64,14 +64,14 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
                 initialOwner: operationsAdmin.owner()
             })
         );
-        usdrifHandler = LayerBankErc20HandlerDex(payable(usdrifHandlerAddress));
+        usdrifHandler = LayerBankHandlerDex(payable(usdrifHandlerAddress));
 
         vm.startPrank(OWNER);
         if (operationsAdmin.getRouteClass(LAYERBANK_INDEX) == IOperationsAdmin.RouteClass.Unregistered) {
             operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
         }
         dcaManager.setTokenMinPurchaseAmount(config.usdrifTokenAddress, MIN_PURCHASE_AMOUNT);
-        operationsAdmin.assignTokenHandler(config.usdrifTokenAddress, LAYERBANK_INDEX, usdrifHandlerAddress);
+        operationsAdmin.assignHandler(config.usdrifTokenAddress, LAYERBANK_INDEX, usdrifHandlerAddress);
         vm.stopPrank();
     }
 
@@ -90,7 +90,7 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
         assertEq(usdrifHandler.pendingOwner(), address(0), "USDRIF handler pending owner must be zero after deploy");
 
         UsdrifHelperConfig.NetworkConfig memory config = usdrifHelperConfig.getNetworkConfig();
-        address registeredHandler = operationsAdmin.getTokenHandler(config.usdrifTokenAddress, LAYERBANK_INDEX);
+        address registeredHandler = operationsAdmin.getHandler(config.usdrifTokenAddress, LAYERBANK_INDEX);
         assertEq(registeredHandler, usdrifHandlerAddress, "USDRIF handler not registered in OperationsAdmin");
         assertEq(uint256(operationsAdmin.getRouteClass(LAYERBANK_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
         assertTrue(
@@ -150,7 +150,7 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
         if (block.chainid != ANVIL_CHAIN_ID) vm.skip(true);
         address deployed = new DeployUsdrifHandler().run(usdrifHelperConfig);
         assertNotEq(deployed, address(0));
-        assertEq(LayerBankErc20HandlerDex(payable(deployed)).owner(), makeAddr(OWNER_STRING));
-        assertEq(LayerBankErc20HandlerDex(payable(deployed)).pendingOwner(), address(0));
+        assertEq(LayerBankHandlerDex(payable(deployed)).owner(), makeAddr(OWNER_STRING));
+        assertEq(LayerBankHandlerDex(payable(deployed)).pendingOwner(), address(0));
     }
 }

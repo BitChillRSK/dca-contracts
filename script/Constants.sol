@@ -2,7 +2,7 @@
 pragma solidity 0.8.36;
 
 // Protocol configuration
-// @notice the fee rate and bound constants carry IFeeHandler.FeeSettings' widths so deploy scripts
+// @notice the fee rate and bound constants carry IPurchaseFees.FeeSettings' widths so deploy scripts
 // and tests can build that struct without a cast.
 uint256 constant MIN_PURCHASE_AMOUNT = 25 ether; // at least 25 DOC on each purchase
 uint16 constant MIN_FEE_RATE = 100;

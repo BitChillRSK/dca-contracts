@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
-import {FeeHandler} from "../../src/FeeHandler.sol";
-import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
+import {PurchaseFees} from "../../src/PurchaseFees.sol";
+import {IPurchaseFees} from "../../src/interfaces/IPurchaseFees.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract FeeHandlerHarness is FeeHandler {
-    constructor(address feeCollector, IFeeHandler.FeeSettings memory settings, address initialOwner)
-        FeeHandler(feeCollector, settings, initialOwner)
+contract PurchaseFeesHarness is PurchaseFees {
+    constructor(address feeCollector, IPurchaseFees.FeeSettings memory settings, address initialOwner)
+        PurchaseFees(feeCollector, settings, initialOwner)
     {}
 
     function exposedCalculateFee(uint256 amount) external view returns (uint256) {
@@ -26,7 +26,7 @@ contract FeeHandlerHarness is FeeHandler {
     }
 
     // Test-only setters without onlyOwner restriction for convenience.
-    // Widths match FeeHandler storage, so a caller cannot park a value the real setters could not write.
+    // Widths match PurchaseFees storage, so a caller cannot park a value the real setters could not write.
     function testSetFeeRateParams(uint16 minFee, uint16 maxFee, uint112 lower, uint112 upper) external {
         s_minFeeRate = minFee;
         s_maxFeeRate = maxFee;

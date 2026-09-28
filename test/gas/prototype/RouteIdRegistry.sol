@@ -39,8 +39,8 @@ contract RouteIdRegistry {
         s_swappers[swapper] = true;
     }
 
-    /// @dev Mints the compact id for a pair. Add-only, exactly as `assignTokenHandler` is.
-    function assignTokenHandler(address token, uint32 routeIndex, address handler) external returns (uint32 routeId) {
+    /// @dev Mints the compact id for a pair. Add-only, exactly as `assignHandler` is.
+    function assignHandler(address token, uint32 routeIndex, address handler) external returns (uint32 routeId) {
         if (s_routeIds[token][routeIndex] != 0) revert RouteIdRegistry__PairAlreadyRegistered(token, routeIndex);
         routeId = s_nextRouteId++;
         s_routes[routeId] = Route({handler: handler, depositsPaused: false, token: token, routeIndex: routeIndex});

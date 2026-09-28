@@ -7,18 +7,18 @@ import {DeployFinal} from "../../../script/DeployFinal.s.sol";
 import {OperationsAdmin} from "../../../src/OperationsAdmin.sol";
 import {DcaManager} from "../../../src/DcaManager.sol";
 import {IOperationsAdmin} from "../../../src/interfaces/IOperationsAdmin.sol";
-import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "../../../src/interfaces/IPurchaseFees.sol";
 import {ILendingHandler} from "../../../src/interfaces/ILendingHandler.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {BitChillOwnable} from "../../../src/BitChillOwnable.sol";
 import {LayerBankDocHandlerMoc} from "../../../src/layerbank/LayerBankDocHandlerMoc.sol";
 import {SovrynDocHandlerMoc} from "../../../src/sovryn/SovrynDocHandlerMoc.sol";
-import {LayerBankErc20HandlerDex} from "../../../src/layerbank/LayerBankErc20HandlerDex.sol";
+import {LayerBankHandlerDex} from "../../../src/layerbank/LayerBankHandlerDex.sol";
 import {DcaManagerAccessControl} from "../../../src/DcaManagerAccessControl.sol";
 import {TokenHandler} from "../../../src/TokenHandler.sol";
 import {PurchaseMoc} from "../../../src/PurchaseMoc.sol";
 import {PurchaseUniswap} from "../../../src/PurchaseUniswap.sol";
-import {LayerBankErc20Handler} from "../../../src/layerbank/LayerBankErc20Handler.sol";
+import {LayerBankHandler} from "../../../src/layerbank/LayerBankHandler.sol";
 import {MockStablecoin} from "../../mocks/MockStablecoin.sol";
 import {MockIsusdToken} from "../../mocks/MockIsusdToken.sol";
 import {MockMocProxy} from "../../mocks/MockMocProxy.sol";
@@ -111,18 +111,16 @@ contract FinalDeploymentTest is Test {
             "Tropykus must stay unregistered"
         );
 
-        assertEq(stack.operationsAdmin.getTokenHandler(address(doc), IDLE_INDEX), stack.docIdle);
-        assertEq(stack.operationsAdmin.getTokenHandler(address(doc), LAYERBANK_INDEX), stack.docLayerBank);
-        assertEq(stack.operationsAdmin.getTokenHandler(address(doc), SOVRYN_INDEX), stack.docSovryn);
-        assertEq(stack.operationsAdmin.getTokenHandler(address(usdrif), IDLE_INDEX), stack.usdrifIdle);
-        assertEq(stack.operationsAdmin.getTokenHandler(address(usdrif), LAYERBANK_INDEX), stack.usdrifLayerBank);
-        assertEq(stack.operationsAdmin.getTokenHandler(address(usdt0), IDLE_INDEX), stack.usdt0Idle);
-        assertEq(stack.operationsAdmin.getTokenHandler(address(usdt0), LAYERBANK_INDEX), stack.usdt0LayerBank);
+        assertEq(stack.operationsAdmin.getHandler(address(doc), IDLE_INDEX), stack.docIdle);
+        assertEq(stack.operationsAdmin.getHandler(address(doc), LAYERBANK_INDEX), stack.docLayerBank);
+        assertEq(stack.operationsAdmin.getHandler(address(doc), SOVRYN_INDEX), stack.docSovryn);
+        assertEq(stack.operationsAdmin.getHandler(address(usdrif), IDLE_INDEX), stack.usdrifIdle);
+        assertEq(stack.operationsAdmin.getHandler(address(usdrif), LAYERBANK_INDEX), stack.usdrifLayerBank);
+        assertEq(stack.operationsAdmin.getHandler(address(usdt0), IDLE_INDEX), stack.usdt0Idle);
+        assertEq(stack.operationsAdmin.getHandler(address(usdt0), LAYERBANK_INDEX), stack.usdt0LayerBank);
+        assertEq(stack.operationsAdmin.getHandler(address(doc), TROPYKUS_INDEX), address(0), "no DOC Tropykus handler");
         assertEq(
-            stack.operationsAdmin.getTokenHandler(address(doc), TROPYKUS_INDEX), address(0), "no DOC Tropykus handler"
-        );
-        assertEq(
-            stack.operationsAdmin.getTokenHandler(address(usdrif), SOVRYN_INDEX), address(0), "no USDRIF Sovryn handler"
+            stack.operationsAdmin.getHandler(address(usdrif), SOVRYN_INDEX), address(0), "no USDRIF Sovryn handler"
         );
 
         assertTrue(stack.operationsAdmin.isSwapper(swapper));
@@ -164,12 +162,12 @@ contract FinalDeploymentTest is Test {
 
         assertEq(address(LayerBankDocHandlerMoc(payable(stack.docLayerBank)).i_aToken()), address(docAToken));
         assertEq(address(SovrynDocHandlerMoc(payable(stack.docSovryn)).i_iSusdToken()), address(iSusd));
-        assertEq(address(LayerBankErc20HandlerDex(payable(stack.usdrifLayerBank)).i_aToken()), address(usdrifAToken));
-        assertEq(address(LayerBankErc20HandlerDex(payable(stack.usdt0LayerBank)).i_aToken()), address(usdt0AToken));
+        assertEq(address(LayerBankHandlerDex(payable(stack.usdrifLayerBank)).i_aToken()), address(usdrifAToken));
+        assertEq(address(LayerBankHandlerDex(payable(stack.usdt0LayerBank)).i_aToken()), address(usdt0AToken));
 
-        assertEq(address(LayerBankErc20Handler(stack.docLayerBank).i_pool()), docAToken.POOL());
-        assertEq(address(LayerBankErc20Handler(stack.usdrifLayerBank).i_pool()), usdrifAToken.POOL());
-        assertEq(address(LayerBankErc20Handler(stack.usdt0LayerBank).i_pool()), usdt0AToken.POOL());
+        assertEq(address(LayerBankHandler(stack.docLayerBank).i_pool()), docAToken.POOL());
+        assertEq(address(LayerBankHandler(stack.usdrifLayerBank).i_pool()), usdrifAToken.POOL());
+        assertEq(address(LayerBankHandler(stack.usdt0LayerBank).i_pool()), usdt0AToken.POOL());
 
         _assertMocWiring(stack.docIdle);
         _assertMocWiring(stack.docLayerBank);
@@ -180,12 +178,12 @@ contract FinalDeploymentTest is Test {
         _assertDexWiring(stack.usdt0Idle);
         _assertDexWiring(stack.usdt0LayerBank);
 
-        IFeeHandler.FeeSettings memory usdt0Fees = IFeeHandler(stack.usdt0LayerBank).getFeeSettings();
+        IPurchaseFees.FeeSettings memory usdt0Fees = IPurchaseFees(stack.usdt0LayerBank).getFeeSettings();
         assertEq(usdt0Fees.feePurchaseLowerBound, USDT0_FEE_PURCHASE_LOWER_BOUND);
         assertEq(usdt0Fees.feePurchaseUpperBound, USDT0_FEE_PURCHASE_UPPER_BOUND);
         assertEq(usdt0Fees.maxFeeRate, MAX_FEE_RATE_PRODUCTION);
 
-        IFeeHandler.FeeSettings memory docFees = IFeeHandler(stack.docIdle).getFeeSettings();
+        IPurchaseFees.FeeSettings memory docFees = IPurchaseFees(stack.docIdle).getFeeSettings();
         assertEq(docFees.feePurchaseLowerBound, FEE_PURCHASE_LOWER_BOUND);
         assertEq(docFees.maxFeeRate, MAX_FEE_RATE_PRODUCTION);
 

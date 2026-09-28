@@ -165,9 +165,9 @@ contract R64BatchGasBenchmarkTest is Test {
                 else s_designI.setTokenMinPurchaseAmount(token, MIN_PURCHASE_AMOUNT);
                 if (d == 5) {
                     s_routeIdsF[s] =
-                        s_routeIdRegistry.assignTokenHandler(token, uint32(ROUTE_INDEX), address(s_handlers[d][s]));
+                        s_routeIdRegistry.assignHandler(token, uint32(ROUTE_INDEX), address(s_handlers[d][s]));
                 } else {
-                    s_operationsAdmin.assignTokenHandler(token, ROUTE_INDEX, address(s_handlers[d][s]));
+                    s_operationsAdmin.assignHandler(token, ROUTE_INDEX, address(s_handlers[d][s]));
                 }
             }
         }

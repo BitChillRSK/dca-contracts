@@ -15,9 +15,9 @@ import {reentrantCall} from "../utils/OzRevert.sol";
 ///      still see the outer guarded call complete.
 contract ReenteringDepositHandler is IERC165, ITokenHandler, IPurchaseRbtc {
     DcaManager private immutable i_manager;
-    /// @dev Reported so `OperationsAdmin.assignTokenHandler` can check it against the assigned token.
+    /// @dev Reported so `OperationsAdmin.assignHandler` can check it against the assigned token.
     IERC20 public immutable i_stableToken;
-    /// @dev Reported for `OperationsAdmin.assignTokenHandler`'s DcaManager check.
+    /// @dev Reported for `OperationsAdmin.assignHandler`'s DcaManager check.
     address public immutable i_dcaManager;
     address private s_token;
     uint64 private s_scheduleId;
@@ -103,7 +103,7 @@ contract R82TransientGuardGasTest is Test {
             new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, address(this));
         s_manager.setTokenMinPurchaseAmount(s_token, MIN_PURCHASE_AMOUNT);
         s_handler = new ReenteringDepositHandler(s_manager, s_token);
-        operationsAdmin.assignTokenHandler(s_token, ROUTE_INDEX, address(s_handler));
+        operationsAdmin.assignHandler(s_token, ROUTE_INDEX, address(s_handler));
 
         vm.prank(s_buyer);
         s_manager.createDcaSchedule(s_token, DEPOSIT_AMOUNT, PURCHASE_AMOUNT, PURCHASE_PERIOD, ROUTE_INDEX);

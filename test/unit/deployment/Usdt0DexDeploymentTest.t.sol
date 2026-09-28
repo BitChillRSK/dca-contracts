@@ -4,10 +4,10 @@ pragma solidity 0.8.36;
 import {Test} from "forge-std/Test.sol";
 import {OperationsAdmin} from "src/OperationsAdmin.sol";
 import {DcaManager} from "src/DcaManager.sol";
-import {LayerBankErc20HandlerDex} from "src/layerbank/LayerBankErc20HandlerDex.sol";
+import {LayerBankHandlerDex} from "src/layerbank/LayerBankHandlerDex.sol";
 import {DeployUsdrifHandler} from "script/DeployUsdrifHandler.s.sol";
 import {IPurchaseUniswap} from "src/interfaces/IPurchaseUniswap.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import {IWRBTC} from "src/interfaces/IWRBTC.sol";
 import {IUniswapV3SwapRouter} from "../../../src/interfaces/IUniswapV3SwapRouter.sol";
 import {ICoinPairPrice} from "src/interfaces/ICoinPairPrice.sol";
@@ -47,8 +47,8 @@ contract Usdt0DexDeploymentTest is Test {
 
     function test_feeSettingsForToken_liveUsdt0UsesSixDecimalBounds() public {
         DeployUsdrifHandler deployer = new DeployUsdrifHandler();
-        IFeeHandler.FeeSettings memory live = deployer.feeSettingsForToken(true);
-        IFeeHandler.FeeSettings memory local = deployer.feeSettingsForToken(false);
+        IPurchaseFees.FeeSettings memory live = deployer.feeSettingsForToken(true);
+        IPurchaseFees.FeeSettings memory local = deployer.feeSettingsForToken(false);
 
         assertEq(live.feePurchaseLowerBound, USDT0_FEE_PURCHASE_LOWER_BOUND);
         assertEq(live.feePurchaseUpperBound, USDT0_FEE_PURCHASE_UPPER_BOUND);
@@ -61,7 +61,7 @@ contract Usdt0DexDeploymentTest is Test {
         (OperationsAdmin operationsAdmin, DcaManager dcaManager, address handler, address usdt0) =
             _deploySixDecimalStack(address(deployer));
 
-        IFeeHandler.FeeSettings memory stored = IFeeHandler(handler).getFeeSettings();
+        IPurchaseFees.FeeSettings memory stored = IPurchaseFees(handler).getFeeSettings();
         assertEq(stored.feePurchaseLowerBound, 1000e6);
         assertEq(stored.feePurchaseUpperBound, 100_000e6);
         assertTrue(stored.feePurchaseLowerBound != 1000 ether);
@@ -74,9 +74,9 @@ contract Usdt0DexDeploymentTest is Test {
 
         assertEq(dcaManager.getTokenMinPurchaseAmount(usdt0), 25e6);
         assertTrue(dcaManager.getTokenMinPurchaseAmount(usdt0) != 25 ether);
-        assertEq(operationsAdmin.getTokenHandler(usdt0, LAYERBANK_INDEX), handler);
+        assertEq(operationsAdmin.getHandler(usdt0, LAYERBANK_INDEX), handler);
         assertTrue(IPurchaseUniswap(handler).isPurchasePathAllowed(keccak256(IPurchaseUniswap(handler).getSwapPath())));
-        assertEq(LayerBankErc20HandlerDex(payable(handler)).i_aToken().UNDERLYING_ASSET_ADDRESS(), usdt0);
+        assertEq(LayerBankHandlerDex(payable(handler)).i_aToken().UNDERLYING_ASSET_ADDRESS(), usdt0);
     }
 
     function test_maybeAssign_nonOwnerLeavesUsdt0MinUnset() public {
@@ -89,7 +89,7 @@ contract Usdt0DexDeploymentTest is Test {
         assertEq(
             dcaManager.getTokenMinPurchaseAmount(usdt0), 0, "non-owner add-on must not set the min; Safe runbook has to"
         );
-        assertEq(operationsAdmin.getTokenHandler(usdt0, LAYERBANK_INDEX), address(0));
+        assertEq(operationsAdmin.getHandler(usdt0, LAYERBANK_INDEX), address(0));
     }
 
     function _deploySixDecimalStack(address owner)
@@ -119,7 +119,7 @@ contract Usdt0DexDeploymentTest is Test {
         fees[0] = 3000;
 
         DeployUsdrifHandler deployer = new DeployUsdrifHandler();
-        handler = deployer.deployLayerBankErc20HandlerDex(
+        handler = deployer.deployLayerBankHandlerDex(
             DeployUsdrifHandler.DeployParams({
                 dcaManagerAddress: dcaManager,
                 tokenAddress: usdt0,

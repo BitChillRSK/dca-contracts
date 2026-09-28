@@ -12,7 +12,7 @@ import "../script/Constants.sol";
 // which is why this is 4 rather than colliding with `LAYERBANK_INDEX`.
 uint256 constant TROPYKUS_INDEX = 4;
 
-// A route index no lane ever registers, so `getTokenHandler` returns `address(0)` for every token
+// A route index no lane ever registers, so `getHandler` returns `address(0)` for every token
 // on it. Used to prove the withdraw-all pair loops skip an unassigned pair instead of reverting.
 uint256 constant UNREGISTERED_ROUTE_INDEX = 999;
 
@@ -37,7 +37,7 @@ uint256 constant DEX_MAX_SLIPPAGE_PERCENT = 0.015 ether; // 1.5%
 // is 1e18-denominated by construction.
 uint256 constant EXCHANGE_RATE_DECIMALS = 1e18; // Valid for DOC and USDRIF in both Tropykus and Sovryn
 
-// Fee-rate denominator mirrored by `TestsHelper`'s independent fee calculation. `FeeHandler`
+// Fee-rate denominator mirrored by `TestsHelper`'s independent fee calculation. `PurchaseFees`
 // declares its own copy on purpose: the test must not compute the expected fee from the same
 // symbol the implementation uses.
 uint256 constant BPS_DENOMINATOR = 10_000;

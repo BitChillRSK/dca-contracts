@@ -3,17 +3,17 @@ pragma solidity 0.8.36;
 
 import {LendingHandler} from "../LendingHandler.sol";
 import {ILayerBankAToken} from "./ILayerBankAToken.sol";
-import {ILayerBankErc20Handler} from "./ILayerBankErc20Handler.sol";
+import {ILayerBankHandler} from "./ILayerBankHandler.sol";
 import {ILayerBankPool} from "./ILayerBankPool.sol";
 
 /**
- * @title LayerBankErc20Handler
+ * @title LayerBankHandler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice LayerBank adapter: Aave-v3 Pool supply/withdraw. Share accounting lives on LendingHandler.
  * @dev Supply and withdraw go through the Pool. Shares are aToken scaled amounts; rebasing
  *      `balanceOf` is never mixed into their accounting.
  */
-abstract contract LayerBankErc20Handler is LendingHandler, ILayerBankErc20Handler {
+abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
@@ -50,10 +50,10 @@ abstract contract LayerBankErc20Handler is LendingHandler, ILayerBankErc20Handle
     {
         i_aToken = ILayerBankAToken(aTokenAddress);
         if (i_aToken.UNDERLYING_ASSET_ADDRESS() != stableTokenAddress) {
-            revert LayerBankErc20Handler__UnderlyingMismatch();
+            revert LayerBankHandler__UnderlyingMismatch();
         }
         address pool = i_aToken.POOL();
-        if (pool == address(0)) revert LayerBankErc20Handler__PoolNotSet();
+        if (pool == address(0)) revert LayerBankHandler__PoolNotSet();
         i_pool = ILayerBankPool(pool);
         _approveLendingSpender();
     }

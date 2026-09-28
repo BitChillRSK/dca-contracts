@@ -2,13 +2,13 @@
 pragma solidity 0.8.36;
 
 import {Test, console2, Vm} from "forge-std/Test.sol";
-import {FeeHandlerHarness} from "../../mocks/FeeHandlerHarness.sol";
+import {PurchaseFeesHarness} from "../../mocks/PurchaseFeesHarness.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
-import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "../../../src/interfaces/IPurchaseFees.sol";
 import {MockStablecoin} from "../../mocks/MockStablecoin.sol";
 
-contract FeeHandlerTest is Test {
-    FeeHandlerHarness feeHandler;
+contract PurchaseFeesTest is Test {
+    PurchaseFeesHarness feeHandler;
 
     address constant FEE_COLLECTOR = address(0xBEEF);
 
@@ -21,66 +21,66 @@ contract FeeHandlerTest is Test {
     uint112 constant UPPER_BOUND = 1000 ether; // above this gets min fee
 
     // Events
-    event FeeHandler__MinFeeRateSet(uint256 minFeeRate);
-    event FeeHandler__MaxFeeRateSet(uint256 maxFeeRate);
-    event FeeHandler__PurchaseLowerBoundSet(uint256 feePurchaseLowerBound);
-    event FeeHandler__PurchaseUpperBoundSet(uint256 feePurchaseUpperBound);
-    event FeeHandler__FeeCollectorAddressSet(address indexed feeCollector);
+    event PurchaseFees__MinFeeRateSet(uint256 minFeeRate);
+    event PurchaseFees__MaxFeeRateSet(uint256 maxFeeRate);
+    event PurchaseFees__PurchaseLowerBoundSet(uint256 feePurchaseLowerBound);
+    event PurchaseFees__PurchaseUpperBoundSet(uint256 feePurchaseUpperBound);
+    event PurchaseFees__FeeCollectorAddressSet(address indexed feeCollector);
     event Transfer(address indexed from, address indexed to, uint256 value);
 
     function setUp() public {
-        IFeeHandler.FeeSettings memory settings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory settings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE,
             feePurchaseLowerBound: LOWER_BOUND,
             feePurchaseUpperBound: UPPER_BOUND
         });
-        feeHandler = new FeeHandlerHarness(FEE_COLLECTOR, settings, address(this));
+        feeHandler = new PurchaseFeesHarness(FEE_COLLECTOR, settings, address(this));
     }
 
     function test_constructor_reverts_invalidRates() public {
-        IFeeHandler.FeeSettings memory settings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory settings = IPurchaseFees.FeeSettings({
             minFeeRate: 300, maxFeeRate: 200, feePurchaseLowerBound: LOWER_BOUND, feePurchaseUpperBound: UPPER_BOUND
         });
 
-        vm.expectRevert(IFeeHandler.FeeHandler__MinFeeRateCannotBeHigherThanMax.selector);
-        new FeeHandlerHarness(FEE_COLLECTOR, settings, address(this));
+        vm.expectRevert(IPurchaseFees.PurchaseFees__MinFeeRateCannotBeHigherThanMax.selector);
+        new PurchaseFeesHarness(FEE_COLLECTOR, settings, address(this));
     }
 
     function test_constructor_reverts_invalidBounds() public {
-        IFeeHandler.FeeSettings memory settings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory settings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE,
             feePurchaseLowerBound: UPPER_BOUND,
             feePurchaseUpperBound: LOWER_BOUND
         });
 
-        vm.expectRevert(IFeeHandler.FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound.selector);
-        new FeeHandlerHarness(FEE_COLLECTOR, settings, address(this));
+        vm.expectRevert(IPurchaseFees.PurchaseFees__FeeLowerBoundMustBeLowerThanUpperBound.selector);
+        new PurchaseFeesHarness(FEE_COLLECTOR, settings, address(this));
     }
 
     function test_constructor_reverts_zeroFeeCollector() public {
-        IFeeHandler.FeeSettings memory settings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory settings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE,
             feePurchaseLowerBound: LOWER_BOUND,
             feePurchaseUpperBound: UPPER_BOUND
         });
 
-        vm.expectRevert(IFeeHandler.FeeHandler__InvalidFeeCollector.selector);
-        new FeeHandlerHarness(address(0), settings, address(this));
+        vm.expectRevert(IPurchaseFees.PurchaseFees__InvalidFeeCollector.selector);
+        new PurchaseFeesHarness(address(0), settings, address(this));
     }
 
     function test_constructor_reverts_maxFeeRateAboveCap() public {
-        IFeeHandler.FeeSettings memory settings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory settings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: FEE_RATE_CAP + 1,
             feePurchaseLowerBound: LOWER_BOUND,
             feePurchaseUpperBound: UPPER_BOUND
         });
 
-        vm.expectRevert(IFeeHandler.FeeHandler__MaxFeeRateExceedsCap.selector);
-        new FeeHandlerHarness(FEE_COLLECTOR, settings, address(this));
+        vm.expectRevert(IPurchaseFees.PurchaseFees__MaxFeeRateExceedsCap.selector);
+        new PurchaseFeesHarness(FEE_COLLECTOR, settings, address(this));
     }
 
     function test_calculateFee_belowLowerBound() public {
@@ -121,12 +121,12 @@ contract FeeHandlerTest is Test {
     }
 
     function test_setFeeRateParams_reverts_invalidRates() public {
-        vm.expectRevert(IFeeHandler.FeeHandler__MinFeeRateCannotBeHigherThanMax.selector);
+        vm.expectRevert(IPurchaseFees.PurchaseFees__MinFeeRateCannotBeHigherThanMax.selector);
         feeHandler.setFeeRateParams(300, 200, LOWER_BOUND, UPPER_BOUND); // min > max
     }
 
     function test_setFeeRateParams_reverts_invalidBounds() public {
-        vm.expectRevert(IFeeHandler.FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound.selector);
+        vm.expectRevert(IPurchaseFees.PurchaseFees__FeeLowerBoundMustBeLowerThanUpperBound.selector);
         feeHandler.setFeeRateParams(MIN_FEE_RATE, MAX_FEE_RATE, 1000 ether, 500 ether); // lower > upper
     }
 
@@ -139,7 +139,7 @@ contract FeeHandlerTest is Test {
         // Should not revert
         feeHandler.setFeeRateParams(newMin, newMax, newLower, newUpper);
 
-        IFeeHandler.FeeSettings memory settings = feeHandler.getFeeSettings();
+        IPurchaseFees.FeeSettings memory settings = feeHandler.getFeeSettings();
         assertEq(settings.minFeeRate, newMin, "Min fee rate not set");
         assertEq(settings.maxFeeRate, newMax, "Max fee rate not set");
         assertEq(settings.feePurchaseLowerBound, newLower, "Lower bound not set");
@@ -152,7 +152,7 @@ contract FeeHandlerTest is Test {
 
         feeHandler.setFeeRateParams(newMin, newMax, LOWER_BOUND, UPPER_BOUND);
 
-        IFeeHandler.FeeSettings memory settings = feeHandler.getFeeSettings();
+        IPurchaseFees.FeeSettings memory settings = feeHandler.getFeeSettings();
         assertEq(settings.minFeeRate, newMin);
         assertEq(settings.maxFeeRate, newMax);
         assertEq(settings.feePurchaseLowerBound, LOWER_BOUND);
@@ -165,24 +165,24 @@ contract FeeHandlerTest is Test {
 
         feeHandler.setFeeRateParams(MIN_FEE_RATE, MAX_FEE_RATE, newLower, newUpper);
 
-        IFeeHandler.FeeSettings memory settings = feeHandler.getFeeSettings();
+        IPurchaseFees.FeeSettings memory settings = feeHandler.getFeeSettings();
         assertEq(settings.feePurchaseLowerBound, newLower);
         assertEq(settings.feePurchaseUpperBound, newUpper);
     }
 
     function test_setFeeRateParams_reverts_whenLowerGteUpper() public {
-        vm.expectRevert(IFeeHandler.FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound.selector);
+        vm.expectRevert(IPurchaseFees.PurchaseFees__FeeLowerBoundMustBeLowerThanUpperBound.selector);
         feeHandler.setFeeRateParams(MIN_FEE_RATE, MAX_FEE_RATE, UPPER_BOUND, UPPER_BOUND);
 
-        vm.expectRevert(IFeeHandler.FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound.selector);
+        vm.expectRevert(IPurchaseFees.PurchaseFees__FeeLowerBoundMustBeLowerThanUpperBound.selector);
         feeHandler.setFeeRateParams(MIN_FEE_RATE, MAX_FEE_RATE, UPPER_BOUND + 1, UPPER_BOUND);
     }
 
     function test_setFeeRateParams_reverts_whenUpperLteLower() public {
-        vm.expectRevert(IFeeHandler.FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound.selector);
+        vm.expectRevert(IPurchaseFees.PurchaseFees__FeeLowerBoundMustBeLowerThanUpperBound.selector);
         feeHandler.setFeeRateParams(MIN_FEE_RATE, MAX_FEE_RATE, LOWER_BOUND, LOWER_BOUND);
 
-        vm.expectRevert(IFeeHandler.FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound.selector);
+        vm.expectRevert(IPurchaseFees.PurchaseFees__FeeLowerBoundMustBeLowerThanUpperBound.selector);
         feeHandler.setFeeRateParams(MIN_FEE_RATE, MAX_FEE_RATE, LOWER_BOUND, LOWER_BOUND - 1);
     }
 
@@ -248,7 +248,7 @@ contract FeeHandlerTest is Test {
     }
 
     function test_setFeeRateParams_reverts_aboveCap() public {
-        vm.expectRevert(IFeeHandler.FeeHandler__MaxFeeRateExceedsCap.selector);
+        vm.expectRevert(IPurchaseFees.PurchaseFees__MaxFeeRateExceedsCap.selector);
         feeHandler.setFeeRateParams(MIN_FEE_RATE, FEE_RATE_CAP + 1, LOWER_BOUND, UPPER_BOUND);
     }
 
@@ -258,14 +258,14 @@ contract FeeHandlerTest is Test {
     }
 
     function test_setFeeCollectorAddress_reverts_zero() public {
-        vm.expectRevert(IFeeHandler.FeeHandler__InvalidFeeCollector.selector);
+        vm.expectRevert(IPurchaseFees.PurchaseFees__InvalidFeeCollector.selector);
         feeHandler.setFeeCollectorAddress(address(0));
     }
 
     function test_setFeeCollectorAddress_success() public {
         address newCollector = address(0xCAFE);
         vm.expectEmit(true, true, true, true);
-        emit FeeHandler__FeeCollectorAddressSet(newCollector);
+        emit PurchaseFees__FeeCollectorAddressSet(newCollector);
         feeHandler.setFeeCollectorAddress(newCollector);
         assertEq(feeHandler.getFeeCollectorAddress(), newCollector);
     }
@@ -298,7 +298,7 @@ contract FeeHandlerTest is Test {
     }
 
     function test_getFeeSettings_returnsStoredBand() public {
-        IFeeHandler.FeeSettings memory settings = feeHandler.getFeeSettings();
+        IPurchaseFees.FeeSettings memory settings = feeHandler.getFeeSettings();
         assertEq(settings.minFeeRate, MIN_FEE_RATE);
         assertEq(settings.maxFeeRate, MAX_FEE_RATE);
         assertEq(settings.feePurchaseLowerBound, LOWER_BOUND);
@@ -400,7 +400,7 @@ contract FeeHandlerTest is Test {
         uint256 newUpper = 2000 ether;
         feeHandler.setFeeRateParams(150, 300, newLower, newUpper);
 
-        IFeeHandler.FeeSettings memory settings = feeHandler.getFeeSettings();
+        IPurchaseFees.FeeSettings memory settings = feeHandler.getFeeSettings();
         assertEq(settings.minFeeRate, 150);
         assertEq(settings.maxFeeRate, 300);
         assertEq(settings.feePurchaseLowerBound, newLower);
@@ -413,7 +413,7 @@ contract FeeHandlerTest is Test {
     function test_setFeeRateParams_revertsOnUncastableRate() public {
         uint256 overflowing = uint256(type(uint16).max) + 1;
         // The cap check fires first: nothing above 500 can reach the uint16 write.
-        vm.expectRevert(IFeeHandler.FeeHandler__MaxFeeRateExceedsCap.selector);
+        vm.expectRevert(IPurchaseFees.PurchaseFees__MaxFeeRateExceedsCap.selector);
         feeHandler.setFeeRateParams(MIN_FEE_RATE, overflowing, LOWER_BOUND, UPPER_BOUND);
     }
 

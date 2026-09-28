@@ -3,10 +3,10 @@ pragma solidity 0.8.36;
 
 import {HandlerTestHarness} from "../HandlerTestHarness.t.sol";
 import {ITokenHandler} from "../../../../src/interfaces/ITokenHandler.sol";
-import {IFeeHandler} from "../../../../src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "../../../../src/interfaces/IPurchaseFees.sol";
 import {IPurchaseUniswap} from "../../../../src/interfaces/IPurchaseUniswap.sol";
-import {TropykusErc20Handler} from "../../../../src/tropykus-legacy/TropykusErc20Handler.sol";
-import {FeeHandler} from "../../../../src/FeeHandler.sol";
+import {TropykusHandler} from "../../../../src/tropykus-legacy/TropykusHandler.sol";
+import {PurchaseFees} from "../../../../src/PurchaseFees.sol";
 import {MockKdocToken} from "../../../mocks/MockKdocToken.sol";
 import {MockStablecoin} from "../../../mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -15,10 +15,10 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import "../../../Constants.sol";
 
 /**
- * @title TropykusErc20HandlerTest
- * @notice Unit tests for TropykusErc20Handler using shared test harness
+ * @title TropykusHandlerTest
+ * @notice Unit tests for TropykusHandler using shared test harness
  */
-contract TropykusErc20HandlerTest is HandlerTestHarness {
+contract TropykusHandlerTest is HandlerTestHarness {
     // Tropykus-specific contracts
     MockKdocToken public kToken;
     TropykusTestHandler public tropykusHandler;
@@ -28,7 +28,7 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
     //////////////////////////////////////////////////////////////*/
 
     function deployHandler() internal override returns (ITokenHandler) {
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE_TEST,
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -393,10 +393,10 @@ contract TropykusErc20HandlerTest is HandlerTestHarness {
 
 /**
  * @title TropykusTestHandler
- * @notice Concrete implementation of TropykusErc20Handler for testing
+ * @notice Concrete implementation of TropykusHandler for testing
  * @dev Implements abstract functions to make testing possible
  */
-contract TropykusTestHandler is TropykusErc20Handler, FeeHandler {
+contract TropykusTestHandler is TropykusHandler, PurchaseFees {
     constructor(
         address dcaManagerAddress,
         address stableTokenAddress,
@@ -405,8 +405,8 @@ contract TropykusTestHandler is TropykusErc20Handler, FeeHandler {
         FeeSettings memory feeSettings,
         address initialOwner
     )
-        TropykusErc20Handler(dcaManagerAddress, stableTokenAddress, kTokenAddress)
-        FeeHandler(feeCollector, feeSettings, initialOwner)
+        TropykusHandler(dcaManagerAddress, stableTokenAddress, kTokenAddress)
+        PurchaseFees(feeCollector, feeSettings, initialOwner)
     {}
 
     function testBatchRetrieveStablecoin(address[] calldata users, uint256[] calldata purchaseAmounts)

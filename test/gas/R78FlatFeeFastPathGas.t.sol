@@ -2,11 +2,11 @@
 pragma solidity 0.8.36;
 
 import {Test, console2} from "forge-std/Test.sol";
-import {FeeHandler} from "src/FeeHandler.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {PurchaseFees} from "src/PurchaseFees.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 
-contract R78OptimizedFeeHandlerGasHarness is FeeHandler {
-    constructor(IFeeHandler.FeeSettings memory feeSettings) FeeHandler(address(0xFEE), feeSettings, msg.sender) {}
+contract R78OptimizedPurchaseFeesGasHarness is PurchaseFees {
+    constructor(IPurchaseFees.FeeSettings memory feeSettings) PurchaseFees(address(0xFEE), feeSettings, msg.sender) {}
 
     function measure(uint256[] calldata purchaseAmounts)
         external
@@ -21,8 +21,8 @@ contract R78OptimizedFeeHandlerGasHarness is FeeHandler {
     }
 }
 
-contract R78BaselineFeeHandlerGasHarness is FeeHandler {
-    constructor(IFeeHandler.FeeSettings memory feeSettings) FeeHandler(address(0xFEE), feeSettings, msg.sender) {}
+contract R78BaselinePurchaseFeesGasHarness is PurchaseFees {
+    constructor(IPurchaseFees.FeeSettings memory feeSettings) PurchaseFees(address(0xFEE), feeSettings, msg.sender) {}
 
     function measure(uint256[] calldata purchaseAmounts)
         external
@@ -119,27 +119,27 @@ contract R78BaselineFeeHandlerGasHarness is FeeHandler {
 contract R78FlatFeeFastPathGasTest is Test {
     uint16 internal constant FLAT_FEE_RATE = 100;
 
-    R78OptimizedFeeHandlerGasHarness internal optimizedHarness;
-    R78OptimizedFeeHandlerGasHarness internal variableOptimizedHarness;
-    R78BaselineFeeHandlerGasHarness internal baselineHarness;
-    R78BaselineFeeHandlerGasHarness internal variableBaselineHarness;
+    R78OptimizedPurchaseFeesGasHarness internal optimizedHarness;
+    R78OptimizedPurchaseFeesGasHarness internal variableOptimizedHarness;
+    R78BaselinePurchaseFeesGasHarness internal baselineHarness;
+    R78BaselinePurchaseFeesGasHarness internal variableBaselineHarness;
 
     function setUp() public {
-        IFeeHandler.FeeSettings memory settings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory settings = IPurchaseFees.FeeSettings({
             minFeeRate: FLAT_FEE_RATE,
             maxFeeRate: FLAT_FEE_RATE,
             feePurchaseLowerBound: 1000 ether,
             feePurchaseUpperBound: 100_000 ether
         });
-        optimizedHarness = new R78OptimizedFeeHandlerGasHarness(settings);
-        baselineHarness = new R78BaselineFeeHandlerGasHarness(settings);
+        optimizedHarness = new R78OptimizedPurchaseFeesGasHarness(settings);
+        baselineHarness = new R78BaselinePurchaseFeesGasHarness(settings);
 
         settings.minFeeRate = 100;
         settings.maxFeeRate = 200;
         settings.feePurchaseLowerBound = 100 ether;
         settings.feePurchaseUpperBound = 1000 ether;
-        variableOptimizedHarness = new R78OptimizedFeeHandlerGasHarness(settings);
-        variableBaselineHarness = new R78BaselineFeeHandlerGasHarness(settings);
+        variableOptimizedHarness = new R78OptimizedPurchaseFeesGasHarness(settings);
+        variableBaselineHarness = new R78BaselinePurchaseFeesGasHarness(settings);
     }
 
     function test_gas_flatOneRowFastPath() public {
@@ -211,8 +211,8 @@ contract R78FlatFeeFastPathGasTest is Test {
     }
 
     function _assertEquivalent(
-        R78BaselineFeeHandlerGasHarness baseline,
-        R78OptimizedFeeHandlerGasHarness optimized,
+        R78BaselinePurchaseFeesGasHarness baseline,
+        R78OptimizedPurchaseFeesGasHarness optimized,
         uint256[] memory amounts
     ) private {
         (, uint256 baselineFee, uint256 baselineNet, bytes32 baselineHash) = baseline.measure(amounts);

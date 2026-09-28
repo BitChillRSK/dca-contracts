@@ -3,11 +3,11 @@ pragma solidity 0.8.36;
 
 import {Test, Vm} from "forge-std/Test.sol";
 import {PurchaseRbtc} from "src/PurchaseRbtc.sol";
-import {FeeHandler} from "src/FeeHandler.sol";
+import {PurchaseFees} from "src/PurchaseFees.sol";
 import {DcaManagerAccessControl} from "src/DcaManagerAccessControl.sol";
 import {StablecoinSource} from "src/StablecoinSource.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
@@ -47,7 +47,7 @@ contract PurchaseRbtcTest is Test {
 
     function setUp() public {
         token = new MockStablecoin(address(this));
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: FLAT_FEE_RATE,
             maxFeeRate: FLAT_FEE_RATE,
             feePurchaseLowerBound: 1000 ether,
@@ -596,7 +596,7 @@ contract PurchaseRbtcTest is Test {
     }
 
     /// @dev Test probe into private `s_usersAccumulatedRbtc` (slot 4 on this harness layout).
-    ///      Re-check with `forge inspect PurchaseRbtcHarness storage-layout` if FeeHandler packing moves.
+    ///      Re-check with `forge inspect PurchaseRbtcHarness storage-layout` if PurchaseFees packing moves.
     function _rawAccumulatedRbtc(address user) private view returns (uint256) {
         return uint256(vm.load(address(harness), keccak256(abi.encode(user, uint256(4)))));
     }
@@ -655,7 +655,7 @@ contract PurchaseRbtcHarness is PurchaseRbtc {
         FeeSettings memory feeSettings,
         address initialOwner
     )
-        PurchaseRbtc(FeeHandlerConfig({feeCollector: feeCollector, feeSettings: feeSettings}), initialOwner)
+        PurchaseRbtc(FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}), initialOwner)
         DcaManagerAccessControl(dcaManagerAddress)
         StablecoinSource(tokenAddress)
     {}

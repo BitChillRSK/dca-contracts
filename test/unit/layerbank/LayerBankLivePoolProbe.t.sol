@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {LayerBankDocHandlerMoc} from "src/layerbank/LayerBankDocHandlerMoc.sol";
 import {ILayerBankAToken} from "src/layerbank/ILayerBankAToken.sol";
 import {ILayerBankPool} from "src/layerbank/ILayerBankPool.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import "test/Constants.sol";
 
 /**
@@ -60,7 +60,7 @@ contract LayerBankLivePoolProbe is Test {
             ATOKEN,
             address(this),
             address(this),
-            IFeeHandler.FeeSettings({
+            IPurchaseFees.FeeSettings({
                 minFeeRate: MIN_FEE_RATE,
                 maxFeeRate: MAX_FEE_RATE_TEST,
                 feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,

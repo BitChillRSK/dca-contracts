@@ -3,22 +3,22 @@ pragma solidity 0.8.36;
 
 import {HandlerTestHarness} from "../HandlerTestHarness.t.sol";
 import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
-import {IdleErc20Handler} from "src/idle/IdleErc20Handler.sol";
-import {FeeHandler} from "src/FeeHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
+import {IdleHandler} from "src/idle/IdleHandler.sol";
+import {PurchaseFees} from "src/PurchaseFees.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "test/Constants.sol";
 
 /**
- * @title IdleErc20HandlerTest
+ * @title IdleHandlerTest
  * @notice Unit tests for idle (non-lending) deposit/withdraw accounting after the per-user ledger
  *         removal. Schedule liability lives in DcaManager; this handler only holds pooled cash.
  */
-contract IdleErc20HandlerTest is HandlerTestHarness {
+contract IdleHandlerTest is HandlerTestHarness {
     IdleTestHandler public idleHandler;
 
     function deployHandler() internal override returns (ITokenHandler) {
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE_TEST,
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -114,16 +114,16 @@ contract IdleErc20HandlerTest is HandlerTestHarness {
 
 /**
  * @title IdleTestHandler
- * @notice Concrete IdleErc20Handler for deposit/withdraw/take unit tests.
+ * @notice Concrete IdleHandler for deposit/withdraw/take unit tests.
  */
-contract IdleTestHandler is IdleErc20Handler, FeeHandler {
+contract IdleTestHandler is IdleHandler, PurchaseFees {
     constructor(
         address dcaManagerAddress,
         address stableTokenAddress,
         address feeCollector,
         FeeSettings memory feeSettings,
         address initialOwner
-    ) IdleErc20Handler(dcaManagerAddress, stableTokenAddress) FeeHandler(feeCollector, feeSettings, initialOwner) {}
+    ) IdleHandler(dcaManagerAddress, stableTokenAddress) PurchaseFees(feeCollector, feeSettings, initialOwner) {}
 
     function testBatchRetrieveStablecoin(address[] calldata users, uint256[] calldata purchaseAmounts)
         external

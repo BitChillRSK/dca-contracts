@@ -6,7 +6,7 @@ import {DcaManager} from "../../src/DcaManager.sol";
 import {OperationsAdmin} from "../../src/OperationsAdmin.sol";
 import {TropykusDocHandlerMoc} from "../../src/tropykus-legacy/TropykusDocHandlerMoc.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
-import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "../../src/interfaces/IPurchaseFees.sol";
 import {MockReentrantStablecoin, ITransferFromHook} from "../mocks/MockReentrantStablecoin.sol";
 import {MockKdocToken} from "../mocks/MockKdocToken.sol";
 import {MockMocProxy} from "../mocks/MockMocProxy.sol";
@@ -95,7 +95,7 @@ contract DepositSwapPopReentrancyTest is Test {
             address(kToken),
             FEE_COLLECTOR,
             address(mocProxy),
-            IFeeHandler.FeeSettings({
+            IPurchaseFees.FeeSettings({
                 minFeeRate: MIN_FEE_RATE,
                 maxFeeRate: MAX_FEE_RATE_TEST,
                 feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -105,7 +105,7 @@ contract DepositSwapPopReentrancyTest is Test {
         );
 
         vm.prank(OWNER);
-        operationsAdmin.assignTokenHandler(address(token), TROPYKUS_INDEX, address(handler));
+        operationsAdmin.assignHandler(address(token), TROPYKUS_INDEX, address(handler));
 
         user = new ReentrantDepositor(dcaManager, address(token));
         token.mint(address(user), 10_000 ether);

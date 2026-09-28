@@ -2,17 +2,17 @@
 pragma solidity 0.8.36;
 
 /**
- * @title ILayerBankErc20Handler
+ * @title ILayerBankHandler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice LayerBank-specific constructor errors. Share events and errors stay on `ILendingHandler`.
  */
-interface ILayerBankErc20Handler {
+interface ILayerBankHandler {
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
 
     /// @notice The aToken's `POOL()` returned the zero address.
-    error LayerBankErc20Handler__PoolNotSet();
+    error LayerBankHandler__PoolNotSet();
     /// @notice The aToken's underlying is not the stablecoin this handler was constructed with.
-    error LayerBankErc20Handler__UnderlyingMismatch();
+    error LayerBankHandler__UnderlyingMismatch();
 }

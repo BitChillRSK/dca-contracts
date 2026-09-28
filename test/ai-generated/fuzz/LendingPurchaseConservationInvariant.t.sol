@@ -4,7 +4,7 @@ pragma solidity 0.8.36;
 import {Test} from "forge-std/Test.sol";
 import {StdInvariant} from "forge-std/StdInvariant.sol";
 import {SovrynDocHandlerMoc} from "src/sovryn/SovrynDocHandlerMoc.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
@@ -139,7 +139,7 @@ contract LendingPurchaseConservationInvariantTest is StdInvariant, Test {
         }
 
         address predictedFuzzHandler = vm.computeCreateAddress(address(this), vm.getNonce(address(this)) + 1);
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: FLAT_FEE_RATE,
             maxFeeRate: FLAT_FEE_RATE,
             feePurchaseLowerBound: 1000 ether,

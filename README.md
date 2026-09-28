@@ -305,19 +305,19 @@ Live owner and fee-collector addresses live in `script/Constants.sol`:
 
 **Mainnet.** Broadcast from an EOA, **not** the Safe. The script:
 
-1. Constructs `OperationsAdmin`, `DcaManager`, and every handler with the EOA as owner (so `registerRoute` / `assignTokenHandler` succeed in the same broadcast).
+1. Constructs `OperationsAdmin`, `DcaManager`, and every handler with the EOA as owner (so `registerRoute` / `assignHandler` succeed in the same broadcast).
 2. Calls `transferOwnership(MAINNET_OWNER)` on each of those contracts. That only *proposes*.
 
 Then, from the Safe UI (one call per contract), send `acceptOwnership()`. Until those accepts land, the deploying EOA can still govern and can propose a different address if the Safe hex was wrong. After accept, the Safe owns `OperationsAdmin`, `DcaManager`, and every handler.
 
 Add-on scripts (`DeployIdleHandler`, `DeployLayerBankHandler`, `DeployUsdrifHandler`) revert if `pendingOwner` is set on `OperationsAdmin` or `DcaManager` — wait until the Safe has accepted, then run them.
 
-**USDT0 / USDRIF add-on (`DeployUsdrifHandler`).** This is the live add-on path against an existing `DcaManager`. On mainnet the Safe already owns `OperationsAdmin`, so the Foundry EOA hits the non-owner branch: it deploys the handler (constructor self-allowlists the initial path), logs, and returns **without** `assignTokenHandler` and **without** `setTokenMinPurchaseAmount`. That is fail-closed until the Safe assigns the handler **and** sets the per-token min (there is no protocol-wide default). After the script, from the Safe, **in this order**:
+**USDT0 / USDRIF add-on (`DeployUsdrifHandler`).** This is the live add-on path against an existing `DcaManager`. On mainnet the Safe already owns `OperationsAdmin`, so the Foundry EOA hits the non-owner branch: it deploys the handler (constructor self-allowlists the initial path), logs, and returns **without** `assignHandler` and **without** `setTokenMinPurchaseAmount`. That is fail-closed until the Safe assigns the handler **and** sets the per-token min (there is no protocol-wide default). After the script, from the Safe, **in this order**:
 
 1. `operationsAdmin.registerRoute(1, true)` **only if** `getRouteClass(1)` is still `Unregistered`. A second `registerRoute` reverts `RouteAlreadyRegistered` (LayerBank is already on the dex map after the USDRIF add-on).
 2. Read `handler.getSwapPath()` and verify it exactly matches the intended stablecoin / intermediate pools / WRBTC route. The constructor already allowlisted that path; this is the human checkpoint before assignment.
 3. `dcaManager.setTokenMinPurchaseAmount(token, min)` — USDRIF `25 ether`, USDT0 `25000000` (`25e6`). Do not skip this step.
-4. `operationsAdmin.assignTokenHandler(token, 1, handler)`. Set the min first so the token is never routable while create still reverts `TokenMinPurchaseAmountNotSet`.
+4. `operationsAdmin.assignHandler(token, 1, handler)`. Set the min first so the token is never routable while create still reverts `TokenMinPurchaseAmountNotSet`.
 
 **Compromised swapper.** Revoke the swapper key **before** revoking any path. A still-allowlisted compromised key can front-run each `setPurchasePathAllowed(..., false)` by re-activating that path. Order is mandatory: `revokeSwapper` → handler owner or remaining swapper `setPurchasePath` to the preferred approved path if needed → then handler owner revokes obsolete paths. Swapper revocation alone is not a routing kill switch.
 
@@ -335,7 +335,7 @@ Later ownership changes (new Safe, recovered wallet) are the same two steps: cur
 The relaunch deployment profile is **`[profile.deploy]`** (`FOUNDRY_PROFILE=deploy`): solc `0.8.36`,
 Cancun, `optimizer = true`, `optimizer_runs = 200`, and — unlike every other profile in this repo —
 `via_ir = true`, compiled across `src/`, `test/`, and `script/` with exactly one file excluded
-(`test/ai-generated/unit/layerbank/LayerBankErc20HandlerDexTest.t.sol`; see `foundry.toml`). Every
+(`test/ai-generated/unit/layerbank/LayerBankHandlerDexTest.t.sol`; see `foundry.toml`). Every
 broadcast command above **requires**
 `FOUNDRY_PROFILE=deploy` in its environment — `forge script` reads compiler settings from whichever
 profile is active, and without it a broadcast silently compiles and deploys the `[profile.default]`

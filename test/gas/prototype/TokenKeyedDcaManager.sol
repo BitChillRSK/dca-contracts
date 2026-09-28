@@ -254,7 +254,7 @@ contract TokenKeyedDcaManager is ReentrancyGuard {
     }
 
     function _handler(address token, uint256 routeIndex) private view returns (ITokenHandler) {
-        address tokenHandlerAddress = i_operationsAdmin.getTokenHandler(token, routeIndex);
+        address tokenHandlerAddress = i_operationsAdmin.getHandler(token, routeIndex);
         if (tokenHandlerAddress == address(0)) revert Prototype__TokenNotAccepted();
         return ITokenHandler(tokenHandlerAddress);
     }

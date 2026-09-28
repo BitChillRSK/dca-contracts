@@ -3,7 +3,7 @@ pragma solidity 0.8.36;
 
 import {IPurchaseRbtc} from "./interfaces/IPurchaseRbtc.sol";
 import {DcaManagerAccessControl} from "./DcaManagerAccessControl.sol";
-import {FeeHandler} from "./FeeHandler.sol";
+import {PurchaseFees} from "./PurchaseFees.sol";
 import {StablecoinSource} from "./StablecoinSource.sol";
 
 /**
@@ -11,7 +11,7 @@ import {StablecoinSource} from "./StablecoinSource.sol";
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Shared rBTC purchase pipeline, accumulated-balance accounting, and signer withdrawals.
  */
-abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessControl, StablecoinSource {
+abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessControl, StablecoinSource {
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
@@ -29,11 +29,11 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, FeeHandler, DcaManagerAccessCon
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @param feeHandlerConfig Collector and interpolated fee settings.
+     * @param feeConfig Collector and interpolated fee settings.
      * @param initialOwner Address that owns this handler immediately after deploy.
      */
-    constructor(FeeHandlerConfig memory feeHandlerConfig, address initialOwner)
-        FeeHandler(feeHandlerConfig.feeCollector, feeHandlerConfig.feeSettings, initialOwner)
+    constructor(FeeConfig memory feeConfig, address initialOwner)
+        PurchaseFees(feeConfig.feeCollector, feeConfig.feeSettings, initialOwner)
     {}
 
     /*//////////////////////////////////////////////////////////////

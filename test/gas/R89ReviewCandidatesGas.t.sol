@@ -202,12 +202,12 @@ contract R89ReviewCandidatesGasTest is DcaDappTest {
     }
 
     /*//////////////////////////////////////////////////////////////
-                      ITEM 11: assignTokenHandler
+                      ITEM 11: assignHandler
     //////////////////////////////////////////////////////////////*/
 
     /// @dev One read of the route's class (was two: the registration check and the lending/idle split).
     ///      A fresh registry takes the lane's real handler, so the pin runs on every lane.
-    function test_assignTokenHandler_readsRouteClassOnce() public {
+    function test_assignHandler_readsRouteClassOnce() public {
         OperationsAdmin registry = new OperationsAdmin(address(this));
         if (s_routeIndex != IDLE_INDEX) {
             registry.registerRoute(
@@ -221,13 +221,13 @@ contract R89ReviewCandidatesGasTest is DcaDappTest {
 
         vm.startStateDiffRecording();
         uint256 gasBefore = gasleft();
-        registry.assignTokenHandler(address(stablecoin), s_routeIndex, address(stablecoinHandler));
+        registry.assignHandler(address(stablecoin), s_routeIndex, address(stablecoinHandler));
         uint256 gasUsed = gasBefore - gasleft();
         Vm.AccountAccess[] memory accesses = vm.stopAndReturnStateDiff();
 
         bytes32 routeClassSlot = keccak256(abi.encode(s_routeIndex, ROUTE_CLASS_SLOT));
         uint256 routeClassReads = _reads(accesses, address(registry), routeClassSlot);
-        console2.log("assignTokenHandler: gas", gasUsed);
+        console2.log("assignHandler: gas", gasUsed);
         console2.log("  route-class reads", routeClassReads);
         assertEq(routeClassReads, 1, "route class re-read");
     }

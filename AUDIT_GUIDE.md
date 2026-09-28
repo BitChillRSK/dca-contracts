@@ -12,8 +12,8 @@ The canonical deployment is `DeployFinal` under `FOUNDRY_PROFILE=deploy`. It cre
 | Stablecoin | Route 0 (idle) | Route 1 (LayerBank) | Route 2 (Sovryn) | Purchase venue |
 |---|---|---|---|---|
 | DOC | `IdleDocHandlerMoc` | `LayerBankDocHandlerMoc` | `SovrynDocHandlerMoc` | Money on Chain |
-| USDRIF | `IdleErc20HandlerDex` | `LayerBankErc20HandlerDex` | — | Uniswap V3 |
-| USDT0 | `IdleErc20HandlerDex` | `LayerBankErc20HandlerDex` | — | Uniswap V3 |
+| USDRIF | `IdleHandlerDex` | `LayerBankHandlerDex` | — | Uniswap V3 |
+| USDT0 | `IdleHandlerDex` | `LayerBankHandlerDex` | — | Uniswap V3 |
 
 `src/tropykus-legacy/` is retained for local and pinned-fork adapter coverage. No live deployment
 script constructs or registers it, and route index 4 is intentionally unused. Lane and add-on scripts

@@ -2,17 +2,17 @@
 pragma solidity 0.8.36;
 
 import {PurchaseUniswap} from "../PurchaseUniswap.sol";
-import {IdleErc20Handler} from "./IdleErc20Handler.sol";
+import {IdleHandler} from "./IdleHandler.sol";
 
 /**
- * @title IdleErc20HandlerDex
+ * @title IdleHandlerDex
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Token-agnostic idle stablecoin + Uniswap V3 purchase handler.
  * @dev Constructor-only leaf. Only its immutable DcaManager moves principal, buys, or withdraws rBTC;
  *      the owner controls fees, oracle, path allowlist, and floor. Holds a standing max stablecoin
  *      approval to SwapRouter02, restorable by anyone.
  */
-contract IdleErc20HandlerDex is IdleErc20Handler, PurchaseUniswap {
+contract IdleHandlerDex is IdleHandler, PurchaseUniswap {
     /**
      * @param dcaManagerAddress The DcaManager allowed to call this handler.
      * @param stableTokenAddress The stablecoin this handler holds idle.
@@ -33,10 +33,10 @@ contract IdleErc20HandlerDex is IdleErc20Handler, PurchaseUniswap {
         uint256 amountOutMinimumSafetyCheck,
         address initialOwner
     )
-        IdleErc20Handler(dcaManagerAddress, stableTokenAddress)
+        IdleHandler(dcaManagerAddress, stableTokenAddress)
         PurchaseUniswap(
             uniswapSettings,
-            FeeHandlerConfig({feeCollector: feeCollector, feeSettings: feeSettings}),
+            FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}),
             amountOutMinimumPercent,
             amountOutMinimumSafetyCheck,
             initialOwner

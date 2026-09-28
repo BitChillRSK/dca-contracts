@@ -4,7 +4,7 @@ pragma solidity 0.8.36;
 
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
-import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "../../src/interfaces/IPurchaseFees.sol";
 import {IdleDocHandlerMoc} from "../../src/idle/IdleDocHandlerMoc.sol";
 import {MockMocProxy} from "../mocks/MockMocProxy.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
@@ -224,13 +224,13 @@ contract SchedulePackingTest is DcaDappTest {
             address(stablecoin),
             FEE_COLLECTOR,
             address(extraMoc),
-            IFeeHandler(address(stablecoinHandler)).getFeeSettings(),
+            IPurchaseFees(address(stablecoinHandler)).getFeeSettings(),
             OWNER
         );
 
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(maxRoute, false);
-        operationsAdmin.assignTokenHandler(address(stablecoin), maxRoute, address(extraHandler));
+        operationsAdmin.assignHandler(address(stablecoin), maxRoute, address(extraHandler));
         vm.stopPrank();
 
         vm.startPrank(USER);

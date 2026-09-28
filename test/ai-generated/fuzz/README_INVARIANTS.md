@@ -8,7 +8,7 @@ new suite `…InvariantTest` is enough to pick it up with no Makefile change.
 
 | Contract | What it targets | What it deliberately does **not** cover |
 |---|---|---|
-| `InvariantTest` | Production `DcaManager` + production lending adapters (`TropykusErc20Handler` / `SovrynErc20Handler`) behind **purchase wrappers** that reimplement `batchBuyRbtc` | Production `PurchaseRbtc` allocation, rBTC solvency, MoC / Uniswap venues |
+| `InvariantTest` | Production `DcaManager` + production lending adapters (`TropykusHandler` / `SovrynHandler`) behind **purchase wrappers** that reimplement `batchBuyRbtc` | Production `PurchaseRbtc` allocation, rBTC solvency, MoC / Uniswap venues |
 | `PurchaseRbtcConservationInvariantTest` | Production `PurchaseRbtc` through `PurchaseRbtcHarness` (venue + retrieval overridden) | Lending share books, `DcaManager`, a real venue |
 | `LendingPurchaseConservationInvariantTest` | Production `SovrynDocHandlerMoc` (lending + `PurchaseMoc` / `PurchaseRbtc`) with `MockIsusdToken` + `MockMocProxy` | Full `DcaManager` schedule lifecycle (the fuzz actor is the `dcaManager`) |
 

@@ -172,8 +172,8 @@ contract ComparePurchaseMethods is Test {
         deployedContracts.adOpsMoc.registerRoute(SOVRYN_INDEX, true);
         deployedContracts.adOpsUni.registerRoute(TROPYKUS_INDEX, true);
         deployedContracts.adOpsUni.registerRoute(SOVRYN_INDEX, true);
-        deployedContracts.adOpsMoc.assignTokenHandler(address(stablecoin), routeIndex, handlerMoc);
-        deployedContracts.adOpsUni.assignTokenHandler(address(stablecoin), routeIndex, handlerUni);
+        deployedContracts.adOpsMoc.assignHandler(address(stablecoin), routeIndex, handlerMoc);
+        deployedContracts.adOpsUni.assignHandler(address(stablecoin), routeIndex, handlerUni);
         vm.stopPrank();
 
         // Create initial DCA schedules for each user

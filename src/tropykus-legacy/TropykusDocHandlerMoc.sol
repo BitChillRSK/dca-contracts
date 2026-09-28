@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
-import {TropykusErc20Handler} from "./TropykusErc20Handler.sol";
+import {TropykusHandler} from "./TropykusHandler.sol";
 import {PurchaseMoc} from "../PurchaseMoc.sol";
 
 /**
@@ -13,7 +13,7 @@ import {PurchaseMoc} from "../PurchaseMoc.sol";
  *      route has no pool-slippage floor.
  *      Holds a standing max DOC approval to the kToken, restorable by anyone.
  */
-contract TropykusDocHandlerMoc is TropykusErc20Handler, PurchaseMoc {
+contract TropykusDocHandlerMoc is TropykusHandler, PurchaseMoc {
     /**
      * @param dcaManagerAddress The DcaManager allowed to call this handler.
      * @param docTokenAddress Dollar On Chain token.
@@ -32,9 +32,7 @@ contract TropykusDocHandlerMoc is TropykusErc20Handler, PurchaseMoc {
         FeeSettings memory feeSettings,
         address initialOwner
     )
-        TropykusErc20Handler(dcaManagerAddress, docTokenAddress, kDocTokenAddress)
-        PurchaseMoc(
-            mocProxyAddress, FeeHandlerConfig({feeCollector: feeCollector, feeSettings: feeSettings}), initialOwner
-        )
+        TropykusHandler(dcaManagerAddress, docTokenAddress, kDocTokenAddress)
+        PurchaseMoc(mocProxyAddress, FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}), initialOwner)
     {}
 }

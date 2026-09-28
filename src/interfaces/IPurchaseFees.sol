@@ -2,12 +2,12 @@
 pragma solidity 0.8.36;
 
 /**
- * @title IFeeHandler
+ * @title IPurchaseFees
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Purchase-fee configuration: the rate bounds, the purchase amounts they interpolate
  *         between, and the address fees are paid to.
  */
-interface IFeeHandler {
+interface IPurchaseFees {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
     //////////////////////////////////////////////////////////////*/
@@ -30,7 +30,7 @@ interface IFeeHandler {
      *      legacy-codegen stack limit. Ownership stays a separate `initialOwner` argument — it is
      *      contract-level authority and may govern settings beyond fees.
      */
-    struct FeeHandlerConfig {
+    struct FeeConfig {
         address feeCollector;
         FeeSettings feeSettings;
     }
@@ -39,28 +39,28 @@ interface IFeeHandler {
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
     /// @notice Owner set the minimum fee rate.
-    event FeeHandler__MinFeeRateSet(uint256 minFeeRate);
+    event PurchaseFees__MinFeeRateSet(uint256 minFeeRate);
     /// @notice Owner set the maximum fee rate.
-    event FeeHandler__MaxFeeRateSet(uint256 maxFeeRate);
+    event PurchaseFees__MaxFeeRateSet(uint256 maxFeeRate);
     /// @notice Owner set the purchase amount below which the maximum fee rate applies.
-    event FeeHandler__PurchaseLowerBoundSet(uint256 feePurchaseLowerBound);
+    event PurchaseFees__PurchaseLowerBoundSet(uint256 feePurchaseLowerBound);
     /// @notice Owner set the purchase amount above which the minimum fee rate applies.
-    event FeeHandler__PurchaseUpperBoundSet(uint256 feePurchaseUpperBound);
+    event PurchaseFees__PurchaseUpperBoundSet(uint256 feePurchaseUpperBound);
     /// @notice Owner set the address that receives purchase fees.
-    event FeeHandler__FeeCollectorAddressSet(address indexed feeCollector);
+    event PurchaseFees__FeeCollectorAddressSet(address indexed feeCollector);
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
 
     /// @notice `minFeeRate` cannot exceed `maxFeeRate`.
-    error FeeHandler__MinFeeRateCannotBeHigherThanMax();
+    error PurchaseFees__MinFeeRateCannotBeHigherThanMax();
     /// @notice `feePurchaseLowerBound` must be strictly less than `feePurchaseUpperBound`.
-    error FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound();
+    error PurchaseFees__FeeLowerBoundMustBeLowerThanUpperBound();
     /// @notice Fee collector cannot be the zero address.
-    error FeeHandler__InvalidFeeCollector();
+    error PurchaseFees__InvalidFeeCollector();
     /// @notice A fee rate exceeds the 5% cap.
-    error FeeHandler__MaxFeeRateExceedsCap();
+    error PurchaseFees__MaxFeeRateExceedsCap();
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS

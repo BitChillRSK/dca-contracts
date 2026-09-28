@@ -11,7 +11,7 @@ import {IdleDocHandlerMoc} from "../src/idle/IdleDocHandlerMoc.sol";
 import {LayerBankDocHandlerMoc} from "../src/layerbank/LayerBankDocHandlerMoc.sol";
 import {OperationsAdmin} from "../src/OperationsAdmin.sol";
 import {ICoinPairPrice} from "../src/interfaces/ICoinPairPrice.sol";
-import {IFeeHandler} from "../src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "../src/interfaces/IPurchaseFees.sol";
 import {console} from "forge-std/Test.sol";
 import "./Constants.sol";
 
@@ -27,7 +27,7 @@ contract DeployMocSwaps is DeployBase {
     }
 
     function deployDocHandlerMoc(DeployParams memory params) public returns (address) {
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: getMaxFeeRate(),
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -161,7 +161,7 @@ contract DeployMocSwaps is DeployBase {
             console.log("Deploying production handlers (idle / LayerBank / Sovryn)");
 
             // Owner is the Foundry broadcaster for this transaction so `registerRoute` /
-            // `assignTokenHandler` succeed. Mainnet proposes MAINNET_OWNER (the Safe) after setup.
+            // `assignHandler` succeed. Mainnet proposes MAINNET_OWNER (the Safe) after setup.
             operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
             operationsAdmin.registerRoute(SOVRYN_INDEX, true);
 
@@ -176,7 +176,7 @@ contract DeployMocSwaps is DeployBase {
                 })
             );
             console.log("Idle handler deployed at:", idleHandler);
-            operationsAdmin.assignTokenHandler(docTokenAddress, IDLE_INDEX, idleHandler);
+            operationsAdmin.assignHandler(docTokenAddress, IDLE_INDEX, idleHandler);
             _proposeFinalOwner(idleHandler);
             if (protocol == Protocol.NONE) {
                 docHandlerMocAddress = idleHandler;
@@ -200,7 +200,7 @@ contract DeployMocSwaps is DeployBase {
                     })
                 );
                 console.log("LayerBank handler deployed at:", layerbankHandler);
-                operationsAdmin.assignTokenHandler(docTokenAddress, LAYERBANK_INDEX, layerbankHandler);
+                operationsAdmin.assignHandler(docTokenAddress, LAYERBANK_INDEX, layerbankHandler);
                 _proposeFinalOwner(layerbankHandler);
                 if (protocol == Protocol.LAYERBANK) {
                     docHandlerMocAddress = layerbankHandler;
@@ -226,7 +226,7 @@ contract DeployMocSwaps is DeployBase {
                         })
                     );
                     console.log("Sovryn handler deployed at:", sovrynHandler);
-                    operationsAdmin.assignTokenHandler(docTokenAddress, SOVRYN_INDEX, sovrynHandler);
+                    operationsAdmin.assignHandler(docTokenAddress, SOVRYN_INDEX, sovrynHandler);
                     _proposeFinalOwner(sovrynHandler);
                     if (protocol == Protocol.SOVRYN) {
                         docHandlerMocAddress = sovrynHandler;

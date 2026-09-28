@@ -8,7 +8,7 @@ import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockIsusdToken} from "test/mocks/MockIsusdToken.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import "test/Constants.sol";
 import {NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
 
@@ -59,7 +59,7 @@ contract BatchTailScheduleTest is Test {
         mocProxy = new MockMocProxy(address(docToken));
         vm.deal(address(mocProxy), 1000 ether);
 
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE_TEST,
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,

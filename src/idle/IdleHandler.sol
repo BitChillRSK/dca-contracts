@@ -4,7 +4,7 @@ pragma solidity 0.8.36;
 import {TokenHandler} from "../TokenHandler.sol";
 
 /**
- * @title IdleErc20Handler
+ * @title IdleHandler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Base for the handlers that hold their stablecoin instead of lending it; each leaf adds a
  *         purchase route.
@@ -14,7 +14,7 @@ import {TokenHandler} from "../TokenHandler.sol";
  *      another user's pooled cash is refused only by schedule ownership and the manager's balance
  *      checks, not by a shadow book here.
  */
-abstract contract IdleErc20Handler is TokenHandler {
+abstract contract IdleHandler is TokenHandler {
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/

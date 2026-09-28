@@ -112,7 +112,7 @@ contract DepositsPauseTest is DcaDappTest {
         DummyTokenHandler otherTokenStub = new DummyTokenHandler(otherToken, address(dcaManager));
 
         vm.startPrank(OWNER);
-        operationsAdmin.assignTokenHandler(otherToken, IDLE_INDEX, address(otherTokenStub));
+        operationsAdmin.assignHandler(otherToken, IDLE_INDEX, address(otherTokenStub));
         operationsAdmin.setDepositsPaused(otherToken, IDLE_INDEX, true);
         vm.stopPrank();
 
@@ -126,7 +126,7 @@ contract DepositsPauseTest is DcaDappTest {
 
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(SECOND_IDLE_INDEX, false);
-        operationsAdmin.assignTokenHandler(address(stablecoin), SECOND_IDLE_INDEX, address(otherRouteStub));
+        operationsAdmin.assignHandler(address(stablecoin), SECOND_IDLE_INDEX, address(otherRouteStub));
         operationsAdmin.setDepositsPaused(address(stablecoin), SECOND_IDLE_INDEX, true);
         vm.stopPrank();
 

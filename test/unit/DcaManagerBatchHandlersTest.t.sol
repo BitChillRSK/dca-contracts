@@ -53,7 +53,7 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         }
 
         vm.prank(OWNER);
-        operationsAdmin.assignTokenHandler(address(stablecoin), secondRouteIndex, secondHandler);
+        operationsAdmin.assignHandler(address(stablecoin), secondRouteIndex, secondHandler);
 
         // The local MoC mock pulls DOC from each handler.
         vm.prank(secondHandler);

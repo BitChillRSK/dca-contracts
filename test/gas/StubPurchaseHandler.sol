@@ -15,7 +15,7 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
  *      transfer and lending-share costs identical on both sides. `deposits` records what the manager
  *      asked for so a benchmark can assert the manager actually ran the deposit path.
  *
- *      Passes `OperationsAdmin.assignTokenHandler`'s ERC-165 gate for an idle route: it answers
+ *      Passes `OperationsAdmin.assignHandler`'s ERC-165 gate for an idle route: it answers
  *      `ITokenHandler` and must not answer `ILendingHandler`, which idle routes reject. It also reports
  *      its token and `i_dcaManager`, which that function checks.
  */

@@ -7,13 +7,13 @@ import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
 import {IERC165} from "lib/forge-std/src/interfaces/IERC165.sol";
-import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "../../src/interfaces/IPurchaseFees.sol";
 import "../Constants.sol";
 
 contract StablecoinHandlerTest is DcaDappTest {
     // Events
     event TokenHandler__MinPurchaseAmountModified(uint256 indexed newMinPurchaseAmount);
-    event FeeHandler__FeeCollectorAddressSet(address indexed feeCollector);
+    event PurchaseFees__FeeCollectorAddressSet(address indexed feeCollector);
 
     function setUp() public override {
         super.setUp();
@@ -29,8 +29,8 @@ contract StablecoinHandlerTest is DcaDappTest {
 
     function testStablecoinHandlerSetFeeRateParams() external {
         vm.prank(OWNER);
-        IFeeHandler(address(stablecoinHandler)).setFeeRateParams(100, 200, 1000 ether, 100000 ether);
-        IFeeHandler.FeeSettings memory settings = IFeeHandler(address(stablecoinHandler)).getFeeSettings();
+        IPurchaseFees(address(stablecoinHandler)).setFeeRateParams(100, 200, 1000 ether, 100000 ether);
+        IPurchaseFees.FeeSettings memory settings = IPurchaseFees(address(stablecoinHandler)).getFeeSettings();
         assertEq(settings.minFeeRate, 100);
         assertEq(settings.maxFeeRate, 200);
         assertEq(settings.feePurchaseLowerBound, 1000 ether);
@@ -41,8 +41,8 @@ contract StablecoinHandlerTest is DcaDappTest {
         address newFeeCollector = makeAddr("newFeeCollector");
         vm.prank(OWNER);
         vm.expectEmit(true, true, true, true);
-        emit FeeHandler__FeeCollectorAddressSet(newFeeCollector);
-        IFeeHandler(address(stablecoinHandler)).setFeeCollectorAddress(newFeeCollector);
-        assertEq(IFeeHandler(address(stablecoinHandler)).getFeeCollectorAddress(), newFeeCollector);
+        emit PurchaseFees__FeeCollectorAddressSet(newFeeCollector);
+        IPurchaseFees(address(stablecoinHandler)).setFeeCollectorAddress(newFeeCollector);
+        assertEq(IPurchaseFees(address(stablecoinHandler)).getFeeCollectorAddress(), newFeeCollector);
     }
 }

@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
-import {IFeeHandler} from "./interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "./interfaces/IPurchaseFees.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {BitChillOwnable} from "./BitChillOwnable.sol";
 
 /**
- * @title FeeHandler
+ * @title PurchaseFees
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Interpolates a purchase fee between the configured rate bounds and pays it to the
  *         collector. Owned by the purchase branch (`PurchaseRbtc` and its MoC / Uniswap leaves).
  */
-abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
+abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
     using SafeERC20 for IERC20;
     using SafeCast for uint256;
 
@@ -44,7 +44,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
     constructor(address feeCollector, FeeSettings memory feeSettings, address initialOwner)
         BitChillOwnable(initialOwner)
     {
-        if (feeCollector == address(0)) revert FeeHandler__InvalidFeeCollector();
+        if (feeCollector == address(0)) revert PurchaseFees__InvalidFeeCollector();
         _validateFeeSettings(
             feeSettings.minFeeRate,
             feeSettings.maxFeeRate,
@@ -63,7 +63,7 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
                            EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc IFeeHandler
+    /// @inheritdoc IPurchaseFees
     function setFeeRateParams(
         uint256 minFeeRate,
         uint256 maxFeeRate,
@@ -74,39 +74,39 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
 
         if (s_minFeeRate != minFeeRate) {
             s_minFeeRate = minFeeRate.toUint16();
-            emit FeeHandler__MinFeeRateSet(minFeeRate);
+            emit PurchaseFees__MinFeeRateSet(minFeeRate);
         }
         if (s_maxFeeRate != maxFeeRate) {
             s_maxFeeRate = maxFeeRate.toUint16();
-            emit FeeHandler__MaxFeeRateSet(maxFeeRate);
+            emit PurchaseFees__MaxFeeRateSet(maxFeeRate);
         }
         if (s_feePurchaseLowerBound != feePurchaseLowerBound) {
             s_feePurchaseLowerBound = feePurchaseLowerBound.toUint112();
-            emit FeeHandler__PurchaseLowerBoundSet(feePurchaseLowerBound);
+            emit PurchaseFees__PurchaseLowerBoundSet(feePurchaseLowerBound);
         }
         if (s_feePurchaseUpperBound != feePurchaseUpperBound) {
             s_feePurchaseUpperBound = feePurchaseUpperBound.toUint112();
-            emit FeeHandler__PurchaseUpperBoundSet(feePurchaseUpperBound);
+            emit PurchaseFees__PurchaseUpperBoundSet(feePurchaseUpperBound);
         }
     }
 
-    /// @inheritdoc IFeeHandler
+    /// @inheritdoc IPurchaseFees
     function setFeeCollectorAddress(address feeCollector) external override onlyOwner {
-        if (feeCollector == address(0)) revert FeeHandler__InvalidFeeCollector();
+        if (feeCollector == address(0)) revert PurchaseFees__InvalidFeeCollector();
         s_feeCollector = feeCollector;
-        emit FeeHandler__FeeCollectorAddressSet(feeCollector);
+        emit PurchaseFees__FeeCollectorAddressSet(feeCollector);
     }
 
     /*//////////////////////////////////////////////////////////////
                                 GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc IFeeHandler
+    /// @inheritdoc IPurchaseFees
     function getFeeCollectorAddress() external view override returns (address) {
         return s_feeCollector;
     }
 
-    /// @inheritdoc IFeeHandler
+    /// @inheritdoc IPurchaseFees
     function getFeeSettings() external view override returns (FeeSettings memory) {
         return FeeSettings({
             minFeeRate: s_minFeeRate,
@@ -246,10 +246,10 @@ abstract contract FeeHandler is IFeeHandler, BitChillOwnable {
         uint256 feePurchaseLowerBound,
         uint256 feePurchaseUpperBound
     ) private pure {
-        if (maxFeeRate > MAX_FEE_RATE_CAP) revert FeeHandler__MaxFeeRateExceedsCap();
-        if (minFeeRate > maxFeeRate) revert FeeHandler__MinFeeRateCannotBeHigherThanMax();
+        if (maxFeeRate > MAX_FEE_RATE_CAP) revert PurchaseFees__MaxFeeRateExceedsCap();
+        if (minFeeRate > maxFeeRate) revert PurchaseFees__MinFeeRateCannotBeHigherThanMax();
         if (feePurchaseLowerBound >= feePurchaseUpperBound) {
-            revert FeeHandler__FeeLowerBoundMustBeLowerThanUpperBound();
+            revert PurchaseFees__FeeLowerBoundMustBeLowerThanUpperBound();
         }
     }
 }

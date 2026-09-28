@@ -3,9 +3,9 @@ pragma solidity 0.8.36;
 
 import {Test} from "forge-std/Test.sol";
 import {SovrynDocHandlerMoc} from "src/sovryn/SovrynDocHandlerMoc.sol";
-import {SovrynErc20HandlerDex} from "src/sovryn/SovrynErc20HandlerDex.sol";
-import {IdleErc20HandlerDex} from "src/idle/IdleErc20HandlerDex.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {SovrynHandlerDex} from "src/sovryn/SovrynHandlerDex.sol";
+import {IdleHandlerDex} from "src/idle/IdleHandlerDex.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {IPurchaseUniswap} from "src/interfaces/IPurchaseUniswap.sol";
 import {IUniswapV3SwapRouter} from "src/interfaces/IUniswapV3SwapRouter.sol";
@@ -46,11 +46,11 @@ contract StandingApprovalRecoveryTest is Test {
     MockWrbtcToken internal wrBtc;
     MockSwapRouter02 internal router;
     MockMocOracle internal oracle;
-    IdleErc20HandlerDex internal dexHandler;
+    IdleHandlerDex internal dexHandler;
 
     /// @dev The only shipped shape that holds both approvals at once, so it has two functions to call.
     MockIsusdToken internal bothHalvesISusd;
-    SovrynErc20HandlerDex internal bothHalvesHandler;
+    SovrynHandlerDex internal bothHalvesHandler;
 
     function setUp() public {
         docToken = new MockDecrementingStablecoin(address(this));
@@ -72,7 +72,7 @@ contract StandingApprovalRecoveryTest is Test {
         oracle = new MockMocOracle();
         vm.deal(address(router), 1000 ether);
 
-        dexHandler = new IdleErc20HandlerDex(
+        dexHandler = new IdleHandlerDex(
             address(this),
             address(docToken),
             _uniswapSettings(),
@@ -84,7 +84,7 @@ contract StandingApprovalRecoveryTest is Test {
         );
 
         bothHalvesISusd = new MockIsusdToken(address(docToken));
-        bothHalvesHandler = new SovrynErc20HandlerDex(
+        bothHalvesHandler = new SovrynHandlerDex(
             address(this),
             address(docToken),
             address(bothHalvesISusd),
@@ -253,8 +253,8 @@ contract StandingApprovalRecoveryTest is Test {
         });
     }
 
-    function _feeSettings() private pure returns (IFeeHandler.FeeSettings memory) {
-        return IFeeHandler.FeeSettings({
+    function _feeSettings() private pure returns (IPurchaseFees.FeeSettings memory) {
+        return IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE_TEST,
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,

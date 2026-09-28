@@ -3,7 +3,7 @@ pragma solidity 0.8.36;
 
 import {Test, Vm, stdError} from "forge-std/Test.sol";
 import {LendingHandler} from "src/LendingHandler.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
 import {MockStablecoin} from "../mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";

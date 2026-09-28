@@ -2,10 +2,10 @@
 pragma solidity 0.8.36;
 
 import {Test} from "forge-std/Test.sol";
-import {IdleErc20Handler} from "src/idle/IdleErc20Handler.sol";
+import {IdleHandler} from "src/idle/IdleHandler.sol";
 import {PurchaseUniswap} from "src/PurchaseUniswap.sol";
 import {IPurchaseUniswap} from "src/interfaces/IPurchaseUniswap.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import {ICoinPairPrice} from "src/interfaces/ICoinPairPrice.sol";
 import {IWRBTC} from "src/interfaces/IWRBTC.sol";
 import {IUniswapV3SwapRouter} from "src/interfaces/IUniswapV3SwapRouter.sol";
@@ -15,11 +15,11 @@ import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import "test/Constants.sol";
 
 /**
- * @notice Production Dex leaves list funding then purchase (`IdleErc20Handler, PurchaseUniswap`).
+ * @notice Production Dex leaves list funding then purchase (`IdleHandler, PurchaseUniswap`).
  *         This harness reverses that `is` order so the test can prove path construction no longer
  *         depends on funding-first inheritance once `i_stableToken` lives on shared `StablecoinSource`.
  */
-contract ReversedIdleErc20HandlerDex is PurchaseUniswap, IdleErc20Handler {
+contract ReversedIdleHandlerDex is PurchaseUniswap, IdleHandler {
     constructor(
         address dcaManagerAddress,
         address stableTokenAddress,
@@ -30,10 +30,10 @@ contract ReversedIdleErc20HandlerDex is PurchaseUniswap, IdleErc20Handler {
         uint256 amountOutMinimumSafetyCheck,
         address initialOwner
     )
-        IdleErc20Handler(dcaManagerAddress, stableTokenAddress)
+        IdleHandler(dcaManagerAddress, stableTokenAddress)
         PurchaseUniswap(
             uniswapSettings,
-            FeeHandlerConfig({feeCollector: feeCollector, feeSettings: feeSettings}),
+            FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}),
             amountOutMinimumPercent,
             amountOutMinimumSafetyCheck,
             initialOwner
@@ -60,14 +60,14 @@ contract ReversedDexInheritanceTest is Test {
             mocOracle: ICoinPairPrice(address(oracle))
         });
 
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE_TEST,
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
             feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
         });
 
-        ReversedIdleErc20HandlerDex handler = new ReversedIdleErc20HandlerDex(
+        ReversedIdleHandlerDex handler = new ReversedIdleHandlerDex(
             address(this),
             address(stablecoin),
             uniswapSettings,

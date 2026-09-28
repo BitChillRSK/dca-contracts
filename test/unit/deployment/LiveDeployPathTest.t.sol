@@ -13,7 +13,7 @@ import {UsdrifHelperConfig} from "../../../script/UsdrifHelperConfig.s.sol";
 import {OperationsAdmin} from "../../../src/OperationsAdmin.sol";
 import {DcaManager} from "../../../src/DcaManager.sol";
 import {IOperationsAdmin} from "../../../src/interfaces/IOperationsAdmin.sol";
-import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "../../../src/interfaces/IPurchaseFees.sol";
 import {IPurchaseUniswap} from "../../../src/interfaces/IPurchaseUniswap.sol";
 import {BitChillOwnable} from "../../../src/BitChillOwnable.sol";
 import {BaseDeploymentTest} from "./BaseDeploymentTest.t.sol";
@@ -133,7 +133,7 @@ contract LiveDeployPathTest is Test {
         assertEq(uint256(operationsAdmin.getRouteClass(LAYERBANK_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
         assertEq(uint256(operationsAdmin.getRouteClass(SOVRYN_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
         assertNotEq(
-            operationsAdmin.getTokenHandler(_docTokenFromHandler(handler), IDLE_INDEX),
+            operationsAdmin.getHandler(_docTokenFromHandler(handler), IDLE_INDEX),
             address(0),
             "live MoC path must assign the idle handler"
         );
@@ -190,8 +190,8 @@ contract LiveDeployPathTest is Test {
 
         if (isDexStable) {
             address token = _docTokenFromHandler(handler);
-            address idleHandler = operationsAdmin.getTokenHandler(token, IDLE_INDEX);
-            assertNotEq(idleHandler, address(0), "live dex path must assign IdleErc20HandlerDex at index 0");
+            address idleHandler = operationsAdmin.getHandler(token, IDLE_INDEX);
+            assertNotEq(idleHandler, address(0), "live dex path must assign IdleHandlerDex at index 0");
             assertTrue(
                 IPurchaseUniswap(idleHandler)
                     .isPurchasePathAllowed(keccak256(IPurchaseUniswap(idleHandler).getSwapPath())),
@@ -223,7 +223,7 @@ contract LiveDeployPathTest is Test {
             assertEq(Ownable(handler).owner(), SAFE);
             assertEq(operationsAdmin.owner(), Ownable(handler).owner());
             if (coinHash == keccak256(abi.encodePacked(USDT0_STRING))) {
-                IFeeHandler.FeeSettings memory stored = IFeeHandler(handler).getFeeSettings();
+                IPurchaseFees.FeeSettings memory stored = IPurchaseFees(handler).getFeeSettings();
                 assertEq(stored.feePurchaseLowerBound, USDT0_FEE_PURCHASE_LOWER_BOUND);
                 assertEq(stored.feePurchaseUpperBound, USDT0_FEE_PURCHASE_UPPER_BOUND);
                 uint256 minPurchase = dcaManager.getTokenMinPurchaseAmount(token);

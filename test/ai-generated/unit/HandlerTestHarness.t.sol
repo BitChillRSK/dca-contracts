@@ -5,7 +5,7 @@ import {Test, console2} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {ITokenHandler} from "../../../src/interfaces/ITokenHandler.sol";
-import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "../../../src/interfaces/IPurchaseFees.sol";
 import {ILendingHandler} from "../../../src/interfaces/ILendingHandler.sol";
 import {IPurchaseRbtc} from "../../../src/interfaces/IPurchaseRbtc.sol";
 import {IPurchaseUniswap} from "../../../src/interfaces/IPurchaseUniswap.sol";
@@ -136,7 +136,7 @@ abstract contract HandlerTestHarness is Test {
         setupRolesAndPermissions();
 
         vm.prank(OWNER);
-        operationsAdmin.assignTokenHandler(address(stablecoin), routeIndex, address(handler));
+        operationsAdmin.assignHandler(address(stablecoin), routeIndex, address(handler));
 
         // Setup user balance and allowances
         stablecoin.mint(USER, USER_INITIAL_BALANCE);
@@ -219,9 +219,9 @@ abstract contract HandlerTestHarness is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_handler_feeSettings() public {
-        IFeeHandler feeHandler = IFeeHandler(address(handler));
+        IPurchaseFees feeHandler = IPurchaseFees(address(handler));
 
-        IFeeHandler.FeeSettings memory settings = feeHandler.getFeeSettings();
+        IPurchaseFees.FeeSettings memory settings = feeHandler.getFeeSettings();
 
         uint256 minFeeRate = settings.minFeeRate;
         uint256 maxFeeRate = settings.maxFeeRate;
@@ -237,12 +237,12 @@ abstract contract HandlerTestHarness is Test {
     }
 
     function test_handler_modifyFeeSettings_success() public {
-        IFeeHandler feeHandler = IFeeHandler(address(handler));
+        IPurchaseFees feeHandler = IPurchaseFees(address(handler));
 
         vm.prank(OWNER);
         feeHandler.setFeeRateParams(50, 150, 200 ether, 2000 ether);
 
-        IFeeHandler.FeeSettings memory settings = feeHandler.getFeeSettings();
+        IPurchaseFees.FeeSettings memory settings = feeHandler.getFeeSettings();
         assertEq(settings.minFeeRate, 50);
         assertEq(settings.maxFeeRate, 150);
         assertEq(settings.feePurchaseLowerBound, 200 ether);
@@ -250,7 +250,7 @@ abstract contract HandlerTestHarness is Test {
     }
 
     function test_handler_modifyFeeSettings_reverts_invalidParams() public {
-        IFeeHandler feeHandler = IFeeHandler(address(handler));
+        IPurchaseFees feeHandler = IPurchaseFees(address(handler));
 
         // min > max should revert
         vm.expectRevert();
@@ -264,7 +264,7 @@ abstract contract HandlerTestHarness is Test {
     }
 
     function test_handler_modifyFeeSettings_reverts_notOwner() public {
-        IFeeHandler feeHandler = IFeeHandler(address(handler));
+        IPurchaseFees feeHandler = IPurchaseFees(address(handler));
 
         vm.expectRevert(ownableUnauthorized(USER));
         vm.prank(USER);

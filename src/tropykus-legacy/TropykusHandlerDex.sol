@@ -2,21 +2,21 @@
 pragma solidity 0.8.36;
 
 import {PurchaseUniswap} from "../PurchaseUniswap.sol";
-import {SovrynErc20Handler} from "./SovrynErc20Handler.sol";
+import {TropykusHandler} from "./TropykusHandler.sol";
 
 /**
- * @title SovrynErc20HandlerDex
+ * @title TropykusHandlerDex
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Sovryn lending + Uniswap V3 purchases.
+ * @notice Test-only Tropykus lending + Uniswap V3 handler; excluded from production deployment.
  * @dev Constructor-only leaf. Only its immutable DcaManager moves principal, buys, or withdraws rBTC;
  *      the owner controls fees, oracle, path allowlist, and floor. Holds standing max stablecoin
- *      approvals to SwapRouter02 and the iSUSD token, restorable by anyone.
+ *      approvals to SwapRouter02 and the kToken, restorable by anyone.
  */
-contract SovrynErc20HandlerDex is SovrynErc20Handler, PurchaseUniswap {
+contract TropykusHandlerDex is TropykusHandler, PurchaseUniswap {
     /**
      * @param dcaManagerAddress The DcaManager allowed to call this handler.
-     * @param stableTokenAddress The stablecoin this handler lends.
-     * @param iSusdTokenAddress Sovryn iToken for that stablecoin.
+     * @param stablecoinAddress The stablecoin this handler lends.
+     * @param kTokenAddress Tropykus kToken for that stablecoin.
      * @param uniswapSettings Router, WRBTC, path, and MoC oracle.
      * @param feeCollector Address that receives purchase fees.
      * @param feeSettings Linear fee parameters.
@@ -26,8 +26,8 @@ contract SovrynErc20HandlerDex is SovrynErc20Handler, PurchaseUniswap {
      */
     constructor(
         address dcaManagerAddress,
-        address stableTokenAddress,
-        address iSusdTokenAddress,
+        address stablecoinAddress,
+        address kTokenAddress,
         UniswapSettings memory uniswapSettings,
         address feeCollector,
         FeeSettings memory feeSettings,
@@ -35,10 +35,10 @@ contract SovrynErc20HandlerDex is SovrynErc20Handler, PurchaseUniswap {
         uint256 amountOutMinimumSafetyCheck,
         address initialOwner
     )
-        SovrynErc20Handler(dcaManagerAddress, stableTokenAddress, iSusdTokenAddress)
+        TropykusHandler(dcaManagerAddress, stablecoinAddress, kTokenAddress)
         PurchaseUniswap(
             uniswapSettings,
-            FeeHandlerConfig({feeCollector: feeCollector, feeSettings: feeSettings}),
+            FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}),
             amountOutMinimumPercent,
             amountOutMinimumSafetyCheck,
             initialOwner

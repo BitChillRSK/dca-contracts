@@ -6,7 +6,7 @@ import {DcaManager} from "src/DcaManager.sol";
 import {OperationsAdmin} from "src/OperationsAdmin.sol";
 import {IdleDocHandlerMoc} from "src/idle/IdleDocHandlerMoc.sol";
 import {IDcaManager} from "src/interfaces/IDcaManager.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import "test/Constants.sol";
@@ -60,7 +60,7 @@ contract IdleAccountingProofTest is Test {
         moc = new MockMocProxy(address(doc));
         vm.deal(address(moc), 1_000 ether);
 
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE_TEST,
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -71,7 +71,7 @@ contract IdleAccountingProofTest is Test {
 
         vm.startPrank(OWNER);
         operationsAdmin.addSwapper(SWAPPER);
-        operationsAdmin.assignTokenHandler(address(doc), IDLE_INDEX, address(handler));
+        operationsAdmin.assignHandler(address(doc), IDLE_INDEX, address(handler));
         dcaManager.setTokenMinPurchaseAmount(address(doc), MIN_PURCHASE_AMOUNT);
         vm.stopPrank();
 

@@ -11,9 +11,9 @@ import {MockSwapRouter02} from "test/mocks/MockSwapRouter02.sol";
 import {MockWrbtcToken} from "test/mocks/MockWrbtcToken.sol";
 import {TropykusDocHandlerMoc} from "src/tropykus-legacy/TropykusDocHandlerMoc.sol";
 import {SovrynDocHandlerMoc} from "src/sovryn/SovrynDocHandlerMoc.sol";
-import {TropykusErc20HandlerDex} from "src/tropykus-legacy/TropykusErc20HandlerDex.sol";
+import {TropykusHandlerDex} from "src/tropykus-legacy/TropykusHandlerDex.sol";
 import {IPurchaseUniswap} from "src/interfaces/IPurchaseUniswap.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import "test/Constants.sol";
 import {IWRBTC} from "src/interfaces/IWRBTC.sol";
 import {IUniswapV3SwapRouter} from "../../../src/interfaces/IUniswapV3SwapRouter.sol";
@@ -43,7 +43,7 @@ contract EdgeCasesTest is Test {
             address(kdoc),
             address(0xFEE),
             address(mocProxy),
-            IFeeHandler.FeeSettings({
+            IPurchaseFees.FeeSettings({
                 minFeeRate: MIN_FEE_RATE,
                 maxFeeRate: MAX_FEE_RATE_TEST,
                 feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -81,14 +81,7 @@ contract EdgeCasesTest is Test {
     //////////////////////////////////////////////////////////////*/
     function _deployDexHandler()
         internal
-        returns (
-            TropykusErc20HandlerDex,
-            MockStablecoin,
-            MockKdocToken,
-            MockSwapRouter02,
-            MockWrbtcToken,
-            MockMocOracle
-        )
+        returns (TropykusHandlerDex, MockStablecoin, MockKdocToken, MockSwapRouter02, MockWrbtcToken, MockMocOracle)
     {
         // Stablecoin & kDOC mocks
         MockStablecoin doc = new MockStablecoin(address(this));
@@ -106,13 +99,13 @@ contract EdgeCasesTest is Test {
             mocOracle: ICoinPairPrice(address(oracle))
         });
 
-        TropykusErc20HandlerDex dex = new TropykusErc20HandlerDex(
+        TropykusHandlerDex dex = new TropykusHandlerDex(
             address(this),
             address(doc),
             address(kdoc),
             uniSettings,
             address(0xFEE),
-            IFeeHandler.FeeSettings({
+            IPurchaseFees.FeeSettings({
                 minFeeRate: MIN_FEE_RATE,
                 maxFeeRate: MAX_FEE_RATE_TEST,
                 feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -127,7 +120,7 @@ contract EdgeCasesTest is Test {
     }
 
     function test_setPurchasePath_reverts_on_length_mismatch() public {
-        (TropykusErc20HandlerDex dex,,,,,) = _deployDexHandler();
+        (TropykusHandlerDex dex,,,,,) = _deployDexHandler();
         address[] memory tokens = new address[](1);
         tokens[0] = address(0x1);
         uint24[] memory fees = new uint24[](3);
@@ -139,25 +132,25 @@ contract EdgeCasesTest is Test {
     }
 
     function test_setAmountOutMinimumPercent_reverts_when_too_high() public {
-        (TropykusErc20HandlerDex dex,,,,,) = _deployDexHandler();
+        (TropykusHandlerDex dex,,,,,) = _deployDexHandler();
         vm.expectRevert();
         dex.setAmountOutMinimumPercent(1.1 ether);
     }
 
     function test_setAmountOutMinimumSafetyCheck_reverts_when_too_high() public {
-        (TropykusErc20HandlerDex dex,,,,,) = _deployDexHandler();
+        (TropykusHandlerDex dex,,,,,) = _deployDexHandler();
         vm.expectRevert();
         dex.setAmountOutMinimumSafetyCheck(1.1 ether);
     }
 
     function test_updateMocOracle_reverts_on_zero_address() public {
-        (TropykusErc20HandlerDex dex,,,,,) = _deployDexHandler();
+        (TropykusHandlerDex dex,,,,,) = _deployDexHandler();
         vm.expectRevert();
         dex.updateMocOracle(address(0));
     }
 
     function test_batchBuyRbtc_reverts_on_outdated_oracle() public {
-        (TropykusErc20HandlerDex dex, MockStablecoin doc,,,, MockMocOracle oracle) = _deployDexHandler();
+        (TropykusHandlerDex dex, MockStablecoin doc,,,, MockMocOracle oracle) = _deployDexHandler();
         // Invalidate oracle price
         oracle.setInvalidPrice();
 
@@ -172,7 +165,7 @@ contract EdgeCasesTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-               SovrynErc20Handler branch – withdrawInterest early exit
+               SovrynHandler branch – withdrawInterest early exit
     //////////////////////////////////////////////////////////////*/
     function test_withdrawInterest_returns_early_when_no_interest() public {
         // Mocks
@@ -187,7 +180,7 @@ contract EdgeCasesTest is Test {
             address(isusd),
             address(0xFEE),
             address(proxy),
-            IFeeHandler.FeeSettings({
+            IPurchaseFees.FeeSettings({
                 minFeeRate: MIN_FEE_RATE,
                 maxFeeRate: MAX_FEE_RATE_TEST,
                 feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,

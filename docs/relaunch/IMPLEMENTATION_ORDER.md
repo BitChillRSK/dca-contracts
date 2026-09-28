@@ -151,9 +151,9 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R87 | after R86, before relaunch deploy | **one verdict per deferred gas candidate, after measurement** (idle ledger, purchase-row event fields, fee sweep, `FeeTransferred`, balance reuse, `optimizer_runs`); no PR if none is approved |
 | R88 | after R87, before relaunch deploy if either Solidity candidate ships | **decided 2026-09-26:** reject shared scale declaration; **inline** LayerBank `_normalizedIncome` (source-only); cheatcode rename waits for an independently justified `forge-std` upgrade |
 | R89 | after R88, before relaunch deploy | **decided 2026-09-26:** implement every post-R88 review candidate (redundant reads, bounded `unchecked`, Dex constructor zero-token check, handler/token match on assignment, stale NatSpec, stray `IStablecoin`); record the rejected ones |
-| R90 | after R89, before relaunch deploy | **decided 2026-09-27:** ship oracle packing + unchecked lending zero-cash sum; defer FeeHandler move and `forge fmt` to R91/R92; reject swap-pop bounds assembly and the other keep-rejected/checked rows |
+| R90 | after R89, before relaunch deploy | **decided 2026-09-27:** ship oracle packing + unchecked lending zero-cash sum; defer PurchaseFees move and `forge fmt` to R91/R92; reject swap-pop bounds assembly and the other keep-rejected/checked rows |
 | R91 | after R90; not deployment-bound | none (`forge fmt` one-shot + CI enforce; metadata-stripped bytecode identity) |
-| R92 | after R91, before relaunch deploy | none (FeeHandler off `TokenHandler`; solve default-profile Dex stack-too-deep) |
+| R92 | after R91, before relaunch deploy | none (PurchaseFees off `TokenHandler`; solve default-profile Dex stack-too-deep) |
 | R93 | after R92, before relaunch deploy | none (report already-measured receipt shares on zero-cash reverts; delete the diagnostic-only batch loop) |
 | R94 | after R93, before relaunch deploy | none (create nonce before pull; drop withdrawal downcast; deposit store-before-pull and top-up hoist measured and reverted; record closed canvas leftovers) |
 | R95 | after R94, before relaunch deploy | **decided 2026-09-27:** merge `TokenLending` into the lending base and rename it `LendingHandler` / `ILendingHandler` (prefix `LendingHandler__`); scale visibility, R85 slip, declaration order, relative imports (runtime identical up to renamed topics/selectors); record the verdict on every candidate of the PRs 138–160 review |
@@ -164,6 +164,8 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R100 | after R99; not deployment-bound | none (invariant suite honesty + integrated lending/purchase coverage) |
 | R101 | after R100, before relaunch deploy | **decided 2026-09-27:** registry checks a handler's DcaManager pin; min-purchase check before the create pull; dead top-up guard dropped; Tropykus-only redeem error off `ILendingHandler`; `…MustBeAtLeastMinimum` renames; stale NatSpec; lending-exit balance reuse and the `withdrawTokenAndInterest` reorder closed |
 | R102 | after R101, before relaunch deploy | none (`PurchaseUniswap` unwraps through `_withdrawRbtc`; encoding + path helpers `private`; NatSpec) |
+| R103 | after R102, before relaunch deploy | **decided 2026-09-28: `PurchaseFees`** (Handler taxonomy: strip `Erc20`, fee mixin off Handler, `getHandler` / `assignHandler`) |
+| R104 | after R103, before relaunch deploy | none (identifier polish + NatSpec trim; stack on R103 names) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -219,7 +221,7 @@ Measure token/native balance deltas after Sovryn, Tropykus, MoC, and Uniswap ope
 
 **Read this before writing a handler that holds the stablecoin instead of lending it.**
 
-Per-user accounting for lending lives in `LendingErc20Handler.s_shares`. Idle has its own mapping in `IdleErc20Handler`. The base `TokenHandler.withdrawToken` is a bare `safeTransfer` with **no cap and no mapping behind it**, so a handler that extends `TokenHandler` without adding its own per-user tracking pays out whatever `DcaManager` asks from a pooled balance.
+Per-user accounting for lending lives in `LendingErc20Handler.s_shares`. Idle has its own mapping in `IdleHandler`. The base `TokenHandler.withdrawToken` is a bare `safeTransfer` with **no cap and no mapping behind it**, so a handler that extends `TokenHandler` without adding its own per-user tracking pays out whatever `DcaManager` asks from a pooled balance.
 
 Lending handlers clamp a withdrawal to the caller's own position (`LendingErc20Handler.withdrawToken`) instead of reverting. That clamp is what currently bounds *every* `DcaManager` accounting bug to the user who caused it. Remove it and the same bugs become solvency bugs against other users' pooled funds. Concretely, the `updateDcaSchedule` stale-write-back reentrancy that R6 analysed is self-desync under a lending handler and a straight pool drain under an idle one.
 
@@ -337,7 +339,7 @@ Resolve the former unassigned checkpoint into implementation specs and order. No
 
 The split is intentional: authority/fund lifecycle, configuration behavior, handler ABI, DcaManager ABI, and internal cleanup each receive their own review boundary. The old checkpoint is closed; none of Candidates C–F remains in limbo.
 
-The R28 snapshot measured runtime bytecode at 21,081 bytes for `DcaManager`, 24,243 for `SovrynErc20HandlerDex`, and 24,366 for `TropykusErc20HandlerDex` — unoptimized, like every figure recorded before #104 ([Measurement basis](./README.md#measurement-basis)). R30 changed those numbers; R31 must re-measure actual base/head sizes rather than carrying the snapshot forward as a promise.
+The R28 snapshot measured runtime bytecode at 21,081 bytes for `DcaManager`, 24,243 for `SovrynHandlerDex`, and 24,366 for `TropykusHandlerDex` — unoptimized, like every figure recorded before #104 ([Measurement basis](./README.md#measurement-basis)). R30 changed those numbers; R31 must re-measure actual base/head sizes rather than carrying the snapshot forward as a promise.
 
 Deliberate non-candidates remain excluded (the `TokenLending` merge was reopened and shipped by [R95](./R95-merge-token-lending.md) on 2026-09-27): do not merge `TokenLending` into `LendingErc20Handler`, absorb Idle into the lending base, add speculative adapter layers, or introduce proxies, delegatecall, owner rescue, or a withdrawal `to` parameter.
 
@@ -353,16 +355,16 @@ At the same time, remove the unused string protocol registry, replace it with an
 
 **No open product gates — do not ask.** Both decisions were recorded in the spec on 2026-08-26:
 
-- **Migration gate: option (a), manual exit/re-entry.** No cooperative migration ships; these handler versions will never gain the hook. Migration would not survive the bug scenarios that motivate it (it redeems through the same path), `SovrynErc20HandlerDex` has 426 bytes of runtime margin, and a position-moving function on immutable unaudited contracts is the worst place for a bug. The work is the four conditions attached to the decision, not new code. Never allow governance to move another user's funds. **Re-baselined by R53:** that 426 bytes was an unoptimized measurement and the leaf now has 9,097 ([Measurement basis](./README.md#measurement-basis)), so the size half of this decision is void. The other three reasons — migration redeems through the same broken path, it is the highest-value target on immutable contracts, and generation 2 can still ship the hook — do not depend on bytecode. Re-judge in its own PR if at all; R53 does not.
+- **Migration gate: option (a), manual exit/re-entry.** No cooperative migration ships; these handler versions will never gain the hook. Migration would not survive the bug scenarios that motivate it (it redeems through the same path), `SovrynHandlerDex` has 426 bytes of runtime margin, and a position-moving function on immutable unaudited contracts is the worst place for a bug. The work is the four conditions attached to the decision, not new code. Never allow governance to move another user's funds. **Re-baselined by R53:** that 426 bytes was an unoptimized measurement and the leaf now has 9,097 ([Measurement basis](./README.md#measurement-basis)), so the size half of this decision is void. The other three reasons — migration redeems through the same broken path, it is the highest-value target on immutable contracts, and generation 2 can still ship the hook — do not depend on bytecode. Re-judge in its own PR if at all; R53 does not.
 - **Idle is a route class, not index zero.** Each index registers once as idle or lending, the constructor pre-registers `0` as idle, and handler assignment requires a registered class. Without this, add-only assignment would make a buggy idle handler unrecoverable for new users on that token — because `(token, 0)` is the only idle slot and no non-zero index accepts a non-lending handler.
 
-`DcaManager.setOperationsAdmin` and ownership-transfer hardening are explicitly **out of scope** here. Their later review is now resolved: R45 adds the acceptance flow and R46 removes the setter in favor of an immutable constructor admin. Class↔handler ERC-165 (`ITokenLending` on `assignTokenHandler`) is the same error class as a mistyped index and is **required on R31**. See [`R13-operations-admin-lifecycle.md`](./R13-operations-admin-lifecycle.md).
+`DcaManager.setOperationsAdmin` and ownership-transfer hardening are explicitly **out of scope** here. Their later review is now resolved: R45 adds the acceptance flow and R46 removes the setter in favor of an immutable constructor admin. Class↔handler ERC-165 (`ITokenLending` on `assignHandler`) is the same error class as a mistyped index and is **required on R31**. See [`R13-operations-admin-lifecycle.md`](./R13-operations-admin-lifecycle.md).
 
 ### PR 25 - R31 handler ABI trim
 
 Remove redundant handler getters and aliases before R9 freezes the shipped surface, and decide whether fee-band mutation remains available through individual setters or only the atomic setter. Preserve fee math, the 5% cap, every concrete handler constructor ABI, storage layout, and purchase behavior; remove dead stablecoin parameters only from the abstract purchase bases. Re-measure every concrete handler's selectors and runtime margin.
 
-Also close the R13 class↔handler hole: `assignTokenHandler` must match `RouteClass` to `ITokenLending` via ERC-165 (lending handlers advertise it; idle handlers must not). If Dex margin cannot absorb that after pruning, assign a follow-up spec in the same PR — do not merge with only a cutover warning. See [`R31-handler-abi-trim.md`](./R31-handler-abi-trim.md).
+Also close the R13 class↔handler hole: `assignHandler` must match `RouteClass` to `ITokenLending` via ERC-165 (lending handlers advertise it; idle handlers must not). If Dex margin cannot absorb that after pruning, assign a follow-up spec in the same PR — do not merge with only a cutover warning. See [`R31-handler-abi-trim.md`](./R31-handler-abi-trim.md).
 
 ### PR 26 - R34 DcaManager ABI
 
@@ -469,7 +471,7 @@ Pack `DcaSchedule` into three slots with checked widths: two `uint128` amounts; 
 
 ### PR 42 - R36 LayerBank dex stables (USDRIF + USDT0)
 
-Ship `LayerBankErc20HandlerDex` (`LayerBankErc20Handler` + `PurchaseUniswap`, constructor-only, modelled on `SovrynErc20HandlerDex`) and deploy it twice: USDRIF (replacing `TropykusErc20HandlerDex`) and USDT0 (new listing). Same bytecode; config differs. Add a `dex-layerbank` lane to the Makefile and CI for both `STABLECOIN_TYPE=USDRIF` and `STABLECOIN_TYPE=USDT0`.
+Ship `LayerBankHandlerDex` (`LayerBankHandler` + `PurchaseUniswap`, constructor-only, modelled on `SovrynHandlerDex`) and deploy it twice: USDRIF (replacing `TropykusHandlerDex`) and USDT0 (new listing). Same bytecode; config differs. Add a `dex-layerbank` lane to the Makefile and CI for both `STABLECOIN_TYPE=USDRIF` and `STABLECOIN_TYPE=USDT0`.
 
 R22 (PR 29) took Tropykus off the production **MoC** map but it is still live on the **dex** map: `DeployUsdrifHandler` and the `DeployDexSwaps` live branch both deploy Tropykus dex handlers. LayerBank lists USDRIF **and** USDT0. R22 listed "LayerBank Uniswap / USDRIF" as out of scope; this is that deferred item plus the USDT0 twin.
 
@@ -481,7 +483,7 @@ Lands before R9 and R10 on purpose: the event freeze must exercise the final shi
 
 ### PR 43 - R50 packing follow-up
 
-Two-slot `DcaSchedule` with a public `uint64 scheduleId` equal to the monotonic nonce (no keccak). Pack `FeeHandler` (rates + collector; two `uint128` bounds), OperationsAdmin handler+pause into one `TokenRoute` value, DcaManager protocol scalars + nonce into one slot, and the two Uniswap slippage percents into one slot. Apply R18’s `toUint32()` bound to `setDepositsPaused` and every other OperationsAdmin route-index argument (R18 review: pause still keyed the mapping with raw `uint256`). Keep `s_scheduleNonce`; do not bitmap-pack address flags; do not narrow handler financial mappings. See [`R50-packing-follow-up.md`](./R50-packing-follow-up.md).
+Two-slot `DcaSchedule` with a public `uint64 scheduleId` equal to the monotonic nonce (no keccak). Pack `PurchaseFees` (rates + collector; two `uint128` bounds), OperationsAdmin handler+pause into one `TokenRoute` value, DcaManager protocol scalars + nonce into one slot, and the two Uniswap slippage percents into one slot. Apply R18’s `toUint32()` bound to `setDepositsPaused` and every other OperationsAdmin route-index argument (R18 review: pause still keyed the mapping with raw `uint256`). Keep `s_scheduleNonce`; do not bitmap-pack address flags; do not narrow handler financial mappings. See [`R50-packing-follow-up.md`](./R50-packing-follow-up.md).
 
 **Must land before R9 (PR 47).** ABI: `bytes32 scheduleId` → `uint64` on every function, event, and error that carries it.
 
@@ -519,7 +521,7 @@ Index every existing scalar `address` and `scheduleId`, and index nothing else. 
 
 Add `TokenLending__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares)` to the shared lending interface and emit it after every successful per-user virtual lending-share mutation in the shipped lending handlers. Deposits report the exact measured lending-token mint, not the stablecoin input. Withdrawals, interest, and every buyer debit in a batch are covered; repeated users in one batch produce sequential transitions. Tests must show each `newShares` equals `getUserShares(user)` and that replay from a fresh deployment reconstructs current balances. The shipped set now includes the LayerBank Dex handler added by R36. See [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md) and [`R9-event-indexing.md`](./R9-event-indexing.md).
 
-Add `FeeHandler__FeeTransferred(token, collector, amount)` from `_transferFee` when the fee is non-zero (one event per batch for the aggregated fee). Per-user rBTC in a batch is already `PurchaseRbtc__RbtcBought` — that is a monitoring consumer, not a new event.
+Add `PurchaseFees__FeeTransferred(token, collector, amount)` from `_transferFee` when the fee is non-zero (one event per batch for the aggregated fee). Per-user rBTC in a batch is already `PurchaseRbtc__RbtcBought` — that is a monitoring consumer, not a new event.
 
 R18/R19/R49/R50 already landed. Add no extra purchase-event fields.
 
@@ -583,7 +585,7 @@ as a Dex relaunch gate rather than a PR-merge gate. R9 indexing and R10 natspec 
 product gates; the Safe approves the measured static live backstops once during cutover.**
 
 Current PR 101 baseline: `DcaManager` 23,683 bytes (893 margin) and
-`LayerBankErc20HandlerDex` 23,418 (1,158 margin) — unoptimized
+`LayerBankHandlerDex` 23,418 (1,158 margin) — unoptimized
 ([Measurement basis](./README.md#measurement-basis)); today they are 13,767 / 10,809 and 15,692 / 8,884. DcaManager already takes `Batch`, so the obsolete
 seven-argument manager-stack finding no longer applies. The handler ABI addition has been compiled against
 PR 101 and does fail legacy no-IR codegen as written. Preserve its arithmetic/event order and re-measure
@@ -608,7 +610,7 @@ the same position as Tropykus after R37.
 
 ### R57 - close the DOC Dex deploy hole ([spec](./R57-close-doc-dex-deploy-hole.md), [#106](https://github.com/BitChillRSK/dca-contracts/pull/106))
 
-`DeployDexSwaps`' live branch still registers `SOVRYN_INDEX` and constructs `SovrynErc20HandlerDex` when
+`DeployDexSwaps`' live branch still registers `SOVRYN_INDEX` and constructs `SovrynHandlerDex` when
 `STABLECOIN_TYPE=DOC`, and its comment at `script/DeployDexSwaps.s.sol:113` still names Sovryn (DOC) as part
 of the live dex map. Deploy-script work is outside R51's Solidity scope, so PR 103 left it alone. The fix
 reverts on DOC in the live Dex branch (DOC is not a Dex token; MoC redemption is its route) and deletes the
@@ -619,7 +621,7 @@ broadcast; it does not block R52.
 **Promoted to R57 on 2026-09-02.** It had no R-id and no spec, which made it the only queued item a
 handover prompt could not name, and left the reader to reassemble the hazard from three documents. The
 spec records what makes it a hazard rather than untidiness: `DOC_STRING` is `DOC`, so an unset
-`STABLECOIN_TYPE` is enough to trigger it; `assignTokenHandler` is add-only, so `(DOC, SOVRYN_INDEX)` is
+`STABLECOIN_TYPE` is enough to trigger it; `assignHandler` is add-only, so `(DOC, SOVRYN_INDEX)` is
 burned permanently once taken — the same key `DeployMocSwaps` needs for the production
 `SovrynDocHandlerMoc`; and the live DOC arm is currently exercised and green by `LiveDeployPathTest` on
 the `moc-sovryn` lane, so closing it changes existing tests rather than only adding one.
@@ -792,7 +794,7 @@ to the ceiling and never above it. A caller passing the displayed number therefo
 bound, though the independent purchase-boundary minimum can still reject it; the worst a stale quote costs
 against the ceiling is a slice left for the next call. `ITokenLending` gains a function, so its ERC-165
 id changes; handlers and `OperationsAdmin` compute it from the same source and ship together, so the lending
-gate in `assignTokenHandler` is unaffected.
+gate in `assignHandler` is unaffected.
 
 That split is what put `DcaManager` 23 B *below* the non-view attempt and within 1 B of the shape before it
 (14,541 -> 14,542): a `view` external call compiles to `staticcall`. The cost lands on the lending handlers
@@ -1158,7 +1160,7 @@ a one-time ~20,000 at deploy and breaks even after about 2–4 uses.
 **Ask:** whether Dex handlers (all, lending-only, or none) and lending handlers should hold a standing
 approval to their spender instead. Ask only after the PR records each spender's code identity,
 upgradeability, and admins, SwapRouter02 included. The main exposure is idle deposits held by
-`IdleErc20HandlerDex`.
+`IdleHandlerDex`.
 
 Lending approvals must be set at the end of each adapter's constructor. The base constructor would
 read the spender immutable as `address(0)`.
@@ -1253,7 +1255,7 @@ PR, one commit each. Ask: the six verdicts, all at once, after measuring.
 
 **Decided 2026-09-26** ([verdicts](./R87-deferred-gas-candidates.md#verdicts-2026-09-26)); **implemented** in
 the stacked follow-up PR: remove the idle ledger after its per-user ghost, aggregate solvency,
-enumeration, cross-user, and transition-coverage proofs pass; drop `FeeHandler__FeeTransferred` and
+enumeration, cross-user, and transition-coverage proofs pass; drop `PurchaseFees__FeeTransferred` and
 monitor the stablecoin's standard `Transfer`; and add an `unchecked` credit in `_creditRbtc` under the
 explicit received-rBTC and native-supply bound. Every other candidate, and assembly in the purchase path,
 is closed.
@@ -1283,7 +1285,7 @@ profile, 10-row batches save 2,853–3,795 gas on Rootstock (compute).
 saves about 210–520. An external review of the first push put three `unchecked` blocks back to checked:
 the `amountSpent` product, whose bound is an unenforced stablecoin supply, and the lending share sum
 and deposit credit, whose bound is the market's receipt token. It also added a cached route class in
-`assignTokenHandler` and two `unchecked` widening adds (spec items 11–12). Runtime size under `deploy`:
+`assignHandler` and two `unchecked` widening adds (spec items 11–12). Runtime size under `deploy`:
 - handlers change by −117 to +40 bytes (LayerBank Dex is a `via_ir` layout effect);
 - `DcaManager` grows by 241 and `OperationsAdmin` by 88.
 The owner's review then moved the zero-stablecoin check into `StablecoinSource` (item 13), so every
@@ -1294,7 +1296,7 @@ constructor error `PurchaseUniswap__ZeroPurchaseToken`, replaced by `StablecoinS
 ### R90 - final optimization and handler-structure decisions ([spec](./R90-final-optimization-decisions.md))
 
 After R89, in a separate PR. Ships Dex oracle/live-floor packing and the unchecked lending zero-cash
-sum. FeeHandler ownership move and `forge fmt` enforcement are **approved but deferred** to their own
+sum. PurchaseFees ownership move and `forge fmt` enforcement are **approved but deferred** to their own
 PRs (diagram cleanup / format-only; do not mix into R90). Gross-total `_batchRetrieveStablecoin` and
 Idle fold stay rejected; keep-checked arithmetic stays checked. Swap-pop bounds assembly **rejected**
 (packed `uint64[]`; rare path). Ask: none remaining for this PR's executable subset.
@@ -1305,9 +1307,9 @@ After R90; not deployment-bound. Format the first-party tree, ignore vendored AB
 `foundry.toml` `[fmt]`, wire `make fmt-check` into `make check` and CI, and prove metadata-stripped
 creation/runtime identity on every deployable contract under both profiles. Ask: none.
 
-### R92 - FeeHandler ownership move ([spec](./R92-feehandler-ownership.md) — write before Solidity)
+### R92 - PurchaseFees ownership move ([spec](./R92-feehandler-ownership.md) — write before Solidity)
 
-After R91, before relaunch deploy. Move `FeeHandler` off `TokenHandler` onto the purchase branch;
+After R91, before relaunch deploy. Move `PurchaseFees` off `TokenHandler` onto the purchase branch;
 solve default-profile Dex stack-too-deep. Ask: none (approved under R90).
 
 ### R93 - zero-cash receipt-share diagnostic ([spec](./R93-zero-cash-share-diagnostic.md))
@@ -1324,7 +1326,7 @@ After R93, before relaunch deploy. `createDcaSchedule` stores the schedule nonce
 pull (≈ −200 Rootstock under deploy); `_withdrawToken` drops the impossible `toUint128()`. Deposit
 store-before-pull and the top-up `purchaseAmount` hoist were measured and **reverted**. Also records
 the canvas closed leftovers (Idle fold, shared scale, purchase slot-0 further collapse, joined
-OperationsAdmin view, Uniswap path `calldata`, `BitChillOwnable` off `FeeHandler`). Ask: none
+OperationsAdmin view, Uniswap path `calldata`, `BitChillOwnable` off `PurchaseFees`). Ask: none
 (locked 2026-09-27).
 
 ### R95 - merge `TokenLending`, rename the lending base, and source-order cleanups ([spec](./R95-merge-token-lending.md))
@@ -1333,7 +1335,7 @@ After R94, before relaunch deploy. Delete `TokenLending`; `LendingHandler is Tok
 ILendingHandler` (formerly `LendingErc20Handler` / `ITokenLending`) holds the scale immutable (now
 explicitly `internal`) and both conversion helpers. Errors and events take the `LendingHandler__` prefix;
 `bitchill-monitoring` follows up. Also the `PurchaseRbtc` `///` slip, constants → immutables → storage in
-`PurchaseUniswap` and `FeeHandler`, and relative `src/` imports. Runtime identical on both profiles up
+`PurchaseUniswap` and `PurchaseFees`, and relative `src/` imports. Runtime identical on both profiles up
 to the renamed topics and selectors. Records the verdict on every
 candidate from the 2026-09-27 review of PRs 138–160. Ask: none (decided 2026-09-27).
 
@@ -1376,11 +1378,11 @@ After R99; not deployment-bound. Fix the tautological interest invariant, correc
 ### R101 - post-R100 review cleanups ([spec](./R101-post-r100-review-cleanups.md), [#167](https://github.com/BitChillRSK/dca-contracts/pull/167))
 
 After R100, before relaunch deploy. The 2026-09-27 pass over the R100 tip found no purchase-path gas
-left. It ships: `assignTokenHandler` requires the handler's `i_dcaManager()` to pin this registry
+left. It ships: `assignHandler` requires the handler's `i_dcaManager()` to pin this registry
 (new `OperationsAdmin__HandlerDcaManagerMismatch`); `_validatePurchaseAmount` runs before the create
 pull (max-schedules stays after it: +450 under deploy otherwise); the unreachable
 `purchaseAmount == 0` top-up guard is removed; `LendingHandler__LendingProtocolRedeemFailed` moves to
-`ITropykusErc20Handler`; the two `…MustBeGreaterThanMinimum` errors become `…MustBeAtLeastMinimum`;
+`ITropykusHandler`; the two `…MustBeGreaterThanMinimum` errors become `…MustBeAtLeastMinimum`;
 stale NatSpec is fixed. It closes reusing the lending redeem's balance reading, and the
 `withdrawTokenAndInterest` route-check reorder (dropped after review). Ask: none (decided 2026-09-27).
 
@@ -1392,6 +1394,23 @@ the single-caller path helpers become `private`; NatSpec that predates interest 
 amount check is fixed. No ABI change. Ask: none. Post-ship review (2026-09-28) closed fee-collector
 packing, the MoC balance local, and three cold-path leave-as-is items — see the closed register and
 [R102 § Post-ship review](./R102-wrbtc-withdraw-seam.md#post-ship-review-2026-09-28).
+
+### R103 - Handler taxonomy renames ([spec](./R103-handler-taxonomy-renames.md))
+
+After R102, before relaunch deploy. `*Handler` means fund custody/execution only (`TokenHandler`
+lineage). Strip `Erc20` from protocol bases and Dex leaves; rename the fee mixin off `*Handler`
+(**name open** — ask before Solidity; lean `FeeLogic`); OpsAdmin `getHandler` /
+`assignHandler` / `HandlerAssigned` (keep `assign`, not `set`; keep `ContractIsNotTokenHandler`).
+`Purchase*` and `*DocHandlerMoc` unchanged. Rename-only. Identifier and NatSpec polish → R104.
+
+### R104 - Identifier polish and NatSpec trim ([spec](./R104-identifier-and-natspec-polish.md))
+
+After R103, before relaunch deploy. Public immutables (`i_wrbtc`, `i_swapRouter`, `i_iSusd`);
+`modify*`/`update*` → `set*` where config is overwriteable; `getInterestAccrued` →
+`getAccruedInterest`; `withdrawRbtcFromTokenHandler` → `withdrawAccumulatedRbtc(token, routeIndex)`;
+fee collector drops `Address`; local grammar (`purchaseCount`, `userShares`, `handler`); NatSpec trim
+(no constructor-supplied `@return` boilerplate, no state-var restatement `//`, no scope apologetics).
+Ask: none (decided 2026-09-28 with R103).
 
 ## Closed non-implementation decisions
 
@@ -1405,13 +1424,13 @@ There is no optional-late queue. Items either have an ordered spec above or are 
   [R88](./R88-post-r87-structural-cleanups.md#verdicts-2026-09-26). Reaffirmed 2026-09-27 under
   [R94](./R94-dcamanager-store-before-pull.md#closed-decisions-2026-09-27).
 
-- **Fold `IdleErc20Handler` into `TokenHandler` — rejected (R90, reaffirmed R94 2026-09-27).**
+- **Fold `IdleHandler` into `TokenHandler` — rejected (R90, reaffirmed R94 2026-09-27).**
   Idle funding as `TokenHandler`'s default batch rule would be a diagram lie lending must override.
   The short class is where the no-ledger residual risk is stated.
 
-- **Move `BitChillOwnable` off `FeeHandler` — rejected 2026-09-27 (R94).** Dex owner setters for the
+- **Move `BitChillOwnable` off `PurchaseFees` — rejected 2026-09-27 (R94).** Dex owner setters for the
   oracle, floor, and path would force the fee setters to move too and change storage layout, for no
-  hot-path gas. Ownership stays on `FeeHandler` after R92's purchase-branch move.
+  hot-path gas. Ownership stays on `PurchaseFees` after R92's purchase-branch move.
 
 - **Gas candidates deferred 2026-09-25 — queued as [R87](./R87-deferred-gas-candidates.md).** The
   purchase-path review behind [R86](./R86-calldata-array-parameters.md) deferred six candidates:
@@ -1477,7 +1496,7 @@ There is no optional-late queue. Items either have an ordered spec above or are 
   post-balance costs more stack shuffling than the extra read. Solc 0.8.36 / optimizer 200: the
   re-read wins by 1–5 gas depending on profile and whether the redeem pays. Matches `096719a`. See
   [R102 post-ship review](./R102-wrbtc-withdraw-seam.md#post-ship-review-2026-09-28).
-- **Owner no-op write guards, purchase-only `getTokenHandler`, and `Batch.routeIndex` as `uint32` —
+- **Owner no-op write guards, purchase-only `getHandler`, and `Batch.routeIndex` as `uint32` —
   closed 2026-09-28 without shipping.** Equality checks on `addSwapper` / `revokeSwapper` /
   `setFeeCollectorAddress` are owner cold-path code for a rare 5,000-gas Rootstock `RESET`. A
   purchase-only handler getter would duplicate the shared view for a few gas inside an external call.

@@ -3,14 +3,14 @@ pragma solidity 0.8.36;
 
 import {Test} from "forge-std/Test.sol";
 import {IdleDocHandlerMoc} from "src/idle/IdleDocHandlerMoc.sol";
-import {IdleErc20HandlerDex} from "src/idle/IdleErc20HandlerDex.sol";
+import {IdleHandlerDex} from "src/idle/IdleHandlerDex.sol";
 import {SovrynDocHandlerMoc} from "src/sovryn/SovrynDocHandlerMoc.sol";
-import {SovrynErc20HandlerDex} from "src/sovryn/SovrynErc20HandlerDex.sol";
+import {SovrynHandlerDex} from "src/sovryn/SovrynHandlerDex.sol";
 import {LayerBankDocHandlerMoc} from "src/layerbank/LayerBankDocHandlerMoc.sol";
-import {LayerBankErc20HandlerDex} from "src/layerbank/LayerBankErc20HandlerDex.sol";
+import {LayerBankHandlerDex} from "src/layerbank/LayerBankHandlerDex.sol";
 import {IStablecoinSource} from "src/interfaces/IStablecoinSource.sol";
 import {IPurchaseUniswap} from "src/interfaces/IPurchaseUniswap.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import {ICoinPairPrice} from "src/interfaces/ICoinPairPrice.sol";
 import {IWRBTC} from "src/interfaces/IWRBTC.sol";
 import {IUniswapV3SwapRouter} from "src/interfaces/IUniswapV3SwapRouter.sol";
@@ -54,7 +54,7 @@ contract ZeroStablecoinTest is Test {
 
     function testIdleDexRejectsZeroStablecoin() public {
         vm.expectRevert(IStablecoinSource.StablecoinSource__ZeroStablecoin.selector);
-        new IdleErc20HandlerDex(
+        new IdleHandlerDex(
             address(this),
             address(0),
             _uniswapSettings(),
@@ -75,7 +75,7 @@ contract ZeroStablecoinTest is Test {
 
     function testSovrynDexRejectsZeroStablecoin() public {
         vm.expectRevert(IStablecoinSource.StablecoinSource__ZeroStablecoin.selector);
-        new SovrynErc20HandlerDex(
+        new SovrynHandlerDex(
             address(this),
             address(0),
             s_iSusd,
@@ -97,7 +97,7 @@ contract ZeroStablecoinTest is Test {
 
     function testLayerBankDexRejectsZeroStablecoin() public {
         vm.expectRevert(IStablecoinSource.StablecoinSource__ZeroStablecoin.selector);
-        new LayerBankErc20HandlerDex(
+        new LayerBankHandlerDex(
             address(this),
             address(0),
             s_aToken,
@@ -110,8 +110,8 @@ contract ZeroStablecoinTest is Test {
         );
     }
 
-    function _feeSettings() private pure returns (IFeeHandler.FeeSettings memory) {
-        return IFeeHandler.FeeSettings({
+    function _feeSettings() private pure returns (IPurchaseFees.FeeSettings memory) {
+        return IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE_TEST,
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,

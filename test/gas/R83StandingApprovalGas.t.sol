@@ -2,9 +2,9 @@
 pragma solidity 0.8.36;
 
 import {Test, console2, Vm} from "forge-std/Test.sol";
-import {IdleErc20HandlerDex} from "src/idle/IdleErc20HandlerDex.sol";
+import {IdleHandlerDex} from "src/idle/IdleHandlerDex.sol";
 import {SovrynDocHandlerMoc} from "src/sovryn/SovrynDocHandlerMoc.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {IPurchaseUniswap} from "src/interfaces/IPurchaseUniswap.sol";
 import {IUniswapV3SwapRouter} from "src/interfaces/IUniswapV3SwapRouter.sol";
@@ -64,7 +64,7 @@ contract R83StandingApprovalGasTest is Test {
     MockWrbtcToken private s_wrBtc;
     MockSwapRouter02 private s_router;
     MockMocOracle private s_oracle;
-    IdleErc20HandlerDex private s_dexHandler;
+    IdleHandlerDex private s_dexHandler;
 
     /// @dev Both handlers take this test contract as their DcaManager so the `onlyDcaManager` entry
     ///      points are callable directly and the measurement is of the handler, not of the manager.
@@ -106,7 +106,7 @@ contract R83StandingApprovalGasTest is Test {
 
         uint24[] memory poolFeeRates = new uint24[](1);
         poolFeeRates[0] = 3000;
-        s_dexHandler = new IdleErc20HandlerDex(
+        s_dexHandler = new IdleHandlerDex(
             address(this),
             address(s_stablecoin),
             IPurchaseUniswap.UniswapSettings({
@@ -253,8 +253,8 @@ contract R83StandingApprovalGasTest is Test {
         }
     }
 
-    function _feeSettings() private pure returns (IFeeHandler.FeeSettings memory) {
-        return IFeeHandler.FeeSettings({
+    function _feeSettings() private pure returns (IPurchaseFees.FeeSettings memory) {
+        return IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE_TEST,
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -278,7 +278,7 @@ contract PreR83SovrynDocHandlerMoc is SovrynDocHandlerMoc {
         address iSusdTokenAddress,
         address feeCollector,
         address mocProxyAddress,
-        IFeeHandler.FeeSettings memory feeSettings,
+        IPurchaseFees.FeeSettings memory feeSettings,
         address initialOwner
     )
         SovrynDocHandlerMoc(

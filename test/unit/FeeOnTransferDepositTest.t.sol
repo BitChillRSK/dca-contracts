@@ -9,7 +9,7 @@ import {TropykusDocHandlerMoc} from "../../src/tropykus-legacy/TropykusDocHandle
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
 import {ILendingHandler} from "../../src/interfaces/ILendingHandler.sol";
-import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "../../src/interfaces/IPurchaseFees.sol";
 import {MockFeeOnTransferStablecoin} from "../mocks/MockFeeOnTransferStablecoin.sol";
 import {MockKdocToken} from "../mocks/MockKdocToken.sol";
 import {MockMocProxy} from "../mocks/MockMocProxy.sol";
@@ -65,7 +65,7 @@ contract FeeOnTransferDepositTest is Test {
         mocProxy = new MockMocProxy(address(token));
         vm.deal(address(mocProxy), 100 ether);
 
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE_TEST,
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -83,8 +83,8 @@ contract FeeOnTransferDepositTest is Test {
         vm.startPrank(OWNER);
         operationsAdmin.addSwapper(SWAPPER);
         operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
-        operationsAdmin.assignTokenHandler(address(token), IDLE_INDEX, address(idleHandler));
-        operationsAdmin.assignTokenHandler(address(token), TROPYKUS_INDEX, address(tropykusHandler));
+        operationsAdmin.assignHandler(address(token), IDLE_INDEX, address(idleHandler));
+        operationsAdmin.assignHandler(address(token), TROPYKUS_INDEX, address(tropykusHandler));
         vm.stopPrank();
 
         vm.prank(address(idleHandler));

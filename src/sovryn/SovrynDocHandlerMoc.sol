@@ -2,7 +2,7 @@
 pragma solidity 0.8.36;
 
 import {PurchaseMoc} from "../PurchaseMoc.sol";
-import {SovrynErc20Handler} from "./SovrynErc20Handler.sol";
+import {SovrynHandler} from "./SovrynHandler.sol";
 
 /**
  * @title SovrynDocHandlerMoc
@@ -13,7 +13,7 @@ import {SovrynErc20Handler} from "./SovrynErc20Handler.sol";
  *      route has no pool-slippage floor.
  *      Holds a standing max DOC approval to the iSUSD token, restorable by anyone.
  */
-contract SovrynDocHandlerMoc is SovrynErc20Handler, PurchaseMoc {
+contract SovrynDocHandlerMoc is SovrynHandler, PurchaseMoc {
     /**
      * @param dcaManagerAddress The DcaManager allowed to call this handler.
      * @param docTokenAddress Dollar On Chain token.
@@ -32,9 +32,7 @@ contract SovrynDocHandlerMoc is SovrynErc20Handler, PurchaseMoc {
         FeeSettings memory feeSettings,
         address initialOwner
     )
-        SovrynErc20Handler(dcaManagerAddress, docTokenAddress, iSusdTokenAddress)
-        PurchaseMoc(
-            mocProxyAddress, FeeHandlerConfig({feeCollector: feeCollector, feeSettings: feeSettings}), initialOwner
-        )
+        SovrynHandler(dcaManagerAddress, docTokenAddress, iSusdTokenAddress)
+        PurchaseMoc(mocProxyAddress, FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}), initialOwner)
     {}
 }

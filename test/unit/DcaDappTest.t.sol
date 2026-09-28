@@ -151,7 +151,7 @@ contract DcaDappTest is Test {
     );
 
     // OperationsAdmin
-    event OperationsAdmin__TokenHandlerAssigned(
+    event OperationsAdmin__HandlerAssigned(
         address indexed token, uint256 lendinProtocolIndex, address indexed newHandler
     );
 
@@ -416,9 +416,9 @@ contract DcaDappTest is Test {
 
         // Add tokenHandler
         vm.expectEmit(true, true, true, false);
-        emit OperationsAdmin__TokenHandlerAssigned(address(stablecoin), s_routeIndex, address(stablecoinHandler));
+        emit OperationsAdmin__HandlerAssigned(address(stablecoin), s_routeIndex, address(stablecoinHandler));
         vm.prank(OWNER);
-        operationsAdmin.assignTokenHandler(address(stablecoin), s_routeIndex, address(stablecoinHandler));
+        operationsAdmin.assignHandler(address(stablecoin), s_routeIndex, address(stablecoinHandler));
 
         // The starting point of the tests is that the user has already deposited stablecoin (so withdrawals can also be tested without much hassle)
         vm.startPrank(USER);

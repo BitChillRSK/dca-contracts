@@ -7,7 +7,7 @@ import {MocHelperConfig} from "./MocHelperConfig.s.sol";
 import {IdleDocHandlerMoc} from "../src/idle/IdleDocHandlerMoc.sol";
 import {OperationsAdmin} from "../src/OperationsAdmin.sol";
 import {DcaManager} from "../src/DcaManager.sol";
-import {IFeeHandler} from "../src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "../src/interfaces/IPurchaseFees.sol";
 import {console} from "forge-std/Test.sol";
 import "./Constants.sol";
 
@@ -27,7 +27,7 @@ contract DeployIdleHandler is DeployBase {
     }
 
     function deployIdleDocHandlerMoc(DeployParams memory params) public returns (address) {
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: getMaxFeeRate(),
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -84,13 +84,13 @@ contract DeployIdleHandler is DeployBase {
 
         if (msg.sender != operationsAdmin.owner()) {
             console.log("Warning: Deployer is not the owner. Cannot register handler.");
-            console.log("Please call operationsAdmin.assignTokenHandler() as owner with:");
+            console.log("Please call operationsAdmin.assignHandler() as owner with:");
             console.log("tokenAddress:", docTokenAddress);
             console.log("index: 0");
             console.log("handlerAddress:", idleHandler);
         } else {
             // Occupied `(token, IDLE_INDEX)` reverts `HandlerAlreadyAssigned` — do not skip.
-            operationsAdmin.assignTokenHandler(docTokenAddress, IDLE_INDEX, idleHandler);
+            operationsAdmin.assignHandler(docTokenAddress, IDLE_INDEX, idleHandler);
             console.log("Idle DOC handler registered with OperationsAdmin at index", IDLE_INDEX);
         }
 

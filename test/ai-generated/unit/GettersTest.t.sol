@@ -4,7 +4,7 @@ pragma solidity 0.8.36;
 import {DcaDappTest} from "../../unit/DcaDappTest.t.sol";
 import {IDcaManager} from "../../../src/interfaces/IDcaManager.sol";
 import {IOperationsAdmin} from "../../../src/interfaces/IOperationsAdmin.sol";
-import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "../../../src/interfaces/IPurchaseFees.sol";
 import {ITokenHandler} from "../../../src/interfaces/ITokenHandler.sol";
 import {IPurchaseRbtc} from "../../../src/interfaces/IPurchaseRbtc.sol";
 import {IPurchaseUniswap} from "../../../src/interfaces/IPurchaseUniswap.sol";
@@ -12,10 +12,10 @@ import {ILendingHandler} from "../../../src/interfaces/ILendingHandler.sol";
 import {ICoinPairPrice} from "../../../src/interfaces/ICoinPairPrice.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {PurchaseUniswap} from "../../../src/PurchaseUniswap.sol";
-import {TropykusErc20Handler} from "../../../src/tropykus-legacy/TropykusErc20Handler.sol";
-import {SovrynErc20Handler} from "../../../src/sovryn/SovrynErc20Handler.sol";
-import {TropykusErc20HandlerDex} from "../../../src/tropykus-legacy/TropykusErc20HandlerDex.sol";
-import {SovrynErc20HandlerDex} from "../../../src/sovryn/SovrynErc20HandlerDex.sol";
+import {TropykusHandler} from "../../../src/tropykus-legacy/TropykusHandler.sol";
+import {SovrynHandler} from "../../../src/sovryn/SovrynHandler.sol";
+import {TropykusHandlerDex} from "../../../src/tropykus-legacy/TropykusHandlerDex.sol";
+import {SovrynHandlerDex} from "../../../src/sovryn/SovrynHandlerDex.sol";
 import {DcaManagerAccessControl} from "../../../src/DcaManagerAccessControl.sol";
 import {IDcaManagerAccessControl} from "../../../src/interfaces/IDcaManagerAccessControl.sol";
 import "../../Constants.sol";
@@ -144,12 +144,12 @@ contract GettersTest is DcaDappTest {
                     OPERATIONS ADMIN GETTERS TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_operationsAdmin_getTokenHandler() public {
-        address handler = operationsAdmin.getTokenHandler(address(stablecoin), s_routeIndex);
+    function test_operationsAdmin_getHandler() public {
+        address handler = operationsAdmin.getHandler(address(stablecoin), s_routeIndex);
         assertEq(handler, address(stablecoinHandler));
 
         // Test non-existent handler
-        address nonExistentHandler = operationsAdmin.getTokenHandler(address(0x999), 1);
+        address nonExistentHandler = operationsAdmin.getHandler(address(0x999), 1);
         assertEq(nonExistentHandler, address(0));
     }
 
@@ -171,7 +171,7 @@ contract GettersTest is DcaDappTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_feeHandler_getFeeSettings() public {
-        IFeeHandler.FeeSettings memory settings = IFeeHandler(address(stablecoinHandler)).getFeeSettings();
+        IPurchaseFees.FeeSettings memory settings = IPurchaseFees(address(stablecoinHandler)).getFeeSettings();
         assertGt(settings.minFeeRate, 0);
         assertGt(settings.maxFeeRate, 0);
         assertLe(settings.minFeeRate, settings.maxFeeRate);
@@ -180,12 +180,12 @@ contract GettersTest is DcaDappTest {
     }
 
     function test_feeHandler_getFeeCollectorAddress() public {
-        address feeCollector = IFeeHandler(address(stablecoinHandler)).getFeeCollectorAddress();
+        address feeCollector = IPurchaseFees(address(stablecoinHandler)).getFeeCollectorAddress();
         assertNotEq(feeCollector, address(0));
     }
 
     function test_feeHandler_feeRateConsistency() public {
-        IFeeHandler.FeeSettings memory settings = IFeeHandler(address(stablecoinHandler)).getFeeSettings();
+        IPurchaseFees.FeeSettings memory settings = IPurchaseFees(address(stablecoinHandler)).getFeeSettings();
         assertLe(settings.minFeeRate, settings.maxFeeRate);
     }
 
@@ -304,13 +304,11 @@ contract GettersTest is DcaDappTest {
         // Test that the docHandler has the correct DCA manager address
         // The public immutable creates an automatic getter
         if (s_routeIndex == TROPYKUS_INDEX) {
-            try TropykusErc20Handler(payable(address(stablecoinHandler))).i_dcaManager() returns (
-                address dcaManagerAddr
-            ) {
+            try TropykusHandler(payable(address(stablecoinHandler))).i_dcaManager() returns (address dcaManagerAddr) {
                 assertEq(dcaManagerAddr, address(dcaManager));
             } catch {
                 // Try the Dex version
-                try TropykusErc20HandlerDex(payable(address(stablecoinHandler))).i_dcaManager() returns (
+                try TropykusHandlerDex(payable(address(stablecoinHandler))).i_dcaManager() returns (
                     address dcaManagerAddr
                 ) {
                     assertEq(dcaManagerAddr, address(dcaManager));
@@ -319,12 +317,10 @@ contract GettersTest is DcaDappTest {
                 }
             }
         } else if (s_routeIndex == SOVRYN_INDEX) {
-            try SovrynErc20Handler(payable(address(stablecoinHandler))).i_dcaManager() returns (
-                address dcaManagerAddr
-            ) {
+            try SovrynHandler(payable(address(stablecoinHandler))).i_dcaManager() returns (address dcaManagerAddr) {
                 assertEq(dcaManagerAddr, address(dcaManager));
             } catch {
-                try SovrynErc20HandlerDex(payable(address(stablecoinHandler))).i_dcaManager() returns (
+                try SovrynHandlerDex(payable(address(stablecoinHandler))).i_dcaManager() returns (
                     address dcaManagerAddr
                 ) {
                     assertEq(dcaManagerAddr, address(dcaManager));
@@ -358,7 +354,7 @@ contract GettersTest is DcaDappTest {
             dcaManager.getDcaSchedules(USER, fakeToken);
         assertEq(schedules.length, 0);
 
-        address handler = operationsAdmin.getTokenHandler(fakeToken, 1);
+        address handler = operationsAdmin.getHandler(fakeToken, 1);
         assertEq(handler, address(0));
     }
 
@@ -410,7 +406,7 @@ contract GettersTest is DcaDappTest {
         assertEq(uint256(operationsAdmin.getRouteClass(IDLE_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle));
 
         // Test fee bounds consistency
-        IFeeHandler.FeeSettings memory settings = IFeeHandler(address(stablecoinHandler)).getFeeSettings();
+        IPurchaseFees.FeeSettings memory settings = IPurchaseFees(address(stablecoinHandler)).getFeeSettings();
         assertLe(settings.feePurchaseLowerBound, settings.feePurchaseUpperBound);
     }
 

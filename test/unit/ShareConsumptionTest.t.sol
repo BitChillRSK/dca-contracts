@@ -3,7 +3,7 @@ pragma solidity 0.8.36;
 
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {ILendingHandler} from "../../src/interfaces/ILendingHandler.sol";
-import {LayerBankErc20Handler} from "../../src/layerbank/LayerBankErc20Handler.sol";
+import {LayerBankHandler} from "../../src/layerbank/LayerBankHandler.sol";
 import "../Constants.sol";
 import {scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
@@ -57,7 +57,7 @@ contract ShareConsumptionTest is DcaDappTest {
     function _receiptShares() private returns (uint256) {
         if (s_routeIndex == LAYERBANK_INDEX) {
             // DcaDappTest leaves `shareToken` unset for LayerBank (aToken is not IShareToken).
-            return LayerBankErc20Handler(payable(address(stablecoinHandler))).i_aToken()
+            return LayerBankHandler(payable(address(stablecoinHandler))).i_aToken()
                 .scaledBalanceOf(address(stablecoinHandler));
         }
         return shareToken.balanceOf(address(stablecoinHandler));

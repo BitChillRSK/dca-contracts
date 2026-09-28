@@ -24,10 +24,16 @@ The human prompt is one line: `Start with R2` or `Start with PR 3`. Do not expec
 
 Do not Grep/`Glob` `out/`, `cache/`, or `lib/` (see `.cursorignore`). Open a `lib/` path only when a `src/` import points there.
 
+**`*Handler` means fund custody/execution in the `TokenHandler` lineage only.** Protocol bases
+(`IdleHandler`, `SovrynHandler`, …), Dex leaves (`*HandlerDex`), Doc/MoC leaves (`*DocHandlerMoc`),
+`TokenHandler`, and `LendingHandler` are Handlers. `PurchaseFees` and the `Purchase*` mixins are not —
+they price fees or run the purchase pipeline on the purchase branch. OpsAdmin’s registry is
+`getHandler` / `assignHandler`.
+
 ```
 DcaManager          user + swapper entry; schedules; single- and multi-handler purchases
-OperationsAdmin     roles; token × lending-index → handler
-FeeHandler          fee math (owned by PurchaseRbtc; MoC / Uniswap route fee construction)
+OperationsAdmin     roles; token × route-index → handler
+PurchaseFees        fee math (owned by PurchaseRbtc; MoC / Uniswap route fee construction)
 TokenHandler        deposit/withdraw stablecoin
 LendingHandler      TokenHandler + ILendingHandler; share ↔ underlying conversion, per-user shares, withdraw clamp, interest, exact-sum batch redeem
 StablecoinSource    shared `i_stableToken` + batch-funding hook (TokenHandler and PurchaseRbtc inherit; idle/lending implement retrieve)
@@ -36,18 +42,18 @@ PurchaseMoc         MoC redeem DOC → rBTC (_purchaseRbtc only)
 PurchaseUniswap     Uniswap V3 → WRBTC (_purchaseRbtc + WRBTC unwrap on withdraw)
 
 Handlers = LendingHandler + a Purchase*  (lending adapters) or TokenHandler + a Purchase* (idle):
-  src/idle/              IdleErc20Handler ─┬─ IdleDocHandlerMoc (+ PurchaseMoc)  index 0 (DOC)
-                                          └─ IdleErc20HandlerDex (+ PurchaseUniswap)  index 0 (USDRIF / USDT0)
-  src/layerbank/         LayerBankErc20Handler ─┬─ LayerBankDocHandlerMoc (+ PurchaseMoc) index 1
-                                               └─ LayerBankErc20HandlerDex (+ PurchaseUniswap)  USDRIF / USDT0
-  src/sovryn/            SovrynErc20Handler ─┬─ SovrynDocHandlerMoc   (+ PurchaseMoc)  index 2
-                                            └─ SovrynErc20HandlerDex (+ PurchaseUniswap)
-  src/tropykus-legacy/   TropykusErc20Handler ─┬─ TropykusDocHandlerMoc   (+ PurchaseMoc)
-                                              └─ TropykusErc20HandlerDex (+ PurchaseUniswap)
+  src/idle/              IdleHandler ─┬─ IdleDocHandlerMoc (+ PurchaseMoc)  index 0 (DOC)
+                                          └─ IdleHandlerDex (+ PurchaseUniswap)  index 0 (USDRIF / USDT0)
+  src/layerbank/         LayerBankHandler ─┬─ LayerBankDocHandlerMoc (+ PurchaseMoc) index 1
+                                               └─ LayerBankHandlerDex (+ PurchaseUniswap)  USDRIF / USDT0
+  src/sovryn/            SovrynHandler ─┬─ SovrynDocHandlerMoc   (+ PurchaseMoc)  index 2
+                                            └─ SovrynHandlerDex (+ PurchaseUniswap)
+  src/tropykus-legacy/   TropykusHandler ─┬─ TropykusDocHandlerMoc   (+ PurchaseMoc)
+                                              └─ TropykusHandlerDex (+ PurchaseUniswap)
                              test-only: no live deploy branch builds one, on either map
 ```
 
-- `src/interfaces/` — shared first-party ABIs; keep in sync with implementations. Protocol-specific interfaces (`IiSusdToken`, `IkToken`, `ILayerBankAToken`, `ILayerBankPool`, `ILayerBankErc20Handler`, `ITropykusErc20Handler`) live next to their handlers. Idle has no protocol-specific interface after R87 removed the per-user ledger surface. Lending handlers share `ILendingHandler` directly — R16 removed the empty per-protocol lending interfaces, so do not add one for a new handler unless it actually declares something (errors, events, or protocol-specific views — same bar Idle now meets by having none).
+- `src/interfaces/` — shared first-party ABIs; keep in sync with implementations. Protocol-specific interfaces (`IiSusdToken`, `IkToken`, `ILayerBankAToken`, `ILayerBankPool`, `ILayerBankHandler`, `ITropykusHandler`) live next to their handlers. Idle has no protocol-specific interface after R87 removed the per-user ledger surface. Lending handlers share `ILendingHandler` directly — R16 removed the empty per-protocol lending interfaces, so do not add one for a new handler unless it actually declares something (errors, events, or protocol-specific views — same bar Idle now meets by having none).
 - `test/unit/DcaDappTest.t.sol` — shared harness; **requires** `SWAP_TYPE` and `LENDING_PROTOCOL` (no fallback).
 - `test/unit/`, `test/mocks/`, `test/ai-generated/` — unit / mocks / extra + fuzz. Dedicated handler tests: `test/ai-generated/unit/sovryn/`, `test/ai-generated/unit/tropykus-legacy/`, `test/ai-generated/unit/idle/`, `test/ai-generated/unit/layerbank/`.
 - `script/` — deploy helpers. Do not `--broadcast` or talk to live contracts. `TROPYKUS_INDEX` deliberately lives in `test/Constants.sol`, not `script/Constants.sol`, so a `script/` file that names a Tropykus route does not compile; `TROPYKUS_STRING` stays in `script/Constants.sol` because the helper configs select mocks with it. Do not move the index back or re-add a Tropykus arm to a live branch — both live branches reject `Protocol.TROPYKUS`. A new production handler ships its deploy path in the same PR: extend `DeployMocSwaps` / `DeployDexSwaps` when it belongs in the main index map, or add a `Deploy<Handler>.s.sol` add-on (see `DeployUsdrifHandler`, `DeployIdleHandler`, `DeployLayerBankHandler`). DcaManager and deployment tests must construct that handler through the script (`DcaDappTest`, `BaseDeploymentTest`, `NewHandlerDeploymentTest`). `new Handler(...)` is only for test subclasses that expose internals, or handler-level tests that set `dcaManager` to the test contract so they can call `onlyDcaManager` entry points.
@@ -82,7 +88,7 @@ First-party `src/` files use Foundry-style banners with these exact titles. When
 
 `TYPE DECLARATIONS` → `STATE VARIABLES` → `EVENTS` → `ERRORS` → `MODIFIERS` → `CONSTRUCTOR` → `EXTERNAL FUNCTIONS` → `GETTERS` → `INTERNAL FUNCTIONS` → `PRIVATE FUNCTIONS`.
 
-- **Floor:** constructor-only contracts (the only declaration is `constructor`) carry no banners — that is the leaf-handler shape (`IdleDocHandlerMoc`, `*Erc20HandlerDex`, `*DocHandlerMoc`, …). Every other first-party file uses banners for each non-empty section.
+- **Floor:** constructor-only contracts (the only declaration is `constructor`) carry no banners — that is the leaf-handler shape (`IdleDocHandlerMoc`, `*HandlerDex`, `*DocHandlerMoc`, …). Every other first-party file uses banners for each non-empty section.
 - **Visibility:** external → public → internal → private. The externally reachable surface is therefore always the top of the file, which is what makes it readable in one pass; that property, not the banners, is the point of the ordering.
 - **EXTERNAL FUNCTIONS** holds `external` / `public` entry points that write state, including `receive` / `fallback` and `public` overrides. It is decided by mutability, not by name: `getAccruedInterest` is deliberately non-`view` and belongs here.
 - **GETTERS** holds `view` / `pure` `external` / `public` accessors — reads a caller makes for an answer. `supportsInterface` (the public view ERC-165 override) lives here. A `view` / `pure` function that only reverts is a disabled mutator, not an accessor, and stays with the mutators (`BitChillOwnable.renounceOwnership`).
@@ -100,7 +106,7 @@ layer is written once, on the interface, and reaches the implementation through 
 hatch: on a contract it fails the compile outright (`Error (6546): Documentation tag @inheritdoc not
 valid for contracts`). Header NatSpec is own-file — it does not cross `is` to an implementation, and it
 does not travel down an inheritance chain either, so `SovrynDocHandlerMoc` inherits nothing from
-`SovrynErc20Handler`'s header. The header layer is therefore written by hand, and this is where.
+`SovrynHandler`'s header. The header layer is therefore written by hand, and this is where.
 
 **A deployed contract must be readable on its own.** Anyone auditing this protocol lands on the verified
 concrete contract. Every contract that is actually deployed — `DcaManager`, `OperationsAdmin`, and the
@@ -120,15 +126,15 @@ Everything else is single-sourced on the interface:
   its own code that a reader of the surface could not infer; an abstract's header reaches no shipped
   artifact whichever side it sits on, so there is nothing to be gained by restating the interface there.
 - Two cases where no interface owns the claim, so it stays on the implementation. An interface that
-  declares no functions (`ILayerBankErc20Handler`, `ITropykusErc20Handler`) is a home
+  declares no functions (`ILayerBankHandler`, `ITropykusHandler`) is a home
   for errors and events, not a surface: its `@notice` says what it carries. And a fact true of one
   implementation cannot live on an interface several share — `ILendingHandler` is Sovryn's, LayerBank's,
   and Tropykus's at once.
 - Constructor-only leaves carry the header even though they carry no banners, and sibling leaves state
-  the same fact the same way: the four `*Erc20HandlerDex` contracts each say `Constructor-only leaf`
+  the same fact the same way: the four `*HandlerDex` contracts each say `Constructor-only leaf`
   and their approval/lifecycle model in `@dev`, not one of them in `@notice`.
 
-**Do not name a token in a contract that does not name it itself.** `PurchaseUniswap`, `IdleErc20Handler`,
+**Do not name a token in a contract that does not name it itself.** `PurchaseUniswap`, `IdleHandler`,
 `LendingHandler`, `TokenHandler` and their interfaces are constructed with whatever stablecoin they
 are given; a comment listing DOC, USDRIF, or USDT0 there is a snapshot of a listing decision that will
 rot, and on the Uniswap path naming DOC is simply wrong — DOC is redeemed at MoC and never swapped.
@@ -193,7 +199,7 @@ is proven by comparing metadata-stripped runtime, not `forge build --sizes` (see
   local forge can rewrite wrapping and fail `fmt-check`. Do not call `vm.skip` at the end of a
   `setUp` that already ran `super.setUp()` — CI forge reports that as `FAIL: FOUNDRY::SKIP`; gate
   inside the test (or a modifier) instead.
-- Fork tests (`make fork-*`) need an RPC and are not in CI. `test/mainnet-debug/**` is excluded from normal local/CI runs. They run on **Anvil/revm**, not rskj: useful for live Sovryn/MoC state, **not** a Rootstock opcode/compiler proof. `make fork-*` passes `SWAP_TYPE` (default `mocSwaps`) and sources `.env` for `RSK_MAINNET_RPC_URL` — an empty `--fork-url` makes Forge treat the cwd as an IPC socket. `make fork-tropykus` (and `make fork` when `LENDING_PROTOCOL=tropykus`) pins `--fork-block-number 8700000` (2026-04-05), before Tropykus paused kDOC mint. The pause is between blocks 8739512 and 8740674 (2026-04-16/17), measured by bisecting mint on a fork; above it, deposits revert with kToken error `C2`. `make fork-sovryn`, `make fork-layerbank`, and `make fork-none` stay on the chain tip. Dex path allowlist coverage on a fork is `make fork-dex-path` (`DexPathFailoverTest` on USDRIF / LayerBank **and** USDRIF / idle / dexSwaps). Constructor self-allowlists the initial Dex path; do not require a separate `setPurchasePathAllowed` before `assignTokenHandler`. Full live-Uniswap purchase coverage for Dex leaves is `SWAP_TYPE=dexSwaps STABLECOIN_TYPE=USDRIF make fork-layerbank` (LayerBank) and `SWAP_TYPE=dexSwaps STABLECOIN_TYPE=USDRIF make fork-none` (idle); those can still revert `Too little received` and are not the R52 gate. Do not `vm.setEnv("LENDING_PROTOCOL", …)` in tests — it is process-wide and makes every later suite ignore the Makefile lane (`EXPECTED_LENDING_PROTOCOL` is the canary).
+- Fork tests (`make fork-*`) need an RPC and are not in CI. `test/mainnet-debug/**` is excluded from normal local/CI runs. They run on **Anvil/revm**, not rskj: useful for live Sovryn/MoC state, **not** a Rootstock opcode/compiler proof. `make fork-*` passes `SWAP_TYPE` (default `mocSwaps`) and sources `.env` for `RSK_MAINNET_RPC_URL` — an empty `--fork-url` makes Forge treat the cwd as an IPC socket. `make fork-tropykus` (and `make fork` when `LENDING_PROTOCOL=tropykus`) pins `--fork-block-number 8700000` (2026-04-05), before Tropykus paused kDOC mint. The pause is between blocks 8739512 and 8740674 (2026-04-16/17), measured by bisecting mint on a fork; above it, deposits revert with kToken error `C2`. `make fork-sovryn`, `make fork-layerbank`, and `make fork-none` stay on the chain tip. Dex path allowlist coverage on a fork is `make fork-dex-path` (`DexPathFailoverTest` on USDRIF / LayerBank **and** USDRIF / idle / dexSwaps). Constructor self-allowlists the initial Dex path; do not require a separate `setPurchasePathAllowed` before `assignHandler`. Full live-Uniswap purchase coverage for Dex leaves is `SWAP_TYPE=dexSwaps STABLECOIN_TYPE=USDRIF make fork-layerbank` (LayerBank) and `SWAP_TYPE=dexSwaps STABLECOIN_TYPE=USDRIF make fork-none` (idle); those can still revert `Too little received` and are not the R52 gate. Do not `vm.setEnv("LENDING_PROTOCOL", …)` in tests — it is process-wide and makes every later suite ignore the Makefile lane (`EXPECTED_LENDING_PROTOCOL` is the canary).
 
 ## Git (relaunch)
 

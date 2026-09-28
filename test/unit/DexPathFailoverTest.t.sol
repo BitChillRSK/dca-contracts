@@ -3,12 +3,12 @@ pragma solidity 0.8.36;
 
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IPurchaseUniswap} from "src/interfaces/IPurchaseUniswap.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import {IWRBTC} from "src/interfaces/IWRBTC.sol";
 import {ICoinPairPrice} from "src/interfaces/ICoinPairPrice.sol";
 import {IUniswapV3SwapRouter} from "../../src/interfaces/IUniswapV3SwapRouter.sol";
 import {DexHelperConfig} from "script/DexHelperConfig.s.sol";
-import {SovrynErc20HandlerDex} from "src/sovryn/SovrynErc20HandlerDex.sol";
+import {SovrynHandlerDex} from "src/sovryn/SovrynHandlerDex.sol";
 import {MockIsusdToken} from "test/mocks/MockIsusdToken.sol";
 import {BitChillOwnable} from "src/BitChillOwnable.sol";
 import {ownableUnauthorized} from "../utils/OzRevert.sol";
@@ -204,7 +204,7 @@ contract DexPathFailoverTest is DcaDappTest {
     function testConstructorPathIsAllowlistedBeforeAssignment() public {
         bytes memory path = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
         assertTrue(IPurchaseUniswap(address(stablecoinHandler)).isPurchasePathAllowed(keccak256(path)));
-        assertEq(operationsAdmin.getTokenHandler(address(stablecoin), s_routeIndex), address(stablecoinHandler));
+        assertEq(operationsAdmin.getHandler(address(stablecoin), s_routeIndex), address(stablecoinHandler));
     }
 
     function testUnauthorizedActivationOfNonAllowlistedPathFails() public {
@@ -386,7 +386,7 @@ contract DexPathFailoverTest is DcaDappTest {
         IPurchaseUniswap primary = IPurchaseUniswap(address(stablecoinHandler));
         other = IPurchaseUniswap(
             address(
-                new SovrynErc20HandlerDex(
+                new SovrynHandlerDex(
                     address(dcaManager),
                     address(stablecoin),
                     address(new MockIsusdToken(address(stablecoin))),
@@ -398,7 +398,7 @@ contract DexPathFailoverTest is DcaDappTest {
                         mocOracle: ICoinPairPrice(config.mocOracleAddress)
                     }),
                     FEE_COLLECTOR,
-                    IFeeHandler(address(stablecoinHandler)).getFeeSettings(),
+                    IPurchaseFees(address(stablecoinHandler)).getFeeSettings(),
                     primary.getAmountOutMinimumPercent(),
                     primary.getAmountOutMinimumSafetyCheck(),
                     OWNER

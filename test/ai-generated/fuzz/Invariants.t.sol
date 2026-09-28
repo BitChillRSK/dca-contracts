@@ -6,11 +6,11 @@ import {Test, console2} from "forge-std/Test.sol";
 import {StdInvariant} from "forge-std/StdInvariant.sol";
 import {DcaManager} from "src/DcaManager.sol";
 import {OperationsAdmin} from "src/OperationsAdmin.sol";
-import {TropykusErc20Handler} from "src/tropykus-legacy/TropykusErc20Handler.sol";
-import {SovrynErc20Handler} from "src/sovryn/SovrynErc20Handler.sol";
+import {TropykusHandler} from "src/tropykus-legacy/TropykusHandler.sol";
+import {SovrynHandler} from "src/sovryn/SovrynHandler.sol";
 import {PurchaseRbtc} from "src/PurchaseRbtc.sol";
 import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
 import {IDcaManager} from "src/interfaces/IDcaManager.sol";
@@ -119,7 +119,7 @@ contract InvariantTest is StdInvariant, Test {
         }
 
         vm.prank(OWNER);
-        operationsAdmin.assignTokenHandler(address(stablecoin), s_routeIndex, address(handler));
+        operationsAdmin.assignHandler(address(stablecoin), s_routeIndex, address(handler));
 
         // Setup users and balances
         for (uint256 i = 0; i < NUM_USERS; i++) {
@@ -440,15 +440,15 @@ contract InvariantTest is StdInvariant, Test {
 
 /**
  * @title TropykusHandlerWrapper
- * @notice Concrete implementation of TropykusErc20Handler for testing
+ * @notice Concrete implementation of TropykusHandler for testing
  * @dev Properly simulates rBTC accounting - handler's balance decreases when users buy rBTC
  */
-contract TropykusHandlerWrapper is TropykusErc20Handler {
+contract TropykusHandlerWrapper is TropykusHandler {
     // Track users' accumulated RBTC for testing
     mapping(address user => uint256 amount) internal s_usersAccumulatedRbtc;
 
     constructor(address dcaManagerAddress, address stableTokenAddress, address kTokenAddress)
-        TropykusErc20Handler(dcaManagerAddress, stableTokenAddress, kTokenAddress)
+        TropykusHandler(dcaManagerAddress, stableTokenAddress, kTokenAddress)
     {}
 
     /**
@@ -552,15 +552,15 @@ contract TropykusHandlerWrapper is TropykusErc20Handler {
 
 /**
  * @title SovrynHandlerWrapper
- * @notice Concrete implementation of SovrynErc20Handler for testing
+ * @notice Concrete implementation of SovrynHandler for testing
  * @dev Provides the missing Sovryn wrapper for invariant testing
  */
-contract SovrynHandlerWrapper is SovrynErc20Handler {
+contract SovrynHandlerWrapper is SovrynHandler {
     // Track users' accumulated RBTC for testing
     mapping(address user => uint256 amount) internal s_usersAccumulatedRbtc;
 
     constructor(address dcaManagerAddress, address stableTokenAddress, address iSusdTokenAddress)
-        SovrynErc20Handler(dcaManagerAddress, stableTokenAddress, iSusdTokenAddress)
+        SovrynHandler(dcaManagerAddress, stableTokenAddress, iSusdTokenAddress)
     {}
 
     /**

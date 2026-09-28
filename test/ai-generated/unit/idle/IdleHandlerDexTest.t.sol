@@ -3,13 +3,13 @@ pragma solidity 0.8.36;
 
 import {HandlerTestHarness} from "../HandlerTestHarness.t.sol";
 import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import {IPurchaseUniswap} from "src/interfaces/IPurchaseUniswap.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {IWRBTC} from "src/interfaces/IWRBTC.sol";
 import {IUniswapV3SwapRouter} from "../../../../src/interfaces/IUniswapV3SwapRouter.sol";
 import {ICoinPairPrice} from "src/interfaces/ICoinPairPrice.sol";
-import {IdleErc20HandlerDex} from "src/idle/IdleErc20HandlerDex.sol";
+import {IdleHandlerDex} from "src/idle/IdleHandlerDex.sol";
 import {MockWrbtcToken} from "test/mocks/MockWrbtcToken.sol";
 import {MockMocOracle} from "test/mocks/MockMocOracle.sol";
 import {MockSwapRouter02} from "test/mocks/MockSwapRouter02.sol";
@@ -18,17 +18,17 @@ import {handlerBatchBuyOne, NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
 import "test/Constants.sol";
 
 /**
- * @title IdleErc20HandlerDexTest
- * @notice Unit tests for IdleErc20HandlerDex: deposit → Uniswap batch → withdraw rBTC.
+ * @title IdleHandlerDexTest
+ * @notice Unit tests for IdleHandlerDex: deposit → Uniswap batch → withdraw rBTC.
  */
-contract IdleErc20HandlerDexTest is HandlerTestHarness {
+contract IdleHandlerDexTest is HandlerTestHarness {
     MockWrbtcToken public wrbtcToken;
     MockMocOracle public mocOracle;
     MockSwapRouter02 public mockRouter;
-    IdleErc20HandlerDex public idleDexHandler;
+    IdleHandlerDex public idleDexHandler;
 
     function deployHandler() internal override returns (ITokenHandler) {
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE_TEST,
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -47,7 +47,7 @@ contract IdleErc20HandlerDexTest is HandlerTestHarness {
             mocOracle: ICoinPairPrice(address(mocOracle))
         });
 
-        idleDexHandler = new IdleErc20HandlerDex(
+        idleDexHandler = new IdleHandlerDex(
             address(dcaManager),
             address(stablecoin),
             uniswapSettings,

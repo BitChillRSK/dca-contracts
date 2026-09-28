@@ -3,9 +3,9 @@ pragma solidity 0.8.36;
 
 import {HandlerTestHarness} from "../HandlerTestHarness.t.sol";
 import {ITokenHandler} from "../../../../src/interfaces/ITokenHandler.sol";
-import {IFeeHandler} from "../../../../src/interfaces/IFeeHandler.sol";
-import {SovrynErc20Handler} from "../../../../src/sovryn/SovrynErc20Handler.sol";
-import {FeeHandler} from "../../../../src/FeeHandler.sol";
+import {IPurchaseFees} from "../../../../src/interfaces/IPurchaseFees.sol";
+import {SovrynHandler} from "../../../../src/sovryn/SovrynHandler.sol";
+import {PurchaseFees} from "../../../../src/PurchaseFees.sol";
 import {MockIsusdToken} from "../../../mocks/MockIsusdToken.sol";
 import {MockStablecoin} from "../../../mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -14,10 +14,10 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import "../../../Constants.sol";
 
 /**
- * @title SovrynErc20HandlerTest
- * @notice Unit tests for SovrynErc20Handler using shared test harness
+ * @title SovrynHandlerTest
+ * @notice Unit tests for SovrynHandler using shared test harness
  */
-contract SovrynErc20HandlerTest is HandlerTestHarness {
+contract SovrynHandlerTest is HandlerTestHarness {
     // Sovryn-specific contracts
     MockIsusdToken public iSusdToken;
     SovrynTestHandler public sovrynHandler;
@@ -27,7 +27,7 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
     //////////////////////////////////////////////////////////////*/
 
     function deployHandler() internal override returns (ITokenHandler) {
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE_TEST,
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -378,10 +378,10 @@ contract SovrynErc20HandlerTest is HandlerTestHarness {
 
 /**
  * @title SovrynTestHandler
- * @notice Concrete implementation of SovrynErc20Handler for testing
+ * @notice Concrete implementation of SovrynHandler for testing
  * @dev Implements abstract functions to make testing possible
  */
-contract SovrynTestHandler is SovrynErc20Handler, FeeHandler {
+contract SovrynTestHandler is SovrynHandler, PurchaseFees {
     constructor(
         address dcaManagerAddress,
         address stableTokenAddress,
@@ -390,8 +390,8 @@ contract SovrynTestHandler is SovrynErc20Handler, FeeHandler {
         FeeSettings memory feeSettings,
         address initialOwner
     )
-        SovrynErc20Handler(dcaManagerAddress, stableTokenAddress, iSusdTokenAddress)
-        FeeHandler(feeCollector, feeSettings, initialOwner)
+        SovrynHandler(dcaManagerAddress, stableTokenAddress, iSusdTokenAddress)
+        PurchaseFees(feeCollector, feeSettings, initialOwner)
     {}
 
     /**

@@ -2,21 +2,21 @@
 pragma solidity 0.8.36;
 
 import {PurchaseUniswap} from "../PurchaseUniswap.sol";
-import {LayerBankErc20Handler} from "./LayerBankErc20Handler.sol";
+import {SovrynHandler} from "./SovrynHandler.sol";
 
 /**
- * @title LayerBankErc20HandlerDex
+ * @title SovrynHandlerDex
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Token-agnostic LayerBank lending + Uniswap V3 purchase handler.
+ * @notice Sovryn lending + Uniswap V3 purchases.
  * @dev Constructor-only leaf. Only its immutable DcaManager moves principal, buys, or withdraws rBTC;
  *      the owner controls fees, oracle, path allowlist, and floor. Holds standing max stablecoin
- *      approvals to SwapRouter02 and the LayerBank Pool, restorable by anyone.
+ *      approvals to SwapRouter02 and the iSUSD token, restorable by anyone.
  */
-contract LayerBankErc20HandlerDex is LayerBankErc20Handler, PurchaseUniswap {
+contract SovrynHandlerDex is SovrynHandler, PurchaseUniswap {
     /**
      * @param dcaManagerAddress The DcaManager allowed to call this handler.
      * @param stableTokenAddress The stablecoin this handler lends.
-     * @param aTokenAddress LayerBank aToken for that stablecoin.
+     * @param iSusdTokenAddress Sovryn iToken for that stablecoin.
      * @param uniswapSettings Router, WRBTC, path, and MoC oracle.
      * @param feeCollector Address that receives purchase fees.
      * @param feeSettings Linear fee parameters.
@@ -27,7 +27,7 @@ contract LayerBankErc20HandlerDex is LayerBankErc20Handler, PurchaseUniswap {
     constructor(
         address dcaManagerAddress,
         address stableTokenAddress,
-        address aTokenAddress,
+        address iSusdTokenAddress,
         UniswapSettings memory uniswapSettings,
         address feeCollector,
         FeeSettings memory feeSettings,
@@ -35,10 +35,10 @@ contract LayerBankErc20HandlerDex is LayerBankErc20Handler, PurchaseUniswap {
         uint256 amountOutMinimumSafetyCheck,
         address initialOwner
     )
-        LayerBankErc20Handler(dcaManagerAddress, stableTokenAddress, aTokenAddress)
+        SovrynHandler(dcaManagerAddress, stableTokenAddress, iSusdTokenAddress)
         PurchaseUniswap(
             uniswapSettings,
-            FeeHandlerConfig({feeCollector: feeCollector, feeSettings: feeSettings}),
+            FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}),
             amountOutMinimumPercent,
             amountOutMinimumSafetyCheck,
             initialOwner
