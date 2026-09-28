@@ -62,7 +62,7 @@ contract DepositsPauseTest is DcaDappTest {
         _pauseDeposits(true);
 
         uint256 userStablecoinBefore = stablecoin.balanceOf(USER);
-        uint256 numOfSchedulesBefore = scheduleCount(dcaManager, USER, address(stablecoin));
+        uint256 scheduleCountBefore = scheduleCount(dcaManager, USER, address(stablecoin));
 
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
@@ -73,7 +73,7 @@ contract DepositsPauseTest is DcaDappTest {
         vm.stopPrank();
 
         assertEq(stablecoin.balanceOf(USER), userStablecoinBefore, "the user paid on a paused route");
-        assertEq(scheduleCount(dcaManager, USER, address(stablecoin)), numOfSchedulesBefore);
+        assertEq(scheduleCount(dcaManager, USER, address(stablecoin)), scheduleCountBefore);
     }
 
     /// @dev With no allowance a deposit would revert inside the handler. The pause error is what
@@ -165,7 +165,7 @@ contract DepositsPauseTest is DcaDappTest {
 
         uint256 userRbtcBefore = USER.balance;
         vm.prank(USER);
-        dcaManager.withdrawRbtcFromTokenHandler(address(stablecoin), s_routeIndex);
+        dcaManager.withdrawAccumulatedRbtc(address(stablecoin), s_routeIndex);
         assertEq(USER.balance - userRbtcBefore, rbtcAccumulated);
     }
 

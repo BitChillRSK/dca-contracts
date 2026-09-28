@@ -101,7 +101,7 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
 
         uint256 userRbtcBefore = USER.balance;
         vm.prank(USER);
-        dcaManager.withdrawRbtcFromTokenHandler(address(docToken), LAYERBANK_INDEX);
+        dcaManager.withdrawAccumulatedRbtc(address(docToken), LAYERBANK_INDEX);
         assertGt(USER.balance, userRbtcBefore);
         assertEq(dcaManager.getAccumulatedRbtcBalance(USER, address(docToken), LAYERBANK_INDEX), 0);
     }
@@ -110,7 +110,7 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, LAYERBANK_INDEX);
 
-        uint256 interest = dcaManager.getInterestAccrued(USER, address(docToken), LAYERBANK_INDEX);
+        uint256 interest = dcaManager.getAccruedInterest(USER, address(docToken), LAYERBANK_INDEX);
         assertEq(interest, 0);
     }
 }

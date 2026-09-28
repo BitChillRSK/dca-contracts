@@ -20,8 +20,8 @@ interface IPurchaseUniswap {
     //////////////////////////////////////////////////////////////*/
     /// @notice Constructor bundle for the Uniswap router, wrapped rBTC, path, and MoC BTC/USD oracle.
     struct UniswapSettings {
-        IWRBTC wrBtcToken;
-        IUniswapV3SwapRouter swapRouter02;
+        IWRBTC wrbtc;
+        IUniswapV3SwapRouter swapRouter;
         address[] swapIntermediateTokens;
         uint24[] swapPoolFeeRates;
         ICoinPairPrice mocOracle;
@@ -132,7 +132,7 @@ interface IPurchaseUniswap {
      * @notice Point min-out at a new MoC BTC/USD oracle.
      * @param newOracle New oracle. Cannot be zero.
      */
-    function updateMocOracle(address newOracle) external;
+    function setMocOracle(address newOracle) external;
 
     /**
      * @notice Re-grant SwapRouter02 the unbounded stablecoin allowance set at construction.

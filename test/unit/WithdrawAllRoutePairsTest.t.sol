@@ -108,8 +108,8 @@ contract WithdrawAllRoutePairsTest is BaseDeploymentTest {
     function testWithdrawAllInterestOnlyCallsTheNamedPairs() external {
         vm.warp(block.timestamp + 365 days);
 
-        uint256 interestOne = dcaManager.getInterestAccrued(USER, address(tokenOne), ROUTE_ONE);
-        uint256 interestTwo = dcaManager.getInterestAccrued(USER, address(tokenTwo), ROUTE_TWO);
+        uint256 interestOne = dcaManager.getAccruedInterest(USER, address(tokenOne), ROUTE_ONE);
+        uint256 interestTwo = dcaManager.getAccruedInterest(USER, address(tokenTwo), ROUTE_TWO);
         assertGt(interestOne, 0);
         assertGt(interestTwo, 0);
 
@@ -160,7 +160,7 @@ contract WithdrawAllRoutePairsTest is BaseDeploymentTest {
     function testWithdrawAllInterestOnOnePairLeavesTheOtherRoutesAlone() external {
         vm.warp(block.timestamp + 365 days);
 
-        uint256 interestOne = dcaManager.getInterestAccrued(USER, address(tokenOne), ROUTE_ONE);
+        uint256 interestOne = dcaManager.getAccruedInterest(USER, address(tokenOne), ROUTE_ONE);
         uint256 balanceOneBefore = tokenOne.balanceOf(USER);
         uint256 balanceTwoBefore = tokenTwo.balanceOf(USER);
 
@@ -183,7 +183,7 @@ contract WithdrawAllRoutePairsTest is BaseDeploymentTest {
     function testWithdrawAllInterestSkipsTheUnassignedCellOfTheGrid() external {
         vm.warp(block.timestamp + 365 days);
 
-        uint256 interestTwo = dcaManager.getInterestAccrued(USER, address(tokenTwo), ROUTE_TWO);
+        uint256 interestTwo = dcaManager.getAccruedInterest(USER, address(tokenTwo), ROUTE_TWO);
         uint256 balanceTwoBefore = tokenTwo.balanceOf(USER);
 
         address[] memory tokens = new address[](2);

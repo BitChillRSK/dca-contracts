@@ -42,7 +42,7 @@ contract StablecoinHandlerTest is DcaDappTest {
         vm.prank(OWNER);
         vm.expectEmit(true, true, true, true);
         emit PurchaseFees__FeeCollectorAddressSet(newFeeCollector);
-        IPurchaseFees(address(stablecoinHandler)).setFeeCollectorAddress(newFeeCollector);
-        assertEq(IPurchaseFees(address(stablecoinHandler)).getFeeCollectorAddress(), newFeeCollector);
+        IPurchaseFees(address(stablecoinHandler)).setFeeCollector(newFeeCollector);
+        assertEq(IPurchaseFees(address(stablecoinHandler)).getFeeCollector(), newFeeCollector);
     }
 }

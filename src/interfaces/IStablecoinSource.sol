@@ -21,9 +21,6 @@ interface IStablecoinSource {
                                 GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @notice The stablecoin this handler deposits, withdraws, and spends on purchases.
-     * @return The constructor-supplied ERC20.
-     */
+    /// @notice The stablecoin this handler deposits, withdraws, and spends on purchases.
     function i_stableToken() external view returns (IERC20);
 }

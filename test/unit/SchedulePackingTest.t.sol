@@ -382,7 +382,7 @@ contract SchedulePackingTest is DcaDappTest {
 
         // Keep this one-day boundary probe independent of the weekly launch default.
         vm.prank(OWNER);
-        dcaManager.modifyMinPurchasePeriod(1 days);
+        dcaManager.setMinPurchasePeriod(1 days);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.prank(USER);
         dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, 1 days);

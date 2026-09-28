@@ -257,17 +257,17 @@ contract PurchaseFeesTest is Test {
         assertEq(feeHandler.getFeeSettings().maxFeeRate, FEE_RATE_CAP);
     }
 
-    function test_setFeeCollectorAddress_reverts_zero() public {
+    function test_setFeeCollector_reverts_zero() public {
         vm.expectRevert(IPurchaseFees.PurchaseFees__InvalidFeeCollector.selector);
-        feeHandler.setFeeCollectorAddress(address(0));
+        feeHandler.setFeeCollector(address(0));
     }
 
-    function test_setFeeCollectorAddress_success() public {
+    function test_setFeeCollector_success() public {
         address newCollector = address(0xCAFE);
         vm.expectEmit(true, true, true, true);
         emit PurchaseFees__FeeCollectorAddressSet(newCollector);
-        feeHandler.setFeeCollectorAddress(newCollector);
-        assertEq(feeHandler.getFeeCollectorAddress(), newCollector);
+        feeHandler.setFeeCollector(newCollector);
+        assertEq(feeHandler.getFeeCollector(), newCollector);
     }
 
     function test_transferFee_transfersWhenNonZero() public {

@@ -88,12 +88,11 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
         }
         if (s_handlerAssigned[handler]) revert OperationsAdmin__HandlerAddressAlreadyInUse(handler);
 
-        IERC165 tokenHandler = IERC165(handler);
-        if (!tokenHandler.supportsInterface(type(ITokenHandler).interfaceId)) {
+        if (!IERC165(handler).supportsInterface(type(ITokenHandler).interfaceId)) {
             revert OperationsAdmin__ContractIsNotTokenHandler(handler);
         }
 
-        bool supportsLending = tokenHandler.supportsInterface(type(ILendingHandler).interfaceId);
+        bool supportsLending = IERC165(handler).supportsInterface(type(ILendingHandler).interfaceId);
         if (routeClass == RouteClass.Lending) {
             if (!supportsLending) revert OperationsAdmin__ContractIsNotLendingHandler(handler);
         } else if (supportsLending) {

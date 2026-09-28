@@ -163,9 +163,9 @@ contract FlatKeyedDcaManager is ReentrancyGuard {
         if (dcaSchedule.user != msg.sender) revert Prototype__NotScheduleOwner();
 
         uint64[] storage scheduleIds = s_scheduleIds[msg.sender][dcaSchedule.token];
-        uint256 numOfSchedules = scheduleIds.length;
-        uint256 lastIndex = numOfSchedules - 1;
-        for (uint256 i; i < numOfSchedules; ++i) {
+        uint256 scheduleCount = scheduleIds.length;
+        uint256 lastIndex = scheduleCount - 1;
+        for (uint256 i; i < scheduleCount; ++i) {
             if (scheduleIds[i] == scheduleId) {
                 if (i != lastIndex) scheduleIds[i] = scheduleIds[lastIndex];
                 break;
@@ -187,14 +187,14 @@ contract FlatKeyedDcaManager is ReentrancyGuard {
      * @dev The buyer list the handler takes is built from storage, since the batch no longer carries it.
      */
     function batchBuyRbtc(Batch calldata batch) external onlySwapper {
-        uint256 numOfPurchases = batch.scheduleIds.length;
-        if (numOfPurchases == 0) revert Prototype__EmptyBatch();
+        uint256 purchaseCount = batch.scheduleIds.length;
+        if (purchaseCount == 0) revert Prototype__EmptyBatch();
 
-        address[] memory buyers = new address[](numOfPurchases);
-        uint256[] memory purchaseAmounts = new uint256[](numOfPurchases);
-        for (uint256 i; i < numOfPurchases; ++i) {
+        address[] memory buyers = new address[](purchaseCount);
+        uint256[] memory purchaseAmounts = new uint256[](purchaseCount);
+        for (uint256 i; i < purchaseCount; ++i) {
             (address buyer, uint256 purchaseAmount) =
-                _rBtcPurchaseChecksEffects(batch.scheduleIds[i], batch.token, batch.routeIndex);
+                _rbtcPurchaseChecksEffects(batch.scheduleIds[i], batch.token, batch.routeIndex);
             buyers[i] = buyer;
             purchaseAmounts[i] = purchaseAmount;
         }
@@ -207,9 +207,9 @@ contract FlatKeyedDcaManager is ReentrancyGuard {
     ///      rather than a user — measured for completeness, not as an argument.
     function getDcaSchedules(address user, address token) external view returns (FlatSchedule[] memory) {
         uint64[] storage scheduleIds = s_scheduleIds[user][token];
-        uint256 numOfSchedules = scheduleIds.length;
-        FlatSchedule[] memory schedules = new FlatSchedule[](numOfSchedules);
-        for (uint256 i; i < numOfSchedules; ++i) {
+        uint256 scheduleCount = scheduleIds.length;
+        FlatSchedule[] memory schedules = new FlatSchedule[](scheduleCount);
+        for (uint256 i; i < scheduleCount; ++i) {
             schedules[i] = s_dcaSchedules[scheduleIds[i]];
         }
         return schedules;
@@ -233,9 +233,9 @@ contract FlatKeyedDcaManager is ReentrancyGuard {
     }
 
     function _handler(address token, uint256 routeIndex) private view returns (ITokenHandler) {
-        address tokenHandlerAddress = i_operationsAdmin.getHandler(token, routeIndex);
-        if (tokenHandlerAddress == address(0)) revert Prototype__TokenNotAccepted();
-        return ITokenHandler(tokenHandlerAddress);
+        address handler = i_operationsAdmin.getHandler(token, routeIndex);
+        if (handler == address(0)) revert Prototype__TokenNotAccepted();
+        return ITokenHandler(handler);
     }
 
     /**
@@ -243,7 +243,7 @@ contract FlatKeyedDcaManager is ReentrancyGuard {
      *      checked here: a row naming another token or route would otherwise be debited by a handler
      *      that never holds its funds.
      */
-    function _rBtcPurchaseChecksEffects(uint64 scheduleId, address token, uint256 routeIndex)
+    function _rbtcPurchaseChecksEffects(uint64 scheduleId, address token, uint256 routeIndex)
         private
         returns (address, uint256)
     {

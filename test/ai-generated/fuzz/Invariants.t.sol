@@ -198,7 +198,7 @@ contract InvariantTest is StdInvariant, Test {
         fuzzHandler.withdrawToken(0, 0, MIN_PURCHASE_AMOUNT / 10);
         vm.warp(block.timestamp + 365 days);
         vm.roll(block.number + 365 days / 30);
-        uint256 accruedInterest = dcaManager.getInterestAccrued(s_users[0], address(stablecoin), s_routeIndex);
+        uint256 accruedInterest = dcaManager.getAccruedInterest(s_users[0], address(stablecoin), s_routeIndex);
         assertGt(accruedInterest, MIN_PURCHASE_AMOUNT / 10, "the lane accrued too little to credit");
 
         uint256 balanceBefore = scheduleAt(dcaManager, s_users[0], address(stablecoin), 0).tokenBalance;

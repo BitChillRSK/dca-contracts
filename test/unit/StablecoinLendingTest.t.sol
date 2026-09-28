@@ -202,7 +202,7 @@ contract StablecoinLendingTest is DcaDappTest {
     function testWithdrawInterest() external onlyLendingLane {
         updateExchangeRate(10 days);
 
-        uint256 withdrawableInterest = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        uint256 withdrawableInterest = dcaManager.getAccruedInterest(USER, address(stablecoin), s_routeIndex);
         uint256 userStablecoinBalanceBeforeInterestWithdrawal = stablecoin.balanceOf(USER);
         // assertGt(withdrawableInterest, 0);
         vm.prank(USER);
@@ -221,7 +221,7 @@ contract StablecoinLendingTest is DcaDappTest {
             withdrawableInterest,
             _lendingRedeemCashRelTol()
         );
-        withdrawableInterest = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        withdrawableInterest = dcaManager.getAccruedInterest(USER, address(stablecoin), s_routeIndex);
         if (withdrawableInterest == 1) withdrawableInterest--; // Handle Sovryn's precision loss
         assertEq(withdrawableInterest, 0);
     }
@@ -257,7 +257,7 @@ contract StablecoinLendingTest is DcaDappTest {
     function testWithdrawAllInterestSkipsUnregisteredPairAndKeepsGoing() external onlyLendingLane {
         updateExchangeRate(10 days);
 
-        uint256 withdrawableInterest = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        uint256 withdrawableInterest = dcaManager.getAccruedInterest(USER, address(stablecoin), s_routeIndex);
         uint256 userBalanceBeforeWithdrawal = stablecoin.balanceOf(USER);
 
         address[] memory tokens = new address[](2);
@@ -281,7 +281,7 @@ contract StablecoinLendingTest is DcaDappTest {
     function testWithdrawAllInterestWithDuplicatePairPaysOnce() external onlyLendingLane {
         updateExchangeRate(10 days);
 
-        uint256 withdrawableInterest = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        uint256 withdrawableInterest = dcaManager.getAccruedInterest(USER, address(stablecoin), s_routeIndex);
         uint256 userBalanceBeforeWithdrawal = stablecoin.balanceOf(USER);
 
         address[] memory tokens = new address[](2);
@@ -297,7 +297,7 @@ contract StablecoinLendingTest is DcaDappTest {
         assertApproxEqRel(
             stablecoin.balanceOf(USER) - userBalanceBeforeWithdrawal, withdrawableInterest, _lendingRedeemCashRelTol()
         );
-        uint256 remainingInterest = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        uint256 remainingInterest = dcaManager.getAccruedInterest(USER, address(stablecoin), s_routeIndex);
         if (remainingInterest == 1) remainingInterest--; // Handle Sovryn's precision loss
         assertEq(remainingInterest, 0);
     }
@@ -310,7 +310,7 @@ contract StablecoinLendingTest is DcaDappTest {
         // On fork tests we need to simulate some operation on Tropykus so that the exchange rate gets updated
         updateExchangeRate(10 days);
 
-        uint256 withdrawableInterest = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        uint256 withdrawableInterest = dcaManager.getAccruedInterest(USER, address(stablecoin), s_routeIndex);
         uint256 userStablecoinBalanceBeforeInterestWithdrawal = stablecoin.balanceOf(USER);
         assertGt(withdrawableInterest, 0);
 
@@ -325,7 +325,7 @@ contract StablecoinLendingTest is DcaDappTest {
             _lendingRedeemCashRelTol()
         );
 
-        withdrawableInterest = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        withdrawableInterest = dcaManager.getAccruedInterest(USER, address(stablecoin), s_routeIndex);
         if (withdrawableInterest == 1) withdrawableInterest = 0; // Handle edge case of 1 wei remaining
         assertEq(withdrawableInterest, 0);
     }
@@ -335,7 +335,7 @@ contract StablecoinLendingTest is DcaDappTest {
         super.createSeveralDcaSchedules();
         updateExchangeRate(10 days);
 
-        uint256 interest = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        uint256 interest = dcaManager.getAccruedInterest(USER, address(stablecoin), s_routeIndex);
         assertGt(interest, 0);
         // One missed schedule would treat that principal as yield (~AMOUNT_TO_DEPOSIT / NUM_OF_SCHEDULES).
         assertLt(interest, AMOUNT_TO_DEPOSIT / NUM_OF_SCHEDULES);

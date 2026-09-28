@@ -20,7 +20,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         super.setUp();
         // Exercise the contract-level daily cadence independently of the weekly launch default.
         vm.prank(OWNER);
-        dcaManager.modifyMinPurchasePeriod(TEST_PURCHASE_PERIOD);
+        dcaManager.setMinPurchasePeriod(TEST_PURCHASE_PERIOD);
         _setPurchasePeriod(TEST_PURCHASE_PERIOD);
     }
 
@@ -244,7 +244,7 @@ contract RbtcPurchaseTest is DcaDappTest {
     }
 
     function testSeveralPurchasesOneSchedule() external {
-        uint256 numOfPurchases = 5;
+        uint256 purchaseCount = 5;
 
         uint256 fee = feeCalculator.calculateFee(AMOUNT_TO_SPEND);
         uint256 netPurchaseAmount = AMOUNT_TO_SPEND - fee;
@@ -252,22 +252,22 @@ contract RbtcPurchaseTest is DcaDappTest {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.prank(USER);
         dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, TEST_PURCHASE_PERIOD);
-        for (uint256 i; i < numOfPurchases; ++i) {
+        for (uint256 i; i < purchaseCount; ++i) {
             buyRbtcOne(scheduleId);
             vm.warp(vm.getBlockTimestamp() + TEST_PURCHASE_PERIOD);
         }
         vm.prank(USER);
-        // assertEq(stablecoinHandler.getAccumulatedRbtcBalance(), (netPurchaseAmount / s_btcPrice) * numOfPurchases);
+        // assertEq(stablecoinHandler.getAccumulatedRbtcBalance(), (netPurchaseAmount / s_btcPrice) * purchaseCount);
 
         // if (keccak256(abi.encodePacked(swapType)) == keccak256(abi.encodePacked("mocSwaps"))) {
         //     assertEq(
         //         IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER),
-        //         (netPurchaseAmount / s_btcPrice) * numOfPurchases
+        //         (netPurchaseAmount / s_btcPrice) * purchaseCount
         //     );
         // } else if (keccak256(abi.encodePacked(swapType)) == keccak256(abi.encodePacked("dexSwaps"))) {
         assertApproxEqRel( // The mock contract that simulates swapping on Uniswap allows for some slippage
             IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER),
-            (netPurchaseAmount / s_btcPrice) * numOfPurchases,
+            (netPurchaseAmount / s_btcPrice) * purchaseCount,
             _maxPurchaseSlippage() // Allow a maximum difference of 0.5% (on fork tests we saw this was necessary for both MoC and Uniswap purchases)
         );
         // }
@@ -317,9 +317,9 @@ contract RbtcPurchaseTest is DcaDappTest {
      *      this test asserts the DcaManager guard it is named for on every lane.
      */
     function testRevertPurchasetIfStablecoinRunsOut() external {
-        uint256 numOfPurchases = AMOUNT_TO_DEPOSIT / AMOUNT_TO_SPEND;
+        uint256 purchaseCount = AMOUNT_TO_DEPOSIT / AMOUNT_TO_SPEND;
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        for (uint256 i; i < numOfPurchases - 1; ++i) {
+        for (uint256 i; i < purchaseCount - 1; ++i) {
             buyRbtcOne(scheduleId);
             vm.warp(vm.getBlockTimestamp() + TEST_PURCHASE_PERIOD);
         }
@@ -537,9 +537,9 @@ contract RbtcPurchaseTest is DcaDappTest {
         uint256 purchasesPerSchedule = AMOUNT_TO_DEPOSIT / AMOUNT_TO_SPEND;
 
         // Store initial interest accrued (should be 0 initially)
-        uint256 initialInterestUser = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        uint256 initialInterestUser = dcaManager.getAccruedInterest(USER, address(stablecoin), s_routeIndex);
         uint256 initialInterestSecondUser =
-            dcaManager.getInterestAccrued(SECOND_USER, address(stablecoin), s_routeIndex);
+            dcaManager.getAccruedInterest(SECOND_USER, address(stablecoin), s_routeIndex);
 
         // Both users should have 0 interest initially
         assertEq(initialInterestUser, 0, "USER should have 0 interest initially");
@@ -569,8 +569,8 @@ contract RbtcPurchaseTest is DcaDappTest {
         }
 
         // After time has passed and multiple purchase rounds, check that interest has accrued
-        uint256 finalInterestUser = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
-        uint256 finalInterestSecondUser = dcaManager.getInterestAccrued(SECOND_USER, address(stablecoin), s_routeIndex);
+        uint256 finalInterestUser = dcaManager.getAccruedInterest(USER, address(stablecoin), s_routeIndex);
+        uint256 finalInterestSecondUser = dcaManager.getAccruedInterest(SECOND_USER, address(stablecoin), s_routeIndex);
 
         // Both users should have accrued some interest during the test
         assertGt(finalInterestUser, initialInterestUser, "USER should have accrued interest during the test");
@@ -639,9 +639,9 @@ contract RbtcPurchaseTest is DcaDappTest {
         uint256 purchasesPerSchedule = AMOUNT_TO_DEPOSIT / AMOUNT_TO_SPEND;
 
         // Store initial interest accrued (should be 0 initially)
-        uint256 initialInterestUser = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        uint256 initialInterestUser = dcaManager.getAccruedInterest(USER, address(stablecoin), s_routeIndex);
         uint256 initialInterestSecondUser =
-            dcaManager.getInterestAccrued(SECOND_USER, address(stablecoin), s_routeIndex);
+            dcaManager.getAccruedInterest(SECOND_USER, address(stablecoin), s_routeIndex);
 
         // Both users should have 0 interest initially
         assertEq(initialInterestUser, 0, "USER should have 0 interest initially");
@@ -666,8 +666,8 @@ contract RbtcPurchaseTest is DcaDappTest {
         }
 
         // After time has passed and multiple purchase rounds, check that interest has accrued
-        uint256 finalInterestUser = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
-        uint256 finalInterestSecondUser = dcaManager.getInterestAccrued(SECOND_USER, address(stablecoin), s_routeIndex);
+        uint256 finalInterestUser = dcaManager.getAccruedInterest(USER, address(stablecoin), s_routeIndex);
+        uint256 finalInterestSecondUser = dcaManager.getAccruedInterest(SECOND_USER, address(stablecoin), s_routeIndex);
 
         // Both users should have accrued some interest during the test
         assertGt(finalInterestUser, initialInterestUser, "USER should have accrued interest during the test");
@@ -741,9 +741,9 @@ contract RbtcPurchaseTest is DcaDappTest {
         uint256 purchasesPerSchedule = AMOUNT_TO_DEPOSIT / AMOUNT_TO_SPEND;
 
         // Store initial interest accrued (should be 0 initially)
-        uint256 initialInterestUser = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        uint256 initialInterestUser = dcaManager.getAccruedInterest(USER, address(stablecoin), s_routeIndex);
         uint256 initialInterestSecondUser =
-            dcaManager.getInterestAccrued(SECOND_USER, address(stablecoin), s_routeIndex);
+            dcaManager.getAccruedInterest(SECOND_USER, address(stablecoin), s_routeIndex);
 
         // Both users should have 0 interest initially
         assertEq(initialInterestUser, 0, "USER should have 0 interest initially");
@@ -785,8 +785,8 @@ contract RbtcPurchaseTest is DcaDappTest {
         }
 
         // After time has passed and multiple purchase rounds, check that interest has accrued
-        uint256 finalInterestUser = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
-        uint256 finalInterestSecondUser = dcaManager.getInterestAccrued(SECOND_USER, address(stablecoin), s_routeIndex);
+        uint256 finalInterestUser = dcaManager.getAccruedInterest(USER, address(stablecoin), s_routeIndex);
+        uint256 finalInterestSecondUser = dcaManager.getAccruedInterest(SECOND_USER, address(stablecoin), s_routeIndex);
 
         // Both users should have accrued some interest during the test
         assertEq(finalInterestUser, 0, "USER should have already withdrawn all interest");

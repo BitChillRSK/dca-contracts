@@ -158,8 +158,8 @@ contract IdleLedgerBaselineHarness is TokenHandler {
         override
         returns (uint256 totalWithdrawn)
     {
-        uint256 numOfPurchases = users.length;
-        for (uint256 i; i < numOfPurchases; ++i) {
+        uint256 purchaseCount = users.length;
+        for (uint256 i; i < purchaseCount; ++i) {
             uint256 amount = purchaseAmounts[i];
             uint256 idleBalance = s_idleBalances[users[i]];
             require(amount <= idleBalance, "baseline underfunded");

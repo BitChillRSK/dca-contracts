@@ -421,7 +421,7 @@ contract NetRedemptionTest is DcaDappTest {
             anchorsBefore[i] = schedule.cadenceAnchor;
         }
 
-        address feeCollector = IPurchaseFees(address(stablecoinHandler)).getFeeCollectorAddress();
+        address feeCollector = IPurchaseFees(address(stablecoinHandler)).getFeeCollector();
         uint256 feeCollectorBefore = stablecoin.balanceOf(feeCollector);
         uint256 userSharesBefore = ILendingHandler(address(stablecoinHandler)).getUserShares(USER);
         uint256 iTokenBefore = shareToken.balanceOf(address(stablecoinHandler));

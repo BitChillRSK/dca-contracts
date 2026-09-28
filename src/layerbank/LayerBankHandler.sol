@@ -25,10 +25,7 @@ abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
      */
     uint256 public constant EXCHANGE_RATE_DECIMALS = 1e27;
 
-    /**
-     * @notice LayerBank aToken for this handler's stablecoin.
-     * @return The constructor-supplied aToken.
-     */
+    /// @notice LayerBank aToken for this handler's stablecoin.
     ILayerBankAToken public immutable i_aToken;
     /**
      * @notice LayerBank Pool this handler supplies to and withdraws from.

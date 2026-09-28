@@ -123,8 +123,8 @@ contract ZeroStablecoinTest is Test {
         uint24[] memory poolFeeRates = new uint24[](1);
         poolFeeRates[0] = 3000;
         return IPurchaseUniswap.UniswapSettings({
-            wrBtcToken: IWRBTC(address(s_wrBtc)),
-            swapRouter02: IUniswapV3SwapRouter(SWAP_ROUTER),
+            wrbtc: IWRBTC(address(s_wrBtc)),
+            swapRouter: IUniswapV3SwapRouter(SWAP_ROUTER),
             swapIntermediateTokens: new address[](0),
             swapPoolFeeRates: poolFeeRates,
             mocOracle: ICoinPairPrice(address(s_oracle))

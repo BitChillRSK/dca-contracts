@@ -110,8 +110,8 @@ contract R83StandingApprovalGasTest is Test {
             address(this),
             address(s_stablecoin),
             IPurchaseUniswap.UniswapSettings({
-                wrBtcToken: IWRBTC(address(s_wrBtc)),
-                swapRouter02: IUniswapV3SwapRouter(address(s_router)),
+                wrbtc: IWRBTC(address(s_wrBtc)),
+                swapRouter: IUniswapV3SwapRouter(address(s_router)),
                 swapIntermediateTokens: new address[](0),
                 swapPoolFeeRates: poolFeeRates,
                 mocOracle: ICoinPairPrice(address(s_oracle))

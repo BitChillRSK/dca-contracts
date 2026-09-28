@@ -170,17 +170,17 @@ contract PackedRowDcaManager is ReentrancyGuard {
     }
 
     function batchBuyRbtc(Batch calldata batch) external onlySwapper {
-        uint256 numOfPurchases = batch.rows.length;
-        if (numOfPurchases == 0) revert Prototype__EmptyBatch();
-        address[] memory buyers = new address[](numOfPurchases);
-        uint64[] memory scheduleIds = new uint64[](numOfPurchases);
-        uint256[] memory purchaseAmounts = new uint256[](numOfPurchases);
-        for (uint256 i; i < numOfPurchases; ++i) {
+        uint256 purchaseCount = batch.rows.length;
+        if (purchaseCount == 0) revert Prototype__EmptyBatch();
+        address[] memory buyers = new address[](purchaseCount);
+        uint64[] memory scheduleIds = new uint64[](purchaseCount);
+        uint256[] memory purchaseAmounts = new uint256[](purchaseCount);
+        for (uint256 i; i < purchaseCount; ++i) {
             uint256 row = uint256(batch.rows[i]);
             uint64 scheduleId = uint64(row >> 160);
             address buyer = address(uint160(row));
             (uint256 schedulePurchaseAmount, uint256 scheduleRouteIndex) =
-                _rBtcPurchaseChecksEffects(scheduleId, buyer, batch.token);
+                _rbtcPurchaseChecksEffects(scheduleId, buyer, batch.token);
             if (scheduleRouteIndex != batch.routeIndex) revert Prototype__RouteIndexMismatch();
             buyers[i] = buyer;
             scheduleIds[i] = scheduleId;
@@ -206,7 +206,7 @@ contract PackedRowDcaManager is ReentrancyGuard {
      * @dev Existence, ownership and the token check are all the lookup: a row naming another account's
      *      schedule, or a schedule of another stablecoin, lands on an empty struct.
      */
-    function _rBtcPurchaseChecksEffects(uint64 scheduleId, address buyer, address token)
+    function _rbtcPurchaseChecksEffects(uint64 scheduleId, address buyer, address token)
         private
         returns (uint256, uint256)
     {
@@ -247,10 +247,10 @@ contract PackedRowDcaManager is ReentrancyGuard {
 
     function _removeScheduleId(address user, address token, uint64 scheduleId) private {
         uint64[] storage scheduleIds = s_scheduleIds[user][token];
-        uint256 numOfSchedules = scheduleIds.length;
-        for (uint256 i; i < numOfSchedules; ++i) {
+        uint256 scheduleCount = scheduleIds.length;
+        for (uint256 i; i < scheduleCount; ++i) {
             if (scheduleIds[i] == scheduleId) {
-                uint256 lastIndex = numOfSchedules - 1;
+                uint256 lastIndex = scheduleCount - 1;
                 if (i != lastIndex) scheduleIds[i] = scheduleIds[lastIndex];
                 scheduleIds.pop();
                 return;
@@ -266,9 +266,9 @@ contract PackedRowDcaManager is ReentrancyGuard {
     }
 
     function _handler(address token, uint256 routeIndex) private view returns (ITokenHandler) {
-        address tokenHandlerAddress = i_operationsAdmin.getHandler(token, routeIndex);
-        if (tokenHandlerAddress == address(0)) revert Prototype__TokenNotAccepted();
-        return ITokenHandler(tokenHandlerAddress);
+        address handler = i_operationsAdmin.getHandler(token, routeIndex);
+        if (handler == address(0)) revert Prototype__TokenNotAccepted();
+        return ITokenHandler(handler);
     }
 
     function _validatePurchasePeriod(uint256 purchasePeriod) private view {

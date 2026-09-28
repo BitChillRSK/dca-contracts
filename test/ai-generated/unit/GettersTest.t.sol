@@ -119,16 +119,16 @@ contract GettersTest is DcaDappTest {
         dcaManager.getAccumulatedRbtcBalance(USER, unknownToken, s_routeIndex);
     }
 
-    function test_dcaManager_getInterestAccrued_whenSupported() public {
+    function test_dcaManager_getAccruedInterest_whenSupported() public {
         if (s_routeIndex > 0) {
-            uint256 interest = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+            uint256 interest = dcaManager.getAccruedInterest(USER, address(stablecoin), s_routeIndex);
             assertGe(interest, 0);
         }
     }
 
-    function test_dcaManager_getInterestAccrued_reverts_tokenDoesNotYieldInterest() public {
+    function test_dcaManager_getAccruedInterest_reverts_tokenDoesNotYieldInterest() public {
         vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__TokenIsNotLent.selector, address(stablecoin)));
-        dcaManager.getInterestAccrued(USER, address(stablecoin), 0);
+        dcaManager.getAccruedInterest(USER, address(stablecoin), 0);
     }
 
     function test_dcaManager_getDcaSchedule_reverts_inexistentId() public {
@@ -179,8 +179,8 @@ contract GettersTest is DcaDappTest {
         assertGe(settings.feePurchaseUpperBound, settings.feePurchaseLowerBound);
     }
 
-    function test_feeHandler_getFeeCollectorAddress() public {
-        address feeCollector = IPurchaseFees(address(stablecoinHandler)).getFeeCollectorAddress();
+    function test_feeHandler_getFeeCollector() public {
+        address feeCollector = IPurchaseFees(address(stablecoinHandler)).getFeeCollector();
         assertNotEq(feeCollector, address(0));
     }
 

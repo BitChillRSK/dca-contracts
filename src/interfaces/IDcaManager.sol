@@ -325,7 +325,7 @@ interface IDcaManager {
      * @param token The stablecoin the schedule spends, which is half its storage key.
      * @param scheduleId The schedule to credit. Must belong to the caller.
      * @param amount Interest to credit, at most the spendable accrued-interest ceiling computed at
-     *        the market's current rate. `getInterestAccrued` can quote less on a lazily-accruing market.
+     *        the market's current rate. `getAccruedInterest` can quote less on a lazily-accruing market.
      * @dev Interest belongs to a user-token-route position, so the caller chooses which schedule on that
      *      route receives it. No tokens move; this raises the schedule's claim over funds already lent and
      *      remains available while deposits are paused. The amount must be accrued and fund at least one
@@ -347,7 +347,7 @@ interface IDcaManager {
      * @param token The stablecoin whose handler holds the rBTC.
      * @param routeIndex The route whose handler holds the rBTC.
      */
-    function withdrawRbtcFromTokenHandler(address token, uint256 routeIndex) external;
+    function withdrawAccumulatedRbtc(address token, uint256 routeIndex) external;
 
     /**
      * @notice Withdraw all rBTC the caller has accumulated on each named token×route pair.
@@ -400,13 +400,13 @@ interface IDcaManager {
      * @notice Set the protocol minimum purchase period.
      * @param minPurchasePeriod New minimum in seconds; at least one whole UTC day.
      */
-    function modifyMinPurchasePeriod(uint256 minPurchasePeriod) external;
+    function setMinPurchasePeriod(uint256 minPurchasePeriod) external;
 
     /**
      * @notice Set the maximum number of schedules a user may hold per token.
      * @param maxSchedulesPerToken New cap.
      */
-    function modifyMaxSchedulesPerToken(uint256 maxSchedulesPerToken) external;
+    function setMaxSchedulesPerToken(uint256 maxSchedulesPerToken) external;
 
     /**
      * @notice Set the minimum purchase amount for a stablecoin.
@@ -420,10 +420,7 @@ interface IDcaManager {
                                 GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @notice The OperationsAdmin this manager is permanently pinned to.
-     * @return The constructor-supplied OperationsAdmin.
-     */
+    /// @notice The OperationsAdmin this manager is permanently pinned to.
     function i_operationsAdmin() external view returns (IOperationsAdmin);
 
     /**
@@ -480,7 +477,7 @@ interface IDcaManager {
      *      can trail the spendable ceiling, never exceed it. This guarantees the quote satisfies the
      *      upper bound; `topUpFromInterest` still requires it to cross the next purchase boundary.
      */
-    function getInterestAccrued(address user, address token, uint256 routeIndex) external view returns (uint256);
+    function getAccruedInterest(address user, address token, uint256 routeIndex) external view returns (uint256);
 
     /**
      * @notice Block from which guarded user mutations are allowed after the latest protected window.

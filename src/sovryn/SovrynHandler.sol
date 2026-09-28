@@ -20,11 +20,8 @@ abstract contract SovrynHandler is LendingHandler {
      */
     uint256 public constant EXCHANGE_RATE_DECIMALS = 1e18;
 
-    /**
-     * @notice Sovryn iSUSD (or equivalent iToken) this handler mints and burns.
-     * @return The constructor-supplied iToken.
-     */
-    IiSusdToken public immutable i_iSusdToken;
+    /// @notice Sovryn iSUSD (or equivalent iToken) this handler mints and burns.
+    IiSusdToken public immutable i_iSusd;
 
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
@@ -38,7 +35,7 @@ abstract contract SovrynHandler is LendingHandler {
     constructor(address dcaManagerAddress, address stableTokenAddress, address iSusdTokenAddress)
         LendingHandler(dcaManagerAddress, stableTokenAddress, EXCHANGE_RATE_DECIMALS)
     {
-        i_iSusdToken = IiSusdToken(iSusdTokenAddress);
+        i_iSusd = IiSusdToken(iSusdTokenAddress);
         _approveLendingSpender();
     }
 
@@ -47,16 +44,16 @@ abstract contract SovrynHandler is LendingHandler {
     //////////////////////////////////////////////////////////////*/
 
     function _viewExchangeRate() internal view override returns (uint256) {
-        return i_iSusdToken.tokenPrice();
+        return i_iSusd.tokenPrice();
     }
 
     function _lendingSpender() internal view override returns (address) {
-        return address(i_iSusdToken);
+        return address(i_iSusd);
     }
 
     /// @dev Mint only; the base credits the measured iSUSD gain, never `mint()`'s return value.
     function _protocolDeposit(uint256 stablecoinAmount) internal override {
-        i_iSusdToken.mint(address(this), stablecoinAmount);
+        i_iSusd.mint(address(this), stablecoinAmount);
     }
 
     /**
@@ -64,10 +61,10 @@ abstract contract SovrynHandler is LendingHandler {
      *      exit fee is on; the return is ignored and the base measures cash and iToken deltas.
      */
     function _protocolRedeem(uint256 sharesAmount, uint256) internal override {
-        i_iSusdToken.burn(address(this), sharesAmount);
+        i_iSusd.burn(address(this), sharesAmount);
     }
 
     function _receiptSharesBalance() internal override returns (uint256) {
-        return i_iSusdToken.balanceOf(address(this));
+        return i_iSusd.balanceOf(address(this));
     }
 }

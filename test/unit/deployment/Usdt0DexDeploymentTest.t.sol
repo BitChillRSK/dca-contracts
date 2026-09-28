@@ -125,8 +125,8 @@ contract Usdt0DexDeploymentTest is Test {
                 tokenAddress: usdt0,
                 aTokenAddress: address(aToken),
                 uniswapSettings: IPurchaseUniswap.UniswapSettings({
-                    wrBtcToken: IWRBTC(address(wrbtc)),
-                    swapRouter02: IUniswapV3SwapRouter(address(new MockSwapRouter02(wrbtc, BTC_PRICE))),
+                    wrbtc: IWRBTC(address(wrbtc)),
+                    swapRouter: IUniswapV3SwapRouter(address(new MockSwapRouter02(wrbtc, BTC_PRICE))),
                     swapIntermediateTokens: intermediates,
                     swapPoolFeeRates: fees,
                     mocOracle: ICoinPairPrice(address(new MockMocOracle()))

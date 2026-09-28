@@ -53,8 +53,8 @@ contract ReversedDexInheritanceTest is Test {
         poolFeeRates[0] = 3000;
 
         IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
-            wrBtcToken: IWRBTC(address(wrBtc)),
-            swapRouter02: IUniswapV3SwapRouter(router),
+            wrbtc: IWRBTC(address(wrBtc)),
+            swapRouter: IUniswapV3SwapRouter(router),
             swapIntermediateTokens: intermediateTokens,
             swapPoolFeeRates: poolFeeRates,
             mocOracle: ICoinPairPrice(address(oracle))

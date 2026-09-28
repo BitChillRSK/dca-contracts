@@ -171,15 +171,15 @@ contract RouteIdDcaManager is ReentrancyGuard {
     }
 
     function batchBuyRbtc(Batch calldata batch) external onlySwapper {
-        uint256 numOfPurchases = batch.scheduleIds.length;
-        if (numOfPurchases == 0) revert Prototype__EmptyBatch();
+        uint256 purchaseCount = batch.scheduleIds.length;
+        if (purchaseCount == 0) revert Prototype__EmptyBatch();
         (address handler, address token) = i_registry.getHandlerAndToken(batch.routeId);
         if (handler == address(0)) revert Prototype__TokenNotAccepted();
-        address[] memory buyers = new address[](numOfPurchases);
-        uint256[] memory purchaseAmounts = new uint256[](numOfPurchases);
-        for (uint256 i; i < numOfPurchases; ++i) {
+        address[] memory buyers = new address[](purchaseCount);
+        uint256[] memory purchaseAmounts = new uint256[](purchaseCount);
+        for (uint256 i; i < purchaseCount; ++i) {
             (address buyer, uint256 schedulePurchaseAmount) =
-                _rBtcPurchaseChecksEffects(batch.scheduleIds[i], batch.routeId, token);
+                _rbtcPurchaseChecksEffects(batch.scheduleIds[i], batch.routeId, token);
             buyers[i] = buyer;
             purchaseAmounts[i] = schedulePurchaseAmount;
         }
@@ -203,7 +203,7 @@ contract RouteIdDcaManager is ReentrancyGuard {
      *      makes: one `uint32` equality proves the row belongs to the handler this batch is paying,
      *      because a `routeId` names the pair rather than either half of it.
      */
-    function _rBtcPurchaseChecksEffects(uint64 scheduleId, uint32 batchRouteId, address token)
+    function _rbtcPurchaseChecksEffects(uint64 scheduleId, uint32 batchRouteId, address token)
         private
         returns (address, uint256)
     {
@@ -246,10 +246,10 @@ contract RouteIdDcaManager is ReentrancyGuard {
 
     function _removeScheduleId(address user, address token, uint64 scheduleId) private {
         uint64[] storage scheduleIds = s_scheduleIds[user][token];
-        uint256 numOfSchedules = scheduleIds.length;
-        for (uint256 i; i < numOfSchedules; ++i) {
+        uint256 scheduleCount = scheduleIds.length;
+        for (uint256 i; i < scheduleCount; ++i) {
             if (scheduleIds[i] == scheduleId) {
-                uint256 lastIndex = numOfSchedules - 1;
+                uint256 lastIndex = scheduleCount - 1;
                 if (i != lastIndex) scheduleIds[i] = scheduleIds[lastIndex];
                 scheduleIds.pop();
                 return;
@@ -265,9 +265,9 @@ contract RouteIdDcaManager is ReentrancyGuard {
     }
 
     function _handler(uint32 routeId) private view returns (ITokenHandler) {
-        address tokenHandlerAddress = i_registry.getHandler(routeId);
-        if (tokenHandlerAddress == address(0)) revert Prototype__TokenNotAccepted();
-        return ITokenHandler(tokenHandlerAddress);
+        address handler = i_registry.getHandler(routeId);
+        if (handler == address(0)) revert Prototype__TokenNotAccepted();
+        return ITokenHandler(handler);
     }
 
     function _validatePurchasePeriod(uint256 purchasePeriod) private view {

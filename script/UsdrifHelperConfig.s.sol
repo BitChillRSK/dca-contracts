@@ -16,7 +16,7 @@ contract UsdrifHelperConfig is Script {
         address layerbankUsdrifATokenAddress;
         address layerbankUsdt0ATokenAddress;
         address wrbtcTokenAddress;
-        address swapRouter02Address;
+        address swapRouterAddress;
         address[] swapIntermediateTokens;
         uint24[] swapPoolFeeRates;
         address mocOracleAddress;
@@ -56,7 +56,7 @@ contract UsdrifHelperConfig is Script {
             layerbankUsdrifATokenAddress: LAYERBANK_USDRIF_ATOKEN,
             layerbankUsdt0ATokenAddress: LAYERBANK_USDT0_ATOKEN,
             wrbtcTokenAddress: 0x542fDA317318eBF1d3DEAf76E0b632741A7e677d, // WRBTC on mainnet
-            swapRouter02Address: 0x0B14ff67f0014046b4b99057Aec4509640b3947A, // SwapRouter02 on mainnet
+            swapRouterAddress: 0x0B14ff67f0014046b4b99057Aec4509640b3947A, // SwapRouter02 on mainnet
             swapIntermediateTokens: intermediateTokens,
             swapPoolFeeRates: poolFeeRates,
             mocOracleAddress: 0xe2927A0620b82A66D67F678FC9b826B0E01B1bFD, // MoC Oracle on mainnet
@@ -81,7 +81,7 @@ contract UsdrifHelperConfig is Script {
             layerbankUsdrifATokenAddress: address(0), // LayerBank USDRIF is mainnet-only
             layerbankUsdt0ATokenAddress: address(0), // LayerBank USDT0 is mainnet-only
             wrbtcTokenAddress: 0x69FE5cEC81D5eF92600c1A0dB1F11986AB3758Ab, // WRBTC on testnet
-            swapRouter02Address: 0x0000000000000000000000000000000000000000, // Replace if exists on testnet
+            swapRouterAddress: 0x0000000000000000000000000000000000000000, // Replace if exists on testnet
             swapIntermediateTokens: intermediateTokens,
             swapPoolFeeRates: poolFeeRates,
             mocOracleAddress: 0x0000000000000000000000000000000000000000, // Replace with MoC Oracle on testnet
@@ -161,7 +161,7 @@ contract UsdrifHelperConfig is Script {
             layerbankUsdrifATokenAddress: address(mockAToken),
             layerbankUsdt0ATokenAddress: address(mockAToken),
             wrbtcTokenAddress: address(mockWrbtcToken),
-            swapRouter02Address: address(mockSwapRouter),
+            swapRouterAddress: address(mockSwapRouter),
             swapIntermediateTokens: intermediateTokens,
             swapPoolFeeRates: poolFeeRates,
             mocOracleAddress: address(mockMocOracle),

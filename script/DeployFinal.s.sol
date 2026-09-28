@@ -69,7 +69,7 @@ contract DeployFinal is DeployBase {
         address usdt0;
         address usdt0LayerBankAToken;
         address wrbtc;
-        address swapRouter02;
+        address swapRouter;
         address mocOracle;
         address[] usdrifIntermediateTokens;
         uint24[] usdrifPoolFeeRates;
@@ -162,7 +162,7 @@ contract DeployFinal is DeployBase {
         s_cfg.usdt0 = config.usdt0;
         s_cfg.usdt0LayerBankAToken = config.usdt0LayerBankAToken;
         s_cfg.wrbtc = config.wrbtc;
-        s_cfg.swapRouter02 = config.swapRouter02;
+        s_cfg.swapRouter = config.swapRouter;
         s_cfg.mocOracle = config.mocOracle;
         s_cfg.usdrifIntermediateTokens = config.usdrifIntermediateTokens;
         s_cfg.usdrifPoolFeeRates = config.usdrifPoolFeeRates;
@@ -268,8 +268,8 @@ contract DeployFinal is DeployBase {
 
     function _uniswapSettings(bool isUsdt0) private view returns (IPurchaseUniswap.UniswapSettings memory) {
         return IPurchaseUniswap.UniswapSettings({
-            wrBtcToken: IWRBTC(s_cfg.wrbtc),
-            swapRouter02: IUniswapV3SwapRouter(s_cfg.swapRouter02),
+            wrbtc: IWRBTC(s_cfg.wrbtc),
+            swapRouter: IUniswapV3SwapRouter(s_cfg.swapRouter),
             swapIntermediateTokens: isUsdt0 ? s_cfg.usdt0IntermediateTokens : s_cfg.usdrifIntermediateTokens,
             swapPoolFeeRates: isUsdt0 ? s_cfg.usdt0PoolFeeRates : s_cfg.usdrifPoolFeeRates,
             mocOracle: ICoinPairPrice(s_cfg.mocOracle)
@@ -302,7 +302,7 @@ contract DeployFinal is DeployBase {
             usdt0: dex.usdt0TokenAddress,
             usdt0LayerBankAToken: dex.layerbankUsdt0ATokenAddress,
             wrbtc: dex.wrbtcTokenAddress,
-            swapRouter02: dex.swapRouter02Address,
+            swapRouter: dex.swapRouterAddress,
             mocOracle: dex.mocOracleAddress,
             usdrifIntermediateTokens: dex.swapIntermediateTokens,
             usdrifPoolFeeRates: dex.swapPoolFeeRates,
@@ -340,7 +340,7 @@ contract DeployFinal is DeployBase {
             layerbankUsdrifATokenAddress: LAYERBANK_USDRIF_ATOKEN,
             layerbankUsdt0ATokenAddress: LAYERBANK_USDT0_ATOKEN,
             wrbtcTokenAddress: 0x542fDA317318eBF1d3DEAf76E0b632741A7e677d,
-            swapRouter02Address: 0x0B14ff67f0014046b4b99057Aec4509640b3947A,
+            swapRouterAddress: 0x0B14ff67f0014046b4b99057Aec4509640b3947A,
             swapIntermediateTokens: intermediateTokens,
             swapPoolFeeRates: poolFeeRates,
             mocOracleAddress: 0xe2927A0620b82A66D67F678FC9b826B0E01B1bFD,
@@ -361,7 +361,7 @@ contract DeployFinal is DeployBase {
         if (s_cfg.usdt0 == address(0)) revert DeployFinal__ZeroAddress("usdt0");
         if (s_cfg.usdt0LayerBankAToken == address(0)) revert DeployFinal__IncompleteMap("usdt0LayerBankAToken");
         if (s_cfg.wrbtc == address(0)) revert DeployFinal__ZeroAddress("wrbtc");
-        if (s_cfg.swapRouter02 == address(0)) revert DeployFinal__ZeroAddress("swapRouter02");
+        if (s_cfg.swapRouter == address(0)) revert DeployFinal__ZeroAddress("swapRouter");
         if (s_cfg.mocOracle == address(0)) revert DeployFinal__ZeroAddress("mocOracle");
         if (s_cfg.feeCollector == address(0)) revert DeployFinal__ZeroAddress("feeCollector");
         if (s_cfg.initialSwapper == address(0)) revert DeployFinal__ZeroAddress("initialSwapper");

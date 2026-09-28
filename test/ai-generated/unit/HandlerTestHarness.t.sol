@@ -227,7 +227,7 @@ abstract contract HandlerTestHarness is Test {
         uint256 maxFeeRate = settings.maxFeeRate;
         uint256 lowerBound = settings.feePurchaseLowerBound;
         uint256 upperBound = settings.feePurchaseUpperBound;
-        address feeCollector = feeHandler.getFeeCollectorAddress();
+        address feeCollector = feeHandler.getFeeCollector();
 
         assertGt(minFeeRate, 0);
         assertGt(maxFeeRate, 0);

@@ -1,6 +1,6 @@
 # R104 — Identifier polish and NatSpec trim
 
-Status: **not started** · Assigned: no · Optional/further-review: no · Stack on: R103 ([R103-handler-taxonomy-renames.md](./R103-handler-taxonomy-renames.md))
+Status: **in progress** · Assigned: yes · Optional/further-review: no · Stack on: R103 ([R103-handler-taxonomy-renames.md](./R103-handler-taxonomy-renames.md))
 
 ## Objective
 
@@ -35,49 +35,49 @@ R103’s gate, not this PR’s.
 
 ### Public / immutable renames (ABI)
 
-- [ ] `PurchaseUniswap.i_wrBtcToken` → `i_wrbtc`; `UniswapSettings.wrBtcToken` → `wrbtc`; locals
+- [x] `PurchaseUniswap.i_wrBtcToken` → `i_wrbtc`; `UniswapSettings.wrBtcToken` → `wrbtc`; locals
       `wrBtcBalanceBefore` → `wrbtcBalanceBefore`.
-- [ ] `PurchaseUniswap.i_swapRouter02` → `i_swapRouter` (`@notice` may still say SwapRouter02).
-- [ ] `SovrynHandler.i_iSusdToken` → `i_iSusd` (post-R103 type name).
-- [ ] `DcaManager.modifyMinPurchasePeriod` → `setMinPurchasePeriod`.
-- [ ] `DcaManager.modifyMaxSchedulesPerToken` → `setMaxSchedulesPerToken`.
-- [ ] `DcaManager.getInterestAccrued` → `getAccruedInterest` (align with `ILendingHandler` /
+- [x] `PurchaseUniswap.i_swapRouter02` → `i_swapRouter` (`@notice` may still say SwapRouter02).
+- [x] `SovrynHandler.i_iSusdToken` → `i_iSusd` (post-R103 type name).
+- [x] `DcaManager.modifyMinPurchasePeriod` → `setMinPurchasePeriod`.
+- [x] `DcaManager.modifyMaxSchedulesPerToken` → `setMaxSchedulesPerToken`.
+- [x] `DcaManager.getInterestAccrued` → `getAccruedInterest` (align with `ILendingHandler` /
       `quoteAccruedInterest`).
-- [ ] `DcaManager.withdrawRbtcFromTokenHandler` → `withdrawAccumulatedRbtc(token, routeIndex)`
+- [x] `DcaManager.withdrawRbtcFromTokenHandler` → `withdrawAccumulatedRbtc(token, routeIndex)`
       (mirrors `getAccumulatedRbtcBalance` / handler `withdrawAccumulatedRbtc(user)`).
-- [ ] `IPurchaseUniswap.updateMocOracle` → `setMocOracle`.
-- [ ] Fee mixin `getFeeCollectorAddress` / `setFeeCollectorAddress` → `getFeeCollector` /
+- [x] `IPurchaseUniswap.updateMocOracle` → `setMocOracle`.
+- [x] Fee mixin `getFeeCollectorAddress` / `setFeeCollectorAddress` → `getFeeCollector` /
       `setFeeCollector` (post-R103 fee type).
 
 ### Locals / private (no ABI)
 
-- [ ] `numOfPurchases` / `numOfSchedules` / `numOfPairs` → `purchaseCount` / `scheduleCount` /
+- [x] `numOfPurchases` / `numOfSchedules` / `numOfPairs` → `purchaseCount` / `scheduleCount` /
       `pairCount` (and matching return names).
-- [ ] `usersShares` / `usersSharesToRedeem` / `usersPurchasedRbtc` / `usersStablecoinSpent` →
+- [x] `usersShares` / `usersSharesToRedeem` / `usersPurchasedRbtc` / `usersStablecoinSpent` →
       `userShares` / `sharesToRedeem` / `userRbtc` / `userStablecoinSpent`.
-- [ ] `tokenHandlerAddress` / redundant typed `tokenHandler` → `handler` (or `lendingHandler`).
-- [ ] `_rBtcPurchaseChecksEffects` → `_rbtcPurchaseChecksEffects`.
+- [x] `tokenHandlerAddress` / redundant typed `tokenHandler` → `handler` (or `lendingHandler`).
+- [x] `_rBtcPurchaseChecksEffects` → `_rbtcPurchaseChecksEffects`.
 
 ### NatSpec / comments
 
-- [ ] Remove `@return The constructor-supplied …` on public immutables (type + `@notice` suffice).
-- [ ] Remove Fee mixin trailing `//` on `s_feeCollector` / bounds / rates that restate the name
+- [x] Remove `@return The constructor-supplied …` on public immutables (type + `@notice` suffice).
+- [x] Remove Fee mixin trailing `//` on `s_feeCollector` / bounds / rates that restate the name
       (keep the packing `@dev`).
-- [ ] Remove `s_tokenMinPurchaseAmounts // Per-token…`, `// Calculate net amounts`, and “scoped to
+- [x] Remove `s_tokenMinPurchaseAmounts // Per-token…`, `// Calculate net amounts`, and “scoped to
       this block because it is dead once…” apologetics in `PurchaseRbtc`.
-- [ ] Collapse duplicate `memory` `@dev` on `setPurchasePath` / `setPurchasePathAllowed` to one short
+- [x] Collapse duplicate `memory` `@dev` on `setPurchasePath` / `setPurchasePathAllowed` to one short
       note (or one site + `@inheritdoc`-style silence on the twin).
-- [ ] Fix inaccurate `i_pool` `@return` on LayerBank if it still claims constructor-supplied aToken.
-- [ ] Do **not** strip durable invariant `@dev` (packing, exact consumption, oracle floor, protected
+- [x] Fix inaccurate `i_pool` `@return` on LayerBank if it still claims constructor-supplied aToken.
+- [x] Do **not** strip durable invariant `@dev` (packing, exact consumption, oracle floor, protected
       window, schedule-id-as-nonce, leaf lifecycle headers).
 
 ### Keep explicitly
 
-- [ ] Event / error spellings such as `PurchaseRbtc__rBtcWithdrawn` (ABI churn for monitoring with no
+- [x] Event / error spellings such as `PurchaseRbtc__rBtcWithdrawn` (ABI churn for monitoring with no
       readability win).
-- [ ] `i_stableToken`, `i_operationsAdmin`, `i_dcaManager`, `i_mocProxy`, `i_aToken`, `i_kToken`,
+- [x] `i_stableToken`, `i_operationsAdmin`, `i_dcaManager`, `i_mocProxy`, `i_aToken`, `i_kToken`,
       `i_pool`, and domain `s_*` names.
-- [ ] Long product names: `batchBuyRbtcAcrossHandlers`, protected-window APIs, `topUpFromInterest`,
+- [x] Long product names: `batchBuyRbtcAcrossHandlers`, protected-window APIs, `topUpFromInterest`,
       `restore*Approval`.
 
 ## Out of scope
@@ -112,11 +112,11 @@ full gate for the ABI renames.
 
 ## Success criteria
 
-- [ ] Every Scope rename applied; Keep list untouched.
-- [ ] No `@return The constructor-supplied` left on first-party public immutables.
-- [ ] Fee / PurchaseUniswap state-var trailing noise and PurchaseRbtc scope apologetics gone.
-- [ ] `make check` + both forks green; consumer issues linked in the PR.
-- [ ] `docs/relaunch/README.md` Status points at this PR; next unassigned prompt returns to cutover
+- [x] Every Scope rename applied; Keep list untouched.
+- [x] No `@return The constructor-supplied` left on first-party public immutables.
+- [x] Fee / PurchaseUniswap state-var trailing noise and PurchaseRbtc scope apologetics gone.
+- [x] `make check` + both forks green; consumer issues linked in the PR.
+- [x] `docs/relaunch/README.md` Status points at this PR; next unassigned prompt returns to cutover
       (`CUTOVER_RUNBOOK.md`) unless a later item is ordered.
 
 ## Reviewer checklist

@@ -62,10 +62,8 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
         uint256 totalNetStablecoinPlanned;
         uint256 totalStablecoinAmountToSpend;
 
-        // `aggregatedFee` is scoped to this block because it is dead once the fee is paid.
         {
             uint256 aggregatedFee;
-            // Calculate net amounts
             (aggregatedFee, netStablecoinAmountsToSpend, totalNetStablecoinPlanned) =
                 _calculateFeeAndNetAmounts(purchaseAmounts);
 
@@ -84,7 +82,6 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
         }
 
         uint256 totalPurchasedRbtc;
-        // The input balances are scoped to this block because they are dead once consumption is proved.
         {
             uint256 inputBalanceBefore = i_stableToken.balanceOf(address(this));
             totalPurchasedRbtc = _purchaseRbtc(totalStablecoinAmountToSpend, minRbtcOut);
@@ -106,25 +103,23 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
             revert PurchaseRbtc__BelowSwapperMinimum(totalPurchasedRbtc, minRbtcOut);
         }
 
-        uint256 numOfPurchases = buyers.length;
-        for (uint256 i; i < numOfPurchases; ++i) {
+        uint256 purchaseCount = buyers.length;
+        for (uint256 i; i < purchaseCount; ++i) {
             // Planned nets are allocation weights only: they sum to totalNetStablecoinPlanned, so each row
             // takes its share of what actually moved even if the redemption paid less than planned. Both
             // shares floor, which can leave under one wei of rBTC per row uncredited; see IPurchaseRbtc.
             uint256 plannedNet = netStablecoinAmountsToSpend[i];
             address buyer = buyers[i];
-            uint256 usersPurchasedRbtc;
+            uint256 userRbtc;
             // Can't overflow: the rBTC total is under the native supply (< 2^85 wei) and each weight is a uint96.
             // The stablecoin product below stays checked because nothing here bounds the token's supply.
             unchecked {
-                usersPurchasedRbtc = totalPurchasedRbtc * plannedNet / totalNetStablecoinPlanned;
+                userRbtc = totalPurchasedRbtc * plannedNet / totalNetStablecoinPlanned;
             }
-            uint256 usersStablecoinSpent = totalStablecoinAmountToSpend * plannedNet / totalNetStablecoinPlanned;
+            uint256 userStablecoinSpent = totalStablecoinAmountToSpend * plannedNet / totalNetStablecoinPlanned;
             // Skip zero floor allocations so a never-credited user is not marked live.
-            if (usersPurchasedRbtc != 0) _creditRbtc(buyer, usersPurchasedRbtc);
-            emit PurchaseRbtc__RbtcBought(
-                buyer, address(i_stableToken), usersPurchasedRbtc, scheduleIds[i], usersStablecoinSpent
-            );
+            if (userRbtc != 0) _creditRbtc(buyer, userRbtc);
+            emit PurchaseRbtc__RbtcBought(buyer, address(i_stableToken), userRbtc, scheduleIds[i], userStablecoinSpent);
         }
         emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
             address(i_stableToken), totalPurchasedRbtc, totalStablecoinAmountToSpend

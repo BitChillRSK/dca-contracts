@@ -100,8 +100,8 @@ contract VersionedRouteAccountingTest is BaseDeploymentTest {
     function testInterestOnOneRouteExcludesTheOtherRoutesPrincipal() external {
         vm.warp(block.timestamp + 365 days);
 
-        uint256 interestV1 = dcaManager.getInterestAccrued(USER, address(docToken), ROUTE_V1);
-        uint256 interestV2 = dcaManager.getInterestAccrued(USER, address(docToken), ROUTE_V2);
+        uint256 interestV1 = dcaManager.getAccruedInterest(USER, address(docToken), ROUTE_V1);
+        uint256 interestV2 = dcaManager.getAccruedInterest(USER, address(docToken), ROUTE_V2);
 
         assertGt(interestV1, 0);
         assertGt(interestV2, 0);

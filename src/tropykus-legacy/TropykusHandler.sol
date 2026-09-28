@@ -22,10 +22,7 @@ abstract contract TropykusHandler is LendingHandler, ITropykusHandler {
      */
     uint256 public constant EXCHANGE_RATE_DECIMALS = 1e18;
 
-    /**
-     * @notice Tropykus kToken this handler mints and redeems.
-     * @return The constructor-supplied kToken.
-     */
+    /// @notice Tropykus kToken this handler mints and redeems.
     IkToken public immutable i_kToken;
 
     /*//////////////////////////////////////////////////////////////

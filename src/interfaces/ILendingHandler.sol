@@ -114,7 +114,7 @@ interface ILendingHandler is ITokenHandler {
      * @param stablecoinLockedInDcaSchedules Principal DcaManager still locks for this user on this
      *        handler's route.
      * @return Accrued interest in stablecoin units, or zero.
-     * @dev The display quote, and what keeps `IDcaManager.getInterestAccrued` a `view`. On a market
+     * @dev The display quote, and what keeps `IDcaManager.getAccruedInterest` a `view`. On a market
      *      that accrues lazily this can sit below what `getAccruedInterest` reports, never above,
      *      because a stored rate only trails a current one. The quote therefore never exceeds the
      *      top-up ceiling; DcaManager separately enforces its minimum purchase-boundary rule.

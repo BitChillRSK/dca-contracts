@@ -28,16 +28,10 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     uint256 internal constant HUNDRED_PERCENT = 1 ether;
     /// @notice decimals of the MoC BTC/USD price. Hardcoded because the oracle exposes no `decimals()`.
     uint256 internal constant ORACLE_DECIMALS = 18;
-    /**
-     * @notice Wrapped rBTC token this route swaps into and unwraps on withdraw.
-     * @return The constructor-supplied WRBTC.
-     */
-    IWRBTC public immutable i_wrBtcToken;
-    /**
-     * @notice Uniswap V3 SwapRouter02 used to buy WRBTC.
-     * @return The constructor-supplied router.
-     */
-    IUniswapV3SwapRouter public immutable i_swapRouter02;
+    /// @notice Wrapped rBTC token this route swaps into and unwraps on withdraw.
+    IWRBTC public immutable i_wrbtc;
+    /// @notice Uniswap V3 SwapRouter02 used to buy WRBTC.
+    IUniswapV3SwapRouter public immutable i_swapRouter;
     /**
      * @notice `10 ** (ORACLE_DECIMALS - stablecoin decimals)`, which lifts a stablecoin amount into the oracle's USD units
      * @dev Fixed at deploy because the handler's stablecoin is immutable, so a 6-decimal stablecoin
@@ -99,8 +93,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         if (address(uniswapSettings.mocOracle) == address(0)) {
             revert PurchaseUniswap__InvalidOracleAddress();
         }
-        i_swapRouter02 = uniswapSettings.swapRouter02;
-        i_wrBtcToken = uniswapSettings.wrBtcToken;
+        i_swapRouter = uniswapSettings.swapRouter;
+        i_wrbtc = uniswapSettings.wrbtc;
         s_mocOracle = uniswapSettings.mocOracle;
 
         _validateSlippageSettings(amountOutMinimumPercent, amountOutMinimumSafetyCheck);
@@ -150,12 +144,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         _setPurchasePathAllowed(pathHash, encodedPath, intermediateTokens, poolFeeRates, allowed);
     }
 
-    /**
-     * @inheritdoc IPurchaseUniswap
-     * @dev The arrays are `memory` on purpose. The path helpers they reach are shared with the
-     *      constructor, which can only pass `memory`, so `calldata` here would be copied at each helper
-     *      call. That measured dearer than the single copy the ABI decoder makes.
-     */
+    /// @inheritdoc IPurchaseUniswap
     function setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates) external override {
         bytes memory newPath = _encodePurchasePath(intermediateTokens, poolFeeRates);
         bytes32 pathHash = keccak256(newPath);
@@ -187,7 +176,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     /// @inheritdoc IPurchaseUniswap
-    function updateMocOracle(address newOracle) external override onlyOwner {
+    function setMocOracle(address newOracle) external override onlyOwner {
         if (newOracle == address(0)) {
             revert PurchaseUniswap__InvalidOracleAddress();
         }
@@ -251,14 +240,14 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         uint256 intermediateCount = intermediateTokens.length;
         uint256[] memory routerBalancesBefore = new uint256[](intermediateCount);
         for (uint256 i; i < intermediateCount; ++i) {
-            routerBalancesBefore[i] = _balanceOf(intermediateTokens[i], address(i_swapRouter02));
+            routerBalancesBefore[i] = _balanceOf(intermediateTokens[i], address(i_swapRouter));
         }
 
-        uint256 wrBtcBalanceBefore = _balanceOf(address(i_wrBtcToken), address(this));
-        i_swapRouter02.exactInput(params);
+        uint256 wrbtcBalanceBefore = _balanceOf(address(i_wrbtc), address(this));
+        i_swapRouter.exactInput(params);
 
         for (uint256 i; i < intermediateCount; ++i) {
-            uint256 routerBalanceAfter = _balanceOf(intermediateTokens[i], address(i_swapRouter02));
+            uint256 routerBalanceAfter = _balanceOf(intermediateTokens[i], address(i_swapRouter));
             if (routerBalanceAfter != routerBalancesBefore[i]) {
                 revert PurchaseUniswap__IntermediateBalanceChangedInRouter(
                     intermediateTokens[i], routerBalancesBefore[i], routerBalanceAfter
@@ -266,7 +255,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
             }
         }
 
-        amountOut = _balanceOf(address(i_wrBtcToken), address(this)) - wrBtcBalanceBefore;
+        amountOut = _balanceOf(address(i_wrbtc), address(this)) - wrbtcBalanceBefore;
     }
 
     /**
@@ -291,7 +280,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
 
     /// @dev Purchases accumulate WRBTC; unwrap the withdrawal to native rBTC before paying the signer.
     function _withdrawRbtc(address user, uint256 rbtcBalance) internal override {
-        i_wrBtcToken.withdraw(rbtcBalance);
+        i_wrbtc.withdraw(rbtcBalance);
         super._withdrawRbtc(user, rbtcBalance);
     }
 
@@ -335,7 +324,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     function _approveSwapRouter() private {
-        i_stableToken.forceApprove(address(i_swapRouter02), type(uint256).max);
+        i_stableToken.forceApprove(address(i_swapRouter), type(uint256).max);
     }
 
     /**
@@ -358,7 +347,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
             newPath = abi.encodePacked(newPath, poolFeeRates[i], intermediateTokens[i]);
         }
 
-        newPath = abi.encodePacked(newPath, poolFeeRates[poolFeeRates.length - 1], address(i_wrBtcToken));
+        newPath = abi.encodePacked(newPath, poolFeeRates[poolFeeRates.length - 1], address(i_wrbtc));
     }
 
     /**

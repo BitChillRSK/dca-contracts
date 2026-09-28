@@ -201,7 +201,7 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
         state.handlerStablecoin = stablecoin.balanceOf(address(stablecoinHandler));
         state.routerStablecoin = stablecoin.balanceOf(_routerAddress());
         state.feeCollectorStablecoin = stablecoin.balanceOf(FEE_COLLECTOR);
-        state.handlerWrBtc = wrBtcToken.balanceOf(address(stablecoinHandler));
+        state.handlerWrBtc = wrbtc.balanceOf(address(stablecoinHandler));
         state.userAccumulatedRbtc = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
     }
 
@@ -278,11 +278,11 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
         for (uint256 i; i < mids.length; ++i) {
             path = abi.encodePacked(path, fees[i], mids[i]);
         }
-        path = abi.encodePacked(path, fees[fees.length - 1], address(wrBtcToken));
+        path = abi.encodePacked(path, fees[fees.length - 1], address(wrbtc));
     }
 
     function _routerAddress() private view returns (address) {
-        return dexHelperConfig.getActiveNetworkConfig().swapRouter02Address;
+        return dexHelperConfig.getActiveNetworkConfig().swapRouterAddress;
     }
 
     function _router() private view returns (MockSwapRouter02) {
