@@ -1,6 +1,6 @@
 # R105 — Strip redundant `Address` from address parameters
 
-Status: **assigned** · Assigned: yes · Optional/further-review: no · Stack on: R104 ([R104-identifier-and-natspec-polish.md](./R104-identifier-and-natspec-polish.md))
+Status: **assigned** · Assigned: yes · Optional/further-review: no · Stack on: R104 ([R104-identifier-and-natspec-polish.md](./R104-identifier-and-natspec-polish.md)) · PR: [#171](https://github.com/BitChillRSK/dca-contracts/pull/171)
 
 ## Objective
 
@@ -41,16 +41,16 @@ Do not add `Address` back for “clarity.”
 
 ## Scope
 
-- [ ] Rename every first-party `address` constructor / function parameter whose name ends in
+- [x] Rename every first-party `address` constructor / function parameter whose name ends in
       `Address` to the role noun (table above and any sibling role such as `wrbtcTokenAddress` →
       `wrbtc`, `swapRouterAddress` → `swapRouter`, `shareTokenAddress` → `shareToken`).
-- [ ] Rename matching locals in those bodies, and script / test helpers that declare the same role
+- [x] Rename matching locals in those bodies, and script / test helpers that declare the same role
       as an `address` parameter or NetworkConfig field feeding a constructor.
-- [ ] Update NatSpec `@param` names to match.
-- [ ] Update every compile-breaking call site (`new Handler(...)`, deploy scripts, tests).
-- [ ] Tropykus DOC leaf: `kDocTokenAddress` → `kToken` (consistent with `i_kToken` and the base
+- [x] Update NatSpec `@param` names to match.
+- [x] Update every compile-breaking call site (`new Handler(...)`, deploy scripts, tests).
+- [x] Tropykus DOC leaf: `kDocTokenAddress` → `kToken` (consistent with `i_kToken` and the base
       ctor). `MocHelperConfig.kDocAddress` → `kDoc` (already token-specific without `Token`).
-- [ ] Script accessors that only exist to return those roles may drop `Address` too
+- [x] Script accessors that only exist to return those roles may drop `Address` too
       (`getStablecoinAddress` → `getStablecoin`, and siblings) so callers stay consistent.
 
 ## Out of scope
@@ -83,13 +83,13 @@ Rename-only in `src/` / `script/` / `test/` → full executable gate:
 
 ## Success criteria
 
-- [ ] Every scoped `*Address` parameter / matching local renamed per the table; Keep / out-of-scope
+- [x] Every scoped `*Address` parameter / matching local renamed per the table; Keep / out-of-scope
       list untouched.
-- [ ] No `Address` re-introduced on those roles “for clarity.”
-- [ ] `make check` + both forks green.
-- [ ] PR open with template; `docs/relaunch/README.md` Status points at this PR; next unassigned
+- [x] No `Address` re-introduced on those roles “for clarity.”
+- [x] `make check` + both forks green.
+- [x] PR open with template; `docs/relaunch/README.md` Status points at this PR; next unassigned
       remains cutover (`CUTOVER_RUNBOOK.md`).
-- [ ] No historical `docs/relaunch/R*.md` (other than this file) rewritten for the new names.
+- [x] No historical `docs/relaunch/R*.md` (other than this file) rewritten for the new names.
 
 ## Reviewer checklist
 
