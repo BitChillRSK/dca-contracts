@@ -166,6 +166,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R102 | after R101, before relaunch deploy | none (`PurchaseUniswap` unwraps through `_withdrawRbtc`; encoding + path helpers `private`; NatSpec) |
 | R103 | after R102, before relaunch deploy | **decided 2026-09-28: `PurchaseFees`** (Handler taxonomy: strip `Erc20`, fee mixin off Handler, `getHandler` / `assignHandler`) |
 | R104 | after R103, before relaunch deploy | none (identifier polish + NatSpec trim; stack on R103 names) |
+| R105 | after R104, before relaunch deploy | none (strip redundant `Address` from address params / matching locals; stack on R104) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1411,6 +1412,13 @@ After R103, before relaunch deploy. Public immutables (`i_wrbtc`, `i_swapRouter`
 fee collector drops `Address`; local grammar (`purchaseCount`, `userShares`, `handler`); NatSpec trim
 (no constructor-supplied `@return` boilerplate, no state-var restatement `//`, no scope apologetics).
 Ask: none (decided 2026-09-28 with R103).
+
+### R105 - Strip redundant `Address` from address parameters ([spec](./R105-strip-address-param-suffix.md))
+
+After R104, before relaunch deploy. Constructor / function `address` parameters and matching locals
+drop the `Address` suffix (`stablecoinAddress` → `stablecoin`, `dcaManagerAddress` → `dcaManager`,
+`kDocTokenAddress` → `kToken`, …). Type already says address. Events, errors, public immutables, and
+historical specs stay. Ask: none.
 
 ## Closed non-implementation decisions
 
