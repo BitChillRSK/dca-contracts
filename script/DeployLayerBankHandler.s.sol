@@ -109,9 +109,8 @@ contract DeployLayerBankHandler is DeployBase {
         address layerbankHandler;
 
         if (environment == Environment.LOCAL) {
-            layerbankHandler = deployMocksAndHandler(
-                dcaManager, docToken, mocProxy, getFeeCollector(environment), opsAdmin.owner()
-            );
+            layerbankHandler =
+                deployMocksAndHandler(dcaManager, docToken, mocProxy, getFeeCollector(environment), opsAdmin.owner());
         } else if (environment == Environment.TESTNET || environment == Environment.MAINNET) {
             address aToken = networkConfig.layerbankAToken;
             if (aToken == address(0)) {
