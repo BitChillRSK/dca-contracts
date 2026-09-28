@@ -1,6 +1,6 @@
 # R103 — Handler taxonomy: contract and registry renames
 
-Status: **in progress** · Assigned: yes · Optional/further-review: no · Stack on: R102 ([#168](https://github.com/BitChillRSK/dca-contracts/pull/168))
+Status: **PR open** · Assigned: yes · Optional/further-review: no · Stack on: R102 ([#168](https://github.com/BitChillRSK/dca-contracts/pull/168)) · PR: [#169](https://github.com/BitChillRSK/dca-contracts/pull/169)
 
 ## Objective
 
@@ -75,7 +75,7 @@ Once the fee name is answered, implement:
       and `TokenHandler` remains the funding-base type.
 - [x] Update `script/`, `test/`, `AGENTS.md`, and first-party READMEs under `src/*/README.md` that
       hardcode the old contract or path names. Prefer `git mv` for file renames.
-- [ ] Consumer follow-up issues for every renamed selector, event, and custom error (at least
+- [x] Consumer follow-up issues for every renamed selector, event, and custom error (at least
       front-end, bitchill-monitoring; swapper-bot / data-api if they call the registry getters).
 
 ## Out of scope
@@ -125,7 +125,7 @@ Rename-only; behavior unchanged. Full executable gate:
 - [x] OpsAdmin exposes `getHandler` / `assignHandler` / `HandlerAssigned`; `ContractIsNotTokenHandler` kept.
 - [x] `Purchase*` and `*DocHandlerMoc` names unchanged.
 - [x] `make check` + both forks green; consumer issues filed and linked in the PR.
-- [ ] `docs/relaunch/README.md` Status points at this PR; next unassigned prompt is `Start with R104`.
+- [x] `docs/relaunch/README.md` Status points at this PR; next unassigned prompt is `Start with R104`.
 
 ## Reviewer checklist
 
