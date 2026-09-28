@@ -57,6 +57,25 @@ and LayerBank's exact-burn note covers the batch caller as well as a single rede
 - [x] Any ABI, event, or selector change.
 - [x] Rewriting historical specs (R30 still names the old override shape; behavior is unchanged).
 
+## Post-ship review (2026-09-28)
+
+A fresh pass after this PR asked whether anything still worth shipping remained across
+`DcaManager`, `PurchaseRbtc`, `FeeHandler`, `LendingHandler`, `PurchaseMoc`, and `PurchaseUniswap`.
+The closed register (R87–R101) was treated as closed. Nothing cleared the purchase-path or
+simplify-or-decline bar. Two candidates needed a permanent close so a later pass does not reopen
+them; three more were real and not worth a register line of their own.
+
+| # | Candidate | Verdict | Why |
+|---|---|---|---|
+| 5 | Pack the fee collector beside the fee rates (R95 item 4) | **Closed** | There is nothing left to measure. The fee word is already full (`uint112` × 2 + `uint16` × 2). The collector is 160 bits; narrowing the bounds to `uint96` frees 32 bits. The 12 spare bytes beside `owner` / `_pendingOwner` cannot hold an address either. Packing the collector into the Dex safety-check word still leaves one purchase-path `SLOAD`, because purchases never load that word. The path already does the minimum: one `SLOAD` of the fee word, and one of the collector when the fee is nonzero (~200 Rootstock gas, ~0.02% of a 1M-gas batch). |
+| 6 | Cache MoC's post-redeem `address(this).balance` in a local | **Keep re-read** | Compiles to `SELFBALANCE` (5 gas on Foundry and on Rootstock `LOW_TIER`), not `BALANCE` (400). Naming `balancePost` makes the compiler keep that word alive; the shuffle costs more than the extra read. Solc 0.8.36 / optimizer 200: re-read wins by 1 gas (legacy) / 3 gas (via-IR) when the redeem pays, and by 3 / 5 gas when it pays nothing. Matches the September Foundry result that dropped the local (`096719a`). |
+| 7 | Equality guards on `addSwapper` / `revokeSwapper` / `setFeeCollectorAddress` | **Leave** | Owner cold path; a no-op write costs 5,000 Rootstock `RESET`. An equality check is more code for a rare call. Same bar as R81's declined fee-setter merge. |
+| 8 | Drop `toUint32` on the purchase path's `getTokenHandler` | **Leave** | The cast cannot fail once the batch route has matched the schedule's `uint32` route, but the shared getter still serves deposits and withdrawals. A purchase-only path would be a second getter for a few gas inside that external call. |
+| 9 | Narrow `Batch.routeIndex` to `uint32` | **Leave** | ABI pads it to a 32-byte word either way; calldata does not shrink. |
+
+Recorded in [`IMPLEMENTATION_ORDER.md`](./IMPLEMENTATION_ORDER.md#closed-non-implementation-decisions).
+R95 item 4's "reopen with a deploy measurement" is superseded.
+
 ## Files likely touched
 
 - `src/PurchaseRbtc.sol`
@@ -67,6 +86,7 @@ and LayerBank's exact-burn note covers the batch caller as well as a single rede
 - `docs/relaunch/R102-wrbtc-withdraw-seam.md`
 - `docs/relaunch/README.md`
 - `docs/relaunch/IMPLEMENTATION_ORDER.md`
+- `docs/relaunch/R95-merge-token-lending.md` (item 4 closed; no reopen)
 
 ## Required tests
 
@@ -85,6 +105,8 @@ and LayerBank's exact-burn note covers the batch caller as well as a single rede
 - [x] No ABI / event / selector change.
 - [x] `make check` + both production fork lanes green.
 - [x] Spec assigned; README Status and `IMPLEMENTATION_ORDER.md` updated.
+- [x] Post-ship review candidates recorded as closed (fee-collector packing, MoC balance local, and
+      the three leave-as-is cold-path items).
 
 ## Reviewer checklist
 
