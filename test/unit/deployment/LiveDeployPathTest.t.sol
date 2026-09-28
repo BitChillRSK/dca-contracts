@@ -301,9 +301,9 @@ contract LiveDeployPathTest is Test {
     }
 
     function _docTokenFromHandler(address handler) internal view returns (address) {
-        // TokenHandler.i_stableToken is public immutable on every leaf.
-        (bool ok, bytes memory data) = handler.staticcall(abi.encodeWithSignature("i_stableToken()"));
-        require(ok && data.length >= 32, "handler has no i_stableToken");
+        // TokenHandler.i_stablecoin is public immutable on every leaf.
+        (bool ok, bytes memory data) = handler.staticcall(abi.encodeWithSignature("i_stablecoin()"));
+        require(ok && data.length >= 32, "handler has no i_stablecoin");
         return abi.decode(data, (address));
     }
 }

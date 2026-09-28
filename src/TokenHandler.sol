@@ -22,11 +22,11 @@ abstract contract TokenHandler is ITokenHandler, ERC165, DcaManagerAccessControl
 
     /**
      * @param dcaManagerAddress The DcaManager allowed to call deposit and withdraw.
-     * @param tokenAddress The stablecoin this handler holds.
+     * @param stablecoinAddress The stablecoin this handler holds.
      */
-    constructor(address dcaManagerAddress, address tokenAddress)
+    constructor(address dcaManagerAddress, address stablecoinAddress)
         DcaManagerAccessControl(dcaManagerAddress)
-        StablecoinSource(tokenAddress)
+        StablecoinSource(stablecoinAddress)
     {}
 
     /*//////////////////////////////////////////////////////////////
@@ -67,20 +67,20 @@ abstract contract TokenHandler is ITokenHandler, ERC165, DcaManagerAccessControl
 
     /// @dev Pull `depositAmount` from `user` and revert unless the measured balance delta matches.
     function _depositToken(address user, uint256 depositAmount) internal virtual {
-        uint256 balanceBefore = i_stableToken.balanceOf(address(this));
-        i_stableToken.safeTransferFrom(user, address(this), depositAmount);
-        uint256 depositedAmount = i_stableToken.balanceOf(address(this)) - balanceBefore;
+        uint256 balanceBefore = i_stablecoin.balanceOf(address(this));
+        i_stablecoin.safeTransferFrom(user, address(this), depositAmount);
+        uint256 depositedAmount = i_stablecoin.balanceOf(address(this)) - balanceBefore;
         if (depositedAmount != depositAmount) {
             revert TokenHandler__DepositAmountMismatch(depositAmount, depositedAmount);
         }
-        emit TokenHandler__TokenDeposited(address(i_stableToken), user, depositAmount);
+        emit TokenHandler__TokenDeposited(address(i_stablecoin), user, depositAmount);
     }
 
     /// @dev Pay `withdrawalAmount` of the stablecoin to `user` and return the measured balance delta.
     function _withdrawToken(address user, uint256 withdrawalAmount) internal virtual returns (uint256 withdrawnAmount) {
-        uint256 balanceBefore = i_stableToken.balanceOf(address(this));
-        i_stableToken.safeTransfer(user, withdrawalAmount);
-        withdrawnAmount = balanceBefore - i_stableToken.balanceOf(address(this));
-        emit TokenHandler__TokenWithdrawn(address(i_stableToken), user, withdrawnAmount);
+        uint256 balanceBefore = i_stablecoin.balanceOf(address(this));
+        i_stablecoin.safeTransfer(user, withdrawalAmount);
+        withdrawnAmount = balanceBefore - i_stablecoin.balanceOf(address(this));
+        emit TokenHandler__TokenWithdrawn(address(i_stablecoin), user, withdrawnAmount);
     }
 }

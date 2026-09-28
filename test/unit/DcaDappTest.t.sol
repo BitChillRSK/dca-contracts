@@ -884,7 +884,7 @@ contract DcaDappTest is Test {
                     revert("Failed to get Tropykus shares from handler");
                 }
             } else if (routeIndex == SOVRYN_INDEX) {
-                try SovrynDocHandlerMoc(payable(address(stablecoinHandler))).i_iSusd() returns (
+                try SovrynDocHandlerMoc(payable(address(stablecoinHandler))).i_iToken() returns (
                     IiSusdToken iSusdToken
                 ) {
                     shareTokenAddress = address(iSusdToken);

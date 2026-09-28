@@ -52,7 +52,7 @@ contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
 
         assertEq(layerbankHandler.i_dcaManager(), address(dcaManager), "LayerBank handler doesn't reference DcaManager");
         assertEq(
-            address(layerbankHandler.i_stableToken()),
+            address(layerbankHandler.i_stablecoin()),
             helperConfig.getStablecoinAddress(),
             "LayerBank handler DOC mismatch"
         );

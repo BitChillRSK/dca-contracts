@@ -15,7 +15,7 @@ import {IdleHandler} from "./IdleHandler.sol";
 contract IdleHandlerDex is IdleHandler, PurchaseUniswap {
     /**
      * @param dcaManagerAddress The DcaManager allowed to call this handler.
-     * @param stableTokenAddress The stablecoin this handler holds idle.
+     * @param stablecoinAddress The stablecoin this handler holds idle.
      * @param uniswapSettings Router, WRBTC, path, and MoC oracle.
      * @param feeCollector Address that receives purchase fees.
      * @param feeSettings Linear fee parameters.
@@ -25,7 +25,7 @@ contract IdleHandlerDex is IdleHandler, PurchaseUniswap {
      */
     constructor(
         address dcaManagerAddress,
-        address stableTokenAddress,
+        address stablecoinAddress,
         UniswapSettings memory uniswapSettings,
         address feeCollector,
         FeeSettings memory feeSettings,
@@ -33,7 +33,7 @@ contract IdleHandlerDex is IdleHandler, PurchaseUniswap {
         uint256 amountOutMinimumSafetyCheck,
         address initialOwner
     )
-        IdleHandler(dcaManagerAddress, stableTokenAddress)
+        IdleHandler(dcaManagerAddress, stablecoinAddress)
         PurchaseUniswap(
             uniswapSettings,
             FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}),

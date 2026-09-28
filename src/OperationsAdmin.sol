@@ -98,7 +98,7 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
         } else if (supportsLending) {
             revert OperationsAdmin__LendingHandlerOnIdleRoute(handler);
         }
-        if (address(ITokenHandler(handler).i_stableToken()) != token) {
+        if (address(ITokenHandler(handler).i_stablecoin()) != token) {
             revert OperationsAdmin__HandlerTokenMismatch(token, handler);
         }
         address dcaManager = IDcaManagerAccessControl(handler).i_dcaManager();

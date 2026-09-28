@@ -125,8 +125,8 @@ contract R87IdleLedgerRemovalGasTest is Test {
 }
 
 contract IdleGasHarness is IdleHandler {
-    constructor(address dcaManagerAddress, address stableTokenAddress)
-        IdleHandler(dcaManagerAddress, stableTokenAddress)
+    constructor(address dcaManagerAddress, address stablecoinAddress)
+        IdleHandler(dcaManagerAddress, stablecoinAddress)
     {}
 
     function exposedBatchRetrieve(address[] calldata users, uint256[] calldata purchaseAmounts)
@@ -144,8 +144,8 @@ contract IdleGasHarness is IdleHandler {
 contract IdleLedgerBaselineHarness is TokenHandler {
     mapping(address user => uint256 balance) internal s_idleBalances;
 
-    constructor(address dcaManagerAddress, address stableTokenAddress)
-        TokenHandler(dcaManagerAddress, stableTokenAddress)
+    constructor(address dcaManagerAddress, address stablecoinAddress)
+        TokenHandler(dcaManagerAddress, stablecoinAddress)
     {}
 
     function _depositToken(address user, uint256 depositAmount) internal override {

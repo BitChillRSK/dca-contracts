@@ -36,7 +36,7 @@ OperationsAdmin     roles; token × route-index → handler
 PurchaseFees        fee math (owned by PurchaseRbtc; MoC / Uniswap route fee construction)
 TokenHandler        deposit/withdraw stablecoin
 LendingHandler      TokenHandler + ILendingHandler; share ↔ underlying conversion, per-user shares, withdraw clamp, interest, exact-sum batch redeem
-StablecoinSource    shared `i_stableToken` + batch-funding hook (TokenHandler and PurchaseRbtc inherit; idle/lending implement retrieve)
+StablecoinSource    shared `i_stablecoin` + batch-funding hook (TokenHandler and PurchaseRbtc inherit; idle/lending implement retrieve)
 PurchaseRbtc        shared buy/batch pipeline; accumulated rBTC; withdraw to signer
 PurchaseMoc         MoC redeem DOC → rBTC (_purchaseRbtc only)
 PurchaseUniswap     Uniswap V3 → WRBTC (_purchaseRbtc + WRBTC unwrap on withdraw)

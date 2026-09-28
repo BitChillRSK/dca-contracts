@@ -275,25 +275,19 @@ contract PreR83SovrynDocHandlerMoc is SovrynDocHandlerMoc {
     constructor(
         address dcaManagerAddress,
         address docTokenAddress,
-        address iSusdTokenAddress,
+        address iTokenAddress,
         address feeCollector,
         address mocProxyAddress,
         IPurchaseFees.FeeSettings memory feeSettings,
         address initialOwner
     )
         SovrynDocHandlerMoc(
-            dcaManagerAddress,
-            docTokenAddress,
-            iSusdTokenAddress,
-            feeCollector,
-            mocProxyAddress,
-            feeSettings,
-            initialOwner
+            dcaManagerAddress, docTokenAddress, iTokenAddress, feeCollector, mocProxyAddress, feeSettings, initialOwner
         )
     {}
 
     function _depositToken(address user, uint256 depositAmount) internal override {
-        i_stableToken.forceApprove(_lendingSpender(), depositAmount);
+        i_stablecoin.forceApprove(_lendingSpender(), depositAmount);
         super._depositToken(user, depositAmount);
     }
 }

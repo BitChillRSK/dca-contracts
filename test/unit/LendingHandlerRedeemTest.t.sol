@@ -720,8 +720,8 @@ contract LendingHandlerHarness is LendingHandler {
     bool public increaseBalanceOnRedeem;
     bool public revertOnRedeem;
 
-    constructor(address dcaManagerAddress, address stableTokenAddress, uint256 exchangeRateDecimals)
-        LendingHandler(dcaManagerAddress, stableTokenAddress, exchangeRateDecimals)
+    constructor(address dcaManagerAddress, address stablecoinAddress, uint256 exchangeRateDecimals)
+        LendingHandler(dcaManagerAddress, stablecoinAddress, exchangeRateDecimals)
     {}
 
     function setExchangeRate(uint256 rate) external {
@@ -778,7 +778,7 @@ contract LendingHandlerHarness is LendingHandler {
 
     function _protocolDeposit(uint256 stablecoinAmount) internal override {
         protocolShares += _stablecoinToShares(stablecoinAmount, exchangeRate);
-        i_stableToken.safeTransfer(address(1), stablecoinAmount);
+        i_stablecoin.safeTransfer(address(1), stablecoinAmount);
     }
 
     function _protocolRedeem(uint256 sharesAmount, uint256 rate) internal override {
@@ -801,7 +801,7 @@ contract LendingHandlerHarness is LendingHandler {
         if (!payOut) return;
         uint256 amount = toBurn > 0 ? _sharesToStablecoin(toBurn, rate) : _sharesToStablecoin(sharesAmount, rate);
         if (amount > 0) {
-            MockStablecoin(address(i_stableToken)).mint(address(this), amount);
+            MockStablecoin(address(i_stablecoin)).mint(address(this), amount);
         }
     }
 }

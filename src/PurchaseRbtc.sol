@@ -78,14 +78,14 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
                 totalStablecoinAmountToSpend -= aggregatedFee;
             }
 
-            _transferFee(i_stableToken, aggregatedFee);
+            _transferFee(i_stablecoin, aggregatedFee);
         }
 
         uint256 totalPurchasedRbtc;
         {
-            uint256 inputBalanceBefore = i_stableToken.balanceOf(address(this));
+            uint256 inputBalanceBefore = i_stablecoin.balanceOf(address(this));
             totalPurchasedRbtc = _purchaseRbtc(totalStablecoinAmountToSpend, minRbtcOut);
-            uint256 inputBalanceAfter = i_stableToken.balanceOf(address(this));
+            uint256 inputBalanceAfter = i_stablecoin.balanceOf(address(this));
             if (
                 inputBalanceAfter > inputBalanceBefore
                     || inputBalanceBefore - inputBalanceAfter != totalStablecoinAmountToSpend
@@ -95,7 +95,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
                 );
             }
         }
-        if (totalPurchasedRbtc == 0) revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(i_stableToken));
+        if (totalPurchasedRbtc == 0) revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(i_stablecoin));
         // Checked against the rBTC we measured ourselves receiving, so the bound holds on every purchase
         // venue and never trusts an integrator return value. Equality passes. Where the venue applies a
         // floor of its own, it is enforced there and the stricter of the two decides.
@@ -119,10 +119,10 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
             uint256 userStablecoinSpent = totalStablecoinAmountToSpend * plannedNet / totalNetStablecoinPlanned;
             // Skip zero floor allocations so a never-credited user is not marked live.
             if (userRbtc != 0) _creditRbtc(buyer, userRbtc);
-            emit PurchaseRbtc__RbtcBought(buyer, address(i_stableToken), userRbtc, scheduleIds[i], userStablecoinSpent);
+            emit PurchaseRbtc__RbtcBought(buyer, address(i_stablecoin), userRbtc, scheduleIds[i], userStablecoinSpent);
         }
         emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
-            address(i_stableToken), totalPurchasedRbtc, totalStablecoinAmountToSpend
+            address(i_stablecoin), totalPurchasedRbtc, totalStablecoinAmountToSpend
         );
     }
 

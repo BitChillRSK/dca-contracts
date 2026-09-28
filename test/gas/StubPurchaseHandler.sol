@@ -20,13 +20,13 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
  *      its token and `i_dcaManager`, which that function checks.
  */
 contract StubPurchaseHandler is IERC165, ITokenHandler, IPurchaseRbtc {
-    IERC20 public immutable i_stableToken;
+    IERC20 public immutable i_stablecoin;
     address public immutable i_dcaManager;
     uint256 public deposits;
     uint256 public rowsBought;
 
-    constructor(address stableToken, address dcaManager) {
-        i_stableToken = IERC20(stableToken);
+    constructor(address stablecoin, address dcaManager) {
+        i_stablecoin = IERC20(stablecoin);
         i_dcaManager = dcaManager;
     }
 

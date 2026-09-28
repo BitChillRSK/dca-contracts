@@ -689,9 +689,9 @@ contract PurchaseRbtcHarness is PurchaseRbtc {
         if (revertOnPurchase) revert("route-called");
         purchaseCalls++;
         lastPurchaseAmount = stablecoinAmount;
-        feeCollectorBalanceOnPurchase = i_stableToken.balanceOf(s_feeCollector);
+        feeCollectorBalanceOnPurchase = i_stablecoin.balanceOf(s_feeCollector);
         uint256 inputToConsume = usePurchaseInputOverride ? purchaseInputOverride : stablecoinAmount;
-        require(i_stableToken.transfer(address(0xBEEF), inputToConsume));
+        require(i_stablecoin.transfer(address(0xBEEF), inputToConsume));
         return rbtcOut;
     }
 

@@ -111,7 +111,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         _setPurchasePath(intermediateTokens, poolFeeRates, newPath);
         _setPurchasePathAllowed(pathHash, newPath, intermediateTokens, poolFeeRates, true);
 
-        uint8 stablecoinDecimals = IERC20Metadata(address(i_stableToken)).decimals();
+        uint8 stablecoinDecimals = IERC20Metadata(address(i_stablecoin)).decimals();
         if (stablecoinDecimals > ORACLE_DECIMALS) {
             revert PurchaseUniswap__UnsupportedStablecoinDecimals(stablecoinDecimals);
         }
@@ -324,7 +324,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     }
 
     function _approveSwapRouter() private {
-        i_stableToken.forceApprove(address(i_swapRouter), type(uint256).max);
+        i_stablecoin.forceApprove(address(i_swapRouter), type(uint256).max);
     }
 
     /**
@@ -342,7 +342,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
             revert PurchaseUniswap__WrongNumberOfTokensOrFeeRates(intermediateTokens.length, poolFeeRates.length);
         }
 
-        newPath = abi.encodePacked(address(i_stableToken));
+        newPath = abi.encodePacked(address(i_stablecoin));
         for (uint256 i = 0; i < intermediateTokens.length; ++i) {
             newPath = abi.encodePacked(newPath, poolFeeRates[i], intermediateTokens[i]);
         }

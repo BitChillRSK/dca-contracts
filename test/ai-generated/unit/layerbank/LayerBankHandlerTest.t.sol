@@ -461,13 +461,13 @@ contract LayerBankHandlerTest is HandlerTestHarness {
 contract LayerBankTestHandler is LayerBankHandler, PurchaseFees {
     constructor(
         address dcaManagerAddress,
-        address stableTokenAddress,
+        address stablecoinAddress,
         address aTokenAddress,
         address feeCollector,
         FeeSettings memory feeSettings,
         address initialOwner
     )
-        LayerBankHandler(dcaManagerAddress, stableTokenAddress, aTokenAddress)
+        LayerBankHandler(dcaManagerAddress, stablecoinAddress, aTokenAddress)
         PurchaseFees(feeCollector, feeSettings, initialOwner)
     {}
 

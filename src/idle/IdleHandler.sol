@@ -21,10 +21,10 @@ abstract contract IdleHandler is TokenHandler {
 
     /**
      * @param dcaManagerAddress The DcaManager allowed to call deposit and withdraw.
-     * @param stableTokenAddress The ERC20 stablecoin this handler holds idle.
+     * @param stablecoinAddress The ERC20 stablecoin this handler holds idle.
      */
-    constructor(address dcaManagerAddress, address stableTokenAddress)
-        TokenHandler(dcaManagerAddress, stableTokenAddress)
+    constructor(address dcaManagerAddress, address stablecoinAddress)
+        TokenHandler(dcaManagerAddress, stablecoinAddress)
     {}
 
     /*//////////////////////////////////////////////////////////////

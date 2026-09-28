@@ -334,7 +334,7 @@ contract PurchaseUniswapMinOutTest is Test {
 }
 
 /**
- * @notice Sets `i_stableToken` in a base constructor, the way `TokenHandler` does for the real handlers,
+ * @notice Sets `i_stablecoin` in a base constructor, the way `TokenHandler` does for the real handlers,
  *         so `PurchaseUniswap`'s constructor can already read it.
  */
 abstract contract PurchaseTokenBase is StablecoinSource {

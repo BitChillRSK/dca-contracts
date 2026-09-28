@@ -22,5 +22,5 @@ interface IStablecoinSource {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice The stablecoin this handler deposits, withdraws, and spends on purchases.
-    function i_stableToken() external view returns (IERC20);
+    function i_stablecoin() external view returns (IERC20);
 }

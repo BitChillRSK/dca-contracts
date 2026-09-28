@@ -16,7 +16,7 @@ import {reentrantCall} from "../utils/OzRevert.sol";
 contract ReenteringDepositHandler is IERC165, ITokenHandler, IPurchaseRbtc {
     DcaManager private immutable i_manager;
     /// @dev Reported so `OperationsAdmin.assignHandler` can check it against the assigned token.
-    IERC20 public immutable i_stableToken;
+    IERC20 public immutable i_stablecoin;
     /// @dev Reported for `OperationsAdmin.assignHandler`'s DcaManager check.
     address public immutable i_dcaManager;
     address private s_token;
@@ -24,10 +24,10 @@ contract ReenteringDepositHandler is IERC165, ITokenHandler, IPurchaseRbtc {
     bool private s_armed;
     bytes public s_innerRevert;
 
-    constructor(DcaManager manager, address stableToken) {
+    constructor(DcaManager manager, address stablecoin) {
         i_manager = manager;
         i_dcaManager = address(manager);
-        i_stableToken = IERC20(stableToken);
+        i_stablecoin = IERC20(stablecoin);
     }
 
     function arm(address token, uint64 scheduleId) external {

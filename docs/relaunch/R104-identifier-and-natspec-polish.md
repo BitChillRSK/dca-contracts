@@ -25,10 +25,15 @@ Conventions locked in planning (keep in the PR body / `AGENTS.md` only where a d
   lowercase `rbtc`. WRBTC immutable: ticker noun `i_wrbtc`.
 - Interest: one noun order — `getAccruedInterest` / `quoteAccruedInterest` on the handler and on
   `DcaManager`.
+- Product token: `i_stablecoin` (not `i_stableToken` / `i_asset` / `i_underlying`). Lending receipt
+  immutables share the short noun form: `i_aToken`, `i_kToken`, `i_iToken` (Sovryn). Vendored
+  `IiSusdToken` stays.
 
 ## Open product decisions
 
-**none** — every rename below was approved in the naming chat (2026-09-28). Fee mixin *type* name is
+**none remaining.** Renames through the first Keep list were approved in the naming chat
+(2026-09-28). Product override the same day: also rename `i_stableToken` → `i_stablecoin` and
+Sovryn `i_iSusd` / `iSusdTokenAddress` → `i_iToken` / `iTokenAddress`. Fee mixin *type* name remains
 R103’s gate, not this PR’s.
 
 ## Scope
@@ -38,7 +43,10 @@ R103’s gate, not this PR’s.
 - [x] `PurchaseUniswap.i_wrBtcToken` → `i_wrbtc`; `UniswapSettings.wrBtcToken` → `wrbtc`; locals
       `wrBtcBalanceBefore` → `wrbtcBalanceBefore`.
 - [x] `PurchaseUniswap.i_swapRouter02` → `i_swapRouter` (`@notice` may still say SwapRouter02).
-- [x] `SovrynHandler.i_iSusdToken` → `i_iSusd` (post-R103 type name).
+- [x] `SovrynHandler.i_iSusdToken` → `i_iSusd` → **`i_iToken`** (parity with `i_aToken` /
+      `i_kToken`); ctor `iSusdTokenAddress` → `iTokenAddress`. Leave vendored `IiSusdToken` alone.
+- [x] `i_stableToken` → `i_stablecoin`; ctor/locals `stableTokenAddress` / `tokenAddress` (where
+      that arg *is* the stablecoin) → `stablecoinAddress`.
 - [x] `DcaManager.modifyMinPurchasePeriod` → `setMinPurchasePeriod`.
 - [x] `DcaManager.modifyMaxSchedulesPerToken` → `setMaxSchedulesPerToken`.
 - [x] `DcaManager.getInterestAccrued` → `getAccruedInterest` (align with `ILendingHandler` /
@@ -75,8 +83,8 @@ R103’s gate, not this PR’s.
 
 - [x] Event / error spellings such as `PurchaseRbtc__rBtcWithdrawn` (ABI churn for monitoring with no
       readability win).
-- [x] `i_stableToken`, `i_operationsAdmin`, `i_dcaManager`, `i_mocProxy`, `i_aToken`, `i_kToken`,
-      `i_pool`, and domain `s_*` names.
+- [x] `i_operationsAdmin`, `i_dcaManager`, `i_mocProxy`, `i_aToken`, `i_kToken`, `i_pool`, and
+      domain `s_*` names. Vendored `IiSusdToken` type/file name.
 - [x] Long product names: `batchBuyRbtcAcrossHandlers`, protected-window APIs, `topUpFromInterest`,
       `restore*Approval`.
 
@@ -85,7 +93,9 @@ R103’s gate, not this PR’s.
 - [ ] Any contract, file, or fee-mixin *type* rename — R103.
 - [ ] OpsAdmin `getHandler` / `assignHandler` — R103.
 - [ ] Behavior, gas, packing, purchase-path logic.
-- [ ] Rewriting historical relaunch specs’ old names.
+- [ ] Rewriting historical relaunch specs’ old names (closed R10 / R21 / … keep the names that
+      shipped then). Only this file, `docs/relaunch/README.md` Status, and `AGENTS.md` may name the
+      new identifiers in docs.
 
 ## Files likely touched
 
@@ -93,10 +103,11 @@ R103’s gate, not this PR’s.
 - `src/PurchaseRbtc.sol`, `src/interfaces/IPurchaseRbtc.sol`
 - `src/DcaManager.sol`, `src/interfaces/IDcaManager.sol`
 - Fee mixin + `IFee*` (post-R103 paths)
-- `src/sovryn/SovrynHandler.sol` (immutable rename)
+- `src/StablecoinSource.sol`, `src/interfaces/IStablecoinSource.sol`, `src/TokenHandler.sol`
+- `src/sovryn/SovrynHandler.sol` (+ Dex / Doc leaves’ ctor param names; not `IiSusdToken.sol`)
 - `src/LendingHandler.sol`, `src/idle/IdleHandler.sol`, other call sites of locals
 - Matching `test/**`, `script/**` only where they name renamed selectors or immutables
-- `AGENTS.md` only if a durable naming sentence belongs there (optional; prefer PR body)
+- `AGENTS.md` for the durable `i_stablecoin` layout sentence; `docs/relaunch/README.md` Status
 
 ## Required tests
 
@@ -112,12 +123,14 @@ full gate for the ABI renames.
 
 ## Success criteria
 
-- [x] Every Scope rename applied; Keep list untouched.
+- [x] Every Scope rename applied; Keep list untouched (except the product override that moved
+      `i_stablecoin` / `i_iToken` into Scope).
 - [x] No `@return The constructor-supplied` left on first-party public immutables.
 - [x] Fee / PurchaseUniswap state-var trailing noise and PurchaseRbtc scope apologetics gone.
 - [x] `make check` + both forks green; consumer issues linked in the PR.
 - [x] `docs/relaunch/README.md` Status points at this PR; next unassigned prompt returns to cutover
       (`CUTOVER_RUNBOOK.md`) unless a later item is ordered.
+- [x] No historical `docs/relaunch/R*.md` (other than this file) rewritten for the new names.
 
 ## Reviewer checklist
 
@@ -125,11 +138,12 @@ full gate for the ABI renames.
 - [ ] Invariants unchanged; NatSpec trim did not delete durable reasons.
 - [ ] `set*` used only for overwriteable config; registry stays `assign*`.
 - [ ] Files beyond this list are direct fallout and named in the PR.
+- [ ] Closed relaunch specs still use the names that shipped then.
 
 ## ABI / deploy / cutover impact
 
 - ABI: yes — listed public immutable getters and function selectors.
 - Scripts: update any literal that references old immutable or function names.
 - Cutover: front-end (DcaManager setters/getters/withdraw), monitoring if it decodes fee collector
-  setters, swapper if it reads Dex immutables or `minRbtcOut` call sites only (selector changes on
-  owner paths may not touch the bot — still grep). Open/update sibling issues per `AGENTS.md`.
+  setters or handler immutables (`i_stablecoin`, `i_iToken`, Dex getters), swapper if it reads Dex
+  immutables. Open/update sibling issues per `AGENTS.md`.
