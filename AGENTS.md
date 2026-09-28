@@ -82,6 +82,8 @@ Unless the assigned spec explicitly changes one:
 
 13. **Accumulated rBTC encoding lives in three helpers only** — `s_usersAccumulatedRbtc` is `private` and stores `claimable + 1` when live (`0` = never credited; `1` = post-withdraw sentinel). Read or write it only through the three `private` helpers `_creditRbtc`, `_claimableRbtc`, and `_withdrawRbtcChecksEffects`. A raw `+=` on the mapping underpays the user by one wei of encoding on every later decode. Privacy makes a leaf bypass a compile error — same teeth as invariant 8's private `s_dcaSchedules`. Routes that accumulate wrapped rBTC override the separate `internal virtual` `_withdrawRbtc` pay seam (unwrap, then `super`) rather than restating the external withdraw. See `docs/relaunch/R77-accumulated-rbtc-storage-sentinel.md`.
 
+14. **Shared accounting storage that only the owning base may touch is `private`** — `LendingHandler.s_shares`, and `PurchaseUniswap`'s `s_swapPath` / `s_swapIntermediateTokens`, are `private`. Adapters supply protocol operations; they must not bypass the shared books or split the executed path from its intermediate-token checks. Same compiler teeth as invariants 8 and 13. See `docs/relaunch/R106-private-accounting-boundaries.md`.
+
 ## Section headers and function order
 
 First-party `src/` files use Foundry-style banners with these exact titles. When a section is non-empty, emit its banner; skip empty ones. Order:

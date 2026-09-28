@@ -167,6 +167,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R103 | after R102, before relaunch deploy | **decided 2026-09-28: `PurchaseFees`** (Handler taxonomy: strip `Erc20`, fee mixin off Handler, `getHandler` / `assignHandler`) |
 | R104 | after R103, before relaunch deploy | none (identifier polish + NatSpec trim; stack on R103 names) |
 | R105 | after R104, before relaunch deploy | none (strip redundant `Address` from address params / matching locals; stack on R104) |
+| R106 | after R105, before relaunch deploy | none (`s_shares` / Uniswap path state `private`; correct `UserSharesUpdated` docs; stack on R105) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1419,6 +1420,14 @@ After R104, before relaunch deploy. Constructor / function `address` parameters 
 drop the `Address` suffix (`stablecoinAddress` → `stablecoin`, `dcaManagerAddress` → `dcaManager`,
 `kDocTokenAddress` → `kToken`, …). Type already says address. Events, errors, public immutables, and
 historical specs stay. Ask: none.
+
+### R106 - Private accounting boundaries ([spec](./R106-private-accounting-boundaries.md))
+
+After R105, before relaunch deploy. `LendingHandler.s_shares` and `PurchaseUniswap`'s
+`s_swapPath` / `s_swapIntermediateTokens` become `private` (compiler-enforced, same teeth as
+invariants 8 and 13). Correct `UserSharesUpdated` NatSpec / `EXTERNAL_REWARDS.md`: `newShares` is
+the balance after that transition; only the last event for a repeated batch buyer matches the
+final getter. Ask: none.
 
 ## Closed non-implementation decisions
 
