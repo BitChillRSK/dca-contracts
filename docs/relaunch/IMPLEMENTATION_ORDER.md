@@ -1384,7 +1384,7 @@ pull (max-schedules stays after it: +450 under deploy otherwise); the unreachabl
 stale NatSpec is fixed. It closes reusing the lending redeem's balance reading, and the
 `withdrawTokenAndInterest` route-check reorder (dropped after review). Ask: none (decided 2026-09-27).
 
-### R102 - unwrap WRBTC through the withdraw seam ([spec](./R102-wrbtc-withdraw-seam.md))
+### R102 - unwrap WRBTC through the withdraw seam ([spec](./R102-wrbtc-withdraw-seam.md), [#168](https://github.com/BitChillRSK/dca-contracts/pull/168))
 
 After R101, before relaunch deploy. `PurchaseUniswap` overrides `_withdrawRbtc` (unwrap, then `super`)
 instead of restating the guarded external withdraw; `_withdrawRbtcChecksEffects`, `_claimableRbtc`, and

@@ -1,6 +1,6 @@
 # R102 — Unwrap WRBTC through the withdraw seam
 
-Status: **implemented** · Assigned: yes · Optional/further-review: no · Stack on: R101 ([#167](https://github.com/BitChillRSK/dca-contracts/pull/167))
+Status: **implemented** · GitHub [#168](https://github.com/BitChillRSK/dca-contracts/pull/168) · Assigned: yes · Optional/further-review: no · Stack on: R101 ([#167](https://github.com/BitChillRSK/dca-contracts/pull/167))
 
 ## Objective
 
