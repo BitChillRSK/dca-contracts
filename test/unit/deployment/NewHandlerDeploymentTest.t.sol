@@ -40,8 +40,8 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
 
         UsdrifHelperConfig.NetworkConfig memory config = usdrifHelperConfig.getNetworkConfig();
         IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
-            wrBtcToken: IWRBTC(config.wrbtcTokenAddress),
-            swapRouter02: IUniswapV3SwapRouter(config.swapRouter02Address),
+            wrbtc: IWRBTC(config.wrbtcTokenAddress),
+            swapRouter: IUniswapV3SwapRouter(config.swapRouterAddress),
             swapIntermediateTokens: config.swapIntermediateTokens,
             swapPoolFeeRates: config.swapPoolFeeRates,
             mocOracle: ICoinPairPrice(config.mocOracleAddress)
@@ -117,7 +117,7 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
         vm.prank(OWNER);
         operationsAdmin.addSwapper(swapper);
         // The mock router wraps rBTC it holds into WRBTC for the handler, the way a real swap pays out.
-        vm.deal(config.swapRouter02Address, 1000 ether);
+        vm.deal(config.swapRouterAddress, 1000 ether);
 
         usdrif.mint(user, DEPOSIT_AMOUNT);
         vm.startPrank(user);

@@ -525,11 +525,11 @@ contract Handler is Test {
     /**
      * @notice Withdraw accumulated rBTC for a random user
      */
-    function withdrawRbtcFromTokenHandler(uint256 userSeed) external {
+    function withdrawAccumulatedRbtc(uint256 userSeed) external {
         address user = s_users[userSeed % s_users.length];
 
         vm.startPrank(user);
-        try dcaManager.withdrawRbtcFromTokenHandler(address(stablecoin), routeIndex) {
+        try dcaManager.withdrawAccumulatedRbtc(address(stablecoin), routeIndex) {
         // Success
         }
             catch {
@@ -604,7 +604,7 @@ contract Handler is Test {
 
         // Non-lending routes revert this getter rather than returning zero.
         uint256 accruedInterest;
-        try dcaManager.getInterestAccrued(user, address(stablecoin), routeIndex) returns (uint256 accrued) {
+        try dcaManager.getAccruedInterest(user, address(stablecoin), routeIndex) returns (uint256 accrued) {
             accruedInterest = accrued;
         } catch {
             return;
@@ -650,11 +650,11 @@ contract Handler is Test {
     /**
      * @notice Test modifying minimum purchase period (owner-only)
      */
-    function modifyMinPurchasePeriod(uint256 newMinPurchasePeriod) external {
+    function setMinPurchasePeriod(uint256 newMinPurchasePeriod) external {
         newMinPurchasePeriod = bound(newMinPurchasePeriod, 1 days, 365 days);
 
         vm.startPrank(OWNER);
-        try dcaManager.modifyMinPurchasePeriod(newMinPurchasePeriod) {
+        try dcaManager.setMinPurchasePeriod(newMinPurchasePeriod) {
         // Success
         }
             catch {
@@ -666,11 +666,11 @@ contract Handler is Test {
     /**
      * @notice Test modifying maximum schedules per token (owner-only)
      */
-    function modifyMaxSchedulesPerToken(uint256 newMaxSchedules) external {
+    function setMaxSchedulesPerToken(uint256 newMaxSchedules) external {
         newMaxSchedules = bound(newMaxSchedules, 1, 50);
 
         vm.startPrank(OWNER);
-        try dcaManager.modifyMaxSchedulesPerToken(newMaxSchedules) {
+        try dcaManager.setMaxSchedulesPerToken(newMaxSchedules) {
         // Success
         }
             catch {

@@ -245,8 +245,8 @@ contract StandingApprovalRecoveryTest is Test {
         uint24[] memory poolFeeRates = new uint24[](1);
         poolFeeRates[0] = 3000;
         return IPurchaseUniswap.UniswapSettings({
-            wrBtcToken: IWRBTC(address(wrBtc)),
-            swapRouter02: IUniswapV3SwapRouter(address(router)),
+            wrbtc: IWRBTC(address(wrBtc)),
+            swapRouter: IUniswapV3SwapRouter(address(router)),
             swapIntermediateTokens: new address[](0),
             swapPoolFeeRates: poolFeeRates,
             mocOracle: ICoinPairPrice(address(oracle))

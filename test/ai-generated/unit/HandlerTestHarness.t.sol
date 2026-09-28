@@ -158,7 +158,7 @@ abstract contract HandlerTestHarness is Test {
 
     function test_handler_deployment() public {
         assertNotEq(address(handler), address(0));
-        // Note: i_stableToken is immutable but may not be publicly accessible
+        // Note: i_stablecoin is immutable but may not be publicly accessible
         // We can verify it works through deposit/withdraw functionality instead
         // Minimum purchase amount is now handled by DcaManager, not individual handlers
     }
@@ -227,7 +227,7 @@ abstract contract HandlerTestHarness is Test {
         uint256 maxFeeRate = settings.maxFeeRate;
         uint256 lowerBound = settings.feePurchaseLowerBound;
         uint256 upperBound = settings.feePurchaseUpperBound;
-        address feeCollector = feeHandler.getFeeCollectorAddress();
+        address feeCollector = feeHandler.getFeeCollector();
 
         assertGt(minFeeRate, 0);
         assertGt(maxFeeRate, 0);

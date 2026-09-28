@@ -200,6 +200,6 @@ contract BatchMinRbtcOutTest is DcaDappTest {
 
     /// @dev MoC pays native rBTC into the handler; the Uniswap route holds WRBTC until withdrawal.
     function _handlerRbtcCash() private view returns (uint256) {
-        return isDexSwaps ? wrBtcToken.balanceOf(address(stablecoinHandler)) : address(stablecoinHandler).balance;
+        return isDexSwaps ? wrbtc.balanceOf(address(stablecoinHandler)) : address(stablecoinHandler).balance;
     }
 }

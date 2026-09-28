@@ -8,7 +8,7 @@ import {IStablecoinSource} from "./interfaces/IStablecoinSource.sol";
  * @title StablecoinSource
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Shared stablecoin immutable and batch-funding hook for handlers and purchase routes.
- * @dev Owns `i_stableToken` so deposit/withdraw and the purchase pipeline name the same token.
+ * @dev Owns `i_stablecoin` so deposit/withdraw and the purchase pipeline name the same token.
  *      Lending and idle bases implement `_batchRetrieveStablecoin`.
  */
 abstract contract StablecoinSource is IStablecoinSource {
@@ -17,18 +17,18 @@ abstract contract StablecoinSource is IStablecoinSource {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IStablecoinSource
-    IERC20 public immutable override i_stableToken;
+    IERC20 public immutable override i_stablecoin;
 
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @param tokenAddress The stablecoin this handler holds or lends out.
+     * @param stablecoinAddress The stablecoin this handler holds or lends out.
      */
-    constructor(address tokenAddress) {
-        if (tokenAddress == address(0)) revert StablecoinSource__ZeroStablecoin();
-        i_stableToken = IERC20(tokenAddress);
+    constructor(address stablecoinAddress) {
+        if (stablecoinAddress == address(0)) revert StablecoinSource__ZeroStablecoin();
+        i_stablecoin = IERC20(stablecoinAddress);
     }
 
     /*//////////////////////////////////////////////////////////////

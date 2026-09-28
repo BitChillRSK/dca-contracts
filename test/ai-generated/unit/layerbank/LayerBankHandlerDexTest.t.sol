@@ -43,8 +43,8 @@ contract LayerBankHandlerDexTest is HandlerTestHarness {
         poolFeeRates[0] = 3000;
 
         IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
-            wrBtcToken: IWRBTC(address(wrbtcToken)),
-            swapRouter02: IUniswapV3SwapRouter(address(mockRouter)),
+            wrbtc: IWRBTC(address(wrbtcToken)),
+            swapRouter: IUniswapV3SwapRouter(address(mockRouter)),
             swapIntermediateTokens: intermediateTokens,
             swapPoolFeeRates: poolFeeRates,
             mocOracle: ICoinPairPrice(address(mocOracle))

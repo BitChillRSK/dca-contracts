@@ -27,7 +27,7 @@ contract LendingPurchaseConservationHandler is Test {
 
     SovrynDocHandlerMoc public immutable i_handler;
     MockStablecoin public immutable i_doc;
-    MockIsusdToken public immutable i_iSusd;
+    MockIsusdToken public immutable i_iToken;
     address[] public s_users;
 
     uint256 public s_depositSuccesses;
@@ -41,7 +41,7 @@ contract LendingPurchaseConservationHandler is Test {
     constructor(SovrynDocHandlerMoc handler, MockStablecoin doc, MockIsusdToken iSusd, address[] memory users) {
         i_handler = handler;
         i_doc = doc;
-        i_iSusd = iSusd;
+        i_iToken = iSusd;
         s_users = users;
     }
 
@@ -103,7 +103,7 @@ contract LendingPurchaseConservationHandler is Test {
 
     /// @dev Round-down share → stablecoin, matching LendingHandler's withdrawable ceiling.
     function _shareBackedStablecoin(address user) private view returns (uint256) {
-        return ILendingHandler(address(i_handler)).getUserShares(user) * i_iSusd.tokenPrice() / EXCHANGE_RATE_DECIMALS;
+        return ILendingHandler(address(i_handler)).getUserShares(user) * i_iToken.tokenPrice() / EXCHANGE_RATE_DECIMALS;
     }
 }
 

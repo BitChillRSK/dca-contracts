@@ -176,15 +176,15 @@ contract NestedIndexedDcaManager is ReentrancyGuard {
     }
 
     function batchBuyRbtc(Batch calldata batch) external onlySwapper {
-        uint256 numOfPurchases = batch.buyers.length;
-        if (numOfPurchases == 0) revert Prototype__EmptyBatch();
+        uint256 purchaseCount = batch.buyers.length;
+        if (purchaseCount == 0) revert Prototype__EmptyBatch();
         if (
-            numOfPurchases != batch.scheduleIndexes.length || numOfPurchases != batch.scheduleIds.length
-                || numOfPurchases != batch.purchaseAmounts.length
+            purchaseCount != batch.scheduleIndexes.length || purchaseCount != batch.scheduleIds.length
+                || purchaseCount != batch.purchaseAmounts.length
         ) revert Prototype__ArraysLengthMismatch();
-        for (uint256 i; i < numOfPurchases; ++i) {
+        for (uint256 i; i < purchaseCount; ++i) {
             (uint256 schedulePurchaseAmount, uint256 scheduleRouteIndex) =
-                _rBtcPurchaseChecksEffects(batch.buyers[i], batch.token, batch.scheduleIndexes[i], batch.scheduleIds[i]);
+                _rbtcPurchaseChecksEffects(batch.buyers[i], batch.token, batch.scheduleIndexes[i], batch.scheduleIds[i]);
             if (schedulePurchaseAmount != batch.purchaseAmounts[i]) revert Prototype__PurchaseAmountMismatch();
             if (scheduleRouteIndex != batch.routeIndex) revert Prototype__RouteIndexMismatch();
         }
@@ -211,12 +211,12 @@ contract NestedIndexedDcaManager is ReentrancyGuard {
     }
 
     function _handler(address token, uint256 routeIndex) private view returns (ITokenHandler) {
-        address tokenHandlerAddress = i_operationsAdmin.getHandler(token, routeIndex);
-        if (tokenHandlerAddress == address(0)) revert Prototype__TokenNotAccepted();
-        return ITokenHandler(tokenHandlerAddress);
+        address handler = i_operationsAdmin.getHandler(token, routeIndex);
+        if (handler == address(0)) revert Prototype__TokenNotAccepted();
+        return ITokenHandler(handler);
     }
 
-    function _rBtcPurchaseChecksEffects(address buyer, address token, uint256 scheduleIndex, uint64 scheduleId)
+    function _rbtcPurchaseChecksEffects(address buyer, address token, uint256 scheduleIndex, uint64 scheduleId)
         private
         validateScheduleIndex(buyer, token, scheduleIndex)
         returns (uint256, uint256)

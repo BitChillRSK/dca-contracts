@@ -34,13 +34,13 @@ contract PurchaseUniswapMinOutTest is Test {
     address private constant BUYER = address(0xB0B);
     uint64 private constant SCHEDULE_ID = 1;
 
-    MockWrbtcToken private wrBtcToken;
+    MockWrbtcToken private wrbtc;
     MockFloorSwapRouter private swapRouter;
     MockMocOracle private mocOracle;
 
     function setUp() public {
-        wrBtcToken = new MockWrbtcToken();
-        swapRouter = new MockFloorSwapRouter(wrBtcToken);
+        wrbtc = new MockWrbtcToken();
+        swapRouter = new MockFloorSwapRouter(wrbtc);
         mocOracle = new MockMocOracle();
         vm.deal(address(swapRouter), 100 ether);
     }
@@ -314,8 +314,8 @@ contract PurchaseUniswapMinOutTest is Test {
         poolFeeRates[0] = 3000;
 
         IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
-            wrBtcToken: IWRBTC(address(wrBtcToken)),
-            swapRouter02: IUniswapV3SwapRouter(address(swapRouter)),
+            wrbtc: IWRBTC(address(wrbtc)),
+            swapRouter: IUniswapV3SwapRouter(address(swapRouter)),
             swapIntermediateTokens: intermediateTokens,
             swapPoolFeeRates: poolFeeRates,
             mocOracle: ICoinPairPrice(address(mocOracle))
@@ -334,7 +334,7 @@ contract PurchaseUniswapMinOutTest is Test {
 }
 
 /**
- * @notice Sets `i_stableToken` in a base constructor, the way `TokenHandler` does for the real handlers,
+ * @notice Sets `i_stablecoin` in a base constructor, the way `TokenHandler` does for the real handlers,
  *         so `PurchaseUniswap`'s constructor can already read it.
  */
 abstract contract PurchaseTokenBase is StablecoinSource {
@@ -413,11 +413,11 @@ contract MockFloorSwapRouter {
         uint256 amountOutMinimum;
     }
 
-    MockWrbtcToken private immutable i_wrBtcToken;
+    MockWrbtcToken private immutable i_wrbtc;
     uint256 private s_amountOut;
 
-    constructor(MockWrbtcToken wrBtcToken) {
-        i_wrBtcToken = wrBtcToken;
+    constructor(MockWrbtcToken wrbtc) {
+        i_wrbtc = wrbtc;
     }
 
     function setAmountOut(uint256 amountOut) external {
@@ -431,7 +431,7 @@ contract MockFloorSwapRouter {
         address tokenIn = address(uint160(bytes20(params.path[:20])));
         require(IERC20(tokenIn).transferFrom(msg.sender, address(this), params.amountIn), "transferFrom failed");
 
-        i_wrBtcToken.deposit{value: amountOut}(msg.sender);
+        i_wrbtc.deposit{value: amountOut}(msg.sender);
     }
 
     receive() external payable {}

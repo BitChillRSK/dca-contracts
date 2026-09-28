@@ -174,13 +174,13 @@ contract TripleKeyedDcaManager is ReentrancyGuard {
     }
 
     function batchBuyRbtc(Batch calldata batch) external onlySwapper {
-        uint256 numOfPurchases = batch.scheduleIds.length;
-        if (numOfPurchases == 0) revert Prototype__EmptyBatch();
-        if (numOfPurchases != batch.buyers.length) revert Prototype__ArraysLengthMismatch();
-        uint256[] memory purchaseAmounts = new uint256[](numOfPurchases);
-        for (uint256 i; i < numOfPurchases; ++i) {
+        uint256 purchaseCount = batch.scheduleIds.length;
+        if (purchaseCount == 0) revert Prototype__EmptyBatch();
+        if (purchaseCount != batch.buyers.length) revert Prototype__ArraysLengthMismatch();
+        uint256[] memory purchaseAmounts = new uint256[](purchaseCount);
+        for (uint256 i; i < purchaseCount; ++i) {
             (uint256 schedulePurchaseAmount, uint256 scheduleRouteIndex) =
-                _rBtcPurchaseChecksEffects(batch.scheduleIds[i], batch.buyers[i], batch.token);
+                _rbtcPurchaseChecksEffects(batch.scheduleIds[i], batch.buyers[i], batch.token);
             if (scheduleRouteIndex != batch.routeIndex) revert Prototype__RouteIndexMismatch();
             purchaseAmounts[i] = schedulePurchaseAmount;
         }
@@ -204,7 +204,7 @@ contract TripleKeyedDcaManager is ReentrancyGuard {
      * @dev Existence, ownership and the token check are all the lookup: a row naming another account's
      *      schedule, or a schedule of another stablecoin, lands on an empty struct.
      */
-    function _rBtcPurchaseChecksEffects(uint64 scheduleId, address buyer, address token)
+    function _rbtcPurchaseChecksEffects(uint64 scheduleId, address buyer, address token)
         private
         returns (uint256, uint256)
     {
@@ -245,10 +245,10 @@ contract TripleKeyedDcaManager is ReentrancyGuard {
 
     function _removeScheduleId(address user, address token, uint64 scheduleId) private {
         uint64[] storage scheduleIds = s_scheduleIds[user][token];
-        uint256 numOfSchedules = scheduleIds.length;
-        for (uint256 i; i < numOfSchedules; ++i) {
+        uint256 scheduleCount = scheduleIds.length;
+        for (uint256 i; i < scheduleCount; ++i) {
             if (scheduleIds[i] == scheduleId) {
-                uint256 lastIndex = numOfSchedules - 1;
+                uint256 lastIndex = scheduleCount - 1;
                 if (i != lastIndex) scheduleIds[i] = scheduleIds[lastIndex];
                 scheduleIds.pop();
                 return;
@@ -264,9 +264,9 @@ contract TripleKeyedDcaManager is ReentrancyGuard {
     }
 
     function _handler(address token, uint256 routeIndex) private view returns (ITokenHandler) {
-        address tokenHandlerAddress = i_operationsAdmin.getHandler(token, routeIndex);
-        if (tokenHandlerAddress == address(0)) revert Prototype__TokenNotAccepted();
-        return ITokenHandler(tokenHandlerAddress);
+        address handler = i_operationsAdmin.getHandler(token, routeIndex);
+        if (handler == address(0)) revert Prototype__TokenNotAccepted();
+        return ITokenHandler(handler);
     }
 
     function _validatePurchasePeriod(uint256 purchasePeriod) private view {

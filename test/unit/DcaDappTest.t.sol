@@ -43,7 +43,7 @@ contract DcaDappTest is Test {
     OperationsAdmin operationsAdmin;
     MockStablecoin stablecoin;
     IShareToken shareToken;
-    MockWrbtcToken wrBtcToken;
+    MockWrbtcToken wrbtc;
     FeeCalculator feeCalculator;
 
     // Helper configs from deployment
@@ -326,12 +326,12 @@ contract DcaDappTest is Test {
             stablecoinHandler = IStablecoinHandler(stablecoinHandlerAddress);
 
             address stablecoinAddress = dexHelperConfig.getStablecoinAddress();
-            address wrBtcTokenAddress = dexHelperConfig.getActiveNetworkConfig().wrbtcTokenAddress;
-            address swapRouter02Address = dexHelperConfig.getActiveNetworkConfig().swapRouter02Address;
+            address wrbtcTokenAddress = dexHelperConfig.getActiveNetworkConfig().wrbtcTokenAddress;
+            address swapRouter02Address = dexHelperConfig.getActiveNetworkConfig().swapRouterAddress;
             address mocProxyAddress = dexHelperConfig.getActiveNetworkConfig().mocProxyAddress;
 
             stablecoin = MockStablecoin(stablecoinAddress);
-            wrBtcToken = MockWrbtcToken(wrBtcTokenAddress);
+            wrbtc = MockWrbtcToken(wrbtcTokenAddress);
             mocProxy = MockMocProxy(mocProxyAddress);
 
             // Mint stablecoin for the user
@@ -599,10 +599,10 @@ contract DcaDappTest is Test {
     function makeSeveralPurchasesWithSeveralSchedules() internal returns (uint256 totalStablecoinSpent) {
         // createSeveralDcaSchedules();
 
-        uint8 numOfPurchases = 5;
+        uint8 purchaseCount = 5;
 
         for (uint8 i; i < NUM_OF_SCHEDULES; ++i) {
-            totalStablecoinSpent += _runSchedulePurchases(i, numOfPurchases);
+            totalStablecoinSpent += _runSchedulePurchases(i, purchaseCount);
         }
 
         vm.prank(USER);
@@ -619,7 +619,7 @@ contract DcaDappTest is Test {
     // stays low enough to compile under via_ir (see docs/relaunch/R60-src-only-via-ir.md) — the merged
     // body kept ~13 locals live across two nested loops, which is stack-too-deep territory under IR
     // even though it fits under legacy codegen. No assertion or behavior changed by the split.
-    function _runSchedulePurchases(uint256 scheduleIndex, uint8 numOfPurchases)
+    function _runSchedulePurchases(uint256 scheduleIndex, uint8 purchaseCount)
         private
         returns (uint256 scheduleStablecoinSpent)
     {
@@ -630,7 +630,7 @@ contract DcaDappTest is Test {
         uint256 fee = feeCalculator.calculateFee(schedulePurchaseAmount);
         uint256 netPurchaseAmount = schedulePurchaseAmount - fee;
 
-        for (uint8 j; j < numOfPurchases; ++j) {
+        for (uint8 j; j < purchaseCount; ++j) {
             vm.startPrank(USER);
             uint256 stablecoinBalanceBeforePurchase =
                 scheduleAt(dcaManager, USER, address(stablecoin), scheduleIndex).tokenBalance;
@@ -670,7 +670,7 @@ contract DcaDappTest is Test {
         if (isMocSwaps) {
             prevStablecoinHandlerBalance = address(stablecoinHandler).balance;
         } else if (isDexSwaps) {
-            prevStablecoinHandlerBalance = wrBtcToken.balanceOf(address(stablecoinHandler));
+            prevStablecoinHandlerBalance = wrbtc.balanceOf(address(stablecoinHandler));
         }
 
         vm.prank(USER);
@@ -724,7 +724,7 @@ contract DcaDappTest is Test {
         if (isMocSwaps) {
             postStablecoinHandlerBalance = address(stablecoinHandler).balance;
         } else if (isDexSwaps) {
-            postStablecoinHandlerBalance = wrBtcToken.balanceOf(address(stablecoinHandler));
+            postStablecoinHandlerBalance = wrbtc.balanceOf(address(stablecoinHandler));
         }
 
         assertApproxEqRel(
@@ -752,7 +752,7 @@ contract DcaDappTest is Test {
         if (isMocSwaps) {
             postStablecoinHandlerBalance2 = address(stablecoinHandler).balance;
         } else if (isDexSwaps) {
-            postStablecoinHandlerBalance2 = wrBtcToken.balanceOf(address(stablecoinHandler));
+            postStablecoinHandlerBalance2 = wrbtc.balanceOf(address(stablecoinHandler));
         }
 
         assertApproxEqRel(
@@ -838,7 +838,7 @@ contract DcaDappTest is Test {
         // Make the mock oracle the one for Uniswap interactions as well
         if (isDexSwaps) {
             vm.prank(OWNER);
-            IPurchaseUniswap(address(stablecoinHandler)).updateMocOracle(address(mockMocBtcPriceProvider));
+            IPurchaseUniswap(address(stablecoinHandler)).setMocOracle(address(mockMocBtcPriceProvider));
         }
     }
 
@@ -884,7 +884,7 @@ contract DcaDappTest is Test {
                     revert("Failed to get Tropykus shares from handler");
                 }
             } else if (routeIndex == SOVRYN_INDEX) {
-                try SovrynDocHandlerMoc(payable(address(stablecoinHandler))).i_iSusdToken() returns (
+                try SovrynDocHandlerMoc(payable(address(stablecoinHandler))).i_iToken() returns (
                     IiSusdToken iSusdToken
                 ) {
                     shareTokenAddress = address(iSusdToken);

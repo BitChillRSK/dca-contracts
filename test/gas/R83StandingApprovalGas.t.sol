@@ -110,8 +110,8 @@ contract R83StandingApprovalGasTest is Test {
             address(this),
             address(s_stablecoin),
             IPurchaseUniswap.UniswapSettings({
-                wrBtcToken: IWRBTC(address(s_wrBtc)),
-                swapRouter02: IUniswapV3SwapRouter(address(s_router)),
+                wrbtc: IWRBTC(address(s_wrBtc)),
+                swapRouter: IUniswapV3SwapRouter(address(s_router)),
                 swapIntermediateTokens: new address[](0),
                 swapPoolFeeRates: poolFeeRates,
                 mocOracle: ICoinPairPrice(address(s_oracle))
@@ -275,25 +275,19 @@ contract PreR83SovrynDocHandlerMoc is SovrynDocHandlerMoc {
     constructor(
         address dcaManagerAddress,
         address docTokenAddress,
-        address iSusdTokenAddress,
+        address iTokenAddress,
         address feeCollector,
         address mocProxyAddress,
         IPurchaseFees.FeeSettings memory feeSettings,
         address initialOwner
     )
         SovrynDocHandlerMoc(
-            dcaManagerAddress,
-            docTokenAddress,
-            iSusdTokenAddress,
-            feeCollector,
-            mocProxyAddress,
-            feeSettings,
-            initialOwner
+            dcaManagerAddress, docTokenAddress, iTokenAddress, feeCollector, mocProxyAddress, feeSettings, initialOwner
         )
     {}
 
     function _depositToken(address user, uint256 depositAmount) internal override {
-        i_stableToken.forceApprove(_lendingSpender(), depositAmount);
+        i_stablecoin.forceApprove(_lendingSpender(), depositAmount);
         super._depositToken(user, depositAmount);
     }
 }

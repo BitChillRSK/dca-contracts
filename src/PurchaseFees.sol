@@ -31,11 +31,11 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
      *      both uint16 rates fill that word exactly. The bound width remains wider than the uint96
      *      purchase amount of any schedule.
      */
-    address internal s_feeCollector; // Address to which the fees charged to the user will be sent
-    uint112 internal s_feePurchaseLowerBound; // Spending below lower bound gets the maximum fee rate
-    uint112 internal s_feePurchaseUpperBound; // Spending above upper bound gets the minimum fee rate
-    uint16 internal s_minFeeRate; // Minimum fee rate
-    uint16 internal s_maxFeeRate; // Maximum fee rate
+    address internal s_feeCollector;
+    uint112 internal s_feePurchaseLowerBound;
+    uint112 internal s_feePurchaseUpperBound;
+    uint16 internal s_minFeeRate;
+    uint16 internal s_maxFeeRate;
 
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
@@ -91,7 +91,7 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
     }
 
     /// @inheritdoc IPurchaseFees
-    function setFeeCollectorAddress(address feeCollector) external override onlyOwner {
+    function setFeeCollector(address feeCollector) external override onlyOwner {
         if (feeCollector == address(0)) revert PurchaseFees__InvalidFeeCollector();
         s_feeCollector = feeCollector;
         emit PurchaseFees__FeeCollectorAddressSet(feeCollector);
@@ -102,7 +102,7 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IPurchaseFees
-    function getFeeCollectorAddress() external view override returns (address) {
+    function getFeeCollector() external view override returns (address) {
         return s_feeCollector;
     }
 

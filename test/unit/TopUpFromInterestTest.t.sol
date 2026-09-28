@@ -44,10 +44,10 @@ contract TopUpFromInterestTest is DcaDappTest {
     }
 
     /// @dev `view`, and that is load-bearing: the compiler rejects this the moment
-    ///      `getInterestAccrued` stops being one, which is what keeps generated clients reading it
+    ///      `getAccruedInterest` stops being one, which is what keeps generated clients reading it
     ///      for free instead of routing it through a write binding.
     function _accruedInterest() private view returns (uint256) {
-        return dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        return dcaManager.getAccruedInterest(USER, address(stablecoin), s_routeIndex);
     }
 
     /// @dev Every schedule read is hoisted out of the arguments: a view call made after `vm.prank`
@@ -213,7 +213,7 @@ contract TopUpFromInterestTest is DcaDappTest {
 
     /**
      * @notice The quote is a real `eth_call`: readable with no signer and no state change.
-     * @dev The helper above already fails to compile if `getInterestAccrued` loses `view`, but that
+     * @dev The helper above already fails to compile if `getAccruedInterest` loses `view`, but that
      *      only binds Solidity callers. This binds the wire: a `staticcall` reverts on any state
      *      write, so a getter that pokes the market would fail here.
      */
@@ -221,7 +221,7 @@ contract TopUpFromInterestTest is DcaDappTest {
         _accrueAndOpenSlack(SCHEDULE_INDEX);
 
         (bool success, bytes memory returnData) = address(dcaManager)
-            .staticcall(abi.encodeCall(IDcaManager.getInterestAccrued, (USER, address(stablecoin), s_routeIndex)));
+            .staticcall(abi.encodeCall(IDcaManager.getAccruedInterest, (USER, address(stablecoin), s_routeIndex)));
 
         assertTrue(success, "the accrued-interest quote is no longer readable without a transaction");
         assertEq(abi.decode(returnData, (uint256)), _accruedInterest(), "the staticcall read a different figure");

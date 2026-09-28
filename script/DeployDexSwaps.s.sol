@@ -224,8 +224,8 @@ contract DeployDexSwaps is DeployBase {
         address docHandlerDexAddress;
 
         IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
-            wrBtcToken: IWRBTC(networkConfig.wrbtcTokenAddress),
-            swapRouter02: IUniswapV3SwapRouter(networkConfig.swapRouter02Address),
+            wrbtc: IWRBTC(networkConfig.wrbtcTokenAddress),
+            swapRouter: IUniswapV3SwapRouter(networkConfig.swapRouterAddress),
             swapIntermediateTokens: networkConfig.swapIntermediateTokens,
             swapPoolFeeRates: networkConfig.swapPoolFeeRates,
             mocOracle: ICoinPairPrice(networkConfig.mocOracleAddress)

@@ -185,7 +185,7 @@ contract DexPathFailoverTest is DcaDappTest {
 
         vm.expectRevert(ownableUnauthorized(SWAPPER));
         vm.prank(SWAPPER);
-        IPurchaseUniswap(address(stablecoinHandler)).updateMocOracle(address(1));
+        IPurchaseUniswap(address(stablecoinHandler)).setMocOracle(address(1));
     }
 
     function testConstructorSelfAllowlistsActivePathWithoutSetter() public {
@@ -276,7 +276,7 @@ contract DexPathFailoverTest is DcaDappTest {
 
         // The activated path's token is the one a stranded balance is now measured against.
         uint256 stranded = 1 ether;
-        MockSwapRouter02 router = MockSwapRouter02(dexHelperConfig.getActiveNetworkConfig().swapRouter02Address);
+        MockSwapRouter02 router = MockSwapRouter02(dexHelperConfig.getActiveNetworkConfig().swapRouterAddress);
         router.setStrandedIntermediate(address(newIntermediate), stranded);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.expectRevert(
@@ -391,8 +391,8 @@ contract DexPathFailoverTest is DcaDappTest {
                     address(stablecoin),
                     address(new MockIsusdToken(address(stablecoin))),
                     IPurchaseUniswap.UniswapSettings({
-                        wrBtcToken: IWRBTC(address(wrBtcToken)),
-                        swapRouter02: IUniswapV3SwapRouter(config.swapRouter02Address),
+                        wrbtc: IWRBTC(address(wrbtc)),
+                        swapRouter: IUniswapV3SwapRouter(config.swapRouterAddress),
                         swapIntermediateTokens: config.swapIntermediateTokens,
                         swapPoolFeeRates: config.swapPoolFeeRates,
                         mocOracle: ICoinPairPrice(config.mocOracleAddress)
@@ -426,6 +426,6 @@ contract DexPathFailoverTest is DcaDappTest {
         for (uint256 i; i < mids.length; ++i) {
             path = abi.encodePacked(path, fees[i], mids[i]);
         }
-        path = abi.encodePacked(path, fees[fees.length - 1], address(wrBtcToken));
+        path = abi.encodePacked(path, fees[fees.length - 1], address(wrbtc));
     }
 }

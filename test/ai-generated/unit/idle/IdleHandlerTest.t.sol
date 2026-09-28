@@ -119,11 +119,11 @@ contract IdleHandlerTest is HandlerTestHarness {
 contract IdleTestHandler is IdleHandler, PurchaseFees {
     constructor(
         address dcaManagerAddress,
-        address stableTokenAddress,
+        address stablecoinAddress,
         address feeCollector,
         FeeSettings memory feeSettings,
         address initialOwner
-    ) IdleHandler(dcaManagerAddress, stableTokenAddress) PurchaseFees(feeCollector, feeSettings, initialOwner) {}
+    ) IdleHandler(dcaManagerAddress, stablecoinAddress) PurchaseFees(feeCollector, feeSettings, initialOwner) {}
 
     function testBatchRetrieveStablecoin(address[] calldata users, uint256[] calldata purchaseAmounts)
         external

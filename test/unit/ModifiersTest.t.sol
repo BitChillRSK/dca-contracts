@@ -76,13 +76,13 @@ contract ModifiersTest is DcaDappTest {
         uint256 minPurchasePeriodBefore = dcaManager.getMinPurchasePeriod();
         vm.expectRevert(ownableUnauthorized(USER));
         vm.prank(USER); // User can't
-        dcaManager.modifyMinPurchasePeriod(newMinPurchasePeriod); // dummy address, e.g. that of DcaManager
+        dcaManager.setMinPurchasePeriod(newMinPurchasePeriod); // dummy address, e.g. that of DcaManager
         uint256 minPurchasePeriodAfter = dcaManager.getMinPurchasePeriod();
         assertEq(minPurchasePeriodBefore, minPurchasePeriodAfter);
         vm.prank(OWNER); // Owner can
         vm.expectEmit(true, true, true, true);
         emit DcaManager__MinPurchasePeriodModified(newMinPurchasePeriod);
-        dcaManager.modifyMinPurchasePeriod(newMinPurchasePeriod);
+        dcaManager.setMinPurchasePeriod(newMinPurchasePeriod);
         minPurchasePeriodAfter = dcaManager.getMinPurchasePeriod();
         assertEq(minPurchasePeriodAfter, newMinPurchasePeriod);
     }
@@ -90,15 +90,15 @@ contract ModifiersTest is DcaDappTest {
     function testModifyMinPurchasePeriodRevertsBelowOneDay() external {
         vm.prank(OWNER);
         vm.expectRevert(IDcaManager.DcaManager__MinPurchasePeriodMustBeAtLeastOneDay.selector);
-        dcaManager.modifyMinPurchasePeriod(1 days - 1);
+        dcaManager.setMinPurchasePeriod(1 days - 1);
         assertEq(dcaManager.getMinPurchasePeriod(), MIN_PURCHASE_PERIOD);
     }
 
     function testModifyMinPurchasePeriodAllowsOneDay() external {
         vm.prank(OWNER);
-        dcaManager.modifyMinPurchasePeriod(2 days);
+        dcaManager.setMinPurchasePeriod(2 days);
         vm.prank(OWNER);
-        dcaManager.modifyMinPurchasePeriod(1 days);
+        dcaManager.setMinPurchasePeriod(1 days);
         assertEq(dcaManager.getMinPurchasePeriod(), 1 days);
     }
 
@@ -110,7 +110,7 @@ contract ModifiersTest is DcaDappTest {
     function testModifyMinPurchasePeriodRevertsOnPartialDay() external {
         vm.prank(OWNER);
         vm.expectRevert(IDcaManager.DcaManager__PurchasePeriodMustBeWholeDays.selector);
-        dcaManager.modifyMinPurchasePeriod(36 hours);
+        dcaManager.setMinPurchasePeriod(36 hours);
         assertEq(dcaManager.getMinPurchasePeriod(), MIN_PURCHASE_PERIOD);
     }
 

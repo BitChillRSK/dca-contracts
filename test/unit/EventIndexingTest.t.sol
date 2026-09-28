@@ -50,7 +50,7 @@ contract EventIndexingTest is DcaDappTest {
     }
 
     function testPurchaseFeePaysCollectorViaErc20Transfer() external {
-        address collector = IPurchaseFees(address(stablecoinHandler)).getFeeCollectorAddress();
+        address collector = IPurchaseFees(address(stablecoinHandler)).getFeeCollector();
         uint256 collectorBefore = stablecoin.balanceOf(collector);
 
         vm.recordLogs();
@@ -96,7 +96,7 @@ contract EventIndexingTest is DcaDappTest {
         vm.stopPrank();
         makeSinglePurchase();
         vm.prank(USER);
-        dcaManager.withdrawRbtcFromTokenHandler(address(stablecoin), s_routeIndex);
+        dcaManager.withdrawAccumulatedRbtc(address(stablecoin), s_routeIndex);
         vm.prank(USER);
         dcaManager.deleteDcaSchedule(address(stablecoin), scheduleId, SCHEDULE_INDEX);
         _assertFirstPartyIndexing(vm.getRecordedLogs());

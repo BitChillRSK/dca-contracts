@@ -399,13 +399,13 @@ contract TropykusHandlerTest is HandlerTestHarness {
 contract TropykusTestHandler is TropykusHandler, PurchaseFees {
     constructor(
         address dcaManagerAddress,
-        address stableTokenAddress,
+        address stablecoinAddress,
         address kTokenAddress,
         address feeCollector,
         FeeSettings memory feeSettings,
         address initialOwner
     )
-        TropykusHandler(dcaManagerAddress, stableTokenAddress, kTokenAddress)
+        TropykusHandler(dcaManagerAddress, stablecoinAddress, kTokenAddress)
         PurchaseFees(feeCollector, feeSettings, initialOwner)
     {}
 

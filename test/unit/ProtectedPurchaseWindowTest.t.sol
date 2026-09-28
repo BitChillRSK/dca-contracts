@@ -144,10 +144,10 @@ contract ProtectedPurchaseWindowTest is DcaDappTest {
         uint64 secondScheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 1);
 
         vm.prank(OWNER);
-        dcaManager.modifyMinPurchasePeriod(2 days);
+        dcaManager.setMinPurchasePeriod(2 days);
         assertEq(dcaManager.getMinPurchasePeriod(), 2 days);
         vm.startPrank(OWNER);
-        dcaManager.modifyMaxSchedulesPerToken(3);
+        dcaManager.setMaxSchedulesPerToken(3);
         dcaManager.setTokenMinPurchaseAmount(address(stablecoin), 1);
         vm.stopPrank();
 
@@ -176,13 +176,13 @@ contract ProtectedPurchaseWindowTest is DcaDappTest {
         vm.warp(block.timestamp + MIN_PURCHASE_PERIOD);
         buyRbtcOne(scheduleId);
         vm.prank(USER);
-        dcaManager.withdrawRbtcFromTokenHandler(address(stablecoin), s_routeIndex);
+        dcaManager.withdrawAccumulatedRbtc(address(stablecoin), s_routeIndex);
     }
 
     function testInterestTopUpStaysOpen() external onlyLendingLane {
         updateExchangeRate(200 days);
         uint64 scheduleId = _scheduleId();
-        uint256 accruedInterest = dcaManager.getInterestAccrued(USER, address(stablecoin), s_routeIndex);
+        uint256 accruedInterest = dcaManager.getAccruedInterest(USER, address(stablecoin), s_routeIndex);
         assertGt(accruedInterest, 0);
 
         uint256 slack = accruedInterest / 4;

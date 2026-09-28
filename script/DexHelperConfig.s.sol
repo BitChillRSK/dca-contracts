@@ -37,7 +37,7 @@ contract DexHelperConfig is Script {
 
         // Swap-related addresses
         address wrbtcTokenAddress;
-        address swapRouter02Address; // @notice NOT DEPLOYED ON RSK TESTNET!!
+        address swapRouterAddress; // @notice NOT DEPLOYED ON RSK TESTNET!!
         address[] swapIntermediateTokens;
         uint24[] swapPoolFeeRates;
         address mocOracleAddress;
@@ -53,7 +53,7 @@ contract DexHelperConfig is Script {
     event HelperConfig__CreatedMockShareToken(address shareTokenAddress, string protocol);
     event HelperConfig__CreatedMockIntermediateToken(address intermediateTokenAddress);
     event HelperConfig__CreatedMockWrbtc(address wrbtcTokenAddress);
-    event HelperConfig__CreatedMockSwapRouter02(address swapRouter02Address);
+    event HelperConfig__CreatedMockSwapRouter02(address swapRouterAddress);
     event HelperConfig__CreatedMockMocOracle(address mocOracleAddress);
     event HelperConfig__CreatedMockMocProxy(address mocProxyAddress);
 
@@ -119,7 +119,7 @@ contract DexHelperConfig is Script {
             sovrynShareToken: sovrynShareToken,
             layerbankAToken: layerbankAToken,
             wrbtcTokenAddress: 0x69FE5cEC81D5eF92600c1A0dB1F11986AB3758Ab, // WRBTC token on testnet
-            swapRouter02Address: 0x0000000000000000000000000000000000000000, // Uniswap's contracts are not deployed on RSK testnet
+            swapRouterAddress: 0x0000000000000000000000000000000000000000, // Uniswap's contracts are not deployed on RSK testnet
             swapIntermediateTokens: intermediateTokens,
             swapPoolFeeRates: poolFeeRates,
             mocOracleAddress: 0x0000000000000000000000000000000000000000,
@@ -175,7 +175,7 @@ contract DexHelperConfig is Script {
             sovrynShareToken: sovrynShareToken,
             layerbankAToken: layerbankAToken,
             wrbtcTokenAddress: 0x542fDA317318eBF1d3DEAf76E0b632741A7e677d, // WRBTC token on mainnet
-            swapRouter02Address: 0x0B14ff67f0014046b4b99057Aec4509640b3947A,
+            swapRouterAddress: 0x0B14ff67f0014046b4b99057Aec4509640b3947A,
             swapIntermediateTokens: intermediateTokens,
             swapPoolFeeRates: poolFeeRates,
             mocOracleAddress: 0xe2927A0620b82A66D67F678FC9b826B0E01B1bFD,
@@ -280,7 +280,7 @@ contract DexHelperConfig is Script {
             sovrynShareToken: lendingProtocolIsSovryn ? mockShareTokenAddress : address(0),
             layerbankAToken: lendingProtocolIsLayerbank ? mockLayerbankAToken : address(0),
             wrbtcTokenAddress: address(mockWrbtcToken),
-            swapRouter02Address: address(mockSwapRouter02),
+            swapRouterAddress: address(mockSwapRouter02),
             swapIntermediateTokens: intermediateTokens,
             swapPoolFeeRates: poolFeeRates,
             mocOracleAddress: address(mockMocOracle),

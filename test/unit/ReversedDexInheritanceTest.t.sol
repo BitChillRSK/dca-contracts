@@ -17,12 +17,12 @@ import "test/Constants.sol";
 /**
  * @notice Production Dex leaves list funding then purchase (`IdleHandler, PurchaseUniswap`).
  *         This harness reverses that `is` order so the test can prove path construction no longer
- *         depends on funding-first inheritance once `i_stableToken` lives on shared `StablecoinSource`.
+ *         depends on funding-first inheritance once `i_stablecoin` lives on shared `StablecoinSource`.
  */
 contract ReversedIdleHandlerDex is PurchaseUniswap, IdleHandler {
     constructor(
         address dcaManagerAddress,
-        address stableTokenAddress,
+        address stablecoinAddress,
         UniswapSettings memory uniswapSettings,
         address feeCollector,
         FeeSettings memory feeSettings,
@@ -30,7 +30,7 @@ contract ReversedIdleHandlerDex is PurchaseUniswap, IdleHandler {
         uint256 amountOutMinimumSafetyCheck,
         address initialOwner
     )
-        IdleHandler(dcaManagerAddress, stableTokenAddress)
+        IdleHandler(dcaManagerAddress, stablecoinAddress)
         PurchaseUniswap(
             uniswapSettings,
             FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}),
@@ -53,8 +53,8 @@ contract ReversedDexInheritanceTest is Test {
         poolFeeRates[0] = 3000;
 
         IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
-            wrBtcToken: IWRBTC(address(wrBtc)),
-            swapRouter02: IUniswapV3SwapRouter(router),
+            wrbtc: IWRBTC(address(wrBtc)),
+            swapRouter: IUniswapV3SwapRouter(router),
             swapIntermediateTokens: intermediateTokens,
             swapPoolFeeRates: poolFeeRates,
             mocOracle: ICoinPairPrice(address(oracle))
@@ -78,9 +78,9 @@ contract ReversedDexInheritanceTest is Test {
             address(this)
         );
 
-        assertEq(address(handler.i_stableToken()), address(stablecoin), "stablecoin immutable");
+        assertEq(address(handler.i_stablecoin()), address(stablecoin), "stablecoin immutable");
         bytes memory path = handler.getSwapPath();
-        assertEq(_firstTokenInPath(path), address(stablecoin), "path hop 0 must be i_stableToken");
+        assertEq(_firstTokenInPath(path), address(stablecoin), "path hop 0 must be i_stablecoin");
     }
 
     function _firstTokenInPath(bytes memory path) private pure returns (address token) {

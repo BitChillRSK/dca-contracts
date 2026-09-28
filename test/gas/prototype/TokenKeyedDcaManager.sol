@@ -165,13 +165,13 @@ contract TokenKeyedDcaManager is ReentrancyGuard {
     }
 
     function batchBuyRbtc(Batch calldata batch) external onlySwapper {
-        uint256 numOfPurchases = batch.scheduleIds.length;
-        if (numOfPurchases == 0) revert Prototype__EmptyBatch();
-        address[] memory buyers = new address[](numOfPurchases);
-        uint256[] memory purchaseAmounts = new uint256[](numOfPurchases);
-        for (uint256 i; i < numOfPurchases; ++i) {
+        uint256 purchaseCount = batch.scheduleIds.length;
+        if (purchaseCount == 0) revert Prototype__EmptyBatch();
+        address[] memory buyers = new address[](purchaseCount);
+        uint256[] memory purchaseAmounts = new uint256[](purchaseCount);
+        for (uint256 i; i < purchaseCount; ++i) {
             (address buyer, uint256 schedulePurchaseAmount, uint256 scheduleRouteIndex) =
-                _rBtcPurchaseChecksEffects(batch.scheduleIds[i], batch.token);
+                _rbtcPurchaseChecksEffects(batch.scheduleIds[i], batch.token);
             if (scheduleRouteIndex != batch.routeIndex) revert Prototype__RouteIndexMismatch();
             buyers[i] = buyer;
             purchaseAmounts[i] = schedulePurchaseAmount;
@@ -196,7 +196,7 @@ contract TokenKeyedDcaManager is ReentrancyGuard {
      * @dev Existence and the token check are one comparison: a row naming a schedule of another
      *      stablecoin lands on an empty struct, whose `user` is `address(0)`.
      */
-    function _rBtcPurchaseChecksEffects(uint64 scheduleId, address token) private returns (address, uint256, uint256) {
+    function _rbtcPurchaseChecksEffects(uint64 scheduleId, address token) private returns (address, uint256, uint256) {
         Schedule storage dcaScheduleStorage = s_dcaSchedules[scheduleId][token];
         Schedule memory dcaSchedule = dcaScheduleStorage;
 
@@ -235,10 +235,10 @@ contract TokenKeyedDcaManager is ReentrancyGuard {
 
     function _removeScheduleId(address user, address token, uint64 scheduleId) private {
         uint64[] storage scheduleIds = s_scheduleIds[user][token];
-        uint256 numOfSchedules = scheduleIds.length;
-        for (uint256 i; i < numOfSchedules; ++i) {
+        uint256 scheduleCount = scheduleIds.length;
+        for (uint256 i; i < scheduleCount; ++i) {
             if (scheduleIds[i] == scheduleId) {
-                uint256 lastIndex = numOfSchedules - 1;
+                uint256 lastIndex = scheduleCount - 1;
                 if (i != lastIndex) scheduleIds[i] = scheduleIds[lastIndex];
                 scheduleIds.pop();
                 return;
@@ -254,9 +254,9 @@ contract TokenKeyedDcaManager is ReentrancyGuard {
     }
 
     function _handler(address token, uint256 routeIndex) private view returns (ITokenHandler) {
-        address tokenHandlerAddress = i_operationsAdmin.getHandler(token, routeIndex);
-        if (tokenHandlerAddress == address(0)) revert Prototype__TokenNotAccepted();
-        return ITokenHandler(tokenHandlerAddress);
+        address handler = i_operationsAdmin.getHandler(token, routeIndex);
+        if (handler == address(0)) revert Prototype__TokenNotAccepted();
+        return ITokenHandler(handler);
     }
 
     function _validatePurchasePeriod(uint256 purchasePeriod) private view {

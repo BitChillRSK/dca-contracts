@@ -21,10 +21,10 @@ abstract contract IdleHandler is TokenHandler {
 
     /**
      * @param dcaManagerAddress The DcaManager allowed to call deposit and withdraw.
-     * @param stableTokenAddress The ERC20 stablecoin this handler holds idle.
+     * @param stablecoinAddress The ERC20 stablecoin this handler holds idle.
      */
-    constructor(address dcaManagerAddress, address stableTokenAddress)
-        TokenHandler(dcaManagerAddress, stableTokenAddress)
+    constructor(address dcaManagerAddress, address stablecoinAddress)
+        TokenHandler(dcaManagerAddress, stablecoinAddress)
     {}
 
     /*//////////////////////////////////////////////////////////////
@@ -42,8 +42,8 @@ abstract contract IdleHandler is TokenHandler {
         override
         returns (uint256 totalWithdrawn)
     {
-        uint256 numOfPurchases = purchaseAmounts.length;
-        for (uint256 i; i < numOfPurchases; ++i) {
+        uint256 purchaseCount = purchaseAmounts.length;
+        for (uint256 i; i < purchaseCount; ++i) {
             // Each amount is a uint96, so the sum cannot overflow.
             unchecked {
                 totalWithdrawn += purchaseAmounts[i];

@@ -161,7 +161,7 @@ contract FinalDeploymentTest is Test {
         _assertCommonHandlerWiring(stack.usdt0LayerBank, address(stack.dcaManager), address(usdt0));
 
         assertEq(address(LayerBankDocHandlerMoc(payable(stack.docLayerBank)).i_aToken()), address(docAToken));
-        assertEq(address(SovrynDocHandlerMoc(payable(stack.docSovryn)).i_iSusdToken()), address(iSusd));
+        assertEq(address(SovrynDocHandlerMoc(payable(stack.docSovryn)).i_iToken()), address(iSusd));
         assertEq(address(LayerBankHandlerDex(payable(stack.usdrifLayerBank)).i_aToken()), address(usdrifAToken));
         assertEq(address(LayerBankHandlerDex(payable(stack.usdt0LayerBank)).i_aToken()), address(usdt0AToken));
 
@@ -289,7 +289,7 @@ contract FinalDeploymentTest is Test {
 
     function _assertCommonHandlerWiring(address handler, address manager, address stablecoin) internal {
         assertEq(DcaManagerAccessControl(handler).i_dcaManager(), manager);
-        assertEq(address(TokenHandler(handler).i_stableToken()), stablecoin);
+        assertEq(address(TokenHandler(handler).i_stablecoin()), stablecoin);
     }
 
     function _assertStandingApproval(address handler, MockStablecoin token, address spender) internal {
@@ -303,8 +303,8 @@ contract FinalDeploymentTest is Test {
 
     function _assertDexWiring(address handler) internal {
         PurchaseUniswap purchase = PurchaseUniswap(payable(handler));
-        assertEq(address(purchase.i_wrBtcToken()), address(wrbtc));
-        assertEq(address(purchase.i_swapRouter02()), address(router));
+        assertEq(address(purchase.i_wrbtc()), address(wrbtc));
+        assertEq(address(purchase.i_swapRouter()), address(router));
         assertEq(address(purchase.getMocOracle()), address(oracle));
         bytes memory path = purchase.getSwapPath();
         assertTrue(purchase.isPurchasePathAllowed(keccak256(path)));
@@ -334,7 +334,7 @@ contract FinalDeploymentTest is Test {
             usdt0: address(usdt0),
             usdt0LayerBankAToken: address(usdt0AToken),
             wrbtc: address(wrbtc),
-            swapRouter02: address(router),
+            swapRouter: address(router),
             mocOracle: address(oracle),
             usdrifIntermediateTokens: usdrifIntermediate,
             usdrifPoolFeeRates: usdrifFees,

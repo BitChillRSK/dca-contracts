@@ -92,8 +92,8 @@ contract EdgeCasesTest is Test {
         MockMocOracle oracle = new MockMocOracle();
 
         IPurchaseUniswap.UniswapSettings memory uniSettings = IPurchaseUniswap.UniswapSettings({
-            wrBtcToken: IWRBTC(address(wrbtc)),
-            swapRouter02: IUniswapV3SwapRouter(address(router)),
+            wrbtc: IWRBTC(address(wrbtc)),
+            swapRouter: IUniswapV3SwapRouter(address(router)),
             swapIntermediateTokens: new address[](0),
             swapPoolFeeRates: new uint24[](1), // will be ignored for empty path
             mocOracle: ICoinPairPrice(address(oracle))
@@ -143,10 +143,10 @@ contract EdgeCasesTest is Test {
         dex.setAmountOutMinimumSafetyCheck(1.1 ether);
     }
 
-    function test_updateMocOracle_reverts_on_zero_address() public {
+    function test_setMocOracle_reverts_on_zero_address() public {
         (TropykusHandlerDex dex,,,,,) = _deployDexHandler();
         vm.expectRevert();
-        dex.updateMocOracle(address(0));
+        dex.setMocOracle(address(0));
     }
 
     function test_batchBuyRbtc_reverts_on_outdated_oracle() public {

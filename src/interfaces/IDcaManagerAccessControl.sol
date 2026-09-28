@@ -12,10 +12,7 @@ interface IDcaManagerAccessControl {
                                 GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @notice The DcaManager allowed to call this handler's entry points.
-     * @return The constructor-supplied DcaManager address.
-     */
+    /// @notice The DcaManager allowed to call this handler's entry points.
     function i_dcaManager() external view returns (address);
 
     /*//////////////////////////////////////////////////////////////

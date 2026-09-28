@@ -86,7 +86,7 @@ interface IPurchaseFees {
      * @notice Set the address that receives purchase fees.
      * @param feeCollector New collector. Cannot be zero.
      */
-    function setFeeCollectorAddress(address feeCollector) external;
+    function setFeeCollector(address feeCollector) external;
 
     /*//////////////////////////////////////////////////////////////
                                 GETTERS
@@ -96,7 +96,7 @@ interface IPurchaseFees {
      * @notice Address that currently receives purchase fees.
      * @return The fee collector.
      */
-    function getFeeCollectorAddress() external view returns (address);
+    function getFeeCollector() external view returns (address);
 
     /**
      * @notice The four fee settings used to interpolate a purchase fee.

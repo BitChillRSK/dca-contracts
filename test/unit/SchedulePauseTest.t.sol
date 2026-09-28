@@ -248,7 +248,7 @@ contract SchedulePauseTest is DcaDappTest {
 
         uint256 userRbtcBefore = USER.balance;
         vm.prank(USER);
-        dcaManager.withdrawRbtcFromTokenHandler(address(stablecoin), s_routeIndex);
+        dcaManager.withdrawAccumulatedRbtc(address(stablecoin), s_routeIndex);
         assertEq(USER.balance - userRbtcBefore, rbtcAccumulated);
     }
 

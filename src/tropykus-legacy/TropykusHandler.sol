@@ -22,10 +22,7 @@ abstract contract TropykusHandler is LendingHandler, ITropykusHandler {
      */
     uint256 public constant EXCHANGE_RATE_DECIMALS = 1e18;
 
-    /**
-     * @notice Tropykus kToken this handler mints and redeems.
-     * @return The constructor-supplied kToken.
-     */
+    /// @notice Tropykus kToken this handler mints and redeems.
     IkToken public immutable i_kToken;
 
     /*//////////////////////////////////////////////////////////////
@@ -34,11 +31,11 @@ abstract contract TropykusHandler is LendingHandler, ITropykusHandler {
 
     /**
      * @param dcaManagerAddress The DcaManager allowed to call this handler.
-     * @param stableTokenAddress The ERC20 stablecoin this handler lends.
+     * @param stablecoinAddress The ERC20 stablecoin this handler lends.
      * @param kTokenAddress Tropykus kToken for that stablecoin.
      */
-    constructor(address dcaManagerAddress, address stableTokenAddress, address kTokenAddress)
-        LendingHandler(dcaManagerAddress, stableTokenAddress, EXCHANGE_RATE_DECIMALS)
+    constructor(address dcaManagerAddress, address stablecoinAddress, address kTokenAddress)
+        LendingHandler(dcaManagerAddress, stablecoinAddress, EXCHANGE_RATE_DECIMALS)
     {
         i_kToken = IkToken(kTokenAddress);
         _approveLendingSpender();

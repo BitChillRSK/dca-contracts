@@ -198,7 +198,7 @@ contract InvariantTest is StdInvariant, Test {
         fuzzHandler.withdrawToken(0, 0, MIN_PURCHASE_AMOUNT / 10);
         vm.warp(block.timestamp + 365 days);
         vm.roll(block.number + 365 days / 30);
-        uint256 accruedInterest = dcaManager.getInterestAccrued(s_users[0], address(stablecoin), s_routeIndex);
+        uint256 accruedInterest = dcaManager.getAccruedInterest(s_users[0], address(stablecoin), s_routeIndex);
         assertGt(accruedInterest, MIN_PURCHASE_AMOUNT / 10, "the lane accrued too little to credit");
 
         uint256 balanceBefore = scheduleAt(dcaManager, s_users[0], address(stablecoin), 0).tokenBalance;
@@ -447,8 +447,8 @@ contract TropykusHandlerWrapper is TropykusHandler {
     // Track users' accumulated RBTC for testing
     mapping(address user => uint256 amount) internal s_usersAccumulatedRbtc;
 
-    constructor(address dcaManagerAddress, address stableTokenAddress, address kTokenAddress)
-        TropykusHandler(dcaManagerAddress, stableTokenAddress, kTokenAddress)
+    constructor(address dcaManagerAddress, address stablecoinAddress, address kTokenAddress)
+        TropykusHandler(dcaManagerAddress, stablecoinAddress, kTokenAddress)
     {}
 
     /**
@@ -520,9 +520,9 @@ contract TropykusHandlerWrapper is TropykusHandler {
         // ✅ SIMULATE: Consume the stablecoin retrieved (as it would be used for actual rBTC purchase)
         // In real protocol, this stablecoin gets sent to DEX/MoC and consumed
         // We simulate this by transferring it away (burn it)
-        uint256 handlerBalance = i_stableToken.balanceOf(address(this));
+        uint256 handlerBalance = i_stablecoin.balanceOf(address(this));
         if (handlerBalance > 0) {
-            i_stableToken.transfer(address(0xdead), handlerBalance); // Burn the stablecoin
+            i_stablecoin.transfer(address(0xdead), handlerBalance); // Burn the stablecoin
         }
 
         // Mock conversion: 1 stablecoin = 0.00003 rBTC (roughly $50k BTC price)
@@ -534,7 +534,7 @@ contract TropykusHandlerWrapper is TropykusHandler {
         // Add to user's rBTC balance
         s_usersAccumulatedRbtc[buyer] += rbtcAmount;
 
-        emit PurchaseRbtc__RbtcBought(buyer, address(i_stableToken), rbtcAmount, scheduleId, purchaseAmount);
+        emit PurchaseRbtc__RbtcBought(buyer, address(i_stablecoin), rbtcAmount, scheduleId, purchaseAmount);
 
         return rbtcAmount;
     }
@@ -559,8 +559,8 @@ contract SovrynHandlerWrapper is SovrynHandler {
     // Track users' accumulated RBTC for testing
     mapping(address user => uint256 amount) internal s_usersAccumulatedRbtc;
 
-    constructor(address dcaManagerAddress, address stableTokenAddress, address iSusdTokenAddress)
-        SovrynHandler(dcaManagerAddress, stableTokenAddress, iSusdTokenAddress)
+    constructor(address dcaManagerAddress, address stablecoinAddress, address iTokenAddress)
+        SovrynHandler(dcaManagerAddress, stablecoinAddress, iTokenAddress)
     {}
 
     /**
@@ -631,9 +631,9 @@ contract SovrynHandlerWrapper is SovrynHandler {
         // ✅ SIMULATE: Consume the stablecoin retrieved (as it would be used for actual rBTC purchase)
         // In real protocol, this stablecoin gets sent to DEX/MoC and consumed
         // We simulate this by transferring it away (burn it)
-        uint256 handlerBalance = i_stableToken.balanceOf(address(this));
+        uint256 handlerBalance = i_stablecoin.balanceOf(address(this));
         if (handlerBalance > 0) {
-            i_stableToken.transfer(address(0xdead), handlerBalance); // Burn the stablecoin
+            i_stablecoin.transfer(address(0xdead), handlerBalance); // Burn the stablecoin
         }
 
         // Mock conversion: 1 stablecoin = 0.00003 rBTC
@@ -645,7 +645,7 @@ contract SovrynHandlerWrapper is SovrynHandler {
         // Add to user's rBTC balance
         s_usersAccumulatedRbtc[buyer] += rbtcAmount;
 
-        emit PurchaseRbtc__RbtcBought(buyer, address(i_stableToken), rbtcAmount, scheduleId, purchaseAmount);
+        emit PurchaseRbtc__RbtcBought(buyer, address(i_stablecoin), rbtcAmount, scheduleId, purchaseAmount);
 
         return rbtcAmount;
     }

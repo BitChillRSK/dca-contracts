@@ -17,7 +17,7 @@ contract SovrynDocHandlerMoc is SovrynHandler, PurchaseMoc {
     /**
      * @param dcaManagerAddress The DcaManager allowed to call this handler.
      * @param docTokenAddress Dollar On Chain token.
-     * @param iSusdTokenAddress Sovryn iSUSD token.
+     * @param iTokenAddress Sovryn iSUSD token.
      * @param feeCollector Address that receives purchase fees.
      * @param mocProxyAddress Money on Chain proxy.
      * @param feeSettings Linear fee parameters.
@@ -26,13 +26,13 @@ contract SovrynDocHandlerMoc is SovrynHandler, PurchaseMoc {
     constructor(
         address dcaManagerAddress,
         address docTokenAddress,
-        address iSusdTokenAddress,
+        address iTokenAddress,
         address feeCollector,
         address mocProxyAddress,
         FeeSettings memory feeSettings,
         address initialOwner
     )
-        SovrynHandler(dcaManagerAddress, docTokenAddress, iSusdTokenAddress)
+        SovrynHandler(dcaManagerAddress, docTokenAddress, iTokenAddress)
         PurchaseMoc(mocProxyAddress, FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}), initialOwner)
     {}
 }

@@ -125,8 +125,8 @@ contract R87IdleLedgerRemovalGasTest is Test {
 }
 
 contract IdleGasHarness is IdleHandler {
-    constructor(address dcaManagerAddress, address stableTokenAddress)
-        IdleHandler(dcaManagerAddress, stableTokenAddress)
+    constructor(address dcaManagerAddress, address stablecoinAddress)
+        IdleHandler(dcaManagerAddress, stablecoinAddress)
     {}
 
     function exposedBatchRetrieve(address[] calldata users, uint256[] calldata purchaseAmounts)
@@ -144,8 +144,8 @@ contract IdleGasHarness is IdleHandler {
 contract IdleLedgerBaselineHarness is TokenHandler {
     mapping(address user => uint256 balance) internal s_idleBalances;
 
-    constructor(address dcaManagerAddress, address stableTokenAddress)
-        TokenHandler(dcaManagerAddress, stableTokenAddress)
+    constructor(address dcaManagerAddress, address stablecoinAddress)
+        TokenHandler(dcaManagerAddress, stablecoinAddress)
     {}
 
     function _depositToken(address user, uint256 depositAmount) internal override {
@@ -158,8 +158,8 @@ contract IdleLedgerBaselineHarness is TokenHandler {
         override
         returns (uint256 totalWithdrawn)
     {
-        uint256 numOfPurchases = users.length;
-        for (uint256 i; i < numOfPurchases; ++i) {
+        uint256 purchaseCount = users.length;
+        for (uint256 i; i < purchaseCount; ++i) {
             uint256 amount = purchaseAmounts[i];
             uint256 idleBalance = s_idleBalances[users[i]];
             require(amount <= idleBalance, "baseline underfunded");

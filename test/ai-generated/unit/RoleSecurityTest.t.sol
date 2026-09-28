@@ -88,8 +88,8 @@ contract RoleSecurityTest is Test {
         poolFeeRates[0] = 3000;
 
         IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
-            wrBtcToken: IWRBTC(address(wrbtcToken)),
-            swapRouter02: IUniswapV3SwapRouter(address(0x777)),
+            wrbtc: IWRBTC(address(wrbtcToken)),
+            swapRouter: IUniswapV3SwapRouter(address(0x777)),
             swapIntermediateTokens: intermediateTokens,
             swapPoolFeeRates: poolFeeRates,
             mocOracle: ICoinPairPrice(address(mocOracle))
@@ -145,8 +145,8 @@ contract RoleSecurityTest is Test {
             address(stablecoin),
             address(kToken),
             IPurchaseUniswap.UniswapSettings({
-                wrBtcToken: IWRBTC(address(wrbtcToken)),
-                swapRouter02: IUniswapV3SwapRouter(address(0x777)),
+                wrbtc: IWRBTC(address(wrbtcToken)),
+                swapRouter: IUniswapV3SwapRouter(address(0x777)),
                 swapIntermediateTokens: new address[](0),
                 swapPoolFeeRates: new uint24[](1),
                 mocOracle: ICoinPairPrice(address(mocOracle))

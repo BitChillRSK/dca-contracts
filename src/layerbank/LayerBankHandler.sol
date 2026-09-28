@@ -25,10 +25,7 @@ abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
      */
     uint256 public constant EXCHANGE_RATE_DECIMALS = 1e27;
 
-    /**
-     * @notice LayerBank aToken for this handler's stablecoin.
-     * @return The constructor-supplied aToken.
-     */
+    /// @notice LayerBank aToken for this handler's stablecoin.
     ILayerBankAToken public immutable i_aToken;
     /**
      * @notice LayerBank Pool this handler supplies to and withdraws from.
@@ -42,14 +39,14 @@ abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
 
     /**
      * @param dcaManagerAddress The DcaManager allowed to call this handler.
-     * @param stableTokenAddress The ERC20 stablecoin this handler lends.
+     * @param stablecoinAddress The ERC20 stablecoin this handler lends.
      * @param aTokenAddress LayerBank aToken for that stablecoin.
      */
-    constructor(address dcaManagerAddress, address stableTokenAddress, address aTokenAddress)
-        LendingHandler(dcaManagerAddress, stableTokenAddress, EXCHANGE_RATE_DECIMALS)
+    constructor(address dcaManagerAddress, address stablecoinAddress, address aTokenAddress)
+        LendingHandler(dcaManagerAddress, stablecoinAddress, EXCHANGE_RATE_DECIMALS)
     {
         i_aToken = ILayerBankAToken(aTokenAddress);
-        if (i_aToken.UNDERLYING_ASSET_ADDRESS() != stableTokenAddress) {
+        if (i_aToken.UNDERLYING_ASSET_ADDRESS() != stablecoinAddress) {
             revert LayerBankHandler__UnderlyingMismatch();
         }
         address pool = i_aToken.POOL();
@@ -64,7 +61,7 @@ abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
 
     /// @dev Aave liquidity index including pending interest, RAY (1e27) scale.
     function _viewExchangeRate() internal view override returns (uint256) {
-        return i_pool.getReserveNormalizedIncome(address(i_stableToken));
+        return i_pool.getReserveNormalizedIncome(address(i_stablecoin));
     }
 
     function _lendingSpender() internal view override returns (address) {
@@ -73,7 +70,7 @@ abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
 
     /// @dev Supply only; the base credits the measured `scaledBalanceOf` gain, never a Pool return.
     function _protocolDeposit(uint256 stablecoinAmount) internal override {
-        i_pool.supply(address(i_stableToken), stablecoinAmount, address(this), 0);
+        i_pool.supply(address(i_stablecoin), stablecoinAmount, address(this), 0);
     }
 
     /**
@@ -88,7 +85,7 @@ abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
      */
     function _protocolRedeem(uint256 sharesAmount, uint256 exchangeRate) internal override {
         uint256 amountOut = _underlyingForExactScaledBurn(sharesAmount, exchangeRate);
-        i_pool.withdraw(address(i_stableToken), amountOut, address(this));
+        i_pool.withdraw(address(i_stablecoin), amountOut, address(this));
     }
 
     function _receiptSharesBalance() internal override returns (uint256) {

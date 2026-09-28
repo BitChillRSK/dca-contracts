@@ -154,8 +154,8 @@ contract DeployUsdrifHandler is DeployBase {
             fees[0] = 3000;
         }
         return IPurchaseUniswap.UniswapSettings({
-            wrBtcToken: IWRBTC(networkConfig.wrbtcTokenAddress),
-            swapRouter02: IUniswapV3SwapRouter(networkConfig.swapRouter02Address),
+            wrbtc: IWRBTC(networkConfig.wrbtcTokenAddress),
+            swapRouter: IUniswapV3SwapRouter(networkConfig.swapRouterAddress),
             swapIntermediateTokens: intermediates,
             swapPoolFeeRates: fees,
             mocOracle: ICoinPairPrice(networkConfig.mocOracleAddress)

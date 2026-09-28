@@ -116,7 +116,7 @@ contract DcaConfigurationTest is DcaDappTest {
         vm.expectEmit(true, true, true, true);
         emit DcaManager__MaxSchedulesPerTokenModified(MAX_SCHEDULES_PER_TOKEN);
         vm.startPrank(OWNER);
-        dcaManager.modifyMaxSchedulesPerToken(MAX_SCHEDULES_PER_TOKEN);
+        dcaManager.setMaxSchedulesPerToken(MAX_SCHEDULES_PER_TOKEN);
         assertEq(MAX_SCHEDULES_PER_TOKEN, dcaManager.getMaxSchedulesPerToken());
     }
 
@@ -236,7 +236,7 @@ contract DcaConfigurationTest is DcaDappTest {
 
         uint256 loweredMax = maxSchedulesPerToken - 1;
         vm.prank(OWNER);
-        dcaManager.modifyMaxSchedulesPerToken(loweredMax);
+        dcaManager.setMaxSchedulesPerToken(loweredMax);
 
         bytes memory encodedRevert =
             abi.encodeWithSelector(IDcaManager.DcaManager__MaxSchedulesPerTokenReached.selector, address(stablecoin));

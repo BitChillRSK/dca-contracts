@@ -224,7 +224,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
 
         // Update the oracle
         vm.prank(OWNER);
-        IPurchaseUniswap(address(stablecoinHandler)).updateMocOracle(address(newMocOracle));
+        IPurchaseUniswap(address(stablecoinHandler)).setMocOracle(address(newMocOracle));
 
         // Verify the oracle was updated
         address updatedOracleAddress = address(IPurchaseUniswap(address(stablecoinHandler)).getMocOracle());
@@ -236,7 +236,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         // Try to update with zero address
         vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__InvalidOracleAddress.selector);
         vm.prank(OWNER);
-        IPurchaseUniswap(address(stablecoinHandler)).updateMocOracle(address(0));
+        IPurchaseUniswap(address(stablecoinHandler)).setMocOracle(address(0));
     }
 
     function testConstructorRevertsIfOracleIsZeroAddress() public onlyDexSwaps {
@@ -244,9 +244,9 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         uint24[] memory poolFeeRates = new uint24[](1);
         poolFeeRates[0] = 3000;
         IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
-            wrBtcToken: IWRBTC(address(wrBtcToken)),
-            swapRouter02: IUniswapV3SwapRouter(
-                address(PurchaseUniswap(payable(address(stablecoinHandler))).i_swapRouter02())
+            wrbtc: IWRBTC(address(wrbtc)),
+            swapRouter: IUniswapV3SwapRouter(
+                address(PurchaseUniswap(payable(address(stablecoinHandler))).i_swapRouter())
             ),
             swapIntermediateTokens: intermediateTokens,
             swapPoolFeeRates: poolFeeRates,
@@ -279,7 +279,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         // Try to update oracle as non-owner
         vm.expectRevert(ownableUnauthorized(USER));
         vm.prank(USER);
-        IPurchaseUniswap(address(stablecoinHandler)).updateMocOracle(address(newMocOracle));
+        IPurchaseUniswap(address(stablecoinHandler)).setMocOracle(address(newMocOracle));
     }
 
     ////////////////////////////
@@ -300,7 +300,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
 
         // Update the oracle to use our invalid one
         vm.prank(OWNER);
-        IPurchaseUniswap(address(stablecoinHandler)).updateMocOracle(address(invalidOracle));
+        IPurchaseUniswap(address(stablecoinHandler)).setMocOracle(address(invalidOracle));
 
         // Try to make a purchase, which should revert due to invalid price
         vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__OutdatedPrice.selector);
@@ -377,7 +377,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
 
     function testSwapPathStartsWithPurchaseToken() public onlyDexSwaps {
         bytes memory initialPath = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
-        assertEq(_firstTokenInPath(initialPath), address(stablecoin), "initial path must start with i_stableToken");
+        assertEq(_firstTokenInPath(initialPath), address(stablecoin), "initial path must start with i_stablecoin");
 
         address[] memory intermediateTokens = new address[](1);
         intermediateTokens[0] = makeAddr("r31Intermediate");
@@ -391,7 +391,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(intermediateTokens, poolFeeRates);
 
         bytes memory updatedPath = IPurchaseUniswap(address(stablecoinHandler)).getSwapPath();
-        assertEq(_firstTokenInPath(updatedPath), address(stablecoin), "updated path must start with i_stableToken");
+        assertEq(_firstTokenInPath(updatedPath), address(stablecoin), "updated path must start with i_stablecoin");
     }
 
     function _firstTokenInPath(bytes memory path) private pure returns (address token) {
@@ -412,6 +412,6 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         for (uint256 i; i < intermediateTokens.length; ++i) {
             path = abi.encodePacked(path, poolFeeRates[i], intermediateTokens[i]);
         }
-        path = abi.encodePacked(path, poolFeeRates[poolFeeRates.length - 1], address(wrBtcToken));
+        path = abi.encodePacked(path, poolFeeRates[poolFeeRates.length - 1], address(wrbtc));
     }
 }
