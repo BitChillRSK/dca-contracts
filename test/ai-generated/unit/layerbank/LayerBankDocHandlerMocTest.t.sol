@@ -6,7 +6,7 @@ import {LayerBankDocHandlerMoc} from "src/layerbank/LayerBankDocHandlerMoc.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockLayerBankAToken, MockLayerBankPool} from "test/mocks/MockLayerBank.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import "test/Constants.sol";
 import {handlerBatchBuyOne, NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
@@ -40,7 +40,7 @@ contract LayerBankDocHandlerMocTest is Test {
             address(aToken),
             FEE_COLLECTOR,
             address(mocProxy),
-            IFeeHandler.FeeSettings({
+            IPurchaseFees.FeeSettings({
                 minFeeRate: MIN_FEE_RATE,
                 maxFeeRate: MAX_FEE_RATE_TEST,
                 feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,

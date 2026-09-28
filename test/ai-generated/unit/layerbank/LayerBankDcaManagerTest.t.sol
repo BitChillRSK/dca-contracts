@@ -54,7 +54,7 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
             operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
         }
         operationsAdmin.addSwapper(SWAPPER);
-        operationsAdmin.assignTokenHandler(address(docToken), LAYERBANK_INDEX, address(handler));
+        operationsAdmin.assignHandler(address(docToken), LAYERBANK_INDEX, address(handler));
         vm.stopPrank();
 
         vm.deal(address(mocProxy), 100 ether);

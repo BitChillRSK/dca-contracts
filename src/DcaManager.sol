@@ -314,7 +314,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     {
         uint256 numOfPairs = _requirePairedWithdrawalArrays(tokens, routeIndexes);
         for (uint256 i; i < numOfPairs; ++i) {
-            address tokenHandlerAddress = i_operationsAdmin.getTokenHandler(tokens[i], routeIndexes[i]);
+            address tokenHandlerAddress = i_operationsAdmin.getHandler(tokens[i], routeIndexes[i]);
             if (tokenHandlerAddress == address(0)) continue;
             // Skip idle routes so a mixed idle+lending call still withdraws interest
             // from the indexes that yield. Unassigned pairs already continued above.
@@ -336,7 +336,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     {
         uint256 numOfPairs = _requirePairedWithdrawalArrays(tokens, routeIndexes);
         for (uint256 i; i < numOfPairs; ++i) {
-            address tokenHandlerAddress = i_operationsAdmin.getTokenHandler(tokens[i], routeIndexes[i]);
+            address tokenHandlerAddress = i_operationsAdmin.getHandler(tokens[i], routeIndexes[i]);
             if (tokenHandlerAddress == address(0)) continue;
             IPurchaseRbtc handler = IPurchaseRbtc(tokenHandlerAddress);
             if (handler.getAccumulatedRbtcBalance(msg.sender) == 0) continue;
@@ -701,7 +701,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
 
     /// @dev Resolve the handler for a token and route. Reverts if none is assigned.
     function _handler(address token, uint256 routeIndex) private view returns (ITokenHandler) {
-        address tokenHandlerAddress = i_operationsAdmin.getTokenHandler(token, routeIndex);
+        address tokenHandlerAddress = i_operationsAdmin.getHandler(token, routeIndex);
         if (tokenHandlerAddress == address(0)) revert DcaManager__TokenNotAccepted(token, routeIndex);
         return ITokenHandler(tokenHandlerAddress);
     }

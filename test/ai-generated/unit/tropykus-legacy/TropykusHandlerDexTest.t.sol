@@ -3,12 +3,12 @@ pragma solidity 0.8.36;
 
 import {HandlerTestHarness} from "../HandlerTestHarness.t.sol";
 import {ITokenHandler} from "../../../../src/interfaces/ITokenHandler.sol";
-import {IFeeHandler} from "../../../../src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "../../../../src/interfaces/IPurchaseFees.sol";
 import {IPurchaseUniswap} from "../../../../src/interfaces/IPurchaseUniswap.sol";
 import {IWRBTC} from "../../../../src/interfaces/IWRBTC.sol";
 import {IUniswapV3SwapRouter} from "../../../../src/interfaces/IUniswapV3SwapRouter.sol";
 import {ICoinPairPrice} from "../../../../src/interfaces/ICoinPairPrice.sol";
-import {TropykusErc20HandlerDex} from "../../../../src/tropykus-legacy/TropykusErc20HandlerDex.sol";
+import {TropykusHandlerDex} from "../../../../src/tropykus-legacy/TropykusHandlerDex.sol";
 import {MockKToken} from "../../../mocks/MockKToken.sol";
 import {MockWrbtcToken} from "../../../mocks/MockWrbtcToken.sol";
 import {MockMocOracle} from "../../../mocks/MockMocOracle.sol";
@@ -20,10 +20,10 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {ownableUnauthorized} from "../../../utils/OzRevert.sol";
 
 /**
- * @title TropykusErc20HandlerDexTest
- * @notice Unit tests for TropykusErc20HandlerDex (DEX variant) using shared test harness
+ * @title TropykusHandlerDexTest
+ * @notice Unit tests for TropykusHandlerDex (DEX variant) using shared test harness
  */
-contract TropykusErc20HandlerDexTest is HandlerTestHarness {
+contract TropykusHandlerDexTest is HandlerTestHarness {
     event PurchaseUniswap__AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
     event PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(uint256 oldValue, uint256 newValue);
 
@@ -32,14 +32,14 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
     MockWrbtcToken public wrbtcToken;
     MockMocOracle public mocOracle;
     MockSwapRouter02 public mockRouter;
-    TropykusErc20HandlerDex public tropykusDexHandler;
+    TropykusHandlerDex public tropykusDexHandler;
 
     /*//////////////////////////////////////////////////////////////
                            HANDLER-SPECIFIC IMPLEMENTATIONS
     //////////////////////////////////////////////////////////////*/
 
     function deployHandler() internal override returns (ITokenHandler) {
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE_TEST,
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -58,7 +58,7 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
             mocOracle: ICoinPairPrice(address(mocOracle))
         });
 
-        tropykusDexHandler = new TropykusErc20HandlerDex(
+        tropykusDexHandler = new TropykusHandlerDex(
             address(dcaManager),
             address(stablecoin),
             address(kToken),
@@ -202,13 +202,13 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
     }
 
     function test_tropykusDex_constructor_allows_hundred_percent() public {
-        TropykusErc20HandlerDex handler = _deployTropykusDexWithSlippage(1 ether, 1 ether);
+        TropykusHandlerDex handler = _deployTropykusDexWithSlippage(1 ether, 1 ether);
         assertEq(handler.getAmountOutMinimumPercent(), 1 ether);
         assertEq(handler.getAmountOutMinimumSafetyCheck(), 1 ether);
     }
 
     function test_tropykusDex_constructor_allows_equal_percent_and_safety() public {
-        TropykusErc20HandlerDex handler = _deployTropykusDexWithSlippage(0.99 ether, 0.99 ether);
+        TropykusHandlerDex handler = _deployTropykusDexWithSlippage(0.99 ether, 0.99 ether);
         assertEq(handler.getAmountOutMinimumPercent(), 0.99 ether);
         assertEq(handler.getAmountOutMinimumSafetyCheck(), 0.99 ether);
     }
@@ -488,9 +488,9 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
 
     function _deployTropykusDexWithSlippage(uint256 amountOutMinimumPercent, uint256 amountOutMinimumSafetyCheck)
         private
-        returns (TropykusErc20HandlerDex)
+        returns (TropykusHandlerDex)
     {
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE_TEST,
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -509,7 +509,7 @@ contract TropykusErc20HandlerDexTest is HandlerTestHarness {
             mocOracle: ICoinPairPrice(address(mocOracle))
         });
 
-        return new TropykusErc20HandlerDex(
+        return new TropykusHandlerDex(
             address(dcaManager),
             address(stablecoin),
             address(kToken),

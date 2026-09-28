@@ -8,7 +8,7 @@ import {MockKdocToken} from "test/mocks/MockKdocToken.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import "test/Constants.sol";
 import {handlerBatchBuyOne, NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
 
@@ -46,7 +46,7 @@ contract TropykusDocHandlerMocTest is Test {
             address(kDocToken),
             FEE_COLLECTOR,
             address(mocProxy),
-            IFeeHandler.FeeSettings({
+            IPurchaseFees.FeeSettings({
                 minFeeRate: MIN_FEE_RATE,
                 maxFeeRate: MAX_FEE_RATE_TEST,
                 feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,

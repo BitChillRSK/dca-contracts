@@ -8,7 +8,7 @@ import {LayerBankDocHandlerMoc} from "../src/layerbank/LayerBankDocHandlerMoc.so
 import {OperationsAdmin} from "../src/OperationsAdmin.sol";
 import {DcaManager} from "../src/DcaManager.sol";
 import {IOperationsAdmin} from "../src/interfaces/IOperationsAdmin.sol";
-import {IFeeHandler} from "../src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "../src/interfaces/IPurchaseFees.sol";
 import {MockLayerBankAToken, MockLayerBankPool} from "../test/mocks/MockLayerBank.sol";
 import {console} from "forge-std/Test.sol";
 import "./Constants.sol";
@@ -34,7 +34,7 @@ contract DeployLayerBankHandler is DeployBase {
     }
 
     function deployLayerBankDocHandlerMoc(DeployParams memory params) public returns (address) {
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: getMaxFeeRate(),
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -56,7 +56,7 @@ contract DeployLayerBankHandler is DeployBase {
 
     /**
      * @notice Deploy Pool/aToken mocks and the handler. Used by tests on Anvil and on a fork.
-     * @dev Does not `broadcast` or call `assignTokenHandler`. `run()` broadcasts.
+     * @dev Does not `broadcast` or call `assignHandler`. `run()` broadcasts.
      */
     function deployMocksAndHandler(
         address dcaManager,
@@ -149,7 +149,7 @@ contract DeployLayerBankHandler is DeployBase {
 
         if (!isOwner) {
             console.log("Warning: Deployer is not the owner. Cannot register handler.");
-            console.log("Please call operationsAdmin.registerRoute + assignTokenHandler as owner with:");
+            console.log("Please call operationsAdmin.registerRoute + assignHandler as owner with:");
             console.log("tokenAddress:", docTokenAddress);
             console.log("index:", LAYERBANK_INDEX);
             console.log("handlerAddress:", layerbankHandler);
@@ -158,7 +158,7 @@ contract DeployLayerBankHandler is DeployBase {
         if (operationsAdmin.getRouteClass(LAYERBANK_INDEX) == IOperationsAdmin.RouteClass.Unregistered) {
             operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
         }
-        operationsAdmin.assignTokenHandler(docTokenAddress, LAYERBANK_INDEX, layerbankHandler);
+        operationsAdmin.assignHandler(docTokenAddress, LAYERBANK_INDEX, layerbankHandler);
         console.log("LayerBank DOC handler registered with OperationsAdmin at index", LAYERBANK_INDEX);
     }
 }

@@ -2,21 +2,21 @@
 pragma solidity 0.8.36;
 
 import {PurchaseUniswap} from "../PurchaseUniswap.sol";
-import {TropykusErc20Handler} from "./TropykusErc20Handler.sol";
+import {LayerBankHandler} from "./LayerBankHandler.sol";
 
 /**
- * @title TropykusErc20HandlerDex
+ * @title LayerBankHandlerDex
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Test-only Tropykus lending + Uniswap V3 handler; excluded from production deployment.
+ * @notice Token-agnostic LayerBank lending + Uniswap V3 purchase handler.
  * @dev Constructor-only leaf. Only its immutable DcaManager moves principal, buys, or withdraws rBTC;
  *      the owner controls fees, oracle, path allowlist, and floor. Holds standing max stablecoin
- *      approvals to SwapRouter02 and the kToken, restorable by anyone.
+ *      approvals to SwapRouter02 and the LayerBank Pool, restorable by anyone.
  */
-contract TropykusErc20HandlerDex is TropykusErc20Handler, PurchaseUniswap {
+contract LayerBankHandlerDex is LayerBankHandler, PurchaseUniswap {
     /**
      * @param dcaManagerAddress The DcaManager allowed to call this handler.
-     * @param stablecoinAddress The stablecoin this handler lends.
-     * @param kTokenAddress Tropykus kToken for that stablecoin.
+     * @param stableTokenAddress The stablecoin this handler lends.
+     * @param aTokenAddress LayerBank aToken for that stablecoin.
      * @param uniswapSettings Router, WRBTC, path, and MoC oracle.
      * @param feeCollector Address that receives purchase fees.
      * @param feeSettings Linear fee parameters.
@@ -26,8 +26,8 @@ contract TropykusErc20HandlerDex is TropykusErc20Handler, PurchaseUniswap {
      */
     constructor(
         address dcaManagerAddress,
-        address stablecoinAddress,
-        address kTokenAddress,
+        address stableTokenAddress,
+        address aTokenAddress,
         UniswapSettings memory uniswapSettings,
         address feeCollector,
         FeeSettings memory feeSettings,
@@ -35,10 +35,10 @@ contract TropykusErc20HandlerDex is TropykusErc20Handler, PurchaseUniswap {
         uint256 amountOutMinimumSafetyCheck,
         address initialOwner
     )
-        TropykusErc20Handler(dcaManagerAddress, stablecoinAddress, kTokenAddress)
+        LayerBankHandler(dcaManagerAddress, stableTokenAddress, aTokenAddress)
         PurchaseUniswap(
             uniswapSettings,
-            FeeHandlerConfig({feeCollector: feeCollector, feeSettings: feeSettings}),
+            FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}),
             amountOutMinimumPercent,
             amountOutMinimumSafetyCheck,
             initialOwner

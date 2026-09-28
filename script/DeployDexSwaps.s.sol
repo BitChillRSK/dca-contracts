@@ -5,16 +5,16 @@ pragma solidity 0.8.36;
 import {DeployBase} from "./DeployBase.s.sol";
 import {DexHelperConfig} from "./DexHelperConfig.s.sol";
 import {DcaManager} from "../src/DcaManager.sol";
-import {TropykusErc20HandlerDex} from "../src/tropykus-legacy/TropykusErc20HandlerDex.sol";
-import {SovrynErc20HandlerDex} from "../src/sovryn/SovrynErc20HandlerDex.sol";
-import {LayerBankErc20HandlerDex} from "../src/layerbank/LayerBankErc20HandlerDex.sol";
-import {IdleErc20HandlerDex} from "../src/idle/IdleErc20HandlerDex.sol";
+import {TropykusHandlerDex} from "../src/tropykus-legacy/TropykusHandlerDex.sol";
+import {SovrynHandlerDex} from "../src/sovryn/SovrynHandlerDex.sol";
+import {LayerBankHandlerDex} from "../src/layerbank/LayerBankHandlerDex.sol";
+import {IdleHandlerDex} from "../src/idle/IdleHandlerDex.sol";
 import {IPurchaseUniswap} from "../src/interfaces/IPurchaseUniswap.sol";
 import {OperationsAdmin} from "../src/OperationsAdmin.sol";
 import {IWRBTC} from "../src/interfaces/IWRBTC.sol";
 import {IUniswapV3SwapRouter} from "../src/interfaces/IUniswapV3SwapRouter.sol";
 import {ICoinPairPrice} from "../src/interfaces/ICoinPairPrice.sol";
-import {IFeeHandler} from "../src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "../src/interfaces/IPurchaseFees.sol";
 import {console} from "forge-std/Test.sol";
 import "./Constants.sol";
 
@@ -40,8 +40,8 @@ contract DeployDexSwaps is DeployBase {
     }
 
     /// @notice Live USDT0 uses 6-decimal bounds; local/fork mocks stay 18-decimal.
-    function feeSettingsForToken(bool isUsdt0Live) public view returns (IFeeHandler.FeeSettings memory) {
-        return IFeeHandler.FeeSettings({
+    function feeSettingsForToken(bool isUsdt0Live) public view returns (IPurchaseFees.FeeSettings memory) {
+        return IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: getMaxFeeRate(),
             feePurchaseLowerBound: isUsdt0Live ? USDT0_FEE_PURCHASE_LOWER_BOUND : FEE_PURCHASE_LOWER_BOUND,
@@ -51,11 +51,11 @@ contract DeployDexSwaps is DeployBase {
 
     function deployDocHandlerDex(DeployParams memory params) public returns (address) {
         bool isUsdt0Live = _isLiveEnvironment() && _isUsdt0(_stablecoinType());
-        IFeeHandler.FeeSettings memory feeSettings = feeSettingsForToken(isUsdt0Live);
+        IPurchaseFees.FeeSettings memory feeSettings = feeSettingsForToken(isUsdt0Live);
 
         if (params.protocol == Protocol.NONE) {
             return address(
-                new IdleErc20HandlerDex(
+                new IdleHandlerDex(
                     params.dcaManager,
                     params.tokenAddress,
                     params.uniswapSettings,
@@ -69,7 +69,7 @@ contract DeployDexSwaps is DeployBase {
         }
         if (params.protocol == Protocol.TROPYKUS) {
             return address(
-                new TropykusErc20HandlerDex(
+                new TropykusHandlerDex(
                     params.dcaManager,
                     params.tokenAddress,
                     params.shareToken,
@@ -84,7 +84,7 @@ contract DeployDexSwaps is DeployBase {
         }
         if (params.protocol == Protocol.SOVRYN) {
             return address(
-                new SovrynErc20HandlerDex(
+                new SovrynHandlerDex(
                     params.dcaManager,
                     params.tokenAddress,
                     params.shareToken,
@@ -99,7 +99,7 @@ contract DeployDexSwaps is DeployBase {
         }
         if (params.protocol == Protocol.LAYERBANK) {
             return address(
-                new LayerBankErc20HandlerDex(
+                new LayerBankHandlerDex(
                     params.dcaManager,
                     params.tokenAddress,
                     params.shareToken,
@@ -156,7 +156,7 @@ contract DeployDexSwaps is DeployBase {
             })
         );
         console.log("Idle dex handler deployed at:", idleHandler);
-        operationsAdmin.assignTokenHandler(stablecoinAddress, IDLE_INDEX, idleHandler);
+        operationsAdmin.assignHandler(stablecoinAddress, IDLE_INDEX, idleHandler);
         _proposeFinalOwner(idleHandler);
         if (protocol == Protocol.NONE) {
             selectedHandler = idleHandler;
@@ -182,7 +182,7 @@ contract DeployDexSwaps is DeployBase {
                 })
             );
             console.log("LayerBank dex handler deployed at:", layerbankHandler);
-            operationsAdmin.assignTokenHandler(stablecoinAddress, LAYERBANK_INDEX, layerbankHandler);
+            operationsAdmin.assignHandler(stablecoinAddress, LAYERBANK_INDEX, layerbankHandler);
             _proposeFinalOwner(layerbankHandler);
             if (protocol == Protocol.LAYERBANK) {
                 selectedHandler = layerbankHandler;

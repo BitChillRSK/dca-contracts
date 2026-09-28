@@ -6,14 +6,14 @@ import {OperationsAdmin} from "../../../src/OperationsAdmin.sol";
 import {DcaManager} from "../../../src/DcaManager.sol";
 import {MockStablecoin} from "../../mocks/MockStablecoin.sol";
 import {MockKdocToken} from "../../mocks/MockKdocToken.sol";
-import {TropykusErc20HandlerDex} from "../../../src/tropykus-legacy/TropykusErc20HandlerDex.sol";
+import {TropykusHandlerDex} from "../../../src/tropykus-legacy/TropykusHandlerDex.sol";
 import {IPurchaseUniswap} from "../../../src/interfaces/IPurchaseUniswap.sol";
 import {ICoinPairPrice} from "../../../src/interfaces/ICoinPairPrice.sol";
 import {MockMocOracle} from "../../mocks/MockMocOracle.sol";
 import {MockWrbtcToken} from "../../mocks/MockWrbtcToken.sol";
 import {IWRBTC} from "../../../src/interfaces/IWRBTC.sol";
 import {IUniswapV3SwapRouter} from "../../../src/interfaces/IUniswapV3SwapRouter.sol";
-import {IFeeHandler} from "../../../src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "../../../src/interfaces/IPurchaseFees.sol";
 import {ITokenHandler} from "../../../src/interfaces/ITokenHandler.sol";
 import {IDcaManager} from "../../../src/interfaces/IDcaManager.sol";
 import {IOperationsAdmin} from "../../../src/interfaces/IOperationsAdmin.sol";
@@ -36,7 +36,7 @@ contract RoleSecurityTest is Test {
     DcaManager public dcaManager;
     MockStablecoin public stablecoin;
     MockKdocToken public kToken;
-    TropykusErc20HandlerDex public handler;
+    TropykusHandlerDex public handler;
     MockWrbtcToken public wrbtcToken;
     MockMocOracle public mocOracle;
 
@@ -76,7 +76,7 @@ contract RoleSecurityTest is Test {
         vm.stopPrank();
 
         // Deploy handler
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE_TEST,
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -96,7 +96,7 @@ contract RoleSecurityTest is Test {
         });
 
         vm.prank(OWNER);
-        handler = new TropykusErc20HandlerDex(
+        handler = new TropykusHandlerDex(
             address(dcaManager),
             address(stablecoin),
             address(kToken),
@@ -110,7 +110,7 @@ contract RoleSecurityTest is Test {
 
         // Register handler
         vm.prank(OWNER);
-        operationsAdmin.assignTokenHandler(address(stablecoin), TROPYKUS_INDEX, address(handler));
+        operationsAdmin.assignHandler(address(stablecoin), TROPYKUS_INDEX, address(handler));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -140,7 +140,7 @@ contract RoleSecurityTest is Test {
         vm.prank(OWNER);
         operationsAdmin.registerRoute(newIndex, true);
 
-        TropykusErc20HandlerDex newHandler = new TropykusErc20HandlerDex(
+        TropykusHandlerDex newHandler = new TropykusHandlerDex(
             address(dcaManager),
             address(stablecoin),
             address(kToken),
@@ -152,7 +152,7 @@ contract RoleSecurityTest is Test {
                 mocOracle: ICoinPairPrice(address(mocOracle))
             }),
             FEE_COLLECTOR,
-            IFeeHandler.FeeSettings({
+            IPurchaseFees.FeeSettings({
                 minFeeRate: MIN_FEE_RATE,
                 maxFeeRate: MAX_FEE_RATE_TEST,
                 feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -165,21 +165,21 @@ contract RoleSecurityTest is Test {
 
         vm.expectRevert(ownableUnauthorized(UNAUTHORIZED_USER));
         vm.prank(UNAUTHORIZED_USER);
-        operationsAdmin.assignTokenHandler(address(stablecoin), newIndex, address(newHandler));
+        operationsAdmin.assignHandler(address(stablecoin), newIndex, address(newHandler));
 
         vm.expectRevert(ownableUnauthorized(ADMIN));
         vm.prank(ADMIN);
-        operationsAdmin.assignTokenHandler(address(stablecoin), newIndex, address(newHandler));
+        operationsAdmin.assignHandler(address(stablecoin), newIndex, address(newHandler));
 
         vm.expectRevert(ownableUnauthorized(SWAPPER));
         vm.prank(SWAPPER);
-        operationsAdmin.assignTokenHandler(address(stablecoin), newIndex, address(newHandler));
+        operationsAdmin.assignHandler(address(stablecoin), newIndex, address(newHandler));
 
         vm.prank(OWNER);
-        operationsAdmin.assignTokenHandler(address(stablecoin), newIndex, address(newHandler));
+        operationsAdmin.assignHandler(address(stablecoin), newIndex, address(newHandler));
 
-        assertEq(operationsAdmin.getTokenHandler(address(stablecoin), newIndex), address(newHandler));
-        assertEq(operationsAdmin.getTokenHandler(address(stablecoin), TROPYKUS_INDEX), address(handler));
+        assertEq(operationsAdmin.getHandler(address(stablecoin), newIndex), address(newHandler));
+        assertEq(operationsAdmin.getHandler(address(stablecoin), TROPYKUS_INDEX), address(handler));
     }
 
     function test_onlyOwnerCanRegisterRoute() public {
@@ -387,7 +387,7 @@ contract RoleSecurityTest is Test {
 
         vm.expectRevert(ownableUnauthorized(randomUser));
         vm.prank(randomUser);
-        operationsAdmin.assignTokenHandler(address(stablecoin), TROPYKUS_INDEX, randomUser);
+        operationsAdmin.assignHandler(address(stablecoin), TROPYKUS_INDEX, randomUser);
 
         // Handler functions should fail
         vm.expectRevert();

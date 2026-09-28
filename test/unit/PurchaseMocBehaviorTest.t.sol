@@ -3,7 +3,7 @@ pragma solidity 0.8.36;
 
 import {Test} from "forge-std/Test.sol";
 import {IdleDocHandlerMoc} from "src/idle/IdleDocHandlerMoc.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {MockStablecoin} from "../mocks/MockStablecoin.sol";
 import {MockMocProxy} from "../mocks/MockMocProxy.sol";
@@ -33,7 +33,7 @@ contract PurchaseMocBehaviorTest is Test {
         moc = new MockMocProxy(address(doc));
         vm.deal(address(moc), 100 ether);
 
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE_TEST,
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,

@@ -1,11 +1,11 @@
-LayerBank aToken handler (lending index 1). `LayerBankErc20Handler` supplies and withdraws through the live Aave-v3-style Pool. Per-user virtual balances store **scaled** aToken amounts (`scaledBalanceOf`), not rebasing `balanceOf`.
+LayerBank aToken handler (lending index 1). `LayerBankHandler` supplies and withdraws through the live Aave-v3-style Pool. Per-user virtual balances store **scaled** aToken amounts (`scaledBalanceOf`), not rebasing `balanceOf`.
 
 - DOC + MoC: `LayerBankDocHandlerMoc`
-- USDRIF + Uniswap and USDT0 + Uniswap: two deployments of `LayerBankErc20HandlerDex` (same contract type with token-specific immutables; USDT0 constructor fees and `DcaManager.setTokenMinPurchaseAmount` are 6-decimal)
+- USDRIF + Uniswap and USDT0 + Uniswap: two deployments of `LayerBankHandlerDex` (same contract type with token-specific immutables; USDT0 constructor fees and `DcaManager.setTokenMinPurchaseAmount` are 6-decimal)
 
 Deploy DOC + MoC with `script/DeployLayerBankHandler.s.sol`. Deploy the dex stables with `script/DeployUsdrifHandler.s.sol` (keyed off `STABLECOIN_TYPE`) or `script/DeployDexSwaps.s.sol`. Anvil deploys Pool/aToken mocks. Live aToken addresses are in `script/Constants.sol`.
 
-USDT0 add-on on mainnet: the Foundry EOA cannot `assignTokenHandler` (Safe owns `OperationsAdmin`). The Safe must `setTokenMinPurchaseAmount(usdt0, 25e6)` **before** `assignTokenHandler` — there is no protocol-wide default; an unset min makes create revert. See root README "Ownership after deploy".
+USDT0 add-on on mainnet: the Foundry EOA cannot `assignHandler` (Safe owns `OperationsAdmin`). The Safe must `setTokenMinPurchaseAmount(usdt0, 25e6)` **before** `assignHandler` — there is no protocol-wide default; an unset min makes create revert. See root README "Ownership after deploy".
 
 External LayerBank incentives (LAB / Merkl) are not claimed. Native aToken interest is the only yield this handler distributes.
 

@@ -27,9 +27,9 @@ contract IdleHandlerDeploymentTest is BaseDeploymentTest {
         idleHandler = IdleDocHandlerMoc(payable(idleHandlerAddress));
         address docTokenAddress = helperConfig.getStablecoinAddress();
 
-        if (operationsAdmin.getTokenHandler(docTokenAddress, IDLE_INDEX) == address(0)) {
+        if (operationsAdmin.getHandler(docTokenAddress, IDLE_INDEX) == address(0)) {
             vm.prank(OWNER);
-            operationsAdmin.assignTokenHandler(docTokenAddress, IDLE_INDEX, idleHandlerAddress);
+            operationsAdmin.assignHandler(docTokenAddress, IDLE_INDEX, idleHandlerAddress);
         }
     }
 
@@ -41,7 +41,7 @@ contract IdleHandlerDeploymentTest is BaseDeploymentTest {
         assertEq(idleHandler.owner(), makeAddr(OWNER_STRING), "Idle handler owner not set correctly");
         assertEq(idleHandler.pendingOwner(), address(0), "Idle handler pending owner must be zero after deploy");
 
-        address registeredHandler = operationsAdmin.getTokenHandler(helperConfig.getStablecoinAddress(), IDLE_INDEX);
+        address registeredHandler = operationsAdmin.getHandler(helperConfig.getStablecoinAddress(), IDLE_INDEX);
         assertEq(registeredHandler, idleHandlerAddress, "Idle handler not registered in OperationsAdmin");
         assertEq(
             uint256(operationsAdmin.getRouteClass(IDLE_INDEX)),

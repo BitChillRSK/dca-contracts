@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
-import {LayerBankErc20Handler} from "./LayerBankErc20Handler.sol";
+import {LayerBankHandler} from "./LayerBankHandler.sol";
 import {PurchaseMoc} from "../PurchaseMoc.sol";
 
 /**
@@ -13,7 +13,7 @@ import {PurchaseMoc} from "../PurchaseMoc.sol";
  *      route has no pool-slippage floor.
  *      Holds a standing max DOC approval to the LayerBank Pool, restorable by anyone.
  */
-contract LayerBankDocHandlerMoc is LayerBankErc20Handler, PurchaseMoc {
+contract LayerBankDocHandlerMoc is LayerBankHandler, PurchaseMoc {
     /**
      * @param dcaManagerAddress The DcaManager allowed to call this handler.
      * @param docTokenAddress Dollar On Chain token.
@@ -32,9 +32,7 @@ contract LayerBankDocHandlerMoc is LayerBankErc20Handler, PurchaseMoc {
         FeeSettings memory feeSettings,
         address initialOwner
     )
-        LayerBankErc20Handler(dcaManagerAddress, docTokenAddress, aTokenAddress)
-        PurchaseMoc(
-            mocProxyAddress, FeeHandlerConfig({feeCollector: feeCollector, feeSettings: feeSettings}), initialOwner
-        )
+        LayerBankHandler(dcaManagerAddress, docTokenAddress, aTokenAddress)
+        PurchaseMoc(mocProxyAddress, FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}), initialOwner)
     {}
 }

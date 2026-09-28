@@ -4,7 +4,7 @@ pragma solidity 0.8.36;
 import {Vm} from "forge-std/Test.sol";
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import "../Constants.sol";
 import {scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
@@ -50,7 +50,7 @@ contract EventIndexingTest is DcaDappTest {
     }
 
     function testPurchaseFeePaysCollectorViaErc20Transfer() external {
-        address collector = IFeeHandler(address(stablecoinHandler)).getFeeCollectorAddress();
+        address collector = IPurchaseFees(address(stablecoinHandler)).getFeeCollectorAddress();
         uint256 collectorBefore = stablecoin.balanceOf(collector);
 
         vm.recordLogs();
@@ -194,7 +194,7 @@ contract EventIndexingTest is DcaDappTest {
         if (sig == keccak256("PurchaseRbtc__rBtcWithdrawn(address,uint256)")) return (true, 1);
         if (sig == keccak256("PurchaseRbtc__RbtcBought(address,address,uint256,uint64,uint256)")) return (true, 3);
         if (sig == keccak256("PurchaseRbtc__SuccessfulRbtcBatchPurchase(address,uint256,uint256)")) return (true, 1);
-        if (sig == keccak256("OperationsAdmin__TokenHandlerAssigned(address,uint256,address)")) return (true, 2);
+        if (sig == keccak256("OperationsAdmin__HandlerAssigned(address,uint256,address)")) return (true, 2);
         if (sig == keccak256("OperationsAdmin__RouteRegistered(uint256,bool)")) return (true, 0);
         if (sig == keccak256("OperationsAdmin__SwapperAdded(address)")) return (true, 1);
         if (sig == keccak256("OperationsAdmin__SwapperRevoked(address)")) return (true, 1);
@@ -202,11 +202,11 @@ contract EventIndexingTest is DcaDappTest {
         if (sig == keccak256("PurchaseUniswap__PurchasePathAllowedSet(bytes32,bytes,address[],uint24[],bool)")) {
             return (true, 0);
         }
-        if (sig == keccak256("FeeHandler__MinFeeRateSet(uint256)")) return (true, 0);
-        if (sig == keccak256("FeeHandler__MaxFeeRateSet(uint256)")) return (true, 0);
-        if (sig == keccak256("FeeHandler__PurchaseLowerBoundSet(uint256)")) return (true, 0);
-        if (sig == keccak256("FeeHandler__PurchaseUpperBoundSet(uint256)")) return (true, 0);
-        if (sig == keccak256("FeeHandler__FeeCollectorAddressSet(address)")) return (true, 1);
+        if (sig == keccak256("PurchaseFees__MinFeeRateSet(uint256)")) return (true, 0);
+        if (sig == keccak256("PurchaseFees__MaxFeeRateSet(uint256)")) return (true, 0);
+        if (sig == keccak256("PurchaseFees__PurchaseLowerBoundSet(uint256)")) return (true, 0);
+        if (sig == keccak256("PurchaseFees__PurchaseUpperBoundSet(uint256)")) return (true, 0);
+        if (sig == keccak256("PurchaseFees__FeeCollectorAddressSet(address)")) return (true, 1);
         if (sig == keccak256("PurchaseUniswap__NewPathSet(address[],uint24[],bytes)")) return (true, 0);
         if (sig == keccak256("PurchaseUniswap__AmountOutMinimumPercentUpdated(uint256,uint256)")) return (true, 0);
         if (sig == keccak256("PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(uint256,uint256)")) return (true, 0);

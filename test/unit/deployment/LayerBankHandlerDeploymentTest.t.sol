@@ -21,8 +21,8 @@ contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
         super.setUp();
 
         address docTokenAddress = helperConfig.getStablecoinAddress();
-        if (operationsAdmin.getTokenHandler(docTokenAddress, LAYERBANK_INDEX) != address(0)) {
-            layerbankHandlerAddress = operationsAdmin.getTokenHandler(docTokenAddress, LAYERBANK_INDEX);
+        if (operationsAdmin.getHandler(docTokenAddress, LAYERBANK_INDEX) != address(0)) {
+            layerbankHandlerAddress = operationsAdmin.getHandler(docTokenAddress, LAYERBANK_INDEX);
             layerbankHandler = LayerBankDocHandlerMoc(payable(layerbankHandlerAddress));
             return;
         }
@@ -43,7 +43,7 @@ contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
         if (operationsAdmin.getRouteClass(LAYERBANK_INDEX) == IOperationsAdmin.RouteClass.Unregistered) {
             operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
         }
-        operationsAdmin.assignTokenHandler(docTokenAddress, LAYERBANK_INDEX, layerbankHandlerAddress);
+        operationsAdmin.assignHandler(docTokenAddress, LAYERBANK_INDEX, layerbankHandlerAddress);
         vm.stopPrank();
     }
 
@@ -73,8 +73,7 @@ contract LayerBankHandlerDeploymentTest is BaseDeploymentTest {
             layerbankHandler.pendingOwner(), address(0), "LayerBank handler pending owner must be zero after deploy"
         );
 
-        address registeredHandler =
-            operationsAdmin.getTokenHandler(helperConfig.getStablecoinAddress(), LAYERBANK_INDEX);
+        address registeredHandler = operationsAdmin.getHandler(helperConfig.getStablecoinAddress(), LAYERBANK_INDEX);
         assertEq(registeredHandler, layerbankHandlerAddress, "LayerBank handler not registered in OperationsAdmin");
         assertEq(uint256(operationsAdmin.getRouteClass(LAYERBANK_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
         assertEq(layerbankHandler.EXCHANGE_RATE_DECIMALS(), 1e27);

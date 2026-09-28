@@ -3,10 +3,10 @@ pragma solidity 0.8.36;
 
 import {Test} from "forge-std/Test.sol";
 import {PurchaseUniswap} from "../../src/PurchaseUniswap.sol";
-import {FeeHandler} from "../../src/FeeHandler.sol";
+import {PurchaseFees} from "../../src/PurchaseFees.sol";
 import {DcaManagerAccessControl} from "../../src/DcaManagerAccessControl.sol";
 import {StablecoinSource} from "../../src/StablecoinSource.sol";
-import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "../../src/interfaces/IPurchaseFees.sol";
 import {IPurchaseUniswap} from "../../src/interfaces/IPurchaseUniswap.sol";
 import {ICoinPairPrice} from "../../src/interfaces/ICoinPairPrice.sol";
 import {IWRBTC} from "../../src/interfaces/IWRBTC.sol";
@@ -322,7 +322,7 @@ contract PurchaseUniswapMinOutTest is Test {
         });
 
         // Fee bounds are irrelevant here: the harness calls the swap directly, never the fee-charging batch.
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE_TEST,
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -348,7 +348,7 @@ abstract contract PurchaseTokenBase is StablecoinSource {
 contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
     constructor(
         MockStablecoinWithDecimals token,
-        IFeeHandler.FeeSettings memory feeSettings,
+        IPurchaseFees.FeeSettings memory feeSettings,
         UniswapSettings memory uniswapSettings,
         uint256 amountOutMinimumPercent,
         uint256 amountOutMinimumSafetyCheck
@@ -357,7 +357,7 @@ contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
         DcaManagerAccessControl(msg.sender)
         PurchaseUniswap(
             uniswapSettings,
-            FeeHandlerConfig({feeCollector: address(0xFEE), feeSettings: feeSettings}),
+            FeeConfig({feeCollector: address(0xFEE), feeSettings: feeSettings}),
             amountOutMinimumPercent,
             amountOutMinimumSafetyCheck,
             msg.sender

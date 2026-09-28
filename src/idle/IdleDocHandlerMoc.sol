@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
-import {IdleErc20Handler} from "./IdleErc20Handler.sol";
+import {IdleHandler} from "./IdleHandler.sol";
 import {PurchaseMoc} from "../PurchaseMoc.sol";
 
 /**
@@ -11,7 +11,7 @@ import {PurchaseMoc} from "../PurchaseMoc.sol";
  * @dev Constructor-only leaf. Only its immutable DcaManager moves principal, buys, or withdraws rBTC;
  *      the owner controls fee settings and collection. It has no pause or owner rescue path.
  */
-contract IdleDocHandlerMoc is IdleErc20Handler, PurchaseMoc {
+contract IdleDocHandlerMoc is IdleHandler, PurchaseMoc {
     /**
      * @param dcaManagerAddress The DcaManager allowed to call this handler.
      * @param docTokenAddress Dollar On Chain token.
@@ -28,9 +28,7 @@ contract IdleDocHandlerMoc is IdleErc20Handler, PurchaseMoc {
         FeeSettings memory feeSettings,
         address initialOwner
     )
-        IdleErc20Handler(dcaManagerAddress, docTokenAddress)
-        PurchaseMoc(
-            mocProxyAddress, FeeHandlerConfig({feeCollector: feeCollector, feeSettings: feeSettings}), initialOwner
-        )
+        IdleHandler(dcaManagerAddress, docTokenAddress)
+        PurchaseMoc(mocProxyAddress, FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}), initialOwner)
     {}
 }

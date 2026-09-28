@@ -42,7 +42,7 @@ via_ir = true
 [profile.deploy.fuzz]
 runs = 1000
 
-# LayerBankErc20HandlerDexTest.t.sol trips a via_ir/Yul stack-too-deep ("Variable size is
+# LayerBankHandlerDexTest.t.sol trips a via_ir/Yul stack-too-deep ("Variable size is
 # 1 too deep in the stack ... memoryguard was present"): it is the one HandlerTestHarness subclass that
 # is simultaneously a Dex handler and a LayerBank lending handler, and via_ir compiles a contract's full
 # inherited call graph together — that combination overflows the Yul optimizer's stack allocator for
@@ -61,7 +61,7 @@ optimizer_runs = 200        # optimizer settings, and without them legacy codege
                              # stack-too-deep (see docs/relaunch/R55-solx-and-ir-evaluation.md)
 
 [[profile.deploy.compilation_restrictions]]
-paths = "test/ai-generated/unit/layerbank/LayerBankErc20HandlerDexTest.t.sol"
+paths = "test/ai-generated/unit/layerbank/LayerBankHandlerDexTest.t.sol"
 via_ir = false
 
 # Vendored ABIs stay byte-diffable against upstream (AGENTS.md). Only IkToken is currently

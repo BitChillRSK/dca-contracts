@@ -4,12 +4,12 @@ pragma solidity 0.8.36;
 import {Test, console} from "forge-std/Test.sol";
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {PurchaseUniswap} from "../../src/PurchaseUniswap.sol";
-import {FeeHandler} from "../../src/FeeHandler.sol";
+import {PurchaseFees} from "../../src/PurchaseFees.sol";
 import {DcaManagerAccessControl} from "../../src/DcaManagerAccessControl.sol";
-import {IdleErc20HandlerDex} from "../../src/idle/IdleErc20HandlerDex.sol";
+import {IdleHandlerDex} from "../../src/idle/IdleHandlerDex.sol";
 import {IPurchaseUniswap} from "../../src/interfaces/IPurchaseUniswap.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
-import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "../../src/interfaces/IPurchaseFees.sol";
 import {ICoinPairPrice} from "../../src/interfaces/ICoinPairPrice.sol";
 import {IWRBTC} from "../../src/interfaces/IWRBTC.sol";
 import {IUniswapV3SwapRouter} from "../../src/interfaces/IUniswapV3SwapRouter.sol";
@@ -252,7 +252,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
             swapPoolFeeRates: poolFeeRates,
             mocOracle: ICoinPairPrice(address(0))
         });
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE_TEST,
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -260,7 +260,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         });
 
         vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__InvalidOracleAddress.selector);
-        new IdleErc20HandlerDex(
+        new IdleHandlerDex(
             address(this),
             address(stablecoin),
             uniswapSettings,

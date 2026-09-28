@@ -13,7 +13,7 @@ import {scheduleAt} from "test/utils/ScheduleAt.sol";
  * @notice Two versioned lending routes backed by two distinct handlers keep independent
  *         principal and share accounting.
  * @dev **This is not a guard on R47's uniqueness check.** It passes with that check removed,
- *      because R47 makes the shared-handler state unconstructible through `assignTokenHandler`:
+ *      because R47 makes the shared-handler state unconstructible through `assignHandler`:
  *      once one address cannot back two pairs, no test driving the public API can reach the bug.
  *      The guards on the check itself are the `testHandlerAddressCannotBe*` cases in
  *      `OperationsAdminTest`, which do fail without it.
@@ -71,8 +71,8 @@ contract VersionedRouteAccountingTest is BaseDeploymentTest {
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(ROUTE_V1, true);
         operationsAdmin.registerRoute(ROUTE_V2, true);
-        operationsAdmin.assignTokenHandler(docTokenAddress, ROUTE_V1, address(handlerV1));
-        operationsAdmin.assignTokenHandler(docTokenAddress, ROUTE_V2, address(handlerV2));
+        operationsAdmin.assignHandler(docTokenAddress, ROUTE_V1, address(handlerV1));
+        operationsAdmin.assignHandler(docTokenAddress, ROUTE_V2, address(handlerV2));
         vm.stopPrank();
 
         docToken.mint(USER, DEPOSIT_V1 + DEPOSIT_V2);
@@ -90,8 +90,8 @@ contract VersionedRouteAccountingTest is BaseDeploymentTest {
         assertGt(handlerV2.getUserShares(USER), 0);
         // Shares track each route's own deposit, so the larger deposit holds the larger balance.
         assertGt(handlerV1.getUserShares(USER), handlerV2.getUserShares(USER));
-        assertEq(operationsAdmin.getTokenHandler(address(docToken), ROUTE_V1), address(handlerV1), "route v1 handler");
-        assertEq(operationsAdmin.getTokenHandler(address(docToken), ROUTE_V2), address(handlerV2), "route v2 handler");
+        assertEq(operationsAdmin.getHandler(address(docToken), ROUTE_V1), address(handlerV1), "route v1 handler");
+        assertEq(operationsAdmin.getHandler(address(docToken), ROUTE_V2), address(handlerV2), "route v2 handler");
         assertTrue(address(handlerV1) != address(handlerV2), "R47 forbids one address at both routes");
     }
 

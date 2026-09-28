@@ -2,8 +2,8 @@
 pragma solidity 0.8.36;
 
 import {Test, console2} from "forge-std/Test.sol";
-import {FeeHandler} from "src/FeeHandler.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {PurchaseFees} from "src/PurchaseFees.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -31,7 +31,7 @@ contract R87FeeTransferredRemovalGasTest is Test {
 
     function setUp() public {
         token = new MockStablecoin(address(this));
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: 100, maxFeeRate: 100, feePurchaseLowerBound: 1000 ether, feePurchaseUpperBound: 100_000 ether
         });
         current = new FeeTransferCurrent(address(0xFEE), feeSettings, address(this));
@@ -63,9 +63,9 @@ contract R87FeeTransferredRemovalGasTest is Test {
     }
 }
 
-contract FeeTransferCurrent is FeeHandler {
+contract FeeTransferCurrent is PurchaseFees {
     constructor(address feeCollector, FeeSettings memory feeSettings, address initialOwner)
-        FeeHandler(feeCollector, feeSettings, initialOwner)
+        PurchaseFees(feeCollector, feeSettings, initialOwner)
     {}
 
     function exposedTransferFee(IERC20 token, uint256 fee) external {
@@ -74,19 +74,19 @@ contract FeeTransferCurrent is FeeHandler {
 }
 
 /// @dev Pre-removal `_transferFee` body: direct storage read, transfer, custom event.
-contract FeeTransferBaseline is FeeHandler {
+contract FeeTransferBaseline is PurchaseFees {
     using SafeERC20 for IERC20;
 
-    event FeeHandler__FeeTransferred(address indexed token, address indexed collector, uint256 amount);
+    event PurchaseFees__FeeTransferred(address indexed token, address indexed collector, uint256 amount);
 
     constructor(address feeCollector, FeeSettings memory feeSettings, address initialOwner)
-        FeeHandler(feeCollector, feeSettings, initialOwner)
+        PurchaseFees(feeCollector, feeSettings, initialOwner)
     {}
 
     function exposedTransferFee(IERC20 token, uint256 fee) external {
         if (fee == 0) return;
         address collector = s_feeCollector;
         token.safeTransfer(collector, fee);
-        emit FeeHandler__FeeTransferred(address(token), collector, fee);
+        emit PurchaseFees__FeeTransferred(address(token), collector, fee);
     }
 }

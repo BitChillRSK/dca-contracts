@@ -3,12 +3,12 @@ pragma solidity 0.8.36;
 
 import {HandlerTestHarness} from "../HandlerTestHarness.t.sol";
 import {ITokenHandler} from "../../../../src/interfaces/ITokenHandler.sol";
-import {IFeeHandler} from "../../../../src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "../../../../src/interfaces/IPurchaseFees.sol";
 import {IPurchaseUniswap} from "../../../../src/interfaces/IPurchaseUniswap.sol";
 import {IWRBTC} from "../../../../src/interfaces/IWRBTC.sol";
 import {IUniswapV3SwapRouter} from "../../../../src/interfaces/IUniswapV3SwapRouter.sol";
 import {ICoinPairPrice} from "../../../../src/interfaces/ICoinPairPrice.sol";
-import {SovrynErc20HandlerDex} from "../../../../src/sovryn/SovrynErc20HandlerDex.sol";
+import {SovrynHandlerDex} from "../../../../src/sovryn/SovrynHandlerDex.sol";
 import {MockIsusdToken} from "../../../mocks/MockIsusdToken.sol";
 import {MockWrbtcToken} from "../../../mocks/MockWrbtcToken.sol";
 import {MockMocOracle} from "../../../mocks/MockMocOracle.sol";
@@ -20,10 +20,10 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {ownableUnauthorized} from "../../../utils/OzRevert.sol";
 
 /**
- * @title SovrynErc20HandlerDexTest
- * @notice Unit tests for SovrynErc20HandlerDex (DEX variant) using shared test harness
+ * @title SovrynHandlerDexTest
+ * @notice Unit tests for SovrynHandlerDex (DEX variant) using shared test harness
  */
-contract SovrynErc20HandlerDexTest is HandlerTestHarness {
+contract SovrynHandlerDexTest is HandlerTestHarness {
     event PurchaseUniswap__AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
     event PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(uint256 oldValue, uint256 newValue);
 
@@ -32,14 +32,14 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
     MockWrbtcToken public wrbtcToken;
     MockMocOracle public mocOracle;
     MockSwapRouter02 public mockRouter;
-    SovrynErc20HandlerDex public sovrynDexHandler;
+    SovrynHandlerDex public sovrynDexHandler;
 
     /*//////////////////////////////////////////////////////////////
                            HANDLER-SPECIFIC IMPLEMENTATIONS
     //////////////////////////////////////////////////////////////*/
 
     function deployHandler() internal override returns (ITokenHandler) {
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE_TEST,
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -58,7 +58,7 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
             mocOracle: ICoinPairPrice(address(mocOracle))
         });
 
-        sovrynDexHandler = new SovrynErc20HandlerDex(
+        sovrynDexHandler = new SovrynHandlerDex(
             address(dcaManager),
             address(stablecoin),
             address(iSusdToken),
@@ -199,13 +199,13 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
     }
 
     function test_sovrynDex_constructor_allows_hundred_percent() public {
-        SovrynErc20HandlerDex handler = _deploySovrynDexWithSlippage(1 ether, 1 ether);
+        SovrynHandlerDex handler = _deploySovrynDexWithSlippage(1 ether, 1 ether);
         assertEq(handler.getAmountOutMinimumPercent(), 1 ether);
         assertEq(handler.getAmountOutMinimumSafetyCheck(), 1 ether);
     }
 
     function test_sovrynDex_constructor_allows_equal_percent_and_safety() public {
-        SovrynErc20HandlerDex handler = _deploySovrynDexWithSlippage(0.99 ether, 0.99 ether);
+        SovrynHandlerDex handler = _deploySovrynDexWithSlippage(0.99 ether, 0.99 ether);
         assertEq(handler.getAmountOutMinimumPercent(), 0.99 ether);
         assertEq(handler.getAmountOutMinimumSafetyCheck(), 0.99 ether);
     }
@@ -572,9 +572,9 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
 
     function _deploySovrynDexWithSlippage(uint256 amountOutMinimumPercent, uint256 amountOutMinimumSafetyCheck)
         private
-        returns (SovrynErc20HandlerDex)
+        returns (SovrynHandlerDex)
     {
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE_TEST,
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -593,7 +593,7 @@ contract SovrynErc20HandlerDexTest is HandlerTestHarness {
             mocOracle: ICoinPairPrice(address(mocOracle))
         });
 
-        return new SovrynErc20HandlerDex(
+        return new SovrynHandlerDex(
             address(dcaManager),
             address(stablecoin),
             address(iSusdToken),

@@ -10,10 +10,10 @@ import {OperationsAdmin} from "../src/OperationsAdmin.sol";
 import {IdleDocHandlerMoc} from "../src/idle/IdleDocHandlerMoc.sol";
 import {LayerBankDocHandlerMoc} from "../src/layerbank/LayerBankDocHandlerMoc.sol";
 import {SovrynDocHandlerMoc} from "../src/sovryn/SovrynDocHandlerMoc.sol";
-import {IdleErc20HandlerDex} from "../src/idle/IdleErc20HandlerDex.sol";
-import {LayerBankErc20HandlerDex} from "../src/layerbank/LayerBankErc20HandlerDex.sol";
+import {IdleHandlerDex} from "../src/idle/IdleHandlerDex.sol";
+import {LayerBankHandlerDex} from "../src/layerbank/LayerBankHandlerDex.sol";
 import {IPurchaseUniswap} from "../src/interfaces/IPurchaseUniswap.sol";
-import {IFeeHandler} from "../src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "../src/interfaces/IPurchaseFees.sol";
 import {IWRBTC} from "../src/interfaces/IWRBTC.sol";
 import {IUniswapV3SwapRouter} from "../src/interfaces/IUniswapV3SwapRouter.sol";
 import {ICoinPairPrice} from "../src/interfaces/ICoinPairPrice.sol";
@@ -129,13 +129,13 @@ contract DeployFinal is DeployBase {
         _allowUsdrifAltPath(s_stack.usdrifIdle);
         _allowUsdrifAltPath(s_stack.usdrifLayerBank);
 
-        operationsAdmin.assignTokenHandler(s_cfg.doc, IDLE_INDEX, s_stack.docIdle);
-        operationsAdmin.assignTokenHandler(s_cfg.doc, LAYERBANK_INDEX, s_stack.docLayerBank);
-        operationsAdmin.assignTokenHandler(s_cfg.doc, SOVRYN_INDEX, s_stack.docSovryn);
-        operationsAdmin.assignTokenHandler(s_cfg.usdrif, IDLE_INDEX, s_stack.usdrifIdle);
-        operationsAdmin.assignTokenHandler(s_cfg.usdrif, LAYERBANK_INDEX, s_stack.usdrifLayerBank);
-        operationsAdmin.assignTokenHandler(s_cfg.usdt0, IDLE_INDEX, s_stack.usdt0Idle);
-        operationsAdmin.assignTokenHandler(s_cfg.usdt0, LAYERBANK_INDEX, s_stack.usdt0LayerBank);
+        operationsAdmin.assignHandler(s_cfg.doc, IDLE_INDEX, s_stack.docIdle);
+        operationsAdmin.assignHandler(s_cfg.doc, LAYERBANK_INDEX, s_stack.docLayerBank);
+        operationsAdmin.assignHandler(s_cfg.doc, SOVRYN_INDEX, s_stack.docSovryn);
+        operationsAdmin.assignHandler(s_cfg.usdrif, IDLE_INDEX, s_stack.usdrifIdle);
+        operationsAdmin.assignHandler(s_cfg.usdrif, LAYERBANK_INDEX, s_stack.usdrifLayerBank);
+        operationsAdmin.assignHandler(s_cfg.usdt0, IDLE_INDEX, s_stack.usdt0Idle);
+        operationsAdmin.assignHandler(s_cfg.usdt0, LAYERBANK_INDEX, s_stack.usdt0LayerBank);
 
         _proposeFinalOwner(address(operationsAdmin));
         _proposeFinalOwner(address(dcaManager));
@@ -212,7 +212,7 @@ contract DeployFinal is DeployBase {
 
     function _newDexIdle(address dcaManager, address owner, bool isUsdt0) private returns (address) {
         return address(
-            new IdleErc20HandlerDex(
+            new IdleHandlerDex(
                 dcaManager,
                 isUsdt0 ? s_cfg.usdt0 : s_cfg.usdrif,
                 _uniswapSettings(isUsdt0),
@@ -227,7 +227,7 @@ contract DeployFinal is DeployBase {
 
     function _newDexLayerBank(address dcaManager, address owner, bool isUsdt0) private returns (address) {
         return address(
-            new LayerBankErc20HandlerDex(
+            new LayerBankHandlerDex(
                 dcaManager,
                 isUsdt0 ? s_cfg.usdt0 : s_cfg.usdrif,
                 isUsdt0 ? s_cfg.usdt0LayerBankAToken : s_cfg.usdrifLayerBankAToken,
@@ -248,8 +248,8 @@ contract DeployFinal is DeployBase {
             .setPurchasePathAllowed(s_cfg.usdrifAltIntermediateTokens, s_cfg.usdrifAltPoolFeeRates, true);
     }
 
-    function _docFeeSettings() private view returns (IFeeHandler.FeeSettings memory) {
-        return IFeeHandler.FeeSettings({
+    function _docFeeSettings() private view returns (IPurchaseFees.FeeSettings memory) {
+        return IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: getMaxFeeRate(),
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -257,8 +257,8 @@ contract DeployFinal is DeployBase {
         });
     }
 
-    function _usdt0FeeSettings() private view returns (IFeeHandler.FeeSettings memory) {
-        return IFeeHandler.FeeSettings({
+    function _usdt0FeeSettings() private view returns (IPurchaseFees.FeeSettings memory) {
+        return IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: getMaxFeeRate(),
             feePurchaseLowerBound: USDT0_FEE_PURCHASE_LOWER_BOUND,

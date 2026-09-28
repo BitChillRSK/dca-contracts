@@ -85,7 +85,7 @@ contract DcaScheduleTest is DcaDappTest {
 
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(zeroTokenRoute, false);
-        operationsAdmin.assignTokenHandler(address(0), zeroTokenRoute, address(zeroTokenHandler));
+        operationsAdmin.assignHandler(address(0), zeroTokenRoute, address(zeroTokenHandler));
         vm.stopPrank();
 
         vm.expectRevert(

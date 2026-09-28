@@ -68,9 +68,9 @@ contract WithdrawAllRoutePairsTest is BaseDeploymentTest {
         operationsAdmin.registerRoute(ROUTE_ONE, true);
         operationsAdmin.registerRoute(ROUTE_TWO, true);
         dcaManager.setTokenMinPurchaseAmount(address(tokenTwo), MIN_PURCHASE_AMOUNT);
-        operationsAdmin.assignTokenHandler(address(tokenOne), ROUTE_ONE, address(handlerOneOne));
-        operationsAdmin.assignTokenHandler(address(tokenTwo), ROUTE_TWO, address(handlerTwoTwo));
-        operationsAdmin.assignTokenHandler(address(tokenOne), ROUTE_TWO, address(handlerOneTwo));
+        operationsAdmin.assignHandler(address(tokenOne), ROUTE_ONE, address(handlerOneOne));
+        operationsAdmin.assignHandler(address(tokenTwo), ROUTE_TWO, address(handlerTwoTwo));
+        operationsAdmin.assignHandler(address(tokenOne), ROUTE_TWO, address(handlerOneTwo));
         vm.stopPrank();
         // (tokenTwo, ROUTE_ONE) stays unassigned: the fourth cell of the grid.
 
@@ -120,9 +120,7 @@ contract WithdrawAllRoutePairsTest is BaseDeploymentTest {
 
         // The cross pair is never resolved and its handler is never called.
         vm.expectCall(
-            address(operationsAdmin),
-            abi.encodeCall(IOperationsAdmin.getTokenHandler, (address(tokenOne), ROUTE_TWO)),
-            0
+            address(operationsAdmin), abi.encodeCall(IOperationsAdmin.getHandler, (address(tokenOne), ROUTE_TWO)), 0
         );
         vm.expectCall(address(handlerOneTwo), abi.encodeWithSelector(ILendingHandler.withdrawInterest.selector), 0);
         // One lending-class lookup per pair, not one per combination: the cartesian form made four.
@@ -151,9 +149,7 @@ contract WithdrawAllRoutePairsTest is BaseDeploymentTest {
         vm.expectCall(address(handlerTwoTwo), balanceCall, 1);
         vm.expectCall(address(handlerOneTwo), balanceCall, 0);
         vm.expectCall(
-            address(operationsAdmin),
-            abi.encodeCall(IOperationsAdmin.getTokenHandler, (address(tokenOne), ROUTE_TWO)),
-            0
+            address(operationsAdmin), abi.encodeCall(IOperationsAdmin.getHandler, (address(tokenOne), ROUTE_TWO)), 0
         );
 
         vm.prank(USER);

@@ -2,9 +2,9 @@
 pragma solidity 0.8.36;
 
 import {Test, console2, Vm} from "forge-std/Test.sol";
-import {IdleErc20Handler} from "src/idle/IdleErc20Handler.sol";
+import {IdleHandler} from "src/idle/IdleHandler.sol";
 import {TokenHandler} from "src/TokenHandler.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import "test/Constants.sol";
 
@@ -124,9 +124,9 @@ contract R87IdleLedgerRemovalGasTest is Test {
     }
 }
 
-contract IdleGasHarness is IdleErc20Handler {
+contract IdleGasHarness is IdleHandler {
     constructor(address dcaManagerAddress, address stableTokenAddress)
-        IdleErc20Handler(dcaManagerAddress, stableTokenAddress)
+        IdleHandler(dcaManagerAddress, stableTokenAddress)
     {}
 
     function exposedBatchRetrieve(address[] calldata users, uint256[] calldata purchaseAmounts)

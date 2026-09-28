@@ -77,7 +77,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
 
     /**
      * @param uniswapSettings the settings for the uniswap router
-     * @param feeHandlerConfig Collector and interpolated fee settings.
+     * @param feeConfig Collector and interpolated fee settings.
      * @param amountOutMinimumPercent The swap-time oracle floor
      *        (deploy default: `DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT`)
      * @param amountOutMinimumSafetyCheck The lowest floor the owner may later configure
@@ -91,11 +91,11 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      */
     constructor(
         UniswapSettings memory uniswapSettings,
-        FeeHandlerConfig memory feeHandlerConfig,
+        FeeConfig memory feeConfig,
         uint256 amountOutMinimumPercent,
         uint256 amountOutMinimumSafetyCheck,
         address initialOwner
-    ) PurchaseRbtc(feeHandlerConfig, initialOwner) {
+    ) PurchaseRbtc(feeConfig, initialOwner) {
         if (address(uniswapSettings.mocOracle) == address(0)) {
             revert PurchaseUniswap__InvalidOracleAddress();
         }

@@ -2,7 +2,7 @@
 pragma solidity 0.8.36;
 
 import {Test, console2} from "forge-std/Test.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {PurchaseRbtcHarness} from "test/unit/PurchaseRbtcTest.t.sol";
 import {NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
@@ -42,7 +42,7 @@ contract R77AccumulatedRbtcSentinelGasTest is Test {
 
     function setUp() public {
         token = new MockStablecoin(address(this));
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: FLAT_FEE_RATE,
             maxFeeRate: FLAT_FEE_RATE,
             feePurchaseLowerBound: 1000 ether,
@@ -126,7 +126,7 @@ contract R77AccumulatedRbtcSentinelGasTest is Test {
     }
 
     /// @dev Test probe into private `s_usersAccumulatedRbtc` (slot 4 on this harness layout).
-    ///      Re-check with `forge inspect PurchaseRbtcHarness storage-layout` if FeeHandler packing moves.
+    ///      Re-check with `forge inspect PurchaseRbtcHarness storage-layout` if PurchaseFees packing moves.
     function _rawAccumulatedRbtc(address user) private view returns (uint256) {
         return uint256(vm.load(address(harness), keccak256(abi.encode(user, uint256(4)))));
     }

@@ -3,10 +3,10 @@ pragma solidity 0.8.36;
 
 import {HandlerTestHarness} from "../HandlerTestHarness.t.sol";
 import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
-import {LayerBankErc20Handler} from "src/layerbank/LayerBankErc20Handler.sol";
-import {FeeHandler} from "src/FeeHandler.sol";
-import {ILayerBankErc20Handler} from "src/layerbank/ILayerBankErc20Handler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
+import {LayerBankHandler} from "src/layerbank/LayerBankHandler.sol";
+import {PurchaseFees} from "src/PurchaseFees.sol";
+import {ILayerBankHandler} from "src/layerbank/ILayerBankHandler.sol";
 import {MockLayerBankAToken, MockLayerBankPool} from "test/mocks/MockLayerBank.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -15,16 +15,16 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import "test/Constants.sol";
 
 /**
- * @title LayerBankErc20HandlerTest
- * @notice Unit tests for LayerBankErc20Handler using the shared handler harness.
+ * @title LayerBankHandlerTest
+ * @notice Unit tests for LayerBankHandler using the shared handler harness.
  */
-contract LayerBankErc20HandlerTest is HandlerTestHarness {
+contract LayerBankHandlerTest is HandlerTestHarness {
     MockLayerBankAToken public aToken;
     MockLayerBankPool public pool;
     LayerBankTestHandler public layerbankHandler;
 
     function deployHandler() internal override returns (ITokenHandler) {
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE_TEST,
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -68,14 +68,14 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
 
     function test_layerbank_constructor_revertsIfPoolUnset() public {
         MockLayerBankAToken unset = new MockLayerBankAToken(address(stablecoin));
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE_TEST,
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
             feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
         });
 
-        vm.expectRevert(ILayerBankErc20Handler.LayerBankErc20Handler__PoolNotSet.selector);
+        vm.expectRevert(ILayerBankHandler.LayerBankHandler__PoolNotSet.selector);
         new LayerBankTestHandler(
             address(dcaManager), address(stablecoin), address(unset), FEE_COLLECTOR, feeSettings, OWNER
         );
@@ -87,14 +87,14 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
         MockLayerBankPool mismatchPool = new MockLayerBankPool(mismatch);
         mismatch.setPool(address(mismatchPool));
 
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE_TEST,
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
             feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
         });
 
-        vm.expectRevert(ILayerBankErc20Handler.LayerBankErc20Handler__UnderlyingMismatch.selector);
+        vm.expectRevert(ILayerBankHandler.LayerBankHandler__UnderlyingMismatch.selector);
         new LayerBankTestHandler(
             address(dcaManager), address(stablecoin), address(mismatch), FEE_COLLECTOR, feeSettings, OWNER
         );
@@ -458,7 +458,7 @@ contract LayerBankErc20HandlerTest is HandlerTestHarness {
     }
 }
 
-contract LayerBankTestHandler is LayerBankErc20Handler, FeeHandler {
+contract LayerBankTestHandler is LayerBankHandler, PurchaseFees {
     constructor(
         address dcaManagerAddress,
         address stableTokenAddress,
@@ -467,8 +467,8 @@ contract LayerBankTestHandler is LayerBankErc20Handler, FeeHandler {
         FeeSettings memory feeSettings,
         address initialOwner
     )
-        LayerBankErc20Handler(dcaManagerAddress, stableTokenAddress, aTokenAddress)
-        FeeHandler(feeCollector, feeSettings, initialOwner)
+        LayerBankHandler(dcaManagerAddress, stableTokenAddress, aTokenAddress)
+        PurchaseFees(feeCollector, feeSettings, initialOwner)
     {}
 
     function testBatchRetrieveStablecoin(address[] calldata users, uint256[] calldata purchaseAmounts)

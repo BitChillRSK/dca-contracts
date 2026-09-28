@@ -6,7 +6,7 @@ import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {Vm} from "forge-std/Test.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import {ILendingHandler} from "../../src/interfaces/ILendingHandler.sol";
-import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "../../src/interfaces/IPurchaseFees.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {MockIsusdToken} from "../mocks/MockIsusdToken.sol";
 import {toBatch} from "../utils/BatchBuyOne.sol";
@@ -421,7 +421,7 @@ contract NetRedemptionTest is DcaDappTest {
             anchorsBefore[i] = schedule.cadenceAnchor;
         }
 
-        address feeCollector = IFeeHandler(address(stablecoinHandler)).getFeeCollectorAddress();
+        address feeCollector = IPurchaseFees(address(stablecoinHandler)).getFeeCollectorAddress();
         uint256 feeCollectorBefore = stablecoin.balanceOf(feeCollector);
         uint256 userSharesBefore = ILendingHandler(address(stablecoinHandler)).getUserShares(USER);
         uint256 iTokenBefore = shareToken.balanceOf(address(stablecoinHandler));

@@ -5,11 +5,11 @@ import {LendingHandler} from "../LendingHandler.sol";
 import {IiSusdToken} from "./IiSusdToken.sol";
 
 /**
- * @title SovrynErc20Handler
+ * @title SovrynHandler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Sovryn adapter: iSUSD mint/burn. Share accounting lives on LendingHandler.
  */
-abstract contract SovrynErc20Handler is LendingHandler {
+abstract contract SovrynHandler is LendingHandler {
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/

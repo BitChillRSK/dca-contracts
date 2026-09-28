@@ -46,10 +46,10 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
 
         vm.startPrank(OWNER);
         operationsAdmin.addSwapper(SWAPPER);
-        if (operationsAdmin.getTokenHandler(address(docToken), IDLE_INDEX) == address(0)) {
-            operationsAdmin.assignTokenHandler(address(docToken), IDLE_INDEX, address(handler));
+        if (operationsAdmin.getHandler(address(docToken), IDLE_INDEX) == address(0)) {
+            operationsAdmin.assignHandler(address(docToken), IDLE_INDEX, address(handler));
         } else {
-            handler = IdleDocHandlerMoc(payable(operationsAdmin.getTokenHandler(address(docToken), IDLE_INDEX)));
+            handler = IdleDocHandlerMoc(payable(operationsAdmin.getHandler(address(docToken), IDLE_INDEX)));
         }
         vm.stopPrank();
 
@@ -130,7 +130,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
 
         vm.prank(OWNER);
-        operationsAdmin.assignTokenHandler(address(docToken), lendingIndex, lendingHandler);
+        operationsAdmin.assignHandler(address(docToken), lendingIndex, lendingHandler);
 
         vm.prank(USER);
         docToken.approve(lendingHandler, type(uint256).max);
@@ -169,7 +169,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
 
         vm.prank(OWNER);
-        operationsAdmin.assignTokenHandler(address(docToken), lendingIndex, lendingHandler);
+        operationsAdmin.assignHandler(address(docToken), lendingIndex, lendingHandler);
 
         vm.startPrank(USER);
         docToken.approve(lendingHandler, type(uint256).max);
@@ -197,7 +197,7 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         dcaManager.createDcaSchedule(address(docToken), DEPOSIT, PURCHASE, MIN_PURCHASE_PERIOD, IDLE_INDEX);
 
         vm.prank(OWNER);
-        operationsAdmin.assignTokenHandler(address(docToken), lendingIndex, lendingHandler);
+        operationsAdmin.assignHandler(address(docToken), lendingIndex, lendingHandler);
 
         vm.prank(USER);
         docToken.approve(lendingHandler, type(uint256).max);

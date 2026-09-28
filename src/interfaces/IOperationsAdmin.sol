@@ -34,7 +34,7 @@ interface IOperationsAdmin {
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
     /// @notice A handler was assigned to a `(token, routeIndex)` pair. Add-only.
-    event OperationsAdmin__TokenHandlerAssigned(address indexed token, uint256 routeIndex, address indexed handler);
+    event OperationsAdmin__HandlerAssigned(address indexed token, uint256 routeIndex, address indexed handler);
     /// @notice A route index was classified as idle (`lends == false`) or lending. One-shot.
     event OperationsAdmin__RouteRegistered(uint256 index, bool lends);
     /// @notice `swapper` was added to the allowlist. Idempotent.
@@ -94,7 +94,7 @@ interface IOperationsAdmin {
      *      routes reject it. The handler's `i_stableToken()` must be `token`, and its
      *      `i_dcaManager()` must be pinned to this registry. One handler address may back only one pair.
      */
-    function assignTokenHandler(address token, uint256 routeIndex, address handler) external;
+    function assignHandler(address token, uint256 routeIndex, address handler) external;
 
     /**
      * @notice Pause or unpause new stablecoin deposits for one assigned `(token, routeIndex)` pair.
@@ -143,7 +143,7 @@ interface IOperationsAdmin {
      * @param routeIndex The route index. Must fit `uint32`.
      * @return handler The TokenHandler, or `address(0)` if none is assigned.
      */
-    function getTokenHandler(address token, uint256 routeIndex) external view returns (address handler);
+    function getHandler(address token, uint256 routeIndex) external view returns (address handler);
 
     /**
      * @notice Whether new deposits to `(token, routeIndex)` are currently blocked.

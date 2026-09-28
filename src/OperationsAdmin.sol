@@ -76,7 +76,7 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
      *      must be `token`, and one handler address may back only one pair. A handler pinned to another
      *      DcaManager would take the pair for good while every deposit through it reverts.
      */
-    function assignTokenHandler(address token, uint256 routeIndex, address handler) external onlyOwner {
+    function assignHandler(address token, uint256 routeIndex, address handler) external onlyOwner {
         uint32 route = routeIndex.toUint32();
         if (handler.code.length == 0) revert OperationsAdmin__EoaCannotBeHandler(handler);
         RouteClass routeClass = s_routeClass[route];
@@ -109,7 +109,7 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
 
         s_tokenRoute[token][route].handler = handler;
         s_handlerAssigned[handler] = true;
-        emit OperationsAdmin__TokenHandlerAssigned(token, route, handler);
+        emit OperationsAdmin__HandlerAssigned(token, route, handler);
     }
 
     /**
@@ -160,7 +160,7 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
     }
 
     /// @inheritdoc IOperationsAdmin
-    function getTokenHandler(address token, uint256 routeIndex) external view returns (address) {
+    function getHandler(address token, uint256 routeIndex) external view returns (address) {
         return s_tokenRoute[token][routeIndex.toUint32()].handler;
     }
 

@@ -4,12 +4,12 @@ pragma solidity 0.8.36;
 
 import {DeployBase} from "./DeployBase.s.sol";
 import {UsdrifHelperConfig} from "./UsdrifHelperConfig.s.sol";
-import {LayerBankErc20HandlerDex} from "../src/layerbank/LayerBankErc20HandlerDex.sol";
+import {LayerBankHandlerDex} from "../src/layerbank/LayerBankHandlerDex.sol";
 import {OperationsAdmin} from "../src/OperationsAdmin.sol";
 import {DcaManager} from "../src/DcaManager.sol";
 import {IOperationsAdmin} from "../src/interfaces/IOperationsAdmin.sol";
 import {IPurchaseUniswap} from "../src/interfaces/IPurchaseUniswap.sol";
-import {IFeeHandler} from "../src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "../src/interfaces/IPurchaseFees.sol";
 import {IWRBTC} from "../src/interfaces/IWRBTC.sol";
 import {IUniswapV3SwapRouter} from "../src/interfaces/IUniswapV3SwapRouter.sol";
 import {ICoinPairPrice} from "../src/interfaces/ICoinPairPrice.sol";
@@ -19,7 +19,7 @@ import "./Constants.sol";
 
 /**
  * @title DeployUsdrifHandler
- * @notice Dex-stable add-on: one `LayerBankErc20HandlerDex` keyed off `STABLECOIN_TYPE` (USDRIF or USDT0).
+ * @notice Dex-stable add-on: one `LayerBankHandlerDex` keyed off `STABLECOIN_TYPE` (USDRIF or USDT0).
  * @dev Replaces the Tropykus USDRIF arm. Live TESTNET/MAINNET (`REAL_DEPLOYMENT=true`) bind the
  *      looked-up LayerBank aToken. `getEnvironment()` returns FORK for a real RSK RPC unless that
  *      env var is set — FORK must not take the live path (test `feeCollector` / 2% cap would
@@ -27,7 +27,7 @@ import "./Constants.sol";
  *      `HandlerAlreadyAssigned` — do not skip. USDT0 live path uses 6-decimal fee bounds and
  *      `setTokenMinPurchaseAmount`. Mainnet add-on: the Foundry EOA is not the Safe, so `run()`
  *      deploys then returns without assigning. The constructor already allowlists the initial path.
- *      The Safe must read `getSwapPath()` and confirm the intended route, then `assignTokenHandler`
+ *      The Safe must read `getSwapPath()` and confirm the intended route, then `assignHandler`
  *      **and** `setTokenMinPurchaseAmount` (USDRIF `25 ether`, USDT0 `25e6`). There is no
  *      protocol-wide default min. See README "Ownership after deploy".
  */
@@ -38,15 +38,15 @@ contract DeployUsdrifHandler is DeployBase {
         address aTokenAddress;
         IPurchaseUniswap.UniswapSettings uniswapSettings;
         address feeCollector;
-        IFeeHandler.FeeSettings feeSettings;
+        IPurchaseFees.FeeSettings feeSettings;
         uint256 amountOutMinimumPercent;
         uint256 amountOutMinimumSafetyCheck;
         address initialOwner;
     }
 
-    function deployLayerBankErc20HandlerDex(DeployParams memory params) public returns (address) {
+    function deployLayerBankHandlerDex(DeployParams memory params) public returns (address) {
         return address(
-            new LayerBankErc20HandlerDex(
+            new LayerBankHandlerDex(
                 params.dcaManagerAddress,
                 params.tokenAddress,
                 params.aTokenAddress,
@@ -62,7 +62,7 @@ contract DeployUsdrifHandler is DeployBase {
 
     /**
      * @notice Deploy Pool/aToken mocks and the dex handler. Used by tests on Anvil and on a fork.
-     * @dev Does not `broadcast` or call `assignTokenHandler`. `run()` broadcasts.
+     * @dev Does not `broadcast` or call `assignHandler`. `run()` broadcasts.
      *      `params.aTokenAddress` is ignored; a fresh mock aToken is bound to `params.tokenAddress`.
      */
     function deployMocksAndHandler(DeployParams memory params) public returns (address handler) {
@@ -70,12 +70,12 @@ contract DeployUsdrifHandler is DeployBase {
         MockLayerBankPool pool = new MockLayerBankPool(aToken);
         aToken.setPool(address(pool));
         params.aTokenAddress = address(aToken);
-        return deployLayerBankErc20HandlerDex(params);
+        return deployLayerBankHandlerDex(params);
     }
 
     /// @notice Live USDT0 uses 6-decimal bounds; Anvil mocks stay 18-decimal so local USDT0 keeps DOC/USDRIF units.
-    function feeSettingsForToken(bool isUsdt0Live) public view returns (IFeeHandler.FeeSettings memory) {
-        return IFeeHandler.FeeSettings({
+    function feeSettingsForToken(bool isUsdt0Live) public view returns (IPurchaseFees.FeeSettings memory) {
+        return IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: getMaxFeeRate(),
             feePurchaseLowerBound: isUsdt0Live ? USDT0_FEE_PURCHASE_LOWER_BOUND : FEE_PURCHASE_LOWER_BOUND,
@@ -128,7 +128,7 @@ contract DeployUsdrifHandler is DeployBase {
             if (params.aTokenAddress == address(0)) {
                 revert("LayerBank aToken address is not configured for this network");
             }
-            handler = deployLayerBankErc20HandlerDex(params);
+            handler = deployLayerBankHandlerDex(params);
         } else {
             revert("DeployUsdrifHandler live path requires REAL_DEPLOYMENT=true");
         }
@@ -180,7 +180,7 @@ contract DeployUsdrifHandler is DeployBase {
             console.log("   stablecoin / intermediate pools / WRBTC route (constructor already allowlisted it)");
             console.log("3. REQUIRED: dcaManager.setTokenMinPurchaseAmount(token, min)");
             console.log("   USDRIF: 25 ether; USDT0: 25e6. There is no protocol-wide default.");
-            console.log("4. assignTokenHandler(token, LAYERBANK_INDEX, handler)");
+            console.log("4. assignHandler(token, LAYERBANK_INDEX, handler)");
             console.log("tokenAddress:", tokenAddress);
             console.log("index:", LAYERBANK_INDEX);
             console.log("handlerAddress:", handler);
@@ -193,7 +193,7 @@ contract DeployUsdrifHandler is DeployBase {
         uint256 minPurchaseAmount = isUsdt0Live ? USDT0_MIN_PURCHASE_AMOUNT : MIN_PURCHASE_AMOUNT;
         dcaManager.setTokenMinPurchaseAmount(tokenAddress, minPurchaseAmount);
         console.log("Token min purchase amount set to", minPurchaseAmount);
-        operationsAdmin.assignTokenHandler(tokenAddress, LAYERBANK_INDEX, handler);
+        operationsAdmin.assignHandler(tokenAddress, LAYERBANK_INDEX, handler);
         console.log("LayerBank dex handler registered with OperationsAdmin at index", LAYERBANK_INDEX);
     }
 }

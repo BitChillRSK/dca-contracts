@@ -3,13 +3,13 @@ pragma solidity 0.8.36;
 
 import {HandlerTestHarness} from "../HandlerTestHarness.t.sol";
 import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
-import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import {IPurchaseUniswap} from "src/interfaces/IPurchaseUniswap.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {IWRBTC} from "src/interfaces/IWRBTC.sol";
 import {IUniswapV3SwapRouter} from "../../../../src/interfaces/IUniswapV3SwapRouter.sol";
 import {ICoinPairPrice} from "src/interfaces/ICoinPairPrice.sol";
-import {LayerBankErc20HandlerDex} from "src/layerbank/LayerBankErc20HandlerDex.sol";
+import {LayerBankHandlerDex} from "src/layerbank/LayerBankHandlerDex.sol";
 import {MockLayerBankAToken, MockLayerBankPool} from "test/mocks/MockLayerBank.sol";
 import {MockWrbtcToken} from "test/mocks/MockWrbtcToken.sol";
 import {MockMocOracle} from "test/mocks/MockMocOracle.sol";
@@ -19,19 +19,19 @@ import {handlerBatchBuyOne} from "test/utils/BatchBuyOne.sol";
 import "test/Constants.sol";
 
 /**
- * @title LayerBankErc20HandlerDexTest
- * @notice Unit tests for LayerBankErc20HandlerDex using the shared handler harness.
+ * @title LayerBankHandlerDexTest
+ * @notice Unit tests for LayerBankHandlerDex using the shared handler harness.
  */
-contract LayerBankErc20HandlerDexTest is HandlerTestHarness {
+contract LayerBankHandlerDexTest is HandlerTestHarness {
     MockLayerBankAToken public aToken;
     MockLayerBankPool public pool;
     MockWrbtcToken public wrbtcToken;
     MockMocOracle public mocOracle;
     MockSwapRouter02 public mockRouter;
-    LayerBankErc20HandlerDex public layerbankDexHandler;
+    LayerBankHandlerDex public layerbankDexHandler;
 
     function deployHandler() internal override returns (ITokenHandler) {
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: MAX_FEE_RATE_TEST,
             feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
@@ -50,7 +50,7 @@ contract LayerBankErc20HandlerDexTest is HandlerTestHarness {
             mocOracle: ICoinPairPrice(address(mocOracle))
         });
 
-        layerbankDexHandler = new LayerBankErc20HandlerDex(
+        layerbankDexHandler = new LayerBankHandlerDex(
             address(dcaManager),
             address(stablecoin),
             address(aToken),
@@ -120,7 +120,7 @@ contract LayerBankErc20HandlerDexTest is HandlerTestHarness {
     /**
      * @notice Virtual scaled books must stay ≤ handler `scaledBalanceOf` after odd-amount
      *         redeems against Aave-like round-nearest `rayDiv` burns. Same property R22
-     *         established on the MoC leaf; the dex leaf shares `LayerBankErc20Handler`.
+     *         established on the MoC leaf; the dex leaf shares `LayerBankHandler`.
      * @dev Flipping `_stablecoinToShares` to `Rounding.Floor` lets `sum(getUserShares)`
      *      drift above `aToken.scaledBalanceOf(handler)` and fails this test.
      */
