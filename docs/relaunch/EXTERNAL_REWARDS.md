@@ -40,7 +40,10 @@ Every lending handler must emit the event after each successful change to its pe
 - a single rBTC purchase;
 - each per-user debit in a batch purchase, including sequential updates when the same user appears more than once.
 
-`previousShares` lets an indexer detect a missed or inconsistent transition. `newShares` is the canonical post-state and must equal `getUserShares(user)` after the transaction. Reverted mutations produce no lasting event.
+`previousShares` lets an indexer detect a missed or inconsistent transition. `newShares` is the
+balance immediately after that transition. When the same user appears more than once in a batch,
+earlier events carry intermediate balances; only the last event for that user equals
+`getUserShares(user)` after the transaction. Reverted mutations produce no lasting event.
 
 No new on-chain `totalShares` counter is required for forwarding. An indexer can sum the latest per-user balances from the event stream and cross-check individual balances through the existing getter. The share token's `balanceOf(handler)` (or LayerBank `scaledBalanceOf`) remains an independent aggregate solvency check, subject to the handler's documented rounding behavior.
 

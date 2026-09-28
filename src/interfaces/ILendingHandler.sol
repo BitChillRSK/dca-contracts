@@ -17,7 +17,9 @@ interface ILendingHandler is ITokenHandler {
 
     /**
      * @notice Canonical per-user virtual lending-share balance after a successful mint or burn.
-     * @dev Only `user` is indexed. `newShares` equals `getUserShares(user)` after the call.
+     * @dev Only `user` is indexed. `newShares` is the balance immediately after this transition.
+     *      When a buyer appears more than once in a batch, earlier events carry intermediate
+     *      balances; only the last event for that user equals `getUserShares(user)` after the call.
      *      Reverted mutations produce no lasting log. Idle handlers do not emit this.
      */
     event LendingHandler__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares);
@@ -104,7 +106,8 @@ interface ILendingHandler is ITokenHandler {
     /**
      * @notice This user's virtual lending-share balance on this handler.
      * @param user Account to query.
-     * @return The booked share balance. Equals `newShares` on the latest `UserSharesUpdated` for `user`.
+     * @return The booked share balance. Equals `newShares` on the latest `UserSharesUpdated` for
+     *         that user (intermediate emits in the same call may differ).
      */
     function getUserShares(address user) external view returns (uint256);
 

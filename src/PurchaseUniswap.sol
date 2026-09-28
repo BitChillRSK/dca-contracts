@@ -59,9 +59,9 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      *      Both are 1e18-scaled; the live floor packs with the oracle, this value starts the next word.
      */
     uint64 internal s_amountOutMinimumSafetyCheck;
-    bytes internal s_swapPath;
+    bytes private s_swapPath;
     /// @dev Active path's intermediate tokens, retained so purchases can detect router-stranded balances.
-    address[] internal s_swapIntermediateTokens;
+    address[] private s_swapIntermediateTokens;
     /// @dev Exact encoded paths this handler may activate. Purchases read `s_swapPath` only.
     mapping(bytes32 pathHash => bool allowed) private s_purchasePathAllowed;
 
