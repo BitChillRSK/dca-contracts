@@ -24,7 +24,7 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     /// @dev Scale of the protocol exchange rate; each adapter passes its own constant.
     uint256 internal immutable i_exchangeRateDecimals;
 
-    mapping(address user => uint256 balance) internal s_shares;
+    mapping(address user => uint256 balance) private s_shares;
 
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
-import {Test, Vm, stdError} from "forge-std/Test.sol";
+import {Test, Vm, stdError, stdStorage, StdStorage} from "forge-std/Test.sol";
 import {LendingHandler} from "src/LendingHandler.sol";
 import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
@@ -17,6 +17,8 @@ import "../Constants.sol";
  *         clamp, interest bounds, and the positive-share zero-payout revert.
  */
 contract LendingHandlerRedeemTest is Test {
+    using stdStorage for StdStorage;
+
     event LendingHandler__WithdrawalAmountAdjusted(
         address indexed user, uint256 originalAmount, uint256 adjustedAmount
     );
@@ -96,7 +98,7 @@ contract LendingHandlerRedeemTest is Test {
         shares = bound(shares, 0, type(uint256).max / rate);
         harness.setExchangeRate(rate);
         if (shares > 0) {
-            harness.creditShares(userA, shares);
+            _creditShares(userA, shares);
         }
 
         uint256 shareBacked = shares * rate / RATE_SCALE;
@@ -122,7 +124,7 @@ contract LendingHandlerRedeemTest is Test {
         rate = bound(rate, 1, type(uint128).max);
         shares = bound(shares, 1, type(uint256).max / rate);
         harness.setExchangeRate(rate);
-        harness.creditShares(userA, shares);
+        _creditShares(userA, shares);
 
         uint256 shareBacked = shares * rate / RATE_SCALE;
         locked = bound(locked, 0, shareBacked);
@@ -700,6 +702,17 @@ contract LendingHandlerRedeemTest is Test {
         }
         harness.batchRetrieveStablecoin(users, amounts);
     }
+
+    /**
+     * @dev Seed virtual books through the public getter slot: `s_shares` is private on the base.
+     *      Also bump the harness's protocol-side share count so redeems have something to burn.
+     */
+    function _creditShares(address user, uint256 shares) private {
+        uint256 previous = harness.getUserShares(user);
+        stdstore.target(address(harness)).sig(harness.getUserShares.selector).with_key(user)
+            .checked_write(previous + shares);
+        harness.addProtocolShares(shares);
+    }
 }
 
 /**
@@ -748,8 +761,7 @@ contract LendingHandlerHarness is LendingHandler {
         revertOnRedeem = enabled;
     }
 
-    function creditShares(address user, uint256 shares) external {
-        s_shares[user] += shares;
+    function addProtocolShares(uint256 shares) external {
         protocolShares += shares;
     }
 
