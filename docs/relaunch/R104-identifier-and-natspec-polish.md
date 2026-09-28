@@ -1,6 +1,6 @@
 # R104 — Identifier polish and NatSpec trim
 
-Status: **in progress** · Assigned: yes · Optional/further-review: no · Stack on: R103 ([R103-handler-taxonomy-renames.md](./R103-handler-taxonomy-renames.md))
+Status: **assigned** · Assigned: yes · Optional/further-review: no · Stack on: R103 ([R103-handler-taxonomy-renames.md](./R103-handler-taxonomy-renames.md)) · PR: [#170](https://github.com/BitChillRSK/dca-contracts/pull/170)
 
 ## Objective
 
