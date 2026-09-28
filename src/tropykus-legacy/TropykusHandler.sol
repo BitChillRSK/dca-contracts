@@ -30,14 +30,14 @@ abstract contract TropykusHandler is LendingHandler, ITropykusHandler {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @param dcaManagerAddress The DcaManager allowed to call this handler.
-     * @param stablecoinAddress The ERC20 stablecoin this handler lends.
-     * @param kTokenAddress Tropykus kToken for that stablecoin.
+     * @param dcaManager The DcaManager allowed to call this handler.
+     * @param stablecoin The ERC20 stablecoin this handler lends.
+     * @param kToken Tropykus kToken for that stablecoin.
      */
-    constructor(address dcaManagerAddress, address stablecoinAddress, address kTokenAddress)
-        LendingHandler(dcaManagerAddress, stablecoinAddress, EXCHANGE_RATE_DECIMALS)
+    constructor(address dcaManager, address stablecoin, address kToken)
+        LendingHandler(dcaManager, stablecoin, EXCHANGE_RATE_DECIMALS)
     {
-        i_kToken = IkToken(kTokenAddress);
+        i_kToken = IkToken(kToken);
         _approveLendingSpender();
     }
 

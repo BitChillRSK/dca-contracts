@@ -649,15 +649,15 @@ contract PurchaseRbtcHarness is PurchaseRbtc {
     bool internal revertOnPurchase;
 
     constructor(
-        address dcaManagerAddress,
-        address tokenAddress,
+        address dcaManager,
+        address stablecoin,
         address feeCollector,
         FeeSettings memory feeSettings,
         address initialOwner
     )
         PurchaseRbtc(FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}), initialOwner)
-        DcaManagerAccessControl(dcaManagerAddress)
-        StablecoinSource(tokenAddress)
+        DcaManagerAccessControl(dcaManager)
+        StablecoinSource(stablecoin)
     {}
 
     function setRbtcOut(uint256 amount) external {

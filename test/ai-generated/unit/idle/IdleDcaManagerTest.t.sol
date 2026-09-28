@@ -41,8 +41,8 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         handler = IdleDocHandlerMoc(
             payable(new DeployIdleHandler().run(helperConfig, address(operationsAdmin), address(dcaManager)))
         );
-        docToken = MockStablecoin(helperConfig.getStablecoinAddress());
-        mocProxy = MockMocProxy(helperConfig.getActiveNetworkConfig().mocProxyAddress);
+        docToken = MockStablecoin(helperConfig.getStablecoin());
+        mocProxy = MockMocProxy(helperConfig.getActiveNetworkConfig().mocProxy);
 
         vm.startPrank(OWNER);
         operationsAdmin.addSwapper(SWAPPER);
@@ -240,11 +240,9 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         if (address(tropykusHandler) != address(0)) {
             return (address(tropykusHandler), TROPYKUS_INDEX);
         }
-        if (
-            docHandlerMocAddress != address(0)
-                && IERC165(docHandlerMocAddress).supportsInterface(type(ILendingHandler).interfaceId)
-        ) {
-            return (docHandlerMocAddress, LAYERBANK_INDEX);
+        if (docHandlerMoc != address(0) && IERC165(docHandlerMoc).supportsInterface(type(ILendingHandler).interfaceId))
+        {
+            return (docHandlerMoc, LAYERBANK_INDEX);
         }
         vm.skip(true);
     }

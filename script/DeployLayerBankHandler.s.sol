@@ -17,7 +17,7 @@ import "./Constants.sol";
  * @title DeployLayerBankHandler
  * @notice Add-on deploy for the index-1 LayerBank DOC + MoC handler, same shape as DeployIdleHandler.
  * @dev Local/Anvil deploys Pool/aToken mocks. Live TESTNET/MAINNET (`REAL_DEPLOYMENT=true`) bind
- *      `MocHelperConfig.layerbankATokenAddress` (handler reads Pool from `aToken.POOL()`).
+ *      `MocHelperConfig.layerbankAToken` (handler reads Pool from `aToken.POOL()`).
  *      `getEnvironment()` returns FORK for a real RSK RPC unless that env var is set — FORK must
  *      not take the live path (test `feeCollector` / 2% cap would permanently occupy `(DOC, 1)`).
  *      Fork tests use `deployMocksAndHandler` (no broadcast). Occupied `(token, LAYERBANK_INDEX)`
@@ -26,7 +26,7 @@ import "./Constants.sol";
 contract DeployLayerBankHandler is DeployBase {
     struct DeployParams {
         address dcaManager;
-        address tokenAddress;
+        address stablecoin;
         address aToken;
         address mocProxy;
         address feeCollector;
@@ -44,7 +44,7 @@ contract DeployLayerBankHandler is DeployBase {
         return address(
             new LayerBankDocHandlerMoc(
                 params.dcaManager,
-                params.tokenAddress,
+                params.stablecoin,
                 params.aToken,
                 params.feeCollector,
                 params.mocProxy,
@@ -60,18 +60,18 @@ contract DeployLayerBankHandler is DeployBase {
      */
     function deployMocksAndHandler(
         address dcaManager,
-        address tokenAddress,
+        address stablecoin,
         address mocProxy,
         address feeCollector,
         address owner
     ) public returns (address handler) {
-        MockLayerBankAToken aToken = new MockLayerBankAToken(tokenAddress);
+        MockLayerBankAToken aToken = new MockLayerBankAToken(stablecoin);
         MockLayerBankPool pool = new MockLayerBankPool(aToken);
         aToken.setPool(address(pool));
         handler = deployLayerBankDocHandlerMoc(
             DeployParams({
                 dcaManager: dcaManager,
-                tokenAddress: tokenAddress,
+                stablecoin: stablecoin,
                 aToken: address(aToken),
                 mocProxy: mocProxy,
                 feeCollector: feeCollector,
@@ -81,54 +81,49 @@ contract DeployLayerBankHandler is DeployBase {
         return handler;
     }
 
-    function run(MocHelperConfig existingConfig, address operationsAdminAddress, address dcaManagerAddress)
+    function run(MocHelperConfig existingConfig, address operationsAdmin, address dcaManager)
         external
         returns (address)
     {
         MocHelperConfig helperConfig = address(existingConfig) != address(0) ? existingConfig : new MocHelperConfig();
 
-        if (operationsAdminAddress == address(0) || dcaManagerAddress == address(0)) {
+        if (operationsAdmin == address(0) || dcaManager == address(0)) {
             revert("OperationsAdmin and DcaManager addresses must be set");
         }
 
         MocHelperConfig.NetworkConfig memory networkConfig = helperConfig.getActiveNetworkConfig();
-        address docTokenAddress = helperConfig.getStablecoinAddress();
-        address mocProxyAddress = networkConfig.mocProxyAddress;
+        address docToken = helperConfig.getStablecoin();
+        address mocProxy = networkConfig.mocProxy;
 
-        console.log("OperationsAdmin address:", operationsAdminAddress);
-        console.log("DcaManager address:", dcaManagerAddress);
-        console.log("DOC token address:", docTokenAddress);
-        console.log("MoC Proxy address:", mocProxyAddress);
+        console.log("OperationsAdmin address:", operationsAdmin);
+        console.log("DcaManager address:", dcaManager);
+        console.log("DOC token address:", docToken);
+        console.log("MoC Proxy address:", mocProxy);
 
-        OperationsAdmin operationsAdmin = OperationsAdmin(operationsAdminAddress);
-        _requireNoPendingOwner(operationsAdmin);
-        _requireNoPendingOwner(DcaManager(dcaManagerAddress));
+        OperationsAdmin opsAdmin = OperationsAdmin(operationsAdmin);
+        _requireNoPendingOwner(opsAdmin);
+        _requireNoPendingOwner(DcaManager(dcaManager));
 
         vm.startBroadcast();
 
         address layerbankHandler;
 
         if (environment == Environment.LOCAL) {
-            layerbankHandler = deployMocksAndHandler(
-                dcaManagerAddress,
-                docTokenAddress,
-                mocProxyAddress,
-                getFeeCollector(environment),
-                operationsAdmin.owner()
-            );
+            layerbankHandler =
+                deployMocksAndHandler(dcaManager, docToken, mocProxy, getFeeCollector(environment), opsAdmin.owner());
         } else if (environment == Environment.TESTNET || environment == Environment.MAINNET) {
-            address aToken = networkConfig.layerbankATokenAddress;
+            address aToken = networkConfig.layerbankAToken;
             if (aToken == address(0)) {
                 revert("LayerBank aToken address is not configured for this network");
             }
             layerbankHandler = deployLayerBankDocHandlerMoc(
                 DeployParams({
-                    dcaManager: dcaManagerAddress,
-                    tokenAddress: docTokenAddress,
+                    dcaManager: dcaManager,
+                    stablecoin: docToken,
                     aToken: aToken,
-                    mocProxy: mocProxyAddress,
+                    mocProxy: mocProxy,
                     feeCollector: getFeeCollector(environment),
-                    initialOwner: operationsAdmin.owner()
+                    initialOwner: opsAdmin.owner()
                 })
             );
         } else {
@@ -137,28 +132,28 @@ contract DeployLayerBankHandler is DeployBase {
         }
 
         console.log("LayerBank DOC handler deployed at:", layerbankHandler);
-        _maybeAssign(operationsAdmin, docTokenAddress, layerbankHandler);
+        _maybeAssign(opsAdmin, docToken, layerbankHandler);
 
         vm.stopBroadcast();
 
         return layerbankHandler;
     }
 
-    function _maybeAssign(OperationsAdmin operationsAdmin, address docTokenAddress, address layerbankHandler) internal {
+    function _maybeAssign(OperationsAdmin operationsAdmin, address docToken, address layerbankHandler) internal {
         bool isOwner = msg.sender == operationsAdmin.owner();
 
         if (!isOwner) {
             console.log("Warning: Deployer is not the owner. Cannot register handler.");
             console.log("Please call operationsAdmin.registerRoute + assignHandler as owner with:");
-            console.log("tokenAddress:", docTokenAddress);
+            console.log("stablecoin:", docToken);
             console.log("index:", LAYERBANK_INDEX);
-            console.log("handlerAddress:", layerbankHandler);
+            console.log("handler:", layerbankHandler);
             return;
         }
         if (operationsAdmin.getRouteClass(LAYERBANK_INDEX) == IOperationsAdmin.RouteClass.Unregistered) {
             operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
         }
-        operationsAdmin.assignHandler(docTokenAddress, LAYERBANK_INDEX, layerbankHandler);
+        operationsAdmin.assignHandler(docToken, LAYERBANK_INDEX, layerbankHandler);
         console.log("LayerBank DOC handler registered with OperationsAdmin at index", LAYERBANK_INDEX);
     }
 }

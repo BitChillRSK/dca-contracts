@@ -24,11 +24,11 @@ abstract contract StablecoinSource is IStablecoinSource {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @param stablecoinAddress The stablecoin this handler holds or lends out.
+     * @param stablecoin The stablecoin this handler holds or lends out.
      */
-    constructor(address stablecoinAddress) {
-        if (stablecoinAddress == address(0)) revert StablecoinSource__ZeroStablecoin();
-        i_stablecoin = IERC20(stablecoinAddress);
+    constructor(address stablecoin) {
+        if (stablecoin == address(0)) revert StablecoinSource__ZeroStablecoin();
+        i_stablecoin = IERC20(stablecoin);
     }
 
     /*//////////////////////////////////////////////////////////////

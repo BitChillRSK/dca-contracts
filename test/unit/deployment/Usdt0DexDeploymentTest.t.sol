@@ -22,11 +22,11 @@ contract DeployUsdrifHandlerHarness is DeployUsdrifHandler {
     function maybeAssign(
         OperationsAdmin operationsAdmin,
         DcaManager dcaManager,
-        address tokenAddress,
+        address stablecoin,
         address handler,
         bool isUsdt0Live
     ) external {
-        _maybeAssign(operationsAdmin, dcaManager, tokenAddress, handler, isUsdt0Live);
+        _maybeAssign(operationsAdmin, dcaManager, stablecoin, handler, isUsdt0Live);
     }
 }
 
@@ -121,9 +121,9 @@ contract Usdt0DexDeploymentTest is Test {
         DeployUsdrifHandler deployer = new DeployUsdrifHandler();
         handler = deployer.deployLayerBankHandlerDex(
             DeployUsdrifHandler.DeployParams({
-                dcaManagerAddress: dcaManager,
-                tokenAddress: usdt0,
-                aTokenAddress: address(aToken),
+                dcaManager: dcaManager,
+                stablecoin: usdt0,
+                aToken: address(aToken),
                 uniswapSettings: IPurchaseUniswap.UniswapSettings({
                     wrbtc: IWRBTC(address(wrbtc)),
                     swapRouter: IUniswapV3SwapRouter(address(new MockSwapRouter02(wrbtc, BTC_PRICE))),

@@ -13,22 +13,22 @@ import {PurchaseMoc} from "../PurchaseMoc.sol";
  */
 contract IdleDocHandlerMoc is IdleHandler, PurchaseMoc {
     /**
-     * @param dcaManagerAddress The DcaManager allowed to call this handler.
-     * @param docTokenAddress Dollar On Chain token.
+     * @param dcaManager The DcaManager allowed to call this handler.
+     * @param docToken Dollar On Chain token.
      * @param feeCollector Address that receives purchase fees.
-     * @param mocProxyAddress Money on Chain proxy.
+     * @param mocProxy Money on Chain proxy.
      * @param feeSettings Linear fee parameters.
      * @param initialOwner Address that owns fee configuration immediately after deploy.
      */
     constructor(
-        address dcaManagerAddress,
-        address docTokenAddress,
+        address dcaManager,
+        address docToken,
         address feeCollector,
-        address mocProxyAddress,
+        address mocProxy,
         FeeSettings memory feeSettings,
         address initialOwner
     )
-        IdleHandler(dcaManagerAddress, docTokenAddress)
-        PurchaseMoc(mocProxyAddress, FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}), initialOwner)
+        IdleHandler(dcaManager, docToken)
+        PurchaseMoc(mocProxy, FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}), initialOwner)
     {}
 }

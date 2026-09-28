@@ -92,8 +92,8 @@ contract TokenKeyedDcaManager is ReentrancyGuard {
         _;
     }
 
-    constructor(address operationsAdminAddress, uint256 minPurchasePeriod, uint256 maxSchedulesPerToken) {
-        i_operationsAdmin = OperationsAdmin(operationsAdminAddress);
+    constructor(address operationsAdmin, uint256 minPurchasePeriod, uint256 maxSchedulesPerToken) {
+        i_operationsAdmin = OperationsAdmin(operationsAdmin);
         s_protocolSettings = IDcaManager.ProtocolSettings({
             minPurchasePeriod: minPurchasePeriod.toUint32(),
             maxSchedulesPerToken: maxSchedulesPerToken.toUint16(),

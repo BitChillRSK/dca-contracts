@@ -15,8 +15,8 @@ contract MockMocProxy {
     string private s_revertFreeDoc;
     uint256 private s_freeDoc = type(uint256).max;
 
-    constructor(address docTokenAddress) {
-        mockDocToken = MockStablecoin(docTokenAddress);
+    constructor(address docToken) {
+        mockDocToken = MockStablecoin(docToken);
     }
 
     function setRevertFreeDoc(string calldata reason) external {

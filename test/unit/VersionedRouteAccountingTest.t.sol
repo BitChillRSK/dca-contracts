@@ -52,35 +52,35 @@ contract VersionedRouteAccountingTest is BaseDeploymentTest {
         }
         super.setUp();
 
-        address docTokenAddress = helperConfig.getStablecoinAddress();
-        docToken = MockStablecoin(docTokenAddress);
-        address mocProxyAddress = helperConfig.getActiveNetworkConfig().mocProxyAddress;
+        address docTokenAddr = helperConfig.getStablecoin();
+        docToken = MockStablecoin(docTokenAddr);
+        address mocProxy = helperConfig.getActiveNetworkConfig().mocProxy;
 
         DeployLayerBankHandler deployer = new DeployLayerBankHandler();
         handlerV1 = LayerBankDocHandlerMoc(
             payable(deployer.deployMocksAndHandler(
-                    address(dcaManager), docTokenAddress, mocProxyAddress, makeAddr(FEE_COLLECTOR_STRING), OWNER
+                    address(dcaManager), docTokenAddr, mocProxy, makeAddr(FEE_COLLECTOR_STRING), OWNER
                 ))
         );
         handlerV2 = LayerBankDocHandlerMoc(
             payable(deployer.deployMocksAndHandler(
-                    address(dcaManager), docTokenAddress, mocProxyAddress, makeAddr(FEE_COLLECTOR_STRING), OWNER
+                    address(dcaManager), docTokenAddr, mocProxy, makeAddr(FEE_COLLECTOR_STRING), OWNER
                 ))
         );
 
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(ROUTE_V1, true);
         operationsAdmin.registerRoute(ROUTE_V2, true);
-        operationsAdmin.assignHandler(docTokenAddress, ROUTE_V1, address(handlerV1));
-        operationsAdmin.assignHandler(docTokenAddress, ROUTE_V2, address(handlerV2));
+        operationsAdmin.assignHandler(docTokenAddr, ROUTE_V1, address(handlerV1));
+        operationsAdmin.assignHandler(docTokenAddr, ROUTE_V2, address(handlerV2));
         vm.stopPrank();
 
         docToken.mint(USER, DEPOSIT_V1 + DEPOSIT_V2);
         vm.startPrank(USER);
         docToken.approve(address(handlerV1), type(uint256).max);
         docToken.approve(address(handlerV2), type(uint256).max);
-        dcaManager.createDcaSchedule(docTokenAddress, DEPOSIT_V1, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, ROUTE_V1);
-        dcaManager.createDcaSchedule(docTokenAddress, DEPOSIT_V2, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, ROUTE_V2);
+        dcaManager.createDcaSchedule(address(docToken), DEPOSIT_V1, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, ROUTE_V1);
+        dcaManager.createDcaSchedule(address(docToken), DEPOSIT_V2, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, ROUTE_V2);
         vm.stopPrank();
     }
 

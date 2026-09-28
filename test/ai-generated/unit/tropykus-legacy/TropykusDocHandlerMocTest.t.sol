@@ -41,7 +41,7 @@ contract TropykusDocHandlerMocTest is Test {
         // Deploy the handler – set dcaManager to this test contract so we can
         // invoke onlyDcaManager functions directly.
         handler = new TropykusDocHandlerMoc(
-            address(this), // dcaManagerAddress
+            address(this), // dcaManager
             address(docToken),
             address(kDocToken),
             FEE_COLLECTOR,

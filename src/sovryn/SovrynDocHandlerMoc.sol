@@ -15,24 +15,24 @@ import {SovrynHandler} from "./SovrynHandler.sol";
  */
 contract SovrynDocHandlerMoc is SovrynHandler, PurchaseMoc {
     /**
-     * @param dcaManagerAddress The DcaManager allowed to call this handler.
-     * @param docTokenAddress Dollar On Chain token.
-     * @param iTokenAddress Sovryn iSUSD token.
+     * @param dcaManager The DcaManager allowed to call this handler.
+     * @param docToken Dollar On Chain token.
+     * @param iToken Sovryn iSUSD token.
      * @param feeCollector Address that receives purchase fees.
-     * @param mocProxyAddress Money on Chain proxy.
+     * @param mocProxy Money on Chain proxy.
      * @param feeSettings Linear fee parameters.
      * @param initialOwner Address that owns fee configuration immediately after deploy.
      */
     constructor(
-        address dcaManagerAddress,
-        address docTokenAddress,
-        address iTokenAddress,
+        address dcaManager,
+        address docToken,
+        address iToken,
         address feeCollector,
-        address mocProxyAddress,
+        address mocProxy,
         FeeSettings memory feeSettings,
         address initialOwner
     )
-        SovrynHandler(dcaManagerAddress, docTokenAddress, iTokenAddress)
-        PurchaseMoc(mocProxyAddress, FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}), initialOwner)
+        SovrynHandler(dcaManager, docToken, iToken)
+        PurchaseMoc(mocProxy, FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}), initialOwner)
     {}
 }

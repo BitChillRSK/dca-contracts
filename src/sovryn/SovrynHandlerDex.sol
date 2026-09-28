@@ -14,9 +14,9 @@ import {SovrynHandler} from "./SovrynHandler.sol";
  */
 contract SovrynHandlerDex is SovrynHandler, PurchaseUniswap {
     /**
-     * @param dcaManagerAddress The DcaManager allowed to call this handler.
-     * @param stablecoinAddress The stablecoin this handler lends.
-     * @param iTokenAddress Sovryn iToken for that stablecoin.
+     * @param dcaManager The DcaManager allowed to call this handler.
+     * @param stablecoin The stablecoin this handler lends.
+     * @param iToken Sovryn iToken for that stablecoin.
      * @param uniswapSettings Router, WRBTC, path, and MoC oracle.
      * @param feeCollector Address that receives purchase fees.
      * @param feeSettings Linear fee parameters.
@@ -25,9 +25,9 @@ contract SovrynHandlerDex is SovrynHandler, PurchaseUniswap {
      * @param initialOwner Address that owns fee/oracle configuration immediately after deploy.
      */
     constructor(
-        address dcaManagerAddress,
-        address stablecoinAddress,
-        address iTokenAddress,
+        address dcaManager,
+        address stablecoin,
+        address iToken,
         UniswapSettings memory uniswapSettings,
         address feeCollector,
         FeeSettings memory feeSettings,
@@ -35,7 +35,7 @@ contract SovrynHandlerDex is SovrynHandler, PurchaseUniswap {
         uint256 amountOutMinimumSafetyCheck,
         address initialOwner
     )
-        SovrynHandler(dcaManagerAddress, stablecoinAddress, iTokenAddress)
+        SovrynHandler(dcaManager, stablecoin, iToken)
         PurchaseUniswap(
             uniswapSettings,
             FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}),

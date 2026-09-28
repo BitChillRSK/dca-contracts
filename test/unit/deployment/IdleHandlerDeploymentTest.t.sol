@@ -9,7 +9,6 @@ import {console} from "forge-std/Test.sol";
 import "../../Constants.sol";
 
 contract IdleHandlerDeploymentTest is BaseDeploymentTest {
-    address public idleHandlerAddress;
     IdleDocHandlerMoc public idleHandler;
 
     function setUp() public override {
@@ -23,26 +22,26 @@ contract IdleHandlerDeploymentTest is BaseDeploymentTest {
         DeployIdleHandler idleDeployer = new DeployIdleHandler();
         console.log("Idle handler deployer:", address(idleDeployer));
 
-        idleHandlerAddress = idleDeployer.run(helperConfig, address(operationsAdmin), address(dcaManager));
-        idleHandler = IdleDocHandlerMoc(payable(idleHandlerAddress));
-        address docTokenAddress = helperConfig.getStablecoinAddress();
+        idleHandler =
+            IdleDocHandlerMoc(payable(idleDeployer.run(helperConfig, address(operationsAdmin), address(dcaManager))));
+        address docToken = helperConfig.getStablecoin();
 
-        if (operationsAdmin.getHandler(docTokenAddress, IDLE_INDEX) == address(0)) {
+        if (operationsAdmin.getHandler(docToken, IDLE_INDEX) == address(0)) {
             vm.prank(OWNER);
-            operationsAdmin.assignHandler(docTokenAddress, IDLE_INDEX, idleHandlerAddress);
+            operationsAdmin.assignHandler(docToken, IDLE_INDEX, address(idleHandler));
         }
     }
 
     function testIdleHandlerDeployment() public {
-        assertNotEq(idleHandlerAddress, address(0), "Idle handler not deployed");
+        assertNotEq(address(idleHandler), address(0), "Idle handler not deployed");
 
         assertEq(idleHandler.i_dcaManager(), address(dcaManager), "Idle handler doesn't reference DcaManager");
-        assertEq(address(idleHandler.i_stablecoin()), helperConfig.getStablecoinAddress(), "Idle handler DOC mismatch");
+        assertEq(address(idleHandler.i_stablecoin()), helperConfig.getStablecoin(), "Idle handler DOC mismatch");
         assertEq(idleHandler.owner(), makeAddr(OWNER_STRING), "Idle handler owner not set correctly");
         assertEq(idleHandler.pendingOwner(), address(0), "Idle handler pending owner must be zero after deploy");
 
-        address registeredHandler = operationsAdmin.getHandler(helperConfig.getStablecoinAddress(), IDLE_INDEX);
-        assertEq(registeredHandler, idleHandlerAddress, "Idle handler not registered in OperationsAdmin");
+        address registeredHandler = operationsAdmin.getHandler(helperConfig.getStablecoin(), IDLE_INDEX);
+        assertEq(registeredHandler, address(idleHandler), "Idle handler not registered in OperationsAdmin");
         assertEq(
             uint256(operationsAdmin.getRouteClass(IDLE_INDEX)),
             uint256(IOperationsAdmin.RouteClass.Idle),

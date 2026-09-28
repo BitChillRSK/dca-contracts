@@ -11,17 +11,17 @@ import "./Constants.sol";
 
 contract UsdrifHelperConfig is Script {
     struct NetworkConfig {
-        address usdrifTokenAddress;
-        address usdt0TokenAddress;
-        address layerbankUsdrifATokenAddress;
-        address layerbankUsdt0ATokenAddress;
-        address wrbtcTokenAddress;
-        address swapRouterAddress;
+        address usdrifToken;
+        address usdt0Token;
+        address layerbankUsdrifAToken;
+        address layerbankUsdt0AToken;
+        address wrbtc;
+        address swapRouter;
         address[] swapIntermediateTokens;
         uint24[] swapPoolFeeRates;
-        address mocOracleAddress;
-        address operationsAdminAddress;
-        address dcaManagerAddress;
+        address mocOracle;
+        address operationsAdmin;
+        address dcaManager;
         uint256 amountOutMinimumPercent;
         uint256 amountOutMinimumSafetyCheck;
     }
@@ -51,17 +51,17 @@ contract UsdrifHelperConfig is Script {
         poolFeeRates[1] = 3000;
 
         config = NetworkConfig({
-            usdrifTokenAddress: 0x3A15461d8aE0F0Fb5Fa2629e9DA7D66A794a6e37, // USDRIF on mainnet
-            usdt0TokenAddress: USDT0_MAINNET,
-            layerbankUsdrifATokenAddress: LAYERBANK_USDRIF_ATOKEN,
-            layerbankUsdt0ATokenAddress: LAYERBANK_USDT0_ATOKEN,
-            wrbtcTokenAddress: 0x542fDA317318eBF1d3DEAf76E0b632741A7e677d, // WRBTC on mainnet
-            swapRouterAddress: 0x0B14ff67f0014046b4b99057Aec4509640b3947A, // SwapRouter02 on mainnet
+            usdrifToken: 0x3A15461d8aE0F0Fb5Fa2629e9DA7D66A794a6e37, // USDRIF on mainnet
+            usdt0Token: USDT0_MAINNET,
+            layerbankUsdrifAToken: LAYERBANK_USDRIF_ATOKEN,
+            layerbankUsdt0AToken: LAYERBANK_USDT0_ATOKEN,
+            wrbtc: 0x542fDA317318eBF1d3DEAf76E0b632741A7e677d, // WRBTC on mainnet
+            swapRouter: 0x0B14ff67f0014046b4b99057Aec4509640b3947A, // SwapRouter02 on mainnet
             swapIntermediateTokens: intermediateTokens,
             swapPoolFeeRates: poolFeeRates,
-            mocOracleAddress: 0xe2927A0620b82A66D67F678FC9b826B0E01B1bFD, // MoC Oracle on mainnet
-            operationsAdminAddress: 0x07623b4bfA188687B683CbF242C12A7d4bD7D355, // OperationsAdmin
-            dcaManagerAddress: 0x6287F0Ef7dcb288603B484d666785c59f7F6aa70, // DcaManager
+            mocOracle: 0xe2927A0620b82A66D67F678FC9b826B0E01B1bFD, // MoC Oracle on mainnet
+            operationsAdmin: 0x07623b4bfA188687B683CbF242C12A7d4bD7D355, // OperationsAdmin
+            dcaManager: 0x6287F0Ef7dcb288603B484d666785c59f7F6aa70, // DcaManager
             amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
             amountOutMinimumSafetyCheck: DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK
         });
@@ -76,34 +76,34 @@ contract UsdrifHelperConfig is Script {
         poolFeeRates[1] = 500;
 
         config = NetworkConfig({
-            usdrifTokenAddress: 0x0000000000000000000000000000000000000000, // Replace with USDRIF on testnet
-            usdt0TokenAddress: 0x5a2256DD0DfbC8cE121d923AC7D6E7A3fc7F9922, // USDT0 on testnet
-            layerbankUsdrifATokenAddress: address(0), // LayerBank USDRIF is mainnet-only
-            layerbankUsdt0ATokenAddress: address(0), // LayerBank USDT0 is mainnet-only
-            wrbtcTokenAddress: 0x69FE5cEC81D5eF92600c1A0dB1F11986AB3758Ab, // WRBTC on testnet
-            swapRouterAddress: 0x0000000000000000000000000000000000000000, // Replace if exists on testnet
+            usdrifToken: 0x0000000000000000000000000000000000000000, // Replace with USDRIF on testnet
+            usdt0Token: 0x5a2256DD0DfbC8cE121d923AC7D6E7A3fc7F9922, // USDT0 on testnet
+            layerbankUsdrifAToken: address(0), // LayerBank USDRIF is mainnet-only
+            layerbankUsdt0AToken: address(0), // LayerBank USDT0 is mainnet-only
+            wrbtc: 0x69FE5cEC81D5eF92600c1A0dB1F11986AB3758Ab, // WRBTC on testnet
+            swapRouter: 0x0000000000000000000000000000000000000000, // Replace if exists on testnet
             swapIntermediateTokens: intermediateTokens,
             swapPoolFeeRates: poolFeeRates,
-            mocOracleAddress: 0x0000000000000000000000000000000000000000, // Replace with MoC Oracle on testnet
-            operationsAdminAddress: 0x0000000000000000000000000000000000000000, // Placeholder for OperationsAdmin
-            dcaManagerAddress: 0x0000000000000000000000000000000000000000, // Placeholder for DcaManager
+            mocOracle: 0x0000000000000000000000000000000000000000, // Replace with MoC Oracle on testnet
+            operationsAdmin: 0x0000000000000000000000000000000000000000, // Placeholder for OperationsAdmin
+            dcaManager: 0x0000000000000000000000000000000000000000, // Placeholder for DcaManager
             amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
             amountOutMinimumSafetyCheck: DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK
         });
     }
 
-    function getOrCreateAnvilConfig(address adminOpsAddress, address dcaManagerAddress)
+    function getOrCreateAnvilConfig(address operationsAdmin, address dcaManager)
         public
         returns (NetworkConfig memory config)
     {
         // Check if we already have a configuration
-        if (activeNetworkConfig.wrbtcTokenAddress != address(0)) {
+        if (activeNetworkConfig.wrbtc != address(0)) {
             // Update with provided addresses if not zero
-            if (adminOpsAddress != address(0)) {
-                activeNetworkConfig.operationsAdminAddress = adminOpsAddress;
+            if (operationsAdmin != address(0)) {
+                activeNetworkConfig.operationsAdmin = operationsAdmin;
             }
-            if (dcaManagerAddress != address(0)) {
-                activeNetworkConfig.dcaManagerAddress = dcaManagerAddress;
+            if (dcaManager != address(0)) {
+                activeNetworkConfig.dcaManager = dcaManager;
             }
             return activeNetworkConfig;
         }
@@ -156,17 +156,17 @@ contract UsdrifHelperConfig is Script {
         poolFeeRates[1] = 500;
 
         config = NetworkConfig({
-            usdrifTokenAddress: address(mockUsdrifToken),
-            usdt0TokenAddress: address(mockUsdrifToken), // Anvil reuses the 18-decimal mock; 6-decimal coverage is a dedicated test
-            layerbankUsdrifATokenAddress: address(mockAToken),
-            layerbankUsdt0ATokenAddress: address(mockAToken),
-            wrbtcTokenAddress: address(mockWrbtcToken),
-            swapRouterAddress: address(mockSwapRouter),
+            usdrifToken: address(mockUsdrifToken),
+            usdt0Token: address(mockUsdrifToken), // Anvil reuses the 18-decimal mock; 6-decimal coverage is a dedicated test
+            layerbankUsdrifAToken: address(mockAToken),
+            layerbankUsdt0AToken: address(mockAToken),
+            wrbtc: address(mockWrbtcToken),
+            swapRouter: address(mockSwapRouter),
             swapIntermediateTokens: intermediateTokens,
             swapPoolFeeRates: poolFeeRates,
-            mocOracleAddress: address(mockMocOracle),
-            operationsAdminAddress: adminOpsAddress,
-            dcaManagerAddress: dcaManagerAddress,
+            mocOracle: address(mockMocOracle),
+            operationsAdmin: operationsAdmin,
+            dcaManager: dcaManager,
             amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
             amountOutMinimumSafetyCheck: DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK
         });
@@ -175,9 +175,9 @@ contract UsdrifHelperConfig is Script {
         activeNetworkConfig = config;
     }
 
-    function updateProtocolAddresses(address adminOpsAddress, address dcaManagerAddress) external {
-        activeNetworkConfig.operationsAdminAddress = adminOpsAddress;
-        activeNetworkConfig.dcaManagerAddress = dcaManagerAddress;
+    function updateProtocolAddresses(address operationsAdmin, address dcaManager) external {
+        activeNetworkConfig.operationsAdmin = operationsAdmin;
+        activeNetworkConfig.dcaManager = dcaManager;
     }
 
     function getNetworkConfig() public view returns (NetworkConfig memory) {
@@ -194,14 +194,11 @@ contract UsdrifHelperConfig is Script {
         return keccak256(abi.encodePacked(coinType)) == keccak256(abi.encodePacked(USDT0_STRING));
     }
 
-    function getTokenAddress() public view returns (address) {
-        return isUsdt0() ? activeNetworkConfig.usdt0TokenAddress : activeNetworkConfig.usdrifTokenAddress;
+    function getToken() public view returns (address) {
+        return isUsdt0() ? activeNetworkConfig.usdt0Token : activeNetworkConfig.usdrifToken;
     }
 
-    function getATokenAddress() public view returns (address) {
-        return
-            isUsdt0()
-                ? activeNetworkConfig.layerbankUsdt0ATokenAddress
-                : activeNetworkConfig.layerbankUsdrifATokenAddress;
+    function getAToken() public view returns (address) {
+        return isUsdt0() ? activeNetworkConfig.layerbankUsdt0AToken : activeNetworkConfig.layerbankUsdrifAToken;
     }
 }

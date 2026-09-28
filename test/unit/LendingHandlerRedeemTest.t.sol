@@ -720,8 +720,8 @@ contract LendingHandlerHarness is LendingHandler {
     bool public increaseBalanceOnRedeem;
     bool public revertOnRedeem;
 
-    constructor(address dcaManagerAddress, address stablecoinAddress, uint256 exchangeRateDecimals)
-        LendingHandler(dcaManagerAddress, stablecoinAddress, exchangeRateDecimals)
+    constructor(address dcaManager, address stablecoin, uint256 exchangeRateDecimals)
+        LendingHandler(dcaManager, stablecoin, exchangeRateDecimals)
     {}
 
     function setExchangeRate(uint256 rate) external {

@@ -16,7 +16,7 @@ contract BaseDeploymentTest is Test {
     // Core contracts
     OperationsAdmin public operationsAdmin;
     DcaManager public dcaManager;
-    address public docHandlerMocAddress;
+    address public docHandlerMoc;
     MocHelperConfig public helperConfig;
     address OWNER = makeAddr(OWNER_STRING);
     address ADMIN = makeAddr(ADMIN_STRING);
@@ -39,13 +39,13 @@ contract BaseDeploymentTest is Test {
         }
 
         DeployMocSwaps deployer = new DeployMocSwaps();
-        (operationsAdmin, docHandlerMocAddress, dcaManager, helperConfig) = deployer.run();
+        (operationsAdmin, docHandlerMoc, dcaManager, helperConfig) = deployer.run();
 
         string memory lendingProtocol = vm.envString("LENDING_PROTOCOL");
         if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(SOVRYN_STRING))) {
-            sovrynHandler = SovrynDocHandlerMoc(payable(docHandlerMocAddress));
+            sovrynHandler = SovrynDocHandlerMoc(payable(docHandlerMoc));
         } else if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(TROPYKUS_STRING))) {
-            tropykusHandler = TropykusDocHandlerMoc(payable(docHandlerMocAddress));
+            tropykusHandler = TropykusDocHandlerMoc(payable(docHandlerMoc));
         }
 
         vm.startPrank(OWNER);
@@ -63,7 +63,7 @@ contract BaseDeploymentTest is Test {
         assertNotEq(address(dcaManager), address(0), "DcaManager not deployed");
 
         // Verify DocHandler deployment
-        assertNotEq(docHandlerMocAddress, address(0), "DocHandler not deployed");
+        assertNotEq(docHandlerMoc, address(0), "DocHandler not deployed");
 
         // Check ownership
         assertEq(operationsAdmin.owner(), makeAddr(OWNER_STRING), "OperationsAdmin owner not set correctly");
@@ -83,31 +83,31 @@ contract BaseDeploymentTest is Test {
                 tropykusHandler.i_dcaManager(), address(dcaManager), "TropykusHandler doesn't reference DcaManager"
             );
             assertEq(
-                TropykusDocHandlerMoc(payable(docHandlerMocAddress)).owner(),
+                TropykusDocHandlerMoc(payable(docHandlerMoc)).owner(),
                 makeAddr(OWNER_STRING),
                 "Handler owner not set correctly"
             );
             assertEq(
-                TropykusDocHandlerMoc(payable(docHandlerMocAddress)).pendingOwner(),
+                TropykusDocHandlerMoc(payable(docHandlerMoc)).pendingOwner(),
                 address(0),
                 "Handler pending owner must be zero after deploy"
             );
         } else if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(SOVRYN_STRING))) {
             assertEq(sovrynHandler.i_dcaManager(), address(dcaManager), "SovrynHandler doesn't reference DcaManager");
             assertEq(
-                SovrynDocHandlerMoc(payable(docHandlerMocAddress)).owner(),
+                SovrynDocHandlerMoc(payable(docHandlerMoc)).owner(),
                 makeAddr(OWNER_STRING),
                 "Handler owner not set correctly"
             );
             assertEq(
-                SovrynDocHandlerMoc(payable(docHandlerMocAddress)).pendingOwner(),
+                SovrynDocHandlerMoc(payable(docHandlerMoc)).pendingOwner(),
                 address(0),
                 "Handler pending owner must be zero after deploy"
             );
         } else {
-            assertEq(Ownable(docHandlerMocAddress).owner(), makeAddr(OWNER_STRING), "Handler owner not set correctly");
+            assertEq(Ownable(docHandlerMoc).owner(), makeAddr(OWNER_STRING), "Handler owner not set correctly");
             assertEq(
-                BitChillOwnable(docHandlerMocAddress).pendingOwner(),
+                BitChillOwnable(docHandlerMoc).pendingOwner(),
                 address(0),
                 "Handler pending owner must be zero after deploy"
             );

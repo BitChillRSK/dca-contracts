@@ -15,24 +15,24 @@ import {PurchaseMoc} from "../PurchaseMoc.sol";
  */
 contract TropykusDocHandlerMoc is TropykusHandler, PurchaseMoc {
     /**
-     * @param dcaManagerAddress The DcaManager allowed to call this handler.
-     * @param docTokenAddress Dollar On Chain token.
-     * @param kDocTokenAddress Tropykus kDOC token.
+     * @param dcaManager The DcaManager allowed to call this handler.
+     * @param docToken Dollar On Chain token.
+     * @param kToken Tropykus kDOC token.
      * @param feeCollector Address that receives purchase fees.
-     * @param mocProxyAddress Money on Chain proxy.
+     * @param mocProxy Money on Chain proxy.
      * @param feeSettings Linear fee parameters.
      * @param initialOwner Address that owns fee configuration immediately after deploy.
      */
     constructor(
-        address dcaManagerAddress,
-        address docTokenAddress,
-        address kDocTokenAddress,
+        address dcaManager,
+        address docToken,
+        address kToken,
         address feeCollector,
-        address mocProxyAddress,
+        address mocProxy,
         FeeSettings memory feeSettings,
         address initialOwner
     )
-        TropykusHandler(dcaManagerAddress, docTokenAddress, kDocTokenAddress)
-        PurchaseMoc(mocProxyAddress, FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}), initialOwner)
+        TropykusHandler(dcaManager, docToken, kToken)
+        PurchaseMoc(mocProxy, FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}), initialOwner)
     {}
 }

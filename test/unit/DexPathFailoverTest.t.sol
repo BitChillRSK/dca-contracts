@@ -276,7 +276,7 @@ contract DexPathFailoverTest is DcaDappTest {
 
         // The activated path's token is the one a stranded balance is now measured against.
         uint256 stranded = 1 ether;
-        MockSwapRouter02 router = MockSwapRouter02(dexHelperConfig.getActiveNetworkConfig().swapRouterAddress);
+        MockSwapRouter02 router = MockSwapRouter02(dexHelperConfig.getActiveNetworkConfig().swapRouter);
         router.setStrandedIntermediate(address(newIntermediate), stranded);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.expectRevert(
@@ -392,10 +392,10 @@ contract DexPathFailoverTest is DcaDappTest {
                     address(new MockIsusdToken(address(stablecoin))),
                     IPurchaseUniswap.UniswapSettings({
                         wrbtc: IWRBTC(address(wrbtc)),
-                        swapRouter: IUniswapV3SwapRouter(config.swapRouterAddress),
+                        swapRouter: IUniswapV3SwapRouter(config.swapRouter),
                         swapIntermediateTokens: config.swapIntermediateTokens,
                         swapPoolFeeRates: config.swapPoolFeeRates,
-                        mocOracle: ICoinPairPrice(config.mocOracleAddress)
+                        mocOracle: ICoinPairPrice(config.mocOracle)
                     }),
                     FEE_COLLECTOR,
                     IPurchaseFees(address(stablecoinHandler)).getFeeSettings(),

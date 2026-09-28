@@ -21,8 +21,8 @@ import "test/Constants.sol";
  */
 contract ReversedIdleHandlerDex is PurchaseUniswap, IdleHandler {
     constructor(
-        address dcaManagerAddress,
-        address stablecoinAddress,
+        address dcaManager,
+        address stablecoin,
         UniswapSettings memory uniswapSettings,
         address feeCollector,
         FeeSettings memory feeSettings,
@@ -30,7 +30,7 @@ contract ReversedIdleHandlerDex is PurchaseUniswap, IdleHandler {
         uint256 amountOutMinimumSafetyCheck,
         address initialOwner
     )
-        IdleHandler(dcaManagerAddress, stablecoinAddress)
+        IdleHandler(dcaManager, stablecoin)
         PurchaseUniswap(
             uniswapSettings,
             FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}),

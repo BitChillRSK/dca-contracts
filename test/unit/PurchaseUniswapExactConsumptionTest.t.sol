@@ -282,7 +282,7 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
     }
 
     function _routerAddress() private view returns (address) {
-        return dexHelperConfig.getActiveNetworkConfig().swapRouterAddress;
+        return dexHelperConfig.getActiveNetworkConfig().swapRouter;
     }
 
     function _router() private view returns (MockSwapRouter02) {

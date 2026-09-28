@@ -40,14 +40,14 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
             payable(new DeployLayerBankHandler()
                     .deployMocksAndHandler(
                         address(dcaManager),
-                        helperConfig.getStablecoinAddress(),
-                        helperConfig.getActiveNetworkConfig().mocProxyAddress,
+                        helperConfig.getStablecoin(),
+                        helperConfig.getActiveNetworkConfig().mocProxy,
                         makeAddr(FEE_COLLECTOR_STRING),
                         operationsAdmin.owner()
                     ))
         );
-        docToken = MockStablecoin(helperConfig.getStablecoinAddress());
-        mocProxy = MockMocProxy(helperConfig.getActiveNetworkConfig().mocProxyAddress);
+        docToken = MockStablecoin(helperConfig.getStablecoin());
+        mocProxy = MockMocProxy(helperConfig.getActiveNetworkConfig().mocProxy);
 
         vm.startPrank(OWNER);
         if (operationsAdmin.getRouteClass(LAYERBANK_INDEX) == IOperationsAdmin.RouteClass.Unregistered) {
