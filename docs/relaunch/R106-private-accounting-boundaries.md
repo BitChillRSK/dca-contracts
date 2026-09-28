@@ -1,6 +1,6 @@
 # R106 — Private accounting boundaries
 
-Status: **assigned** · Assigned: yes · Optional/further-review: no · Stack on: R105 ([#171](https://github.com/BitChillRSK/dca-contracts/pull/171))
+Status: **implemented** · GitHub [#172](https://github.com/BitChillRSK/dca-contracts/pull/172) · Assigned: yes · Optional/further-review: no · Stack on: R105 ([#171](https://github.com/BitChillRSK/dca-contracts/pull/171))
 
 ## Objective
 
