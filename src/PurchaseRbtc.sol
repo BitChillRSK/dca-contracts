@@ -49,7 +49,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
      *      for: a lending handler can come back short when it redeems its shares. Idle retrieval only sums
      *      the request, because the cash already sits on the handler; if it is not all there, the venue's
      *      pull or the exact-consumption check reverts the batch. The venue spends that full retrieved
-     *      amount. Planned nets and the aggregated fee are allocation weights over planned gross: buyer
+     *      amount. Planned net weights and the aggregated fee allocate measured output over planned gross: buyer
      *      credits and the protocol fee are floored shares of measured output. Reported spend is each
      *      row's share of retrieved gross. The fee (native rBTC or WRBTC) is paid last.
      */
@@ -59,18 +59,18 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
         uint256[] calldata purchaseAmounts,
         uint256 minRbtcOut
     ) external override onlyDcaManager {
-        uint256[] memory netStablecoinAmountsToSpend;
+        uint256[] memory netWeights;
         uint256 plannedGross;
         uint256 aggregatedFee;
         uint256 totalStablecoinRetrieved;
 
         {
-            uint256 totalNetStablecoinPlanned;
-            (aggregatedFee, netStablecoinAmountsToSpend, totalNetStablecoinPlanned) =
-                _calculateFeeAndNetAmounts(purchaseAmounts);
-            // Fee + nets reconstruct the planned gross: each row's fee was peeled from its purchase amount.
+            uint256 totalNetWeight;
+            (aggregatedFee, netWeights, totalNetWeight) = _calculateFeeAndNetAmounts(purchaseAmounts);
+            // Fee + net weights reconstruct the planned gross: each row's fee was peeled from its
+            // purchase amount.
             unchecked {
-                plannedGross = totalNetStablecoinPlanned + aggregatedFee;
+                plannedGross = totalNetWeight + aggregatedFee;
             }
 
             // Retrieve the full planned gross. What comes back is what the retrieval delivered, which a
@@ -109,13 +109,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
         }
 
         _creditPurchases(
-            buyers,
-            scheduleIds,
-            purchaseAmounts,
-            netStablecoinAmountsToSpend,
-            totalPurchasedRbtc,
-            plannedGross,
-            totalStablecoinRetrieved
+            buyers, scheduleIds, purchaseAmounts, netWeights, totalPurchasedRbtc, plannedGross, totalStablecoinRetrieved
         );
         emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
             address(i_stablecoin), totalPurchasedRbtc, totalStablecoinRetrieved
@@ -166,7 +160,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Planned nets are allocation weights over planned gross: each row takes its share of
+     * @dev `netWeights` are allocation weights over planned gross: each row takes its share of
      *      measured output even if the redemption paid less than planned. Both the fee and each row
      *      floor, which can leave under one wei of rBTC per term uncredited; see IPurchaseRbtc.
      *      Split out of `batchBuyRbtc` so the purchase path compiles under legacy codegen.
@@ -175,7 +169,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
         address[] calldata buyers,
         uint64[] calldata scheduleIds,
         uint256[] calldata purchaseAmounts,
-        uint256[] memory netAmounts,
+        uint256[] memory netWeights,
         uint256 totalPurchasedRbtc,
         uint256 plannedGross,
         uint256 totalStablecoinRetrieved
@@ -184,7 +178,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
         for (uint256 i; i < purchaseCount; ++i) {
             uint256 userRbtc;
             unchecked {
-                userRbtc = totalPurchasedRbtc * netAmounts[i] / plannedGross;
+                userRbtc = totalPurchasedRbtc * netWeights[i] / plannedGross;
             }
             // Gross share of what the venue actually spent (all-in average price).
             uint256 userStablecoinSpent = totalStablecoinRetrieved * purchaseAmounts[i] / plannedGross;

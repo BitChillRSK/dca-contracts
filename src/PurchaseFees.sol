@@ -119,17 +119,19 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Calculate the fee and net amounts for a batch of purchase amounts.
+     * @dev Split each purchase amount into a fee weight and a net weight. Callers allocate
+     *      measured output over planned gross using these weights; they are not amounts the
+     *      venue spends.
      * @param purchaseAmounts The array with the raw purchase amounts specified by users.
-     * @return aggregatedFee      The total fee weight (stablecoin units) for all purchases.
-     * @return netAmountsToSpend  An array with the net amounts (purchase amount minus fee) for each user.
-     * @return totalAmountToSpend The aggregated net weight used with `aggregatedFee` to allocate
-     *                            measured output between buyers and the collector.
+     * @return aggregatedFee  The total fee weight (stablecoin units) for all purchases.
+     * @return netWeights     Per-row net (purchase amount minus fee), used as allocation weights.
+     * @return totalNetWeight Sum of `netWeights`, used with `aggregatedFee` to reconstruct planned
+     *                        gross.
      */
     function _calculateFeeAndNetAmounts(uint256[] calldata purchaseAmounts)
         internal
         view
-        returns (uint256 aggregatedFee, uint256[] memory netAmountsToSpend, uint256 totalAmountToSpend)
+        returns (uint256 aggregatedFee, uint256[] memory netWeights, uint256 totalNetWeight)
     {
         uint16 minFeeRate = s_minFeeRate;
         uint16 maxFeeRate = s_maxFeeRate;
@@ -165,10 +167,10 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
     function _calculateFlatFeeAndNetAmounts(uint256[] calldata purchaseAmounts, uint256 feeRate)
         private
         pure
-        returns (uint256 aggregatedFee, uint256[] memory netAmountsToSpend, uint256 totalAmountToSpend)
+        returns (uint256 aggregatedFee, uint256[] memory netWeights, uint256 totalNetWeight)
     {
         uint256 len = purchaseAmounts.length;
-        netAmountsToSpend = new uint256[](len);
+        netWeights = new uint256[](len);
         for (uint256 i; i < len; ++i) {
             uint256 amount = purchaseAmounts[i];
             uint256 fee = _calculateFeeAtRate(amount, feeRate);
@@ -178,9 +180,9 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
             unchecked {
                 net = amount - fee;
                 aggregatedFee += fee;
-                totalAmountToSpend += net;
+                totalNetWeight += net;
             }
-            netAmountsToSpend[i] = net;
+            netWeights[i] = net;
         }
     }
 
@@ -194,9 +196,9 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
         uint256 maxFeeRate,
         uint256 feePurchaseLowerBound,
         uint256 feePurchaseUpperBound
-    ) private pure returns (uint256 aggregatedFee, uint256[] memory netAmountsToSpend, uint256 totalAmountToSpend) {
+    ) private pure returns (uint256 aggregatedFee, uint256[] memory netWeights, uint256 totalNetWeight) {
         uint256 len = purchaseAmounts.length;
-        netAmountsToSpend = new uint256[](len);
+        netWeights = new uint256[](len);
         for (uint256 i; i < len; ++i) {
             uint256 amount = purchaseAmounts[i];
             uint256 fee =
@@ -207,9 +209,9 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
             unchecked {
                 net = amount - fee;
                 aggregatedFee += fee;
-                totalAmountToSpend += net;
+                totalNetWeight += net;
             }
-            netAmountsToSpend[i] = net;
+            netWeights[i] = net;
         }
     }
 

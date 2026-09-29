@@ -11,13 +11,13 @@ contract R78OptimizedPurchaseFeesGasHarness is PurchaseFees {
     function measure(uint256[] calldata purchaseAmounts)
         external
         view
-        returns (uint256 gasUsed, uint256 aggregatedFee, uint256 totalAmountToSpend, bytes32 netAmountsHash)
+        returns (uint256 gasUsed, uint256 aggregatedFee, uint256 totalNetWeight, bytes32 netWeightsHash)
     {
-        uint256[] memory netAmounts;
+        uint256[] memory netWeights;
         uint256 gasBefore = gasleft();
-        (aggregatedFee, netAmounts, totalAmountToSpend) = _calculateFeeAndNetAmounts(purchaseAmounts);
+        (aggregatedFee, netWeights, totalNetWeight) = _calculateFeeAndNetAmounts(purchaseAmounts);
         gasUsed = gasBefore - gasleft();
-        netAmountsHash = keccak256(abi.encode(netAmounts));
+        netWeightsHash = keccak256(abi.encode(netWeights));
     }
 }
 
@@ -27,14 +27,14 @@ contract R78BaselinePurchaseFeesGasHarness is PurchaseFees {
     function measure(uint256[] calldata purchaseAmounts)
         external
         view
-        returns (uint256 gasUsed, uint256 aggregatedFee, uint256 totalAmountToSpend, bytes32 netAmountsHash)
+        returns (uint256 gasUsed, uint256 aggregatedFee, uint256 totalNetWeight, bytes32 netWeightsHash)
     {
         uint256[] memory amounts = purchaseAmounts;
-        uint256[] memory netAmounts;
+        uint256[] memory netWeights;
         uint256 gasBefore = gasleft();
-        (aggregatedFee, netAmounts, totalAmountToSpend) = _baselineCalculateFeeAndNetAmounts(amounts);
+        (aggregatedFee, netWeights, totalNetWeight) = _baselineCalculateFeeAndNetAmounts(amounts);
         gasUsed = gasBefore - gasleft();
-        netAmountsHash = keccak256(abi.encode(netAmounts));
+        netWeightsHash = keccak256(abi.encode(netWeights));
     }
 
     /// @dev The generic loop mirrors the private production curve against the same packed settings
@@ -42,10 +42,10 @@ contract R78BaselinePurchaseFeesGasHarness is PurchaseFees {
     function _baselineCalculateFeeAndNetAmounts(uint256[] memory purchaseAmounts)
         private
         view
-        returns (uint256 aggregatedFee, uint256[] memory netAmountsToSpend, uint256 totalAmountToSpend)
+        returns (uint256 aggregatedFee, uint256[] memory netWeights, uint256 totalNetWeight)
     {
         uint256 len = purchaseAmounts.length;
-        netAmountsToSpend = new uint256[](len);
+        netWeights = new uint256[](len);
         FeeSettings memory feeSettings = FeeSettings({
             minFeeRate: s_minFeeRate,
             maxFeeRate: s_maxFeeRate,
@@ -67,8 +67,8 @@ contract R78BaselinePurchaseFeesGasHarness is PurchaseFees {
             unchecked {
                 net = amount - fee;
             }
-            netAmountsToSpend[i] = net;
-            totalAmountToSpend += net;
+            netWeights[i] = net;
+            totalNetWeight += net;
         }
     }
 

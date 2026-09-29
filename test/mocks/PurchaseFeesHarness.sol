@@ -19,7 +19,7 @@ contract PurchaseFeesHarness is PurchaseFees {
     function exposedCalculateFeeAndNetAmounts(uint256[] calldata purchaseAmounts)
         external
         view
-        returns (uint256 aggregatedFee, uint256[] memory netAmountsToSpend, uint256 totalAmountToSpend)
+        returns (uint256 aggregatedFee, uint256[] memory netWeights, uint256 totalNetWeight)
     {
         return _calculateFeeAndNetAmounts(purchaseAmounts);
     }
