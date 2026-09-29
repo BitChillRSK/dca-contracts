@@ -49,11 +49,11 @@ interface IPurchaseFees {
     /// @notice Owner set the address that receives purchase fees.
     event PurchaseFees__FeeCollectorAddressSet(address indexed feeCollector);
     /**
-     * @notice A non-zero purchase fee was paid to the collector (native rBTC or WRBTC).
-     * @dev `token` is `address(0)` for native rBTC (MoC) and the WRBTC address on Dex. Emitted once
-     *      per batch after buyer credits. Do not index `amount`.
+     * @notice A non-zero purchase fee was paid to the collector (native rBTC on MoC, WRBTC on Dex).
+     * @dev Emitted once per batch after buyer credits. The asset is implied by the emitting handler;
+     *      Dex also logs a WRBTC `Transfer`.
      */
-    event PurchaseFees__FeeTransferred(address indexed token, address indexed collector, uint256 amount);
+    event PurchaseFees__FeeTransferred(address indexed collector, uint256 amount);
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS

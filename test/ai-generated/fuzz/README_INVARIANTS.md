@@ -65,8 +65,8 @@ withdraw / purchase are allowed and expected.
 ### `PurchaseRbtcConservationInvariantTest` (purchase allocation)
 
 1. **Credits stay in the floored band** — sum of books + withdrawn + collector fees ≤ measured
-   venue output, and that total plus under-one-wei-per-term slack (buyer rows + fee) ≥ measured
-   output.
+   venue output, and that total plus under-one-wei-per-row slack (k = rows + fee floors leave at
+   most k − 1 wei) ≥ measured output.
 2. **Books never exceed handler balance** — claimable rBTC ≤ `address(harness).balance`.
 
 ### `LendingPurchaseConservationInvariantTest` (production lending + purchase together)

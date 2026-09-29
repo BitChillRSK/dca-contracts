@@ -15,7 +15,7 @@ import {scheduleIdAt} from "test/utils/ScheduleAt.sol";
  */
 contract EventIndexingTest is DcaDappTest {
     event LendingHandler__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares);
-    event PurchaseFees__FeeTransferred(address indexed token, address indexed collector, uint256 amount);
+    event PurchaseFees__FeeTransferred(address indexed collector, uint256 amount);
 
     bytes32 private constant OWNERSHIP_TRANSFERRED = keccak256("OwnershipTransferred(address,address)");
     bytes32 private constant OWNERSHIP_TRANSFER_STARTED = keccak256("OwnershipTransferStarted(address,address)");
@@ -128,12 +128,10 @@ contract EventIndexingTest is DcaDappTest {
     function _feeTransferredAmount(Vm.Log[] memory logs, address collector) private view returns (uint256 amount) {
         bytes32 sig = PurchaseFees__FeeTransferred.selector;
         bool found;
-        address expectedToken = isDexSwaps ? address(wrbtc) : address(0);
         for (uint256 i; i < logs.length; ++i) {
             if (logs[i].topics[0] != sig) continue;
             if (logs[i].emitter != address(stablecoinHandler)) continue;
-            if (address(uint160(uint256(logs[i].topics[1]))) != expectedToken) continue;
-            if (address(uint160(uint256(logs[i].topics[2]))) != collector) continue;
+            if (address(uint160(uint256(logs[i].topics[1]))) != collector) continue;
             amount = abi.decode(logs[i].data, (uint256));
             found = true;
         }
@@ -206,7 +204,7 @@ contract EventIndexingTest is DcaDappTest {
         if (sig == keccak256("PurchaseFees__PurchaseLowerBoundSet(uint256)")) return (true, 0);
         if (sig == keccak256("PurchaseFees__PurchaseUpperBoundSet(uint256)")) return (true, 0);
         if (sig == keccak256("PurchaseFees__FeeCollectorAddressSet(address)")) return (true, 1);
-        if (sig == keccak256("PurchaseFees__FeeTransferred(address,address,uint256)")) return (true, 2);
+        if (sig == keccak256("PurchaseFees__FeeTransferred(address,uint256)")) return (true, 1);
         if (sig == keccak256("PurchaseUniswap__NewPathSet(address[],uint24[],bytes)")) return (true, 0);
         if (sig == keccak256("PurchaseUniswap__AmountOutMinimumPercentUpdated(uint256,uint256)")) return (true, 0);
         if (sig == keccak256("PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(uint256,uint256)")) return (true, 0);

@@ -68,8 +68,8 @@ contract PurchaseRbtcConservationHandler is Test {
 
         try i_harness.batchBuyRbtc(buyers, scheduleIds, amounts, 0) {
             s_rbtcBoughtGhost += rbtcOut;
-            // Buyer rows plus the collector fee each floor; remainder is at most that many wei.
-            s_flooredSlackGhost += rows + 1;
+            // Weights (rows + fee) reconstruct planned gross; k floors leave at most k-1 wei.
+            s_flooredSlackGhost += rows;
             ++s_batchSuccesses;
         } catch {
             // An unlucky draw is not a finding.

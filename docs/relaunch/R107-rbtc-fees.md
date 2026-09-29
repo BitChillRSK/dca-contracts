@@ -21,7 +21,7 @@ public timing lever). Land before the audit revision freezes.
 R87 dropped `PurchaseFees__FeeTransferred` because the stablecoin `Transfer` was enough
 telemetry. Native MoC fee payments emit no ERC-20 `Transfer`, so this PR re-adds
 `PurchaseFees__FeeTransferred` and emits it on every route (MoC and Dex) for uniform
-monitoring. `token` is `address(0)` for native rBTC and the WRBTC address on Dex.
+monitoring. The asset is implied by the emitting handler; Dex also emits a WRBTC `Transfer`.
 
 Do **not** credit the collector through `_creditRbtc`: that mixes revenue into the users’
 ledger, keeps fee custody on the handler, and needs a withdraw from every leaf. A push
@@ -47,12 +47,12 @@ collector; gross `minRbtcOut`; fee event on every route.
       `PurchaseRbtc__StablecoinRetrievedBelowFee` (short retrieval spends what it got; fee
       shrinks with `Q`).
 - [ ] Keep `_transferFee` on `PurchaseFees` as the payment hook (same place R78 named). Default
-      is native rBTC to the collector (`call{value:}` + `FeeTransferred(address(0), …)`), matching
+      is native rBTC to the collector (`call{value:}` + `FeeTransferred(collector, amount)`), matching
       `_withdrawRbtc`: MoC inherits, Dex overrides.
-      - `PurchaseUniswap`: `safeTransfer` WRBTC + `FeeTransferred(address(i_wrbtc), …)`.
+      - `PurchaseUniswap`: `safeTransfer` WRBTC + `FeeTransferred(collector, amount)`.
       - Zero fee: no-op (no event).
-- [ ] Re-add `PurchaseFees__FeeTransferred(address indexed token, address indexed collector, uint256 amount)`.
-      Do not index `amount`.
+- [ ] Re-add `PurchaseFees__FeeTransferred(address indexed collector, uint256 amount)`.
+      Asset is implied by the emitting handler (Dex also emits WRBTC `Transfer`).
 - [ ] `minRbtcOut` continues to bind **gross** measured venue output before the fee peel.
 - [ ] Floor dust: `fee + ∑ row credits ≤ Q`; uncredited wei stays on the handler (R69 stands).
 - [ ] Update unit / integration tests that assumed a stablecoin fee transfer or
@@ -84,6 +84,7 @@ collector; gross `minRbtcOut`; fee event on every route.
 - `docs/relaunch/R107-rbtc-fees.md`
 - `docs/relaunch/README.md`
 - `docs/relaunch/IMPLEMENTATION_ORDER.md`
+- `docs/relaunch/CUTOVER_RUNBOOK.md` (collector must be able to receive native rBTC)
 - `.gitignore` (keep any local fee-currency decision note untracked)
 
 ## Required tests
@@ -118,7 +119,7 @@ No new fork-specific assertions required beyond the production fork lanes.
       transfer gone.
 - [ ] Conservation / rounding pinned: `floor(Q×F/G)` + `∑ floor(Q×nᵢ/G) ≤ Q`.
 - [ ] Gross `minRbtcOut`; gross `amountSpent` / batch spent totals.
-- [ ] `PurchaseFees__FeeTransferred` on MoC (`token=0`) and Dex (`token=WRBTC`).
+- [ ] `PurchaseFees__FeeTransferred` on every successful non-zero-fee purchase (MoC and Dex).
 - [ ] `make check` + both production fork lanes green.
 - [ ] Consumer issues opened / updated; URLs in the PR cutover note.
 - [ ] Spec assigned; README Status and `IMPLEMENTATION_ORDER.md` updated.
@@ -137,14 +138,18 @@ No new fork-specific assertions required beyond the production fork lanes.
 ## ABI / deploy / cutover impact
 
 - ABI: remove `PurchaseRbtc__StablecoinRetrievedBelowFee`; add
-  `PurchaseFees__FeeTransferred`; `RbtcBought.amountSpent` and batch spent totals change
+  `PurchaseFees__FeeTransferred(address indexed collector, uint256 amount)` and
+  `PurchaseFees__FeePaymentFailed`; `RbtcBought.amountSpent` and batch spent totals change
   meaning (net → gross). No function selector changes on `batchBuyRbtc`.
-- Scripts: none required (fee collector address unchanged).
+- Scripts: none required (fee collector address unchanged). The collector must be an EOA or
+  other address that can receive native rBTC (MoC `call{value:}` forwards all gas); Dex pays
+  WRBTC to the same address. See [`CUTOVER_RUNBOOK.md`](./CUTOVER_RUNBOOK.md).
 - Cutover:
   - **swapper-bot** — quote Dex / MoC `minRbtcOut` from **gross** stablecoin input (not
-    post-fee 99%); update [swapper-bot#6](https://github.com/BitChillRSK/swapper-bot/issues/6).
+    post-fee 99%); [swapper-bot#15](https://github.com/BitChillRSK/swapper-bot/issues/15).
   - **bitchill-monitoring** — subscribe to `PurchaseFees__FeeTransferred`; stop expecting a
-    stablecoin `Transfer` to the collector on purchase; MoC fees are native (`token=0`).
+    stablecoin `Transfer` to the collector on purchase; MoC native payments have no ERC-20 log;
+    watch `PurchaseFees__FeePaymentFailed`. [bitchill-monitoring#27](https://github.com/BitChillRSK/bitchill-monitoring/issues/27).
   - **front-end** — fee copy stays “1%”; average price from `amountSpent` is all-in; show fee
     in sats carefully.
   - **data-api** / **metrics-dashboard** — `amountSpent` / batch spent are gross if indexed.

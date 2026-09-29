@@ -154,7 +154,7 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
         address collector = s_feeCollector;
         (bool sent,) = collector.call{value: fee}("");
         if (!sent) revert PurchaseFees__FeePaymentFailed();
-        emit PurchaseFees__FeeTransferred(address(0), collector, fee);
+        emit PurchaseFees__FeeTransferred(collector, fee);
     }
 
     /*//////////////////////////////////////////////////////////////

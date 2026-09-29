@@ -27,7 +27,7 @@ contract PurchaseRbtcTest is Test {
     event PurchaseRbtc__SuccessfulRbtcBatchPurchase(
         address indexed token, uint256 totalPurchasedRbtc, uint256 totalStablecoinAmountSpent
     );
-    event PurchaseFees__FeeTransferred(address indexed token, address indexed collector, uint256 amount);
+    event PurchaseFees__FeeTransferred(address indexed collector, uint256 amount);
 
     uint16 internal constant FLAT_FEE_RATE = 100; // 1%
     uint256 internal constant BPS_DENOMINATOR = 10_000;
@@ -175,8 +175,8 @@ contract PurchaseRbtcTest is Test {
         emit PurchaseRbtc__RbtcBought(buyerA, address(token), userRbtc, scheduleA, requested);
         vm.expectEmit(true, true, true, true, address(harness));
         emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(address(token), RBTC_OUT, requested);
-        vm.expectEmit(true, true, false, true, address(harness));
-        emit PurchaseFees__FeeTransferred(address(0), feeCollector, feeRbtc);
+        vm.expectEmit(true, false, false, true, address(harness));
+        emit PurchaseFees__FeeTransferred(feeCollector, feeRbtc);
 
         harness.batchBuyRbtc(
             _oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested), NO_MIN_RBTC_OUT

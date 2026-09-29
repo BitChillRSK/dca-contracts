@@ -25,7 +25,7 @@ contract PurchaseFeesTest is Test {
     event PurchaseFees__PurchaseLowerBoundSet(uint256 feePurchaseLowerBound);
     event PurchaseFees__PurchaseUpperBoundSet(uint256 feePurchaseUpperBound);
     event PurchaseFees__FeeCollectorAddressSet(address indexed feeCollector);
-    event PurchaseFees__FeeTransferred(address indexed token, address indexed collector, uint256 amount);
+    event PurchaseFees__FeeTransferred(address indexed collector, uint256 amount);
 
     function setUp() public {
         IPurchaseFees.FeeSettings memory settings = IPurchaseFees.FeeSettings({
@@ -273,8 +273,8 @@ contract PurchaseFeesTest is Test {
         uint256 fee = 1 ether;
         vm.deal(address(feeHandler), fee);
         uint256 collectorBefore = FEE_COLLECTOR.balance;
-        vm.expectEmit(true, true, false, true, address(feeHandler));
-        emit PurchaseFees__FeeTransferred(address(0), FEE_COLLECTOR, fee);
+        vm.expectEmit(true, false, false, true, address(feeHandler));
+        emit PurchaseFees__FeeTransferred(FEE_COLLECTOR, fee);
         feeHandler.exposedTransferFee(fee);
         assertEq(FEE_COLLECTOR.balance - collectorBefore, fee);
         assertEq(address(feeHandler).balance, 0);

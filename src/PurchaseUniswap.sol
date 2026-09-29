@@ -289,7 +289,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         if (fee == 0) return;
         address collector = s_feeCollector;
         IERC20(address(i_wrbtc)).safeTransfer(collector, fee);
-        emit PurchaseFees__FeeTransferred(address(i_wrbtc), collector, fee);
+        emit PurchaseFees__FeeTransferred(collector, fee);
     }
 
     /*//////////////////////////////////////////////////////////////
