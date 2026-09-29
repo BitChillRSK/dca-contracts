@@ -62,7 +62,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
         uint256[] memory netStablecoinAmountsToSpend;
         uint256 plannedGross;
         uint256 aggregatedFee;
-        uint256 totalStablecoinAmountToSpend;
+        uint256 totalStablecoinRetrieved;
 
         {
             uint256 totalNetStablecoinPlanned;
@@ -75,20 +75,20 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
 
             // Retrieve the full planned gross. What comes back is what the retrieval delivered, which a
             // lending handler can leave short of the request. The venue spends that amount in full.
-            totalStablecoinAmountToSpend = _batchRetrieveStablecoin(buyers, purchaseAmounts);
+            totalStablecoinRetrieved = _batchRetrieveStablecoin(buyers, purchaseAmounts);
         }
 
         uint256 totalPurchasedRbtc;
         {
             uint256 inputBalanceBefore = i_stablecoin.balanceOf(address(this));
-            totalPurchasedRbtc = _purchaseRbtc(totalStablecoinAmountToSpend, minRbtcOut);
+            totalPurchasedRbtc = _purchaseRbtc(totalStablecoinRetrieved, minRbtcOut);
             uint256 inputBalanceAfter = i_stablecoin.balanceOf(address(this));
             if (
                 inputBalanceAfter > inputBalanceBefore
-                    || inputBalanceBefore - inputBalanceAfter != totalStablecoinAmountToSpend
+                    || inputBalanceBefore - inputBalanceAfter != totalStablecoinRetrieved
             ) {
                 revert PurchaseRbtc__InputAmountNotFullySpent(
-                    totalStablecoinAmountToSpend, inputBalanceBefore, inputBalanceAfter
+                    totalStablecoinRetrieved, inputBalanceBefore, inputBalanceAfter
                 );
             }
         }
@@ -115,10 +115,10 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
             netStablecoinAmountsToSpend,
             totalPurchasedRbtc,
             plannedGross,
-            totalStablecoinAmountToSpend
+            totalStablecoinRetrieved
         );
         emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
-            address(i_stablecoin), totalPurchasedRbtc, totalStablecoinAmountToSpend
+            address(i_stablecoin), totalPurchasedRbtc, totalStablecoinRetrieved
         );
         // Fee last: buyer credits and events are already in the frame. A failing collector payment
         // reverts the whole batch rather than leaving partial accounting.
@@ -178,7 +178,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
         uint256[] memory netAmounts,
         uint256 totalPurchasedRbtc,
         uint256 plannedGross,
-        uint256 totalStablecoinAmountToSpend
+        uint256 totalStablecoinRetrieved
     ) private {
         uint256 purchaseCount = buyers.length;
         for (uint256 i; i < purchaseCount; ++i) {
@@ -187,7 +187,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
                 userRbtc = totalPurchasedRbtc * netAmounts[i] / plannedGross;
             }
             // Gross share of what the venue actually spent (all-in average price).
-            uint256 userStablecoinSpent = totalStablecoinAmountToSpend * purchaseAmounts[i] / plannedGross;
+            uint256 userStablecoinSpent = totalStablecoinRetrieved * purchaseAmounts[i] / plannedGross;
             // Skip zero floor allocations so a never-credited user is not marked live.
             if (userRbtc != 0) _creditRbtc(buyers[i], userRbtc);
             emit PurchaseRbtc__RbtcBought(
