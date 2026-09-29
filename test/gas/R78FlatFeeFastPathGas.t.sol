@@ -190,15 +190,15 @@ contract R78FlatFeeFastPathGasTest is Test {
 
     function _assertSaving(uint256[] memory amounts, string memory label) private {
         _cool(address(baselineHarness));
-        (uint256 baselineGas, uint256 baselineFee, uint256 baselineNet, bytes32 baselineHash) =
+        (uint256 baselineGas, uint256 baselineFee, uint256 baselinePurchaseAmountsSum, bytes32 baselineHash) =
             baselineHarness.measure(amounts);
 
         _cool(address(optimizedHarness));
-        (uint256 optimizedGas, uint256 optimizedFee, uint256 optimizedNet, bytes32 optimizedHash) =
+        (uint256 optimizedGas, uint256 optimizedFee, uint256 optimizedPurchaseAmountsSum, bytes32 optimizedHash) =
             optimizedHarness.measure(amounts);
 
         assertEq(optimizedFee, baselineFee, "total fee changed");
-        assertEq(optimizedNet, baselineNet, "purchaseAmountsSum changed");
+        assertEq(optimizedPurchaseAmountsSum, baselinePurchaseAmountsSum, "purchaseAmountsSum changed");
         assertEq(optimizedHash, baselineHash, "per-row net amounts changed");
 
         uint256 saving = baselineGas - optimizedGas;
@@ -215,11 +215,12 @@ contract R78FlatFeeFastPathGasTest is Test {
         R78OptimizedPurchaseFeesGasHarness optimized,
         uint256[] memory amounts
     ) private {
-        (, uint256 baselineFee, uint256 baselineNet, bytes32 baselineHash) = baseline.measure(amounts);
-        (, uint256 optimizedFee, uint256 optimizedNet, bytes32 optimizedHash) = optimized.measure(amounts);
+        (, uint256 baselineFee, uint256 baselinePurchaseAmountsSum, bytes32 baselineHash) = baseline.measure(amounts);
+        (, uint256 optimizedFee, uint256 optimizedPurchaseAmountsSum, bytes32 optimizedHash) =
+            optimized.measure(amounts);
 
         assertEq(optimizedFee, baselineFee, "total fee changed");
-        assertEq(optimizedNet, baselineNet, "purchaseAmountsSum changed");
+        assertEq(optimizedPurchaseAmountsSum, baselinePurchaseAmountsSum, "purchaseAmountsSum changed");
         assertEq(optimizedHash, baselineHash, "per-row net amounts changed");
     }
 
