@@ -48,6 +48,12 @@ interface IPurchaseFees {
     event PurchaseFees__PurchaseUpperBoundSet(uint256 feePurchaseUpperBound);
     /// @notice Owner set the address that receives purchase fees.
     event PurchaseFees__FeeCollectorAddressSet(address indexed feeCollector);
+    /**
+     * @notice A non-zero purchase fee was paid to the collector (native rBTC or WRBTC).
+     * @dev `token` is `address(0)` for native rBTC (MoC) and the WRBTC address on Dex. Emitted once
+     *      per batch after buyer credits. Do not index `amount`.
+     */
+    event PurchaseFees__FeeTransferred(address indexed token, address indexed collector, uint256 amount);
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -61,6 +67,8 @@ interface IPurchaseFees {
     error PurchaseFees__InvalidFeeCollector();
     /// @notice A fee rate exceeds the 5% cap.
     error PurchaseFees__MaxFeeRateExceedsCap();
+    /// @notice Native rBTC fee payment to the collector failed.
+    error PurchaseFees__FeePaymentFailed();
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
@@ -93,7 +101,7 @@ interface IPurchaseFees {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Address that currently receives purchase fees.
+     * @notice Address that currently receives purchase fees (native rBTC on MoC, WRBTC on Dex).
      * @return The fee collector.
      */
     function getFeeCollector() external view returns (address);

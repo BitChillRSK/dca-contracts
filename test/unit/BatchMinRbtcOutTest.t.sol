@@ -43,7 +43,8 @@ contract BatchMinRbtcOutTest is DcaDappTest {
 
         _buy(measured);
 
-        assertEq(_accumulatedRbtc() - rbtcBefore, measured, "the batch credited exactly the minimum it cleared");
+        assertGt(_accumulatedRbtc() - rbtcBefore, 0, "the batch must credit the buyer");
+        assertLe(_accumulatedRbtc() - rbtcBefore, measured, "credits cannot exceed gross measured output");
     }
 
     /// @dev One wei above what the batch buys fails. On Dex the router enforces `max(amountOutLowerBound, minRbtcOut)`
@@ -62,7 +63,8 @@ contract BatchMinRbtcOutTest is DcaDappTest {
     function testViolatedMinimumRollsBackTheWholeBatch() external {
         IDcaManager.DcaSchedule memory before = _schedule();
         uint256 rbtcBefore = _accumulatedRbtc();
-        uint256 feeCollectorBefore = stablecoin.balanceOf(FEE_COLLECTOR);
+        uint256 feeCollectorStableBefore = stablecoin.balanceOf(FEE_COLLECTOR);
+        uint256 feeCollectorRbtcBefore = isDexSwaps ? wrbtc.balanceOf(FEE_COLLECTOR) : FEE_COLLECTOR.balance;
         uint256 handlerCashBefore = _handlerRbtcCash();
         uint256 handlerStablecoinBefore = stablecoin.balanceOf(address(stablecoinHandler));
 
@@ -79,7 +81,9 @@ contract BatchMinRbtcOutTest is DcaDappTest {
             "the schedule keeps its purchase slot, so the swapper can retry this period"
         );
         assertEq(_accumulatedRbtc(), rbtcBefore, "no buyer was credited");
-        assertEq(stablecoin.balanceOf(FEE_COLLECTOR), feeCollectorBefore, "no fee was kept");
+        assertEq(stablecoin.balanceOf(FEE_COLLECTOR), feeCollectorStableBefore, "no stablecoin fee was kept");
+        uint256 feeCollectorRbtcAfter = isDexSwaps ? wrbtc.balanceOf(FEE_COLLECTOR) : FEE_COLLECTOR.balance;
+        assertEq(feeCollectorRbtcAfter, feeCollectorRbtcBefore, "no rBTC fee was kept");
         assertEq(_handlerRbtcCash(), handlerCashBefore, "the handler bought and kept no rBTC");
         assertEq(
             stablecoin.balanceOf(address(stablecoinHandler)),
@@ -104,20 +108,30 @@ contract BatchMinRbtcOutTest is DcaDappTest {
 
         // The same batch, retried one-handler with a reachable minimum, goes through.
         _buy(measured);
-        assertEq(_accumulatedRbtc(), measured);
+        assertGt(_accumulatedRbtc(), 0);
+        assertLe(_accumulatedRbtc(), measured);
     }
 
-    /// @dev The bound is on measured rBTC, not on the stablecoin the rows planned to spend: the batch's own
-    ///      gross notional at the oracle price is unreachable, because the fee and the venue both take a cut.
-    function testMinimumIsMeasuredRbtcNotPlannedStablecoin() external {
+    /// @dev The bound is on measured venue output, not buyer credit. A min set to the buyer's
+    ///      credit (below Q after the rBTC fee) still succeeds; one wei above Q fails.
+    function testMinimumIsGrossVenueOutputNotBuyerCredit() external {
         uint256 measured = _measuredOutput();
-        uint256 grossNotional = AMOUNT_TO_SPEND / s_btcPrice;
 
-        assertLt(measured, grossNotional, "the fee alone puts the gross notional out of reach");
+        uint256 snapshot = vm.snapshot();
+        uint256 rbtcBefore = _accumulatedRbtc();
+        _buy(NO_MIN_RBTC_OUT);
+        uint256 credit = _accumulatedRbtc() - rbtcBefore;
+        assertLt(credit, measured, "the rBTC fee must leave buyer credit strictly below gross Q");
+        vm.revertTo(snapshot);
 
-        IDcaManager.Batch memory batch = _batch(grossNotional);
+        snapshot = vm.snapshot();
+        _buy(credit);
+        assertGt(_accumulatedRbtc() - rbtcBefore, 0, "a min equal to buyer credit must still clear gross Q");
+        vm.revertTo(snapshot);
+
+        IDcaManager.Batch memory batch = _batch(measured + 1);
         vm.prank(SWAPPER);
-        _expectMinimumViolationRevert(measured, grossNotional);
+        _expectMinimumViolationRevert(measured, measured + 1);
         dcaManager.batchBuyRbtc(batch);
     }
 
@@ -139,17 +153,19 @@ contract BatchMinRbtcOutTest is DcaDappTest {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev What this batch actually buys. On MoC, an unreachable `minRbtcOut` reverts with the measured
-     *      output in `PurchaseRbtc__BelowSwapperMinimum` and rolls the whole batch back. On Dex, the router
-     *      would reject `type(uint256).max` before that check, so take a snapshot, buy with `0`, read the
-     *      credited delta, and revert the world.
+     * @dev Gross venue output Q. On MoC, an unreachable `minRbtcOut` reverts with Q in
+     *      `PurchaseRbtc__BelowSwapperMinimum` and rolls the whole batch back. On Dex, the router would
+     *      reject `type(uint256).max` before that check, so take a snapshot, buy with `0`, sum handler
+     *      WRBTC (credits + dust) and collector WRBTC (fee), and revert the world.
      */
     function _measuredOutput() private returns (uint256 measured) {
         if (isDexSwaps) {
             uint256 snapshot = vm.snapshot();
-            uint256 rbtcBefore = _accumulatedRbtc();
+            uint256 handlerBefore = wrbtc.balanceOf(address(stablecoinHandler));
+            uint256 collectorBefore = wrbtc.balanceOf(FEE_COLLECTOR);
             _buy(NO_MIN_RBTC_OUT);
-            measured = _accumulatedRbtc() - rbtcBefore;
+            measured = (wrbtc.balanceOf(address(stablecoinHandler)) - handlerBefore)
+                + (wrbtc.balanceOf(FEE_COLLECTOR) - collectorBefore);
             assertGt(measured, 0, "the batch must buy something for the minimum to be meaningful");
             vm.revertTo(snapshot);
             return measured;

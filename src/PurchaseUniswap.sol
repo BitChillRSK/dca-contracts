@@ -284,6 +284,14 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         super._withdrawRbtc(user, rbtcBalance);
     }
 
+    /// @dev Purchases accumulate WRBTC; pay the fee in WRBTC. Collector unwraps infrequently off-path.
+    function _transferFee(uint256 fee) internal override {
+        if (fee == 0) return;
+        address collector = s_feeCollector;
+        IERC20(address(i_wrbtc)).safeTransfer(collector, fee);
+        emit PurchaseFees__FeeTransferred(address(i_wrbtc), collector, fee);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             PRIVATE FUNCTIONS
     //////////////////////////////////////////////////////////////*/

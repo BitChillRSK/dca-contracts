@@ -2,19 +2,17 @@
 pragma solidity 0.8.36;
 
 import {IPurchaseFees} from "./interfaces/IPurchaseFees.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {BitChillOwnable} from "./BitChillOwnable.sol";
 
 /**
  * @title PurchaseFees
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Interpolates a purchase fee between the configured rate bounds and pays it to the
- *         collector. Owned by the purchase branch (`PurchaseRbtc` and its MoC / Uniswap leaves).
+ * @notice Interpolates a purchase fee between the configured rate bounds. Owned by the purchase
+ *         branch (`PurchaseRbtc` and its MoC / Uniswap leaves); the purchase pipeline pays the
+ *         floored rBTC / WRBTC share to the collector.
  */
 abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
-    using SafeERC20 for IERC20;
     using SafeCast for uint256;
 
     /*//////////////////////////////////////////////////////////////
@@ -123,9 +121,10 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
     /**
      * @dev Calculate the fee and net amounts for a batch of purchase amounts.
      * @param purchaseAmounts The array with the raw purchase amounts specified by users.
-     * @return aggregatedFee      The total fee to be collected for all purchases.
+     * @return aggregatedFee      The total fee weight (stablecoin units) for all purchases.
      * @return netAmountsToSpend  An array with the net amounts (purchase amount minus fee) for each user.
-     * @return totalAmountToSpend The aggregated net amount that will actually be used to buy rBTC after fee is charged.
+     * @return totalAmountToSpend The aggregated net weight used with `aggregatedFee` to allocate
+     *                            measured output between buyers and the collector.
      */
     function _calculateFeeAndNetAmounts(uint256[] calldata purchaseAmounts)
         internal
@@ -144,9 +143,18 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
         );
     }
 
-    function _transferFee(IERC20 token, uint256 fee) internal {
+    /**
+     * @dev Pay `fee` to `s_feeCollector`. Default is native rBTC (MoC). A route whose purchases
+     *      accumulate WRBTC overrides this to transfer WRBTC instead. No-op when the floored fee is
+     *      zero. Kept as the last external interaction of a purchase so a failing collector undoes
+     *      buyer credits rather than leaving a partial batch.
+     */
+    function _transferFee(uint256 fee) internal virtual {
         if (fee == 0) return;
-        token.safeTransfer(s_feeCollector, fee);
+        address collector = s_feeCollector;
+        (bool sent,) = collector.call{value: fee}("");
+        if (!sent) revert PurchaseFees__FeePaymentFailed();
+        emit PurchaseFees__FeeTransferred(address(0), collector, fee);
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -70,7 +70,8 @@ contract R77AccumulatedRbtcSentinelGasTest is Test {
         uint256 firstCreditGas = gasBefore - gasleft();
 
         console2.log("COLD first credit onto 0:", firstCreditGas);
-        assertEq(harness.getAccumulatedRbtcBalance(buyerFirst), RBTC_OUT);
+        uint256 expectedCredit = RBTC_OUT * (10_000 - FLAT_FEE_RATE) / 10_000;
+        assertEq(harness.getAccumulatedRbtcBalance(buyerFirst), expectedCredit);
     }
 
     function test_gas_coldRecreditOntoSentinel() public {
@@ -81,7 +82,8 @@ contract R77AccumulatedRbtcSentinelGasTest is Test {
         uint256 recreditGas = gasBefore - gasleft();
 
         console2.log("COLD re-credit onto sentinel:", recreditGas);
-        assertEq(harness.getAccumulatedRbtcBalance(buyerSentinel), RBTC_OUT);
+        uint256 expectedCredit = RBTC_OUT * (10_000 - FLAT_FEE_RATE) / 10_000;
+        assertEq(harness.getAccumulatedRbtcBalance(buyerSentinel), expectedCredit);
     }
 
     function test_gas_coldRecreditSavesAgainstFirstCredit() public {

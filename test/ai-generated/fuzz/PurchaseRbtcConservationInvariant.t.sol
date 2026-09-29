@@ -68,10 +68,11 @@ contract PurchaseRbtcConservationHandler is Test {
 
         try i_harness.batchBuyRbtc(buyers, scheduleIds, amounts, 0) {
             s_rbtcBoughtGhost += rbtcOut;
-            s_flooredSlackGhost += rows - 1;
+            // Buyer rows plus the collector fee each floor; remainder is at most that many wei.
+            s_flooredSlackGhost += rows + 1;
             ++s_batchSuccesses;
         } catch {
-            // An unlucky draw (retrieval at or below the aggregated fee) is not a finding.
+            // An unlucky draw is not a finding.
         }
     }
 
@@ -162,10 +163,11 @@ contract PurchaseRbtcConservationInvariantTest is StdInvariant, Test {
 
         uint256 attributed = totalOnBooks + fuzzHandler.s_rbtcWithdrawnGhost();
         uint256 bought = fuzzHandler.s_rbtcBoughtGhost();
+        uint256 fees = address(0xFEE).balance;
 
-        assertLe(attributed, bought, "books claim more rBTC than the venue leg delivered");
+        assertLe(attributed + fees, bought, "books plus collector claim more rBTC than the venue delivered");
         assertGe(
-            attributed + fuzzHandler.s_flooredSlackGhost(),
+            attributed + fees + fuzzHandler.s_flooredSlackGhost(),
             bought,
             "measured rBTC went missing beyond the floor allocation's slack"
         );

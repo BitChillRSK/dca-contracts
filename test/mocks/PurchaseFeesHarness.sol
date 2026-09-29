@@ -3,7 +3,6 @@ pragma solidity 0.8.36;
 
 import {PurchaseFees} from "../../src/PurchaseFees.sol";
 import {IPurchaseFees} from "../../src/interfaces/IPurchaseFees.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract PurchaseFeesHarness is PurchaseFees {
     constructor(address feeCollector, IPurchaseFees.FeeSettings memory settings, address initialOwner)
@@ -50,7 +49,7 @@ contract PurchaseFeesHarness is PurchaseFees {
         s_feePurchaseUpperBound = upper;
     }
 
-    function exposedTransferFee(IERC20 token, uint256 fee) external {
-        _transferFee(token, fee);
+    function exposedTransferFee(uint256 fee) external {
+        _transferFee(fee);
     }
 }

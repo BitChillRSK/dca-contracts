@@ -174,12 +174,10 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         // MockMocProxy.redeemFreeDoc's DOC transferFrom reverts. MoC wrappers are gone, so the
         // OZ ERC-20 error bubbles. Scoped to that selector — a bare expectRevert would also
         // pass if the *first* handler failed. Fork lanes skip this case (no second MoC handler).
-        uint256 fee = feeCalculator.calculateFee(AMOUNT_TO_SPEND);
-        uint256 netDoc = AMOUNT_TO_SPEND - fee;
         IDcaManager.Batch[] memory batches = _twoHandlers();
         vm.expectRevert(
             abi.encodeWithSelector(
-                IERC20Errors.ERC20InsufficientAllowance.selector, address(mocProxy), uint256(0), netDoc
+                IERC20Errors.ERC20InsufficientAllowance.selector, address(mocProxy), uint256(0), AMOUNT_TO_SPEND
             )
         );
         _batchBuy(batches);
@@ -262,7 +260,9 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         batches[1].minRbtcOut = 1;
         _batchBuy(batches);
 
-        assertEq(IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER), firstMeasured);
+        uint256 firstCredit = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
+        assertGt(firstCredit, 0);
+        assertLe(firstCredit, firstMeasured, "buyer credit is net of the rBTC fee; min bound is gross Q");
         assertGt(IPurchaseRbtc(secondHandler).getAccumulatedRbtcBalance(USER), 0);
     }
 

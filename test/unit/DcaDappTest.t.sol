@@ -558,7 +558,7 @@ contract DcaDappTest is Test {
             vm.expectEmit(true, true, true, false); // Amounts may not match to the last wei on fork tests
         }
         emit PurchaseRbtc__RbtcBought(
-            USER, address(stablecoin), netPurchaseAmount / s_btcPrice, dcaDetailsIds[SCHEDULE_INDEX], netPurchaseAmount
+            USER, address(stablecoin), netPurchaseAmount / s_btcPrice, dcaDetailsIds[SCHEDULE_INDEX], AMOUNT_TO_SPEND
         );
         buyRbtcOne(dcaDetailsIds[SCHEDULE_INDEX]);
 
