@@ -22,7 +22,12 @@ interface IPurchaseRbtc is IStablecoinSource {
         uint64 indexed scheduleId,
         uint256 amountSpent
     );
-    /// @notice A batch purchase completed. Totals are measured cash, not planned figures.
+    /**
+     * @notice A batch purchase completed. Totals are measured cash, not planned figures.
+     * @dev `totalPurchasedRbtc` is gross measured venue output. It includes the collector's
+     *      floored share and generally exceeds the sum of this batch's `RbtcBought.rBtcBought`
+     *      (floor dust can widen the gap). `totalStablecoinAmountSpent` is retrieved gross.
+     */
     event PurchaseRbtc__SuccessfulRbtcBatchPurchase(
         address indexed token, uint256 totalPurchasedRbtc, uint256 totalStablecoinAmountSpent
     );

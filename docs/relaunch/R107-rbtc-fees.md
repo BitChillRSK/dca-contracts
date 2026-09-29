@@ -140,7 +140,9 @@ No new fork-specific assertions required beyond the production fork lanes.
 - ABI: remove `PurchaseRbtc__StablecoinRetrievedBelowFee`; add
   `PurchaseFees__FeeTransferred(address indexed collector, uint256 amount)` and
   `PurchaseFees__FeePaymentFailed`; `RbtcBought.amountSpent` and batch spent totals change
-  meaning (net → gross). No function selector changes on `batchBuyRbtc`.
+  meaning (net → gross). `SuccessfulRbtcBatchPurchase.totalPurchasedRbtc` is still gross
+  measured output and now includes the collector's share, so it generally exceeds
+  `∑ RbtcBought.rBtcBought`. No function selector changes on `batchBuyRbtc`.
 - Scripts: none required (fee collector address unchanged). The collector must be an EOA or
   other address that can receive native rBTC (MoC `call{value:}` forwards all gas); Dex pays
   WRBTC to the same address. See [`CUTOVER_RUNBOOK.md`](./CUTOVER_RUNBOOK.md).
@@ -149,7 +151,12 @@ No new fork-specific assertions required beyond the production fork lanes.
     post-fee 99%); [swapper-bot#15](https://github.com/BitChillRSK/swapper-bot/issues/15).
   - **bitchill-monitoring** — subscribe to `PurchaseFees__FeeTransferred`; stop expecting a
     stablecoin `Transfer` to the collector on purchase; MoC native payments have no ERC-20 log;
-    watch `PurchaseFees__FeePaymentFailed`. [bitchill-monitoring#27](https://github.com/BitChillRSK/bitchill-monitoring/issues/27).
+    watch `PurchaseFees__FeePaymentFailed`. Do not alert on
+    `∑ RbtcBought.rBtcBought != SuccessfulRbtcBatchPurchase.totalPurchasedRbtc`: the batch
+    total is gross `Q` and includes the collector's share.
+    [bitchill-monitoring#27](https://github.com/BitChillRSK/bitchill-monitoring/issues/27).
   - **front-end** — fee copy stays “1%”; average price from `amountSpent` is all-in; show fee
     in sats carefully.
   - **data-api** / **metrics-dashboard** — `amountSpent` / batch spent are gross if indexed.
+    `totalPurchasedRbtc` includes the collector's share and generally exceeds the sum of
+    buyer credits.
