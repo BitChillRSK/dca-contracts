@@ -59,7 +59,7 @@ interface IPurchaseRbtc is IStablecoinSource {
      * @notice Spend each buyer's stablecoin and credit their accumulated rBTC.
      * @param buyers Users to buy for. An address may appear more than once.
      * @param scheduleIds Schedule id for each row, used only in `RbtcBought`.
-     * @param purchaseAmounts Gross stablecoin each row contributes (fee weight is derived from these).
+     * @param purchaseAmounts Gross stablecoin each row contributes (the total fee is derived from these).
      * @param minRbtcOut Minimum rBTC this batch as a whole must buy, in rBTC/WRBTC wei (18 decimals)
      *        whatever the stablecoin's decimals. `0` disables this check. Binds gross measured output
      *        before the protocol fee is taken from that output.

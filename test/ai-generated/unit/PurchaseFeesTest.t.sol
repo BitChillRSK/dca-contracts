@@ -205,18 +205,18 @@ contract PurchaseFeesTest is Test {
         amounts[2] = 550 ether;
         amounts[3] = 2000 ether;
 
-        (uint256 totalFeeWeight, uint256[] memory netAmounts, uint256 requestedGross) =
+        (uint256 totalFee, uint256[] memory netAmounts, uint256 requestedGross) =
             feeHandler.exposedCalculateFeeAndNetWeights(amounts);
 
-        uint256 expectedTotalFeeWeight;
+        uint256 expectedTotalFee;
         uint256 expectedRequestedGross;
         for (uint256 i; i < amounts.length; ++i) {
             uint256 expectedFee = feeHandler.exposedCalculateFee(amounts[i]);
-            expectedTotalFeeWeight += expectedFee;
+            expectedTotalFee += expectedFee;
             expectedRequestedGross += amounts[i];
             assertEq(netAmounts[i], amounts[i] - expectedFee);
         }
-        assertEq(totalFeeWeight, expectedTotalFeeWeight);
+        assertEq(totalFee, expectedTotalFee);
         assertEq(requestedGross, expectedRequestedGross);
     }
 
@@ -231,18 +231,18 @@ contract PurchaseFeesTest is Test {
         amounts[3] = 10_000;
         amounts[4] = 550 ether;
 
-        (uint256 totalFeeWeight, uint256[] memory netAmounts, uint256 requestedGross) =
+        (uint256 totalFee, uint256[] memory netAmounts, uint256 requestedGross) =
             feeHandler.exposedCalculateFeeAndNetWeights(amounts);
 
-        uint256 expectedTotalFeeWeight;
+        uint256 expectedTotalFee;
         uint256 expectedRequestedGross;
         for (uint256 i; i < amounts.length; ++i) {
             uint256 expectedFee = amounts[i] * flatRate / BPS_DENOMINATOR;
-            expectedTotalFeeWeight += expectedFee;
+            expectedTotalFee += expectedFee;
             expectedRequestedGross += amounts[i];
             assertEq(netAmounts[i], amounts[i] - expectedFee);
         }
-        assertEq(totalFeeWeight, expectedTotalFeeWeight);
+        assertEq(totalFee, expectedTotalFee);
         assertEq(requestedGross, expectedRequestedGross);
     }
 
@@ -362,7 +362,7 @@ contract PurchaseFeesTest is Test {
         uint256 lower,
         uint256 upper
     ) private {
-        (uint256 totalFeeWeight, uint256[] memory nets, uint256 requestedGross) =
+        (uint256 totalFee, uint256[] memory nets, uint256 requestedGross) =
             feeHandler.exposedCalculateFeeAndNetWeights(amounts);
         uint256 expectedFees;
         uint256 expectedRequestedGross;
@@ -377,7 +377,7 @@ contract PurchaseFeesTest is Test {
             expectedFees += fee;
             expectedRequestedGross += amount;
         }
-        assertEq(totalFeeWeight, expectedFees, "fee weight");
+        assertEq(totalFee, expectedFees, "total fee");
         assertEq(requestedGross, expectedRequestedGross, "requested gross");
     }
 

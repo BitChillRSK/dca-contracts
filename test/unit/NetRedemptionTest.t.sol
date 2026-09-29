@@ -217,15 +217,15 @@ contract NetRedemptionTest is DcaDappTest {
 
         (,, uint64[] memory scheduleIds, uint256[] memory purchaseAmounts) = _batchArrays();
 
-        uint256 totalFeeWeight;
+        uint256 totalFee;
         uint256 totalPurchase;
         for (uint256 i; i < purchaseAmounts.length; ++i) {
-            totalFeeWeight += feeCalculator.calculateFee(purchaseAmounts[i]);
+            totalFee += feeCalculator.calculateFee(purchaseAmounts[i]);
             totalPurchase += purchaseAmounts[i];
         }
         uint256 expectedRedeemed = totalPurchase * (BPS_DENOMINATOR - RUG_EXIT_FEE_BPS) / BPS_DENOMINATOR;
         assertGt(expectedRedeemed, 0, "a zero payout is a different error");
-        assertLe(expectedRedeemed, totalFeeWeight, "the redeem should fall short of the planned fee weight");
+        assertLe(expectedRedeemed, totalFee, "the redeem should fall short of the total fee");
 
         uint256 collectorBefore = IPurchaseFees(address(stablecoinHandler)).getFeeCollector().balance;
         uint256 rbtcBefore = _accumulatedRbtc();

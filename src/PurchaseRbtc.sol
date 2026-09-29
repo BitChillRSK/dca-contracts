@@ -49,7 +49,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
      *      for: a lending handler can come back short when it redeems its shares. Idle retrieval only sums
      *      the request, because the cash already sits on the handler; if it is not all there, the venue's
      *      pull or the exact-consumption check reverts the batch. The venue spends that full retrieved
-     *      amount. Net weights and the fee weight allocate measured output over requested gross (`∑
+     *      amount. Net weights and the total fee allocate measured output over requested gross (`∑
      *      purchaseAmounts`): buyer credits and the protocol fee are floored shares of measured
      *      output. Reported spend is each row's share of retrieved gross. The fee (native rBTC or
      *      WRBTC) is paid last.
@@ -62,11 +62,11 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
     ) external override onlyDcaManager {
         uint256[] memory netWeights;
         uint256 requestedGross;
-        uint256 totalFeeWeight;
+        uint256 totalFee;
         uint256 totalStablecoinRetrieved;
 
         {
-            (totalFeeWeight, netWeights, requestedGross) = _calculateFeeAndNetWeights(purchaseAmounts);
+            (totalFee, netWeights, requestedGross) = _calculateFeeAndNetWeights(purchaseAmounts);
 
             // Retrieve the requested gross. What comes back is what the retrieval delivered, which a
             // lending handler can leave short of the request. The venue spends that amount in full.
@@ -96,11 +96,11 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
             revert PurchaseRbtc__BelowSwapperMinimum(totalPurchasedRbtc, minRbtcOut);
         }
 
-        // Can't overflow: the rBTC total is under the native supply (< 2^85 wei) and the fee weight is a
+        // Can't overflow: the rBTC total is under the native supply (< 2^85 wei) and the total fee is a
         // fraction of requestedGross (capped at 5% of uint96 purchase amounts).
         uint256 feeRbtc;
         unchecked {
-            feeRbtc = totalPurchasedRbtc * totalFeeWeight / requestedGross;
+            feeRbtc = totalPurchasedRbtc * totalFee / requestedGross;
         }
 
         _creditPurchases(
