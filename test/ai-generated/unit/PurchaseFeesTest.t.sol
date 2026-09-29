@@ -198,29 +198,29 @@ contract PurchaseFeesTest is Test {
         assertEq(feeHandler.exposedCalculateFee(above), above * flatRate / BPS_DENOMINATOR);
     }
 
-    function test_calculateFeeAndNetAmounts_matchesSequentialCalculateFee() public {
+    function test_calculateFeeAndNetWeights_matchesSequentialCalculateFee() public {
         uint256[] memory amounts = new uint256[](4);
         amounts[0] = 50 ether;
         amounts[1] = LOWER_BOUND;
         amounts[2] = 550 ether;
         amounts[3] = 2000 ether;
 
-        (uint256 aggregatedFee, uint256[] memory netAmounts, uint256 totalNet) =
-            feeHandler.exposedCalculateFeeAndNetAmounts(amounts);
+        (uint256 totalFeeWeight, uint256[] memory netAmounts, uint256 totalNet) =
+            feeHandler.exposedCalculateFeeAndNetWeights(amounts);
 
-        uint256 expectedAggregatedFee;
+        uint256 expectedTotalFeeWeight;
         uint256 expectedTotalNet;
         for (uint256 i; i < amounts.length; ++i) {
             uint256 expectedFee = feeHandler.exposedCalculateFee(amounts[i]);
-            expectedAggregatedFee += expectedFee;
+            expectedTotalFeeWeight += expectedFee;
             expectedTotalNet += amounts[i] - expectedFee;
             assertEq(netAmounts[i], amounts[i] - expectedFee);
         }
-        assertEq(aggregatedFee, expectedAggregatedFee);
+        assertEq(totalFeeWeight, expectedTotalFeeWeight);
         assertEq(totalNet, expectedTotalNet);
     }
 
-    function test_calculateFeeAndNetAmounts_flatMatchesSequentialIncludingRounding() public {
+    function test_calculateFeeAndNetWeights_flatMatchesSequentialIncludingRounding() public {
         uint16 flatRate = 137;
         feeHandler.testSetFeeRateParams(flatRate, flatRate, LOWER_BOUND, UPPER_BOUND);
 
@@ -231,18 +231,18 @@ contract PurchaseFeesTest is Test {
         amounts[3] = 10_000;
         amounts[4] = 550 ether;
 
-        (uint256 aggregatedFee, uint256[] memory netAmounts, uint256 totalNet) =
-            feeHandler.exposedCalculateFeeAndNetAmounts(amounts);
+        (uint256 totalFeeWeight, uint256[] memory netAmounts, uint256 totalNet) =
+            feeHandler.exposedCalculateFeeAndNetWeights(amounts);
 
-        uint256 expectedAggregatedFee;
+        uint256 expectedTotalFeeWeight;
         uint256 expectedTotalNet;
         for (uint256 i; i < amounts.length; ++i) {
             uint256 expectedFee = amounts[i] * flatRate / BPS_DENOMINATOR;
-            expectedAggregatedFee += expectedFee;
+            expectedTotalFeeWeight += expectedFee;
             expectedTotalNet += amounts[i] - expectedFee;
             assertEq(netAmounts[i], amounts[i] - expectedFee);
         }
-        assertEq(aggregatedFee, expectedAggregatedFee);
+        assertEq(totalFeeWeight, expectedTotalFeeWeight);
         assertEq(totalNet, expectedTotalNet);
     }
 
@@ -338,7 +338,7 @@ contract PurchaseFeesTest is Test {
     /// @dev The fee multiplication and both loop sums run unchecked, bounded by uint96 purchase amounts and
     ///      the 500 bps cap. Drive a long batch at those bounds, flat and across the whole variable band,
     ///      and compare every output with full-width arithmetic.
-    function test_calculateFeeAndNetAmounts_uint96RowsAtCapMatchFullWidth() public {
+    function test_calculateFeeAndNetWeights_uint96RowsAtCapMatchFullWidth() public {
         uint256 rows = 256;
         uint256[] memory amounts = new uint256[](rows);
         uint256 step = uint256(type(uint96).max) / rows;
@@ -362,8 +362,8 @@ contract PurchaseFeesTest is Test {
         uint256 lower,
         uint256 upper
     ) private {
-        (uint256 aggregatedFee, uint256[] memory nets, uint256 totalNet) =
-            feeHandler.exposedCalculateFeeAndNetAmounts(amounts);
+        (uint256 totalFeeWeight, uint256[] memory nets, uint256 totalNet) =
+            feeHandler.exposedCalculateFeeAndNetWeights(amounts);
         uint256 expectedFees;
         uint256 expectedNets;
         for (uint256 i; i < amounts.length; ++i) {
@@ -377,7 +377,7 @@ contract PurchaseFeesTest is Test {
             expectedFees += fee;
             expectedNets += amount - fee;
         }
-        assertEq(aggregatedFee, expectedFees, "aggregated fee");
+        assertEq(totalFeeWeight, expectedFees, "fee weight");
         assertEq(totalNet, expectedNets, "total net");
     }
 

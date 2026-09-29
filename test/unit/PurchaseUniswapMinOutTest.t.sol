@@ -386,7 +386,7 @@ contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
 
     /// @dev External so the batch fee helper receives the `calldata` array it takes in production.
     function calculateBatchFee(uint256[] calldata amounts) external view returns (uint256 fee) {
-        (fee,,) = _calculateFeeAndNetAmounts(amounts);
+        (fee,,) = _calculateFeeAndNetWeights(amounts);
     }
 
     function purchaseRbtc(uint256 stablecoinAmountToSpend, uint256 minRbtcOut) external returns (uint256) {

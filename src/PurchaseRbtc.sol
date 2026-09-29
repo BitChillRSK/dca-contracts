@@ -49,7 +49,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
      *      for: a lending handler can come back short when it redeems its shares. Idle retrieval only sums
      *      the request, because the cash already sits on the handler; if it is not all there, the venue's
      *      pull or the exact-consumption check reverts the batch. The venue spends that full retrieved
-     *      amount. Planned net weights and the aggregated fee allocate measured output over planned gross: buyer
+     *      amount. Planned net weights and the fee weight allocate measured output over planned gross: buyer
      *      credits and the protocol fee are floored shares of measured output. Reported spend is each
      *      row's share of retrieved gross. The fee (native rBTC or WRBTC) is paid last.
      */
@@ -61,16 +61,16 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
     ) external override onlyDcaManager {
         uint256[] memory netWeights;
         uint256 plannedGross;
-        uint256 aggregatedFee;
+        uint256 totalFeeWeight;
         uint256 totalStablecoinRetrieved;
 
         {
             uint256 totalNetWeight;
-            (aggregatedFee, netWeights, totalNetWeight) = _calculateFeeAndNetAmounts(purchaseAmounts);
-            // Fee + net weights reconstruct the planned gross: each row's fee was peeled from its
-            // purchase amount.
+            (totalFeeWeight, netWeights, totalNetWeight) = _calculateFeeAndNetWeights(purchaseAmounts);
+            // Fee weight + net weights reconstruct the planned gross: each row's fee was peeled from
+            // its purchase amount.
             unchecked {
-                plannedGross = totalNetWeight + aggregatedFee;
+                plannedGross = totalNetWeight + totalFeeWeight;
             }
 
             // Retrieve the full planned gross. What comes back is what the retrieval delivered, which a
@@ -105,7 +105,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
         // fraction of plannedGross (capped at 5% of uint96 purchase amounts).
         uint256 feeRbtc;
         unchecked {
-            feeRbtc = totalPurchasedRbtc * aggregatedFee / plannedGross;
+            feeRbtc = totalPurchasedRbtc * totalFeeWeight / plannedGross;
         }
 
         _creditPurchases(

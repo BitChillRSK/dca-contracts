@@ -12,16 +12,16 @@ contract PurchaseFeesHarness is PurchaseFees {
     function exposedCalculateFee(uint256 amount) external view returns (uint256) {
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = amount;
-        (uint256 fee,,) = this.exposedCalculateFeeAndNetAmounts(amounts);
+        (uint256 fee,,) = this.exposedCalculateFeeAndNetWeights(amounts);
         return fee;
     }
 
-    function exposedCalculateFeeAndNetAmounts(uint256[] calldata purchaseAmounts)
+    function exposedCalculateFeeAndNetWeights(uint256[] calldata purchaseAmounts)
         external
         view
-        returns (uint256 aggregatedFee, uint256[] memory netWeights, uint256 totalNetWeight)
+        returns (uint256 totalFeeWeight, uint256[] memory netWeights, uint256 totalNetWeight)
     {
-        return _calculateFeeAndNetAmounts(purchaseAmounts);
+        return _calculateFeeAndNetWeights(purchaseAmounts);
     }
 
     // Test-only setters without onlyOwner restriction for convenience.

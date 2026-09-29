@@ -123,24 +123,24 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
      *      measured output over planned gross using these weights; they are not amounts the
      *      venue spends.
      * @param purchaseAmounts The array with the raw purchase amounts specified by users.
-     * @return aggregatedFee  The total fee weight (stablecoin units) for all purchases.
+     * @return totalFeeWeight The total fee weight (stablecoin units) for all purchases.
      * @return netWeights     Per-row net (purchase amount minus fee), used as allocation weights.
-     * @return totalNetWeight Sum of `netWeights`, used with `aggregatedFee` to reconstruct planned
+     * @return totalNetWeight Sum of `netWeights`, used with `totalFeeWeight` to reconstruct planned
      *                        gross.
      */
-    function _calculateFeeAndNetAmounts(uint256[] calldata purchaseAmounts)
+    function _calculateFeeAndNetWeights(uint256[] calldata purchaseAmounts)
         internal
         view
-        returns (uint256 aggregatedFee, uint256[] memory netWeights, uint256 totalNetWeight)
+        returns (uint256 totalFeeWeight, uint256[] memory netWeights, uint256 totalNetWeight)
     {
         uint16 minFeeRate = s_minFeeRate;
         uint16 maxFeeRate = s_maxFeeRate;
 
         if (minFeeRate == maxFeeRate) {
-            return _calculateFlatFeeAndNetAmounts(purchaseAmounts, minFeeRate);
+            return _calculateFlatFeeAndNetWeights(purchaseAmounts, minFeeRate);
         }
 
-        return _calculateVariableFeeAndNetAmounts(
+        return _calculateVariableFeeAndNetWeights(
             purchaseAmounts, minFeeRate, maxFeeRate, s_feePurchaseLowerBound, s_feePurchaseUpperBound
         );
     }
@@ -164,10 +164,10 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev When the linear variable fee rate is not in use, apply the flat fee rate to all amounts.
-    function _calculateFlatFeeAndNetAmounts(uint256[] calldata purchaseAmounts, uint256 feeRate)
+    function _calculateFlatFeeAndNetWeights(uint256[] calldata purchaseAmounts, uint256 feeRate)
         private
         pure
-        returns (uint256 aggregatedFee, uint256[] memory netWeights, uint256 totalNetWeight)
+        returns (uint256 totalFeeWeight, uint256[] memory netWeights, uint256 totalNetWeight)
     {
         uint256 len = purchaseAmounts.length;
         netWeights = new uint256[](len);
@@ -179,7 +179,7 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
             // The fee is at most 5% of a uint96 amount, so neither the subtraction nor the sums can overflow.
             unchecked {
                 net = amount - fee;
-                aggregatedFee += fee;
+                totalFeeWeight += fee;
                 totalNetWeight += net;
             }
             netWeights[i] = net;
@@ -190,13 +190,13 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
      * @dev When the linear variable fee rate is in use, batches load the settings once and keep the
      *      four scalars on the stack across rows.
      */
-    function _calculateVariableFeeAndNetAmounts(
+    function _calculateVariableFeeAndNetWeights(
         uint256[] calldata purchaseAmounts,
         uint256 minFeeRate,
         uint256 maxFeeRate,
         uint256 feePurchaseLowerBound,
         uint256 feePurchaseUpperBound
-    ) private pure returns (uint256 aggregatedFee, uint256[] memory netWeights, uint256 totalNetWeight) {
+    ) private pure returns (uint256 totalFeeWeight, uint256[] memory netWeights, uint256 totalNetWeight) {
         uint256 len = purchaseAmounts.length;
         netWeights = new uint256[](len);
         for (uint256 i; i < len; ++i) {
@@ -208,7 +208,7 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
             // The fee is at most 5% of a uint96 amount, so neither the subtraction nor the sums can overflow.
             unchecked {
                 net = amount - fee;
-                aggregatedFee += fee;
+                totalFeeWeight += fee;
                 totalNetWeight += net;
             }
             netWeights[i] = net;

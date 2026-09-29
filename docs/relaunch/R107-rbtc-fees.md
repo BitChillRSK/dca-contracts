@@ -38,8 +38,8 @@ collector; gross `minRbtcOut`; fee event on every route.
 
 - [ ] `PurchaseRbtc.batchBuyRbtc`: retrieve gross → spend full retrieved at venue → allocate
       measured output `Q` as `fee = floor(Q × F / G)` and row credit `floor(Q × nᵢ / G)` where
-      `G` is planned gross (`∑ purchaseAmounts`), `F` is the aggregated fee in stablecoin
-      units from `_calculateFeeAndNetAmounts`, and `nᵢ` is each row’s planned net. Do **not**
+      `G` is planned gross (`∑ purchaseAmounts`), `F` is the fee weight in stablecoin
+      units from `_calculateFeeAndNetWeights`, and `nᵢ` is each row’s planned net. Do **not**
       allocate all of `Q` over net weights and then take another fee.
 - [ ] `amountSpent` / `SuccessfulRbtcBatchPurchase.totalStablecoinAmountSpent` report **gross**
       venue input (row share of retrieved / total retrieved). Average price is all-in.
