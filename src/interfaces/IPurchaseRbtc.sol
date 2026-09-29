@@ -64,7 +64,7 @@ interface IPurchaseRbtc is IStablecoinSource {
      *        whatever the stablecoin's decimals. `0` disables this check. Binds gross measured output
      *        before the protocol fee is taken from that output.
      * @dev DcaManager has already debited the schedules. The venue spends the full retrieved
-     *      stablecoin. Measured rBTC is split over requested gross (`∑ purchaseAmounts`): buyers get
+     *      stablecoin. Measured rBTC is split over `purchaseAmountsSum`: buyers get
      *      `floor(Q × netᵢ / G)`, the collector gets `floor(Q × F / G)`, and floor dust stays
      *      uncredited. Reported `amountSpent` is each row's share of retrieved gross. `minRbtcOut`
      *      binds the measured receipt independently of any venue-specific floor. A successful venue

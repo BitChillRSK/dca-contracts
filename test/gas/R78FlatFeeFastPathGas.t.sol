@@ -11,11 +11,11 @@ contract R78OptimizedPurchaseFeesGasHarness is PurchaseFees {
     function measure(uint256[] calldata purchaseAmounts)
         external
         view
-        returns (uint256 gasUsed, uint256 totalFee, uint256 requestedGross, bytes32 netWeightsHash)
+        returns (uint256 gasUsed, uint256 totalFee, uint256 purchaseAmountsSum, bytes32 netWeightsHash)
     {
         uint256[] memory netWeights;
         uint256 gasBefore = gasleft();
-        (totalFee, netWeights, requestedGross) = _calculateFeeAndNetWeights(purchaseAmounts);
+        (totalFee, netWeights, purchaseAmountsSum) = _calculateFeeAndNetWeights(purchaseAmounts);
         gasUsed = gasBefore - gasleft();
         netWeightsHash = keccak256(abi.encode(netWeights));
     }
@@ -27,12 +27,12 @@ contract R78BaselinePurchaseFeesGasHarness is PurchaseFees {
     function measure(uint256[] calldata purchaseAmounts)
         external
         view
-        returns (uint256 gasUsed, uint256 totalFee, uint256 requestedGross, bytes32 netWeightsHash)
+        returns (uint256 gasUsed, uint256 totalFee, uint256 purchaseAmountsSum, bytes32 netWeightsHash)
     {
         uint256[] memory amounts = purchaseAmounts;
         uint256[] memory netWeights;
         uint256 gasBefore = gasleft();
-        (totalFee, netWeights, requestedGross) = _baselineCalculateFeeAndNetWeights(amounts);
+        (totalFee, netWeights, purchaseAmountsSum) = _baselineCalculateFeeAndNetWeights(amounts);
         gasUsed = gasBefore - gasleft();
         netWeightsHash = keccak256(abi.encode(netWeights));
     }
@@ -42,7 +42,7 @@ contract R78BaselinePurchaseFeesGasHarness is PurchaseFees {
     function _baselineCalculateFeeAndNetWeights(uint256[] memory purchaseAmounts)
         private
         view
-        returns (uint256 totalFee, uint256[] memory netWeights, uint256 requestedGross)
+        returns (uint256 totalFee, uint256[] memory netWeights, uint256 purchaseAmountsSum)
     {
         uint256 len = purchaseAmounts.length;
         netWeights = new uint256[](len);
@@ -68,7 +68,7 @@ contract R78BaselinePurchaseFeesGasHarness is PurchaseFees {
                 net = amount - fee;
             }
             netWeights[i] = net;
-            requestedGross += amount;
+            purchaseAmountsSum += amount;
         }
     }
 
@@ -198,7 +198,7 @@ contract R78FlatFeeFastPathGasTest is Test {
             optimizedHarness.measure(amounts);
 
         assertEq(optimizedFee, baselineFee, "total fee changed");
-        assertEq(optimizedNet, baselineNet, "requested gross changed");
+        assertEq(optimizedNet, baselineNet, "purchaseAmountsSum changed");
         assertEq(optimizedHash, baselineHash, "per-row net amounts changed");
 
         uint256 saving = baselineGas - optimizedGas;
@@ -219,7 +219,7 @@ contract R78FlatFeeFastPathGasTest is Test {
         (, uint256 optimizedFee, uint256 optimizedNet, bytes32 optimizedHash) = optimized.measure(amounts);
 
         assertEq(optimizedFee, baselineFee, "total fee changed");
-        assertEq(optimizedNet, baselineNet, "requested gross changed");
+        assertEq(optimizedNet, baselineNet, "purchaseAmountsSum changed");
         assertEq(optimizedHash, baselineHash, "per-row net amounts changed");
     }
 

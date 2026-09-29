@@ -49,10 +49,9 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
      *      for: a lending handler can come back short when it redeems its shares. Idle retrieval only sums
      *      the request, because the cash already sits on the handler; if it is not all there, the venue's
      *      pull or the exact-consumption check reverts the batch. The venue spends that full retrieved
-     *      amount. Net weights and the total fee allocate measured output over requested gross (`∑
-     *      purchaseAmounts`): buyer credits and the protocol fee are floored shares of measured
-     *      output. Reported spend is each row's share of retrieved gross. The fee (native rBTC or
-     *      WRBTC) is paid last.
+     *      amount. Net weights and the total fee allocate measured output over `purchaseAmountsSum`:
+     *      buyer credits and the protocol fee are floored shares of measured output. Reported spend
+     *      is each row's share of retrieved gross. The fee (native rBTC or WRBTC) is paid last.
      */
     function batchBuyRbtc(
         address[] calldata buyers,
@@ -61,15 +60,16 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
         uint256 minRbtcOut
     ) external override onlyDcaManager {
         uint256[] memory netWeights;
-        uint256 requestedGross;
+        uint256 purchaseAmountsSum;
         uint256 totalFee;
         uint256 totalStablecoinRetrieved;
 
         {
-            (totalFee, netWeights, requestedGross) = _calculateFeeAndNetWeights(purchaseAmounts);
+            (totalFee, netWeights, purchaseAmountsSum) = _calculateFeeAndNetWeights(purchaseAmounts);
 
-            // Retrieve the requested gross. What comes back is what the retrieval delivered, which a
-            // lending handler can leave short of the request. The venue spends that amount in full.
+            // Retrieve against `purchaseAmounts`. What comes back is what the retrieval delivered,
+            // which a lending handler can leave short of the request. The venue spends that amount in
+            // full.
             totalStablecoinRetrieved = _batchRetrieveStablecoin(buyers, purchaseAmounts);
         }
 
@@ -97,10 +97,10 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
         }
 
         // Can't overflow: the rBTC total is under the native supply (< 2^85 wei) and the total fee is a
-        // fraction of requestedGross (capped at 5% of uint96 purchase amounts).
+        // fraction of purchaseAmountsSum (capped at 5% of uint96 purchase amounts).
         uint256 feeRbtc;
         unchecked {
-            feeRbtc = totalPurchasedRbtc * totalFee / requestedGross;
+            feeRbtc = totalPurchasedRbtc * totalFee / purchaseAmountsSum;
         }
 
         _creditPurchases(
@@ -109,7 +109,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
             purchaseAmounts,
             netWeights,
             totalPurchasedRbtc,
-            requestedGross,
+            purchaseAmountsSum,
             totalStablecoinRetrieved
         );
         emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
@@ -161,7 +161,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev `netWeights` are allocation weights over requested gross: each row takes its share of
+     * @dev `netWeights` are allocation weights over `purchaseAmountsSum`: each row takes its share of
      *      measured output even if the redemption paid less than requested. Both the fee and each row
      *      floor, which can leave under one wei of rBTC per term uncredited; see IPurchaseRbtc.
      *      Split out of `batchBuyRbtc` so the purchase path compiles under legacy codegen.
@@ -172,17 +172,17 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
         uint256[] calldata purchaseAmounts,
         uint256[] memory netWeights,
         uint256 totalPurchasedRbtc,
-        uint256 requestedGross,
+        uint256 purchaseAmountsSum,
         uint256 totalStablecoinRetrieved
     ) private {
         uint256 purchaseCount = buyers.length;
         for (uint256 i; i < purchaseCount; ++i) {
             uint256 userRbtc;
             unchecked {
-                userRbtc = totalPurchasedRbtc * netWeights[i] / requestedGross;
+                userRbtc = totalPurchasedRbtc * netWeights[i] / purchaseAmountsSum;
             }
             // Gross share of what the venue actually spent (all-in average price).
-            uint256 userStablecoinSpent = totalStablecoinRetrieved * purchaseAmounts[i] / requestedGross;
+            uint256 userStablecoinSpent = totalStablecoinRetrieved * purchaseAmounts[i] / purchaseAmountsSum;
             // Skip zero floor allocations so a never-credited user is not marked live.
             if (userRbtc != 0) _creditRbtc(buyers[i], userRbtc);
             emit PurchaseRbtc__RbtcBought(

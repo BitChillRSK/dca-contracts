@@ -69,7 +69,7 @@ contract PurchaseRbtcConservationHandler is Test {
 
         i_harness.batchBuyRbtc(buyers, scheduleIds, amounts, 0);
         s_rbtcBoughtGhost += rbtcOut;
-        // k floors over requested gross leave at most k-1 wei uncredited.
+        // k floors over `purchaseAmountsSum` leave at most k-1 wei uncredited.
         s_flooredSlackGhost += rows;
         ++s_batchSuccesses;
     }
