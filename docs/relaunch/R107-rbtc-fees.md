@@ -1,6 +1,6 @@
 # R107 — rBTC / WRBTC purchase fees
 
-Status: **not started** · Assigned: yes · Optional/further-review: no · Stack on: R106 ([#172](https://github.com/BitChillRSK/dca-contracts/pull/172))
+Status: **in review** · Assigned: yes · Optional/further-review: no · Stack on: R106 ([#172](https://github.com/BitChillRSK/dca-contracts/pull/172)) · PR: [#173](https://github.com/BitChillRSK/dca-contracts/pull/173)
 
 ## Objective
 
