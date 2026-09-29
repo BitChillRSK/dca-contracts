@@ -205,19 +205,19 @@ contract PurchaseFeesTest is Test {
         amounts[2] = 550 ether;
         amounts[3] = 2000 ether;
 
-        (uint256 totalFeeWeight, uint256[] memory netAmounts, uint256 totalNet) =
+        (uint256 totalFeeWeight, uint256[] memory netAmounts, uint256 requestedGross) =
             feeHandler.exposedCalculateFeeAndNetWeights(amounts);
 
         uint256 expectedTotalFeeWeight;
-        uint256 expectedTotalNet;
+        uint256 expectedRequestedGross;
         for (uint256 i; i < amounts.length; ++i) {
             uint256 expectedFee = feeHandler.exposedCalculateFee(amounts[i]);
             expectedTotalFeeWeight += expectedFee;
-            expectedTotalNet += amounts[i] - expectedFee;
+            expectedRequestedGross += amounts[i];
             assertEq(netAmounts[i], amounts[i] - expectedFee);
         }
         assertEq(totalFeeWeight, expectedTotalFeeWeight);
-        assertEq(totalNet, expectedTotalNet);
+        assertEq(requestedGross, expectedRequestedGross);
     }
 
     function test_calculateFeeAndNetWeights_flatMatchesSequentialIncludingRounding() public {
@@ -231,19 +231,19 @@ contract PurchaseFeesTest is Test {
         amounts[3] = 10_000;
         amounts[4] = 550 ether;
 
-        (uint256 totalFeeWeight, uint256[] memory netAmounts, uint256 totalNet) =
+        (uint256 totalFeeWeight, uint256[] memory netAmounts, uint256 requestedGross) =
             feeHandler.exposedCalculateFeeAndNetWeights(amounts);
 
         uint256 expectedTotalFeeWeight;
-        uint256 expectedTotalNet;
+        uint256 expectedRequestedGross;
         for (uint256 i; i < amounts.length; ++i) {
             uint256 expectedFee = amounts[i] * flatRate / BPS_DENOMINATOR;
             expectedTotalFeeWeight += expectedFee;
-            expectedTotalNet += amounts[i] - expectedFee;
+            expectedRequestedGross += amounts[i];
             assertEq(netAmounts[i], amounts[i] - expectedFee);
         }
         assertEq(totalFeeWeight, expectedTotalFeeWeight);
-        assertEq(totalNet, expectedTotalNet);
+        assertEq(requestedGross, expectedRequestedGross);
     }
 
     function test_setFeeRateParams_reverts_aboveCap() public {
@@ -362,10 +362,10 @@ contract PurchaseFeesTest is Test {
         uint256 lower,
         uint256 upper
     ) private {
-        (uint256 totalFeeWeight, uint256[] memory nets, uint256 totalNet) =
+        (uint256 totalFeeWeight, uint256[] memory nets, uint256 requestedGross) =
             feeHandler.exposedCalculateFeeAndNetWeights(amounts);
         uint256 expectedFees;
-        uint256 expectedNets;
+        uint256 expectedRequestedGross;
         for (uint256 i; i < amounts.length; ++i) {
             uint256 amount = amounts[i];
             uint256 rate;
@@ -375,10 +375,10 @@ contract PurchaseFeesTest is Test {
             uint256 fee = amount * rate / BPS_DENOMINATOR;
             assertEq(nets[i], amount - fee, "row net");
             expectedFees += fee;
-            expectedNets += amount - fee;
+            expectedRequestedGross += amount;
         }
         assertEq(totalFeeWeight, expectedFees, "fee weight");
-        assertEq(totalNet, expectedNets, "total net");
+        assertEq(requestedGross, expectedRequestedGross, "requested gross");
     }
 
     /*//////////////////////////////////////////////////////////////

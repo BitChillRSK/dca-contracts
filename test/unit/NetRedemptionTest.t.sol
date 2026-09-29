@@ -190,9 +190,9 @@ contract NetRedemptionTest is DcaDappTest {
 
         (,, uint64[] memory scheduleIds, uint256[] memory purchaseAmounts) = _batchArrays();
 
-        uint256 plannedGross;
+        uint256 requestedGross;
         for (uint256 i; i < purchaseAmounts.length; ++i) {
-            plannedGross += purchaseAmounts[i];
+            requestedGross += purchaseAmounts[i];
         }
 
         vm.recordLogs();
@@ -201,7 +201,7 @@ contract NetRedemptionTest is DcaDappTest {
 
         (uint256 perUserSpentTotal, uint256 batchSpent) = _batchSpendFromLogs();
 
-        assertLt(batchSpent, plannedGross, "the exit fee should have shortened the spend");
+        assertLt(batchSpent, requestedGross, "the exit fee should have shortened the spend");
         assertLe(perUserSpentTotal, batchSpent, "per-user events report more spending than the batch did");
         assertApproxEqAbs(perUserSpentTotal, batchSpent, NUM_OF_SCHEDULES);
     }
