@@ -27,7 +27,7 @@ contract PurchaseRbtcTest is Test {
     event PurchaseRbtc__SuccessfulRbtcBatchPurchase(
         address indexed token, uint256 totalPurchasedRbtc, uint256 totalStablecoinAmountSpent
     );
-    event PurchaseFees__FeeTransferred(address indexed collector, uint256 amount);
+    event PurchaseFees__FeeCredited(address indexed collector, uint256 rbtcAmount, uint256 stablecoinAmount);
 
     uint16 internal constant FLAT_FEE_RATE = 100; // 1%
     uint256 internal constant BPS_DENOMINATOR = 10_000;
@@ -144,7 +144,7 @@ contract PurchaseRbtcTest is Test {
 
         assertEq(harness.lastPurchaseAmount(), retrieved);
         assertEq(token.balanceOf(feeCollector), 0);
-        assertEq(feeCollector.balance, feeRbtc);
+        assertEq(harness.getAccumulatedRbtcBalance(feeCollector), feeRbtc);
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), userRbtc);
     }
 
@@ -161,7 +161,7 @@ contract PurchaseRbtcTest is Test {
         assertEq(harness.purchaseCalls(), 1);
         assertEq(harness.lastPurchaseAmount(), requested);
         assertEq(token.balanceOf(feeCollector), 0);
-        assertEq(feeCollector.balance, feeRbtc);
+        assertEq(harness.getAccumulatedRbtcBalance(feeCollector), feeRbtc);
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), userRbtc);
     }
 
@@ -176,14 +176,14 @@ contract PurchaseRbtcTest is Test {
         vm.expectEmit(true, true, true, true, address(harness));
         emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(address(token), RBTC_OUT, requested);
         vm.expectEmit(true, false, false, true, address(harness));
-        emit PurchaseFees__FeeTransferred(feeCollector, feeRbtc);
+        emit PurchaseFees__FeeCredited(feeCollector, feeRbtc, feeStable);
 
         harness.batchBuyRbtc(
             _oneBuyerBatchBuyers(), _oneBuyerBatchIds(), _oneBuyerBatchAmounts(requested), NO_MIN_RBTC_OUT
         );
 
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), userRbtc);
-        assertEq(feeCollector.balance, feeRbtc);
+        assertEq(harness.getAccumulatedRbtcBalance(feeCollector), feeRbtc);
     }
 
     function test_lengthOneBatch_zeroFeeDoesNotPayCollector() public {
@@ -198,12 +198,13 @@ contract PurchaseRbtcTest is Test {
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i; i < logs.length; ++i) {
-            if (logs[i].topics[0] == PurchaseFees__FeeTransferred.selector) {
-                revert("FeeTransferred emitted on a zero-fee purchase");
+            if (logs[i].topics[0] == PurchaseFees__FeeCredited.selector) {
+                revert("FeeCredited emitted on a zero-fee purchase");
             }
         }
         assertEq(token.balanceOf(feeCollector), 0);
         assertEq(feeCollector.balance, collectorBefore);
+        assertEq(harness.getAccumulatedRbtcBalance(feeCollector), 0);
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), RBTC_OUT);
     }
 
@@ -244,6 +245,7 @@ contract PurchaseRbtcTest is Test {
         assertEq(feeCollector.balance, collectorBefore);
         assertEq(token.balanceOf(address(0xBEEF)), 0);
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), 0);
+        assertEq(harness.getAccumulatedRbtcBalance(feeCollector), 0);
     }
 
     function test_batchPurchase_shortRetrievalStillPurchasesAndScalesFee() public {
@@ -263,7 +265,7 @@ contract PurchaseRbtcTest is Test {
 
         assertEq(harness.lastPurchaseAmount(), retrieved);
         assertEq(token.balanceOf(feeCollector), 0);
-        assertEq(feeCollector.balance, feeRbtc);
+        assertEq(harness.getAccumulatedRbtcBalance(feeCollector), feeRbtc);
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), rbtc0);
         assertEq(harness.getAccumulatedRbtcBalance(buyerB), rbtc1);
     }
@@ -288,7 +290,7 @@ contract PurchaseRbtcTest is Test {
 
         assertEq(harness.lastPurchaseAmount(), retrieved);
         assertEq(token.balanceOf(feeCollector), 0);
-        assertEq(feeCollector.balance, feeRbtc);
+        assertEq(harness.getAccumulatedRbtcBalance(feeCollector), feeRbtc);
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), rbtc0);
         assertEq(harness.getAccumulatedRbtcBalance(buyerB), rbtc1);
         _assertCreditsAndFeeWithinFloorBound(2, feeRbtc);
@@ -321,7 +323,7 @@ contract PurchaseRbtcTest is Test {
 
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), rbtc0, "row 0 takes its floor");
         assertEq(harness.getAccumulatedRbtcBalance(buyerB), rbtc1, "the last row takes its floor, not a remainder");
-        assertEq(feeCollector.balance, feeRbtc);
+        assertEq(harness.getAccumulatedRbtcBalance(feeCollector), feeRbtc);
         uint256 credited = harness.getAccumulatedRbtcBalance(buyerA) + harness.getAccumulatedRbtcBalance(buyerB);
         assertLe(credited + feeRbtc, q, "credits plus fee exceed the measured rBTC");
         assertGe(credited + feeRbtc, q - 2, "residue larger than one wei per buyer term");
@@ -485,7 +487,7 @@ contract PurchaseRbtcTest is Test {
         assertFalse(ok, "a batch below the caller minimum must revert");
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), 0);
         assertEq(harness.getAccumulatedRbtcBalance(buyerB), 0);
-        assertEq(feeCollector.balance, 0, "the fee payment rolls back with the batch");
+        assertEq(harness.getAccumulatedRbtcBalance(feeCollector), 0, "the fee credit rolls back with the batch");
         assertEq(token.balanceOf(feeCollector), 0, "no stablecoin fee is taken");
     }
 
@@ -531,17 +533,38 @@ contract PurchaseRbtcTest is Test {
         harness.batchBuyRbtc(buyers, scheduleIds, amounts, minRbtcOut);
     }
 
-    function test_transferFee_rejectingCollectorRevertsTheBatch() public {
+    function test_payFee_creditsCollectorWithoutPayingOut() public {
+        (address[] memory buyers, uint64[] memory scheduleIds, uint256[] memory amounts) = _twoBuyerBatch();
+        harness.batchBuyRbtc(buyers, scheduleIds, amounts, NO_MIN_RBTC_OUT);
+
+        uint256 purchaseAmountsSum = amounts[0] + amounts[1];
+        uint256 totalFee = _fee(amounts[0]) + _fee(amounts[1]);
+        uint256 feeRbtc = _share(RBTC_OUT, totalFee, purchaseAmountsSum);
+        assertEq(harness.getAccumulatedRbtcBalance(feeCollector), feeRbtc);
+        assertEq(feeCollector.balance, 0, "the collector is not paid until it withdraws");
+
+        uint256 before = feeCollector.balance;
+        harness.withdrawAccumulatedRbtc(feeCollector);
+        assertEq(feeCollector.balance - before, feeRbtc);
+        assertEq(harness.getAccumulatedRbtcBalance(feeCollector), 0);
+    }
+
+    function test_payFee_rejectingCollectorDoesNotRevertTheBatch() public {
         FeeCollectorRejects rejecting = new FeeCollectorRejects();
         harness.setFeeCollector(address(rejecting));
         (address[] memory buyers, uint64[] memory scheduleIds, uint256[] memory amounts) = _twoBuyerBatch();
 
-        vm.expectRevert(IPurchaseFees.PurchaseFees__FeePaymentFailed.selector);
         harness.batchBuyRbtc(buyers, scheduleIds, amounts, NO_MIN_RBTC_OUT);
 
-        assertEq(harness.getAccumulatedRbtcBalance(buyerA), 0);
-        assertEq(harness.getAccumulatedRbtcBalance(buyerB), 0);
-        assertEq(token.balanceOf(address(0xBEEF)), 0);
+        uint256 purchaseAmountsSum = amounts[0] + amounts[1];
+        uint256 totalFee = _fee(amounts[0]) + _fee(amounts[1]);
+        uint256 feeRbtc = _share(RBTC_OUT, totalFee, purchaseAmountsSum);
+        assertGt(harness.getAccumulatedRbtcBalance(buyerA), 0);
+        assertEq(harness.getAccumulatedRbtcBalance(address(rejecting)), feeRbtc);
+
+        vm.expectRevert(IPurchaseRbtc.PurchaseRbtc__rBtcWithdrawalFailed.selector);
+        harness.withdrawAccumulatedRbtc(address(rejecting));
+        assertEq(harness.getAccumulatedRbtcBalance(address(rejecting)), feeRbtc, "failed withdraw leaves the credit");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -560,7 +583,7 @@ contract PurchaseRbtcTest is Test {
 
         assertEq(harness.getAccumulatedRbtcBalance(buyerA), userRbtc);
         assertEq(_rawAccumulatedRbtc(buyerA), userRbtc + 1);
-        assertEq(feeCollector.balance, feeRbtc);
+        assertEq(harness.getAccumulatedRbtcBalance(feeCollector), feeRbtc);
 
         uint256 balanceBefore = buyerA.balance;
         harness.withdrawAccumulatedRbtc(buyerA);
@@ -632,7 +655,7 @@ contract PurchaseRbtcTest is Test {
         }
     }
 
-    /// @dev Test probe into private `s_usersAccumulatedRbtc` (slot 4 on this harness layout).
+    /// @dev Test probe into private `s_accumulatedRbtc` (slot 4 on this harness layout).
     ///      Re-check with `forge inspect PurchaseRbtcHarness storage-layout` if PurchaseFees packing moves.
     function _rawAccumulatedRbtc(address user) private view returns (uint256) {
         return uint256(vm.load(address(harness), keccak256(abi.encode(user, uint256(4)))));

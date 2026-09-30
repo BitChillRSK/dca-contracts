@@ -5,7 +5,7 @@ pragma solidity 0.8.36;
  * @title IPurchaseFees
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Purchase-fee configuration: the rate bounds, the purchase amounts they interpolate
- *         between, and the address fees are paid to.
+ *         between, and the address fees are credited to.
  */
 interface IPurchaseFees {
     /*//////////////////////////////////////////////////////////////
@@ -49,11 +49,13 @@ interface IPurchaseFees {
     /// @notice Owner set the address that receives purchase fees.
     event PurchaseFees__FeeCollectorAddressSet(address indexed feeCollector);
     /**
-     * @notice A non-zero purchase fee was paid to the collector (native rBTC on MoC, WRBTC on Dex).
-     * @dev Emitted once per batch after buyer credits. The asset is implied by the emitting handler;
-     *      Dex also logs a WRBTC `Transfer`.
+     * @notice A non-zero purchase fee was credited to the collector's accumulated rBTC.
+     * @dev Emitted once per batch after buyer credits. `rbtcAmount` is the floored share of
+     *      measured output; `stablecoinAmount` is that same share of retrieved venue input, so
+     *      all-in price is `stablecoinAmount / rbtcAmount`. The collector withdraws through
+     *      `withdrawAccumulatedRbtc` like any other account.
      */
-    event PurchaseFees__FeeTransferred(address indexed collector, uint256 amount);
+    event PurchaseFees__FeeCredited(address indexed collector, uint256 rbtcAmount, uint256 stablecoinAmount);
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -67,8 +69,6 @@ interface IPurchaseFees {
     error PurchaseFees__InvalidFeeCollector();
     /// @notice A fee rate exceeds the 5% cap.
     error PurchaseFees__MaxFeeRateExceedsCap();
-    /// @notice Native rBTC fee payment to the collector failed.
-    error PurchaseFees__FeePaymentFailed();
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
@@ -91,7 +91,7 @@ interface IPurchaseFees {
     ) external;
 
     /**
-     * @notice Set the address that receives purchase fees.
+     * @notice Set the address whose accumulated rBTC receives purchase fees.
      * @param feeCollector New collector. Cannot be zero.
      */
     function setFeeCollector(address feeCollector) external;
@@ -101,7 +101,7 @@ interface IPurchaseFees {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Address that currently receives purchase fees (native rBTC on MoC, WRBTC on Dex).
+     * @notice Address whose accumulated rBTC currently receives purchase fees.
      * @return The fee collector.
      */
     function getFeeCollector() external view returns (address);

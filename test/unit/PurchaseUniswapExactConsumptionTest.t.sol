@@ -32,6 +32,7 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
         uint256 feeCollectorWrBtc;
         uint256 handlerWrBtc;
         uint256 userAccumulatedRbtc;
+        uint256 collectorAccumulatedRbtc;
     }
 
     MockStablecoin internal intermediateToken;
@@ -153,10 +154,11 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
                                 HELPERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev A complete fill debits the schedule and pays the fee, and credits the buyer exactly the WRBTC
-    ///      the handler measured itself receiving. Lending handlers hold no stablecoin between redemptions,
-    ///      so their handler balance is unchanged across a successful purchase. Idle handlers hold the pool
-    ///      on the contract, so the same purchase drops the handler balance by the full gross spend.
+    /// @dev A complete fill debits the schedule, credits the buyer and the collector on the same WRBTC
+    ///      books, and leaves the WRBTC on the handler until withdraw. Lending handlers hold no stablecoin
+    ///      between redemptions, so their handler balance is unchanged across a successful purchase. Idle
+    ///      handlers hold the pool on the contract, so the same purchase drops the handler balance by the
+    ///      full gross spend.
     function _assertFullFillSpendsEverything() private {
         PurchaseState memory before = _snapshot();
 
@@ -170,13 +172,11 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
         }
         assertEq(before.scheduleBalance - afterPurchase.scheduleBalance, AMOUNT_TO_SPEND);
         assertEq(afterPurchase.feeCollectorStablecoin, before.feeCollectorStablecoin, "stablecoin fee must not be paid");
-        uint256 wrBtcBought = afterPurchase.handlerWrBtc + afterPurchase.feeCollectorWrBtc - before.handlerWrBtc
-            - before.feeCollectorWrBtc;
-        assertEq(
-            afterPurchase.userAccumulatedRbtc - before.userAccumulatedRbtc,
-            afterPurchase.handlerWrBtc - before.handlerWrBtc
-        );
-        assertGt(afterPurchase.feeCollectorWrBtc, before.feeCollectorWrBtc, "WRBTC fee was not paid");
+        uint256 wrBtcBought = afterPurchase.handlerWrBtc - before.handlerWrBtc;
+        uint256 collectorCredit = afterPurchase.collectorAccumulatedRbtc - before.collectorAccumulatedRbtc;
+        assertEq(afterPurchase.userAccumulatedRbtc - before.userAccumulatedRbtc + collectorCredit, wrBtcBought);
+        assertEq(afterPurchase.feeCollectorWrBtc, before.feeCollectorWrBtc, "WRBTC stays on the handler");
+        assertGt(collectorCredit, 0, "fee was not credited");
         assertGt(wrBtcBought, 0);
 
         if (block.chainid == ANVIL_CHAIN_ID) {
@@ -194,6 +194,7 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
         assertEq(afterRevert.feeCollectorWrBtc, before.feeCollectorWrBtc);
         assertEq(afterRevert.handlerWrBtc, before.handlerWrBtc);
         assertEq(afterRevert.userAccumulatedRbtc, before.userAccumulatedRbtc);
+        assertEq(afterRevert.collectorAccumulatedRbtc, before.collectorAccumulatedRbtc);
     }
 
     function _snapshot() private view returns (PurchaseState memory state) {
@@ -206,6 +207,8 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
         state.feeCollectorWrBtc = wrbtc.balanceOf(FEE_COLLECTOR);
         state.handlerWrBtc = wrbtc.balanceOf(address(stablecoinHandler));
         state.userAccumulatedRbtc = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
+        state.collectorAccumulatedRbtc =
+            IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(FEE_COLLECTOR);
     }
 
     /// @dev Takes the id rather than reading it, so a caller's `vm.expectRevert` lands on the batch call

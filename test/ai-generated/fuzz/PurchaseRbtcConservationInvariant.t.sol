@@ -69,7 +69,7 @@ contract PurchaseRbtcConservationHandler is Test {
 
         i_harness.batchBuyRbtc(buyers, scheduleIds, amounts, 0);
         s_rbtcBoughtGhost += rbtcOut;
-        // k floors over `purchaseAmountsSum` leave at most k-1 wei uncredited.
+        // k = rows + 1 floors (buyers + fee) leave at most k-1 = rows wei uncredited.
         s_flooredSlackGhost += rows;
         ++s_batchSuccesses;
     }
@@ -159,7 +159,7 @@ contract PurchaseRbtcConservationInvariantTest is StdInvariant, Test {
 
         uint256 attributed = totalOnBooks + fuzzHandler.s_rbtcWithdrawnGhost();
         uint256 bought = fuzzHandler.s_rbtcBoughtGhost();
-        uint256 fees = address(0xFEE).balance;
+        uint256 fees = harness.getAccumulatedRbtcBalance(address(0xFEE));
 
         assertLe(attributed + fees, bought, "books plus collector claim more rBTC than the venue delivered");
         assertGe(
@@ -175,6 +175,7 @@ contract PurchaseRbtcConservationInvariantTest is StdInvariant, Test {
         for (uint256 i; i < s_buyers.length; ++i) {
             totalOnBooks += harness.getAccumulatedRbtcBalance(s_buyers[i]);
         }
+        totalOnBooks += harness.getAccumulatedRbtcBalance(address(0xFEE));
         assertLe(totalOnBooks, address(harness).balance, "handler owes more rBTC than it holds");
     }
 }

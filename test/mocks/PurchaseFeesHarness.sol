@@ -48,8 +48,4 @@ contract PurchaseFeesHarness is PurchaseFees {
     function testSetFeePurchaseUpperBound(uint112 upper) external {
         s_feePurchaseUpperBound = upper;
     }
-
-    function exposedTransferFee(uint256 fee) external {
-        _transferFee(fee);
-    }
 }

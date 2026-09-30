@@ -69,7 +69,7 @@ interface IPurchaseRbtc is IStablecoinSource {
      *      uncredited. Reported `amountSpent` is each row's share of retrieved gross. `minRbtcOut`
      *      binds the measured receipt independently of any venue-specific floor. A successful venue
      *      call must consume exactly the stablecoin passed to it; otherwise the entire batch reverts.
-     *      The output fee is paid last so a collector failure reverts the batch.
+     *      The output fee is credited to the collector last on the same accumulated-rBTC books.
      */
     function batchBuyRbtc(
         address[] calldata buyers,
@@ -81,7 +81,8 @@ interface IPurchaseRbtc is IStablecoinSource {
     /**
      * @notice Pay `user` the rBTC this handler has accumulated for them.
      * @param user Account whose balance is paid. DcaManager always passes `msg.sender`; there is
-     *        no `to` parameter and no owner rescue of another account's rBTC.
+     *        no `to` parameter and no owner rescue of another account's rBTC. The fee collector
+     *        withdraws here too.
      */
     function withdrawAccumulatedRbtc(address user) external;
 

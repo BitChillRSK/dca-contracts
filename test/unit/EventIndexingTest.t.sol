@@ -5,17 +5,18 @@ import {Vm} from "forge-std/Test.sol";
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
 import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
+import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import "../Constants.sol";
 import {scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 /**
  * @title EventIndexingTest
  * @notice ABI-freeze coverage: every scalar address and `scheduleId` is indexed, and nothing else is; lending share
- *         transitions replay to `getUserShares`; a non-zero purchase fee emits `PurchaseFees__FeeTransferred`.
+ *         transitions replay to `getUserShares`; a non-zero purchase fee emits `PurchaseFees__FeeCredited`.
  */
 contract EventIndexingTest is DcaDappTest {
     event LendingHandler__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares);
-    event PurchaseFees__FeeTransferred(address indexed collector, uint256 amount);
+    event PurchaseFees__FeeCredited(address indexed collector, uint256 rbtcAmount, uint256 stablecoinAmount);
 
     bytes32 private constant OWNERSHIP_TRANSFERRED = keccak256("OwnershipTransferred(address,address)");
     bytes32 private constant OWNERSHIP_TRANSFER_STARTED = keccak256("OwnershipTransferStarted(address,address)");
@@ -49,18 +50,23 @@ contract EventIndexingTest is DcaDappTest {
         }
     }
 
-    function testPurchaseFeeEmitsFeeTransferred() external {
+    function testPurchaseFeeEmitsFeeCredited() external {
         address collector = IPurchaseFees(address(stablecoinHandler)).getFeeCollector();
-        uint256 collectorBefore = isDexSwaps ? wrbtc.balanceOf(collector) : collector.balance;
+        uint256 creditBefore = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(collector);
+        uint256 collectorAssetBefore = isDexSwaps ? wrbtc.balanceOf(collector) : collector.balance;
 
         vm.recordLogs();
         makeSinglePurchase();
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        uint256 feeAmount = _feeTransferredAmount(logs, collector);
-        assertGt(feeAmount, 0, "purchase with a positive fee rate must emit FeeTransferred");
-        uint256 collectorAfter = isDexSwaps ? wrbtc.balanceOf(collector) : collector.balance;
-        assertEq(collectorAfter - collectorBefore, feeAmount);
+        (uint256 rbtcAmount, uint256 stablecoinAmount) = _feeCreditedAmounts(logs, collector);
+        assertGt(rbtcAmount, 0, "purchase with a positive fee rate must emit FeeCredited");
+        assertGt(stablecoinAmount, 0, "FeeCredited must log the stablecoin share");
+        assertEq(
+            IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(collector) - creditBefore, rbtcAmount
+        );
+        uint256 collectorAssetAfter = isDexSwaps ? wrbtc.balanceOf(collector) : collector.balance;
+        assertEq(collectorAssetAfter, collectorAssetBefore, "the collector is not paid until it withdraws");
         assertEq(stablecoin.balanceOf(collector), 0, "stablecoin fee must not be paid");
         _assertFirstPartyIndexing(logs);
     }
@@ -125,17 +131,21 @@ contract EventIndexingTest is DcaDappTest {
         assertTrue(found, "DcaManager__DcaScheduleDeleted not emitted");
     }
 
-    function _feeTransferredAmount(Vm.Log[] memory logs, address collector) private view returns (uint256 amount) {
-        bytes32 sig = PurchaseFees__FeeTransferred.selector;
+    function _feeCreditedAmounts(Vm.Log[] memory logs, address collector)
+        private
+        view
+        returns (uint256 rbtcAmount, uint256 stablecoinAmount)
+    {
+        bytes32 sig = PurchaseFees__FeeCredited.selector;
         bool found;
         for (uint256 i; i < logs.length; ++i) {
             if (logs[i].topics[0] != sig) continue;
             if (logs[i].emitter != address(stablecoinHandler)) continue;
             if (address(uint160(uint256(logs[i].topics[1]))) != collector) continue;
-            amount = abi.decode(logs[i].data, (uint256));
+            (rbtcAmount, stablecoinAmount) = abi.decode(logs[i].data, (uint256, uint256));
             found = true;
         }
-        require(found, "PurchaseFees__FeeTransferred not emitted");
+        require(found, "PurchaseFees__FeeCredited not emitted");
     }
 
     function _latestUserShares(Vm.Log[] memory logs, address user) private pure returns (uint256 newShares) {
@@ -204,7 +214,7 @@ contract EventIndexingTest is DcaDappTest {
         if (sig == keccak256("PurchaseFees__PurchaseLowerBoundSet(uint256)")) return (true, 0);
         if (sig == keccak256("PurchaseFees__PurchaseUpperBoundSet(uint256)")) return (true, 0);
         if (sig == keccak256("PurchaseFees__FeeCollectorAddressSet(address)")) return (true, 1);
-        if (sig == keccak256("PurchaseFees__FeeTransferred(address,uint256)")) return (true, 1);
+        if (sig == keccak256("PurchaseFees__FeeCredited(address,uint256,uint256)")) return (true, 1);
         if (sig == keccak256("PurchaseUniswap__NewPathSet(address[],uint24[],bytes)")) return (true, 0);
         if (sig == keccak256("PurchaseUniswap__AmountOutMinimumPercentUpdated(uint256,uint256)")) return (true, 0);
         if (sig == keccak256("PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(uint256,uint256)")) return (true, 0);

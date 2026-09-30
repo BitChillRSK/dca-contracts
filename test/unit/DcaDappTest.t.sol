@@ -682,6 +682,7 @@ contract DcaDappTest is Test {
             totalFee += fee;
             scheduleIds[i] = scheduleIdAt(dcaManager, USER, address(stablecoin), i);
         }
+        uint256 totalGrossPurchaseAmount = totalNetPurchaseAmount + totalFee;
         // After R1 the batch event's measured DOC is in data, not a topic. expectEmit
         // cannot check that: data is exact, and on a live iSUSD fork tokenPrice
         // rounding is 1 wei off (SIP-0094 is not charging). Per-user redeem logs and the
@@ -697,11 +698,11 @@ contract DcaDappTest is Test {
         vm.expectEmit(true, false, false, false); // the amount of rBTC purchased won't match exactly neither the amount of stablecoin spent in the case of Sovryn due to rounding errors
         if (isMocSwaps) {
             emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
-                address(stablecoin), totalNetPurchaseAmount / s_btcPrice, totalNetPurchaseAmount
+                address(stablecoin), totalGrossPurchaseAmount / s_btcPrice, totalGrossPurchaseAmount
             );
         } else if (isDexSwaps) {
             emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
-                address(stablecoin), (totalNetPurchaseAmount * 995) / (1000 * s_btcPrice), totalNetPurchaseAmount
+                address(stablecoin), (totalGrossPurchaseAmount * 995) / (1000 * s_btcPrice), totalGrossPurchaseAmount
             );
         }
 
@@ -709,7 +710,7 @@ contract DcaDappTest is Test {
         dcaManager.batchBuyRbtc(toBatch(scheduleIds, address(stablecoin), s_routeIndex));
 
         if (isLendingLane) {
-            _assertBatchRedemptionReported(totalNetPurchaseAmount + totalFee);
+            _assertBatchRedemptionReported(totalGrossPurchaseAmount);
         }
 
         uint256 postStablecoinHandlerBalance;
@@ -720,9 +721,11 @@ contract DcaDappTest is Test {
             postStablecoinHandlerBalance = wrbtc.balanceOf(address(stablecoinHandler));
         }
 
+        // Handler cash is gross measured output: buyer credits plus the collector's share stay on
+        // the contract until withdrawn.
         assertApproxEqRel(
             postStablecoinHandlerBalance - prevStablecoinHandlerBalance,
-            totalNetPurchaseAmount / s_btcPrice,
+            totalGrossPurchaseAmount / s_btcPrice,
             _maxPurchaseSlippage() // Allow a maximum difference of 0.5% (on fork tests we saw this was necessary for both MoC and Uniswap purchases)
         );
 
@@ -750,12 +753,12 @@ contract DcaDappTest is Test {
 
         assertApproxEqRel(
             postStablecoinHandlerBalance2 - postStablecoinHandlerBalance,
-            totalNetPurchaseAmount / s_btcPrice,
+            totalGrossPurchaseAmount / s_btcPrice,
             _maxPurchaseSlippage() // Allow a maximum difference of 0.5% (on fork tests we saw this was necessary for both MoC and Uniswap purchases)
         );
 
         if (isLendingLane) {
-            _assertBatchRedemptionReported(totalNetPurchaseAmount + totalFee);
+            _assertBatchRedemptionReported(totalGrossPurchaseAmount);
         }
     }
 

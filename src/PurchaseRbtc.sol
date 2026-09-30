@@ -22,7 +22,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
      *      full withdrawal is a cheaper nonzero-to-nonzero SSTORE. Getters and withdrawals decode.
      *      Private so leaves cannot bypass `_creditRbtc` / `_claimableRbtc` / `_withdrawRbtcChecksEffects`.
      */
-    mapping(address user => uint256 encodedAmount) private s_usersAccumulatedRbtc;
+    mapping(address account => uint256 encodedAmount) private s_accumulatedRbtc;
 
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
@@ -51,7 +51,8 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
      *      pull or the exact-consumption check reverts the batch. The venue spends that full retrieved
      *      amount. Net weights and the total fee allocate measured output over `purchaseAmountsSum`:
      *      buyer credits and the protocol fee are floored shares of measured output. Reported spend
-     *      is each row's share of retrieved gross. The fee (native rBTC or WRBTC) is paid last.
+     *      is each row's share of retrieved gross. The collector's share is credited to the same
+     *      accumulated-rBTC books last; it withdraws like any other account.
      */
     function batchBuyRbtc(
         address[] calldata buyers,
@@ -115,9 +116,9 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
         emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
             address(i_stablecoin), totalPurchasedRbtc, totalStablecoinRetrieved
         );
-        // Fee last: buyer credits and events are already in the frame. A failing collector payment
-        // reverts the whole batch rather than leaving partial accounting.
-        _transferFee(feeRbtc);
+        // Fee last: buyer credits and the batch event are already in the frame. The collector is
+        // credited on the same books and withdraws through `withdrawAccumulatedRbtc`.
+        _payFee(feeRbtc, totalFee, purchaseAmountsSum, totalStablecoinRetrieved);
     }
 
     /// @inheritdoc IPurchaseRbtc
@@ -192,27 +193,45 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
     }
 
     /**
+     * @dev Credit `feeRbtc` to `s_feeCollector` on the same accumulated-rBTC books as buyers.
+     *      `stablecoinAmount` is the fee's share of retrieved venue input so off-chain can compute
+     *      BitChill's all-in price. No-op when the floored rBTC fee is zero.
+     */
+    function _payFee(uint256 feeRbtc, uint256 totalFee, uint256 purchaseAmountsSum, uint256 totalStablecoinRetrieved)
+        private
+    {
+        if (feeRbtc == 0) return;
+        uint256 feeStablecoin;
+        unchecked {
+            feeStablecoin = totalStablecoinRetrieved * totalFee / purchaseAmountsSum;
+        }
+        address collector = s_feeCollector;
+        _creditRbtc(collector, feeRbtc);
+        emit PurchaseFees__FeeCredited(collector, feeRbtc, feeStablecoin);
+    }
+
+    /**
      * @dev Encode and store a positive rBTC credit. Live slots hold `claimable + 1`.
      *      The add is unchecked: credits are shares of rBTC this handler measured receiving,
      *      which are tiny compared to `type(uint256).max`.
      */
-    function _creditRbtc(address buyer, uint256 amount) private {
-        uint256 stored = s_usersAccumulatedRbtc[buyer];
+    function _creditRbtc(address account, uint256 amount) private {
+        uint256 stored = s_accumulatedRbtc[account];
         unchecked {
-            s_usersAccumulatedRbtc[buyer] = (stored == 0 ? 1 : stored) + amount;
+            s_accumulatedRbtc[account] = (stored == 0 ? 1 : stored) + amount;
         }
     }
 
     /// @dev Decode claimable rBTC, revert if none, and leave the post-withdraw sentinel. Caller then pays.
     function _withdrawRbtcChecksEffects(address user) private returns (uint256 rbtcBalance) {
-        uint256 stored = s_usersAccumulatedRbtc[user];
+        uint256 stored = s_accumulatedRbtc[user];
         // `0` = never credited; `1` = fully withdrawn sentinel. Both mean nothing to pay.
         if (stored <= 1) revert PurchaseRbtc__NoAccumulatedRbtcToWithdraw();
 
         unchecked {
             rbtcBalance = stored - 1;
         }
-        s_usersAccumulatedRbtc[user] = 1;
+        s_accumulatedRbtc[user] = 1;
     }
 
     /**
@@ -220,7 +239,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
      *      return 0 so callers never see dust.
      */
     function _claimableRbtc(address user) private view returns (uint256) {
-        uint256 stored = s_usersAccumulatedRbtc[user];
+        uint256 stored = s_accumulatedRbtc[user];
         unchecked {
             return stored == 0 ? 0 : stored - 1;
         }

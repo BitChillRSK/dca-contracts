@@ -27,10 +27,11 @@ Human operator only. Agents must not `--broadcast`.
 7. `RSK_MAINNET_RPC_URL`, Blockscout verifier URL, deployer keystore/Ledger ready.
 8. `INITIAL_SWAPPER` = production bot EOA (non-zero).
 9. Safe (`MAINNET_OWNER`) and fee collector (`MAINNET_FEE_COLLECTOR`) match `script/Constants.sol`.
-   The collector receives **native rBTC** from every MoC purchase (`call{value:}` with all gas
-   forwarded) and **WRBTC** from every Dex purchase. It must be an EOA or a wallet that accepts
-   native rBTC (for example a Safe). A contract without a payable `receive` reverts every MoC
-   purchase on that handler until `setFeeCollector` (which only rejects the zero address).
+   The collector is a passive EOA. Each purchase **credits** its accumulated rBTC on that
+   handler; it withdraws through `DcaManager.withdrawAccumulatedRbtc` per token × route (Dex
+   unwraps WRBTC then pays native). A wallet that cannot receive native rBTC does not revert
+   purchases; it cannot claim until it can receive, and `setFeeCollector` does not migrate
+   already-credited balances. Sweep every live handler after deploy.
 
 ## Deploy
 

@@ -227,7 +227,9 @@ contract NetRedemptionTest is DcaDappTest {
         assertGt(expectedRedeemed, 0, "a zero payout is a different error");
         assertLe(expectedRedeemed, totalFee, "the redeem should fall short of the total fee");
 
-        uint256 collectorBefore = IPurchaseFees(address(stablecoinHandler)).getFeeCollector().balance;
+        address collector = IPurchaseFees(address(stablecoinHandler)).getFeeCollector();
+        uint256 collectorCreditBefore = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(collector);
+        uint256 collectorNativeBefore = collector.balance;
         uint256 rbtcBefore = _accumulatedRbtc();
 
         vm.prank(SWAPPER);
@@ -235,11 +237,12 @@ contract NetRedemptionTest is DcaDappTest {
 
         assertGt(_accumulatedRbtc(), rbtcBefore, "short redeem should still credit some rBTC");
         assertGt(
-            IPurchaseFees(address(stablecoinHandler)).getFeeCollector().balance,
-            collectorBefore,
-            "short redeem should still pay an rBTC fee"
+            IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(collector),
+            collectorCreditBefore,
+            "short redeem should still credit an rBTC fee"
         );
-        assertEq(stablecoin.balanceOf(IPurchaseFees(address(stablecoinHandler)).getFeeCollector()), 0);
+        assertEq(collector.balance, collectorNativeBefore, "the collector is not paid until it withdraws");
+        assertEq(stablecoin.balanceOf(collector), 0);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -421,6 +424,8 @@ contract NetRedemptionTest is DcaDappTest {
         address feeCollector = IPurchaseFees(address(stablecoinHandler)).getFeeCollector();
         uint256 feeCollectorDocBefore = stablecoin.balanceOf(feeCollector);
         uint256 feeCollectorRbtcBefore = feeCollector.balance;
+        uint256 collectorCreditBefore =
+            IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(feeCollector);
         uint256 userSharesBefore = ILendingHandler(address(stablecoinHandler)).getUserShares(USER);
         uint256 iTokenBefore = shareToken.balanceOf(address(stablecoinHandler));
         uint256 handlerDocBefore = stablecoin.balanceOf(address(stablecoinHandler));
@@ -438,6 +443,11 @@ contract NetRedemptionTest is DcaDappTest {
         }
         assertEq(stablecoin.balanceOf(feeCollector), feeCollectorDocBefore, "fee collector DOC rolled back");
         assertEq(feeCollector.balance, feeCollectorRbtcBefore, "fee collector rBTC rolled back");
+        assertEq(
+            IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(feeCollector),
+            collectorCreditBefore,
+            "fee collector credit rolled back"
+        );
         assertEq(ILendingHandler(address(stablecoinHandler)).getUserShares(USER), userSharesBefore);
         assertEq(shareToken.balanceOf(address(stablecoinHandler)), iTokenBefore);
         assertEq(stablecoin.balanceOf(address(stablecoinHandler)), handlerDocBefore);

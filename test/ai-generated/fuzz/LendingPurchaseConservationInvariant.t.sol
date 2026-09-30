@@ -201,27 +201,28 @@ contract LendingPurchaseConservationInvariantTest is StdInvariant, Test {
         assertEq(fuzzHandler.s_withdrawSuccesses(), 1, "withdraw never reached PurchaseRbtc");
         assertEq(IPurchaseRbtc(address(handler)).getAccumulatedRbtcBalance(s_users[0]), 0, "books not cleared");
         assertEq(
-            address(handler).balance + FEE_COLLECTOR.balance + fuzzHandler.s_rbtcWithdrawnGhost(),
+            address(handler).balance + fuzzHandler.s_rbtcWithdrawnGhost(),
             fuzzHandler.s_rbtcReceivedGhost(),
-            "native rBTC left the (handler, collector, users) closed set"
+            "native rBTC left the (handler, users) closed set"
         );
     }
 
     /**
-     * @notice MoC-paid rBTC is on the handler (buyer claims + floor dust), at the collector (fee),
-     *         or already paid to a user. Length-1 batches can leave one wei of floor dust.
+     * @notice MoC-paid rBTC is on the handler (buyer claims + collector credit + floor dust)
+     *         or already paid to a withdrawer. Length-1 batches can leave one wei of floor dust.
      */
     function invariant_rbtcNativeConservation() public {
         uint256 claimable;
         for (uint256 i; i < s_users.length; ++i) {
             claimable += IPurchaseRbtc(address(handler)).getAccumulatedRbtcBalance(s_users[i]);
         }
+        claimable += IPurchaseRbtc(address(handler)).getAccumulatedRbtcBalance(FEE_COLLECTOR);
 
         assertLe(claimable, address(handler).balance, "claimable rBTC exceeds handler native balance");
         assertEq(
-            address(handler).balance + FEE_COLLECTOR.balance + fuzzHandler.s_rbtcWithdrawnGhost(),
+            address(handler).balance + fuzzHandler.s_rbtcWithdrawnGhost(),
             fuzzHandler.s_rbtcReceivedGhost(),
-            "received rBTC is not conserved across handler residual, collector fees, and withdrawals"
+            "received rBTC is not conserved across handler residual and withdrawals"
         );
     }
 

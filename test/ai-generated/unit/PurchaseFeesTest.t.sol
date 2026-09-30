@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
-import {Test, console2, Vm} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {PurchaseFeesHarness} from "../../mocks/PurchaseFeesHarness.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {IPurchaseFees} from "../../../src/interfaces/IPurchaseFees.sol";
@@ -25,7 +25,6 @@ contract PurchaseFeesTest is Test {
     event PurchaseFees__PurchaseLowerBoundSet(uint256 feePurchaseLowerBound);
     event PurchaseFees__PurchaseUpperBoundSet(uint256 feePurchaseUpperBound);
     event PurchaseFees__FeeCollectorAddressSet(address indexed feeCollector);
-    event PurchaseFees__FeeTransferred(address indexed collector, uint256 amount);
 
     function setUp() public {
         IPurchaseFees.FeeSettings memory settings = IPurchaseFees.FeeSettings({
@@ -269,40 +268,6 @@ contract PurchaseFeesTest is Test {
         assertEq(feeHandler.getFeeCollector(), newCollector);
     }
 
-    function test_transferFee_paysNativeRbtcWhenNonZero() public {
-        uint256 fee = 1 ether;
-        vm.deal(address(feeHandler), fee);
-        uint256 collectorBefore = FEE_COLLECTOR.balance;
-        vm.expectEmit(true, false, false, true, address(feeHandler));
-        emit PurchaseFees__FeeTransferred(FEE_COLLECTOR, fee);
-        feeHandler.exposedTransferFee(fee);
-        assertEq(FEE_COLLECTOR.balance - collectorBefore, fee);
-        assertEq(address(feeHandler).balance, 0);
-    }
-
-    function test_transferFee_zeroDoesNotPay() public {
-        vm.deal(address(feeHandler), 1 ether);
-        uint256 collectorBefore = FEE_COLLECTOR.balance;
-        vm.recordLogs();
-        feeHandler.exposedTransferFee(0);
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        for (uint256 i; i < logs.length; ++i) {
-            if (logs[i].topics[0] == PurchaseFees__FeeTransferred.selector) {
-                revert("FeeTransferred emitted for a zero fee");
-            }
-        }
-        assertEq(FEE_COLLECTOR.balance, collectorBefore);
-        assertEq(address(feeHandler).balance, 1 ether);
-    }
-
-    function test_transferFee_revertsWhenCollectorRejects() public {
-        FeeCollectorRejects rejecting = new FeeCollectorRejects();
-        feeHandler.setFeeCollector(address(rejecting));
-        vm.deal(address(feeHandler), 1 ether);
-        vm.expectRevert(IPurchaseFees.PurchaseFees__FeePaymentFailed.selector);
-        feeHandler.exposedTransferFee(1 ether);
-    }
-
     function test_getFeeSettings_returnsStoredBand() public {
         IPurchaseFees.FeeSettings memory settings = feeHandler.getFeeSettings();
         assertEq(settings.minFeeRate, MIN_FEE_RATE);
@@ -427,11 +392,5 @@ contract PurchaseFeesTest is Test {
         uint256 overflowing = uint256(type(uint112).max) + 1;
         vm.expectRevert(abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 112, overflowing));
         feeHandler.setFeeRateParams(MIN_FEE_RATE, MAX_FEE_RATE, LOWER_BOUND, overflowing);
-    }
-}
-
-contract FeeCollectorRejects {
-    receive() external payable {
-        revert("no");
     }
 }

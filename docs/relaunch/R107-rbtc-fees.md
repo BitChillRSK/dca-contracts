@@ -4,10 +4,11 @@ Status: **in review** · Assigned: yes · Optional/further-review: no · Stack o
 
 ## Objective
 
-Charge BitChill’s purchase fee in native rBTC on MoC routes and WRBTC on Dex routes,
-pushed to the fee collector in the same purchase transaction after buyer credits. The
-venue spends the full retrieved stablecoin; `minRbtcOut` stays a bound on gross measured
-venue output. No currency toggle.
+Charge BitChill’s purchase fee in native rBTC on MoC routes and WRBTC on Dex routes.
+The venue spends the full retrieved stablecoin; `minRbtcOut` stays a bound on gross measured
+venue output. The collector’s floored share is **credited** on the same accumulated-rBTC
+books as buyers (`s_accumulatedRbtc`) and withdrawn later through
+`withdrawAccumulatedRbtc`. No currency toggle.
 
 ## Background
 
@@ -18,21 +19,33 @@ treasury income is BTC, converts at the users’ price on arrival, and shares ex
 shortfall with buyers. Admin-configurable currency was rejected (dual pipeline forever,
 public timing lever). Land before the audit revision freezes.
 
-R87 dropped `PurchaseFees__FeeTransferred` because the stablecoin `Transfer` was enough
-telemetry. Native MoC fee payments emit no ERC-20 `Transfer`, so this PR re-adds
-`PurchaseFees__FeeTransferred` and emits it on every route (MoC and Dex) for uniform
-monitoring. The asset is implied by the emitting handler; Dex also emits a WRBTC `Transfer`.
+A first cut of this PR **pushed** native rBTC (MoC) or WRBTC (Dex) to the collector in the
+purchase transaction. That was discarded in-PR (2026-09-30): a push needs a Dex
+`_transferFee` override, reverts the whole batch if the collector cannot receive native
+rBTC, and is more expensive on the hot path than one extra `_creditRbtc`. The collector is
+a **passive EOA** that will not open a BitChill position. Credits to that address are fees;
+`PurchaseFees__FeeCredited` versus `PurchaseRbtc__RbtcBought` lets monitoring reconstruct
+history even if the same address later bought. Mixing the mapping is therefore acceptable.
+The mapping is renamed `s_usersAccumulatedRbtc` → `s_accumulatedRbtc` because it is no
+longer users-only.
 
-Do **not** credit the collector through `_creditRbtc`: that mixes revenue into the users’
-ledger, keeps fee custody on the handler, and needs a withdraw from every leaf. A push
-keeps handler rBTC as users’ claims only. Pay the fee **last** — after buyer credits,
-`RbtcBought` / batch events, and other handler state writes — so a failing collector call
-or WRBTC transfer reverts the whole purchase rather than leaving partial accounting.
+R87 dropped `PurchaseFees__FeeTransferred` because the stablecoin `Transfer` was enough
+telemetry. There is still no ERC-20 `Transfer` on a MoC fee (nothing is pushed), so this PR
+emits `PurchaseFees__FeeCredited(collector, rbtcAmount, stablecoinAmount)` on every route.
+`rbtcAmount` is the floored share of measured output; `stablecoinAmount` is that same share
+of retrieved venue input so off-chain can compute BitChill’s all-in price
+(`stablecoinAmount / rbtcAmount`). Dex WRBTC stays on the handler until the collector
+withdraws (unwrap then native, same seam as buyers).
+
+Pay the fee **last** — after buyer credits and the batch event — so the collector’s
+storage write is the last accounting step. A zero floored `feeRbtc` is a no-op and emits
+nothing. A rejecting collector **does not** revert the purchase; it only fails that
+address’s later withdraw (`PurchaseRbtc__rBtcWithdrawalFailed`). `setFeeCollector` does not
+migrate already-credited balances.
 
 ## Open product decisions
 
-**none** — decided 2026-09-29: option (2) hardcoded rBTC / WRBTC fees; no toggle; EOA
-collector; gross `minRbtcOut`; fee event on every route.
+**none** — rBTC/WRBTC fees decided 2026-09-29; credit-not-push decided 2026-09-30 in this PR.
 
 ## Scope
 
@@ -46,26 +59,24 @@ collector; gross `minRbtcOut`; fee event on every route.
 - [ ] Remove stablecoin `_transferFee` from the purchase path. Remove
       `PurchaseRbtc__StablecoinRetrievedBelowFee` (short retrieval spends what it got; fee
       shrinks with `Q`).
-- [ ] Keep `_transferFee` on `PurchaseFees` as the payment hook (same place R78 named). Default
-      is native rBTC to the collector (`call{value:}` + `FeeTransferred(collector, amount)`), matching
-      `_withdrawRbtc`: MoC inherits, Dex overrides.
-      - `PurchaseUniswap`: `safeTransfer` WRBTC + `FeeTransferred(collector, amount)`.
-      - Zero fee: no-op (no event).
-- [ ] Re-add `PurchaseFees__FeeTransferred(address indexed collector, uint256 amount)`.
-      Asset is implied by the emitting handler (Dex also emits WRBTC `Transfer`).
+- [ ] `_payFee` on `PurchaseRbtc` (no Dex override): `_creditRbtc(collector, feeRbtc)` and
+      emit `FeeCredited`. Rename `s_usersAccumulatedRbtc` → `s_accumulatedRbtc`.
+- [ ] `PurchaseFees__FeeCredited(address indexed collector, uint256 rbtcAmount, uint256 stablecoinAmount)`.
+      Asset is implied by the emitting handler. `stablecoinAmount = retrieved × F / G`.
+      Zero `feeRbtc`: no-op, no event.
 - [ ] `minRbtcOut` continues to bind **gross** measured venue output before the fee peel.
 - [ ] Floor dust: `fee + ∑ row credits ≤ Q`; uncredited wei stays on the handler (R69 stands).
-- [ ] Update unit / integration tests that assumed a stablecoin fee transfer or
-      `StablecoinRetrievedBelowFee`.
-- [ ] Consumer cutover issues (bot quotes gross; monitoring fee event; `amountSpent` meaning).
+- [ ] Update unit / integration tests that assumed a stablecoin fee transfer, a native/WRBTC
+      push, or `StablecoinRetrievedBelowFee`.
+- [ ] Consumer cutover issues (bot quotes gross; monitoring `FeeCredited`; `amountSpent` meaning).
 - [ ] Assign this spec; update README Status and `IMPLEMENTATION_ORDER.md`.
 
 ## Out of scope
 
 - [ ] Admin-configurable fee currency (rejected).
-- [ ] Crediting the collector via `_accumulate` / `_creditRbtc`.
+- [ ] Pushing rBTC/WRBTC to the collector in the purchase transaction.
 - [ ] Changing fee rate math, BPS, flat / variable paths, or collector setters.
-- [ ] Unwrapping WRBTC fees on every Dex purchase (collector unwraps infrequently off-path).
+- [ ] Unwrapping WRBTC on every Dex purchase (collector unwraps on withdraw, same as buyers).
 - [ ] Deploy broadcast / live addresses.
 - [ ] Committing any local product-decision note that is not this assigned spec.
 
@@ -78,13 +89,22 @@ collector; gross `minRbtcOut`; fee event on every route.
 - `src/interfaces/IPurchaseRbtc.sol`
 - `src/interfaces/IPurchaseFees.sol`
 - `test/unit/PurchaseRbtcTest.t.sol`
+- `test/unit/DcaDappTest.t.sol`
 - `test/unit/NetRedemptionTest.t.sol`
+- `test/unit/EventIndexingTest.t.sol`
+- `test/unit/BatchMinRbtcOutTest.t.sol`
+- `test/unit/PurchaseUniswapExactConsumptionTest.t.sol`
 - `test/mocks/PurchaseFeesHarness.sol`
 - `test/ai-generated/unit/PurchaseFeesTest.t.sol`
+- `test/ai-generated/fuzz/PurchaseRbtcConservationInvariant.t.sol`
+- `test/ai-generated/fuzz/LendingPurchaseConservationInvariant.t.sol`
+- `test/ai-generated/fuzz/README_INVARIANTS.md`
+- `AGENTS.md`
 - `docs/relaunch/R107-rbtc-fees.md`
 - `docs/relaunch/README.md`
 - `docs/relaunch/IMPLEMENTATION_ORDER.md`
-- `docs/relaunch/CUTOVER_RUNBOOK.md` (collector must be able to receive native rBTC)
+- `docs/relaunch/CUTOVER_RUNBOOK.md` (collector withdraws per handler; payable receive is for
+  withdraw, not every MoC purchase)
 - `.gitignore` (keep any local fee-currency decision note untracked)
 
 ## Required tests
@@ -101,25 +121,28 @@ Executable `src/` change → full gate:
 Behaviors to assert:
 
 - Full retrieval: venue input equals `purchaseAmountsSum`; buyers credited `floor(Q × nᵢ / G)`;
-  collector receives `floor(Q × F / G)` as native rBTC (MoC) or WRBTC (Dex).
+  collector credited `floor(Q × F / G)` on the same books (native rBTC MoC / WRBTC Dex still
+  on the handler until withdraw).
 - Short retrieval: venue spends retrieved; fee and credits scale with `Q`; no
   `StablecoinRetrievedBelowFee`.
-- Zero fee rate: no payment, no `FeeTransferred`.
-- Fee payment failure (rejecting collector / failing WRBTC transfer) reverts the whole batch
-  including credits and events.
-- `minRbtcOut` compares gross `Q` before fee peel; violation rolls back fee and credits.
+- Zero fee rate: no credit, no `FeeCredited`.
+- A rejecting collector does **not** revert the batch; its later withdraw reverts
+  `rBtcWithdrawalFailed` and leaves the credit.
+- `minRbtcOut` compares gross `Q` before fee peel; violation rolls back fee credit and buyer credits.
 - Floor dust: `fee + ∑ credits ≤ Q`; last row does not take a remainder of `Q`.
 - `amountSpent` is the row’s share of gross retrieved stablecoin.
+- `FeeCredited.stablecoinAmount` is the retrieved share (`retrieved × F / G`), not raw `F`.
 
 No new fork-specific assertions required beyond the production fork lanes.
 
 ## Success criteria
 
-- [ ] Fee paid last on every successful purchase path (rBTC MoC / WRBTC Dex); stablecoin fee
-      transfer gone.
+- [ ] Fee credited last on every successful purchase path; stablecoin fee transfer gone; no
+      Dex `_transferFee` override.
 - [ ] Conservation / rounding pinned: `floor(Q×F/G)` + `∑ floor(Q×nᵢ/G) ≤ Q`.
 - [ ] Gross `minRbtcOut`; gross `amountSpent` / batch spent totals.
-- [ ] `PurchaseFees__FeeTransferred` on every successful non-zero-fee purchase (MoC and Dex).
+- [ ] `PurchaseFees__FeeCredited` on every successful non-zero-fee purchase (MoC and Dex).
+- [ ] `s_accumulatedRbtc` is the only accumulated-rBTC mapping; invariant 13 names it.
 - [ ] `make check` + both production fork lanes green.
 - [ ] Consumer issues opened / updated; URLs in the PR cutover note.
 - [ ] Spec assigned; README Status and `IMPLEMENTATION_ORDER.md` updated.
@@ -129,7 +152,8 @@ No new fork-specific assertions required beyond the production fork lanes.
 
 - [ ] Matches **Scope**; nothing from **Out of scope**.
 - [ ] Protocol invariants in `AGENTS.md` still hold (exact stablecoin consumption on gross
-      venue input; rBTC pays the signer for user withdrawals; fee is not user-ledger credit).
+      venue input; rBTC pays the signer for withdrawals, including the collector’s; collector
+      credit is on `s_accumulatedRbtc`).
 - [ ] Tests in the PR match **Required tests**.
 - [ ] Files beyond this list are limited to direct dependencies and are named in the PR.
 - [ ] No unrelated refactors; history is reviewable.
@@ -138,25 +162,25 @@ No new fork-specific assertions required beyond the production fork lanes.
 ## ABI / deploy / cutover impact
 
 - ABI: remove `PurchaseRbtc__StablecoinRetrievedBelowFee`; add
-  `PurchaseFees__FeeTransferred(address indexed collector, uint256 amount)` and
-  `PurchaseFees__FeePaymentFailed`; `RbtcBought.amountSpent` and batch spent totals change
+  `PurchaseFees__FeeCredited(address indexed collector, uint256 rbtcAmount, uint256 stablecoinAmount)`;
+  do **not** add `FeePaymentFailed`. `RbtcBought.amountSpent` and batch spent totals change
   meaning (net → gross). `SuccessfulRbtcBatchPurchase.totalPurchasedRbtc` is still gross
   measured output and now includes the collector's share, so it generally exceeds
   `∑ RbtcBought.rBtcBought`. No function selector changes on `batchBuyRbtc`.
-- Scripts: none required (fee collector address unchanged). The collector must be an EOA or
-  other address that can receive native rBTC (MoC `call{value:}` forwards all gas); Dex pays
-  WRBTC to the same address. See [`CUTOVER_RUNBOOK.md`](./CUTOVER_RUNBOOK.md).
+- Scripts: none required (fee collector address unchanged). The collector is a passive EOA.
+  It withdraws per handler through `DcaManager.withdrawAccumulatedRbtc`; Dex unwraps WRBTC
+  then pays native. See [`CUTOVER_RUNBOOK.md`](./CUTOVER_RUNBOOK.md).
 - Cutover:
   - **swapper-bot** — quote Dex / MoC `minRbtcOut` from **gross** stablecoin input (not
     post-fee 99%); [swapper-bot#15](https://github.com/BitChillRSK/swapper-bot/issues/15).
-  - **bitchill-monitoring** — subscribe to `PurchaseFees__FeeTransferred`; stop expecting a
-    stablecoin `Transfer` to the collector on purchase; MoC native payments have no ERC-20 log;
+  - **bitchill-monitoring** — subscribe to `PurchaseFees__FeeCredited` (rBTC + stablecoin
+    amounts); stop expecting a stablecoin `Transfer` to the collector on purchase; do not
     watch `PurchaseFees__FeePaymentFailed`. Do not alert on
     `∑ RbtcBought.rBtcBought != SuccessfulRbtcBatchPurchase.totalPurchasedRbtc`: the batch
     total is gross `Q` and includes the collector's share.
     [bitchill-monitoring#27](https://github.com/BitChillRSK/bitchill-monitoring/issues/27).
   - **front-end** — fee copy stays “1%”; average price from `amountSpent` is all-in; show fee
-    in sats carefully.
+    in sats carefully. Collector withdraw uses the existing accumulated-rBTC path.
   - **data-api** / **metrics-dashboard** — `amountSpent` / batch spent are gross if indexed.
     `totalPurchasedRbtc` includes the collector's share and generally exceeds the sum of
-    buyer credits.
+    buyer credits. `FeeCredited.stablecoinAmount` is the fee’s share of retrieved input.

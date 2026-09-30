@@ -64,16 +64,16 @@ withdraw / purchase are allowed and expected.
 
 ### `PurchaseRbtcConservationInvariantTest` (purchase allocation)
 
-1. **Credits stay in the floored band** — sum of books + withdrawn + collector fees ≤ measured
+1. **Credits stay in the floored band** — sum of buyer books + withdrawn + collector credit ≤ measured
    venue output, and that total plus under-one-wei-per-row slack (k = rows + fee floors leave at
    most k − 1 wei) ≥ measured output.
-2. **Books never exceed handler balance** — claimable rBTC ≤ `address(harness).balance`.
+2. **Books never exceed handler balance** — claimable rBTC (buyers + collector) ≤ `address(harness).balance`.
 
 ### `LendingPurchaseConservationInvariantTest` (production lending + purchase together)
 
-1. **Native rBTC conservation** — MoC-paid rBTC (measured as handler + collector balance gains)
-   equals remaining handler balance plus collector fees plus measured withdrawals to users.
-   Length-1 batches can leave one wei of floor dust on the handler.
+1. **Native rBTC conservation** — MoC-paid rBTC (measured as handler balance gains)
+   equals remaining handler balance plus measured withdrawals. Collector fees stay on the
+   handler until withdrawn. Length-1 batches can leave one wei of floor dust on the handler.
 2. **Virtual shares ≤ receipt shares** — same lending-book bound as the main suite, on the real
    `SovrynDocHandlerMoc` leaf while purchases redeem through MoC.
 3. **No idle stablecoin on the handler** — DOC sits in iSUSD or is consumed by MoC. Purchase fees are native rBTC.

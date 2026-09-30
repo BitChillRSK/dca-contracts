@@ -65,6 +65,8 @@ contract BatchMinRbtcOutTest is DcaDappTest {
         uint256 rbtcBefore = _accumulatedRbtc();
         uint256 feeCollectorStableBefore = stablecoin.balanceOf(FEE_COLLECTOR);
         uint256 feeCollectorRbtcBefore = isDexSwaps ? wrbtc.balanceOf(FEE_COLLECTOR) : FEE_COLLECTOR.balance;
+        uint256 collectorCreditBefore =
+            IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(FEE_COLLECTOR);
         uint256 handlerCashBefore = _handlerRbtcCash();
         uint256 handlerStablecoinBefore = stablecoin.balanceOf(address(stablecoinHandler));
 
@@ -83,7 +85,12 @@ contract BatchMinRbtcOutTest is DcaDappTest {
         assertEq(_accumulatedRbtc(), rbtcBefore, "no buyer was credited");
         assertEq(stablecoin.balanceOf(FEE_COLLECTOR), feeCollectorStableBefore, "no stablecoin fee was kept");
         uint256 feeCollectorRbtcAfter = isDexSwaps ? wrbtc.balanceOf(FEE_COLLECTOR) : FEE_COLLECTOR.balance;
-        assertEq(feeCollectorRbtcAfter, feeCollectorRbtcBefore, "no rBTC fee was kept");
+        assertEq(feeCollectorRbtcAfter, feeCollectorRbtcBefore, "no rBTC fee was paid out");
+        assertEq(
+            IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(FEE_COLLECTOR),
+            collectorCreditBefore,
+            "no fee was credited"
+        );
         assertEq(_handlerRbtcCash(), handlerCashBefore, "the handler bought and kept no rBTC");
         assertEq(
             stablecoin.balanceOf(address(stablecoinHandler)),
@@ -156,16 +163,14 @@ contract BatchMinRbtcOutTest is DcaDappTest {
      * @dev Gross venue output Q. On MoC, an unreachable `minRbtcOut` reverts with Q in
      *      `PurchaseRbtc__BelowSwapperMinimum` and rolls the whole batch back. On Dex, the router would
      *      reject `type(uint256).max` before that check, so take a snapshot, buy with `0`, sum handler
-     *      WRBTC (credits + dust) and collector WRBTC (fee), and revert the world.
+     *      WRBTC (buyer credits + collector credit + dust), and revert the world.
      */
     function _measuredOutput() private returns (uint256 measured) {
         if (isDexSwaps) {
             uint256 snapshot = vm.snapshot();
             uint256 handlerBefore = wrbtc.balanceOf(address(stablecoinHandler));
-            uint256 collectorBefore = wrbtc.balanceOf(FEE_COLLECTOR);
             _buy(NO_MIN_RBTC_OUT);
-            measured = (wrbtc.balanceOf(address(stablecoinHandler)) - handlerBefore)
-                + (wrbtc.balanceOf(FEE_COLLECTOR) - collectorBefore);
+            measured = wrbtc.balanceOf(address(stablecoinHandler)) - handlerBefore;
             assertGt(measured, 0, "the batch must buy something for the minimum to be meaningful");
             vm.revertTo(snapshot);
             return measured;

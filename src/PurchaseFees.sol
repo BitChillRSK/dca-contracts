@@ -9,8 +9,8 @@ import {BitChillOwnable} from "./BitChillOwnable.sol";
  * @title PurchaseFees
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Interpolates a purchase fee between the configured rate bounds. Owned by the purchase
- *         branch (`PurchaseRbtc` and its MoC / Uniswap leaves); the purchase pipeline pays the
- *         floored rBTC / WRBTC share to the collector.
+ *         branch (`PurchaseRbtc` and its MoC / Uniswap leaves); the purchase pipeline credits the
+ *         floored rBTC share to the collector's accumulated balance.
  */
 abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
     using SafeCast for uint256;
@@ -142,20 +142,6 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
         return _calculateVariableFeeAndNetWeights(
             purchaseAmounts, minFeeRate, maxFeeRate, s_feePurchaseLowerBound, s_feePurchaseUpperBound
         );
-    }
-
-    /**
-     * @dev Pay `fee` to `s_feeCollector`. Default is native rBTC (MoC). A route whose purchases
-     *      accumulate WRBTC overrides this to transfer WRBTC instead. No-op when the floored fee is
-     *      zero. Kept as the last external interaction of a purchase so a failing collector undoes
-     *      buyer credits rather than leaving a partial batch.
-     */
-    function _transferFee(uint256 fee) internal virtual {
-        if (fee == 0) return;
-        address collector = s_feeCollector;
-        (bool sent,) = collector.call{value: fee}("");
-        if (!sent) revert PurchaseFees__FeePaymentFailed();
-        emit PurchaseFees__FeeTransferred(collector, fee);
     }
 
     /*//////////////////////////////////////////////////////////////
