@@ -24,9 +24,8 @@ interface IPurchaseRbtc is IStablecoinSource {
     );
     /**
      * @notice A batch purchase completed. Totals are measured cash, not the amounts requested.
-     * @dev `totalPurchasedRbtc` is gross measured venue output. It includes the collector's
-     *      floored share and generally exceeds the sum of this batch's `RbtcBought.rBtcBought`
-     *      (floor dust can widen the gap). `totalStablecoinAmountSpent` is retrieved gross.
+     * @dev `totalPurchasedRbtc` is gross measured output (includes the collector share; generally
+     *      exceeds ∑ `RbtcBought.rBtcBought`). `totalStablecoinAmountSpent` is retrieved gross.
      */
     event PurchaseRbtc__SuccessfulRbtcBatchPurchase(
         address indexed token, uint256 totalPurchasedRbtc, uint256 totalStablecoinAmountSpent
@@ -44,11 +43,7 @@ interface IPurchaseRbtc is IStablecoinSource {
     error PurchaseRbtc__RbtcBatchPurchaseFailed(address tokenSpent);
     /// @notice The measured rBTC this batch bought is below the minimum the caller attached to it.
     error PurchaseRbtc__BelowSwapperMinimum(uint256 rbtcReceived, uint256 minRbtcOut);
-    /**
-     * @notice The purchase venue did not consume exactly the stablecoin amount supplied to it.
-     * @dev A successful venue call must reduce the handler's purchase-token balance by `expectedAmount`.
-     *      Any smaller, larger, or negative delta reverts the entire batch and all earlier accounting.
-     */
+    /// @notice Venue did not reduce the handler's purchase-token balance by exactly `expectedAmount`.
     error PurchaseRbtc__InputAmountNotFullySpent(uint256 expectedAmount, uint256 balanceBefore, uint256 balanceAfter);
 
     /*//////////////////////////////////////////////////////////////
@@ -59,17 +54,14 @@ interface IPurchaseRbtc is IStablecoinSource {
      * @notice Spend each buyer's stablecoin and credit their accumulated rBTC.
      * @param buyers Users to buy for. An address may appear more than once.
      * @param scheduleIds Schedule id for each row, used only in `RbtcBought`.
-     * @param purchaseAmounts Gross stablecoin each row contributes (the total fee is derived from these).
-     * @param minRbtcOut Minimum rBTC this batch as a whole must buy, in rBTC/WRBTC wei (18 decimals)
-     *        whatever the stablecoin's decimals. `0` disables this check. Binds gross measured output
-     *        before the protocol fee is taken from that output.
-     * @dev DcaManager has already debited the schedules. The venue spends the full retrieved
-     *      stablecoin. Measured rBTC is split over `purchaseAmountsSum`: buyers get
-     *      `floor(Q × netᵢ / G)`, the collector gets `floor(Q × F / G)`, and floor dust stays
-     *      uncredited. Reported `amountSpent` is each row's share of retrieved gross. `minRbtcOut`
-     *      binds the measured receipt independently of any venue-specific floor. A successful venue
-     *      call must consume exactly the stablecoin passed to it; otherwise the entire batch reverts.
-     *      The output fee is credited to the collector last on the same accumulated-rBTC books.
+     * @param purchaseAmounts Gross stablecoin each row contributes (fee derived from these).
+     * @param minRbtcOut Minimum rBTC this batch must buy (rBTC/WRBTC wei). `0` disables. Binds
+     *        gross measured output before the protocol fee is taken from that output.
+     * @dev DcaManager has already debited the schedules. Venue spends full retrieved stablecoin.
+     *      Measured output `Q` splits over `purchaseAmountsSum` (`G`): buyers
+     *      `floor(Q × netᵢ / G)`, collector `floor(Q × F / G)`, floor dust uncredited.
+     *      `amountSpent` is each row's share of retrieved gross. Exact stablecoin consumption
+     *      required. Collector fee credited last on the same accumulated-rBTC books.
      */
     function batchBuyRbtc(
         address[] calldata buyers,
@@ -80,9 +72,8 @@ interface IPurchaseRbtc is IStablecoinSource {
 
     /**
      * @notice Pay `user` the rBTC this handler has accumulated for them.
-     * @param user Account whose balance is paid. DcaManager always passes `msg.sender`; there is
-     *        no `to` parameter and no owner rescue of another account's rBTC. The fee collector
-     *        withdraws here too.
+     * @param user Account paid. DcaManager always passes `msg.sender` — no `to`, no owner rescue.
+     *        The fee collector withdraws here too.
      */
     function withdrawAccumulatedRbtc(address user) external;
 

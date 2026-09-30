@@ -49,11 +49,9 @@ interface IPurchaseFees {
     /// @notice Owner set the address that receives purchase fees.
     event PurchaseFees__FeeCollectorAddressSet(address indexed feeCollector);
     /**
-     * @notice A non-zero purchase fee was credited to the collector's accumulated rBTC.
-     * @dev Emitted once per batch after buyer credits. `rbtcAmount` is the floored share of
-     *      measured output; `stablecoinAmount` is that same share of retrieved venue input, so
-     *      all-in price is `stablecoinAmount / rbtcAmount`. The collector withdraws through
-     *      `withdrawAccumulatedRbtc` like any other account.
+     * @notice Non-zero purchase fee credited to the collector's accumulated rBTC.
+     * @dev `rbtcAmount` is the floored share of measured output; `stablecoinAmount` is the same
+     *      share of retrieved input (all-in price = stablecoinAmount / rbtcAmount).
      */
     event PurchaseFees__FeeCredited(address indexed collector, uint256 rbtcAmount, uint256 stablecoinAmount);
 
@@ -90,20 +88,14 @@ interface IPurchaseFees {
         uint256 feePurchaseUpperBound
     ) external;
 
-    /**
-     * @notice Set the address whose accumulated rBTC receives purchase fees.
-     * @param feeCollector New collector. Cannot be zero.
-     */
+    /// @notice Set the address that receives purchase fees on the accumulated-rBTC books.
     function setFeeCollector(address feeCollector) external;
 
     /*//////////////////////////////////////////////////////////////
                                 GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @notice Address whose accumulated rBTC currently receives purchase fees.
-     * @return The fee collector.
-     */
+    /// @notice Address that currently receives purchase fees on the accumulated-rBTC books.
     function getFeeCollector() external view returns (address);
 
     /**

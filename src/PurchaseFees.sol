@@ -8,9 +8,7 @@ import {BitChillOwnable} from "./BitChillOwnable.sol";
 /**
  * @title PurchaseFees
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Interpolates a purchase fee between the configured rate bounds. Owned by the purchase
- *         branch (`PurchaseRbtc` and its MoC / Uniswap leaves); the purchase pipeline credits the
- *         floored rBTC share to the collector's accumulated balance.
+ * @notice Fee-rate config for the purchase branch; `PurchaseRbtc` credits the collector.
  */
 abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
     using SafeCast for uint256;
@@ -119,13 +117,12 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Split each purchase amount into a fee and a net weight. Callers allocate measured
-     *      output over `purchaseAmountsSum` using these values; they are not amounts the venue spends.
-     * @param purchaseAmounts The array with the raw purchase amounts specified by users.
-     * @return totalFee       Sum of per-row fees in stablecoin units.
-     * @return netWeights     Per-row net (purchase amount minus fee), used as allocation weights.
-     * @return purchaseAmountsSum Sum of `purchaseAmounts`. Allocation denominator; retrieval may
-     *                        deliver less.
+     * @dev Fee and net weight per row. Callers allocate measured output over `purchaseAmountsSum`;
+     *      these are not venue spend amounts.
+     * @param purchaseAmounts Raw purchase amounts.
+     * @return totalFee Sum of per-row fees in stablecoin units.
+     * @return netWeights Per-row net (amount − fee), as allocation weights.
+     * @return purchaseAmountsSum Sum of `purchaseAmounts` (allocation denominator).
      */
     function _calculateFeeAndNetWeights(uint256[] calldata purchaseAmounts)
         internal

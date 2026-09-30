@@ -43,17 +43,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
     /// @dev Allow the contract to receive native rBTC from MoC or from unwrapping WRBTC.
     receive() external payable {}
 
-    /**
-     * @inheritdoc IPurchaseRbtc
-     * @dev Spends the stablecoin the retrieval actually delivered, never the gross amount it was asked
-     *      for: a lending handler can come back short when it redeems its shares. Idle retrieval only sums
-     *      the request, because the cash already sits on the handler; if it is not all there, the venue's
-     *      pull or the exact-consumption check reverts the batch. The venue spends that full retrieved
-     *      amount. Net weights and the total fee allocate measured output over `purchaseAmountsSum`:
-     *      buyer credits and the protocol fee are floored shares of measured output. Reported spend
-     *      is each row's share of retrieved gross. The collector's share is credited to the same
-     *      accumulated-rBTC books last; it withdraws like any other account.
-     */
+    /// @inheritdoc IPurchaseRbtc
     function batchBuyRbtc(
         address[] calldata buyers,
         uint64[] calldata scheduleIds,
@@ -67,10 +57,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
 
         {
             (totalFee, netWeights, purchaseAmountsSum) = _calculateFeeAndNetWeights(purchaseAmounts);
-
-            // Retrieve against `purchaseAmounts`. What comes back is what the retrieval delivered,
-            // which a lending handler can leave short of the request. The venue spends that amount in
-            // full.
+            // Lending may return less than requested; the venue spends whatever came back.
             totalStablecoinRetrieved = _batchRetrieveStablecoin(buyers, purchaseAmounts);
         }
 
@@ -89,16 +76,12 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
             }
         }
         if (totalPurchasedRbtc == 0) revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(i_stablecoin));
-        // Checked against the rBTC we measured ourselves receiving, so the bound holds on every purchase
-        // venue and never trusts an integrator return value. Equality passes. Where the venue applies a
-        // floor of its own, it is enforced there and the stricter of the two decides. The bound is on
-        // gross measured output; buyer credits are the residual after the protocol fee and floor dust.
+        // Gross measured Q — never trusts an integrator return. Equality passes.
         if (totalPurchasedRbtc < minRbtcOut) {
             revert PurchaseRbtc__BelowSwapperMinimum(totalPurchasedRbtc, minRbtcOut);
         }
 
-        // Can't overflow: the rBTC total is under the native supply (< 2^85 wei) and the total fee is a
-        // fraction of purchaseAmountsSum (capped at 5% of uint96 purchase amounts).
+        // Can't overflow: rBTC < 2^85 wei; totalFee ≤ 5% of uint96 purchase amounts.
         uint256 feeRbtc;
         unchecked {
             feeRbtc = totalPurchasedRbtc * totalFee / purchaseAmountsSum;
@@ -116,8 +99,6 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
         emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
             address(i_stablecoin), totalPurchasedRbtc, totalStablecoinRetrieved
         );
-        // Fee last: buyer credits and the batch event are already in the frame. The collector is
-        // credited on the same books and withdraws through `withdrawAccumulatedRbtc`.
         _creditFee(feeRbtc, totalFee, purchaseAmountsSum, totalStablecoinRetrieved);
     }
 
@@ -151,9 +132,9 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
     }
 
     /**
-     * @dev Spend `stablecoinAmount` of stablecoin and return only measured rBTC or WRBTC received.
-     *      The caller proves exact purchase-token consumption around this call. The amount is the full
-     *      retrieved gross — the protocol fee is taken from the measured output afterward.
+     * @dev Spend `stablecoinAmount` of stablecoin; return only measured rBTC/WRBTC.
+     *      Caller proves exact purchase-token consumption. Amount is retrieved gross; the fee is
+     *      taken from measured output afterward.
      */
     function _purchaseRbtc(uint256 stablecoinAmount, uint256 minRbtcOut) internal virtual returns (uint256 rbtcReceived);
 
@@ -162,10 +143,8 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev `netWeights` are allocation weights over `purchaseAmountsSum`: each row takes its share of
-     *      measured output even if the redemption paid less than requested. Both the fee and each row
-     *      floor, which can leave under one wei of rBTC per term uncredited; see IPurchaseRbtc.
-     *      Split out of `batchBuyRbtc` so the purchase path compiles under legacy codegen.
+     * @dev Allocate floored shares of measured output. Split out of `batchBuyRbtc` for legacy codegen.
+     *      Fee and each row floor; under one wei per term can stay uncredited — see IPurchaseRbtc.
      */
     function _creditPurchases(
         address[] calldata buyers,
@@ -182,9 +161,8 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
             unchecked {
                 userRbtc = totalPurchasedRbtc * netWeights[i] / purchaseAmountsSum;
             }
-            // Gross share of what the venue actually spent (all-in average price).
             uint256 userStablecoinSpent = totalStablecoinRetrieved * purchaseAmounts[i] / purchaseAmountsSum;
-            // Skip zero floor allocations so a never-credited user is not marked live.
+            // Skip zero floors so a never-credited user is not marked live.
             if (userRbtc != 0) _creditRbtc(buyers[i], userRbtc);
             emit PurchaseRbtc__RbtcBought(
                 buyers[i], address(i_stablecoin), userRbtc, scheduleIds[i], userStablecoinSpent
@@ -193,9 +171,8 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
     }
 
     /**
-     * @dev Credit `feeRbtc` to `s_feeCollector` on the same accumulated-rBTC books as buyers.
-     *      `stablecoinAmount` is the fee's share of retrieved venue input so off-chain can compute
-     *      BitChill's all-in price. No-op when the floored rBTC fee is zero.
+     * @dev Credit the floored rBTC fee to `s_feeCollector`. Emit the matching retrieved-stablecoin
+     *      share for off-chain all-in price. No-op when `feeRbtc` is zero.
      */
     function _creditFee(uint256 feeRbtc, uint256 totalFee, uint256 purchaseAmountsSum, uint256 totalStablecoinRetrieved)
         private
