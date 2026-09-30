@@ -171,8 +171,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
     }
 
     /**
-     * @dev Credit the floored rBTC fee to `s_feeCollector`. Emit the matching retrieved-stablecoin
-     *      share for off-chain all-in price. No-op when `feeRbtc` is zero.
+     * @dev Credit `floor(Q × F / G)` rBTC; emit `floor(retrieved × F / G)` stablecoin. No-op at zero.
      */
     function _creditFee(uint256 feeRbtc, uint256 totalFee, uint256 purchaseAmountsSum, uint256 totalStablecoinRetrieved)
         private

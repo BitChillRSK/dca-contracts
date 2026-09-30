@@ -50,8 +50,8 @@ interface IPurchaseFees {
     event PurchaseFees__FeeCollectorAddressSet(address indexed feeCollector);
     /**
      * @notice Non-zero purchase fee credited to the collector's accumulated rBTC.
-     * @dev `rbtcAmount` is the floored share of measured output; `stablecoinAmount` is the same
-     *      share of retrieved input (all-in price = stablecoinAmount / rbtcAmount).
+     * @dev `rbtcAmount` is `floor(Q × F / G)`; `stablecoinAmount` is `floor(retrieved × F / G)`.
+     *      Independent floors; their ratio is an approximate all-in price.
      */
     event PurchaseFees__FeeCredited(address indexed collector, uint256 rbtcAmount, uint256 stablecoinAmount);
 

@@ -32,10 +32,9 @@ longer users-only.
 R87 dropped `PurchaseFees__FeeTransferred` because the stablecoin `Transfer` was enough
 telemetry. There is still no ERC-20 `Transfer` on a MoC fee (nothing is pushed), so this PR
 emits `PurchaseFees__FeeCredited(collector, rbtcAmount, stablecoinAmount)` on every route.
-`rbtcAmount` is the floored share of measured output; `stablecoinAmount` is that same share
-of retrieved venue input so off-chain can compute BitChill’s all-in price
-(`stablecoinAmount / rbtcAmount`). Dex WRBTC stays on the handler until the collector
-withdraws (unwrap then native, same seam as buyers).
+`rbtcAmount` is `floor(Q × F / G)`; `stablecoinAmount` is `floor(retrieved × F / G)`.
+Independent floors; their ratio is an approximate all-in price. Dex WRBTC stays on the
+handler until the collector withdraws (unwrap then native, same seam as buyers).
 
 Pay the fee **last** — after buyer credits and the batch event — so the collector’s
 storage write is the last accounting step. A zero floored `feeRbtc` is a no-op and emits
