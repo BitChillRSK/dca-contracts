@@ -22,3 +22,6 @@ report.md
 .cursor/*
 !.cursor/rules/
 !.cursor/rules/**
+
+# Local product-decision notes (not assigned relaunch specs).
+docs/relaunch/FEE-CURRENCY-OPTIONS.md

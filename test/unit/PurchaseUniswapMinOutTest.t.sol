@@ -156,9 +156,8 @@ contract PurchaseUniswapMinOutTest is Test {
     function testOracleFloorRevertsWithNoCallerMinimum() public {
         MinOutHarness harness = _deployHarness(18);
         uint256 gross = _fundedGross(harness, 18);
-        uint256 net = gross - harness.calculateFee(gross);
 
-        swapRouter.setAmountOut(harness.getAmountOutMinimum(net) - 1);
+        swapRouter.setAmountOut(harness.getAmountOutMinimum(gross) - 1);
 
         vm.expectRevert(bytes("Too little received"));
         _buyOne(harness, gross, NO_MIN_RBTC_OUT);
@@ -169,9 +168,8 @@ contract PurchaseUniswapMinOutTest is Test {
     function testCallerMinimumRevertsAnOutputTheOracleFloorAccepts() public {
         MinOutHarness harness = _deployHarness(18);
         uint256 gross = _fundedGross(harness, 18);
-        uint256 net = gross - harness.calculateFee(gross);
 
-        uint256 clearsTheFloor = harness.getAmountOutMinimum(net);
+        uint256 clearsTheFloor = harness.getAmountOutMinimum(gross);
         swapRouter.setAmountOut(clearsTheFloor);
 
         vm.expectRevert(bytes("Too little received"));
@@ -183,14 +181,17 @@ contract PurchaseUniswapMinOutTest is Test {
     function testCallerMinimumBelowTheOracleFloorIsInert() public {
         MinOutHarness harness = _deployHarness(18);
         uint256 gross = _fundedGross(harness, 18);
-        uint256 net = gross - harness.calculateFee(gross);
 
-        uint256 floor = harness.getAmountOutMinimum(net);
+        uint256 floor = harness.getAmountOutMinimum(gross);
         swapRouter.setAmountOut(floor);
 
         _buyOne(harness, gross, floor / 2);
 
-        assertEq(harness.getAccumulatedRbtcBalance(BUYER), floor, "the measured delta is still what is credited");
+        assertEq(
+            harness.getAccumulatedRbtcBalance(BUYER),
+            _buyerCredit(harness, gross, floor),
+            "the buyer is credited the residual after the WRBTC fee"
+        );
     }
 
     /// @dev No caller value can loosen the governance floor. The interesting case is not `0` — which the
@@ -200,9 +201,8 @@ contract PurchaseUniswapMinOutTest is Test {
     function testCallerMinimumCannotLoosenTheOracleFloor() public {
         MinOutHarness harness = _deployHarness(18);
         uint256 gross = _fundedGross(harness, 18);
-        uint256 net = gross - harness.calculateFee(gross);
 
-        uint256 belowTheFloor = harness.getAmountOutMinimum(net) - 1;
+        uint256 belowTheFloor = harness.getAmountOutMinimum(gross) - 1;
         swapRouter.setAmountOut(belowTheFloor);
 
         // The caller minimum is satisfied by this payout, and is the loosest nonzero value that still is.
@@ -224,16 +224,20 @@ contract PurchaseUniswapMinOutTest is Test {
 
         uint256 grossEighteen = _fundedGross(eighteen, 18);
         uint256 grossSix = _fundedGross(six, 6);
-        // Same USD notional, so the same net USD and the same oracle-derived floor in WRBTC wei.
-        uint256 floor = eighteen.getAmountOutMinimum(grossEighteen - eighteen.calculateFee(grossEighteen));
-        assertEq(six.getAmountOutMinimum(grossSix - six.calculateFee(grossSix)), floor, "same USD, same floor");
+        // Same USD notional, so the same oracle-derived floor in WRBTC wei (venue spends the gross).
+        uint256 floor = eighteen.getAmountOutMinimum(grossEighteen);
+        assertEq(six.getAmountOutMinimum(grossSix), floor, "same USD, same floor");
 
         swapRouter.setAmountOut(floor);
         _buyOne(eighteen, grossEighteen, floor);
         _buyOne(six, grossSix, floor);
 
-        assertEq(eighteen.getAccumulatedRbtcBalance(BUYER), floor);
-        assertEq(six.getAccumulatedRbtcBalance(BUYER), floor, "a 6-decimal input still takes an 18-decimal minimum");
+        assertEq(eighteen.getAccumulatedRbtcBalance(BUYER), _buyerCredit(eighteen, grossEighteen, floor));
+        assertEq(
+            six.getAccumulatedRbtcBalance(BUYER),
+            _buyerCredit(six, grossSix, floor),
+            "a 6-decimal input still takes an 18-decimal minimum"
+        );
 
         // A wei more than the 18-decimal payout is out of reach for both, so neither read its own token's units.
         six.mintStablecoin(grossSix); // the first batch spent what it was funded with
@@ -247,12 +251,11 @@ contract PurchaseUniswapMinOutTest is Test {
     function testOwnerCanRetightenTheFloorAndTheSwapFollows() public {
         MinOutHarness harness = _deployHarness(18);
         uint256 gross = _fundedGross(harness, 18);
-        uint256 net = gross - harness.calculateFee(gross);
 
-        uint256 looseFloor = harness.getAmountOutMinimum(net);
+        uint256 looseFloor = harness.getAmountOutMinimum(gross);
 
         harness.setAmountOutMinimumPercent(0.99 ether);
-        uint256 tightFloor = harness.getAmountOutMinimum(net);
+        uint256 tightFloor = harness.getAmountOutMinimum(gross);
         assertGt(tightFloor, looseFloor, "raising the percent raises the swap-time floor");
 
         // A payout the old floor accepted is now rejected, with no caller minimum involved.
@@ -268,14 +271,13 @@ contract PurchaseUniswapMinOutTest is Test {
     function testTheWallBoundsHowFarOneOwnerTransactionCanWiden() public {
         MinOutHarness harness = _deployHarness(18);
         uint256 gross = _fundedGross(harness, 18);
-        uint256 net = gross - harness.calculateFee(gross);
 
         vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
         harness.setAmountOutMinimumPercent(SAFETY - 1);
 
         // The loosest reachable floor in one transaction is the wall itself.
         harness.setAmountOutMinimumPercent(SAFETY);
-        uint256 wallFloor = harness.getAmountOutMinimum(net);
+        uint256 wallFloor = harness.getAmountOutMinimum(gross);
 
         swapRouter.setAmountOut(wallFloor - 1);
         vm.expectRevert(bytes("Too little received"));
@@ -283,12 +285,20 @@ contract PurchaseUniswapMinOutTest is Test {
 
         swapRouter.setAmountOut(wallFloor);
         _buyOne(harness, gross, 1);
-        assertEq(harness.getAccumulatedRbtcBalance(BUYER), wallFloor, "the wall is the worst reachable fill");
+        assertEq(
+            harness.getAccumulatedRbtcBalance(BUYER),
+            _buyerCredit(harness, gross, wallFloor),
+            "the wall is the worst reachable fill"
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
                                 HELPERS
     //////////////////////////////////////////////////////////////*/
+
+    function _buyerCredit(MinOutHarness harness, uint256 gross, uint256 q) private view returns (uint256) {
+        return q * (gross - harness.calculateFee(gross)) / gross;
+    }
 
     /// @dev Fund the handler with a batch's gross spend: `FEE_PURCHASE_LOWER_BOUND` USD in the token's units,
     ///      which sits inside the fee bands the harness is built with.
@@ -376,7 +386,7 @@ contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
 
     /// @dev External so the batch fee helper receives the `calldata` array it takes in production.
     function calculateBatchFee(uint256[] calldata amounts) external view returns (uint256 fee) {
-        (fee,,) = _calculateFeeAndNetAmounts(amounts);
+        (fee,,) = _calculateFeeAndNetWeights(amounts);
     }
 
     function purchaseRbtc(uint256 stablecoinAmountToSpend, uint256 minRbtcOut) external returns (uint256) {

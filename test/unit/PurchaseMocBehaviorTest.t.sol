@@ -88,9 +88,7 @@ contract PurchaseMocBehaviorTest is Test {
 
     function test_partialFreeDocRedemptionRevertsAndRollsBack() public {
         uint256 purchaseAmount = 25 ether;
-        uint256 fee = purchaseAmount * MAX_FEE_RATE_TEST / BPS_DENOMINATOR;
-        uint256 netAmount = purchaseAmount - fee;
-        uint256 partialAmount = netAmount - 1 ether;
+        uint256 partialAmount = purchaseAmount - 1 ether;
         moc.setFreeDoc(partialAmount);
 
         address[] memory buyers = new address[](1);
@@ -101,11 +99,11 @@ contract PurchaseMocBehaviorTest is Test {
         amounts[0] = purchaseAmount;
 
         PurchaseState memory before = _snapshot();
-        uint256 inputBalanceBefore = before.handlerDoc - fee;
+        uint256 inputBalanceBefore = before.handlerDoc;
         vm.expectRevert(
             abi.encodeWithSelector(
                 IPurchaseRbtc.PurchaseRbtc__InputAmountNotFullySpent.selector,
-                netAmount,
+                purchaseAmount,
                 inputBalanceBefore,
                 inputBalanceBefore - partialAmount
             )

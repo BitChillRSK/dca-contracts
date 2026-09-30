@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
-import {Test, console2, Vm} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {PurchaseFeesHarness} from "../../mocks/PurchaseFeesHarness.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {IPurchaseFees} from "../../../src/interfaces/IPurchaseFees.sol";
-import {MockStablecoin} from "../../mocks/MockStablecoin.sol";
 
 contract PurchaseFeesTest is Test {
     PurchaseFeesHarness feeHandler;
@@ -26,7 +25,6 @@ contract PurchaseFeesTest is Test {
     event PurchaseFees__PurchaseLowerBoundSet(uint256 feePurchaseLowerBound);
     event PurchaseFees__PurchaseUpperBoundSet(uint256 feePurchaseUpperBound);
     event PurchaseFees__FeeCollectorAddressSet(address indexed feeCollector);
-    event Transfer(address indexed from, address indexed to, uint256 value);
 
     function setUp() public {
         IPurchaseFees.FeeSettings memory settings = IPurchaseFees.FeeSettings({
@@ -199,29 +197,29 @@ contract PurchaseFeesTest is Test {
         assertEq(feeHandler.exposedCalculateFee(above), above * flatRate / BPS_DENOMINATOR);
     }
 
-    function test_calculateFeeAndNetAmounts_matchesSequentialCalculateFee() public {
+    function test_calculateFeeAndNetWeights_matchesSequentialCalculateFee() public {
         uint256[] memory amounts = new uint256[](4);
         amounts[0] = 50 ether;
         amounts[1] = LOWER_BOUND;
         amounts[2] = 550 ether;
         amounts[3] = 2000 ether;
 
-        (uint256 aggregatedFee, uint256[] memory netAmounts, uint256 totalNet) =
-            feeHandler.exposedCalculateFeeAndNetAmounts(amounts);
+        (uint256 totalFee, uint256[] memory netAmounts, uint256 purchaseAmountsSum) =
+            feeHandler.exposedCalculateFeeAndNetWeights(amounts);
 
-        uint256 expectedAggregatedFee;
-        uint256 expectedTotalNet;
+        uint256 expectedTotalFee;
+        uint256 expectedPurchaseAmountsSum;
         for (uint256 i; i < amounts.length; ++i) {
             uint256 expectedFee = feeHandler.exposedCalculateFee(amounts[i]);
-            expectedAggregatedFee += expectedFee;
-            expectedTotalNet += amounts[i] - expectedFee;
+            expectedTotalFee += expectedFee;
+            expectedPurchaseAmountsSum += amounts[i];
             assertEq(netAmounts[i], amounts[i] - expectedFee);
         }
-        assertEq(aggregatedFee, expectedAggregatedFee);
-        assertEq(totalNet, expectedTotalNet);
+        assertEq(totalFee, expectedTotalFee);
+        assertEq(purchaseAmountsSum, expectedPurchaseAmountsSum);
     }
 
-    function test_calculateFeeAndNetAmounts_flatMatchesSequentialIncludingRounding() public {
+    function test_calculateFeeAndNetWeights_flatMatchesSequentialIncludingRounding() public {
         uint16 flatRate = 137;
         feeHandler.testSetFeeRateParams(flatRate, flatRate, LOWER_BOUND, UPPER_BOUND);
 
@@ -232,19 +230,19 @@ contract PurchaseFeesTest is Test {
         amounts[3] = 10_000;
         amounts[4] = 550 ether;
 
-        (uint256 aggregatedFee, uint256[] memory netAmounts, uint256 totalNet) =
-            feeHandler.exposedCalculateFeeAndNetAmounts(amounts);
+        (uint256 totalFee, uint256[] memory netAmounts, uint256 purchaseAmountsSum) =
+            feeHandler.exposedCalculateFeeAndNetWeights(amounts);
 
-        uint256 expectedAggregatedFee;
-        uint256 expectedTotalNet;
+        uint256 expectedTotalFee;
+        uint256 expectedPurchaseAmountsSum;
         for (uint256 i; i < amounts.length; ++i) {
             uint256 expectedFee = amounts[i] * flatRate / BPS_DENOMINATOR;
-            expectedAggregatedFee += expectedFee;
-            expectedTotalNet += amounts[i] - expectedFee;
+            expectedTotalFee += expectedFee;
+            expectedPurchaseAmountsSum += amounts[i];
             assertEq(netAmounts[i], amounts[i] - expectedFee);
         }
-        assertEq(aggregatedFee, expectedAggregatedFee);
-        assertEq(totalNet, expectedTotalNet);
+        assertEq(totalFee, expectedTotalFee);
+        assertEq(purchaseAmountsSum, expectedPurchaseAmountsSum);
     }
 
     function test_setFeeRateParams_reverts_aboveCap() public {
@@ -268,33 +266,6 @@ contract PurchaseFeesTest is Test {
         emit PurchaseFees__FeeCollectorAddressSet(newCollector);
         feeHandler.setFeeCollector(newCollector);
         assertEq(feeHandler.getFeeCollector(), newCollector);
-    }
-
-    function test_transferFee_transfersWhenNonZero() public {
-        MockStablecoin token = new MockStablecoin(address(this));
-        uint256 fee = 1 ether;
-        token.mint(address(feeHandler), fee);
-        vm.expectEmit(true, true, false, true, address(token));
-        emit Transfer(address(feeHandler), FEE_COLLECTOR, fee);
-        feeHandler.exposedTransferFee(token, fee);
-        assertEq(token.balanceOf(FEE_COLLECTOR), fee);
-    }
-
-    function test_transferFee_zeroDoesNotTransfer() public {
-        MockStablecoin token = new MockStablecoin(address(this));
-        token.mint(address(feeHandler), 1 ether);
-        uint256 collectorBefore = token.balanceOf(FEE_COLLECTOR);
-        vm.recordLogs();
-        feeHandler.exposedTransferFee(token, 0);
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 sig = Transfer.selector;
-        for (uint256 i; i < logs.length; ++i) {
-            if (logs[i].topics[0] != sig) continue;
-            if (logs[i].emitter != address(token)) continue;
-            revert("Transfer emitted for a zero fee");
-        }
-        assertEq(token.balanceOf(FEE_COLLECTOR), collectorBefore);
-        assertEq(token.balanceOf(address(feeHandler)), 1 ether);
     }
 
     function test_getFeeSettings_returnsStoredBand() public {
@@ -332,7 +303,7 @@ contract PurchaseFeesTest is Test {
     /// @dev The fee multiplication and both loop sums run unchecked, bounded by uint96 purchase amounts and
     ///      the 500 bps cap. Drive a long batch at those bounds, flat and across the whole variable band,
     ///      and compare every output with full-width arithmetic.
-    function test_calculateFeeAndNetAmounts_uint96RowsAtCapMatchFullWidth() public {
+    function test_calculateFeeAndNetWeights_uint96RowsAtCapMatchFullWidth() public {
         uint256 rows = 256;
         uint256[] memory amounts = new uint256[](rows);
         uint256 step = uint256(type(uint96).max) / rows;
@@ -356,10 +327,10 @@ contract PurchaseFeesTest is Test {
         uint256 lower,
         uint256 upper
     ) private {
-        (uint256 aggregatedFee, uint256[] memory nets, uint256 totalNet) =
-            feeHandler.exposedCalculateFeeAndNetAmounts(amounts);
+        (uint256 totalFee, uint256[] memory nets, uint256 purchaseAmountsSum) =
+            feeHandler.exposedCalculateFeeAndNetWeights(amounts);
         uint256 expectedFees;
-        uint256 expectedNets;
+        uint256 expectedPurchaseAmountsSum;
         for (uint256 i; i < amounts.length; ++i) {
             uint256 amount = amounts[i];
             uint256 rate;
@@ -369,10 +340,10 @@ contract PurchaseFeesTest is Test {
             uint256 fee = amount * rate / BPS_DENOMINATOR;
             assertEq(nets[i], amount - fee, "row net");
             expectedFees += fee;
-            expectedNets += amount - fee;
+            expectedPurchaseAmountsSum += amount;
         }
-        assertEq(aggregatedFee, expectedFees, "aggregated fee");
-        assertEq(totalNet, expectedNets, "total net");
+        assertEq(totalFee, expectedFees, "total fee");
+        assertEq(purchaseAmountsSum, expectedPurchaseAmountsSum, "purchaseAmountsSum");
     }
 
     /*//////////////////////////////////////////////////////////////

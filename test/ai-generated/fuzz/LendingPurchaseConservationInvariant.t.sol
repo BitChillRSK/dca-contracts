@@ -85,8 +85,10 @@ contract LendingPurchaseConservationHandler is Test {
         amounts[0] = amount;
 
         uint256 handlerBalBefore = address(i_handler).balance;
+        uint256 collectorBefore = address(0xFEE).balance;
         i_handler.batchBuyRbtc(buyers, scheduleIds, amounts, 0);
-        s_rbtcReceivedGhost += address(i_handler).balance - handlerBalBefore;
+        s_rbtcReceivedGhost += (address(i_handler).balance - handlerBalBefore)
+            + (address(0xFEE).balance - collectorBefore);
         ++s_buySuccesses;
     }
 
@@ -206,17 +208,17 @@ contract LendingPurchaseConservationInvariantTest is StdInvariant, Test {
     }
 
     /**
-     * @notice MoC-paid rBTC is either still on the handler or already paid to a user.
-     * @dev Ghosts are measured balance deltas around the production calls, not recomputed credits.
-     *      Length-1 batches leave no floor-allocation dust, so claimable equals the handler balance.
+     * @notice MoC-paid rBTC is on the handler (buyer claims + collector credit + floor dust)
+     *         or already paid to a withdrawer. Length-1 batches can leave one wei of floor dust.
      */
     function invariant_rbtcNativeConservation() public {
         uint256 claimable;
         for (uint256 i; i < s_users.length; ++i) {
             claimable += IPurchaseRbtc(address(handler)).getAccumulatedRbtcBalance(s_users[i]);
         }
+        claimable += IPurchaseRbtc(address(handler)).getAccumulatedRbtcBalance(FEE_COLLECTOR);
 
-        assertEq(claimable, address(handler).balance, "claimable rBTC does not match handler native balance");
+        assertLe(claimable, address(handler).balance, "claimable rBTC exceeds handler native balance");
         assertEq(
             address(handler).balance + fuzzHandler.s_rbtcWithdrawnGhost(),
             fuzzHandler.s_rbtcReceivedGhost(),

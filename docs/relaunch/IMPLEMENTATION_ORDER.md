@@ -168,6 +168,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R104 | after R103, before relaunch deploy | none (identifier polish + NatSpec trim; stack on R103 names) |
 | R105 | after R104, before relaunch deploy | none (strip redundant `Address` from address params / matching locals; stack on R104) |
 | R106 | after R105, before relaunch deploy | none (`s_shares` / Uniswap path state `private`; correct `UserSharesUpdated` docs; stack on R105) |
+| R107 | after R106, before audit freeze / relaunch deploy | none (hardcoded rBTC MoC / WRBTC Dex fees credited on accumulated books; decided 2026-09-29 / 2026-09-30) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1428,6 +1429,15 @@ After R105, before relaunch deploy. `LendingHandler.s_shares` and `PurchaseUnisw
 invariants 8 and 13). Correct `UserSharesUpdated` NatSpec / `EXTERNAL_REWARDS.md`: `newShares` is
 the balance after that transition; only the last event for a repeated batch buyer matches the
 final getter. Ask: none.
+
+### R107 - rBTC / WRBTC purchase fees ([spec](./R107-rbtc-fees.md))
+
+After R106, before the audit revision freezes (and before relaunch deploy). Venue spends the full
+retrieved stablecoin; after measured rBTC/WRBTC arrives, credit `floor(Q × F / G)` to the
+collector on `s_accumulatedRbtc` **last**, after buyer credits. Emit
+`PurchaseFees__FeeCredited` (rBTC amount + stablecoin share). Gross `minRbtcOut` and gross
+`amountSpent`. No currency toggle; no push in the purchase tx. Ask: none (fees decided
+2026-09-29; credit-not-push decided 2026-09-30).
 
 ## Closed non-implementation decisions
 

@@ -29,8 +29,10 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
         uint256 handlerStablecoin;
         uint256 routerStablecoin;
         uint256 feeCollectorStablecoin;
+        uint256 feeCollectorWrBtc;
         uint256 handlerWrBtc;
         uint256 userAccumulatedRbtc;
+        uint256 collectorAccumulatedRbtc;
     }
 
     MockStablecoin internal intermediateToken;
@@ -107,7 +109,7 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
         _activateOneHopPath(address(intermediateToken));
         // The whole input leaves the handler, so only the router's intermediate balance can show that a
         // later hop stopped short.
-        uint256 stranded = (_netAmountToSpend() * (FULL_FILL_PERCENT - SHORT_FILL_PERCENT)) / FULL_FILL_PERCENT;
+        uint256 stranded = (AMOUNT_TO_SPEND * (FULL_FILL_PERCENT - SHORT_FILL_PERCENT)) / FULL_FILL_PERCENT;
         _router().setOutputFillPercent(SHORT_FILL_PERCENT);
         _router().setStrandedIntermediate(address(intermediateToken), stranded);
 
@@ -130,7 +132,7 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
         _skipOnFork();
         _activateOneHopPath(address(intermediateToken));
         intermediateToken.mint(_routerAddress(), ROUTER_DUST);
-        uint256 stranded = (_netAmountToSpend() * (FULL_FILL_PERCENT - SHORT_FILL_PERCENT)) / FULL_FILL_PERCENT;
+        uint256 stranded = (AMOUNT_TO_SPEND * (FULL_FILL_PERCENT - SHORT_FILL_PERCENT)) / FULL_FILL_PERCENT;
         _router().setOutputFillPercent(SHORT_FILL_PERCENT);
         _router().setStrandedIntermediate(address(intermediateToken), stranded);
 
@@ -152,10 +154,11 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
                                 HELPERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev A complete fill debits the schedule and pays the fee, and credits the buyer exactly the WRBTC
-    ///      the handler measured itself receiving. Lending handlers hold no stablecoin between redemptions,
-    ///      so their handler balance is unchanged across a successful purchase. Idle handlers hold the pool
-    ///      on the contract, so the same purchase drops the handler balance by the full gross spend.
+    /// @dev A complete fill debits the schedule, credits the buyer and the collector on the same WRBTC
+    ///      books, and leaves the WRBTC on the handler until withdraw. Lending handlers hold no stablecoin
+    ///      between redemptions, so their handler balance is unchanged across a successful purchase. Idle
+    ///      handlers hold the pool on the contract, so the same purchase drops the handler balance by the
+    ///      full gross spend.
     function _assertFullFillSpendsEverything() private {
         PurchaseState memory before = _snapshot();
 
@@ -168,18 +171,16 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
             assertEq(afterPurchase.handlerStablecoin, before.handlerStablecoin);
         }
         assertEq(before.scheduleBalance - afterPurchase.scheduleBalance, AMOUNT_TO_SPEND);
-        assertEq(afterPurchase.feeCollectorStablecoin - before.feeCollectorStablecoin, _fee());
-        assertEq(
-            afterPurchase.userAccumulatedRbtc - before.userAccumulatedRbtc,
-            afterPurchase.handlerWrBtc - before.handlerWrBtc
-        );
-        assertGt(afterPurchase.userAccumulatedRbtc, before.userAccumulatedRbtc);
+        assertEq(afterPurchase.feeCollectorStablecoin, before.feeCollectorStablecoin, "stablecoin fee must not be paid");
+        uint256 wrBtcBought = afterPurchase.handlerWrBtc - before.handlerWrBtc;
+        uint256 collectorCredit = afterPurchase.collectorAccumulatedRbtc - before.collectorAccumulatedRbtc;
+        assertEq(afterPurchase.userAccumulatedRbtc - before.userAccumulatedRbtc + collectorCredit, wrBtcBought);
+        assertEq(afterPurchase.feeCollectorWrBtc, before.feeCollectorWrBtc, "WRBTC stays on the handler");
+        assertGt(collectorCredit, 0, "fee was not credited");
+        assertGt(wrBtcBought, 0);
 
-        // Naming the amount that moved is a mock-router assertion: `MockSwapRouter02` keeps what it pulls,
-        // while Uniswap's own SwapRouter02 forwards the input straight into the pool and ends holding none
-        // of it. On a fork the handler-side delta above is the venue-independent half.
         if (block.chainid == ANVIL_CHAIN_ID) {
-            assertEq(afterPurchase.routerStablecoin - before.routerStablecoin, _netAmountToSpend());
+            assertEq(afterPurchase.routerStablecoin - before.routerStablecoin, AMOUNT_TO_SPEND);
         }
     }
 
@@ -190,8 +191,10 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
         assertEq(afterRevert.handlerStablecoin, before.handlerStablecoin);
         assertEq(afterRevert.routerStablecoin, before.routerStablecoin);
         assertEq(afterRevert.feeCollectorStablecoin, before.feeCollectorStablecoin);
+        assertEq(afterRevert.feeCollectorWrBtc, before.feeCollectorWrBtc);
         assertEq(afterRevert.handlerWrBtc, before.handlerWrBtc);
         assertEq(afterRevert.userAccumulatedRbtc, before.userAccumulatedRbtc);
+        assertEq(afterRevert.collectorAccumulatedRbtc, before.collectorAccumulatedRbtc);
     }
 
     function _snapshot() private view returns (PurchaseState memory state) {
@@ -201,8 +204,11 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
         state.handlerStablecoin = stablecoin.balanceOf(address(stablecoinHandler));
         state.routerStablecoin = stablecoin.balanceOf(_routerAddress());
         state.feeCollectorStablecoin = stablecoin.balanceOf(FEE_COLLECTOR);
+        state.feeCollectorWrBtc = wrbtc.balanceOf(FEE_COLLECTOR);
         state.handlerWrBtc = wrbtc.balanceOf(address(stablecoinHandler));
         state.userAccumulatedRbtc = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
+        state.collectorAccumulatedRbtc =
+            IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(FEE_COLLECTOR);
     }
 
     /// @dev Takes the id rather than reading it, so a caller's `vm.expectRevert` lands on the batch call
@@ -215,19 +221,18 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
         return scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
     }
 
-    /// @dev The handler pays the fee first, then snapshots its stablecoin balance for the consumption
-    ///      check. Lending retrieval leaves only the net swap amount on the handler; idle funds were
-    ///      already there, so the before-balance is the pool minus the fee just paid.
+    /// @dev The consumption check snapshots the handler's stablecoin immediately around the venue call.
+    ///      The venue is passed the full retrieved gross (no stablecoin fee peel).
     function _expectShortFillRevert() private {
-        uint256 netAmount = _netAmountToSpend();
-        uint256 inputBalanceBefore = isNone ? stablecoin.balanceOf(address(stablecoinHandler)) - _fee() : netAmount;
-        uint256 unspent = netAmount - (netAmount * SHORT_FILL_PERCENT) / FULL_FILL_PERCENT;
+        uint256 gross = AMOUNT_TO_SPEND;
+        uint256 inputBalanceBefore = isNone ? stablecoin.balanceOf(address(stablecoinHandler)) : gross;
+        uint256 unspent = gross - (gross * SHORT_FILL_PERCENT) / FULL_FILL_PERCENT;
         vm.expectRevert(
             abi.encodeWithSelector(
                 IPurchaseRbtc.PurchaseRbtc__InputAmountNotFullySpent.selector,
-                netAmount,
+                gross,
                 inputBalanceBefore,
-                inputBalanceBefore - (netAmount - unspent)
+                inputBalanceBefore - (gross - unspent)
             )
         );
     }
@@ -236,14 +241,6 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
         // The pools take less than asked and pay for only what they took, so the swap still clears min-out.
         _router().setInputConsumedPercent(SHORT_FILL_PERCENT);
         _router().setOutputFillPercent(SHORT_FILL_PERCENT);
-    }
-
-    function _fee() private view returns (uint256) {
-        return feeCalculator.calculateFee(AMOUNT_TO_SPEND);
-    }
-
-    function _netAmountToSpend() private view returns (uint256) {
-        return AMOUNT_TO_SPEND - _fee();
     }
 
     function _activateDirectPath() private {

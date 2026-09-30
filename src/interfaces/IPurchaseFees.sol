@@ -5,7 +5,7 @@ pragma solidity 0.8.36;
  * @title IPurchaseFees
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Purchase-fee configuration: the rate bounds, the purchase amounts they interpolate
- *         between, and the address fees are paid to.
+ *         between, and the address fees are credited to.
  */
 interface IPurchaseFees {
     /*//////////////////////////////////////////////////////////////
@@ -48,6 +48,12 @@ interface IPurchaseFees {
     event PurchaseFees__PurchaseUpperBoundSet(uint256 feePurchaseUpperBound);
     /// @notice Owner set the address that receives purchase fees.
     event PurchaseFees__FeeCollectorAddressSet(address indexed feeCollector);
+    /**
+     * @notice Non-zero purchase fee credited to the collector's accumulated rBTC.
+     * @dev `rbtcAmount` is `floor(Q × F / G)`; `stablecoinAmount` is `floor(retrieved × F / G)`.
+     *      Independent floors; their ratio is an approximate all-in price.
+     */
+    event PurchaseFees__FeeCredited(address indexed collector, uint256 rbtcAmount, uint256 stablecoinAmount);
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -82,20 +88,14 @@ interface IPurchaseFees {
         uint256 feePurchaseUpperBound
     ) external;
 
-    /**
-     * @notice Set the address that receives purchase fees.
-     * @param feeCollector New collector. Cannot be zero.
-     */
+    /// @notice Set the address that receives purchase fees on the accumulated-rBTC books.
     function setFeeCollector(address feeCollector) external;
 
     /*//////////////////////////////////////////////////////////////
                                 GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @notice Address that currently receives purchase fees.
-     * @return The fee collector.
-     */
+    /// @notice Address that currently receives purchase fees on the accumulated-rBTC books.
     function getFeeCollector() external view returns (address);
 
     /**

@@ -22,7 +22,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
      *      full withdrawal is a cheaper nonzero-to-nonzero SSTORE. Getters and withdrawals decode.
      *      Private so leaves cannot bypass `_creditRbtc` / `_claimableRbtc` / `_withdrawRbtcChecksEffects`.
      */
-    mapping(address user => uint256 encodedAmount) private s_usersAccumulatedRbtc;
+    mapping(address account => uint256 encodedAmount) private s_accumulatedRbtc;
 
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
@@ -43,87 +43,63 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
     /// @dev Allow the contract to receive native rBTC from MoC or from unwrapping WRBTC.
     receive() external payable {}
 
-    /**
-     * @inheritdoc IPurchaseRbtc
-     * @dev Spends the stablecoin the retrieval actually delivered, never the gross amount it was asked
-     *      for: a lending handler can come back short when it redeems its shares. Idle retrieval only sums
-     *      the request, because the cash already sits on the handler; if it is not all there, the fee
-     *      transfer, the venue's pull, or the exact-consumption check reverts the batch. Planned net
-     *      amounts are only allocation weights: both the rBTC credited and the stablecoin reported as
-     *      spent are shares of what actually moved.
-     */
+    /// @inheritdoc IPurchaseRbtc
     function batchBuyRbtc(
         address[] calldata buyers,
         uint64[] calldata scheduleIds,
         uint256[] calldata purchaseAmounts,
         uint256 minRbtcOut
     ) external override onlyDcaManager {
-        uint256[] memory netStablecoinAmountsToSpend;
-        uint256 totalNetStablecoinPlanned;
-        uint256 totalStablecoinAmountToSpend;
+        uint256[] memory netWeights;
+        uint256 purchaseAmountsSum;
+        uint256 totalFee;
+        uint256 totalStablecoinRetrieved;
 
         {
-            uint256 aggregatedFee;
-            (aggregatedFee, netStablecoinAmountsToSpend, totalNetStablecoinPlanned) =
-                _calculateFeeAndNetAmounts(purchaseAmounts);
-
-            // Retrieve the stablecoin to spend: the net amount destined for rBTC plus the fee BitChill
-            // charges. What comes back is what the retrieval delivered, which a lending handler can leave
-            // short of the request.
-            totalStablecoinAmountToSpend = _batchRetrieveStablecoin(buyers, purchaseAmounts);
-            if (totalStablecoinAmountToSpend <= aggregatedFee) {
-                revert PurchaseRbtc__StablecoinRetrievedBelowFee(totalStablecoinAmountToSpend, aggregatedFee);
-            }
-            unchecked {
-                totalStablecoinAmountToSpend -= aggregatedFee;
-            }
-
-            _transferFee(i_stablecoin, aggregatedFee);
+            (totalFee, netWeights, purchaseAmountsSum) = _calculateFeeAndNetWeights(purchaseAmounts);
+            // Lending may return less than requested; the venue spends whatever came back.
+            totalStablecoinRetrieved = _batchRetrieveStablecoin(buyers, purchaseAmounts);
         }
 
         uint256 totalPurchasedRbtc;
         {
             uint256 inputBalanceBefore = i_stablecoin.balanceOf(address(this));
-            totalPurchasedRbtc = _purchaseRbtc(totalStablecoinAmountToSpend, minRbtcOut);
+            totalPurchasedRbtc = _purchaseRbtc(totalStablecoinRetrieved, minRbtcOut);
             uint256 inputBalanceAfter = i_stablecoin.balanceOf(address(this));
             if (
                 inputBalanceAfter > inputBalanceBefore
-                    || inputBalanceBefore - inputBalanceAfter != totalStablecoinAmountToSpend
+                    || inputBalanceBefore - inputBalanceAfter != totalStablecoinRetrieved
             ) {
                 revert PurchaseRbtc__InputAmountNotFullySpent(
-                    totalStablecoinAmountToSpend, inputBalanceBefore, inputBalanceAfter
+                    totalStablecoinRetrieved, inputBalanceBefore, inputBalanceAfter
                 );
             }
         }
         if (totalPurchasedRbtc == 0) revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(i_stablecoin));
-        // Checked against the rBTC we measured ourselves receiving, so the bound holds on every purchase
-        // venue and never trusts an integrator return value. Equality passes. Where the venue applies a
-        // floor of its own, it is enforced there and the stricter of the two decides.
+        // Gross measured Q — never trusts an integrator return. Equality passes.
         if (totalPurchasedRbtc < minRbtcOut) {
             revert PurchaseRbtc__BelowSwapperMinimum(totalPurchasedRbtc, minRbtcOut);
         }
 
-        uint256 purchaseCount = buyers.length;
-        for (uint256 i; i < purchaseCount; ++i) {
-            // Planned nets are allocation weights only: they sum to totalNetStablecoinPlanned, so each row
-            // takes its share of what actually moved even if the redemption paid less than planned. Both
-            // shares floor, which can leave under one wei of rBTC per row uncredited; see IPurchaseRbtc.
-            uint256 plannedNet = netStablecoinAmountsToSpend[i];
-            address buyer = buyers[i];
-            uint256 userRbtc;
-            // Can't overflow: the rBTC total is under the native supply (< 2^85 wei) and each weight is a uint96.
-            // The stablecoin product below stays checked because nothing here bounds the token's supply.
-            unchecked {
-                userRbtc = totalPurchasedRbtc * plannedNet / totalNetStablecoinPlanned;
-            }
-            uint256 userStablecoinSpent = totalStablecoinAmountToSpend * plannedNet / totalNetStablecoinPlanned;
-            // Skip zero floor allocations so a never-credited user is not marked live.
-            if (userRbtc != 0) _creditRbtc(buyer, userRbtc);
-            emit PurchaseRbtc__RbtcBought(buyer, address(i_stablecoin), userRbtc, scheduleIds[i], userStablecoinSpent);
+        // Can't overflow: rBTC < 2^85 wei; totalFee ≤ 5% of uint96 purchase amounts.
+        uint256 feeRbtc;
+        unchecked {
+            feeRbtc = totalPurchasedRbtc * totalFee / purchaseAmountsSum;
         }
-        emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
-            address(i_stablecoin), totalPurchasedRbtc, totalStablecoinAmountToSpend
+
+        _creditPurchases(
+            buyers,
+            scheduleIds,
+            purchaseAmounts,
+            netWeights,
+            totalPurchasedRbtc,
+            purchaseAmountsSum,
+            totalStablecoinRetrieved
         );
+        emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
+            address(i_stablecoin), totalPurchasedRbtc, totalStablecoinRetrieved
+        );
+        _creditFee(feeRbtc, totalFee, purchaseAmountsSum, totalStablecoinRetrieved);
     }
 
     /// @inheritdoc IPurchaseRbtc
@@ -156,8 +132,9 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
     }
 
     /**
-     * @dev Spend `stablecoinAmount` of net stablecoin and return only measured rBTC or WRBTC received.
-     *      The caller proves exact purchase-token consumption around this call.
+     * @dev Spend `stablecoinAmount` of stablecoin; return only measured rBTC/WRBTC.
+     *      Caller proves exact purchase-token consumption. Amount is retrieved gross; the fee is
+     *      taken from measured output afterward.
      */
     function _purchaseRbtc(uint256 stablecoinAmount, uint256 minRbtcOut) internal virtual returns (uint256 rbtcReceived);
 
@@ -166,27 +143,71 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
     //////////////////////////////////////////////////////////////*/
 
     /**
+     * @dev Allocate floored shares of measured output. Split out of `batchBuyRbtc` for legacy codegen.
+     *      Fee and each row floor; under one wei per term can stay uncredited — see IPurchaseRbtc.
+     */
+    function _creditPurchases(
+        address[] calldata buyers,
+        uint64[] calldata scheduleIds,
+        uint256[] calldata purchaseAmounts,
+        uint256[] memory netWeights,
+        uint256 totalPurchasedRbtc,
+        uint256 purchaseAmountsSum,
+        uint256 totalStablecoinRetrieved
+    ) private {
+        uint256 purchaseCount = buyers.length;
+        for (uint256 i; i < purchaseCount; ++i) {
+            uint256 userRbtc;
+            unchecked {
+                userRbtc = totalPurchasedRbtc * netWeights[i] / purchaseAmountsSum;
+            }
+            uint256 userStablecoinSpent = totalStablecoinRetrieved * purchaseAmounts[i] / purchaseAmountsSum;
+            // Skip zero floors so a never-credited user is not marked live.
+            if (userRbtc != 0) _creditRbtc(buyers[i], userRbtc);
+            emit PurchaseRbtc__RbtcBought(
+                buyers[i], address(i_stablecoin), userRbtc, scheduleIds[i], userStablecoinSpent
+            );
+        }
+    }
+
+    /**
+     * @dev Credit `floor(Q × F / G)` rBTC; emit `floor(retrieved × F / G)` stablecoin. No-op at zero.
+     */
+    function _creditFee(uint256 feeRbtc, uint256 totalFee, uint256 purchaseAmountsSum, uint256 totalStablecoinRetrieved)
+        private
+    {
+        if (feeRbtc == 0) return;
+        uint256 feeStablecoin;
+        unchecked {
+            feeStablecoin = totalStablecoinRetrieved * totalFee / purchaseAmountsSum;
+        }
+        address collector = s_feeCollector;
+        _creditRbtc(collector, feeRbtc);
+        emit PurchaseFees__FeeCredited(collector, feeRbtc, feeStablecoin);
+    }
+
+    /**
      * @dev Encode and store a positive rBTC credit. Live slots hold `claimable + 1`.
      *      The add is unchecked: credits are shares of rBTC this handler measured receiving,
      *      which are tiny compared to `type(uint256).max`.
      */
-    function _creditRbtc(address buyer, uint256 amount) private {
-        uint256 stored = s_usersAccumulatedRbtc[buyer];
+    function _creditRbtc(address account, uint256 amount) private {
+        uint256 stored = s_accumulatedRbtc[account];
         unchecked {
-            s_usersAccumulatedRbtc[buyer] = (stored == 0 ? 1 : stored) + amount;
+            s_accumulatedRbtc[account] = (stored == 0 ? 1 : stored) + amount;
         }
     }
 
     /// @dev Decode claimable rBTC, revert if none, and leave the post-withdraw sentinel. Caller then pays.
     function _withdrawRbtcChecksEffects(address user) private returns (uint256 rbtcBalance) {
-        uint256 stored = s_usersAccumulatedRbtc[user];
+        uint256 stored = s_accumulatedRbtc[user];
         // `0` = never credited; `1` = fully withdrawn sentinel. Both mean nothing to pay.
         if (stored <= 1) revert PurchaseRbtc__NoAccumulatedRbtcToWithdraw();
 
         unchecked {
             rbtcBalance = stored - 1;
         }
-        s_usersAccumulatedRbtc[user] = 1;
+        s_accumulatedRbtc[user] = 1;
     }
 
     /**
@@ -194,7 +215,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
      *      return 0 so callers never see dust.
      */
     function _claimableRbtc(address user) private view returns (uint256) {
-        uint256 stored = s_usersAccumulatedRbtc[user];
+        uint256 stored = s_accumulatedRbtc[user];
         unchecked {
             return stored == 0 ? 0 : stored - 1;
         }

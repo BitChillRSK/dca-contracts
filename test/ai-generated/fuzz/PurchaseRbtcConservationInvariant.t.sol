@@ -11,8 +11,9 @@ import {PurchaseRbtcHarness} from "test/unit/PurchaseRbtcTest.t.sol";
  * @title PurchaseRbtcConservationHandler
  * @notice Fuzz actions over the real `PurchaseRbtc` batch pipeline.
  * @dev Drives `batchBuyRbtc` at random row counts, weights, and venue outputs, and withdraws for
- *      random buyers. Both actions swallow reverts so `fail_on_revert = true` reports protocol
- *      breakage rather than an unlucky draw.
+ *      random buyers. Purchases are not wrapped in try/catch: the harness always delivers a full
+ *      retrieval and a positive venue output, so a revert is a finding (`fail_on_revert`). Empty
+ *      withdrawals return early instead of catching `NoAccumulatedRbtcToWithdraw`.
  */
 contract PurchaseRbtcConservationHandler is Test {
     uint256 internal constant MAX_ROWS = 12;
@@ -66,26 +67,22 @@ contract PurchaseRbtcConservationHandler is Test {
         // The harness pays its books in native rBTC, so it must actually hold what it says it bought.
         vm.deal(address(i_harness), address(i_harness).balance + rbtcOut);
 
-        try i_harness.batchBuyRbtc(buyers, scheduleIds, amounts, 0) {
-            s_rbtcBoughtGhost += rbtcOut;
-            s_flooredSlackGhost += rows - 1;
-            ++s_batchSuccesses;
-        } catch {
-            // An unlucky draw (retrieval at or below the aggregated fee) is not a finding.
-        }
+        i_harness.batchBuyRbtc(buyers, scheduleIds, amounts, 0);
+        s_rbtcBoughtGhost += rbtcOut;
+        // k = rows + 1 floors (buyers + fee) leave at most k-1 = rows wei uncredited.
+        s_flooredSlackGhost += rows;
+        ++s_batchSuccesses;
     }
 
     /// @notice Pay one buyer's whole accumulated balance out of the books.
     function withdrawAccumulatedRbtc(uint256 buyerSeed) external {
         address buyer = s_buyers[buyerSeed % s_buyers.length];
         uint256 owed = i_harness.getAccumulatedRbtcBalance(buyer);
+        if (owed == 0) return;
 
-        try i_harness.withdrawAccumulatedRbtc(buyer) {
-            s_rbtcWithdrawnGhost += owed;
-            ++s_withdrawSuccesses;
-        } catch {
-            // Nothing accumulated yet.
-        }
+        i_harness.withdrawAccumulatedRbtc(buyer);
+        s_rbtcWithdrawnGhost += owed;
+        ++s_withdrawSuccesses;
     }
 }
 
@@ -162,10 +159,11 @@ contract PurchaseRbtcConservationInvariantTest is StdInvariant, Test {
 
         uint256 attributed = totalOnBooks + fuzzHandler.s_rbtcWithdrawnGhost();
         uint256 bought = fuzzHandler.s_rbtcBoughtGhost();
+        uint256 fees = harness.getAccumulatedRbtcBalance(address(0xFEE));
 
-        assertLe(attributed, bought, "books claim more rBTC than the venue leg delivered");
+        assertLe(attributed + fees, bought, "books plus collector claim more rBTC than the venue delivered");
         assertGe(
-            attributed + fuzzHandler.s_flooredSlackGhost(),
+            attributed + fees + fuzzHandler.s_flooredSlackGhost(),
             bought,
             "measured rBTC went missing beyond the floor allocation's slack"
         );
@@ -177,6 +175,7 @@ contract PurchaseRbtcConservationInvariantTest is StdInvariant, Test {
         for (uint256 i; i < s_buyers.length; ++i) {
             totalOnBooks += harness.getAccumulatedRbtcBalance(s_buyers[i]);
         }
+        totalOnBooks += harness.getAccumulatedRbtcBalance(address(0xFEE));
         assertLe(totalOnBooks, address(harness).balance, "handler owes more rBTC than it holds");
     }
 }

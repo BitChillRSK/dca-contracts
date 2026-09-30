@@ -61,7 +61,8 @@ contract NetRedemptionTest is DcaDappTest {
 
         uint256 rbtcBought = _accumulatedRbtc() - rbtcBefore;
         uint256 netRedeemed = _afterExitFee(AMOUNT_TO_SPEND);
-        uint256 expected = (netRedeemed - feeCalculator.calculateFee(netRedeemed)) / s_btcPrice;
+        uint256 feeWeight = feeCalculator.calculateFee(AMOUNT_TO_SPEND);
+        uint256 expected = (netRedeemed * (AMOUNT_TO_SPEND - feeWeight) / AMOUNT_TO_SPEND) / s_btcPrice;
 
         assertApproxEqRel(rbtcBought, expected, _maxPurchaseSlippage());
         // the exit fee is a haircut on the purchase, not a free lunch: strictly less rBTC than a fee-free redeem
@@ -180,18 +181,18 @@ contract NetRedemptionTest is DcaDappTest {
 
     /**
      * @notice Per-user events must add up to the batch event. After a short redemption the batch reports the
-     * smaller actual spend, so reporting each buyer's *planned* net amount would make the per-user totals
+     * smaller actual (gross) spend, so reporting each buyer's *planned* amount would make the per-user totals
      * exceed the cash that moved. The planned amounts are allocation weights, not amounts spent.
      */
     function test_sovryn_batchBuyRbtcEventsReportActualSpending() public onlySovrynMocMocks {
         createSeveralDcaSchedules();
         _enableExitFee();
 
-        (address[] memory users,, uint64[] memory scheduleIds, uint256[] memory purchaseAmounts) = _batchArrays();
+        (,, uint64[] memory scheduleIds, uint256[] memory purchaseAmounts) = _batchArrays();
 
-        uint256 plannedNetTotal;
+        uint256 purchaseAmountsSum;
         for (uint256 i; i < purchaseAmounts.length; ++i) {
-            plannedNetTotal += purchaseAmounts[i] - feeCalculator.calculateFee(purchaseAmounts[i]);
+            purchaseAmountsSum += purchaseAmounts[i];
         }
 
         vm.recordLogs();
@@ -200,49 +201,48 @@ contract NetRedemptionTest is DcaDappTest {
 
         (uint256 perUserSpentTotal, uint256 batchSpent) = _batchSpendFromLogs();
 
-        assertLt(batchSpent, plannedNetTotal, "the exit fee should have shortened the spend");
+        assertLt(batchSpent, purchaseAmountsSum, "the exit fee should have shortened the spend");
         assertLe(perUserSpentTotal, batchSpent, "per-user events report more spending than the batch did");
-        // and they are not silently zeroed either: rounding may drop a wei per buyer, nothing more
         assertApproxEqAbs(perUserSpentTotal, batchSpent, NUM_OF_SCHEDULES);
     }
 
     /**
-     * @notice The guard for a redemption that cannot even cover BitChill's own fee.
-     * @dev This is deliberately not a SIP-0094 scenario. The Perimeter Fee is 10 bps against a BitChill fee
-     * of ~100-200 bps, so a batch always redeems roughly a hundred times what it owes in fees and
-     * `PurchaseRbtc__StablecoinRetrievedBelowFee` is unreachable in production. It fires only if a lending
-     * protocol withholds almost the entire redemption — a rug or an insolvent pool — which is what the
-     * ~99% fee below simulates. The point is that BitChill reverts cleanly instead of underflowing.
+     * @notice A redemption that cannot cover today's BitChill fee still purchases: the venue spends
+     *         the retrieved gross and the rBTC fee scales with measured output.
      */
-    function test_sovryn_batchBuyRbtcRevertsWhenRedeemCannotCoverTheFee() public onlySovrynMocMocks {
+    function test_sovryn_batchBuyRbtcShortRedeemStillPurchases() public onlySovrynMocMocks {
         createSeveralDcaSchedules();
 
-        // Purchases here are AMOUNT_TO_SPEND / NUM_OF_SCHEDULES = 40 DOC, below FEE_PURCHASE_LOWER_BOUND, so
-        // they pay the max rate (200 bps locally): 4 DOC of fees on a 200 DOC batch. Withholding 99.5%
-        // leaves 1 DOC redeemed, which is below the fee but still above zero — a zero payout would revert
-        // earlier with LendingHandler__ZeroStablecoinReceived, which is a different failure.
         MockIsusdToken(address(shareToken)).setExitFeeBps(RUG_EXIT_FEE_BPS);
 
-        (address[] memory users,, uint64[] memory scheduleIds, uint256[] memory purchaseAmounts) = _batchArrays();
+        (,, uint64[] memory scheduleIds, uint256[] memory purchaseAmounts) = _batchArrays();
 
-        uint256 aggregatedFee;
+        uint256 totalFee;
         uint256 totalPurchase;
         for (uint256 i; i < purchaseAmounts.length; ++i) {
-            aggregatedFee += feeCalculator.calculateFee(purchaseAmounts[i]);
+            totalFee += feeCalculator.calculateFee(purchaseAmounts[i]);
             totalPurchase += purchaseAmounts[i];
         }
         uint256 expectedRedeemed = totalPurchase * (BPS_DENOMINATOR - RUG_EXIT_FEE_BPS) / BPS_DENOMINATOR;
-        // the two conditions the guard exists for, spelled out
         assertGt(expectedRedeemed, 0, "a zero payout is a different error");
-        assertLe(expectedRedeemed, aggregatedFee, "the redeem must fall short of the fee for this to fire");
+        assertLe(expectedRedeemed, totalFee, "the redeem should fall short of the total fee");
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IPurchaseRbtc.PurchaseRbtc__StablecoinRetrievedBelowFee.selector, expectedRedeemed, aggregatedFee
-            )
-        );
+        address collector = IPurchaseFees(address(stablecoinHandler)).getFeeCollector();
+        uint256 collectorCreditBefore = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(collector);
+        uint256 collectorNativeBefore = collector.balance;
+        uint256 rbtcBefore = _accumulatedRbtc();
+
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtc(toBatch(scheduleIds, address(stablecoin), s_routeIndex));
+
+        assertGt(_accumulatedRbtc(), rbtcBefore, "short redeem should still credit some rBTC");
+        assertGt(
+            IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(collector),
+            collectorCreditBefore,
+            "short redeem should still credit an rBTC fee"
+        );
+        assertEq(collector.balance, collectorNativeBefore, "the collector is not paid until it withdraws");
+        assertEq(stablecoin.balanceOf(collector), 0);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -422,7 +422,10 @@ contract NetRedemptionTest is DcaDappTest {
         }
 
         address feeCollector = IPurchaseFees(address(stablecoinHandler)).getFeeCollector();
-        uint256 feeCollectorBefore = stablecoin.balanceOf(feeCollector);
+        uint256 feeCollectorDocBefore = stablecoin.balanceOf(feeCollector);
+        uint256 feeCollectorRbtcBefore = feeCollector.balance;
+        uint256 collectorCreditBefore =
+            IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(feeCollector);
         uint256 userSharesBefore = ILendingHandler(address(stablecoinHandler)).getUserShares(USER);
         uint256 iTokenBefore = shareToken.balanceOf(address(stablecoinHandler));
         uint256 handlerDocBefore = stablecoin.balanceOf(address(stablecoinHandler));
@@ -438,7 +441,13 @@ contract NetRedemptionTest is DcaDappTest {
             assertEq(schedule.tokenBalance, balancesBefore[i], "schedule balance rolled back");
             assertEq(schedule.cadenceAnchor, anchorsBefore[i], "schedule cadence anchor rolled back");
         }
-        assertEq(stablecoin.balanceOf(feeCollector), feeCollectorBefore, "fee collector rolled back");
+        assertEq(stablecoin.balanceOf(feeCollector), feeCollectorDocBefore, "fee collector DOC rolled back");
+        assertEq(feeCollector.balance, feeCollectorRbtcBefore, "fee collector rBTC rolled back");
+        assertEq(
+            IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(feeCollector),
+            collectorCreditBefore,
+            "fee collector credit rolled back"
+        );
         assertEq(ILendingHandler(address(stablecoinHandler)).getUserShares(USER), userSharesBefore);
         assertEq(shareToken.balanceOf(address(stablecoinHandler)), iTokenBefore);
         assertEq(stablecoin.balanceOf(address(stablecoinHandler)), handlerDocBefore);

@@ -2,19 +2,15 @@
 pragma solidity 0.8.36;
 
 import {IPurchaseFees} from "./interfaces/IPurchaseFees.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {BitChillOwnable} from "./BitChillOwnable.sol";
 
 /**
  * @title PurchaseFees
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Interpolates a purchase fee between the configured rate bounds and pays it to the
- *         collector. Owned by the purchase branch (`PurchaseRbtc` and its MoC / Uniswap leaves).
+ * @notice Fee-rate config for the purchase branch; `PurchaseRbtc` credits the collector.
  */
 abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
-    using SafeERC20 for IERC20;
     using SafeCast for uint256;
 
     /*//////////////////////////////////////////////////////////////
@@ -121,32 +117,28 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Calculate the fee and net amounts for a batch of purchase amounts.
-     * @param purchaseAmounts The array with the raw purchase amounts specified by users.
-     * @return aggregatedFee      The total fee to be collected for all purchases.
-     * @return netAmountsToSpend  An array with the net amounts (purchase amount minus fee) for each user.
-     * @return totalAmountToSpend The aggregated net amount that will actually be used to buy rBTC after fee is charged.
+     * @dev Fee and net weight per row. Callers allocate measured output over `purchaseAmountsSum`;
+     *      these are not venue spend amounts.
+     * @param purchaseAmounts Raw purchase amounts.
+     * @return totalFee Sum of per-row fees in stablecoin units.
+     * @return netWeights Per-row net (amount − fee), as allocation weights.
+     * @return purchaseAmountsSum Sum of `purchaseAmounts` (allocation denominator).
      */
-    function _calculateFeeAndNetAmounts(uint256[] calldata purchaseAmounts)
+    function _calculateFeeAndNetWeights(uint256[] calldata purchaseAmounts)
         internal
         view
-        returns (uint256 aggregatedFee, uint256[] memory netAmountsToSpend, uint256 totalAmountToSpend)
+        returns (uint256 totalFee, uint256[] memory netWeights, uint256 purchaseAmountsSum)
     {
         uint16 minFeeRate = s_minFeeRate;
         uint16 maxFeeRate = s_maxFeeRate;
 
         if (minFeeRate == maxFeeRate) {
-            return _calculateFlatFeeAndNetAmounts(purchaseAmounts, minFeeRate);
+            return _calculateFlatFeeAndNetWeights(purchaseAmounts, minFeeRate);
         }
 
-        return _calculateVariableFeeAndNetAmounts(
+        return _calculateVariableFeeAndNetWeights(
             purchaseAmounts, minFeeRate, maxFeeRate, s_feePurchaseLowerBound, s_feePurchaseUpperBound
         );
-    }
-
-    function _transferFee(IERC20 token, uint256 fee) internal {
-        if (fee == 0) return;
-        token.safeTransfer(s_feeCollector, fee);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -154,13 +146,13 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev When the linear variable fee rate is not in use, apply the flat fee rate to all amounts.
-    function _calculateFlatFeeAndNetAmounts(uint256[] calldata purchaseAmounts, uint256 feeRate)
+    function _calculateFlatFeeAndNetWeights(uint256[] calldata purchaseAmounts, uint256 feeRate)
         private
         pure
-        returns (uint256 aggregatedFee, uint256[] memory netAmountsToSpend, uint256 totalAmountToSpend)
+        returns (uint256 totalFee, uint256[] memory netWeights, uint256 purchaseAmountsSum)
     {
         uint256 len = purchaseAmounts.length;
-        netAmountsToSpend = new uint256[](len);
+        netWeights = new uint256[](len);
         for (uint256 i; i < len; ++i) {
             uint256 amount = purchaseAmounts[i];
             uint256 fee = _calculateFeeAtRate(amount, feeRate);
@@ -169,10 +161,10 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
             // The fee is at most 5% of a uint96 amount, so neither the subtraction nor the sums can overflow.
             unchecked {
                 net = amount - fee;
-                aggregatedFee += fee;
-                totalAmountToSpend += net;
+                totalFee += fee;
+                purchaseAmountsSum += amount;
             }
-            netAmountsToSpend[i] = net;
+            netWeights[i] = net;
         }
     }
 
@@ -180,15 +172,15 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
      * @dev When the linear variable fee rate is in use, batches load the settings once and keep the
      *      four scalars on the stack across rows.
      */
-    function _calculateVariableFeeAndNetAmounts(
+    function _calculateVariableFeeAndNetWeights(
         uint256[] calldata purchaseAmounts,
         uint256 minFeeRate,
         uint256 maxFeeRate,
         uint256 feePurchaseLowerBound,
         uint256 feePurchaseUpperBound
-    ) private pure returns (uint256 aggregatedFee, uint256[] memory netAmountsToSpend, uint256 totalAmountToSpend) {
+    ) private pure returns (uint256 totalFee, uint256[] memory netWeights, uint256 purchaseAmountsSum) {
         uint256 len = purchaseAmounts.length;
-        netAmountsToSpend = new uint256[](len);
+        netWeights = new uint256[](len);
         for (uint256 i; i < len; ++i) {
             uint256 amount = purchaseAmounts[i];
             uint256 fee =
@@ -198,10 +190,10 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
             // The fee is at most 5% of a uint96 amount, so neither the subtraction nor the sums can overflow.
             unchecked {
                 net = amount - fee;
-                aggregatedFee += fee;
-                totalAmountToSpend += net;
+                totalFee += fee;
+                purchaseAmountsSum += amount;
             }
-            netAmountsToSpend[i] = net;
+            netWeights[i] = net;
         }
     }
 

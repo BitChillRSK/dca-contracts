@@ -3,7 +3,6 @@ pragma solidity 0.8.36;
 
 import {PurchaseFees} from "../../src/PurchaseFees.sol";
 import {IPurchaseFees} from "../../src/interfaces/IPurchaseFees.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract PurchaseFeesHarness is PurchaseFees {
     constructor(address feeCollector, IPurchaseFees.FeeSettings memory settings, address initialOwner)
@@ -13,16 +12,16 @@ contract PurchaseFeesHarness is PurchaseFees {
     function exposedCalculateFee(uint256 amount) external view returns (uint256) {
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = amount;
-        (uint256 fee,,) = this.exposedCalculateFeeAndNetAmounts(amounts);
+        (uint256 fee,,) = this.exposedCalculateFeeAndNetWeights(amounts);
         return fee;
     }
 
-    function exposedCalculateFeeAndNetAmounts(uint256[] calldata purchaseAmounts)
+    function exposedCalculateFeeAndNetWeights(uint256[] calldata purchaseAmounts)
         external
         view
-        returns (uint256 aggregatedFee, uint256[] memory netAmountsToSpend, uint256 totalAmountToSpend)
+        returns (uint256 totalFee, uint256[] memory netWeights, uint256 purchaseAmountsSum)
     {
-        return _calculateFeeAndNetAmounts(purchaseAmounts);
+        return _calculateFeeAndNetWeights(purchaseAmounts);
     }
 
     // Test-only setters without onlyOwner restriction for convenience.
@@ -48,9 +47,5 @@ contract PurchaseFeesHarness is PurchaseFees {
 
     function testSetFeePurchaseUpperBound(uint112 upper) external {
         s_feePurchaseUpperBound = upper;
-    }
-
-    function exposedTransferFee(IERC20 token, uint256 fee) external {
-        _transferFee(token, fee);
     }
 }
