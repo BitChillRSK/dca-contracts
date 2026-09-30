@@ -59,7 +59,7 @@ migrate already-credited balances.
 - [ ] Remove stablecoin `_transferFee` from the purchase path. Remove
       `PurchaseRbtc__StablecoinRetrievedBelowFee` (short retrieval spends what it got; fee
       shrinks with `Q`).
-- [ ] `_payFee` on `PurchaseRbtc` (no Dex override): `_creditRbtc(collector, feeRbtc)` and
+- [ ] `_creditFee` on `PurchaseRbtc` (no Dex override): `_creditRbtc(collector, feeRbtc)` and
       emit `FeeCredited`. Rename `s_usersAccumulatedRbtc` → `s_accumulatedRbtc`.
 - [ ] `PurchaseFees__FeeCredited(address indexed collector, uint256 rbtcAmount, uint256 stablecoinAmount)`.
       Asset is implied by the emitting handler. `stablecoinAmount = retrieved × F / G`.

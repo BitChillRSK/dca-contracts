@@ -533,7 +533,7 @@ contract PurchaseRbtcTest is Test {
         harness.batchBuyRbtc(buyers, scheduleIds, amounts, minRbtcOut);
     }
 
-    function test_payFee_creditsCollectorWithoutPayingOut() public {
+    function test_creditFee_creditsCollectorWithoutPayingOut() public {
         (address[] memory buyers, uint64[] memory scheduleIds, uint256[] memory amounts) = _twoBuyerBatch();
         harness.batchBuyRbtc(buyers, scheduleIds, amounts, NO_MIN_RBTC_OUT);
 
@@ -549,7 +549,7 @@ contract PurchaseRbtcTest is Test {
         assertEq(harness.getAccumulatedRbtcBalance(feeCollector), 0);
     }
 
-    function test_payFee_rejectingCollectorDoesNotRevertTheBatch() public {
+    function test_creditFee_rejectingCollectorDoesNotRevertTheBatch() public {
         FeeCollectorRejects rejecting = new FeeCollectorRejects();
         harness.setFeeCollector(address(rejecting));
         (address[] memory buyers, uint64[] memory scheduleIds, uint256[] memory amounts) = _twoBuyerBatch();

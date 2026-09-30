@@ -118,7 +118,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
         );
         // Fee last: buyer credits and the batch event are already in the frame. The collector is
         // credited on the same books and withdraws through `withdrawAccumulatedRbtc`.
-        _payFee(feeRbtc, totalFee, purchaseAmountsSum, totalStablecoinRetrieved);
+        _creditFee(feeRbtc, totalFee, purchaseAmountsSum, totalStablecoinRetrieved);
     }
 
     /// @inheritdoc IPurchaseRbtc
@@ -197,7 +197,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
      *      `stablecoinAmount` is the fee's share of retrieved venue input so off-chain can compute
      *      BitChill's all-in price. No-op when the floored rBTC fee is zero.
      */
-    function _payFee(uint256 feeRbtc, uint256 totalFee, uint256 purchaseAmountsSum, uint256 totalStablecoinRetrieved)
+    function _creditFee(uint256 feeRbtc, uint256 totalFee, uint256 purchaseAmountsSum, uint256 totalStablecoinRetrieved)
         private
     {
         if (feeRbtc == 0) return;
