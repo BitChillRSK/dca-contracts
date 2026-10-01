@@ -170,6 +170,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R106 | after R105, before relaunch deploy | none (`s_shares` / Uniswap path state `private`; correct `UserSharesUpdated` docs; stack on R105) |
 | R107 | after R106, before audit freeze / relaunch deploy | none (hardcoded rBTC MoC / WRBTC Dex fees credited on accumulated books; decided 2026-09-29 / 2026-09-30) |
 | R108 | after R107, before audit freeze / relaunch deploy | none (monotone purchase-fee formula; launch defaults 100/20 bps, lower bound 250 tokens) |
+| R109 | after R108, before audit freeze / relaunch deploy | none (`_setUserShares` always emit; checked `FeeCredited` product; variable-fee conservation coverage) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1443,6 +1444,13 @@ collector on `s_accumulatedRbtc` **last**, after buyer credits. Emit
 ### R108 - Monotone purchase fees ([spec](./R108-monotone-purchase-fees.md))
 
 Replace linear rate interpolation with a smooth asymptotic rate and nondecreasing absolute fees. Remove the obsolete upper bound. Launch defaults approved: maximum 100 bps, minimum 20 bps, lower bound 250 tokens. Retain configurable flat mode. Ask: none.
+
+### R109 - Post-R108 review cleanups ([spec](./R109-always-emit-user-shares.md))
+
+After R108, before audit freeze / relaunch deploy. Always emit `UserSharesUpdated` from
+`_setUserShares` (drop unreachable equality branch); restore checked arithmetic on
+`FeeCredited.stablecoinAmount`; exercise launch variable fees plus collector withdraw/rotation in
+the stateful conservation suites. No storage or ABI change. Ask: none.
 
 ## Closed non-implementation decisions
 

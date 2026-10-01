@@ -64,12 +64,20 @@ withdraw / purchase are allowed and expected.
 
 ### `PurchaseRbtcConservationInvariantTest` (purchase allocation)
 
-1. **Credits stay in the floored band** — sum of buyer books + withdrawn + collector credit ≤ measured
-   venue output, and that total plus under-one-wei-per-row slack (k = rows + fee floors leave at
-   most k − 1 wei) ≥ measured output.
-2. **Books never exceed handler balance** — claimable rBTC (buyers + collector) ≤ `address(harness).balance`.
+Configured with the launch variable-fee band (100/20 bps, 250-token lower bound). Fuzz actions
+include `batchBuyRbtc`, buyer/collector `withdrawAccumulatedRbtc`, and `rotateFeeCollector`
+(buyer overlap allowed). Claimables are summed uniquely across buyers and every address that has
+been collector so overlap does not double-count.
+
+1. **Credits stay in the floored band** — unique claimables + withdrawn ≤ measured venue output,
+   and that total plus under-one-wei-per-row slack (k = rows + fee floors leave at most k − 1 wei)
+   ≥ measured output.
+2. **Books never exceed handler balance** — unique claimable rBTC ≤ `address(harness).balance`.
 
 ### `LendingPurchaseConservationInvariantTest` (production lending + purchase together)
+
+Same launch variable-fee band and collector rotate/withdraw surface as the purchase-allocation
+suite, on `SovrynDocHandlerMoc`.
 
 1. **Native rBTC conservation** — MoC-paid rBTC (measured as handler balance gains)
    equals remaining handler balance plus measured withdrawals. Collector fees stay on the
@@ -78,10 +86,10 @@ withdraw / purchase are allowed and expected.
    `SovrynDocHandlerMoc` leaf while purchases redeem through MoC.
 3. **No idle stablecoin on the handler** — DOC sits in iSUSD or is consumed by MoC. Purchase fees are native rBTC.
 
-Actions are restricted to `depositToken` / `buyRbtc` / `withdrawAccumulatedRbtc` via
-`targetContract` + `targetSelector` (so inherited `Test.failed()` and deployed mocks are not
-fuzzed). Production calls are not try/caught: empty cases return early, and `fail_on_revert`
-surfaces real handler regressions.
+Actions are restricted to `depositToken` / `buyRbtc` / `withdrawAccumulatedRbtc` /
+`rotateFeeCollector` via `targetContract` + `targetSelector` (so inherited `Test.failed()` and
+deployed mocks are not fuzzed). Production calls are not try/caught: empty cases return early, and
+`fail_on_revert` surfaces real handler regressions.
 
 ## Historical note
 

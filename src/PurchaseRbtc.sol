@@ -177,10 +177,10 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
         private
     {
         if (feeRbtc == 0) return;
-        uint256 feeStablecoin;
-        unchecked {
-            feeStablecoin = totalStablecoinRetrieved * totalFee / purchaseAmountsSum;
-        }
+        // Checked: same bar as the per-row `amountSpent` product. Aggregate `totalFee` can
+        // overflow the product even when every row fee fits; wrapping would publish a wrong
+        // `FeeCredited.stablecoinAmount`.
+        uint256 feeStablecoin = totalStablecoinRetrieved * totalFee / purchaseAmountsSum;
         address collector = s_feeCollector;
         _creditRbtc(collector, feeRbtc);
         emit PurchaseFees__FeeCredited(collector, feeRbtc, feeStablecoin);
