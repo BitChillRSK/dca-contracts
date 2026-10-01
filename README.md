@@ -91,6 +91,17 @@ The current architecture balances extensibility with gas efficiency:
    - Gas-efficient batch purchases
    - Optimized for multiple users
 
+## Purchase fees
+
+Each handler has owner-configurable minimum and maximum rates and a lower purchase
+threshold. Above that threshold, the effective rate decreases smoothly toward
+the minimum while the absolute fee never decreases as the purchase grows. Equal
+rates give a flat fee. Fees are credited in rBTC/WRBTC after the venue purchase.
+
+See [Purchase fee math](./docs/PURCHASE_FEES.md) for the fee-amount and fee-rate
+curves, exact integer rounding, parameter units, batch allocation and plotting
+expressions.
+
 ## Security Considerations
 
 ### Access Control
