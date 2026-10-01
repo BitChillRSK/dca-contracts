@@ -96,7 +96,7 @@ Forks: no new fork-specific assertions; run as the executable-change gate.
 - [x] Both conservation suites run under launch variable fees with collector withdraw/rotation.
 - [x] No ABI, event signature, storage, or consumer surface change.
 - [x] `make check`, `make invariants-sovryn`, and both lending fork lanes green.
-- [ ] README Status points at this PR; next unassigned prompt updated.
+- [x] README Status points at this PR; next unassigned prompt updated.
 
 ## Reviewer checklist
 
