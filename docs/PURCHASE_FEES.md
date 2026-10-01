@@ -119,17 +119,43 @@ uncredited. The collector withdraws through the accumulated-rBTC withdrawal path
 
 ## Plot the curves
 
-In [Desmos](https://www.desmos.com/calculator), create sliders `M`, `m` and `L`,
-then paste these expressions on separate lines. For visualization, $x$ and $L$
-may be expressed in whole tokens; these plot the unrounded equations.
+Use [Desmos](https://www.desmos.com/calculator). Click an empty expression row
+and paste each block below. The curve blocks use **LaTeX input**: copy the code
+exactly, including the backslashes. Plain-text braces can be dropped by Desmos's
+paste parser, leaving invalid expressions.
+
+First paste these illustrative parameters (they are not deployment defaults):
 
 ```text
-f(x)={0<=x<=L:M*x/10000,x>L:(m*x+(M-m)*(2*L-L^2/x))/10000}
-p(x)={0<x<=L:M/100,x>L:(m+(M-m)*(2*L/x-L^2/x^2))/100}
+M=100
+m=10
+L=250
 ```
 
-`f(x)` is the fee in token units; `p(x)` is the fee percentage. At $x=0$ only
-the fee is defined. Exact contract rounding must be evaluated in token base units.
+**Absolute fee**, in token units:
+
+```text
+y=\frac{M x}{10000}\left\{0\le x\le L\right\}
+y=\frac{m x+(M-m)\left(2L-\frac{L^2}{x}\right)}{10000}\left\{x>L\right\}
+```
+
+**Effective fee rate**, in percent (1 means 1%):
+
+```text
+y=\frac{M}{100}\left\{0<x\le L\right\}
+y=\frac{m+(M-m)\left(\frac{2L}{x}-\frac{L^2}{x^2}\right)}{100}\left\{x>L\right\}
+```
+
+Each curve consists of two restricted expressions. Paste the fee and rate blocks
+into separate graphs, or toggle their colored icons to view one curve at a time.
+For the example above, use graph settings to set the x-axis to 0–10,000; use a
+y-axis of 0–15 for the absolute fee or 0–1.1 for the percentage rate. The default
+Desmos window only shows purchases near zero, so it hides most of the curve.
+
+These expressions were tested by pasting into the Desmos web calculator. They
+plot the unrounded equations with $x$ and $L$ in whole tokens. At $x=0$, only the
+fee amount is defined. Exact contract rounding must be evaluated in token base
+units, as described above.
 
 Implementation: [`PurchaseFees.sol`](../src/PurchaseFees.sol) and
 [`IPurchaseFees.sol`](../src/interfaces/IPurchaseFees.sol).
