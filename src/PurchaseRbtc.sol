@@ -177,10 +177,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
         private
     {
         if (feeRbtc == 0) return;
-        uint256 feeStablecoin;
-        unchecked {
-            feeStablecoin = totalStablecoinRetrieved * totalFee / purchaseAmountsSum;
-        }
+        uint256 feeStablecoin = totalStablecoinRetrieved * totalFee / purchaseAmountsSum;
         address collector = s_feeCollector;
         _creditRbtc(collector, feeRbtc);
         emit PurchaseFees__FeeCredited(collector, feeRbtc, feeStablecoin);

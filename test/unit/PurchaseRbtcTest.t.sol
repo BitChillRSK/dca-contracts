@@ -82,6 +82,62 @@ contract PurchaseRbtcTest is Test {
         assertLe(RBTC_OUT - expectedA - expectedB - expectedCollector, 2);
     }
 
+    function test_creditFee_stablecoinProductOverflowReverts() public {
+        harness.setFeeRateParams(500, 500, 0);
+        uint256 rowCount = 21;
+        uint256 amount = type(uint96).max;
+        uint256 retrieved = 1 << 160;
+        address[] memory buyers = new address[](rowCount);
+        uint64[] memory ids = new uint64[](rowCount);
+        uint256[] memory amounts = new uint256[](rowCount);
+        for (uint256 i; i < rowCount; ++i) {
+            buyers[i] = address(uint160(0x1000 + i));
+            ids[i] = uint64(i + 1);
+            amounts[i] = amount;
+        }
+        uint256 fee = (amount * 500 / 10_000) * rowCount;
+        assertGt(fee, type(uint256).max / retrieved, "fixture must overflow the aggregate product");
+        assertLe(amount, type(uint256).max / retrieved, "per-row product must still fit");
+        token.mint(address(harness), retrieved);
+        harness.setRetrieveOverride(retrieved);
+
+        vm.expectRevert();
+        harness.batchBuyRbtc(buyers, ids, amounts, NO_MIN_RBTC_OUT);
+    }
+
+    function test_variableFee_collectorRotationAndBuyerOverlapConserveClaims() public {
+        harness.setFeeRateParams(20, 100, 250 ether);
+        harness.setFeeCollector(buyerA);
+        address[] memory buyers = new address[](3);
+        uint64[] memory ids = new uint64[](3);
+        uint256[] memory amounts = new uint256[](3);
+        buyers[0] = buyerA;
+        buyers[1] = buyerA;
+        buyers[2] = buyerB;
+        for (uint256 i; i < 3; ++i) {
+            ids[i] = uint64(i + 1);
+            amounts[i] = (300 + i * 100) * 1 ether;
+        }
+        harness.batchBuyRbtc(buyers, ids, amounts, NO_MIN_RBTC_OUT);
+        uint256 oldCollectorClaim = harness.getAccumulatedRbtcBalance(buyerA);
+        harness.setFeeCollector(buyerB);
+        assertEq(harness.getAccumulatedRbtcBalance(buyerA), oldCollectorClaim);
+        harness.batchBuyRbtc(buyers, ids, amounts, NO_MIN_RBTC_OUT);
+        uint256 claimA = harness.getAccumulatedRbtcBalance(buyerA);
+        uint256 claimB = harness.getAccumulatedRbtcBalance(buyerB);
+        assertGt(claimA, oldCollectorClaim);
+        assertLe(claimA + claimB, 2 * RBTC_OUT);
+        assertLe(2 * RBTC_OUT - claimA - claimB, 6);
+        uint256 cashA = buyerA.balance;
+        uint256 cashB = buyerB.balance;
+        harness.withdrawAccumulatedRbtc(buyerA);
+        harness.withdrawAccumulatedRbtc(buyerB);
+        assertEq(buyerA.balance - cashA, claimA);
+        assertEq(buyerB.balance - cashB, claimB);
+        assertEq(harness.getAccumulatedRbtcBalance(buyerA), 0);
+        assertEq(harness.getAccumulatedRbtcBalance(buyerB), 0);
+    }
+
     /**
      * @dev The rBTC allocation product runs unchecked. Drive it to the bound the source states: uint96
      *      weights and rBTC at 2^85 (above Rootstock's whole native supply). Every row's credit must match
