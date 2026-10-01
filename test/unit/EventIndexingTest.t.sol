@@ -212,7 +212,6 @@ contract EventIndexingTest is DcaDappTest {
         if (sig == keccak256("PurchaseFees__MinFeeRateSet(uint256)")) return (true, 0);
         if (sig == keccak256("PurchaseFees__MaxFeeRateSet(uint256)")) return (true, 0);
         if (sig == keccak256("PurchaseFees__PurchaseLowerBoundSet(uint256)")) return (true, 0);
-        if (sig == keccak256("PurchaseFees__PurchaseUpperBoundSet(uint256)")) return (true, 0);
         if (sig == keccak256("PurchaseFees__FeeCollectorAddressSet(address)")) return (true, 1);
         if (sig == keccak256("PurchaseFees__FeeCredited(address,uint256,uint256)")) return (true, 1);
         if (sig == keccak256("PurchaseUniswap__NewPathSet(address[],uint24[],bytes)")) return (true, 0);

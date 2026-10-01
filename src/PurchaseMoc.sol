@@ -23,7 +23,7 @@ abstract contract PurchaseMoc is PurchaseRbtc {
 
     /**
      * @param mocProxy Money on Chain proxy that exposes `redeemFreeDoc`.
-     * @param feeConfig Collector and interpolated fee settings.
+     * @param feeConfig Collector and purchase fee settings.
      * @param initialOwner Address that owns this handler immediately after deploy.
      */
     constructor(address mocProxy, FeeConfig memory feeConfig, address initialOwner)

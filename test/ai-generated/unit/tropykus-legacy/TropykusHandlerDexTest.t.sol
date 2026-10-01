@@ -40,10 +40,7 @@ contract TropykusHandlerDexTest is HandlerTestHarness {
 
     function deployHandler() internal override returns (ITokenHandler) {
         IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
-            minFeeRate: MIN_FEE_RATE,
-            maxFeeRate: MAX_FEE_RATE_TEST,
-            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
         });
 
         address[] memory intermediateTokens = new address[](0); // No intermediate tokens for direct swap
@@ -491,10 +488,7 @@ contract TropykusHandlerDexTest is HandlerTestHarness {
         returns (TropykusHandlerDex)
     {
         IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
-            minFeeRate: MIN_FEE_RATE,
-            maxFeeRate: MAX_FEE_RATE_TEST,
-            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
         });
 
         address[] memory intermediateTokens = new address[](0);

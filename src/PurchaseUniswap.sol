@@ -71,7 +71,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
 
     /**
      * @param uniswapSettings the settings for the uniswap router
-     * @param feeConfig Collector and interpolated fee settings.
+     * @param feeConfig Collector and purchase fee settings.
      * @param amountOutMinimumPercent The swap-time oracle floor
      *        (deploy default: `DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT`)
      * @param amountOutMinimumSafetyCheck The lowest floor the owner may later configure

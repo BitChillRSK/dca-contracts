@@ -20,7 +20,7 @@ contract TropykusDocHandlerMoc is TropykusHandler, PurchaseMoc {
      * @param kToken Tropykus kDOC token.
      * @param feeCollector Address that receives purchase fees.
      * @param mocProxy Money on Chain proxy.
-     * @param feeSettings Linear fee parameters.
+     * @param feeSettings Purchase fee parameters.
      * @param initialOwner Address that owns fee configuration immediately after deploy.
      */
     constructor(

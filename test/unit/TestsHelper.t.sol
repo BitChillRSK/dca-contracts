@@ -56,24 +56,12 @@ contract FeeCalculator {
     uint256 internal s_minFeeRate = MIN_FEE_RATE;
     uint256 internal s_maxFeeRate = MAX_FEE_RATE_TEST; // Use test fee rate for testing
     uint256 internal s_feePurchaseLowerBound = FEE_PURCHASE_LOWER_BOUND;
-    uint256 internal s_feePurchaseUpperBound = FEE_PURCHASE_UPPER_BOUND;
 
-    function calculateFee(uint256 purchaseAmount) external view returns (uint256) {
-        if (s_minFeeRate == s_maxFeeRate) {
-            return purchaseAmount * s_minFeeRate / BPS_DENOMINATOR;
-        }
-
-        uint256 feeRate;
-
-        if (purchaseAmount >= s_feePurchaseLowerBound) {
-            feeRate = s_minFeeRate;
-        } else if (purchaseAmount <= s_feePurchaseLowerBound) {
-            feeRate = s_maxFeeRate;
-        } else {
-            // Calculate the linear fee rate
-            feeRate = s_maxFeeRate - ((purchaseAmount - s_feePurchaseLowerBound) * (s_maxFeeRate - s_minFeeRate))
-                / (s_feePurchaseUpperBound - s_feePurchaseLowerBound);
-        }
-        return purchaseAmount * feeRate / BPS_DENOMINATOR;
+    function calculateFee(uint256 x) external view returns (uint256) {
+        if (x <= s_feePurchaseLowerBound) return x * s_maxFeeRate / BPS_DENOMINATOR;
+        uint256 discountNumerator =
+            (s_maxFeeRate - s_minFeeRate) * (x - s_feePurchaseLowerBound) * (x - s_feePurchaseLowerBound);
+        uint256 discount = discountNumerator / x + (discountNumerator % x == 0 ? 0 : 1);
+        return (s_maxFeeRate * x - discount) / BPS_DENOMINATOR;
     }
 }

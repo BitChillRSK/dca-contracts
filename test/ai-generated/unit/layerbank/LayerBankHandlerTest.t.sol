@@ -25,10 +25,7 @@ contract LayerBankHandlerTest is HandlerTestHarness {
 
     function deployHandler() internal override returns (ITokenHandler) {
         IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
-            minFeeRate: MIN_FEE_RATE,
-            maxFeeRate: MAX_FEE_RATE_TEST,
-            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
         });
 
         layerbankHandler = new LayerBankTestHandler(
@@ -69,10 +66,7 @@ contract LayerBankHandlerTest is HandlerTestHarness {
     function test_layerbank_constructor_revertsIfPoolUnset() public {
         MockLayerBankAToken unset = new MockLayerBankAToken(address(stablecoin));
         IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
-            minFeeRate: MIN_FEE_RATE,
-            maxFeeRate: MAX_FEE_RATE_TEST,
-            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
         });
 
         vm.expectRevert(ILayerBankHandler.LayerBankHandler__PoolNotSet.selector);
@@ -88,10 +82,7 @@ contract LayerBankHandlerTest is HandlerTestHarness {
         mismatch.setPool(address(mismatchPool));
 
         IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
-            minFeeRate: MIN_FEE_RATE,
-            maxFeeRate: MAX_FEE_RATE_TEST,
-            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
         });
 
         vm.expectRevert(ILayerBankHandler.LayerBankHandler__UnderlyingMismatch.selector);

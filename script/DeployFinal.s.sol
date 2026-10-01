@@ -250,19 +250,13 @@ contract DeployFinal is DeployBase {
 
     function _docFeeSettings() private view returns (IPurchaseFees.FeeSettings memory) {
         return IPurchaseFees.FeeSettings({
-            minFeeRate: MIN_FEE_RATE,
-            maxFeeRate: getMaxFeeRate(),
-            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: getMaxFeeRate(), feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
         });
     }
 
     function _usdt0FeeSettings() private view returns (IPurchaseFees.FeeSettings memory) {
         return IPurchaseFees.FeeSettings({
-            minFeeRate: MIN_FEE_RATE,
-            maxFeeRate: getMaxFeeRate(),
-            feePurchaseLowerBound: USDT0_FEE_PURCHASE_LOWER_BOUND,
-            feePurchaseUpperBound: USDT0_FEE_PURCHASE_UPPER_BOUND
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: getMaxFeeRate(), feePurchaseLowerBound: USDT0_FEE_PURCHASE_LOWER_BOUND
         });
     }
 

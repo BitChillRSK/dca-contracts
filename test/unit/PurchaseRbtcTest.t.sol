@@ -47,16 +47,39 @@ contract PurchaseRbtcTest is Test {
     function setUp() public {
         token = new MockStablecoin(address(this));
         IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
-            minFeeRate: FLAT_FEE_RATE,
-            maxFeeRate: FLAT_FEE_RATE,
-            feePurchaseLowerBound: 1000 ether,
-            feePurchaseUpperBound: 100_000 ether
+            minFeeRate: FLAT_FEE_RATE, maxFeeRate: FLAT_FEE_RATE, feePurchaseLowerBound: 1000 ether
         });
         // dcaManager = this, so tests can call onlyDcaManager entry points directly
         harness = new PurchaseRbtcHarness(address(this), address(token), feeCollector, feeSettings, address(this));
         token.mint(address(harness), 1_000_000 ether);
         harness.setRbtcOut(RBTC_OUT);
         vm.deal(address(harness), type(uint128).max);
+    }
+
+    function test_variableFees_creditBuyersAndCollectorUsingNetWeights() public {
+        harness.setFeeRateParams(10, 100, 250 ether);
+        address[] memory buyers = new address[](2);
+        buyers[0] = buyerA;
+        buyers[1] = buyerB;
+        uint64[] memory ids = new uint64[](2);
+        ids[0] = scheduleA;
+        ids[1] = scheduleB;
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = 500 ether;
+        amounts[1] = 1000 ether;
+        uint256 feeA = 3.875 ether;
+        uint256 feeB = 4.9375 ether;
+        uint256 gross = 1500 ether;
+        uint256 expectedA = RBTC_OUT * (amounts[0] - feeA) / gross;
+        uint256 expectedB = RBTC_OUT * (amounts[1] - feeB) / gross;
+        uint256 expectedCollector = RBTC_OUT * (feeA + feeB) / gross;
+        vm.expectEmit(true, false, false, true);
+        emit PurchaseFees__FeeCredited(feeCollector, expectedCollector, feeA + feeB);
+        harness.batchBuyRbtc(buyers, ids, amounts, NO_MIN_RBTC_OUT);
+        assertEq(harness.getAccumulatedRbtcBalance(buyerA), expectedA);
+        assertEq(harness.getAccumulatedRbtcBalance(buyerB), expectedB);
+        assertEq(harness.getAccumulatedRbtcBalance(feeCollector), expectedCollector);
+        assertLe(RBTC_OUT - expectedA - expectedB - expectedCollector, 2);
     }
 
     /**
@@ -187,7 +210,7 @@ contract PurchaseRbtcTest is Test {
     }
 
     function test_lengthOneBatch_zeroFeeDoesNotPayCollector() public {
-        harness.setFeeRateParams(0, 0, 1000 ether, 100_000 ether);
+        harness.setFeeRateParams(0, 0, 1000 ether);
         uint256 requested = 100 ether;
         uint256 collectorBefore = feeCollector.balance;
 

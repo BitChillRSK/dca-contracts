@@ -61,10 +61,7 @@ contract IdleAccountingProofTest is Test {
         vm.deal(address(moc), 1_000 ether);
 
         IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
-            minFeeRate: MIN_FEE_RATE,
-            maxFeeRate: MAX_FEE_RATE_TEST,
-            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
         });
         handler =
             new IdleDocHandlerMoc(address(dcaManager), address(doc), FEE_COLLECTOR, address(moc), feeSettings, OWNER);

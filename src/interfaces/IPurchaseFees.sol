@@ -4,28 +4,30 @@ pragma solidity 0.8.36;
 /**
  * @title IPurchaseFees
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Purchase-fee configuration: the rate bounds, the purchase amounts they interpolate
- *         between, and the address fees are credited to.
+ * @notice Purchase-fee configuration: the rate limits, discount threshold, and fee collector.
  */
 interface IPurchaseFees {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
     //////////////////////////////////////////////////////////////*/
     /**
-     * @notice The four parameters that interpolate a purchase fee between `maxFeeRate` and `minFeeRate`.
-     * @dev Two uint112 bounds plus two uint16 rates occupy one storage word. The bounds remain wider
+     * @notice The three parameters defining the purchase fee curve.
+     * @dev One uint112 bound plus two uint16 rates occupy one storage word. The bound remains wider
      *      than a schedule's uint96 purchase amount. `setFeeRateParams` accepts uint256 values for
      *      owner ergonomics and checked-casts them at the write; `_validateFeeSettings` runs first.
+     *      For x <= L, fee = floor(x * maxFeeRate / 10000). Otherwise fee is
+     *      floor((minFeeRate*x*x + (maxFeeRate-minFeeRate)*L*(2*x-L)) / (x*10000)).
+     *      x and L are token base units. The absolute fee never decreases with x; the unrounded
+     *      effective rate approaches minFeeRate asymptotically. L=0 applies minFeeRate for x>0.
      */
     struct FeeSettings {
-        uint16 minFeeRate; // the lowest possible fee
-        uint16 maxFeeRate; // the highest possible fee
-        uint112 feePurchaseLowerBound; // the purchase amount below which max fee is applied
-        uint112 feePurchaseUpperBound; // the purchase amount above which min fee is applied
+        uint16 minFeeRate; // asymptotic minimum rate, in basis points
+        uint16 maxFeeRate; // rate at or below the lower bound, in basis points
+        uint112 feePurchaseLowerBound; // the purchase amount at or below which max fee rate is applied
     }
 
     /**
-     * @notice Fee-domain constructor inputs: collector and the four interpolated rate parameters.
+     * @notice Fee-domain constructor inputs: collector and the three curve parameters.
      * @dev One memory pointer on the purchase-base constructor call, so Dex leaves stay under the
      *      legacy-codegen stack limit. Ownership stays a separate `initialOwner` argument — it is
      *      contract-level authority and may govern settings beyond fees.
@@ -42,10 +44,8 @@ interface IPurchaseFees {
     event PurchaseFees__MinFeeRateSet(uint256 minFeeRate);
     /// @notice Owner set the maximum fee rate.
     event PurchaseFees__MaxFeeRateSet(uint256 maxFeeRate);
-    /// @notice Owner set the purchase amount below which the maximum fee rate applies.
+    /// @notice Owner set the purchase amount at or below which the maximum fee rate applies.
     event PurchaseFees__PurchaseLowerBoundSet(uint256 feePurchaseLowerBound);
-    /// @notice Owner set the purchase amount above which the minimum fee rate applies.
-    event PurchaseFees__PurchaseUpperBoundSet(uint256 feePurchaseUpperBound);
     /// @notice Owner set the address that receives purchase fees.
     event PurchaseFees__FeeCollectorAddressSet(address indexed feeCollector);
     /**
@@ -61,8 +61,6 @@ interface IPurchaseFees {
 
     /// @notice `minFeeRate` cannot exceed `maxFeeRate`.
     error PurchaseFees__MinFeeRateCannotBeHigherThanMax();
-    /// @notice `feePurchaseLowerBound` must be strictly less than `feePurchaseUpperBound`.
-    error PurchaseFees__FeeLowerBoundMustBeLowerThanUpperBound();
     /// @notice Fee collector cannot be the zero address.
     error PurchaseFees__InvalidFeeCollector();
     /// @notice A fee rate exceeds the 5% cap.
@@ -73,20 +71,14 @@ interface IPurchaseFees {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Set all four fee parameters atomically.
-     * @param minFeeRate Lowest fee rate, in basis points.
+     * @notice Set all three fee parameters atomically.
+     * @param minFeeRate Asymptotic minimum fee rate, in basis points.
      * @param maxFeeRate Highest fee rate. Must be ≥ `minFeeRate` and ≤ 5%.
      * @param feePurchaseLowerBound Purchase amount at or below which `maxFeeRate` applies.
-     * @param feePurchaseUpperBound Purchase amount at or above which `minFeeRate` applies.
-     * @dev The only mutation path for these four values: there are no individual bound or rate
+     * @dev The only mutation path for these three values: there are no individual bound or rate
      *      setters. Writes each field that changed and emits only those events.
      */
-    function setFeeRateParams(
-        uint256 minFeeRate,
-        uint256 maxFeeRate,
-        uint256 feePurchaseLowerBound,
-        uint256 feePurchaseUpperBound
-    ) external;
+    function setFeeRateParams(uint256 minFeeRate, uint256 maxFeeRate, uint256 feePurchaseLowerBound) external;
 
     /// @notice Set the address that receives purchase fees on the accumulated-rBTC books.
     function setFeeCollector(address feeCollector) external;
@@ -99,8 +91,8 @@ interface IPurchaseFees {
     function getFeeCollector() external view returns (address);
 
     /**
-     * @notice The four fee settings used to interpolate a purchase fee.
-     * @return The current min/max rates and purchase-amount bounds.
+     * @notice The three settings defining the purchase fee curve.
+     * @return The current min/max rates and lower purchase bound.
      */
     function getFeeSettings() external view returns (FeeSettings memory);
 }

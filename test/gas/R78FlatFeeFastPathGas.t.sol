@@ -47,20 +47,13 @@ contract R78BaselinePurchaseFeesGasHarness is PurchaseFees {
         uint256 len = purchaseAmounts.length;
         netWeights = new uint256[](len);
         FeeSettings memory feeSettings = FeeSettings({
-            minFeeRate: s_minFeeRate,
-            maxFeeRate: s_maxFeeRate,
-            feePurchaseLowerBound: s_feePurchaseLowerBound,
-            feePurchaseUpperBound: s_feePurchaseUpperBound
+            minFeeRate: s_minFeeRate, maxFeeRate: s_maxFeeRate, feePurchaseLowerBound: s_feePurchaseLowerBound
         });
 
         for (uint256 i; i < len; ++i) {
             uint256 amount = purchaseAmounts[i];
             uint256 fee = _baselineCalculateVariableFee(
-                amount,
-                feeSettings.minFeeRate,
-                feeSettings.maxFeeRate,
-                feeSettings.feePurchaseLowerBound,
-                feeSettings.feePurchaseUpperBound
+                amount, feeSettings.minFeeRate, feeSettings.maxFeeRate, feeSettings.feePurchaseLowerBound
             );
             totalFee += fee;
             uint256 net;
@@ -77,23 +70,19 @@ contract R78BaselinePurchaseFeesGasHarness is PurchaseFees {
         uint256 purchaseAmount,
         uint256 minFeeRate,
         uint256 maxFeeRate,
-        uint256 feePurchaseLowerBound,
-        uint256 feePurchaseUpperBound
+        uint256 feePurchaseLowerBound
     ) private pure returns (uint256) {
-        if (purchaseAmount >= feePurchaseUpperBound) {
-            return _baselineCalculateFeeAtRate(purchaseAmount, minFeeRate);
-        }
-
         if (purchaseAmount <= feePurchaseLowerBound) {
             return _baselineCalculateFeeAtRate(purchaseAmount, maxFeeRate);
         }
-
-        uint256 feeRate;
         unchecked {
-            feeRate = maxFeeRate - ((purchaseAmount - feePurchaseLowerBound) * (maxFeeRate - minFeeRate))
-                / (feePurchaseUpperBound - feePurchaseLowerBound);
+            return (minFeeRate
+                    * purchaseAmount
+                    * purchaseAmount
+                    + (maxFeeRate - minFeeRate)
+                    * feePurchaseLowerBound
+                    * (2 * purchaseAmount - feePurchaseLowerBound)) / (purchaseAmount * BPS_DENOMINATOR);
         }
-        return _baselineCalculateFeeAtRate(purchaseAmount, feeRate);
     }
 
     function _baselineCalculateFeeAtRate(uint256 amount, uint256 feeRate) private pure returns (uint256) {
@@ -126,10 +115,7 @@ contract R78FlatFeeFastPathGasTest is Test {
 
     function setUp() public {
         IPurchaseFees.FeeSettings memory settings = IPurchaseFees.FeeSettings({
-            minFeeRate: FLAT_FEE_RATE,
-            maxFeeRate: FLAT_FEE_RATE,
-            feePurchaseLowerBound: 1000 ether,
-            feePurchaseUpperBound: 100_000 ether
+            minFeeRate: FLAT_FEE_RATE, maxFeeRate: FLAT_FEE_RATE, feePurchaseLowerBound: 1000 ether
         });
         optimizedHarness = new R78OptimizedPurchaseFeesGasHarness(settings);
         baselineHarness = new R78BaselinePurchaseFeesGasHarness(settings);
@@ -137,7 +123,6 @@ contract R78FlatFeeFastPathGasTest is Test {
         settings.minFeeRate = 100;
         settings.maxFeeRate = 200;
         settings.feePurchaseLowerBound = 100 ether;
-        settings.feePurchaseUpperBound = 1000 ether;
         variableOptimizedHarness = new R78OptimizedPurchaseFeesGasHarness(settings);
         variableBaselineHarness = new R78BaselinePurchaseFeesGasHarness(settings);
     }
@@ -229,7 +214,7 @@ contract R78FlatFeeFastPathGasTest is Test {
     function _logActivationPremium(uint256 rows, string memory label) private {
         uint256[] memory amounts = new uint256[](rows);
         for (uint256 i; i < rows; ++i) {
-            // Between the variable harness's 100- and 1,000-ether bounds: full interpolation.
+            // Above the variable harness's lower bound: full curve evaluation.
             amounts[i] = 550 ether;
         }
 

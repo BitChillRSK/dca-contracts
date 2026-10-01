@@ -17,7 +17,7 @@ import {PurchaseRbtcHarness} from "test/unit/PurchaseRbtcTest.t.sol";
  */
 contract PurchaseRbtcConservationHandler is Test {
     uint256 internal constant MAX_ROWS = 12;
-    /// @dev Above the fee's upper bound, so every row pays the same rate and weights stay unequal.
+    /// @dev Distinct purchase sizes under flat fees keep the allocation weights unequal.
     uint256 internal constant MIN_AMOUNT = 1 ether;
     uint256 internal constant MAX_AMOUNT = 500_000 ether;
 
@@ -109,10 +109,7 @@ contract PurchaseRbtcConservationInvariantTest is StdInvariant, Test {
         token = new MockStablecoin(address(this));
 
         IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
-            minFeeRate: FLAT_FEE_RATE,
-            maxFeeRate: FLAT_FEE_RATE,
-            feePurchaseLowerBound: 1000 ether,
-            feePurchaseUpperBound: 100_000 ether
+            minFeeRate: FLAT_FEE_RATE, maxFeeRate: FLAT_FEE_RATE, feePurchaseLowerBound: 1000 ether
         });
 
         for (uint256 i; i < 5; ++i) {

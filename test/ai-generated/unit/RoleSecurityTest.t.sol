@@ -77,10 +77,7 @@ contract RoleSecurityTest is Test {
 
         // Deploy handler
         IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
-            minFeeRate: MIN_FEE_RATE,
-            maxFeeRate: MAX_FEE_RATE_TEST,
-            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
         });
 
         address[] memory intermediateTokens = new address[](0);
@@ -153,10 +150,7 @@ contract RoleSecurityTest is Test {
             }),
             FEE_COLLECTOR,
             IPurchaseFees.FeeSettings({
-                minFeeRate: MIN_FEE_RATE,
-                maxFeeRate: MAX_FEE_RATE_TEST,
-                feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-                feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+                minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
             }),
             DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
             DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
@@ -326,15 +320,15 @@ contract RoleSecurityTest is Test {
         // Test fee settings modification
         vm.expectRevert(ownableUnauthorized(UNAUTHORIZED_USER));
         vm.prank(UNAUTHORIZED_USER);
-        handler.setFeeRateParams(150, MAX_FEE_RATE_TEST, FEE_PURCHASE_LOWER_BOUND, FEE_PURCHASE_UPPER_BOUND);
+        handler.setFeeRateParams(150, MAX_FEE_RATE_TEST, FEE_PURCHASE_LOWER_BOUND);
 
         vm.expectRevert(ownableUnauthorized(ADMIN));
         vm.prank(ADMIN);
-        handler.setFeeRateParams(MIN_FEE_RATE, 250, FEE_PURCHASE_LOWER_BOUND, FEE_PURCHASE_UPPER_BOUND);
+        handler.setFeeRateParams(MIN_FEE_RATE, 250, FEE_PURCHASE_LOWER_BOUND);
 
         // Owner can modify
         vm.prank(OWNER);
-        handler.setFeeRateParams(150, MAX_FEE_RATE_TEST, FEE_PURCHASE_LOWER_BOUND, FEE_PURCHASE_UPPER_BOUND);
+        handler.setFeeRateParams(150, MAX_FEE_RATE_TEST, FEE_PURCHASE_LOWER_BOUND);
         assertEq(handler.getFeeSettings().minFeeRate, 150);
 
         // Test minimum purchase amount
@@ -392,7 +386,7 @@ contract RoleSecurityTest is Test {
         // Handler functions should fail
         vm.expectRevert();
         vm.prank(randomUser);
-        handler.setFeeRateParams(200, MAX_FEE_RATE_TEST, FEE_PURCHASE_LOWER_BOUND, FEE_PURCHASE_UPPER_BOUND);
+        handler.setFeeRateParams(200, MAX_FEE_RATE_TEST, FEE_PURCHASE_LOWER_BOUND);
 
         vm.expectRevert();
         vm.prank(randomUser);
@@ -405,7 +399,7 @@ contract RoleSecurityTest is Test {
 
         // Owner should always succeed on owner-only functions
         vm.prank(OWNER);
-        handler.setFeeRateParams(newMinFee, MAX_FEE_RATE_TEST, FEE_PURCHASE_LOWER_BOUND, FEE_PURCHASE_UPPER_BOUND);
+        handler.setFeeRateParams(newMinFee, MAX_FEE_RATE_TEST, FEE_PURCHASE_LOWER_BOUND);
         assertEq(handler.getFeeSettings().minFeeRate, newMinFee);
 
         // Owner can set new admin

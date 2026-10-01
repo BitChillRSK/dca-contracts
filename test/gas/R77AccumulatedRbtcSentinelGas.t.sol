@@ -43,10 +43,7 @@ contract R77AccumulatedRbtcSentinelGasTest is Test {
     function setUp() public {
         token = new MockStablecoin(address(this));
         IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
-            minFeeRate: FLAT_FEE_RATE,
-            maxFeeRate: FLAT_FEE_RATE,
-            feePurchaseLowerBound: 1000 ether,
-            feePurchaseUpperBound: 100_000 ether
+            minFeeRate: FLAT_FEE_RATE, maxFeeRate: FLAT_FEE_RATE, feePurchaseLowerBound: 1000 ether
         });
         harness = new PurchaseRbtcHarness(address(this), address(token), address(0xFEE), feeSettings, address(this));
         token.mint(address(harness), 1_000_000 ether);

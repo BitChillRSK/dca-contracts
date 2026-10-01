@@ -18,7 +18,7 @@ contract IdleHandlerDex is IdleHandler, PurchaseUniswap {
      * @param stablecoin The stablecoin this handler holds idle.
      * @param uniswapSettings Router, WRBTC, path, and MoC oracle.
      * @param feeCollector Address that receives purchase fees.
-     * @param feeSettings Linear fee parameters.
+     * @param feeSettings Purchase fee parameters.
      * @param amountOutMinimumPercent Swap-time oracle floor, 1e18-scaled.
      * @param amountOutMinimumSafetyCheck Lowest floor the owner may configure, 1e18-scaled.
      * @param initialOwner Address that owns fee/oracle configuration immediately after deploy.

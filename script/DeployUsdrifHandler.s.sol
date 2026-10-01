@@ -78,8 +78,7 @@ contract DeployUsdrifHandler is DeployBase {
         return IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: getMaxFeeRate(),
-            feePurchaseLowerBound: isUsdt0Live ? USDT0_FEE_PURCHASE_LOWER_BOUND : FEE_PURCHASE_LOWER_BOUND,
-            feePurchaseUpperBound: isUsdt0Live ? USDT0_FEE_PURCHASE_UPPER_BOUND : FEE_PURCHASE_UPPER_BOUND
+            feePurchaseLowerBound: isUsdt0Live ? USDT0_FEE_PURCHASE_LOWER_BOUND : FEE_PURCHASE_LOWER_BOUND
         });
     }
 

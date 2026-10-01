@@ -23,13 +23,12 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
 
     /**
      * @dev Two slots. The collector starts its own word because it cannot fit in the 12 bytes left by
-     *      Ownable2Step's `_pendingOwner`. A uint112 bound then starts the next word; both bounds and
-     *      both uint16 rates fill that word exactly. The bound width remains wider than the uint96
+     *      Ownable2Step's `_pendingOwner`. A uint112 bound then starts the next word alongside
+     *      both uint16 rates. The bound width remains wider than the uint96
      *      purchase amount of any schedule.
      */
     address internal s_feeCollector;
     uint112 internal s_feePurchaseLowerBound;
-    uint112 internal s_feePurchaseUpperBound;
     uint16 internal s_minFeeRate;
     uint16 internal s_maxFeeRate;
 
@@ -41,16 +40,10 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
         BitChillOwnable(initialOwner)
     {
         if (feeCollector == address(0)) revert PurchaseFees__InvalidFeeCollector();
-        _validateFeeSettings(
-            feeSettings.minFeeRate,
-            feeSettings.maxFeeRate,
-            feeSettings.feePurchaseLowerBound,
-            feeSettings.feePurchaseUpperBound
-        );
+        _validateFeeSettings(feeSettings.minFeeRate, feeSettings.maxFeeRate);
 
         s_feeCollector = feeCollector;
         s_feePurchaseLowerBound = feeSettings.feePurchaseLowerBound;
-        s_feePurchaseUpperBound = feeSettings.feePurchaseUpperBound;
         s_minFeeRate = feeSettings.minFeeRate;
         s_maxFeeRate = feeSettings.maxFeeRate;
     }
@@ -60,13 +53,12 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IPurchaseFees
-    function setFeeRateParams(
-        uint256 minFeeRate,
-        uint256 maxFeeRate,
-        uint256 feePurchaseLowerBound,
-        uint256 feePurchaseUpperBound
-    ) external override onlyOwner {
-        _validateFeeSettings(minFeeRate, maxFeeRate, feePurchaseLowerBound, feePurchaseUpperBound);
+    function setFeeRateParams(uint256 minFeeRate, uint256 maxFeeRate, uint256 feePurchaseLowerBound)
+        external
+        override
+        onlyOwner
+    {
+        _validateFeeSettings(minFeeRate, maxFeeRate);
 
         if (s_minFeeRate != minFeeRate) {
             s_minFeeRate = minFeeRate.toUint16();
@@ -79,10 +71,6 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
         if (s_feePurchaseLowerBound != feePurchaseLowerBound) {
             s_feePurchaseLowerBound = feePurchaseLowerBound.toUint112();
             emit PurchaseFees__PurchaseLowerBoundSet(feePurchaseLowerBound);
-        }
-        if (s_feePurchaseUpperBound != feePurchaseUpperBound) {
-            s_feePurchaseUpperBound = feePurchaseUpperBound.toUint112();
-            emit PurchaseFees__PurchaseUpperBoundSet(feePurchaseUpperBound);
         }
     }
 
@@ -105,10 +93,7 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
     /// @inheritdoc IPurchaseFees
     function getFeeSettings() external view override returns (FeeSettings memory) {
         return FeeSettings({
-            minFeeRate: s_minFeeRate,
-            maxFeeRate: s_maxFeeRate,
-            feePurchaseLowerBound: s_feePurchaseLowerBound,
-            feePurchaseUpperBound: s_feePurchaseUpperBound
+            minFeeRate: s_minFeeRate, maxFeeRate: s_maxFeeRate, feePurchaseLowerBound: s_feePurchaseLowerBound
         });
     }
 
@@ -136,16 +121,14 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
             return _calculateFlatFeeAndNetWeights(purchaseAmounts, minFeeRate);
         }
 
-        return _calculateVariableFeeAndNetWeights(
-            purchaseAmounts, minFeeRate, maxFeeRate, s_feePurchaseLowerBound, s_feePurchaseUpperBound
-        );
+        return _calculateVariableFeeAndNetWeights(purchaseAmounts, minFeeRate, maxFeeRate, s_feePurchaseLowerBound);
     }
 
     /*//////////////////////////////////////////////////////////////
                             PRIVATE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev When the linear variable fee rate is not in use, apply the flat fee rate to all amounts.
+    /// @dev When the variable fee rate is not in use, apply the flat fee rate to all amounts.
     function _calculateFlatFeeAndNetWeights(uint256[] calldata purchaseAmounts, uint256 feeRate)
         private
         pure
@@ -169,22 +152,20 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
     }
 
     /**
-     * @dev When the linear variable fee rate is in use, batches load the settings once and keep the
-     *      four scalars on the stack across rows.
+     * @dev When the variable fee rate is in use, batches load the settings once and keep the
+     *      three scalars on the stack across rows.
      */
     function _calculateVariableFeeAndNetWeights(
         uint256[] calldata purchaseAmounts,
         uint256 minFeeRate,
         uint256 maxFeeRate,
-        uint256 feePurchaseLowerBound,
-        uint256 feePurchaseUpperBound
+        uint256 feePurchaseLowerBound
     ) private pure returns (uint256 totalFee, uint256[] memory netWeights, uint256 purchaseAmountsSum) {
         uint256 len = purchaseAmounts.length;
         netWeights = new uint256[](len);
         for (uint256 i; i < len; ++i) {
             uint256 amount = purchaseAmounts[i];
-            uint256 fee =
-                _calculateVariableFee(amount, minFeeRate, maxFeeRate, feePurchaseLowerBound, feePurchaseUpperBound);
+            uint256 fee = _calculateVariableFee(amount, minFeeRate, maxFeeRate, feePurchaseLowerBound);
 
             uint256 net;
             // The fee is at most 5% of a uint96 amount, so neither the subtraction nor the sums can overflow.
@@ -197,28 +178,22 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
         }
     }
 
-    /// @dev Apply the linear fee rate to one amount using settings loaded by the batch dispatcher.
-    function _calculateVariableFee(
-        uint256 purchaseAmount,
-        uint256 minFeeRate,
-        uint256 maxFeeRate,
-        uint256 feePurchaseLowerBound,
-        uint256 feePurchaseUpperBound
-    ) private pure returns (uint256) {
-        if (purchaseAmount >= feePurchaseUpperBound) {
-            return _calculateFeeAtRate(purchaseAmount, minFeeRate);
+    /// @dev Round the absolute fee once so increasing the purchase amount cannot reduce its fee.
+    function _calculateVariableFee(uint256 amount, uint256 minFeeRate, uint256 maxFeeRate, uint256 lowerBound)
+        private
+        pure
+        returns (uint256)
+    {
+        if (amount <= lowerBound) {
+            return _calculateFeeAtRate(amount, maxFeeRate);
         }
 
-        if (purchaseAmount <= feePurchaseLowerBound) {
-            return _calculateFeeAtRate(purchaseAmount, maxFeeRate);
-        }
-
-        uint256 feeRate;
         unchecked {
-            feeRate = maxFeeRate - ((purchaseAmount - feePurchaseLowerBound) * (maxFeeRate - minFeeRate))
-                / (feePurchaseUpperBound - feePurchaseLowerBound);
+            // Here L < x <= uint96.max and L*(2*x-L) <= x*x, so the entire numerator
+            // is at most maxFeeRate*x*x < 2^201. The denominator is nonzero and < 2^110.
+            return (minFeeRate * amount * amount + (maxFeeRate - minFeeRate) * lowerBound * (2 * amount - lowerBound))
+                / (amount * BPS_DENOMINATOR);
         }
-        return _calculateFeeAtRate(purchaseAmount, feeRate);
     }
 
     /**
@@ -232,16 +207,8 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
     }
 
     /// @dev Validate the fee settings.
-    function _validateFeeSettings(
-        uint256 minFeeRate,
-        uint256 maxFeeRate,
-        uint256 feePurchaseLowerBound,
-        uint256 feePurchaseUpperBound
-    ) private pure {
+    function _validateFeeSettings(uint256 minFeeRate, uint256 maxFeeRate) private pure {
         if (maxFeeRate > MAX_FEE_RATE_CAP) revert PurchaseFees__MaxFeeRateExceedsCap();
         if (minFeeRate > maxFeeRate) revert PurchaseFees__MinFeeRateCannotBeHigherThanMax();
-        if (feePurchaseLowerBound >= feePurchaseUpperBound) {
-            revert PurchaseFees__FeeLowerBoundMustBeLowerThanUpperBound();
-        }
     }
 }
