@@ -29,7 +29,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @param feeConfig Collector and interpolated fee settings.
+     * @param feeConfig Collector and purchase fee settings.
      * @param initialOwner Address that owns this handler immediately after deploy.
      */
     constructor(FeeConfig memory feeConfig, address initialOwner)

@@ -30,12 +30,13 @@ Launch pricing selection, economic forecasts, custody or purchase allocation cha
 ## Files likely touched
 
 - `src/PurchaseFees.sol`, `src/interfaces/IPurchaseFees.sol`
+- Constructor NatSpec in `src/PurchaseRbtc.sol`, `src/PurchaseMoc.sol`, `src/PurchaseUniswap.sol` and the eight handler leaves under `src/idle/`, `src/layerbank/`, `src/sovryn/`, `src/tropykus-legacy/` (describe purchase-fee parameters without obsolete linear/interpolation wording).
 - `script/Constants.sol`, `script/DeployMocSwaps.s.sol`, `script/DeployDexSwaps.s.sol`, `script/DeployIdleHandler.s.sol`, `script/DeployLayerBankHandler.s.sol`, `script/DeployUsdrifHandler.s.sol`, `script/DeployFinal.s.sol`
 - `test/mocks/PurchaseFeesHarness.sol`, `test/ai-generated/unit/PurchaseFeesTest.t.sol`, `test/ai-generated/unit/HandlerTestHarness.t.sol`, `test/unit/TestsHelper.t.sol`
 - Direct FeeSettings constructor fixtures, setter callers and fee-setting assertions under `test/unit/`, `test/ai-generated/`, `test/gas/`; enumerate these mechanical ABI dependents in the PR.
 - `test/gas/R78FlatFeeFastPathGas.t.sol` (reference curve used by equivalence checks)
 - `README.md`, `docs/PURCHASE_FEES.md` (durable fee math and rounding reference).
-- This spec, `docs/relaunch/README.md`, `docs/relaunch/IMPLEMENTATION_ORDER.md`; current fee ABI cutover documentation reached through those files.
+- This spec, `docs/relaunch/README.md`, `docs/relaunch/IMPLEMENTATION_ORDER.md`; `docs/relaunch/ROOTSTOCK-GAS-AUDIT.md` (current setter field count and historical measurement context); current fee ABI cutover documentation reached through those files.
 
 ## Required tests
 

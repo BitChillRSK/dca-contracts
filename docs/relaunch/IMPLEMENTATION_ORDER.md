@@ -169,7 +169,6 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R105 | after R104, before relaunch deploy | none (strip redundant `Address` from address params / matching locals; stack on R104) |
 | R106 | after R105, before relaunch deploy | none (`s_shares` / Uniswap path state `private`; correct `UserSharesUpdated` docs; stack on R105) |
 | R107 | after R106, before audit freeze / relaunch deploy | none (hardcoded rBTC MoC / WRBTC Dex fees credited on accumulated books; decided 2026-09-29 / 2026-09-30) |
-
 | R108 | after R107, before audit freeze / relaunch deploy | none (monotone purchase-fee formula; three configurable parameters; launch pricing separate) |
 
 ### PR 1 - R23 toolchain and dependency baseline

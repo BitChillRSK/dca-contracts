@@ -298,7 +298,7 @@ contract PurchaseFeesTest is Test {
         uint256 settingsSlot = uint256(vm.load(address(feeHandler), bytes32(uint256(3))));
         assertEq(uint112(settingsSlot), LOWER_BOUND, "lower bound is not first in slot 3");
         assertEq(settingsSlot >> 144, 0, "unexpected bits above settings");
-        assertEq(uint16(settingsSlot >> 112), MIN_FEE_RATE, "minFeeRate does not follow the bounds");
+        assertEq(uint16(settingsSlot >> 112), MIN_FEE_RATE, "minFeeRate does not follow the lower bound");
         assertEq(uint16(settingsSlot >> 128), MAX_FEE_RATE, "maxFeeRate does not finish slot 3");
 
         assertEq(uint256(vm.load(address(feeHandler), bytes32(uint256(4)))), 0, "fee state spilled into a third slot");
