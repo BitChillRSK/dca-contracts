@@ -1,6 +1,6 @@
 # R108 — Monotone purchase fees
 
-Status: **in progress** · Assigned: yes · Optional/further-review: no
+Status: **implemented** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
@@ -60,3 +60,56 @@ Launch pricing selection, economic forecasts, custody or purchase allocation cha
 ## ABI / deploy / cutover impact
 
 `setFeeRateParams(uint256,uint256,uint256,uint256)` becomes the three-argument version. `FeeSettings` loses its uint112 upper-bound field. Remove `PurchaseFees__PurchaseUpperBoundSet` and `PurchaseFees__FeeLowerBoundMustBeLowerThanUpperBound`. Fresh deployments only; refresh consumer ABIs and quote the new formula in token base units. Scripts retain the existing flat rates and lower bound.
+
+## Arithmetic argument
+
+For x>L and d=maxRate-minRate, the unrounded fee derivative is
+`(minRate + d*L*L/(x*x))/10000`, between zero and 0.05. At L, fee and slope
+match the flat segment. Flooring therefore preserves nondecreasing fees and
+nondecreasing net amounts, although sub-unit changes can be rounded away.
+For valid rates, `L*(2*x-L) <= x*x`, so the full numerator is at most
+`maxRate*x*x < 2^201` for uint96 purchases. The curved branch implies L<x
+regardless of the wider stored bound; its denominator is positive and below 2^110.
+An independent checked test oracle uses the equivalent maximum fee minus
+`ceil(d*(x-L)^2/x)` in the numerator, followed by division by 10000.
+
+## Fee-loop measurements
+
+Foundry/Cancun regression figures only, solc 0.8.36 / optimizer 200. Compared
+`ad16af3b` (#173) with this change using `R78FlatFeeFastPathGas.t.sol` in isolated
+source snapshots with the same dependencies. The normal suite uses x=550e18,
+L=100e18, min/max=100/200 bps, and the parent's upper bound=1000e18. For the
+large-purchase comparison, change only `_logActivationPremium`'s row amount to
+2000e18 in each temporary snapshot. No gas claim here is a Rootstock bill or an
+end-to-end purchase benchmark.
+
+| Profile / fee path | Rows | Parent | R108 | Delta |
+|---|---:|---:|---:|---:|
+| Default / flat | 5 | 4,027 | 4,027 | 0 |
+| Default / variable, x=550e18 | 5 | 5,090 | 4,744 | -346 |
+| Deploy / flat | 5 | 3,886 | 3,895 | +9 |
+| Deploy / variable, x=550e18 | 1 | 3,024 | 3,010 | -14 |
+| Deploy / variable, x=550e18 | 5 | 4,680 | 4,654 | -26 |
+| Deploy / variable, x=550e18 | 100 | 44,031 | 43,720 | -311 |
+| Deploy / variable, x=2000e18 | 1 | 2,950 | 3,010 | +60 |
+| Deploy / variable, x=2000e18 | 5 | 4,310 | 4,654 | +344 |
+| Deploy / variable, x=2000e18 | 100 | 36,631 | 43,720 | +7,089 |
+
+The new curve has no upper-bound shortcut: it trades a small amount of arithmetic
+at larger sizes for the monotonic-fee guarantee. This is a correctness change,
+not a universal gas optimization. Both layouts keep fee settings in one word;
+these figures have not been converted using opcode traces to Rootstock pricing.
+
+## Validation
+
+Passed on 2026-10-01:
+
+- `forge test --match-path 'test/{ai-generated/unit/PurchaseFeesTest,unit/PurchaseRbtcTest,gas/R78FlatFeeFastPathGas}.t.sol' -vv`
+- `FOUNDRY_PROFILE=deploy forge test --match-path 'test/{ai-generated/unit/PurchaseFeesTest,unit/PurchaseRbtcTest,gas/R78FlatFeeFastPathGas}.t.sol' -vv`
+- `make check`
+- `make check-deploy`
+- `make fork-sovryn` — 477 passed, zero failed, 36 skipped.
+- `make fork-layerbank` — 477 passed, zero failed, 36 skipped.
+
+The targeted suites pass 65 tests under each profile, including 1,000 fuzz cases
+per fuzz test. No broadcasts or deployment-parameter selection performed.

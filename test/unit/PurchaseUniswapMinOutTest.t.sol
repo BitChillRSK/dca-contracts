@@ -333,10 +333,7 @@ contract PurchaseUniswapMinOutTest is Test {
 
         // Fee bounds are irrelevant here: the harness calls the swap directly, never the fee-charging batch.
         IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
-            minFeeRate: MIN_FEE_RATE,
-            maxFeeRate: MAX_FEE_RATE_TEST,
-            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
         });
 
         return new MinOutHarness(stablecoin, feeSettings, uniswapSettings, PERCENT, SAFETY);

@@ -19,10 +19,7 @@ contract IdleHandlerTest is HandlerTestHarness {
 
     function deployHandler() internal override returns (ITokenHandler) {
         IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
-            minFeeRate: MIN_FEE_RATE,
-            maxFeeRate: MAX_FEE_RATE_TEST,
-            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
         });
 
         idleHandler = new IdleTestHandler(address(dcaManager), address(stablecoin), FEE_COLLECTOR, feeSettings, OWNER);

@@ -180,7 +180,6 @@ contract FinalDeploymentTest is Test {
 
         IPurchaseFees.FeeSettings memory usdt0Fees = IPurchaseFees(stack.usdt0LayerBank).getFeeSettings();
         assertEq(usdt0Fees.feePurchaseLowerBound, USDT0_FEE_PURCHASE_LOWER_BOUND);
-        assertEq(usdt0Fees.feePurchaseUpperBound, USDT0_FEE_PURCHASE_UPPER_BOUND);
         assertEq(usdt0Fees.maxFeeRate, MAX_FEE_RATE_PRODUCTION);
 
         IPurchaseFees.FeeSettings memory docFees = IPurchaseFees(stack.docIdle).getFeeSettings();

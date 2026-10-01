@@ -26,11 +26,10 @@ contract PurchaseFeesHarness is PurchaseFees {
 
     // Test-only setters without onlyOwner restriction for convenience.
     // Widths match PurchaseFees storage, so a caller cannot park a value the real setters could not write.
-    function testSetFeeRateParams(uint16 minFee, uint16 maxFee, uint112 lower, uint112 upper) external {
+    function testSetFeeRateParams(uint16 minFee, uint16 maxFee, uint112 lower) external {
         s_minFeeRate = minFee;
         s_maxFeeRate = maxFee;
         s_feePurchaseLowerBound = lower;
-        s_feePurchaseUpperBound = upper;
     }
 
     function testSetMinFeeRate(uint16 minFee) external {
@@ -43,9 +42,5 @@ contract PurchaseFeesHarness is PurchaseFees {
 
     function testSetFeePurchaseLowerBound(uint112 lower) external {
         s_feePurchaseLowerBound = lower;
-    }
-
-    function testSetFeePurchaseUpperBound(uint112 upper) external {
-        s_feePurchaseUpperBound = upper;
     }
 }

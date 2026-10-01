@@ -44,10 +44,7 @@ contract EdgeCasesTest is Test {
             address(0xFEE),
             address(mocProxy),
             IPurchaseFees.FeeSettings({
-                minFeeRate: MIN_FEE_RATE,
-                maxFeeRate: MAX_FEE_RATE_TEST,
-                feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-                feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+                minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
             }),
             address(this)
         );
@@ -106,10 +103,7 @@ contract EdgeCasesTest is Test {
             uniSettings,
             address(0xFEE),
             IPurchaseFees.FeeSettings({
-                minFeeRate: MIN_FEE_RATE,
-                maxFeeRate: MAX_FEE_RATE_TEST,
-                feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-                feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+                minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
             }),
             DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
             DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
@@ -181,10 +175,7 @@ contract EdgeCasesTest is Test {
             address(0xFEE),
             address(proxy),
             IPurchaseFees.FeeSettings({
-                minFeeRate: MIN_FEE_RATE,
-                maxFeeRate: MAX_FEE_RATE_TEST,
-                feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-                feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+                minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
             }),
             address(this)
         );

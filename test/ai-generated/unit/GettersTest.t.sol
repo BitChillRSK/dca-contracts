@@ -176,7 +176,6 @@ contract GettersTest is DcaDappTest {
         assertGt(settings.maxFeeRate, 0);
         assertLe(settings.minFeeRate, settings.maxFeeRate);
         assertGe(settings.feePurchaseLowerBound, 0);
-        assertGe(settings.feePurchaseUpperBound, settings.feePurchaseLowerBound);
     }
 
     function test_feeHandler_getFeeCollector() public {
@@ -407,7 +406,6 @@ contract GettersTest is DcaDappTest {
 
         // Test fee bounds consistency
         IPurchaseFees.FeeSettings memory settings = IPurchaseFees(address(stablecoinHandler)).getFeeSettings();
-        assertLe(settings.feePurchaseLowerBound, settings.feePurchaseUpperBound);
     }
 
     function test_getters_boundaryConditions() public {

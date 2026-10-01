@@ -226,13 +226,12 @@ abstract contract HandlerTestHarness is Test {
         uint256 minFeeRate = settings.minFeeRate;
         uint256 maxFeeRate = settings.maxFeeRate;
         uint256 lowerBound = settings.feePurchaseLowerBound;
-        uint256 upperBound = settings.feePurchaseUpperBound;
         address feeCollector = feeHandler.getFeeCollector();
 
         assertGt(minFeeRate, 0);
         assertGt(maxFeeRate, 0);
         assertLe(minFeeRate, maxFeeRate);
-        assertLe(lowerBound, upperBound);
+        assertGt(lowerBound, 0);
         assertNotEq(feeCollector, address(0));
     }
 
@@ -240,13 +239,12 @@ abstract contract HandlerTestHarness is Test {
         IPurchaseFees feeHandler = IPurchaseFees(address(handler));
 
         vm.prank(OWNER);
-        feeHandler.setFeeRateParams(50, 150, 200 ether, 2000 ether);
+        feeHandler.setFeeRateParams(50, 150, 200 ether);
 
         IPurchaseFees.FeeSettings memory settings = feeHandler.getFeeSettings();
         assertEq(settings.minFeeRate, 50);
         assertEq(settings.maxFeeRate, 150);
         assertEq(settings.feePurchaseLowerBound, 200 ether);
-        assertEq(settings.feePurchaseUpperBound, 2000 ether);
     }
 
     function test_handler_modifyFeeSettings_reverts_invalidParams() public {
@@ -255,12 +253,12 @@ abstract contract HandlerTestHarness is Test {
         // min > max should revert
         vm.expectRevert();
         vm.prank(OWNER);
-        feeHandler.setFeeRateParams(200, 100, 200 ether, 2000 ether);
+        feeHandler.setFeeRateParams(200, 100, 200 ether);
 
-        // lower > upper should revert
+        // max rate above the hard cap should revert
         vm.expectRevert();
         vm.prank(OWNER);
-        feeHandler.setFeeRateParams(50, 150, 2000 ether, 200 ether);
+        feeHandler.setFeeRateParams(50, 501, 2000 ether);
     }
 
     function test_handler_modifyFeeSettings_reverts_notOwner() public {
@@ -268,7 +266,7 @@ abstract contract HandlerTestHarness is Test {
 
         vm.expectRevert(ownableUnauthorized(USER));
         vm.prank(USER);
-        feeHandler.setFeeRateParams(50, 150, 200 ether, 2000 ether);
+        feeHandler.setFeeRateParams(50, 150, 200 ether);
     }
 
     /*//////////////////////////////////////////////////////////////

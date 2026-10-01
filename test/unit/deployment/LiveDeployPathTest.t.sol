@@ -225,7 +225,6 @@ contract LiveDeployPathTest is Test {
             if (coinHash == keccak256(abi.encodePacked(USDT0_STRING))) {
                 IPurchaseFees.FeeSettings memory stored = IPurchaseFees(handler).getFeeSettings();
                 assertEq(stored.feePurchaseLowerBound, USDT0_FEE_PURCHASE_LOWER_BOUND);
-                assertEq(stored.feePurchaseUpperBound, USDT0_FEE_PURCHASE_UPPER_BOUND);
                 uint256 minPurchase = dcaManager.getTokenMinPurchaseAmount(token);
                 assertEq(minPurchase, USDT0_MIN_PURCHASE_AMOUNT);
                 assertTrue(minPurchase != 0, "DeployDexSwaps live USDT0 path must set the 6-decimal min");

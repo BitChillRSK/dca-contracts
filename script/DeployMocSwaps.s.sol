@@ -28,10 +28,7 @@ contract DeployMocSwaps is DeployBase {
 
     function deployDocHandlerMoc(DeployParams memory params) public returns (address) {
         IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
-            minFeeRate: MIN_FEE_RATE,
-            maxFeeRate: getMaxFeeRate(),
-            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: getMaxFeeRate(), feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
         });
 
         if (params.protocol == Protocol.NONE) {

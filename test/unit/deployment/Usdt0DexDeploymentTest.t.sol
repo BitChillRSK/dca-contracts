@@ -39,10 +39,8 @@ contract Usdt0DexDeploymentTest is Test {
     function test_usdt0ConstantsAreNotEighteenDecimalDocUnits() public {
         assertEq(USDT0_MIN_PURCHASE_AMOUNT, 25e6);
         assertEq(USDT0_FEE_PURCHASE_LOWER_BOUND, 1000e6);
-        assertEq(USDT0_FEE_PURCHASE_UPPER_BOUND, 100_000e6);
         assertTrue(USDT0_MIN_PURCHASE_AMOUNT != MIN_PURCHASE_AMOUNT);
         assertTrue(USDT0_FEE_PURCHASE_LOWER_BOUND != FEE_PURCHASE_LOWER_BOUND);
-        assertTrue(USDT0_FEE_PURCHASE_UPPER_BOUND != FEE_PURCHASE_UPPER_BOUND);
     }
 
     function test_feeSettingsForToken_liveUsdt0UsesSixDecimalBounds() public {
@@ -51,9 +49,7 @@ contract Usdt0DexDeploymentTest is Test {
         IPurchaseFees.FeeSettings memory local = deployer.feeSettingsForToken(false);
 
         assertEq(live.feePurchaseLowerBound, USDT0_FEE_PURCHASE_LOWER_BOUND);
-        assertEq(live.feePurchaseUpperBound, USDT0_FEE_PURCHASE_UPPER_BOUND);
         assertEq(local.feePurchaseLowerBound, FEE_PURCHASE_LOWER_BOUND);
-        assertEq(local.feePurchaseUpperBound, FEE_PURCHASE_UPPER_BOUND);
     }
 
     function test_usdt0Handler_sixDecimalBoundsAndMinPurchase() public {
@@ -63,9 +59,7 @@ contract Usdt0DexDeploymentTest is Test {
 
         IPurchaseFees.FeeSettings memory stored = IPurchaseFees(handler).getFeeSettings();
         assertEq(stored.feePurchaseLowerBound, 1000e6);
-        assertEq(stored.feePurchaseUpperBound, 100_000e6);
         assertTrue(stored.feePurchaseLowerBound != 1000 ether);
-        assertTrue(stored.feePurchaseUpperBound != 100_000 ether);
 
         // Nested admin/manager calls come from the harness; own the stack as the harness so
         // `_maybeAssign`'s `msg.sender == owner` check matches production broadcast.
