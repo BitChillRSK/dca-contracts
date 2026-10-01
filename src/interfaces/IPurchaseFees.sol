@@ -23,7 +23,7 @@ interface IPurchaseFees {
     struct FeeSettings {
         uint16 minFeeRate; // asymptotic minimum rate, in basis points
         uint16 maxFeeRate; // rate at or below the lower bound, in basis points
-        uint112 feePurchaseLowerBound; // the purchase amount at or below which max fee is applied
+        uint112 feePurchaseLowerBound; // the purchase amount at or below which max fee rate is applied
     }
 
     /**
