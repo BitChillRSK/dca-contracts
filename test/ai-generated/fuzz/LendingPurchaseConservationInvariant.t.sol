@@ -16,9 +16,9 @@ import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
  * @notice Fuzz actions over production Sovryn lending + production `PurchaseRbtc` (via MoC).
  * @dev The fuzz actor is the handler's `dcaManager` and owner, so it can call `onlyDcaManager`
  *      entry points and rotate the fee collector. Deposits mint iSUSD; purchases redeem through
- *      `MockMocProxy` and credit through the real shared pipeline under launch variable fees.
- *      Expected-empty cases return early; production calls are not wrapped in try/catch so
- *      `fail_on_revert` surfaces handler regressions.
+ *      `MockMocProxy` and credit through the real shared pipeline. Expected-empty cases return
+ *      early; production calls are not wrapped in try/catch so `fail_on_revert` surfaces handler
+ *      regressions.
  */
 contract LendingPurchaseConservationHandler is Test {
     uint256 internal constant MIN_AMOUNT = 25 ether;
@@ -100,7 +100,6 @@ contract LendingPurchaseConservationHandler is Test {
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = amount;
 
-        // Fees stay on the handler books until withdrawn — measure only the MoC payout onto the leaf.
         uint256 handlerBalBefore = address(i_handler).balance;
         i_handler.batchBuyRbtc(buyers, scheduleIds, amounts, 0);
         s_rbtcReceivedGhost += address(i_handler).balance - handlerBalBefore;
@@ -118,10 +117,7 @@ contract LendingPurchaseConservationHandler is Test {
         ++s_withdrawSuccesses;
     }
 
-    /**
-     * @notice Point fees at a user (overlap) or a dedicated spare collector address.
-     * @dev Prior credits stay with the old collector; only subsequent purchases go to `next`.
-     */
+    /// @notice Point fees at a user (overlap) or a dedicated spare collector address.
     function rotateFeeCollector(uint256 seed) external {
         address next;
         if (seed % 5 == 0) {
@@ -159,17 +155,10 @@ contract LendingPurchaseConservationHandler is Test {
 }
 
 /**
- * @title LendingPurchaseConservationInvariantTest
- * @notice Production lending handler + production `PurchaseRbtc` under one conservation harness.
- * @dev The main `InvariantTest` wrappers reimplement purchase, and `PurchaseRbtcConservationInvariantTest`
- *      skips lending. This suite is the missing middle: `SovrynDocHandlerMoc` runs both halves for real
- *      under launch variable fees with collector withdraw/rotation. Named `…InvariantTest` so
- *      `make invariants` / `make invariants-sovryn` pick it up with no Makefile change.
+ * @title LendingPurchaseConservationInvariantBase
+ * @notice Shared lending+purchase conservation; concrete suites pick flat or launch variable fees.
  */
-contract LendingPurchaseConservationInvariantTest is StdInvariant, Test {
-    uint16 internal constant MIN_FEE_RATE = 20;
-    uint16 internal constant MAX_FEE_RATE = 100;
-    uint112 internal constant FEE_PURCHASE_LOWER_BOUND = 250 ether;
+abstract contract LendingPurchaseConservationInvariantBase is StdInvariant, Test {
     address internal constant INITIAL_COLLECTOR = address(0xFEE);
 
     MockStablecoin internal doc;
@@ -178,6 +167,8 @@ contract LendingPurchaseConservationInvariantTest is StdInvariant, Test {
     SovrynDocHandlerMoc internal handler;
     LendingPurchaseConservationHandler internal fuzzHandler;
     address[] internal s_users;
+
+    function _feeSettings() internal pure virtual returns (IPurchaseFees.FeeSettings memory);
 
     function setUp() public {
         doc = new MockStablecoin(address(this));
@@ -191,16 +182,13 @@ contract LendingPurchaseConservationInvariantTest is StdInvariant, Test {
         }
 
         address predictedFuzzHandler = vm.computeCreateAddress(address(this), vm.getNonce(address(this)) + 1);
-        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
-            minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
-        });
         handler = new SovrynDocHandlerMoc(
             predictedFuzzHandler,
             address(doc),
             address(iSusd),
             INITIAL_COLLECTOR,
             address(mocProxy),
-            feeSettings,
+            _feeSettings(),
             predictedFuzzHandler
         );
         fuzzHandler = new LendingPurchaseConservationHandler(handler, doc, iSusd, s_users, INITIAL_COLLECTOR);
@@ -245,7 +233,7 @@ contract LendingPurchaseConservationInvariantTest is StdInvariant, Test {
         assertGt(
             IPurchaseRbtc(address(handler)).getAccumulatedRbtcBalance(INITIAL_COLLECTOR),
             0,
-            "variable-fee purchase credited no collector share"
+            "purchase credited no collector share"
         );
         assertGt(fuzzHandler.s_rbtcReceivedGhost(), 0, "ghost missed the MoC payout");
         assertEq(doc.balanceOf(address(handler)), 0, "DOC left idle after the purchase");
@@ -254,7 +242,7 @@ contract LendingPurchaseConservationInvariantTest is StdInvariant, Test {
         assertEq(fuzzHandler.s_collectorRotateSuccesses(), 1, "collector rotation never landed");
 
         fuzzHandler.withdrawAccumulatedRbtc(0);
-        fuzzHandler.withdrawAccumulatedRbtc(s_users.length); // initial collector index in _account
+        fuzzHandler.withdrawAccumulatedRbtc(s_users.length);
         assertGt(fuzzHandler.s_withdrawSuccesses(), 0, "withdraw never reached PurchaseRbtc");
         assertEq(
             address(handler).balance + fuzzHandler.s_rbtcWithdrawnGhost(),
@@ -313,5 +301,23 @@ contract LendingPurchaseConservationInvariantTest is StdInvariant, Test {
         }
         seen[seenCount] = account;
         return seenCount + 1;
+    }
+}
+
+/// @notice Flat 100 bps fees (historical conservation configuration).
+contract LendingPurchaseConservationInvariantTest is LendingPurchaseConservationInvariantBase {
+    uint16 internal constant FLAT_FEE_RATE = 100;
+
+    function _feeSettings() internal pure override returns (IPurchaseFees.FeeSettings memory) {
+        return IPurchaseFees.FeeSettings({
+            minFeeRate: FLAT_FEE_RATE, maxFeeRate: FLAT_FEE_RATE, feePurchaseLowerBound: 1000 ether
+        });
+    }
+}
+
+/// @notice Launch variable-fee band: 100/20 bps, 250-token lower bound.
+contract LendingPurchaseVariableFeeConservationInvariantTest is LendingPurchaseConservationInvariantBase {
+    function _feeSettings() internal pure override returns (IPurchaseFees.FeeSettings memory) {
+        return IPurchaseFees.FeeSettings({minFeeRate: 20, maxFeeRate: 100, feePurchaseLowerBound: 250 ether});
     }
 }

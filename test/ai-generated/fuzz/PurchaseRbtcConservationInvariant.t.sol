@@ -18,13 +18,12 @@ import {PurchaseRbtcHarness} from "test/unit/PurchaseRbtcTest.t.sol";
  */
 contract PurchaseRbtcConservationHandler is Test {
     uint256 internal constant MAX_ROWS = 12;
-    /// @dev Spans below and above the launch lower bound so variable fees actually interpolate.
+    /// @dev Distinct purchase sizes keep the allocation weights unequal.
     uint256 internal constant MIN_AMOUNT = 1 ether;
     uint256 internal constant MAX_AMOUNT = 500_000 ether;
 
     PurchaseRbtcHarness public immutable i_harness;
     address[] public s_buyers;
-    /// @dev Every address that has ever been the fee collector (starts with the constructor value).
     address[] public s_collectors;
     address public s_feeCollector;
 
@@ -96,14 +95,10 @@ contract PurchaseRbtcConservationHandler is Test {
         ++s_withdrawSuccesses;
     }
 
-    /**
-     * @notice Point fees at a buyer (overlap) or a dedicated spare collector address.
-     * @dev Rotation does not migrate prior credits; the old collector keeps its claimable balance.
-     */
+    /// @notice Point fees at a buyer (overlap) or a dedicated spare collector address.
     function rotateFeeCollector(uint256 seed) external {
         address next;
         if (seed % 5 == 0) {
-            // Occasional return to a dedicated non-buyer collector so overlap is not permanent.
             next = address(uint160(0xFEE0 + (seed % 3)));
         } else {
             next = s_buyers[seed % s_buyers.length];
@@ -133,17 +128,10 @@ contract PurchaseRbtcConservationHandler is Test {
 }
 
 /**
- * @title PurchaseRbtcConservationInvariantTest
- * @notice Measured rBTC is attributed to buyers and collectors up to the floor allocation's slack.
- * @dev Targets the real `PurchaseRbtc` through `PurchaseRbtcHarness`, which overrides only the venue
- *      and retrieval legs. Launch variable fees, collector withdraw, and collector rotation (including
- *      buyer overlap) are in the fuzz surface. Named `...InvariantTest` so `make invariants` picks it up.
+ * @title PurchaseRbtcConservationInvariantBase
+ * @notice Shared conservation invariants; concrete suites pick flat or launch variable fees.
  */
-contract PurchaseRbtcConservationInvariantTest is StdInvariant, Test {
-    /// @dev Launch band: 100 bps at/below 250 tokens, asymptotic 20 bps.
-    uint16 internal constant MIN_FEE_RATE = 20;
-    uint16 internal constant MAX_FEE_RATE = 100;
-    uint112 internal constant FEE_PURCHASE_LOWER_BOUND = 250 ether;
+abstract contract PurchaseRbtcConservationInvariantBase is StdInvariant, Test {
     address internal constant INITIAL_COLLECTOR = address(0xFEE);
 
     MockStablecoin internal token;
@@ -151,21 +139,18 @@ contract PurchaseRbtcConservationInvariantTest is StdInvariant, Test {
     PurchaseRbtcConservationHandler internal fuzzHandler;
     address[] internal s_buyers;
 
+    function _feeSettings() internal pure virtual returns (IPurchaseFees.FeeSettings memory);
+
     function setUp() public {
         token = new MockStablecoin(address(this));
-
-        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
-            minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
-        });
 
         for (uint256 i; i < 5; ++i) {
             s_buyers.push(address(uint160(0xB0B00 + i)));
         }
 
-        // dcaManager and owner = fuzz handler, so it can purchase and rotate the collector.
         address predictedFuzzHandler = vm.computeCreateAddress(address(this), vm.getNonce(address(this)) + 1);
         harness = new PurchaseRbtcHarness(
-            predictedFuzzHandler, address(token), INITIAL_COLLECTOR, feeSettings, predictedFuzzHandler
+            predictedFuzzHandler, address(token), INITIAL_COLLECTOR, _feeSettings(), predictedFuzzHandler
         );
         fuzzHandler = new PurchaseRbtcConservationHandler(harness, s_buyers, INITIAL_COLLECTOR);
         assertEq(address(fuzzHandler), predictedFuzzHandler, "dcaManager/owner wiring missed the fuzz handler");
@@ -197,9 +182,7 @@ contract PurchaseRbtcConservationInvariantTest is StdInvariant, Test {
 
     /**
      * @notice Credits plus payouts land inside the band the floor allocation is allowed.
-     * @dev Unique claimables across buyers and every address that has been collector — overlap must
-     *      not double-count. Upper bound: books never claim more than the venue delivered. Lower
-     *      bound: measured rBTC is not missing beyond accepted floor slack.
+     * @dev Unique claimables across buyers and collectors — overlap must not double-count.
      */
     function invariant_creditsStayWithinTheFlooredBand() public {
         uint256 claimable = _uniqueClaimable();
@@ -240,5 +223,23 @@ contract PurchaseRbtcConservationInvariantTest is StdInvariant, Test {
         }
         seen[seenCount] = account;
         return seenCount + 1;
+    }
+}
+
+/// @notice Flat 100 bps fees (historical conservation configuration).
+contract PurchaseRbtcConservationInvariantTest is PurchaseRbtcConservationInvariantBase {
+    uint16 internal constant FLAT_FEE_RATE = 100;
+
+    function _feeSettings() internal pure override returns (IPurchaseFees.FeeSettings memory) {
+        return IPurchaseFees.FeeSettings({
+            minFeeRate: FLAT_FEE_RATE, maxFeeRate: FLAT_FEE_RATE, feePurchaseLowerBound: 1000 ether
+        });
+    }
+}
+
+/// @notice Launch variable-fee band: 100/20 bps, 250-token lower bound.
+contract PurchaseRbtcVariableFeeConservationInvariantTest is PurchaseRbtcConservationInvariantBase {
+    function _feeSettings() internal pure override returns (IPurchaseFees.FeeSettings memory) {
+        return IPurchaseFees.FeeSettings({minFeeRate: 20, maxFeeRate: 100, feePurchaseLowerBound: 250 ether});
     }
 }

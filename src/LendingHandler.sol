@@ -309,9 +309,7 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
 
     /**
      * @dev Write the user's virtual share balance and emit the canonical transition.
-     *      Callers pass a real change (deposit reverts on a flat mint; single redeem returns
-     *      before a zero burn; batch rows carry a schedule purchase amount at or above the
-     *      token minimum) and the already-loaded `previousShares` to avoid a second SLOAD.
+     *      Callers pass a real change and the already-loaded `previousShares` to avoid a second SLOAD.
      */
     function _setUserShares(address user, uint256 previousShares, uint256 newShares) private {
         s_shares[user] = newShares;

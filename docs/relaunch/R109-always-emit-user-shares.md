@@ -36,11 +36,9 @@ on supported tokens. No gas claim.
 
 ### Variable-fee conservation coverage
 
-Both `PurchaseRbtcConservationInvariantTest` and `LendingPurchaseConservationInvariantTest` still
-configure flat fees and never withdraw or rotate the collector. Switch them to the launch band
-(100/20 bps, 250-token lower bound), add collector withdrawal and rotation actions (including
-buyer/collector overlap), and keep claimable accounting unique across buyers and collectors so
-overlap does not double-count.
+Both conservation suites kept their flat-fee configuration and gained a sibling suite under the
+launch band (100/20 bps, 250-token lower bound). Shared handlers add collector withdrawal and
+rotation (including buyer/collector overlap) with unique claimable accounting.
 
 ## Open product decisions
 
@@ -54,8 +52,9 @@ overlap does not double-count.
       purchaseAmountsSum`. Comment why it stays checked.
 - [x] Unit test: the extreme overflow shape that previously wrapped now reverts the batch; a
       normal variable-fee purchase still emits the correct `FeeCredited.stablecoinAmount`.
-- [x] Conservation suites: launch variable fee settings; fuzz actions for collector withdraw and
-      `setFeeCollector` rotation (buyer overlap allowed); invariants sum unique claimables.
+- [x] Conservation suites: keep flat-fee suites; add launch-variable sibling suites; fuzz actions for
+      collector withdraw and `setFeeCollector` rotation (buyer overlap allowed); invariants sum
+      unique claimables.
 - [x] Register in `docs/relaunch/README.md` and `IMPLEMENTATION_ORDER.md`.
 
 ## Out of scope
@@ -93,7 +92,8 @@ Forks: no new fork-specific assertions; run as the executable-change gate.
 
 - [x] `_setUserShares` always emits; no equality branch.
 - [x] `_creditFee` stablecoin share uses checked multiplication; overflow reverts.
-- [x] Both conservation suites run under launch variable fees with collector withdraw/rotation.
+- [x] Both conservation surfaces run under flat fees and under launch variable fees, each with
+      collector withdraw/rotation.
 - [x] No ABI, event signature, storage, or consumer surface change.
 - [x] `make check`, `make invariants-sovryn`, and both lending fork lanes green.
 - [x] README Status points at this PR; next unassigned prompt updated.

@@ -9,8 +9,8 @@ new suite `…InvariantTest` is enough to pick it up with no Makefile change.
 | Contract | What it targets | What it deliberately does **not** cover |
 |---|---|---|
 | `InvariantTest` | Production `DcaManager` + production lending adapters (`TropykusHandler` / `SovrynHandler`) behind **purchase wrappers** that reimplement `batchBuyRbtc` | Production `PurchaseRbtc` allocation, rBTC solvency, MoC / Uniswap venues |
-| `PurchaseRbtcConservationInvariantTest` | Production `PurchaseRbtc` through `PurchaseRbtcHarness` (venue + retrieval overridden) | Lending share books, `DcaManager`, a real venue |
-| `LendingPurchaseConservationInvariantTest` | Production `SovrynDocHandlerMoc` (lending + `PurchaseMoc` / `PurchaseRbtc`) with `MockIsusdToken` + `MockMocProxy` | Full `DcaManager` schedule lifecycle (the fuzz actor is the `dcaManager`) |
+| `PurchaseRbtcConservationInvariantTest` / `PurchaseRbtcVariableFeeConservationInvariantTest` | Production `PurchaseRbtc` through `PurchaseRbtcHarness` (venue + retrieval overridden); flat and launch-variable fees | Lending share books, `DcaManager`, a real venue |
+| `LendingPurchaseConservationInvariantTest` / `LendingPurchaseVariableFeeConservationInvariantTest` | Production `SovrynDocHandlerMoc` (lending + `PurchaseMoc` / `PurchaseRbtc`) with `MockIsusdToken` + `MockMocProxy`; flat and launch-variable fees | Full `DcaManager` schedule lifecycle (the fuzz actor is the `dcaManager`) |
 
 The main suite's wrappers exist so deposit / withdraw / pause / top-up / schedule edits can run against
 real lending accounting without standing up MoC. They credit rBTC without a matching cash move, so any
@@ -62,22 +62,21 @@ increases.” The old `invariant_interestOnlyIncreases` asserted `uint256 >= 0` 
 Interest accrual is exercised by the conservation check and the exchange-rate check; share burns on
 withdraw / purchase are allowed and expected.
 
-### `PurchaseRbtcConservationInvariantTest` (purchase allocation)
+### `PurchaseRbtcConservationInvariantTest` / `PurchaseRbtcVariableFeeConservationInvariantTest`
 
-Configured with the launch variable-fee band (100/20 bps, 250-token lower bound). Fuzz actions
-include `batchBuyRbtc`, buyer/collector `withdrawAccumulatedRbtc`, and `rotateFeeCollector`
-(buyer overlap allowed). Claimables are summed uniquely across buyers and every address that has
-been collector so overlap does not double-count.
+Shared handler and invariants; two fee configurations. Flat: 100 bps equal rates. Variable: launch
+band (100/20 bps, 250-token lower bound). Fuzz actions include `batchBuyRbtc`, buyer/collector
+`withdrawAccumulatedRbtc`, and `rotateFeeCollector` (buyer overlap allowed). Claimables are summed
+uniquely across buyers and every address that has been collector so overlap does not double-count.
 
 1. **Credits stay in the floored band** — unique claimables + withdrawn ≤ measured venue output,
    and that total plus under-one-wei-per-row slack (k = rows + fee floors leave at most k − 1 wei)
    ≥ measured output.
 2. **Books never exceed handler balance** — unique claimable rBTC ≤ `address(harness).balance`.
 
-### `LendingPurchaseConservationInvariantTest` (production lending + purchase together)
+### `LendingPurchaseConservationInvariantTest` / `LendingPurchaseVariableFeeConservationInvariantTest`
 
-Same launch variable-fee band and collector rotate/withdraw surface as the purchase-allocation
-suite, on `SovrynDocHandlerMoc`.
+Same flat + launch-variable split and collector rotate/withdraw surface, on `SovrynDocHandlerMoc`.
 
 1. **Native rBTC conservation** — MoC-paid rBTC (measured as handler balance gains)
    equals remaining handler balance plus measured withdrawals. Collector fees stay on the

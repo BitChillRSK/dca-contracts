@@ -82,10 +82,6 @@ contract PurchaseRbtcTest is Test {
         assertLe(RBTC_OUT - expectedA - expectedB - expectedCollector, 2);
     }
 
-    /**
-     * @dev Aggregate `retrieved × totalFee` can overflow even when every per-row fee product fits.
-     *      Checked math must revert rather than wrap `FeeCredited.stablecoinAmount`.
-     */
     function test_creditFee_stablecoinProductOverflowReverts() public {
         harness.setFeeRateParams(500, 500, 0);
         uint256 rowCount = 21;
@@ -105,11 +101,10 @@ contract PurchaseRbtcTest is Test {
         token.mint(address(harness), retrieved);
         harness.setRetrieveOverride(retrieved);
 
-        vm.expectRevert(); // panic(0x11) arithmetic overflow
+        vm.expectRevert();
         harness.batchBuyRbtc(buyers, ids, amounts, NO_MIN_RBTC_OUT);
     }
 
-    /// @dev Launch variable fees with collector/buyer overlap, rotation, and withdrawals conserve claims.
     function test_variableFee_collectorRotationAndBuyerOverlapConserveClaims() public {
         harness.setFeeRateParams(20, 100, 250 ether);
         harness.setFeeCollector(buyerA);
