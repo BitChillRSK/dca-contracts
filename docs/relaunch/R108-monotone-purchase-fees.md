@@ -12,7 +12,7 @@ The existing variable mode has an unintended income reduction: with 100/50 bps a
 
 ## Open product decisions
 
-**none** — formula approved 2026-10-01. Launch parameter selection is separate; retain existing equal-rate deployment defaults.
+**none** — formula approved 2026-10-01. Launch defaults approved in the follow-up: maximum 100 bps, minimum 20 bps, lower bound 250 tokens. Retain the configurable equal-rate flat option.
 
 ## Scope
 
@@ -22,20 +22,23 @@ The existing variable mode has an unintended income reduction: with 100/50 bps a
 - Remove the upper bound from storage, settings, setter, events, errors, deployment constructors and test fixtures. Keep the lower bound uint112 and rates uint16. Zero lower bound is valid and yields the minimum rate for positive amounts; zero minimum rate is valid.
 - Document that the minimum is asymptotic, prove unchecked arithmetic and test fee monotonicity, boundary continuity up to token-unit rounding, rate bounds, conservation and decimals.
 - Update consumer issues for the fee settings ABI and fee quotation semantics.
+- Configure launch defaults at 100/20 bps and a 250-token lower bound, scaled to each token's decimals; retain the $25 minimum and test-only 200 bps maximum. Verify all seven canonical handlers receive these settings.
 
 ## Out of scope
 
-Launch pricing selection, economic forecasts, custody or purchase allocation changes, broadcasts, unrelated optimizations.
+Private pricing research and economic forecasts, custody or purchase allocation changes, broadcasts, unrelated optimizations.
 
 ## Files likely touched
 
 - `src/PurchaseFees.sol`, `src/interfaces/IPurchaseFees.sol`
 - Constructor NatSpec in `src/PurchaseRbtc.sol`, `src/PurchaseMoc.sol`, `src/PurchaseUniswap.sol` and the eight handler leaves under `src/idle/`, `src/layerbank/`, `src/sovryn/`, `src/tropykus-legacy/` (describe purchase-fee parameters without obsolete linear/interpolation wording).
 - `script/Constants.sol`, `script/DeployMocSwaps.s.sol`, `script/DeployDexSwaps.s.sol`, `script/DeployIdleHandler.s.sol`, `script/DeployLayerBankHandler.s.sol`, `script/DeployUsdrifHandler.s.sol`, `script/DeployFinal.s.sol`
+- `script/DeployBase.s.sol` (maximum-rate documentation); `test/unit/deployment/FinalDeploymentTest.t.sol` and `test/unit/deployment/Usdt0DexDeploymentTest.t.sol` (launch settings and token-unit wiring).
 - `test/mocks/PurchaseFeesHarness.sol`, `test/ai-generated/unit/PurchaseFeesTest.t.sol`, `test/ai-generated/unit/HandlerTestHarness.t.sol`, `test/unit/TestsHelper.t.sol`
 - Direct FeeSettings constructor fixtures, setter callers and fee-setting assertions under `test/unit/`, `test/ai-generated/`, `test/gas/`; enumerate these mechanical ABI dependents in the PR.
 - `test/gas/R78FlatFeeFastPathGas.t.sol` (reference curve used by equivalence checks)
 - `README.md`, `docs/PURCHASE_FEES.md` (durable fee math and rounding reference).
+- `test/mainnet-debug/dex-quote-floor/DexQuoteFloorProbe.t.sol` (label its fixed 1% input deduction as a historical benchmark, rather than the current production fee).
 - This spec, `docs/relaunch/README.md`, `docs/relaunch/IMPLEMENTATION_ORDER.md`; `docs/relaunch/ROOTSTOCK-GAS-AUDIT.md` (current setter field count and historical measurement context); current fee ABI cutover documentation reached through those files.
 
 ## Required tests
@@ -55,13 +58,13 @@ Launch pricing selection, economic forecasts, custody or purchase allocation cha
 
 ## Reviewer checklist
 
-- Scope and invariants preserved; no pricing selection or private economic data committed.
+- Scope and invariants preserved; selected launch defaults documented without private economic data.
 - Tests cover the real purchase domain and integer rounding.
 - Direct ABI dependents are identified in the PR.
 
 ## ABI / deploy / cutover impact
 
-`setFeeRateParams(uint256,uint256,uint256,uint256)` becomes the three-argument version. `FeeSettings` loses its uint112 upper-bound field. Remove `PurchaseFees__PurchaseUpperBoundSet` and `PurchaseFees__FeeLowerBoundMustBeLowerThanUpperBound`. Fresh deployments only; refresh consumer ABIs and quote the new formula in token base units. Scripts retain the existing flat rates and lower bound.
+`setFeeRateParams(uint256,uint256,uint256,uint256)` becomes the three-argument version. `FeeSettings` loses its uint112 upper-bound field. Remove `PurchaseFees__PurchaseUpperBoundSet` and `PurchaseFees__FeeLowerBoundMustBeLowerThanUpperBound`. Fresh deployments only; refresh consumer ABIs and quote the new formula in token base units. Launch defaults are maximum 100 bps, minimum 20 bps and lower bound 250 tokens (`250e18` for DOC/USDRIF, `250e6` for USDT0). Local/fork fixtures retain the 200 bps testing maximum; the shared minimum and lower bound follow the launch defaults.
 
 ## Arithmetic argument
 
@@ -114,4 +117,26 @@ Passed on 2026-10-01:
 - `make fork-layerbank` — 477 passed, zero failed, 36 skipped.
 
 The targeted suites pass 65 tests under each profile, including 1,000 fuzz cases
-per fuzz test. No broadcasts or deployment-parameter selection performed.
+per fuzz test. These results predate the launch-parameter follow-up. No broadcasts were performed.
+
+## Launch configuration follow-up — 2026-10-01
+
+Selected defaults: maximum 100 bps, minimum 20 bps, lower bound 250 tokens.
+The purchase minimum stays 25 tokens and equal min/max rates retain flat mode.
+Canonical deployment tests verify the settings on all seven handlers, including
+six-decimal USDT0 units. Local/fork fixtures keep their 200 bps testing maximum.
+
+Passed after changing the defaults:
+
+```sh
+SWAP_TYPE=mocSwaps LENDING_PROTOCOL=none STABLECOIN_TYPE=DOC forge test --match-path 'test/unit/deployment/*.t.sol' -vv
+make check
+make check-deploy
+make fork-sovryn
+make fork-layerbank
+```
+
+Targeted deployment suites: 33 passed, zero failed, five skipped. Default and
+deploy matrices each pass all eight unit lanes and 17 invariant tests. Each
+lending fork: 477 passed, zero failed, 36 skipped. Forks used isolated Foundry
+output/cache directories while the deployment-profile build ran. No broadcasts.

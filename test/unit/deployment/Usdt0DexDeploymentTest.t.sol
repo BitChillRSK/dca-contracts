@@ -38,7 +38,7 @@ contract DeployUsdrifHandlerHarness is DeployUsdrifHandler {
 contract Usdt0DexDeploymentTest is Test {
     function test_usdt0ConstantsAreNotEighteenDecimalDocUnits() public {
         assertEq(USDT0_MIN_PURCHASE_AMOUNT, 25e6);
-        assertEq(USDT0_FEE_PURCHASE_LOWER_BOUND, 1000e6);
+        assertEq(USDT0_FEE_PURCHASE_LOWER_BOUND, 250e6);
         assertTrue(USDT0_MIN_PURCHASE_AMOUNT != MIN_PURCHASE_AMOUNT);
         assertTrue(USDT0_FEE_PURCHASE_LOWER_BOUND != FEE_PURCHASE_LOWER_BOUND);
     }
@@ -58,8 +58,8 @@ contract Usdt0DexDeploymentTest is Test {
             _deploySixDecimalStack(address(deployer));
 
         IPurchaseFees.FeeSettings memory stored = IPurchaseFees(handler).getFeeSettings();
-        assertEq(stored.feePurchaseLowerBound, 1000e6);
-        assertTrue(stored.feePurchaseLowerBound != 1000 ether);
+        assertEq(stored.feePurchaseLowerBound, 250e6);
+        assertTrue(stored.feePurchaseLowerBound != 250 ether);
 
         // Nested admin/manager calls come from the harness; own the stack as the harness so
         // `_maybeAssign`'s `msg.sender == owner` check matches production broadcast.

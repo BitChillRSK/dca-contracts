@@ -43,7 +43,7 @@ contract DexQuoteFloorProbe is Test {
     ///      value the handlers actually enforce. $1 peg, 18-decimal oracle.
     uint256 internal constant AMOUNT_OUT_MINIMUM_PERCENT = DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT;
     uint256 internal constant ORACLE_DECIMALS = 18;
-    /// @dev Production fee is a flat 1% (`MIN_FEE_RATE == MAX_FEE_RATE_PRODUCTION`).
+    /// @dev Historical quote-table assumption: deduct 1% before swapping; not the current rBTC fee path.
     uint256 internal constant FEE_BPS = 100;
 
     SwapProbe internal probe;
@@ -127,7 +127,7 @@ contract DexQuoteFloorProbe is Test {
     }
 
     function _row(address tokenIn, uint8 tokenDecimals, bytes memory path, uint256 grossIn) private {
-        uint256 netIn = grossIn - (grossIn * FEE_BPS / BPS_DENOMINATOR); // what the swap actually spends
+        uint256 netIn = grossIn - (grossIn * FEE_BPS / BPS_DENOMINATOR); // input used by this historical probe
         uint256 floor = _governanceFloor(netIn, tokenDecimals);
 
         console2.log("-- gross in (token units)", grossIn);

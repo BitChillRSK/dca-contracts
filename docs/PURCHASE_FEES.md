@@ -21,8 +21,10 @@ The contract enforces $0\le m\le M\le500$ (a 5% cap). Purchase amounts are bound
 by `uint96` in `DcaManager`; the stored lower bound is `uint112`. Convert the lower
 bound to each token's base units: for example, a threshold of 250 tokens is
 `250e6` for a six-decimal token and `250e18` for an eighteen-decimal token.
-The equations below describe the implemented model; they do not prescribe launch
-parameter values.
+Launch deployment defaults are $M=100$, $m=20$ and $L=250$ whole tokens:
+1% through 250 tokens, decreasing toward 0.2% for larger purchases. The lower
+bound is `250e18` for DOC/USDRIF and `250e6` for USDT0. Equal minimum/maximum
+rates remain available as a flat configuration through the same setter.
 
 ## Fee amount and effective rate
 
@@ -124,11 +126,11 @@ and paste each block below. The curve blocks use **LaTeX input**: copy the code
 exactly, including the backslashes. Plain-text braces can be dropped by Desmos's
 paste parser, leaving invalid expressions.
 
-First paste these illustrative parameters (they are not deployment defaults):
+First paste the launch parameters, with $L$ expressed in whole tokens:
 
 ```text
 M=100
-m=10
+m=20
 L=250
 ```
 
@@ -149,7 +151,7 @@ y=\frac{m+(M-m)\left(\frac{2L}{x}-\frac{L^2}{x^2}\right)}{100}\left\{x>L\right\}
 Each curve consists of two restricted expressions. Paste the fee and rate blocks
 into separate graphs, or toggle their colored icons to view one curve at a time.
 For the example above, use graph settings to set the x-axis to 0–10,000; use a
-y-axis of 0–15 for the absolute fee or 0–1.1 for the percentage rate. The default
+y-axis of 0–25 for the absolute fee or 0–1.1 for the percentage rate. The default
 Desmos window only shows purchases near zero, so it hides most of the curve.
 
 These expressions were tested by pasting into the Desmos web calculator. They

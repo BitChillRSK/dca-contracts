@@ -97,6 +97,8 @@ Each handler has owner-configurable minimum and maximum rates and a lower purcha
 threshold. Above that threshold, the effective rate decreases smoothly toward
 the minimum while the absolute fee never decreases as the purchase grows. Equal
 rates give a flat fee. Fees are credited in rBTC/WRBTC after the venue purchase.
+Launch defaults are 1% through 250 tokens, decreasing toward 0.2% above that
+threshold.
 
 See [Purchase fee math](./docs/PURCHASE_FEES.md) for the fee-amount and fee-rate
 curves, exact integer rounding, parameter units, batch allocation and plotting

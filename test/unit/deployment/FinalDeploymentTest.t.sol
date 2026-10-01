@@ -178,13 +178,13 @@ contract FinalDeploymentTest is Test {
         _assertDexWiring(stack.usdt0Idle);
         _assertDexWiring(stack.usdt0LayerBank);
 
-        IPurchaseFees.FeeSettings memory usdt0Fees = IPurchaseFees(stack.usdt0LayerBank).getFeeSettings();
-        assertEq(usdt0Fees.feePurchaseLowerBound, USDT0_FEE_PURCHASE_LOWER_BOUND);
-        assertEq(usdt0Fees.maxFeeRate, MAX_FEE_RATE_PRODUCTION);
-
-        IPurchaseFees.FeeSettings memory docFees = IPurchaseFees(stack.docIdle).getFeeSettings();
-        assertEq(docFees.feePurchaseLowerBound, FEE_PURCHASE_LOWER_BOUND);
-        assertEq(docFees.maxFeeRate, MAX_FEE_RATE_PRODUCTION);
+        _assertLaunchFees(stack.docIdle, 250e18);
+        _assertLaunchFees(stack.docLayerBank, 250e18);
+        _assertLaunchFees(stack.docSovryn, 250e18);
+        _assertLaunchFees(stack.usdrifIdle, 250e18);
+        _assertLaunchFees(stack.usdrifLayerBank, 250e18);
+        _assertLaunchFees(stack.usdt0Idle, 250e6);
+        _assertLaunchFees(stack.usdt0LayerBank, 250e6);
 
         assertTrue(IERC165(stack.docLayerBank).supportsInterface(type(ILendingHandler).interfaceId));
         assertTrue(IERC165(stack.docSovryn).supportsInterface(type(ILendingHandler).interfaceId));
@@ -284,6 +284,13 @@ contract FinalDeploymentTest is Test {
     function _assertHandlerOwnerPending(address handler, address pending) internal {
         assertEq(Ownable(handler).owner(), address(this));
         assertEq(BitChillOwnable(handler).pendingOwner(), pending);
+    }
+
+    function _assertLaunchFees(address handler, uint256 lowerBound) internal {
+        IPurchaseFees.FeeSettings memory settings = IPurchaseFees(handler).getFeeSettings();
+        assertEq(settings.minFeeRate, 20);
+        assertEq(settings.maxFeeRate, 100);
+        assertEq(settings.feePurchaseLowerBound, lowerBound);
     }
 
     function _assertCommonHandlerWiring(address handler, address manager, address stablecoin) internal {
