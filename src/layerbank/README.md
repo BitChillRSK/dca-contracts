@@ -1,17 +1,19 @@
-LayerBank aToken handler (lending index 1). `LayerBankHandler` supplies and withdraws through the live Aave-v3-style Pool. Per-user virtual balances store **scaled** aToken amounts (`scaledBalanceOf`), not rebasing `balanceOf`.
+# LayerBank handlers
+
+Route index 1, class lending. `LayerBankHandler` supplies and withdraws through LayerBank's Aave-v3-style Pool. Per-user virtual balances store **scaled** aToken amounts (`scaledBalanceOf`), not rebasing `balanceOf`.
 
 - DOC + MoC: `LayerBankDocHandlerMoc`
 - USDRIF + Uniswap and USDT0 + Uniswap: two deployments of `LayerBankHandlerDex` (same contract type with token-specific immutables; USDT0 constructor fees and `DcaManager.setTokenMinPurchaseAmount` are 6-decimal)
 
-Deploy DOC + MoC with `script/DeployLayerBankHandler.s.sol`. Deploy the dex stables with `script/DeployUsdrifHandler.s.sol` (keyed off `STABLECOIN_TYPE`) or `script/DeployDexSwaps.s.sol`. Anvil deploys Pool/aToken mocks. Live aToken addresses are in `script/Constants.sol`.
+`DeployFinal` deploys all three. For the test lanes and add-ons: DOC + MoC with `script/DeployLayerBankHandler.s.sol`, the Dex stablecoins with `script/DeployUsdrifHandler.s.sol` (keyed off `STABLECOIN_TYPE`) or `script/DeployDexSwaps.s.sol`. Anvil deploys Pool and aToken mocks. Live aToken addresses are in `script/Constants.sol` and `script/DeployFinal.s.sol`.
 
-USDT0 add-on on mainnet: the Foundry EOA cannot `assignHandler` (Safe owns `OperationsAdmin`). The Safe must `setTokenMinPurchaseAmount(usdt0, 25e6)` **before** `assignHandler` — there is no protocol-wide default; an unset min makes create revert. See root README "Ownership after deploy".
+Adding a LayerBank handler to a live deployment: the Foundry EOA cannot `assignHandler` because the Safe owns `OperationsAdmin`. The Safe must set the token's minimum purchase amount in the token's own decimals (`25e6` for USDT0) **before** `assignHandler`: there is no protocol-wide default, and an unset minimum makes schedule creation revert. See **Adding a handler after cutover** in [`docs/relaunch/CUTOVER_RUNBOOK.md`](../../docs/relaunch/CUTOVER_RUNBOOK.md).
 
 External LayerBank incentives (LAB / Merkl) are not claimed. Native aToken interest is the only yield this handler distributes.
 
 ## Verified against live LayerBank (Rootstock, 2026-08-24)
 
-The v2-contracts README Core listing is stale and never included DOC. Do not call v2 Core `0xc30991623fb2a63E6e1B59A29987E1EEE57447bF` (`allMarkets()` is still lRBTC / lRIF / lUSDCe / lUSDT / lWETH). Live DOC is on:
+LayerBank's `v2-contracts` repository lists a Core contract, `0xc30991623fb2a63E6e1B59A29987E1EEE57447bF`, whose markets are lRBTC / lRIF / lUSDCe / lUSDT / lWETH. The stablecoins BitChill lists are not on it. They are on the Aave-v3-style Pool below:
 
 | | Address |
 | --- | --- |
@@ -28,7 +30,7 @@ The v2-contracts README Core listing is stale and never included DOC. Do not cal
 - Pool `supply` has no return. `withdraw(asset, amount, to)` returns an amount — the handler measures DOC `balanceOf` deltas instead. `getReserveNormalizedIncome` is RAY (`1e27`).
 - Snapshotting `i_pool` from `aToken.POOL()` matches the Aave aToken's immutable Pool. A Pool migration means a new aToken and therefore a new handler. `LendingHandler` is initialized with hardcoded `EXCHANGE_RATE_DECIMALS` (RAY, `1e27`); there is no `exchangeRateDecimals` constructor arg.
 - Live `withdraw` burns scaled aTokens with half-up `rayDiv` (re-measured 2026-10-02, Pool `POOL_REVISION()` 7, 16 withdrawals of which several separate half-up from round-up). `LayerBankHandler._protocolRedeem` depends on that: see **Burn rounding** below.
-- Live `withdraw` reverts on insufficient aToken cash rather than under-paying. ~56,907 DOC cash vs ~199,584 supplied (2026-08-24): an illiquid reserve aborts the entire `batchBuyRbtc`, not one buyer. Same shape as Tropykus/Sovryn; ops note for PR 16.
+- Live `withdraw` reverts on insufficient aToken cash rather than under-paying. The DOC reserve held ~56,907 DOC of cash against ~199,584 supplied on 2026-08-24. An illiquid reserve aborts the entire `batchBuyRbtc`, not one buyer; Sovryn behaves the same way.
 
 ## Burn rounding (assumption and monitoring)
 

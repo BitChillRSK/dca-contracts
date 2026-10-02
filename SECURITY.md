@@ -1,42 +1,35 @@
 # Security Policy
 
-## Reporting a Vulnerability
+## Reporting a vulnerability
 
-Security vulnerabilities should be reported to the BitChill team:
+Email arynyestos@gmail.com with enough detail to reproduce the issue. Do not open a public GitHub issue
+for an unfixed vulnerability in a live deployment.
 
-- Email: arynyestos@gmail.com
+## Bug bounty
 
-Please include enough detail to reproduce the issue. Do not open a public GitHub issue for an unfixed vulnerability in a live deployment.
+There is no formal bug-bounty program and no guaranteed reward. Significant, good-faith reports may be
+acknowledged and rewarded at BitChill's discretion.
 
-## Bug Bounty
+## Incident response
 
-We appreciate responsible disclosure. There is **no formal bug-bounty program** and **no guaranteed reward amount**. Significant, good-faith reports may be acknowledged and rewarded at BitChill's discretion.
+Production contracts are immutable: no proxies, no upgradeability, and no owner migration of user
+funds. A vulnerability in deployed bytecode cannot be patched in place. The response is:
 
-## Immutable deployments — no patch / backport promise
+1. Contain: revoke the swapper, pause deposits on the affected routes, stop the bot.
+2. Deploy fixed contracts at new route indexes where needed.
+3. Users exit the old handlers and re-enter on the new routes themselves.
 
-Production BitChill contracts are **immutable** (no proxies, no upgradeability). A vulnerability in a deployed
-bytecode cannot be patched in place. Incident response is:
+Off-chain consumers (front end, bot, monitoring) can be updated independently.
 
-1. Operational containment (revoke swapper, pause deposits per route, disable bot routes).
-2. Deploy fixed contracts at **new** route indexes where needed.
-3. Users exit the old handlers and re-enter on the new routes (manual exit/re-entry; no owner migration of user funds).
+## Supported deployments
 
-There is therefore **no** “security patch for version 1.x” or “backport to past major releases” for on-chain
-code. Off-chain consumers (front-end, bot, monitoring) may still receive updates.
+| Deployment | Support |
+| ---------- | ------- |
+| Relaunch deployment (after cutover) | Incident response as above |
+| Pre-relaunch mainnet contracts | None. Users should exit |
 
-## Supported Versions
+## License
 
-| Artifact | What “support” means |
-| -------- | -------------------- |
-| Current relaunch deployment (post-cutover) | Incident response as above; consumer updates |
-| Pre-relaunch mainnet contracts | Users should exit; no further on-chain patches |
-
-## Legal / license
-
-First-party `src/` is licensed under **Business Source License 1.1** (see [`LICENSE`](./LICENSE)), with an
-Additional Use Grant for non-production use and a Change License of `GPL-2.0-or-later` after the Change Date.
-`script/` and `test/` remain MIT. Smart contracts carry technical risk; use is at your own risk.
-
----
-
-For questions: arynyestos@gmail.com.
+`src/` is licensed under the Business Source License 1.1 (see [`LICENSE`](./LICENSE)), with an
+Additional Use Grant for non-production use and a Change License of `GPL-2.0-or-later` after the Change
+Date. `script/` and `test/` are MIT.

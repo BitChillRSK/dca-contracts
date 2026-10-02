@@ -2,7 +2,8 @@
 
 ## Overview
 
-Stateful fuzz coverage for BitChill lives in three contracts under this folder. All of them match
+Stateful fuzz coverage for BitChill lives in three suites under this folder, two of which run under
+both a flat and the launch variable fee configuration. Every contract name matches
 `--match-contract InvariantTest` (the `make invariants` / `make invariants-sovryn` lane), so naming a
 new suite `…InvariantTest` is enough to pick it up with no Makefile change.
 
@@ -20,17 +21,18 @@ other two suites instead.
 ## Running
 
 ```bash
-# Default lane (Tropykus wrappers) + both conservation suites
+# Default lane (Tropykus wrappers) + the conservation suites
 make invariants
 
-# CI lane (Sovryn wrappers) + both conservation suites
+# CI lane (Sovryn wrappers) + the conservation suites
 make invariants-sovryn
 
-# Single contract
-LENDING_PROTOCOL=sovryn forge test --match-contract InvariantTest -j 1
+# The main suite alone
+SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn EXPECTED_LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=DOC \
+  forge test --match-contract '^InvariantTest$' -j 1
 ```
 
-`LENDING_PROTOCOL` only affects `InvariantTest`'s lending wrapper. The two conservation suites build
+`LENDING_PROTOCOL` only affects `InvariantTest`'s lending wrapper. The conservation suites build
 their own fixtures and ignore the env.
 
 ## What each suite actually proves
@@ -58,9 +60,8 @@ reach the chain: `test_invariantHandlerCreatesScheduleAtSelectedRoute`,
 were attempted on live schedules.
 
 **Not claimed here:** rBTC solvency, production purchase allocation, or “user interest only
-increases.” The old `invariant_interestOnlyIncreases` asserted `uint256 >= 0` and was removed.
-Interest accrual is exercised by the conservation check and the exchange-rate check; share burns on
-withdraw / purchase are allowed and expected.
+increases.” Interest accrual is exercised by the conservation check and the exchange-rate check;
+share burns on withdraw / purchase are allowed and expected.
 
 ### `PurchaseRbtcConservationInvariantTest` / `PurchaseRbtcVariableFeeConservationInvariantTest`
 
@@ -90,10 +91,8 @@ Actions are restricted to `depositToken` / `buyRbtc` / `withdrawAccumulatedRbtc`
 deployed mocks are not fuzzed). Production calls are not try/caught: empty cases return early, and
 `fail_on_revert` surfaces real handler regressions.
 
-## Historical note
+## Adding an invariant
 
-An earlier README claimed `address(handler).balance >= 0` proved rBTC solvency and listed a sixth
-“user interest monotonicity” invariant. Both were tautologies (`uint256 >= 0`). The rBTC check was
-deleted from `InvariantTest` (see the comment above `invariant_userBalancesReasonable`); the interest
-check was replaced by `invariant_virtualSharesNeverExceedReceiptShares`. Do not reinstate a
-non-negative balance assertion under a solvency name.
+Do not assert that an unsigned value is non-negative under a solvency or monotonicity name: it is true
+by construction and proves nothing. `InvariantTest` once carried two such checks, on handler rBTC
+balance and on user interest; both were removed.
