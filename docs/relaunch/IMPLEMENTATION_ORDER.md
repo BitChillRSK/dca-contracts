@@ -171,6 +171,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R107 | after R106, before audit freeze / relaunch deploy | none (hardcoded rBTC MoC / WRBTC Dex fees credited on accumulated books; decided 2026-09-29 / 2026-09-30) |
 | R108 | after R107, before audit freeze / relaunch deploy | none (monotone purchase-fee formula; launch defaults 100/20 bps, lower bound 250 tokens) |
 | R109 | after R108, before audit freeze / relaunch deploy | none (`_setUserShares` always emit; checked `FeeCredited` product; variable-fee conservation coverage) |
+| R110 | after R109, before audit freeze / relaunch deploy | none (internal audit follow-ups: stale fee and cadence docs, Sovryn/Tropykus underlying check, LayerBank burn-rounding assumption and probe) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1451,6 +1452,15 @@ After R108, before audit freeze / relaunch deploy. Always emit `UserSharesUpdate
 `_setUserShares` (drop unreachable equality branch); restore checked arithmetic on
 `FeeCredited.stablecoinAmount`; exercise launch variable fees plus collector withdraw/rotation in
 the stateful conservation suites. No storage or ABI change. Ask: none.
+
+### R110 - Internal audit follow-ups ([spec](./R110-internal-audit-followups.md))
+
+After R109, before audit freeze / relaunch deploy. Correct `AUDIT_GUIDE.md` for the R107 fee flow;
+state that the one-buy-per-UTC-day rule holds only while the period is unchanged and pin the
+period-edit case with a test (no contract change); add the underlying-token constructor check to
+`SovrynHandler` and the legacy `TropykusHandler`; document the LayerBank half-up burn-rounding
+assumption and pin it with a live probe. Investigated and kept: the last-shares tail revert
+(R43). Ask: none.
 
 ## Closed non-implementation decisions
 
