@@ -1,169 +1,81 @@
-# BitChill - Smart Contracts
+# BitChill DCA contracts
 
-## Introduction
+BitChill automates recurring purchases of rBTC with stablecoins on Rootstock (dollar-cost averaging).
+A user deposits a listed stablecoin and creates a schedule on `DcaManager`. The deposit sits on a
+handler, idle or supplied to a lending market, and an allowlisted swapper bot spends the schedule's
+purchase amount on rBTC each time the schedule comes due. The rBTC accumulates on the handler until
+the user withdraws it.
 
-BitChill is a smart-contract protocol on Rootstock that enables users to automate BTC purchases with
-Dollar-Cost Averaging (DCA). Users deposit listed stablecoins into handlers (idle custody or lending),
-create schedules on `DcaManager`, and a swapper bot triggers purchases. `DeployFinal` creates this
-production map:
+The contracts are immutable: there are no proxies and no owner migration of user funds.
 
-| Stablecoin | Routes | Venue |
-|---|---|---|
-| DOC | idle (0), LayerBank (1), Sovryn (2) | Money on Chain |
-| USDRIF | idle (0), LayerBank (1) | Uniswap V3 |
-| USDT0 | idle (0), LayerBank (1) | Uniswap V3 |
+Three stablecoins are listed. DOC can sit idle, in LayerBank, or in Sovryn, and is redeemed for rBTC
+at Money on Chain. USDRIF and USDT0 can sit idle or in LayerBank, and are swapped for rBTC on Uniswap
+V3. The route table, with the contract deployed on each route, is under
+[Production scope](./AUDIT_GUIDE.md#production-scope) in the audit guide.
 
-Tropykus remains in-repo for local and pinned-fork adapter coverage only; no live script deploys it.
+Security reviewers should start with [`AUDIT_GUIDE.md`](./AUDIT_GUIDE.md): scope, trust boundaries,
+accounting and scheduling properties, accepted risks, and the release gates. To report a
+vulnerability, see [`SECURITY.md`](./SECURITY.md).
 
-Security reviewers should start with [`AUDIT_GUIDE.md`](./AUDIT_GUIDE.md). It defines the production
-scope, trust boundaries, accounting and scheduling properties, known limitations, and reproducible
-release gates without requiring the historical implementation notes.
+## Contracts
 
-## Protocol Architecture
+Within the custody and purchase branches, indentation is inheritance: each contract inherits the one
+it is nested under.
 
-### Core Components
+```
+DcaManager            user and swapper entry point; the schedule ledger; holds no funds
+OperationsAdmin       route classes, (token, route) → handler registry, swapper allowlist, deposit pause
 
-1. **DcaManager**
-   - Central contract managing all DCA operations
-   - It is the only contract users shall interact with through BitChill's UI to create, delete or modify their DCA schedules
-   - It is the only contract the CRON job will interact with to trigger the purchases
-   - Keeps track of users' DCA schedules
-   - Implements access control and security checks
+Shared bases
+  BitChillOwnable           two-step ownership, no renounce
+                            inherited by DcaManager, OperationsAdmin, PurchaseFees
+  DcaManagerAccessControl   immutable DcaManager address and the onlyDcaManager modifier
+                            inherited by TokenHandler, PurchaseRbtc
+  StablecoinSource          immutable stablecoin and the batch-funding hook
+                            inherited by TokenHandler, PurchaseRbtc
 
-2. **Token Handlers**
-   - Base contract: `TokenHandler` abstract contract
-   - Implements core token operations and access control
-   - Holds idle stablecoin or lending receipt shares on behalf of users
-   - Handles deposits and withdrawals of stablecoins
+Custody branch
+  TokenHandler              deposit and withdraw one stablecoin
+    IdleHandler             keeps the stablecoin on the handler
+    LendingHandler          per-user virtual shares, interest, exact share redemption
+      LayerBankHandler      protocol adapter
+      SovrynHandler         protocol adapter
 
-3. **Lending Integration**
-   - `LendingHandler`: share ↔ underlying conversion and per-user virtual shares
-   - Production lending adapters: LayerBank (index 1), Sovryn (index 2 for DOC)
-   - Idle handlers (index 0) hold the stablecoin without lending
+Purchase branch
+  PurchaseFees              fee curve and fee collector; makes every handler ownable
+    PurchaseRbtc            shared batch pipeline, accumulated-rBTC books, withdrawal to the user
+      PurchaseMoc           redeems DOC for rBTC at Money on Chain
+      PurchaseUniswap       swaps to WRBTC on Uniswap V3 under an oracle floor; unwraps on withdrawal
 
-4. **Purchase Methods**
-   - `PurchaseMoc`: Direct redemption through Money on Chain (for DOC)
-   - `PurchaseUniswap`: Swaps through Uniswap V3 (for other stablecoins)
+Deployed handlers: constructor only, each inheriting one custody contract and one purchase contract
+  src/idle/         IdleDocHandlerMoc   = IdleHandler + PurchaseMoc
+                    IdleHandlerDex      = IdleHandler + PurchaseUniswap
+  src/layerbank/    LayerBankDocHandlerMoc = LayerBankHandler + PurchaseMoc
+                    LayerBankHandlerDex    = LayerBankHandler + PurchaseUniswap
+  src/sovryn/       SovrynDocHandlerMoc = SovrynHandler + PurchaseMoc
+                    SovrynHandlerDex    = SovrynHandler + PurchaseUniswap   (not in the production map)
+  src/tropykus-legacy/   test-only; never deployed
+```
 
-### Architecture Design Considerations
-
-The protocol was designed with extensibility in mind, supporting multiple purchase methods and stablecoins:
-
-1. Money on Chain (MoC) for DOC:
-   - Primary-market redemption rather than an AMM route
-   - Direct redemption mechanism
-   - No AMM pool slippage; Money on Chain availability and pricing remain external dependencies
-
-2. Uniswap V3 for other stablecoins:
-   - Supports approved dollar-pegged ERC20 stablecoins with at most 18 decimals
-   - Market-based pricing
-   - Owner-configurable slippage protection
-   - Path optimization for best rates
-
-### Gas Efficiency Considerations
-
-The current architecture balances extensibility with gas efficiency:
-
-1. Multiple inheritance layers to support different purchase methods
-2. Optimized purchase paths for each stablecoin type
-3. Batch processing for gas savings
-
-## Features
-
-1. **DCA Schedules**
-   - Create, update, and delete DCA schedules
-   - Multiple schedules per user and token
-   - Configurable purchase amounts and periods
-   - Yield accrual on lending routes; idle routes do not generate yield
-
-2. **Token Management**
-   - Support for DOC, USDRIF, and USDT0 on the production map
-   - Integration with LayerBank and Sovryn (DOC); idle custody where chosen
-   - Interest accrual and withdrawal on lending routes
-   - Fee management system
-
-3. **Security properties**
-   - Safe governance, a separate swapper allowlist, and handler entry points restricted to `DcaManager`
-   - Reentrancy guards on user schedule mutations and checks-effects-interactions on purchases
-   - Balance-delta accounting around external token, lending, MoC, and Uniswap interactions
-
-4. **Batch Processing**
-   - Gas-efficient batch purchases
-   - Optimized for multiple users
+Function-level documentation is NatSpec on the interfaces in `src/interfaces/`. Each deployed contract
+also states its own security and lifecycle model in its header.
 
 ## Purchase fees
 
-Each handler has owner-configurable minimum and maximum rates and a lower purchase
-threshold. Above that threshold, the effective rate decreases smoothly toward
-the minimum while the absolute fee never decreases as the purchase grows. Equal
-rates give a flat fee. Fees are credited in rBTC/WRBTC after the venue purchase.
-Launch defaults are 1% through 250 tokens, decreasing toward 0.2% above that
-threshold.
+Each handler has owner-configurable minimum and maximum rates and a lower purchase threshold. At or
+below the threshold the maximum rate applies; above it the effective rate decreases smoothly toward
+the minimum while the absolute fee never decreases as the purchase grows. Equal rates give a flat fee.
+The fee is taken as a share of the rBTC bought, not withheld from the stablecoin spent. The launch
+settings are under [Launch configuration](./AUDIT_GUIDE.md#launch-configuration).
 
-See [Purchase fee math](./docs/PURCHASE_FEES.md) for the fee-amount and fee-rate
-curves, exact integer rounding, parameter units, batch allocation and plotting
-expressions.
+[`docs/PURCHASE_FEES.md`](./docs/PURCHASE_FEES.md) has the curve, the exact integer rounding, and the
+batch allocation.
 
-## Security Considerations
+## Development
 
-### Access Control
-- Owner governance via `Ownable2Step` (Safe after cutover accept)
-- Swapper allowlist on `OperationsAdmin` for purchase operations
-- `DcaManager` as the only user-facing entry for schedules and withdrawals
+Requires [Foundry](https://book.getfoundry.sh/). CI pins forge v1.7.1; a different version can format
+differently and fail `make fmt-check`.
 
-### Reentrancy Protection
-- ReentrancyGuard implementation
-- Checks-Effects-Interactions pattern
-- Safe token transfers using SafeERC20
-
-### Input Validation
-- Comprehensive parameter validation
-- Range checks for amounts and periods
-- Schedule existence verification
-- Balance checks before operations
-
-### Contract Dependencies
-- Rootstock-compatible compiler: solc **0.8.36**, EVM **cancun**
-- OpenZeppelin Contracts **v5.7.0**
-- Money on Chain (DOC redemptions)
-- Uniswap V3 SwapRouter02 (Dex stables)
-- Deployment profile: `FOUNDRY_PROFILE=deploy` (`via_ir = true`) — see below
-
-### Key Security Assumptions
-1. Money on Chain protocol security (for DOC)
-2. Uniswap V3 protocol security (for other stablecoins)
-3. Token contract integrity
-4. Lending protocol reliability
-
-### Known Limitations
-1. Governance controls configuration and the swapper controls purchase liveness and batch selection.
-2. External tokens, lending venues, Money on Chain, Uniswap, WRBTC, and the price oracle can fail or
-   become unavailable.
-3. Deployments are immutable. Handler recovery uses a new route and manual user exit/re-entry.
-4. Fee-on-transfer tokens and asynchronous or partial lending redemptions are unsupported.
-5. Batches are atomic, and missed cadence slots are skipped rather than caught up.
-
-See [`AUDIT_GUIDE.md`](./AUDIT_GUIDE.md) for the exact boundaries behind these summaries.
-
-### Audit and Testing
-
-Two published reviews by Ivan Fitro (April and June 2025) cover the **pre-relaunch** codebase. Details and
-the boundary with the 2026 relaunch are in [`audits/README.md`](./audits/README.md). The relaunch stack has
-not claimed a separate independent audit in that file unless a new report is added.
-
-Local automation includes unit tests, fuzz/invariants, and fork probes. Static analysis at cutover:
-`make slither`, `make aderyn` (triage in [`docs/relaunch/R73-RELEASE_RECORD.md`](./docs/relaunch/R73-RELEASE_RECORD.md)).
-
-**No audit or test suite guarantees absolute safety.** Do your own diligence and only risk funds you can afford to lose.
-
-## Getting Started
-
-### Prerequisites
-- Rust
-- Foundry
-- Rootstock RPC access
-
-### Installation
 ```bash
 git clone git@github.com:BitChillRSK/dca-contracts.git
 cd dca-contracts
@@ -172,219 +84,108 @@ forge build
 ```
 
 ### Testing
-```bash
-# Local done-gate: every production MoC/Dex funding lane plus Sovryn invariants
-make check
 
-# Run tests with DOC and idle funds (index 0)
-make moc-none
+The shared test harness deploys one stack per run, selected by three environment variables, so tests
+run in lanes. Use the `make` targets, which set all three. The harness has no fallback for `SWAP_TYPE`
+or `LENDING_PROTOCOL`: a bare `forge test` fails without them, and forge also reads them from `.env`
+if they are set there.
 
-# Run tests with DOC and LayerBank (index 1)
-make moc-layerbank
-
-# Run tests with DOC and Sovryn (index 2)
-make moc-sovryn
-
-# Legacy Tropykus mocks. Tropykus is on neither live map (index 4 is burned); these lanes
-# exercise LendingHandler through a second adapter.
-make moc-tropykus
-
-# Run tests with USDRIF and Tropykus (legacy lane)
-STABLECOIN_TYPE=USDRIF make dex-tropykus
-
-# Run tests with USDRIF and Sovryn
-STABLECOIN_TYPE=USDRIF make dex-sovryn
-
-# Run specific test file with custom parameters
-STABLECOIN_TYPE=USDRIF SWAP_TYPE=dexSwaps LENDING_PROTOCOL=tropykus forge test --match-path test/unit/DcaDappTest.t.sol -vvv
-
-# -------------------------------
-# Invariant & Fuzz Testing
-# -------------------------------
-# Foundry-based fuzzing and invariants live in `test/ai-generated/fuzz`. A detailed guide
-# is available at test/ai-generated/fuzz/README_INVARIANTS.md.
-#
-# Quick examples:
-#
-# Run the full invariant suite with Tropykus (default)
-forge test --match-contract InvariantTest
-#
-# Same suite but forcing Sovryn mocks
-LENDING_PROTOCOL=sovryn forge test --match-contract InvariantTest
-#
-# Run a single invariant (e.g. deposit-vs-lending consistency)
-forge test --match-test invariant_totalDepositedTokensMatchesLendingProtocol -vv
-```
-
-### Deployment
-
-#### 🔐 Secure Wallet Management (Recommended)
-
-**Using Keystores (Recommended for Production):**
-
-Keystores encrypt your private keys and are much more secure than plain text private keys in `.env` files.
-
-1. **Import your private key into a keystore:**
-   ```bash
-   # Interactive password prompt (recommended)
-   cast wallet import --private-key <RAW_PRIVATE_KEY> <ACCOUNT_NAME>
-   # Enter a strong password when prompted
-   ```
-
-2. **Use keystore in deployment commands:**
-   ```bash
-   # Canonical one-shot stack. FOUNDRY_PROFILE=deploy required.
-   # Precondition: make check-deploy green on this commit. See docs/relaunch/CUTOVER_RUNBOOK.md.
-   REAL_DEPLOYMENT=true \
-   INITIAL_SWAPPER=<bot-eoa> \
-   FOUNDRY_PROFILE=deploy \
-   forge script script/DeployFinal.s.sol:DeployFinal \
-     --rpc-url $RSK_MAINNET_RPC_URL \
-     --account <deployer> \
-     --broadcast \
-     --verify \
-     --verifier blockscout \
-     --verifier-url $BLOCKSCOUT_API_URL \
-     --legacy
-   ```
-
-**Using Hardware Wallets (Most Secure):**
-
-For maximum security, use a Ledger or Trezor hardware wallet:
+| Variable | Values |
+|---|---|
+| `SWAP_TYPE` | `mocSwaps` (DOC through Money on Chain), `dexSwaps` (Uniswap V3) |
+| `LENDING_PROTOCOL` | `none` (idle), `layerbank`, `sovryn`, `tropykus` (legacy mocks) |
+| `STABLECOIN_TYPE` | `DOC`, `USDRIF`, `USDT0` |
 
 ```bash
-# With Ledger — FOUNDRY_PROFILE=deploy required, see below
-FOUNDRY_PROFILE=deploy \
-forge script script/DeployMocSwaps.s.sol \
-  --rpc-url $RSK_TESTNET_RPC_URL \
-  --ledger \
-  --broadcast \
-  --verify \
-  --verifier blockscout \
-  --verifier-url $BLOCKSCOUT_API_URL \
-  --legacy
+make check          # build, license and format checks, every production lane, stateful invariants
+make check-deploy   # the same lanes against the via-IR bytecode that ships; slow
 
-# With Trezor — FOUNDRY_PROFILE=deploy required, see below
-FOUNDRY_PROFILE=deploy \
-forge script script/DeployMocSwaps.s.sol \
-  --rpc-url $RSK_TESTNET_RPC_URL \
-  --trezor \
-  --broadcast \
-  --verify \
-  --verifier blockscout \
-  --verifier-url $BLOCKSCOUT_API_URL \
-  --legacy
+# single lanes
+make moc-none                               # DOC, idle
+make moc-layerbank                          # DOC, LayerBank
+make moc-sovryn                             # DOC, Sovryn
+STABLECOIN_TYPE=USDRIF make dex-none        # USDRIF, idle (also USDT0)
+STABLECOIN_TYPE=USDT0 make dex-layerbank    # USDT0, LayerBank (also USDRIF)
+make invariants-sovryn                      # stateful fuzzing: 64 runs × 512 calls
+
+# one test file in a chosen lane
+SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=DOC \
+  forge test --match-path test/unit/DcaScheduleTest.t.sol -vvv
 ```
 
-#### Deployment Steps
-
-1. Set up environment variables in `.env` (RPC URLs, Blockscout). For the canonical stack:
+Fork tests run against live Rootstock state and need `RSK_MAINNET_RPC_URL` in `.env`. They are not in
+CI.
 
 ```bash
-export REAL_DEPLOYMENT=true
-export INITIAL_SWAPPER=<production-bot-eoa>
-export FOUNDRY_PROFILE=deploy
+make fork-sovryn
+make fork-layerbank
+make fork-dex-path    # Dex path allowlist against live Uniswap pools
 ```
 
-2. Deploy on Rootstock **mainnet** (fail-closed: `DeployFinal.run()` rejects non-mainnet and incomplete maps):
+`make help` lists the remaining lanes, including the Tropykus mock lanes and the live probes under
+`test/mainnet-debug/`. [`test/ai-generated/fuzz/README_INVARIANTS.md`](./test/ai-generated/fuzz/README_INVARIANTS.md)
+describes what each invariant suite proves.
+
+### Static analysis
 
 ```bash
-REAL_DEPLOYMENT=true \
-INITIAL_SWAPPER=<bot-eoa> \
-FOUNDRY_PROFILE=deploy \
-forge script script/DeployFinal.s.sol:DeployFinal \
-  --rpc-url $RSK_MAINNET_RPC_URL \
-  --account <deployer-eoa> \
-  --broadcast --legacy \
-  --verify --verifier blockscout --verifier-url $BLOCKSCOUT_API_URL
+make slither
+make aderyn
 ```
 
-Full checklist: [`docs/relaunch/CUTOVER_RUNBOOK.md`](./docs/relaunch/CUTOVER_RUNBOOK.md).
-Lane scripts (`DeployMocSwaps`, `DeployDexSwaps`, add-ons) remain for local/fork tests and incremental
-additions; they are not the one-shot cutover path.
+Both analyze `src/` only. Slither exits non-zero while triaged findings remain; the triage is in
+[`docs/relaunch/R73-RELEASE_RECORD.md`](./docs/relaunch/R73-RELEASE_RECORD.md#static-analysis-triage).
 
-#### Ownership after deploy
+## Deployment
 
-Foundry always broadcasts from an EOA (`--account` / `--ledger`). A Safe cannot sign that transaction.
+The shipped bytecode is built under `[profile.deploy]` (`via_ir = true`). Every broadcast needs
+`FOUNDRY_PROFILE=deploy` in its environment: without it `forge script` compiles and deploys the
+default no-IR artifact, which is not the bytecode `make check-deploy` validated. Run
+`make check-deploy` green on the exact commit before broadcasting.
 
-Live owner and fee-collector addresses live in `script/Constants.sol`:
+`script/DeployFinal.s.sol` is the production script. `run()` is mainnet-only and reverts on any
+missing address or incomplete route map. The broadcast command and the steps around it are in
+[`docs/relaunch/CUTOVER_RUNBOOK.md`](./docs/relaunch/CUTOVER_RUNBOOK.md#deploy). Sign with a Foundry
+keystore (`--account`) or a hardware wallet (`--ledger`), not a raw private key.
 
-| Network | Owner | Fee collector |
-|---|---|---|
-| Testnet | `TESTNET_OWNER` (the funded EOA that broadcasts) | same EOA |
-| Mainnet | `MAINNET_OWNER` (the BitChill Safe) | `MAINNET_FEE_COLLECTOR` |
+`DeployMocSwaps`, `DeployDexSwaps`, and the add-on scripts (`DeployIdleHandler`,
+`DeployLayerBankHandler`, `DeployUsdrifHandler`) build the stacks the test lanes use. They are not the
+production path, although the two lane scripts also have testnet and mainnet branches.
+`DeployMocAndUniswap` is a local comparison harness and reverts on `REAL_DEPLOYMENT=true`.
 
-**Testnet.** Broadcast from `TESTNET_OWNER`. The script reverts *before* any `CREATE` if a different key is used. After the script, that EOA already owns every contract and `pendingOwner` is zero. No `acceptOwnership`.
+### Ownership after deploy
 
-**Mainnet.** Broadcast from an EOA, **not** the Safe. The script:
+The operator procedures are in [`docs/relaunch/CUTOVER_RUNBOOK.md`](./docs/relaunch/CUTOVER_RUNBOOK.md):
 
-1. Constructs `OperationsAdmin`, `DcaManager`, and every handler with the EOA as owner (so `registerRoute` / `assignHandler` succeed in the same broadcast).
-2. Calls `transferOwnership(MAINNET_OWNER)` on each of those contracts. That only *proposes*.
+- [Ownership handoff](./docs/relaunch/CUTOVER_RUNBOOK.md#ownership-handoff), mainnet and testnet
+- [Adding a handler after cutover](./docs/relaunch/CUTOVER_RUNBOOK.md#adding-a-handler-after-cutover):
+  the order in which the Safe registers the route, sets the token minimum, and assigns the handler
+- [Compromised swapper](./docs/relaunch/CUTOVER_RUNBOOK.md#compromised-swapper)
+- [Fee collector rotation](./docs/relaunch/CUTOVER_RUNBOOK.md#fee-collector-rotation)
 
-Then, from the Safe UI (one call per contract), send `acceptOwnership()`. Until those accepts land, the deploying EOA can still govern and can propose a different address if the Safe hex was wrong. After accept, the Safe owns `OperationsAdmin`, `DcaManager`, and every handler.
+## Documentation
 
-Add-on scripts (`DeployIdleHandler`, `DeployLayerBankHandler`, `DeployUsdrifHandler`) revert if `pendingOwner` is set on `OperationsAdmin` or `DcaManager` — wait until the Safe has accepted, then run them.
-
-**USDT0 / USDRIF add-on (`DeployUsdrifHandler`).** This is the live add-on path against an existing `DcaManager`. On mainnet the Safe already owns `OperationsAdmin`, so the Foundry EOA hits the non-owner branch: it deploys the handler (constructor self-allowlists the initial path), logs, and returns **without** `assignHandler` and **without** `setTokenMinPurchaseAmount`. That is fail-closed until the Safe assigns the handler **and** sets the per-token min (there is no protocol-wide default). After the script, from the Safe, **in this order**:
-
-1. `operationsAdmin.registerRoute(1, true)` **only if** `getRouteClass(1)` is still `Unregistered`. A second `registerRoute` reverts `RouteAlreadyRegistered` (LayerBank is already on the dex map after the USDRIF add-on).
-2. Read `handler.getSwapPath()` and verify it exactly matches the intended stablecoin / intermediate pools / WRBTC route. The constructor already allowlisted that path; this is the human checkpoint before assignment.
-3. `dcaManager.setTokenMinPurchaseAmount(token, min)` — USDRIF `25 ether`, USDT0 `25000000` (`25e6`). Do not skip this step.
-4. `operationsAdmin.assignHandler(token, 1, handler)`. Set the min first so the token is never routable while create still reverts `TokenMinPurchaseAmountNotSet`.
-
-**Compromised swapper.** Revoke the swapper key **before** revoking any path. A still-allowlisted compromised key can front-run each `setPurchasePathAllowed(..., false)` by re-activating that path. Order is mandatory: `revokeSwapper` → handler owner or remaining swapper `setPurchasePath` to the preferred approved path if needed → then handler owner revokes obsolete paths. Swapper revocation alone is not a routing kill switch.
-
-`DeployDexSwaps` live full-stack sets that min in the same broadcast because that script owns the new admin. The add-on does not.
-
-`DeployMocAndUniswap` is a local/fork comparison harness (two independent stacks) and **reverts** on
-`REAL_DEPLOYMENT=true`. The canonical one-shot live script is **`DeployFinal`**: idle / LayerBank /
-Sovryn DOC (MoC) plus idle / LayerBank for USDRIF and USDT0 (Uniswap) on a single `OperationsAdmin` /
-`DcaManager`. See [`docs/relaunch/CUTOVER_RUNBOOK.md`](./docs/relaunch/CUTOVER_RUNBOOK.md).
-
-Later ownership changes (new Safe, recovered wallet) are the same two steps: current owner `transferOwnership(new)`, incoming owner `acceptOwnership()`. `renounceOwnership` always reverts.
-
-### Compilation profile for deployment
-
-The relaunch deployment profile is **`[profile.deploy]`** (`FOUNDRY_PROFILE=deploy`): solc `0.8.36`,
-Cancun, `optimizer = true`, `optimizer_runs = 200`, and — unlike every other profile in this repo —
-`via_ir = true`, compiled across `src/`, `test/`, and `script/` with exactly one file excluded
-(`test/ai-generated/unit/layerbank/LayerBankHandlerDexTest.t.sol`; see `foundry.toml`). Every
-broadcast command above **requires**
-`FOUNDRY_PROFILE=deploy` in its environment — `forge script` reads compiler settings from whichever
-profile is active, and without it a broadcast silently compiles and deploys the `[profile.default]`
-(no-IR) artifact instead, which is not what `make check-deploy` validated.
-
-**Precondition for any real broadcast: run `make check-deploy` green on the exact commit being
-deployed first.** That target compiles `src/`, `test/`, and `script/` under `via_ir = true` and runs the
-full configured test matrix against that exact bytecode — a test's `new DcaManager(...)` deploys the identical
-artifact `forge script` would broadcast, so a passing `check-deploy` is the only proof this bytecode
-passes the suite. Do not broadcast on a commit `check-deploy` has not been run against.
-
-The rationale and the two test-only compiler carve-outs are recorded in
-[`R60-src-only-via-ir.md`](./docs/relaunch/R60-src-only-via-ir.md). An optimizer-on/no-IR artifact has
-already been deployed and verified on Rootstock testnet, but the exact `via_ir=true` deploy profile
-still needs a representative testnet deployment and Blockscout verification before mainnet. Treat that
-as an outstanding release gate, not as evidence supplied by Anvil fork tests.
-
-## Dependency Management
-
-This project uses Git submodules for dependency management:
-
-- OpenZeppelin Contracts **v5.7.0**
-
-For contract addresses after cutover, publish from the `DeployFinal` log; historical lists may live in [ADDRESSES.md](./ADDRESSES.md).
+| Document | Contents |
+|---|---|
+| [`AUDIT_GUIDE.md`](./AUDIT_GUIDE.md) | Scope, trust model, properties, accepted risks, release gates |
+| [`SECURITY.md`](./SECURITY.md) | Vulnerability reporting and incident response |
+| [`audits/`](./audits/README.md) | Review reports |
+| [`ADDRESSES.md`](./ADDRESSES.md) | External contracts the deployment binds to |
+| [`docs/PURCHASE_FEES.md`](./docs/PURCHASE_FEES.md) | Fee math |
+| [`docs/relaunch/`](./docs/relaunch/README.md) | One design record per change, and the cutover runbook |
+| [`AGENTS.md`](./AGENTS.md) | Contributor rules and the protocol invariants |
 
 ## License
 
-- `src/`: [BUSL-1.1](./LICENSE) (Additional Use Grant for non-production use; Change License `GPL-2.0-or-later`)
-- `script/` / `test/`: MIT
-- See [R72](./docs/relaunch/R72-licensing.md) and `SECURITY.md`.
+`src/` is licensed under [BUSL-1.1](./LICENSE): non-production use is granted, and the license changes
+to `GPL-2.0-or-later` on 2030-09-07. `script/` and `test/` are MIT.
 
 ## Contact
-For audit-related inquiries or security concerns, please contact:
-- Smart Contract Developer: [Antonio Rodríguez-Ynyesto](https://www.linkedin.com/in/antonio-maria-rodriguez-ynyesto-sanchez/)
+
+Smart contract developer: [Antonio Rodríguez-Ynyesto](https://www.linkedin.com/in/antonio-maria-rodriguez-ynyesto-sanchez/).
+Security reports go through [`SECURITY.md`](./SECURITY.md).
 
 ## Disclaimer
 
-Smart contracts involve risk. The historical 2025 reviews and the relaunch test suite do not guarantee
-safety. Always perform your own diligence before interacting with the protocol.
+No audit or test suite guarantees safety. Do your own diligence and risk only funds you can afford to
+lose.
