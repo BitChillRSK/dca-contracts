@@ -1,13 +1,13 @@
 # Security review guide
 
-This document is a navigation aid, not a security claim. Review and deployment must use the exact
-commit or release tag supplied for the engagement; the contracts are immutable and the repository's
-main branch or open pull requests may move independently.
+This guide states what ships, who is trusted with what, which properties the code is meant to hold,
+and which risks are accepted. It is a navigation aid, not a security claim. Review the exact commit or tag supplied for
+the engagement: deployed contracts are immutable, and `main` and the open pull requests keep moving.
 
 ## Production scope
 
-The canonical deployment is `DeployFinal` under `FOUNDRY_PROFILE=deploy`. It creates one
-`OperationsAdmin`, one `DcaManager`, and seven handler instances:
+`script/DeployFinal.s.sol`, run under `FOUNDRY_PROFILE=deploy`, is the only production deployment
+path. It creates one `OperationsAdmin`, one `DcaManager`, and seven handlers:
 
 | Stablecoin | Route 0 (idle) | Route 1 (LayerBank) | Route 2 (Sovryn) | Purchase venue |
 |---|---|---|---|---|
@@ -15,21 +15,66 @@ The canonical deployment is `DeployFinal` under `FOUNDRY_PROFILE=deploy`. It cre
 | USDRIF | `IdleHandlerDex` | `LayerBankHandlerDex` | — | Uniswap V3 |
 | USDT0 | `IdleHandlerDex` | `LayerBankHandlerDex` | — | Uniswap V3 |
 
-`src/tropykus-legacy/` is retained for local and pinned-fork adapter coverage. No live deployment
-script constructs or registers it, and route index 4 is intentionally unused. Lane and add-on scripts
-support tests or later deployments; `script/DeployFinal.s.sol` is the one-shot production path.
+In scope:
 
-Review these as part of the deployment boundary:
+- `src/`, except `src/tropykus-legacy/`: about 1,900 lines excluding comments and blank lines
+  (`cloc src --exclude-dir=tropykus-legacy`). The [README](./README.md#contracts) has the inheritance
+  map. Interfaces of external protocols (`IMocProxy`, `ICoinPairPrice`, `IWRBTC`,
+  `IUniswapV3SwapRouter`, `IiToken`, `ILayerBankPool`, `ILayerBankAToken`) are ABIs only.
+  `SovrynHandlerDex` is built and tested but is not one of the seven handlers `DeployFinal` creates.
+- `script/DeployFinal.s.sol`, `script/DeployBase.s.sol`, the helper configs, and
+  `script/Constants.sol`: constructor inputs, external addresses, the route map, and the launch
+  parameters. [`ADDRESSES.md`](./ADDRESSES.md) lists the external contracts the deployment binds to.
+- `foundry.toml` and the OpenZeppelin submodule commit: the compiler and dependency artifact.
+- `test/unit/deployment/FinalDeploymentTest.t.sol`: asserts the wiring `DeployFinal` produces.
 
-- `src/`: first-party contracts and interfaces.
-- `script/DeployFinal.s.sol`, `script/DeployBase.s.sol`, helper configs, and `script/Constants.sol`:
-  constructor inputs, addresses, route map, and initial economic/security settings.
-- `foundry.toml`, `.gitmodules`, and the recorded submodule commits: the compiler and dependency artifact.
-- `test/unit/deployment/FinalDeploymentTest.t.sol`: canonical wiring assertions.
+Out of scope:
 
-The shipped artifact uses Solidity 0.8.36, EVM `cancun`, optimizer runs 200, and `via_ir = true`.
-Two test-only contracts use legacy codegen because of documented compiler stack/immutable issues;
-all production contracts compile under the deploy profile's IR pipeline.
+- `src/tropykus-legacy/`. It is kept for local and pinned-fork coverage of a second lending adapter.
+  No deploy script constructs or registers it, and route index 4 is left unused so it is never
+  reinterpreted as another venue.
+- Every other deploy script. `DeployMocSwaps`, `DeployDexSwaps`, and the add-on scripts support the
+  test lanes and later handler additions.
+- The off-chain consumers (swapper bot, front end, data API, monitoring), which live in other
+  repositories, and the code of the external protocols.
+
+### Compiler and dependencies
+
+| | |
+|---|---|
+| Compiler | solc 0.8.36, EVM `cancun`, optimizer on, 200 runs |
+| Shipped bytecode | `[profile.deploy]`: the settings above with `via_ir = true` |
+| Day-to-day and CI | `[profile.default]` and `[profile.ci]`: the same settings with `via_ir = false` |
+| OpenZeppelin Contracts | v5.7.0 (`cab19933`), git submodule, unmodified |
+| forge-std | vendored under `lib/forge-std`; tests and scripts only |
+
+`make check-deploy` compiles `src/`, `test/`, and `script/` under the deploy profile and runs the
+suite against the bytecode a broadcast would deploy. One test file,
+`test/ai-generated/unit/layerbank/LayerBankHandlerDexTest.t.sol`, is compiled with legacy codegen
+under that profile because via-IR fails on it with a Yul stack-too-deep error. No production contract
+is affected.
+
+Rootstock executes every opcode this target emits: `PUSH0` since Arrowhead (April 2024), and `MCOPY`
+and transient storage since Lovell (March 2025). First-party code uses no blob opcode. `DcaManager`
+inherits OpenZeppelin's `ReentrancyGuardTransient`, so transient storage is on the production path.
+
+### Launch configuration
+
+The values `DeployFinal` sets, from `script/Constants.sol`. The owner can change each one afterward
+within the bound shown.
+
+| Parameter | Launch value | Setter and enforced bound |
+|---|---|---|
+| Purchase fee, per handler | 1% up to 250 tokens, then decreasing toward 0.2% ([math](./docs/PURCHASE_FEES.md)) | `setFeeRateParams`: minimum ≤ maximum ≤ 5% |
+| Minimum purchase amount, per token | 25 tokens (`25e18` DOC and USDRIF, `25e6` USDT0) | `setTokenMinPurchaseAmount`: non-zero |
+| Minimum purchase period | 7 days | `setMinPurchasePeriod`: whole UTC days, at least one |
+| Schedules per user and token | 10 | `setMaxSchedulesPerToken` |
+| Dex oracle floor | 97% of the oracle-implied output | `setAmountOutMinimumPercent`: between the safety check and 100% |
+| Dex floor safety check | 95% | `setAmountOutMinimumSafetyCheck`: at most the active floor |
+| Protected purchase window | 5 blocks | constant |
+
+Dex paths at deploy: USDT0 → WRBTC through the 0.30% pool; USDRIF → USDT0 (0.05%) → WRBTC (0.30%)
+active, with USDRIF → USDT (0.05%) → WRBTC (0.30%) also allowlisted on both USDRIF handlers.
 
 ## Asset and call flow
 
@@ -70,20 +115,39 @@ safety-check bound stops a single percentage change from widening the floor; it 
 `setMocOracle`, which replaces the price the floor is computed from in one transaction with no bound
 against the previous oracle.
 
-Worst case for a leaked swapper key, stated once because its parts are accepted separately. The key can
-reopen the protected window in the block the previous one ends, submit a zero caller minimum, and
-activate any allowlisted Dex path. While windows are chained, users cannot pause, edit, delete, or
-withdraw stablecoin or interest. Each Dex schedule that comes due in that time can be filled down to the
-oracle floor (3% below the oracle at launch settings), once per period. MoC routes have no pool to move.
-Principal cannot leave to anyone but its owner, and `revokeSwapper` ends it. This is accepted without a
-mandatory gap between windows: a gap would give users a few open blocks they are unlikely to use before
-the Safe revokes the key, and a loose fill pays the key holder only if they also move the pool around
-the batch.
+**Worst case for a leaked swapper key.** The key can reopen the protected window in the block the previous
+one ends, submit a zero caller minimum, and activate any allowlisted Dex path. While windows are
+chained, users cannot pause, edit, delete, or withdraw stablecoin or interest. Each Dex schedule that
+comes due in that time can be filled down to the oracle floor (3% below the oracle at launch settings),
+once per period. MoC routes have no pool to move. Principal cannot leave to anyone but its owner, and
+`revokeSwapper` ends it. This is accepted without a mandatory gap between windows: a gap would give
+users a few open blocks they are unlikely to use before the Safe revokes the key, and a loose fill pays
+the key holder only if they also move the pool around the batch.
 
 All nine ownable deployments are constructed under the broadcaster EOA, configured, and then propose
 the Safe as pending owner. The Safe must accept each one. Until acceptance, the broadcaster remains
 owner; afterward, ownership is independent per contract and configuration can diverge unless operations
 apply the same decision everywhere it is meant to apply.
+
+How the boundaries are enforced:
+
+- Handlers take deposits, withdrawals, purchases, and rBTC claims from their immutable `DcaManager`
+  only (`onlyDcaManager`). The direct calls a handler accepts are its owner's setters,
+  `setPurchasePath` from a swapper, and `restoreLendingApproval` / `restoreSwapRouterApproval` from
+  anyone, which re-grant the allowance set at construction.
+- Lending handlers keep a standing unlimited stablecoin allowance to their lending market, and Dex
+  handlers to SwapRouter02. The spender can therefore pull any stablecoin the handler holds at any
+  time, not only during a BitChill call.
+- `DcaManager` has one ownership check, `_callersSchedule`. Every user call that changes an existing
+  schedule reaches it through that function and takes no owner argument. The purchase path needs no
+  ownership check: it reads the buyer from the schedule.
+- Every external function that writes a schedule is `nonReentrant`, except `batchBuyRbtc` and
+  `batchBuyRbtcAcrossHandlers`. Those are swapper-only and finish each handler's schedule writes
+  before calling it. In an across-handlers call a later handler's schedules are written after earlier
+  handler calls; handlers are BitChill-deployed, so this is accepted.
+
+`AGENTS.md` lists these and the other invariants contributors must preserve, under **Protocol
+invariants**, with the reason for each.
 
 ## Accounting properties worth checking
 
@@ -157,6 +221,11 @@ Other deliberate availability trade-offs:
   depeg beyond the configured BTC/USD-derived floor stops swaps rather than repricing the asset.
 - Dex input tokens must have at most 18 decimals. Fee-on-transfer tokens and asynchronous or partial
   lending redemptions are unsupported.
+- Sovryn charges a 0.1% exit fee on iToken burns (first observed on mainnet on 2026-09-07). A user on
+  the Sovryn route therefore receives less stablecoin than the principal debited on withdrawal, and
+  each purchase spends the net amount redeemed. This is the venue-fee case in the accounting
+  properties above, not a loss of shares. `make probe-sovryn-exit-fee` measures the live fee; see
+  `test/mainnet-debug/sovryn-exit-fee/README.md`.
 - LayerBank redemptions are sized for the Pool's current aToken burn rounding (Aave half-up `rayDiv`)
   and a liquidity index of at least one RAY. Upstream Aave v3 has since moved burns to round up. If the
   LayerBank Pool adopts that, a large share of LayerBank redemptions (purchases and withdrawals) revert
@@ -164,10 +233,24 @@ Other deliberate availability trade-offs:
   is orphaned and no funds move. `make fork-layerbank` and `make fork-sovryn` assert the live rounding
   (`LayerBankLivePoolProbe`), so operations should rerun one of them whenever the Pool or aToken
   implementation changes. See `src/layerbank/README.md`.
+- Third-party incentive campaigns on a lending market (for example Merkl) are not claimed or
+  distributed. Handlers pay out the market's native interest only.
 - The bot must quote, simulate, group rows by handler, respect the protected-window workflow, and retry
-  within the due UTC day when appropriate. Monitoring must track custom errors and the current event
-  ABI. There is no `CadenceAnchorUpdated` log: after a purchase, recompute the anchor from prior
-  schedule state or read `getDcaSchedule`; use `PurchaseRbtc__RbtcBought` as the purchase signal.
+  within the due UTC day when appropriate. Monitoring must track custom errors and the event ABI. A
+  purchase emits no cadence-anchor event: `PurchaseRbtc__RbtcBought` is the purchase signal, and an
+  indexer reads the new anchor from `getDcaSchedule` or recomputes it from the previous one.
+
+## Earlier reviews and static analysis
+
+[`audits/README.md`](./audits/README.md) lists every report. Two manual reviews from 2025 cover the
+pre-relaunch code. The relaunch code has had one automated audit (Krait, October 2026) and no
+third-party manual audit. The Krait report's **Resolution** section records which observations were
+fixed and which are accepted; the accepted ones are stated in this guide.
+
+Slither and Aderyn run on `src/` only (`make slither`, `make aderyn`). Slither exits non-zero because
+its triaged findings are kept visible instead of suppressed. Each detector's classification, false
+positive or accepted design, is in
+[`docs/relaunch/R73-RELEASE_RECORD.md`](./docs/relaunch/R73-RELEASE_RECORD.md#static-analysis-triage).
 
 ## Reproducing the release gates
 
@@ -182,27 +265,23 @@ make slither
 make aderyn
 ```
 
-Fork commands require `RSK_MAINNET_RPC_URL`. `make check-deploy` is intentionally separate and slow:
-it runs the suite against the `via_ir` bytecode intended for deployment. Slither retains triaged
-findings and exits non-zero; the current classification is in
-`docs/relaunch/R73-RELEASE_RECORD.md`. The fork suite runs on Anvil/revm against live state and is not
-a Rootstock consensus/compiler proof.
+CI pins Foundry v1.7.1; use the same version locally. Fork commands require `RSK_MAINNET_RPC_URL`.
+`make check-deploy` is separate and slow because it recompiles everything under via-IR. The fork
+suites run on Anvil/revm against live state and are not a Rootstock consensus or compiler proof. The
+[README](./README.md#testing) describes each lane.
 
-For test organization and exact lane semantics, read `AGENTS.md`. For deployment sequencing, read
-`docs/relaunch/CUTOVER_RUNBOOK.md`. Historical design specs under `docs/relaunch/` explain why a choice
-was made, but this guide and the verified source state the current protocol without requiring that
-history.
+The specs under `docs/relaunch/` record why each choice was made. This guide and the verified source
+state the current protocol without requiring that history.
 
-## Required before mainnet
+## Open items before mainnet
 
-- Complete the independent security review against a frozen commit and resolve or explicitly accept
-  every finding.
-- Approve the launch economic matrix (fees, per-token minimum purchase amounts, and minimum period)
-  and make the deploy constants match it. Fee changes affect later purchases immediately; manager
-  minimum changes constrain future creates/updates but do not rewrite existing schedules.
-- Deploy and verify a representative `FOUNDRY_PROFILE=deploy` (`via_ir = true`) artifact on Rootstock
-  testnet. This exact-profile Blockscout proof remains outstanding.
-- Merge the stacked pull requests in order, freeze/tag the resulting commit, and rerun every release
-  gate above on that exact commit.
-- Execute the cutover runbook: verify addresses and wiring, have the Safe accept every ownership,
-  update all five consumers, simulate, and only then enable bot ticks.
+- An independent manual review of a frozen commit, with every finding resolved or explicitly accepted.
+- Final sign-off on the launch configuration above. Fee changes apply to later purchases immediately;
+  manager minimums constrain later creates and edits and do not rewrite existing schedules.
+- A deployment of a `FOUNDRY_PROFILE=deploy` (`via_ir = true`) artifact to Rootstock testnet, verified
+  on Blockscout. An optimizer-on, no-IR artifact has been deployed and verified there; the via-IR one
+  has not.
+- The release gates above, rerun on the frozen commit.
+
+[`docs/relaunch/CUTOVER_RUNBOOK.md`](./docs/relaunch/CUTOVER_RUNBOOK.md) is the operator's sequence
+for the deployment itself.

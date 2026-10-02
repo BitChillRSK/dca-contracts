@@ -58,6 +58,12 @@ Handlers = LendingHandler + a Purchase*  (lending adapters) or TokenHandler + a 
 - `test/unit/`, `test/mocks/`, `test/ai-generated/` — unit / mocks / extra + fuzz. Dedicated handler tests: `test/ai-generated/unit/sovryn/`, `test/ai-generated/unit/tropykus-legacy/`, `test/ai-generated/unit/idle/`, `test/ai-generated/unit/layerbank/`.
 - `script/` — deploy helpers. Do not `--broadcast` or talk to live contracts. `TROPYKUS_INDEX` deliberately lives in `test/Constants.sol`, not `script/Constants.sol`, so a `script/` file that names a Tropykus route does not compile; `TROPYKUS_STRING` stays in `script/Constants.sol` because the helper configs select mocks with it. Do not move the index back or re-add a Tropykus arm to a live branch — both live branches reject `Protocol.TROPYKUS`. A new production handler ships its deploy path in the same PR: extend `DeployMocSwaps` / `DeployDexSwaps` when it belongs in the main index map, or add a `Deploy<Handler>.s.sol` add-on (see `DeployUsdrifHandler`, `DeployIdleHandler`, `DeployLayerBankHandler`). DcaManager and deployment tests must construct that handler through the script (`DcaDappTest`, `BaseDeploymentTest`, `NewHandlerDeploymentTest`). `new Handler(...)` is only for test subclasses that expose internals, or handler-level tests that set `dcaManager` to the test contract so they can call `onlyDcaManager` entry points.
 
+## Toolchain pins
+
+- `solc_version = "0.8.36"`, `evm_version = "cancun"`. Rootstock executes `PUSH0` since Arrowhead and `MCOPY` / `TLOAD` / `TSTORE` since Lovell. Do not set `prague` / `osaka` / `amsterdam`, and do not use `blobhash` / `block.blobbasefee` in first-party code. Deployed bytecode must not start with `0xEF` (Rootstock Vetiver rejects EOF).
+- OpenZeppelin is pinned to the `v5.7.0` tag (`cab19933c33c2ad1d4c7a84864a3601dddfd16f3`). Track the stable tag; do not follow `master`, a release candidate, or a floating `5.x` ref. Never patch or `sed` files under `lib/openzeppelin-contracts`.
+- `lib/openzeppelin-contracts` carries nested submodules (`forge-std`, `erc4626-tests`, `halmos-cheatcodes`) for OpenZeppelin's own tests. First-party builds never compile them, but switching the OZ pin can leave their gitlinks drifted, which shows as `modified: lib/openzeppelin-contracts (modified content)` with no `.sol` diff behind it. Resync with `git submodule update --init --recursive --force lib/openzeppelin-contracts`; never stage it.
+
 ## Protocol invariants
 
 Unless the assigned spec explicitly changes one:
