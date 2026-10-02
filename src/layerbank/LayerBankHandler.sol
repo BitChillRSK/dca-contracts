@@ -47,7 +47,7 @@ abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
     {
         i_aToken = ILayerBankAToken(aToken);
         if (i_aToken.UNDERLYING_ASSET_ADDRESS() != stablecoin) {
-            revert LayerBankHandler__UnderlyingMismatch();
+            revert LendingHandler__UnderlyingMismatch();
         }
         address pool = i_aToken.POOL();
         if (pool == address(0)) revert LayerBankHandler__PoolNotSet();

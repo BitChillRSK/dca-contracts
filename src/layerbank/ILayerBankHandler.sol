@@ -13,6 +13,4 @@ interface ILayerBankHandler {
 
     /// @notice The aToken's `POOL()` returned the zero address.
     error LayerBankHandler__PoolNotSet();
-    /// @notice The aToken's underlying is not the stablecoin this handler was constructed with.
-    error LayerBankHandler__UnderlyingMismatch();
 }

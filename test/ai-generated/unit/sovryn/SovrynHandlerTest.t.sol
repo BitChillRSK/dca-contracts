@@ -5,7 +5,6 @@ import {HandlerTestHarness} from "../HandlerTestHarness.t.sol";
 import {ITokenHandler} from "../../../../src/interfaces/ITokenHandler.sol";
 import {IPurchaseFees} from "../../../../src/interfaces/IPurchaseFees.sol";
 import {SovrynHandler} from "../../../../src/sovryn/SovrynHandler.sol";
-import {ISovrynHandler} from "../../../../src/sovryn/ISovrynHandler.sol";
 import {PurchaseFees} from "../../../../src/PurchaseFees.sol";
 import {MockIsusdToken} from "../../../mocks/MockIsusdToken.sol";
 import {MockStablecoin} from "../../../mocks/MockStablecoin.sol";
@@ -81,7 +80,7 @@ contract SovrynHandlerTest is HandlerTestHarness {
             minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
         });
 
-        vm.expectRevert(ISovrynHandler.SovrynHandler__UnderlyingMismatch.selector);
+        vm.expectRevert(ILendingHandler.LendingHandler__UnderlyingMismatch.selector);
         new SovrynTestHandler(
             address(dcaManager), address(stablecoin), address(mismatch), FEE_COLLECTOR, feeSettings, OWNER
         );

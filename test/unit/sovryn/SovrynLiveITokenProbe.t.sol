@@ -3,7 +3,7 @@ pragma solidity 0.8.36;
 
 import {Test} from "forge-std/Test.sol";
 import {SovrynDocHandlerMoc} from "src/sovryn/SovrynDocHandlerMoc.sol";
-import {ISovrynHandler} from "src/sovryn/ISovrynHandler.sol";
+import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
 import {IiSusdToken} from "src/sovryn/IiSusdToken.sol";
 import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import "test/Constants.sol";
@@ -40,7 +40,7 @@ contract SovrynLiveITokenProbe is Test {
     }
 
     function test_liveISusd_refusesAnotherStablecoin() public {
-        vm.expectRevert(ISovrynHandler.SovrynHandler__UnderlyingMismatch.selector);
+        vm.expectRevert(ILendingHandler.LendingHandler__UnderlyingMismatch.selector);
         _construct(USDRIF);
     }
 

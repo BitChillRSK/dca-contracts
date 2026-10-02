@@ -48,6 +48,11 @@ can never be reassigned. The getter was verified on-chain, not assumed:
 
 `src/tropykus-legacy/` was outside the review but has the same gap, so it gets the same check.
 
+The error is shared. All three adapters now make the same claim about their receipt token, so it is
+one `LendingHandler__UnderlyingMismatch()` on `ILendingHandler` rather than one error per protocol;
+`LayerBankHandler__UnderlyingMismatch()` is renamed into it. The check itself stays in each adapter's
+constructor because only the adapter knows its protocol's getter.
+
 ### 4. LayerBank redeem sizing assumes half-up `rayDiv`
 
 The Pool has no share-sized withdraw, so `LayerBankHandler` picks the underlying amount whose burn is
@@ -101,17 +106,17 @@ the front end can tell a user whose last purchase is stuck to withdraw the remai
 - [x] `AUDIT_GUIDE.md` and `IDcaManager.batchBuyRbtc` NatSpec: the one-buy-per-UTC-day rule is
       conditional on an unchanged period; describe the period-edit case.
 - [x] `RbtcPurchaseTest.testLateBuyThenShorterPeriodIsDueAgainTheSameUtcDay` pins it.
-- [x] `SovrynHandler` constructor: revert `SovrynHandler__UnderlyingMismatch` unless
-      `iToken.loanTokenAddress() == stablecoin`. New `ISovrynHandler` (errors only);
+- [x] `ILendingHandler.LendingHandler__UnderlyingMismatch()` replaces
+      `ILayerBankHandler.LayerBankHandler__UnderlyingMismatch()`; `LayerBankHandler` reverts with it.
+- [x] `SovrynHandler` constructor: revert it unless `iToken.loanTokenAddress() == stablecoin`.
       `IiSusdToken.loanTokenAddress()`.
-- [x] `TropykusHandler` constructor: revert `TropykusHandler__UnderlyingMismatch` unless
-      `kToken.underlying() == stablecoin`. `IkToken.underlying()`.
+- [x] `TropykusHandler` constructor: revert it unless `kToken.underlying() == stablecoin`.
+      `IkToken.underlying()`.
 - [x] Mocks expose the getters (`MockIsusdToken`, `MockKToken`, `MockKdocToken`).
 - [x] `LayerBankHandler._protocolRedeem` NatSpec, `src/layerbank/README.md`, and `AUDIT_GUIDE.md`
       state the half-up assumption, the failure mode, and the monitoring step.
 - [x] `LayerBankLivePoolProbe.test_livePool_withdrawBurnsHalfUpScaledShares` and
       `SovrynLiveITokenProbe` run in the chain-tip fork lanes.
-- [x] `AGENTS.md` interface lists name `ISovrynHandler`.
 
 ## Out of scope
 
@@ -123,14 +128,15 @@ the front end can tell a user whose last purchase is stuck to withdraw the remai
 
 ## Files likely touched
 
-`AUDIT_GUIDE.md`, `AGENTS.md`, `src/interfaces/IDcaManager.sol`, `src/sovryn/SovrynHandler.sol`,
-`src/sovryn/ISovrynHandler.sol`, `src/sovryn/IiSusdToken.sol`, `src/tropykus-legacy/TropykusHandler.sol`,
-`src/tropykus-legacy/ITropykusHandler.sol`, `src/tropykus-legacy/IkToken.sol`,
-`src/layerbank/LayerBankHandler.sol`, `src/layerbank/README.md`, `test/mocks/MockIsusdToken.sol`,
+`AUDIT_GUIDE.md`, `src/interfaces/IDcaManager.sol`, `src/interfaces/ILendingHandler.sol`,
+`src/sovryn/SovrynHandler.sol`, `src/sovryn/IiSusdToken.sol`, `src/tropykus-legacy/TropykusHandler.sol`,
+`src/tropykus-legacy/IkToken.sol`, `src/layerbank/LayerBankHandler.sol`,
+`src/layerbank/ILayerBankHandler.sol`, `src/layerbank/README.md`, `test/mocks/MockIsusdToken.sol`,
 `test/mocks/MockKToken.sol`, `test/mocks/MockKdocToken.sol`, `test/unit/RbtcPurchaseTest.t.sol`,
 `test/unit/layerbank/LayerBankLivePoolProbe.t.sol`, `test/unit/sovryn/SovrynLiveITokenProbe.t.sol`,
 `test/ai-generated/unit/sovryn/SovrynHandlerTest.t.sol`,
-`test/ai-generated/unit/tropykus-legacy/TropykusHandlerTest.t.sol`.
+`test/ai-generated/unit/tropykus-legacy/TropykusHandlerTest.t.sol`,
+`test/ai-generated/unit/layerbank/LayerBankHandlerTest.t.sol`.
 
 ## Required tests
 
@@ -159,12 +165,13 @@ the front end can tell a user whose last purchase is stuck to withdraw the remai
 
 ## ABI / deploy / cutover impact
 
-- ABI: two new constructor-only errors, `SovrynHandler__UnderlyingMismatch()` and
-  `TropykusHandler__UnderlyingMismatch()`. A deployed handler can never raise them. No function,
-  event, or storage change.
+- ABI: one constructor-only error, `LendingHandler__UnderlyingMismatch()`, on every lending handler.
+  It replaces `LayerBankHandler__UnderlyingMismatch()` on the LayerBank leaves and is new on the Sovryn
+  (and legacy Tropykus) ones. A deployed handler can never raise it. No function, event, or storage
+  change.
 - Scripts: none. `DeployFinal` already passes the matching iSUSD and DOC.
-- Cutover: `bitchill-monitoring` regenerates `abi.json` at cutover anyway; the new error is in the
-  Sovryn leaves' ABI
+- Cutover: `bitchill-monitoring` regenerates `abi.json` at cutover anyway; the renamed error is in
+  every lending leaf's ABI
   ([bitchill-monitoring#10 comment](https://github.com/BitChillRSK/bitchill-monitoring/issues/10#issuecomment-5948821411)).
   Operations rerun `make fork-layerbank` when the LayerBank Pool or aToken implementation changes;
   the alert for that is [bitchill-monitoring#36](https://github.com/BitChillRSK/bitchill-monitoring/issues/36).

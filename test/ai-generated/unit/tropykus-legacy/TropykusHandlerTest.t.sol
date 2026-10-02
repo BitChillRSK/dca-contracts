@@ -6,7 +6,6 @@ import {ITokenHandler} from "../../../../src/interfaces/ITokenHandler.sol";
 import {IPurchaseFees} from "../../../../src/interfaces/IPurchaseFees.sol";
 import {IPurchaseUniswap} from "../../../../src/interfaces/IPurchaseUniswap.sol";
 import {TropykusHandler} from "../../../../src/tropykus-legacy/TropykusHandler.sol";
-import {ITropykusHandler} from "../../../../src/tropykus-legacy/ITropykusHandler.sol";
 import {PurchaseFees} from "../../../../src/PurchaseFees.sol";
 import {MockKdocToken} from "../../../mocks/MockKdocToken.sol";
 import {MockStablecoin} from "../../../mocks/MockStablecoin.sol";
@@ -82,7 +81,7 @@ contract TropykusHandlerTest is HandlerTestHarness {
             minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
         });
 
-        vm.expectRevert(ITropykusHandler.TropykusHandler__UnderlyingMismatch.selector);
+        vm.expectRevert(ILendingHandler.LendingHandler__UnderlyingMismatch.selector);
         new TropykusTestHandler(
             address(dcaManager), address(stablecoin), address(mismatch), FEE_COLLECTOR, feeSettings, OWNER
         );
