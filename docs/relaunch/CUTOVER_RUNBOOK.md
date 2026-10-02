@@ -37,14 +37,24 @@ Human operator only. Agents must not `--broadcast`.
 
 ```bash
 REAL_DEPLOYMENT=true \
+LENDING_PROTOCOL=none \
 INITIAL_SWAPPER=<bot-eoa> \
 FOUNDRY_PROFILE=deploy \
 forge script script/DeployFinal.s.sol:DeployFinal \
   --rpc-url $RSK_MAINNET_RPC_URL \
   --account <deployer-keystore> \
+  --sender <deployer-address> \
   --broadcast --legacy \
   --verify --verifier blockscout --verifier-url $BLOCKSCOUT_API_URL
 ```
+
+- `--sender` must be the address of the `--account` keystore. `DeployFinal` makes `msg.sender` the
+  owner of all nine contracts until the Safe accepts, and `--account` alone does not set `msg.sender`
+  inside `run()`.
+- `LENDING_PROTOCOL` must be set because the shared deploy base reads it with no fallback and rejects
+  an unknown value. `DeployFinal` does not use it: it deploys all seven handlers whatever the value.
+- Run the command without `--broadcast` first. That simulates the deployment against the live chain
+  and prints the stack without sending anything.
 
 `DeployFinal.run()` is **mainnet-only** (fail-closed incomplete map on testnet). For a
 `via_ir` Rootstock **testnet** bytecode proof, use a representative component script under
@@ -93,15 +103,18 @@ exit/re-entry (R13), never same-index overwrite or owner rescue.
 
 ## Adding a handler after cutover
 
-Handler assignment is add-only, and `DeployFinal` assigns every pair the existing add-on scripts
-target (`DeployIdleHandler`, `DeployLayerBankHandler`, `DeployUsdrifHandler`). Those scripts remain
-for stacks built by the lane scripts. A handler for a new token or a new route index follows the same
-shape and order.
+Handler assignment is add-only, so a handler is added only for a new token or a new route index.
 
-The add-on scripts revert while `pendingOwner` is set on `OperationsAdmin` or `DcaManager`, so run
-them only after the Safe has accepted. On mainnet the Safe owns `OperationsAdmin`, so the Foundry EOA
-deploys the handler and returns without assigning it. A Dex handler's constructor allowlists its
-initial path. The handler stays unreachable until the Safe, in this order:
+No script in this repository adds a handler to the cutover stack. `DeployFinal` already assigns every
+pair the add-on scripts target. On mainnet `DeployUsdrifHandler` also takes its `OperationsAdmin` and
+`DcaManager` from addresses fixed in `script/UsdrifHelperConfig.s.sol`, not from the `DeployFinal`
+output. A new handler needs its own script, written against the addresses `DeployFinal` logged.
+
+That script should do what the add-on scripts do: refuse to run while `pendingOwner` is set on
+`OperationsAdmin` or `DcaManager`, and construct the handler with `operationsAdmin.owner()`, the Safe,
+as its owner. The deploying EOA is not the owner of `OperationsAdmin`, so the script can deploy the
+handler and nothing more. A Dex handler's constructor allowlists its initial path. The handler stays
+unreachable until the Safe, in this order:
 
 1. Calls `operationsAdmin.registerRoute(index, lends)` only if `getRouteClass(index)` is still
    `Unregistered`. A second registration reverts `RouteAlreadyRegistered`.

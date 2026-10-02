@@ -36,8 +36,8 @@ Uniswap) was not in scope, and the repository's test and fork lanes were not run
 The changes made in response to it are comments and documents, so the audited code is the code that
 ships.
 
-The report and its candidate files cite documents as they stood at `5a9ff0fe`. The README section
-"Compromised swapper" that one candidate cites has since moved to
+The report and its candidate files cite documents as they stood at `5a9ff0fe`. Where a candidate
+cites README "Compromised swapper", that procedure is in
 [`docs/relaunch/CUTOVER_RUNBOOK.md`](../docs/relaunch/CUTOVER_RUNBOOK.md#compromised-swapper).
 
 ## Static analysis

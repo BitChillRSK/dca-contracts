@@ -31,11 +31,14 @@ In scope:
 Out of scope:
 
 - `src/tropykus-legacy/`. It is kept for local and pinned-fork coverage of a second lending adapter.
-  No deploy script constructs or registers it, and route index 4 is left unused so it is never
-  reinterpreted as another venue.
-- Every other deploy script. `DeployMocSwaps`, `DeployDexSwaps`, and the add-on scripts build the
-  stacks the test lanes use. `DeployFinal` already assigns every pair they target, and assignment is
-  add-only.
+  `DeployMocSwaps` and `DeployDexSwaps` construct it on local and fork runs only: their testnet and
+  mainnet branches revert on Tropykus, and `DeployFinal` never names it. Route index 4 is left unused
+  so it is never reinterpreted as another venue.
+- Every other deploy script. BitChill deploys production with `DeployFinal` only. That is a
+  deployment decision, not something the other scripts enforce: `DeployMocSwaps` and `DeployDexSwaps`
+  create their own `OperationsAdmin` and `DcaManager`, and both have testnet and mainnet branches
+  that deploy production handlers and propose the Safe as owner. A stack built by one of them is a
+  separate deployment, outside this review.
 - The off-chain consumers (swapper bot, front end, data API, monitoring), which live in other
   repositories, and the code of the external protocols.
 
@@ -227,8 +230,8 @@ Other deliberate availability trade-offs:
   depeg beyond the configured BTC/USD-derived floor stops swaps rather than repricing the asset.
 - Dex input tokens must have at most 18 decimals. Fee-on-transfer tokens and asynchronous or partial
   lending redemptions are unsupported.
-- Sovryn charges a 0.1% exit fee on iToken burns (first observed on mainnet on 2026-09-07). A user on
-  the Sovryn route therefore receives less stablecoin than the principal debited on withdrawal, and
+- Sovryn charges a 0.1% exit fee on iToken burns. A user on the Sovryn route therefore receives less
+  stablecoin than the principal debited on withdrawal, and
   each purchase spends the net amount redeemed. This is the venue-fee case in the accounting
   properties above, not a loss of shares. `make probe-sovryn-exit-fee` measures the live fee; see
   `test/mainnet-debug/sovryn-exit-fee/README.md`.

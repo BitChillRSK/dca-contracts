@@ -25,7 +25,10 @@ The root documents grew by accretion across the relaunch. Checked against `src/`
 4. `ADDRESSES.md` lists a pre-relaunch testnet deployment with a Tropykus handler and omits USDRIF,
    USDT0, and LayerBank.
 5. `docs/relaunch/CUTOVER_RUNBOOK.md` gates on "PR 134" and `make fork-tropykus`; the gate is
-   `make fork-sovryn` and `make fork-layerbank` (`AGENTS.md`), and the stack has moved on.
+   `make fork-sovryn` and `make fork-layerbank` (`AGENTS.md`), and the stack has moved on. Its
+   broadcast command omits `--sender` and `LENDING_PROTOCOL`: `DeployFinal` takes the owner from
+   `msg.sender`, which `--account` does not set (`script/DeployOptimizerProof.s.sol`, R52), and the
+   deploy base reads `LENDING_PROTOCOL` with no fallback.
 6. `src/idle/README.md` describes only the DOC leaf; `IdleHandlerDex` ships for USDRIF and USDT0.
 
 ## Open product decisions
@@ -43,8 +46,10 @@ The root documents grew by accretion across the relaunch. Checked against `src/`
 - [x] `DEPENDENCY_MODIFICATIONS.md`: deleted. Compiler target and pins move to `AUDIT_GUIDE.md`;
       contributor rules move to `AGENTS.md`.
 - [x] `ADDRESSES.md`: the external mainnet contracts `DeployFinal` binds to, from `script/`.
-- [x] `docs/relaunch/CUTOVER_RUNBOOK.md`: current gates; ownership handoff, add-on handlers, and
-      compromised-swapper order received from the README.
+- [x] `docs/relaunch/CUTOVER_RUNBOOK.md`: current gates; a broadcast command with `--sender` and
+      `LENDING_PROTOCOL`, the only copy in the repository (`R73-RELEASE_RECORD.md` links to it);
+      ownership handoff, the Safe's steps for a new handler, and compromised-swapper order received
+      from the README.
 - [x] `audits/README.md`, `SECURITY.md`, `src/idle/README.md`, `src/layerbank/README.md`,
       `test/ai-generated/fuzz/README_INVARIANTS.md`: corrections and trims.
 - [x] `audits/2026-10-02-Krait/krait-report.md`: one **Resolution** row updated for the deleted file.
@@ -60,7 +65,8 @@ The root documents grew by accretion across the relaunch. Checked against `src/`
 `AUDIT_GUIDE.md`, `README.md`, `DEPENDENCY_MODIFICATIONS.md`, `ADDRESSES.md`, `SECURITY.md`,
 `AGENTS.md`, `audits/README.md`, `audits/2026-10-02-Krait/krait-report.md`, `src/idle/README.md`,
 `src/layerbank/README.md`, `test/ai-generated/fuzz/README_INVARIANTS.md`,
-`docs/relaunch/CUTOVER_RUNBOOK.md`, `docs/relaunch/README.md`, `docs/relaunch/IMPLEMENTATION_ORDER.md`.
+`docs/relaunch/CUTOVER_RUNBOOK.md`, `docs/relaunch/R73-RELEASE_RECORD.md`, `docs/relaunch/README.md`,
+`docs/relaunch/IMPLEMENTATION_ORDER.md`.
 
 ## Required tests
 
@@ -82,5 +88,5 @@ Markdown-only tier (**Scale the gate to the change** in `AGENTS.md`): run nothin
 
 - ABI: none.
 - Scripts: none.
-- Cutover: the runbook's preconditions now name `make fork-layerbank` instead of `make fork-tropykus`.
-  No consumer has to change.
+- Cutover: the runbook's preconditions now name `make fork-layerbank` instead of `make fork-tropykus`,
+  and its broadcast command gains `--sender` and `LENDING_PROTOCOL`. No consumer has to change.

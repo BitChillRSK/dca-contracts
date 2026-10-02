@@ -8,13 +8,10 @@ the user withdraws it.
 
 The contracts are immutable: there are no proxies and no owner migration of user funds.
 
-`script/DeployFinal.s.sol` deploys one `OperationsAdmin`, one `DcaManager`, and seven handlers:
-
-| Stablecoin | Route 0 (idle) | Route 1 (LayerBank) | Route 2 (Sovryn) | Purchase venue |
-|---|---|---|---|---|
-| DOC | `IdleDocHandlerMoc` | `LayerBankDocHandlerMoc` | `SovrynDocHandlerMoc` | Money on Chain |
-| USDRIF | `IdleHandlerDex` | `LayerBankHandlerDex` | — | Uniswap V3 |
-| USDT0 | `IdleHandlerDex` | `LayerBankHandlerDex` | — | Uniswap V3 |
+Three stablecoins are listed. DOC can sit idle, in LayerBank, or in Sovryn, and is redeemed for rBTC
+at Money on Chain. USDRIF and USDT0 can sit idle or in LayerBank, and are swapped for rBTC on Uniswap
+V3. The route table, with the contract deployed on each route, is under
+[Production scope](./AUDIT_GUIDE.md#production-scope) in the audit guide.
 
 Security reviewers should start with [`AUDIT_GUIDE.md`](./AUDIT_GUIDE.md): scope, trust boundaries,
 accounting and scheduling properties, accepted risks, and the release gates. To report a
@@ -152,16 +149,11 @@ missing address or incomplete route map. The broadcast command and the steps aro
 keystore (`--account`) or a hardware wallet (`--ledger`), not a raw private key.
 
 `DeployMocSwaps`, `DeployDexSwaps`, and the add-on scripts (`DeployIdleHandler`,
-`DeployLayerBankHandler`, `DeployUsdrifHandler`) build the stacks the test lanes use. On the
-production stack every pair they target is already assigned, and assignment is add-only.
+`DeployLayerBankHandler`, `DeployUsdrifHandler`) build the stacks the test lanes use. They are not the
+production path, although the two lane scripts also have testnet and mainnet branches.
 `DeployMocAndUniswap` is a local comparison harness and reverts on `REAL_DEPLOYMENT=true`.
 
 ### Ownership after deploy
-
-A Safe cannot sign a Foundry broadcast, so an EOA deploys. The script constructs all nine contracts
-with that EOA as owner, configures them, and calls `transferOwnership(MAINNET_OWNER)` on each, which
-only proposes the Safe. The Safe then sends `acceptOwnership()` to each contract. Until it does, the
-deploying EOA is still the owner. `renounceOwnership` always reverts.
 
 The operator procedures are in [`docs/relaunch/CUTOVER_RUNBOOK.md`](./docs/relaunch/CUTOVER_RUNBOOK.md):
 

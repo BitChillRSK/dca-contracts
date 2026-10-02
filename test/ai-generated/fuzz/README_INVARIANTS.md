@@ -94,5 +94,4 @@ deployed mocks are not fuzzed). Production calls are not try/caught: empty cases
 ## Adding an invariant
 
 Do not assert that an unsigned value is non-negative under a solvency or monotonicity name: it is true
-by construction and proves nothing. `InvariantTest` once carried two such checks, on handler rBTC
-balance and on user interest; both were removed.
+by construction and proves nothing.

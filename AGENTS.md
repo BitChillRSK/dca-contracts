@@ -60,8 +60,10 @@ Handlers = LendingHandler + a Purchase*  (lending adapters) or TokenHandler + a 
 
 ## Toolchain pins
 
-- `solc_version = "0.8.36"`, `evm_version = "cancun"`. Rootstock executes `PUSH0` since Arrowhead and `MCOPY` / `TLOAD` / `TSTORE` since Lovell. Do not set `prague` / `osaka` / `amsterdam`, and do not use `blobhash` / `block.blobbasefee` in first-party code. Deployed bytecode must not start with `0xEF` (Rootstock Vetiver rejects EOF).
-- OpenZeppelin is pinned to the `v5.7.0` tag (`cab19933c33c2ad1d4c7a84864a3601dddfd16f3`). Track the stable tag; do not follow `master`, a release candidate, or a floating `5.x` ref. Never patch or `sed` files under `lib/openzeppelin-contracts`.
+The compiler target and the OpenZeppelin pin are stated in [`AUDIT_GUIDE.md`](./AUDIT_GUIDE.md) under **Compiler and dependencies**. Rules for changing them:
+
+- Do not set `evm_version` to `prague` / `osaka` / `amsterdam`, and do not use `blobhash` / `block.blobbasefee` in first-party code. Deployed bytecode must not start with `0xEF` (Rootstock Vetiver rejects EOF).
+- Move OpenZeppelin only to a stable release tag; do not follow `master`, a release candidate, or a floating `5.x` ref. Never patch or `sed` files under `lib/openzeppelin-contracts`.
 - `lib/openzeppelin-contracts` carries nested submodules (`forge-std`, `erc4626-tests`, `halmos-cheatcodes`) for OpenZeppelin's own tests. First-party builds never compile them, but switching the OZ pin can leave their gitlinks drifted, which shows as `modified: lib/openzeppelin-contracts (modified content)` with no `.sol` diff behind it. Resync with `git submodule update --init --recursive --force lib/openzeppelin-contracts`; never stage it.
 
 ## Protocol invariants

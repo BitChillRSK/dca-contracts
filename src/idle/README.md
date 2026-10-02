@@ -1,8 +1,9 @@
 # Idle handlers
 
 Route index 0, class idle. Deposits stay on the handler as the stablecoin itself: nothing is lent and
-no shares are minted. Purchases and withdrawals spend that pooled balance. Interest calls revert
-because the route is not lending.
+no shares are minted. Purchases and withdrawals spend that pooled balance. There is no interest:
+`withdrawTokenAndInterest`, `topUpFromInterest`, and `getAccruedInterest` revert
+`DcaManager__TokenIsNotLent` on an idle route, and `withdrawAllAccumulatedInterest` skips idle pairs.
 
 - DOC, purchased through Money on Chain: `IdleDocHandlerMoc`
 - USDRIF and USDT0, purchased through Uniswap V3: two deployments of `IdleHandlerDex`

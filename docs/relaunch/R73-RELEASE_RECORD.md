@@ -45,20 +45,9 @@ forge inspect DcaManager storageLayout
 forge inspect OperationsAdmin storageLayout
 ```
 
-Live broadcast (human only; never from an agent session):
-
-```bash
-REAL_DEPLOYMENT=true \
-INITIAL_SWAPPER=<bot-eoa> \
-FOUNDRY_PROFILE=deploy \
-forge script script/DeployFinal.s.sol:DeployFinal \
-  --rpc-url $RSK_MAINNET_RPC_URL \
-  --account <deployer-eoa> \
-  --broadcast --legacy \
-  --verify --verifier blockscout --verifier-url $BLOCKSCOUT_API_URL
-```
-
-Then Safe `acceptOwnership()` on every ownable address logged by the script.
+Live broadcast (human only; never from an agent session): the command is in
+[`CUTOVER_RUNBOOK.md`](./CUTOVER_RUNBOOK.md#deploy). Then Safe `acceptOwnership()` on every ownable
+address logged by the script.
 
 ## Static analysis triage
 
