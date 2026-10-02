@@ -352,11 +352,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
 
     /**
      * @dev Both arguments are 1e18-scaled fractions. Neither may exceed 100%, and the swap-time floor
-     *      cannot sit below the safety check. Lowering the floor past what governance pre-approved as
-     *      the worst acceptable fill therefore takes two transactions: the safety check, then the floor.
-     *      This limits the percentage only. The floor is that percentage of the rBTC amount the oracle
-     *      price implies, and `setMocOracle` can change the oracle in one transaction.
-     *      Used by the constructor and both owner setters.
+     *      cannot sit below the safety check, so lowering the floor percentage past what governance
+     *      pre-approved takes two transactions. Used by the constructor and both owner setters.
      */
     function _validateSlippageSettings(uint256 amountOutMinimumPercent, uint256 amountOutMinimumSafetyCheck)
         private
