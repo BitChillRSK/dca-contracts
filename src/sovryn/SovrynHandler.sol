@@ -3,13 +3,14 @@ pragma solidity 0.8.36;
 
 import {LendingHandler} from "../LendingHandler.sol";
 import {IiSusdToken} from "./IiSusdToken.sol";
+import {ISovrynHandler} from "./ISovrynHandler.sol";
 
 /**
  * @title SovrynHandler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Sovryn adapter: iSUSD mint/burn. Share accounting lives on LendingHandler.
  */
-abstract contract SovrynHandler is LendingHandler {
+abstract contract SovrynHandler is LendingHandler, ISovrynHandler {
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
@@ -36,6 +37,9 @@ abstract contract SovrynHandler is LendingHandler {
         LendingHandler(dcaManager, stablecoin, EXCHANGE_RATE_DECIMALS)
     {
         i_iToken = IiSusdToken(iToken);
+        if (i_iToken.loanTokenAddress() != stablecoin) {
+            revert SovrynHandler__UnderlyingMismatch();
+        }
         _approveLendingSpender();
     }
 

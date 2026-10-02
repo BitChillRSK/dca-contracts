@@ -44,4 +44,10 @@ interface IiSusdToken {
      * @return price of iSusd/stablecoin
      */
     function tokenPrice() external view returns (uint256 price);
+
+    /**
+     * @notice The underlying token this loan token lends
+     * @return The underlying (loan) token address
+     */
+    function loanTokenAddress() external view returns (address);
 }

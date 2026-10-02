@@ -45,4 +45,9 @@ interface IkToken {
      * @return Calculated exchange rate scaled by 1e18
      */
     function exchangeRateCurrent() external returns (uint256);
+
+    /**
+     * @notice Underlying asset for this CToken
+     */
+    function underlying() external view returns (address);
 }

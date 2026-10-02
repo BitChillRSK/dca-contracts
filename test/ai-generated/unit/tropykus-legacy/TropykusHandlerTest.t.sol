@@ -6,6 +6,7 @@ import {ITokenHandler} from "../../../../src/interfaces/ITokenHandler.sol";
 import {IPurchaseFees} from "../../../../src/interfaces/IPurchaseFees.sol";
 import {IPurchaseUniswap} from "../../../../src/interfaces/IPurchaseUniswap.sol";
 import {TropykusHandler} from "../../../../src/tropykus-legacy/TropykusHandler.sol";
+import {ITropykusHandler} from "../../../../src/tropykus-legacy/ITropykusHandler.sol";
 import {PurchaseFees} from "../../../../src/PurchaseFees.sol";
 import {MockKdocToken} from "../../../mocks/MockKdocToken.sol";
 import {MockStablecoin} from "../../../mocks/MockStablecoin.sol";
@@ -71,6 +72,20 @@ contract TropykusHandlerTest is HandlerTestHarness {
 
     function test_tropykus_exchangeRateDecimalsHardcoded() public {
         assertEq(tropykusHandler.EXCHANGE_RATE_DECIMALS(), 1e18);
+    }
+
+    function test_tropykus_constructor_revertsIfUnderlyingMismatch() public {
+        MockStablecoin other = new MockStablecoin(address(this));
+        MockKdocToken mismatch = new MockKdocToken(address(other));
+
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
+        });
+
+        vm.expectRevert(ITropykusHandler.TropykusHandler__UnderlyingMismatch.selector);
+        new TropykusTestHandler(
+            address(dcaManager), address(stablecoin), address(mismatch), FEE_COLLECTOR, feeSettings, OWNER
+        );
     }
 
     function test_tropykus_kTokenMinting() public {

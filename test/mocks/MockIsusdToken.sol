@@ -51,6 +51,11 @@ contract MockIsusdToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
         i_deploymentTimestamp = block.timestamp;
     }
 
+    /// @notice Sovryn's name for the underlying; the handler checks it at construction.
+    function loanTokenAddress() external view returns (address) {
+        return address(i_docToken);
+    }
+
     function mint(address receiver, uint256 depositAmount) external returns (uint256 mintAmount) {
         require(i_docToken.allowance(msg.sender, address(this)) >= depositAmount, "Insufficient allowance");
         // Measure cash actually received. 1:1 tokens are unchanged (`received == depositAmount`).

@@ -13,4 +13,6 @@ interface ITropykusHandler {
 
     /// @notice The kToken's `redeem` reported failure with a non-zero Compound error code.
     error TropykusHandler__LendingProtocolRedeemFailed(uint256 errorCode);
+    /// @notice The kToken's underlying is not the stablecoin this handler was constructed with.
+    error TropykusHandler__UnderlyingMismatch();
 }

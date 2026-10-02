@@ -80,6 +80,11 @@ contract MockKdocToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
         s_increaseBalanceOnRedeem = increaseBalanceOnRedeem;
     }
 
+    /// @notice Compound's name for the underlying; the handler checks it at construction.
+    function underlying() external view returns (address) {
+        return address(i_docToken);
+    }
+
     function mint(uint256 amount) public returns (uint256) {
         require(i_docToken.allowance(msg.sender, address(this)) >= amount, "Insufficient allowance");
         // Compound-style doTransferIn: mint shares from cash actually received, not the argument.
