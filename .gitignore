@@ -17,6 +17,10 @@ node_modules/
 # Aderyn report
 report.md
 
+# Krait audit output and cache
+.audit/
+.krait-cache/
+
 # Cursor (commit .cursorignore so clones skip out/ and lib/ in search).
 # Keep .cursor/rules/ versioned; ignore everything else (e.g. relaunch-plan.md).
 .cursor/*

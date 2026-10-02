@@ -173,6 +173,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R109 | after R108, before audit freeze / relaunch deploy | none (`_setUserShares` always emit; checked `FeeCredited` product; variable-fee conservation coverage) |
 | R110 | after R109, before audit freeze / relaunch deploy | none (internal audit follow-ups: stale fee and cadence docs, Sovryn/Tropykus underlying check, LayerBank burn-rounding assumption and probe) |
 | R111 | after R110, before audit freeze / relaunch deploy | none (`IiSusdToken` → `IiToken`, `MockIsusdToken` → `MockIToken`, remaining `iSusd` identifiers → `iToken`) |
+| R112 | after R111, before audit freeze / relaunch deploy | none (publish the Krait audit report under `audits/2026-10-02-Krait/`; follow-ups are comments and documents only; no window gap) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1468,6 +1469,14 @@ assumption and pin it with a live probe. Investigated and kept: the last-shares 
 After R110, before audit freeze / relaunch deploy. Finish R104's Sovryn naming: `IiSusdToken` →
 `IiToken`, `MockIsusdToken` → `MockIToken`, and remaining first-party `iSusd` / `Isusd` identifiers →
 `iToken` / `IToken`. Names only; no behavior change. Ask: none.
+
+### R112 - Krait audit report and follow-ups ([spec](./R112-krait-audit-report.md))
+
+After R111, before audit freeze / relaunch deploy. Publish the Krait AI audit of `src/` at `5a9ff0fe`
+under `audits/2026-10-02-Krait/` with a provenance note and a resolution section; state the
+leaked-swapper worst case in `AUDIT_GUIDE.md` (no mandatory gap between windows, decided 2026-10-02);
+qualify the Dex floor NatSpec for `setMocOracle`; add the fee collector rotation step to the runbook;
+correct two stale document lines. Comments and documents only. Ask: none.
 
 ## Closed non-implementation decisions
 

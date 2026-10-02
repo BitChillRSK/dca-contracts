@@ -352,9 +352,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
 
     /**
      * @dev Both arguments are 1e18-scaled fractions. Neither may exceed 100%, and the swap-time floor
-     *      cannot sit below the safety check. Keeping that wall means no single owner transaction can
-     *      widen the live floor past what governance pre-approved as the worst acceptable fill.
-     *      Used by the constructor and both owner setters.
+     *      cannot sit below the safety check, so lowering the floor percentage past what governance
+     *      pre-approved takes two transactions. Used by the constructor and both owner setters.
      */
     function _validateSlippageSettings(uint256 amountOutMinimumPercent, uint256 amountOutMinimumSafetyCheck)
         private

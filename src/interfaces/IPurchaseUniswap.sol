@@ -122,15 +122,16 @@ interface IPurchaseUniswap {
     /**
      * @notice Set the lowest `amountOutMinimumPercent` the owner may configure.
      * @param amountOutMinimumSafetyCheck New bound, 1e18-scaled. Never enters swap math.
-     * @dev This is the wall a single owner transaction cannot cross: widening the live floor past it
-     *      takes two transactions, lowering this bound first. Raising it above the active floor reverts
-     *      without changing state.
+     * @dev The floor percentage cannot be set below this bound, so lowering it further takes two
+     *      transactions, this bound first. Raising this bound above the active floor reverts without
+     *      changing state.
      */
     function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external;
 
     /**
      * @notice Point min-out at a new MoC BTC/USD oracle.
      * @param newOracle New oracle. Cannot be zero.
+     * @dev Not bounded by the safety check: a new oracle changes the floor in one transaction.
      */
     function setMocOracle(address newOracle) external;
 

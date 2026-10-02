@@ -72,6 +72,14 @@ exit/re-entry (R13), never same-index overwrite or owner rescue.
 `revokeSwapper` **before** revoking purchase paths. Then restore preferred path if needed.
 See README “Compromised swapper.”
 
+## Fee collector rotation
+
+`setFeeCollector` redirects future fee credits only. rBTC already credited stays with the previous
+collector address on each handler, and only that address can withdraw it. Before rotating, have the
+current collector call `DcaManager.withdrawAccumulatedRbtc` for every live token × route, then call
+`setFeeCollector` on every handler. If the rotation answers a lost or compromised collector key, the
+balance already credited to it cannot be redirected; rotate at once to stop further credits.
+
 ## Ops history note
 
 Standing `redeemDocRequest` queue entries on **pre-relaunch** MoC handlers: checked and closed

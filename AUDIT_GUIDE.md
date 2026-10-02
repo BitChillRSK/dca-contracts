@@ -65,7 +65,20 @@ caller minimum, or choose any governance-allowlisted Dex path. It is not trusted
 schedule supplies the buyer and amount, and the handler's oracle floor remains when `minRbtcOut` is
 zero. Governance is a configuration trust boundary. Add-only handler assignment limits a bad future
 configuration to newly registered pairs/routes, but a malicious or misconfigured owner can still make
-unsafe fee, oracle, floor, path, or listing decisions within the explicit setter bounds.
+unsafe fee, oracle, floor, path, or listing decisions within the explicit setter bounds. The Dex
+safety-check bound stops a single percentage change from widening the floor; it does not cover
+`setMocOracle`, which replaces the price the floor is computed from in one transaction with no bound
+against the previous oracle.
+
+Worst case for a leaked swapper key, stated once because its parts are accepted separately. The key can
+reopen the protected window in the block the previous one ends, submit a zero caller minimum, and
+activate any allowlisted Dex path. While windows are chained, users cannot pause, edit, delete, or
+withdraw stablecoin or interest. Each Dex schedule that comes due in that time can be filled down to the
+oracle floor (3% below the oracle at launch settings), once per period. MoC routes have no pool to move.
+Principal cannot leave to anyone but its owner, and `revokeSwapper` ends it. This is accepted without a
+mandatory gap between windows: a gap would give users a few open blocks they are unlikely to use before
+the Safe revokes the key, and a loose fill pays the key holder only if they also move the pool around
+the batch.
 
 All nine ownable deployments are constructed under the broadcaster EOA, configured, and then propose
 the Safe as pending owner. The Safe must accept each one. Until acceptance, the broadcaster remains
@@ -76,8 +89,9 @@ apply the same decision everywhere it is meant to apply.
 
 - Deposits credit only the handler's measured balance increase and require it to equal the request;
   fee-on-transfer tokens are unsupported.
-- Idle handlers keep per-user balances. Lending handlers keep per-user virtual shares and clamp a
-  withdrawal to that user's share-backed position.
+- Idle handlers keep no per-user book: pooled cash is bounded by the schedule balances `DcaManager`
+  debits before any outflow, plus the exact-delta checks on deposits and purchases. Lending handlers
+  keep per-user virtual shares and clamp a withdrawal to that user's share-backed position.
 - Every successful lending redemption must reduce the handler's external receipt-share balance by
   exactly the virtual shares debited. Cash may be lower only when the complete claim was consumed by
   a venue fee or realized loss.
