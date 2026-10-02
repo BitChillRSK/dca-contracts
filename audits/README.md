@@ -5,18 +5,17 @@ For the current scope, trust boundaries, and accepted risks, start with
 
 | Date | Reviewer | Kind | Code reviewed | Findings | Report |
 |------|----------|------|---------------|----------|--------|
-| April 2025 | [Ivan Fitro](https://twitter.com/FitroIvan) | Manual | Pre-relaunch protocol (Tropykus and Sovryn lending, Money on Chain purchases) | 3 Medium, 4 Low, 2 Info | [PDF](./2025-04-29-Ivan-Fitro.pdf) |
-| June 2025 | [Ivan Fitro](https://twitter.com/FitroIvan) | Manual | Mitigations of the April findings, and the Uniswap V3 integration | 1 Low, 1 Info | [PDF](./2025-06-02-Ivan-Fitro.pdf) |
+| April 2025 | [Ivan Fitro](https://twitter.com/FitroIvan) | Manual | Pre-relaunch protocol (Tropykus and Sovryn lending, Money on Chain purchases) | 3 Medium, 4 Low, 2 Info | [PDF](./pre-relaunch/2025-04-29-Ivan-Fitro.pdf) |
+| June 2025 | [Ivan Fitro](https://twitter.com/FitroIvan) | Manual | Mitigations of the April findings, and the Uniswap V3 integration | 1 Low, 1 Info | [PDF](./pre-relaunch/2025-06-02-Ivan-Fitro.pdf) |
 | 2026-10-02 | [Krait](https://github.com/ZealynxSecurity/krait) by [Zealynx Security](https://zealynx.io) | Automated (AI) | Relaunch `src/` at `5a9ff0fe`, without `src/tropykus-legacy/` (not deployed) | 0 Critical, 0 High, 0 Medium; observations only | [report](./2026-10-02-Krait/krait-report.md) · [JSON](./2026-10-02-Krait/krait-findings.json) · [candidates](./2026-10-02-Krait/findings/) |
 
 The relaunch code has not had a third-party manual audit.
 
 ## 2025 manual reviews
 
-Both were performed by Ivan Fitro, an independent researcher (later of Pashov Audit Group and
-OpenZeppelin), on the code as it stood in 2025. Several contracts had different names then
-(`AdminOperations`, `TropykusDocHandler`), and the findings were addressed in that generation of the
-code.
+Both were performed by Ivan Fitro, an independent researcher (later of Pashov Audit Group), on the
+code as it stood in 2025. Several contracts had different names then (`AdminOperations`,
+`TropykusDocHandler`), and the findings were addressed in that generation of the code.
 
 The 2026 relaunch changed most of what those reports describe: OpenZeppelin v5.7.0, solc 0.8.36, the
 idle, LayerBank, and Sovryn route map, the protected purchase window, exact lending-share consumption,

@@ -6,7 +6,7 @@ Status: **implemented** · Assigned: yes · Optional/further-review: no · Stack
 ## Objective
 
 Make the documents an external auditor reads state the current protocol, once each, and nothing else.
-Markdown only: no Solidity, script, test, Makefile, or configuration change.
+Documents only: no Solidity, script, test, Makefile, or configuration change.
 
 ## Background
 
@@ -54,6 +54,7 @@ The root documents grew by accretion across the relaunch. Checked against `src/`
 - [x] `audits/README.md`, `SECURITY.md`, `src/idle/README.md`, `src/layerbank/README.md`,
       `test/ai-generated/fuzz/README_INVARIANTS.md`: corrections and trims.
 - [x] `audits/2026-10-02-Krait/krait-report.md`: one **Resolution** row updated for the deleted file.
+- [x] `audits/pre-relaunch/`: the two 2025 report PDFs move here from `audits/`, unchanged.
 
 ## Out of scope
 
@@ -64,7 +65,8 @@ The root documents grew by accretion across the relaunch. Checked against `src/`
 ## Files likely touched
 
 `AUDIT_GUIDE.md`, `README.md`, `DEPENDENCY_MODIFICATIONS.md`, `ADDRESSES.md`, `SECURITY.md`,
-`AGENTS.md`, `audits/README.md`, `audits/2026-10-02-Krait/krait-report.md`, `src/idle/README.md`,
+`AGENTS.md`, `audits/README.md`, `audits/2026-10-02-Krait/krait-report.md`,
+`audits/pre-relaunch/*.pdf` (moved), `src/idle/README.md`,
 `src/layerbank/README.md`, `test/ai-generated/fuzz/README_INVARIANTS.md`,
 `docs/relaunch/CUTOVER_RUNBOOK.md`, `docs/relaunch/R73-RELEASE_RECORD.md`, `docs/relaunch/README.md`,
 `docs/relaunch/IMPLEMENTATION_ORDER.md`.
@@ -77,7 +79,7 @@ Markdown-only tier (**Scale the gate to the change** in `AGENTS.md`): run nothin
 
 - [x] Every command, file path, address, and parameter in the edited documents matches the tree.
 - [x] No relative Markdown link in the edited documents is broken.
-- [x] `git diff --name-only` against R112 lists only `.md` files.
+- [x] `git diff --name-only` against R112 lists only `.md` files and the two moved report PDFs.
 
 ## Reviewer checklist
 
