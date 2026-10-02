@@ -46,6 +46,8 @@ interface ILendingHandler is ITokenHandler {
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice The receipt token's underlying is not the stablecoin this handler was constructed with.
+    error LendingHandler__UnderlyingMismatch();
     /// @notice The lending protocol accepted a deposit call but this handler gained no shares.
     error LendingHandler__LendingProtocolDepositFailed();
     /// @notice A zero-cash redemption reports its consumed receipt shares before the call rolls back.

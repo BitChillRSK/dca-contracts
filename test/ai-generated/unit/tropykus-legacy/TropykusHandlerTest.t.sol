@@ -73,6 +73,20 @@ contract TropykusHandlerTest is HandlerTestHarness {
         assertEq(tropykusHandler.EXCHANGE_RATE_DECIMALS(), 1e18);
     }
 
+    function test_tropykus_constructor_revertsIfUnderlyingMismatch() public {
+        MockStablecoin other = new MockStablecoin(address(this));
+        MockKdocToken mismatch = new MockKdocToken(address(other));
+
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
+        });
+
+        vm.expectRevert(ILendingHandler.LendingHandler__UnderlyingMismatch.selector);
+        new TropykusTestHandler(
+            address(dcaManager), address(stablecoin), address(mismatch), FEE_COLLECTOR, feeSettings, OWNER
+        );
+    }
+
     function test_tropykus_kTokenMinting() public {
         uint256 initialKTokenBalance = kToken.balanceOf(address(handler));
 

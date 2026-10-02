@@ -72,6 +72,20 @@ contract SovrynHandlerTest is HandlerTestHarness {
         assertEq(sovrynHandler.EXCHANGE_RATE_DECIMALS(), 1e18);
     }
 
+    function test_sovryn_constructor_revertsIfUnderlyingMismatch() public {
+        MockStablecoin other = new MockStablecoin(address(this));
+        MockIsusdToken mismatch = new MockIsusdToken(address(other));
+
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
+        });
+
+        vm.expectRevert(ILendingHandler.LendingHandler__UnderlyingMismatch.selector);
+        new SovrynTestHandler(
+            address(dcaManager), address(stablecoin), address(mismatch), FEE_COLLECTOR, feeSettings, OWNER
+        );
+    }
+
     function test_sovryn_iSusdMinting() public {
         uint256 initialUserLendingBalance = sovrynHandler.getUserShares(USER);
 

@@ -47,7 +47,7 @@ abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
     {
         i_aToken = ILayerBankAToken(aToken);
         if (i_aToken.UNDERLYING_ASSET_ADDRESS() != stablecoin) {
-            revert LayerBankHandler__UnderlyingMismatch();
+            revert LendingHandler__UnderlyingMismatch();
         }
         address pool = i_aToken.POOL();
         if (pool == address(0)) revert LayerBankHandler__PoolNotSet();
@@ -82,6 +82,8 @@ abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
      *      `exchangeRate >= RAY`: Aave's liquidity index starts at `1e27` and only grows (the
      *      live probe asserts that). Below RAY, floor-then-+1 is not always exact — any miss
      *      still reverts in the shared share-consumption check rather than orphaning a claim.
+     *      Also assumes the Pool burns half-up (probed live): under a round-up burn the + 1
+     *      case burns one share too many and reverts in that same check.
      */
     function _protocolRedeem(uint256 sharesAmount, uint256 exchangeRate) internal override {
         uint256 amountOut = _underlyingForExactScaledBurn(sharesAmount, exchangeRate);

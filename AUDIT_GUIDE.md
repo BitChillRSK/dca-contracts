@@ -46,8 +46,10 @@ batch is also atomic across all handlers.
 DOC is redeemed through Money on Chain. USDRIF and USDT0 are swapped to WRBTC through an allowlisted
 Uniswap V3 path and then unwrapped only when the user withdraws. The Uniswap path checks both an
 oracle-derived floor and the swapper's batch `minRbtcOut`; the stricter bound wins. Across both venues,
-a successful purchase must consume exactly the net stablecoin supplied to it. Uniswap additionally
-requires every intermediate-token balance on the shared router to return to its pre-swap value.
+the handler supplies the whole retrieved (gross) stablecoin to the venue, and a successful purchase must
+consume exactly that amount. No stablecoin fee is withheld first: the purchase fee is a share of the
+measured rBTC/WRBTC output, credited to the fee collector afterward. Uniswap additionally requires every
+intermediate-token balance on the shared router to return to its pre-swap value.
 
 ## Authority and trust boundaries
 
@@ -81,12 +83,16 @@ apply the same decision everywhere it is meant to apply.
   a venue fee or realized loss.
 - Integrator return values and balance views are not treated as received cash. Stablecoin and native
   receipts are measured by balance deltas.
-- Every successful purchase must reduce the handler's stablecoin balance by exactly the net amount
-  passed to the venue. A positive rBTC/WRBTC receipt with a partial or excessive input delta reverts
-  the entire batch.
-- Purchase fees are computed per row, transferred before the venue call, and configured independently
-  on every handler. Batch rBTC and measured stablecoin are allocated using planned net amounts as
-  weights. Integer division can leave less than one wei per row uncredited in the handler.
+- Every successful purchase must reduce the handler's stablecoin balance by exactly the gross amount
+  retrieved for the batch and passed to the venue. A positive rBTC/WRBTC receipt with a partial or
+  excessive input delta reverts the entire batch.
+- Purchase fees are computed per row from the planned gross amounts and configured independently on
+  every handler. No stablecoin moves to the collector: after the venue call, measured output `Q` is
+  split over the planned gross sum `G`. Each buyer is credited `floor(Q × netᵢ / G)` and the collector
+  `floor(Q × F / G)` on the same accumulated-rBTC books, where `netᵢ` is the row's amount minus its fee
+  and `F` the batch fee. `minRbtcOut` and the Uniswap oracle floor bind on `Q`, before the fee share.
+  The per-row `amountSpent` reported in events is the row's share of the retrieved gross. Integer
+  division can leave less than one wei per row, and per fee, uncredited in the handler.
 - Schedule principal is the amount still authorized for purchases, not a mark-to-market claim on a
   lending position. A full receipt-share claim may redeem for less stablecoin after an external loss or
   fee; the shortfall is not restored to principal.
@@ -101,9 +107,20 @@ midnight. Later eligibility is measured from that grid.
 
 A successful purchase consumes the newest due slot and all earlier missed slots. Missed purchases are
 not caught up: funds remain in the schedule and its lifetime extends. An established weekly Monday
-schedule that fails Monday and succeeds Tuesday is next due the following Monday. A schedule cannot
-purchase twice in one UTC day, even after a long gap. All transactions included within a due UTC day
-are equivalent for cadence; a later retry changes only execution price and external market state.
+schedule that fails Monday and succeeds Tuesday is next due the following Monday. While its period is
+unchanged, a schedule cannot purchase twice in one UTC day, even after a long gap. All transactions
+included within a due UTC day are equivalent for cadence; a later retry changes only execution price
+and external market state.
+
+A period edit does not move the anchor, so the next due day is the existing anchor plus the new period.
+The owner can therefore make their own schedule due again on a day it already bought: after a purchase
+that landed at least one new period late, shortening the period to no more than that lateness puts
+anchor-plus-period on or before today. A 28-day schedule bought seven days late and then set to seven
+days is due again that same day. That second purchase re-anchors on today, so the edit yields one extra
+purchase, not a loop. Only the schedule's owner can trigger it and the amount is still bounded by the
+schedule balance; `updatePurchasePeriod` is blocked during a protected window like every other edit.
+This is accepted, not enforced away: refusing a period that makes the schedule immediately due would
+also refuse ordinary mid-cycle shortening.
 
 The protected purchase window blocks only schedule edits/deletion and stablecoin/interest withdrawals
 through activation block `N + 4`; those actions resume at `N + 5`. Creation, deposits, interest top-up,
@@ -126,6 +143,13 @@ Other deliberate availability trade-offs:
   depeg beyond the configured BTC/USD-derived floor stops swaps rather than repricing the asset.
 - Dex input tokens must have at most 18 decimals. Fee-on-transfer tokens and asynchronous or partial
   lending redemptions are unsupported.
+- LayerBank redemptions are sized for the Pool's current aToken burn rounding (Aave half-up `rayDiv`)
+  and a liquidity index of at least one RAY. Upstream Aave v3 has since moved burns to round up. If the
+  LayerBank Pool adopts that, a large share of LayerBank redemptions (purchases and withdrawals) revert
+  on the exact share-consumption check until a re-derived handler is deployed on a new route; no claim
+  is orphaned and no funds move. `make fork-layerbank` and `make fork-sovryn` assert the live rounding
+  (`LayerBankLivePoolProbe`), so operations should rerun one of them whenever the Pool or aToken
+  implementation changes. See `src/layerbank/README.md`.
 - The bot must quote, simulate, group rows by handler, respect the protected-window workflow, and retry
   within the due UTC day when appropriate. Monitoring must track custom errors and the current event
   ABI. There is no `CadenceAnchorUpdated` log: after a purchase, recompute the anchor from prior

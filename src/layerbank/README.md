@@ -27,4 +27,17 @@ The v2-contracts README Core listing is stale and never included DOC. Do not cal
 - aToken exposes `POOL()`, `UNDERLYING_ASSET_ADDRESS()`, `scaledBalanceOf`. No `core()`, `accruedExchangeRate()`, or `underlying()`.
 - Pool `supply` has no return. `withdraw(asset, amount, to)` returns an amount — the handler measures DOC `balanceOf` deltas instead. `getReserveNormalizedIncome` is RAY (`1e27`).
 - Snapshotting `i_pool` from `aToken.POOL()` matches the Aave aToken's immutable Pool. A Pool migration means a new aToken and therefore a new handler. `LendingHandler` is initialized with hardcoded `EXCHANGE_RATE_DECIMALS` (RAY, `1e27`); there is no `exchangeRateDecimals` constructor arg.
+- Live `withdraw` burns scaled aTokens with half-up `rayDiv` (re-measured 2026-10-02, Pool `POOL_REVISION()` 7, 16 withdrawals of which several separate half-up from round-up). `LayerBankHandler._protocolRedeem` depends on that: see **Burn rounding** below.
 - Live `withdraw` reverts on insufficient aToken cash rather than under-paying. ~56,907 DOC cash vs ~199,584 supplied (2026-08-24): an illiquid reserve aborts the entire `batchBuyRbtc`, not one buyer. Same shape as Tropykus/Sovryn; ops note for PR 16.
+
+## Burn rounding (assumption and monitoring)
+
+The Pool has no share-sized withdraw, so the handler picks the underlying amount `a` whose burn is exactly the `s` scaled shares debited from the user's book: `floor(s × index / RAY)`, plus one wei when half-up `rayDiv` of that floor lands on `s − 1`. `LendingHandler` then requires `scaledBalanceOf` to fall by exactly `s`.
+
+Upstream Aave v3 now burns with a ceiling (`TokenMath.getATokenBurnScaledAmount` uses `rayDivCeil`; mints floor). Under that rule the floor is always exact for `index ≥ RAY` and the `+ 1` case burns `s + 1`, which reverts `LendingHandler__ShareConsumptionMismatch`. The sizing cannot be made correct under both rules with one withdrawal: half-up needs `a × RAY / index ∈ [s − ½, s + ½)`, round-up needs `(s − 1, s]`, and the overlap `[s − ½, s]` is narrower than one wei of `a` whenever `index < 2 RAY` — which is where a live index sits. Whenever the floor lands below `s − ½`, half-up needs `floor + 1` and round-up needs `floor`. The rounding-agnostic alternative (withdraw the floor, read `scaledBalanceOf`, withdraw one more wei if one share short) costs an extra aToken read on every redeem and a second Pool `withdraw` on roughly half of them, on the swapper-paid purchase path, to cover an upgrade that fails closed. It was declined; the exact-consumption check is unchanged.
+
+If LayerBank upgrades to round-up burns:
+
+- Effect: every redeem whose floor needs the `+ 1` reverts — batch purchases, principal withdrawals and interest withdrawals on all three LayerBank handlers. The same redeem can succeed at a later index. Nothing is orphaned or mispriced; shares stay on the books and in the aToken.
+- Detection: `test_livePool_withdrawBurnsHalfUpScaledShares` in `test/unit/layerbank/LayerBankLivePoolProbe.t.sol` fails. It runs in `make fork-layerbank` and `make fork-sovryn` at the chain tip. Monitoring should also alert on `LendingHandler__ShareConsumptionMismatch` from a LayerBank handler and on an implementation change of the Pool (`0x526D…72E9`) or aToken proxies; rerun the fork lane on either.
+- Response: handlers are immutable. Deploy a handler with round-up sizing (drop the `+ 1`) on a new route index and have users exit and re-enter; until then exits may need retries across index updates.

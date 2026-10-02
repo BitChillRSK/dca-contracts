@@ -85,7 +85,7 @@ contract LayerBankHandlerTest is HandlerTestHarness {
             minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
         });
 
-        vm.expectRevert(ILayerBankHandler.LayerBankHandler__UnderlyingMismatch.selector);
+        vm.expectRevert(ILendingHandler.LendingHandler__UnderlyingMismatch.selector);
         new LayerBankTestHandler(
             address(dcaManager), address(stablecoin), address(mismatch), FEE_COLLECTOR, feeSettings, OWNER
         );

@@ -36,6 +36,9 @@ abstract contract SovrynHandler is LendingHandler {
         LendingHandler(dcaManager, stablecoin, EXCHANGE_RATE_DECIMALS)
     {
         i_iToken = IiSusdToken(iToken);
+        if (i_iToken.loanTokenAddress() != stablecoin) {
+            revert LendingHandler__UnderlyingMismatch();
+        }
         _approveLendingSpender();
     }
 

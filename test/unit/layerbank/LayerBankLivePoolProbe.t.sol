@@ -2,6 +2,7 @@
 pragma solidity 0.8.36;
 
 import {Test} from "forge-std/Test.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {LayerBankDocHandlerMoc} from "src/layerbank/LayerBankDocHandlerMoc.sol";
 import {ILayerBankAToken} from "src/layerbank/ILayerBankAToken.sol";
 import {ILayerBankPool} from "src/layerbank/ILayerBankPool.sol";
@@ -68,6 +69,35 @@ contract LayerBankLivePoolProbe is Test {
         assertEq(address(handler.i_aToken()), ATOKEN);
         assertEq(address(handler.i_pool()), POOL);
         assertEq(handler.i_aToken().UNDERLYING_ASSET_ADDRESS(), DOC);
+    }
+
+    /// @dev `LayerBankHandler` redeem sizing assumes half-up burns; upstream Aave v3 now rounds up.
+    ///      Fails the fork gate if the live Pool follows. See `src/layerbank/README.md`.
+    function test_livePool_withdrawBurnsHalfUpScaledShares() public {
+        uint256 supplied = 1000 ether;
+        vm.prank(DOC_HOLDER);
+        IERC20(DOC).transfer(address(this), supplied);
+        IERC20(DOC).approve(POOL, supplied);
+
+        ILayerBankPool pool = ILayerBankPool(POOL);
+        ILayerBankAToken aToken = ILayerBankAToken(ATOKEN);
+        pool.supply(DOC, supplied, address(this), 0);
+        uint256 index = pool.getReserveNormalizedIncome(DOC);
+
+        uint256 separatingSamples;
+        for (uint256 i; i < 16; ++i) {
+            uint256 amount = 1 ether + i * 7;
+            uint256 halfUp = (amount * 1e27 + index / 2) / index;
+            uint256 roundUp = (amount * 1e27 + index - 1) / index;
+
+            uint256 scaledBefore = aToken.scaledBalanceOf(address(this));
+            pool.withdraw(DOC, amount, address(this));
+            uint256 burned = scaledBefore - aToken.scaledBalanceOf(address(this));
+
+            assertEq(burned, halfUp, "live Pool no longer burns half-up: re-derive LayerBankHandler redeem sizing");
+            if (halfUp != roundUp) ++separatingSamples;
+        }
+        assertGt(separatingSamples, 0, "no sample separated half-up from round-up");
     }
 
     function test_liveUsdrifAToken_underlyingIsUsdrifNotRusdt() public {

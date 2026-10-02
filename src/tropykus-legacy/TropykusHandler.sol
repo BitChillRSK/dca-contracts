@@ -38,6 +38,9 @@ abstract contract TropykusHandler is LendingHandler, ITropykusHandler {
         LendingHandler(dcaManager, stablecoin, EXCHANGE_RATE_DECIMALS)
     {
         i_kToken = IkToken(kToken);
+        if (i_kToken.underlying() != stablecoin) {
+            revert LendingHandler__UnderlyingMismatch();
+        }
         _approveLendingSpender();
     }
 
