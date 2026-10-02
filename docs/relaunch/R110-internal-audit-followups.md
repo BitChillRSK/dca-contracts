@@ -164,5 +164,7 @@ the front end can tell a user whose last purchase is stuck to withdraw the remai
   event, or storage change.
 - Scripts: none. `DeployFinal` already passes the matching iSUSD and DOC.
 - Cutover: `bitchill-monitoring` regenerates `abi.json` at cutover anyway; the new error is in the
-  Sovryn leaves' ABI. Operations rerun `make fork-layerbank` when the LayerBank Pool or aToken
-  implementation changes.
+  Sovryn leaves' ABI
+  ([bitchill-monitoring#10 comment](https://github.com/BitChillRSK/bitchill-monitoring/issues/10#issuecomment-5948821411)).
+  Operations rerun `make fork-layerbank` when the LayerBank Pool or aToken implementation changes;
+  the alert for that is [bitchill-monitoring#36](https://github.com/BitChillRSK/bitchill-monitoring/issues/36).
