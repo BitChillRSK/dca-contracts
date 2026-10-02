@@ -122,10 +122,11 @@ interface IPurchaseUniswap {
     /**
      * @notice Set the lowest `amountOutMinimumPercent` the owner may configure.
      * @param amountOutMinimumSafetyCheck New bound, 1e18-scaled. Never enters swap math.
-     * @dev This is the wall a single percentage change cannot cross: widening the live floor past it
-     *      takes two transactions, lowering this bound first. It bounds the fraction, not the price:
-     *      `setMocOracle` replaces the price source in one transaction. Raising it above the active
-     *      floor reverts without changing state.
+     * @dev The live floor percentage cannot be set below this bound, so lowering the floor past it takes
+     *      two transactions: lower this bound, then the floor. Setting this bound above the live floor
+     *      reverts without changing state.
+     *      The bound limits the percentage only. The floor is that percentage of the rBTC amount the
+     *      oracle price implies, and `setMocOracle` can change the oracle in one transaction.
      */
     function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external;
 
