@@ -46,8 +46,6 @@ interface IkToken {
      */
     function exchangeRateCurrent() external returns (uint256);
 
-    /**
-     * @notice Underlying asset for this CToken
-     */
+    /// @notice Underlying asset for this CToken
     function underlying() external view returns (address);
 }

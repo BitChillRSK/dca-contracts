@@ -51,7 +51,6 @@ contract MockIsusdToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
         i_deploymentTimestamp = block.timestamp;
     }
 
-    /// @notice Sovryn's name for the underlying; the handler checks it at construction.
     function loanTokenAddress() external view returns (address) {
         return address(i_docToken);
     }

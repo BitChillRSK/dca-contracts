@@ -104,7 +104,8 @@ the front end can tell a user whose last purchase is stuck to withdraw the remai
 - [x] `AUDIT_GUIDE.md`: gross-to-venue, fee credited in rBTC from measured output, allocation
       formulas, exact gross consumption.
 - [x] `AUDIT_GUIDE.md` and `IDcaManager.batchBuyRbtc` NatSpec: the one-buy-per-UTC-day rule is
-      conditional on an unchanged period; describe the period-edit case.
+      conditional on an unchanged period. The guide describes the period-edit case; the NatSpec
+      carries only the condition.
 - [x] `RbtcPurchaseTest.testLateBuyThenShorterPeriodIsDueAgainTheSameUtcDay` pins it.
 - [x] `ILendingHandler.LendingHandler__UnderlyingMismatch()` replaces
       `ILayerBankHandler.LayerBankHandler__UnderlyingMismatch()`; `LayerBankHandler` reverts with it.

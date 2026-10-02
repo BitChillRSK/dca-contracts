@@ -45,9 +45,6 @@ interface IiSusdToken {
      */
     function tokenPrice() external view returns (uint256 price);
 
-    /**
-     * @notice The underlying token this loan token lends
-     * @return The underlying (loan) token address
-     */
+    /// @notice The underlying token this iToken lends.
     function loanTokenAddress() external view returns (address);
 }

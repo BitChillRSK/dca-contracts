@@ -207,13 +207,8 @@ contract RbtcPurchaseTest is DcaDappTest {
         buyRbtcOne(scheduleId);
     }
 
-    /**
-     * @dev Pins a known property, not a desired one: "one buy per UTC day" holds only while the period
-     *      is unchanged. A buy that lands at least one new period late leaves the anchor on the old
-     *      grid, so shortening the period to no more than that lateness makes the schedule due again
-     *      the same day. Only the owner can do it, to their own schedule (R110 kept this; a guard in
-     *      `updatePurchasePeriod` would also refuse ordinary mid-cycle shortening).
-     */
+    /// @dev Accepted behaviour (R110): a period edit keeps the anchor, so "one buy per UTC day" holds
+    ///      only while the period is unchanged.
     function testLateBuyThenShorterPeriodIsDueAgainTheSameUtcDay() external {
         uint256 longPeriod = 28 days;
         uint256 shortPeriod = 7 days;
@@ -224,7 +219,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, longPeriod);
         buyRbtcOne(scheduleId);
 
-        // The 28-day slot is bought seven days late. The anchor stays on the old grid.
+        // Bought seven days late; the anchor stays on the 28-day grid.
         uint256 lateBuy = _utcDayStart(firstBuy) + longPeriod + shortPeriod + 10 hours;
         vm.warp(lateBuy);
         buyRbtcOne(scheduleId);
@@ -247,14 +242,14 @@ contract RbtcPurchaseTest is DcaDappTest {
         vm.prank(USER);
         dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, shortPeriod);
 
-        // Same block timestamp, so the same UTC day: old anchor + new period is today.
+        // Old anchor + new period is today.
         buyRbtcOne(scheduleId);
 
         schedule = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         assertEq(schedule.tokenBalance, balanceAfterLateBuy - AMOUNT_TO_SPEND, "second same-day purchase debited");
         assertEq(schedule.cadenceAnchor, _utcDayStart(lateBuy), "anchor moved to today on the new grid");
 
-        // The edit buys one extra purchase, not a loop: the schedule is now a full new period from due.
+        // One extra purchase, not a loop.
         vm.expectRevert(
             abi.encodeWithSelector(
                 IDcaManager.DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed.selector,

@@ -80,7 +80,6 @@ contract MockKdocToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
         s_increaseBalanceOnRedeem = increaseBalanceOnRedeem;
     }
 
-    /// @notice Compound's name for the underlying; the handler checks it at construction.
     function underlying() external view returns (address) {
         return address(i_docToken);
     }

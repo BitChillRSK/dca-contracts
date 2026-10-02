@@ -71,15 +71,8 @@ contract LayerBankLivePoolProbe is Test {
         assertEq(handler.i_aToken().UNDERLYING_ASSET_ADDRESS(), DOC);
     }
 
-    /**
-     * @dev `LayerBankHandler` sizes each withdrawal so that Aave's half-up `rayDiv` burns exactly the
-     *      booked scaled shares. Current upstream Aave v3 burns with a ceiling instead (`rayDivCeil`
-     *      in `TokenMath.getATokenBurnScaledAmount`); if LayerBank adopts it, the handler's
-     *      floor + 1 candidate burns one share too many and those redeems revert on the shared
-     *      exact-consumption check. No single amount is exact under both rules while the index is
-     *      below 2 RAY, so the handler keeps the half-up sizing and this probe fails the fork gate
-     *      the day the live Pool stops burning half-up.
-     */
+    /// @dev `LayerBankHandler` redeem sizing assumes half-up burns; upstream Aave v3 now rounds up.
+    ///      Fails the fork gate if the live Pool follows. See `src/layerbank/README.md`.
     function test_livePool_withdrawBurnsHalfUpScaledShares() public {
         uint256 supplied = 1000 ether;
         vm.prank(DOC_HOLDER);
@@ -89,7 +82,6 @@ contract LayerBankLivePoolProbe is Test {
         ILayerBankPool pool = ILayerBankPool(POOL);
         ILayerBankAToken aToken = ILayerBankAToken(ATOKEN);
         pool.supply(DOC, supplied, address(this), 0);
-        // One block, so the index every withdrawal below burns at.
         uint256 index = pool.getReserveNormalizedIncome(DOC);
 
         uint256 separatingSamples;

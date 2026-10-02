@@ -11,9 +11,8 @@ import "test/Constants.sol";
 /**
  * @title SovrynLiveITokenProbe
  * @notice View + construct probe against the live Rootstock Sovryn iSUSD loan token.
- * @dev Lives under `test/unit/` so the chain-tip fork lanes run it. Skips when iSUSD has no code
- *      (Anvil). Pins the name of the underlying getter `SovrynHandler` checks at construction:
- *      the live loan token answers `loanTokenAddress()`, not `underlying()` or `asset()`.
+ * @dev Runs in the chain-tip fork lanes; skips when iSUSD has no code (Anvil). Pins the getter
+ *      `SovrynHandler` checks at construction: `loanTokenAddress()`.
  */
 contract SovrynLiveITokenProbe is Test {
     address internal constant I_SUSD = 0xd8D25f03EBbA94E15Df2eD4d6D38276B595593c1;

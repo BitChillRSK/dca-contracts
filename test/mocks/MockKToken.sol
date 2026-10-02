@@ -25,7 +25,6 @@ contract MockKToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
         i_deploymentTimestamp = block.timestamp;
     }
 
-    /// @notice Compound's name for the underlying; the handler checks it at construction.
     function underlying() external view returns (address) {
         return address(i_stablecoin);
     }
