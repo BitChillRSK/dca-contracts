@@ -16,7 +16,8 @@ that name the mainnet address.
 the constructor arg to `iToken`, but left the vendored interface file and type as `IiSusdToken` so it
 stayed diffable against an older upstream dump. That left a permanent mismatch: the immutable is an
 `IiSusdToken` named `i_iToken`, mocks are `MockIsusdToken`, and tests still say `iSusdToken`. Sovryn's
-receipt tokens are iTokens generically; iSUSD is only the DOC instance. Align the type, file, mock,
+receipt tokens are iTokens generically; the DOC instance is iDOC (on-chain ERC-20 symbol still
+`iSUSD`). Align the type, file, mock,
 and locals with `i_aToken` / `i_kToken` parity.
 
 ## Open product decisions
@@ -28,14 +29,15 @@ and locals with `i_aToken` / `i_kToken` parity.
 - [ ] Rename `src/sovryn/IiSusdToken.sol` → `IiToken.sol`; interface `IiSusdToken` → `IiToken`.
       Update NatSpec to say iToken (not iSusd) for the generic share surface.
 - [ ] Update `SovrynHandler` import/casts and adapter comments that still say iSUSD for the generic
-      receipt (keep "iSUSD" only where a comment names the live DOC product / address).
+      receipt (DOC-specific leaf comments use iDOC; keep a note that on-chain `symbol()` is `iSUSD`
+      where that distinction matters).
 - [ ] Rename `test/mocks/MockIsusdToken.sol` → `MockIToken.sol`; contract `MockIsusdToken` →
       `MockIToken`. Fix the mock ERC-20 name/symbol (was "Tropykus iSUSD") to a generic Mock iToken.
 - [ ] Rename remaining first-party identifiers in `src/`, `test/`, `script/` that use `iSusd` /
       `Isusd` / `ISusd` as the BitChill noun (`iSusdToken` → `iToken`, `s_iSusd` → `s_iToken`,
       `bothHalvesISusd` → `bothHalvesIToken`, `test_liveISusd_*` → `test_liveIToken_*`, etc.).
 - [ ] Live-address constants that point at DOC's iToken (`I_SUSD` / `ISUSD`) → `I_TOKEN` (comments
-      may still say the proxy is iSUSD).
+      name the pool iDOC; may note on-chain symbol `iSUSD`).
 - [ ] Update `foundry.toml` `[fmt].ignore`, `AGENTS.md` vendored-interface list, this folder's
       Status / IMPLEMENTATION_ORDER row. Do **not** rewrite closed historical relaunch specs.
 

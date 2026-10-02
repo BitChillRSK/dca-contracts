@@ -100,7 +100,7 @@ contract StandingApprovalProbe is Test {
 
     address internal constant USDT0_HOLDER = 0xaeF6fABf3b0C9e5F9d6D5170AfC703A633479Bbd;
 
-    /// @dev The two production lending spenders: `SovrynHandler._lendingSpender()` (iSUSD, whose
+    /// @dev The two production lending spenders: `SovrynHandler._lendingSpender()` (iDOC, whose
     ///      underlying is DOC) and `LayerBankHandler._lendingSpender()` (the Aave-v3 Pool).
     address internal constant I_TOKEN = 0xd8D25f03EBbA94E15Df2eD4d6D38276B595593c1;
     address internal constant LAYERBANK_POOL = 0x526D06c65777eA6D56d7a1Dd47cD79230dDf72E9;
@@ -232,11 +232,11 @@ contract StandingApprovalProbe is Test {
         vm.prank(victim);
         IERC20(DOC).approve(I_TOKEN, type(uint256).max);
 
-        // `mint(receiver, depositAmount)` names the receiver of the iSUSD, never the payer of the DOC.
+        // `mint(receiver, depositAmount)` names the receiver of the iDOC, never the payer of the DOC.
         vm.prank(attacker);
         (bool minted,) = I_TOKEN.call(abi.encodeCall(ILoanTokenLike.mint, (attacker, funded)));
-        assertFalse(minted, "iSUSD minted against someone else's allowance");
-        assertEq(IERC20(DOC).balanceOf(victim), funded, "a standing iSUSD allowance was spendable");
+        assertFalse(minted, "iDOC minted against someone else's allowance");
+        assertEq(IERC20(DOC).balanceOf(victim), funded, "a standing iDOC allowance was spendable");
     }
 
     function test_layerBankStandingApprovalIsUnreachableByAThirdParty() public {
@@ -287,8 +287,8 @@ contract StandingApprovalProbe is Test {
     }
 
     /**
-     * @notice Sovryn's iSUSD registers no implementation for bZx's `flashBorrowToken`, which is what
-     *         keeps the standing iSUSD approval out of reach of that entry point.
+     * @notice Sovryn's iDOC registers no implementation for bZx's `flashBorrowToken`, which is what
+     *         keeps the standing iDOC approval out of reach of that entry point.
      * @dev Not the LayerBank shape: bZx lets its caller name both a `target` and the calldata sent to
      *      it, so the approver answers nothing and no handler shape defends the allowance. Sovryn not
      *      implementing the function is the whole defence.
@@ -301,11 +301,11 @@ contract StandingApprovalProbe is Test {
         vm.prank(attacker);
         (bool ok, bytes memory reason) =
             I_TOKEN.call(abi.encodeCall(ISovrynFlashBorrowLike.flashBorrowToken, (1e18, attacker, attacker, "", "")));
-        assertFalse(ok, "Sovryn flash borrow is live again; re-examine the standing iSUSD approval");
+        assertFalse(ok, "Sovryn flash borrow is live again; re-examine the standing iDOC approval");
         assertEq(
             _revertReason(reason),
             "LoanTokenLogicProxy:target not active",
-            "iSUSD answered flashBorrowToken; re-examine the standing iSUSD approval"
+            "iDOC answered flashBorrowToken; re-examine the standing iDOC approval"
         );
     }
 

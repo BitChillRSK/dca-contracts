@@ -32,7 +32,7 @@ contract DexHelperConfig is Script {
 
         // Share token addresses by protocol
         address tropykusShareToken; // Legacy Tropykus shares (kDOC, kUSDRIF); local/fork lanes only
-        address sovrynShareToken; // The share token for Sovryn (e.g., iSUSD)
+        address sovrynShareToken; // The share token for Sovryn (e.g., iDOC)
         address layerbankAToken; // LayerBank aToken; handler reads Pool from aToken.POOL()
 
         // Swap-related addresses
@@ -109,7 +109,7 @@ contract DexHelperConfig is Script {
             poolFeeRates[1] = 500;
             stablecoin = 0xCB46c0ddc60D18eFEB0E586C17Af6ea36452Dae0; // DOC token on testnet
             tropykusShareToken = 0x71e6B108d823C2786f8EF63A3E0589576B4F3914; // kDOC proxy on testnet
-            sovrynShareToken = 0x74e00A8CeDdC752074aad367785bFae7034ed89f; // iSUSD proxy on testnet
+            sovrynShareToken = 0x74e00A8CeDdC752074aad367785bFae7034ed89f; // iDOC proxy on testnet
             layerbankAToken = address(0); // LayerBank DOC dex is out of scope
         }
 
@@ -165,7 +165,7 @@ contract DexHelperConfig is Script {
             poolFeeRates[1] = 500;
             stablecoin = 0xe700691dA7b9851F2F35f8b8182c69c53CcaD9Db; // DOC token on mainnet
             tropykusShareToken = 0x544Eb90e766B405134b3B3F62b6b4C23Fcd5fDa2; // kDOC proxy on mainnet
-            sovrynShareToken = 0xd8D25f03EBbA94E15Df2eD4d6D38276B595593c1; // iSUSD proxy on mainnet
+            sovrynShareToken = 0xd8D25f03EBbA94E15Df2eD4d6D38276B595593c1; // iDOC proxy on mainnet
             layerbankAToken = address(0); // LayerBank DOC dex is out of scope
         }
 

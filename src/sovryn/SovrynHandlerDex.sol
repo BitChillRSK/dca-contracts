@@ -10,7 +10,7 @@ import {SovrynHandler} from "./SovrynHandler.sol";
  * @notice Sovryn lending + Uniswap V3 purchases.
  * @dev Constructor-only leaf. Only its immutable DcaManager moves principal, buys, or withdraws rBTC;
  *      the owner controls fees, oracle, path allowlist, and floor. Holds standing max stablecoin
- *      approvals to SwapRouter02 and the iSUSD token, restorable by anyone.
+ *      approvals to SwapRouter02 and the iToken, restorable by anyone.
  */
 contract SovrynHandlerDex is SovrynHandler, PurchaseUniswap {
     /**

@@ -10,9 +10,10 @@ import "test/Constants.sol";
 
 /**
  * @title SovrynLiveITokenProbe
- * @notice View + construct probe against the live Rootstock Sovryn iSUSD loan token.
- * @dev Runs in the chain-tip fork lanes; skips when iSUSD has no code (Anvil). Pins the getter
- *      `SovrynHandler` checks at construction: `loanTokenAddress()`.
+ * @notice View + construct probe against the live Rootstock Sovryn iDOC loan token.
+ * @dev Runs in the chain-tip fork lanes; skips when iDOC has no code (Anvil). Pins the getter
+ *      `SovrynHandler` checks at construction: `loanTokenAddress()`. On-chain `symbol()` is still
+ *      `iSUSD`; Sovryn docs/SIPs call the same pool iDOC.
  */
 contract SovrynLiveITokenProbe is Test {
     address internal constant I_TOKEN = 0xd8D25f03EBbA94E15Df2eD4d6D38276B595593c1;
@@ -27,9 +28,9 @@ contract SovrynLiveITokenProbe is Test {
         assertEq(IiToken(I_TOKEN).loanTokenAddress(), DOC, "loanTokenAddress()");
 
         (bool okUnderlying,) = I_TOKEN.staticcall(abi.encodeWithSignature("underlying()"));
-        assertFalse(okUnderlying, "live iSUSD must not expose underlying()");
+        assertFalse(okUnderlying, "live iDOC must not expose underlying()");
         (bool okAsset,) = I_TOKEN.staticcall(abi.encodeWithSignature("asset()"));
-        assertFalse(okAsset, "live iSUSD must not expose asset()");
+        assertFalse(okAsset, "live iDOC must not expose asset()");
     }
 
     function test_liveIToken_constructsHandlerForItsUnderlying() public {

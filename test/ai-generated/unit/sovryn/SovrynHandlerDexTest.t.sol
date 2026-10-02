@@ -349,7 +349,7 @@ contract SovrynHandlerDexTest is HandlerTestHarness {
         uint256 lendingBalance = sovrynDexHandler.getUserShares(USER);
         assertGt(lendingBalance, 0);
 
-        // Check iSUSD balance (in our mock, handler holds tokens instead of burning)
+        // Check iDOC balance (in our mock, handler holds tokens instead of burning)
         uint256 iTokenBalance = iToken.balanceOf(address(handler));
         assertGt(iTokenBalance, 0); // Mock implementation holds tokens in handler
 
@@ -448,7 +448,7 @@ contract SovrynHandlerDexTest is HandlerTestHarness {
     //////////////////////////////////////////////////////////////*/
 
     function test_sovrynDex_lendingProtocolIntegration() public {
-        // Test that Sovryn's iSUSD burn works with DEX
+        // Test that Sovryn's iDOC burn works with DEX
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);
 

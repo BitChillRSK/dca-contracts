@@ -55,7 +55,7 @@ contract SovrynHandlerTest is HandlerTestHarness {
     }
 
     function setupHandlerSpecifics() internal override {
-        // Deploy mock iSUSD token for Sovryn lending
+        // Deploy mock iDOC token for Sovryn lending
         iToken = new MockIToken(address(stablecoin));
 
         // Note: MockIToken has time-based price calculation built in

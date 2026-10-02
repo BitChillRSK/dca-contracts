@@ -684,7 +684,7 @@ contract DcaDappTest is Test {
         }
         uint256 totalGrossPurchaseAmount = totalNetPurchaseAmount + totalFee;
         // After R1 the batch event's measured DOC is in data, not a topic. expectEmit
-        // cannot check that: data is exact, and on a live iSUSD fork tokenPrice
+        // cannot check that: data is exact, and on a live iDOC fork tokenPrice
         // rounding is 1 wei off (SIP-0094 is not charging). Per-user redeem logs and the
         // iToken Transfer also fire first, so a selector-only expectEmit for the batch event
         // is order-fragile on a fork. Read the log after the call.

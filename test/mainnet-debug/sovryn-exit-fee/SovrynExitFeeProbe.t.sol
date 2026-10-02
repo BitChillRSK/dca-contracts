@@ -29,7 +29,7 @@ contract SovrynExitFeeDirectBurnProbe is Test {
     address constant EXIT_FEE_CONTROLLER = 0x8C1abf364Bf214E41221562693BD9Fb26D6Fa563;
     /// @dev Historical SIP-0094 vault from early Perimeter wiring. Tip burns no longer fund it.
     address constant LEGACY_EXIT_FEE_VAULT = 0x2ba389B021fA4A5F50cc1758EFD23Ca066d0Be08;
-    /// @dev Observed live fee sink on tip (2026-09-07): DOC `Transfer` of ~10 bps on each iSUSD burn.
+    /// @dev Observed live fee sink on tip (2026-09-07): DOC `Transfer` of ~10 bps on each iDOC burn.
     address constant LIVE_FEE_SINK = 0xDDE75f75ff33Aa802f2316cCAe2bE77823fc6f9B;
     address constant SOVRYN_PROTOCOL = 0x5A0D867e0D70Fcc6Ade25C3F1B89d618b5B4Eaa7;
     uint256 constant DEPOSIT_AMOUNT = 1000 ether;
@@ -122,7 +122,7 @@ contract SovrynExitFeeWithdrawalProbe is DcaDappTest {
         super.withdrawStablecoin();
 
         uint256 paid = IERC20(doc).balanceOf(USER) - userDocBefore;
-        console2.log("iSUSD burned (handler)", iTokenBefore - IERC20(iToken).balanceOf(handler));
+        console2.log("iDOC burned (handler)", iTokenBefore - IERC20(iToken).balanceOf(handler));
         console2.log("DOC paid to user", paid);
         console2.log("legacy ExitFeeVault DOC delta", IERC20(doc).balanceOf(LEGACY_EXIT_FEE_VAULT) - legacyVaultBefore);
         console2.log("live fee sink DOC delta", IERC20(doc).balanceOf(LIVE_FEE_SINK) - liveSinkBefore);
