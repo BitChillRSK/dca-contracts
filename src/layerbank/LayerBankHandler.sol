@@ -82,6 +82,11 @@ abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
      *      `exchangeRate >= RAY`: Aave's liquidity index starts at `1e27` and only grows (the
      *      live probe asserts that). Below RAY, floor-then-+1 is not always exact — any miss
      *      still reverts in the shared share-consumption check rather than orphaning a claim.
+     *      Also assumes the Pool burns half-up. A Pool that rounds the burn up instead burns
+     *      exactly `sharesAmount` for the floor and one share more for floor + 1, so every redeem
+     *      this sizing bumps would revert in that same check. Below an index of `2 * RAY` no
+     *      single amount is exact under both rules, so this is a deployment assumption the live
+     *      probe pins, not something the sizing can absorb.
      */
     function _protocolRedeem(uint256 sharesAmount, uint256 exchangeRate) internal override {
         uint256 amountOut = _underlyingForExactScaledBurn(sharesAmount, exchangeRate);
