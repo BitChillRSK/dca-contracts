@@ -375,8 +375,10 @@ interface IDcaManager {
      * @param batch One handler's purchase batch. Every row must share `token` and `routeIndex`.
      * @dev Only a swapper on the OperationsAdmin allowlist may call.
      *      Eligibility starts at 00:00 UTC on the due day, leaving that day for retries. A buy consumes
-     *      its due slot and skips earlier missed slots, preventing catch-up or a second buy that UTC day.
-     *      An established weekly Monday schedule bought Tuesday remains due the following Monday.
+     *      its due slot and skips earlier missed slots, preventing catch-up; while the period is unchanged
+     *      it also prevents a second buy that UTC day. An established weekly Monday schedule bought
+     *      Tuesday remains due the following Monday. The due day is the anchor plus the current period,
+     *      so an owner who shortens the period after a late buy can make the schedule due again that day.
      *      Any paused row fails the whole batch or multi-handler bundle. The token is part of each
      *      schedule key and the route is checked, so rows cannot cross handlers. A measured receipt below
      *      `minRbtcOut` reverts the purchase and all schedule debits.

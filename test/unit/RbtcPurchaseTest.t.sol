@@ -207,6 +207,65 @@ contract RbtcPurchaseTest is DcaDappTest {
         buyRbtcOne(scheduleId);
     }
 
+    /**
+     * @dev Pins a known property, not a desired one: "one buy per UTC day" holds only while the period
+     *      is unchanged. A buy that lands at least one new period late leaves the anchor on the old
+     *      grid, so shortening the period to no more than that lateness makes the schedule due again
+     *      the same day. Only the owner can do it, to their own schedule (R110 kept this; a guard in
+     *      `updatePurchasePeriod` would also refuse ordinary mid-cycle shortening).
+     */
+    function testLateBuyThenShorterPeriodIsDueAgainTheSameUtcDay() external {
+        uint256 longPeriod = 28 days;
+        uint256 shortPeriod = 7 days;
+        uint256 firstBuy = _nextUtcTimestamp(9 hours);
+        vm.warp(firstBuy);
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
+        vm.prank(USER);
+        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, longPeriod);
+        buyRbtcOne(scheduleId);
+
+        // The 28-day slot is bought seven days late. The anchor stays on the old grid.
+        uint256 lateBuy = _utcDayStart(firstBuy) + longPeriod + shortPeriod + 10 hours;
+        vm.warp(lateBuy);
+        buyRbtcOne(scheduleId);
+
+        IDcaManager.DcaSchedule memory schedule = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
+        assertEq(schedule.cadenceAnchor, _utcDayStart(firstBuy) + longPeriod);
+        uint256 balanceAfterLateBuy = schedule.tokenBalance;
+
+        // Control: with the period unchanged, a second buy that UTC day is refused.
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDcaManager.DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed.selector,
+                address(stablecoin),
+                scheduleId,
+                _secondsUntilDueUtcDayStart(schedule.cadenceAnchor, longPeriod)
+            )
+        );
+        buyRbtcOne(scheduleId);
+
+        vm.prank(USER);
+        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, shortPeriod);
+
+        // Same block timestamp, so the same UTC day: old anchor + new period is today.
+        buyRbtcOne(scheduleId);
+
+        schedule = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
+        assertEq(schedule.tokenBalance, balanceAfterLateBuy - AMOUNT_TO_SPEND, "second same-day purchase debited");
+        assertEq(schedule.cadenceAnchor, _utcDayStart(lateBuy), "anchor moved to today on the new grid");
+
+        // The edit buys one extra purchase, not a loop: the schedule is now a full new period from due.
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDcaManager.DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed.selector,
+                address(stablecoin),
+                scheduleId,
+                _secondsUntilDueUtcDayStart(schedule.cadenceAnchor, shortPeriod)
+            )
+        );
+        buyRbtcOne(scheduleId);
+    }
+
     function testPurchasePeriodMustBeWholeDays() external {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.prank(USER);
