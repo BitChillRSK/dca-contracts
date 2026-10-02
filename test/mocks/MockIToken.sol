@@ -10,12 +10,12 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {console} from "forge-std/Test.sol";
 
-contract MockIsusdToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
+contract MockIToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
     IStablecoin immutable i_docToken;
     uint256 constant DECIMALS = 1e18;
-    uint256 constant STARTING_EXCHANGE_RATE = 2 * DECIMALS / 100; // Each DOC token deposited mints 50 iSUSD tokens, each iSUSD token redeems 0.02 DOC tokens
+    uint256 constant STARTING_EXCHANGE_RATE = 2 * DECIMALS / 100; // Each DOC token deposited mints 50 iTokens, each iToken redeems 0.02 DOC tokens
     uint256 immutable i_deploymentTimestamp;
-    uint256 constant ANNUAL_INCREASE = 5; // The DOC tokens redeemed by each iSUSD token increase by 5% annually (mocking behaviour)
+    uint256 constant ANNUAL_INCREASE = 5; // The DOC tokens redeemed by each iToken increase by 5% annually (mocking behaviour)
     uint256 constant YEAR_IN_SECONDS = 31536000;
     uint256 constant BPS_DENOMINATOR = 10_000;
     /**
@@ -26,13 +26,13 @@ contract MockIsusdToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
      */
     uint256 private s_exitFeeBps;
     /**
-     * @notice When set, burn() burns the iSUSD, transfers nothing, and still returns the GROSS amount.
+     * @notice When set, burn() burns the iToken, transfers nothing, and still returns the GROSS amount.
      * @dev Models a Sovryn iToken that reports success while paying out nothing. Integrators that
      *      trust the return value lose the burnt shares; the handler must revert on a zero DOC delta.
      */
     bool private s_silentZeroPayout;
     /**
-     * @notice When set, burn only this many BPS of the requested iSUSD and pay cash for that fraction.
+     * @notice When set, burn only this many BPS of the requested iToken and pay cash for that fraction.
      * @dev Models a partial-liquidity fill that leaves the unpaid claim withdrawable. BPS_DENOMINATOR = full.
      */
     uint256 private s_partialBurnBps = BPS_DENOMINATOR;
@@ -41,12 +41,12 @@ contract MockIsusdToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
      */
     bool private s_revertOnBurn;
     /**
-     * @notice When set, burn consumes more iSUSD than requested (or mints if negative via separate flag).
+     * @notice When set, burn consumes more iToken than requested (or mints if negative via separate flag).
      */
     bool private s_overBurn;
     bool private s_increaseBalanceOnBurn;
 
-    constructor(address docToken) ERC20("Tropykus iSUSD", "iSUSD") Ownable(msg.sender) ERC20Permit("Tropykus iSUSD") {
+    constructor(address docToken) ERC20("Mock iToken", "iToken") Ownable(msg.sender) ERC20Permit("Mock iToken") {
         i_docToken = IStablecoin(docToken);
         i_deploymentTimestamp = block.timestamp;
     }
@@ -67,12 +67,12 @@ contract MockIsusdToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
     }
 
     /**
-     * @dev This function is used to withdraw DOC from the Sovryn protocol, burning the corresponding iSUSD
+     * @dev This function is used to withdraw DOC from the Sovryn protocol, burning the corresponding iToken
      * @param receiver The account getting the redeemed DOC tokens.
-     * @param burnAmount The amount of iSUSD to burn.
+     * @param burnAmount The amount of iToken to burn.
      */
     function burn(address receiver, uint256 burnAmount) external returns (uint256 loanAmountPaid) {
-        if (s_revertOnBurn) revert("MockIsusdToken: insufficient liquidity");
+        if (s_revertOnBurn) revert("MockIToken: insufficient liquidity");
         require(balanceOf(msg.sender) >= burnAmount, "Insufficient balance");
 
         // Default: burn exactly `burnAmount`. Partial / over / increase modes override for R68 tests.
@@ -126,7 +126,7 @@ contract MockIsusdToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
         s_silentZeroPayout = silentZeroPayout;
     }
 
-    /// @notice Burn only `partialBurnBps / BPS_DENOMINATOR` of the requested iSUSD and pay cash for that slice.
+    /// @notice Burn only `partialBurnBps / BPS_DENOMINATOR` of the requested iToken and pay cash for that slice.
     function setPartialBurnBps(uint256 partialBurnBps) external {
         require(partialBurnBps <= BPS_DENOMINATOR, "Bps above 100%");
         s_partialBurnBps = partialBurnBps;
@@ -152,9 +152,9 @@ contract MockIsusdToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
     }
 
     /**
-     * @dev Returns the current exchange rate between DOC and iSUSD.
-     * @notice Calculates the exchange rate from the underlying DOC to iSusd
-     * @return price of iSusd/DOC
+     * @dev Returns the current exchange rate between DOC and iToken.
+     * @notice Calculates the exchange rate from the underlying DOC to iToken
+     * @return price of iToken/DOC
      */
     function tokenPrice() public view returns (uint256 price) {
         uint256 timeElapsed = block.timestamp - i_deploymentTimestamp; // Time elapsed since deployment in seconds
@@ -168,7 +168,7 @@ contract MockIsusdToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
     }
 
     /**
-     * @notice Get the current underlying value of the owner's iSUSD, interest included.
+     * @notice Get the current underlying value of the owner's iToken, interest included.
      * @dev Matches Sovryn: assetBalanceOf is balance * tokenPrice, not the starting rate. profitOf is gone
      * with the redeem preflight that misused it (R1); it was a subset of this value, never an addition to it.
      * @return The user's balance of underlying token.

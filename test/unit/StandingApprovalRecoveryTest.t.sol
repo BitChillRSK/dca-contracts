@@ -16,7 +16,7 @@ import {MockSwapRouter02} from "test/mocks/MockSwapRouter02.sol";
 import {MockWrbtcToken} from "test/mocks/MockWrbtcToken.sol";
 import {handlerBatchBuyOne} from "test/utils/BatchBuyOne.sol";
 import {MockDecrementingStablecoin} from "test/mocks/MockDecrementingStablecoin.sol";
-import {MockIsusdToken} from "test/mocks/MockIsusdToken.sol";
+import {MockIToken} from "test/mocks/MockIToken.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import "test/Constants.sol";
 
@@ -39,7 +39,7 @@ contract StandingApprovalRecoveryTest is Test {
     uint64 internal constant SCHEDULE_ID = 1;
 
     MockDecrementingStablecoin internal docToken;
-    MockIsusdToken internal iSusdToken;
+    MockIToken internal iToken;
     MockMocProxy internal mocProxy;
     SovrynDocHandlerMoc internal handler;
 
@@ -49,18 +49,18 @@ contract StandingApprovalRecoveryTest is Test {
     IdleHandlerDex internal dexHandler;
 
     /// @dev The only shipped shape that holds both approvals at once, so it has two functions to call.
-    MockIsusdToken internal bothHalvesISusd;
+    MockIToken internal bothHalvesIToken;
     SovrynHandlerDex internal bothHalvesHandler;
 
     function setUp() public {
         docToken = new MockDecrementingStablecoin(address(this));
-        iSusdToken = new MockIsusdToken(address(docToken));
+        iToken = new MockIToken(address(docToken));
         mocProxy = new MockMocProxy(address(docToken));
 
         handler = new SovrynDocHandlerMoc(
             address(this),
             address(docToken),
-            address(iSusdToken),
+            address(iToken),
             FEE_COLLECTOR,
             address(mocProxy),
             _feeSettings(),
@@ -83,11 +83,11 @@ contract StandingApprovalRecoveryTest is Test {
             address(this)
         );
 
-        bothHalvesISusd = new MockIsusdToken(address(docToken));
+        bothHalvesIToken = new MockIToken(address(docToken));
         bothHalvesHandler = new SovrynHandlerDex(
             address(this),
             address(docToken),
-            address(bothHalvesISusd),
+            address(bothHalvesIToken),
             _uniswapSettings(),
             FEE_COLLECTOR,
             _feeSettings(),
@@ -106,7 +106,7 @@ contract StandingApprovalRecoveryTest is Test {
 
     /// @notice A lending MoC leaf approves its lending spender and nobody else.
     function test_lendingMocLeaf_approvesOnlyItsLendingSpender() public {
-        assertEq(docToken.allowance(address(handler), address(iSusdToken)), type(uint256).max);
+        assertEq(docToken.allowance(address(handler), address(iToken)), type(uint256).max);
         assertEq(docToken.allowance(address(handler), address(mocProxy)), 0, "MoC redemption needs no allowance");
         assertEq(
             docToken.allowance(address(handler), address(0)), 0, "the approval ran before the spender was assigned"
@@ -115,12 +115,12 @@ contract StandingApprovalRecoveryTest is Test {
 
     /// @notice A decrementing token still deposits against the standing approval, which just shrinks.
     function test_decrementingToken_spendsTheStandingApproval() public {
-        assertEq(docToken.allowance(address(handler), address(iSusdToken)), type(uint256).max);
+        assertEq(docToken.allowance(address(handler), address(iToken)), type(uint256).max);
 
         handler.depositToken(USER, DEPOSIT_AMOUNT);
 
         assertEq(
-            docToken.allowance(address(handler), address(iSusdToken)),
+            docToken.allowance(address(handler), address(iToken)),
             type(uint256).max - DEPOSIT_AMOUNT,
             "the standing allowance should have been spent, not rewritten"
         );
@@ -134,7 +134,7 @@ contract StandingApprovalRecoveryTest is Test {
      */
     function test_clearedLendingAllowance_stopsDepositsUntilAnyoneRestoresIt() public {
         vm.prank(address(handler));
-        docToken.approve(address(iSusdToken), 0);
+        docToken.approve(address(iToken), 0);
 
         (bool deposited,) = address(handler).call(abi.encodeCall(handler.depositToken, (USER, DEPOSIT_AMOUNT)));
         assertFalse(deposited, "a cleared allowance should stop the deposit, not pass silently");
@@ -143,7 +143,7 @@ contract StandingApprovalRecoveryTest is Test {
         handler.restoreLendingApproval();
 
         assertEq(
-            docToken.allowance(address(handler), address(iSusdToken)),
+            docToken.allowance(address(handler), address(iToken)),
             type(uint256).max,
             "the standing allowance should be back at max"
         );
@@ -175,7 +175,7 @@ contract StandingApprovalRecoveryTest is Test {
     /// @notice On a handler that lends and swaps, each approval is restored by its own function.
     function test_lendingDexLeaf_restoresEachApprovalThroughItsOwnFunction() public {
         vm.startPrank(address(bothHalvesHandler));
-        docToken.approve(address(bothHalvesISusd), 0);
+        docToken.approve(address(bothHalvesIToken), 0);
         docToken.approve(address(router), 0);
         vm.stopPrank();
 
@@ -185,7 +185,7 @@ contract StandingApprovalRecoveryTest is Test {
         vm.stopPrank();
 
         assertEq(
-            docToken.allowance(address(bothHalvesHandler), address(bothHalvesISusd)),
+            docToken.allowance(address(bothHalvesHandler), address(bothHalvesIToken)),
             type(uint256).max,
             "the lending approval was not restored"
         );
@@ -208,7 +208,7 @@ contract StandingApprovalRecoveryTest is Test {
         bothHalvesHandler.restoreSwapRouterApproval();
         vm.stopPrank();
 
-        assertEq(docToken.allowance(address(bothHalvesHandler), address(bothHalvesISusd)), type(uint256).max);
+        assertEq(docToken.allowance(address(bothHalvesHandler), address(bothHalvesIToken)), type(uint256).max);
         assertEq(docToken.allowance(address(bothHalvesHandler), address(router)), type(uint256).max);
     }
 

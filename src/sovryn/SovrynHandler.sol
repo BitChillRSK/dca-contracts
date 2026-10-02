@@ -2,12 +2,12 @@
 pragma solidity 0.8.36;
 
 import {LendingHandler} from "../LendingHandler.sol";
-import {IiSusdToken} from "./IiSusdToken.sol";
+import {IiToken} from "./IiToken.sol";
 
 /**
  * @title SovrynHandler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice Sovryn adapter: iSUSD mint/burn. Share accounting lives on LendingHandler.
+ * @notice Sovryn adapter: iToken mint/burn. Share accounting lives on LendingHandler.
  */
 abstract contract SovrynHandler is LendingHandler {
     /*//////////////////////////////////////////////////////////////
@@ -20,8 +20,8 @@ abstract contract SovrynHandler is LendingHandler {
      */
     uint256 public constant EXCHANGE_RATE_DECIMALS = 1e18;
 
-    /// @notice Sovryn iSUSD (or equivalent iToken) this handler mints and burns.
-    IiSusdToken public immutable i_iToken;
+    /// @notice Sovryn iToken this handler mints and burns.
+    IiToken public immutable i_iToken;
 
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
@@ -30,12 +30,12 @@ abstract contract SovrynHandler is LendingHandler {
     /**
      * @param dcaManager The DcaManager allowed to call this handler.
      * @param stablecoin The stablecoin this handler lends.
-     * @param iToken Sovryn iSUSD (or equivalent iToken) for that stablecoin.
+     * @param iToken Sovryn iToken for that stablecoin.
      */
     constructor(address dcaManager, address stablecoin, address iToken)
         LendingHandler(dcaManager, stablecoin, EXCHANGE_RATE_DECIMALS)
     {
-        i_iToken = IiSusdToken(iToken);
+        i_iToken = IiToken(iToken);
         if (i_iToken.loanTokenAddress() != stablecoin) {
             revert LendingHandler__UnderlyingMismatch();
         }
@@ -54,13 +54,13 @@ abstract contract SovrynHandler is LendingHandler {
         return address(i_iToken);
     }
 
-    /// @dev Mint only; the base credits the measured iSUSD gain, never `mint()`'s return value.
+    /// @dev Mint only; the base credits the measured iToken gain, never `mint()`'s return value.
     function _protocolDeposit(uint256 stablecoinAmount) internal override {
         i_iToken.mint(address(this), stablecoinAmount);
     }
 
     /**
-     * @dev Redeem iSUSD onto this contract. `burn()` can return GROSS while paying NET once an
+     * @dev Redeem iToken onto this contract. `burn()` can return GROSS while paying NET once an
      *      exit fee is on; the return is ignored and the base measures cash and iToken deltas.
      */
     function _protocolRedeem(uint256 sharesAmount, uint256) internal override {

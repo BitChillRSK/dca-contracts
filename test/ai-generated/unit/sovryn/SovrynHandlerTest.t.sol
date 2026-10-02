@@ -6,7 +6,7 @@ import {ITokenHandler} from "../../../../src/interfaces/ITokenHandler.sol";
 import {IPurchaseFees} from "../../../../src/interfaces/IPurchaseFees.sol";
 import {SovrynHandler} from "../../../../src/sovryn/SovrynHandler.sol";
 import {PurchaseFees} from "../../../../src/PurchaseFees.sol";
-import {MockIsusdToken} from "../../../mocks/MockIsusdToken.sol";
+import {MockIToken} from "../../../mocks/MockIToken.sol";
 import {MockStablecoin} from "../../../mocks/MockStablecoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ILendingHandler} from "../../../../src/interfaces/ILendingHandler.sol";
@@ -19,7 +19,7 @@ import "../../../Constants.sol";
  */
 contract SovrynHandlerTest is HandlerTestHarness {
     // Sovryn-specific contracts
-    MockIsusdToken public iSusdToken;
+    MockIToken public iToken;
     SovrynTestHandler public sovrynHandler;
 
     /*//////////////////////////////////////////////////////////////
@@ -32,7 +32,7 @@ contract SovrynHandlerTest is HandlerTestHarness {
         });
 
         sovrynHandler = new SovrynTestHandler(
-            address(dcaManager), address(stablecoin), address(iSusdToken), FEE_COLLECTOR, feeSettings, OWNER
+            address(dcaManager), address(stablecoin), address(iToken), FEE_COLLECTOR, feeSettings, OWNER
         );
 
         return ITokenHandler(address(sovrynHandler));
@@ -51,17 +51,17 @@ contract SovrynHandlerTest is HandlerTestHarness {
     }
 
     function getShareToken() internal view override returns (IERC20) {
-        return IERC20(address(iSusdToken));
+        return IERC20(address(iToken));
     }
 
     function setupHandlerSpecifics() internal override {
         // Deploy mock iSUSD token for Sovryn lending
-        iSusdToken = new MockIsusdToken(address(stablecoin));
+        iToken = new MockIToken(address(stablecoin));
 
-        // Note: MockIsusdToken has time-based price calculation built in
+        // Note: MockIToken has time-based price calculation built in
 
-        // Give iSusdToken some underlying tokens to work with
-        stablecoin.mint(address(iSusdToken), 1000000 ether);
+        // Give iToken some underlying tokens to work with
+        stablecoin.mint(address(iToken), 1000000 ether);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -74,7 +74,7 @@ contract SovrynHandlerTest is HandlerTestHarness {
 
     function test_sovryn_constructor_revertsIfUnderlyingMismatch() public {
         MockStablecoin other = new MockStablecoin(address(this));
-        MockIsusdToken mismatch = new MockIsusdToken(address(other));
+        MockIToken mismatch = new MockIToken(address(other));
 
         IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
@@ -86,7 +86,7 @@ contract SovrynHandlerTest is HandlerTestHarness {
         );
     }
 
-    function test_sovryn_iSusdMinting() public {
+    function test_sovryn_iTokenMinting() public {
         uint256 initialUserLendingBalance = sovrynHandler.getUserShares(USER);
 
         vm.prank(address(dcaManager));
@@ -200,7 +200,7 @@ contract SovrynHandlerTest is HandlerTestHarness {
         uint256 sharesBefore = sovrynHandler.getUserShares(USER);
         uint256 userBalanceBefore = stablecoin.balanceOf(USER);
 
-        iSusdToken.setSilentZeroPayout(true);
+        iToken.setSilentZeroPayout(true);
 
         // the interest amount is derived from tokenPrice after a year of warp, so the revert
         // argument is not predictable here; that the guard fires at all is what matters
@@ -217,12 +217,12 @@ contract SovrynHandlerTest is HandlerTestHarness {
     //////////////////////////////////////////////////////////////*/
 
     function test_sovryn_zeroTokenPrice() public {
-        // Note: MockIsusdToken has built-in price logic that doesn't allow 0
+        // Note: MockIToken has built-in price logic that doesn't allow 0
         // This test verifies the handler can deal with edge cases
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);
 
-        // Should succeed as MockIsusdToken has reasonable price logic
+        // Should succeed as MockIToken has reasonable price logic
         uint256 lendingBalance = sovrynHandler.getUserShares(USER);
         assertGt(lendingBalance, 0);
     }
@@ -243,20 +243,20 @@ contract SovrynHandlerTest is HandlerTestHarness {
      * @notice `burn` takes the share count the base booked out, so the two agree to the wei even
      *         when SIP-0094's exit fee makes the stablecoin that comes back smaller.
      */
-    function test_sovryn_bookDebitEqualsIsusdBurn() public {
+    function test_sovryn_bookDebitEqualsITokenBurn() public {
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);
         vm.warp(block.timestamp + 365 days);
 
         uint256 bookBefore = sovrynHandler.getUserShares(USER);
-        uint256 heldBefore = iSusdToken.balanceOf(address(handler));
+        uint256 heldBefore = iToken.balanceOf(address(handler));
 
         vm.prank(address(dcaManager));
         handler.withdrawToken(USER, WITHDRAWAL_AMOUNT);
 
         uint256 bookDebit = bookBefore - sovrynHandler.getUserShares(USER);
         assertGt(bookDebit, 0);
-        assertEq(bookDebit, heldBefore - iSusdToken.balanceOf(address(handler)));
+        assertEq(bookDebit, heldBefore - iToken.balanceOf(address(handler)));
     }
 
     function test_sovryn_assetBalanceCalculation() public {
@@ -347,9 +347,9 @@ contract SovrynHandlerTest is HandlerTestHarness {
 
         uint256 excessiveAmount = DEPOSIT_AMOUNT * 2;
         uint256 available = sovrynHandler.getUserShares(user1);
-        uint256 price = iSusdToken.tokenPrice();
-        uint256 totalIsusdToRedeem = Math.mulDiv(excessiveAmount, EXCHANGE_RATE_DECIMALS, price, Math.Rounding.Ceil);
-        uint256 requested = Math.mulDiv(totalIsusdToRedeem, amounts[0], excessiveAmount, Math.Rounding.Ceil);
+        uint256 price = iToken.tokenPrice();
+        uint256 totalITokenToRedeem = Math.mulDiv(excessiveAmount, EXCHANGE_RATE_DECIMALS, price, Math.Rounding.Ceil);
+        uint256 requested = Math.mulDiv(totalITokenToRedeem, amounts[0], excessiveAmount, Math.Rounding.Ceil);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -368,14 +368,14 @@ contract SovrynHandlerTest is HandlerTestHarness {
     function test_sovryn_staleNonZeroAllowanceIsRestorable() public {
         // Leave a residual allowance that is non-zero but below the next deposit.
         vm.prank(address(sovrynHandler));
-        stablecoin.approve(address(iSusdToken), DEPOSIT_AMOUNT / 2);
-        assertEq(stablecoin.allowance(address(sovrynHandler), address(iSusdToken)), DEPOSIT_AMOUNT / 2);
+        stablecoin.approve(address(iToken), DEPOSIT_AMOUNT / 2);
+        assertEq(stablecoin.allowance(address(sovrynHandler), address(iToken)), DEPOSIT_AMOUNT / 2);
 
         uint256 sharesBefore = sovrynHandler.getUserShares(USER);
 
         sovrynHandler.restoreLendingApproval();
         assertEq(
-            stablecoin.allowance(address(sovrynHandler), address(iSusdToken)),
+            stablecoin.allowance(address(sovrynHandler), address(iToken)),
             type(uint256).max,
             "the restore refused a non-zero -> non-zero change"
         );

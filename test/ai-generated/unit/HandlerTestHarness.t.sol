@@ -15,7 +15,7 @@ import {DcaManager} from "../../../src/DcaManager.sol";
 import {OperationsAdmin} from "../../../src/OperationsAdmin.sol";
 import {MockStablecoin} from "../../mocks/MockStablecoin.sol";
 import {MockKdocToken} from "../../mocks/MockKdocToken.sol";
-import {MockIsusdToken} from "../../mocks/MockIsusdToken.sol";
+import {MockIToken} from "../../mocks/MockIToken.sol";
 import "../../Constants.sol";
 import {ownableUnauthorized} from "../../utils/OzRevert.sol";
 

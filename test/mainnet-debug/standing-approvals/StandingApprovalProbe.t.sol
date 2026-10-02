@@ -102,7 +102,7 @@ contract StandingApprovalProbe is Test {
 
     /// @dev The two production lending spenders: `SovrynHandler._lendingSpender()` (iSUSD, whose
     ///      underlying is DOC) and `LayerBankHandler._lendingSpender()` (the Aave-v3 Pool).
-    address internal constant ISUSD = 0xd8D25f03EBbA94E15Df2eD4d6D38276B595593c1;
+    address internal constant I_TOKEN = 0xd8D25f03EBbA94E15Df2eD4d6D38276B595593c1;
     address internal constant LAYERBANK_POOL = 0x526D06c65777eA6D56d7a1Dd47cD79230dDf72E9;
 
     address internal victim;
@@ -230,11 +230,11 @@ contract StandingApprovalProbe is Test {
         vm.prank(DOC_HOLDER);
         IERC20(DOC).transfer(victim, funded);
         vm.prank(victim);
-        IERC20(DOC).approve(ISUSD, type(uint256).max);
+        IERC20(DOC).approve(I_TOKEN, type(uint256).max);
 
         // `mint(receiver, depositAmount)` names the receiver of the iSUSD, never the payer of the DOC.
         vm.prank(attacker);
-        (bool minted,) = ISUSD.call(abi.encodeCall(ILoanTokenLike.mint, (attacker, funded)));
+        (bool minted,) = I_TOKEN.call(abi.encodeCall(ILoanTokenLike.mint, (attacker, funded)));
         assertFalse(minted, "iSUSD minted against someone else's allowance");
         assertEq(IERC20(DOC).balanceOf(victim), funded, "a standing iSUSD allowance was spendable");
     }
@@ -300,7 +300,7 @@ contract StandingApprovalProbe is Test {
     function test_sovrynFlashBorrow_isNotImplemented() public {
         vm.prank(attacker);
         (bool ok, bytes memory reason) =
-            ISUSD.call(abi.encodeCall(ISovrynFlashBorrowLike.flashBorrowToken, (1e18, attacker, attacker, "", "")));
+            I_TOKEN.call(abi.encodeCall(ISovrynFlashBorrowLike.flashBorrowToken, (1e18, attacker, attacker, "", "")));
         assertFalse(ok, "Sovryn flash borrow is live again; re-examine the standing iSUSD approval");
         assertEq(
             _revertReason(reason),

@@ -8,7 +8,7 @@ import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
-import {MockIsusdToken} from "test/mocks/MockIsusdToken.sol";
+import {MockIToken} from "test/mocks/MockIToken.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 
 /**
@@ -28,7 +28,7 @@ contract LendingPurchaseConservationHandler is Test {
 
     SovrynDocHandlerMoc public immutable i_handler;
     MockStablecoin public immutable i_doc;
-    MockIsusdToken public immutable i_iToken;
+    MockIToken public immutable i_iToken;
     address[] public s_users;
     address[] public s_collectors;
     address public s_feeCollector;
@@ -45,13 +45,13 @@ contract LendingPurchaseConservationHandler is Test {
     constructor(
         SovrynDocHandlerMoc handler,
         MockStablecoin doc,
-        MockIsusdToken iSusd,
+        MockIToken iToken,
         address[] memory users,
         address initialCollector
     ) {
         i_handler = handler;
         i_doc = doc;
-        i_iToken = iSusd;
+        i_iToken = iToken;
         s_users = users;
         s_feeCollector = initialCollector;
         s_collectors.push(initialCollector);
@@ -162,7 +162,7 @@ abstract contract LendingPurchaseConservationInvariantBase is StdInvariant, Test
     address internal constant INITIAL_COLLECTOR = address(0xFEE);
 
     MockStablecoin internal doc;
-    MockIsusdToken internal iSusd;
+    MockIToken internal iToken;
     MockMocProxy internal mocProxy;
     SovrynDocHandlerMoc internal handler;
     LendingPurchaseConservationHandler internal fuzzHandler;
@@ -172,7 +172,7 @@ abstract contract LendingPurchaseConservationInvariantBase is StdInvariant, Test
 
     function setUp() public {
         doc = new MockStablecoin(address(this));
-        iSusd = new MockIsusdToken(address(doc));
+        iToken = new MockIToken(address(doc));
         mocProxy = new MockMocProxy(address(doc));
         // MoC pays native rBTC on redeem; keep a cushion for the whole fuzz run.
         vm.deal(address(mocProxy), 1_000_000 ether);
@@ -185,13 +185,13 @@ abstract contract LendingPurchaseConservationInvariantBase is StdInvariant, Test
         handler = new SovrynDocHandlerMoc(
             predictedFuzzHandler,
             address(doc),
-            address(iSusd),
+            address(iToken),
             INITIAL_COLLECTOR,
             address(mocProxy),
             _feeSettings(),
             predictedFuzzHandler
         );
-        fuzzHandler = new LendingPurchaseConservationHandler(handler, doc, iSusd, s_users, INITIAL_COLLECTOR);
+        fuzzHandler = new LendingPurchaseConservationHandler(handler, doc, iToken, s_users, INITIAL_COLLECTOR);
         assertEq(address(fuzzHandler), predictedFuzzHandler, "dcaManager/owner wiring missed the fuzz handler");
 
         // Local MockMocProxy pulls DOC via transferFrom; live MoC does not. Same fixture step as
@@ -272,7 +272,7 @@ abstract contract LendingPurchaseConservationInvariantBase is StdInvariant, Test
         for (uint256 i; i < s_users.length; ++i) {
             totalVirtual += ILendingHandler(address(handler)).getUserShares(s_users[i]);
         }
-        assertLe(totalVirtual, iSusd.balanceOf(address(handler)), "virtual shares exceed iSUSD held");
+        assertLe(totalVirtual, iToken.balanceOf(address(handler)), "virtual shares exceed iSUSD held");
     }
 
     /// @notice Successful ops leave no idle DOC on the handler.

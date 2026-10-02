@@ -3,7 +3,7 @@ pragma solidity 0.8.36;
 
 import {MockStablecoin} from "../test/mocks/MockStablecoin.sol";
 import {MockKdocToken} from "../test/mocks/MockKdocToken.sol";
-import {MockIsusdToken} from "../test/mocks/MockIsusdToken.sol";
+import {MockIToken} from "../test/mocks/MockIToken.sol";
 import {MockMocProxy} from "../test/mocks/MockMocProxy.sol";
 import {MockLayerBankAToken, MockLayerBankPool} from "../test/mocks/MockLayerBank.sol";
 import "./Constants.sol";
@@ -134,9 +134,9 @@ contract MocHelperConfig is Script {
             console.log("Created MockKdocToken at:", mockShareToken);
             emit HelperConfig__CreatedMockShareToken(mockShareToken, TROPYKUS_STRING);
         } else if (lendingProtocolIsSovryn) {
-            MockIsusdToken shareToken = new MockIsusdToken(address(mockDocToken));
+            MockIToken shareToken = new MockIToken(address(mockDocToken));
             mockShareToken = address(shareToken);
-            console.log("Created MockIsusdToken at:", mockShareToken);
+            console.log("Created MockIToken at:", mockShareToken);
             emit HelperConfig__CreatedMockShareToken(mockShareToken, SOVRYN_STRING);
         } else if (lendingProtocolIsLayerbank) {
             MockLayerBankAToken aToken = new MockLayerBankAToken(address(mockDocToken));

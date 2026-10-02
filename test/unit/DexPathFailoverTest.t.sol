@@ -9,7 +9,7 @@ import {ICoinPairPrice} from "src/interfaces/ICoinPairPrice.sol";
 import {IUniswapV3SwapRouter} from "../../src/interfaces/IUniswapV3SwapRouter.sol";
 import {DexHelperConfig} from "script/DexHelperConfig.s.sol";
 import {SovrynHandlerDex} from "src/sovryn/SovrynHandlerDex.sol";
-import {MockIsusdToken} from "test/mocks/MockIsusdToken.sol";
+import {MockIToken} from "test/mocks/MockIToken.sol";
 import {BitChillOwnable} from "src/BitChillOwnable.sol";
 import {ownableUnauthorized} from "../utils/OzRevert.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
@@ -389,7 +389,7 @@ contract DexPathFailoverTest is DcaDappTest {
                 new SovrynHandlerDex(
                     address(dcaManager),
                     address(stablecoin),
-                    address(new MockIsusdToken(address(stablecoin))),
+                    address(new MockIToken(address(stablecoin))),
                     IPurchaseUniswap.UniswapSettings({
                         wrbtc: IWRBTC(address(wrbtc)),
                         swapRouter: IUniswapV3SwapRouter(config.swapRouter),

@@ -15,7 +15,7 @@ import {ICoinPairPrice} from "src/interfaces/ICoinPairPrice.sol";
 import {IWRBTC} from "src/interfaces/IWRBTC.sol";
 import {IUniswapV3SwapRouter} from "src/interfaces/IUniswapV3SwapRouter.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
-import {MockIsusdToken} from "test/mocks/MockIsusdToken.sol";
+import {MockIToken} from "test/mocks/MockIToken.sol";
 import {MockLayerBankAToken, MockLayerBankPool} from "test/mocks/MockLayerBank.sol";
 import {MockMocOracle} from "test/mocks/MockMocOracle.sol";
 import {MockWrbtcToken} from "test/mocks/MockWrbtcToken.sol";
@@ -32,14 +32,14 @@ contract ZeroStablecoinTest is Test {
     address private constant MOC_PROXY = address(0x70C);
     address private constant SWAP_ROUTER = address(0x5A9);
 
-    address private s_iSusd;
+    address private s_iToken;
     address private s_aToken;
     MockMocOracle private s_oracle;
     MockWrbtcToken private s_wrBtc;
 
     function setUp() public {
         MockStablecoin stablecoin = new MockStablecoin(address(this));
-        s_iSusd = address(new MockIsusdToken(address(stablecoin)));
+        s_iToken = address(new MockIToken(address(stablecoin)));
         MockLayerBankAToken aToken = new MockLayerBankAToken(address(stablecoin));
         aToken.setPool(address(new MockLayerBankPool(aToken)));
         s_aToken = address(aToken);
@@ -69,7 +69,7 @@ contract ZeroStablecoinTest is Test {
     function testSovrynMocRejectsZeroStablecoin() public {
         vm.expectRevert(IStablecoinSource.StablecoinSource__ZeroStablecoin.selector);
         new SovrynDocHandlerMoc(
-            address(this), address(0), s_iSusd, FEE_COLLECTOR, MOC_PROXY, _feeSettings(), address(this)
+            address(this), address(0), s_iToken, FEE_COLLECTOR, MOC_PROXY, _feeSettings(), address(this)
         );
     }
 
@@ -78,7 +78,7 @@ contract ZeroStablecoinTest is Test {
         new SovrynHandlerDex(
             address(this),
             address(0),
-            s_iSusd,
+            s_iToken,
             _uniswapSettings(),
             FEE_COLLECTOR,
             _feeSettings(),

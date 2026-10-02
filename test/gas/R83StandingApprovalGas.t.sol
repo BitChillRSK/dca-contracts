@@ -11,7 +11,7 @@ import {IUniswapV3SwapRouter} from "src/interfaces/IUniswapV3SwapRouter.sol";
 import {ICoinPairPrice} from "src/interfaces/ICoinPairPrice.sol";
 import {IWRBTC} from "src/interfaces/IWRBTC.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
-import {MockIsusdToken} from "test/mocks/MockIsusdToken.sol";
+import {MockIToken} from "test/mocks/MockIToken.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import {MockMocOracle} from "test/mocks/MockMocOracle.sol";
 import {MockSwapRouter02} from "test/mocks/MockSwapRouter02.sol";
@@ -53,12 +53,12 @@ contract R83StandingApprovalGasTest is Test {
     uint64 private constant SCHEDULE_ID = 1;
 
     MockStablecoin private s_stablecoin;
-    MockIsusdToken private s_iSusd;
+    MockIToken private s_iToken;
     MockMocProxy private s_mocProxy;
     SovrynDocHandlerMoc private s_lendingHandler;
     /// @dev The pre-R83 deposit shape, the arm the saving is measured against. It needs its own iToken:
     ///      sharing an allowance slot would let EIP-2200 net metering price its write at 100 gas.
-    MockIsusdToken private s_preR83ISusd;
+    MockIToken private s_preR83IToken;
     PreR83SovrynDocHandlerMoc private s_preR83Handler;
 
     MockWrbtcToken private s_wrBtc;
@@ -70,25 +70,25 @@ contract R83StandingApprovalGasTest is Test {
     ///      points are callable directly and the measurement is of the handler, not of the manager.
     function setUp() public {
         s_stablecoin = new MockStablecoin(address(this));
-        s_iSusd = new MockIsusdToken(address(s_stablecoin));
+        s_iToken = new MockIToken(address(s_stablecoin));
         s_mocProxy = new MockMocProxy(address(s_stablecoin));
         vm.deal(address(s_mocProxy), 100 ether);
 
         s_lendingHandler = new SovrynDocHandlerMoc(
             address(this),
             address(s_stablecoin),
-            address(s_iSusd),
+            address(s_iToken),
             FEE_COLLECTOR,
             address(s_mocProxy),
             _feeSettings(),
             address(this)
         );
 
-        s_preR83ISusd = new MockIsusdToken(address(s_stablecoin));
+        s_preR83IToken = new MockIToken(address(s_stablecoin));
         s_preR83Handler = new PreR83SovrynDocHandlerMoc(
             address(this),
             address(s_stablecoin),
-            address(s_preR83ISusd),
+            address(s_preR83IToken),
             FEE_COLLECTOR,
             address(s_mocProxy),
             _feeSettings(),
@@ -97,7 +97,7 @@ contract R83StandingApprovalGasTest is Test {
         // Undo the standing grant the leaf still makes in its constructor, so this arm starts from the
         // zero allowance the pre-R83 code left behind after every deposit.
         vm.prank(address(s_preR83Handler));
-        s_stablecoin.approve(address(s_preR83ISusd), 0);
+        s_stablecoin.approve(address(s_preR83IToken), 0);
 
         s_wrBtc = new MockWrbtcToken();
         s_router = new MockSwapRouter02(s_wrBtc, BTC_PRICE);
@@ -124,8 +124,8 @@ contract R83StandingApprovalGasTest is Test {
         );
 
         s_stablecoin.mint(USER, 100 * DEPOSIT_AMOUNT);
-        s_stablecoin.mint(address(s_iSusd), 100 * DEPOSIT_AMOUNT);
-        s_stablecoin.mint(address(s_preR83ISusd), 100 * DEPOSIT_AMOUNT);
+        s_stablecoin.mint(address(s_iToken), 100 * DEPOSIT_AMOUNT);
+        s_stablecoin.mint(address(s_preR83IToken), 100 * DEPOSIT_AMOUNT);
         vm.startPrank(USER);
         s_stablecoin.approve(address(s_lendingHandler), type(uint256).max);
         s_stablecoin.approve(address(s_preR83Handler), type(uint256).max);
@@ -140,7 +140,7 @@ contract R83StandingApprovalGasTest is Test {
      *      and the first dirty write for both, moving the delta by thousands of gas on call order alone.
      */
     function test_lendingDeposit_standingApproval_writesNoAllowanceSlot() public {
-        bytes32 allowanceSlot = _allowanceSlot(address(s_lendingHandler), address(s_iSusd));
+        bytes32 allowanceSlot = _allowanceSlot(address(s_lendingHandler), address(s_iToken));
         (uint256 gasUsed, uint256 writes) = _measureDeposit(s_lendingHandler, allowanceSlot);
 
         console2.log("R83 lending deposit, standing approval (Foundry gas)", gasUsed);
@@ -154,13 +154,13 @@ contract R83StandingApprovalGasTest is Test {
      *      re-derived on every run and cannot drift.
      */
     function test_lendingDeposit_preR83Shape_writesTheAllowanceSlotTwice() public {
-        bytes32 allowanceSlot = _allowanceSlot(address(s_preR83Handler), address(s_preR83ISusd));
+        bytes32 allowanceSlot = _allowanceSlot(address(s_preR83Handler), address(s_preR83IToken));
         (uint256 gasUsed, uint256 writes) = _measureDeposit(s_preR83Handler, allowanceSlot);
 
         console2.log("R83 lending deposit, pre-R83 exact approval (Foundry gas)", gasUsed);
         assertEq(writes, 2, "the pre-R83 shape wrote the slot on the grant and again on the pull");
         assertEq(
-            s_stablecoin.allowance(address(s_preR83Handler), address(s_preR83ISusd)),
+            s_stablecoin.allowance(address(s_preR83Handler), address(s_preR83IToken)),
             0,
             "the pull should have spent the exact approval back to zero"
         );
@@ -169,9 +169,9 @@ contract R83StandingApprovalGasTest is Test {
 
     /// @notice Restoring a cleared allowance writes the spender's slot once, off the deposit path.
     function test_restoreLendingApproval_writesTheAllowanceSlotOnce() public {
-        bytes32 allowanceSlot = _allowanceSlot(address(s_lendingHandler), address(s_iSusd));
+        bytes32 allowanceSlot = _allowanceSlot(address(s_lendingHandler), address(s_iToken));
         vm.prank(address(s_lendingHandler));
-        s_stablecoin.approve(address(s_iSusd), 0);
+        s_stablecoin.approve(address(s_iToken), 0);
 
         vm.startStateDiffRecording();
         uint256 gasBefore = gasleft();
@@ -182,7 +182,7 @@ contract R83StandingApprovalGasTest is Test {
         console2.log("R83 restoreLendingApproval (Foundry gas)", gasUsed);
         assertEq(writes, 1, "the restore should write the slot once");
         assertEq(
-            s_stablecoin.allowance(address(s_lendingHandler), address(s_iSusd)),
+            s_stablecoin.allowance(address(s_lendingHandler), address(s_iToken)),
             type(uint256).max,
             "the restore should leave the standing allowance at max"
         );

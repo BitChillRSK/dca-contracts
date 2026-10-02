@@ -20,7 +20,7 @@ import {PurchaseMoc} from "../../../src/PurchaseMoc.sol";
 import {PurchaseUniswap} from "../../../src/PurchaseUniswap.sol";
 import {LayerBankHandler} from "../../../src/layerbank/LayerBankHandler.sol";
 import {MockStablecoin} from "../../mocks/MockStablecoin.sol";
-import {MockIsusdToken} from "../../mocks/MockIsusdToken.sol";
+import {MockIToken} from "../../mocks/MockIToken.sol";
 import {MockMocProxy} from "../../mocks/MockMocProxy.sol";
 import {MockLayerBankAToken, MockLayerBankPool} from "../../mocks/MockLayerBank.sol";
 import {MockWrbtcToken} from "../../mocks/MockWrbtcToken.sol";
@@ -51,7 +51,7 @@ contract FinalDeploymentTest is Test {
     MockStablecoin internal usdrif;
     MockStablecoin internal usdt0;
     MockMocProxy internal mocProxy;
-    MockIsusdToken internal iSusd;
+    MockIToken internal iToken;
     MockLayerBankAToken internal docAToken;
     MockLayerBankAToken internal usdrifAToken;
     MockLayerBankAToken internal usdt0AToken;
@@ -68,7 +68,7 @@ contract FinalDeploymentTest is Test {
         usdrif = new MockStablecoin(address(this));
         usdt0 = new MockStablecoin(address(this));
         mocProxy = new MockMocProxy(address(doc));
-        iSusd = new MockIsusdToken(address(doc));
+        iToken = new MockIToken(address(doc));
 
         docAToken = new MockLayerBankAToken(address(doc));
         MockLayerBankPool docPool = new MockLayerBankPool(docAToken);
@@ -161,7 +161,7 @@ contract FinalDeploymentTest is Test {
         _assertCommonHandlerWiring(stack.usdt0LayerBank, address(stack.dcaManager), address(usdt0));
 
         assertEq(address(LayerBankDocHandlerMoc(payable(stack.docLayerBank)).i_aToken()), address(docAToken));
-        assertEq(address(SovrynDocHandlerMoc(payable(stack.docSovryn)).i_iToken()), address(iSusd));
+        assertEq(address(SovrynDocHandlerMoc(payable(stack.docSovryn)).i_iToken()), address(iToken));
         assertEq(address(LayerBankHandlerDex(payable(stack.usdrifLayerBank)).i_aToken()), address(usdrifAToken));
         assertEq(address(LayerBankHandlerDex(payable(stack.usdt0LayerBank)).i_aToken()), address(usdt0AToken));
 
@@ -230,7 +230,7 @@ contract FinalDeploymentTest is Test {
         _assertStandingApproval(stack.docLayerBank, doc, docAToken.POOL());
         _assertStandingApproval(stack.usdrifLayerBank, usdrif, usdrifAToken.POOL());
         _assertStandingApproval(stack.usdt0LayerBank, usdt0, usdt0AToken.POOL());
-        _assertStandingApproval(stack.docSovryn, doc, address(iSusd));
+        _assertStandingApproval(stack.docSovryn, doc, address(iToken));
 
         // The Uniswap router, on every Dex leaf, idle and lending alike.
         _assertStandingApproval(stack.usdrifIdle, usdrif, address(router));
@@ -334,7 +334,7 @@ contract FinalDeploymentTest is Test {
             doc: address(doc),
             mocProxy: address(mocProxy),
             docLayerBankAToken: address(docAToken),
-            docSovrynShares: address(iSusd),
+            docSovrynShares: address(iToken),
             usdrif: address(usdrif),
             usdrifLayerBankAToken: address(usdrifAToken),
             usdt0: address(usdt0),

@@ -3,7 +3,7 @@ pragma solidity 0.8.36;
 
 import {MockStablecoin} from "../test/mocks/MockStablecoin.sol";
 import {MockKToken} from "../test/mocks/MockKToken.sol";
-import {MockIsusdToken} from "../test/mocks/MockIsusdToken.sol";
+import {MockIToken} from "../test/mocks/MockIToken.sol";
 import {MockMocProxy} from "../test/mocks/MockMocProxy.sol";
 import {MockWrbtcToken} from "../test/mocks/MockWrbtcToken.sol";
 import {MockSwapRouter02} from "../test/mocks/MockSwapRouter02.sol";
@@ -215,7 +215,7 @@ contract DexHelperConfig is Script {
             mockShareToken = address(shareToken);
             emit HelperConfig__CreatedMockShareToken(mockShareToken, TROPYKUS_STRING);
         } else if (lendingProtocolIsSovryn) {
-            MockIsusdToken shareToken = new MockIsusdToken(address(mockStablecoin));
+            MockIToken shareToken = new MockIToken(address(mockStablecoin));
             mockShareToken = address(shareToken);
             emit HelperConfig__CreatedMockShareToken(mockShareToken, SOVRYN_STRING);
         } else if (lendingProtocolIsLayerbank) {

@@ -31,7 +31,7 @@ import {MockSwapRouter02} from "../mocks/MockSwapRouter02.sol";
 import "../Constants.sol";
 import "./TestsHelper.t.sol";
 import {IkToken} from "../../src/tropykus-legacy/IkToken.sol";
-import {IiSusdToken} from "../../src/sovryn/IiSusdToken.sol";
+import {IiToken} from "../../src/sovryn/IiToken.sol";
 import {IPurchaseUniswap} from "../../src/interfaces/IPurchaseUniswap.sol";
 import {batchBuyOne, toBatch} from "../utils/BatchBuyOne.sol";
 import {scheduleAt, scheduleIdAt, scheduleCount} from "test/utils/ScheduleAt.sol";
@@ -880,10 +880,8 @@ contract DcaDappTest is Test {
                     revert("Failed to get Tropykus shares from handler");
                 }
             } else if (routeIndex == SOVRYN_INDEX) {
-                try SovrynDocHandlerMoc(payable(address(stablecoinHandler))).i_iToken() returns (
-                    IiSusdToken iSusdToken
-                ) {
-                    shares = address(iSusdToken);
+                try SovrynDocHandlerMoc(payable(address(stablecoinHandler))).i_iToken() returns (IiToken iToken) {
+                    shares = address(iToken);
                 } catch {
                     revert("Failed to get Sovryn shares from handler");
                 }

@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {SovrynDocHandlerMoc} from "src/sovryn/SovrynDocHandlerMoc.sol";
 import {IdleDocHandlerMoc} from "src/idle/IdleDocHandlerMoc.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
-import {MockIsusdToken} from "test/mocks/MockIsusdToken.sol";
+import {MockIToken} from "test/mocks/MockIToken.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
 import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
@@ -45,7 +45,7 @@ contract BatchTailScheduleTest is Test {
     address internal FEE_COLLECTOR = address(0xFEE);
 
     MockStablecoin internal docToken;
-    MockIsusdToken internal iSusdToken;
+    MockIToken internal iToken;
     MockMocProxy internal mocProxy;
     SovrynDocHandlerMoc internal lendingHandler;
     IdleDocHandlerMoc internal idleHandler;
@@ -55,7 +55,7 @@ contract BatchTailScheduleTest is Test {
 
     function setUp() public {
         docToken = new MockStablecoin(address(this));
-        iSusdToken = new MockIsusdToken(address(docToken));
+        iToken = new MockIToken(address(docToken));
         mocProxy = new MockMocProxy(address(docToken));
         vm.deal(address(mocProxy), 1000 ether);
 
@@ -67,7 +67,7 @@ contract BatchTailScheduleTest is Test {
         lendingHandler = new SovrynDocHandlerMoc(
             address(this),
             address(docToken),
-            address(iSusdToken),
+            address(iToken),
             FEE_COLLECTOR,
             address(mocProxy),
             feeSettings,
@@ -89,7 +89,7 @@ contract BatchTailScheduleTest is Test {
         docToken.approve(address(mocProxy), type(uint256).max);
         vm.prank(address(idleHandler));
         docToken.approve(address(mocProxy), type(uint256).max);
-        docToken.mint(address(iSusdToken), 1_000_000 ether);
+        docToken.mint(address(iToken), 1_000_000 ether);
 
         // Advance so tokenPrice() is not a round number. The starting mock rate divides evenly and
         // would hide the shortfall; a live protocol rate never does.

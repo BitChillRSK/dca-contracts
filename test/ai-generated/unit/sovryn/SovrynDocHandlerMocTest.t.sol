@@ -4,7 +4,7 @@ pragma solidity 0.8.36;
 import {Test} from "forge-std/Test.sol";
 import {SovrynDocHandlerMoc} from "src/sovryn/SovrynDocHandlerMoc.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
-import {MockIsusdToken} from "test/mocks/MockIsusdToken.sol";
+import {MockIToken} from "test/mocks/MockIToken.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import "test/Constants.sol";
 import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
@@ -16,13 +16,13 @@ contract SovrynDocHandlerMocTest is Test {
     address internal FEE_COLLECTOR = address(0xFEE);
 
     MockStablecoin internal docToken;
-    MockIsusdToken internal iSusdToken;
+    MockIToken internal iToken;
     MockMocProxy internal mocProxy;
     SovrynDocHandlerMoc internal handler;
 
     function setUp() public {
         docToken = new MockStablecoin(address(this));
-        iSusdToken = new MockIsusdToken(address(docToken));
+        iToken = new MockIToken(address(docToken));
         mocProxy = new MockMocProxy(address(docToken));
 
         vm.deal(address(mocProxy), 100 ether);
@@ -30,7 +30,7 @@ contract SovrynDocHandlerMocTest is Test {
         handler = new SovrynDocHandlerMoc(
             address(this),
             address(docToken),
-            address(iSusdToken),
+            address(iToken),
             FEE_COLLECTOR,
             address(mocProxy),
             IPurchaseFees.FeeSettings({
@@ -46,7 +46,7 @@ contract SovrynDocHandlerMocTest is Test {
         vm.prank(address(handler));
         docToken.approve(address(mocProxy), type(uint256).max);
 
-        docToken.mint(address(iSusdToken), 10000 ether);
+        docToken.mint(address(iToken), 10000 ether);
     }
 
     function test_lengthOneBatch_flow() public {

@@ -16,7 +16,7 @@ import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
 import {IDcaManager} from "src/interfaces/IDcaManager.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockKdocToken} from "test/mocks/MockKdocToken.sol";
-import {MockIsusdToken} from "test/mocks/MockIsusdToken.sol";
+import {MockIToken} from "test/mocks/MockIToken.sol";
 import "test/Constants.sol";
 import {Handler} from "./Handler.t.sol";
 import {scheduleAt} from "test/utils/ScheduleAt.sol";
@@ -37,7 +37,7 @@ contract InvariantTest is StdInvariant, Test {
     IPurchaseRbtc public handler;
     MockStablecoin public stablecoin;
     MockKdocToken public kToken;
-    MockIsusdToken public iSusdToken;
+    MockIToken public iToken;
     Handler public fuzzHandler;
 
     /*//////////////////////////////////////////////////////////////
@@ -110,12 +110,12 @@ contract InvariantTest is StdInvariant, Test {
             // Give kToken sufficient balance for operations
             stablecoin.mint(address(kToken), HANDLER_INITIAL_BALANCE);
         } else {
-            iSusdToken = new MockIsusdToken(address(stablecoin));
+            iToken = new MockIToken(address(stablecoin));
             handler = IPurchaseRbtc(
-                address(new SovrynHandlerWrapper(address(dcaManager), address(stablecoin), address(iSusdToken)))
+                address(new SovrynHandlerWrapper(address(dcaManager), address(stablecoin), address(iToken)))
             );
-            // Give iSusdToken sufficient balance for operations
-            stablecoin.mint(address(iSusdToken), HANDLER_INITIAL_BALANCE);
+            // Give iToken sufficient balance for operations
+            stablecoin.mint(address(iToken), HANDLER_INITIAL_BALANCE);
         }
 
         vm.prank(OWNER);
@@ -249,7 +249,7 @@ contract InvariantTest is StdInvariant, Test {
             if (s_routeIndex == TROPYKUS_INDEX) {
                 totalStablecoinInLendingProtocol = totalLendingBalances * kToken.exchangeRateCurrent() / 1e18;
             } else {
-                totalStablecoinInLendingProtocol = totalLendingBalances * iSusdToken.tokenPrice() / 1e18;
+                totalStablecoinInLendingProtocol = totalLendingBalances * iToken.tokenPrice() / 1e18;
             }
         }
 
@@ -339,7 +339,7 @@ contract InvariantTest is StdInvariant, Test {
             console2.log("Previous stored rate:", previousRate);
             console2.log("Current rate:", currentRate);
         } else {
-            uint256 previousRate = iSusdToken.tokenPrice();
+            uint256 previousRate = iToken.tokenPrice();
             // For Sovryn, we don't store previous rate, so just check it's positive
             assertGt(previousRate, 0);
             console2.log("Current token price:", previousRate);
@@ -430,9 +430,8 @@ contract InvariantTest is StdInvariant, Test {
             totalVirtualShares += ILendingHandler(address(handler)).getUserShares(s_users[i]);
         }
 
-        uint256 receiptShares = s_routeIndex == TROPYKUS_INDEX
-            ? kToken.balanceOf(address(handler))
-            : iSusdToken.balanceOf(address(handler));
+        uint256 receiptShares =
+            s_routeIndex == TROPYKUS_INDEX ? kToken.balanceOf(address(handler)) : iToken.balanceOf(address(handler));
 
         assertLe(totalVirtualShares, receiptShares, "virtual lending shares exceed receipt shares held");
     }
