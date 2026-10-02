@@ -1478,6 +1478,15 @@ leaked-swapper worst case in `AUDIT_GUIDE.md` (no mandatory gap between windows,
 qualify the Dex floor NatSpec for `setMocOracle`; add the fee collector rotation step to the runbook;
 correct two stale document lines. Comments and documents only. Ask: none.
 
+### R113 - Reviewer-facing documents ([spec](./R113-audit-readiness-docs.md))
+
+After R112, before audit freeze / relaunch deploy. Markdown only. `AUDIT_GUIDE.md` gains explicit
+scope lists, compiler and dependency facts, the launch configuration, and earlier reviews;
+`README.md` drops generic sections and operator procedures; `DEPENDENCY_MODIFICATIONS.md` is removed;
+`ADDRESSES.md` lists the external contracts `DeployFinal` binds to; the cutover runbook gates on
+`make fork-layerbank` and receives the ownership, add-on, and compromised-swapper procedures.
+Ask: none.
+
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:
