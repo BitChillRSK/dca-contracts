@@ -38,8 +38,8 @@ The root documents grew by accretion across the relaunch. Checked against `src/`
       **Launch configuration**; the single ownership check and the reentrancy model; the Sovryn exit
       fee; **Earlier reviews and static analysis**; open items trimmed to what a reviewer needs.
       Existing section titles are kept because the Krait report cites them.
-- [x] `README.md`: introduction, contract map, build and test lanes that exist, one deployment
-      command, license, contact. Operator procedures move to the runbook.
+- [x] `README.md`: introduction, inheritance map, build and test lanes that exist, license, contact.
+      Operator procedures and the `DeployFinal` command move to the runbook, their only home.
 - [x] `DEPENDENCY_MODIFICATIONS.md`: deleted. Compiler target and pins move to `AUDIT_GUIDE.md`;
       contributor rules move to `AGENTS.md`.
 - [x] `ADDRESSES.md`: the external mainnet contracts `DeployFinal` binds to, from `script/`.

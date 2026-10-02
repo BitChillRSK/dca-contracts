@@ -33,8 +33,9 @@ Out of scope:
 - `src/tropykus-legacy/`. It is kept for local and pinned-fork coverage of a second lending adapter.
   No deploy script constructs or registers it, and route index 4 is left unused so it is never
   reinterpreted as another venue.
-- Every other deploy script. `DeployMocSwaps`, `DeployDexSwaps`, and the add-on scripts support the
-  test lanes and later handler additions.
+- Every other deploy script. `DeployMocSwaps`, `DeployDexSwaps`, and the add-on scripts build the
+  stacks the test lanes use. `DeployFinal` already assigns every pair they target, and assignment is
+  add-only.
 - The off-chain consumers (swapper bot, front end, data API, monitoring), which live in other
   repositories, and the code of the external protocols.
 
@@ -60,18 +61,18 @@ inherits OpenZeppelin's `ReentrancyGuardTransient`, so transient storage is on t
 
 ### Launch configuration
 
-The values `DeployFinal` sets, from `script/Constants.sol`. The owner can change each one afterward
-within the bound shown.
+The values `DeployFinal` sets, from `script/Constants.sol`, and what the owner can do to each one
+afterward.
 
-| Parameter | Launch value | Setter and enforced bound |
+| Parameter | Launch value | Owner setter and the bound the contract enforces |
 |---|---|---|
 | Purchase fee, per handler | 1% up to 250 tokens, then decreasing toward 0.2% ([math](./docs/PURCHASE_FEES.md)) | `setFeeRateParams`: minimum ≤ maximum ≤ 5% |
-| Minimum purchase amount, per token | 25 tokens (`25e18` DOC and USDRIF, `25e6` USDT0) | `setTokenMinPurchaseAmount`: non-zero |
+| Minimum purchase amount, per token | 25 tokens (`25e18` DOC and USDRIF, `25e6` USDT0) | `setTokenMinPurchaseAmount`: non-zero, no upper bound |
 | Minimum purchase period | 7 days | `setMinPurchasePeriod`: whole UTC days, at least one |
-| Schedules per user and token | 10 | `setMaxSchedulesPerToken` |
+| Schedules per user and token | 10 | `setMaxSchedulesPerToken`: any `uint16`. Zero blocks every new schedule; existing ones are unaffected |
 | Dex oracle floor | 97% of the oracle-implied output | `setAmountOutMinimumPercent`: between the safety check and 100% |
 | Dex floor safety check | 95% | `setAmountOutMinimumSafetyCheck`: at most the active floor |
-| Protected purchase window | 5 blocks | constant |
+| Protected purchase window | 5 blocks | None. It is a constant |
 
 Dex paths at deploy: USDT0 → WRBTC through the 0.30% pool; USDRIF → USDT0 (0.05%) → WRBTC (0.30%)
 active, with USDRIF → USDT (0.05%) → WRBTC (0.30%) also allowlisted on both USDRIF handlers.
@@ -131,10 +132,15 @@ apply the same decision everywhere it is meant to apply.
 
 How the boundaries are enforced:
 
-- Handlers take deposits, withdrawals, purchases, and rBTC claims from their immutable `DcaManager`
-  only (`onlyDcaManager`). The direct calls a handler accepts are its owner's setters,
-  `setPurchasePath` from a swapper, and `restoreLendingApproval` / `restoreSwapRouterApproval` from
-  anyone, which re-grant the allowance set at construction.
+- Handlers take deposits, withdrawals, interest calls, purchases, and rBTC claims from their immutable
+  `DcaManager` only (`onlyDcaManager`). Everything else a handler accepts directly:
+  - its owner's setters and `transferOwnership`, and `acceptOwnership` from the pending owner;
+  - `setPurchasePath` on a Dex handler, from the owner or a swapper;
+  - `restoreLendingApproval` and `restoreSwapRouterApproval` from anyone, which re-grant the allowance
+    set at construction;
+  - native rBTC from anyone, through an open `receive()`. Money on Chain payouts and WRBTC unwraps
+    arrive that way. A purchase credits only the balance increase it measures around its own venue
+    call, so rBTC sent in at any other time is credited to no one, and no function recovers it.
 - Lending handlers keep a standing unlimited stablecoin allowance to their lending market, and Dex
   handlers to SwapRouter02. The spender can therefore pull any stablecoin the handler holds at any
   time, not only during a BitChill call.

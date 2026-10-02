@@ -22,26 +22,41 @@ vulnerability, see [`SECURITY.md`](./SECURITY.md).
 
 ## Contracts
 
+Within the custody and purchase branches, indentation is inheritance: each contract inherits the one
+it is nested under.
+
 ```
-DcaManager          user and swapper entry point; the schedule ledger; holds no funds
-OperationsAdmin     route classes, (token, route) → handler registry, swapper allowlist, deposit pause
+DcaManager            user and swapper entry point; the schedule ledger; holds no funds
+OperationsAdmin       route classes, (token, route) → handler registry, swapper allowlist, deposit pause
 
-Custody
-  TokenHandler      deposit and withdraw one stablecoin
-  IdleHandler       TokenHandler that keeps the stablecoin on the handler
-  LendingHandler    TokenHandler with per-user virtual shares, interest, and exact share redemption
-    LayerBankHandler, SovrynHandler      protocol adapters
+Shared bases
+  BitChillOwnable           two-step ownership, no renounce
+                            inherited by DcaManager, OperationsAdmin, PurchaseFees
+  DcaManagerAccessControl   immutable DcaManager address and the onlyDcaManager modifier
+                            inherited by TokenHandler, PurchaseRbtc
+  StablecoinSource          immutable stablecoin and the batch-funding hook
+                            inherited by TokenHandler, PurchaseRbtc
 
-Purchase
-  PurchaseFees      fee curve and fee collector; carries handler ownership
-  PurchaseRbtc      shared batch pipeline, accumulated-rBTC books, withdrawal to the user
-    PurchaseMoc     redeems DOC for rBTC at Money on Chain
-    PurchaseUniswap swaps to WRBTC on Uniswap V3 under an oracle floor; unwraps on withdrawal
+Custody branch
+  TokenHandler              deposit and withdraw one stablecoin
+    IdleHandler             keeps the stablecoin on the handler
+    LendingHandler          per-user virtual shares, interest, exact share redemption
+      LayerBankHandler      protocol adapter
+      SovrynHandler         protocol adapter
 
-Deployed handler = one custody base + one purchase base, constructor only:
-  src/idle/         IdleDocHandlerMoc, IdleHandlerDex
-  src/layerbank/    LayerBankDocHandlerMoc, LayerBankHandlerDex
-  src/sovryn/       SovrynDocHandlerMoc, SovrynHandlerDex (not in the production map)
+Purchase branch
+  PurchaseFees              fee curve and fee collector; makes every handler ownable
+    PurchaseRbtc            shared batch pipeline, accumulated-rBTC books, withdrawal to the user
+      PurchaseMoc           redeems DOC for rBTC at Money on Chain
+      PurchaseUniswap       swaps to WRBTC on Uniswap V3 under an oracle floor; unwraps on withdrawal
+
+Deployed handlers: constructor only, each inheriting one custody contract and one purchase contract
+  src/idle/         IdleDocHandlerMoc   = IdleHandler + PurchaseMoc
+                    IdleHandlerDex      = IdleHandler + PurchaseUniswap
+  src/layerbank/    LayerBankDocHandlerMoc = LayerBankHandler + PurchaseMoc
+                    LayerBankHandlerDex    = LayerBankHandler + PurchaseUniswap
+  src/sovryn/       SovrynDocHandlerMoc = SovrynHandler + PurchaseMoc
+                    SovrynHandlerDex    = SovrynHandler + PurchaseUniswap   (not in the production map)
   src/tropykus-legacy/   test-only; never deployed
 ```
 
@@ -74,8 +89,9 @@ forge build
 ### Testing
 
 The shared test harness deploys one stack per run, selected by three environment variables, so tests
-run in lanes. Use the `make` targets: a bare `forge test` fails without `SWAP_TYPE` and
-`LENDING_PROTOCOL`.
+run in lanes. Use the `make` targets, which set all three. The harness has no fallback for `SWAP_TYPE`
+or `LENDING_PROTOCOL`: a bare `forge test` fails without them, and forge also reads them from `.env`
+if they are set there.
 
 | Variable | Values |
 |---|---|
@@ -97,11 +113,11 @@ make invariants-sovryn                      # stateful fuzzing: 64 runs × 512 c
 
 # one test file in a chosen lane
 SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=DOC \
-  forge test --match-path test/unit/DcaDappTest.t.sol -vvv
+  forge test --match-path test/unit/DcaScheduleTest.t.sol -vvv
 ```
 
-Fork tests run against live Rootstock state and need `RSK_MAINNET_RPC_URL` in `.env` (copy
-`.env.example`). They are not in CI.
+Fork tests run against live Rootstock state and need `RSK_MAINNET_RPC_URL` in `.env`. They are not in
+CI.
 
 ```bash
 make fork-sovryn
@@ -109,7 +125,7 @@ make fork-layerbank
 make fork-dex-path    # Dex path allowlist against live Uniswap pools
 ```
 
-`make help` lists every target, including the Tropykus mock lanes and the live probes under
+`make help` lists the remaining lanes, including the Tropykus mock lanes and the live probes under
 `test/mainnet-debug/`. [`test/ai-generated/fuzz/README_INVARIANTS.md`](./test/ai-generated/fuzz/README_INVARIANTS.md)
 describes what each invariant suite proves.
 
@@ -130,22 +146,14 @@ The shipped bytecode is built under `[profile.deploy]` (`via_ir = true`). Every 
 default no-IR artifact, which is not the bytecode `make check-deploy` validated. Run
 `make check-deploy` green on the exact commit before broadcasting.
 
-```bash
-REAL_DEPLOYMENT=true \
-INITIAL_SWAPPER=<bot-eoa> \
-FOUNDRY_PROFILE=deploy \
-forge script script/DeployFinal.s.sol:DeployFinal \
-  --rpc-url $RSK_MAINNET_RPC_URL \
-  --account <deployer-keystore> \
-  --broadcast --legacy \
-  --verify --verifier blockscout --verifier-url $BLOCKSCOUT_API_URL
-```
-
-`DeployFinal.run()` is mainnet-only and reverts on any missing address or incomplete route map. Sign
-with a Foundry keystore (`--account`) or a hardware wallet (`--ledger`), not a raw private key.
+`script/DeployFinal.s.sol` is the production script. `run()` is mainnet-only and reverts on any
+missing address or incomplete route map. The broadcast command and the steps around it are in
+[`docs/relaunch/CUTOVER_RUNBOOK.md`](./docs/relaunch/CUTOVER_RUNBOOK.md#deploy). Sign with a Foundry
+keystore (`--account`) or a hardware wallet (`--ledger`), not a raw private key.
 
 `DeployMocSwaps`, `DeployDexSwaps`, and the add-on scripts (`DeployIdleHandler`,
-`DeployLayerBankHandler`, `DeployUsdrifHandler`) serve the test lanes and later handler additions.
+`DeployLayerBankHandler`, `DeployUsdrifHandler`) build the stacks the test lanes use. On the
+production stack every pair they target is already assigned, and assignment is add-only.
 `DeployMocAndUniswap` is a local comparison harness and reverts on `REAL_DEPLOYMENT=true`.
 
 ### Ownership after deploy
@@ -155,9 +163,13 @@ with that EOA as owner, configures them, and calls `transferOwnership(MAINNET_OW
 only proposes the Safe. The Safe then sends `acceptOwnership()` to each contract. Until it does, the
 deploying EOA is still the owner. `renounceOwnership` always reverts.
 
-[`docs/relaunch/CUTOVER_RUNBOOK.md`](./docs/relaunch/CUTOVER_RUNBOOK.md) is the full operator
-sequence: preconditions, post-deploy checks, adding a handler to a live deployment, and what to do
-about a compromised swapper key or a fee collector rotation.
+The operator procedures are in [`docs/relaunch/CUTOVER_RUNBOOK.md`](./docs/relaunch/CUTOVER_RUNBOOK.md):
+
+- [Ownership handoff](./docs/relaunch/CUTOVER_RUNBOOK.md#ownership-handoff), mainnet and testnet
+- [Adding a handler after cutover](./docs/relaunch/CUTOVER_RUNBOOK.md#adding-a-handler-after-cutover):
+  the order in which the Safe registers the route, sets the token minimum, and assigns the handler
+- [Compromised swapper](./docs/relaunch/CUTOVER_RUNBOOK.md#compromised-swapper)
+- [Fee collector rotation](./docs/relaunch/CUTOVER_RUNBOOK.md#fee-collector-rotation)
 
 ## Documentation
 

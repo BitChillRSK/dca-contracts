@@ -41,7 +41,7 @@ INITIAL_SWAPPER=<bot-eoa> \
 FOUNDRY_PROFILE=deploy \
 forge script script/DeployFinal.s.sol:DeployFinal \
   --rpc-url $RSK_MAINNET_RPC_URL \
-  --account <deployer-eoa> \
+  --account <deployer-keystore> \
   --broadcast --legacy \
   --verify --verifier blockscout --verifier-url $BLOCKSCOUT_API_URL
 ```
