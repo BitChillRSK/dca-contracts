@@ -90,4 +90,5 @@ Markdown-only tier (**Scale the gate to the change** in `AGENTS.md`): run nothin
 - ABI: none.
 - Scripts: none.
 - Cutover: the runbook's preconditions now name `make fork-layerbank` instead of `make fork-tropykus`,
-  and its broadcast command gains `--sender` and `LENDING_PROTOCOL`. No consumer has to change.
+  its broadcast command gains `--sender` and `LENDING_PROTOCOL`, and the Safe accepts ownership after
+  the wiring checks instead of before them. No consumer has to change.
