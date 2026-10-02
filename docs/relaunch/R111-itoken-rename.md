@@ -1,7 +1,7 @@
 # R111 — Sovryn iToken type and identifier rename
 
-Status: **assigned** · Assigned: yes · Optional/further-review: no · Stack on: R110
-([#176](https://github.com/BitChillRSK/dca-contracts/pull/176))
+Status: **implemented** · Assigned: yes · Optional/further-review: no · Stack on: R110
+([#176](https://github.com/BitChillRSK/dca-contracts/pull/176)) · PR: [#177](https://github.com/BitChillRSK/dca-contracts/pull/177)
 
 ## Objective
 
