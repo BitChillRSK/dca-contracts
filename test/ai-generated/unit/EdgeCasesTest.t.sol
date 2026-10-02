@@ -4,7 +4,7 @@ pragma solidity 0.8.36;
 import {Test} from "forge-std/Test.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockKdocToken} from "test/mocks/MockKdocToken.sol";
-import {MockIsusdToken} from "test/mocks/MockIsusdToken.sol";
+import {MockIToken} from "test/mocks/MockIToken.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 import {MockMocOracle} from "test/mocks/MockMocOracle.sol";
 import {MockSwapRouter02} from "test/mocks/MockSwapRouter02.sol";
@@ -164,14 +164,14 @@ contract EdgeCasesTest is Test {
     function test_withdrawInterest_returns_early_when_no_interest() public {
         // Mocks
         MockStablecoin doc = new MockStablecoin(address(this));
-        MockIsusdToken isusd = new MockIsusdToken(address(doc));
+        MockIToken iToken = new MockIToken(address(doc));
         MockMocProxy proxy = new MockMocProxy(address(doc));
         vm.deal(address(proxy), 10 ether);
 
         SovrynDocHandlerMoc handler = new SovrynDocHandlerMoc(
             address(this),
             address(doc),
-            address(isusd),
+            address(iToken),
             address(0xFEE),
             address(proxy),
             IPurchaseFees.FeeSettings({

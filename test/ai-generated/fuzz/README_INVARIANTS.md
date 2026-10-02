@@ -10,7 +10,7 @@ new suite `…InvariantTest` is enough to pick it up with no Makefile change.
 |---|---|---|
 | `InvariantTest` | Production `DcaManager` + production lending adapters (`TropykusHandler` / `SovrynHandler`) behind **purchase wrappers** that reimplement `batchBuyRbtc` | Production `PurchaseRbtc` allocation, rBTC solvency, MoC / Uniswap venues |
 | `PurchaseRbtcConservationInvariantTest` / `PurchaseRbtcVariableFeeConservationInvariantTest` | Production `PurchaseRbtc` through `PurchaseRbtcHarness` (venue + retrieval overridden); flat and launch-variable fees | Lending share books, `DcaManager`, a real venue |
-| `LendingPurchaseConservationInvariantTest` / `LendingPurchaseVariableFeeConservationInvariantTest` | Production `SovrynDocHandlerMoc` (lending + `PurchaseMoc` / `PurchaseRbtc`) with `MockIsusdToken` + `MockMocProxy`; flat and launch-variable fees | Full `DcaManager` schedule lifecycle (the fuzz actor is the `dcaManager`) |
+| `LendingPurchaseConservationInvariantTest` / `LendingPurchaseVariableFeeConservationInvariantTest` | Production `SovrynDocHandlerMoc` (lending + `PurchaseMoc` / `PurchaseRbtc`) with `MockIToken` + `MockMocProxy`; flat and launch-variable fees | Full `DcaManager` schedule lifecycle (the fuzz actor is the `dcaManager`) |
 
 The main suite's wrappers exist so deposit / withdraw / pause / top-up / schedule edits can run against
 real lending accounting without standing up MoC. They credit rBTC without a matching cash move, so any

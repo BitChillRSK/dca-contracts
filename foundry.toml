@@ -72,7 +72,7 @@ ignore = [
     "src/interfaces/IWRBTC.sol",
     "src/interfaces/ICoinPairPrice.sol",
     "src/tropykus-legacy/IkToken.sol",
-    "src/sovryn/IiSusdToken.sol",
+    "src/sovryn/IiToken.sol",
     "src/layerbank/ILayerBankPool.sol",
     "src/layerbank/ILayerBankAToken.sol",
 ]

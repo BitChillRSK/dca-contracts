@@ -3,7 +3,7 @@ pragma solidity 0.8.36;
 
 import {MockStablecoin} from "../test/mocks/MockStablecoin.sol";
 import {MockKdocToken} from "../test/mocks/MockKdocToken.sol";
-import {MockIsusdToken} from "../test/mocks/MockIsusdToken.sol";
+import {MockIToken} from "../test/mocks/MockIToken.sol";
 import {MockMocProxy} from "../test/mocks/MockMocProxy.sol";
 import {MockLayerBankAToken, MockLayerBankPool} from "../test/mocks/MockLayerBank.sol";
 import "./Constants.sol";
@@ -18,7 +18,7 @@ contract MocHelperConfig is Script {
 
         // Share token addresses by protocol
         address kDoc; // The share token for Tropykus (kDOC) — legacy tests only
-        address iToken; // The share token for Sovryn (iSUSD)
+        address iToken; // The share token for Sovryn (iDOC for DOC)
         address layerbankAToken; // LayerBank lRooDOC aToken; handler reads Pool from aToken.POOL()
 
         // MoC protocol
@@ -67,7 +67,7 @@ contract MocHelperConfig is Script {
         RootstockTestnetNetworkConfig = NetworkConfig({
             docToken: 0xCB46c0ddc60D18eFEB0E586C17Af6ea36452Dae0, // DOC token on testnet
             kDoc: 0x71e6B108d823C2786f8EF63A3E0589576B4F3914, // kDOC proxy on testnet
-            iToken: 0x74e00A8CeDdC752074aad367785bFae7034ed89f, // iSUSD proxy on testnet
+            iToken: 0x74e00A8CeDdC752074aad367785bFae7034ed89f, // iDOC proxy on testnet
             layerbankAToken: address(0), // LayerBank DOC is mainnet-only
             mocProxy: 0x2820f6d4D199B8D8838A4B26F9917754B86a0c1F // MOC proxy on testnet
         });
@@ -77,7 +77,7 @@ contract MocHelperConfig is Script {
         RootstockMainnetNetworkConfig = NetworkConfig({
             docToken: 0xe700691dA7b9851F2F35f8b8182c69c53CcaD9Db, // DOC token on mainnet
             kDoc: 0x544Eb90e766B405134b3B3F62b6b4C23Fcd5fDa2, // kDOC proxy on mainnet
-            iToken: 0xd8D25f03EBbA94E15Df2eD4d6D38276B595593c1, // iSUSD proxy on mainnet
+            iToken: 0xd8D25f03EBbA94E15Df2eD4d6D38276B595593c1, // iDOC proxy on mainnet
             layerbankAToken: 0x3F04280C66314b78E9712A41BF8C1A214460cAa2, // lRooDOC aToken
             mocProxy: 0xf773B590aF754D597770937Fa8ea7AbDf2668370 // MOC proxy on mainnet
         });
@@ -134,9 +134,9 @@ contract MocHelperConfig is Script {
             console.log("Created MockKdocToken at:", mockShareToken);
             emit HelperConfig__CreatedMockShareToken(mockShareToken, TROPYKUS_STRING);
         } else if (lendingProtocolIsSovryn) {
-            MockIsusdToken shareToken = new MockIsusdToken(address(mockDocToken));
+            MockIToken shareToken = new MockIToken(address(mockDocToken));
             mockShareToken = address(shareToken);
-            console.log("Created MockIsusdToken at:", mockShareToken);
+            console.log("Created MockIToken at:", mockShareToken);
             emit HelperConfig__CreatedMockShareToken(mockShareToken, SOVRYN_STRING);
         } else if (lendingProtocolIsLayerbank) {
             MockLayerBankAToken aToken = new MockLayerBankAToken(address(mockDocToken));

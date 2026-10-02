@@ -4,7 +4,7 @@ pragma solidity 0.8.36;
 import {Test, console2} from "forge-std/Test.sol";
 import {DcaDappTest} from "../../unit/DcaDappTest.t.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IiSusdToken} from "../../../src/sovryn/IiSusdToken.sol";
+import {IiToken} from "../../../src/sovryn/IiToken.sol";
 import {BPS_DENOMINATOR, DOC_HOLDER} from "../../Constants.sol";
 
 interface IExitFeeControllerView {
@@ -25,11 +25,11 @@ interface ISovrynProtocolExitFee {
 /// views were stale while burns still haircut ~10 bps to `LIVE_FEE_SINK`.
 contract SovrynExitFeeDirectBurnProbe is Test {
     address constant DOC = 0xe700691dA7b9851F2F35f8b8182c69c53CcaD9Db;
-    address constant I_SUSD = 0xd8D25f03EBbA94E15Df2eD4d6D38276B595593c1;
+    address constant I_TOKEN = 0xd8D25f03EBbA94E15Df2eD4d6D38276B595593c1;
     address constant EXIT_FEE_CONTROLLER = 0x8C1abf364Bf214E41221562693BD9Fb26D6Fa563;
     /// @dev Historical SIP-0094 vault from early Perimeter wiring. Tip burns no longer fund it.
     address constant LEGACY_EXIT_FEE_VAULT = 0x2ba389B021fA4A5F50cc1758EFD23Ca066d0Be08;
-    /// @dev Observed live fee sink on tip (2026-09-07): DOC `Transfer` of ~10 bps on each iSUSD burn.
+    /// @dev Observed live fee sink on tip (2026-09-07): DOC `Transfer` of ~10 bps on each iDOC burn.
     address constant LIVE_FEE_SINK = 0xDDE75f75ff33Aa802f2316cCAe2bE77823fc6f9B;
     address constant SOVRYN_PROTOCOL = 0x5A0D867e0D70Fcc6Ade25C3F1B89d618b5B4Eaa7;
     uint256 constant DEPOSIT_AMOUNT = 1000 ether;
@@ -54,11 +54,11 @@ contract SovrynExitFeeDirectBurnProbe is Test {
         }
     }
 
-    function testDirectIsusdBurn_printFeeSplit() external {
+    function testDirectITokenBurn_printFeeSplit() external {
         vm.startPrank(DOC_HOLDER);
-        IERC20(DOC).approve(I_SUSD, DEPOSIT_AMOUNT);
-        IiSusdToken(I_SUSD).mint(DOC_HOLDER, DEPOSIT_AMOUNT);
-        uint256 shares = IERC20(I_SUSD).balanceOf(DOC_HOLDER);
+        IERC20(DOC).approve(I_TOKEN, DEPOSIT_AMOUNT);
+        IiToken(I_TOKEN).mint(DOC_HOLDER, DEPOSIT_AMOUNT);
+        uint256 shares = IERC20(I_TOKEN).balanceOf(DOC_HOLDER);
 
         uint256 userDocBefore = IERC20(DOC).balanceOf(DOC_HOLDER);
         uint256 legacyVaultBefore = IERC20(DOC).balanceOf(LEGACY_EXIT_FEE_VAULT);
@@ -66,7 +66,7 @@ contract SovrynExitFeeDirectBurnProbe is Test {
         address controllerReceiver = IExitFeeControllerView(EXIT_FEE_CONTROLLER).feeReceiver();
         uint256 controllerReceiverBefore = IERC20(DOC).balanceOf(controllerReceiver);
 
-        uint256 returned = IiSusdToken(I_SUSD).burn(DOC_HOLDER, shares);
+        uint256 returned = IiToken(I_TOKEN).burn(DOC_HOLDER, shares);
         uint256 received = IERC20(DOC).balanceOf(DOC_HOLDER) - userDocBefore;
         uint256 legacyVaultDelta = IERC20(DOC).balanceOf(LEGACY_EXIT_FEE_VAULT) - legacyVaultBefore;
         uint256 liveSinkDelta = IERC20(DOC).balanceOf(LIVE_FEE_SINK) - liveSinkBefore;
@@ -111,18 +111,18 @@ contract SovrynExitFeeWithdrawalProbe is DcaDappTest {
 
     function testStablecoinWithdrawal_printSovrynFeeSplit() external {
         address doc = address(stablecoin);
-        address iSusd = address(shareToken);
+        address iToken = address(shareToken);
         address handler = address(stablecoinHandler);
 
         uint256 legacyVaultBefore = IERC20(doc).balanceOf(LEGACY_EXIT_FEE_VAULT);
         uint256 liveSinkBefore = IERC20(doc).balanceOf(LIVE_FEE_SINK);
         uint256 userDocBefore = IERC20(doc).balanceOf(USER);
-        uint256 iSusdBefore = IERC20(iSusd).balanceOf(handler);
+        uint256 iTokenBefore = IERC20(iToken).balanceOf(handler);
 
         super.withdrawStablecoin();
 
         uint256 paid = IERC20(doc).balanceOf(USER) - userDocBefore;
-        console2.log("iSUSD burned (handler)", iSusdBefore - IERC20(iSusd).balanceOf(handler));
+        console2.log("iDOC burned (handler)", iTokenBefore - IERC20(iToken).balanceOf(handler));
         console2.log("DOC paid to user", paid);
         console2.log("legacy ExitFeeVault DOC delta", IERC20(doc).balanceOf(LEGACY_EXIT_FEE_VAULT) - legacyVaultBefore);
         console2.log("live fee sink DOC delta", IERC20(doc).balanceOf(LIVE_FEE_SINK) - liveSinkBefore);

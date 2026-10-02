@@ -8,7 +8,7 @@ import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
 import {ILendingHandler} from "../../src/interfaces/ILendingHandler.sol";
 import {IPurchaseFees} from "../../src/interfaces/IPurchaseFees.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
-import {MockIsusdToken} from "../mocks/MockIsusdToken.sol";
+import {MockIToken} from "../mocks/MockIToken.sol";
 import {toBatch} from "../utils/BatchBuyOne.sol";
 import "../Constants.sol";
 import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
@@ -213,7 +213,7 @@ contract NetRedemptionTest is DcaDappTest {
     function test_sovryn_batchBuyRbtcShortRedeemStillPurchases() public onlySovrynMocMocks {
         createSeveralDcaSchedules();
 
-        MockIsusdToken(address(shareToken)).setExitFeeBps(RUG_EXIT_FEE_BPS);
+        MockIToken(address(shareToken)).setExitFeeBps(RUG_EXIT_FEE_BPS);
 
         (,, uint64[] memory scheduleIds, uint256[] memory purchaseAmounts) = _batchArrays();
 
@@ -254,7 +254,7 @@ contract NetRedemptionTest is DcaDappTest {
      * is no fee.
      */
     function test_sovryn_withoutExitFeeWithdrawalStaysOneToOne() public onlySovrynMocMocks {
-        assertEq(MockIsusdToken(address(shareToken)).getExitFeeBps(), 0);
+        assertEq(MockIToken(address(shareToken)).getExitFeeBps(), 0);
 
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 scheduleBalanceBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
@@ -290,7 +290,7 @@ contract NetRedemptionTest is DcaDappTest {
     //////////////////////////////////////////////////////////////*/
 
     function _enableExitFee() internal {
-        MockIsusdToken(address(shareToken)).setExitFeeBps(EXIT_FEE_BPS);
+        MockIToken(address(shareToken)).setExitFeeBps(EXIT_FEE_BPS);
     }
 
     function _afterExitFee(uint256 grossAmount) internal pure returns (uint256) {
@@ -389,7 +389,7 @@ contract NetRedemptionTest is DcaDappTest {
         uint256 iTokenBefore = shareToken.balanceOf(address(stablecoinHandler));
         uint256 userDocBefore = stablecoin.balanceOf(USER);
 
-        MockIsusdToken(address(shareToken)).setPartialBurnBps(5_000);
+        MockIToken(address(shareToken)).setPartialBurnBps(5_000);
 
         vm.expectRevert();
         vm.prank(USER);
@@ -409,7 +409,7 @@ contract NetRedemptionTest is DcaDappTest {
      */
     function test_sovryn_partialShareBurnOnBatchRevertsAndRollsBack() public onlySovrynMocMocks {
         createSeveralDcaSchedules();
-        MockIsusdToken(address(shareToken)).setPartialBurnBps(5_000);
+        MockIToken(address(shareToken)).setPartialBurnBps(5_000);
 
         (,, uint64[] memory scheduleIds,) = _batchArrays();
         uint256 n = scheduleIds.length;

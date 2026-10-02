@@ -172,6 +172,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R108 | after R107, before audit freeze / relaunch deploy | none (monotone purchase-fee formula; launch defaults 100/20 bps, lower bound 250 tokens) |
 | R109 | after R108, before audit freeze / relaunch deploy | none (`_setUserShares` always emit; checked `FeeCredited` product; variable-fee conservation coverage) |
 | R110 | after R109, before audit freeze / relaunch deploy | none (internal audit follow-ups: stale fee and cadence docs, Sovryn/Tropykus underlying check, LayerBank burn-rounding assumption and probe) |
+| R111 | after R110, before audit freeze / relaunch deploy | none (`IiSusdToken` → `IiToken`, `MockIsusdToken` → `MockIToken`, remaining `iSusd` identifiers → `iToken`) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1461,6 +1462,12 @@ period-edit case with a test (no contract change); add the underlying-token cons
 `SovrynHandler` and the legacy `TropykusHandler`; document the LayerBank half-up burn-rounding
 assumption and pin it with a live probe. Investigated and kept: the last-shares tail revert
 (R43). Ask: none.
+
+### R111 - Sovryn iToken type and identifier rename ([spec](./R111-itoken-rename.md))
+
+After R110, before audit freeze / relaunch deploy. Finish R104's Sovryn naming: `IiSusdToken` →
+`IiToken`, `MockIsusdToken` → `MockIToken`, and remaining first-party `iSusd` / `Isusd` identifiers →
+`iToken` / `IToken`. Names only; no behavior change. Ask: none.
 
 ## Closed non-implementation decisions
 

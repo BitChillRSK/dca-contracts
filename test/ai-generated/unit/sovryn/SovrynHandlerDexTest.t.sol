@@ -9,7 +9,7 @@ import {IWRBTC} from "../../../../src/interfaces/IWRBTC.sol";
 import {IUniswapV3SwapRouter} from "../../../../src/interfaces/IUniswapV3SwapRouter.sol";
 import {ICoinPairPrice} from "../../../../src/interfaces/ICoinPairPrice.sol";
 import {SovrynHandlerDex} from "../../../../src/sovryn/SovrynHandlerDex.sol";
-import {MockIsusdToken} from "../../../mocks/MockIsusdToken.sol";
+import {MockIToken} from "../../../mocks/MockIToken.sol";
 import {MockWrbtcToken} from "../../../mocks/MockWrbtcToken.sol";
 import {MockMocOracle} from "../../../mocks/MockMocOracle.sol";
 import {MockSwapRouter02} from "../../../mocks/MockSwapRouter02.sol";
@@ -28,7 +28,7 @@ contract SovrynHandlerDexTest is HandlerTestHarness {
     event PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(uint256 oldValue, uint256 newValue);
 
     // Sovryn DEX-specific contracts
-    MockIsusdToken public iSusdToken;
+    MockIToken public iToken;
     MockWrbtcToken public wrbtcToken;
     MockMocOracle public mocOracle;
     MockSwapRouter02 public mockRouter;
@@ -58,7 +58,7 @@ contract SovrynHandlerDexTest is HandlerTestHarness {
         sovrynDexHandler = new SovrynHandlerDex(
             address(dcaManager),
             address(stablecoin),
-            address(iSusdToken),
+            address(iToken),
             uniswapSettings,
             FEE_COLLECTOR,
             feeSettings,
@@ -83,21 +83,21 @@ contract SovrynHandlerDexTest is HandlerTestHarness {
     }
 
     function getShareToken() internal view override returns (IERC20) {
-        return IERC20(address(iSusdToken));
+        return IERC20(address(iToken));
     }
 
     function setupHandlerSpecifics() internal override {
         // Deploy mock tokens
-        iSusdToken = new MockIsusdToken(address(stablecoin));
+        iToken = new MockIToken(address(stablecoin));
         wrbtcToken = new MockWrbtcToken();
         mocOracle = new MockMocOracle();
         mockRouter = new MockSwapRouter02(wrbtcToken, BTC_PRICE);
 
-        // Note: MockIsusdToken has built-in token price logic
+        // Note: MockIToken has built-in token price logic
         // Setup oracle price (e.g., 1 Stablecoin = 0.00003 BTC) - will need oracle mock methods
 
         // Give tokens some initial balances
-        stablecoin.mint(address(iSusdToken), 1000000 ether);
+        stablecoin.mint(address(iToken), 1000000 ether);
         vm.deal(address(mockRouter), 1000 ether); // Give router some ETH for WRBTC deposits
     }
 
@@ -116,7 +116,7 @@ contract SovrynHandlerDexTest is HandlerTestHarness {
     ///         production map, so `FinalDeploymentTest` never builds it.
     function test_sovrynDex_standingSpenderApprovals() public {
         address handlerAddress = address(sovrynDexHandler);
-        assertEq(stablecoin.allowance(handlerAddress, address(iSusdToken)), type(uint256).max);
+        assertEq(stablecoin.allowance(handlerAddress, address(iToken)), type(uint256).max);
         assertEq(stablecoin.allowance(handlerAddress, address(mockRouter)), type(uint256).max);
     }
 
@@ -244,7 +244,7 @@ contract SovrynHandlerDexTest is HandlerTestHarness {
         sovrynDexHandler.depositToken(buyerTwo, DEPOSIT_AMOUNT);
         vm.stopPrank();
 
-        iSusdToken.setExitFeeBps(10); // the 0.10% Sovryn approved
+        iToken.setExitFeeBps(10); // the 0.10% Sovryn approved
 
         address[] memory buyers = new address[](2);
         buyers[0] = buyerOne;
@@ -349,9 +349,9 @@ contract SovrynHandlerDexTest is HandlerTestHarness {
         uint256 lendingBalance = sovrynDexHandler.getUserShares(USER);
         assertGt(lendingBalance, 0);
 
-        // Check iSUSD balance (in our mock, handler holds tokens instead of burning)
-        uint256 iSusdBalance = iSusdToken.balanceOf(address(handler));
-        assertGt(iSusdBalance, 0); // Mock implementation holds tokens in handler
+        // Check iDOC balance (in our mock, handler holds tokens instead of burning)
+        uint256 iTokenBalance = iToken.balanceOf(address(handler));
+        assertGt(iTokenBalance, 0); // Mock implementation holds tokens in handler
 
         // But user should have lending balance
         assertGt(lendingBalance, 0);
@@ -448,13 +448,13 @@ contract SovrynHandlerDexTest is HandlerTestHarness {
     //////////////////////////////////////////////////////////////*/
 
     function test_sovrynDex_lendingProtocolIntegration() public {
-        // Test that Sovryn's iSUSD burn works with DEX
+        // Test that Sovryn's iDOC burn works with DEX
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);
 
         // Check that user has lending balance but handler has no tokens
         uint256 lendingBalance = sovrynDexHandler.getUserShares(USER);
-        uint256 handlerBalance = iSusdToken.balanceOf(address(handler));
+        uint256 handlerBalance = iToken.balanceOf(address(handler));
 
         assertGt(lendingBalance, 0);
         assertGt(handlerBalance, 0); // Mock implementation holds tokens in handler (unlike real Sovryn)
@@ -590,7 +590,7 @@ contract SovrynHandlerDexTest is HandlerTestHarness {
         return new SovrynHandlerDex(
             address(dcaManager),
             address(stablecoin),
-            address(iSusdToken),
+            address(iToken),
             uniswapSettings,
             FEE_COLLECTOR,
             feeSettings,
