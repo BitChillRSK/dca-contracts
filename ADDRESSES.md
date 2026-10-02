@@ -1,58 +1,40 @@
-# BitChill Protocol - Contract Addresses
+# Addresses
 
-## Latest Testnet Deployment
+## BitChill contracts
 
-### Core Protocol Contracts
-- [OperationsAdmin](https://rootstock-testnet.blockscout.com/address/0x7d70dDc0F0Bfaf33FcCe6Af99C2BEF6413d2ec6B): `0x7d70dDc0F0Bfaf33FcCe6Af99C2BEF6413d2ec6B`
-- [DcaManager](https://rootstock-testnet.blockscout.com/address/0xe41768Eb79F7e84cB793f2E50d995eb31AF0883F): `0xe41768Eb79F7e84cB793f2E50d995eb31AF0883F`
-- [TropykusDocHandlerMoc](https://rootstock-testnet.blockscout.com/address/0x513a9D082d291Aa39DBA7a90a8a54A42e0EbF727): `0x513a9D082d291Aa39DBA7a90a8a54A42e0EbF727`
-- [SovrynDocHandlerMoc](https://rootstock-testnet.blockscout.com/address/0x2d8E508c239A1f284e5F859d9945E5e369615364): `0x2d8E508c239A1f284e5F859d9945E5e369615364`
+The relaunch contracts are not deployed yet. After cutover, the nine addresses `DeployFinal` logs
+(`OperationsAdmin`, `DcaManager`, seven handlers) are recorded here.
 
-## External Dependencies - Rootstock Mainnet
+| Role | Rootstock mainnet | Source |
+|---|---|---|
+| Owner after handoff (BitChill Safe) | `0xdeAbdc410aB7B0f1Da830A6b355B5b938208315f` | `MAINNET_OWNER` |
+| Fee collector | `0x3caB92C050514A0368D71815CAc42ad746350F16` | `MAINNET_FEE_COLLECTOR` |
 
-### Money on Chain Contracts
-- DOC Token: `0xe700691dA7b9851F2F35f8b8182c69c53CcaD9Db`
-- MoC Proxy: `0xf773B590aF754D597770937Fa8ea7AbDf2668370`
-- MoC Oracle: `0xe2927A0620b82A66D67F678FC9b826B0E01B1bFD`
+## External contracts the deployment binds to (Rootstock mainnet)
 
-### Rootstock Core Tokens
-- WRBTC Token: `0x542fDA317318eBF1d3DEAf76E0b632741A7e677d`
+These are constructor inputs, taken from `script/DeployFinal.s.sol` and `script/Constants.sol`, which
+are the source of truth. Each is immutable in the handler that receives it, with two exceptions on Dex
+handlers: the owner can replace the MoC oracle (`setMocOracle`), and can allowlist swap paths through
+other intermediate tokens and pools (`setPurchasePathAllowed`).
 
-### Uniswap V3 Contracts
-- SwapRouter02: `0x0B14ff67f0014046b4b99057Aec4509640b3947A`
+| Contract | Address | Used by |
+|---|---|---|
+| DOC | `0xe700691dA7b9851F2F35f8b8182c69c53CcaD9Db` | DOC handlers |
+| USDRIF | `0x3A15461d8aE0F0Fb5Fa2629e9DA7D66A794a6e37` | USDRIF handlers |
+| USDT0 (6 decimals) | `0x779Ded0c9e1022225f8E0630b35a9b54bE713736` | USDT0 handlers; intermediate token on the default USDRIF path |
+| USDT (6 decimals) | `0xAf368c91793CB22739386DFCbBb2F1A9e4bCBeBf` | Intermediate token on the alternative USDRIF path |
+| WRBTC | `0x542fDA317318eBF1d3DEAf76E0b632741A7e677d` | Dex handlers |
+| Money on Chain proxy | `0xf773B590aF754D597770937Fa8ea7AbDf2668370` | DOC handlers (`redeemFreeDoc`) |
+| Money on Chain BTC/USD oracle | `0xe2927A0620b82A66D67F678FC9b826B0E01B1bFD` | Dex handlers (swap floor) |
+| Uniswap V3 SwapRouter02 | `0x0B14ff67f0014046b4b99057Aec4509640b3947A` | Dex handlers |
+| Sovryn iToken for DOC (iSUSD) | `0xd8D25f03EBbA94E15Df2eD4d6D38276B595593c1` | `SovrynDocHandlerMoc` |
+| LayerBank aToken, DOC (lRooDOC) | `0x3F04280C66314b78E9712A41BF8C1A214460cAa2` | `LayerBankDocHandlerMoc` |
+| LayerBank aToken, USDRIF (lRooUSDRIF) | `0xc96fBD12bE56Dd565b258d243344bCf792A51128` | `LayerBankHandlerDex` (USDRIF) |
+| LayerBank aToken, USDT0 (lRooUSDT0) | `0x6bE7d4cfCe825b106aa88F6916A412c5af230Ec0` | `LayerBankHandlerDex` (USDT0) |
+| LayerBank Pool | `0x526D06c65777eA6D56d7a1Dd47cD79230dDf72E9` | Read from each aToken's `POOL()` at construction |
 
-### Lending Protocol Contracts
-#### Tropykus
-- kDOC Token: `0x544Eb90e766B405134b3B3F62b6b4C23Fcd5fDa2`
+Explorer: <https://rootstock.blockscout.com>.
 
-#### Sovryn
-- iSUSD Token: `0xd8D25f03EBbA94E15Df2eD4d6D38276B595593c1`
-
-### Reserved for Future Use
-- rUSDT Token: `0xef213441A85dF4d7ACbDaE0Cf78004e1E486bB96`
-
-## External Dependencies - Rootstock Testnet
-
-### Money on Chain Contracts
-- DOC Token: `0xCB46c0ddc60D18eFEB0E586C17Af6ea36452Dae0`
-- MoC Proxy: `0x2820f6d4D199B8D8838A4B26F9917754B86a0c1F`
-
-### Rootstock Core Tokens
-- WRBTC Token: `0x69FE5cEC81D5eF92600c1A0dB1F11986AB3758Ab`
-
-### Lending Protocol Contracts
-#### Tropykus
-- kDOC Token: `0x71e6B108d823C2786f8EF63A3E0589576B4F3914`
-
-#### Sovryn
-- iSUSD Token: `0x74e00A8CeDdC752074aad367785bFae7034ed89f`
-
-### Reserved for Future Use
-- rUSDT Token: `0x4d5A316d23EBe168D8f887b4447BF8DBfA4901cc`
-
-## Notes
-
-1. Uniswap V3 contracts are not deployed on Rootstock testnet.
-2. All addresses are verified on the respective block explorers:
-   - Mainnet: https://rootstock.blockscout.com
-   - Testnet: https://rootstock-testnet.blockscout.com
+`DeployFinal` does not run on Rootstock testnet, which has no LayerBank aTokens or Uniswap V3
+deployment for this map. Testnet and local addresses used by the test lanes are in
+`script/MocHelperConfig.s.sol`, `script/DexHelperConfig.s.sol`, and `script/UsdrifHelperConfig.s.sol`.
