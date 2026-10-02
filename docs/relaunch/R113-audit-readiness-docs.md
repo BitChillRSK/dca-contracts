@@ -1,7 +1,7 @@
 # R113 — Reviewer-facing documents
 
 Status: **implemented** · Assigned: yes · Optional/further-review: no · Stack on: R112
-([#178](https://github.com/BitChillRSK/dca-contracts/pull/178))
+([#178](https://github.com/BitChillRSK/dca-contracts/pull/178)) · PR: [#179](https://github.com/BitChillRSK/dca-contracts/pull/179)
 
 ## Objective
 
