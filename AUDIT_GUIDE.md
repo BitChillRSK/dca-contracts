@@ -1,8 +1,9 @@
 # Security review guide
 
 This guide states what ships, who is trusted with what, which properties the code is meant to hold,
-and which risks are accepted. It is a navigation aid, not a security claim. Review the exact commit or tag supplied for
-the engagement: deployed contracts are immutable, and `main` and the open pull requests keep moving.
+and which risks are accepted. It is a navigation aid, not a security claim. Review the exact commit
+or tag supplied for the engagement: deployed contracts are immutable, and `main` and the open pull
+requests keep moving.
 
 ## Production scope
 
@@ -22,9 +23,11 @@ In scope:
   map. Interfaces of external protocols (`IMocProxy`, `ICoinPairPrice`, `IWRBTC`,
   `IUniswapV3SwapRouter`, `IiToken`, `ILayerBankPool`, `ILayerBankAToken`) are ABIs only.
   `SovrynHandlerDex` is built and tested but is not one of the seven handlers `DeployFinal` creates.
-- `script/DeployFinal.s.sol`, `script/DeployBase.s.sol`, the helper configs, and
-  `script/Constants.sol`: constructor inputs, external addresses, the route map, and the launch
-  parameters. [`ADDRESSES.md`](./ADDRESSES.md) lists the external contracts the deployment binds to.
+- `script/DeployFinal.s.sol`, `script/DeployBase.s.sol`, and `script/Constants.sol`: constructor
+  inputs, external addresses, the route map, and the launch parameters. `DeployFinal` imports
+  `MocHelperConfig` and `UsdrifHelperConfig` for their struct types only and fills them with its own
+  mainnet values. [`ADDRESSES.md`](./ADDRESSES.md) lists the external contracts the deployment binds
+  to.
 - `foundry.toml` and the OpenZeppelin submodule commit: the compiler and dependency artifact.
 - `test/unit/deployment/FinalDeploymentTest.t.sol`: asserts the wiring `DeployFinal` produces.
 
@@ -37,8 +40,9 @@ Out of scope:
 - Every other deploy script. BitChill deploys production with `DeployFinal` only. That is a
   deployment decision, not something the other scripts enforce: `DeployMocSwaps` and `DeployDexSwaps`
   create their own `OperationsAdmin` and `DcaManager`, and both have testnet and mainnet branches
-  that deploy production handlers and propose the Safe as owner. A stack built by one of them is a
-  separate deployment, outside this review.
+  that deploy production handlers. The mainnet branch proposes the Safe as owner; on testnet the
+  broadcasting EOA stays owner. A stack built by one of them is a separate deployment, outside this
+  review.
 - The off-chain consumers (swapper bot, front end, data API, monitoring), which live in other
   repositories, and the code of the external protocols.
 
@@ -69,7 +73,7 @@ afterward.
 
 | Parameter | Launch value | Owner setter and the bound the contract enforces |
 |---|---|---|
-| Purchase fee, per handler | 1% up to 250 tokens, then decreasing toward 0.2% ([math](./docs/PURCHASE_FEES.md)) | `setFeeRateParams`: minimum ≤ maximum ≤ 5% |
+| Purchase fee, per handler | 1% up to 250 tokens, then decreasing toward 0.2% ([math](./docs/PURCHASE_FEES.md)) | `setFeeRateParams`: minimum ≤ maximum ≤ 5%. The threshold is any `uint112`; at every value the rate stays between the two |
 | Minimum purchase amount, per token | 25 tokens (`25e18` DOC and USDRIF, `25e6` USDT0) | `setTokenMinPurchaseAmount`: non-zero, no upper bound |
 | Minimum purchase period | 7 days | `setMinPurchasePeriod`: whole UTC days, at least one |
 | Schedules per user and token | 10 | `setMaxSchedulesPerToken`: any `uint16`. Zero blocks every new schedule; existing ones are unaffected |
@@ -231,9 +235,9 @@ Other deliberate availability trade-offs:
 - Dex input tokens must have at most 18 decimals. Fee-on-transfer tokens and asynchronous or partial
   lending redemptions are unsupported.
 - Sovryn charges a 0.1% exit fee on iToken burns. A user on the Sovryn route therefore receives less
-  stablecoin than the principal debited on withdrawal, and
-  each purchase spends the net amount redeemed. This is the venue-fee case in the accounting
-  properties above, not a loss of shares. `make probe-sovryn-exit-fee` measures the live fee; see
+  stablecoin than the principal debited on withdrawal, and each purchase spends the net amount
+  redeemed. This is the venue-fee case in the accounting properties above, not a loss of shares.
+  `make probe-sovryn-exit-fee` measures the live fee; see
   `test/mainnet-debug/sovryn-exit-fee/README.md`.
 - LayerBank redemptions are sized for the Pool's current aToken burn rounding (Aave half-up `rayDiv`)
   and a liquidity index of at least one RAY. Upstream Aave v3 has since moved burns to round up. If the
@@ -282,7 +286,7 @@ suites run on Anvil/revm against live state and are not a Rootstock consensus or
 The specs under `docs/relaunch/` record why each choice was made. This guide and the verified source
 state the current protocol without requiring that history.
 
-## Open items before mainnet
+## Required before mainnet
 
 - An independent manual review of a frozen commit, with every finding resolved or explicitly accepted.
 - Final sign-off on the launch configuration above. Fee changes apply to later purchases immediately;

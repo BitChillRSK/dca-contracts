@@ -53,8 +53,9 @@ forge script script/DeployFinal.s.sol:DeployFinal \
   inside `run()`.
 - `LENDING_PROTOCOL` must be set because the shared deploy base reads it with no fallback and rejects
   an unknown value. `DeployFinal` does not use it: it deploys all seven handlers whatever the value.
-- Run the command without `--broadcast` first. That simulates the deployment against the live chain
-  and prints the stack without sending anything.
+- Simulate first: run the command without `--broadcast` and without the `--verify` line, which forge
+  rejects unless `--broadcast` is present. That runs the deployment against the live chain and
+  prints the stack without sending anything.
 
 `DeployFinal.run()` is **mainnet-only** (fail-closed incomplete map on testnet). For a
 `via_ir` Rootstock **testnet** bytecode proof, use a representative component script under
@@ -87,10 +88,12 @@ always reverts.
 ## After broadcast
 
 1. Copy every address from the script log into the consumer issue / ops sheet.
-2. From the Safe, `acceptOwnership()` on `OperationsAdmin`, `DcaManager`, and all seven handlers.
-3. Confirm Dex `getSwapPath()` on each Dex handler matches the intended route (constructor
+2. Confirm Dex `getSwapPath()` on each Dex handler matches the intended route (constructor
    already allowlisted it).
-4. Confirm `isSwapper(INITIAL_SWAPPER)` and per-token mins (DOC/USDRIF `25 ether`, USDT0 `25e6`).
+3. Confirm `isSwapper(INITIAL_SWAPPER)` and that `getTokenMinPurchaseAmount` for each token equals
+   the approved launch value (precondition 3).
+4. Only once steps 2 and 3 pass: from the Safe, `acceptOwnership()` on `OperationsAdmin`,
+   `DcaManager`, and all seven handlers.
 5. Publish addresses to `front-end`, `swapper-bot`, `data-api`, `bitchill-monitoring`,
    `metrics-dashboard`, and add them to [`ADDRESSES.md`](../../ADDRESSES.md).
 6. Enable bot ticks only after a successful dry-run simulation against the new stack.
@@ -121,8 +124,8 @@ unreachable until the Safe, in this order:
 2. For a Dex handler, reads `handler.getSwapPath()` and verifies it matches the intended stablecoin,
    intermediate pools, and WRBTC. This is the human checkpoint before assignment.
 3. Calls `dcaManager.setTokenMinPurchaseAmount(token, min)` in the token's own decimals if the token
-   has no minimum yet (`25 ether` for an 18-decimal token, `25e6` for a 6-decimal one). There is no
-   protocol-wide default, and `createDcaSchedule` reverts `TokenMinPurchaseAmountNotSet` without it.
+   has no minimum yet. There is no protocol-wide default, and `createDcaSchedule` reverts
+   `TokenMinPurchaseAmountNotSet` without it.
 4. Calls `operationsAdmin.assignHandler(token, index, handler)` last, so the token is never routable
    while creation still reverts.
 

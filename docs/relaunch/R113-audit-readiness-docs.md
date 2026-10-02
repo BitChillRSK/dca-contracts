@@ -49,7 +49,8 @@ The root documents grew by accretion across the relaunch. Checked against `src/`
 - [x] `docs/relaunch/CUTOVER_RUNBOOK.md`: current gates; a broadcast command with `--sender` and
       `LENDING_PROTOCOL`, the only copy in the repository (`R73-RELEASE_RECORD.md` links to it);
       ownership handoff, the Safe's steps for a new handler, and compromised-swapper order received
-      from the README.
+      from the README; the wiring checks after broadcast come before the Safe's accept, as
+      **Abort / rollback** requires.
 - [x] `audits/README.md`, `SECURITY.md`, `src/idle/README.md`, `src/layerbank/README.md`,
       `test/ai-generated/fuzz/README_INVARIANTS.md`: corrections and trims.
 - [x] `audits/2026-10-02-Krait/krait-report.md`: one **Resolution** row updated for the deleted file.

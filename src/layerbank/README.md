@@ -7,7 +7,7 @@ Route index 1, class lending. `LayerBankHandler` supplies and withdraws through 
 
 `DeployFinal` deploys all three. For the test lanes and add-ons: DOC + MoC with `script/DeployLayerBankHandler.s.sol`, the Dex stablecoins with `script/DeployUsdrifHandler.s.sol` (keyed off `STABLECOIN_TYPE`) or `script/DeployDexSwaps.s.sol`. Anvil deploys Pool and aToken mocks. Live aToken addresses are in `script/Constants.sol` and `script/DeployFinal.s.sol`.
 
-Adding a LayerBank handler to a live deployment: the Foundry EOA cannot `assignHandler` because the Safe owns `OperationsAdmin`. The Safe must set the token's minimum purchase amount in the token's own decimals (`25e6` for USDT0) **before** `assignHandler`: there is no protocol-wide default, and an unset minimum makes schedule creation revert. See **Adding a handler after cutover** in [`docs/relaunch/CUTOVER_RUNBOOK.md`](../../docs/relaunch/CUTOVER_RUNBOOK.md).
+Adding a LayerBank handler to a live deployment: the Foundry EOA cannot `assignHandler` because the Safe owns `OperationsAdmin`. The Safe must set the token's minimum purchase amount in the token's own decimals **before** `assignHandler`: there is no protocol-wide default, and an unset minimum makes schedule creation revert. See **Adding a handler after cutover** in [`docs/relaunch/CUTOVER_RUNBOOK.md`](../../docs/relaunch/CUTOVER_RUNBOOK.md).
 
 External LayerBank incentives (LAB / Merkl) are not claimed. Native aToken interest is the only yield this handler distributes.
 

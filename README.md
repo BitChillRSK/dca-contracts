@@ -65,8 +65,8 @@ also states its own security and lifecycle model in its header.
 Each handler has owner-configurable minimum and maximum rates and a lower purchase threshold. At or
 below the threshold the maximum rate applies; above it the effective rate decreases smoothly toward
 the minimum while the absolute fee never decreases as the purchase grows. Equal rates give a flat fee.
-The fee is taken as a share of the rBTC bought, not withheld from the stablecoin spent. Launch
-settings are 1% up to 250 tokens, decreasing toward 0.2% above that.
+The fee is taken as a share of the rBTC bought, not withheld from the stablecoin spent. The launch
+settings are under [Launch configuration](./AUDIT_GUIDE.md#launch-configuration).
 
 [`docs/PURCHASE_FEES.md`](./docs/PURCHASE_FEES.md) has the curve, the exact integer rounding, and the
 batch allocation.
