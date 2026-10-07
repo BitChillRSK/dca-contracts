@@ -28,7 +28,7 @@ interface IDcaManager {
      *      sentinel. `getDcaSchedules` returns ids alongside these values.
      */
     struct DcaSchedule {
-        uint128 tokenBalance; // Nominal stablecoin principal remaining in this schedule
+        uint128 tokenBalance; // Stablecoin principal the schedule can still spend or withdraw
         uint48 cadenceAnchor; // UTC midnight of the newest consumed cadence slot; zero before the first purchase
         bool paused; // Set by the schedule's user: purchases are refused while true, every other path stays open
         uint32 purchasePeriod; // Time between cadence slots in seconds; always whole UTC days
@@ -302,11 +302,11 @@ interface IDcaManager {
      * @param scheduleId The schedule to withdraw from. Must belong to the caller.
      * @param withdrawalAmount Amount to withdraw. Pass `type(uint256).max` for this schedule's
      *        whole `tokenBalance`.
-     * @dev Principal is reduced by the requested amount, not by what the handler paid out. A lending
-     *      handler reserves shares for remaining principal and consumes exactly the shares debited from
-     *      the user's book. Rounding, fees, or realized losses can reduce the payout. The shortfall is
-     *      not restored as nominal principal; any retained shares already back the remaining position.
-     *      An idle route pays the requested amount from pooled cash, or the transfer reverts.
+     * @dev Principal is reduced by the requested amount, not by what the handler paid out. On a lending
+     *      route a successful handler call guarantees the external receipt-share claim for that request
+     *      was fully consumed, so a cash shortfall is a fee or realized loss with nothing left to
+     *      re-credit: restoring it would invent principal this route can no longer redeem. An idle route
+     *      pays the requested amount from the handler's pooled balance, or the transfer reverts.
      */
     function withdrawToken(address token, uint64 scheduleId, uint256 withdrawalAmount) external;
 
@@ -472,17 +472,6 @@ interface IDcaManager {
      * @return Accumulated rBTC balance in wei.
      */
     function getAccumulatedRbtcBalance(address user, address token, uint256 routeIndex) external view returns (uint256);
-
-    /**
-     * @notice Remaining schedule principal held by one handler for this user and token.
-     * @param user Account whose schedules are summed.
-     * @param token Stablecoin of the schedules.
-     * @param handler Handler resolved from each schedule's stored route through OperationsAdmin.
-     * @return Remaining nominal principal, including paused schedules.
-     * @dev Lending handlers read this after the manager's withdrawal or purchase effects to reserve
-     *      shares for schedules that remain funded. This is a schedule liability, not a cash estimate.
-     */
-    function getLockedPrincipal(address user, address token, address handler) external view returns (uint256);
 
     /**
      * @notice Lending interest a user has accrued on one token and route, above locked principal.

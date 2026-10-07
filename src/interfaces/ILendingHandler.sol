@@ -18,8 +18,8 @@ interface ILendingHandler is ITokenHandler {
     /**
      * @notice Canonical per-user virtual lending-share balance after a successful mint or burn.
      * @dev Only `user` is indexed. `newShares` is the balance immediately after this transition.
-     *      Batch purchases combine repeated rows and emit one transition per unique buyer.
-     *      Its `newShares` equals `getUserShares(user)` after that batch.
+     *      When a buyer appears more than once in a batch, earlier events carry intermediate
+     *      balances; only the last event for that user equals `getUserShares(user)` after the call.
      *      Reverted mutations produce no lasting log. Idle handlers do not emit this.
      */
     event LendingHandler__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares);
@@ -27,7 +27,7 @@ interface ILendingHandler is ITokenHandler {
      * @notice One user's shares were redeemed for measured stablecoin.
      * @dev Emitted only on single-user redeems (`withdraw` / interest). `underlyingAmount` is the
      *      stablecoin this handler measured receiving for that user. Batch purchases do not emit
-     *      this: each buyer's exact share debit is `UserSharesUpdated`, and measured cash for the
+     *      this: each row's exact share debit is `UserSharesUpdated`, and measured cash for the
      *      whole redeem is `SharesRedeemedBatch`.
      */
     event LendingHandler__SharesRedeemed(address indexed user, uint256 underlyingAmount, uint256 sharesAmountRedeemed);
@@ -37,7 +37,7 @@ interface ILendingHandler is ITokenHandler {
     event LendingHandler__InterestWithdrawn(
         address indexed user, address indexed token, uint256 underlyingAmountWithdrawn
     );
-    /// @notice A withdrawal was clamped to shares available above the remaining principal reserve.
+    /// @notice A withdrawal was clamped to the user's share-backed stablecoin.
     event LendingHandler__WithdrawalAmountAdjusted(
         address indexed user, uint256 originalAmount, uint256 adjustedAmount
     );
@@ -53,9 +53,8 @@ interface ILendingHandler is ITokenHandler {
     /// @notice A zero-cash redemption reports its consumed receipt shares before the call rolls back.
     error LendingHandler__ZeroStablecoinReceived(uint256 sharesRedeemed);
     /**
-     * @notice A buyer has no shares available above the remaining principal reserve.
-     * @dev `requested` is the rounded-up combined purchase; `available` excludes reserved shares.
-     *      Positive available funding is adjusted before fee and output allocation instead of reverting.
+     * @notice A batch row's buyer holds no shares worth any stablecoin.
+     * @dev `requested` is the row's rounded-up share amount; `available` is the buyer's remaining shares.
      */
     error LendingHandler__InsufficientShares(address user, uint256 requested, uint256 available);
     /**
@@ -76,7 +75,7 @@ interface ILendingHandler is ITokenHandler {
      * @notice Pay `user` the stablecoin interest above `stablecoinLockedInDcaSchedules`.
      * @param user The address receiving the interest.
      * @param stablecoinLockedInDcaSchedules Principal DcaManager still locks for this user on this
-     *        handler's route. Reserve its rounded-up shares before valuing the shares available as interest.
+     *        handler's route. Interest is `share-backed stablecoin - this amount`, or zero.
      * @dev Called only by DcaManager. No-op when there is no interest.
      */
     function withdrawInterest(address user, uint256 stablecoinLockedInDcaSchedules) external;
@@ -88,9 +87,7 @@ interface ILendingHandler is ITokenHandler {
      *        handler's route.
      * @return Accrued interest in stablecoin units, or zero.
      * @dev Deliberately not a `view`, and do not make it one: the figure is taken at the market's
-     *      current rate after reserving rounded-up shares for locked principal. This can be slightly
-     *      smaller than subtracting principal from the value of all shares.
-     *      On a market that accrues lazily the exchange-rate call updates that
+     *      current exchange rate, which on a market that accrues lazily is a call that updates that
      *      rate. This is the figure a caller may spend against, so it must not sit a poke behind what
      *      a withdrawal would pay. The non-view mutability costs consumers nothing because only
      *      DcaManager can reach this function; `quoteAccruedInterest` is the `view` display read.

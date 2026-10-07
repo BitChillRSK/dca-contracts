@@ -2,7 +2,6 @@
 pragma solidity 0.8.36;
 
 import {ILendingHandler} from "./interfaces/ILendingHandler.sol";
-import {IDcaManager} from "./interfaces/IDcaManager.sol";
 import {TokenHandler} from "./TokenHandler.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -17,17 +16,6 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
  */
 abstract contract LendingHandler is TokenHandler, ILendingHandler {
     using SafeERC20 for IERC20;
-
-    /*//////////////////////////////////////////////////////////////
-                            TYPE DECLARATIONS
-    //////////////////////////////////////////////////////////////*/
-
-    struct BuyerPurchase {
-        address user;
-        uint256 amount;
-        uint256 fundedAmount;
-        uint256 processedAmount;
-    }
 
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
@@ -61,11 +49,13 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     function withdrawInterest(address user, uint256 stablecoinLockedInDcaSchedules) external override onlyDcaManager {
         uint256 exchangeRate = _exchangeRate();
         uint256 userShares = s_shares[user];
-        uint256 stablecoinInterestAmount = _sharesToStablecoin(
-            _availableShares(userShares, stablecoinLockedInDcaSchedules, exchangeRate), exchangeRate
-        );
-        if (stablecoinInterestAmount == 0) {
+        uint256 totalStablecoinInLending = _sharesToStablecoin(userShares, exchangeRate);
+        if (totalStablecoinInLending <= stablecoinLockedInDcaSchedules) {
             return; // No interest to withdraw
+        }
+        uint256 stablecoinInterestAmount;
+        unchecked {
+            stablecoinInterestAmount = totalStablecoinInLending - stablecoinLockedInDcaSchedules;
         }
         uint256 stablecoinReceived = _redeemShares(user, userShares, stablecoinInterestAmount, exchangeRate);
         if (stablecoinReceived > 0) {
@@ -149,14 +139,11 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     function _withdrawToken(address user, uint256 withdrawalAmount) internal virtual override returns (uint256) {
         uint256 exchangeRate = _exchangeRate();
         uint256 userShares = s_shares[user];
-        uint256 remainingPrincipal =
-            IDcaManager(i_dcaManager).getLockedPrincipal(user, address(i_stablecoin), address(this));
-        uint256 availableStablecoin =
-            _sharesToStablecoin(_availableShares(userShares, remainingPrincipal, exchangeRate), exchangeRate);
+        uint256 totalStablecoinInLending = _sharesToStablecoin(userShares, exchangeRate);
 
-        if (availableStablecoin < withdrawalAmount) {
-            emit LendingHandler__WithdrawalAmountAdjusted(user, withdrawalAmount, availableStablecoin);
-            withdrawalAmount = availableStablecoin;
+        if (totalStablecoinInLending < withdrawalAmount) {
+            emit LendingHandler__WithdrawalAmountAdjusted(user, withdrawalAmount, totalStablecoinInLending);
+            withdrawalAmount = totalStablecoinInLending;
         }
 
         // Pay out what the redemption actually produced, which may be less than requested
@@ -165,9 +152,10 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     }
 
     /**
-     * @dev Convert each buyer's combined input once, preserving shares for remaining principal.
-     *      If fewer shares are available, reduce that buyer's row weights before the purchase pipeline
-     *      calculates fees and allocates output. Redeem exactly the sum of booked buyer debits.
+     * @dev Convert and debit each row separately, then redeem exactly the sum of those shares.
+     *      If a buyer's remaining shares cannot fund a row, debit all those shares and reduce that
+     *      row's weight to their stablecoin value. A zero-value row reverts the batch. The caller
+     *      uses the adjusted weights for fees and output allocation.
      */
     function _batchRetrieveStablecoin(address[] calldata users, uint256[] memory purchaseAmounts)
         internal
@@ -176,13 +164,28 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
         returns (uint256)
     {
         uint256 exchangeRate = _exchangeRate();
-        (BuyerPurchase[] memory purchases, uint256[] memory rowGroups, uint256 buyerCount) =
-            _groupPurchases(users, purchaseAmounts);
         uint256 totalSharesToRedeem;
-        for (uint256 i; i < buyerCount; ++i) {
-            totalSharesToRedeem += _debitPurchase(purchases[i], exchangeRate);
+
+        uint256 purchaseCount = users.length;
+        for (uint256 i; i < purchaseCount; ++i) {
+            uint256 sharesToRedeem = _stablecoinToShares(purchaseAmounts[i], exchangeRate);
+            uint256 userShares = s_shares[users[i]];
+            if (sharesToRedeem > userShares) {
+                purchaseAmounts[i] = _sharesToStablecoin(userShares, exchangeRate);
+                if (purchaseAmounts[i] == 0) {
+                    revert LendingHandler__InsufficientShares(users[i], sharesToRedeem, userShares);
+                }
+                sharesToRedeem = userShares;
+            }
+            unchecked {
+                _setUserShares(users[i], userShares, userShares - sharesToRedeem);
+            }
+            totalSharesToRedeem += sharesToRedeem;
+            // Per-user facts on this path are `UserSharesUpdated` (exact virtual debit) and, after
+            // the protocol call, one measured `SharesRedeemedBatch`. Do not emit `SharesRedeemed`
+            // here: that event's `underlyingAmount` is measured cash on single redeems, and the
+            // planned gross is not measured cash.
         }
-        _adjustPurchaseWeights(purchases, rowGroups, purchaseAmounts);
         uint256 stablecoinReceived = _measuredProtocolRedeem(totalSharesToRedeem, exchangeRate);
         if (stablecoinReceived > 0) {
             emit LendingHandler__SharesRedeemedBatch(stablecoinReceived, totalSharesToRedeem);
@@ -235,7 +238,7 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
      *      what the lending protocol may burn for the same stablecoin amount (keeps sum of
      *      per-user shares <= shares the handler actually holds). Round-down would allow the
      *      books to drift above reality. The product `stablecoinAmount * i_exchangeRateDecimals`
-     *      is checked: callers pass combined uint96 purchases or an amount already bounded by
+     *      is checked: callers pass a `uint96` purchase amount or an amount already bounded by
      *      `_sharesToStablecoin`, so it fits, and an overflow would revert rather than wrap.
      * @param stablecoinAmount Amount of stablecoin to convert.
      * @param exchangeRate Stablecoin per share, scaled by `i_exchangeRateDecimals`.
@@ -268,79 +271,7 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Group buyers in first-seen order with an in-memory hash table. Index plus one distinguishes
-     *      an occupied bucket from zero. At most half the buckets are occupied, so probing terminates.
-     *      Grouping neither changes purchase-row order nor writes persistent accounting storage.
-     */
-    function _groupPurchases(address[] calldata users, uint256[] memory amounts)
-        private
-        pure
-        returns (BuyerPurchase[] memory purchases, uint256[] memory rowGroups, uint256 buyerCount)
-    {
-        purchases = new BuyerPurchase[](users.length);
-        rowGroups = new uint256[](users.length);
-        uint256[] memory buckets = new uint256[](users.length * 2);
-        for (uint256 i; i < users.length; ++i) {
-            address user = users[i];
-            uint256 bucket = uint256(keccak256(abi.encode(user))) % buckets.length;
-            while (buckets[bucket] != 0 && purchases[buckets[bucket] - 1].user != user) {
-                bucket = (bucket + 1) % buckets.length;
-            }
-            if (buckets[bucket] == 0) {
-                purchases[buyerCount].user = user;
-                buckets[bucket] = ++buyerCount;
-            }
-            uint256 group = buckets[bucket] - 1;
-            rowGroups[i] = group;
-            purchases[group].amount += amounts[i];
-        }
-    }
-
-    /// @dev The memory purchase is shared with the caller, including its adjusted funding amount.
-    function _debitPurchase(BuyerPurchase memory purchase, uint256 exchangeRate)
-        private
-        returns (uint256 sharesToRedeem)
-    {
-        address user = purchase.user;
-        uint256 userShares = s_shares[user];
-        uint256 remainingPrincipal =
-            IDcaManager(i_dcaManager).getLockedPrincipal(user, address(i_stablecoin), address(this));
-        uint256 availableShares = _availableShares(userShares, remainingPrincipal, exchangeRate);
-        sharesToRedeem = _stablecoinToShares(purchase.amount, exchangeRate);
-        purchase.fundedAmount = purchase.amount;
-        if (sharesToRedeem > availableShares) {
-            if (availableShares == 0) {
-                revert LendingHandler__InsufficientShares(user, sharesToRedeem, availableShares);
-            }
-            sharesToRedeem = availableShares;
-            purchase.fundedAmount = _sharesToStablecoin(sharesToRedeem, exchangeRate);
-            if (purchase.fundedAmount == 0) revert LendingHandler__ZeroStablecoinReceived(sharesToRedeem);
-        }
-        _setUserShares(user, userShares, userShares - sharesToRedeem);
-    }
-
-    /**
-     * @dev Differences of cumulative floors split reduced funding across rows without losing a
-     *      stablecoin unit per row. Their sum is exactly the buyer's funded amount; each weight stays
-     *      at most its original uint96 amount. A buyer has at most uint16.max schedules, so the
-     *      combined amount is below 2^112 and the checked product of two such amounts fits uint256.
-     */
-    function _adjustPurchaseWeights(
-        BuyerPurchase[] memory purchases,
-        uint256[] memory rowGroups,
-        uint256[] memory amounts
-    ) private pure {
-        for (uint256 i; i < amounts.length; ++i) {
-            BuyerPurchase memory purchase = purchases[rowGroups[i]];
-            if (purchase.fundedAmount == purchase.amount) continue;
-            uint256 previousWeight = purchase.fundedAmount * purchase.processedAmount / purchase.amount;
-            purchase.processedAmount += amounts[i];
-            amounts[i] = purchase.fundedAmount * purchase.processedAmount / purchase.amount - previousWeight;
-        }
-    }
-
-    /**
-     * @dev Stablecoin backed by shares above the rounded-up principal reserve, or zero. The two public
+     * @dev Share-backed stablecoin above locked principal at `exchangeRate`, or zero. The two public
      *      readers differ only in which rate they pass: the quote uses the market's plain read, the
      *      spendable figure the rate a write path would get.
      */
@@ -349,19 +280,12 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
         view
         returns (uint256)
     {
-        return _sharesToStablecoin(
-            _availableShares(s_shares[user], stablecoinLockedInDcaSchedules, exchangeRate), exchangeRate
-        );
-    }
-
-    /// @dev Leave enough shares to cover remaining nominal principal before sizing any redemption.
-    function _availableShares(uint256 userShares, uint256 remainingPrincipal, uint256 exchangeRate)
-        private
-        view
-        returns (uint256)
-    {
-        uint256 reservedShares = _stablecoinToShares(remainingPrincipal, exchangeRate);
-        return userShares > reservedShares ? userShares - reservedShares : 0;
+        uint256 totalStablecoinInLending = _sharesToStablecoin(s_shares[user], exchangeRate);
+        unchecked {
+            return totalStablecoinInLending > stablecoinLockedInDcaSchedules
+                ? totalStablecoinInLending - stablecoinLockedInDcaSchedules
+                : 0;
+        }
     }
 
     /**

@@ -18,11 +18,6 @@ import {NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
  *      receipt shares. Reduced funding changes allocation weights before fees and output credits.
  */
 contract BatchTailScheduleTest is Test {
-    /// @dev This direct-call manager fixture has no schedule liabilities.
-    function getLockedPrincipal(address, address, address) external pure returns (uint256) {
-        return 0;
-    }
-
     address internal ALICE = address(0xA11CE);
     address internal BOB = address(0xB0B);
     address internal FEE_COLLECTOR = address(0xFEE);

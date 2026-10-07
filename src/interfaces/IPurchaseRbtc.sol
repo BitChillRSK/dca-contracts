@@ -58,8 +58,8 @@ interface IPurchaseRbtc is IStablecoinSource {
      * @param minRbtcOut Minimum rBTC this batch must buy (rBTC/WRBTC wei). `0` disables. Binds
      *        gross measured output before the protocol fee is taken from that output.
      * @dev DcaManager has already debited the schedules. Venue spends full retrieved stablecoin.
-     *      Lending combines each buyer's input and reserves shares for remaining principal. If available
-     *      shares reduce funding, that buyer's row weights fall proportionally before fee calculation.
+     *      If a lending row exceeds its buyer's remaining shares, use those shares' stablecoin value
+     *      as that row's funding weight. A zero-value row reverts. Fees use the funded weights.
      *      Measured output `Q` splits over the adjusted funding sum (`G`): buyers
      *      `floor(Q × netᵢ / G)`, collector `floor(Q × F / G)`, floor dust uncredited.
      *      `amountSpent` is each row's share of retrieved gross. Exact stablecoin consumption

@@ -54,6 +54,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
         uint256 purchaseAmountsSum;
         uint256 totalFee;
         uint256[] memory fundedAmounts = purchaseAmounts;
+        // The funding hook may reduce a row's weight in place.
         uint256 totalStablecoinRetrieved = _batchRetrieveStablecoin(buyers, fundedAmounts);
         (totalFee, netWeights, purchaseAmountsSum) = _calculateFeeAndNetWeights(fundedAmounts);
 
@@ -141,6 +142,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
     /**
      * @dev Allocate floored shares of measured output. Split out of `batchBuyRbtc` for legacy codegen.
      *      Fee and each row floor; under one wei per term can stay uncredited — see IPurchaseRbtc.
+     * @param purchaseAmounts Per-row funded weights.
      */
     function _creditPurchases(
         address[] calldata buyers,

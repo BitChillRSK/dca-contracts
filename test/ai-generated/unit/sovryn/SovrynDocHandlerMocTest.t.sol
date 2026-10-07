@@ -12,11 +12,6 @@ import {handlerBatchBuyOne, NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 
 contract SovrynDocHandlerMocTest is Test {
-    /// @dev This direct-call manager fixture has no schedule liabilities.
-    function getLockedPrincipal(address, address, address) external pure returns (uint256) {
-        return 0;
-    }
-
     address internal USER = address(0xBBB2);
     address internal FEE_COLLECTOR = address(0xFEE);
 

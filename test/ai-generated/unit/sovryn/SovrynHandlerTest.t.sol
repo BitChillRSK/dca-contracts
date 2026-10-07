@@ -323,10 +323,9 @@ contract SovrynHandlerTest is HandlerTestHarness {
     }
 
     /**
-     * @notice The assetBalanceOf + profitOf preflight is gone (R1): a lending-protocol view is never a
-     * ceiling on what a redemption will pay. Over-redeeming must still fail, just from real accounting
-     * rather than from a view — here the per-user share exceeds the balance we track for that user.
-     * Named `LendingHandler__InsufficientShares` instead of a 0.8 underflow panic.
+     * @notice An excessive batch row consumes only that buyer's remaining share claim.
+     * @dev Receipt shares bound the debit. Funding weights fall to the shares' stablecoin value;
+     *      a lending-protocol asset view does not set the redeem ceiling.
      */
     function test_sovryn_batchRetrieveStablecoin_exceedsBalance_consumesAvailableClaim() public {
         address user1 = makeAddr("user1");

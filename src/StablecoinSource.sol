@@ -38,8 +38,8 @@ abstract contract StablecoinSource is IStablecoinSource {
     /**
      * @dev Retrieve several buyers' stablecoin for a batch purchase.
      * @param buyers Buyers whose positions are debited.
-     * @param purchaseAmounts Mutable funding weights. Lending can reduce these when available shares
-     *        cannot fund the nominal amounts; the caller uses the adjusted weights for fees and output.
+     * @param purchaseAmounts Per-row funding weights. The hook may reduce a weight in place; the caller
+     *        uses the resulting weights for fees and output allocation.
      * @return The total amount actually available to spend.
      */
     function _batchRetrieveStablecoin(address[] calldata buyers, uint256[] memory purchaseAmounts)

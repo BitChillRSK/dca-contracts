@@ -16,11 +16,6 @@ import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
  * @notice MoC purchase paths for the LayerBank DOC handler.
  */
 contract LayerBankDocHandlerMocTest is Test {
-    /// @dev This direct-call manager fixture has no schedule liabilities.
-    function getLockedPrincipal(address, address, address) external pure returns (uint256) {
-        return 0;
-    }
-
     address internal USER = address(0xAAA1);
     address internal FEE_COLLECTOR = address(0xFEE);
 

@@ -52,11 +52,6 @@ contract LendingHandlerRedeemTest is Test {
         stablecoin.approve(address(harness), type(uint256).max);
     }
 
-    /// @dev This handler-level manager fixture has no schedules unless a test mocks this read.
-    function getLockedPrincipal(address, address, address) external pure returns (uint256) {
-        return 0;
-    }
-
     function test_withdrawToken_overstatedRequest_clampsViaOuterClamp() public {
         harness.depositToken(userA, USER_A_DEPOSIT);
         harness.depositToken(userB, USER_B_DEPOSIT);
@@ -122,8 +117,8 @@ contract LendingHandlerRedeemTest is Test {
     }
 
     /**
-     * @dev Interest must leave the rounded-up principal reserve intact, including non-round rates.
-     *      Locked principal spans the entire share-backed value, including no-interest positions.
+     * @dev Interest redeems at most share-backed minus locked. Same ceil bound as principal;
+     *      locked spans [0, shareBacked] so the no-interest early return is covered too.
      */
     function testFuzz_withdrawInterest_debitNeverExceedsBook(uint256 shares, uint256 rate, uint256 locked) public {
         rate = bound(rate, 1, type(uint128).max);
@@ -146,9 +141,7 @@ contract LendingHandlerRedeemTest is Test {
             return;
         }
 
-        uint256 reservedShares = harness.stablecoinToShares(locked, rate);
-        uint256 interest = (shares - reservedShares) * rate / RATE_SCALE;
-        assertGe(bookAfter, reservedShares);
+        uint256 interest = shareBacked - locked;
         uint256 expectedDebit = harness.stablecoinToShares(interest, rate);
         assertLe(expectedDebit, bookBefore);
         assertEq(bookBefore - bookAfter, expectedDebit);
@@ -201,7 +194,7 @@ contract LendingHandlerRedeemTest is Test {
         _assertLastUserSharesUpdated(userA, previousShares, previousShares - sharesToRedeem);
     }
 
-    function test_batchRetrieve_repeatedUserEmitsOneAggregateTransition() public {
+    function test_batchRetrieve_repeatedUserEmitsSequentialTransitions() public {
         harness.depositToken(userA, USER_A_DEPOSIT);
         uint256 start = harness.getUserShares(userA);
         uint256 firstDebit = 10 ether;
@@ -219,17 +212,7 @@ contract LendingHandlerRedeemTest is Test {
         vm.recordLogs();
         harness.batchRetrieveStablecoin(users, amounts);
 
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        uint256 shareUpdates;
-        for (uint256 i; i < logs.length; ++i) {
-            if (logs[i].topics[0] != LendingHandler__UserSharesUpdated.selector) continue;
-            ++shareUpdates;
-            assertEq(address(uint160(uint256(logs[i].topics[1]))), userA);
-            (uint256 previous, uint256 current) = abi.decode(logs[i].data, (uint256, uint256));
-            assertEq(previous, start);
-            assertEq(current, start - firstShares - secondShares);
-        }
-        assertEq(shareUpdates, 1);
+        _assertSequentialShareDebits(start, firstShares, secondShares);
         assertEq(harness.getUserShares(userA), start - firstShares - secondShares);
     }
 
@@ -295,7 +278,7 @@ contract LendingHandlerRedeemTest is Test {
         assertGt(received, 0);
     }
 
-    function test_batchRetrieve_repeatedBuyerDebitsAggregateCeiling() public {
+    function test_batchRetrieve_repeatedBuyerDebitsExactRowSum() public {
         uint256 rate = 1_000_123_456_789_012_345;
         harness.setExchangeRate(rate);
         _fundAndDeposit(userA, 200 ether);
@@ -303,7 +286,7 @@ contract LendingHandlerRedeemTest is Test {
         uint256 start = harness.getUserShares(userA);
         uint256 protocolBefore = harness.protocolShares();
         uint256 rowAmount = 33 ether + 1;
-        uint256 aggregateShares = _stablecoinToSharesUp(rowAmount * 2, rate);
+        uint256 rowShares = _stablecoinToSharesUp(rowAmount, rate);
 
         address[] memory users = new address[](2);
         users[0] = userA;
@@ -314,109 +297,93 @@ contract LendingHandlerRedeemTest is Test {
 
         harness.batchRetrieveStablecoin(users, amounts);
 
-        assertEq(harness.getUserShares(userA), start - aggregateShares);
-        assertEq(protocolBefore - harness.protocolShares(), aggregateShares);
+        assertEq(harness.getUserShares(userA), start - rowShares * 2);
+        assertEq(protocolBefore - harness.protocolShares(), rowShares * 2);
     }
 
-    function test_batchRetrieve_nonAdjacentBuyersAndHashCollisionKeepExactBooks() public {
-        uint256 rate = 17e17;
-        harness.setExchangeRate(rate);
-        address collider;
-        uint256 bucket = uint256(keccak256(abi.encode(userA))) % 8;
-        for (uint160 candidate = 1;; ++candidate) {
-            address account = address(candidate);
-            if (account != userA && account != userB && uint256(keccak256(abi.encode(account))) % 8 == bucket) {
-                collider = account;
-                break;
-            }
-        }
-        _fundAndDeposit(userA, 100 ether);
-        _fundAndDeposit(userB, 100 ether);
-        _fundAndDeposit(collider, 100 ether);
-        address[] memory users = new address[](4);
-        users[0] = userA;
-        users[1] = collider;
-        users[2] = userA;
-        users[3] = userB;
-        uint256[] memory amounts = new uint256[](4);
-        amounts[0] = 10 ether + 1;
-        amounts[1] = 30 ether;
-        amounts[2] = 20 ether + 3;
-        amounts[3] = 40 ether;
-        uint256 aBefore = harness.getUserShares(userA);
-        uint256 bBefore = harness.getUserShares(userB);
-        uint256 cBefore = harness.getUserShares(collider);
-        uint256 externalBefore = harness.protocolShares();
-        uint256 aDebit = _stablecoinToSharesUp(amounts[0] + amounts[2], rate);
-        uint256 bDebit = _stablecoinToSharesUp(amounts[3], rate);
-        uint256 cDebit = _stablecoinToSharesUp(amounts[1], rate);
-        harness.batchRetrieveStablecoin(users, amounts);
-        assertEq(aBefore - harness.getUserShares(userA), aDebit);
-        assertEq(bBefore - harness.getUserShares(userB), bDebit);
-        assertEq(cBefore - harness.getUserShares(collider), cDebit);
-        assertEq(externalBefore - harness.protocolShares(), aDebit + bDebit + cDebit);
-    }
-
-    function test_batchRetrieve_noSharesAboveReserveRevertsWholeBatch() public {
+    function test_batchRetrieve_shortRowUsesItsRemainingShares() public {
         harness.depositToken(userA, 10 ether);
         harness.depositToken(userB, USER_B_DEPOSIT);
-        vm.mockCall(
-            address(this),
-            abi.encodeWithSelector(this.getLockedPrincipal.selector, userA, address(stablecoin), address(harness)),
-            abi.encode(10 ether)
-        );
-        uint256 sharesA = harness.getUserShares(userA);
-        uint256 sharesB = harness.getUserShares(userB);
-        uint256 protocolBefore = harness.protocolShares();
         address[] memory users = new address[](2);
-        users[0] = userB;
-        users[1] = userA;
+        users[0] = userA;
+        users[1] = userB;
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = 25 ether;
+        amounts[1] = 10 ether;
+        (uint256 received, uint256[] memory weights) = harness.batchRetrieveStablecoinWithWeights(users, amounts);
+        assertEq(received, 20 ether);
+        assertEq(weights[0], 10 ether);
+        assertEq(weights[1], 10 ether);
+        assertEq(harness.getUserShares(userA), 0);
+        assertEq(harness.getUserShares(userB), USER_B_DEPOSIT - 10 ether);
+        assertEq(harness.protocolShares(), harness.getUserShares(userB));
+        assertEq(harness.protocolRedeemCalls(), 1);
+    }
+
+    function test_batchRetrieve_zeroShareBuyerRollsBackEarlierRow() public {
+        _assertEmptyRowRollback(false);
+    }
+
+    function test_batchRetrieve_repeatedBuyerEmptySecondRowRollsBack() public {
+        _assertEmptyRowRollback(true);
+    }
+
+    function _assertEmptyRowRollback(bool repeated) private {
+        harness.depositToken(userA, 10 ether);
+        address[] memory users = new address[](2);
+        users[0] = userA;
+        users[1] = repeated ? userA : userB;
         uint256[] memory amounts = new uint256[](2);
         amounts[0] = 10 ether;
         amounts[1] = 25 ether;
+        uint256 cashBefore = stablecoin.balanceOf(address(harness));
         vm.expectRevert(
-            abi.encodeWithSelector(ILendingHandler.LendingHandler__InsufficientShares.selector, userA, 25 ether, 0)
+            abi.encodeWithSelector(ILendingHandler.LendingHandler__InsufficientShares.selector, users[1], 25 ether, 0)
         );
         harness.batchRetrieveStablecoin(users, amounts);
-        assertEq(harness.getUserShares(userA), sharesA);
-        assertEq(harness.getUserShares(userB), sharesB);
-        assertEq(harness.protocolShares(), protocolBefore);
+        assertEq(harness.getUserShares(userA), 10 ether);
+        assertEq(harness.getUserShares(userB), 0);
+        assertEq(harness.protocolShares(), 10 ether);
         assertEq(harness.protocolRedeemCalls(), 0);
+        assertEq(stablecoin.balanceOf(address(harness)), cashBefore);
     }
 
-    function testFuzz_batchRetrieve_reducedWeightsSumToBuyerFunding(
-        uint256 first,
-        uint256 second,
-        uint256 third,
-        uint256 funding
-    ) public {
-        first = bound(first, 1 ether, 100 ether);
-        second = bound(second, 1 ether, 100 ether);
-        third = bound(third, 1 ether, 100 ether);
-        uint256 planned = first + second + third;
-        funding = bound(funding, 1, planned - 1);
-        _fundAndDeposit(userA, funding);
-        _fundAndDeposit(userB, 50 ether);
-        address[] memory users = new address[](4);
+    function testFuzz_batchRetrieve_reducedWeightEqualsDebitedShareValue(uint256 rate, uint256 deposit, uint256 extra)
+        public
+    {
+        rate = bound(rate, RATE_SCALE, 3 * RATE_SCALE);
+        deposit = bound(deposit, 1 ether, 100 ether);
+        extra = bound(extra, 1, 100 ether);
+        harness.setExchangeRate(rate);
+        _fundAndDeposit(userA, deposit);
+        uint256 shares = harness.getUserShares(userA);
+        uint256 value = shares * rate / RATE_SCALE;
+        address[] memory users = new address[](1);
         users[0] = userA;
-        users[1] = userB;
-        users[2] = userA;
-        users[3] = userA;
-        uint256[] memory amounts = new uint256[](4);
-        amounts[0] = first;
-        amounts[1] = 50 ether;
-        amounts[2] = second;
-        amounts[3] = third;
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = value + extra;
         (uint256 received, uint256[] memory weights) = harness.batchRetrieveStablecoinWithWeights(users, amounts);
-        assertEq(received, funding + 50 ether);
-        assertEq(weights[0] + weights[2] + weights[3], funding);
-        assertEq(weights[1], 50 ether);
-        assertLe(weights[0], first);
-        assertLe(weights[2], second);
-        assertLe(weights[3], third);
+        assertEq(weights[0], value);
+        assertLt(weights[0], amounts[0]);
+        assertEq(received, value);
         assertEq(harness.getUserShares(userA), 0);
-        assertEq(harness.getUserShares(userB), 0);
         assertEq(harness.protocolShares(), 0);
+    }
+
+    function test_batchRetrieve_positiveSharesWithZeroValueReverts() public {
+        harness.depositToken(userA, 1);
+        harness.setExchangeRate(1);
+        address[] memory users = new address[](1);
+        users[0] = userA;
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 1;
+        vm.expectRevert(
+            abi.encodeWithSelector(ILendingHandler.LendingHandler__InsufficientShares.selector, userA, RATE_SCALE, 1)
+        );
+        harness.batchRetrieveStablecoin(users, amounts);
+        assertEq(harness.getUserShares(userA), 1);
+        assertEq(harness.protocolShares(), 1);
+        assertEq(harness.protocolRedeemCalls(), 0);
     }
 
     function _fundAndDeposit(address user, uint256 amount) private {
@@ -471,6 +438,27 @@ contract LendingHandlerRedeemTest is Test {
             if (user == a) sharesA = newShares;
             else if (user == b) sharesB = newShares;
         }
+    }
+
+    function _assertSequentialShareDebits(uint256 start, uint256 firstDebit, uint256 secondDebit) private {
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 sig = LendingHandler__UserSharesUpdated.selector;
+        uint256 seen;
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].topics[0] != sig) continue;
+            address user = address(uint160(uint256(logs[i].topics[1])));
+            (uint256 prev, uint256 next) = abi.decode(logs[i].data, (uint256, uint256));
+            assertEq(user, userA);
+            if (seen == 0) {
+                assertEq(prev, start);
+                assertEq(next, start - firstDebit);
+            } else {
+                assertEq(prev, start - firstDebit);
+                assertEq(next, start - firstDebit - secondDebit);
+            }
+            seen++;
+        }
+        assertEq(seen, 2, "repeated buyer must emit one UserSharesUpdated per debit");
     }
 
     function _assertLastUserSharesUpdated(address expectedUser, uint256 previousShares, uint256 newShares) private {

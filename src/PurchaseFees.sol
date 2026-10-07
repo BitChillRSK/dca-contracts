@@ -104,7 +104,7 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
     /**
      * @dev Fee and net weight per row. Callers allocate measured output over `purchaseAmountsSum`;
      *      these are not venue spend amounts.
-     * @param purchaseAmounts Raw purchase amounts.
+     * @param purchaseAmounts Per-row funded weights.
      * @return totalFee Sum of per-row fees in stablecoin units.
      * @return netWeights Per-row net (amount − fee), as allocation weights.
      * @return purchaseAmountsSum Sum of `purchaseAmounts` (allocation denominator).
