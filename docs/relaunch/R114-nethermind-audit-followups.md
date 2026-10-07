@@ -1,7 +1,7 @@
 # R114 — Nethermind AuditAgent report and dispositions
 
-Status: **implemented; PR pending** · Assigned: yes · Optional/further-review: no · Stack on: R113
-([#179](https://github.com/BitChillRSK/dca-contracts/pull/179))
+Status: **implemented** · Assigned: yes · Optional/further-review: no · Stack on: R113
+([#179](https://github.com/BitChillRSK/dca-contracts/pull/179)) · PR: [#180](https://github.com/BitChillRSK/dca-contracts/pull/180)
 
 ## Objective
 
@@ -110,7 +110,7 @@ The original report retains six two-space Markdown hard breaks, so the whitespac
 - [x] The report remains byte-identical to the supplied artifact.
 - [x] All reproductions pass under both profiles.
 - [x] Runtime, creation code, and ABI comparisons confirm unchanged executable contracts.
-- [ ] The PR stacks on R113 and remains ready for the human's separate review.
+- [x] The PR stacks on R113 and remains ready for the human's separate review.
 
 ## Reviewer checklist
 
