@@ -346,6 +346,9 @@ interface IDcaManager {
      * @notice Withdraw all rBTC the caller has accumulated on one token×route handler.
      * @param token The stablecoin whose handler holds the rBTC.
      * @param routeIndex The route whose handler holds the rBTC.
+     * @dev Pays native rBTC to `msg.sender`, including on Dex routes after WRBTC unwrap. The caller
+     *      must accept an empty-calldata native transfer. Rejecting accounts cannot nominate another
+     *      recipient; a failed transfer reverts and preserves the accumulated credit.
      */
     function withdrawAccumulatedRbtc(address token, uint256 routeIndex) external;
 
@@ -355,6 +358,8 @@ interface IDcaManager {
      * @param routeIndexes The route of each pair.
      * @dev The two arrays are positional pairs: `tokens[i]` is only withdrawn from `routeIndexes[i]`.
      *      The arrays must be the same length and non-empty; an unassigned or zero-balance pair is skipped.
+     *      The caller must accept native rBTC with empty calldata. A rejected payment reverts every
+     *      claim in this call and preserves all accumulated credits.
      */
     function withdrawAllAccumulatedRbtc(address[] calldata tokens, uint256[] calldata routeIndexes) external;
 

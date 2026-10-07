@@ -137,6 +137,13 @@ the Safe as pending owner. The Safe must accept each one. Until acceptance, the 
 owner; afterward, ownership is independent per contract and configuration can diverge unless operations
 apply the same decision everywhere it is meant to apply.
 
+Handler admission checks registry affiliation, not canonical manager identity.
+An impostor manager can return the same registry from `i_operationsAdmin()`.
+Before acceptance or permanent assignment, operations must verify the handler's exact immutable manager, stablecoin, and released code.
+An incorrect owner assignment can disable that pair or expose tokens approved to the incorrectly bound handler.
+The Safe controls later assignments; the broadcaster EOA configures the initial stack before Safe acceptance.
+The [cutover runbook](./docs/relaunch/CUTOVER_RUNBOOK.md) specifies those checks.
+
 How the boundaries are enforced:
 
 - Handlers take deposits, withdrawals, interest calls, purchases, and rBTC claims from their immutable
@@ -220,6 +227,16 @@ rBTC withdrawal, reads, governance, and purchases remain open. Purchases do not 
 Other deliberate availability trade-offs:
 
 - A bad row reverts its entire handler batch; a bad handler batch reverts an across-handlers call.
+- Lending schedule principal is nominal. Measured receipt shares can cover slightly less after
+  rounded mints, withdrawals, or earlier purchases. A final purchase can therefore fail with
+  `LendingHandler__InsufficientShares`. Separate rounded-up rows for the same buyer can also fail
+  despite sufficient backing for one aggregate conversion. Both failures revert the entire batch.
+
+  Interest can repair a dust gap, but zero or insufficient accrual cannot guarantee a repair.
+  One additional underlying base unit is not sufficient for every repeated-buyer case.
+  These availability risks are accepted; the bot simulates complete batches and omits failing rows.
+  The owner can add backing, reduce a purchase, or exit principal through the available-share clamp.
+  See the [AuditAgent dispositions](./audits/2026-10-06-Nethermind/README.md) and their reproductions.
 - A user pause blocks purchases only. A governance deposit pause blocks new inflows only, preserving
   purchases and exits.
 - Contracts are not proxies. Recovery from a defective immutable handler is a new route index plus
@@ -230,8 +247,16 @@ Other deliberate availability trade-offs:
 - Listed stablecoins, Money on Chain, lending markets, the Uniswap router/pools, WRBTC, and the MoC
   BTC/USD oracle remain correct and available. External illiquidity or pauses can revert purchases or
   withdrawals.
-- Dex pricing assumes the input stablecoin is worth one USD; there is no stablecoin/USD oracle. A
-  depeg beyond the configured BTC/USD-derived floor stops swaps rather than repricing the asset.
+- Dex pricing assumes the input stablecoin is worth one USD; there is no stablecoin/USD oracle.
+  A downward depeg can stop swaps at the configured BTC/USD-derived floor. An upward depeg does not
+  raise that floor. A fair pool can pay the premium, but the floor does not require it; a tight
+  quote-derived `minRbtcOut` protects the batch. The additional headroom with a weak caller minimum
+  is accepted under the peg assumption.
+- Users and the fee collector must accept native rBTC with empty calldata. EOAs and compatible
+  payable contract accounts meet this requirement; permanently rejecting accounts are unsupported.
+  They can create schedules and receive credits but cannot claim them through signer-bound payouts.
+  A failed claim preserves the credit. Dex claims unwrap WRBTC and have the same requirement.
+  No alternate recipient, wrapped claim, or owner rescue exists.
 - Dex input tokens must have at most 18 decimals. Fee-on-transfer tokens and asynchronous or partial
   lending redemptions are unsupported.
 - Sovryn charges a 0.1% exit fee on iToken burns. A user on the Sovryn route therefore receives less
@@ -246,6 +271,8 @@ Other deliberate availability trade-offs:
   is orphaned and no funds move. `make fork-layerbank` and `make fork-sovryn` assert the live rounding
   (`LayerBankLivePoolProbe`), so operations should rerun one of them whenever the Pool or aToken
   implementation changes. See `src/layerbank/README.md`.
+  This upgrade assumption is separate from current half-up mint rounding: a fresh deposit can mint
+  one share fewer than a full-principal purchase requires without any implementation change.
 - Third-party incentive campaigns on a lending market (for example Merkl) are not claimed or
   distributed. Handlers pay out the market's native interest only.
 - The bot must quote, simulate, group rows by handler, respect the protected-window workflow, and retry
@@ -256,9 +283,10 @@ Other deliberate availability trade-offs:
 ## Earlier reviews and static analysis
 
 [`audits/README.md`](./audits/README.md) lists every report. Two manual reviews from 2025 cover the
-pre-relaunch code. The relaunch code has had one automated audit (Krait, October 2026) and no
-third-party manual audit. The Krait report's **Resolution** section records which observations were
-fixed and which are accepted; the accepted ones are stated in this guide.
+pre-relaunch code. The relaunch code has had two automated audits (Krait and Nethermind AuditAgent,
+October 2026) and no third-party manual audit. The Krait report's **Resolution** section records its
+decisions. The [AuditAgent companion](./audits/2026-10-06-Nethermind/README.md) records all six
+dispositions separately from the unchanged original report. Accepted risks are stated in this guide.
 
 Slither and Aderyn run on `src/` only (`make slither`, `make aderyn`). Slither exits non-zero because
 its triaged findings are kept visible instead of suppressed. Each detector's classification, false

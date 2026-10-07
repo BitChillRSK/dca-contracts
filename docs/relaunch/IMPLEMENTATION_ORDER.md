@@ -174,6 +174,8 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R110 | after R109, before audit freeze / relaunch deploy | none (internal audit follow-ups: stale fee and cadence docs, Sovryn/Tropykus underlying check, LayerBank burn-rounding assumption and probe) |
 | R111 | after R110, before audit freeze / relaunch deploy | none (`IiSusdToken` → `IiToken`, `MockIsusdToken` → `MockIToken`, remaining `iSusd` identifiers → `iToken`) |
 | R112 | after R111, before audit freeze / relaunch deploy | none (publish the Krait audit report under `audits/2026-10-02-Krait/`; follow-ups are comments and documents only; no window gap) |
+| R113 | after R112, before audit freeze / relaunch deploy | none (reviewer-facing documents; Markdown only) |
+| R114 | after R113, before audit freeze / relaunch deploy | none (AuditAgent report, six explicit dispositions, isolated reproductions, NatSpec, and exact manager checks; no executable contract change) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1486,6 +1488,14 @@ scope lists, compiler and dependency facts, the launch configuration, and earlie
 `ADDRESSES.md` lists the external contracts `DeployFinal` binds to; the cutover runbook gates on
 `make fork-layerbank` and receives the ownership, add-on, and compromised-swapper procedures.
 Ask: none.
+
+### R114 - Nethermind AuditAgent report and dispositions ([spec](./R114-nethermind-audit-followups.md))
+
+After R113, before audit freeze / relaunch deploy. Preserve the supplied automated report unchanged.
+Record all six dispositions and prove the boundary cases with local tests under both compiler profiles.
+Correct peg, wallet, and registry NatSpec. Require exact manager checks in the deployment procedure.
+Keep the accepted lending-tail policy, signer-only payouts, and one-dollar pricing assumption.
+No executable contract change. Ask: none. The human arranges the separate Claude review.
 
 ## Closed non-implementation decisions
 

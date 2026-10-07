@@ -88,15 +88,21 @@ always reverts.
 ## After broadcast
 
 1. Copy every address from the script log into the consumer issue / ops sheet.
-2. Confirm Dex `getSwapPath()` on each Dex handler matches the intended route (constructor
+2. Verify `dcaManager.i_operationsAdmin()` equals the deployed `OperationsAdmin` address.
+   For all seven handlers, verify `handler.i_dcaManager()` equals that exact deployed `DcaManager`.
+   Verify `handler.i_stablecoin()` equals the token assigned to its pair.
+   Compare each handler's verified code and constructor arguments with the frozen release artifact.
+   A manager that merely returns the same registry does not establish canonical manager identity.
+   Record the addresses and check results before Safe acceptance or consumer publication.
+3. Confirm Dex `getSwapPath()` on each Dex handler matches the intended route (constructor
    already allowlisted it).
-3. Confirm `isSwapper(INITIAL_SWAPPER)` and that `getTokenMinPurchaseAmount` for each token equals
+4. Confirm `isSwapper(INITIAL_SWAPPER)` and that `getTokenMinPurchaseAmount` for each token equals
    the approved launch value (precondition 3).
-4. Only once steps 2 and 3 pass: from the Safe, `acceptOwnership()` on `OperationsAdmin`,
+5. Only once steps 2 through 4 pass: from the Safe, `acceptOwnership()` on `OperationsAdmin`,
    `DcaManager`, and all seven handlers.
-5. Publish addresses to `front-end`, `swapper-bot`, `data-api`, `bitchill-monitoring`,
+6. Publish addresses to `front-end`, `swapper-bot`, `data-api`, `bitchill-monitoring`,
    `metrics-dashboard`, and add them to [`ADDRESSES.md`](../../ADDRESSES.md).
-6. Enable bot ticks only after a successful dry-run simulation against the new stack.
+7. Enable bot ticks only after a successful dry-run simulation against the new stack.
 
 ## Abort / rollback
 
@@ -119,14 +125,22 @@ as its owner. The deploying EOA is not the owner of `OperationsAdmin`, so the sc
 handler and nothing more. A Dex handler's constructor allowlists its initial path. The handler stays
 unreachable until the Safe, in this order:
 
-1. Calls `operationsAdmin.registerRoute(index, lends)` only if `getRouteClass(index)` is still
+**Caution:** The registry checks affiliation only. A matching registry getter does not prove canonical manager identity.
+
+1. Verifies the deployed handler against the frozen release artifact and constructor arguments.
+   Reads `handler.i_dcaManager()` and checks equality with the exact published `DcaManager` address.
+   Reads `handler.i_stablecoin()` and checks equality with the intended token.
+   Reads `dcaManager.i_operationsAdmin()` and checks equality with the published registry.
+   Confirms the handler owner is the Safe and no ownership transfer is pending.
+   Records these checks before approving any permanent assignment.
+2. Calls `operationsAdmin.registerRoute(index, lends)` only if `getRouteClass(index)` is still
    `Unregistered`. A second registration reverts `RouteAlreadyRegistered`.
-2. For a Dex handler, reads `handler.getSwapPath()` and verifies it matches the intended stablecoin,
+3. For a Dex handler, reads `handler.getSwapPath()` and verifies it matches the intended stablecoin,
    intermediate pools, and WRBTC. This is the human checkpoint before assignment.
-3. Calls `dcaManager.setTokenMinPurchaseAmount(token, min)` in the token's own decimals if the token
+4. Calls `dcaManager.setTokenMinPurchaseAmount(token, min)` in the token's own decimals if the token
    has no minimum yet. There is no protocol-wide default, and `createDcaSchedule` reverts
    `TokenMinPurchaseAmountNotSet` without it.
-4. Calls `operationsAdmin.assignHandler(token, index, handler)` last, so the token is never routable
+5. Calls `operationsAdmin.assignHandler(token, index, handler)` last, so the token is never routable
    while creation still reverts.
 
 ## Compromised swapper
