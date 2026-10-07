@@ -153,6 +153,7 @@ contract NethermindLayerBankAuditTest is LayerBankDcaManagerTest {
     function test_NM5_flatIndexPurchasesPreservePrincipalThroughFinalTick() public {
         _index(101e25);
         uint64 id = _create(75 ether, 25 ether);
+        uint256 nextPurchaseTime = block.timestamp;
         for (uint256 tick; tick < 3; ++tick) {
             vm.prank(SWAPPER);
             batchBuyOne(dcaManager, address(docToken), id, 1);
@@ -160,7 +161,8 @@ contract NethermindLayerBankAuditTest is LayerBankDcaManagerTest {
             assertEq(dcaManager.getLockedPrincipal(USER, address(docToken), address(handler)), remaining);
             assertGe(handler.getUserShares(USER) * 101e25 / 1e27, remaining);
             assertEq(handler.getUserShares(USER), handler.i_aToken().scaledBalanceOf(address(handler)));
-            vm.warp(block.timestamp + 7 days);
+            nextPurchaseTime += 7 days;
+            vm.warp(nextPurchaseTime);
         }
         assertEq(handler.getUserShares(USER), 0);
         assertGt(handler.getAccumulatedRbtcBalance(USER), 0);
