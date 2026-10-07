@@ -5,7 +5,8 @@ pragma solidity 0.8.36;
  * @notice Reproducible R114 purchase-cost measurements against local protocol mocks.
  * @dev Adapted from the independent review's measurement probe. Gas and access recording run in
  *      separate tests from identical post-setUp state. The recorder warms storage before reporting
- *      accesses, so gas measured with it active would be invalid. Run under the deploy profile.
+ *      accesses, so gas measured with it active would be invalid. Access counts and clean Foundry
+ *      gas ceilings are regression assertions under both default and deploy profiles.
  */
 import {BaseDeploymentTest} from "test/unit/deployment/BaseDeploymentTest.t.sol";
 import {DeployIdleHandler} from "script/DeployIdleHandler.s.sol";
@@ -302,6 +303,10 @@ abstract contract R114PurchaseClampGasBase is BaseDeploymentTest, AccessPricer {
         uint256 gasUsed = gasleft();
         manager.batchBuyRbtc(batch);
         gasUsed -= gasleft();
+        // A compute-cost regression must fail too, even if account/storage counts do not change.
+        bool deploy = keccak256(bytes(vm.envOr("FOUNDRY_PROFILE", string("default")))) == keccak256("deploy");
+        uint256 ceiling = _route() == LAYERBANK_INDEX ? (deploy ? 445_000 : 461_000) : (deploy ? 302_000 : 313_000);
+        assertLe(gasUsed, ceiling, "clean Foundry purchase gas ceiling");
         console.log(
             string.concat(
                 "R114GAS|",
@@ -328,6 +333,22 @@ abstract contract R114PurchaseClampGasBase is BaseDeploymentTest, AccessPricer {
         VmSafe.AccountAccess[] memory accesses = vm.stopAndReturnStateDiff();
         Vm.Log[] memory logs = vm.getRecordedLogs();
         Tally memory t = _price(accesses);
+        bool lending = _route() == LAYERBANK_INDEX;
+        bool deploy = keccak256(bytes(vm.envOr("FOUNDRY_PROFILE", string("default")))) == keccak256("deploy");
+        assertEq(t.calls, lending ? 23 : 12, "purchase calls");
+        assertEq(t.sloads, lending ? (deploy ? 87 : 122) : (deploy ? 59 : 92), "purchase SLOADs");
+        assertEq(t.sstoreSet, lending ? 2 : 1, "zero-to-nonzero writes");
+        assertEq(t.sstoreClear, lending ? 2 : 1, "nonzero-to-zero writes");
+        assertEq(t.sstoreReset, lending ? 36 : 24, "nonzero-to-nonzero writes");
+        assertEq(t.sstoreSame, 0, "same-value writes");
+        assertEq(t.ext700, 4, "code accesses");
+        assertEq(t.ext400, 0, "balance/hash accesses");
+        assertEq(logs.length, lending ? 38 : 25, "purchase logs");
+        assertEq(s_callsInto[address(dcaManager)], 1, "manager calls");
+        assertEq(s_callsInto[address(operationsAdmin)], 2, "registry calls");
+        assertEq(s_callsInto[_measuredHandler()], 2, "handler calls");
+        assertEq(s_sloadsIn[_measuredHandler()], lending ? (deploy ? 23 : 24) : (deploy ? 13 : 14), "handler SLOADs");
+        assertEq(s_sstoresIn[_measuredHandler()], lending ? 21 : 11, "handler SSTOREs");
         _report(t, logs.length);
     }
 

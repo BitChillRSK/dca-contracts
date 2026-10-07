@@ -348,6 +348,22 @@ contract LendingHandlerRedeemTest is Test {
         assertEq(stablecoin.balanceOf(address(harness)), cashBefore);
     }
 
+    /// @dev A row its buyer's shares cover exactly keeps its nominal weight, even when those shares are worth more.
+    function testFuzz_batchRetrieve_exactlyCoveredRowKeepsNominalWeight(uint256 rate, uint256 amount) public {
+        rate = bound(rate, RATE_SCALE, 3 * RATE_SCALE);
+        amount = bound(amount, 1 ether, 100 ether);
+        harness.setExchangeRate(rate);
+        _fundAndDeposit(userA, amount);
+        assertEq(harness.getUserShares(userA), _stablecoinToSharesUp(amount, rate), "deposit mints the row's ceiling");
+        address[] memory users = new address[](1);
+        users[0] = userA;
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = amount;
+        (, uint256[] memory weights) = harness.batchRetrieveStablecoinWithWeights(users, amounts);
+        assertEq(weights[0], amount);
+        assertEq(harness.getUserShares(userA), 0);
+    }
+
     function testFuzz_batchRetrieve_reducedWeightEqualsDebitedShareValue(uint256 rate, uint256 deposit, uint256 extra)
         public
     {

@@ -21,7 +21,8 @@ that row. It also adds manager callbacks and schedule enumeration to the purchas
 Review measurements used local mocks, the deploy profile, and Rootstock pricing: a steady-state
 LayerBank tick with ten buyers cost 411,203 gas on R113, 491,278 with reserves and grouping, and
 734,378 when each buyer held ten schedules. The review measured 412,131 for the clamp alone.
-These are review measurements; independent measurements below will use separate gas/access tests.
+These are review measurements; the reproduced measurements below use the reviewer's probe with
+separate gas/access tests.
 
 ## Open product decisions
 
@@ -41,6 +42,10 @@ Require exact manager, token, and released-code checks before initial Safe accep
 - Keep schedule debits nominal, measured cash, exact share consumption, exact venue consumption,
   signer-bound withdrawals, and all-or-nothing batches.
 - Retain the report unchanged, accepted-risk NatSpec, and assignment checks in the runbook.
+- Second review follow-up (2026-10-08): pin the exactly covered row boundary, add gas/access assertions
+  to the reviewer-derived harness, tighten funding comments and reviewer documents, and restore the
+  five Krait candidate snapshots. Keep executable production code unchanged. Defer optional live-tail
+  fork coverage and declaration cleanup; the supplied fork probe is not present in this checkout.
 
 ## Out of scope
 
@@ -62,7 +67,7 @@ Require exact manager, token, and released-code checks before initial Safe accep
 - `test/ai-generated/unit/{layerbank/LayerBankHandlerTest,sovryn/SovrynHandlerTest,tropykus-legacy/TropykusHandlerTest}.t.sol`
 - `test/ai-generated/fuzz/LendingPurchaseConservationInvariant.t.sol`
 - `test/gas/R78FlatFeeFastPathGas.t.sol`, `test/gas/R87IdleLedgerRemovalGas.t.sol`
-- `test/gas/R114PurchaseClampGas.t.sol`, `test/gas/reprice_r114.py` (independent measurement evidence)
+- `test/gas/R114PurchaseClampGas.t.sol`, `test/gas/reprice_r114.py` (reviewer-derived measurement evidence)
 - `audits/2026-10-06-Nethermind/audit-agent-report.md` (unchanged), its `README.md`, `audits/README.md`
 - `AUDIT_GUIDE.md`, `docs/PURCHASE_FEES.md`, `docs/relaunch/EXTERNAL_REWARDS.md` (restore)
 - `docs/relaunch/CUTOVER_RUNBOOK.md`, `docs/relaunch/README.md`, `docs/relaunch/IMPLEMENTATION_ORDER.md`
@@ -83,6 +88,9 @@ Name additional paths in the PR body.
   when `minRbtcOut` is missed. Keep the pipeline-level reduced-funding fee test.
 - Pin zero-share rollback, including a repeated buyer whose first row consumes all its shares.
 - Fuzz that a reduced weight equals the debited shares' value and is below nominal.
+- Fuzz that an exactly covered row keeps its nominal weight even when its shares are worth more.
+  Verify that this test fails if the clamp condition changes from `>` to `>=`.
+- Pin gas ceilings and access counts for the three cost cases under default and deploy profiles.
 - After a 20% index loss, a funded purchase and partial withdrawal still pay the full request.
 - Run `make check` under default and deploy profiles, `make fork-sovryn`, `make fork-layerbank`,
   formatting, and installed static analyzers. Compare all first-party ABIs with R113: no differences.
@@ -96,7 +104,7 @@ Name additional paths in the PR body.
 - Nominal principal may exceed share value by rounding dust. A zero-value row still reverts.
   After a lending loss, purchases continue while the buyer has shares that fund their rows.
 - Every finding has a clear disposition and residual risk. No first-party ABI changes.
-- Tests, forks, latest CI, artifact checks, and independently measured gas evidence pass.
+- Tests, forks, latest CI, artifact checks, and reproduced gas evidence pass.
 - Focused new commits preserve the stack and history. PR 180 and all three consumer comments describe
   the final behavior. The separate Claude review remains BitChill's review step.
 
@@ -118,15 +126,19 @@ Interest quotes and withdrawals retain R113 behavior. Deploy the immutable contr
 
 ## Implementation and validation
 
-### Independent gas measurement
+### Reproduced gas measurement
 
-Run the same checked-in harness on R113 and the revised tree. Both runs use solc 0.8.36, Cancun,
+The harness adapts the independent reviewer's probe; it is not an independently designed measurement.
+BitChill reran that harness on R113 and the revised tree. Both runs use solc 0.8.36, Cancun,
 optimizer 200, the deploy profile, local protocol mocks, ten distinct buyers, and 25-token rows.
 Each setup executes an initial tick, then advances one purchase period. This makes the measured tick
 steady-state: cadence anchors and accumulated-rBTC balances are live.
 
 `test_probe_gas` measures `gasleft()` without recording. `test_probe_accesses` records the same call
 from the same setup state without measuring gas. Two micro-tests verify the Cancun cold/warm model.
+The follow-up pins calls, SLOADs, write classes, logs, handler accesses, and clean Foundry gas ceilings.
+Lending ceilings are 461,000 under default and 445,000 under deploy; idle ceilings are 313,000 and
+302,000. These are compiler-profile regression ceilings, not production gas prices.
 The repricer subtracts Cancun access charges and adds Rootstock charges: SLOAD 200, calls 700,
 SET 20,000, and RESET/CLEAR 5,000. It preserves compute, memory, logs, and value-transfer costs.
 Figures exclude transaction intrinsic gas and precede refunds; they are estimates from local mocks,
@@ -142,7 +154,7 @@ For lending, the writes are two SET, two CLEAR, and 36 RESET on each tree; no sa
 For idle, they are one SET, one CLEAR, and 24 RESET. Clear refunds are 30,000 and 15,000 respectively
 and remain unchanged. Per handler, lending has 23 SLOAD and 21 SSTORE; idle has 13 SLOAD and 11 SSTORE.
 Each tree calls the manager once, admin twice, and handler twice. The delta is compute/memory only.
-Extra held schedules add no purchase-path access. The independent figures differ by one gas from
+Extra held schedules add no purchase-path access. The reproduced figures differ by one gas from
 review lending figures; the measured delta agrees at 928 gas for ten rows.
 
 Exact measurement commands, run from each tree with the same harness:
@@ -152,7 +164,7 @@ SWAP_TYPE=mocSwaps LENDING_PROTOCOL=none STABLECOIN_TYPE=DOC FOUNDRY_PROFILE=dep
 python3 test/gas/reprice_r114.py R113 /tmp/bitchill-r114-rework.wiDWFD/gas-base.log clamp /tmp/bitchill-r114-rework.wiDWFD/gas-clamp.log
 ```
 
-### Regression and gate evidence
+### Regression and full-gate evidence (2026-10-07)
 
 All nine NM1/NM5/NM6 scenarios fail against R113 with a share shortfall. They pass with the clamp.
 The targeted default run passes 92 tests without failures or skips, including new loss/zero-value
@@ -201,6 +213,25 @@ Consumer corrections update the existing comments:
 There is no new getter, interest or withdrawal change, or event cardinality change.
 `amountSpent` can fall below nominal on a short lending row; `InsufficientShares` identifies zero value.
 
+
+### Second review follow-up (2026-10-08)
+
+The exactly covered row fuzz keeps nominal weight when `ceil(nominal × scale / rate)` equals the
+buyer's shares. A temporary `>` → `>=` mutation fails that test. The gas harness now asserts clean
+Foundry gas ceilings and exact access counts under both profiles; an added `balanceOf` call fails
+its call and SLOAD assertions. Both mutations were restored before the final builds.
+
+Both comment rewrites are applied. Reviewer documents describe current behavior without withdrawn-design
+rebuttals; the fee document contains fee facts. The five Krait candidate files match R113 exactly.
+The measurement harness is explicitly reviewer-derived. Declaration and private-parameter cleanup
+remain deferred. Existing fork gates do not spend a schedule's final tail through the live market;
+the supplied `scratchpad/probe/R114ForkTail.t.sol` is absent from this checkout.
+
+The final targeted run passes 93 tests with no failures or skips under each profile. The new boundary
+fuzz runs 1,000 cases per profile. `forge build` and the deploy-profile build pass. All 42 first-party
+ABIs and metadata-stripped creation/runtime bytecodes match `086973f4` under both profiles. Gas and
+access counts remain unchanged; the earlier production-code fork evidence stands. Formatting and
+whitespace checks pass. PR 180 records the new CI run after push.
 
 ### Rework commits
 
