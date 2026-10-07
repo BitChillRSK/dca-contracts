@@ -38,12 +38,12 @@ Every lending handler must emit the event after each successful change to its pe
 - a normal stablecoin withdrawal;
 - an interest withdrawal;
 - a single rBTC purchase;
-- one combined debit per unique buyer in a batch purchase, including non-adjacent repeated rows.
+- each per-user debit in a batch purchase, including sequential updates when the same user appears more than once.
 
 `previousShares` lets an indexer detect a missed or inconsistent transition. `newShares` is the
-balance immediately after that transition. R114 combines repeated buyers before share conversion,
-so one batch emits one transition per buyer, equal to `getUserShares(user)` after that batch.
-Reverted mutations produce no lasting event.
+balance immediately after that transition. When the same user appears more than once in a batch,
+earlier events carry intermediate balances; only the last event for that user equals
+`getUserShares(user)` after the transaction. Reverted mutations produce no lasting event.
 
 No new on-chain `totalShares` counter is required for forwarding. An indexer can sum the latest per-user balances from the event stream and cross-check individual balances through the existing getter. The share token's `balanceOf(handler)` (or LayerBank `scaledBalanceOf`) remains an independent aggregate solvency check, subject to the handler's documented rounding behavior.
 
@@ -51,7 +51,7 @@ No new on-chain `totalShares` counter is required for forwarding. An indexer can
 
 - `TokenHandler__TokenDeposited` identifies the user but reports stablecoin received, not the exact number of lending shares minted at the then-current exchange rate.
 - `TokenLending__SharesRedeemed` reports measured stablecoin and exact share burns on
-  **single-user** redeems only. Batch purchases emit per-buyer `UserSharesUpdated` and one
+  **single-user** redeems only. Batch purchases emit per-row `UserSharesUpdated` and one
   measured `SharesRedeemedBatch` instead — there is still no exact share-mint event.
 - `DcaManager` events report schedule principal in underlying stablecoin. Schedule principal is not a lending-share balance.
 - `getUserShares(user)` exposes current state, not the historical time-weighted balance required for forwarding.

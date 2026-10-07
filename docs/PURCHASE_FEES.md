@@ -26,10 +26,12 @@ Launch deployment defaults are $M=100$, $m=20$ and $L=250$ whole tokens:
 bound is `250e18` for DOC/USDRIF and `250e6` for USDT0. Equal minimum/maximum
 rates remain available as a flat configuration through the same setter.
 
-Funding weights normally equal scheduled purchase amounts. Lending first combines each buyer's
-rows and reserves shares for remaining principal. If available shares reduce funding, only that
-buyer's weights decrease. Fees use those adjusted weights; the schedule debit remains nominal.
-Idle handlers use the nominal amounts. Quotes must account for any funding reduction.
+Funding weights normally equal scheduled purchase amounts. If a lending row requests more shares
+than its buyer holds, the row uses those shares' stablecoin value as its funding weight. Fees use
+that weight; other rows keep their weights and schedule debits remain nominal. A zero-value row
+reverts the batch. Nominal principal can exceed share value by rounding dust; after a loss, purchases
+continue while shares fund the rows. This one rule resolves AuditAgent findings 1, 5, and 6.
+Idle handlers use nominal amounts. Quotes must account for reduced funding.
 
 ## Fee amount and effective rate
 

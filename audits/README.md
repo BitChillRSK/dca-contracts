@@ -8,7 +8,7 @@ For the current scope, trust boundaries, and accepted risks, start with
 | April 2025 | [Ivan Fitro](https://twitter.com/FitroIvan) | Manual | Pre-relaunch protocol (Tropykus and Sovryn lending, Money on Chain purchases) | 3 Medium, 4 Low, 2 Info | [PDF](./pre-relaunch/2025-04-29-Ivan-Fitro.pdf) |
 | June 2025 | [Ivan Fitro](https://twitter.com/FitroIvan) | Manual | Mitigations of the April findings, and the Uniswap V3 integration | 1 Low, 1 Info | [PDF](./pre-relaunch/2025-06-02-Ivan-Fitro.pdf) |
 | 2026-10-02 | [Krait](https://github.com/ZealynxSecurity/krait) by [Zealynx Security](https://zealynx.io) | Automated (AI) | Relaunch `src/` at `5a9ff0fe`, without `src/tropykus-legacy/` (not deployed) | 0 Critical, 0 High, 0 Medium; observations only | [report](./2026-10-02-Krait/krait-report.md) · [JSON](./2026-10-02-Krait/krait-findings.json) · [candidates](./2026-10-02-Krait/findings/) |
-| 2026-10-06 | Nethermind AuditAgent (human-supplied report) | Automated (AI) | Relaunch at `284b3500` on `docs/r113-audit-readiness-docs`; 37 contracts listed in the report | Original: 3 Medium, 3 Low; all six have explicit BitChill dispositions | [original report](./2026-10-06-Nethermind/audit-agent-report.md) · [provenance and dispositions](./2026-10-06-Nethermind/README.md) |
+| 2026-10-06 | Nethermind AuditAgent (BitChill-supplied report) | Automated (AI) | Relaunch at `284b3500` on `docs/r113-audit-readiness-docs`; 37 contracts listed in the report | Original: 3 Medium, 3 Low; all six have explicit BitChill dispositions | [original report](./2026-10-06-Nethermind/audit-agent-report.md) · [provenance and dispositions](./2026-10-06-Nethermind/README.md) |
 
 The relaunch code has not had a third-party manual audit.
 
@@ -42,12 +42,13 @@ cites README "Compromised swapper", that procedure is in
 
 ## Nethermind AuditAgent scan (October 2026)
 
-The human supplied this automated report from Nethermind's AuditAgent.
+BitChill supplied this automated report from Nethermind's AuditAgent.
 It is not a manual engagement by Nethermind's auditors.
 The original artifact is unchanged; its companion document records provenance, reproductions, and all six decisions.
 None of the six mechanisms is dismissed as a false positive.
-BitChill fixes findings 1/5/6 through principal reserves, combined buyer conversion, and adjusted
-purchase funding weights. It accepts the peg and unsupported-wallet limitations and mitigates manager
+BitChill resolves the batch failure in findings 1/5/6 with one per-row share clamp and adjusted
+funding weights. Nominal principal can exceed share value by rounding dust. A zero-value row still
+reverts; after a loss, purchases continue while shares fund the rows. It accepts the peg and unsupported-wallet limitations and mitigates manager
 assignment mistakes through deployment checks.
 The reproductions use local mocks; they do not measure live incidence or prove profitable pool manipulation.
 

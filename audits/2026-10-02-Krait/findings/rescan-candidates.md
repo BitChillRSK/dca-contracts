@@ -1,5 +1,10 @@
 # Krait Rescan Candidates — Phase 1b
 
+> Current behavior update — 2026-10-07: [R114](../../../docs/relaunch/R114-nethermind-audit-followups.md)
+> supersedes the tail-revert decision recorded here. A positive-value short row clamps to its buyer's
+> remaining shares and reduces its funding weight. A zero-value row still reverts. The assessment
+> below describes the audited revision; the original Krait report remains unchanged.
+
 Hard exit rule: Pass 1 produced candidates above Info (C-01, C-02, C-04, C-06, C-11 at Medium) → proceed.
 
 ## Exclusion list (Pass 1)

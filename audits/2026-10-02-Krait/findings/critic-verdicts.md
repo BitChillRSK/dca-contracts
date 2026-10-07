@@ -1,5 +1,10 @@
 # Krait Critic Verdicts — Phase 3
 
+> Current behavior update — 2026-10-07: [R114](../../../docs/relaunch/R114-nethermind-audit-followups.md)
+> supersedes the tail-revert decision recorded here. A positive-value short row clamps to its buyer's
+> remaining shares and reduces its funding weight. A zero-value row still reverts. The assessment
+> below describes the audited revision; the original Krait report remains unchanged.
+
 Inputs: `detector-candidates.md` (C-01…C-19), `rescan-candidates.md` (RS-1…RS-6),
 `percontract-candidates.md` (PC1-1, PC3-1, PC4-1, PC4-2, PC5-1), `state-candidates.md` (STATE-1…3).
 Every cited line was re-read against `src/` at `5a9ff0fe`. Evidence tier for everything below is

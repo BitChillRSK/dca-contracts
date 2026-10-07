@@ -1,5 +1,10 @@
 # Krait Second Opinion — BitChill DCA contracts
 
+> Current behavior update — 2026-10-07: [R114](../../../docs/relaunch/R114-nethermind-audit-followups.md)
+> supersedes the tail-revert decision recorded here. A positive-value short row clamps to its buyer's
+> remaining shares and reduces its funding weight. A zero-value row still reverts. The assessment
+> below describes the audited revision; the original Krait report remains unchanged.
+
 27 killed findings: 25 re-examined, 2 skipped (dismissed as generic best practice or out of context,
 which are not re-opened). Result: 1 revived for manual review, 1 folded into a systemic pattern,
 23 confirmed. Three further notes come from findings the verification step downgraded rather than killed.

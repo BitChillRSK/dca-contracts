@@ -1,6 +1,6 @@
 # R114 — Nethermind AuditAgent report and lending purchase clamp
 
-Status: **review rework in progress** · Assigned: yes · Optional/further-review: no · Stack on: R113
+Status: **implemented — PR open for review** · Assigned: yes · Optional/further-review: no · Stack on: R113
 ([#179](https://github.com/BitChillRSK/dca-contracts/pull/179)) · PR: [#180](https://github.com/BitChillRSK/dca-contracts/pull/180)
 
 ## Objective
@@ -102,12 +102,12 @@ Name additional paths in the PR body.
 
 ## Reviewer checklist
 
-- [ ] LendingHandler differs from R113 only in the funding hook.
-- [ ] No reserve, grouping, manager callback, or added getter remains.
-- [ ] Allocation and fees use funded weights. Exact-consumption invariants still hold.
-- [ ] Required tests pass unchanged except the assigned exceptions.
-- [ ] All six findings have current dispositions and consumer notes.
-- [ ] Both profiles, lending forks, ABI checks, and gas measurements are complete.
+- [x] LendingHandler differs from R113 only in the funding hook.
+- [x] No reserve, grouping, manager callback, or added getter remains.
+- [x] Allocation and fees use funded weights. Exact-consumption invariants still hold.
+- [x] Required tests pass unchanged except the assigned exceptions.
+- [x] All six findings have current dispositions and consumer notes.
+- [x] Both profiles, lending forks, ABI checks, and gas measurements are complete.
 
 ## ABI / deploy / cutover impact
 
@@ -118,4 +118,98 @@ Interest quotes and withdrawals retain R113 behavior. Deploy the immutable contr
 
 ## Implementation and validation
 
-Pending. Record exact gate commands, results, independent gas/access table, and consumer links here.
+### Independent gas measurement
+
+Run the same checked-in harness on R113 and the revised tree. Both runs use solc 0.8.36, Cancun,
+optimizer 200, the deploy profile, local protocol mocks, ten distinct buyers, and 25-token rows.
+Each setup executes an initial tick, then advances one purchase period. This makes the measured tick
+steady-state: cadence anchors and accumulated-rBTC balances are live.
+
+`test_probe_gas` measures `gasleft()` without recording. `test_probe_accesses` records the same call
+from the same setup state without measuring gas. Two micro-tests verify the Cancun cold/warm model.
+The repricer subtracts Cancun access charges and adds Rootstock charges: SLOAD 200, calls 700,
+SET 20,000, and RESET/CLEAR 5,000. It preserves compute, memory, logs, and value-transfer costs.
+Figures exclude transaction intrinsic gas and precede refunds; they are estimates from local mocks,
+not measurements of a live Rootstock transaction.
+
+| Steady-state tick | R113 Rootstock gas | Revised Rootstock gas | Delta | SLOAD before → after | Calls before → after | SSTORE before → after |
+|-------------------|-------------------|-----------------------|-------|----------------------|----------------------|-----------------------|
+| LayerBank, one schedule per buyer | 411,204 | 412,132 | +928 (+92.8/row) | 87 → 87 | 23 → 23 | 40 → 40 |
+| LayerBank, ten schedules per buyer | 411,204 | 412,132 | +928 (+92.8/row) | 87 → 87 | 23 → 23 | 40 → 40 |
+| Idle, one schedule per buyer | 271,566 | 272,641 | +1,075 (+107.5/row) | 59 → 59 | 12 → 12 | 26 → 26 |
+
+For lending, the writes are two SET, two CLEAR, and 36 RESET on each tree; no same-value writes.
+For idle, they are one SET, one CLEAR, and 24 RESET. Clear refunds are 30,000 and 15,000 respectively
+and remain unchanged. Per handler, lending has 23 SLOAD and 21 SSTORE; idle has 13 SLOAD and 11 SSTORE.
+Each tree calls the manager once, admin twice, and handler twice. The delta is compute/memory only.
+Extra held schedules add no purchase-path access. The independent figures differ by one gas from
+review lending figures; the measured delta agrees at 928 gas for ten rows.
+
+Exact measurement commands, run from each tree with the same harness:
+
+```sh
+SWAP_TYPE=mocSwaps LENDING_PROTOCOL=none STABLECOIN_TYPE=DOC FOUNDRY_PROFILE=deploy forge test --match-path test/gas/R114PurchaseClampGas.t.sol -j 1 -vv
+python3 test/gas/reprice_r114.py R113 /tmp/bitchill-r114-rework.wiDWFD/gas-base.log clamp /tmp/bitchill-r114-rework.wiDWFD/gas-clamp.log
+```
+
+### Regression and gate evidence
+
+All nine NM1/NM5/NM6 scenarios fail against R113 with a share shortfall. They pass with the clamp.
+The targeted default run passes 92 tests without failures or skips, including new loss/zero-value
+regressions and measurement self-checks. A function-body comparison finds changes only in the seven
+assigned base-test exceptions. Hook signatures and optimized-profile fixture corrections remain.
+
+`make check` passes under the default profile: all eight unit lanes and all five invariant suites.
+The deploy gate also passes all eight unit lanes and all five invariant suites. Each profile passes
+24 invariant tests, zero failures, and zero skips, with 64 runs × 512 calls per stateful invariant.
+The final targeted deploy run also passes 92 tests without failures or skips.
+Latest-head CI is recorded in PR 180 after push.
+
+| Unit lane | Passed under each profile | Route and benchmark skips |
+|-----------|---------------------------|---------------------------|
+| MoC / idle / DOC | 999 | 34 |
+| MoC / LayerBank / DOC | 1,007 | 26 |
+| MoC / Sovryn / DOC | 1,021 | 12 |
+| DEX / idle / USDRIF | 958 | 45 |
+| DEX / idle / USDT0 | 958 | 45 |
+| DEX / Sovryn / USDRIF | 600 | 52 |
+| DEX / LayerBank / USDRIF | 963 | 40 |
+| DEX / LayerBank / USDT0 | 963 | 40 |
+
+Both lending fork gates pass 491 tests, zero failures, and 39 route/benchmark skips each.
+No required base test needs a further behavior change. Comments in `RbtcPurchaseTest` and the Sovryn
+shortfall test now describe the current rule without changing their assertions.
+
+Exact full-gate commands:
+
+```sh
+make check
+FOUNDRY_PROFILE=deploy FOUNDRY_OUT=/tmp/bitchill-r114-rework.wiDWFD/deploy-out FOUNDRY_CACHE_PATH=/tmp/bitchill-r114-rework.wiDWFD/deploy-cache make check
+make fork-sovryn
+make fork-layerbank
+```
+
+All 42 first-party ABIs match R113 under both profiles. All ten concrete runtimes fit 24,576 bytes
+and have no EOF prefix. Formatting and authored-file whitespace checks pass.
+`make slither` reports 83 results and exits non-zero; `make aderyn` completes with two High and seven
+Low categories. Findings remain triaged in R73; neither analyzer has a clean-zero claim.
+
+Consumer corrections update the existing comments:
+[front-end#11](https://github.com/BitChillRSK/front-end/issues/11#issuecomment-6045133192),
+[bitchill-monitoring#10](https://github.com/BitChillRSK/bitchill-monitoring/issues/10#issuecomment-6045133656),
+[swapper-bot#15](https://github.com/BitChillRSK/swapper-bot/issues/15#issuecomment-6045134182).
+There is no new getter, interest or withdrawal change, or event cardinality change.
+`amountSpent` can fall below nominal on a short lending row; `InsufficientShares` identifies zero value.
+
+
+### Rework commits
+
+- `e8b7d6ad`: assign the narrowed spec before implementation.
+- `aa958db`: replace reserves/grouping with the per-row clamp; restore withdrawals, quotes, events,
+  original accounting tests, and manager fixtures; add successful and rollback regressions.
+- `565460c`: retain reproducible gas/access probes and Rootstock repricing.
+- Follow-up documents record the final risks, superseded decisions, validation, and consumer corrections.
+
+The original report remains byte-identical with its recorded SHA-256. No work was broadcast,
+no live transaction was sent, and dependency/compiler pins remain unchanged.
+The next step is BitChill's independent review of PR 180. After review and merge, follow the cutover runbook.

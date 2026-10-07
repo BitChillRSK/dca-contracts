@@ -175,7 +175,7 @@ invariants**, with the reason for each.
   fee-on-transfer tokens are unsupported.
 - Idle handlers keep no per-user book: pooled cash is bounded by the schedule balances `DcaManager`
   debits before any outflow, plus the exact-delta checks on deposits and purchases. Lending handlers
-  keep per-user virtual shares and size withdrawals from shares above the remaining principal reserve.
+  keep per-user virtual shares and clamp withdrawals to their share-backed stablecoin value.
 - Every successful lending redemption must reduce the handler's external receipt-share balance by
   exactly the virtual shares debited. Rounding can limit the funded amount before redemption.
   A venue fee or realized loss can reduce cash after the debited claim was fully consumed.
@@ -228,17 +228,17 @@ rBTC withdrawal, reads, governance, and purchases remain open. Purchases do not 
 Other deliberate availability trade-offs:
 
 - A bad row reverts its entire handler batch; a bad handler batch reverts an across-handlers call.
-- Lending schedule principal is nominal; measured receipt shares are the actual claim. Withdrawals and
-  purchases preserve rounded-up shares for remaining principal. Interest quotes value shares above
-  that reserve. A buyer's purchase rows convert to shares once, regardless of row order. If available
-  shares reduce funding, only that buyer's allocation weights fall; fees use the adjusted weights.
-  Ordinary rounded mints can therefore complete their final purchase without new yield. Exact external
-  share consumption and exact venue input consumption remain mandatory.
+- Lending schedule principal is nominal; receipt shares are the actual claim. Each purchase row uses
+  a rounded-up share debit. If the buyer has fewer shares, the row consumes those shares and reduces
+  its funding weight to their stablecoin value. Fees and output allocation use the funded weights.
+  This one rule resolves the batch failure in AuditAgent findings 1, 5, and 6. Nominal principal can
+  still exceed share value by rounding dust. Share events remain one per row.
 
-  External loss or illiquidity can still stop a batch. No available shares above the reserve, zero
-  funded stablecoin, or an unmet caller minimum causes atomic rollback. The bot must simulate actual
-  gross funding; a nominal-input quote can be unattainable after a shortfall. See the
-  [AuditAgent dispositions](./audits/2026-10-06-Nethermind/README.md) and their regressions.
+  After a lending loss, purchases continue while shares fund the rows. A zero-value row still reverts,
+  including a repeated buyer's later row after an earlier row empties the position. Illiquidity,
+  zero received cash, an incompatible share burn, or an unmet minimum output also causes atomic
+  rollback. The bot must simulate actual gross funding. Interest quotes and withdrawals retain their
+  existing behavior. See the [AuditAgent dispositions](./audits/2026-10-06-Nethermind/README.md).
 - A user pause blocks purchases only. A governance deposit pause blocks new inflows only, preserving
   purchases and exits.
 - Contracts are not proxies. Recovery from a defective immutable handler is a new route index plus
@@ -274,7 +274,7 @@ Other deliberate availability trade-offs:
   (`LayerBankLivePoolProbe`), so operations should rerun one of them whenever the Pool or aToken
   implementation changes. See `src/layerbank/README.md`.
   This upgrade assumption is separate from current half-up mint rounding: a fresh deposit can mint
-  fewer shares than a nominal full-principal purchase requires. Available-share funding and adjusted
+  fewer shares than a nominal full-principal purchase requires. The per-row share clamp and adjusted
   allocation weights handle that current rounding gap without relaxing the burn check.
 - Third-party incentive campaigns on a lending market (for example Merkl) are not claimed or
   distributed. Handlers pay out the market's native interest only.

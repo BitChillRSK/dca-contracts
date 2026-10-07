@@ -1,5 +1,10 @@
 # Krait Detector Candidates — Phase 1
 
+> Current behavior update — 2026-10-07: [R114](../../../docs/relaunch/R114-nethermind-audit-followups.md)
+> supersedes the tail-revert decision recorded here. A positive-value short row clamps to its buyer's
+> remaining shares and reduces its funding weight. A zero-value row still reverts. The assessment
+> below describes the audited revision; the original Krait report remains unchanged.
+
 Scope: `src/` excluding `src/tropykus-legacy/`. Strategy: MEDIUM codebase, tiered 3-pass. All 20
 implementation files and 17 interfaces were read in full regardless of tier. Recall-oriented: several
 entries below are recorded so the Critic can rule on them explicitly, including ones the documentation

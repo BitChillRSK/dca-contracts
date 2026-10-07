@@ -169,6 +169,11 @@ before this spec. They now name `DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT` and
 
 ## R39 handoff questions
 
+**Later decisions:** [R114](./R114-nethermind-audit-followups.md) supersedes the tail-revert decision
+below with a per-row share clamp and funded weights. Fees now use funded weights after retrieval;
+[R107](./R107-rbtc-fees.md) moved the fee to measured rBTC output. The paragraphs below
+record R43's original decisions, not the current purchase pipeline.
+
 R39 handed this review two questions about the surviving batch path. Both are answered **keep today's
 behavior**, and neither is implemented here — they are lending-side behavior, not the Dex path this PR reviews.
 
