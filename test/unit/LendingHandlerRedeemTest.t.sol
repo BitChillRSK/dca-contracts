@@ -52,6 +52,11 @@ contract LendingHandlerRedeemTest is Test {
         stablecoin.approve(address(harness), type(uint256).max);
     }
 
+    /// @dev This handler-level manager fixture has no schedules unless a test mocks this read.
+    function getLockedPrincipal(address, address, address) external pure returns (uint256) {
+        return 0;
+    }
+
     function test_withdrawToken_overstatedRequest_clampsViaOuterClamp() public {
         harness.depositToken(userA, USER_A_DEPOSIT);
         harness.depositToken(userB, USER_B_DEPOSIT);
@@ -117,8 +122,8 @@ contract LendingHandlerRedeemTest is Test {
     }
 
     /**
-     * @dev Interest redeems at most share-backed minus locked. Same ceil bound as principal;
-     *      locked spans [0, shareBacked] so the no-interest early return is covered too.
+     * @dev Interest must leave the rounded-up principal reserve intact, including non-round rates.
+     *      Locked principal spans the entire share-backed value, including no-interest positions.
      */
     function testFuzz_withdrawInterest_debitNeverExceedsBook(uint256 shares, uint256 rate, uint256 locked) public {
         rate = bound(rate, 1, type(uint128).max);
@@ -141,7 +146,9 @@ contract LendingHandlerRedeemTest is Test {
             return;
         }
 
-        uint256 interest = shareBacked - locked;
+        uint256 reservedShares = harness.stablecoinToShares(locked, rate);
+        uint256 interest = (shares - reservedShares) * rate / RATE_SCALE;
+        assertGe(bookAfter, reservedShares);
         uint256 expectedDebit = harness.stablecoinToShares(interest, rate);
         assertLe(expectedDebit, bookBefore);
         assertEq(bookBefore - bookAfter, expectedDebit);

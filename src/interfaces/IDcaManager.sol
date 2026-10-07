@@ -474,6 +474,17 @@ interface IDcaManager {
     function getAccumulatedRbtcBalance(address user, address token, uint256 routeIndex) external view returns (uint256);
 
     /**
+     * @notice Remaining schedule principal held by one handler for this user and token.
+     * @param user Account whose schedules are summed.
+     * @param token Stablecoin of the schedules.
+     * @param handler Handler resolved from each schedule's stored route through OperationsAdmin.
+     * @return Remaining nominal principal, including paused schedules.
+     * @dev Lending handlers read this after the manager's withdrawal or purchase effects to reserve
+     *      shares for schedules that remain funded. This is a schedule liability, not a cash estimate.
+     */
+    function getLockedPrincipal(address user, address token, address handler) external view returns (uint256);
+
+    /**
      * @notice Lending interest a user has accrued on one token and route, above locked principal.
      * @param user Account to query.
      * @param token Stablecoin of the route.

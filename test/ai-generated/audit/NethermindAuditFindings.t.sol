@@ -89,7 +89,7 @@ contract NethermindLayerBankAuditTest is LayerBankDcaManagerTest {
         assertGt(docToken.balanceOf(USER), before);
     }
 
-    function test_NM1_interestWithdrawalLeavesOneWeiPrincipalGap() public {
+    function test_NM1_interestWithdrawalPreservesPrincipalShares() public {
         _index(1e27);
         uint64 id = _create(1000 ether, 1000 ether);
         _index(11e26);
@@ -100,26 +100,67 @@ contract NethermindLayerBankAuditTest is LayerBankDcaManagerTest {
         vm.prank(USER);
         dcaManager.withdrawAllAccumulatedInterest(tokens, routes);
         uint256 backing = handler.getUserShares(USER) * 11e26 / 1e27;
-        assertEq(backing, 1000 ether - 1);
+        assertGe(backing, 1000 ether);
         assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, 1000 ether);
         vm.prank(SWAPPER);
         dcaManager.activateProtectedPurchaseWindow();
-        _expectShortfall(id, 1000 ether);
-        // Exit is blocked only until the protected window expires.
-        vm.roll(block.number + 5);
-        _exit(id);
+        vm.prank(SWAPPER);
+        batchBuyOne(dcaManager, address(docToken), id, 1);
+        assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, 0);
+        assertGt(handler.getAccumulatedRbtcBalance(USER), 0);
     }
 
-    function test_NM1_principalWithdrawalLeavesOneWeiPrincipalGap() public {
+    function test_NM1_principalWithdrawalPreservesPrincipalShares() public {
         _index(11e26);
         uint64 id = _create(1100 ether, 100 ether);
         assertEq(handler.getUserShares(USER), 1000 ether);
         vm.prank(USER);
         dcaManager.withdrawToken(address(docToken), id, 1000 ether);
         assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, 100 ether);
-        assertEq(handler.getUserShares(USER) * 11e26 / 1e27, 100 ether - 1);
-        _expectShortfall(id, 100 ether);
-        _exit(id);
+        assertGe(handler.getUserShares(USER) * 11e26 / 1e27, 100 ether);
+        vm.prank(SWAPPER);
+        batchBuyOne(dcaManager, address(docToken), id, 1);
+        assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, 0);
+        assertGt(handler.getAccumulatedRbtcBalance(USER), 0);
+    }
+
+    function test_NM1_reserveIncludesOtherPausedSchedulesAndSurvivesDeletion() public {
+        _index(1e27);
+        uint64 first = _create(1000 ether, 1000 ether);
+        uint64 second = _create(500 ether, 500 ether);
+        vm.prank(USER);
+        dcaManager.setSchedulePaused(address(docToken), second, true);
+        _index(11e26);
+        assertEq(dcaManager.getLockedPrincipal(USER, address(docToken), address(handler)), 1500 ether);
+        assertEq(dcaManager.getLockedPrincipal(USER, address(docToken), address(0xBAD)), 0);
+        vm.prank(USER);
+        dcaManager.withdrawTokenAndInterest(address(docToken), first, 1000 ether);
+        assertGe(handler.getUserShares(USER) * 11e26 / 1e27, 500 ether);
+        assertEq(dcaManager.getLockedPrincipal(USER, address(docToken), address(handler)), 500 ether);
+        vm.prank(USER);
+        dcaManager.deleteDcaSchedule(address(docToken), first, 0);
+        assertEq(dcaManager.getLockedPrincipal(USER, address(docToken), address(handler)), 500 ether);
+        vm.prank(USER);
+        dcaManager.setSchedulePaused(address(docToken), second, false);
+        vm.prank(SWAPPER);
+        batchBuyOne(dcaManager, address(docToken), second, 1);
+        assertEq(dcaManager.getLockedPrincipal(USER, address(docToken), address(handler)), 0);
+        assertGt(handler.getAccumulatedRbtcBalance(USER), 0);
+    }
+
+    function testFuzz_NM1_partialWithdrawPreservesAggregatePrincipal(uint256 index, uint256 withdrawal) public {
+        _index(1e27);
+        uint64 id = _create(1000 ether, 25 ether);
+        _create(500 ether, 25 ether);
+        index = bound(index, 1e27, 3e27);
+        withdrawal = bound(withdrawal, 1, 1000 ether);
+        _index(index);
+        vm.prank(USER);
+        dcaManager.withdrawTokenAndInterest(address(docToken), id, withdrawal);
+        uint256 remaining = 1500 ether - withdrawal;
+        assertEq(dcaManager.getLockedPrincipal(USER, address(docToken), address(handler)), remaining);
+        assertGe(handler.getUserShares(USER) * index / 1e27, remaining);
+        assertEq(handler.getUserShares(USER), handler.i_aToken().scaledBalanceOf(address(handler)));
     }
 
     function test_NM5_freshDepositAtHalfUpIndexCannotPurchaseFullPrincipal() public {

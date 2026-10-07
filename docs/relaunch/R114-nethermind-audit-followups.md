@@ -62,7 +62,7 @@ Require exact manager, token, and released-code checks before initial Safe accep
 - Direct funding harnesses and assertions reached through failing tests: lending/idle handler tests
   under `test/ai-generated/unit/`, `test/ai-generated/fuzz/Invariants.t.sol`
 - `audits/2026-10-06-Nethermind/audit-agent-report.md` (unchanged), its `README.md`, `audits/README.md`
-- `AUDIT_GUIDE.md`, `EXTERNAL_REWARDS.md`, `docs/relaunch/CUTOVER_RUNBOOK.md`
+- `AUDIT_GUIDE.md`, `docs/relaunch/EXTERNAL_REWARDS.md`, `docs/relaunch/CUTOVER_RUNBOOK.md`
 - `docs/relaunch/README.md`, `docs/relaunch/IMPLEMENTATION_ORDER.md`, this spec
 
 Expand only through imports, interfaces, inheritance, mocks, compiler errors, or failing tests.

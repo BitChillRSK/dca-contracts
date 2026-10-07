@@ -37,7 +37,7 @@ interface ILendingHandler is ITokenHandler {
     event LendingHandler__InterestWithdrawn(
         address indexed user, address indexed token, uint256 underlyingAmountWithdrawn
     );
-    /// @notice A withdrawal was clamped to the user's share-backed stablecoin.
+    /// @notice A withdrawal was clamped to shares available above the remaining principal reserve.
     event LendingHandler__WithdrawalAmountAdjusted(
         address indexed user, uint256 originalAmount, uint256 adjustedAmount
     );
@@ -75,7 +75,7 @@ interface ILendingHandler is ITokenHandler {
      * @notice Pay `user` the stablecoin interest above `stablecoinLockedInDcaSchedules`.
      * @param user The address receiving the interest.
      * @param stablecoinLockedInDcaSchedules Principal DcaManager still locks for this user on this
-     *        handler's route. Interest is `share-backed stablecoin - this amount`, or zero.
+     *        handler's route. Reserve its rounded-up shares before valuing the shares available as interest.
      * @dev Called only by DcaManager. No-op when there is no interest.
      */
     function withdrawInterest(address user, uint256 stablecoinLockedInDcaSchedules) external;
@@ -87,7 +87,9 @@ interface ILendingHandler is ITokenHandler {
      *        handler's route.
      * @return Accrued interest in stablecoin units, or zero.
      * @dev Deliberately not a `view`, and do not make it one: the figure is taken at the market's
-     *      current exchange rate, which on a market that accrues lazily is a call that updates that
+     *      current rate after reserving rounded-up shares for locked principal. This can be slightly
+     *      smaller than subtracting principal from the value of all shares.
+     *      On a market that accrues lazily the exchange-rate call updates that
      *      rate. This is the figure a caller may spend against, so it must not sit a poke behind what
      *      a withdrawal would pay. The non-view mutability costs consumers nothing because only
      *      DcaManager can reach this function; `quoteAccruedInterest` is the `view` display read.

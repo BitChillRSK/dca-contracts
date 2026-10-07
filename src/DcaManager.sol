@@ -442,6 +442,19 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     }
 
     /// @inheritdoc IDcaManager
+    function getLockedPrincipal(address user, address token, address handler) external view override returns (uint256) {
+        uint64[] memory scheduleIds = s_scheduleIds[user][token];
+        uint256 lockedPrincipal;
+        for (uint256 i; i < scheduleIds.length; ++i) {
+            DcaSchedule storage dcaSchedule = s_dcaSchedules[token][scheduleIds[i]];
+            if (i_operationsAdmin.getHandler(token, dcaSchedule.routeIndex) == handler) {
+                lockedPrincipal += dcaSchedule.tokenBalance;
+            }
+        }
+        return lockedPrincipal;
+    }
+
+    /// @inheritdoc IDcaManager
     function getAccruedInterest(address user, address token, uint256 routeIndex)
         external
         view

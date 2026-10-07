@@ -2,6 +2,7 @@
 pragma solidity 0.8.36;
 
 import {ILendingHandler} from "./interfaces/ILendingHandler.sol";
+import {IDcaManager} from "./interfaces/IDcaManager.sol";
 import {TokenHandler} from "./TokenHandler.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -49,13 +50,11 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     function withdrawInterest(address user, uint256 stablecoinLockedInDcaSchedules) external override onlyDcaManager {
         uint256 exchangeRate = _exchangeRate();
         uint256 userShares = s_shares[user];
-        uint256 totalStablecoinInLending = _sharesToStablecoin(userShares, exchangeRate);
-        if (totalStablecoinInLending <= stablecoinLockedInDcaSchedules) {
+        uint256 stablecoinInterestAmount = _sharesToStablecoin(
+            _availableShares(userShares, stablecoinLockedInDcaSchedules, exchangeRate), exchangeRate
+        );
+        if (stablecoinInterestAmount == 0) {
             return; // No interest to withdraw
-        }
-        uint256 stablecoinInterestAmount;
-        unchecked {
-            stablecoinInterestAmount = totalStablecoinInLending - stablecoinLockedInDcaSchedules;
         }
         uint256 stablecoinReceived = _redeemShares(user, userShares, stablecoinInterestAmount, exchangeRate);
         if (stablecoinReceived > 0) {
@@ -139,11 +138,14 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     function _withdrawToken(address user, uint256 withdrawalAmount) internal virtual override returns (uint256) {
         uint256 exchangeRate = _exchangeRate();
         uint256 userShares = s_shares[user];
-        uint256 totalStablecoinInLending = _sharesToStablecoin(userShares, exchangeRate);
+        uint256 remainingPrincipal =
+            IDcaManager(i_dcaManager).getLockedPrincipal(user, address(i_stablecoin), address(this));
+        uint256 availableStablecoin =
+            _sharesToStablecoin(_availableShares(userShares, remainingPrincipal, exchangeRate), exchangeRate);
 
-        if (totalStablecoinInLending < withdrawalAmount) {
-            emit LendingHandler__WithdrawalAmountAdjusted(user, withdrawalAmount, totalStablecoinInLending);
-            withdrawalAmount = totalStablecoinInLending;
+        if (availableStablecoin < withdrawalAmount) {
+            emit LendingHandler__WithdrawalAmountAdjusted(user, withdrawalAmount, availableStablecoin);
+            withdrawalAmount = availableStablecoin;
         }
 
         // Pay out what the redemption actually produced, which may be less than requested
@@ -269,7 +271,7 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Share-backed stablecoin above locked principal at `exchangeRate`, or zero. The two public
+     * @dev Stablecoin backed by shares above the rounded-up principal reserve, or zero. The two public
      *      readers differ only in which rate they pass: the quote uses the market's plain read, the
      *      spendable figure the rate a write path would get.
      */
@@ -278,12 +280,19 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
         view
         returns (uint256)
     {
-        uint256 totalStablecoinInLending = _sharesToStablecoin(s_shares[user], exchangeRate);
-        unchecked {
-            return totalStablecoinInLending > stablecoinLockedInDcaSchedules
-                ? totalStablecoinInLending - stablecoinLockedInDcaSchedules
-                : 0;
-        }
+        return _sharesToStablecoin(
+            _availableShares(s_shares[user], stablecoinLockedInDcaSchedules, exchangeRate), exchangeRate
+        );
+    }
+
+    /// @dev Leave enough shares to cover remaining nominal principal before sizing any redemption.
+    function _availableShares(uint256 userShares, uint256 remainingPrincipal, uint256 exchangeRate)
+        private
+        view
+        returns (uint256)
+    {
+        uint256 reservedShares = _stablecoinToShares(remainingPrincipal, exchangeRate);
+        return userShares > reservedShares ? userShares - reservedShares : 0;
     }
 
     /**
