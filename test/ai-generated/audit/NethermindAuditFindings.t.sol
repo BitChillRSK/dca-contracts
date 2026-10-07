@@ -13,7 +13,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {batchBuyOne, toBatch} from "test/utils/BatchBuyOne.sol";
 import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
-import {Test} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 import {MinOutHarness, MockFloorSwapRouter} from "test/unit/PurchaseUniswapMinOutTest.t.sol";
 import {MockStablecoinWithDecimals} from "test/mocks/MockStablecoinWithDecimals.sol";
 import {MockMocOracle} from "test/mocks/MockMocOracle.sol";
@@ -49,8 +49,8 @@ contract NethermindImpostorManager {
 }
 
 /**
- * @notice Reproduces accepted AuditAgent boundary cases through production manager and handler paths.
- * @dev These are local mock proofs of the dispositions, not fixes or estimates of live incidence.
+ * @notice Regression tests and accepted AuditAgent boundary cases through production contract paths.
+ * @dev Local mocks establish behavior, not estimates of live incidence.
  */
 contract NethermindLayerBankAuditTest is LayerBankDcaManagerTest {
     function _index(uint256 index) private {
@@ -61,32 +61,6 @@ contract NethermindLayerBankAuditTest is LayerBankDcaManagerTest {
         vm.prank(USER);
         dcaManager.createDcaSchedule(address(docToken), deposit, purchase, 7 days, 1);
         return uint64(dcaManager.getSchedulesCreatedCount());
-    }
-
-    function _expectShortfall(uint64 id, uint256 amount) private {
-        uint256 index = handler.i_pool().getReserveNormalizedIncome(address(docToken));
-        uint256 requested = (amount * 1e27 + index - 1) / index;
-        uint256 available = handler.getUserShares(USER);
-        assertGt(requested, available);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ILendingHandler.LendingHandler__InsufficientShares.selector, USER, requested, available
-            )
-        );
-        vm.prank(SWAPPER);
-        batchBuyOne(dcaManager, address(docToken), id, 1);
-        assertEq(handler.getUserShares(USER), available);
-        assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, amount);
-        assertEq(handler.getAccumulatedRbtcBalance(USER), 0);
-    }
-
-    function _exit(uint64 id) private {
-        uint256 before = docToken.balanceOf(USER);
-        vm.prank(USER);
-        dcaManager.withdrawToken(address(docToken), id, type(uint256).max);
-        assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, 0);
-        assertEq(handler.getUserShares(USER), 0);
-        assertGt(docToken.balanceOf(USER), before);
     }
 
     function test_NM1_interestWithdrawalPreservesPrincipalShares() public {
@@ -163,13 +137,95 @@ contract NethermindLayerBankAuditTest is LayerBankDcaManagerTest {
         assertEq(handler.getUserShares(USER), handler.i_aToken().scaledBalanceOf(address(handler)));
     }
 
-    function test_NM5_freshDepositAtHalfUpIndexCannotPurchaseFullPrincipal() public {
+    function test_NM5_freshDepositAtHalfUpIndexPurchasesFullPrincipal() public {
         _index(101e25);
         uint64 id = _create(25 ether, 25 ether);
         assertEq(handler.getUserShares(USER), (uint256(25 ether) * 1e27 + uint256(101e25) / 2) / 101e25);
         assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, 25 ether);
-        _expectShortfall(id, 25 ether);
-        _exit(id);
+        vm.prank(SWAPPER);
+        batchBuyOne(dcaManager, address(docToken), id, 1);
+        assertEq(handler.getUserShares(USER), 0);
+        assertEq(handler.i_aToken().scaledBalanceOf(address(handler)), 0);
+        assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, 0);
+        assertGt(handler.getAccumulatedRbtcBalance(USER), 0);
+    }
+
+    function test_NM5_flatIndexPurchasesPreservePrincipalThroughFinalTick() public {
+        _index(101e25);
+        uint64 id = _create(75 ether, 25 ether);
+        for (uint256 tick; tick < 3; ++tick) {
+            vm.prank(SWAPPER);
+            batchBuyOne(dcaManager, address(docToken), id, 1);
+            uint256 remaining = (2 - tick) * 25 ether;
+            assertEq(dcaManager.getLockedPrincipal(USER, address(docToken), address(handler)), remaining);
+            assertGe(handler.getUserShares(USER) * 101e25 / 1e27, remaining);
+            assertEq(handler.getUserShares(USER), handler.i_aToken().scaledBalanceOf(address(handler)));
+            vm.warp(block.timestamp + 7 days);
+        }
+        assertEq(handler.getUserShares(USER), 0);
+        assertGt(handler.getAccumulatedRbtcBalance(USER), 0);
+    }
+
+    function test_NM5_reducedFundingDoesNotDiluteAnotherBuyerAndMinimumRollsBack() public {
+        _index(1e27);
+        MockLayerBankAToken aToken = MockLayerBankAToken(address(handler.i_aToken()));
+        aToken.setMintOverride(25 ether, true);
+        uint64 first = _create(60 ether, 60 ether);
+        uint64 third = _create(40 ether, 40 ether);
+        aToken.setMintOverride(0, false);
+        address other = address(0xB0B);
+        docToken.mint(other, 100 ether);
+        vm.startPrank(other);
+        docToken.approve(address(handler), type(uint256).max);
+        dcaManager.createDcaSchedule(address(docToken), 100 ether, 100 ether, 7 days, 1);
+        vm.stopPrank();
+        uint64 second = uint64(dcaManager.getSchedulesCreatedCount());
+        vm.prank(OWNER);
+        handler.setFeeRateParams(0, 0, 0);
+        uint64[] memory ids = new uint64[](3);
+        ids[0] = first;
+        ids[1] = second;
+        ids[2] = third;
+        IDcaManager.Batch memory batch = toBatch(ids, address(docToken), 1);
+        batch.minRbtcOut = type(uint128).max;
+        vm.expectRevert(
+            abi.encodeWithSelector(IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, 3e15, type(uint128).max)
+        );
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(batch);
+        assertEq(handler.getUserShares(USER), 50 ether);
+        assertEq(handler.getUserShares(other), 100 ether);
+        assertEq(handler.i_aToken().scaledBalanceOf(address(handler)), 150 ether);
+        assertEq(dcaManager.getDcaSchedule(address(docToken), first).tokenBalance, 60 ether);
+        assertEq(dcaManager.getDcaSchedule(address(docToken), second).tokenBalance, 100 ether);
+        assertEq(dcaManager.getDcaSchedule(address(docToken), third).tokenBalance, 40 ether);
+        assertEq(dcaManager.getDcaSchedule(address(docToken), first).cadenceAnchor, 0);
+        assertEq(handler.getAccumulatedRbtcBalance(USER), 0);
+        assertEq(handler.getAccumulatedRbtcBalance(other), 0);
+        batch.minRbtcOut = 0;
+        vm.recordLogs();
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(batch);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        uint256 spent;
+        uint256 output;
+        uint256 rows;
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].topics[0] == IPurchaseRbtc.PurchaseRbtc__SuccessfulRbtcBatchPurchase.selector) {
+                (output, spent) = abi.decode(logs[i].data, (uint256, uint256));
+            }
+            if (logs[i].topics[0] != IPurchaseRbtc.PurchaseRbtc__RbtcBought.selector) continue;
+            (, uint256 rowSpent) = abi.decode(logs[i].data, (uint256, uint256));
+            assertEq(rowSpent, rows == 0 ? 30 ether : rows == 1 ? 100 ether : 20 ether);
+            ++rows;
+        }
+        assertEq(rows, 3);
+        assertEq(spent, 150 ether);
+        assertEq(handler.getAccumulatedRbtcBalance(other), output * 100 / 150);
+        assertApproxEqAbs(handler.getAccumulatedRbtcBalance(USER), output * 50 / 150, 1);
+        assertEq(handler.getUserShares(USER), 0);
+        assertEq(handler.getUserShares(other), 0);
+        assertEq(handler.i_aToken().scaledBalanceOf(address(handler)), 0);
     }
 
     function test_NM6_repeatedBuyerFullyBackedAggregatePurchases() public {

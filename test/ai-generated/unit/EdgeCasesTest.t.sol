@@ -22,6 +22,11 @@ import {handlerBatchBuyOne, UNUSED_SCHEDULE_ID} from "../../utils/BatchBuyOne.so
 import {IPurchaseRbtc} from "../../../src/interfaces/IPurchaseRbtc.sol";
 
 contract EdgeCasesTest is Test {
+    /// @dev This direct-call manager fixture has no schedule liabilities.
+    function getLockedPrincipal(address, address, address) external pure returns (uint256) {
+        return 0;
+    }
+
     /*//////////////////////////////////////////////////////////////
                               UTILITIES
     //////////////////////////////////////////////////////////////*/

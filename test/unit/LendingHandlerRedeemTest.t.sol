@@ -357,35 +357,66 @@ contract LendingHandlerRedeemTest is Test {
         assertEq(externalBefore - harness.protocolShares(), aDebit + bDebit + cDebit);
     }
 
-    function test_batchRetrieve_insufficientSharesRevertsWholeBatch() public {
+    function test_batchRetrieve_noSharesAboveReserveRevertsWholeBatch() public {
         harness.depositToken(userA, 10 ether);
         harness.depositToken(userB, USER_B_DEPOSIT);
-
+        vm.mockCall(
+            address(this),
+            abi.encodeWithSelector(this.getLockedPrincipal.selector, userA, address(stablecoin), address(harness)),
+            abi.encode(10 ether)
+        );
         uint256 sharesA = harness.getUserShares(userA);
         uint256 sharesB = harness.getUserShares(userB);
         uint256 protocolBefore = harness.protocolShares();
-
         address[] memory users = new address[](2);
-        users[0] = userA;
-        users[1] = userB;
+        users[0] = userB;
+        users[1] = userA;
         uint256[] memory amounts = new uint256[](2);
-        amounts[0] = 25 ether; // more than userA's 10 ether deposit
-        amounts[1] = 10 ether;
-
+        amounts[0] = 10 ether;
+        amounts[1] = 25 ether;
         vm.expectRevert(
-            abi.encodeWithSelector(
-                ILendingHandler.LendingHandler__InsufficientShares.selector,
-                userA,
-                _stablecoinToSharesUp(amounts[0], RATE_SCALE),
-                sharesA
-            )
+            abi.encodeWithSelector(ILendingHandler.LendingHandler__InsufficientShares.selector, userA, 25 ether, 0)
         );
         harness.batchRetrieveStablecoin(users, amounts);
-
         assertEq(harness.getUserShares(userA), sharesA);
         assertEq(harness.getUserShares(userB), sharesB);
         assertEq(harness.protocolShares(), protocolBefore);
         assertEq(harness.protocolRedeemCalls(), 0);
+    }
+
+    function testFuzz_batchRetrieve_reducedWeightsSumToBuyerFunding(
+        uint256 first,
+        uint256 second,
+        uint256 third,
+        uint256 funding
+    ) public {
+        first = bound(first, 1 ether, 100 ether);
+        second = bound(second, 1 ether, 100 ether);
+        third = bound(third, 1 ether, 100 ether);
+        uint256 planned = first + second + third;
+        funding = bound(funding, 1, planned - 1);
+        _fundAndDeposit(userA, funding);
+        _fundAndDeposit(userB, 50 ether);
+        address[] memory users = new address[](4);
+        users[0] = userA;
+        users[1] = userB;
+        users[2] = userA;
+        users[3] = userA;
+        uint256[] memory amounts = new uint256[](4);
+        amounts[0] = first;
+        amounts[1] = 50 ether;
+        amounts[2] = second;
+        amounts[3] = third;
+        (uint256 received, uint256[] memory weights) = harness.batchRetrieveStablecoinWithWeights(users, amounts);
+        assertEq(received, funding + 50 ether);
+        assertEq(weights[0] + weights[2] + weights[3], funding);
+        assertEq(weights[1], 50 ether);
+        assertLe(weights[0], first);
+        assertLe(weights[2], second);
+        assertLe(weights[3], third);
+        assertEq(harness.getUserShares(userA), 0);
+        assertEq(harness.getUserShares(userB), 0);
+        assertEq(harness.protocolShares(), 0);
     }
 
     function _fundAndDeposit(address user, uint256 amount) private {
@@ -809,6 +840,14 @@ contract LendingHandlerHarness is LendingHandler {
         returns (uint256)
     {
         return _batchRetrieveStablecoin(users, purchaseAmounts);
+    }
+
+    function batchRetrieveStablecoinWithWeights(address[] calldata users, uint256[] memory amounts)
+        external
+        returns (uint256 received, uint256[] memory weights)
+    {
+        received = _batchRetrieveStablecoin(users, amounts);
+        return (received, amounts);
     }
 
     function _viewExchangeRate() internal view override returns (uint256) {

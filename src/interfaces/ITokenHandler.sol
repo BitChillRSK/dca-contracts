@@ -45,7 +45,7 @@ interface ITokenHandler is IStablecoinSource {
     /**
      * @notice Send `amount` of this handler's stablecoin to `user`.
      * @param user The user receiving the withdrawal.
-     * @param amount The amount requested. A lending handler may clamp first to the user's position;
+     * @param amount The amount requested. A lending handler reserves shares for remaining principal first;
      *        an idle handler pays the requested amount from pooled cash (schedule liability is the book).
      * @return withdrawnAmount The amount that left this contract, measured as a `balanceOf(address(this))`
      *         delta around `safeTransfer`. This measures handler cash, not the user's balance, and it is
@@ -53,6 +53,8 @@ interface ITokenHandler is IStablecoinSource {
      *         On a lending route a successful call guarantees the external receipt-share claim for that
      *         request was fully consumed, so a cash shortfall is a fee or realized loss with no unpaid
      *         claim left withdrawable — not a reason to re-credit principal.
+     * @dev DcaManager completes schedule effects before calling. Lending reads the remaining schedule
+     *      liability and preserves its rounded-up share reserve. A rounding-limited payout can be smaller.
      */
     function withdrawToken(address user, uint256 amount) external returns (uint256 withdrawnAmount);
 }

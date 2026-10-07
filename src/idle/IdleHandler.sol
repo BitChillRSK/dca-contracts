@@ -34,7 +34,7 @@ abstract contract IdleHandler is TokenHandler {
      *      each schedule before the call, so a second per-user book here would only re-store the
      *      same figures.
      */
-    function _batchRetrieveStablecoin(address[] calldata, uint256[] calldata purchaseAmounts)
+    function _batchRetrieveStablecoin(address[] calldata, uint256[] memory purchaseAmounts)
         internal
         virtual
         override

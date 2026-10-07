@@ -28,7 +28,7 @@ interface IDcaManager {
      *      sentinel. `getDcaSchedules` returns ids alongside these values.
      */
     struct DcaSchedule {
-        uint128 tokenBalance; // Stablecoin principal the schedule can still spend or withdraw
+        uint128 tokenBalance; // Nominal stablecoin principal remaining in this schedule
         uint48 cadenceAnchor; // UTC midnight of the newest consumed cadence slot; zero before the first purchase
         bool paused; // Set by the schedule's user: purchases are refused while true, every other path stays open
         uint32 purchasePeriod; // Time between cadence slots in seconds; always whole UTC days

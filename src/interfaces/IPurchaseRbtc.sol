@@ -54,11 +54,13 @@ interface IPurchaseRbtc is IStablecoinSource {
      * @notice Spend each buyer's stablecoin and credit their accumulated rBTC.
      * @param buyers Users to buy for. An address may appear more than once.
      * @param scheduleIds Schedule id for each row, used only in `RbtcBought`.
-     * @param purchaseAmounts Gross stablecoin each row contributes (fee derived from these).
+     * @param purchaseAmounts Nominal stablecoin requested per row. Lending may reduce the funding weights.
      * @param minRbtcOut Minimum rBTC this batch must buy (rBTC/WRBTC wei). `0` disables. Binds
      *        gross measured output before the protocol fee is taken from that output.
      * @dev DcaManager has already debited the schedules. Venue spends full retrieved stablecoin.
-     *      Measured output `Q` splits over `purchaseAmountsSum` (`G`): buyers
+     *      Lending combines each buyer's input and reserves shares for remaining principal. If available
+     *      shares reduce funding, that buyer's row weights fall proportionally before fee calculation.
+     *      Measured output `Q` splits over the adjusted funding sum (`G`): buyers
      *      `floor(Q × netᵢ / G)`, collector `floor(Q × F / G)`, floor dust uncredited.
      *      `amountSpent` is each row's share of retrieved gross. Exact stablecoin consumption
      *      required. Collector fee credited last on the same accumulated-rBTC books.

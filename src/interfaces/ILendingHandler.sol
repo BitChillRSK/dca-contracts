@@ -53,8 +53,9 @@ interface ILendingHandler is ITokenHandler {
     /// @notice A zero-cash redemption reports its consumed receipt shares before the call rolls back.
     error LendingHandler__ZeroStablecoinReceived(uint256 sharesRedeemed);
     /**
-     * @notice Batch redeem asked for more of this user's shares than the handler tracks.
-     * @dev Same outcome as a 0.8 underflow on `s_shares[user] -=`; the named error is for the swapper.
+     * @notice A buyer has no shares available above the remaining principal reserve.
+     * @dev `requested` is the rounded-up combined purchase; `available` excludes reserved shares.
+     *      Positive available funding is adjusted before fee and output allocation instead of reverting.
      */
     error LendingHandler__InsufficientShares(address user, uint256 requested, uint256 available);
     /**

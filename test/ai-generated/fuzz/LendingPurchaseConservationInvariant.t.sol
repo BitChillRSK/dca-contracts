@@ -21,6 +21,11 @@ import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
  *      regressions.
  */
 contract LendingPurchaseConservationHandler is Test {
+    /// @dev This direct-call manager fixture has no schedule liabilities.
+    function getLockedPrincipal(address, address, address) external pure returns (uint256) {
+        return 0;
+    }
+
     uint256 internal constant MIN_AMOUNT = 25 ether;
     uint256 internal constant MAX_AMOUNT = 10_000 ether;
     uint256 internal constant MAX_SCHEDULE_ID = 64;

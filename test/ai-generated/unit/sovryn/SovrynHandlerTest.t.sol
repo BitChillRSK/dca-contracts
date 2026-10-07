@@ -328,7 +328,7 @@ contract SovrynHandlerTest is HandlerTestHarness {
      * rather than from a view — here the per-user share exceeds the balance we track for that user.
      * Named `LendingHandler__InsufficientShares` instead of a 0.8 underflow panic.
      */
-    function test_sovryn_batchRetrieveStablecoin_exceedsBalance_reverts() public {
+    function test_sovryn_batchRetrieveStablecoin_exceedsBalance_consumesAvailableClaim() public {
         address user1 = makeAddr("user1");
         address[] memory users = new address[](1);
         users[0] = user1;
@@ -345,18 +345,9 @@ contract SovrynHandlerTest is HandlerTestHarness {
         vm.prank(address(dcaManager));
         handler.depositToken(user1, DEPOSIT_AMOUNT / 10); // Deposit only 1/10th
 
-        uint256 excessiveAmount = DEPOSIT_AMOUNT * 2;
-        uint256 available = sovrynHandler.getUserShares(user1);
-        uint256 price = iToken.tokenPrice();
-        uint256 totalITokenToRedeem = Math.mulDiv(excessiveAmount, EXCHANGE_RATE_DECIMALS, price, Math.Rounding.Ceil);
-        uint256 requested = Math.mulDiv(totalITokenToRedeem, amounts[0], excessiveAmount, Math.Rounding.Ceil);
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ILendingHandler.LendingHandler__InsufficientShares.selector, user1, requested, available
-            )
-        );
-        sovrynHandler.testBatchRetrieveStablecoin(users, amounts);
+        uint256 received = sovrynHandler.testBatchRetrieveStablecoin(users, amounts);
+        assertGt(received, 0);
+        assertEq(sovrynHandler.getUserShares(user1), 0);
     }
 
     /**

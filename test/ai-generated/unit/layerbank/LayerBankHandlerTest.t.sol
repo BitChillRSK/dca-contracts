@@ -295,7 +295,7 @@ contract LayerBankHandlerTest is HandlerTestHarness {
         assertEq(layerbankHandler.getUserShares(USER), aTokenBalanceBefore);
     }
 
-    function test_layerbank_batchRetrieveStablecoin_exceedsBalance_reverts() public {
+    function test_layerbank_batchRetrieveStablecoin_exceedsBalance_consumesAvailableClaim() public {
         address user1 = makeAddr("user1");
         address[] memory users = new address[](1);
         users[0] = user1;
@@ -310,18 +310,9 @@ contract LayerBankHandlerTest is HandlerTestHarness {
         vm.prank(address(dcaManager));
         handler.depositToken(user1, DEPOSIT_AMOUNT / 10);
 
-        uint256 excessiveAmount = DEPOSIT_AMOUNT * 2;
-        uint256 available = layerbankHandler.getUserShares(user1);
-        uint256 exchangeRate = aToken.getNormalizedIncome();
-        uint256 totalAtokenToRedeem = Math.mulDiv(excessiveAmount, aToken.RAY(), exchangeRate, Math.Rounding.Ceil);
-        uint256 requested = Math.mulDiv(totalAtokenToRedeem, amounts[0], excessiveAmount, Math.Rounding.Ceil);
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ILendingHandler.LendingHandler__InsufficientShares.selector, user1, requested, available
-            )
-        );
-        layerbankHandler.testBatchRetrieveStablecoin(users, amounts);
+        uint256 received = layerbankHandler.testBatchRetrieveStablecoin(users, amounts);
+        assertGt(received, 0);
+        assertEq(layerbankHandler.getUserShares(user1), 0);
     }
 
     function test_layerbank_batchRetrieveStablecoin_zeroPayout_reverts() public {

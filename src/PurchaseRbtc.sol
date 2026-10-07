@@ -53,13 +53,9 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
         uint256[] memory netWeights;
         uint256 purchaseAmountsSum;
         uint256 totalFee;
-        uint256 totalStablecoinRetrieved;
-
-        {
-            (totalFee, netWeights, purchaseAmountsSum) = _calculateFeeAndNetWeights(purchaseAmounts);
-            // Lending may return less than requested; the venue spends whatever came back.
-            totalStablecoinRetrieved = _batchRetrieveStablecoin(buyers, purchaseAmounts);
-        }
+        uint256[] memory fundedAmounts = purchaseAmounts;
+        uint256 totalStablecoinRetrieved = _batchRetrieveStablecoin(buyers, fundedAmounts);
+        (totalFee, netWeights, purchaseAmountsSum) = _calculateFeeAndNetWeights(fundedAmounts);
 
         uint256 totalPurchasedRbtc;
         {
@@ -90,7 +86,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
         _creditPurchases(
             buyers,
             scheduleIds,
-            purchaseAmounts,
+            fundedAmounts,
             netWeights,
             totalPurchasedRbtc,
             purchaseAmountsSum,
@@ -149,7 +145,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
     function _creditPurchases(
         address[] calldata buyers,
         uint64[] calldata scheduleIds,
-        uint256[] calldata purchaseAmounts,
+        uint256[] memory purchaseAmounts,
         uint256[] memory netWeights,
         uint256 totalPurchasedRbtc,
         uint256 purchaseAmountsSum,
