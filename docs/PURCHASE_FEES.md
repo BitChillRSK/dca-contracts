@@ -1,6 +1,6 @@
 # Purchase fees
 
-`PurchaseFees` prices each scheduled purchase independently. Its fee amount is a
+`PurchaseFees` prices each funded purchase row independently. Its fee amount is a
 stablecoin-denominated allocation weight: the venue receives the full retrieved
 stablecoin, and the collector receives a share of the measured rBTC/WRBTC output.
 The fee parameters are configured per handler by its owner through
@@ -11,7 +11,7 @@ The fee parameters are configured per handler by its owner through
 
 | Symbol | Contract value | Meaning |
 |---|---|---|
-| $x$ | Purchase amount | Gross scheduled purchase, in the token's smallest units |
+| $x$ | Funding weight | Gross row weight after funding adjustment, in the token's smallest units |
 | $L$ | `feePurchaseLowerBound` | Amount at or below which the maximum rate applies; same units as $x$ |
 | $M$ | `maxFeeRate` | Maximum rate, in basis points |
 | $m$ | `minFeeRate` | Asymptotic minimum rate, in basis points |
@@ -25,6 +25,11 @@ Launch deployment defaults are $M=100$, $m=20$ and $L=250$ whole tokens:
 1% through 250 tokens, decreasing toward 0.2% for larger purchases. The lower
 bound is `250e18` for DOC/USDRIF and `250e6` for USDT0. Equal minimum/maximum
 rates remain available as a flat configuration through the same setter.
+
+Funding weights normally equal scheduled purchase amounts. Lending first combines each buyer's
+rows and reserves shares for remaining principal. If available shares reduce funding, only that
+buyer's weights decrease. Fees use those adjusted weights; the schedule debit remains nominal.
+Idle handlers use the nominal amounts. Quotes must account for any funding reduction.
 
 ## Fee amount and effective rate
 
