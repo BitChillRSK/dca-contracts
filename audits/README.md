@@ -33,8 +33,8 @@ produced it, with a **Resolution** section at the end stating what BitChill fixe
 `findings/` folder holds all 33 candidates Krait raised and the reason each was kept, downgraded, or
 dismissed. Limits the report states: external protocol source (Money on Chain, Sovryn, LayerBank,
 Uniswap) was not in scope, and the repository's test and fork lanes were not run as part of the audit.
-The changes made in response to it are comments and documents, so the audited code is the code that
-ships.
+The R112 response changed comments and documents. R114 later changes lending accounting, so the
+final release differs from the code Krait audited.
 
 The report and its candidate files cite documents as they stood at `5a9ff0fe`. Where a candidate
 cites README "Compromised swapper", that procedure is in
@@ -46,11 +46,14 @@ The human supplied this automated report from Nethermind's AuditAgent.
 It is not a manual engagement by Nethermind's auditors.
 The original artifact is unchanged; its companion document records provenance, reproductions, and all six decisions.
 None of the six mechanisms is dismissed as a false positive.
-BitChill accepts the rounding, peg, and unsupported-wallet limits and mitigates manager assignment mistakes through deployment checks.
+BitChill fixes findings 1/5/6 through principal reserves, combined buyer conversion, and adjusted
+purchase funding weights. It accepts the peg and unsupported-wallet limitations and mitigates manager
+assignment mistakes through deployment checks.
 The reproductions use local mocks; they do not measure live incidence or prove profitable pool manipulation.
 
-The follow-up changes documents, NatSpec, and an isolated test file.
-Metadata-stripped runtime and creation code comparisons verify unchanged executable contracts under both compiler profiles.
+The follow-up changes executable lending and purchase accounting. Regression tests and full default,
+deploy, and lending-fork gates validate those changes. The original report remains byte-identical.
+The final release must be reviewed with these fixes; the report describes the earlier audited revision.
 
 ## Static analysis
 

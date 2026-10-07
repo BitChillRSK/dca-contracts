@@ -50,9 +50,9 @@ interface ITokenHandler is IStablecoinSource {
      * @return withdrawnAmount The amount that left this contract, measured as a `balanceOf(address(this))`
      *         delta around `safeTransfer`. This measures handler cash, not the user's balance, and it is
      *         not what a schedule's principal is debited by: principal is reduced by the amount requested.
-     *         On a lending route a successful call guarantees the external receipt-share claim for that
-     *         request was fully consumed, so a cash shortfall is a fee or realized loss with no unpaid
-     *         claim left withdrawable — not a reason to re-credit principal.
+     *         A lending route consumes exactly the receipt shares debited from the user's book.
+     *         Rounding, fees, or realized losses can reduce cash; the shortfall does not restore nominal
+     *         principal. Any retained shares already back the remaining position.
      * @dev DcaManager completes schedule effects before calling. Lending reads the remaining schedule
      *      liability and preserves its rounded-up share reserve. A rounding-limited payout can be smaller.
      */

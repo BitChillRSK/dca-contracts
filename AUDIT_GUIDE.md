@@ -227,16 +227,17 @@ rBTC withdrawal, reads, governance, and purchases remain open. Purchases do not 
 Other deliberate availability trade-offs:
 
 - A bad row reverts its entire handler batch; a bad handler batch reverts an across-handlers call.
-- Lending schedule principal is nominal. Measured receipt shares can cover slightly less after
-  rounded mints, withdrawals, or earlier purchases. A final purchase can therefore fail with
-  `LendingHandler__InsufficientShares`. Separate rounded-up rows for the same buyer can also fail
-  despite sufficient backing for one aggregate conversion. Both failures revert the entire batch.
+- Lending schedule principal is nominal; measured receipt shares are the actual claim. Withdrawals and
+  purchases preserve rounded-up shares for remaining principal. Interest quotes value shares above
+  that reserve. A buyer's purchase rows convert to shares once, regardless of row order. If available
+  shares reduce funding, only that buyer's allocation weights fall; fees use the adjusted weights.
+  Ordinary rounded mints can therefore complete their final purchase without new yield. Exact external
+  share consumption and exact venue input consumption remain mandatory.
 
-  Interest can repair a dust gap, but zero or insufficient accrual cannot guarantee a repair.
-  One additional underlying base unit is not sufficient for every repeated-buyer case.
-  These availability risks are accepted; the bot simulates complete batches and omits failing rows.
-  The owner can add backing, reduce a purchase, or exit principal through the available-share clamp.
-  See the [AuditAgent dispositions](./audits/2026-10-06-Nethermind/README.md) and their reproductions.
+  External loss or illiquidity can still stop a batch. No available shares above the reserve, zero
+  funded stablecoin, or an unmet caller minimum causes atomic rollback. The bot must simulate actual
+  gross funding; a nominal-input quote can be unattainable after a shortfall. See the
+  [AuditAgent dispositions](./audits/2026-10-06-Nethermind/README.md) and their regressions.
 - A user pause blocks purchases only. A governance deposit pause blocks new inflows only, preserving
   purchases and exits.
 - Contracts are not proxies. Recovery from a defective immutable handler is a new route index plus
@@ -272,7 +273,8 @@ Other deliberate availability trade-offs:
   (`LayerBankLivePoolProbe`), so operations should rerun one of them whenever the Pool or aToken
   implementation changes. See `src/layerbank/README.md`.
   This upgrade assumption is separate from current half-up mint rounding: a fresh deposit can mint
-  one share fewer than a full-principal purchase requires without any implementation change.
+  fewer shares than a nominal full-principal purchase requires. Available-share funding and adjusted
+  allocation weights handle that current rounding gap without relaxing the burn check.
 - Third-party incentive campaigns on a lending market (for example Merkl) are not claimed or
   distributed. Handlers pay out the market's native interest only.
 - The bot must quote, simulate, group rows by handler, respect the protected-window workflow, and retry
@@ -286,7 +288,8 @@ Other deliberate availability trade-offs:
 pre-relaunch code. The relaunch code has had two automated audits (Krait and Nethermind AuditAgent,
 October 2026) and no third-party manual audit. The Krait report's **Resolution** section records its
 decisions. The [AuditAgent companion](./audits/2026-10-06-Nethermind/README.md) records all six
-dispositions separately from the unchanged original report. Accepted risks are stated in this guide.
+dispositions separately from the unchanged original report. Its accounting fixes change executable
+code after both automated scans. Accepted risks are stated in this guide.
 
 Slither and Aderyn run on `src/` only (`make slither`, `make aderyn`). Slither exits non-zero because
 its triaged findings are kept visible instead of suppressed. Each detector's classification, false

@@ -16,63 +16,47 @@ Report annotations and suggested changes are evidence, not implementation instru
 
 ## Decisions — 2026-10-07
 
-All six mechanisms are reproducible under their stated conditions.
-None is dismissed as a false positive.
-The scanner's first three Medium labels do not describe an unconditional loss to ordinary users.
-BitChill treats the rounding cases as Low availability risks and the remaining cases as explicit
-deployment assumptions or unsupported use.
+All six mechanisms are reproducible under their stated conditions. None is dismissed as a false positive.
+The first three Medium labels do not describe an unconditional loss to ordinary users.
+The human authorized accounting fixes after reviewing the initial documentation-only PR.
+The final decisions below supersede that PR's initial acceptance of findings 1, 5, and 6.
 
-| Finding | Original severity | BitChill disposition | Action |
-|---------|-------------------|----------------------|--------|
-| 1. Rounded withdrawals leave nominal principal short of share backing | Medium | Valid; accepted Low availability risk | Retain strict share accounting; add interest and principal withdrawal reproductions and exit checks |
-| 2. Stablecoin premium weakens the one-dollar floor | Medium | Valid conditional exposure; accepted peg assumption | Correct depeg NatSpec and document quote-derived caller protection |
-| 3. Nonpayable contract accounts cannot claim native rBTC | Medium | Valid for unsupported accounts; accepted limitation | State receiving requirements for users and the fee collector |
-| 4. Registry affiliation does not authenticate the canonical manager | Low | Valid trusted-governance risk; mitigated operationally | Check the exact immutable manager, token, and released code before acceptance or assignment |
-| 5. Current LayerBank mint rounding can leave a fresh purchase one share short | Low | Valid; accepted Low availability risk | Add a fresh-deposit reproduction; distinguish it from burn-rounding upgrades |
-| 6. Separate ceilings for repeated buyers can exceed their aggregate shares | Low | Valid; accepted Low availability risk | Add repeated-buyer reproductions, including positive one-wei interest |
+| Finding | Original severity | Final disposition | Action |
+|---------|-------------------|-------------------|--------|
+| 1. Rounded withdrawals reduce principal backing | Medium | Fixed | Reserve shares for remaining principal before withdrawals; use the same reserve for interest quotes |
+| 2. Stablecoin premium weakens the one-dollar floor | Medium | Accepted peg assumption | Retain the floor and quote-derived caller protection |
+| 3. Nonpayable accounts cannot claim native rBTC | Medium | Accepted account limitation | State receiving requirements for users and the fee collector |
+| 4. Registry affiliation does not authenticate the manager | Low | Operational mitigation; owner trust retained | Verify exact manager, token, and released code before acceptance or assignment |
+| 5. LayerBank mint rounding leaves a purchase one share short | Low | Fixed | Fund purchases from available receipt shares and reduce the affected buyer's allocation weights |
+| 6. Separate ceilings exceed a repeated buyer's shares | Low | Fixed | Convert each buyer's combined input once, independent of row order |
 
-“Accepted” means the condition remains possible in the contracts.
-“Mitigated operationally” means the procedure prevents a governance mistake when operators follow it.
-The contracts still permit finding 4 after an incorrect owner assignment.
-These decisions preserve the current product rules; they do not establish that every risk is unlikely.
+Accepted conditions remain possible in the contracts. Operational checks prevent assignment mistakes
+when followed; the owner can still assign a wrongly bound handler. Fixes address the arithmetic
+triggers, not external market illiquidity, realized losses, or incompatible protocol upgrades.
 
 ## 1. Withdrawals and the final purchase
 
-The manager records nominal stablecoin principal.
-The lending handler records measured receipt shares and rounds share debits upward.
-A withdrawal can consume a fraction of a share more than its nominal stablecoin debit.
-That can leave a final purchase one share short without a market loss.
-Repeated withdrawals or purchases can accumulate the discrepancy.
-The discrepancy is bounded by the applicable rounding events, not universally by one underlying wei.
+The manager records nominal stablecoin principal. The handler records measured receipt shares.
+Previously, an upward-rounded withdrawal could consume shares needed by remaining principal.
+At `1.1 RAY`, withdrawing interest left `1,000 DOC - 1` base unit against `1,000 DOC` principal.
+A partial principal withdrawal similarly left `100 DOC - 1` against `100 DOC` principal.
+The final purchase reverted and rolled back the whole batch. Continuous yield could hide this gap;
+additional interest was never a guarantee.
 
-Tests reproduce both withdrawal triggers through the real manager and deployment helpers.
-At index `1.1 RAY`, an interest withdrawal leaves `1,000 DOC - 1` base unit behind
-`1,000 DOC` of recorded principal.
-A principal withdrawal leaves `100 DOC - 1` base unit behind `100 DOC` of recorded principal.
-The final purchase reverts with `LendingHandler__InsufficientShares`.
-Activating a protected purchase window afterwards does not repair the existing gap.
+**Fix:** reserve `ceil(remainingPrincipal × scale / rate)` shares before sizing withdrawals.
+The manager's new `getLockedPrincipal(user, token, handler)` reads remaining schedule liabilities
+through the permanent registry after the existing schedule effects. It includes paused schedules.
+The handler values only shares above that reserve. It still measures cash and proves exact external
+share consumption. A rounding-limited payout can be slightly smaller than the nominal request.
 
-The failed purchase rolls back schedule effects and share debits.
-It can delay every other row in that batch, including other handlers in an atomic across-handlers call.
-It does not authorize a user to withdraw another user's shares.
-Principal exit clamps to available backing and remains possible in these tests.
-The exact cash payout depends on the adapter's measured redemption, fees, and rounding.
+Interest quotes and top-ups use the same reserved-share calculation. Their quote can be slightly
+smaller than subtracting nominal principal from the value of all shares. This keeps displayed and
+spendable interest consistent with the withdrawal rule.
 
-**Decision:** retain the no-clamp purchase policy from
-[R43](../../docs/relaunch/R43-dex-path-review.md) and
-[R110](../../docs/relaunch/R110-internal-audit-followups.md).
-Existing bot simulation must identify failing row sets before submission.
-Omitting an affected row allows other buyers to proceed.
-Additional backing, sufficient yield, a smaller purchase, or principal exit can resolve the affected position.
-An unchanged retry is not a repair when the market does not accrue enough interest.
-
-A reserve-based alternative must preserve enough shares for the remaining aggregate principal.
-That requires coordinated withdrawal accounting; changing every ceiling to a floor is not a safe substitute.
-No such redesign is assigned for this relaunch.
-The human reports no production incidents, but this review does not independently verify that history.
-Continuous yield can explain the absence of observed failures; it is not a contract guarantee.
-The current batch-only purchase path also differs from the earlier single-purchase path removed by
-[R39](../../docs/relaunch/R39-remove-single-buy.md).
+Regressions now complete the previously failing purchases. Other tests cover paused schedules,
+deletion, combined principal/interest withdrawal, and 1,000 fuzzed indices and withdrawal amounts.
+If principal was backed before the operation, remaining shares still cover it afterward at that rate.
+External losses can already leave principal unbacked; a reserve cannot manufacture missing shares.
 
 ## 2. An upward depeg
 
@@ -138,68 +122,73 @@ No canonical-manager storage or new registry ABI is added.
 
 ## 5. LayerBank mint rounding versus a future burn upgrade
 
-At index `1.01 RAY`, the current half-up mint credits `24,752,475,247,524,752,475` shares for 25 DOC.
-Purchasing that full principal requires `24,752,475,247,524,752,476` shares under the handler's ceiling.
-The fresh schedule is therefore one share short at the same index.
-No withdrawal, malicious token, market loss, or proxy upgrade is necessary.
-The test also confirms principal exit after the failed purchase.
+At `1.01 RAY`, a current half-up mint gives `24,752,475,247,524,752,475` shares for 25 DOC.
+The former full-principal purchase required one additional share and failed at the same index.
+No withdrawal, malicious token, market loss, or proxy upgrade was necessary.
 
-**Decision:** accept this rounding-tail availability risk under the same policy as finding 1.
-Enough later yield can remove the gap, but zero or insufficient yield cannot guarantee a repair.
+**Fix:** preserve the remaining principal reserve, then cap the buyer's combined debit to available
+shares. If that cap reduces funding, value the debited shares and reduce only that buyer's row weights.
+Differences of cumulative floors split the reduced funding exactly across that buyer's rows.
+Their weights sum to the funded amount and never exceed the nominal row amounts.
+The shared purchase pipeline calculates fees and output allocations from these adjusted weights.
+The venue still spends only measured redeemed cash, and its input-consumption check remains exact.
 
-A future LayerBank burn-rounding upgrade is a separate risk.
-The adapter sizes an underlying withdrawal for today's half-up burn and requires exact measured share consumption.
-A changed burn rule can cause `LendingHandler__ShareConsumptionMismatch` and require a new handler route.
-The existing live probe and fork release gate cover that assumption.
-They do not eliminate the current mint-versus-ceiling mismatch described here.
+Deposits and schedule debits remain nominal. Receipt shares are the actual lending claim.
+An ordinary rounded deposit is accepted; the final purchase consumes the available claim instead of
+failing for one missing share. There is no invented share, fixed dust tolerance, or use of another
+buyer's shares. Full claims after a realized loss can also receive reduced funding. If no shares are
+available above remaining principal, or no positive stablecoin can be funded, the whole batch reverts.
+The swapper's minimum remains binding, so an unattainable nominal-input quote can still refuse the batch.
+
+Tests cover a fresh 25-DOC purchase, three purchases at a flat index through the final tick, and
+an enlarged mock shortfall with non-adjacent rows. The enlarged case proves that a healthy buyer
+retains its funding weight. A failed output minimum restores all schedules, shares, and credits.
+A shared-pipeline test confirms variable fees are recalculated from reduced weights.
+
+A future LayerBank burn-rounding upgrade remains a separate integration risk.
+The adapter still assumes today's half-up burn and a liquidity index of at least RAY.
+A changed burn can cause `LendingHandler__ShareConsumptionMismatch` and require a new handler route.
+The live probe and fork release gate check that assumption; these fixes do not relax exact consumption.
 
 ## 6. Repeated buyers and positive interest
 
-For each buyer, `sum(ceil(rowAmount × scale / rate))` can exceed
-`ceil(sum(rowAmount) × scale / rate)`.
-With `k` positive rows, the excess is at most `k - 1` shares relative to one aggregate conversion.
-The handler debits each row separately and reverts if a later row exceeds the remaining shares.
-A fully backed aggregate can therefore fail.
+`sum(ceil(rowAmount × scale / rate))` can exceed `ceil(sum(rowAmount) × scale / rate)`.
+With `k` rows, the excess is at most `k - 1` shares. The previous per-row debits could therefore
+reject a fully backed buyer, and one underlying base unit of extra interest did not always help.
 
-The first reproduction compounds 100 DOC of interest into two schedules.
-At `1.5 RAY`, their purchases total 300 DOC against 200 scaled shares.
-Their separate ceilings require `200e18 + 1` shares.
-The failed batch preserves both schedules and the user's shares.
+**Fix:** group buyers in memory, including non-adjacent rows. Convert each combined amount once.
+Debit each buyer once and redeem exactly the sum of those debits. No pro-rata share ceiling follows
+the conversion. Purchase events retain their input row order, and calldata needs no new grouping rule.
+`LendingHandler__UserSharesUpdated` now emits one transition per unique buyer per batch.
 
-The second reproduction uses three 100-DOC rows after compounding.
-It then increases the index from `1.5e27` by `5,000,000`, which adds exactly one underlying base unit of value.
-The three ceilings still require `200e18 + 1` shares against `200e18` held shares.
-Thus, “at least one wei of new interest” is not a sufficient guarantee.
-The test does not estimate this event's frequency on a live market.
+The grouping uses a half-full memory hash table with linear probing. Tests include colliding buckets.
+It writes no persistent grouping state. The share book has one write per buyer; Rootstock prices each
+nonzero-to-nonzero write at 5,000 gas. No net gas saving is claimed: grouping and principal reads add work.
+The manager's principal read scans the user's token schedules, bounded by the configured schedule cap.
+Operators must continue to simulate batches and choose a suitable batch size.
 
-**Decision:** accept the Low availability risk and preserve strict row debits for this relaunch.
-Existing simulation must cover the complete row set, including repeated buyers.
-Sufficient new backing or smaller requested purchases can repair it.
-Splitting the same requests into unchanged batches is not a guaranteed repair at a fixed rate.
-Per-buyer aggregate conversion would address this trigger, but requires a purchase-accounting change and rounding allocation between rows.
-[R79](../../docs/relaunch/R79-coalesce-repeated-buyer-writes.md) considered write coalescing;
-that optimization is not itself a solution to the mathematical conversion issue.
+Regressions use the reserve-safe top-up quote introduced by finding 1's fix. At `1.7 RAY`, two
+combined purchases need exactly the held shares while separate ceilings need one more.
+A second case uses three rows at `1.5 RAY` and adds exactly one underlying base unit of interest.
+Separate ceilings still exceed held shares; the aggregate conversion succeeds and keeps any excess claim.
+The historical 300-DOC reproduction in the initial PR assumed the former, larger interest quote.
 
-## Reproduction and validation
+## Validation
 
-The dedicated [test file](../../test/ai-generated/audit/NethermindAuditFindings.t.sol) uses local mocks
-and production contract paths.
-It does not change shared mocks or deployment helpers.
+The [audit regression file](../../test/ai-generated/audit/NethermindAuditFindings.t.sol) uses local
+mocks and production contract paths. Local tests prove behavior, not live incident frequency.
+Additional base tests cover fees, reduced-weight conservation, exact share burns, and rollback.
+Direct-call manager fixtures now implement the remaining-principal read with zero liabilities.
+The existing tail-revert tests now assert successful claim consumption.
 
-```bash
-SWAP_TYPE=mocSwaps LENDING_PROTOCOL=none STABLECOIN_TYPE=DOC \
-  forge test --match-path test/ai-generated/audit/NethermindAuditFindings.t.sol --match-test test_NM
-FOUNDRY_PROFILE=deploy SWAP_TYPE=mocSwaps LENDING_PROTOCOL=none STABLECOIN_TYPE=DOC \
-  forge test --match-path test/ai-generated/audit/NethermindAuditFindings.t.sol --match-test test_NM
-SWAP_TYPE=mocSwaps LENDING_PROTOCOL=none STABLECOIN_TYPE=DOC \
-  forge test --match-path test/unit/deployment/FinalDeploymentTest.t.sol --match-contract FinalDeploymentTest
-FOUNDRY_PROFILE=deploy SWAP_TYPE=mocSwaps LENDING_PROTOCOL=none STABLECOIN_TYPE=DOC \
-  forge test --match-path test/unit/deployment/FinalDeploymentTest.t.sol --match-contract FinalDeploymentTest
-```
+The full default and deploy gates pass all eight unit lanes and all five invariant suites.
+Each profile passes 24 invariant tests; no suite reports a failure. Both lending fork gates pass
+487 tests, with zero failures and 36 existing lane skips. Slither and Aderyn were rerun; their
+unsuppressed baseline and new accounting observations are documented in
+[R114](../../docs/relaunch/R114-nethermind-audit-followups.md). PR 180 records latest CI and artifact checks.
 
-Validation results are recorded in [R114](../../docs/relaunch/R114-nethermind-audit-followups.md).
-All eight new reproductions and six existing deployment tests passed under both profiles.
-For each profile, all 42 first-party `src/` artifacts have identical ABIs and metadata-stripped runtime and creation code.
-Ten artifacts contain creation code; their runtime metadata changes, so the comparison observes the NatSpec edits.
-No live fork was run for this document, NatSpec, and isolated-test change.
-The deployment release gates remain mandatory on the frozen release revision.
+Consumer follow-ups:
+
+- [front-end#11](https://github.com/BitChillRSK/front-end/issues/11#issuecomment-6045133192): principal getter and reserve-safe interest quotes.
+- [bitchill-monitoring#10](https://github.com/BitChillRSK/bitchill-monitoring/issues/10#issuecomment-6045133656): per-buyer share events and adjusted funding semantics.
+- [swapper-bot#15](https://github.com/BitChillRSK/swapper-bot/issues/15#issuecomment-6045134182): quote and simulate actual gross funding.

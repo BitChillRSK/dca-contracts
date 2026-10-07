@@ -1,6 +1,6 @@
 # R114 — Nethermind AuditAgent report and accounting fixes
 
-Status: **in progress** · Assigned: yes · Optional/further-review: no · Stack on: R113
+Status: **implemented — PR open for review** · Assigned: yes · Optional/further-review: no · Stack on: R113
 ([#179](https://github.com/BitChillRSK/dca-contracts/pull/179)) · PR: [#180](https://github.com/BitChillRSK/dca-contracts/pull/180)
 
 ## Objective
@@ -88,12 +88,12 @@ Name any additional paths in the final PR body.
 
 ## Reviewer checklist
 
-- [ ] Matches scope; no unrelated or optional implementation.
-- [ ] Protocol invariants remain unchanged, including measured cash and exact claim consumption.
-- [ ] Tests cover successful rounding cases and meaningful rollback failures.
-- [ ] New principal reads query schedule liabilities, not an external protocol's cash estimate.
-- [ ] Actual allocation weights reflect reduced funding; fees remain bounded by each row's nominal amount.
-- [ ] Original report and BitChill's assessment remain distinct.
+- [x] Matches scope; no unrelated or optional implementation.
+- [x] Protocol invariants remain unchanged, including measured cash and exact claim consumption.
+- [x] Tests cover successful rounding cases and meaningful rollback failures.
+- [x] New principal reads query schedule liabilities, not an external protocol's cash estimate.
+- [x] Actual allocation weights reflect reduced funding; fees remain bounded by each row's nominal amount.
+- [x] Original report and BitChill's assessment remain distinct.
 
 ## ABI / deploy / cutover impact
 
@@ -102,3 +102,64 @@ Name any additional paths in the final PR body.
 - Lending share-transition events become one event per buyer per batch. Purchase amounts reflect adjusted funding weights.
 - Redeploy the immutable contracts at cutover. Refresh consumer ABIs and document the interest/funding semantics.
 - Consumer issue URLs and completed validation results belong in the final PR body and disposition document.
+
+## Implementation and validation — 2026-10-07
+
+Three separate executable commits implement the assigned fixes:
+
+1. `d7e2feaf`: principal-share reserves for principal and interest withdrawals, quotes, and top-ups.
+2. `53b4c91a`: one share conversion and debit per buyer, including non-adjacent rows.
+3. `a651e3ab`: reserve-aware purchase funding and adjusted row weights before fee/output calculation.
+
+`e167a897` corrects optimized-profile test fixtures. An explicit time variable avoids timestamp reuse
+across looped `vm.warp` calls. Both fee calculators copy inputs before the gas measurement.
+These fixture corrections do not change contract logic.
+
+The full gates pass under default and deploy (`via_ir`) profiles. Both gates run all eight unit lanes
+and all five invariant suites. The invariant result is 24 passed, zero failures, and zero skips per
+profile, with 64 runs × 512 calls per stateful invariant. Local fuzz tests use 1,000 runs.
+
+| Unit lane | Passed under each profile | Existing route skips |
+|-----------|---------------------------|----------------------|
+| MoC / idle / DOC | 982 | 34 |
+| MoC / LayerBank / DOC | 990 | 26 |
+| MoC / Sovryn / DOC | 1,004 | 12 |
+| DEX / idle / USDRIF | 954 | 42 |
+| DEX / idle / USDT0 | 954 | 42 |
+| DEX / Sovryn / USDRIF | 596 | 49 |
+| DEX / LayerBank / USDRIF | 959 | 37 |
+| DEX / LayerBank / USDT0 | 959 | 37 |
+
+Exact full-gate commands:
+
+```sh
+make check
+FOUNDRY_PROFILE=deploy FOUNDRY_OUT=/tmp/bitchill-r114-fixes.Ao4SbA/deploy-out FOUNDRY_CACHE_PATH=/tmp/bitchill-r114-fixes.Ao4SbA/deploy-cache make check
+make fork-sovryn
+make fork-layerbank
+```
+
+Each lending fork gate passes 487 tests, with zero failures and 36 existing lane skips.
+Fork execution uses Anvil/revm and live protocol state. It does not prove Rootstock opcode pricing.
+The final default-profile targeted run also passes all 23 audit and R78 fixture tests without skips.
+
+`make slither` reports 87 results and exits non-zero, as expected for the unsuppressed baseline.
+`make aderyn` completes and reports two High and seven Low categories. The baseline decisions remain
+in [R73](./R73-RELEASE_RECORD.md). New Slither observations concern trusted registry reads inside
+the bounded principal loop, Solidity's default-zero local accumulator, and explicit zero-funding
+guards. These are intended behavior; they do not bypass custody, ownership, or exact-burn checks.
+
+The report copy matches the original byte-for-byte and retains the recorded SHA-256.
+The final withdrawal NatSpec corrections compile under both profiles. All 42 first-party artifact
+ABIs, metadata-stripped runtimes, and metadata-stripped creation code match the tested pre-comment
+tree. Against R113, the only ABI addition is `getLockedPrincipal(address,address,address)` on
+DcaManager and its interface. All ten concrete runtimes fit 24,576 bytes and have no EOF prefix.
+The largest deploy runtime is LayerBankHandlerDex at 13,692 bytes; DcaManager is 12,454 bytes.
+Compiler and dependency pins remain unchanged. Formatting and authored-file whitespace checks pass.
+
+Consumer follow-ups: [front-end#11](https://github.com/BitChillRSK/front-end/issues/11#issuecomment-6045133192),
+[bitchill-monitoring#10](https://github.com/BitChillRSK/bitchill-monitoring/issues/10#issuecomment-6045133656),
+[swapper-bot#15](https://github.com/BitChillRSK/swapper-bot/issues/15#issuecomment-6045134182).
+
+Latest CI and final artifact checks are recorded in PR 180. The separate Claude review remains the
+human's next review step. These fixes do not constitute a new external audit.

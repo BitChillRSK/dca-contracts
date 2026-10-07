@@ -302,11 +302,11 @@ interface IDcaManager {
      * @param scheduleId The schedule to withdraw from. Must belong to the caller.
      * @param withdrawalAmount Amount to withdraw. Pass `type(uint256).max` for this schedule's
      *        whole `tokenBalance`.
-     * @dev Principal is reduced by the requested amount, not by what the handler paid out. On a lending
-     *      route a successful handler call guarantees the external receipt-share claim for that request
-     *      was fully consumed, so a cash shortfall is a fee or realized loss with nothing left to
-     *      re-credit: restoring it would invent principal this route can no longer redeem. An idle route
-     *      pays the requested amount from the handler's pooled balance, or the transfer reverts.
+     * @dev Principal is reduced by the requested amount, not by what the handler paid out. A lending
+     *      handler reserves shares for remaining principal and consumes exactly the shares debited from
+     *      the user's book. Rounding, fees, or realized losses can reduce the payout. The shortfall is
+     *      not restored as nominal principal; any retained shares already back the remaining position.
+     *      An idle route pays the requested amount from pooled cash, or the transfer reverts.
      */
     function withdrawToken(address token, uint64 scheduleId, uint256 withdrawalAmount) external;
 
