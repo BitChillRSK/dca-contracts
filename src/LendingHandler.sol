@@ -19,6 +19,15 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     using SafeERC20 for IERC20;
 
     /*//////////////////////////////////////////////////////////////
+                            TYPE DECLARATIONS
+    //////////////////////////////////////////////////////////////*/
+
+    struct BuyerPurchase {
+        address user;
+        uint256 amount;
+    }
+
+    /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
@@ -155,9 +164,8 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
 
     /**
      * @dev Retrieve several users' stablecoin in one protocol redemption.
-     *      Each row uses the same ceil(stablecoin → shares) as a single redeem; the protocol
-     *      burn is exactly the sum of those debits so virtual books and the lending position
-     *      stay aligned (an aggregate-then-pro-rata ceil can debit more shares than it burns).
+     *      Combine each buyer's rows before converting to shares. The protocol burns exactly
+     *      the sum of those buyer debits, so virtual books and the lending position stay aligned.
      *      Shortfalls revert rather than clamp: PurchaseRbtc still allocates by the planned
      *      weights, so clamping one row would dilute every other buyer in the batch.
      */
@@ -169,16 +177,17 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     {
         uint256 exchangeRate = _exchangeRate();
         uint256 totalSharesToRedeem;
+        (BuyerPurchase[] memory purchases, uint256 buyerCount) = _groupPurchases(users, purchaseAmounts);
 
-        uint256 purchaseCount = users.length;
-        for (uint256 i; i < purchaseCount; ++i) {
-            uint256 sharesToRedeem = _stablecoinToShares(purchaseAmounts[i], exchangeRate);
-            uint256 userShares = s_shares[users[i]];
+        for (uint256 i; i < buyerCount; ++i) {
+            address user = purchases[i].user;
+            uint256 sharesToRedeem = _stablecoinToShares(purchases[i].amount, exchangeRate);
+            uint256 userShares = s_shares[user];
             if (sharesToRedeem > userShares) {
-                revert LendingHandler__InsufficientShares(users[i], sharesToRedeem, userShares);
+                revert LendingHandler__InsufficientShares(user, sharesToRedeem, userShares);
             }
             unchecked {
-                _setUserShares(users[i], userShares, userShares - sharesToRedeem);
+                _setUserShares(user, userShares, userShares - sharesToRedeem);
             }
             totalSharesToRedeem += sharesToRedeem;
             // Per-user facts on this path are `UserSharesUpdated` (exact virtual debit) and, after
@@ -269,6 +278,32 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     /*//////////////////////////////////////////////////////////////
                             PRIVATE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @dev Group buyers in first-seen order with an in-memory hash table. Index plus one distinguishes
+     *      an occupied bucket from zero. At most half the buckets are occupied, so probing terminates.
+     *      Grouping neither changes purchase-row order nor writes persistent accounting storage.
+     */
+    function _groupPurchases(address[] calldata users, uint256[] calldata amounts)
+        private
+        pure
+        returns (BuyerPurchase[] memory purchases, uint256 buyerCount)
+    {
+        purchases = new BuyerPurchase[](users.length);
+        uint256[] memory buckets = new uint256[](users.length * 2);
+        for (uint256 i; i < users.length; ++i) {
+            address user = users[i];
+            uint256 bucket = uint256(keccak256(abi.encode(user))) % buckets.length;
+            while (buckets[bucket] != 0 && purchases[buckets[bucket] - 1].user != user) {
+                bucket = (bucket + 1) % buckets.length;
+            }
+            if (buckets[bucket] == 0) {
+                purchases[buyerCount].user = user;
+                buckets[bucket] = ++buyerCount;
+            }
+            purchases[buckets[bucket] - 1].amount += amounts[i];
+        }
+    }
 
     /**
      * @dev Stablecoin backed by shares above the rounded-up principal reserve, or zero. The two public

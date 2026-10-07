@@ -172,75 +172,66 @@ contract NethermindLayerBankAuditTest is LayerBankDcaManagerTest {
         _exit(id);
     }
 
-    function test_NM6_repeatedBuyerFullyBackedAggregateReverts() public {
+    function test_NM6_repeatedBuyerFullyBackedAggregatePurchases() public {
         _index(1e27);
         uint64 first = _create(100 ether, 100 ether);
         uint64 second = _create(100 ether, 100 ether);
-        _index(15e26);
+        _index(17e26);
+        uint256 topUp = dcaManager.getAccruedInterest(USER, address(docToken), 1);
+        assertEq(topUp, 140 ether - 1);
         vm.prank(USER);
-        dcaManager.topUpFromInterest(address(docToken), first, 100 ether);
+        dcaManager.topUpFromInterest(address(docToken), first, topUp);
         vm.prank(USER);
-        dcaManager.updatePurchaseAmount(address(docToken), first, 200 ether);
+        dcaManager.updatePurchaseAmount(address(docToken), first, 100 ether + topUp);
         uint256 shares = handler.getUserShares(USER);
-        assertEq(shares, 200 ether);
-        assertEq(shares * 15e26 / 1e27, 300 ether);
-        uint256 firstDebit = (uint256(200 ether) * 1e27 + 15e26 - 1) / 15e26;
-        uint256 secondDebit = (uint256(100 ether) * 1e27 + 15e26 - 1) / 15e26;
+        uint256 firstDebit = ((100 ether + topUp) * 1e27 + 17e26 - 1) / 17e26;
+        uint256 secondDebit = (uint256(100 ether) * 1e27 + 17e26 - 1) / 17e26;
         assertEq(firstDebit + secondDebit, shares + 1);
         uint64[] memory ids = new uint64[](2);
         ids[0] = first;
         ids[1] = second;
-        IDcaManager.Batch memory batch = toBatch(ids, address(docToken), 1);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ILendingHandler.LendingHandler__InsufficientShares.selector, USER, secondDebit, shares - firstDebit
-            )
-        );
         vm.prank(SWAPPER);
-        dcaManager.batchBuyRbtc(batch);
-        assertEq(handler.getUserShares(USER), shares);
-        assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, 200 ether);
-        assertEq(scheduleAt(dcaManager, USER, address(docToken), 1).tokenBalance, 100 ether);
+        dcaManager.batchBuyRbtc(toBatch(ids, address(docToken), 1));
+        assertEq(handler.getUserShares(USER), 0);
+        assertEq(handler.i_aToken().scaledBalanceOf(address(handler)), 0);
+        assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, 0);
+        assertEq(scheduleAt(dcaManager, USER, address(docToken), 1).tokenBalance, 0);
+        assertGt(handler.getAccumulatedRbtcBalance(USER), 0);
     }
 
-    function test_NM6_oneUnderlyingWeiOfNewInterestCanStillBeInsufficient() public {
-        MockLayerBankAToken token = MockLayerBankAToken(address(handler.i_aToken()));
-        token.setNormalizedIncome(1e27, true);
+    function test_NM6_repeatedBuyerPurchasesWithOneWeiOfNewInterest() public {
+        _index(1e27);
         uint64 first = _create(100 ether, 100 ether);
-        uint64 second = _create(50 ether, 50 ether);
-        uint64 third = _create(50 ether, 50 ether);
-        token.setNormalizedIncome(15e26, true);
+        uint64 second = _create(50 ether, 25 ether);
+        uint64 third = _create(50 ether, 25 ether);
+        _index(15e26);
         vm.startPrank(USER);
-        dcaManager.topUpFromInterest(address(docToken), second, 50 ether);
-        dcaManager.topUpFromInterest(address(docToken), third, 50 ether);
-        dcaManager.updatePurchaseAmount(address(docToken), second, 100 ether);
-        dcaManager.updatePurchaseAmount(address(docToken), third, 100 ether);
+        dcaManager.topUpFromInterest(address(docToken), second, 50 ether - 2);
+        dcaManager.topUpFromInterest(address(docToken), third, 50 ether + 1);
+        dcaManager.updatePurchaseAmount(address(docToken), second, 100 ether - 2);
+        dcaManager.updatePurchaseAmount(address(docToken), third, 100 ether + 1);
         vm.stopPrank();
         uint256 shares = handler.getUserShares(USER);
-        assertEq(shares, 200 ether);
-        uint256 originalIndex = 15e26;
-        uint256 newIndex = originalIndex + 5_000_000;
-        token.setNormalizedIncome(newIndex, true);
-        assertEq(shares * newIndex / 1e27 - shares * originalIndex / 1e27, 1);
-        uint256 perRow = (uint256(100 ether) * 1e27 + newIndex - 1) / newIndex;
-        assertEq(3 * perRow, shares + 1);
+        uint256 newIndex = 15e26 + 5_000_000;
+        _index(newIndex);
+        assertEq(shares * newIndex / 1e27 - shares * 15e26 / 1e27, 1);
+        uint256 separateDebits = (uint256(100 ether) * 1e27 + newIndex - 1) / newIndex
+            + ((uint256(100 ether) - 2) * 1e27 + newIndex - 1) / newIndex
+            + ((uint256(100 ether) + 1) * 1e27 + newIndex - 1) / newIndex;
+        assertEq(separateDebits, shares + 1);
         uint64[] memory ids = new uint64[](3);
         ids[0] = first;
         ids[1] = second;
         ids[2] = third;
-        IDcaManager.Batch memory batch = toBatch(ids, address(docToken), 1);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ILendingHandler.LendingHandler__InsufficientShares.selector, USER, perRow, shares - 2 * perRow
-            )
-        );
         vm.prank(SWAPPER);
-        dcaManager.batchBuyRbtc(batch);
-        assertEq(handler.getUserShares(USER), shares);
+        dcaManager.batchBuyRbtc(toBatch(ids, address(docToken), 1));
+        uint256 aggregateDebit = ((uint256(300 ether) - 1) * 1e27 + newIndex - 1) / newIndex;
+        assertEq(handler.getUserShares(USER), shares - aggregateDebit);
+        assertEq(handler.i_aToken().scaledBalanceOf(address(handler)), shares - aggregateDebit);
         for (uint256 i; i < 3; ++i) {
-            assertEq(scheduleAt(dcaManager, USER, address(docToken), i).tokenBalance, 100 ether);
+            assertEq(scheduleAt(dcaManager, USER, address(docToken), i).tokenBalance, 0);
         }
-        assertEq(handler.getAccumulatedRbtcBalance(USER), 0);
+        assertGt(handler.getAccumulatedRbtcBalance(USER), 0);
     }
 
     function test_NM3_rejectingContractCanCreateButCannotClaim() public {

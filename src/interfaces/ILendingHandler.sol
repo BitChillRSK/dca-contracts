@@ -18,8 +18,8 @@ interface ILendingHandler is ITokenHandler {
     /**
      * @notice Canonical per-user virtual lending-share balance after a successful mint or burn.
      * @dev Only `user` is indexed. `newShares` is the balance immediately after this transition.
-     *      When a buyer appears more than once in a batch, earlier events carry intermediate
-     *      balances; only the last event for that user equals `getUserShares(user)` after the call.
+     *      Batch purchases combine repeated rows and emit one transition per unique buyer.
+     *      Its `newShares` equals `getUserShares(user)` after that batch.
      *      Reverted mutations produce no lasting log. Idle handlers do not emit this.
      */
     event LendingHandler__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares);
@@ -27,7 +27,7 @@ interface ILendingHandler is ITokenHandler {
      * @notice One user's shares were redeemed for measured stablecoin.
      * @dev Emitted only on single-user redeems (`withdraw` / interest). `underlyingAmount` is the
      *      stablecoin this handler measured receiving for that user. Batch purchases do not emit
-     *      this: each row's exact share debit is `UserSharesUpdated`, and measured cash for the
+     *      this: each buyer's exact share debit is `UserSharesUpdated`, and measured cash for the
      *      whole redeem is `SharesRedeemedBatch`.
      */
     event LendingHandler__SharesRedeemed(address indexed user, uint256 underlyingAmount, uint256 sharesAmountRedeemed);
