@@ -58,9 +58,9 @@ interface IPurchaseRbtc is IStablecoinSource {
      * @param minRbtcOut Minimum rBTC this batch must buy (rBTC/WRBTC wei). `0` disables. Binds
      *        gross measured output before the protocol fee is taken from that output.
      * @dev DcaManager has already debited the schedules. Venue spends full retrieved stablecoin.
-     *      If a lending row exceeds its buyer's remaining shares, use those shares' stablecoin value
-     *      as that row's funding weight. A zero-value row reverts. Fees use the funded weights.
-     *      Measured output `Q` splits over the adjusted funding sum (`G`): buyers
+     *      A lending row its buyer's remaining shares cannot cover is funded with those shares and
+     *      weighted at their stablecoin value; a row worth nothing reverts the batch. Fees use the
+     *      funded weights. Measured output `Q` splits over their sum (`G`): buyers
      *      `floor(Q × netᵢ / G)`, collector `floor(Q × F / G)`, floor dust uncredited.
      *      `amountSpent` is each row's share of retrieved gross. Exact stablecoin consumption
      *      required. Collector fee credited last on the same accumulated-rBTC books.
@@ -76,9 +76,7 @@ interface IPurchaseRbtc is IStablecoinSource {
      * @notice Pay `user` the rBTC this handler has accumulated for them.
      * @param user Account paid. DcaManager always passes `msg.sender` — no `to`, no owner rescue.
      *        The fee collector withdraws here too.
-     * @dev The account must accept native rBTC with empty calldata, including after WRBTC unwrap on
-     *      Dex routes. A rejected payment reverts and restores the credit. An account that permanently
-     *      rejects native transfers cannot claim through this surface.
+     * @dev The account must accept native rBTC with empty calldata. Failed payments preserve its credit.
      */
     function withdrawAccumulatedRbtc(address user) external;
 

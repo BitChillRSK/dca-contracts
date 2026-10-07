@@ -41,9 +41,6 @@ The handler redeems exactly the sum of row debits and measures the received stab
 `PurchaseRbtc` computes fees after funding, using the adjusted weights. Credits and `amountSpent`
 use those weights too. A healthy buyer keeps its weight; no other buyer supplies the shortfall.
 
-Principal withdrawals, interest withdrawals, quotes, and top-ups keep their existing calculations.
-There is no principal reserve, buyer grouping, manager callback, or new getter.
-Share events remain sequential, one per purchase row. Every first-party ABI stays unchanged.
 The schedule still debits its nominal purchase amount, as principal withdrawals debit the request.
 
 **What remains:** nominal principal can exceed share value by rounding dust. Repeated rows still use
@@ -67,8 +64,9 @@ nominal schedule balances and leave total virtual shares equal to external recei
 The short-row test proves exact healthy-buyer credit, funding-based `amountSpent`, and complete rollback
 on an unmet caller minimum. Other tests pin zero-share rollback, including an empty second row for a
 repeated buyer, and purchases and partial withdrawals after a 20% index loss.
-`LendingHandlerRedeemTest` restores the original interest fuzz, exact row sum, and sequential share events.
-Its new fuzz proves each reduced weight equals the value of the shares debited and stays below nominal.
+`LendingHandlerRedeemTest` checks exact row sums and sequential share events.
+Its fuzz tests prove that reduced weights equal the debited shares' value and stay below nominal,
+and that an exactly covered row keeps its nominal weight.
 `PurchaseRbtcTest` verifies that reduced weights also change fees before allocation.
 
 ## 2. An upward depeg
@@ -135,7 +133,7 @@ No canonical-manager storage or new registry ABI is added.
 ## Validation and consumer impact
 
 The original report remains byte-identical. Exact gate commands, final results, ABI comparison, and
-independent Rootstock-priced gas measurements appear in
+reproduced Rootstock-priced gas measurements from the reviewer-derived harness appear in
 [R114](../../docs/relaunch/R114-nethermind-audit-followups.md) and PR 180.
 Local mocks prove behavior; fork tests check live lending integration on Anvil/revm.
 These tests do not constitute a new external audit.

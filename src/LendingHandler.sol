@@ -152,10 +152,10 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     }
 
     /**
-     * @dev Convert and debit each row separately, then redeem exactly the sum of those shares.
-     *      If a buyer's remaining shares cannot fund a row, debit all those shares and reduce that
-     *      row's weight to their stablecoin value. A zero-value row reverts the batch. The caller
-     *      uses the adjusted weights for fees and output allocation.
+     * @dev Each row is converted and debited on its own and the protocol burn is exactly the sum of
+     *      those debits, so virtual books and the lending position stay aligned. A row its buyer's
+     *      shares cannot cover spends the shares that are there and takes their value as its weight,
+     *      so no other buyer funds the shortfall. A row worth nothing reverts the batch.
      */
     function _batchRetrieveStablecoin(address[] calldata users, uint256[] memory purchaseAmounts)
         internal

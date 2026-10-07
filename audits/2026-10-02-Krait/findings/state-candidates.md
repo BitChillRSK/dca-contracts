@@ -1,10 +1,5 @@
 # Krait State Audit Candidates — Phase 2
 
-> Current behavior update — 2026-10-07: [R114](../../../docs/relaunch/R114-nethermind-audit-followups.md)
-> supersedes the tail-revert decision recorded here. A positive-value short row clamps to its buyer's
-> remaining shares and reduces its funding weight. A zero-value row still reverts. The assessment
-> below describes the audited revision; the original Krait report remains unchanged.
-
 ## Coupled State Dependency Map
 
 ```

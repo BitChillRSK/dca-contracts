@@ -46,10 +46,9 @@ BitChill supplied this automated report from Nethermind's AuditAgent.
 It is not a manual engagement by Nethermind's auditors.
 The original artifact is unchanged; its companion document records provenance, reproductions, and all six decisions.
 None of the six mechanisms is dismissed as a false positive.
-BitChill resolves the batch failure in findings 1/5/6 with one per-row share clamp and adjusted
-funding weights. Nominal principal can exceed share value by rounding dust. A zero-value row still
-reverts; after a loss, purchases continue while shares fund the rows. It accepts the peg and unsupported-wallet limitations and mitigates manager
-assignment mistakes through deployment checks.
+BitChill resolves the batch failure in findings 1/5/6 with one per-row share clamp and funded weights.
+It accepts the peg and unsupported-wallet limitations and mitigates manager assignment mistakes
+through deployment checks. The [dispositions](./2026-10-06-Nethermind/README.md) describe the remaining risks.
 The reproductions use local mocks; they do not measure live incidence or prove profitable pool manipulation.
 
 The follow-up changes executable lending and purchase accounting. Regression tests and full default,

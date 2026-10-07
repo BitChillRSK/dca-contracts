@@ -231,14 +231,13 @@ Other deliberate availability trade-offs:
 - Lending schedule principal is nominal; receipt shares are the actual claim. Each purchase row uses
   a rounded-up share debit. If the buyer has fewer shares, the row consumes those shares and reduces
   its funding weight to their stablecoin value. Fees and output allocation use the funded weights.
-  This one rule resolves the batch failure in AuditAgent findings 1, 5, and 6. Nominal principal can
-  still exceed share value by rounding dust. Share events remain one per row.
+  Nominal principal can still exceed share value by rounding dust.
 
   After a lending loss, purchases continue while shares fund the rows. A zero-value row still reverts,
   including a repeated buyer's later row after an earlier row empties the position. Illiquidity,
   zero received cash, an incompatible share burn, or an unmet minimum output also causes atomic
-  rollback. The bot must simulate actual gross funding. Interest quotes and withdrawals retain their
-  existing behavior. See the [AuditAgent dispositions](./audits/2026-10-06-Nethermind/README.md).
+  rollback. The bot must simulate actual gross funding. See the
+  [AuditAgent dispositions](./audits/2026-10-06-Nethermind/README.md).
 - A user pause blocks purchases only. A governance deposit pause blocks new inflows only, preserving
   purchases and exits.
 - Contracts are not proxies. Recovery from a defective immutable handler is a new route index plus
