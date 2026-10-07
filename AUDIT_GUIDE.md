@@ -175,20 +175,21 @@ invariants**, with the reason for each.
   fee-on-transfer tokens are unsupported.
 - Idle handlers keep no per-user book: pooled cash is bounded by the schedule balances `DcaManager`
   debits before any outflow, plus the exact-delta checks on deposits and purchases. Lending handlers
-  keep per-user virtual shares and clamp a withdrawal to that user's share-backed position.
+  keep per-user virtual shares and size withdrawals from shares above the remaining principal reserve.
 - Every successful lending redemption must reduce the handler's external receipt-share balance by
-  exactly the virtual shares debited. Cash may be lower only when the complete claim was consumed by
-  a venue fee or realized loss.
+  exactly the virtual shares debited. Rounding can limit the funded amount before redemption.
+  A venue fee or realized loss can reduce cash after the debited claim was fully consumed.
 - Integrator return values and balance views are not treated as received cash. Stablecoin and native
   receipts are measured by balance deltas.
 - Every successful purchase must reduce the handler's stablecoin balance by exactly the gross amount
   retrieved for the batch and passed to the venue. A positive rBTC/WRBTC receipt with a partial or
   excessive input delta reverts the entire batch.
-- Purchase fees are computed per row from the planned gross amounts and configured independently on
+- Purchase fees are computed per row from the adjusted funding weights and configured independently on
   every handler. No stablecoin moves to the collector: after the venue call, measured output `Q` is
-  split over the planned gross sum `G`. Each buyer is credited `floor(Q × netᵢ / G)` and the collector
-  `floor(Q × F / G)` on the same accumulated-rBTC books, where `netᵢ` is the row's amount minus its fee
-  and `F` the batch fee. `minRbtcOut` and the Uniswap oracle floor bind on `Q`, before the fee share.
+  split over their sum `G`. Each buyer is credited `floor(Q × netᵢ / G)` and the collector
+  `floor(Q × F / G)` on the same accumulated-rBTC books, where `netᵢ` is the row's funding weight
+  minus its fee and `F` the batch fee. Idle funding weights equal the nominal amounts. `minRbtcOut`
+  and the Uniswap oracle floor bind on `Q`, before the fee share.
   The per-row `amountSpent` reported in events is the row's share of the retrieved gross. Integer
   division can leave less than one wei per row, and per fee, uncredited in the handler.
 - Schedule principal is the amount still authorized for purchases, not a mark-to-market claim on a
