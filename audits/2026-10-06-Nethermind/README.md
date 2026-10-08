@@ -134,7 +134,7 @@ No canonical-manager storage or new registry ABI is added.
 
 The original report remains byte-identical. Exact gate commands, final results, ABI comparison, and
 reproduced Rootstock-priced gas measurements from the reviewer-derived harness appear in
-[R114](../../docs/relaunch/R114-nethermind-audit-followups.md) and PR 181.
+[R114](../../docs/relaunch/R114-nethermind-audit-followups.md) and PR 180.
 Local mocks prove behavior; fork tests check live lending integration on Anvil/revm.
 These tests do not constitute a new external audit.
 
