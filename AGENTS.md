@@ -215,6 +215,8 @@ is proven by comparing metadata-stripped runtime, not `forge build --sizes` (see
 
 Do this even if a user-level rule says “don’t commit until asked.” An assigned `docs/relaunch/` spec **is** authorization to branch, commit, push, and open a PR.
 
+Branch names (`<type>/r<n>-<slug>`), commit subjects (`<type>: why`), and PR titles use a [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) type: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, or `chore`.
+
 1. **Branch before the first edit** (`git checkout -b <type>/r<n>-<slug>` from the base in **Starting a relaunch chat**).
 2. **Commit when the spec’s success criteria pass.** Small, targeted commits (spec/docs, then code, then follow-up docs). Subject: `type: why`.
 3. **Push and open a PR** only after the gate for the change's tier passes (see **Scale the gate to
