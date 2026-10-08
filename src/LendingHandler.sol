@@ -173,7 +173,7 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
             if (sharesToRedeem > userShares) {
                 purchaseAmounts[i] = _sharesToStablecoin(userShares, exchangeRate);
                 if (purchaseAmounts[i] == 0) {
-                    revert LendingHandler__InsufficientShares(users[i], sharesToRedeem, userShares);
+                    revert LendingHandler__ZeroShareValue(users[i], sharesToRedeem, userShares);
                 }
                 sharesToRedeem = userShares;
             }

@@ -36,7 +36,7 @@ Require exact manager, token, and released-code checks before initial Safe accep
 - Convert and debit each purchase row separately. Preserve sequential per-row share events.
 - If a row requests more shares than its buyer holds, use all that buyer's remaining shares.
   Replace that row's memory weight with `floor(shares × rate / scale)`.
-  If that value is zero, revert `LendingHandler__InsufficientShares` atomically.
+  If that value is zero, revert `LendingHandler__ZeroShareValue` atomically.
 - Compute fees and output allocation after the funding hook adjusts the memory weights.
   A healthy buyer retains its weight. No other buyer supplies the short row's shares.
 - Keep schedule debits nominal, measured cash, exact share consumption, exact venue consumption,
@@ -46,6 +46,12 @@ Require exact manager, token, and released-code checks before initial Safe accep
   to the reviewer-derived harness, tighten funding comments and reviewer documents, and restore the
   five Krait candidate snapshots. Keep executable production code unchanged. Defer optional live-tail
   fork coverage and declaration cleanup; the supplied fork probe is not present in this checkout.
+
+- Reachability follow-up (2026-10-08): retain the zero-value guard and rename its error
+  to `LendingHandler__ZeroShareValue`, with the same arguments. Prove
+  manager-path reachability with normal mint rounding and an index-loss scenario. Use `purchaseAmounts` as the mutable memory argument directly; remove the local copy.
+  Use the completed direct-memory tests and the pre-rename gates. The human explicitly waived
+  further tests after the error rename and removal of the local variable.
 
 ## Out of scope
 
@@ -93,7 +99,7 @@ Name additional paths in the PR body.
 - Pin gas ceilings and access counts for the three cost cases under default and deploy profiles.
 - After a 20% index loss, a funded purchase and partial withdrawal still pay the full request.
 - Run `make check` under default and deploy profiles, `make fork-sovryn`, `make fork-layerbank`,
-  formatting, and installed static analyzers. Compare all first-party ABIs with R113: no differences.
+  formatting, and installed static analyzers. The final ABI difference is the zero-value error rename; external function ABIs remain unchanged.
 - Measure steady-state lending and idle ticks under deploy. Read gas only without the state-diff
   recorder. Count storage/account accesses in separate tests and reprice on Rootstock's schedule.
 - Preserve report SHA-256 `cdfdc50d03787e7fc0fdf861ee50ac5b78e352c998c3a22bc6bacb4e59abc4e5`.
@@ -103,7 +109,7 @@ Name additional paths in the PR body.
 - One targeted fix resolves the positive-share batch failure in findings 1/5/6.
 - Nominal principal may exceed share value by rounding dust. A zero-value row still reverts.
   After a lending loss, purchases continue while the buyer has shares that fund their rows.
-- Every finding has a clear disposition and residual risk. No first-party ABI changes.
+- Every finding has a clear disposition and residual risk. Only the zero-value custom error changes in the ABI.
 - Tests, forks, latest CI, artifact checks, and reproduced gas evidence pass.
 - Focused new commits preserve the stack and history. PR 180 and all three consumer comments describe
   the final behavior. The separate Claude review remains BitChill's review step.
@@ -119,14 +125,19 @@ Name additional paths in the PR body.
 
 ## ABI / deploy / cutover impact
 
-No selector, argument, event signature, schedule layout, or first-party ABI changes.
+The custom error changes from `LendingHandler__InsufficientShares(address,uint256,uint256)` to
+`LendingHandler__ZeroShareValue(address,uint256,uint256)`. Function selectors, arguments, events,
+schedule layout, and ERC-165 interface IDs remain unchanged. Consumers must update error decoding.
 Share events remain one per row. `amountSpent` may be below nominal for a short lending row.
-`InsufficientShares` means no shares worth any stablecoin remain behind that row.
+`ZeroShareValue` means no shares worth any stablecoin remain behind that row.
 Interest quotes and withdrawals retain R113 behavior. Deploy the immutable contracts at cutover.
 
 ## Implementation and validation
 
-### Reproduced gas measurement
+The earlier gas tables and full gates below cover the calldata/local-copy implementation. The final
+follow-up records the direct-memory experiment, the error rename, and the human's test waiver.
+
+### Reproduced gas measurement (before the final memory-argument and error-name edits)
 
 The harness adapts the independent reviewer's probe; it is not an independently designed measurement.
 BitChill reran that harness on R113 and the revised tree. Both runs use solc 0.8.36, Cancun,
@@ -211,7 +222,7 @@ Consumer corrections update the existing comments:
 [bitchill-monitoring#10](https://github.com/BitChillRSK/bitchill-monitoring/issues/10#issuecomment-6045133656),
 [swapper-bot#15](https://github.com/BitChillRSK/swapper-bot/issues/15#issuecomment-6045134182).
 There is no new getter, interest or withdrawal change, or event cardinality change.
-`amountSpent` can fall below nominal on a short lending row; `InsufficientShares` identifies zero value.
+`amountSpent` can fall below nominal on a short lending row; `ZeroShareValue` identifies zero value.
 
 
 ### Second review follow-up (2026-10-08)
@@ -232,6 +243,56 @@ fuzz runs 1,000 cases per profile. `forge build` and the deploy-profile build pa
 ABIs and metadata-stripped creation/runtime bytecodes match `086973f4` under both profiles. Gas and
 access counts remain unchanged; the earlier production-code fork evidence stands. Formatting and
 whitespace checks pass. PR 180 records the new CI run after push.
+
+### Memory parameter and zero-value reachability follow-up (2026-10-08)
+
+The external implementation may declare `purchaseAmounts` as `memory` while its interface declares
+`calldata`. External ABI encoding does not include the data location. The decoder then supplies the
+mutable array to the funding hook. A separate calldata-to-memory copy also works. The final implementation declares `purchaseAmounts` in memory and passes it directly to funding,
+fees, and allocation. The funding hook clamps that array in place. There is no extra local array
+variable. This direct-memory form compiles and passes all 19 manager-path audit tests under both
+default and deploy profiles in the completed experiment, before the error rename. That experiment
+retains all 42 first-party ABIs; the subsequent custom-error rename is the only final ABI change. Solidity documents this
+[external-function data-location rule](https://www.soliditylang.org/blog/2022/05/17/data-location-inheritance-bug/).
+
+The manager checks nominal schedule balances, cadence, pause state, and route identity before calling
+the handler. It does not check the buyer's share value. A lending loss can leave nominal schedules
+behind an exhausted position. The manager-path rollback tests now use normal half-up mint rounding:
+60-token and 40-token schedules at index `2 RAY` mint 50 shares in total. An index loss to `1 RAY`
+leaves 50 tokens of value. The 60-token row consumes those 50 shares; the 40-token row then reaches
+the funding hook with zero shares. This happens within one batch or on a later purchase. The test
+models a loss boundary, not current live LayerBank index behavior.
+
+Under LayerBank's current `index >= RAY` assumption, a positive scaled share is worth at least one
+stablecoin wei. This does not rule out zero remaining shares. Other lending adapters can also produce
+positive shares whose rounded-down value is zero. The guard covers both cases and retains
+`LendingHandler__ZeroShareValue`. The name describes this guard's narrower condition.
+The rename changes the error selector without changing the guard's behavior.
+
+Removing the zero-value guard in a temporary mutation makes
+`test_repeatedBuyerEmptySecondRowRollsBackSchedulesAndVenue` fail with `next call did not revert as
+expected`: the batch succeeds and clears the unfunded nominal row. The original guard is restored.
+This is a loss-mode reachability proof, not evidence that healthy live LayerBank operation can reach
+the guard. A smaller payout caused only by an exit fee is a different case; it does not lower the
+exchange rate in this test.
+
+Before the error rename, the calldata/local-copy tree passes `make check` under both profiles: all eight unit lanes and all 24 invariant
+tests (64 runs × 512 calls) pass. Both lending forks pass 492 tests with no failures and 39 route or
+benchmark skips each. All 42 first-party ABIs and metadata-stripped creation/runtime bytecodes match
+parent `838516e3` under both profiles. Formatting, whitespace, and changed-document links pass.
+The original report and all five Krait snapshots remain unchanged. The final tree changes the custom-error selector and uses the tested direct-memory parameter form.
+The human explicitly requested no further tests. Newly started reruns were interrupted. The earlier
+results do not claim to test the final renamed error. Consumer comments record the new selector.
+
+Exact pre-rename validation commands:
+
+```sh
+make check
+FOUNDRY_PROFILE=deploy FOUNDRY_OUT=/var/folders/q9/4vzw5rqx0n19_0tyv8fw9khc0000gn/T/bitchill-r114-reachability.7sa7j1kp/final-deploy-out FOUNDRY_CACHE_PATH=/var/folders/q9/4vzw5rqx0n19_0tyv8fw9khc0000gn/T/bitchill-r114-reachability.7sa7j1kp/final-deploy-cache make check
+make fork-sovryn
+make fork-layerbank
+forge fmt --check
+```
 
 ### Rework commits
 

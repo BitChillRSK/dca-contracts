@@ -374,12 +374,14 @@ contract NethermindLayerBankAuditTest is LayerBankDcaManagerTest {
     }
 
     function _assertZeroShareRowRollback(bool repeated) private {
-        _index(1e27);
-        MockLayerBankAToken aToken = MockLayerBankAToken(address(handler.i_aToken()));
-        aToken.setMintOverride(25 ether, true);
+        // Normal half-up mints create 50 shares backing 100 tokens in nominal schedules.
+        _index(2e27);
         uint64 first = _create(60 ether, 60 ether);
         uint64 second = _create(40 ether, 40 ether);
-        aToken.setMintOverride(0, false);
+        assertEq(handler.getUserShares(USER), 50 ether);
+        // A loss leaves 50 tokens of share value. The first row consumes the entire position.
+        // This models a loss boundary, not the live LayerBank index's current monotonic behavior.
+        _index(1e27);
         if (!repeated) {
             _buy(_ids(first));
             assertEq(handler.getUserShares(USER), 0);
@@ -395,7 +397,7 @@ contract NethermindLayerBankAuditTest is LayerBankDcaManagerTest {
         uint256 venueCash = docToken.balanceOf(address(mocProxy));
         uint256 venueRbtc = address(mocProxy).balance;
         vm.expectRevert(
-            abi.encodeWithSelector(ILendingHandler.LendingHandler__InsufficientShares.selector, USER, 40 ether, 0)
+            abi.encodeWithSelector(ILendingHandler.LendingHandler__ZeroShareValue.selector, USER, 40 ether, 0)
         );
         _buy(ids);
         assertEq(handler.getUserShares(USER), userShares);

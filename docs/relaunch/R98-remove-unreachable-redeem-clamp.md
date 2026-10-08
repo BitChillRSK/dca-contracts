@@ -14,7 +14,7 @@ paths (including fuzzes over non-round rates).
 ## Background
 
 **Later decision:** [R114](./R114-nethermind-audit-followups.md) changes the batch shortfall check
-only. It clamps positive-value short rows and retains `InsufficientShares` for zero-value rows.
+only. It clamps positive-value short rows and retains `LendingHandler__ZeroShareValue` for zero-value rows.
 This spec's withdrawal bound and removal of the unreachable single-redeem clamp remain in force.
 
 [R28](./R28-lending-erc20-handler.md) kept the inner clamp as a per-user solvency boundary because

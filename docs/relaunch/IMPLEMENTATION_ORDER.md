@@ -1372,7 +1372,7 @@ After R96, before relaunch deploy. Drop the dead `sharesToRedeem > usersShares` 
 `_redeemShares`, delete `LendingHandler__AmountToRedeemAdjusted`, make the helper `private`, keep the
 share debit **checked** (no wrap if a future caller broke the bound), and prove the bound through
 `withdrawToken` / `withdrawInterest` (including fuzzes). Keep the outer withdrawal clamp and batch
-`InsufficientShares` (R114 later limits this to zero-value purchase rows). Ask: none.
+`InsufficientShares`, later renamed `LendingHandler__ZeroShareValue` (R114 limits this to zero-value purchase rows). Ask: none.
 
 ### R99 - centralize measured deposit-share accounting ([spec](./R99-centralize-deposit-share-accounting.md))
 

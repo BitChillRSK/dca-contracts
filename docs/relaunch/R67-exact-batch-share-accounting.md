@@ -30,7 +30,7 @@ handler's lending position.
 
 **Later decision:** [R114](./R114-nethermind-audit-followups.md) retains exact-sum share consumption
 and supersedes this spec's shortfall revert. A positive-value short row clamps to its buyer's shares
-and reduces its funding weight; only a zero-value row raises `InsufficientShares`.
+and reduces its funding weight; only a zero-value row raises `LendingHandler__ZeroShareValue`.
 
 - [x] Measure the maximum and observed difference between shares debited and shares
       redeemed across supported lending adapters and representative batch sizes.

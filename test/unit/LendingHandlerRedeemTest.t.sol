@@ -338,7 +338,7 @@ contract LendingHandlerRedeemTest is Test {
         amounts[1] = 25 ether;
         uint256 cashBefore = stablecoin.balanceOf(address(harness));
         vm.expectRevert(
-            abi.encodeWithSelector(ILendingHandler.LendingHandler__InsufficientShares.selector, users[1], 25 ether, 0)
+            abi.encodeWithSelector(ILendingHandler.LendingHandler__ZeroShareValue.selector, users[1], 25 ether, 0)
         );
         harness.batchRetrieveStablecoin(users, amounts);
         assertEq(harness.getUserShares(userA), 10 ether);
@@ -394,7 +394,7 @@ contract LendingHandlerRedeemTest is Test {
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = 1;
         vm.expectRevert(
-            abi.encodeWithSelector(ILendingHandler.LendingHandler__InsufficientShares.selector, userA, RATE_SCALE, 1)
+            abi.encodeWithSelector(ILendingHandler.LendingHandler__ZeroShareValue.selector, userA, RATE_SCALE, 1)
         );
         harness.batchRetrieveStablecoin(users, amounts);
         assertEq(harness.getUserShares(userA), 1);

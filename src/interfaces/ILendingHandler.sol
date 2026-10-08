@@ -56,7 +56,7 @@ interface ILendingHandler is ITokenHandler {
      * @notice A batch row's buyer holds no shares worth any stablecoin.
      * @dev `requested` is the row's rounded-up share amount; `available` is the buyer's remaining shares.
      */
-    error LendingHandler__InsufficientShares(address user, uint256 requested, uint256 available);
+    error LendingHandler__ZeroShareValue(address user, uint256 requested, uint256 available);
     /**
      * @notice The lending protocol did not consume exactly the receipt shares BitChill debited.
      * @dev `balanceBefore` / `balanceAfter` are the handler's external receipt-share balances
