@@ -96,6 +96,8 @@ interface IOperationsAdmin {
      *      affiliation, not canonical manager identity. Before assignment, the owner must verify the
      *      handler's immutable `i_dcaManager()` equals the intended deployment's manager and its code
      *      matches the released artifact. One handler address may back only one pair.
+     *      An accepted handler bound to another manager permanently occupies the pair and rejects deposits
+     *      through the intended manager.
      */
     function assignHandler(address token, uint256 routeIndex, address handler) external;
 

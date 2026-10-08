@@ -38,7 +38,7 @@ abstract contract StablecoinSource is IStablecoinSource {
     /**
      * @dev Retrieve several buyers' stablecoin for a batch purchase.
      * @param buyers Buyers whose positions are debited.
-     * @param purchaseAmounts Per-row funding weights. The hook may reduce a weight in place; the caller
+     * @param purchaseAmounts Per-row funding weights. May get clamped; the caller
      *        uses the resulting weights for fees and output allocation.
      * @return The total amount actually available to spend.
      */

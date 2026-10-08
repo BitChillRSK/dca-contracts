@@ -53,7 +53,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
         uint256[] memory netWeights;
         uint256 purchaseAmountsSum;
         uint256 totalFee;
-        // The funding hook may reduce a row's weight in place.
+        // Retrieve stablecoin first so the potentially clamped amounts are used to calculate fees and net weights.
         uint256 totalStablecoinRetrieved = _batchRetrieveStablecoin(buyers, purchaseAmounts);
         (totalFee, netWeights, purchaseAmountsSum) = _calculateFeeAndNetWeights(purchaseAmounts);
 
