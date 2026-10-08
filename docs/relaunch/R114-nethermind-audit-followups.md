@@ -138,13 +138,14 @@ Interest quotes and withdrawals retain R113 behavior. Deploy the immutable contr
 
 ## Implementation and validation
 
-The earlier gas tables and full gates below cover the calldata/local-copy implementation. The final
-follow-up records the direct-memory experiment, the error rename, and BitChill's test waiver.
+The gas table includes the auditor's final memory-parameter measurements. The recorded full gates
+cover the earlier calldata/local-copy implementation. The final follow-up records the direct-memory
+experiment, the error rename, and BitChill's test waiver.
 
-### Reproduced gas measurement (before the final memory-argument and error-name edits)
+### Gas measurement
 
 The harness adapts the independent reviewer's probe; it is not an independently designed measurement.
-BitChill reran that harness on R113 and the revised tree. Both runs use solc 0.8.36, Cancun,
+BitChill reran that harness on R113 and the explicit-copy tree. Both runs use solc 0.8.36, Cancun,
 optimizer 200, the deploy profile, local protocol mocks, ten distinct buyers, and 25-token rows.
 Each setup executes an initial tick, then advances one purchase period. This makes the measured tick
 steady-state: cadence anchors and accumulated-rBTC balances are live.
@@ -161,20 +162,27 @@ SET 20,000, and RESET/CLEAR 5,000. It preserves compute, memory, logs, and value
 Figures exclude transaction intrinsic gas and precede refunds; they are estimates from local mocks,
 not measurements of a live Rootstock transaction.
 
-| Steady-state tick | R113 Rootstock gas | Revised Rootstock gas | Delta | SLOAD before → after | Calls before → after | SSTORE before → after |
-|-------------------|-------------------|-----------------------|-------|----------------------|----------------------|-----------------------|
-| LayerBank, one schedule per buyer | 411,204 | 412,132 | +928 (+92.8/row) | 87 → 87 | 23 → 23 | 40 → 40 |
-| LayerBank, ten schedules per buyer | 411,204 | 412,132 | +928 (+92.8/row) | 87 → 87 | 23 → 23 | 40 → 40 |
-| Idle, one schedule per buyer | 271,566 | 272,641 | +1,075 (+107.5/row) | 59 → 59 | 12 → 12 | 26 → 26 |
+The auditor supplied final memory-parameter figures for a ten-row tick under the deploy profile,
+priced on Rootstock. These are auditor-reported results, not a new local rerun.
+
+| Route | R113 Rootstock gas | Earlier explicit copy | Final memory parameter | Final delta |
+|-------|-------------------|-----------------------|------------------------|-------------|
+| LayerBank | 411,204 | 412,132 | 412,037 | +833 (+83.3/row) |
+| Idle | 271,566 | 272,641 | 272,546 | +980 (+98/row) |
+
+The auditor reports identical calls, storage reads, writes, and logs versus R113 in every case.
+The earlier probes recorded 87 SLOAD, 23 calls, and 40 SSTORE for lending; idle recorded
+59 SLOAD, 12 calls, and 26 SSTORE. The explicit-copy lending probe produced the same figures
+with one or ten schedules held per buyer.
 
 For lending, the writes are two SET, two CLEAR, and 36 RESET on each tree; no same-value writes.
 For idle, they are one SET, one CLEAR, and 24 RESET. Clear refunds are 30,000 and 15,000 respectively
 and remain unchanged. Per handler, lending has 23 SLOAD and 21 SSTORE; idle has 13 SLOAD and 11 SSTORE.
 Each tree calls the manager once, admin twice, and handler twice. The delta is compute/memory only.
-Extra held schedules add no purchase-path access. The reproduced figures differ by one gas from
-review lending figures; the measured delta agrees at 928 gas for ten rows.
+Extra held schedules add no purchase-path access. Removing the explicit copy reduces the reported
+cost by 95 gas per ten-row tick on both routes.
 
-Exact measurement commands, run from each tree with the same harness:
+Earlier local measurement commands, run from each tree with the same harness:
 
 ```sh
 SWAP_TYPE=mocSwaps LENDING_PROTOCOL=none STABLECOIN_TYPE=DOC FOUNDRY_PROFILE=deploy forge test --match-path test/gas/R114PurchaseClampGas.t.sol -j 1 -vv
