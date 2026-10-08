@@ -141,7 +141,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
     /**
      * @dev Allocate floored shares of measured output. Split out of `batchBuyRbtc` for legacy codegen.
      *      Fee and each row floor; under one wei per term can stay uncredited — see IPurchaseRbtc.
-     * @param purchaseAmounts Per-row funded weights.
+     * @param purchaseAmounts May contain clamped amounts.
      */
     function _creditPurchases(
         address[] calldata buyers,

@@ -51,7 +51,7 @@ Require exact manager, token, and released-code checks before initial Safe accep
 - Reachability follow-up (2026-10-08): retain the zero-value guard and rename its error
   to `LendingHandler__ZeroShareValue`, with the same arguments. Prove
   manager-path reachability with normal mint rounding and an index-loss scenario. Use `purchaseAmounts` as the mutable memory argument directly; remove the local copy.
-  Use the completed direct-memory tests and the pre-rename gates. The human explicitly waived
+  Use the completed direct-memory tests and the pre-rename gates. BitChill explicitly waived
   further tests after the error rename and removal of the local variable.
 
 - NatSpec follow-up: document the zero-value error as a defensive guard after an exchange-rate
@@ -139,7 +139,7 @@ Interest quotes and withdrawals retain R113 behavior. Deploy the immutable contr
 ## Implementation and validation
 
 The earlier gas tables and full gates below cover the calldata/local-copy implementation. The final
-follow-up records the direct-memory experiment, the error rename, and the human's test waiver.
+follow-up records the direct-memory experiment, the error rename, and BitChill's test waiver.
 
 ### Reproduced gas measurement (before the final memory-argument and error-name edits)
 
@@ -154,6 +154,8 @@ from the same setup state without measuring gas. Two micro-tests verify the Canc
 The follow-up pins calls, SLOADs, write classes, logs, handler accesses, and clean Foundry gas ceilings.
 Lending ceilings are 461,000 under default and 445,000 under deploy; idle ceilings are 313,000 and
 302,000. These are compiler-profile regression ceilings, not production gas prices.
+Their headroom is approximately 0.4%. Compiler or optimizer changes require remeasurement
+and new ceiling values; the exact access assertions remain separate checks.
 The repricer subtracts Cancun access charges and adds Rootstock charges: SLOAD 200, calls 700,
 SET 20,000, and RESET/CLEAR 5,000. It preserves compute, memory, logs, and value-transfer costs.
 Figures exclude transaction intrinsic gas and precede refunds; they are estimates from local mocks,
@@ -192,16 +194,18 @@ The deploy gate also passes all eight unit lanes and all five invariant suites. 
 The final targeted deploy run also passes 92 tests without failures or skips.
 Latest-head CI is recorded in PR 181 after push.
 
+The table includes the later reachability regression, as verified by the pre-rename full gates below.
+
 | Unit lane | Passed under each profile | Route and benchmark skips |
 |-----------|---------------------------|---------------------------|
-| MoC / idle / DOC | 999 | 34 |
-| MoC / LayerBank / DOC | 1,007 | 26 |
-| MoC / Sovryn / DOC | 1,021 | 12 |
-| DEX / idle / USDRIF | 958 | 45 |
-| DEX / idle / USDT0 | 958 | 45 |
-| DEX / Sovryn / USDRIF | 600 | 52 |
-| DEX / LayerBank / USDRIF | 963 | 40 |
-| DEX / LayerBank / USDT0 | 963 | 40 |
+| MoC / idle / DOC | 1,000 | 34 |
+| MoC / LayerBank / DOC | 1,008 | 26 |
+| MoC / Sovryn / DOC | 1,022 | 12 |
+| DEX / idle / USDRIF | 959 | 45 |
+| DEX / idle / USDT0 | 959 | 45 |
+| DEX / Sovryn / USDRIF | 601 | 52 |
+| DEX / LayerBank / USDRIF | 964 | 40 |
+| DEX / LayerBank / USDT0 | 964 | 40 |
 
 Both lending fork gates pass 491 tests, zero failures, and 39 route/benchmark skips each.
 No required base test needs a further behavior change. Comments in `RbtcPurchaseTest` and the Sovryn
@@ -285,7 +289,7 @@ tests (64 runs × 512 calls) pass. Both lending forks pass 492 tests with no fai
 benchmark skips each. All 42 first-party ABIs and metadata-stripped creation/runtime bytecodes match
 parent `838516e3` under both profiles. Formatting, whitespace, and changed-document links pass.
 The original report and all five Krait snapshots remain unchanged. The final tree changes the custom-error selector and uses the tested direct-memory parameter form.
-The human explicitly requested no further tests. Newly started reruns were interrupted. The earlier
+BitChill explicitly requested no further tests. Newly started reruns were interrupted. The earlier
 results do not claim to test the final renamed error. Consumer comments record the new selector.
 
 Exact pre-rename validation commands:
