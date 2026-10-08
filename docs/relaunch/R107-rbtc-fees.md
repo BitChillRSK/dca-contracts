@@ -8,7 +8,7 @@ Charge BitChill’s purchase fee in native rBTC on MoC routes and WRBTC on Dex r
 The venue spends the full retrieved stablecoin; `minRbtcOut` stays a bound on gross measured
 venue output. The collector’s floored share is **credited** on the same accumulated-rBTC
 books as buyers (`s_accumulatedRbtc`) and withdrawn later through
-`withdrawAccumulatedRbtc`. No currency toggle.
+`withdrawAllAccumulatedRbtc`. No currency toggle.
 
 ## Background
 
@@ -167,7 +167,7 @@ No new fork-specific assertions required beyond the production fork lanes.
   measured output and now includes the collector's share, so it generally exceeds
   `∑ RbtcBought.rBtcBought`. No function selector changes on `batchBuyRbtc`.
 - Scripts: none required (fee collector address unchanged). The collector is a passive EOA.
-  It withdraws per handler through `DcaManager.withdrawAccumulatedRbtc`; Dex unwraps WRBTC
+  It withdraws through `DcaManager.withdrawAllAccumulatedRbtc`, one pair per handler; Dex unwraps WRBTC
   then pays native. See [`CUTOVER_RUNBOOK.md`](./CUTOVER_RUNBOOK.md).
 - Cutover:
   - **swapper-bot** — quote Dex / MoC `minRbtcOut` from **gross** stablecoin input (not

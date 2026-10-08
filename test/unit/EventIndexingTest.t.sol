@@ -103,8 +103,12 @@ contract EventIndexingTest is DcaDappTest {
         dcaManager.setSchedulePaused(address(stablecoin), scheduleId, false);
         vm.stopPrank();
         makeSinglePurchase();
+        address[] memory tokens = new address[](1);
+        tokens[0] = address(stablecoin);
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = s_routeIndex;
         vm.prank(USER);
-        dcaManager.withdrawAccumulatedRbtc(address(stablecoin), s_routeIndex);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
         vm.prank(USER);
         dcaManager.deleteDcaSchedule(address(stablecoin), scheduleId, SCHEDULE_INDEX);
         _assertFirstPartyIndexing(vm.getRecordedLogs());

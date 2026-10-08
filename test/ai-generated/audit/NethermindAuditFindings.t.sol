@@ -31,7 +31,11 @@ contract NethermindRejectingWallet {
     }
 
     function claim(IDcaManager manager, address token) external {
-        manager.withdrawAccumulatedRbtc(token, 1);
+        address[] memory tokens = new address[](1);
+        tokens[0] = token;
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = 1;
+        manager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
     }
 }
 

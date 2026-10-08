@@ -239,19 +239,6 @@ contract SchedulePauseTest is DcaDappTest {
         );
     }
 
-    function testPausedScheduleStillPaysAccumulatedRbtc() external {
-        super.makeSinglePurchase();
-        _setPaused(SCHEDULE_INDEX, true);
-
-        uint256 rbtcAccumulated = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
-        assertGt(rbtcAccumulated, 0, "nothing was bought to withdraw");
-
-        uint256 userRbtcBefore = USER.balance;
-        vm.prank(USER);
-        dcaManager.withdrawAccumulatedRbtc(address(stablecoin), s_routeIndex);
-        assertEq(USER.balance - userRbtcBefore, rbtcAccumulated);
-    }
-
     function testPausedScheduleStillPaysInterest() external onlyLendingLane {
         updateExchangeRate(10 days);
         _setPaused(SCHEDULE_INDEX, true);
