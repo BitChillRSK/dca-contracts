@@ -31,7 +31,8 @@ Human operator only. Agents must not `--broadcast`.
    handler; it withdraws through `DcaManager.withdrawAllAccumulatedRbtc`, one `(token, routeIndex)`
    pair per live handler (Dex unwraps WRBTC then pays native). A wallet that cannot receive native
    rBTC does not revert purchases; it cannot claim until it can receive, and `setFeeCollector` does
-   not migrate already-credited balances. Sweep every live handler after deploy.
+   not migrate already-credited balances. Sweep every live handler after deploy, then confirm
+   each pair's accumulated balance is zero.
 
 ## Deploy
 
@@ -161,8 +162,9 @@ key is live is stated under **Authority and trust boundaries** in
 
 `setFeeCollector` redirects future fee credits only. rBTC already credited stays with the previous
 collector address on each handler, and only that address can withdraw it. Before rotating, have the
-current collector call `DcaManager.withdrawAllAccumulatedRbtc` with one pair per live token × route,
-then call `setFeeCollector` on every handler. If the rotation answers a lost or compromised collector key, the
+current collector call `DcaManager.withdrawAllAccumulatedRbtc` with one pair per live token × route.
+Confirm each named pair's accumulated balance is zero before `setFeeCollector`: a wrong index
+succeeds and pays nothing. Then call `setFeeCollector` on every handler. If the rotation answers a lost or compromised collector key, the
 balance already credited to it cannot be redirected; rotate at once to stop further credits.
 
 ## Ops history note
