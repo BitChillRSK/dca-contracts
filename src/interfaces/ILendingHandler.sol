@@ -54,7 +54,9 @@ interface ILendingHandler is ITokenHandler {
     error LendingHandler__ZeroStablecoinReceived(uint256 sharesRedeemed);
     /**
      * @notice A batch row's buyer holds no shares worth any stablecoin.
-     * @dev `requested` is the row's rounded-up share amount; `available` is the buyer's remaining shares.
+     * @dev Defensive guard for an unfunded nominal row, e.g. after an exchange-rate loss exhausts its shares.
+     *      Positive-value rounding shortfalls are clamped instead; this error does not diagnose bad debt.
+     *      `requested` is the row's rounded-up share amount; `available` is the buyer's remaining shares.
      */
     error LendingHandler__ZeroShareValue(address user, uint256 requested, uint256 available);
     /**

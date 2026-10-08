@@ -53,6 +53,9 @@ Require exact manager, token, and released-code checks before initial Safe accep
   Use the completed direct-memory tests and the pre-rename gates. The human explicitly waived
   further tests after the error rename and removal of the local variable.
 
+- NatSpec follow-up: document the zero-value error as a defensive guard after an exchange-rate
+  loss; distinguish it from positive-value rounding shortfalls and avoid diagnosing bad debt.
+
 ## Out of scope
 
 - Principal reserves, buyer grouping, tolerance constants, changes to withdrawals or interest.
