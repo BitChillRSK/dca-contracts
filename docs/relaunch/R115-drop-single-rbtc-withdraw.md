@@ -1,7 +1,7 @@
 # R115 — Drop the single accumulated-rBTC withdraw
 
-Status: **in progress** · Assigned: yes · Optional/further-review: no · Stack on: R114
-([#181](https://github.com/BitChillRSK/dca-contracts/pull/181))
+Status: **implemented — PR open for review** · Assigned: yes · Optional/further-review: no · Stack on: R114
+([#181](https://github.com/BitChillRSK/dca-contracts/pull/181)) · PR: [#182](https://github.com/BitChillRSK/dca-contracts/pull/182)
 
 ## Objective
 
@@ -25,10 +25,10 @@ branch that calls it for one handler.
 
 ## Scope
 
-- [ ] Delete `DcaManager.withdrawAccumulatedRbtc` and the matching `IDcaManager` declaration.
-- [ ] Point tests that called it at `withdrawAllAccumulatedRbtc` with one pair.
-- [ ] Drop the duplicate invariant action that only called the removed function.
-- [ ] Point the cutover runbook and the R107 collector sentence at the batch function.
+- [x] Delete `DcaManager.withdrawAccumulatedRbtc` and the matching `IDcaManager` declaration.
+- [x] Point tests that called it at `withdrawAllAccumulatedRbtc` with one pair.
+- [x] Drop the duplicate invariant action that only called the removed function.
+- [x] Point the cutover runbook and the R107 collector sentence at the batch function.
 
 ## Out of scope
 
@@ -57,11 +57,11 @@ branch that calls it for one handler.
 
 ## Success criteria
 
-- [ ] `DcaManager` has no `withdrawAccumulatedRbtc`.
-- [ ] `withdrawAllAccumulatedRbtc` is unchanged apart from being the only accumulated-rBTC withdraw.
-- [ ] Handler `withdrawAccumulatedRbtc(user)` still exists.
-- [ ] The runbook tells the collector to call the batch function.
-- [ ] Invariants 3, 6, 10, and 13 still hold.
+- [x] `DcaManager` has no `withdrawAccumulatedRbtc`.
+- [x] `withdrawAllAccumulatedRbtc` is unchanged apart from being the only accumulated-rBTC withdraw.
+- [x] Handler `withdrawAccumulatedRbtc(user)` still exists.
+- [x] The runbook tells the collector to call the batch function.
+- [x] Invariants 3, 6, 10, and 13 still hold.
 
 ## Reviewer checklist
 
@@ -78,8 +78,8 @@ branch that calls it for one handler.
   `PurchaseRbtc.withdrawAccumulatedRbtc(address)` is unchanged.
 - Scripts: none.
 - Cutover: the collector sweeps with `withdrawAllAccumulatedRbtc`, one pair per live handler.
-  Comment on [front-end#30](https://github.com/BitChillRSK/front-end/issues/30): drop the unused
-  ABI entry instead of renaming it. Comment on
-  [bitchill-monitoring#10](https://github.com/BitChillRSK/bitchill-monitoring/issues/10) and
-  [swapper-bot#14](https://github.com/BitChillRSK/swapper-bot/issues/14): regenerate `abi.json`
-  without that selector. `data-api` and `metrics-dashboard` do not name it.
+  Comment on [front-end#30](https://github.com/BitChillRSK/front-end/issues/30#issuecomment-6059879028):
+  drop the unused ABI entry instead of renaming it. Comment on
+  [bitchill-monitoring#10](https://github.com/BitChillRSK/bitchill-monitoring/issues/10#issuecomment-6059879711)
+  and [swapper-bot#14](https://github.com/BitChillRSK/swapper-bot/issues/14#issuecomment-6059880156):
+  regenerate `abi.json` without that selector. `data-api` and `metrics-dashboard` do not name it.
