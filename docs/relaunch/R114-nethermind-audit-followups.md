@@ -1,7 +1,7 @@
 # R114 — Nethermind AuditAgent report and lending purchase clamp
 
 Status: **implemented — PR open for review** · Assigned: yes · Optional/further-review: no · Stack on: R113
-([#179](https://github.com/BitChillRSK/dca-contracts/pull/179)) · PR: [#180](https://github.com/BitChillRSK/dca-contracts/pull/180)
+([#179](https://github.com/BitChillRSK/dca-contracts/pull/179)) · PR: [#181](https://github.com/BitChillRSK/dca-contracts/pull/181)
 
 ## Objective
 
@@ -12,9 +12,8 @@ share clamp. Document accepted findings 2 and 3 and the operational mitigation f
 
 The automated report scans `docs/r113-audit-readiness-docs` at `284b3500`. It is evidence, not an
 implementation instruction or a manual Nethermind engagement. BitChill authorized this rework on
-2026-10-07 after independent review. Keep PR 180, its R113 base, and its review history.
-Use `fix/r114-nethermind-audit-followups` locally and as the canonical remote branch. Retain the
-original remote head only to preserve PR 180; push both references together when updating it.
+2026-10-07 after independent review. The work retains its R113 base and commit history.
+PR 181 uses `fix/r114-nethermind-audit-followups`; prior review history remains in closed PR 180.
 R114 supersedes the R43/R110 decision to revert a lending batch on any share shortfall.
 
 The initial reserve and buyer grouping design is withdrawn. The reserve changes loss handling:
@@ -116,7 +115,7 @@ Name additional paths in the PR body.
   After a lending loss, purchases continue while the buyer has shares that fund their rows.
 - Every finding has a clear disposition and residual risk. Only the zero-value custom error changes in the ABI.
 - Tests, forks, latest CI, artifact checks, and reproduced gas evidence pass.
-- Focused new commits preserve the stack and history. PR 180 and all three consumer comments describe
+- Focused new commits preserve the stack and history. PR 181 and all three consumer comments describe
   the final behavior. The separate Claude review remains BitChill's review step.
 
 ## Reviewer checklist
@@ -191,7 +190,7 @@ assigned base-test exceptions. Hook signatures and optimized-profile fixture cor
 The deploy gate also passes all eight unit lanes and all five invariant suites. Each profile passes
 24 invariant tests, zero failures, and zero skips, with 64 runs × 512 calls per stateful invariant.
 The final targeted deploy run also passes 92 tests without failures or skips.
-Latest-head CI is recorded in PR 180 after push.
+Latest-head CI is recorded in PR 181 after push.
 
 | Unit lane | Passed under each profile | Route and benchmark skips |
 |-----------|---------------------------|---------------------------|
@@ -247,7 +246,7 @@ The final targeted run passes 93 tests with no failures or skips under each prof
 fuzz runs 1,000 cases per profile. `forge build` and the deploy-profile build pass. All 42 first-party
 ABIs and metadata-stripped creation/runtime bytecodes match `086973f4` under both profiles. Gas and
 access counts remain unchanged; the earlier production-code fork evidence stands. Formatting and
-whitespace checks pass. PR 180 records the new CI run after push.
+whitespace checks pass. PR 181 records the new CI run after push.
 
 ### Memory parameter and zero-value reachability follow-up (2026-10-08)
 
@@ -309,4 +308,4 @@ forge fmt --check
 
 The original report remains byte-identical with its recorded SHA-256. No work was broadcast,
 no live transaction was sent, and dependency/compiler pins remain unchanged.
-The next step is BitChill's independent review of PR 180. After review and merge, follow the cutover runbook.
+The next step is BitChill's independent review of PR 181. After review and merge, follow the cutover runbook.
