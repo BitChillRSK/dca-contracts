@@ -342,7 +342,7 @@ contract TropykusHandlerTest is HandlerTestHarness {
         assertGt(lendingBalance, 0);
     }
 
-    function test_tropykus_batchRetrieveStablecoin_exceedsBalance_reverts() public {
+    function test_tropykus_batchRetrieveStablecoin_exceedsBalance_consumesAvailableClaim() public {
         address user1 = makeAddr("user1");
         address[] memory users = new address[](1);
         users[0] = user1;
@@ -357,19 +357,9 @@ contract TropykusHandlerTest is HandlerTestHarness {
         vm.prank(address(dcaManager));
         handler.depositToken(user1, DEPOSIT_AMOUNT / 10);
 
-        uint256 excessiveAmount = DEPOSIT_AMOUNT * 2;
-        uint256 available = tropykusHandler.getUserShares(user1);
-        uint256 exchangeRate = kToken.exchangeRateCurrent();
-        uint256 totalKtokenToRedeem =
-            Math.mulDiv(excessiveAmount, EXCHANGE_RATE_DECIMALS, exchangeRate, Math.Rounding.Ceil);
-        uint256 requested = Math.mulDiv(totalKtokenToRedeem, amounts[0], excessiveAmount, Math.Rounding.Ceil);
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ILendingHandler.LendingHandler__InsufficientShares.selector, user1, requested, available
-            )
-        );
-        tropykusHandler.testBatchRetrieveStablecoin(users, amounts);
+        uint256 received = tropykusHandler.testBatchRetrieveStablecoin(users, amounts);
+        assertGt(received, 0);
+        assertEq(tropykusHandler.getUserShares(user1), 0);
     }
 
     function test_tropykus_batchRetrieveStablecoin_zeroPayout_reverts() public {

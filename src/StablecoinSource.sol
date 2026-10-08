@@ -38,10 +38,11 @@ abstract contract StablecoinSource is IStablecoinSource {
     /**
      * @dev Retrieve several buyers' stablecoin for a batch purchase.
      * @param buyers Buyers whose positions are debited.
-     * @param purchaseAmounts Amount charged to each buyer.
+     * @param purchaseAmounts Per-row funding weights. May get clamped; the caller
+     *        uses the resulting weights for fees and output allocation.
      * @return The total amount actually available to spend.
      */
-    function _batchRetrieveStablecoin(address[] calldata buyers, uint256[] calldata purchaseAmounts)
+    function _batchRetrieveStablecoin(address[] calldata buyers, uint256[] memory purchaseAmounts)
         internal
         virtual
         returns (uint256);

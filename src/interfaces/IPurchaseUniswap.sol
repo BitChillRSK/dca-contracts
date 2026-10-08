@@ -11,8 +11,8 @@ import {ICoinPairPrice} from "./ICoinPairPrice.sol";
  * @notice Uniswap V3 purchase configuration: encoded path, slippage band, and MoC BTC/USD oracle.
  * @dev Min-out assumes the handler's stablecoin is worth one USD and uses the MoC BTC/USD oracle;
  *      no stablecoin/USD feed enforces that peg. Governance owns this deployment precondition. Tokens
- *      above 18 decimals revert. A depeg beyond the oracle-implied floor stops swaps rather than
- *      repricing them and requires governance action.
+ *      above 18 decimals revert. A downward depeg can stop swaps at the oracle-implied floor. An upward
+ *      depeg does not raise that floor; a quote-derived caller minimum must protect the premium.
  */
 interface IPurchaseUniswap {
     /*//////////////////////////////////////////////////////////////

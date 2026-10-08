@@ -152,14 +152,12 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     }
 
     /**
-     * @dev Retrieve several users' stablecoin in one protocol redemption.
-     *      Each row uses the same ceil(stablecoin → shares) as a single redeem; the protocol
-     *      burn is exactly the sum of those debits so virtual books and the lending position
-     *      stay aligned (an aggregate-then-pro-rata ceil can debit more shares than it burns).
-     *      Shortfalls revert rather than clamp: PurchaseRbtc still allocates by the planned
-     *      weights, so clamping one row would dilute every other buyer in the batch.
+     * @dev Each row is converted and debited on its own and the protocol burn is exactly the sum of
+     *      those debits, so virtual books and the lending position stay aligned. A row its buyer's
+     *      shares cannot cover spends the shares that are there and takes their value as its weight,
+     *      so no other buyer funds the shortfall. A row worth nothing reverts the batch.
      */
-    function _batchRetrieveStablecoin(address[] calldata users, uint256[] calldata purchaseAmounts)
+    function _batchRetrieveStablecoin(address[] calldata users, uint256[] memory purchaseAmounts)
         internal
         virtual
         override
@@ -173,7 +171,11 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
             uint256 sharesToRedeem = _stablecoinToShares(purchaseAmounts[i], exchangeRate);
             uint256 userShares = s_shares[users[i]];
             if (sharesToRedeem > userShares) {
-                revert LendingHandler__InsufficientShares(users[i], sharesToRedeem, userShares);
+                purchaseAmounts[i] = _sharesToStablecoin(userShares, exchangeRate);
+                if (purchaseAmounts[i] == 0) {
+                    revert LendingHandler__ZeroShareValue(users[i], sharesToRedeem, userShares);
+                }
+                sharesToRedeem = userShares;
             }
             unchecked {
                 _setUserShares(users[i], userShares, userShares - sharesToRedeem);

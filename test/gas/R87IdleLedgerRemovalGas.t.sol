@@ -149,7 +149,7 @@ contract IdleLedgerBaselineHarness is TokenHandler {
         s_idleBalances[user] += depositAmount;
     }
 
-    function _batchRetrieveStablecoin(address[] calldata users, uint256[] calldata purchaseAmounts)
+    function _batchRetrieveStablecoin(address[] calldata users, uint256[] memory purchaseAmounts)
         internal
         override
         returns (uint256 totalWithdrawn)

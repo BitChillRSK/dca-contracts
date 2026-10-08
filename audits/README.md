@@ -8,6 +8,7 @@ For the current scope, trust boundaries, and accepted risks, start with
 | April 2025 | [Ivan Fitro](https://twitter.com/FitroIvan) | Manual | Pre-relaunch protocol (Tropykus and Sovryn lending, Money on Chain purchases) | 3 Medium, 4 Low, 2 Info | [PDF](./pre-relaunch/2025-04-29-Ivan-Fitro.pdf) |
 | June 2025 | [Ivan Fitro](https://twitter.com/FitroIvan) | Manual | Mitigations of the April findings, and the Uniswap V3 integration | 1 Low, 1 Info | [PDF](./pre-relaunch/2025-06-02-Ivan-Fitro.pdf) |
 | 2026-10-02 | [Krait](https://github.com/ZealynxSecurity/krait) by [Zealynx Security](https://zealynx.io) | Automated (AI) | Relaunch `src/` at `5a9ff0fe`, without `src/tropykus-legacy/` (not deployed) | 0 Critical, 0 High, 0 Medium; observations only | [report](./2026-10-02-Krait/krait-report.md) · [JSON](./2026-10-02-Krait/krait-findings.json) · [candidates](./2026-10-02-Krait/findings/) |
+| 2026-10-06 | Nethermind AuditAgent (BitChill-supplied report) | Automated (AI) | Relaunch at `284b3500` on `docs/r113-audit-readiness-docs`; 37 contracts listed in the report | Original: 3 Medium, 3 Low; all six have explicit BitChill dispositions | [original report](./2026-10-06-Nethermind/audit-agent-report.md) · [provenance and dispositions](./2026-10-06-Nethermind/README.md) |
 
 The relaunch code has not had a third-party manual audit.
 
@@ -32,12 +33,27 @@ produced it, with a **Resolution** section at the end stating what BitChill fixe
 `findings/` folder holds all 33 candidates Krait raised and the reason each was kept, downgraded, or
 dismissed. Limits the report states: external protocol source (Money on Chain, Sovryn, LayerBank,
 Uniswap) was not in scope, and the repository's test and fork lanes were not run as part of the audit.
-The changes made in response to it are comments and documents, so the audited code is the code that
-ships.
+The R112 response changed comments and documents. R114 later changes lending accounting, so the
+final release differs from the code Krait audited.
 
 The report and its candidate files cite documents as they stood at `5a9ff0fe`. Where a candidate
 cites README "Compromised swapper", that procedure is in
 [`docs/relaunch/CUTOVER_RUNBOOK.md`](../docs/relaunch/CUTOVER_RUNBOOK.md#compromised-swapper).
+
+## Nethermind AuditAgent scan (October 2026)
+
+BitChill supplied this automated report from Nethermind's AuditAgent.
+It is not a manual engagement by Nethermind's auditors.
+The original artifact is unchanged; its companion document records provenance, reproductions, and all six decisions.
+None of the six mechanisms is dismissed as a false positive.
+BitChill resolves the batch failure in findings 1/5/6 with one per-row share clamp and funded weights.
+It accepts the peg and unsupported-wallet limitations and mitigates manager assignment mistakes
+through deployment checks. The [dispositions](./2026-10-06-Nethermind/README.md) describe the remaining risks.
+The reproductions use local mocks; they do not measure live incidence or prove profitable pool manipulation.
+
+The follow-up changes executable lending and purchase accounting. Regression tests and full default,
+deploy, and lending-fork gates validate those changes. The original report remains byte-identical.
+The final release must be reviewed with these fixes; the report describes the earlier audited revision.
 
 ## Static analysis
 

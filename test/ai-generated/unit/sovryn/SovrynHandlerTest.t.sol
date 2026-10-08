@@ -323,12 +323,11 @@ contract SovrynHandlerTest is HandlerTestHarness {
     }
 
     /**
-     * @notice The assetBalanceOf + profitOf preflight is gone (R1): a lending-protocol view is never a
-     * ceiling on what a redemption will pay. Over-redeeming must still fail, just from real accounting
-     * rather than from a view — here the per-user share exceeds the balance we track for that user.
-     * Named `LendingHandler__InsufficientShares` instead of a 0.8 underflow panic.
+     * @notice An excessive batch row consumes only that buyer's remaining share claim.
+     * @dev Receipt shares bound the debit. Funding weights fall to the shares' stablecoin value;
+     *      a lending-protocol asset view does not set the redeem ceiling.
      */
-    function test_sovryn_batchRetrieveStablecoin_exceedsBalance_reverts() public {
+    function test_sovryn_batchRetrieveStablecoin_exceedsBalance_consumesAvailableClaim() public {
         address user1 = makeAddr("user1");
         address[] memory users = new address[](1);
         users[0] = user1;
@@ -345,18 +344,9 @@ contract SovrynHandlerTest is HandlerTestHarness {
         vm.prank(address(dcaManager));
         handler.depositToken(user1, DEPOSIT_AMOUNT / 10); // Deposit only 1/10th
 
-        uint256 excessiveAmount = DEPOSIT_AMOUNT * 2;
-        uint256 available = sovrynHandler.getUserShares(user1);
-        uint256 price = iToken.tokenPrice();
-        uint256 totalITokenToRedeem = Math.mulDiv(excessiveAmount, EXCHANGE_RATE_DECIMALS, price, Math.Rounding.Ceil);
-        uint256 requested = Math.mulDiv(totalITokenToRedeem, amounts[0], excessiveAmount, Math.Rounding.Ceil);
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ILendingHandler.LendingHandler__InsufficientShares.selector, user1, requested, available
-            )
-        );
-        sovrynHandler.testBatchRetrieveStablecoin(users, amounts);
+        uint256 received = sovrynHandler.testBatchRetrieveStablecoin(users, amounts);
+        assertGt(received, 0);
+        assertEq(sovrynHandler.getUserShares(user1), 0);
     }
 
     /**

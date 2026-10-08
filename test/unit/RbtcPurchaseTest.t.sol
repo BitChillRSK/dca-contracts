@@ -363,12 +363,9 @@ contract RbtcPurchaseTest is DcaDappTest {
 
     /**
      * @notice the DcaManager balance guard fires once a schedule has nothing left to spend.
-     * @dev The batch path debits each buyer's shares rounded **up** (`_batchRetrieveStablecoin`) and
-     *      reverts on a shortfall, where the removed single path clamped to the shares held. On a
-     *      live lending fork with a static exchange rate that round-up costs ~1 wei of shares per
-     *      purchase, so draining the very last purchase through the batch can revert on shares
-     *      before the schedule balance reaches zero. Withdraw the tail instead of spending it, so
-     *      this test asserts the DcaManager guard it is named for on every lane.
+     * @dev Withdraw the final nominal balance before testing the manager's empty-schedule guard.
+     *      Lending purchases clamp positive share shortfalls; rows without positive share value still
+     *      revert. This test checks the schedule balance independently of receipt-share rounding.
      */
     function testRevertPurchasetIfStablecoinRunsOut() external {
         uint256 purchaseCount = AMOUNT_TO_DEPOSIT / AMOUNT_TO_SPEND;

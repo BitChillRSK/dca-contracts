@@ -104,12 +104,12 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
     /**
      * @dev Fee and net weight per row. Callers allocate measured output over `purchaseAmountsSum`;
      *      these are not venue spend amounts.
-     * @param purchaseAmounts Raw purchase amounts.
+     * @param purchaseAmounts May contain clamped amounts.
      * @return totalFee Sum of per-row fees in stablecoin units.
      * @return netWeights Per-row net (amount − fee), as allocation weights.
      * @return purchaseAmountsSum Sum of `purchaseAmounts` (allocation denominator).
      */
-    function _calculateFeeAndNetWeights(uint256[] calldata purchaseAmounts)
+    function _calculateFeeAndNetWeights(uint256[] memory purchaseAmounts)
         internal
         view
         returns (uint256 totalFee, uint256[] memory netWeights, uint256 purchaseAmountsSum)
@@ -129,7 +129,7 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev When the variable fee rate is not in use, apply the flat fee rate to all amounts.
-    function _calculateFlatFeeAndNetWeights(uint256[] calldata purchaseAmounts, uint256 feeRate)
+    function _calculateFlatFeeAndNetWeights(uint256[] memory purchaseAmounts, uint256 feeRate)
         private
         pure
         returns (uint256 totalFee, uint256[] memory netWeights, uint256 purchaseAmountsSum)
@@ -156,7 +156,7 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
      *      three scalars on the stack across rows.
      */
     function _calculateVariableFeeAndNetWeights(
-        uint256[] calldata purchaseAmounts,
+        uint256[] memory purchaseAmounts,
         uint256 minFeeRate,
         uint256 maxFeeRate,
         uint256 feePurchaseLowerBound

@@ -92,7 +92,12 @@ interface IOperationsAdmin {
      * @param handler The TokenHandler for that token and route, not yet assigned anywhere in this admin.
      * @dev Requires ERC-165 `ITokenHandler`; lending routes also require `ILendingHandler`, while idle
      *      routes reject it. The handler's `i_stablecoin()` must be `token`, and its
-     *      `i_dcaManager()` must be pinned to this registry. One handler address may back only one pair.
+     *      reported manager must return this registry from `i_operationsAdmin()`. This proves registry
+     *      affiliation, not canonical manager identity. Before assignment, the owner must verify the
+     *      handler's immutable `i_dcaManager()` equals the intended deployment's manager and its code
+     *      matches the released artifact. One handler address may back only one pair.
+     *      An accepted handler bound to another manager permanently occupies the pair and rejects deposits
+     *      through the intended manager.
      */
     function assignHandler(address token, uint256 routeIndex, address handler) external;
 

@@ -82,6 +82,30 @@ contract PurchaseRbtcTest is Test {
         assertLe(RBTC_OUT - expectedA - expectedB - expectedCollector, 2);
     }
 
+    function test_reducedFundingRecalculatesVariableFeesAndBuyerWeights() public {
+        harness.setFeeRateParams(10, 100, 250 ether);
+        address[] memory buyers = new address[](2);
+        buyers[0] = buyerA;
+        buyers[1] = buyerB;
+        uint64[] memory ids = new uint64[](2);
+        ids[0] = scheduleA;
+        ids[1] = scheduleB;
+        uint256[] memory planned = new uint256[](2);
+        planned[0] = 500 ether;
+        planned[1] = 1000 ether;
+        uint256[] memory funded = new uint256[](2);
+        funded[0] = 100 ether;
+        funded[1] = 1000 ether;
+        harness.setFundingWeights(funded);
+        harness.batchBuyRbtc(buyers, ids, planned, 0);
+        uint256 feeA = 1 ether;
+        uint256 feeB = 4.9375 ether;
+        assertEq(harness.getAccumulatedRbtcBalance(buyerA), RBTC_OUT * (funded[0] - feeA) / 1100 ether);
+        assertEq(harness.getAccumulatedRbtcBalance(buyerB), RBTC_OUT * (funded[1] - feeB) / 1100 ether);
+        assertEq(harness.getAccumulatedRbtcBalance(feeCollector), RBTC_OUT * (feeA + feeB) / 1100 ether);
+        assertEq(harness.lastPurchaseAmount(), 1100 ether);
+    }
+
     function test_creditFee_stablecoinProductOverflowReverts() public {
         harness.setFeeRateParams(500, 500, 0);
         uint256 rowCount = 21;
@@ -781,6 +805,7 @@ contract PurchaseRbtcHarness is PurchaseRbtc {
     uint256 public purchaseCalls;
     uint256 public rbtcOut;
     uint256 internal retrieveOverride;
+    uint256[] internal fundingWeights;
     uint256 internal purchaseInputOverride;
     bool internal useRetrieveOverride;
     bool internal usePurchaseInputOverride;
@@ -800,6 +825,10 @@ contract PurchaseRbtcHarness is PurchaseRbtc {
 
     function setRbtcOut(uint256 amount) external {
         rbtcOut = amount;
+    }
+
+    function setFundingWeights(uint256[] calldata weights) external {
+        fundingWeights = weights;
     }
 
     function setRetrieveOverride(uint256 amount) external {
@@ -832,7 +861,7 @@ contract PurchaseRbtcHarness is PurchaseRbtc {
         return rbtcOut;
     }
 
-    function _batchRetrieveStablecoin(address[] calldata, uint256[] calldata purchaseAmounts)
+    function _batchRetrieveStablecoin(address[] calldata, uint256[] memory purchaseAmounts)
         internal
         view
         override
@@ -841,6 +870,7 @@ contract PurchaseRbtcHarness is PurchaseRbtc {
         if (useRetrieveOverride) return retrieveOverride;
         uint256 total;
         for (uint256 i; i < purchaseAmounts.length; ++i) {
+            if (fundingWeights.length != 0) purchaseAmounts[i] = fundingWeights[i];
             total += purchaseAmounts[i];
         }
         return total;

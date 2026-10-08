@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
+import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
+
 import {Test} from "forge-std/Test.sol";
 import {DcaManager} from "../../src/DcaManager.sol";
 import {OperationsAdmin} from "../../src/OperationsAdmin.sol";
@@ -329,37 +331,18 @@ contract FeeOnTransferDepositTest is Test {
         assertLt(userGained, REQUESTED);
     }
 
-    function test_tropykus_batchBuy_ofOverstatedBalance_reverts() public {
+    function test_tropykus_batchBuy_ofOverstatedBalance_consumesActualClaim() public {
         kToken.setMintShortfallBps(FEE_BPS);
         uint64 scheduleId = _createTropykusSchedule(USER, REQUESTED);
-
-        address[] memory buyers = new address[](1);
-        buyers[0] = USER;
-        uint256[] memory indexes = new uint256[](1);
-        indexes[0] = 0;
         uint64[] memory ids = new uint64[](1);
         ids[0] = scheduleId;
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = REQUESTED;
-
-        uint256 availableShares = tropykusHandler.getUserShares(USER);
-        uint256 rate = kToken.exchangeRateStored();
-        uint256 requestedShares = (REQUESTED * EXCHANGE_RATE_DECIMALS + rate - 1) / rate;
+        uint256 underlyingBefore = _tropykusUnderlying(USER);
+        assertLt(underlyingBefore, REQUESTED);
         vm.prank(SWAPPER);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ILendingHandler.LendingHandler__InsufficientShares.selector, USER, requestedShares, availableShares
-            )
-        );
         dcaManager.batchBuyRbtc(toBatch(ids, address(token), TROPYKUS_INDEX));
-
-        // Revert leaves the schedule intact; the lending clamp still lets the user withdraw.
-        assertEq(scheduleAt(dcaManager, USER, address(token), 0).tokenBalance, REQUESTED);
-        uint256 userBefore = token.balanceOf(USER);
-        vm.prank(USER);
-        dcaManager.withdrawToken(address(token), scheduleId, REQUESTED);
         assertEq(scheduleAt(dcaManager, USER, address(token), 0).tokenBalance, 0);
-        assertGt(token.balanceOf(USER), userBefore);
+        assertEq(tropykusHandler.getUserShares(USER), 0);
+        assertGt(IPurchaseRbtc(address(tropykusHandler)).getAccumulatedRbtcBalance(USER), 0);
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -395,7 +395,7 @@ contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
     }
 
     /// @dev The stablecoin is minted straight to the harness, so a batch "retrieves" exactly what it asked for.
-    function _batchRetrieveStablecoin(address[] calldata, uint256[] calldata purchaseAmounts)
+    function _batchRetrieveStablecoin(address[] calldata, uint256[] memory purchaseAmounts)
         internal
         pure
         override

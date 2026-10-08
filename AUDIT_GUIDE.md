@@ -137,6 +137,13 @@ the Safe as pending owner. The Safe must accept each one. Until acceptance, the 
 owner; afterward, ownership is independent per contract and configuration can diverge unless operations
 apply the same decision everywhere it is meant to apply.
 
+Handler admission checks registry affiliation, not canonical manager identity.
+An impostor manager can return the same registry from `i_operationsAdmin()`.
+Before acceptance or permanent assignment, operations must verify the handler's exact immutable manager, stablecoin, and released code.
+An incorrect owner assignment can disable that pair or expose tokens approved to the incorrectly bound handler.
+The Safe controls later assignments; the broadcaster EOA configures the initial stack before Safe acceptance.
+The [cutover runbook](./docs/relaunch/CUTOVER_RUNBOOK.md) specifies those checks.
+
 How the boundaries are enforced:
 
 - Handlers take deposits, withdrawals, interest calls, purchases, and rBTC claims from their immutable
@@ -168,20 +175,21 @@ invariants**, with the reason for each.
   fee-on-transfer tokens are unsupported.
 - Idle handlers keep no per-user book: pooled cash is bounded by the schedule balances `DcaManager`
   debits before any outflow, plus the exact-delta checks on deposits and purchases. Lending handlers
-  keep per-user virtual shares and clamp a withdrawal to that user's share-backed position.
+  keep per-user virtual shares and clamp withdrawals to their share-backed stablecoin value.
 - Every successful lending redemption must reduce the handler's external receipt-share balance by
-  exactly the virtual shares debited. Cash may be lower only when the complete claim was consumed by
-  a venue fee or realized loss.
+  exactly the virtual shares debited. Rounding can limit the funded amount before redemption.
+  A venue fee or realized loss can reduce cash after the debited claim was fully consumed.
 - Integrator return values and balance views are not treated as received cash. Stablecoin and native
   receipts are measured by balance deltas.
 - Every successful purchase must reduce the handler's stablecoin balance by exactly the gross amount
   retrieved for the batch and passed to the venue. A positive rBTC/WRBTC receipt with a partial or
   excessive input delta reverts the entire batch.
-- Purchase fees are computed per row from the planned gross amounts and configured independently on
+- Purchase fees are computed per row from the adjusted funding weights and configured independently on
   every handler. No stablecoin moves to the collector: after the venue call, measured output `Q` is
-  split over the planned gross sum `G`. Each buyer is credited `floor(Q × netᵢ / G)` and the collector
-  `floor(Q × F / G)` on the same accumulated-rBTC books, where `netᵢ` is the row's amount minus its fee
-  and `F` the batch fee. `minRbtcOut` and the Uniswap oracle floor bind on `Q`, before the fee share.
+  split over their sum `G`. Each buyer is credited `floor(Q × netᵢ / G)` and the collector
+  `floor(Q × F / G)` on the same accumulated-rBTC books, where `netᵢ` is the row's funding weight
+  minus its fee and `F` the batch fee. Idle funding weights equal the nominal amounts. `minRbtcOut`
+  and the Uniswap oracle floor bind on `Q`, before the fee share.
   The per-row `amountSpent` reported in events is the row's share of the retrieved gross. Integer
   division can leave less than one wei per row, and per fee, uncredited in the handler.
 - Schedule principal is the amount still authorized for purchases, not a mark-to-market claim on a
@@ -220,6 +228,16 @@ rBTC withdrawal, reads, governance, and purchases remain open. Purchases do not 
 Other deliberate availability trade-offs:
 
 - A bad row reverts its entire handler batch; a bad handler batch reverts an across-handlers call.
+- Lending schedule principal is nominal; receipt shares are the actual claim. Each purchase row uses
+  a rounded-up share debit. If the buyer has fewer shares, the row consumes those shares and reduces
+  its funding weight to their stablecoin value. Fees and output allocation use the funded weights.
+  Nominal principal can still exceed share value by rounding dust.
+
+  After a lending loss, purchases continue while shares fund the rows. A zero-value row still reverts,
+  including a repeated buyer's later row after an earlier row empties the position. Illiquidity,
+  zero received cash, an incompatible share burn, or an unmet minimum output also causes atomic
+  rollback. The bot must simulate actual gross funding. See the
+  [AuditAgent dispositions](./audits/2026-10-06-Nethermind/README.md).
 - A user pause blocks purchases only. A governance deposit pause blocks new inflows only, preserving
   purchases and exits.
 - Contracts are not proxies. Recovery from a defective immutable handler is a new route index plus
@@ -230,8 +248,16 @@ Other deliberate availability trade-offs:
 - Listed stablecoins, Money on Chain, lending markets, the Uniswap router/pools, WRBTC, and the MoC
   BTC/USD oracle remain correct and available. External illiquidity or pauses can revert purchases or
   withdrawals.
-- Dex pricing assumes the input stablecoin is worth one USD; there is no stablecoin/USD oracle. A
-  depeg beyond the configured BTC/USD-derived floor stops swaps rather than repricing the asset.
+- Dex pricing assumes the input stablecoin is worth one USD; there is no stablecoin/USD oracle.
+  A downward depeg can stop swaps at the configured BTC/USD-derived floor. An upward depeg does not
+  raise that floor. A fair pool can pay the premium, but the floor does not require it; a tight
+  quote-derived `minRbtcOut` protects the batch. The additional headroom with a weak caller minimum
+  is accepted under the peg assumption.
+- Users and the fee collector must accept native rBTC with empty calldata. EOAs and compatible
+  payable contract accounts meet this requirement; permanently rejecting accounts are unsupported.
+  They can create schedules and receive credits but cannot claim them through signer-bound payouts.
+  A failed claim preserves the credit. Dex claims unwrap WRBTC and have the same requirement.
+  No alternate recipient, wrapped claim, or owner rescue exists.
 - Dex input tokens must have at most 18 decimals. Fee-on-transfer tokens and asynchronous or partial
   lending redemptions are unsupported.
 - Sovryn charges a 0.1% exit fee on iToken burns. A user on the Sovryn route therefore receives less
@@ -246,6 +272,9 @@ Other deliberate availability trade-offs:
   is orphaned and no funds move. `make fork-layerbank` and `make fork-sovryn` assert the live rounding
   (`LayerBankLivePoolProbe`), so operations should rerun one of them whenever the Pool or aToken
   implementation changes. See `src/layerbank/README.md`.
+  This upgrade assumption is separate from current half-up mint rounding: a fresh deposit can mint
+  fewer shares than a nominal full-principal purchase requires. The per-row share clamp and adjusted
+  allocation weights handle that current rounding gap without relaxing the burn check.
 - Third-party incentive campaigns on a lending market (for example Merkl) are not claimed or
   distributed. Handlers pay out the market's native interest only.
 - The bot must quote, simulate, group rows by handler, respect the protected-window workflow, and retry
@@ -256,9 +285,11 @@ Other deliberate availability trade-offs:
 ## Earlier reviews and static analysis
 
 [`audits/README.md`](./audits/README.md) lists every report. Two manual reviews from 2025 cover the
-pre-relaunch code. The relaunch code has had one automated audit (Krait, October 2026) and no
-third-party manual audit. The Krait report's **Resolution** section records which observations were
-fixed and which are accepted; the accepted ones are stated in this guide.
+pre-relaunch code. The relaunch code has had two automated audits (Krait and Nethermind AuditAgent,
+October 2026) and no third-party manual audit. The Krait report's **Resolution** section records its
+decisions. The [AuditAgent companion](./audits/2026-10-06-Nethermind/README.md) records all six
+dispositions separately from the unchanged original report. Its accounting fixes change executable
+code after both automated scans. Accepted risks are stated in this guide.
 
 Slither and Aderyn run on `src/` only (`make slither`, `make aderyn`). Slither exits non-zero because
 its triaged findings are kept visible instead of suppressed. Each detector's classification, false

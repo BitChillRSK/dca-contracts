@@ -54,11 +54,13 @@ interface IPurchaseRbtc is IStablecoinSource {
      * @notice Spend each buyer's stablecoin and credit their accumulated rBTC.
      * @param buyers Users to buy for. An address may appear more than once.
      * @param scheduleIds Schedule id for each row, used only in `RbtcBought`.
-     * @param purchaseAmounts Gross stablecoin each row contributes (fee derived from these).
+     * @param purchaseAmounts Nominal stablecoin requested per row. Lending may reduce the funding weights.
      * @param minRbtcOut Minimum rBTC this batch must buy (rBTC/WRBTC wei). `0` disables. Binds
      *        gross measured output before the protocol fee is taken from that output.
      * @dev DcaManager has already debited the schedules. Venue spends full retrieved stablecoin.
-     *      Measured output `Q` splits over `purchaseAmountsSum` (`G`): buyers
+     *      A lending row its buyer's remaining shares cannot cover is funded with those shares and
+     *      weighted at their stablecoin value; a row worth nothing reverts the batch. Fees use the
+     *      funded weights. Measured output `Q` splits over their sum (`G`): buyers
      *      `floor(Q × netᵢ / G)`, collector `floor(Q × F / G)`, floor dust uncredited.
      *      `amountSpent` is each row's share of retrieved gross. Exact stablecoin consumption
      *      required. Collector fee credited last on the same accumulated-rBTC books.
@@ -74,6 +76,7 @@ interface IPurchaseRbtc is IStablecoinSource {
      * @notice Pay `user` the rBTC this handler has accumulated for them.
      * @param user Account paid. DcaManager always passes `msg.sender` — no `to`, no owner rescue.
      *        The fee collector withdraws here too.
+     * @dev The account must accept native rBTC with empty calldata. Failed payments preserve its credit.
      */
     function withdrawAccumulatedRbtc(address user) external;
 

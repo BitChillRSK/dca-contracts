@@ -75,6 +75,10 @@ Fork: no new assertions. Still run both fork lanes before push.
 
 ## Decisions taken while implementing
 
+**Later decision:** [R114](./R114-nethermind-audit-followups.md) retains the nominal/share-value
+separation tested below. Its per-row purchase clamp now consumes a positive-value short claim and
+reduces that row's funding weight. `LendingHandler__ZeroShareValue` remains only for zero-value purchase rows.
+
 **Hop-2 coverage kept, moved off the FOT stablecoin (2026-08-28).** The spec left this open ("if hop-2 coverage
 is still wanted"). It is: the four Tropykus cases assert that `DcaManager`'s book can sit ahead of the
 share-backed underlying, which is what R28's per-user share clamp and `TokenLending__InsufficientShares` exist

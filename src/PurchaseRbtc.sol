@@ -47,19 +47,15 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
     function batchBuyRbtc(
         address[] calldata buyers,
         uint64[] calldata scheduleIds,
-        uint256[] calldata purchaseAmounts,
+        uint256[] memory purchaseAmounts,
         uint256 minRbtcOut
     ) external override onlyDcaManager {
         uint256[] memory netWeights;
         uint256 purchaseAmountsSum;
         uint256 totalFee;
-        uint256 totalStablecoinRetrieved;
-
-        {
-            (totalFee, netWeights, purchaseAmountsSum) = _calculateFeeAndNetWeights(purchaseAmounts);
-            // Lending may return less than requested; the venue spends whatever came back.
-            totalStablecoinRetrieved = _batchRetrieveStablecoin(buyers, purchaseAmounts);
-        }
+        // Retrieve stablecoin first so the potentially clamped amounts are used to calculate fees and net weights.
+        uint256 totalStablecoinRetrieved = _batchRetrieveStablecoin(buyers, purchaseAmounts);
+        (totalFee, netWeights, purchaseAmountsSum) = _calculateFeeAndNetWeights(purchaseAmounts);
 
         uint256 totalPurchasedRbtc;
         {
@@ -145,11 +141,12 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
     /**
      * @dev Allocate floored shares of measured output. Split out of `batchBuyRbtc` for legacy codegen.
      *      Fee and each row floor; under one wei per term can stay uncredited — see IPurchaseRbtc.
+     * @param purchaseAmounts May contain clamped amounts.
      */
     function _creditPurchases(
         address[] calldata buyers,
         uint64[] calldata scheduleIds,
-        uint256[] calldata purchaseAmounts,
+        uint256[] memory purchaseAmounts,
         uint256[] memory netWeights,
         uint256 totalPurchasedRbtc,
         uint256 purchaseAmountsSum,

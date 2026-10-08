@@ -7,37 +7,15 @@ import {IdleDocHandlerMoc} from "src/idle/IdleDocHandlerMoc.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockIToken} from "test/mocks/MockIToken.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
-import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
 import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import "test/Constants.sol";
 import {NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
 
 /**
  * @title BatchTailScheduleTest
- * @notice Pins today's behavior when a schedule spends its exact remaining balance on a lending route.
- *
- * @dev **This documents a known rough edge, not a desired property. R43 decided to keep it.**
- *
- * `LendingHandler._stablecoinToShares` rounds the share debit **up** (deliberately: the per-user share
- * book must never drift above the shares the handler actually holds), while `depositToken` credits the
- * floor-rounded amount the lending protocol actually minted. So whenever the exchange rate does not
- * divide the deposit evenly — i.e. essentially always in production — spending the full remaining
- * balance asks for one more share than the user owns, and `_batchRetrieveStablecoin` reverts with
- * `LendingHandler__InsufficientShares` rather than clamping.
- *
- * Two consequences worth keeping visible:
- *   1. No draining loop is needed. A single purchase of the exact remaining balance is already short.
- *   2. The revert happens inside the per-buyer loop, so one schedule at its tail fails the whole
- *      batch — every healthy buyer in the same tick is rolled back with it.
- *
- * R39 removed `buyRbtc`, whose `_redeemShares` path clamped the shortfall to the shares held. That was
- * the only path that could clear a tail schedule, so these tests are the record of what replaced it.
- * Idle is unaffected: its balances are 1:1, with no rate and no rounding.
- *
- * R43 kept the revert: clamping would debit fewer shares than the schedule's `purchaseAmounts[i]` says was
- * spent, diverging the DcaManager balance from the share book over dust, and it would change every lending
- * route. A tail schedule is a state the swapper bot filters before batching, like a paused one, and the user's
- * own exit is the withdraw-all sentinel. If that is ever revisited, these tests should be flipped, not deleted.
+ * @notice Lending tail purchases consume the available claim and preserve healthy buyers' allocation.
+ * @dev R114 replaces R43's accepted tail revert. Nominal schedule debits remain separate from measured
+ *      receipt shares. Reduced funding changes allocation weights before fees and output credits.
  */
 contract BatchTailScheduleTest is Test {
     address internal ALICE = address(0xA11CE);
@@ -96,56 +74,41 @@ contract BatchTailScheduleTest is Test {
         vm.warp(block.timestamp + 197 days + 13 hours + 7 minutes);
     }
 
-    function test_lendingTail_singleScheduleSpendingFullBalanceRevertsOnShares() external {
+    function test_lendingTail_singleScheduleSpendingFullBalancePurchases() external {
         lendingHandler.depositToken(ALICE, ALICE_DEPOSIT);
-
-        // One purchase, no draining loop: the round-up already asks for more shares than Alice owns,
-        // and it is short by exactly one share.
-        uint256 aliceShares = lendingHandler.getUserShares(ALICE);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ILendingHandler.LendingHandler__InsufficientShares.selector, ALICE, aliceShares + 1, aliceShares
-            )
-        );
+        uint256 before = iToken.balanceOf(address(lendingHandler));
         lendingHandler.batchBuyRbtc(_one(ALICE), _oneId(1), _one(ALICE_DEPOSIT), NO_MIN_RBTC_OUT);
-
-        // Nothing moved: the shortfall is rejected, not clamped.
-        assertEq(lendingHandler.getUserShares(ALICE), aliceShares);
-        assertEq(lendingHandler.getAccumulatedRbtcBalance(ALICE), 0);
+        assertEq(lendingHandler.getUserShares(ALICE), 0);
+        assertEq(iToken.balanceOf(address(lendingHandler)), 0);
+        assertGt(before, 0);
+        assertGt(lendingHandler.getAccumulatedRbtcBalance(ALICE), 0);
     }
 
-    function test_lendingTail_takesDownEveryOtherBuyerInTheSameBatch() external {
+    function test_lendingTail_doesNotBlockHealthyBuyerInSameBatch() external {
         lendingHandler.depositToken(ALICE, ALICE_DEPOSIT);
         lendingHandler.depositToken(BOB, 5_000 ether);
-
         address[] memory buyers = new address[](2);
         uint64[] memory scheduleIds = new uint64[](2);
-        uint256[] memory purchaseAmounts = new uint256[](2);
+        uint256[] memory amounts = new uint256[](2);
         buyers[0] = ALICE;
         buyers[1] = BOB;
         scheduleIds[0] = 1;
         scheduleIds[1] = 2;
-        purchaseAmounts[0] = ALICE_DEPOSIT; // tail schedule
-        purchaseAmounts[1] = 100 ether; // perfectly healthy
-
-        uint256 aliceShares = lendingHandler.getUserShares(ALICE);
-        uint256 bobShares = lendingHandler.getUserShares(BOB);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ILendingHandler.LendingHandler__InsufficientShares.selector, ALICE, aliceShares + 1, aliceShares
-            )
-        );
-        lendingHandler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT);
-
-        // Bob did nothing wrong and still bought nothing: one tail schedule poisons the whole tick.
-        assertEq(lendingHandler.getAccumulatedRbtcBalance(BOB), 0);
-        assertEq(lendingHandler.getUserShares(BOB), bobShares);
+        amounts[0] = ALICE_DEPOSIT;
+        amounts[1] = 100 ether;
+        uint256 bobBefore = lendingHandler.getUserShares(BOB);
+        lendingHandler.batchBuyRbtc(buyers, scheduleIds, amounts, NO_MIN_RBTC_OUT);
+        assertEq(lendingHandler.getUserShares(ALICE), 0);
+        assertGt(lendingHandler.getAccumulatedRbtcBalance(ALICE), 0);
+        assertGt(lendingHandler.getAccumulatedRbtcBalance(BOB), 0);
+        assertLt(lendingHandler.getUserShares(BOB), bobBefore);
+        assertEq(iToken.balanceOf(address(lendingHandler)), lendingHandler.getUserShares(BOB));
     }
 
     function test_idleTail_singleScheduleSpendingFullBalanceSucceeds() external {
         idleHandler.depositToken(ALICE, ALICE_DEPOSIT);
 
-        // Idle books are 1:1, so the exact-balance purchase the lending route rejects goes through.
+        // Idle funding remains the nominal purchase amount.
         idleHandler.batchBuyRbtc(_one(ALICE), _oneId(1), _one(ALICE_DEPOSIT), NO_MIN_RBTC_OUT);
 
         assertEq(docToken.balanceOf(address(idleHandler)), 0);

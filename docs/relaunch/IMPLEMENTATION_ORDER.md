@@ -174,6 +174,8 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R110 | after R109, before audit freeze / relaunch deploy | none (internal audit follow-ups: stale fee and cadence docs, Sovryn/Tropykus underlying check, LayerBank burn-rounding assumption and probe) |
 | R111 | after R110, before audit freeze / relaunch deploy | none (`IiSusdToken` → `IiToken`, `MockIsusdToken` → `MockIToken`, remaining `iSusd` identifiers → `iToken`) |
 | R112 | after R111, before audit freeze / relaunch deploy | none (publish the Krait audit report under `audits/2026-10-02-Krait/`; follow-ups are comments and documents only; no window gap) |
+| R113 | after R112, before audit freeze / relaunch deploy | none (reviewer-facing documents; Markdown only) |
+| R114 | after R113, before audit freeze / relaunch deploy | none (AuditAgent report; targeted lending fixes for findings 1/5/6; accepted 2/3; operational checks for 4) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1370,7 +1372,7 @@ After R96, before relaunch deploy. Drop the dead `sharesToRedeem > usersShares` 
 `_redeemShares`, delete `LendingHandler__AmountToRedeemAdjusted`, make the helper `private`, keep the
 share debit **checked** (no wrap if a future caller broke the bound), and prove the bound through
 `withdrawToken` / `withdrawInterest` (including fuzzes). Keep the outer withdrawal clamp and batch
-`InsufficientShares`. Ask: none.
+`InsufficientShares`, later renamed `LendingHandler__ZeroShareValue` (R114 limits this to zero-value purchase rows). Ask: none.
 
 ### R99 - centralize measured deposit-share accounting ([spec](./R99-centralize-deposit-share-accounting.md))
 
@@ -1461,8 +1463,8 @@ After R109, before audit freeze / relaunch deploy. Correct `AUDIT_GUIDE.md` for 
 state that the one-buy-per-UTC-day rule holds only while the period is unchanged and pin the
 period-edit case with a test (no contract change); add the underlying-token constructor check to
 `SovrynHandler` and the legacy `TropykusHandler`; document the LayerBank half-up burn-rounding
-assumption and pin it with a live probe. Investigated and kept: the last-shares tail revert
-(R43). Ask: none.
+assumption and pin it with a live probe. R114 supersedes the last-shares tail revert previously
+retained here and in R43. Ask: none.
 
 ### R111 - Sovryn iToken type and identifier rename ([spec](./R111-itoken-rename.md))
 
@@ -1487,9 +1489,27 @@ scope lists, compiler and dependency facts, the launch configuration, and earlie
 `make fork-layerbank` and receives the ownership, add-on, and compromised-swapper procedures.
 Ask: none.
 
+### R114 - Nethermind AuditAgent report and accounting fixes ([spec](./R114-nethermind-audit-followups.md))
+
+After R113, before audit freeze / relaunch deploy. Preserve the supplied automated report unchanged.
+Clamp each short lending row to its buyer's remaining shares and adjust only that row's funding
+weight before fees and allocation. Withdrawals and interest retain R113 behavior. This supersedes
+R43/R110's tail-revert decision; a zero-value row still reverts.
+Retain the accepted peg/account limitations and exact manager checks during assignment.
+Ask: none. BitChill authorized the review rework and arranges the separate Claude review.
+
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:
+
+- **R114 principal reserve and buyer grouping — withdrawn 2026-10-07 after review.**
+  The reserve can block purchases and reduce partial withdrawals to zero after a lending loss.
+  Manager callbacks enumerate schedules on the purchase path. Grouping adds a hash table and weight
+  splitting when the per-row clamp already resolves the reported failures. Review measurements,
+  deploy profile, local mocks, Rootstock pricing, ten steady-state LayerBank rows: R113 411,203 gas;
+  reserve/grouping 491,278 (+8,008 per row); 734,378 with ten schedules per buyer (+32,318 per row);
+  clamp alone 412,131 (+93 per row, no extra call or SLOAD). These are review measurements.
+  Independent measurements appear in [R114](./R114-nethermind-audit-followups.md).
 
 - **R88 shared exchange-rate scale declaration — rejected 2026-09-26.** A shared field would remain
   named `i_exchangeRateDecimals`; exposing that changes the getter ABI, and keeping a separate

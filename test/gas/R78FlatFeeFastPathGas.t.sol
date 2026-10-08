@@ -13,9 +13,11 @@ contract R78OptimizedPurchaseFeesGasHarness is PurchaseFees {
         view
         returns (uint256 gasUsed, uint256 totalFee, uint256 purchaseAmountsSum, bytes32 netWeightsHash)
     {
+        // Production now passes funding weights already in memory; match the baseline's measurement boundary.
+        uint256[] memory amounts = purchaseAmounts;
         uint256[] memory netWeights;
         uint256 gasBefore = gasleft();
-        (totalFee, netWeights, purchaseAmountsSum) = _calculateFeeAndNetWeights(purchaseAmounts);
+        (totalFee, netWeights, purchaseAmountsSum) = _calculateFeeAndNetWeights(amounts);
         gasUsed = gasBefore - gasleft();
         netWeightsHash = keccak256(abi.encode(netWeights));
     }

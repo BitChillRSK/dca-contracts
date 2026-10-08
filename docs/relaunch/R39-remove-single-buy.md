@@ -98,7 +98,11 @@ Dex margin grows ~38–44%; that is the headroom R9 spends on share-transition e
 
 Two, both pre-existing properties of `batchBuyRbtc` rather than anything R39 introduces — production has always batched. R39 matters because it removes the only path that behaved differently. Both are inputs to R43.
 
-### 1. Share shortfall: the batch reverts where the single path clamped
+### 1. Share shortfall: original batch behavior
+
+**Superseded by [R114](./R114-nethermind-audit-followups.md).** Positive share shortfalls now clamp
+per row and reduce its funding weight before fees and allocation. A zero-value row still reverts.
+The following records the R39 behavior at that revision.
 
 - `_retrieveStablecoin` → `_redeemShares` (single) **clamped** a share shortfall down to the shares held and emitted `TokenLending__AmountToRedeemAdjusted`.
 - `_batchRetrieveStablecoin` (batch) debits each buyer's shares **rounded up** (`TokenLending._stablecoinToShares`, so the per-user book never drifts above the shares the handler holds) and **reverts** with `TokenLending__InsufficientShares` on any shortfall.

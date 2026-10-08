@@ -73,7 +73,11 @@ floor, read `scaledBalanceOf`, withdraw one more wei if one share short). It add
 every redeem and a second Pool `withdraw` to roughly half of them, on the swapper-paid purchase path,
 to cover an upgrade that fails closed. Declined: document the assumption and pin it with a live probe.
 
-### 5. The purchase that uses a user's last shares can revert `InsufficientShares`
+### 5. Last-shares purchase: original decision
+
+**Superseded by [R114](./R114-nethermind-audit-followups.md).** A short row now consumes its buyer's
+remaining shares and reduces its funding weight. This prevents the dilution described below.
+A row without positive share value still reverts. The following is R110's original assessment.
 
 Investigated; no change. This is the tail [R39](./R39-remove-single-buy.md) raised and
 [R43](./R43-dex-path-review.md) decided to keep (revert, do not clamp), pinned by
