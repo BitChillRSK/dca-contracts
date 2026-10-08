@@ -47,16 +47,15 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
     function batchBuyRbtc(
         address[] calldata buyers,
         uint64[] calldata scheduleIds,
-        uint256[] calldata purchaseAmounts,
+        uint256[] memory purchaseAmounts,
         uint256 minRbtcOut
     ) external override onlyDcaManager {
         uint256[] memory netWeights;
         uint256 purchaseAmountsSum;
         uint256 totalFee;
-        uint256[] memory fundedAmounts = purchaseAmounts;
         // The funding hook may reduce a row's weight in place.
-        uint256 totalStablecoinRetrieved = _batchRetrieveStablecoin(buyers, fundedAmounts);
-        (totalFee, netWeights, purchaseAmountsSum) = _calculateFeeAndNetWeights(fundedAmounts);
+        uint256 totalStablecoinRetrieved = _batchRetrieveStablecoin(buyers, purchaseAmounts);
+        (totalFee, netWeights, purchaseAmountsSum) = _calculateFeeAndNetWeights(purchaseAmounts);
 
         uint256 totalPurchasedRbtc;
         {
@@ -87,7 +86,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
         _creditPurchases(
             buyers,
             scheduleIds,
-            fundedAmounts,
+            purchaseAmounts,
             netWeights,
             totalPurchasedRbtc,
             purchaseAmountsSum,
