@@ -202,8 +202,13 @@ contract RbtcWithdrawalTest is DcaDappTest {
         uint256 attackerBalanceBefore = attacker.balance;
         uint256 ownerBalanceBefore = OWNER.balance;
 
+        address[] memory tokens = new address[](1);
+        tokens[0] = address(stablecoin);
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = s_routeIndex;
+
         vm.prank(attacker);
-        dcaManager.withdrawAccumulatedRbtc(address(stablecoin), s_routeIndex);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
 
         assertEq(attacker.balance, attackerBalanceBefore + attackerAccrued, "attacker did not receive only their rBTC");
         assertEq(USER.balance, userBalanceBefore, "USER native balance moved on attacker withdraw");
@@ -212,7 +217,7 @@ contract RbtcWithdrawalTest is DcaDappTest {
         assertEq(IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(attacker), 0);
 
         vm.prank(USER);
-        dcaManager.withdrawAccumulatedRbtc(address(stablecoin), s_routeIndex);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
 
         assertEq(USER.balance, userBalanceBefore + userAccrued, "USER did not receive only their rBTC");
         assertEq(attacker.balance, attackerBalanceBefore + attackerAccrued, "attacker balance changed on USER withdraw");

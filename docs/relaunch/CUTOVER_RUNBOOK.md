@@ -28,10 +28,10 @@ Human operator only. Agents must not `--broadcast`.
 8. `INITIAL_SWAPPER` = production bot EOA (non-zero).
 9. Safe (`MAINNET_OWNER`) and fee collector (`MAINNET_FEE_COLLECTOR`) match `script/Constants.sol`.
    The collector is a passive EOA. Each purchase **credits** its accumulated rBTC on that
-   handler; it withdraws through `DcaManager.withdrawAccumulatedRbtc` per token × route (Dex
-   unwraps WRBTC then pays native). A wallet that cannot receive native rBTC does not revert
-   purchases; it cannot claim until it can receive, and `setFeeCollector` does not migrate
-   already-credited balances. Sweep every live handler after deploy.
+   handler; it withdraws through `DcaManager.withdrawAllAccumulatedRbtc`, one `(token, routeIndex)`
+   pair per live handler (Dex unwraps WRBTC then pays native). A wallet that cannot receive native
+   rBTC does not revert purchases; it cannot claim until it can receive, and `setFeeCollector` does
+   not migrate already-credited balances. Sweep every live handler after deploy.
 
 ## Deploy
 
@@ -161,8 +161,8 @@ key is live is stated under **Authority and trust boundaries** in
 
 `setFeeCollector` redirects future fee credits only. rBTC already credited stays with the previous
 collector address on each handler, and only that address can withdraw it. Before rotating, have the
-current collector call `DcaManager.withdrawAccumulatedRbtc` for every live token × route, then call
-`setFeeCollector` on every handler. If the rotation answers a lost or compromised collector key, the
+current collector call `DcaManager.withdrawAllAccumulatedRbtc` with one pair per live token × route,
+then call `setFeeCollector` on every handler. If the rotation answers a lost or compromised collector key, the
 balance already credited to it cannot be redirected; rotate at once to stop further credits.
 
 ## Ops history note

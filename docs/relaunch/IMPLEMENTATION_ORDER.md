@@ -176,6 +176,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R112 | after R111, before audit freeze / relaunch deploy | none (publish the Krait audit report under `audits/2026-10-02-Krait/`; follow-ups are comments and documents only; no window gap) |
 | R113 | after R112, before audit freeze / relaunch deploy | none (reviewer-facing documents; Markdown only) |
 | R114 | after R113, before audit freeze / relaunch deploy | none (AuditAgent report; targeted lending fixes for findings 1/5/6; accepted 2/3; operational checks for 4) |
+| R115 | after R114, before audit freeze / relaunch deploy | **decided 2026-10-08:** drop `DcaManager.withdrawAccumulatedRbtc`; one-element `withdrawAllAccumulatedRbtc` is the single-handler withdraw |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1497,6 +1498,13 @@ weight before fees and allocation. Withdrawals and interest retain R113 behavior
 R43/R110's tail-revert decision; a zero-value row still reverts.
 Retain the accepted peg/account limitations and exact manager checks during assignment.
 Ask: none. BitChill authorized the review rework and arranges the separate Claude review.
+
+### R115 - Drop the single accumulated-rBTC withdraw ([spec](./R115-drop-single-rbtc-withdraw.md))
+
+After R114, before audit freeze / relaunch deploy. Remove `DcaManager.withdrawAccumulatedRbtc`.
+Accumulated rBTC leaves only through `withdrawAllAccumulatedRbtc`, including a one-element pair
+list. `PurchaseRbtc.withdrawAccumulatedRbtc(user)` stays.
+Ask: none. Decided 2026-10-08.
 
 ## Closed non-implementation decisions
 

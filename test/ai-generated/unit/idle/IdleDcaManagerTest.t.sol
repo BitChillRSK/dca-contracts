@@ -93,9 +93,13 @@ contract IdleDcaManagerTest is BaseDeploymentTest {
         assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, 0);
         assertEq(docToken.balanceOf(address(handler)), 0);
 
+        address[] memory tokens = new address[](1);
+        tokens[0] = address(docToken);
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = IDLE_INDEX;
         uint256 userRbtcBefore = USER.balance;
         vm.prank(USER);
-        dcaManager.withdrawAccumulatedRbtc(address(docToken), IDLE_INDEX);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
         assertGt(USER.balance, userRbtcBefore);
         assertEq(dcaManager.getAccumulatedRbtcBalance(USER, address(docToken), IDLE_INDEX), 0);
     }

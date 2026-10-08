@@ -99,9 +99,13 @@ contract LayerBankDcaManagerTest is BaseDeploymentTest {
         assertEq(docToken.balanceOf(USER), userDocBefore + DEPOSIT - PURCHASE);
         assertEq(scheduleAt(dcaManager, USER, address(docToken), 0).tokenBalance, 0);
 
+        address[] memory tokens = new address[](1);
+        tokens[0] = address(docToken);
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = LAYERBANK_INDEX;
         uint256 userRbtcBefore = USER.balance;
         vm.prank(USER);
-        dcaManager.withdrawAccumulatedRbtc(address(docToken), LAYERBANK_INDEX);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
         assertGt(USER.balance, userRbtcBefore);
         assertEq(dcaManager.getAccumulatedRbtcBalance(USER, address(docToken), LAYERBANK_INDEX), 0);
     }

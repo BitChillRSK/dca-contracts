@@ -322,11 +322,6 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     }
 
     /// @inheritdoc IDcaManager
-    function withdrawAccumulatedRbtc(address token, uint256 routeIndex) external override nonReentrant {
-        IPurchaseRbtc(address(_handler(token, routeIndex))).withdrawAccumulatedRbtc(msg.sender);
-    }
-
-    /// @inheritdoc IDcaManager
     function withdrawAllAccumulatedRbtc(address[] calldata tokens, uint256[] calldata routeIndexes)
         external
         override

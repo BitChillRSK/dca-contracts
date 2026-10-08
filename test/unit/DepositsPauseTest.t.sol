@@ -163,9 +163,14 @@ contract DepositsPauseTest is DcaDappTest {
         uint256 rbtcAccumulated = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
         assertGt(rbtcAccumulated, 0, "nothing was bought to withdraw");
 
+        address[] memory tokens = new address[](1);
+        tokens[0] = address(stablecoin);
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = s_routeIndex;
+
         uint256 userRbtcBefore = USER.balance;
         vm.prank(USER);
-        dcaManager.withdrawAccumulatedRbtc(address(stablecoin), s_routeIndex);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
         assertEq(USER.balance - userRbtcBefore, rbtcAccumulated);
     }
 

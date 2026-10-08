@@ -523,22 +523,6 @@ contract Handler is Test {
     }
 
     /**
-     * @notice Withdraw accumulated rBTC for a random user
-     */
-    function withdrawAccumulatedRbtc(uint256 userSeed) external {
-        address user = s_users[userSeed % s_users.length];
-
-        vm.startPrank(user);
-        try dcaManager.withdrawAccumulatedRbtc(address(stablecoin), routeIndex) {
-        // Success
-        }
-            catch {
-            // Ignore failures
-        }
-        vm.stopPrank();
-    }
-
-    /**
      * @notice Withdraw all accumulated rBTC across all protocols
      */
     function withdrawAllAccumulatedRbtc(uint256 userSeed) external {

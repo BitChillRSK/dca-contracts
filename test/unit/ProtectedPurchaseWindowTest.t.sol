@@ -176,7 +176,7 @@ contract ProtectedPurchaseWindowTest is DcaDappTest {
         vm.warp(block.timestamp + MIN_PURCHASE_PERIOD);
         buyRbtcOne(scheduleId);
         vm.prank(USER);
-        dcaManager.withdrawAccumulatedRbtc(address(stablecoin), s_routeIndex);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
     }
 
     function testInterestTopUpStaysOpen() external onlyLendingLane {
