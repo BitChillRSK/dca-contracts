@@ -11,6 +11,9 @@ remappings = [
 
 solc_version = "0.8.36"
 evm_version = "cancun"
+# Local Anvil defaults to timestamp 1. 00:00 UTC of that day is 0, which DcaManager
+# treats as "never purchased". Production Rootstock cannot hit that; tests should not either.
+block_timestamp = 86400
 
 [fuzz]
 runs = 1000

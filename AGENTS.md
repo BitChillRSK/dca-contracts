@@ -46,6 +46,14 @@ Handlers = TokenHandler + TokenLending + a Purchase*:
 - `test/unit/`, `test/mocks/`, `test/ai-generated/` — unit / mocks / extra + fuzz.
 - `script/` — deploy helpers. Do not `--broadcast` or talk to live contracts.
 
+## Match existing code
+
+The spec is the behavior source of truth. It is not a license to invent a new shape when the file already has one.
+
+Before adding a helper, read the neighboring functions in that file and copy their pattern unless the spec is explicitly changing that convention, or you have a concrete reason (say so in the PR).
+
+In `DcaManager`, argument checks are private `_validate*` functions called from the constructor or function body (`_validatePurchasePeriod`, `_validateDeposit`, `_validatePurchaseAmount`). Modifiers are for gates reused across many externals (`validateScheduleIndex`, `onlySwapper`). Do not add a new modifier because the spec said “modifier” if a private function would match those neighbors.
+
 ## Protocol invariants
 
 Unless the assigned spec explicitly changes one:
