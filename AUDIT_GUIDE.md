@@ -285,11 +285,14 @@ Other deliberate availability trade-offs:
 ## Earlier reviews and static analysis
 
 [`audits/README.md`](./audits/README.md) lists every report. Two manual reviews from 2025 cover the
-pre-relaunch code. The relaunch code has had two automated audits (Krait and Nethermind AuditAgent,
-October 2026) and no third-party manual audit. The Krait report's **Resolution** section records its
-decisions. The [AuditAgent companion](./audits/2026-10-06-Nethermind/README.md) records all six
-dispositions separately from the unchanged original report. Its accounting fixes change executable
-code after both automated scans. Accepted risks are stated in this guide.
+pre-relaunch code. The relaunch code has had three automated audits (Krait, Nethermind AuditAgent, and
+Pashov Audit Group's open-source solidity-auditor skill, October 2026) and no third-party manual
+audit. The Krait report's **Resolution** section records its decisions. The
+[AuditAgent companion](./audits/2026-10-06-Nethermind/README.md) records all six dispositions
+separately from the unchanged original report. Its accounting fixes change executable code after the
+first two scans. The Pashov scan ran after those fixes and has not been triaged yet. The
+[Pashov companion](./audits/2026-10-13-Pashov-Skills/README.md) also covers the X-Ray pre-audit map and
+the Fizz fuzzing suite in `test/fizz/`. Accepted risks are stated in this guide.
 
 Slither and Aderyn run on `src/` only (`make slither`, `make aderyn`). Slither exits non-zero because
 its triaged findings are kept visible instead of suppressed. Each detector's classification, false
