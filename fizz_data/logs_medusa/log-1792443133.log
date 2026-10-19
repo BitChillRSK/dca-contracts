@@ -1,0 +1,1179 @@
+⇾ Compiling targets with crytic-compile
+⇾ Running command:
+/opt/homebrew/bin/crytic-compile . --export-format solc --export-dir fizz_data/crytic-export --foundry-compile-all
+⇾ Finished compiling targets in 50s
+⇾ artifacts: Medusa is running against a new set of build artifacts
+⇾ Using cached Slither results found at fizz_data/slither_results.json
+warn Contract 'LayerBankHandlerDexHandler': method 'property_stablecoinConservation' has signature 'function property_stablecoinConservation() returns()' but property testing provider expects 'property_stablecoinConservation() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_principalBackedNoLoss' has signature 'function property_principalBackedNoLoss() returns()' but property testing provider expects 'property_principalBackedNoLoss() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_scheduleCounts' has signature 'function property_scheduleCounts() returns()' but property testing provider expects 'property_scheduleCounts() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_sharePreviewPositive' has signature 'function property_sharePreviewPositive() returns()' but property testing provider expects 'property_sharePreviewPositive() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_idleCashCoversPrincipal' has signature 'function property_idleCashCoversPrincipal() returns()' but property testing provider expects 'property_idleCashCoversPrincipal() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_previewsNeverRevert' has signature 'function property_previewsNeverRevert() returns()' but property testing provider expects 'property_previewsNeverRevert() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_principalHasSharesNoLoss' has signature 'function property_principalHasSharesNoLoss() returns()' but property testing provider expects 'property_principalHasSharesNoLoss() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_rbtcSolvency' has signature 'function property_rbtcSolvency() returns()' but property testing provider expects 'property_rbtcSolvency() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_virtualSharesBacked' has signature 'function property_virtualSharesBacked() returns()' but property testing provider expects 'property_virtualSharesBacked() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_anchorOnGrid' has signature 'function property_anchorOnGrid() returns()' but property testing provider expects 'property_anchorOnGrid() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_scheduleDomains' has signature 'function property_scheduleDomains() returns()' but property testing provider expects 'property_scheduleDomains() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_activePathAllowlisted' has signature 'function property_activePathAllowlisted() returns()' but property testing provider expects 'property_activePathAllowlisted() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_lendingNoRawStablecoin' has signature 'function property_lendingNoRawStablecoin() returns()' but property testing provider expects 'property_lendingNoRawStablecoin() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_retiredIdsStayDead' has signature 'function property_retiredIdsStayDead() returns()' but property testing provider expects 'property_retiredIdsStayDead() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_virtualSharesExact' has signature 'function property_virtualSharesExact() returns()' but property testing provider expects 'property_virtualSharesExact() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_rbtcAssetSplit' has signature 'function property_rbtcAssetSplit() returns()' but property testing provider expects 'property_rbtcAssetSplit() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_rbtcBooksExact' has signature 'function property_rbtcBooksExact() returns()' but property testing provider expects 'property_rbtcBooksExact() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_windowFreeze' has signature 'function property_windowFreeze() returns()' but property testing provider expects 'property_windowFreeze() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_accruedInterestIdentity' has signature 'function property_accruedInterestIdentity() returns()' but property testing provider expects 'property_accruedInterestIdentity() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_canActivateSync' has signature 'function property_canActivateSync() returns()' but property testing provider expects 'property_canActivateSync() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_marketValueCoversUserValues' has signature 'function property_marketValueCoversUserValues() returns()' but property testing provider expects 'property_marketValueCoversUserValues() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_oneBuyPerDay' has signature 'function property_oneBuyPerDay() returns()' but property testing provider expects 'property_oneBuyPerDay() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_routesFixed' has signature 'function property_routesFixed() returns()' but property testing provider expects 'property_routesFixed() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_windowBounded' has signature 'function property_windowBounded() returns()' but property testing provider expects 'property_windowBounded() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_nativeConservation' has signature 'function property_nativeConservation() returns()' but property testing provider expects 'property_nativeConservation() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_privilegedHoldNothing' has signature 'function property_privilegedHoldNothing() returns()' but property testing provider expects 'property_privilegedHoldNothing() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_depositPauseOnlyAssigned' has signature 'function property_depositPauseOnlyAssigned() returns()' but property testing provider expects 'property_depositPauseOnlyAssigned() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_idleCashExact' has signature 'function property_idleCashExact() returns()' but property testing provider expects 'property_idleCashExact() nonpayable returns (bool)'
+warn Contract 'LayerBankHandlerDexHandler': method 'property_settingsDomains' has signature 'function property_settingsDomains() returns()' but property testing provider expects 'property_settingsDomains() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_virtualSharesExact' has signature 'function property_virtualSharesExact() returns()' but property testing provider expects 'property_virtualSharesExact() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_routesFixed' has signature 'function property_routesFixed() returns()' but property testing provider expects 'property_routesFixed() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_scheduleCounts' has signature 'function property_scheduleCounts() returns()' but property testing provider expects 'property_scheduleCounts() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_settingsDomains' has signature 'function property_settingsDomains() returns()' but property testing provider expects 'property_settingsDomains() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_activePathAllowlisted' has signature 'function property_activePathAllowlisted() returns()' but property testing provider expects 'property_activePathAllowlisted() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_nativeConservation' has signature 'function property_nativeConservation() returns()' but property testing provider expects 'property_nativeConservation() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_rbtcBooksExact' has signature 'function property_rbtcBooksExact() returns()' but property testing provider expects 'property_rbtcBooksExact() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_scheduleDomains' has signature 'function property_scheduleDomains() returns()' but property testing provider expects 'property_scheduleDomains() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_accruedInterestIdentity' has signature 'function property_accruedInterestIdentity() returns()' but property testing provider expects 'property_accruedInterestIdentity() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_canActivateSync' has signature 'function property_canActivateSync() returns()' but property testing provider expects 'property_canActivateSync() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_depositPauseOnlyAssigned' has signature 'function property_depositPauseOnlyAssigned() returns()' but property testing provider expects 'property_depositPauseOnlyAssigned() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_idleCashCoversPrincipal' has signature 'function property_idleCashCoversPrincipal() returns()' but property testing provider expects 'property_idleCashCoversPrincipal() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_idleCashExact' has signature 'function property_idleCashExact() returns()' but property testing provider expects 'property_idleCashExact() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_rbtcSolvency' has signature 'function property_rbtcSolvency() returns()' but property testing provider expects 'property_rbtcSolvency() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_retiredIdsStayDead' has signature 'function property_retiredIdsStayDead() returns()' but property testing provider expects 'property_retiredIdsStayDead() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_sharePreviewPositive' has signature 'function property_sharePreviewPositive() returns()' but property testing provider expects 'property_sharePreviewPositive() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_principalHasSharesNoLoss' has signature 'function property_principalHasSharesNoLoss() returns()' but property testing provider expects 'property_principalHasSharesNoLoss() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_privilegedHoldNothing' has signature 'function property_privilegedHoldNothing() returns()' but property testing provider expects 'property_privilegedHoldNothing() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_rbtcAssetSplit' has signature 'function property_rbtcAssetSplit() returns()' but property testing provider expects 'property_rbtcAssetSplit() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_anchorOnGrid' has signature 'function property_anchorOnGrid() returns()' but property testing provider expects 'property_anchorOnGrid() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_lendingNoRawStablecoin' has signature 'function property_lendingNoRawStablecoin() returns()' but property testing provider expects 'property_lendingNoRawStablecoin() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_marketValueCoversUserValues' has signature 'function property_marketValueCoversUserValues() returns()' but property testing provider expects 'property_marketValueCoversUserValues() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_oneBuyPerDay' has signature 'function property_oneBuyPerDay() returns()' but property testing provider expects 'property_oneBuyPerDay() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_windowFreeze' has signature 'function property_windowFreeze() returns()' but property testing provider expects 'property_windowFreeze() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_principalBackedNoLoss' has signature 'function property_principalBackedNoLoss() returns()' but property testing provider expects 'property_principalBackedNoLoss() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_stablecoinConservation' has signature 'function property_stablecoinConservation() returns()' but property testing provider expects 'property_stablecoinConservation() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_windowBounded' has signature 'function property_windowBounded() returns()' but property testing provider expects 'property_windowBounded() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_previewsNeverRevert' has signature 'function property_previewsNeverRevert() returns()' but property testing provider expects 'property_previewsNeverRevert() nonpayable returns (bool)'
+warn Contract 'Properties': method 'property_virtualSharesBacked' has signature 'function property_virtualSharesBacked() returns()' but property testing provider expects 'property_virtualSharesBacked() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_rbtcAssetSplit' has signature 'function property_rbtcAssetSplit() returns()' but property testing provider expects 'property_rbtcAssetSplit() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_windowFreeze' has signature 'function property_windowFreeze() returns()' but property testing provider expects 'property_windowFreeze() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_accruedInterestIdentity' has signature 'function property_accruedInterestIdentity() returns()' but property testing provider expects 'property_accruedInterestIdentity() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_activePathAllowlisted' has signature 'function property_activePathAllowlisted() returns()' but property testing provider expects 'property_activePathAllowlisted() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_marketValueCoversUserValues' has signature 'function property_marketValueCoversUserValues() returns()' but property testing provider expects 'property_marketValueCoversUserValues() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_nativeConservation' has signature 'function property_nativeConservation() returns()' but property testing provider expects 'property_nativeConservation() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_routesFixed' has signature 'function property_routesFixed() returns()' but property testing provider expects 'property_routesFixed() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_stablecoinConservation' has signature 'function property_stablecoinConservation() returns()' but property testing provider expects 'property_stablecoinConservation() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_idleCashExact' has signature 'function property_idleCashExact() returns()' but property testing provider expects 'property_idleCashExact() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_previewsNeverRevert' has signature 'function property_previewsNeverRevert() returns()' but property testing provider expects 'property_previewsNeverRevert() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_principalBackedNoLoss' has signature 'function property_principalBackedNoLoss() returns()' but property testing provider expects 'property_principalBackedNoLoss() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_principalHasSharesNoLoss' has signature 'function property_principalHasSharesNoLoss() returns()' but property testing provider expects 'property_principalHasSharesNoLoss() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_oneBuyPerDay' has signature 'function property_oneBuyPerDay() returns()' but property testing provider expects 'property_oneBuyPerDay() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_retiredIdsStayDead' has signature 'function property_retiredIdsStayDead() returns()' but property testing provider expects 'property_retiredIdsStayDead() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_sharePreviewPositive' has signature 'function property_sharePreviewPositive() returns()' but property testing provider expects 'property_sharePreviewPositive() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_idleCashCoversPrincipal' has signature 'function property_idleCashCoversPrincipal() returns()' but property testing provider expects 'property_idleCashCoversPrincipal() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_rbtcBooksExact' has signature 'function property_rbtcBooksExact() returns()' but property testing provider expects 'property_rbtcBooksExact() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_settingsDomains' has signature 'function property_settingsDomains() returns()' but property testing provider expects 'property_settingsDomains() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_virtualSharesExact' has signature 'function property_virtualSharesExact() returns()' but property testing provider expects 'property_virtualSharesExact() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_anchorOnGrid' has signature 'function property_anchorOnGrid() returns()' but property testing provider expects 'property_anchorOnGrid() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_canActivateSync' has signature 'function property_canActivateSync() returns()' but property testing provider expects 'property_canActivateSync() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_depositPauseOnlyAssigned' has signature 'function property_depositPauseOnlyAssigned() returns()' but property testing provider expects 'property_depositPauseOnlyAssigned() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_privilegedHoldNothing' has signature 'function property_privilegedHoldNothing() returns()' but property testing provider expects 'property_privilegedHoldNothing() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_rbtcSolvency' has signature 'function property_rbtcSolvency() returns()' but property testing provider expects 'property_rbtcSolvency() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_scheduleCounts' has signature 'function property_scheduleCounts() returns()' but property testing provider expects 'property_scheduleCounts() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_scheduleDomains' has signature 'function property_scheduleDomains() returns()' but property testing provider expects 'property_scheduleDomains() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_windowBounded' has signature 'function property_windowBounded() returns()' but property testing provider expects 'property_windowBounded() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_lendingNoRawStablecoin' has signature 'function property_lendingNoRawStablecoin() returns()' but property testing provider expects 'property_lendingNoRawStablecoin() nonpayable returns (bool)'
+warn Contract 'EnvironmentHandler': method 'property_virtualSharesBacked' has signature 'function property_virtualSharesBacked() returns()' but property testing provider expects 'property_virtualSharesBacked() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_activePathAllowlisted' has signature 'function property_activePathAllowlisted() returns()' but property testing provider expects 'property_activePathAllowlisted() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_marketValueCoversUserValues' has signature 'function property_marketValueCoversUserValues() returns()' but property testing provider expects 'property_marketValueCoversUserValues() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_principalHasSharesNoLoss' has signature 'function property_principalHasSharesNoLoss() returns()' but property testing provider expects 'property_principalHasSharesNoLoss() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_accruedInterestIdentity' has signature 'function property_accruedInterestIdentity() returns()' but property testing provider expects 'property_accruedInterestIdentity() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_rbtcBooksExact' has signature 'function property_rbtcBooksExact() returns()' but property testing provider expects 'property_rbtcBooksExact() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_sharePreviewPositive' has signature 'function property_sharePreviewPositive() returns()' but property testing provider expects 'property_sharePreviewPositive() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_nativeConservation' has signature 'function property_nativeConservation() returns()' but property testing provider expects 'property_nativeConservation() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_rbtcSolvency' has signature 'function property_rbtcSolvency() returns()' but property testing provider expects 'property_rbtcSolvency() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_scheduleDomains' has signature 'function property_scheduleDomains() returns()' but property testing provider expects 'property_scheduleDomains() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_privilegedHoldNothing' has signature 'function property_privilegedHoldNothing() returns()' but property testing provider expects 'property_privilegedHoldNothing() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_rbtcAssetSplit' has signature 'function property_rbtcAssetSplit() returns()' but property testing provider expects 'property_rbtcAssetSplit() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_oneBuyPerDay' has signature 'function property_oneBuyPerDay() returns()' but property testing provider expects 'property_oneBuyPerDay() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_virtualSharesBacked' has signature 'function property_virtualSharesBacked() returns()' but property testing provider expects 'property_virtualSharesBacked() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_previewsNeverRevert' has signature 'function property_previewsNeverRevert() returns()' but property testing provider expects 'property_previewsNeverRevert() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_scheduleCounts' has signature 'function property_scheduleCounts() returns()' but property testing provider expects 'property_scheduleCounts() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_depositPauseOnlyAssigned' has signature 'function property_depositPauseOnlyAssigned() returns()' but property testing provider expects 'property_depositPauseOnlyAssigned() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_principalBackedNoLoss' has signature 'function property_principalBackedNoLoss() returns()' but property testing provider expects 'property_principalBackedNoLoss() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_anchorOnGrid' has signature 'function property_anchorOnGrid() returns()' but property testing provider expects 'property_anchorOnGrid() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_canActivateSync' has signature 'function property_canActivateSync() returns()' but property testing provider expects 'property_canActivateSync() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_lendingNoRawStablecoin' has signature 'function property_lendingNoRawStablecoin() returns()' but property testing provider expects 'property_lendingNoRawStablecoin() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_routesFixed' has signature 'function property_routesFixed() returns()' but property testing provider expects 'property_routesFixed() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_virtualSharesExact' has signature 'function property_virtualSharesExact() returns()' but property testing provider expects 'property_virtualSharesExact() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_idleCashCoversPrincipal' has signature 'function property_idleCashCoversPrincipal() returns()' but property testing provider expects 'property_idleCashCoversPrincipal() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_retiredIdsStayDead' has signature 'function property_retiredIdsStayDead() returns()' but property testing provider expects 'property_retiredIdsStayDead() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_settingsDomains' has signature 'function property_settingsDomains() returns()' but property testing provider expects 'property_settingsDomains() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_windowFreeze' has signature 'function property_windowFreeze() returns()' but property testing provider expects 'property_windowFreeze() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_idleCashExact' has signature 'function property_idleCashExact() returns()' but property testing provider expects 'property_idleCashExact() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_stablecoinConservation' has signature 'function property_stablecoinConservation() returns()' but property testing provider expects 'property_stablecoinConservation() nonpayable returns (bool)'
+warn Contract 'RoundTripHandler': method 'property_windowBounded' has signature 'function property_windowBounded() returns()' but property testing provider expects 'property_windowBounded() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_previewsNeverRevert' has signature 'function property_previewsNeverRevert() returns()' but property testing provider expects 'property_previewsNeverRevert() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_principalHasSharesNoLoss' has signature 'function property_principalHasSharesNoLoss() returns()' but property testing provider expects 'property_principalHasSharesNoLoss() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_settingsDomains' has signature 'function property_settingsDomains() returns()' but property testing provider expects 'property_settingsDomains() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_activePathAllowlisted' has signature 'function property_activePathAllowlisted() returns()' but property testing provider expects 'property_activePathAllowlisted() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_accruedInterestIdentity' has signature 'function property_accruedInterestIdentity() returns()' but property testing provider expects 'property_accruedInterestIdentity() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_lendingNoRawStablecoin' has signature 'function property_lendingNoRawStablecoin() returns()' but property testing provider expects 'property_lendingNoRawStablecoin() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_rbtcSolvency' has signature 'function property_rbtcSolvency() returns()' but property testing provider expects 'property_rbtcSolvency() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_routesFixed' has signature 'function property_routesFixed() returns()' but property testing provider expects 'property_routesFixed() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_canActivateSync' has signature 'function property_canActivateSync() returns()' but property testing provider expects 'property_canActivateSync() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_idleCashCoversPrincipal' has signature 'function property_idleCashCoversPrincipal() returns()' but property testing provider expects 'property_idleCashCoversPrincipal() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_oneBuyPerDay' has signature 'function property_oneBuyPerDay() returns()' but property testing provider expects 'property_oneBuyPerDay() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_depositPauseOnlyAssigned' has signature 'function property_depositPauseOnlyAssigned() returns()' but property testing provider expects 'property_depositPauseOnlyAssigned() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_rbtcBooksExact' has signature 'function property_rbtcBooksExact() returns()' but property testing provider expects 'property_rbtcBooksExact() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_marketValueCoversUserValues' has signature 'function property_marketValueCoversUserValues() returns()' but property testing provider expects 'property_marketValueCoversUserValues() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_privilegedHoldNothing' has signature 'function property_privilegedHoldNothing() returns()' but property testing provider expects 'property_privilegedHoldNothing() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_rbtcAssetSplit' has signature 'function property_rbtcAssetSplit() returns()' but property testing provider expects 'property_rbtcAssetSplit() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_nativeConservation' has signature 'function property_nativeConservation() returns()' but property testing provider expects 'property_nativeConservation() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_retiredIdsStayDead' has signature 'function property_retiredIdsStayDead() returns()' but property testing provider expects 'property_retiredIdsStayDead() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_sharePreviewPositive' has signature 'function property_sharePreviewPositive() returns()' but property testing provider expects 'property_sharePreviewPositive() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_stablecoinConservation' has signature 'function property_stablecoinConservation() returns()' but property testing provider expects 'property_stablecoinConservation() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_virtualSharesBacked' has signature 'function property_virtualSharesBacked() returns()' but property testing provider expects 'property_virtualSharesBacked() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_virtualSharesExact' has signature 'function property_virtualSharesExact() returns()' but property testing provider expects 'property_virtualSharesExact() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_anchorOnGrid' has signature 'function property_anchorOnGrid() returns()' but property testing provider expects 'property_anchorOnGrid() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_scheduleDomains' has signature 'function property_scheduleDomains() returns()' but property testing provider expects 'property_scheduleDomains() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_windowBounded' has signature 'function property_windowBounded() returns()' but property testing provider expects 'property_windowBounded() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_windowFreeze' has signature 'function property_windowFreeze() returns()' but property testing provider expects 'property_windowFreeze() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_idleCashExact' has signature 'function property_idleCashExact() returns()' but property testing provider expects 'property_idleCashExact() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_principalBackedNoLoss' has signature 'function property_principalBackedNoLoss() returns()' but property testing provider expects 'property_principalBackedNoLoss() nonpayable returns (bool)'
+warn Contract 'Handlers': method 'property_scheduleCounts' has signature 'function property_scheduleCounts() returns()' but property testing provider expects 'property_scheduleCounts() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_principalHasSharesNoLoss' has signature 'function property_principalHasSharesNoLoss() returns()' but property testing provider expects 'property_principalHasSharesNoLoss() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_settingsDomains' has signature 'function property_settingsDomains() returns()' but property testing provider expects 'property_settingsDomains() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_retiredIdsStayDead' has signature 'function property_retiredIdsStayDead() returns()' but property testing provider expects 'property_retiredIdsStayDead() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_nativeConservation' has signature 'function property_nativeConservation() returns()' but property testing provider expects 'property_nativeConservation() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_oneBuyPerDay' has signature 'function property_oneBuyPerDay() returns()' but property testing provider expects 'property_oneBuyPerDay() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_principalBackedNoLoss' has signature 'function property_principalBackedNoLoss() returns()' but property testing provider expects 'property_principalBackedNoLoss() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_rbtcAssetSplit' has signature 'function property_rbtcAssetSplit() returns()' but property testing provider expects 'property_rbtcAssetSplit() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_idleCashExact' has signature 'function property_idleCashExact() returns()' but property testing provider expects 'property_idleCashExact() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_privilegedHoldNothing' has signature 'function property_privilegedHoldNothing() returns()' but property testing provider expects 'property_privilegedHoldNothing() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_routesFixed' has signature 'function property_routesFixed() returns()' but property testing provider expects 'property_routesFixed() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_sharePreviewPositive' has signature 'function property_sharePreviewPositive() returns()' but property testing provider expects 'property_sharePreviewPositive() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_accruedInterestIdentity' has signature 'function property_accruedInterestIdentity() returns()' but property testing provider expects 'property_accruedInterestIdentity() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_lendingNoRawStablecoin' has signature 'function property_lendingNoRawStablecoin() returns()' but property testing provider expects 'property_lendingNoRawStablecoin() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_idleCashCoversPrincipal' has signature 'function property_idleCashCoversPrincipal() returns()' but property testing provider expects 'property_idleCashCoversPrincipal() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_rbtcSolvency' has signature 'function property_rbtcSolvency() returns()' but property testing provider expects 'property_rbtcSolvency() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_scheduleCounts' has signature 'function property_scheduleCounts() returns()' but property testing provider expects 'property_scheduleCounts() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_scheduleDomains' has signature 'function property_scheduleDomains() returns()' but property testing provider expects 'property_scheduleDomains() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_depositPauseOnlyAssigned' has signature 'function property_depositPauseOnlyAssigned() returns()' but property testing provider expects 'property_depositPauseOnlyAssigned() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_canActivateSync' has signature 'function property_canActivateSync() returns()' but property testing provider expects 'property_canActivateSync() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_marketValueCoversUserValues' has signature 'function property_marketValueCoversUserValues() returns()' but property testing provider expects 'property_marketValueCoversUserValues() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_rbtcBooksExact' has signature 'function property_rbtcBooksExact() returns()' but property testing provider expects 'property_rbtcBooksExact() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_anchorOnGrid' has signature 'function property_anchorOnGrid() returns()' but property testing provider expects 'property_anchorOnGrid() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_previewsNeverRevert' has signature 'function property_previewsNeverRevert() returns()' but property testing provider expects 'property_previewsNeverRevert() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_virtualSharesExact' has signature 'function property_virtualSharesExact() returns()' but property testing provider expects 'property_virtualSharesExact() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_windowBounded' has signature 'function property_windowBounded() returns()' but property testing provider expects 'property_windowBounded() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_activePathAllowlisted' has signature 'function property_activePathAllowlisted() returns()' but property testing provider expects 'property_activePathAllowlisted() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_stablecoinConservation' has signature 'function property_stablecoinConservation() returns()' but property testing provider expects 'property_stablecoinConservation() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_virtualSharesBacked' has signature 'function property_virtualSharesBacked() returns()' but property testing provider expects 'property_virtualSharesBacked() nonpayable returns (bool)'
+warn Contract 'AdversarialHandler': method 'property_windowFreeze' has signature 'function property_windowFreeze() returns()' but property testing provider expects 'property_windowFreeze() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_activePathAllowlisted' has signature 'function property_activePathAllowlisted() returns()' but property testing provider expects 'property_activePathAllowlisted() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_depositPauseOnlyAssigned' has signature 'function property_depositPauseOnlyAssigned() returns()' but property testing provider expects 'property_depositPauseOnlyAssigned() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_marketValueCoversUserValues' has signature 'function property_marketValueCoversUserValues() returns()' but property testing provider expects 'property_marketValueCoversUserValues() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_principalHasSharesNoLoss' has signature 'function property_principalHasSharesNoLoss() returns()' but property testing provider expects 'property_principalHasSharesNoLoss() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_rbtcBooksExact' has signature 'function property_rbtcBooksExact() returns()' but property testing provider expects 'property_rbtcBooksExact() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_virtualSharesBacked' has signature 'function property_virtualSharesBacked() returns()' but property testing provider expects 'property_virtualSharesBacked() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_lendingNoRawStablecoin' has signature 'function property_lendingNoRawStablecoin() returns()' but property testing provider expects 'property_lendingNoRawStablecoin() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_nativeConservation' has signature 'function property_nativeConservation() returns()' but property testing provider expects 'property_nativeConservation() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_oneBuyPerDay' has signature 'function property_oneBuyPerDay() returns()' but property testing provider expects 'property_oneBuyPerDay() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_rbtcAssetSplit' has signature 'function property_rbtcAssetSplit() returns()' but property testing provider expects 'property_rbtcAssetSplit() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_rbtcSolvency' has signature 'function property_rbtcSolvency() returns()' but property testing provider expects 'property_rbtcSolvency() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_virtualSharesExact' has signature 'function property_virtualSharesExact() returns()' but property testing provider expects 'property_virtualSharesExact() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_windowBounded' has signature 'function property_windowBounded() returns()' but property testing provider expects 'property_windowBounded() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_stablecoinConservation' has signature 'function property_stablecoinConservation() returns()' but property testing provider expects 'property_stablecoinConservation() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_previewsNeverRevert' has signature 'function property_previewsNeverRevert() returns()' but property testing provider expects 'property_previewsNeverRevert() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_accruedInterestIdentity' has signature 'function property_accruedInterestIdentity() returns()' but property testing provider expects 'property_accruedInterestIdentity() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_routesFixed' has signature 'function property_routesFixed() returns()' but property testing provider expects 'property_routesFixed() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_principalBackedNoLoss' has signature 'function property_principalBackedNoLoss() returns()' but property testing provider expects 'property_principalBackedNoLoss() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_privilegedHoldNothing' has signature 'function property_privilegedHoldNothing() returns()' but property testing provider expects 'property_privilegedHoldNothing() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_settingsDomains' has signature 'function property_settingsDomains() returns()' but property testing provider expects 'property_settingsDomains() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_idleCashCoversPrincipal' has signature 'function property_idleCashCoversPrincipal() returns()' but property testing provider expects 'property_idleCashCoversPrincipal() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_scheduleCounts' has signature 'function property_scheduleCounts() returns()' but property testing provider expects 'property_scheduleCounts() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_scheduleDomains' has signature 'function property_scheduleDomains() returns()' but property testing provider expects 'property_scheduleDomains() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_anchorOnGrid' has signature 'function property_anchorOnGrid() returns()' but property testing provider expects 'property_anchorOnGrid() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_canActivateSync' has signature 'function property_canActivateSync() returns()' but property testing provider expects 'property_canActivateSync() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_idleCashExact' has signature 'function property_idleCashExact() returns()' but property testing provider expects 'property_idleCashExact() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_retiredIdsStayDead' has signature 'function property_retiredIdsStayDead() returns()' but property testing provider expects 'property_retiredIdsStayDead() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_windowFreeze' has signature 'function property_windowFreeze() returns()' but property testing provider expects 'property_windowFreeze() nonpayable returns (bool)'
+warn Contract 'OperationsAdminHandler': method 'property_sharePreviewPositive' has signature 'function property_sharePreviewPositive() returns()' but property testing provider expects 'property_sharePreviewPositive() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_rbtcSolvency' has signature 'function property_rbtcSolvency() returns()' but property testing provider expects 'property_rbtcSolvency() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_retiredIdsStayDead' has signature 'function property_retiredIdsStayDead() returns()' but property testing provider expects 'property_retiredIdsStayDead() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_stablecoinConservation' has signature 'function property_stablecoinConservation() returns()' but property testing provider expects 'property_stablecoinConservation() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_virtualSharesExact' has signature 'function property_virtualSharesExact() returns()' but property testing provider expects 'property_virtualSharesExact() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_windowFreeze' has signature 'function property_windowFreeze() returns()' but property testing provider expects 'property_windowFreeze() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_depositPauseOnlyAssigned' has signature 'function property_depositPauseOnlyAssigned() returns()' but property testing provider expects 'property_depositPauseOnlyAssigned() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_previewsNeverRevert' has signature 'function property_previewsNeverRevert() returns()' but property testing provider expects 'property_previewsNeverRevert() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_settingsDomains' has signature 'function property_settingsDomains() returns()' but property testing provider expects 'property_settingsDomains() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_activePathAllowlisted' has signature 'function property_activePathAllowlisted() returns()' but property testing provider expects 'property_activePathAllowlisted() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_scheduleCounts' has signature 'function property_scheduleCounts() returns()' but property testing provider expects 'property_scheduleCounts() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_canActivateSync' has signature 'function property_canActivateSync() returns()' but property testing provider expects 'property_canActivateSync() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_privilegedHoldNothing' has signature 'function property_privilegedHoldNothing() returns()' but property testing provider expects 'property_privilegedHoldNothing() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_rbtcAssetSplit' has signature 'function property_rbtcAssetSplit() returns()' but property testing provider expects 'property_rbtcAssetSplit() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_idleCashExact' has signature 'function property_idleCashExact() returns()' but property testing provider expects 'property_idleCashExact() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_rbtcBooksExact' has signature 'function property_rbtcBooksExact() returns()' but property testing provider expects 'property_rbtcBooksExact() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_accruedInterestIdentity' has signature 'function property_accruedInterestIdentity() returns()' but property testing provider expects 'property_accruedInterestIdentity() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_anchorOnGrid' has signature 'function property_anchorOnGrid() returns()' but property testing provider expects 'property_anchorOnGrid() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_oneBuyPerDay' has signature 'function property_oneBuyPerDay() returns()' but property testing provider expects 'property_oneBuyPerDay() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_routesFixed' has signature 'function property_routesFixed() returns()' but property testing provider expects 'property_routesFixed() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_lendingNoRawStablecoin' has signature 'function property_lendingNoRawStablecoin() returns()' but property testing provider expects 'property_lendingNoRawStablecoin() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_principalBackedNoLoss' has signature 'function property_principalBackedNoLoss() returns()' but property testing provider expects 'property_principalBackedNoLoss() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_sharePreviewPositive' has signature 'function property_sharePreviewPositive() returns()' but property testing provider expects 'property_sharePreviewPositive() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_marketValueCoversUserValues' has signature 'function property_marketValueCoversUserValues() returns()' but property testing provider expects 'property_marketValueCoversUserValues() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_virtualSharesBacked' has signature 'function property_virtualSharesBacked() returns()' but property testing provider expects 'property_virtualSharesBacked() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_windowBounded' has signature 'function property_windowBounded() returns()' but property testing provider expects 'property_windowBounded() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_idleCashCoversPrincipal' has signature 'function property_idleCashCoversPrincipal() returns()' but property testing provider expects 'property_idleCashCoversPrincipal() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_nativeConservation' has signature 'function property_nativeConservation() returns()' but property testing provider expects 'property_nativeConservation() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_principalHasSharesNoLoss' has signature 'function property_principalHasSharesNoLoss() returns()' but property testing provider expects 'property_principalHasSharesNoLoss() nonpayable returns (bool)'
+warn Contract 'FuzzTester': method 'property_scheduleDomains' has signature 'function property_scheduleDomains() returns()' but property testing provider expects 'property_scheduleDomains() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_idleCashCoversPrincipal' has signature 'function property_idleCashCoversPrincipal() returns()' but property testing provider expects 'property_idleCashCoversPrincipal() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_rbtcBooksExact' has signature 'function property_rbtcBooksExact() returns()' but property testing provider expects 'property_rbtcBooksExact() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_marketValueCoversUserValues' has signature 'function property_marketValueCoversUserValues() returns()' but property testing provider expects 'property_marketValueCoversUserValues() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_routesFixed' has signature 'function property_routesFixed() returns()' but property testing provider expects 'property_routesFixed() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_activePathAllowlisted' has signature 'function property_activePathAllowlisted() returns()' but property testing provider expects 'property_activePathAllowlisted() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_scheduleDomains' has signature 'function property_scheduleDomains() returns()' but property testing provider expects 'property_scheduleDomains() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_stablecoinConservation' has signature 'function property_stablecoinConservation() returns()' but property testing provider expects 'property_stablecoinConservation() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_idleCashExact' has signature 'function property_idleCashExact() returns()' but property testing provider expects 'property_idleCashExact() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_virtualSharesBacked' has signature 'function property_virtualSharesBacked() returns()' but property testing provider expects 'property_virtualSharesBacked() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_canActivateSync' has signature 'function property_canActivateSync() returns()' but property testing provider expects 'property_canActivateSync() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_principalHasSharesNoLoss' has signature 'function property_principalHasSharesNoLoss() returns()' but property testing provider expects 'property_principalHasSharesNoLoss() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_settingsDomains' has signature 'function property_settingsDomains() returns()' but property testing provider expects 'property_settingsDomains() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_previewsNeverRevert' has signature 'function property_previewsNeverRevert() returns()' but property testing provider expects 'property_previewsNeverRevert() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_windowFreeze' has signature 'function property_windowFreeze() returns()' but property testing provider expects 'property_windowFreeze() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_rbtcSolvency' has signature 'function property_rbtcSolvency() returns()' but property testing provider expects 'property_rbtcSolvency() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_sharePreviewPositive' has signature 'function property_sharePreviewPositive() returns()' but property testing provider expects 'property_sharePreviewPositive() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_virtualSharesExact' has signature 'function property_virtualSharesExact() returns()' but property testing provider expects 'property_virtualSharesExact() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_anchorOnGrid' has signature 'function property_anchorOnGrid() returns()' but property testing provider expects 'property_anchorOnGrid() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_rbtcAssetSplit' has signature 'function property_rbtcAssetSplit() returns()' but property testing provider expects 'property_rbtcAssetSplit() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_scheduleCounts' has signature 'function property_scheduleCounts() returns()' but property testing provider expects 'property_scheduleCounts() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_depositPauseOnlyAssigned' has signature 'function property_depositPauseOnlyAssigned() returns()' but property testing provider expects 'property_depositPauseOnlyAssigned() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_nativeConservation' has signature 'function property_nativeConservation() returns()' but property testing provider expects 'property_nativeConservation() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_windowBounded' has signature 'function property_windowBounded() returns()' but property testing provider expects 'property_windowBounded() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_oneBuyPerDay' has signature 'function property_oneBuyPerDay() returns()' but property testing provider expects 'property_oneBuyPerDay() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_privilegedHoldNothing' has signature 'function property_privilegedHoldNothing() returns()' but property testing provider expects 'property_privilegedHoldNothing() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_principalBackedNoLoss' has signature 'function property_principalBackedNoLoss() returns()' but property testing provider expects 'property_principalBackedNoLoss() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_retiredIdsStayDead' has signature 'function property_retiredIdsStayDead() returns()' but property testing provider expects 'property_retiredIdsStayDead() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_accruedInterestIdentity' has signature 'function property_accruedInterestIdentity() returns()' but property testing provider expects 'property_accruedInterestIdentity() nonpayable returns (bool)'
+warn Contract 'DcaManagerHandler': method 'property_lendingNoRawStablecoin' has signature 'function property_lendingNoRawStablecoin() returns()' but property testing provider expects 'property_lendingNoRawStablecoin() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_rbtcSolvency' has signature 'function property_rbtcSolvency() returns()' but property testing provider expects 'property_rbtcSolvency() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_scheduleCounts' has signature 'function property_scheduleCounts() returns()' but property testing provider expects 'property_scheduleCounts() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_idleCashCoversPrincipal' has signature 'function property_idleCashCoversPrincipal() returns()' but property testing provider expects 'property_idleCashCoversPrincipal() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_routesFixed' has signature 'function property_routesFixed() returns()' but property testing provider expects 'property_routesFixed() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_retiredIdsStayDead' has signature 'function property_retiredIdsStayDead() returns()' but property testing provider expects 'property_retiredIdsStayDead() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_nativeConservation' has signature 'function property_nativeConservation() returns()' but property testing provider expects 'property_nativeConservation() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_scheduleDomains' has signature 'function property_scheduleDomains() returns()' but property testing provider expects 'property_scheduleDomains() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_virtualSharesExact' has signature 'function property_virtualSharesExact() returns()' but property testing provider expects 'property_virtualSharesExact() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_sharePreviewPositive' has signature 'function property_sharePreviewPositive() returns()' but property testing provider expects 'property_sharePreviewPositive() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_virtualSharesBacked' has signature 'function property_virtualSharesBacked() returns()' but property testing provider expects 'property_virtualSharesBacked() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_activePathAllowlisted' has signature 'function property_activePathAllowlisted() returns()' but property testing provider expects 'property_activePathAllowlisted() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_canActivateSync' has signature 'function property_canActivateSync() returns()' but property testing provider expects 'property_canActivateSync() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_marketValueCoversUserValues' has signature 'function property_marketValueCoversUserValues() returns()' but property testing provider expects 'property_marketValueCoversUserValues() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_anchorOnGrid' has signature 'function property_anchorOnGrid() returns()' but property testing provider expects 'property_anchorOnGrid() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_principalBackedNoLoss' has signature 'function property_principalBackedNoLoss() returns()' but property testing provider expects 'property_principalBackedNoLoss() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_oneBuyPerDay' has signature 'function property_oneBuyPerDay() returns()' but property testing provider expects 'property_oneBuyPerDay() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_idleCashExact' has signature 'function property_idleCashExact() returns()' but property testing provider expects 'property_idleCashExact() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_windowBounded' has signature 'function property_windowBounded() returns()' but property testing provider expects 'property_windowBounded() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_rbtcBooksExact' has signature 'function property_rbtcBooksExact() returns()' but property testing provider expects 'property_rbtcBooksExact() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_accruedInterestIdentity' has signature 'function property_accruedInterestIdentity() returns()' but property testing provider expects 'property_accruedInterestIdentity() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_settingsDomains' has signature 'function property_settingsDomains() returns()' but property testing provider expects 'property_settingsDomains() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_depositPauseOnlyAssigned' has signature 'function property_depositPauseOnlyAssigned() returns()' but property testing provider expects 'property_depositPauseOnlyAssigned() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_rbtcAssetSplit' has signature 'function property_rbtcAssetSplit() returns()' but property testing provider expects 'property_rbtcAssetSplit() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_previewsNeverRevert' has signature 'function property_previewsNeverRevert() returns()' but property testing provider expects 'property_previewsNeverRevert() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_windowFreeze' has signature 'function property_windowFreeze() returns()' but property testing provider expects 'property_windowFreeze() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_privilegedHoldNothing' has signature 'function property_privilegedHoldNothing() returns()' but property testing provider expects 'property_privilegedHoldNothing() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_lendingNoRawStablecoin' has signature 'function property_lendingNoRawStablecoin() returns()' but property testing provider expects 'property_lendingNoRawStablecoin() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_principalHasSharesNoLoss' has signature 'function property_principalHasSharesNoLoss() returns()' but property testing provider expects 'property_principalHasSharesNoLoss() nonpayable returns (bool)'
+warn Contract 'FoundryTester': method 'property_stablecoinConservation' has signature 'function property_stablecoinConservation() returns()' but property testing provider expects 'property_stablecoinConservation() nonpayable returns (bool)'
+⇾ Running with a timeout of 600 seconds
+⇾ Setting up test chain
+⇾ Finished setting up test chain
+⇾ Creating corpus...
+⇾ Initializing corpus...
+⇾ Fuzzing with 10 workers
+⇾ [NOT STARTED] Assertion Test: FuzzTester.adv_interestLiveness(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_rbtcSolvency()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_retiredIdsStayDead()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_stablecoinConservation()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.adv_executeProtectedBatch()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.adv_mutateForeignSchedule(uint8,uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_depositToken(address,uint64,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_updatePurchaseAmount(address,uint64,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.env_skipDays(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_virtualSharesExact()
+⇾ fuzz: elapsed:       0s, calls:          0 (     0/sec), seq/s:      0, branches:   1398, corpus:     0, failures: 0/0, gas/s:            0
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_windowFreeze()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.adv_depositLiveness(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_depositPauseOnlyAssigned()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.adv_topUpLiveness(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_batchBuyRbtc_clamped(uint256,uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_withdrawAllAccumulatedInterest_clamped(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.env_donateStablecoin(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.env_setDexPrice(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_previewsNeverRevert()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_settingsDomains()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.adv_impersonateSwapper(uint8,uint256,uint256,uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_activateProtectedPurchaseWindow()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_createDcaSchedule(address,uint256,uint256,uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_withdrawAllAccumulatedRbtc(address[],uint256[])
+⇾ [NOT STARTED] Assertion Test: FuzzTester.env_donateETH(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.env_setOracleValid(bool,bool)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_activePathAllowlisted()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_scheduleCounts()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_secondary(uint8,uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_withdrawAllAccumulatedRbtc_asCollector(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.env_donateIntermediateToRouter(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.operationsAdmin_remapAttempt(uint8,uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_canActivateSync()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_privilegedHoldNothing()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_rbtcAssetSplit()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.setCurrentSwapper(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.adv_fullExitAndReenter(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.adv_nonOwnerSetter(uint8,uint256,uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_updatePurchasePeriod_clamped(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_idleCashExact()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.adv_planProtectedBatch(uint256,uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_batchBuyRbtc_zeroMinOut(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_setSchedulePaused_clamped(uint256,bool)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_topUpFromInterest(address,uint64,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_withdrawToken(address,uint64,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.env_moveSovrynPrice(uint256,bool)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_rbtcBooksExact()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_batchBuyRbtc((uint64[],address,uint256,uint256))
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_deleteDcaSchedule_clamped(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_withdrawToken_clamped(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.operationsAdmin_secondary(uint8,uint256,bool)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.roundTrip_interestTwice(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.adv_createLiveness(uint256,uint256,uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.adv_protectedBatchScenario(uint256,uint256,uint256,uint256,uint256,bool,bool)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_withdrawAllAccumulatedRbtc_clamped(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_withdrawToken_full(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.env_skipBlocks(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.layerBankHandlerDex_secondary(uint8,uint256,uint256,uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.probe_feeCurve(uint256,uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_accruedInterestIdentity()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.adv_withdrawLiveness(uint256,uint256,bool)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_batchBuyRbtcAcrossHandlers((uint64[],address,uint256,uint256)[])
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_createDcaSchedule_clamped(uint256,uint256,uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_depositToken_clamped(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_withdrawTokenAndInterest_clamped(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_anchorOnGrid()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_oneBuyPerDay()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_routesFixed()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.adv_deleteLiveness(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.adv_executeProtectedBatchWithQuote()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_batchBuyRbtc_allRows(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_withdrawAllAccumulatedInterest(address[],uint256[])
+⇾ [NOT STARTED] Assertion Test: FuzzTester.probe_buyOne(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_lendingNoRawStablecoin()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_principalBackedNoLoss()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_sharePreviewPositive()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_activateProtectedPurchaseWindow_clamped(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_updatePurchaseAmount_clamped(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_marketValueCoversUserValues()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_virtualSharesBacked()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_windowBounded()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.adv_cleanBatchLiveness(uint256,uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_deleteDcaSchedule(address,uint64,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_depositToken_dust(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_setSchedulePaused(address,uint64,bool)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_idleCashCoversPrincipal()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.roundTrip_createDelete(uint256,uint256,uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.adv_claimLiveness(uint256,uint256,uint8)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.adv_principalAndInterestLiveness(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_batchBuyRbtcAcrossHandlers_clamped(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_topUpFromInterest_clamped(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.env_bumpLayerBankIndex(bool,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.env_setOraclePrice(bool,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.env_setSovrynExitFee(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_nativeConservation()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_updatePurchasePeriod(address,uint64,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_withdrawTokenAndInterest(address,uint64,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_principalHasSharesNoLoss()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.property_scheduleDomains()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.roundTrip_depositWithdraw(uint256,uint256,uint8,bool)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.setCurrentActor(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.adv_callHandlerDirectly(uint8,uint256,uint256,uint256)
+⇾ fuzz: elapsed:       3s, calls:       1545 (   514/sec), seq/s:     18, branches:   5474, corpus:    58, failures: 0/56, gas/s:    681566800
+⇾ fuzz: elapsed:       6s, calls:       3842 (   765/sec), seq/s:     19, branches:   8528, corpus:   138, failures: 0/114, gas/s:    903248075
+⇾ fuzz: elapsed:       9s, calls:       6145 (   764/sec), seq/s:     12, branches:   9892, corpus:   189, failures: 0/153, gas/s:    999530317
+⇾ fuzz: elapsed:      12s, calls:       9100 (   984/sec), seq/s:     15, branches:  10273, corpus:   235, failures: 0/199, gas/s:   1256207294
+⇾ fuzz: elapsed:      15s, calls:      11649 (   849/sec), seq/s:     16, branches:  10804, corpus:   271, failures: 0/249, gas/s:   1068472384
+⇾ fuzz: elapsed:      18s, calls:      14423 (   924/sec), seq/s:     20, branches:  11127, corpus:   314, failures: 0/311, gas/s:   1194771383
+⇾ fuzz: elapsed:      21s, calls:      14831 (   135/sec), seq/s:      1, branches:  12442, corpus:   349, failures: 0/317, gas/s:    181670047
+⇾ fuzz: elapsed:      24s, calls:      15003 (    57/sec), seq/s:      0, branches:  13334, corpus:   383, failures: 0/317, gas/s:     40650746
+⇾ fuzz: elapsed:      27s, calls:      15194 (    63/sec), seq/s:      0, branches:  13809, corpus:   414, failures: 0/317, gas/s:     51528191
+⇾ fuzz: elapsed:      30s, calls:      15979 (   261/sec), seq/s:      2, branches:  14232, corpus:   443, failures: 0/326, gas/s:    256255938
+⇾ fuzz: elapsed:      33s, calls:      16825 (   281/sec), seq/s:      2, branches:  14542, corpus:   470, failures: 0/334, gas/s:    246822756
+⇾ fuzz: elapsed:      36s, calls:      17780 (   317/sec), seq/s:      3, branches:  14669, corpus:   496, failures: 0/344, gas/s:    273234261
+⇾ fuzz: elapsed:      39s, calls:      20674 (   964/sec), seq/s:      9, branches:  14859, corpus:   516, failures: 0/372, gas/s:    874839015
+⇾ fuzz: elapsed:      42s, calls:      23770 (  1029/sec), seq/s:     10, branches:  14918, corpus:   534, failures: 0/405, gas/s:    915815395
+⇾ fuzz: elapsed:      45s, calls:      27326 (  1180/sec), seq/s:     12, branches:  14946, corpus:   547, failures: 0/442, gas/s:   1063925261
+⇾ fuzz: elapsed:      48s, calls:      30897 (  1184/sec), seq/s:     11, branches:  15024, corpus:   553, failures: 0/477, gas/s:   1095520029
+⇾ fuzz: elapsed:      51s, calls:      34421 (  1173/sec), seq/s:     11, branches:  15036, corpus:   559, failures: 0/512, gas/s:   1049051161
+⇾ fuzz: elapsed:      54s, calls:      37595 (  1052/sec), seq/s:      9, branches:  15080, corpus:   565, failures: 0/542, gas/s:    932670570
+⇾ fuzz: elapsed:      57s, calls:      41512 (  1296/sec), seq/s:     13, branches:  15104, corpus:   570, failures: 0/584, gas/s:   1193754468
+⇾ fuzz: elapsed:    1m00s, calls:      45803 (  1425/sec), seq/s:     13, branches:  15121, corpus:   573, failures: 0/624, gas/s:   1269355124
+⇾ fuzz: elapsed:    1m03s, calls:      49958 (  1384/sec), seq/s:     14, branches:  15128, corpus:   577, failures: 0/667, gas/s:   1178212950
+⇾ fuzz: elapsed:    1m06s, calls:      54442 (  1484/sec), seq/s:     14, branches:  15131, corpus:   579, failures: 0/711, gas/s:   1309162084
+⇾ fuzz: elapsed:    1m09s, calls:      58639 (  1397/sec), seq/s:     13, branches:  15137, corpus:   581, failures: 0/753, gas/s:   1287816879
+⇾ [Worker 0] Shrinking call sequence for Assertion Test: FuzzTester.adv_protectedBatchScenario(uint256,uint256,uint256,uint256,uint256,bool,bool) with 70 call(s)
+⇾ fuzz: elapsed:    1m12s, calls:      62621 (  1326/sec), seq/s:     13, branches:  15167, corpus:   586, failures: 0/795, gas/s:   1188390693
+⇾ fuzz: elapsed:    1m15s, calls:      66364 (  1232/sec), seq/s:     11, branches:  15181, corpus:   588, failures: 0/831, gas/s:   1118108225
+⇾ fuzz: elapsed:    1m18s, calls:      70039 (  1224/sec), seq/s:     12, branches:  15188, corpus:   591, failures: 0/868, gas/s:   1137860488
+⇾ fuzz: elapsed:    1m21s, calls:      73849 (  1268/sec), seq/s:     12, branches:  15190, corpus:   592, failures: 0/907, gas/s:   1173274363
+⇾ fuzz: elapsed:    1m24s, calls:      77381 (  1172/sec), seq/s:     11, branches:  15193, corpus:   594, failures: 0/943, gas/s:   1005262133
+⇾ fuzz: elapsed:    1m27s, calls:      81247 (  1287/sec), seq/s:     12, branches:  15193, corpus:   594, failures: 0/981, gas/s:   1166439765
+⇾ fuzz: elapsed:    1m30s, calls:      84124 (   955/sec), seq/s:      9, branches:  15199, corpus:   595, failures: 0/1011, gas/s:    878687543
+⇾ fuzz: elapsed:    1m33s, calls:      87315 (  1061/sec), seq/s:     10, branches:  15231, corpus:   597, failures: 0/1042, gas/s:    922026788
+⇾ fuzz: elapsed:    1m36s, calls:      90760 (  1143/sec), seq/s:     11, branches:  15231, corpus:   597, failures: 0/1076, gas/s:   1039446594
+⇾ fuzz: elapsed:    1m40s, calls:      94934 (  1369/sec), seq/s:     13, branches:  15231, corpus:   597, failures: 0/1117, gas/s:   1176782610
+⇾ fuzz: elapsed:    1m43s, calls:      98734 (  1256/sec), seq/s:     13, branches:  15249, corpus:   598, failures: 0/1157, gas/s:   1129840211
+⇾ [Worker 3] Shrinking call sequence for Assertion Test: FuzzTester.property_sharePreviewPositive() with 41 call(s)
+⇾ fuzz: elapsed:    1m46s, calls:     101980 (  1078/sec), seq/s:     10, branches:  15251, corpus:   602, failures: 0/1189, gas/s:    988345337
+⇾ fuzz: elapsed:    1m49s, calls:     105218 (  1074/sec), seq/s:     10, branches:  15255, corpus:   602, failures: 0/1221, gas/s:   1004774152
+⇾ [Worker 2] Shrinking call sequence for Assertion Test: FuzzTester.property_sharePreviewPositive() with 89 call(s)
+⇾ fuzz: elapsed:    1m52s, calls:     108534 (  1097/sec), seq/s:     11, branches:  15256, corpus:   604, failures: 0/1255, gas/s:    949149057
+⇾ fuzz: elapsed:    1m55s, calls:     111330 (   924/sec), seq/s:      9, branches:  15260, corpus:   606, failures: 0/1283, gas/s:    828491279
+⇾ fuzz: elapsed:    1m58s, calls:     114218 (   961/sec), seq/s:      9, branches:  15262, corpus:   607, failures: 0/1311, gas/s:    871161575
+⇾ fuzz: elapsed:    2m01s, calls:     116866 (   878/sec), seq/s:      8, branches:  15262, corpus:   607, failures: 0/1338, gas/s:    832446409
+⇾ fuzz: elapsed:    2m04s, calls:     119497 (   876/sec), seq/s:      8, branches:  15262, corpus:   607, failures: 0/1365, gas/s:    775737421
+⇾ fuzz: elapsed:    2m07s, calls:     122307 (   930/sec), seq/s:      9, branches:  15262, corpus:   607, failures: 0/1394, gas/s:    800053775
+⇾ fuzz: elapsed:    2m10s, calls:     124683 (   791/sec), seq/s:      7, branches:  15262, corpus:   607, failures: 0/1417, gas/s:    767753715
+⇾ fuzz: elapsed:    2m13s, calls:     127260 (   854/sec), seq/s:      8, branches:  15262, corpus:   607, failures: 0/1442, gas/s:    785556367
+⇾ fuzz: elapsed:    2m16s, calls:     129835 (   857/sec), seq/s:      8, branches:  15262, corpus:   607, failures: 0/1468, gas/s:    787954035
+⇾ fuzz: elapsed:    2m19s, calls:     132743 (   969/sec), seq/s:      9, branches:  15262, corpus:   607, failures: 0/1497, gas/s:    892735874
+⇾ fuzz: elapsed:    2m22s, calls:     135792 (  1012/sec), seq/s:     10, branches:  15262, corpus:   607, failures: 0/1528, gas/s:    886119824
+⇾ fuzz: elapsed:    2m25s, calls:     138602 (   936/sec), seq/s:      8, branches:  15262, corpus:   607, failures: 0/1554, gas/s:    898554616
+⇾ [Worker 0] Shrinking complete after 5000 attempts (limit: 5000)
+⇾ fuzz: elapsed:    2m28s, calls:     141472 (   936/sec), seq/s:      9, branches:  15263, corpus:   608, failures: 0/1584, gas/s:    848785212
+⇾ fuzz: elapsed:    2m31s, calls:     144343 (   955/sec), seq/s:      9, branches:  15265, corpus:   609, failures: 0/1613, gas/s:    862165886
+⇾ fuzz: elapsed:    2m34s, calls:     147129 (   919/sec), seq/s:      9, branches:  15266, corpus:   609, failures: 0/1642, gas/s:    814512968
+⇾ fuzz: elapsed:    2m37s, calls:     150091 (   984/sec), seq/s:      9, branches:  15266, corpus:   610, failures: 0/1671, gas/s:    876467332
+⇾ fuzz: elapsed:    2m40s, calls:     152723 (   875/sec), seq/s:      8, branches:  15266, corpus:   610, failures: 0/1697, gas/s:    787113351
+⇾ fuzz: elapsed:    2m43s, calls:     155521 (   930/sec), seq/s:      9, branches:  15266, corpus:   610, failures: 0/1725, gas/s:    820612682
+⇾ [Worker 4] Shrinking call sequence for Assertion Test: FuzzTester.property_sharePreviewPositive() with 92 call(s)
+⇾ fuzz: elapsed:    2m46s, calls:     157968 (   813/sec), seq/s:      8, branches:  15270, corpus:   612, failures: 0/1750, gas/s:    716155470
+⇾ fuzz: elapsed:    2m49s, calls:     160126 (   717/sec), seq/s:      7, branches:  15270, corpus:   612, failures: 0/1773, gas/s:    715476393
+⇾ fuzz: elapsed:    2m52s, calls:     162011 (   627/sec), seq/s:      6, branches:  15270, corpus:   612, failures: 0/1792, gas/s:    578573321
+⇾ fuzz: elapsed:    2m55s, calls:     164356 (   774/sec), seq/s:      6, branches:  15270, corpus:   612, failures: 0/1813, gas/s:    725390421
+⇾ fuzz: elapsed:    2m58s, calls:     166728 (   788/sec), seq/s:      7, branches:  15270, corpus:   612, failures: 0/1837, gas/s:    750934753
+⇾ [Worker 3] Shrinking complete after 5000 attempts (limit: 5000)
+⇾ fuzz: elapsed:    3m01s, calls:     169481 (   912/sec), seq/s:      9, branches:  15270, corpus:   612, failures: 0/1865, gas/s:    765190942
+⇾ fuzz: elapsed:    3m04s, calls:     172038 (   848/sec), seq/s:      8, branches:  15270, corpus:   612, failures: 0/1890, gas/s:    772363355
+⇾ [Worker 6] Shrinking call sequence for Assertion Test: FuzzTester.adv_protectedBatchScenario(uint256,uint256,uint256,uint256,uint256,bool,bool) with 84 call(s)
+⇾ [FAILED] Assertion Test: FuzzTester.adv_protectedBatchScenario(uint256,uint256,uint256,uint256,uint256,bool,bool)
+Test for method "FuzzTester.adv_protectedBatchScenario(uint256,uint256,uint256,uint256,uint256,bool,bool)" resulted in an assertion failure after the following call sequence:
+[Call Sequence]
+1) FuzzTester.adv_fullExitAndReenter(uint256,uint256)(21024335355776915299101188012106854391436269275498184707108144420689833445126, 177684100258073654261007264031024834504374210172652464502406003705877663695) (block=25, time=25, gas=12500000, gasprice=0, value=0, sender=0x10000)
+2) FuzzTester.adv_protectedBatchScenario(uint256,uint256,uint256,uint256,uint256,bool,bool)(1975002696069456087214340238281671596821, 421249970143250876261811275459913810280165123251885570202849875862, 2204170690891626633309222478778813937632695548626627593618633, 6739986666787659948716747286684485514180790527444378453215531223095, 1606938044071917663131576722572516091220514129647059794356917, false, true) (block=25, time=25, gas=12500000, gasprice=0, value=0, sender=0x10000)
+[Execution Trace]
+ => [call] Admin.adv_protectedBatchScenario(uint256,uint256,uint256,uint256,uint256,bool,bool)(1975002696069456087214340238281671596821, 421249970143250876261811275459913810280165123251885570202849875862, 2204170690891626633309222478778813937632695548626627593618633, 6739986666787659948716747286684485514180790527444378453215531223095, 1606938044071917663131576722572516091220514129647059794356917, false, true) (addr=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519], value=0, sender=0x10000)
+	 => [call] DcaManager.getUserMutationsAllowedFromBlock()() (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (0)]
+	 => [call] StdCheats.prank(address)(SwapperB [0x5a12]) (addr=0x7109709ECfa91a80626fF3989D68f67F5b1DD12D, value=0, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return ()]
+	 => [call] DcaManager.activateProtectedPurchaseWindow()() (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=0, sender=SwapperB [0x5a12])
+		 => [call] OperationsAdmin.isSwapper(address)(SwapperB [0x5a12]) (addr=0xdaE97900D4B184c5D2012dcdB658c008966466DD, value=<nil>, sender=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB)
+			 => [return (true)]
+		 => [event] DcaManager__ProtectedPurchaseWindowActivated(SwapperB [0x5a12], 30)
+		 => [return ()]
+	 => [call] DcaManager.getUserMutationsAllowedFromBlock()() (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (30)]
+	 => [call] DcaManager.getDcaSchedule(address,uint64)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return ({tokenBalance: 45339368595323959075853, cadenceAnchor: 0, paused: false, purchasePeriod: 86400, routeIndex: 1, user: Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], purchaseAmount: 45339368595323959075853})]
+	 => [call] MockLayerBankAToken.getNormalizedIncome()() (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (1000000038051750380517503805)]
+	 => [call] LayerBankDocHandlerMoc.getUserShares(address)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (45339366870081688524799)]
+	 => [call] LayerBankDocHandlerMoc.getUserShares(address)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (45339366870081688524799)]
+	 => [call] LayerBankDocHandlerMoc.getUserShares(address)(Bob [0xa251723bDB913C80CDEdb56EeE116F14611A4379]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (0)]
+	 => [call] LayerBankDocHandlerMoc.getUserShares(address)(Charlie [0xA594C0510365Db9dBAEBB1546a59E96E115C3b22]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (0)]
+	 => [call] LayerBankDocHandlerMoc.getUserShares(address)(FeeCollector [0xC7f2Cf4845C6db0e1a1e91ED41Bcd0FcC1b0E141]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (0)]
+	 => [call] SovrynDocHandlerMoc.getUserShares(address)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E]) (addr=SovrynDocHandlerMoc [0x9848e4470F89bec8b050eCDf93F69B8660B6046C], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (0)]
+	 => [call] SovrynDocHandlerMoc.getUserShares(address)(Bob [0xa251723bDB913C80CDEdb56EeE116F14611A4379]) (addr=SovrynDocHandlerMoc [0x9848e4470F89bec8b050eCDf93F69B8660B6046C], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (0)]
+	 => [call] SovrynDocHandlerMoc.getUserShares(address)(Charlie [0xA594C0510365Db9dBAEBB1546a59E96E115C3b22]) (addr=SovrynDocHandlerMoc [0x9848e4470F89bec8b050eCDf93F69B8660B6046C], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (0)]
+	 => [call] SovrynDocHandlerMoc.getUserShares(address)(FeeCollector [0xC7f2Cf4845C6db0e1a1e91ED41Bcd0FcC1b0E141]) (addr=SovrynDocHandlerMoc [0x9848e4470F89bec8b050eCDf93F69B8660B6046C], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (0)]
+	 => [call] LayerBankHandlerDex.getUserShares(address)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E]) (addr=LayerBankHandlerDex [0x612Be731946c59C61Ba449f1011F22Ff8a3a389c], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (0)]
+	 => [call] LayerBankHandlerDex.getUserShares(address)(Bob [0xa251723bDB913C80CDEdb56EeE116F14611A4379]) (addr=LayerBankHandlerDex [0x612Be731946c59C61Ba449f1011F22Ff8a3a389c], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (0)]
+	 => [call] LayerBankHandlerDex.getUserShares(address)(Charlie [0xA594C0510365Db9dBAEBB1546a59E96E115C3b22]) (addr=LayerBankHandlerDex [0x612Be731946c59C61Ba449f1011F22Ff8a3a389c], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (0)]
+	 => [call] LayerBankHandlerDex.getUserShares(address)(FeeCollector [0xC7f2Cf4845C6db0e1a1e91ED41Bcd0FcC1b0E141]) (addr=LayerBankHandlerDex [0x612Be731946c59C61Ba449f1011F22Ff8a3a389c], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (0)]
+	 => [call] DcaManager.getDcaSchedule(address,uint64)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return ({tokenBalance: 45339368595323959075853, cadenceAnchor: 0, paused: false, purchasePeriod: 86400, routeIndex: 1, user: Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], purchaseAmount: 45339368595323959075853})]
+	 => [call] MockLayerBankAToken.getNormalizedIncome()() (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (1000000038051750380517503805)]
+	 => [call] DcaManager.getDcaSchedule(address,uint64)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return ({tokenBalance: 45339368595323959075853, cadenceAnchor: 0, paused: false, purchasePeriod: 86400, routeIndex: 1, user: Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], purchaseAmount: 45339368595323959075853})]
+	 => [call] LayerBankDocHandlerMoc.getUserShares(address)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (45339366870081688524799)]
+	 => [call] MockLayerBankAToken.getNormalizedIncome()() (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (1000000038051750380517503805)]
+	 => [call] DcaManager.getUserMutationsAllowedFromBlock()() (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (30)]
+	 => [call] MockLayerBankAToken.getNormalizedIncome()() (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (1000000038051750380517503805)]
+	 => [call] FizzIToken.getExitFeeBps()() (addr=0x2CfFF1c8Df8CE2BA6CBa19699CCBa6F381734938, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (0)]
+	 => [call] DcaManager.getDcaSchedule(address,uint64)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return ({tokenBalance: 45339368595323959075853, cadenceAnchor: 0, paused: false, purchasePeriod: 86400, routeIndex: 1, user: Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], purchaseAmount: 45339368595323959075853})]
+	 => [call] DcaManager.getDcaSchedule(address,uint64)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return ({tokenBalance: 45339368595323959075853, cadenceAnchor: 0, paused: false, purchasePeriod: 86400, routeIndex: 1, user: Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], purchaseAmount: 45339368595323959075853})]
+	 => [call] OperationsAdmin.areDepositsPaused(address,uint256)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0xdaE97900D4B184c5D2012dcdB658c008966466DD, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (false)]
+	 => [call] DOC.balanceOf(address)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E]) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (954660631404676040924147)]
+	 => [event] LogString("Clamping value 1606938044071917663131576722572516091220514129647059794356917 to 20514129647059794356918")
+	 => [call] MockLayerBankAToken.getNormalizedIncome()() (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (1000000038051750380517503805)]
+	 => [call] StdCheats.prank(address)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E]) (addr=0x7109709ECfa91a80626fF3989D68f67F5b1DD12D, value=0, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return ()]
+	 => [call] DcaManager.depositToken(address,uint64,uint256)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1, 20514129647059794356918) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=0, sender=Alice [0x276c280BA74986247527F08DafE0336abD86eF4E])
+		 => [call] OperationsAdmin.getHandler(address,uint256)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0xdaE97900D4B184c5D2012dcdB658c008966466DD, value=<nil>, sender=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB)
+			 => [return (LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])]
+		 => [call] OperationsAdmin.areDepositsPaused(address,uint256)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0xdaE97900D4B184c5D2012dcdB658c008966466DD, value=<nil>, sender=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB)
+			 => [return (false)]
+		 => [call] LayerBankDocHandlerMoc.depositToken(address,uint256)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], 20514129647059794356918) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=0, sender=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB)
+			 => [call] DOC.balanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [return (0)]
+			 => [call] DOC.transferFrom(address,address,uint256)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 20514129647059794356918) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=0, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [event] Transfer(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 20514129647059794356918)
+				 => [return (true)]
+			 => [call] DOC.balanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [return (20514129647059794356918)]
+			 => [event] TokenHandler__TokenDeposited(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], 20514129647059794356918)
+			 => [call] MockLayerBankAToken.scaledBalanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [return (45339366870081688524799)]
+			 => [call] MockLayerBankPool.supply(address,uint256,address,uint16)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 20514129647059794356918, LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 0) (addr=0x3857b6c6f162fDA9BD591D4CCDEF8C00093cC357, value=0, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [call] DOC.balanceOf(address)(0x2AC24b15a2Ded48F4B51e70293589058546a11FE) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=0x3857b6c6f162fDA9BD591D4CCDEF8C00093cC357)
+					 => [return (45339368595323959075853)]
+				 => [call] DOC.transferFrom(address,address,uint256)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 0x2AC24b15a2Ded48F4B51e70293589058546a11FE, 20514129647059794356918) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=0, sender=0x3857b6c6f162fDA9BD591D4CCDEF8C00093cC357)
+					 => [event] Transfer(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 0x2AC24b15a2Ded48F4B51e70293589058546a11FE, 20514129647059794356918)
+					 => [return (true)]
+				 => [call] DOC.balanceOf(address)(0x2AC24b15a2Ded48F4B51e70293589058546a11FE) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=0x3857b6c6f162fDA9BD591D4CCDEF8C00093cC357)
+					 => [return (65853498242383753432771)]
+				 => [call] MockLayerBankAToken.mintScaled(address,uint256)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 20514129647059794356918) (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=0, sender=0x3857b6c6f162fDA9BD591D4CCDEF8C00093cC357)
+					 => [event] Transfer(0x0, LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 20514128866461283456565)
+					 => [return (20514128866461283456565)]
+				 => [return ()]
+			 => [call] MockLayerBankAToken.scaledBalanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [return (65853495736542971981364)]
+			 => [event] LendingHandler__UserSharesUpdated(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], 45339366870081688524799, 65853495736542971981364)
+			 => [return ()]
+		 => [event] DcaManager__TokenBalanceUpdated(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1, 65853498242383753432771)
+		 => [return ()]
+	 => [call] MockLayerBankAToken.getNormalizedIncome()() (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (1000000038051750380517503805)]
+	 => [call] DcaManager.getUserMutationsAllowedFromBlock()() (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (30)]
+	 => [call] DcaManager.getDcaSchedule(address,uint64)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return ({tokenBalance: 65853498242383753432771, cadenceAnchor: 0, paused: false, purchasePeriod: 86400, routeIndex: 1, user: Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], purchaseAmount: 45339368595323959075853})]
+	 => [call] StdCheats.prank(address)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E]) (addr=0x7109709ECfa91a80626fF3989D68f67F5b1DD12D, value=0, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return ()]
+	 => [call] DcaManager.setSchedulePaused(address,uint64,bool)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1, true) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=0, sender=Alice [0x276c280BA74986247527F08DafE0336abD86eF4E])
+		 => [revert (error: DcaManager__UserMutationsLocked(30))]
+	 => [call] DcaManager.getUserMutationsAllowedFromBlock()() (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (30)]
+	 => [call] DcaManager.getDcaSchedule(address,uint64)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return ({tokenBalance: 65853498242383753432771, cadenceAnchor: 0, paused: false, purchasePeriod: 86400, routeIndex: 1, user: Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], purchaseAmount: 45339368595323959075853})]
+	 => [call] DcaManager.getAccruedInterest(address,address,uint256)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [call] OperationsAdmin.getRouteClass(uint256)(1) (addr=0xdaE97900D4B184c5D2012dcdB658c008966466DD, value=<nil>, sender=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB)
+			 => [return (2)]
+		 => [call] OperationsAdmin.getHandler(address,uint256)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0xdaE97900D4B184c5D2012dcdB658c008966466DD, value=<nil>, sender=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB)
+			 => [return (LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])]
+		 => [call] LayerBankDocHandlerMoc.quoteAccruedInterest(address,uint256)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], 65853498242383753432771) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB)
+			 => [call] MockLayerBankPool.getReserveNormalizedIncome(address)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0]) (addr=0x3857b6c6f162fDA9BD591D4CCDEF8C00093cC357, value=<nil>, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [call] MockLayerBankAToken.getNormalizedIncome()() (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=0x3857b6c6f162fDA9BD591D4CCDEF8C00093cC357)
+					 => [return (1000000038051750380517503805)]
+				 => [return (1000000038051750380517503805)]
+			 => [return (0)]
+		 => [return (0)]
+	 => [call] DcaManager.getUserMutationsAllowedFromBlock()() (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (30)]
+	 => [call] DcaManager.getDcaSchedule(address,uint64)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return ({tokenBalance: 65853498242383753432771, cadenceAnchor: 0, paused: false, purchasePeriod: 86400, routeIndex: 1, user: Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], purchaseAmount: 45339368595323959075853})]
+	 => [call] MockLayerBankAToken.getNormalizedIncome()() (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (1000000038051750380517503805)]
+	 => [call] MockLayerBankAToken.scaledBalanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (65853495736542971981364)]
+	 => [call] USDRIF.balanceOf(address)(0x3150d9893b1c0bf6F48E591d2d873DdA3A88Ac7C) (addr=USDRIF [0xDc82c0362A241Aa94d53546648EACe48C9773dAa], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (0)]
+	 => [call] DcaManager.getDcaSchedule(address,uint64)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return ({tokenBalance: 65853498242383753432771, cadenceAnchor: 0, paused: false, purchasePeriod: 86400, routeIndex: 1, user: Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], purchaseAmount: 45339368595323959075853})]
+	 => [call] LayerBankDocHandlerMoc.getUserShares(address)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (65853495736542971981364)]
+	 => [call] LayerBankDocHandlerMoc.getUserShares(address)(Bob [0xa251723bDB913C80CDEdb56EeE116F14611A4379]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (0)]
+	 => [call] LayerBankDocHandlerMoc.getUserShares(address)(Charlie [0xA594C0510365Db9dBAEBB1546a59E96E115C3b22]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (0)]
+	 => [call] LayerBankDocHandlerMoc.getUserShares(address)(FeeCollector [0xC7f2Cf4845C6db0e1a1e91ED41Bcd0FcC1b0E141]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (0)]
+	 => [call] DcaManager.getDcaSchedule(address,uint64)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return ({tokenBalance: 65853498242383753432771, cadenceAnchor: 0, paused: false, purchasePeriod: 86400, routeIndex: 1, user: Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], purchaseAmount: 45339368595323959075853})]
+	 => [call] DcaManager.getUserMutationsAllowedFromBlock()() (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (30)]
+	 => [call] StdCheats.prank(address)(SwapperB [0x5a12]) (addr=0x7109709ECfa91a80626fF3989D68f67F5b1DD12D, value=0, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return ()]
+	 => [call] DcaManager.batchBuyRbtc((uint64[],address,uint256,uint256))({scheduleIds: [1], token: DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], routeIndex: 1, minRbtcOut: 906787371906479181}) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=0, sender=SwapperB [0x5a12])
+		 => [call] OperationsAdmin.isSwapper(address)(SwapperB [0x5a12]) (addr=0xdaE97900D4B184c5D2012dcdB658c008966466DD, value=<nil>, sender=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB)
+			 => [return (true)]
+		 => [event] DcaManager__TokenBalanceUpdated(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1, 20514129647059794356918)
+		 => [call] OperationsAdmin.getHandler(address,uint256)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0xdaE97900D4B184c5D2012dcdB658c008966466DD, value=<nil>, sender=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB)
+			 => [return (LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])]
+		 => [call] LayerBankDocHandlerMoc.batchBuyRbtc(address[],uint64[],uint256[],uint256)([Alice [0x276c280BA74986247527F08DafE0336abD86eF4E]], [1], [45339368595323959075853], 906787371906479181) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=0, sender=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB)
+			 => [call] MockLayerBankPool.getReserveNormalizedIncome(address)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0]) (addr=0x3857b6c6f162fDA9BD591D4CCDEF8C00093cC357, value=<nil>, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [call] MockLayerBankAToken.getNormalizedIncome()() (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=0x3857b6c6f162fDA9BD591D4CCDEF8C00093cC357)
+					 => [return (1000000038051750380517503805)]
+				 => [return (1000000038051750380517503805)]
+			 => [event] LendingHandler__UserSharesUpdated(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], 65853495736542971981364, 20514128866461283456564)
+			 => [call] MockLayerBankAToken.scaledBalanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [return (65853495736542971981364)]
+			 => [call] DOC.balanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [return (0)]
+			 => [call] MockLayerBankPool.withdraw(address,uint256,address)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 45339368595323959075854, LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=0x3857b6c6f162fDA9BD591D4CCDEF8C00093cC357, value=0, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [call] MockLayerBankAToken.UNDERLYING_ASSET_ADDRESS()() (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=0x3857b6c6f162fDA9BD591D4CCDEF8C00093cC357)
+					 => [return (DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0])]
+				 => [call] MockLayerBankAToken.burnScaled(address,address,uint256)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 45339368595323959075854) (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=0, sender=0x3857b6c6f162fDA9BD591D4CCDEF8C00093cC357)
+					 => [event] Transfer(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 0x0, 45339366870081688524800)
+					 => [call] DOC.balanceOf(address)(0x2AC24b15a2Ded48F4B51e70293589058546a11FE) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=0x2AC24b15a2Ded48F4B51e70293589058546a11FE)
+						 => [return (65853498242383753432771)]
+					 => [call] DOC.transfer(address,uint256)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 45339368595323959075854) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=0, sender=0x2AC24b15a2Ded48F4B51e70293589058546a11FE)
+						 => [event] Transfer(0x2AC24b15a2Ded48F4B51e70293589058546a11FE, LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 45339368595323959075854)
+						 => [return (true)]
+					 => [return (45339368595323959075854)]
+				 => [return (45339368595323959075854)]
+			 => [call] MockLayerBankAToken.scaledBalanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [return (20514128866461283456564)]
+			 => [call] DOC.balanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [return (45339368595323959075854)]
+			 => [event] LendingHandler__SharesRedeemedBatch(45339368595323959075854, 45339366870081688524800)
+			 => [call] DOC.balanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [return (45339368595323959075854)]
+			 => [call] MockMocProxy.redeemFreeDoc(uint256)(45339368595323959075854) (addr=0x856e75e9c0Da547F9753c17746D6cc139b668e5c, value=0, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [call] DOC.balanceOf(address)(0x856e75e9c0Da547F9753c17746D6cc139b668e5c) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=0x856e75e9c0Da547F9753c17746D6cc139b668e5c)
+					 => [return (0)]
+				 => [call] DOC.transferFrom(address,address,uint256)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 0x856e75e9c0Da547F9753c17746D6cc139b668e5c, 45339368595323959075854) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=0, sender=0x856e75e9c0Da547F9753c17746D6cc139b668e5c)
+					 => [event] Transfer(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 0x856e75e9c0Da547F9753c17746D6cc139b668e5c, 45339368595323959075854)
+					 => [return (true)]
+				 => [call] DOC.balanceOf(address)(0x856e75e9c0Da547F9753c17746D6cc139b668e5c) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=0x856e75e9c0Da547F9753c17746D6cc139b668e5c)
+					 => [return (45339368595323959075854)]
+				 => [call] DOC.burn(uint256)(45339368595323959075854) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=0, sender=0x856e75e9c0Da547F9753c17746D6cc139b668e5c)
+					 => [event] Transfer(0x856e75e9c0Da547F9753c17746D6cc139b668e5c, 0x0, 45339368595323959075854)
+					 => [return ()]
+				 => [call] LayerBankDocHandlerMoc.<unresolved method>(msg_data=) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=906787371906479181, sender=0x856e75e9c0Da547F9753c17746D6cc139b668e5c)
+					 => [return]
+				 => [event] MockMocProxy__DocRedeemed(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 45339368595323959075854, 906787371906479181)
+				 => [return ()]
+			 => [call] DOC.balanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [return (0)]
+			 => [event] PurchaseRbtc__RbtcBought(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 904894017721538342, 1, 45339368595323959075854)
+			 => [event] PurchaseRbtc__SuccessfulRbtcBatchPurchase(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 906787371906479181, 45339368595323959075854)
+			 => [event] PurchaseFees__FeeCredited(FeeCollector [0xC7f2Cf4845C6db0e1a1e91ED41Bcd0FcC1b0E141], 1893354184940838, 94667709247041937562)
+			 => [return ()]
+		 => [return ()]
+	 => [call] MockLayerBankAToken.getNormalizedIncome()() (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (1000000038051750380517503805)]
+	 => [call] LayerBankDocHandlerMoc.getUserShares(address)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (20514128866461283456564)]
+	 => [call] LayerBankDocHandlerMoc.getUserShares(address)(Bob [0xa251723bDB913C80CDEdb56EeE116F14611A4379]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (0)]
+	 => [call] LayerBankDocHandlerMoc.getUserShares(address)(Charlie [0xA594C0510365Db9dBAEBB1546a59E96E115C3b22]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (0)]
+	 => [call] LayerBankDocHandlerMoc.getUserShares(address)(FeeCollector [0xC7f2Cf4845C6db0e1a1e91ED41Bcd0FcC1b0E141]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (0)]
+	 => [call] MockLayerBankAToken.scaledBalanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (20514128866461283456564)]
+	 => [event] AssertEqFail("Invalid: 45339366870081688524800!=45339366870081688524799, reason: SP-64: burned shares moved inside the protected window")
+	 => [panic: assertion failed]
+
+
+⇾ fuzz: elapsed:    3m07s, calls:     174534 (   829/sec), seq/s:      8, branches:  15270, corpus:   612, failures: 1/1916, gas/s:    702759006
+⇾ fuzz: elapsed:    3m10s, calls:     177232 (   891/sec), seq/s:      8, branches:  15270, corpus:   612, failures: 1/1942, gas/s:    768996103
+⇾ fuzz: elapsed:    3m13s, calls:     179822 (   853/sec), seq/s:      8, branches:  15270, corpus:   612, failures: 1/1968, gas/s:    725907887
+⇾ fuzz: elapsed:    3m16s, calls:     182229 (   796/sec), seq/s:      8, branches:  15270, corpus:   612, failures: 1/1993, gas/s:    768738379
+⇾ fuzz: elapsed:    3m19s, calls:     184607 (   786/sec), seq/s:      7, branches:  15273, corpus:   613, failures: 1/2017, gas/s:    714262545
+⇾ fuzz: elapsed:    3m22s, calls:     186886 (   757/sec), seq/s:      7, branches:  15273, corpus:   613, failures: 1/2039, gas/s:    671651425
+⇾ fuzz: elapsed:    3m25s, calls:     189106 (   739/sec), seq/s:      7, branches:  15273, corpus:   613, failures: 1/2063, gas/s:    692926127
+⇾ fuzz: elapsed:    3m28s, calls:     191395 (   757/sec), seq/s:      7, branches:  15273, corpus:   613, failures: 1/2085, gas/s:    686441626
+⇾ fuzz: elapsed:    3m31s, calls:     193511 (   701/sec), seq/s:      6, branches:  15273, corpus:   613, failures: 1/2105, gas/s:    632428023
+⇾ [Worker 2] Shrinking complete after 5000 attempts (limit: 5000)
+⇾ fuzz: elapsed:    3m34s, calls:     196059 (   844/sec), seq/s:      8, branches:  15273, corpus:   613, failures: 1/2131, gas/s:    751122298
+⇾ fuzz: elapsed:    3m37s, calls:     198521 (   819/sec), seq/s:      7, branches:  15273, corpus:   613, failures: 1/2155, gas/s:    754294416
+⇾ fuzz: elapsed:    3m40s, calls:     201155 (   872/sec), seq/s:      8, branches:  15273, corpus:   613, failures: 1/2181, gas/s:    798037417
+⇾ [FAILED] Assertion Test: FuzzTester.property_sharePreviewPositive()
+Test for method "FuzzTester.property_sharePreviewPositive()" resulted in an assertion failure after the following call sequence:
+[Call Sequence]
+1) FuzzTester.dcaManager_secondary(uint8,uint256,uint256)(20, 400123900000000000000000000, 42396913941755556936654186938328322142679471649784381576262641083582743421624) (block=25, time=25, gas=12500000, gasprice=0, value=0, sender=0x20000)
+2) FuzzTester.property_sharePreviewPositive()() (block=25, time=25, gas=12500000, gasprice=0, value=0, sender=0x20000)
+[Execution Trace]
+ => [call] Admin.property_sharePreviewPositive()() (addr=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519], value=0, sender=0x20000)
+	 => [call] MockLayerBankAToken.getNormalizedIncome()() (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (1000000038051750380517503805)]
+	 => [call] DcaManager.getTokenMinPurchaseAmount(address)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0]) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (1)]
+	 => [call] FizzIToken.tokenPrice()() (addr=0x2CfFF1c8Df8CE2BA6CBa19699CCBa6F381734938, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (1013700000000000000)]
+	 => [call] DcaManager.getTokenMinPurchaseAmount(address)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0]) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [return (1)]
+	 => [event] AssertGtFail("Invalid: 0<=0 failed, reason: GL-15: a minimum deposit previews zero receipt shares")
+	 => [panic: assertion failed]
+
+
+⇾ fuzz: elapsed:    3m43s, calls:     203801 (   873/sec), seq/s:      9, branches:  15273, corpus:   613, failures: 2/2209, gas/s:    786918496
+⇾ fuzz: elapsed:    3m46s, calls:     206656 (   950/sec), seq/s:      9, branches:  15273, corpus:   613, failures: 2/2237, gas/s:    889303116
+⇾ fuzz: elapsed:    3m49s, calls:     209493 (   938/sec), seq/s:      9, branches:  15273, corpus:   613, failures: 2/2266, gas/s:    867214972
+⇾ fuzz: elapsed:    3m52s, calls:     212318 (   939/sec), seq/s:      9, branches:  15275, corpus:   614, failures: 2/2294, gas/s:    852744578
+⇾ fuzz: elapsed:    3m55s, calls:     215298 (   990/sec), seq/s:      9, branches:  15275, corpus:   614, failures: 2/2322, gas/s:    861909005
+⇾ fuzz: elapsed:    3m58s, calls:     218229 (   976/sec), seq/s:      9, branches:  15275, corpus:   614, failures: 2/2352, gas/s:    828634628
+⇾ fuzz: elapsed:    4m01s, calls:     220726 (   828/sec), seq/s:      8, branches:  15275, corpus:   614, failures: 2/2377, gas/s:    776271450
+⇾ fuzz: elapsed:    4m04s, calls:     223546 (   929/sec), seq/s:      9, branches:  15275, corpus:   614, failures: 2/2405, gas/s:    845004756
+⇾ fuzz: elapsed:    4m08s, calls:     225867 (   773/sec), seq/s:      7, branches:  15275, corpus:   614, failures: 2/2429, gas/s:    719675181
+⇾ fuzz: elapsed:    4m11s, calls:     228395 (   839/sec), seq/s:      8, branches:  15275, corpus:   614, failures: 2/2454, gas/s:    755600343
+⇾ fuzz: elapsed:    4m14s, calls:     231230 (   938/sec), seq/s:      8, branches:  15275, corpus:   614, failures: 2/2481, gas/s:    905542683
+⇾ fuzz: elapsed:    4m17s, calls:     234162 (   976/sec), seq/s:      9, branches:  15275, corpus:   614, failures: 3/2510, gas/s:    902407108
+⇾ fuzz: elapsed:    4m20s, calls:     237448 (  1085/sec), seq/s:     11, branches:  15275, corpus:   614, failures: 3/2544, gas/s:   1001161539
+⇾ fuzz: elapsed:    4m23s, calls:     240547 (  1026/sec), seq/s:     10, branches:  15279, corpus:   615, failures: 3/2575, gas/s:    943930892
+⇾ fuzz: elapsed:    4m26s, calls:     243804 (  1082/sec), seq/s:     10, branches:  15279, corpus:   615, failures: 3/2608, gas/s:    995399379
+⇾ fuzz: elapsed:    4m29s, calls:     247050 (  1075/sec), seq/s:     10, branches:  15279, corpus:   615, failures: 3/2640, gas/s:    973778603
+⇾ fuzz: elapsed:    4m32s, calls:     250221 (  1050/sec), seq/s:     10, branches:  15279, corpus:   615, failures: 3/2672, gas/s:    968175159
+⇾ fuzz: elapsed:    4m35s, calls:     253464 (  1074/sec), seq/s:     10, branches:  15279, corpus:   615, failures: 3/2705, gas/s:    970802824
+⇾ fuzz: elapsed:    4m38s, calls:     256459 (   996/sec), seq/s:      9, branches:  15279, corpus:   615, failures: 3/2735, gas/s:    880936614
+⇾ [Worker 4] Shrinking complete after 5000 attempts (limit: 5000)
+⇾ fuzz: elapsed:    4m41s, calls:     259298 (   945/sec), seq/s:      8, branches:  15279, corpus:   615, failures: 3/2762, gas/s:    838671250
+⇾ [Worker 6] Shrinking complete after 5000 attempts (limit: 5000)
+⇾ fuzz: elapsed:    4m44s, calls:     262189 (   961/sec), seq/s:      9, branches:  15279, corpus:   615, failures: 3/2790, gas/s:    906143388
+⇾ fuzz: elapsed:    4m47s, calls:     265168 (   985/sec), seq/s:     10, branches:  15279, corpus:   615, failures: 3/2822, gas/s:    909076040
+⇾ fuzz: elapsed:    4m50s, calls:     267954 (   926/sec), seq/s:      8, branches:  15279, corpus:   615, failures: 3/2849, gas/s:    854708719
+⇾ fuzz: elapsed:    4m53s, calls:     271249 (  1092/sec), seq/s:     10, branches:  15279, corpus:   615, failures: 3/2880, gas/s:   1019355242
+⇾ fuzz: elapsed:    4m56s, calls:     274617 (  1116/sec), seq/s:     11, branches:  15279, corpus:   615, failures: 3/2916, gas/s:   1009259247
+⇾ fuzz: elapsed:    4m59s, calls:     277986 (  1120/sec), seq/s:     10, branches:  15279, corpus:   615, failures: 3/2949, gas/s:   1002030805
+⇾ fuzz: elapsed:    5m02s, calls:     281057 (  1017/sec), seq/s:     10, branches:  15279, corpus:   615, failures: 3/2980, gas/s:    929247121
+⇾ fuzz: elapsed:    5m05s, calls:     284152 (  1021/sec), seq/s:     10, branches:  15279, corpus:   615, failures: 3/3013, gas/s:    942375956
+⇾ fuzz: elapsed:    5m08s, calls:     287101 (   978/sec), seq/s:      9, branches:  15279, corpus:   615, failures: 3/3041, gas/s:    913523726
+⇾ fuzz: elapsed:    5m11s, calls:     290221 (  1039/sec), seq/s:     10, branches:  15280, corpus:   616, failures: 3/3072, gas/s:    867126688
+⇾ fuzz: elapsed:    5m14s, calls:     293077 (   942/sec), seq/s:      9, branches:  15280, corpus:   616, failures: 3/3101, gas/s:    886130378
+⇾ fuzz: elapsed:    5m17s, calls:     295910 (   941/sec), seq/s:      9, branches:  15280, corpus:   616, failures: 3/3129, gas/s:    876672772
+⇾ fuzz: elapsed:    5m20s, calls:     298211 (   761/sec), seq/s:      7, branches:  15283, corpus:   617, failures: 3/3153, gas/s:    678594820
+⇾ fuzz: elapsed:    5m23s, calls:     301016 (   927/sec), seq/s:      8, branches:  15283, corpus:   617, failures: 3/3180, gas/s:    849993172
+⇾ fuzz: elapsed:    5m26s, calls:     304107 (  1027/sec), seq/s:      9, branches:  15283, corpus:   617, failures: 4/3210, gas/s:    882674299
+⇾ fuzz: elapsed:    5m29s, calls:     307201 (  1029/sec), seq/s:     10, branches:  15283, corpus:   617, failures: 5/3242, gas/s:    989055403
+⇾ fuzz: elapsed:    5m32s, calls:     310355 (  1049/sec), seq/s:      9, branches:  15284, corpus:   618, failures: 5/3272, gas/s:    896017421
+⇾ fuzz: elapsed:    5m35s, calls:     313336 (   990/sec), seq/s:      9, branches:  15284, corpus:   618, failures: 5/3302, gas/s:    912906509
+⇾ fuzz: elapsed:    5m38s, calls:     316928 (  1189/sec), seq/s:     12, branches:  15284, corpus:   618, failures: 5/3339, gas/s:   1063875807
+⇾ fuzz: elapsed:    5m41s, calls:     320027 (  1023/sec), seq/s:      9, branches:  15286, corpus:   619, failures: 5/3367, gas/s:    931660579
+⇾ fuzz: elapsed:    5m44s, calls:     323453 (  1140/sec), seq/s:     11, branches:  15286, corpus:   619, failures: 5/3403, gas/s:   1029295184
+⇾ fuzz: elapsed:    5m47s, calls:     326892 (  1138/sec), seq/s:     10, branches:  15286, corpus:   619, failures: 5/3436, gas/s:   1038857782
+⇾ fuzz: elapsed:    5m50s, calls:     330408 (  1168/sec), seq/s:     12, branches:  15286, corpus:   619, failures: 5/3473, gas/s:   1035198488
+⇾ fuzz: elapsed:    5m53s, calls:     333872 (  1148/sec), seq/s:     10, branches:  15286, corpus:   619, failures: 5/3506, gas/s:   1025805382
+⇾ fuzz: elapsed:    5m56s, calls:     337422 (  1182/sec), seq/s:     11, branches:  15286, corpus:   619, failures: 5/3542, gas/s:   1017472029
+⇾ fuzz: elapsed:    5m59s, calls:     340869 (  1148/sec), seq/s:     11, branches:  15286, corpus:   619, failures: 5/3577, gas/s:   1025737454
+⇾ fuzz: elapsed:    6m02s, calls:     344073 (  1067/sec), seq/s:     11, branches:  15286, corpus:   619, failures: 5/3611, gas/s:    903673532
+⇾ fuzz: elapsed:    6m06s, calls:     347148 (  1017/sec), seq/s:      9, branches:  15286, corpus:   619, failures: 5/3641, gas/s:    906774888
+⇾ fuzz: elapsed:    6m09s, calls:     350075 (   975/sec), seq/s:      8, branches:  15289, corpus:   620, failures: 5/3668, gas/s:    911008700
+⇾ fuzz: elapsed:    6m12s, calls:     353505 (  1116/sec), seq/s:     11, branches:  15289, corpus:   620, failures: 5/3704, gas/s:    959097973
+⇾ fuzz: elapsed:    6m15s, calls:     356783 (  1090/sec), seq/s:     10, branches:  15289, corpus:   620, failures: 5/3735, gas/s:    964028866
+⇾ fuzz: elapsed:    6m18s, calls:     359808 (  1002/sec), seq/s:     10, branches:  15289, corpus:   620, failures: 5/3768, gas/s:    888628785
+⇾ fuzz: elapsed:    6m21s, calls:     363006 (  1059/sec), seq/s:      9, branches:  15289, corpus:   620, failures: 5/3798, gas/s:    926235872
+⇾ fuzz: elapsed:    6m24s, calls:     366237 (  1076/sec), seq/s:     10, branches:  15289, corpus:   620, failures: 5/3829, gas/s:    956262756
+⇾ fuzz: elapsed:    6m27s, calls:     370055 (  1268/sec), seq/s:     13, branches:  15289, corpus:   620, failures: 5/3870, gas/s:   1064793198
+⇾ fuzz: elapsed:    6m30s, calls:     373310 (  1081/sec), seq/s:      9, branches:  15291, corpus:   621, failures: 5/3900, gas/s:    932453490
+⇾ fuzz: elapsed:    6m33s, calls:     376602 (  1095/sec), seq/s:     11, branches:  15291, corpus:   621, failures: 5/3935, gas/s:    988370708
+⇾ fuzz: elapsed:    6m36s, calls:     380105 (  1154/sec), seq/s:     10, branches:  15291, corpus:   621, failures: 5/3968, gas/s:   1058549657
+⇾ fuzz: elapsed:    6m39s, calls:     383512 (  1130/sec), seq/s:     11, branches:  15291, corpus:   621, failures: 5/4003, gas/s:    997263438
+⇾ fuzz: elapsed:    6m42s, calls:     386923 (  1129/sec), seq/s:     11, branches:  15293, corpus:   622, failures: 5/4038, gas/s:    972998555
+⇾ fuzz: elapsed:    6m45s, calls:     390476 (  1168/sec), seq/s:     11, branches:  15293, corpus:   622, failures: 5/4073, gas/s:    989693598
+⇾ fuzz: elapsed:    6m48s, calls:     393957 (  1157/sec), seq/s:     11, branches:  15298, corpus:   622, failures: 5/4109, gas/s:    975490775
+⇾ fuzz: elapsed:    6m51s, calls:     396946 (   990/sec), seq/s:      9, branches:  15298, corpus:   623, failures: 5/4138, gas/s:    907622333
+⇾ fuzz: elapsed:    6m54s, calls:     400144 (  1065/sec), seq/s:     10, branches:  15298, corpus:   623, failures: 5/4170, gas/s:    913826929
+⇾ fuzz: elapsed:    6m57s, calls:     403653 (  1162/sec), seq/s:     11, branches:  15298, corpus:   623, failures: 5/4206, gas/s:    998799933
+⇾ fuzz: elapsed:    7m00s, calls:     407123 (  1133/sec), seq/s:     11, branches:  15298, corpus:   623, failures: 5/4240, gas/s:    985575084
+⇾ fuzz: elapsed:    7m03s, calls:     410275 (  1046/sec), seq/s:     10, branches:  15298, corpus:   623, failures: 5/4272, gas/s:    891841840
+⇾ fuzz: elapsed:    7m06s, calls:     413183 (   958/sec), seq/s:      9, branches:  15298, corpus:   623, failures: 5/4300, gas/s:    875452561
+⇾ fuzz: elapsed:    7m09s, calls:     416456 (  1090/sec), seq/s:     10, branches:  15298, corpus:   623, failures: 5/4333, gas/s:    963965756
+⇾ fuzz: elapsed:    7m12s, calls:     420010 (  1176/sec), seq/s:     11, branches:  15298, corpus:   623, failures: 5/4368, gas/s:   1057279031
+⇾ fuzz: elapsed:    7m15s, calls:     423217 (  1062/sec), seq/s:     10, branches:  15298, corpus:   623, failures: 5/4401, gas/s:    973673397
+⇾ fuzz: elapsed:    7m18s, calls:     426721 (  1160/sec), seq/s:     11, branches:  15298, corpus:   623, failures: 5/4436, gas/s:   1035515887
+⇾ fuzz: elapsed:    7m21s, calls:     430308 (  1189/sec), seq/s:     11, branches:  15298, corpus:   623, failures: 5/4471, gas/s:   1031410519
+⇾ fuzz: elapsed:    7m25s, calls:     434003 (  1223/sec), seq/s:     12, branches:  15298, corpus:   623, failures: 5/4508, gas/s:   1074181797
+⇾ fuzz: elapsed:    7m28s, calls:     437666 (  1211/sec), seq/s:     12, branches:  15298, corpus:   623, failures: 5/4546, gas/s:   1047325196
+⇾ fuzz: elapsed:    7m31s, calls:     441196 (  1175/sec), seq/s:     11, branches:  15298, corpus:   623, failures: 5/4580, gas/s:   1038435785
+⇾ fuzz: elapsed:    7m34s, calls:     444720 (  1173/sec), seq/s:     11, branches:  15299, corpus:   624, failures: 5/4615, gas/s:    999948710
+⇾ fuzz: elapsed:    7m37s, calls:     447815 (  1021/sec), seq/s:     10, branches:  15299, corpus:   624, failures: 5/4648, gas/s:    890288393
+⇾ fuzz: elapsed:    7m40s, calls:     450856 (  1003/sec), seq/s:      9, branches:  15299, corpus:   624, failures: 5/4677, gas/s:    927792881
+⇾ fuzz: elapsed:    7m43s, calls:     454301 (  1147/sec), seq/s:     11, branches:  15299, corpus:   624, failures: 5/4712, gas/s:    985672520
+⇾ fuzz: elapsed:    7m46s, calls:     457692 (  1093/sec), seq/s:     10, branches:  15299, corpus:   624, failures: 5/4746, gas/s:    971284159
+⇾ fuzz: elapsed:    7m49s, calls:     460876 (  1052/sec), seq/s:     10, branches:  15299, corpus:   624, failures: 5/4779, gas/s:    931776333
+⇾ fuzz: elapsed:    7m52s, calls:     463704 (   931/sec), seq/s:      8, branches:  15299, corpus:   624, failures: 5/4805, gas/s:    868070778
+⇾ fuzz: elapsed:    7m55s, calls:     467259 (  1181/sec), seq/s:     11, branches:  15299, corpus:   624, failures: 5/4841, gas/s:   1006756019
+⇾ fuzz: elapsed:    7m58s, calls:     470914 (  1180/sec), seq/s:     11, branches:  15299, corpus:   624, failures: 5/4877, gas/s:   1023045732
+⇾ fuzz: elapsed:    8m01s, calls:     474614 (  1232/sec), seq/s:     12, branches:  15299, corpus:   624, failures: 5/4915, gas/s:   1031373942
+⇾ fuzz: elapsed:    8m04s, calls:     478143 (  1175/sec), seq/s:     11, branches:  15299, corpus:   624, failures: 5/4951, gas/s:   1018555898
+⇾ fuzz: elapsed:    8m07s, calls:     481778 (  1193/sec), seq/s:     11, branches:  15299, corpus:   624, failures: 5/4986, gas/s:   1013589679
+⇾ fuzz: elapsed:    8m10s, calls:     485283 (  1166/sec), seq/s:     11, branches:  15299, corpus:   624, failures: 5/5020, gas/s:    998009293
+⇾ fuzz: elapsed:    8m13s, calls:     488852 (  1185/sec), seq/s:     12, branches:  15299, corpus:   624, failures: 5/5058, gas/s:   1037767722
+⇾ fuzz: elapsed:    8m16s, calls:     492541 (  1218/sec), seq/s:     11, branches:  15299, corpus:   624, failures: 5/5093, gas/s:   1033548458
+⇾ fuzz: elapsed:    8m19s, calls:     495681 (  1045/sec), seq/s:     10, branches:  15300, corpus:   625, failures: 5/5125, gas/s:    939336379
+⇾ fuzz: elapsed:    8m22s, calls:     498890 (  1067/sec), seq/s:     10, branches:  15300, corpus:   625, failures: 5/5158, gas/s:    942446444
+⇾ fuzz: elapsed:    8m25s, calls:     501776 (   957/sec), seq/s:      9, branches:  15301, corpus:   626, failures: 5/5187, gas/s:    839909133
+⇾ Transaction test limit reached, halting now...
+⇾ Fuzzer stopped, test results follow below ...
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.adv_callHandlerDirectly(uint8,uint256,uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.adv_claimLiveness(uint256,uint256,uint8)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.adv_cleanBatchLiveness(uint256,uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.adv_createLiveness(uint256,uint256,uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.adv_deleteLiveness(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.adv_depositLiveness(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.adv_executeProtectedBatch()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.adv_executeProtectedBatchWithQuote()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.adv_fullExitAndReenter(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.adv_impersonateSwapper(uint8,uint256,uint256,uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.adv_interestLiveness(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.adv_mutateForeignSchedule(uint8,uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.adv_nonOwnerSetter(uint8,uint256,uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.adv_planProtectedBatch(uint256,uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.adv_principalAndInterestLiveness(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.adv_topUpLiveness(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.adv_withdrawLiveness(uint256,uint256,bool)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_activateProtectedPurchaseWindow()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_activateProtectedPurchaseWindow_clamped(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_batchBuyRbtc((uint64[],address,uint256,uint256))[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_batchBuyRbtc_allRows(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_batchBuyRbtc_clamped(uint256,uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_batchBuyRbtc_zeroMinOut(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_batchBuyRbtcAcrossHandlers((uint64[],address,uint256,uint256)[])[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_batchBuyRbtcAcrossHandlers_clamped(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_createDcaSchedule(address,uint256,uint256,uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_createDcaSchedule_clamped(uint256,uint256,uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_deleteDcaSchedule(address,uint64,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_deleteDcaSchedule_clamped(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_depositToken(address,uint64,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_depositToken_clamped(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_depositToken_dust(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_secondary(uint8,uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_setSchedulePaused(address,uint64,bool)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_setSchedulePaused_clamped(uint256,bool)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_topUpFromInterest(address,uint64,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_topUpFromInterest_clamped(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_updatePurchaseAmount(address,uint64,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_updatePurchaseAmount_clamped(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_updatePurchasePeriod(address,uint64,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_updatePurchasePeriod_clamped(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_withdrawAllAccumulatedInterest(address[],uint256[])[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_withdrawAllAccumulatedInterest_clamped(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_withdrawAllAccumulatedRbtc(address[],uint256[])[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_withdrawAllAccumulatedRbtc_asCollector(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_withdrawAllAccumulatedRbtc_clamped(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_withdrawToken(address,uint64,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_withdrawToken_clamped(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_withdrawToken_full(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_withdrawTokenAndInterest(address,uint64,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_withdrawTokenAndInterest_clamped(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.env_bumpLayerBankIndex(bool,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.env_donateETH(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.env_donateIntermediateToRouter(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.env_donateStablecoin(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.env_moveSovrynPrice(uint256,bool)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.env_setDexPrice(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.env_setOraclePrice(bool,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.env_setOracleValid(bool,bool)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.env_setSovrynExitFee(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.env_skipBlocks(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.env_skipDays(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.layerBankHandlerDex_secondary(uint8,uint256,uint256,uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.operationsAdmin_remapAttempt(uint8,uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.operationsAdmin_secondary(uint8,uint256,bool)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.probe_buyOne(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.probe_feeCurve(uint256,uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_accruedInterestIdentity()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_activePathAllowlisted()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_anchorOnGrid()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_canActivateSync()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_depositPauseOnlyAssigned()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_idleCashCoversPrincipal()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_idleCashExact()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_lendingNoRawStablecoin()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_marketValueCoversUserValues()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_nativeConservation()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_oneBuyPerDay()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_previewsNeverRevert()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_principalBackedNoLoss()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_principalHasSharesNoLoss()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_privilegedHoldNothing()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_rbtcAssetSplit()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_rbtcBooksExact()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_rbtcSolvency()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_retiredIdsStayDead()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_routesFixed()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_scheduleCounts()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_scheduleDomains()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_settingsDomains()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_stablecoinConservation()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_virtualSharesBacked()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_virtualSharesExact()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_windowBounded()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.property_windowFreeze()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.roundTrip_createDelete(uint256,uint256,uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.roundTrip_depositWithdraw(uint256,uint256,uint8,bool)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.roundTrip_interestTwice(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.setCurrentActor(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.setCurrentSwapper(uint256)[0m
+⇾ [1m[31m[FAILED] [0m[0m[1mAssertion Test: FuzzTester.adv_protectedBatchScenario(uint256,uint256,uint256,uint256,uint256,bool,bool)[0m
+Test for method "FuzzTester.adv_protectedBatchScenario(uint256,uint256,uint256,uint256,uint256,bool,bool)" resulted in an assertion failure after the following call sequence:
+[1m[Call Sequence][0m
+1) FuzzTester.adv_fullExitAndReenter(uint256,uint256)(6564884559935786913787462645624740629187880633605400846918287578960147725091, 74551610127532259184319038635280866386834398182444822176547051182) (block=25, time=25, gas=12500000, gasprice=0, value=0, sender=0x10000)
+2) FuzzTester.adv_protectedBatchScenario(uint256,uint256,uint256,uint256,uint256,bool,bool)(286531216665065191416643476521846067202003291690714572541076950922224583726, 26328072917139296674479583849828193027609744038578805069019428366, 710504257944837593415645361196545624152479218671655117695451733762624709319, 30267999105505149529054168452996990108236455161247430269617460890586842253461, 0, true, false) (block=25, time=25, gas=12500000, gasprice=0, value=0, sender=0x20000)
+[1m[Execution Trace][0m
+ => [1m[34m[call] [0m[0mAdmin.adv_protectedBatchScenario(uint256,uint256,uint256,uint256,uint256,bool,bool)(286531216665065191416643476521846067202003291690714572541076950922224583726, 26328072917139296674479583849828193027609744038578805069019428366, 710504257944837593415645361196545624152479218671655117695451733762624709319, 30267999105505149529054168452996990108236455161247430269617460890586842253461, 0, true, false) (addr=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519], value=0, sender=0x20000)
+	 => [1m[34m[call] [0m[0mDcaManager.getUserMutationsAllowedFromBlock()() (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (0)][0m[0m
+	 => [1m[34m[call] [0m[0mFizzIToken.tokenPrice()() (addr=0x2CfFF1c8Df8CE2BA6CBa19699CCBa6F381734938, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (1013700000000000000)][0m[0m
+	 => [1m[34m[call] [0m[0mFizzIToken.setTokenPrice(uint256)(865497060000000000) (addr=0x2CfFF1c8Df8CE2BA6CBa19699CCBa6F381734938, value=0, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return ()][0m[0m
+	 => [1m[34m[call] [0m[0mStdCheats.prank(address)(SwapperB [0x5a12]) (addr=0x7109709ECfa91a80626fF3989D68f67F5b1DD12D, value=0, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return ()][0m[0m
+	 => [1m[34m[call] [0m[0mDcaManager.activateProtectedPurchaseWindow()() (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=0, sender=SwapperB [0x5a12])
+		 => [1m[34m[call] [0m[0mOperationsAdmin.isSwapper(address)(SwapperB [0x5a12]) (addr=0xdaE97900D4B184c5D2012dcdB658c008966466DD, value=<nil>, sender=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB)
+			 => [1m[32m[return (true)][0m[0m
+		 => [1m[35m[event] [0m[0mDcaManager__ProtectedPurchaseWindowActivated(SwapperB [0x5a12], 30)
+		 => [1m[32m[return ()][0m[0m
+	 => [1m[34m[call] [0m[0mDcaManager.getUserMutationsAllowedFromBlock()() (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (30)][0m[0m
+	 => [1m[34m[call] [0m[0mDcaManager.getDcaSchedule(address,uint64)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return ({tokenBalance: 4604083404282480159657, cadenceAnchor: 0, paused: false, purchasePeriod: 86400, routeIndex: 1, user: Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], purchaseAmount: 4604083404282480159657})][0m[0m
+	 => [1m[34m[call] [0m[0mMockLayerBankAToken.getNormalizedIncome()() (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (1000000038051750380517503805)][0m[0m
+	 => [1m[34m[call] [0m[0mLayerBankDocHandlerMoc.getUserShares(address)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (4604083229089054395233)][0m[0m
+	 => [1m[34m[call] [0m[0mLayerBankDocHandlerMoc.getUserShares(address)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (4604083229089054395233)][0m[0m
+	 => [1m[34m[call] [0m[0mLayerBankDocHandlerMoc.getUserShares(address)(Bob [0xa251723bDB913C80CDEdb56EeE116F14611A4379]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (0)][0m[0m
+	 => [1m[34m[call] [0m[0mLayerBankDocHandlerMoc.getUserShares(address)(Charlie [0xA594C0510365Db9dBAEBB1546a59E96E115C3b22]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (0)][0m[0m
+	 => [1m[34m[call] [0m[0mLayerBankDocHandlerMoc.getUserShares(address)(FeeCollector [0xC7f2Cf4845C6db0e1a1e91ED41Bcd0FcC1b0E141]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (0)][0m[0m
+	 => [1m[34m[call] [0m[0mSovrynDocHandlerMoc.getUserShares(address)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E]) (addr=SovrynDocHandlerMoc [0x9848e4470F89bec8b050eCDf93F69B8660B6046C], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (0)][0m[0m
+	 => [1m[34m[call] [0m[0mSovrynDocHandlerMoc.getUserShares(address)(Bob [0xa251723bDB913C80CDEdb56EeE116F14611A4379]) (addr=SovrynDocHandlerMoc [0x9848e4470F89bec8b050eCDf93F69B8660B6046C], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (0)][0m[0m
+	 => [1m[34m[call] [0m[0mSovrynDocHandlerMoc.getUserShares(address)(Charlie [0xA594C0510365Db9dBAEBB1546a59E96E115C3b22]) (addr=SovrynDocHandlerMoc [0x9848e4470F89bec8b050eCDf93F69B8660B6046C], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (0)][0m[0m
+	 => [1m[34m[call] [0m[0mSovrynDocHandlerMoc.getUserShares(address)(FeeCollector [0xC7f2Cf4845C6db0e1a1e91ED41Bcd0FcC1b0E141]) (addr=SovrynDocHandlerMoc [0x9848e4470F89bec8b050eCDf93F69B8660B6046C], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (0)][0m[0m
+	 => [1m[34m[call] [0m[0mLayerBankHandlerDex.getUserShares(address)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E]) (addr=LayerBankHandlerDex [0x612Be731946c59C61Ba449f1011F22Ff8a3a389c], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (0)][0m[0m
+	 => [1m[34m[call] [0m[0mLayerBankHandlerDex.getUserShares(address)(Bob [0xa251723bDB913C80CDEdb56EeE116F14611A4379]) (addr=LayerBankHandlerDex [0x612Be731946c59C61Ba449f1011F22Ff8a3a389c], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (0)][0m[0m
+	 => [1m[34m[call] [0m[0mLayerBankHandlerDex.getUserShares(address)(Charlie [0xA594C0510365Db9dBAEBB1546a59E96E115C3b22]) (addr=LayerBankHandlerDex [0x612Be731946c59C61Ba449f1011F22Ff8a3a389c], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (0)][0m[0m
+	 => [1m[34m[call] [0m[0mLayerBankHandlerDex.getUserShares(address)(FeeCollector [0xC7f2Cf4845C6db0e1a1e91ED41Bcd0FcC1b0E141]) (addr=LayerBankHandlerDex [0x612Be731946c59C61Ba449f1011F22Ff8a3a389c], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (0)][0m[0m
+	 => [1m[34m[call] [0m[0mDcaManager.getDcaSchedule(address,uint64)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return ({tokenBalance: 4604083404282480159657, cadenceAnchor: 0, paused: false, purchasePeriod: 86400, routeIndex: 1, user: Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], purchaseAmount: 4604083404282480159657})][0m[0m
+	 => [1m[34m[call] [0m[0mMockLayerBankAToken.getNormalizedIncome()() (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (1000000038051750380517503805)][0m[0m
+	 => [1m[34m[call] [0m[0mDcaManager.getDcaSchedule(address,uint64)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return ({tokenBalance: 4604083404282480159657, cadenceAnchor: 0, paused: false, purchasePeriod: 86400, routeIndex: 1, user: Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], purchaseAmount: 4604083404282480159657})][0m[0m
+	 => [1m[34m[call] [0m[0mLayerBankDocHandlerMoc.getUserShares(address)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (4604083229089054395233)][0m[0m
+	 => [1m[34m[call] [0m[0mMockLayerBankAToken.getNormalizedIncome()() (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (1000000038051750380517503805)][0m[0m
+	 => [1m[34m[call] [0m[0mDcaManager.getUserMutationsAllowedFromBlock()() (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (30)][0m[0m
+	 => [1m[34m[call] [0m[0mMockLayerBankAToken.getNormalizedIncome()() (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (1000000038051750380517503805)][0m[0m
+	 => [1m[34m[call] [0m[0mFizzIToken.getExitFeeBps()() (addr=0x2CfFF1c8Df8CE2BA6CBa19699CCBa6F381734938, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (0)][0m[0m
+	 => [1m[34m[call] [0m[0mDcaManager.getDcaSchedule(address,uint64)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return ({tokenBalance: 4604083404282480159657, cadenceAnchor: 0, paused: false, purchasePeriod: 86400, routeIndex: 1, user: Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], purchaseAmount: 4604083404282480159657})][0m[0m
+	 => [1m[34m[call] [0m[0mDcaManager.getDcaSchedule(address,uint64)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return ({tokenBalance: 4604083404282480159657, cadenceAnchor: 0, paused: false, purchasePeriod: 86400, routeIndex: 1, user: Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], purchaseAmount: 4604083404282480159657})][0m[0m
+	 => [1m[34m[call] [0m[0mOperationsAdmin.areDepositsPaused(address,uint256)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0xdaE97900D4B184c5D2012dcdB658c008966466DD, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (false)][0m[0m
+	 => [1m[34m[call] [0m[0mDOC.balanceOf(address)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E]) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (995395916595717519840343)][0m[0m
+	 => [1m[35m[event] [0m[0mLogString("Clamping value 0 to 1")
+	 => [1m[34m[call] [0m[0mMockLayerBankAToken.getNormalizedIncome()() (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (1000000038051750380517503805)][0m[0m
+	 => [1m[34m[call] [0m[0mStdCheats.prank(address)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E]) (addr=0x7109709ECfa91a80626fF3989D68f67F5b1DD12D, value=0, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return ()][0m[0m
+	 => [1m[34m[call] [0m[0mDcaManager.depositToken(address,uint64,uint256)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1, 1) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=0, sender=Alice [0x276c280BA74986247527F08DafE0336abD86eF4E])
+		 => [1m[34m[call] [0m[0mOperationsAdmin.getHandler(address,uint256)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0xdaE97900D4B184c5D2012dcdB658c008966466DD, value=<nil>, sender=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB)
+			 => [1m[32m[return (LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])][0m[0m
+		 => [1m[34m[call] [0m[0mOperationsAdmin.areDepositsPaused(address,uint256)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0xdaE97900D4B184c5D2012dcdB658c008966466DD, value=<nil>, sender=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB)
+			 => [1m[32m[return (false)][0m[0m
+		 => [1m[34m[call] [0m[0mLayerBankDocHandlerMoc.depositToken(address,uint256)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], 1) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=0, sender=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB)
+			 => [1m[34m[call] [0m[0mDOC.balanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [1m[32m[return (0)][0m[0m
+			 => [1m[34m[call] [0m[0mDOC.transferFrom(address,address,uint256)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 1) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=0, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [1m[35m[event] [0m[0mTransfer(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 1)
+				 => [1m[32m[return (true)][0m[0m
+			 => [1m[34m[call] [0m[0mDOC.balanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [1m[32m[return (1)][0m[0m
+			 => [1m[35m[event] [0m[0mTokenHandler__TokenDeposited(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], 1)
+			 => [1m[34m[call] [0m[0mMockLayerBankAToken.scaledBalanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [1m[32m[return (4604083229089054395233)][0m[0m
+			 => [1m[34m[call] [0m[0mMockLayerBankPool.supply(address,uint256,address,uint16)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1, LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 0) (addr=0x3857b6c6f162fDA9BD591D4CCDEF8C00093cC357, value=0, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [1m[34m[call] [0m[0mDOC.balanceOf(address)(0x2AC24b15a2Ded48F4B51e70293589058546a11FE) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=0x3857b6c6f162fDA9BD591D4CCDEF8C00093cC357)
+					 => [1m[32m[return (4604083404282480159657)][0m[0m
+				 => [1m[34m[call] [0m[0mDOC.transferFrom(address,address,uint256)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 0x2AC24b15a2Ded48F4B51e70293589058546a11FE, 1) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=0, sender=0x3857b6c6f162fDA9BD591D4CCDEF8C00093cC357)
+					 => [1m[35m[event] [0m[0mTransfer(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 0x2AC24b15a2Ded48F4B51e70293589058546a11FE, 1)
+					 => [1m[32m[return (true)][0m[0m
+				 => [1m[34m[call] [0m[0mDOC.balanceOf(address)(0x2AC24b15a2Ded48F4B51e70293589058546a11FE) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=0x3857b6c6f162fDA9BD591D4CCDEF8C00093cC357)
+					 => [1m[32m[return (4604083404282480159658)][0m[0m
+				 => [1m[34m[call] [0m[0mMockLayerBankAToken.mintScaled(address,uint256)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 1) (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=0, sender=0x3857b6c6f162fDA9BD591D4CCDEF8C00093cC357)
+					 => [1m[35m[event] [0m[0mTransfer(0x0, LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 1)
+					 => [1m[32m[return (1)][0m[0m
+				 => [1m[32m[return ()][0m[0m
+			 => [1m[34m[call] [0m[0mMockLayerBankAToken.scaledBalanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [1m[32m[return (4604083229089054395234)][0m[0m
+			 => [1m[35m[event] [0m[0mLendingHandler__UserSharesUpdated(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], 4604083229089054395233, 4604083229089054395234)
+			 => [1m[32m[return ()][0m[0m
+		 => [1m[35m[event] [0m[0mDcaManager__TokenBalanceUpdated(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1, 4604083404282480159658)
+		 => [1m[32m[return ()][0m[0m
+	 => [1m[34m[call] [0m[0mMockLayerBankAToken.getNormalizedIncome()() (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (1000000038051750380517503805)][0m[0m
+	 => [1m[34m[call] [0m[0mDcaManager.getUserMutationsAllowedFromBlock()() (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (30)][0m[0m
+	 => [1m[34m[call] [0m[0mDcaManager.getUserMutationsAllowedFromBlock()() (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (30)][0m[0m
+	 => [1m[34m[call] [0m[0mDcaManager.getDcaSchedule(address,uint64)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return ({tokenBalance: 4604083404282480159658, cadenceAnchor: 0, paused: false, purchasePeriod: 86400, routeIndex: 1, user: Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], purchaseAmount: 4604083404282480159657})][0m[0m
+	 => [1m[34m[call] [0m[0mMockLayerBankAToken.getNormalizedIncome()() (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (1000000038051750380517503805)][0m[0m
+	 => [1m[34m[call] [0m[0mMockLayerBankAToken.scaledBalanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (4604083229089054395234)][0m[0m
+	 => [1m[34m[call] [0m[0mUSDRIF.balanceOf(address)(0x3150d9893b1c0bf6F48E591d2d873DdA3A88Ac7C) (addr=USDRIF [0xDc82c0362A241Aa94d53546648EACe48C9773dAa], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (0)][0m[0m
+	 => [1m[34m[call] [0m[0mDcaManager.getDcaSchedule(address,uint64)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return ({tokenBalance: 4604083404282480159658, cadenceAnchor: 0, paused: false, purchasePeriod: 86400, routeIndex: 1, user: Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], purchaseAmount: 4604083404282480159657})][0m[0m
+	 => [1m[34m[call] [0m[0mLayerBankDocHandlerMoc.getUserShares(address)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (4604083229089054395234)][0m[0m
+	 => [1m[34m[call] [0m[0mLayerBankDocHandlerMoc.getUserShares(address)(Bob [0xa251723bDB913C80CDEdb56EeE116F14611A4379]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (0)][0m[0m
+	 => [1m[34m[call] [0m[0mLayerBankDocHandlerMoc.getUserShares(address)(Charlie [0xA594C0510365Db9dBAEBB1546a59E96E115C3b22]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (0)][0m[0m
+	 => [1m[34m[call] [0m[0mLayerBankDocHandlerMoc.getUserShares(address)(FeeCollector [0xC7f2Cf4845C6db0e1a1e91ED41Bcd0FcC1b0E141]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (0)][0m[0m
+	 => [1m[34m[call] [0m[0mDcaManager.getDcaSchedule(address,uint64)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return ({tokenBalance: 4604083404282480159658, cadenceAnchor: 0, paused: false, purchasePeriod: 86400, routeIndex: 1, user: Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], purchaseAmount: 4604083404282480159657})][0m[0m
+	 => [1m[34m[call] [0m[0mDcaManager.getUserMutationsAllowedFromBlock()() (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (30)][0m[0m
+	 => [1m[34m[call] [0m[0mStdCheats.prank(address)(SwapperB [0x5a12]) (addr=0x7109709ECfa91a80626fF3989D68f67F5b1DD12D, value=0, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return ()][0m[0m
+	 => [1m[34m[call] [0m[0mDcaManager.batchBuyRbtc((uint64[],address,uint256,uint256))({scheduleIds: [1], token: DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], routeIndex: 1, minRbtcOut: 0}) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=0, sender=SwapperB [0x5a12])
+		 => [1m[34m[call] [0m[0mOperationsAdmin.isSwapper(address)(SwapperB [0x5a12]) (addr=0xdaE97900D4B184c5D2012dcdB658c008966466DD, value=<nil>, sender=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB)
+			 => [1m[32m[return (true)][0m[0m
+		 => [1m[35m[event] [0m[0mDcaManager__TokenBalanceUpdated(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1, 1)
+		 => [1m[34m[call] [0m[0mOperationsAdmin.getHandler(address,uint256)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 1) (addr=0xdaE97900D4B184c5D2012dcdB658c008966466DD, value=<nil>, sender=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB)
+			 => [1m[32m[return (LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])][0m[0m
+		 => [1m[34m[call] [0m[0mLayerBankDocHandlerMoc.batchBuyRbtc(address[],uint64[],uint256[],uint256)([Alice [0x276c280BA74986247527F08DafE0336abD86eF4E]], [1], [4604083404282480159657], 0) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=0, sender=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB)
+			 => [1m[34m[call] [0m[0mMockLayerBankPool.getReserveNormalizedIncome(address)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0]) (addr=0x3857b6c6f162fDA9BD591D4CCDEF8C00093cC357, value=<nil>, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [1m[34m[call] [0m[0mMockLayerBankAToken.getNormalizedIncome()() (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=0x3857b6c6f162fDA9BD591D4CCDEF8C00093cC357)
+					 => [1m[32m[return (1000000038051750380517503805)][0m[0m
+				 => [1m[32m[return (1000000038051750380517503805)][0m[0m
+			 => [1m[35m[event] [0m[0mLendingHandler__UserSharesUpdated(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], 4604083229089054395234, 0)
+			 => [1m[34m[call] [0m[0mMockLayerBankAToken.scaledBalanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [1m[32m[return (4604083229089054395234)][0m[0m
+			 => [1m[34m[call] [0m[0mDOC.balanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [1m[32m[return (0)][0m[0m
+			 => [1m[34m[call] [0m[0mMockLayerBankPool.withdraw(address,uint256,address)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 4604083404282480159658, LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=0x3857b6c6f162fDA9BD591D4CCDEF8C00093cC357, value=0, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [1m[34m[call] [0m[0mMockLayerBankAToken.UNDERLYING_ASSET_ADDRESS()() (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=0x3857b6c6f162fDA9BD591D4CCDEF8C00093cC357)
+					 => [1m[32m[return (DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0])][0m[0m
+				 => [1m[34m[call] [0m[0mMockLayerBankAToken.burnScaled(address,address,uint256)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 4604083404282480159658) (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=0, sender=0x3857b6c6f162fDA9BD591D4CCDEF8C00093cC357)
+					 => [1m[35m[event] [0m[0mTransfer(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 0x0, 4604083229089054395234)
+					 => [1m[34m[call] [0m[0mDOC.balanceOf(address)(0x2AC24b15a2Ded48F4B51e70293589058546a11FE) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=0x2AC24b15a2Ded48F4B51e70293589058546a11FE)
+						 => [1m[32m[return (4604083404282480159658)][0m[0m
+					 => [1m[34m[call] [0m[0mDOC.transfer(address,uint256)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 4604083404282480159658) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=0, sender=0x2AC24b15a2Ded48F4B51e70293589058546a11FE)
+						 => [1m[35m[event] [0m[0mTransfer(0x2AC24b15a2Ded48F4B51e70293589058546a11FE, LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 4604083404282480159658)
+						 => [1m[32m[return (true)][0m[0m
+					 => [1m[32m[return (4604083404282480159658)][0m[0m
+				 => [1m[32m[return (4604083404282480159658)][0m[0m
+			 => [1m[34m[call] [0m[0mMockLayerBankAToken.scaledBalanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [1m[32m[return (0)][0m[0m
+			 => [1m[34m[call] [0m[0mDOC.balanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [1m[32m[return (4604083404282480159658)][0m[0m
+			 => [1m[35m[event] [0m[0mLendingHandler__SharesRedeemedBatch(4604083404282480159658, 4604083229089054395234)
+			 => [1m[34m[call] [0m[0mDOC.balanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [1m[32m[return (4604083404282480159658)][0m[0m
+			 => [1m[34m[call] [0m[0mMockMocProxy.redeemFreeDoc(uint256)(4604083404282480159658) (addr=0x856e75e9c0Da547F9753c17746D6cc139b668e5c, value=0, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [1m[34m[call] [0m[0mDOC.balanceOf(address)(0x856e75e9c0Da547F9753c17746D6cc139b668e5c) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=0x856e75e9c0Da547F9753c17746D6cc139b668e5c)
+					 => [1m[32m[return (0)][0m[0m
+				 => [1m[34m[call] [0m[0mDOC.transferFrom(address,address,uint256)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 0x856e75e9c0Da547F9753c17746D6cc139b668e5c, 4604083404282480159658) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=0, sender=0x856e75e9c0Da547F9753c17746D6cc139b668e5c)
+					 => [1m[35m[event] [0m[0mTransfer(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 0x856e75e9c0Da547F9753c17746D6cc139b668e5c, 4604083404282480159658)
+					 => [1m[32m[return (true)][0m[0m
+				 => [1m[34m[call] [0m[0mDOC.balanceOf(address)(0x856e75e9c0Da547F9753c17746D6cc139b668e5c) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=0x856e75e9c0Da547F9753c17746D6cc139b668e5c)
+					 => [1m[32m[return (4604083404282480159658)][0m[0m
+				 => [1m[34m[call] [0m[0mDOC.burn(uint256)(4604083404282480159658) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=0, sender=0x856e75e9c0Da547F9753c17746D6cc139b668e5c)
+					 => [1m[35m[event] [0m[0mTransfer(0x856e75e9c0Da547F9753c17746D6cc139b668e5c, 0x0, 4604083404282480159658)
+					 => [1m[32m[return ()][0m[0m
+				 => [1m[34m[call] [0m[0mLayerBankDocHandlerMoc.<unresolved method>(msg_data=) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=92081668085649603, sender=0x856e75e9c0Da547F9753c17746D6cc139b668e5c)
+					 => [1m[32m[return][0m[0m
+				 => [1m[35m[event] [0m[0mMockMocProxy__DocRedeemed(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], 4604083404282480159658, 92081668085649603)
+				 => [1m[32m[return ()][0m[0m
+			 => [1m[34m[call] [0m[0mDOC.balanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], value=<nil>, sender=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E])
+				 => [1m[32m[return (0)][0m[0m
+			 => [1m[35m[event] [0m[0mPurchaseRbtc__RbtcBought(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E], DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 91819676734458136, 1, 4604083404282480159658)
+			 => [1m[35m[event] [0m[0mPurchaseRbtc__SuccessfulRbtcBatchPurchase(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0], 92081668085649603, 4604083404282480159658)
+			 => [1m[35m[event] [0m[0mPurchaseFees__FeeCredited(FeeCollector [0xC7f2Cf4845C6db0e1a1e91ED41Bcd0FcC1b0E141], 261991351191466, 13099567559573309587)
+			 => [1m[32m[return ()][0m[0m
+		 => [1m[32m[return ()][0m[0m
+	 => [1m[34m[call] [0m[0mMockLayerBankAToken.getNormalizedIncome()() (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (1000000038051750380517503805)][0m[0m
+	 => [1m[34m[call] [0m[0mLayerBankDocHandlerMoc.getUserShares(address)(Alice [0x276c280BA74986247527F08DafE0336abD86eF4E]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (0)][0m[0m
+	 => [1m[34m[call] [0m[0mLayerBankDocHandlerMoc.getUserShares(address)(Bob [0xa251723bDB913C80CDEdb56EeE116F14611A4379]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (0)][0m[0m
+	 => [1m[34m[call] [0m[0mLayerBankDocHandlerMoc.getUserShares(address)(Charlie [0xA594C0510365Db9dBAEBB1546a59E96E115C3b22]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (0)][0m[0m
+	 => [1m[34m[call] [0m[0mLayerBankDocHandlerMoc.getUserShares(address)(FeeCollector [0xC7f2Cf4845C6db0e1a1e91ED41Bcd0FcC1b0E141]) (addr=LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E], value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (0)][0m[0m
+	 => [1m[34m[call] [0m[0mMockLayerBankAToken.scaledBalanceOf(address)(LayerBankDocHandlerMoc [0xc043F015EB8cA0b94D4cAde622ed7369ce4ffE4E]) (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (0)][0m[0m
+	 => [1m[35m[event] [0m[0mAssertEqFail("Invalid: 4604083229089054395234!=4604083229089054395233, reason: SP-64: burned shares moved inside the protected window")
+	 => [1m[31m[panic: assertion failed][0m[0m
+
+
+⇾ [1m[31m[FAILED] [0m[0m[1mAssertion Test: FuzzTester.property_sharePreviewPositive()[0m
+Test for method "FuzzTester.property_sharePreviewPositive()" resulted in an assertion failure after the following call sequence:
+[1m[Call Sequence][0m
+1) FuzzTester.dcaManager_secondary(uint8,uint256,uint256)(14, 0, 7067388259113536866020341319705285333727003752286414718178843498770871512) (block=25, time=25, gas=12500000, gasprice=0, value=0, sender=0x10000)
+2) FuzzTester.property_sharePreviewPositive()() (block=25, time=25, gas=12500000, gasprice=0, value=0, sender=0x30000)
+[1m[Execution Trace][0m
+ => [1m[34m[call] [0m[0mAdmin.property_sharePreviewPositive()() (addr=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519], value=0, sender=0x30000)
+	 => [1m[34m[call] [0m[0mMockLayerBankAToken.getNormalizedIncome()() (addr=0x2AC24b15a2Ded48F4B51e70293589058546a11FE, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (1000000038051750380517503805)][0m[0m
+	 => [1m[34m[call] [0m[0mDcaManager.getTokenMinPurchaseAmount(address)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0]) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (1)][0m[0m
+	 => [1m[34m[call] [0m[0mFizzIToken.tokenPrice()() (addr=0x2CfFF1c8Df8CE2BA6CBa19699CCBa6F381734938, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (1013700000000000000)][0m[0m
+	 => [1m[34m[call] [0m[0mDcaManager.getTokenMinPurchaseAmount(address)(DOC [0xd85BdcdaE4db1FAEB8eF93331525FE68D7C8B3f0]) (addr=0x238213078DbD09f2D15F4c14c02300FA1b2A81BB, value=<nil>, sender=Admin [0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519])
+		 => [1m[32m[return (1)][0m[0m
+	 => [1m[35m[event] [0m[0mAssertGtFail("Invalid: 0<=0 failed, reason: GL-15: a minimum deposit previews zero receipt shares")
+	 => [1m[31m[panic: assertion failed][0m[0m
+
+
+⇾ Test summary: 100 test(s) passed, 2 test(s) failed
+⇾ html report(s) saved to: fizz_data/corpus_medusa/coverage/coverage_report.html
+⇾ lcov report(s) saved to: fizz_data/corpus_medusa/coverage/lcov.info

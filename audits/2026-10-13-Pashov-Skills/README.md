@@ -20,7 +20,8 @@ This is an automated scan. It is not an engagement with Pashov Audit Group or it
 - The agents could only read the repository. Their proof-of-concept tests and simulations stayed
   outside it. Some agents read live Rootstock state with read-only calls and a read-only fork. No
   agent sent a transaction.
-- The X-Ray and Fizz skills from the same repository have not run yet.
+- The X-Ray and Fizz skills from the same repository ran after this scan, on the same `src/`. The
+  scan's agents did not read their output. See [X-Ray](#x-ray) and [Fizz](#fizz) below.
 
 The report has 2 findings at confidence 75 and 28 leads. A lead is a code smell with an incomplete
 exploit path. It is not scored and it is not a false positive. "Seen in k/3 runs" counts the passes
@@ -68,7 +69,10 @@ Three leads (`depositToken`, `createDcaSchedule`, and `_batchRetrieveStablecoin`
 resize") have the same cause, and six or more agents raised them. `whenUserMutationsAllowed` is on
 seven `DcaManager` functions but not on `depositToken` or `createDcaSchedule`. Users can therefore add
 lending shares that a short row then spends. The simple fix is to add the modifier to both functions.
-Without a lending loss the effect is rounding dust.
+Without a lending loss the effect is rounding dust. Fizz reproduced that case: a 1-wei
+`depositToken` inside a live window made a planned LayerBank batch burn one share more than
+planned (property SP-64, `test_repro_adv_protectedBatchScenario` in
+[`test/fizz/FoundryTester.sol`](../../test/fizz/FoundryTester.sol)).
 
 ### LayerBank round-up burns
 
@@ -113,3 +117,65 @@ retry with another amount.
   [`docs/relaunch/CUTOVER_RUNBOOK.md`](../../docs/relaunch/CUTOVER_RUNBOOK.md#compromised-swapper).
 - The back-to-back protected window lead is a risk that `AUDIT_GUIDE.md` and `AGENTS.md`
   invariant 10 accept.
+
+## X-Ray
+
+BitChill ran the [X-Ray](https://github.com/pashov/skills) skill (version 2) on 2026-10-16, in Claude
+Code on Claude Opus 5.5, on the same `src/` as the scan. `src/tropykus-legacy/` was excluded.
+X-Ray writes a pre-audit map, not findings. Its output is in [`x-ray/`](./x-ray/):
+
+- [`x-ray.md`](./x-ray/x-ray.md): the protocol overview, trust model, and the areas a reviewer should
+  read first.
+- [`invariants.md`](./x-ray/invariants.md): 37 guards, 22 single-contract invariants, 6 cross-contract
+  invariants and 3 economic invariants. 10 of them are not enforced on-chain.
+- [`entry-points.md`](./x-ray/entry-points.md): every external entry point with its caller and access
+  control.
+- [`architecture.svg`](./x-ray/architecture.svg): the contract and route diagram.
+
+The file headers name `f414708a`, the commit that added the scan report. `src/` there is identical to
+`d5c09c32`.
+
+## Fizz
+
+BitChill ran the [Fizz](https://github.com/pashov/skills) skill (version 1) between 2026-10-17 and
+2026-10-19, in Claude Code on Claude Opus 5.5, on the same `src/`. Fizz writes a stateful fuzzing
+suite from the X-Ray output and runs it. Like the scan, it is automated and is not an engagement with
+Pashov Audit Group.
+
+- **Method.** Automatic mode. Opus subagents ran one at a time: 5 property-discovery agents and a
+  synthesizer at high effort, then 2 implementers and a report writer at default effort. Tools:
+  Foundry 1.7.1 and Medusa 1.5.1. Echidna 2.3.3 was installed but not run.
+- **Harness.** [`test/fizz/`](../../test/fizz/) deploys one `DcaManager` and one `OperationsAdmin`
+  with five routes: DOC idle, LayerBank and Sovryn on Money on Chain, and USDRIF idle and LayerBank on
+  Uniswap with the oracle floor. Every venue is a local mock. The Sovryn iToken mock can lose value
+  and charge an exit fee. `SovrynHandlerDex` is not deployed.
+- **Properties.** [`PROPERTIES.md`](../../PROPERTIES.md) lists 106 properties: 29 global and 77
+  checked after specific calls. 83 are SHOULD-HOLD, so a violation is a bug. 23 are EXPLORATORY, so a
+  violation needs human review. All 106 are implemented.
+- **Campaign.** One Medusa run: 10 workers, 8 min 25 s, 501,776 calls (it stopped at the 500,000
+  call limit), 15,301 branches. Line coverage of the deployed in-scope contracts is 85% to 100%.
+
+No SHOULD-HOLD property failed. Two EXPLORATORY properties failed, and each has a Foundry test in
+[`test/fizz/FoundryTester.sol`](../../test/fizz/FoundryTester.sol) that replays the fuzzer's
+sequence:
+
+- **SP-64**, `test_repro_adv_protectedBatchScenario`. A deposit inside a protected window made the
+  batch burn one share more than planned. This confirms the "Deposits and new schedules in the
+  protected window" note above. Without a lending loss the effect is one share of dust.
+- **GL-15**, `test_repro_property_sharePreviewPositive`. After the owner sets DOC's minimum purchase
+  amount to 1 wei, a minimum deposit previews zero Sovryn shares. A real 1-wei deposit reverts and
+  loses nothing. The property is too strong for an owner-set minimum.
+
+Limits of this run:
+
+- GL-24 failed once in a short trial run before the campaign but not in the campaign. It is an
+  unconfirmed rounding-dust lead on Sovryn.
+- SP-72 was never evaluated, because no Dex purchase used the path through USDT0.
+- The run was short. The report recommends a run of 4 hours or more, then 24 hours before release,
+  and an Echidna pass.
+
+[`fizz_data/report.md`](../../fizz_data/report.md) has the full results, coverage per contract, and
+next steps. [`fizz_data/property-plan.md`](../../fizz_data/property-plan.md) gives each property's
+source and reasoning. The Medusa corpus, the coverage HTML and the compile caches are not committed.
+To rerun, run `medusa fuzz` from the repository root, or
+`forge test --match-contract FoundryTester` for the Foundry tests.

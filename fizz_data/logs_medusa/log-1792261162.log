@@ -1,0 +1,13 @@
+⇾ Compiling targets with crytic-compile
+⇾ Running command:
+/opt/homebrew/bin/crytic-compile . --export-format solc --export-dir fizz_data/crytic-export --foundry-compile-all
+⇾ Finished compiling targets in 47s
+⇾ artifacts: Medusa is running against a new set of build artifacts
+⇾ No Slither cached results found at fizz_data/slither_results.json
+⇾ Running Slither:
+/opt/homebrew/bin/slither . --ignore-compile --print echidna --json -
+⇾ Finished running Slither in 1m27s
+⇾ Running with a timeout of 300 seconds
+⇾ Setting up test chain
+error Failed to initialize the test chain
+‣ test chain state write error when adding tx to pending block: insufficient funds for gas * price + value: address 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38 have 340282366920938463463374607431768211455 want 6277101735386680763835789423207666416102355444464034512895

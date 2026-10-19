@@ -1,0 +1,594 @@
+[
+  {
+    "name": "DcaManager",
+    "sourcePath": "src/DcaManager.sol",
+    "artifactPath": "out/DcaManager.sol/DcaManager.json",
+    "constructor": {
+      "inputs": [
+        {
+          "name": "operationsAdmin",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "minPurchasePeriod",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "maxSchedulesPerToken",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "initialOwner",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "activateProtectedPurchaseWindow",
+        "inputs": [],
+        "stateMutability": "nonpayable",
+        "tier": "primary"
+      },
+      {
+        "name": "batchBuyRbtc",
+        "inputs": [
+          {
+            "name": "batch",
+            "type": "tuple",
+            "internalType": "IDcaManager.Batch"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "primary"
+      },
+      {
+        "name": "batchBuyRbtcAcrossHandlers",
+        "inputs": [
+          {
+            "name": "batches",
+            "type": "array",
+            "internalType": "IDcaManager.Batch[]"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "primary"
+      },
+      {
+        "name": "createDcaSchedule",
+        "inputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "depositAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "purchaseAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "purchasePeriod",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "routeIndex",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "primary"
+      },
+      {
+        "name": "deleteDcaSchedule",
+        "inputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "scheduleId",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "scheduleIdIndex",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "primary"
+      },
+      {
+        "name": "depositToken",
+        "inputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "scheduleId",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "depositAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "primary"
+      },
+      {
+        "name": "setMaxSchedulesPerToken",
+        "inputs": [
+          {
+            "name": "maxSchedulesPerToken",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "secondary"
+      },
+      {
+        "name": "setMinPurchasePeriod",
+        "inputs": [
+          {
+            "name": "minPurchasePeriod",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "secondary"
+      },
+      {
+        "name": "setSchedulePaused",
+        "inputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "scheduleId",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "paused",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "primary"
+      },
+      {
+        "name": "setTokenMinPurchaseAmount",
+        "inputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "minPurchaseAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "secondary"
+      },
+      {
+        "name": "topUpFromInterest",
+        "inputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "scheduleId",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "amount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "primary"
+      },
+      {
+        "name": "updatePurchaseAmount",
+        "inputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "scheduleId",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "newPurchaseAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "primary"
+      },
+      {
+        "name": "updatePurchasePeriod",
+        "inputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "scheduleId",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "newPurchasePeriod",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "primary"
+      },
+      {
+        "name": "withdrawAllAccumulatedInterest",
+        "inputs": [
+          {
+            "name": "tokens",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "routeIndexes",
+            "type": "array",
+            "internalType": "uint256[]"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "primary"
+      },
+      {
+        "name": "withdrawAllAccumulatedRbtc",
+        "inputs": [
+          {
+            "name": "tokens",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "routeIndexes",
+            "type": "array",
+            "internalType": "uint256[]"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "primary"
+      },
+      {
+        "name": "withdrawToken",
+        "inputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "scheduleId",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "withdrawalAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "primary"
+      },
+      {
+        "name": "withdrawTokenAndInterest",
+        "inputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "scheduleId",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "withdrawalAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "primary"
+      }
+    ],
+    "hasReceive": false,
+    "hasFallback": false
+  },
+  {
+    "name": "OperationsAdmin",
+    "sourcePath": "src/OperationsAdmin.sol",
+    "artifactPath": "out/OperationsAdmin.sol/OperationsAdmin.json",
+    "constructor": {
+      "inputs": [
+        {
+          "name": "initialOwner",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "addSwapper",
+        "inputs": [
+          {
+            "name": "swapper",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "secondary"
+      },
+      {
+        "name": "revokeSwapper",
+        "inputs": [
+          {
+            "name": "swapper",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "secondary"
+      },
+      {
+        "name": "setDepositsPaused",
+        "inputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "routeIndex",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "paused",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "secondary"
+      }
+    ],
+    "hasReceive": false,
+    "hasFallback": false
+  },
+  {
+    "name": "LayerBankHandlerDex",
+    "sourcePath": "src/layerbank/LayerBankHandlerDex.sol",
+    "artifactPath": "out/LayerBankHandlerDex.sol/LayerBankHandlerDex.json",
+    "constructor": {
+      "inputs": [
+        {
+          "name": "dcaManager",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "stablecoin",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "aToken",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "uniswapSettings",
+          "type": "tuple",
+          "internalType": "IPurchaseUniswap.UniswapSettings"
+        },
+        {
+          "name": "feeCollector",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "feeSettings",
+          "type": "tuple",
+          "internalType": "IPurchaseFees.FeeSettings"
+        },
+        {
+          "name": "amountOutMinimumPercent",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "amountOutMinimumSafetyCheck",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "initialOwner",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "restoreLendingApproval",
+        "inputs": [],
+        "stateMutability": "nonpayable",
+        "tier": "secondary"
+      },
+      {
+        "name": "restoreSwapRouterApproval",
+        "inputs": [],
+        "stateMutability": "nonpayable",
+        "tier": "secondary"
+      },
+      {
+        "name": "setAmountOutMinimumPercent",
+        "inputs": [
+          {
+            "name": "amountOutMinimumPercent",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "secondary"
+      },
+      {
+        "name": "setAmountOutMinimumSafetyCheck",
+        "inputs": [
+          {
+            "name": "amountOutMinimumSafetyCheck",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "secondary"
+      },
+      {
+        "name": "setFeeCollector",
+        "inputs": [
+          {
+            "name": "feeCollector",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "secondary"
+      },
+      {
+        "name": "setFeeRateParams",
+        "inputs": [
+          {
+            "name": "minFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "feePurchaseLowerBound",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "secondary"
+      },
+      {
+        "name": "setMocOracle",
+        "inputs": [
+          {
+            "name": "newOracle",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "secondary"
+      },
+      {
+        "name": "setPurchasePath",
+        "inputs": [
+          {
+            "name": "intermediateTokens",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "poolFeeRates",
+            "type": "array",
+            "internalType": "uint24[]"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "secondary"
+      },
+      {
+        "name": "setPurchasePathAllowed",
+        "inputs": [
+          {
+            "name": "intermediateTokens",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "poolFeeRates",
+            "type": "array",
+            "internalType": "uint24[]"
+          },
+          {
+            "name": "allowed",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "tier": "secondary"
+      }
+    ],
+    "hasReceive": true,
+    "hasFallback": false
+  }
+]
