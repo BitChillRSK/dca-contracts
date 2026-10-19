@@ -1,7 +1,7 @@
 # R116 — Pashov skills audit results
 
 Status: **implemented** · Assigned: yes · Optional/further-review: no · Stack on: R115
-([#182](https://github.com/BitChillRSK/dca-contracts/pull/182))
+([#182](https://github.com/BitChillRSK/dca-contracts/pull/182)) · PR: [#183](https://github.com/BitChillRSK/dca-contracts/pull/183)
 
 ## Objective
 

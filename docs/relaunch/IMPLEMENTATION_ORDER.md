@@ -1507,7 +1507,7 @@ Accumulated rBTC leaves only through `withdrawAllAccumulatedRbtc`, including a o
 list. `PurchaseRbtc.withdrawAccumulatedRbtc(user)` stays.
 Ask: none. Decided 2026-10-08.
 
-### R116 - Pashov skills audit results ([spec](./R116-pashov-skills-audit.md))
+### R116 - Pashov skills audit results ([spec](./R116-pashov-skills-audit.md), [#183](https://github.com/BitChillRSK/dca-contracts/pull/183))
 
 After R115, before audit freeze / relaunch deploy. Publish three automated runs of Pashov Audit
 Group's open-source skills on `src/` at `d5c09c32`: the solidity-auditor report (unchanged; 2
