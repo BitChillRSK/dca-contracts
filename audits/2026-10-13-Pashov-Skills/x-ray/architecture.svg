@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1434" height="645" viewBox="0 0 574 258" font-family="Arial, sans-serif">
+  <defs>
+    <marker id="ah" viewBox="0 0 8 6" refX="8" refY="3"
+      markerWidth="4" markerHeight="3" orient="auto">
+      <path d="M0.5,0.5 L7,3 L0.5,5.5" fill="none" stroke="#94A3B8"
+        stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round"/>
+    </marker>
+    <filter id="shadow" x="-6%" y="-8%" width="112%" height="128%">
+      <feDropShadow dx="0" dy="0.5" stdDeviation="0.8"
+        flood-color="#000" flood-opacity="0.05"/>
+    </filter>
+  </defs>
+  <rect width="574" height="258" fill="#F8F9FB" rx="3"/>
+  <text x="287" y="11" text-anchor="middle" font-size="6" font-weight="700" fill="#1E293B">BitChill DCA Architecture</text>
+  <rect x="212" y="16" width="150" height="10" rx="3" fill="#fff" stroke="#E2E5EA" stroke-width="0.4"/>
+  <rect x="217" y="18.5" width="5" height="5" rx="2.5" fill="#fff" stroke="#E2E5EA" stroke-width="0.4"/>
+  <text x="225" y="22.5" font-size="3.5" fill="#1E293B">Actor</text>
+  <rect x="257" y="18.5" width="5" height="5" rx="1.5" fill="#fff" stroke="#E2E5EA" stroke-width="0.4"/>
+  <rect x="258" y="19.5" width="0.8" height="3" rx="0.4" fill="#3B82F6"/>
+  <text x="265" y="22.5" font-size="3.5" fill="#1E293B">Protocol</text>
+  <rect x="305" y="18.5" width="5" height="5" rx="1.5" fill="#fff" stroke="#E2E5EA" stroke-width="0.4"/>
+  <rect x="306" y="19.5" width="0.8" height="3" rx="0.4" fill="#F59E0B"/>
+  <text x="313" y="22.5" font-size="3.5" fill="#1E293B">External</text>
+  <rect x="80.7" y="84.0" width="473.2" height="40.0" rx="5" fill="#EDEEF2"/>
+  <text x="550.9" y="89.0" text-anchor="end" font-size="3.5" fill="#94A3B8" font-weight="500">Core</text>
+  <rect x="80.7" y="146.0" width="473.2" height="40.0" rx="5" fill="#EDEEF2"/>
+  <text x="550.9" y="151.0" text-anchor="end" font-size="3.5" fill="#94A3B8" font-weight="500">Handlers (hold funds)</text>
+  <path d="M73.6,46.0 C73.6,70.0 158.8,70.0 158.8,94.0" fill="none" stroke="#94A3B8" stroke-width="0.5" marker-end="url(#ah)"/>
+  <path d="M175.6,46.0 C175.6,70.0 158.8,70.0 158.8,94.0" fill="none" stroke="#94A3B8" stroke-width="0.5" marker-end="url(#ah)"/>
+  <path d="M271.0,46.0 C271.0,70.0 263.8,70.0 263.8,94.0" fill="none" stroke="#94A3B8" stroke-width="0.5" marker-end="url(#ah)"/>
+  <path d="M271.0,46.0 C271.0,70.0 158.8,70.0 158.8,94.0" fill="none" stroke="#94A3B8" stroke-width="0.5" marker-end="url(#ah)"/>
+  <path d="M195.8,112.0 C202.4,130.0 211.2,130.0 217.8,114.0" fill="none" stroke="#94A3B8" stroke-width="0.5" marker-end="url(#ah)"/>
+  <path d="M158.8,114.0 C158.8,135.0 161.9,135.0 161.9,156.0" fill="none" stroke="#94A3B8" stroke-width="0.5" marker-end="url(#ah)"/>
+  <path d="M158.8,114.0 C158.8,135.0 344.3,135.0 344.3,156.0" fill="none" stroke="#94A3B8" stroke-width="0.5" marker-end="url(#ah)"/>
+  <path d="M158.8,114.0 C158.8,135.0 499.7,135.0 499.7,156.0" fill="none" stroke="#94A3B8" stroke-width="0.5" marker-end="url(#ah)"/>
+  <path d="M161.9,176.0 C161.9,197.0 150.5,197.0 150.5,218.0" fill="none" stroke="#94A3B8" stroke-width="0.5" marker-end="url(#ah)"/>
+  <path d="M161.9,176.0 C161.9,197.0 254.9,197.0 254.9,218.0" fill="none" stroke="#94A3B8" stroke-width="0.5" marker-end="url(#ah)"/>
+  <path d="M161.9,176.0 C161.9,197.0 356.9,197.0 356.9,218.0" fill="none" stroke="#94A3B8" stroke-width="0.5" marker-end="url(#ah)"/>
+  <path d="M344.3,176.0 C344.3,197.0 150.5,197.0 150.5,218.0" fill="none" stroke="#94A3B8" stroke-width="0.5" marker-end="url(#ah)"/>
+  <path d="M344.3,176.0 C344.3,197.0 254.9,197.0 254.9,218.0" fill="none" stroke="#94A3B8" stroke-width="0.5" marker-end="url(#ah)"/>
+  <path d="M344.3,176.0 C344.3,197.0 356.9,197.0 356.9,218.0" fill="none" stroke="#94A3B8" stroke-width="0.5" marker-end="url(#ah)"/>
+  <path d="M344.3,176.0 C344.3,197.0 482.9,197.0 482.9,218.0" fill="none" stroke="#94A3B8" stroke-width="0.5" marker-end="url(#ah)"/>
+  <path d="M499.7,176.0 C499.7,197.0 356.9,197.0 356.9,218.0" fill="none" stroke="#94A3B8" stroke-width="0.5" marker-end="url(#ah)"/>
+  <path d="M499.7,176.0 C499.7,197.0 482.9,197.0 482.9,218.0" fill="none" stroke="#94A3B8" stroke-width="0.5" marker-end="url(#ah)"/>
+  <g filter="url(#shadow)">
+    <rect x="30.0" y="32.0" width="87.2" height="14" rx="7" fill="#fff" stroke="#E2E5EA" stroke-width="0.5"/>
+    <text x="73.6" y="40.8" text-anchor="middle" font-size="4.8" font-weight="600" fill="#1E293B">Schedule Owner</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="139.2" y="32.0" width="72.8" height="14" rx="7" fill="#fff" stroke="#E2E5EA" stroke-width="0.5"/>
+    <text x="175.6" y="40.8" text-anchor="middle" font-size="4.8" font-weight="600" fill="#1E293B">Swapper Bot</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="234.0" y="32.0" width="74.0" height="14" rx="7" fill="#fff" stroke="#E2E5EA" stroke-width="0.5"/>
+    <text x="271.0" y="40.8" text-anchor="middle" font-size="4.8" font-weight="600" fill="#1E293B">Owner</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="121.8" y="94.0" width="74.0" height="20" rx="3" fill="#fff" stroke="#E2E5EA" stroke-width="0.5"/>
+    <rect x="124.8" y="97.0" width="1.4" height="14" rx="0.6" fill="#3B82F6"/>
+    <text x="158.8" y="103.5" text-anchor="middle" font-size="4.8" font-weight="600" fill="#1E293B">DcaManager</text>
+    <text x="158.8" y="108.5" text-anchor="middle" font-size="3.5" fill="#64748B">Ledger &amp; router</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="217.8" y="94.0" width="92.0" height="20" rx="3" fill="#fff" stroke="#E2E5EA" stroke-width="0.5"/>
+    <rect x="220.8" y="97.0" width="1.4" height="14" rx="0.6" fill="#3B82F6"/>
+    <text x="263.8" y="103.5" text-anchor="middle" font-size="4.8" font-weight="600" fill="#1E293B">OperationsAdmin</text>
+    <text x="263.8" y="108.5" text-anchor="middle" font-size="3.5" fill="#64748B">Registry</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="90.7" y="156.0" width="142.4" height="20" rx="3" fill="#fff" stroke="#E2E5EA" stroke-width="0.5"/>
+    <rect x="93.7" y="159.0" width="1.4" height="14" rx="0.6" fill="#3B82F6"/>
+    <text x="161.9" y="165.5" text-anchor="middle" font-size="4.8" font-weight="600" fill="#1E293B">Idle Handlers</text>
+    <text x="161.9" y="170.5" text-anchor="middle" font-size="3.5" fill="#64748B">IdleDocHandlerMoc / IdleHandlerDex</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="255.1" y="156.0" width="178.4" height="20" rx="3" fill="#fff" stroke="#E2E5EA" stroke-width="0.5"/>
+    <rect x="258.1" y="159.0" width="1.4" height="14" rx="0.6" fill="#3B82F6"/>
+    <text x="344.3" y="165.5" text-anchor="middle" font-size="4.8" font-weight="600" fill="#1E293B">LayerBank Handlers</text>
+    <text x="344.3" y="170.5" text-anchor="middle" font-size="3.5" fill="#64748B">LayerBankDocHandlerMoc / LayerBankHandlerDex</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="455.5" y="156.0" width="88.4" height="20" rx="3" fill="#fff" stroke="#E2E5EA" stroke-width="0.5"/>
+    <rect x="458.5" y="159.0" width="1.4" height="14" rx="0.6" fill="#3B82F6"/>
+    <text x="499.7" y="165.5" text-anchor="middle" font-size="4.8" font-weight="600" fill="#1E293B">Sovryn Handler</text>
+    <text x="499.7" y="170.5" text-anchor="middle" font-size="3.5" fill="#64748B">SovrynDocHandlerMoc</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="104.5" y="218.0" width="92.0" height="20" rx="3" fill="#fff" stroke="#E2E5EA" stroke-width="0.5"/>
+    <rect x="107.5" y="221.0" width="1.4" height="14" rx="0.6" fill="#F59E0B"/>
+    <text x="150.5" y="227.5" text-anchor="middle" font-size="4.8" font-weight="600" fill="#1E293B">Uniswap V3</text>
+    <text x="150.5" y="232.5" text-anchor="middle" font-size="3.5" fill="#64748B">SwapRouter02 / pools</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="218.5" y="218.0" width="72.8" height="20" rx="3" fill="#fff" stroke="#E2E5EA" stroke-width="0.5"/>
+    <rect x="221.5" y="221.0" width="1.4" height="14" rx="0.6" fill="#F59E0B"/>
+    <text x="254.9" y="227.5" text-anchor="middle" font-size="4.8" font-weight="600" fill="#1E293B">MoC BTC/USD</text>
+    <text x="254.9" y="232.5" text-anchor="middle" font-size="3.5" fill="#64748B">Price Feed</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="313.3" y="218.0" width="87.2" height="20" rx="3" fill="#fff" stroke="#E2E5EA" stroke-width="0.5"/>
+    <rect x="316.3" y="221.0" width="1.4" height="14" rx="0.6" fill="#F59E0B"/>
+    <text x="356.9" y="227.5" text-anchor="middle" font-size="4.8" font-weight="600" fill="#1E293B">Money on Chain</text>
+    <text x="356.9" y="232.5" text-anchor="middle" font-size="3.5" fill="#64748B">redeemFreeDoc</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="422.5" y="218.0" width="120.8" height="20" rx="3" fill="#fff" stroke="#E2E5EA" stroke-width="0.5"/>
+    <rect x="425.5" y="221.0" width="1.4" height="14" rx="0.6" fill="#F59E0B"/>
+    <text x="482.9" y="227.5" text-anchor="middle" font-size="4.8" font-weight="600" fill="#1E293B">Lending Markets</text>
+    <text x="482.9" y="232.5" text-anchor="middle" font-size="3.5" fill="#64748B">LayerBank Pool / Sovryn iDOC</text>
+  </g>
+  <rect x="87.8" y="65.0" width="56.8" height="6.0" rx="1" fill="#F8F9FB"/>
+  <text x="116.2" y="70.0" font-size="4" fill="#1E293B" font-weight="500" text-anchor="middle">schedules, withdrawals</text>
+  <rect x="147.2" y="65.0" width="40.0" height="6.0" rx="1" fill="#F8F9FB"/>
+  <text x="167.2" y="70.0" font-size="4" fill="#1E293B" font-weight="500" text-anchor="middle">window, batches</text>
+  <rect x="246.2" y="65.0" width="42.4" height="6.0" rx="1" fill="#F8F9FB"/>
+  <text x="267.4" y="70.0" font-size="4" fill="#1E293B" font-weight="500" text-anchor="middle">routes, swappers</text>
+  <rect x="205.7" y="65.0" width="18.4" height="6.0" rx="1" fill="#F8F9FB"/>
+  <text x="214.9" y="70.0" font-size="4" fill="#1E293B" font-weight="500" text-anchor="middle">limits</text>
+  <rect x="186.8" y="129.0" width="40.0" height="6.0" rx="1" fill="#F8F9FB"/>
+  <text x="206.8" y="134.0" font-size="4" fill="#1E293B" font-weight="500" text-anchor="middle">resolve handler</text>
+  <rect x="146.3" y="130.0" width="28.0" height="6.0" rx="1" fill="#F8F9FB"/>
+  <text x="160.3" y="135.0" font-size="4" fill="#1E293B" font-weight="500" text-anchor="middle">idle calls</text>
+  <rect x="231.5" y="130.0" width="40.0" height="6.0" rx="1" fill="#F8F9FB"/>
+  <text x="251.5" y="135.0" font-size="4" fill="#1E293B" font-weight="500" text-anchor="middle">LayerBank calls</text>
+  <rect x="312.8" y="130.0" width="32.8" height="6.0" rx="1" fill="#F8F9FB"/>
+  <text x="329.2" y="135.0" font-size="4" fill="#1E293B" font-weight="500" text-anchor="middle">Sovryn calls</text>
+  <rect x="142.2" y="192.0" width="28.0" height="6.0" rx="1" fill="#F8F9FB"/>
+  <text x="156.2" y="197.0" font-size="4" fill="#1E293B" font-weight="500" text-anchor="middle">idle swaps</text>
+  <rect x="194.4" y="192.0" width="28.0" height="6.0" rx="1" fill="#F8F9FB"/>
+  <text x="208.4" y="197.0" font-size="4" fill="#1E293B" font-weight="500" text-anchor="middle">idle floor</text>
+  <rect x="239.4" y="192.0" width="40.0" height="6.0" rx="1" fill="#F8F9FB"/>
+  <text x="259.4" y="197.0" font-size="4" fill="#1E293B" font-weight="500" text-anchor="middle">idle DOC redeem</text>
+  <rect x="235.8" y="184.0" width="23.2" height="6.0" rx="1" fill="#F8F9FB"/>
+  <text x="247.4" y="189.0" font-size="4" fill="#1E293B" font-weight="500" text-anchor="middle">LB swaps</text>
+  <rect x="288.0" y="192.0" width="23.2" height="6.0" rx="1" fill="#F8F9FB"/>
+  <text x="299.6" y="197.0" font-size="4" fill="#1E293B" font-weight="500" text-anchor="middle">LB floor</text>
+  <rect x="333.0" y="192.0" width="35.2" height="6.0" rx="1" fill="#F8F9FB"/>
+  <text x="350.6" y="197.0" font-size="4" fill="#1E293B" font-weight="500" text-anchor="middle">LB DOC redeem</text>
+  <rect x="392.4" y="192.0" width="42.4" height="6.0" rx="1" fill="#F8F9FB"/>
+  <text x="413.6" y="197.0" font-size="4" fill="#1E293B" font-weight="500" text-anchor="middle">supply, withdraw</text>
+  <rect x="405.9" y="184.0" width="44.8" height="6.0" rx="1" fill="#F8F9FB"/>
+  <text x="428.3" y="189.0" font-size="4" fill="#1E293B" font-weight="500" text-anchor="middle">Sovryn DOC redeem</text>
+  <rect x="477.3" y="192.0" width="28.0" height="6.0" rx="1" fill="#F8F9FB"/>
+  <text x="491.3" y="197.0" font-size="4" fill="#1E293B" font-weight="500" text-anchor="middle">mint, burn</text>
+</svg>

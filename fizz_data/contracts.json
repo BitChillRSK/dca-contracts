@@ -1,0 +1,3220 @@
+[
+  {
+    "name": "BitChillOwnable",
+    "sourcePath": "src/BitChillOwnable.sol",
+    "artifactPath": "out/BitChillOwnable.sol/BitChillOwnable.json",
+    "constructor": {
+      "inputs": [],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "acceptOwnership",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "transferOwnership",
+        "inputs": [
+          {
+            "name": "newOwner",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      }
+    ],
+    "hasReceive": false,
+    "hasFallback": false
+  },
+  {
+    "name": "DcaManager",
+    "sourcePath": "src/DcaManager.sol",
+    "artifactPath": "out/DcaManager.sol/DcaManager.json",
+    "constructor": {
+      "inputs": [
+        {
+          "name": "operationsAdmin",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "minPurchasePeriod",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "maxSchedulesPerToken",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "initialOwner",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "acceptOwnership",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "activateProtectedPurchaseWindow",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "batchBuyRbtc",
+        "inputs": [
+          {
+            "name": "batch",
+            "type": "tuple",
+            "internalType": "IDcaManager.Batch"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "batchBuyRbtcAcrossHandlers",
+        "inputs": [
+          {
+            "name": "batches",
+            "type": "array",
+            "internalType": "IDcaManager.Batch[]"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "createDcaSchedule",
+        "inputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "depositAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "purchaseAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "purchasePeriod",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "routeIndex",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "deleteDcaSchedule",
+        "inputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "scheduleId",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "scheduleIdIndex",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "depositToken",
+        "inputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "scheduleId",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "depositAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setMaxSchedulesPerToken",
+        "inputs": [
+          {
+            "name": "maxSchedulesPerToken",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setMinPurchasePeriod",
+        "inputs": [
+          {
+            "name": "minPurchasePeriod",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setSchedulePaused",
+        "inputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "scheduleId",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "paused",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setTokenMinPurchaseAmount",
+        "inputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "minPurchaseAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "topUpFromInterest",
+        "inputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "scheduleId",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "amount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "transferOwnership",
+        "inputs": [
+          {
+            "name": "newOwner",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "updatePurchaseAmount",
+        "inputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "scheduleId",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "newPurchaseAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "updatePurchasePeriod",
+        "inputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "scheduleId",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "newPurchasePeriod",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawAllAccumulatedInterest",
+        "inputs": [
+          {
+            "name": "tokens",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "routeIndexes",
+            "type": "array",
+            "internalType": "uint256[]"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawAllAccumulatedRbtc",
+        "inputs": [
+          {
+            "name": "tokens",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "routeIndexes",
+            "type": "array",
+            "internalType": "uint256[]"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawToken",
+        "inputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "scheduleId",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "withdrawalAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawTokenAndInterest",
+        "inputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "scheduleId",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "withdrawalAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      }
+    ],
+    "hasReceive": false,
+    "hasFallback": false
+  },
+  {
+    "name": "LendingHandler",
+    "sourcePath": "src/LendingHandler.sol",
+    "artifactPath": "out/LendingHandler.sol/LendingHandler.json",
+    "constructor": {
+      "inputs": [],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "depositToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "depositAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "getAccruedInterest",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "stablecoinLockedInDcaSchedules",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "restoreLendingApproval",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawInterest",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "stablecoinLockedInDcaSchedules",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "withdrawalAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      }
+    ],
+    "hasReceive": false,
+    "hasFallback": false
+  },
+  {
+    "name": "OperationsAdmin",
+    "sourcePath": "src/OperationsAdmin.sol",
+    "artifactPath": "out/OperationsAdmin.sol/OperationsAdmin.json",
+    "constructor": {
+      "inputs": [
+        {
+          "name": "initialOwner",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "acceptOwnership",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "addSwapper",
+        "inputs": [
+          {
+            "name": "swapper",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "assignHandler",
+        "inputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "routeIndex",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "handler",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "registerRoute",
+        "inputs": [
+          {
+            "name": "index",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "lends",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "revokeSwapper",
+        "inputs": [
+          {
+            "name": "swapper",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setDepositsPaused",
+        "inputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "routeIndex",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "paused",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "transferOwnership",
+        "inputs": [
+          {
+            "name": "newOwner",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      }
+    ],
+    "hasReceive": false,
+    "hasFallback": false
+  },
+  {
+    "name": "PurchaseFees",
+    "sourcePath": "src/PurchaseFees.sol",
+    "artifactPath": "out/PurchaseFees.sol/PurchaseFees.json",
+    "constructor": {
+      "inputs": [],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "acceptOwnership",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeCollector",
+        "inputs": [
+          {
+            "name": "feeCollector",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeRateParams",
+        "inputs": [
+          {
+            "name": "minFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "feePurchaseLowerBound",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "transferOwnership",
+        "inputs": [
+          {
+            "name": "newOwner",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      }
+    ],
+    "hasReceive": false,
+    "hasFallback": false
+  },
+  {
+    "name": "PurchaseMoc",
+    "sourcePath": "src/PurchaseMoc.sol",
+    "artifactPath": "out/PurchaseMoc.sol/PurchaseMoc.json",
+    "constructor": {
+      "inputs": [],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "acceptOwnership",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "batchBuyRbtc",
+        "inputs": [
+          {
+            "name": "buyers",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "scheduleIds",
+            "type": "array",
+            "internalType": "uint64[]"
+          },
+          {
+            "name": "purchaseAmounts",
+            "type": "array",
+            "internalType": "uint256[]"
+          },
+          {
+            "name": "minRbtcOut",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeCollector",
+        "inputs": [
+          {
+            "name": "feeCollector",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeRateParams",
+        "inputs": [
+          {
+            "name": "minFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "feePurchaseLowerBound",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "transferOwnership",
+        "inputs": [
+          {
+            "name": "newOwner",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawAccumulatedRbtc",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      }
+    ],
+    "hasReceive": true,
+    "hasFallback": false
+  },
+  {
+    "name": "PurchaseRbtc",
+    "sourcePath": "src/PurchaseRbtc.sol",
+    "artifactPath": "out/PurchaseRbtc.sol/PurchaseRbtc.json",
+    "constructor": {
+      "inputs": [],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "acceptOwnership",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "batchBuyRbtc",
+        "inputs": [
+          {
+            "name": "buyers",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "scheduleIds",
+            "type": "array",
+            "internalType": "uint64[]"
+          },
+          {
+            "name": "purchaseAmounts",
+            "type": "array",
+            "internalType": "uint256[]"
+          },
+          {
+            "name": "minRbtcOut",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeCollector",
+        "inputs": [
+          {
+            "name": "feeCollector",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeRateParams",
+        "inputs": [
+          {
+            "name": "minFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "feePurchaseLowerBound",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "transferOwnership",
+        "inputs": [
+          {
+            "name": "newOwner",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawAccumulatedRbtc",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      }
+    ],
+    "hasReceive": true,
+    "hasFallback": false
+  },
+  {
+    "name": "PurchaseUniswap",
+    "sourcePath": "src/PurchaseUniswap.sol",
+    "artifactPath": "out/PurchaseUniswap.sol/PurchaseUniswap.json",
+    "constructor": {
+      "inputs": [],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "acceptOwnership",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "batchBuyRbtc",
+        "inputs": [
+          {
+            "name": "buyers",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "scheduleIds",
+            "type": "array",
+            "internalType": "uint64[]"
+          },
+          {
+            "name": "purchaseAmounts",
+            "type": "array",
+            "internalType": "uint256[]"
+          },
+          {
+            "name": "minRbtcOut",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "restoreSwapRouterApproval",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setAmountOutMinimumPercent",
+        "inputs": [
+          {
+            "name": "amountOutMinimumPercent",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setAmountOutMinimumSafetyCheck",
+        "inputs": [
+          {
+            "name": "amountOutMinimumSafetyCheck",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeCollector",
+        "inputs": [
+          {
+            "name": "feeCollector",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeRateParams",
+        "inputs": [
+          {
+            "name": "minFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "feePurchaseLowerBound",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setMocOracle",
+        "inputs": [
+          {
+            "name": "newOracle",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setPurchasePath",
+        "inputs": [
+          {
+            "name": "intermediateTokens",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "poolFeeRates",
+            "type": "array",
+            "internalType": "uint24[]"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setPurchasePathAllowed",
+        "inputs": [
+          {
+            "name": "intermediateTokens",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "poolFeeRates",
+            "type": "array",
+            "internalType": "uint24[]"
+          },
+          {
+            "name": "allowed",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "transferOwnership",
+        "inputs": [
+          {
+            "name": "newOwner",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawAccumulatedRbtc",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      }
+    ],
+    "hasReceive": true,
+    "hasFallback": false
+  },
+  {
+    "name": "TokenHandler",
+    "sourcePath": "src/TokenHandler.sol",
+    "artifactPath": "out/TokenHandler.sol/TokenHandler.json",
+    "constructor": {
+      "inputs": [],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "depositToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "depositAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "withdrawalAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      }
+    ],
+    "hasReceive": false,
+    "hasFallback": false
+  },
+  {
+    "name": "IdleDocHandlerMoc",
+    "sourcePath": "src/idle/IdleDocHandlerMoc.sol",
+    "artifactPath": "out/IdleDocHandlerMoc.sol/IdleDocHandlerMoc.json",
+    "constructor": {
+      "inputs": [
+        {
+          "name": "dcaManager",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "docToken",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "feeCollector",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "mocProxy",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "feeSettings",
+          "type": "tuple",
+          "internalType": "IPurchaseFees.FeeSettings"
+        },
+        {
+          "name": "initialOwner",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "acceptOwnership",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "batchBuyRbtc",
+        "inputs": [
+          {
+            "name": "buyers",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "scheduleIds",
+            "type": "array",
+            "internalType": "uint64[]"
+          },
+          {
+            "name": "purchaseAmounts",
+            "type": "array",
+            "internalType": "uint256[]"
+          },
+          {
+            "name": "minRbtcOut",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "depositToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "depositAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeCollector",
+        "inputs": [
+          {
+            "name": "feeCollector",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeRateParams",
+        "inputs": [
+          {
+            "name": "minFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "feePurchaseLowerBound",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "transferOwnership",
+        "inputs": [
+          {
+            "name": "newOwner",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawAccumulatedRbtc",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "withdrawalAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      }
+    ],
+    "hasReceive": true,
+    "hasFallback": false
+  },
+  {
+    "name": "IdleHandler",
+    "sourcePath": "src/idle/IdleHandler.sol",
+    "artifactPath": "out/IdleHandler.sol/IdleHandler.json",
+    "constructor": {
+      "inputs": [],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "depositToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "depositAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "withdrawalAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      }
+    ],
+    "hasReceive": false,
+    "hasFallback": false
+  },
+  {
+    "name": "IdleHandlerDex",
+    "sourcePath": "src/idle/IdleHandlerDex.sol",
+    "artifactPath": "out/IdleHandlerDex.sol/IdleHandlerDex.json",
+    "constructor": {
+      "inputs": [
+        {
+          "name": "dcaManager",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "stablecoin",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "uniswapSettings",
+          "type": "tuple",
+          "internalType": "IPurchaseUniswap.UniswapSettings"
+        },
+        {
+          "name": "feeCollector",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "feeSettings",
+          "type": "tuple",
+          "internalType": "IPurchaseFees.FeeSettings"
+        },
+        {
+          "name": "amountOutMinimumPercent",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "amountOutMinimumSafetyCheck",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "initialOwner",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "acceptOwnership",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "batchBuyRbtc",
+        "inputs": [
+          {
+            "name": "buyers",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "scheduleIds",
+            "type": "array",
+            "internalType": "uint64[]"
+          },
+          {
+            "name": "purchaseAmounts",
+            "type": "array",
+            "internalType": "uint256[]"
+          },
+          {
+            "name": "minRbtcOut",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "depositToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "depositAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "restoreSwapRouterApproval",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setAmountOutMinimumPercent",
+        "inputs": [
+          {
+            "name": "amountOutMinimumPercent",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setAmountOutMinimumSafetyCheck",
+        "inputs": [
+          {
+            "name": "amountOutMinimumSafetyCheck",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeCollector",
+        "inputs": [
+          {
+            "name": "feeCollector",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeRateParams",
+        "inputs": [
+          {
+            "name": "minFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "feePurchaseLowerBound",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setMocOracle",
+        "inputs": [
+          {
+            "name": "newOracle",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setPurchasePath",
+        "inputs": [
+          {
+            "name": "intermediateTokens",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "poolFeeRates",
+            "type": "array",
+            "internalType": "uint24[]"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setPurchasePathAllowed",
+        "inputs": [
+          {
+            "name": "intermediateTokens",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "poolFeeRates",
+            "type": "array",
+            "internalType": "uint24[]"
+          },
+          {
+            "name": "allowed",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "transferOwnership",
+        "inputs": [
+          {
+            "name": "newOwner",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawAccumulatedRbtc",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "withdrawalAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      }
+    ],
+    "hasReceive": true,
+    "hasFallback": false
+  },
+  {
+    "name": "LayerBankDocHandlerMoc",
+    "sourcePath": "src/layerbank/LayerBankDocHandlerMoc.sol",
+    "artifactPath": "out/LayerBankDocHandlerMoc.sol/LayerBankDocHandlerMoc.json",
+    "constructor": {
+      "inputs": [
+        {
+          "name": "dcaManager",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "docToken",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "aToken",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "feeCollector",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "mocProxy",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "feeSettings",
+          "type": "tuple",
+          "internalType": "IPurchaseFees.FeeSettings"
+        },
+        {
+          "name": "initialOwner",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "acceptOwnership",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "batchBuyRbtc",
+        "inputs": [
+          {
+            "name": "buyers",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "scheduleIds",
+            "type": "array",
+            "internalType": "uint64[]"
+          },
+          {
+            "name": "purchaseAmounts",
+            "type": "array",
+            "internalType": "uint256[]"
+          },
+          {
+            "name": "minRbtcOut",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "depositToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "depositAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "getAccruedInterest",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "stablecoinLockedInDcaSchedules",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "restoreLendingApproval",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeCollector",
+        "inputs": [
+          {
+            "name": "feeCollector",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeRateParams",
+        "inputs": [
+          {
+            "name": "minFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "feePurchaseLowerBound",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "transferOwnership",
+        "inputs": [
+          {
+            "name": "newOwner",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawAccumulatedRbtc",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawInterest",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "stablecoinLockedInDcaSchedules",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "withdrawalAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      }
+    ],
+    "hasReceive": true,
+    "hasFallback": false
+  },
+  {
+    "name": "LayerBankHandler",
+    "sourcePath": "src/layerbank/LayerBankHandler.sol",
+    "artifactPath": "out/LayerBankHandler.sol/LayerBankHandler.json",
+    "constructor": {
+      "inputs": [],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "depositToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "depositAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "getAccruedInterest",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "stablecoinLockedInDcaSchedules",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "restoreLendingApproval",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawInterest",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "stablecoinLockedInDcaSchedules",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "withdrawalAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      }
+    ],
+    "hasReceive": false,
+    "hasFallback": false
+  },
+  {
+    "name": "LayerBankHandlerDex",
+    "sourcePath": "src/layerbank/LayerBankHandlerDex.sol",
+    "artifactPath": "out/LayerBankHandlerDex.sol/LayerBankHandlerDex.json",
+    "constructor": {
+      "inputs": [
+        {
+          "name": "dcaManager",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "stablecoin",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "aToken",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "uniswapSettings",
+          "type": "tuple",
+          "internalType": "IPurchaseUniswap.UniswapSettings"
+        },
+        {
+          "name": "feeCollector",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "feeSettings",
+          "type": "tuple",
+          "internalType": "IPurchaseFees.FeeSettings"
+        },
+        {
+          "name": "amountOutMinimumPercent",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "amountOutMinimumSafetyCheck",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "initialOwner",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "acceptOwnership",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "batchBuyRbtc",
+        "inputs": [
+          {
+            "name": "buyers",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "scheduleIds",
+            "type": "array",
+            "internalType": "uint64[]"
+          },
+          {
+            "name": "purchaseAmounts",
+            "type": "array",
+            "internalType": "uint256[]"
+          },
+          {
+            "name": "minRbtcOut",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "depositToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "depositAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "getAccruedInterest",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "stablecoinLockedInDcaSchedules",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "restoreLendingApproval",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "restoreSwapRouterApproval",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setAmountOutMinimumPercent",
+        "inputs": [
+          {
+            "name": "amountOutMinimumPercent",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setAmountOutMinimumSafetyCheck",
+        "inputs": [
+          {
+            "name": "amountOutMinimumSafetyCheck",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeCollector",
+        "inputs": [
+          {
+            "name": "feeCollector",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeRateParams",
+        "inputs": [
+          {
+            "name": "minFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "feePurchaseLowerBound",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setMocOracle",
+        "inputs": [
+          {
+            "name": "newOracle",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setPurchasePath",
+        "inputs": [
+          {
+            "name": "intermediateTokens",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "poolFeeRates",
+            "type": "array",
+            "internalType": "uint24[]"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setPurchasePathAllowed",
+        "inputs": [
+          {
+            "name": "intermediateTokens",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "poolFeeRates",
+            "type": "array",
+            "internalType": "uint24[]"
+          },
+          {
+            "name": "allowed",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "transferOwnership",
+        "inputs": [
+          {
+            "name": "newOwner",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawAccumulatedRbtc",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawInterest",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "stablecoinLockedInDcaSchedules",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "withdrawalAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      }
+    ],
+    "hasReceive": true,
+    "hasFallback": false
+  },
+  {
+    "name": "SovrynDocHandlerMoc",
+    "sourcePath": "src/sovryn/SovrynDocHandlerMoc.sol",
+    "artifactPath": "out/SovrynDocHandlerMoc.sol/SovrynDocHandlerMoc.json",
+    "constructor": {
+      "inputs": [
+        {
+          "name": "dcaManager",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "docToken",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "iToken",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "feeCollector",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "mocProxy",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "feeSettings",
+          "type": "tuple",
+          "internalType": "IPurchaseFees.FeeSettings"
+        },
+        {
+          "name": "initialOwner",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "acceptOwnership",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "batchBuyRbtc",
+        "inputs": [
+          {
+            "name": "buyers",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "scheduleIds",
+            "type": "array",
+            "internalType": "uint64[]"
+          },
+          {
+            "name": "purchaseAmounts",
+            "type": "array",
+            "internalType": "uint256[]"
+          },
+          {
+            "name": "minRbtcOut",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "depositToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "depositAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "getAccruedInterest",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "stablecoinLockedInDcaSchedules",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "restoreLendingApproval",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeCollector",
+        "inputs": [
+          {
+            "name": "feeCollector",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeRateParams",
+        "inputs": [
+          {
+            "name": "minFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "feePurchaseLowerBound",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "transferOwnership",
+        "inputs": [
+          {
+            "name": "newOwner",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawAccumulatedRbtc",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawInterest",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "stablecoinLockedInDcaSchedules",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "withdrawalAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      }
+    ],
+    "hasReceive": true,
+    "hasFallback": false
+  },
+  {
+    "name": "SovrynHandler",
+    "sourcePath": "src/sovryn/SovrynHandler.sol",
+    "artifactPath": "out/SovrynHandler.sol/SovrynHandler.json",
+    "constructor": {
+      "inputs": [],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "depositToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "depositAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "getAccruedInterest",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "stablecoinLockedInDcaSchedules",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "restoreLendingApproval",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawInterest",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "stablecoinLockedInDcaSchedules",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "withdrawalAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      }
+    ],
+    "hasReceive": false,
+    "hasFallback": false
+  },
+  {
+    "name": "SovrynHandlerDex",
+    "sourcePath": "src/sovryn/SovrynHandlerDex.sol",
+    "artifactPath": "out/SovrynHandlerDex.sol/SovrynHandlerDex.json",
+    "constructor": {
+      "inputs": [
+        {
+          "name": "dcaManager",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "stablecoin",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "iToken",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "uniswapSettings",
+          "type": "tuple",
+          "internalType": "IPurchaseUniswap.UniswapSettings"
+        },
+        {
+          "name": "feeCollector",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "feeSettings",
+          "type": "tuple",
+          "internalType": "IPurchaseFees.FeeSettings"
+        },
+        {
+          "name": "amountOutMinimumPercent",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "amountOutMinimumSafetyCheck",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "initialOwner",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "acceptOwnership",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "batchBuyRbtc",
+        "inputs": [
+          {
+            "name": "buyers",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "scheduleIds",
+            "type": "array",
+            "internalType": "uint64[]"
+          },
+          {
+            "name": "purchaseAmounts",
+            "type": "array",
+            "internalType": "uint256[]"
+          },
+          {
+            "name": "minRbtcOut",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "depositToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "depositAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "getAccruedInterest",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "stablecoinLockedInDcaSchedules",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "restoreLendingApproval",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "restoreSwapRouterApproval",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setAmountOutMinimumPercent",
+        "inputs": [
+          {
+            "name": "amountOutMinimumPercent",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setAmountOutMinimumSafetyCheck",
+        "inputs": [
+          {
+            "name": "amountOutMinimumSafetyCheck",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeCollector",
+        "inputs": [
+          {
+            "name": "feeCollector",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeRateParams",
+        "inputs": [
+          {
+            "name": "minFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "feePurchaseLowerBound",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setMocOracle",
+        "inputs": [
+          {
+            "name": "newOracle",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setPurchasePath",
+        "inputs": [
+          {
+            "name": "intermediateTokens",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "poolFeeRates",
+            "type": "array",
+            "internalType": "uint24[]"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setPurchasePathAllowed",
+        "inputs": [
+          {
+            "name": "intermediateTokens",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "poolFeeRates",
+            "type": "array",
+            "internalType": "uint24[]"
+          },
+          {
+            "name": "allowed",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "transferOwnership",
+        "inputs": [
+          {
+            "name": "newOwner",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawAccumulatedRbtc",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawInterest",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "stablecoinLockedInDcaSchedules",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "withdrawalAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      }
+    ],
+    "hasReceive": true,
+    "hasFallback": false
+  },
+  {
+    "name": "TropykusDocHandlerMoc",
+    "sourcePath": "src/tropykus-legacy/TropykusDocHandlerMoc.sol",
+    "artifactPath": "out/TropykusDocHandlerMoc.sol/TropykusDocHandlerMoc.json",
+    "constructor": {
+      "inputs": [
+        {
+          "name": "dcaManager",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "docToken",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "kToken",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "feeCollector",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "mocProxy",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "feeSettings",
+          "type": "tuple",
+          "internalType": "IPurchaseFees.FeeSettings"
+        },
+        {
+          "name": "initialOwner",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "acceptOwnership",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "batchBuyRbtc",
+        "inputs": [
+          {
+            "name": "buyers",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "scheduleIds",
+            "type": "array",
+            "internalType": "uint64[]"
+          },
+          {
+            "name": "purchaseAmounts",
+            "type": "array",
+            "internalType": "uint256[]"
+          },
+          {
+            "name": "minRbtcOut",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "depositToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "depositAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "getAccruedInterest",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "stablecoinLockedInDcaSchedules",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "restoreLendingApproval",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeCollector",
+        "inputs": [
+          {
+            "name": "feeCollector",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeRateParams",
+        "inputs": [
+          {
+            "name": "minFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "feePurchaseLowerBound",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "transferOwnership",
+        "inputs": [
+          {
+            "name": "newOwner",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawAccumulatedRbtc",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawInterest",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "stablecoinLockedInDcaSchedules",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "withdrawalAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      }
+    ],
+    "hasReceive": true,
+    "hasFallback": false
+  },
+  {
+    "name": "TropykusHandler",
+    "sourcePath": "src/tropykus-legacy/TropykusHandler.sol",
+    "artifactPath": "out/TropykusHandler.sol/TropykusHandler.json",
+    "constructor": {
+      "inputs": [],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "depositToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "depositAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "getAccruedInterest",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "stablecoinLockedInDcaSchedules",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "restoreLendingApproval",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawInterest",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "stablecoinLockedInDcaSchedules",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "withdrawalAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      }
+    ],
+    "hasReceive": false,
+    "hasFallback": false
+  },
+  {
+    "name": "TropykusHandlerDex",
+    "sourcePath": "src/tropykus-legacy/TropykusHandlerDex.sol",
+    "artifactPath": "out/TropykusHandlerDex.sol/TropykusHandlerDex.json",
+    "constructor": {
+      "inputs": [
+        {
+          "name": "dcaManager",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "stablecoin",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "kToken",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "uniswapSettings",
+          "type": "tuple",
+          "internalType": "IPurchaseUniswap.UniswapSettings"
+        },
+        {
+          "name": "feeCollector",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "feeSettings",
+          "type": "tuple",
+          "internalType": "IPurchaseFees.FeeSettings"
+        },
+        {
+          "name": "amountOutMinimumPercent",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "amountOutMinimumSafetyCheck",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "initialOwner",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    "functions": [
+      {
+        "name": "acceptOwnership",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "batchBuyRbtc",
+        "inputs": [
+          {
+            "name": "buyers",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "scheduleIds",
+            "type": "array",
+            "internalType": "uint64[]"
+          },
+          {
+            "name": "purchaseAmounts",
+            "type": "array",
+            "internalType": "uint256[]"
+          },
+          {
+            "name": "minRbtcOut",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "depositToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "depositAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "getAccruedInterest",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "stablecoinLockedInDcaSchedules",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "restoreLendingApproval",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "restoreSwapRouterApproval",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setAmountOutMinimumPercent",
+        "inputs": [
+          {
+            "name": "amountOutMinimumPercent",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setAmountOutMinimumSafetyCheck",
+        "inputs": [
+          {
+            "name": "amountOutMinimumSafetyCheck",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeCollector",
+        "inputs": [
+          {
+            "name": "feeCollector",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setFeeRateParams",
+        "inputs": [
+          {
+            "name": "minFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxFeeRate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "feePurchaseLowerBound",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setMocOracle",
+        "inputs": [
+          {
+            "name": "newOracle",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setPurchasePath",
+        "inputs": [
+          {
+            "name": "intermediateTokens",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "poolFeeRates",
+            "type": "array",
+            "internalType": "uint24[]"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "setPurchasePathAllowed",
+        "inputs": [
+          {
+            "name": "intermediateTokens",
+            "type": "array",
+            "internalType": "address[]"
+          },
+          {
+            "name": "poolFeeRates",
+            "type": "array",
+            "internalType": "uint24[]"
+          },
+          {
+            "name": "allowed",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "transferOwnership",
+        "inputs": [
+          {
+            "name": "newOwner",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawAccumulatedRbtc",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawInterest",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "stablecoinLockedInDcaSchedules",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "name": "withdrawToken",
+        "inputs": [
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "withdrawalAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      }
+    ],
+    "hasReceive": true,
+    "hasFallback": false
+  }
+]

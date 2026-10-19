@@ -177,6 +177,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R113 | after R112, before audit freeze / relaunch deploy | none (reviewer-facing documents; Markdown only) |
 | R114 | after R113, before audit freeze / relaunch deploy | none (AuditAgent report; targeted lending fixes for findings 1/5/6; accepted 2/3; operational checks for 4) |
 | R115 | after R114, before audit freeze / relaunch deploy | **decided 2026-10-08:** drop `DcaManager.withdrawAccumulatedRbtc`; one-element `withdrawAllAccumulatedRbtc` is the single-handler withdraw |
+| R116 | after R115, before audit freeze / relaunch deploy | none (publish the Pashov skills scan, X-Ray map and Fizz fuzzing suite; no `src/` change; triage is R117) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1505,6 +1506,15 @@ After R114, before audit freeze / relaunch deploy. Remove `DcaManager.withdrawAc
 Accumulated rBTC leaves only through `withdrawAllAccumulatedRbtc`, including a one-element pair
 list. `PurchaseRbtc.withdrawAccumulatedRbtc(user)` stays.
 Ask: none. Decided 2026-10-08.
+
+### R116 - Pashov skills audit results ([spec](./R116-pashov-skills-audit.md), [#183](https://github.com/BitChillRSK/dca-contracts/pull/183))
+
+After R115, before audit freeze / relaunch deploy. Publish three automated runs of Pashov Audit
+Group's open-source skills on `src/` at `d5c09c32`: the solidity-auditor report (unchanged; 2
+findings, 28 leads), the X-Ray pre-audit map, and the Fizz suite in `test/fizz/` (106 properties, one
+Medusa campaign, two EXPLORATORY violations with Foundry repros). No `src/` or `script/` change.
+Triage, including the window-deposit product decision under `AGENTS.md` invariant 10, is R117.
+Ask: none.
 
 ## Closed non-implementation decisions
 
