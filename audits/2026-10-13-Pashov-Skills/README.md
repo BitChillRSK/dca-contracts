@@ -42,8 +42,10 @@ The orchestrator applied the skill's gates with these rules in all three passes:
 
 ## Status
 
-BitChill has not triaged this report yet. The notes below are triage input from the scan, not
-decisions.
+BitChill has not approved dispositions for this report yet. The notes below are triage input from
+the scan, not decisions. The separate [proposed disposition register](../../docs/relaunch/PASHOV_TRIAGE_DECISIONS.md)
+covers both findings, all 28 leads, and the Fizz follow-ups. It distinguishes recommendations,
+existing policy, and pending owner decisions. The generated report remains unchanged.
 
 ## Notes for triage
 
