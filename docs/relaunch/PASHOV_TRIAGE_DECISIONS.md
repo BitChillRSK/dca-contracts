@@ -1,9 +1,9 @@
 # Pashov results — dispositions and proposals for R117
 
-Status: **F1 policy confirmed; remaining owner decisions pending**. Updated on 2026-10-20.
+Status: **F1 policy and initial Sovryn exclusion confirmed; remaining owner decisions pending**. Updated on 2026-10-20.
 
-This record supports the R117 implementation spec. It does not assign implementation work or
-change an existing product decision. No new risk acceptance is approved by this record yet.
+This record supports the R117 implementation spec. It records owner decisions but does not assign implementation work.
+No new risk acceptance is approved by this record yet.
 
 ## Evidence and limits
 
@@ -33,6 +33,7 @@ X-Ray supplies a map and candidate invariants, not another list of confirmed fin
 | Group | Recommended disposition | Closure requirement |
 | --- | --- | --- |
 | M | Mitigate before the affected feature or route opens | Demonstrate the reported condition, implement the selected control, and add a regression test. |
+| X | Exclude the integration from the initial release | Verify that the launch deployment omits its handlers and route assignments. Retain unresolved integration risks for a future review. |
 | O | Apply operational controls; acknowledge the residual risk | Identify the responsible component and verify its behaviour. Record the remaining impact. |
 | A | Acknowledge expected behaviour or a dependency assumption | Confirm the stated scope. Distinguish existing policy from new acceptance. |
 | V | Verify before deciding | Keep the question open until evidence supports mitigation or acceptance. |
@@ -47,7 +48,7 @@ Existing acceptance is attributed to the report or repository policy; it is not 
 | ID | Report item | Proposal | Reason and closure evidence |
 | --- | --- | --- | --- |
 | F1 | Batch `minRbtcOut` does not scale with the input spent | M — policy confirmed | Keep deposits and creation open; protect the quoted execution rate against actual input changes. The owner confirmed this policy on 2026-10-20. Implementation and verification remain pending. The material attack remains conditional; SP-64 demonstrates only dust. |
-| F2 | `DeployFinal` assigns a Sovryn DOC market with no free DOC | M + O | Start this route with deposits paused, or omit assignment, pending a launch liquidity review. A new deposit can become unavailable if other lenders withdraw its liquidity. Fresh cash alone cannot guarantee later exits. L28 is the same dependency risk. |
+| F2 | `DeployFinal` assigns a Sovryn DOC market with no free DOC | X — exclusion confirmed | The owner excluded all Sovryn integration from the initial release on 2026-10-20. Omit Sovryn handler deployment and route assignments. Implementation remains pending. This avoids new release exposure; it does not fix Sovryn liquidity or accept that risk. L28 has the same disposition. |
 
 ### F1 — confirmed policy and implementation requirements
 
@@ -88,6 +89,23 @@ Under that policy, replace the expected invariant with the chosen execution-rate
 Retain the dust sequence as a test of allowed behaviour and output protection.
 Do not merely suppress its assertion or describe the behaviour as fixed.
 
+### F2 — confirmed initial release scope
+
+**Confirmed policy: the initial new BitChill release will not integrate Sovryn.**
+The owner selected exclusion on 2026-10-20 and cited uncertainty surrounding Sovryn.
+This applies to all Sovryn routes, not only DOC or a temporary deposit pause.
+The initial deployment must omit Sovryn handlers and their route assignments.
+The existing deployment script described by the report still needs that change.
+
+A Sovryn handler can be deployed later if the owner decides to integrate Sovryn.
+Before that integration, review current liquidity, remainder burns, exit-fee rounding, and adapter compatibility.
+Keep L15, L18's Sovryn-specific case, L28, and the Sovryn-specific Fizz questions in that review.
+They do not block an initial release that excludes Sovryn and has no exposure to it.
+Shared lending logic and enabled integrations retain their own review requirements.
+
+Exclusion does not repair an old Sovryn position or release funds from an earlier deployment.
+No deletion of Sovryn source or tests follows from this decision.
+
 ## Complete lead register
 
 L01–L28 identify leads in their original report order. They are local reference IDs, not severity scores.
@@ -108,10 +126,10 @@ L01–L28 identify leads in their original report order. They are local referenc
 | L12 | A row without shares reverts every batch containing it | O + V — lending-loss case | Verify bot exclusion and recovery behaviour for funded-looking rows with zero backing. The report describes loss-dependent availability failures, not demonstrated theft. Share the review with L16; do not reopen previously declined reserve/grouping designs by default. |
 | L13 | Clamped lending input grows after the snapshot | M — duplicate of F1 | Same funding change as L05/L07. Verify the material loss-dependent case separately from SP-64's dust case. |
 | L14 | Lending deposit does not prove full market consumption | H | No supported market partially consumes a deposit in the report. Record full consumption as a dependency assumption. Consider a measured-input check before adding a market with different deposit behaviour. |
-| L15 | Sovryn burns a small remainder and violates exact consumption | M — before enabling Sovryn deposits | The report says a live fork confirmed Sovryn's remainder-burn rule. A small donation or residual position can block another user's full exit. Preserve exact accounting. Validate the proposed unowned seed before relying on it; see below. |
+| L15 | Sovryn burns a small remainder and violates exact consumption | X — future integration condition | Sovryn is excluded from the initial release. The reported full-exit failure remains unresolved. Before a future integration, preserve exact accounting and validate a mitigation, including the proposed unowned seed if selected. See below. |
 | L16 | Withdrawal after loss consumes backing of other schedules | O + V — same user, loss-dependent | The reported backing is shared across one user's schedules. This does not establish cross-user theft. Reproduce the modest-loss case, state the allocation policy, and verify exclusion/recovery for the remaining rows. External-loss acceptance does not automatically settle internal liveness. |
 | L17 | Zero-valued withdrawal still transfers zero tokens | H — minor compatibility | The listed tokens accept zero transfers. Skipping the transfer is reasonable optional hardening. No current withdrawal failure follows from the supported-token case in the report. |
-| L18 | Zero-valued interest redeem reverts combined withdrawal | V — possible exit availability issue | The fee-rounding premise was not verified. Reproduce actual Sovryn behaviour before closure. If confirmed, prevent dust interest from blocking principal exit while preserving accounting. A principal-only fallback limits impact but does not settle the combined-call behaviour. |
+| L18 | Zero-valued interest redeem reverts combined withdrawal | X/V — Sovryn case deferred | The reported Sovryn fee-rounding premise remains unverified. Review it before a future Sovryn integration. If another enabled market can produce the same zero-valued redeem, assess that shared-code case separately. Do not mark the underlying behaviour fixed. |
 | L19 | Money on Chain caps transaction gas price | O + A — dependency constraint | Read the current cap when building transactions. Separate MoC and Dex calls when needed and retry unsupported MoC execution. The historical 16% headroom is not a current limit. No contract redesign is recommended from this report alone. |
 | L20 | Money on Chain redeems only available free DOC | O + A — dependency constraint | Check available capacity, size batches, and retry when capacity changes. Keep the exact-input revert. Do not accept a partial spend to force a purchase through. |
 | L21 | MoC has no independent contract price floor | V + O | Establish MoC's output, fee, and oracle guarantees. Use a meaningful quote-derived minimum meanwhile. Zero minimum plus a trusted redemption venue is an assumption, not a demonstrated manipulation exploit. Add an independent floor only if the evidence requires it. |
@@ -121,9 +139,11 @@ L01–L28 identify leads in their original report order. They are local referenc
 | L25 | Measured WRBTC is not checked against the oracle floor | H | The router enforces its output minimum; no divergence from measured receipt is shown. A second measured-output check is reasonable defence in depth. Do not classify a standard trusted router as compromised without evidence. |
 | L26 | Swapper activates a path before owner revocation | O + A — existing procedure | The report identifies the Safe multisend or revoke-swapper-first response. Verify that procedure operationally. No additional loss beyond the revocation delay is shown. |
 | L27 | Swapper changes path after quotation | A + O — role and quote assumption | The quote-derived minimum still binds. Document coordination between authorised callers. Avoid execution with a weak minimum and an unreviewed alternate path. A path commitment is optional unless multiple independent swappers require it. |
-| L28 | Sovryn liquidity shortage blocks exits | M/F2 + O — duplicate | Same market dependency as F2. Gate new exposure and acknowledge remaining liquidity risk explicitly. Pausing deposits does not release existing funds. |
+| L28 | Sovryn liquidity shortage blocks exits | X/F2 — duplicate | Sovryn is excluded from the initial release. Reassess liquidity before any future integration. Exclusion does not release existing funds or guarantee future exits. |
 
 ### L15 — do not weaken the exact-burn invariant
+
+This work is deferred until a future Sovryn integration. It is not an initial release requirement while Sovryn remains excluded.
 
 The companion proposes at least 11 unowned iToken wei in each Sovryn handler.
 Treat that as a candidate mitigation, not a proved permanent reserve.
@@ -140,8 +160,8 @@ If Sovryn stays disabled, record this as a condition for enabling it rather than
 | Item | Proposal | Closure requirement |
 | --- | --- | --- |
 | SP-64 | Resolve with F1's selected semantics | Keep its demonstrated dust behaviour distinct from the unproved material attack. Under a rate guarantee, test that guarantee instead of demanding fixed input. |
-| GL-15 | D — correct an overstrong property | A real dust deposit reverts without loss. Condition the minimum-deposit assertion on minting at least one share. Keep the 1e18-deposit assertion. Update the replay's expected result. |
-| GL-24 | V — unconfirmed rounding lead | Reproduce the smoke-run sequence in a deterministic test. Accept only a demonstrated dust bound. Do not weaken the property using an arbitrary tolerance. |
+| GL-15 | D — correct an overstrong property; Sovryn excluded at launch | A real dust deposit reverts without loss. Condition the minimum-deposit assertion on minting at least one share. Keep the 1e18-deposit assertion. Update the replay's expected result. This harness correction does not require enabling Sovryn. |
+| GL-24 | X/V — unconfirmed Sovryn rounding lead | Retain the smoke-run sequence for a future Sovryn review. Reproduce it before claiming a dust bound or changing the property. It is not an initial release blocker while Sovryn remains excluded. |
 | SP-72 | D — close a coverage gap | Execute a purchase through the intermediate USDT0 path and assert intermediate balance conservation. A declared property with no evaluation provides no evidence. |
 | Campaign duration | Extend after harness corrections | The report recommends at least four hours, then 24 hours before release, plus Echidna. Preserve results and limitations. Runtime duration alone is not a security proof. |
 | Mock and coverage limits | Preserve limitations; add targeted checks | Mock venues do not validate live fee, burn, liquidity, or oracle rules. Verify those assumptions with focused tests or dependency evidence. Correct the report's coverage explanation through a separate annotation. |
@@ -149,13 +169,14 @@ If Sovryn stays disabled, record this as a condition for enabling it rather than
 ## Priorities for the implementation spec
 
 1. Specify and implement F1's confirmed execution-rate protection against actual input changes. Keep deposits and creation open.
-2. Gate Sovryn DOC and the alternate path reported empty until their launch conditions pass.
-3. Resolve L15 before enabling Sovryn deposits.
-4. Close L18, L21, L23, and the loss-recovery questions in L12/L16 with targeted evidence.
+2. Omit Sovryn handler deployment and route assignments from the initial release. Verify the resulting launch map.
+3. Gate the alternate path reported empty until its launch conditions pass.
+4. Close L21, L23, the loss-recovery questions in L12/L16, and any enabled-market L18 case with targeted evidence.
 5. Verify the operational controls for price impact, venue capacity, failed rows, and route isolation.
 6. Correct the cadence documentation and Fizz properties, then run the selected assurance campaigns.
 7. Keep optional hardening separate from required fixes.
 
+Sovryn-specific remediation and evidence remain conditions for a future integration, not initial release blockers.
 Checks can be scoped to enabled routes. An explicit disabled-route condition can defer its route-specific work.
 Availability failures and price-protection gaps stay open until their control or acceptance is supported.
 
@@ -164,7 +185,7 @@ Availability failures and price-protection gaps stay open until their control or
 | Decision | Recommended position | Confirmed position |
 | --- | --- | --- |
 | Deposits and creation during protected windows | Keep them open; protect execution rate against actual input changes | Confirmed by the owner on 2026-10-20. This selects mitigation, not acceptance of F1. Implementation remains pending. |
-| Sovryn DOC at launch | Deposits paused or route omitted until liquidity and L15 checks pass | Pending |
+| Sovryn integration at launch | Initial proposal was a paused DOC route; the owner selected broader exclusion | Confirmed by the owner on 2026-10-20: omit all Sovryn integration from the initial release. A handler can be deployed later. Deployment changes remain pending; Sovryn-specific risks stay open for a future review. |
 | Alternate path reported empty | Keep disabled or outside the allowlist until reviewed | Pending |
 | New residual risk acceptances | Review the A/O rows with their stated impact and controls | Pending |
 
