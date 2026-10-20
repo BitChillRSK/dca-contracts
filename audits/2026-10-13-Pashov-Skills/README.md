@@ -45,8 +45,9 @@ The orchestrator applied the skill's gates with these rules in all three passes:
 Triage is in progress. On 2026-10-20, the owner confirmed F1's policy: keep deposits and schedule
 creation open, and protect the quoted execution rate against actual input changes. The owner also
 excluded all Sovryn integration from the initial release. A Sovryn handler can be deployed later;
-its unresolved integration risks remain conditions for that future review. Implementation remains
-pending. The notes below are scan input, not decisions. The separate
+its unresolved integration risks remain conditions for that future review. The owner also excluded
+the alternate USDRIF → USDT → WRBTC path from the launch allowlist, retaining the primary path
+through USDT0. Implementation remains pending. The notes below are scan input, not decisions. The separate
 [disposition register](../../docs/relaunch/PASHOV_TRIAGE_DECISIONS.md) covers both findings, all 28
 leads, and the Fizz follow-ups. It distinguishes confirmed policy, recommendations, existing
 policy, and pending owner decisions. The generated report remains unchanged.

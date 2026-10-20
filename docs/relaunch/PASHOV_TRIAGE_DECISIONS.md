@@ -1,6 +1,6 @@
 # Pashov results — dispositions and proposals for R117
 
-Status: **F1 policy and initial Sovryn exclusion confirmed; remaining owner decisions pending**. Updated on 2026-10-20.
+Status: **F1 policy, Sovryn exclusion, and alternate-path exclusion confirmed; remaining owner decisions pending**. Updated on 2026-10-20.
 
 This record supports the R117 implementation spec. It records owner decisions but does not assign implementation work.
 No new risk acceptance is approved by this record yet.
@@ -33,7 +33,7 @@ X-Ray supplies a map and candidate invariants, not another list of confirmed fin
 | Group | Recommended disposition | Closure requirement |
 | --- | --- | --- |
 | M | Mitigate before the affected feature or route opens | Demonstrate the reported condition, implement the selected control, and add a regression test. |
-| X | Exclude the integration from the initial release | Verify that the launch deployment omits its handlers and route assignments. Retain unresolved integration risks for a future review. |
+| X | Exclude the integration or path from the initial release | Verify that the launch deployment omits the selected handlers, route assignments, or path permissions. Retain unresolved risks for a future review. |
 | O | Apply operational controls; acknowledge the residual risk | Identify the responsible component and verify its behaviour. Record the remaining impact. |
 | A | Acknowledge expected behaviour or a dependency assumption | Confirm the stated scope. Distinguish existing policy from new acceptance. |
 | V | Verify before deciding | Keep the question open until evidence supports mitigation or acceptance. |
@@ -106,6 +106,18 @@ Shared lending logic and enabled integrations retain their own review requiremen
 Exclusion does not repair an old Sovryn position or release funds from an earlier deployment.
 No deletion of Sovryn source or tests follows from this decision.
 
+### L09 — confirmed alternate-path exclusion
+
+**Confirmed policy: exclude the alternate USDRIF → USDT → WRBTC path from the launch allowlist.**
+The owner selected this policy on 2026-10-20. The report observed an empty pool on that path.
+The observation is historical; this decision does not assert that the pool is still empty.
+The implementation must omit that alternate path's launch permissions on every affected handler.
+
+This decision retains the primary USDRIF → USDT0 → WRBTC path described in the report.
+It does not exclude USDRIF or USDT0 from launch.
+Before adding the alternate path later, review current liquidity, execution quality, and quote protection.
+Implementation remains pending. Exclusion does not fix the pool or accept its execution risk.
+
 ## Complete lead register
 
 L01–L28 identify leads in their original report order. They are local reference IDs, not severity scores.
@@ -120,7 +132,7 @@ L01–L28 identify leads in their original report order. They are local referenc
 | L06 | `depositToken` stores a balance read before the handler call | H | No listed token or market callback reaches the swapper in the report. Prefer checks-effects-interactions if this path changes. A theoretical callback is not proof of a current exploit. |
 | L07 | Deposit inside the window adds shares to a short row | M — duplicate of F1 | Cover deposits in F1. The demonstrated no-loss case is rounding dust. |
 | L08 | Period reductions permit several purchases on one day | D + A — expected owner choice | Correct the guide's “one extra purchase” claim. The reported sequence permits several purchases. Keep current cadence semantics unless the product requires a per-day restriction. No loss to another user is reported. |
-| L09 | Allowlisted USDRIF path uses a pool reported empty | M + O | Prefer leaving this alternate path disabled or outside the launch allowlist until depth and execution checks support it. An allowlist is not proof of usable liquidity. Recheck current state; zero liquidity was a snapshot. |
+| L09 | Allowlisted USDRIF path uses a pool reported empty | X — exclusion confirmed | The owner excluded USDRIF → USDT → WRBTC from the launch allowlist on 2026-10-20. Retain the primary USDRIF → USDT0 → WRBTC path. Verify that every affected handler omits the alternate permission. Implementation remains pending; any future addition needs a fresh review. |
 | L10 | LayerBank cash shortage blocks exits and bundled purchases | O + A — material dependency risk | External illiquidity is already accepted according to the report. Verify reserve checks, retry behaviour, and exclusion of a failing route from unrelated bundles. Monitoring cannot guarantee an exit or prevent a borrower from taking cash. |
 | L11 | LayerBank changes to round-up share burns | A — conditional upgrade risk | No current rounding mismatch is reported. Preserve exact consumption checks. Record upgrade monitoring, fork probes, replacement planning, and documented retry options. A replacement alone does not guarantee exit from an incompatible old handler. |
 | L12 | A row without shares reverts every batch containing it | O + V — lending-loss case | Verify bot exclusion and recovery behaviour for funded-looking rows with zero backing. The report describes loss-dependent availability failures, not demonstrated theft. Share the review with L16; do not reopen previously declined reserve/grouping designs by default. |
@@ -170,7 +182,7 @@ If Sovryn stays disabled, record this as a condition for enabling it rather than
 
 1. Specify and implement F1's confirmed execution-rate protection against actual input changes. Keep deposits and creation open.
 2. Omit Sovryn handler deployment and route assignments from the initial release. Verify the resulting launch map.
-3. Gate the alternate path reported empty until its launch conditions pass.
+3. Omit USDRIF → USDT → WRBTC from the launch allowlist. Verify its exclusion on every affected handler.
 4. Close L21, L23, the loss-recovery questions in L12/L16, and any enabled-market L18 case with targeted evidence.
 5. Verify the operational controls for price impact, venue capacity, failed rows, and route isolation.
 6. Correct the cadence documentation and Fizz properties, then run the selected assurance campaigns.
@@ -186,7 +198,7 @@ Availability failures and price-protection gaps stay open until their control or
 | --- | --- | --- |
 | Deposits and creation during protected windows | Keep them open; protect execution rate against actual input changes | Confirmed by the owner on 2026-10-20. This selects mitigation, not acceptance of F1. Implementation remains pending. |
 | Sovryn integration at launch | Initial proposal was a paused DOC route; the owner selected broader exclusion | Confirmed by the owner on 2026-10-20: omit all Sovryn integration from the initial release. A handler can be deployed later. Deployment changes remain pending; Sovryn-specific risks stay open for a future review. |
-| Alternate path reported empty | Keep disabled or outside the allowlist until reviewed | Pending |
+| Alternate path reported empty | Exclude it from the launch allowlist until reviewed | Confirmed by the owner on 2026-10-20: exclude USDRIF → USDT → WRBTC at launch. Retain the primary USDRIF → USDT0 → WRBTC path. Implementation remains pending. |
 | New residual risk acceptances | Review the A/O rows with their stated impact and controls | Pending |
 
 Existing accepted policies remain attributed to the report and repository instructions.
