@@ -1,6 +1,6 @@
-# Pashov results — proposed dispositions for R117
+# Pashov results — dispositions and proposals for R117
 
-Status: **proposal; owner decisions pending**. Prepared on 2026-10-20.
+Status: **F1 policy confirmed; remaining owner decisions pending**. Updated on 2026-10-20.
 
 This record supports the R117 implementation spec. It does not assign implementation work or
 change an existing product decision. No new risk acceptance is approved by this record yet.
@@ -39,20 +39,21 @@ X-Ray supplies a map and candidate invariants, not another list of confirmed fin
 | H | Optional hardening | No current supported exploit is reported. Revisit before expanding supported dependencies. |
 | D | Correct documentation or the test harness | Preserve intended contract behaviour unless a separate product decision changes it. |
 
-These are recommendations, not audit severities. Multiple report items can share one control.
+These groups are dispositions, not audit severities. Multiple report items can share one control.
 Existing acceptance is attributed to the report or repository policy; it is not a new owner decision.
 
 ## Findings
 
 | ID | Report item | Proposal | Reason and closure evidence |
 | --- | --- | --- | --- |
-| F1 | Batch `minRbtcOut` does not scale with the input spent | M | Bind the quote to actual execution input. A fixed absolute output floor can permit a worse execution rate when input increases. The material attack remains conditional; SP-64 demonstrates only dust. See the design choice below. |
+| F1 | Batch `minRbtcOut` does not scale with the input spent | M — policy confirmed | Keep deposits and creation open; protect the quoted execution rate against actual input changes. The owner confirmed this policy on 2026-10-20. Implementation and verification remain pending. The material attack remains conditional; SP-64 demonstrates only dust. |
 | F2 | `DeployFinal` assigns a Sovryn DOC market with no free DOC | M + O | Start this route with deposits paused, or omit assignment, pending a launch liquidity review. A new deposit can become unavailable if other lenders withdraw its liquidity. Fresh cash alone cannot guarantee later exits. L28 is the same dependency risk. |
 
-### F1 — recommended design choice
+### F1 — confirmed policy and implementation requirements
 
-**Recommended policy: keep deposits and schedule creation open, and protect the quoted execution rate.**
-This recommendation preserves the current window policy. It needs owner agreement.
+**Confirmed policy: keep deposits and schedule creation open, and protect the quoted execution rate.**
+The owner selected this policy on 2026-10-20. It preserves the current window policy.
+The selected protection must account for actual execution input. The exact contract and bot changes remain to be specified.
 
 The reports describe two different situations:
 
@@ -147,7 +148,7 @@ If Sovryn stays disabled, record this as a condition for enabling it rather than
 
 ## Priorities for the implementation spec
 
-1. Resolve F1's policy and specify a control against actual input changes.
+1. Specify and implement F1's confirmed execution-rate protection against actual input changes. Keep deposits and creation open.
 2. Gate Sovryn DOC and the alternate path reported empty until their launch conditions pass.
 3. Resolve L15 before enabling Sovryn deposits.
 4. Close L18, L21, L23, and the loss-recovery questions in L12/L16 with targeted evidence.
@@ -162,7 +163,7 @@ Availability failures and price-protection gaps stay open until their control or
 
 | Decision | Recommended position | Confirmed position |
 | --- | --- | --- |
-| Deposits and creation during protected windows | Keep them open; protect execution rate against actual input changes | Pending |
+| Deposits and creation during protected windows | Keep them open; protect execution rate against actual input changes | Confirmed by the owner on 2026-10-20. This selects mitigation, not acceptance of F1. Implementation remains pending. |
 | Sovryn DOC at launch | Deposits paused or route omitted until liquidity and L15 checks pass | Pending |
 | Alternate path reported empty | Keep disabled or outside the allowlist until reviewed | Pending |
 | New residual risk acceptances | Review the A/O rows with their stated impact and controls | Pending |
