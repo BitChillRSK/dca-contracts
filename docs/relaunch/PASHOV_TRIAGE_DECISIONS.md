@@ -36,6 +36,7 @@ X-Ray supplies a map and candidate invariants, not another list of confirmed fin
 | X | Exclude the integration or path from the initial release | Verify that the launch deployment omits the selected handlers, route assignments, or path permissions. Retain unresolved risks for a future review. |
 | O | Apply operational controls; acknowledge the residual risk | Identify the responsible component and verify its behaviour. Record the remaining impact. |
 | A | Acknowledge expected behaviour or a dependency assumption | Confirm the stated scope. Distinguish existing policy from new acceptance. |
+| N | Reject the security-finding interpretation | Identify the intended feature or missing security requirement. Preserve any accurate technical observation without treating it as an accepted vulnerability. |
 | V | Verify before deciding | Keep the question open until evidence supports mitigation or acceptance. |
 | H | Optional hardening | No current supported exploit is reported. Revisit before expanding supported dependencies. |
 | D | Correct documentation or the test harness | Preserve intended contract behaviour unless a separate product decision changes it. |
@@ -118,20 +119,48 @@ It does not exclude USDRIF or USDT0 from launch.
 Before adding the alternate path later, review current liquidity, execution quality, and quote protection.
 Implementation remains pending. Exclusion does not fix the pool or accept its execution risk.
 
+### L01/L08 — intended behaviour and bot execution context
+
+The owner clarified that multiple schedules are allowed. A user need not delete a schedule to create another one.
+The owner also stated that the bot will run weekly at launch and at most once daily under the intended operating policy.
+These are owner-supplied requirements. This report-only review did not inspect the bot or verify its execution policy.
+
+**L01: recommend closure as intended behaviour, not an accepted security risk.**
+There is no stated wallet-wide purchase cooldown for the creation/deletion sequence to bypass.
+Independent schedules can already purchase in one bot cycle. The report establishes no additional security failure from recreation.
+Do not add a wallet-wide restriction or contract fix for this lead.
+
+**L08: retain the technical observation as informational and correct the guide.**
+The same-day sequence needs several successful purchases of the same schedule, interleaved with period reductions.
+One successful purchase per schedule per bot cycle prevents that sequence under the declared daily/weekly policy.
+A weekly cron alone does not establish that condition: one job can send several transactions or rebuild batches.
+Do not assume that one job, one transaction, and one successful purchase per schedule mean the same thing.
+
+When implementing bot follow-ups, verify that rescans, retries, and parallel batches cannot repeat a successfully purchased schedule in the same cycle.
+Key that check by schedule, not by wallet, because several independent schedules are legitimate.
+This is a proposed execution-policy check; it is not a claim that the current bot has a defect.
+
+No contract change is recommended for L08 from this report alone, even if the bot frequency later changes.
+The user deliberately edits their own schedule and funds each purchase; the report shows no loss to another user.
+The missing security harm matters independently of the launch cron schedule.
+Keep the accurate statement that period reductions can make a schedule eligible again.
+Replace the guide's categorical “one extra purchase” claim with the eligibility behaviour and its swapper-execution dependency.
+Do not describe multiple same-day executions as impossible on-chain.
+
 ## Complete lead register
 
 L01–L28 identify leads in their original report order. They are local reference IDs, not severity scores.
 
 | ID | Report item | Proposal | Reason and next action |
 | --- | --- | --- | --- |
-| L01 | Delete and create permit another purchase that day | A — expected | Cadence applies to a schedule. The user funds the purchases and pays each fee. No loss to another user is reported. Do not add a per-user purchase limit without a product requirement. |
+| L01 | Delete and create permit another purchase that day | N — intended behaviour | Multiple schedules are explicitly allowed. Another schedule can already purchase in the same cycle without deletion. No wallet-wide cooldown is required or bypassed. Recommend closure as not a security vulnerability, with no contract fix or risk acceptance. |
 | L02 | Swapper opens protected windows without a gap | A — existing trust policy, material impact | The report and invariant 10 already accept this power. A compromised swapper can repeatedly block stablecoin exits. Record owner revocation, its response dependency, and the remaining active window. Do not label this minor because each window is short. |
 | L03 | Pool moves between activation and quotation | O — bot mitigation | Apply a quote-quality limit against a reliable independent reference and expected price impact. Reject unacceptable quotes even when they clear the contract's broad oracle floor. Profitability of the reported attack is unproved; residual MEV remains. |
 | L04 | Later handler batches pay earlier batches' price impact | O + A | Sequential swaps naturally affect later fills. Simulate the complete ordered bundle and check every quote. Document separate handler execution prices. Rotation or aggregation is an optional fairness change, not a required contract fix. |
 | L05 | Creation inside the window grows a short lending row | M — duplicate of F1 | Cover creation as well as deposits in F1's regression cases. This is not another independent loss finding. |
 | L06 | `depositToken` stores a balance read before the handler call | H | No listed token or market callback reaches the swapper in the report. Prefer checks-effects-interactions if this path changes. A theoretical callback is not proof of a current exploit. |
 | L07 | Deposit inside the window adds shares to a short row | M — duplicate of F1 | Cover deposits in F1. The demonstrated no-loss case is rounding dust. |
-| L08 | Period reductions permit several purchases on one day | D + A — expected owner choice | Correct the guide's “one extra purchase” claim. The reported sequence permits several purchases. Keep current cadence semantics unless the product requires a per-day restriction. No loss to another user is reported. |
+| L08 | Period reductions permit several purchases on one day | D — informational; no contract fix proposed | Correct the guide's “one extra purchase” claim. The sequence requires repeat execution of the same schedule after edits. The owner states weekly launch execution, at most daily under the intended policy. Verify one success per schedule per cycle rather than relying on cron frequency alone. No loss to another user is reported. |
 | L09 | Allowlisted USDRIF path uses a pool reported empty | X — exclusion confirmed | The owner excluded USDRIF → USDT → WRBTC from the launch allowlist on 2026-10-20. Retain the primary USDRIF → USDT0 → WRBTC path. Verify that every affected handler omits the alternate permission. Implementation remains pending; any future addition needs a fresh review. |
 | L10 | LayerBank cash shortage blocks exits and bundled purchases | O + A — material dependency risk | External illiquidity is already accepted according to the report. Verify reserve checks, retry behaviour, and exclusion of a failing route from unrelated bundles. Monitoring cannot guarantee an exit or prevent a borrower from taking cash. |
 | L11 | LayerBank changes to round-up share burns | A — conditional upgrade risk | No current rounding mismatch is reported. Preserve exact consumption checks. Record upgrade monitoring, fork probes, replacement planning, and documented retry options. A replacement alone does not guarantee exit from an incompatible old handler. |
