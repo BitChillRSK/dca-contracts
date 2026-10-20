@@ -511,7 +511,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
             purchaseAmounts[i] = schedulePurchaseAmount;
         }
         IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex)))
-            .batchBuyRbtc(buyers, batch.scheduleIds, purchaseAmounts, batch.minRbtcOut);
+            .batchBuyRbtc(buyers, batch.scheduleIds, purchaseAmounts, batch.minRbtcOut, batch.quotedStablecoinIn);
     }
 
     /**

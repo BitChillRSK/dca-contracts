@@ -35,11 +35,18 @@ abstract contract DcaManagerHandler is Properties {
     ///      `rowMask` picks a subset; `minOutSeed` is clamped to the venue's expected gross output.
     function dcaManager_batchBuyRbtc_clamped(uint256 routeSeed, uint256 rowMask, uint256 minOutSeed) public {
         Route memory r = _route(routeSeed);
-        (uint64[] memory ids, uint256 total) = _eligibleRows(r, rowMask);
+        (uint64[] memory ids,) = _eligibleRows(r, rowMask);
         if (ids.length == 0) return;
-        uint256 minOut = clampLte(minOutSeed, _expectedGrossRbtc(r, total));
+        CleanPlan memory quote = _simLendingBatch(r, ids);
+        uint256 minOut = clampLte(minOutSeed, _expectedGrossRbtc(r, quote.cashIn));
         dcaManager_batchBuyRbtc(
-            IDcaManager.Batch({scheduleIds: ids, token: r.token, routeIndex: r.routeIndex, minRbtcOut: minOut})
+            IDcaManager.Batch({
+                scheduleIds: ids,
+                token: r.token,
+                routeIndex: r.routeIndex,
+                minRbtcOut: minOut,
+                quotedStablecoinIn: quote.cashIn
+            })
         );
     }
 
@@ -49,7 +56,9 @@ abstract contract DcaManagerHandler is Properties {
         (uint64[] memory ids,) = _eligibleRows(r, rowMask);
         if (ids.length == 0) return;
         dcaManager_batchBuyRbtc(
-            IDcaManager.Batch({scheduleIds: ids, token: r.token, routeIndex: r.routeIndex, minRbtcOut: 0})
+            IDcaManager.Batch({
+                scheduleIds: ids, token: r.token, routeIndex: r.routeIndex, minRbtcOut: 0, quotedStablecoinIn: 0
+            })
         );
     }
 
@@ -60,7 +69,9 @@ abstract contract DcaManagerHandler is Properties {
         uint64[] memory ids = _routeRows(r);
         if (ids.length == 0) return;
         dcaManager_batchBuyRbtc(
-            IDcaManager.Batch({scheduleIds: ids, token: r.token, routeIndex: r.routeIndex, minRbtcOut: 0})
+            IDcaManager.Batch({
+                scheduleIds: ids, token: r.token, routeIndex: r.routeIndex, minRbtcOut: 0, quotedStablecoinIn: 0
+            })
         );
     }
 
@@ -76,7 +87,11 @@ abstract contract DcaManagerHandler is Properties {
             if (ids.length == 0) continue;
             total += ids.length;
             tmp[count++] = IDcaManager.Batch({
-                scheduleIds: ids, token: routes[i].token, routeIndex: routes[i].routeIndex, minRbtcOut: 0
+                scheduleIds: ids,
+                token: routes[i].token,
+                routeIndex: routes[i].routeIndex,
+                minRbtcOut: 0,
+                quotedStablecoinIn: 0
             });
         }
         if (count == 0) return;

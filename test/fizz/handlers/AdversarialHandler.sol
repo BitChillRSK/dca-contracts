@@ -396,7 +396,9 @@ abstract contract AdversarialHandler is DcaManagerHandler {
         returns (IDcaManager.Batch[] memory bs)
     {
         bs = new IDcaManager.Batch[](1);
-        bs[0] = IDcaManager.Batch({scheduleIds: ids, token: r.token, routeIndex: r.routeIndex, minRbtcOut: minOut});
+        bs[0] = IDcaManager.Batch({
+            scheduleIds: ids, token: r.token, routeIndex: r.routeIndex, minRbtcOut: minOut, quotedStablecoinIn: 0
+        });
     }
 
     /// @dev Activation outside the funnel (scenario gas); the window ghosts are still opened.
@@ -448,8 +450,9 @@ abstract contract AdversarialHandler is DcaManagerHandler {
         if (!_planRowsUnbought(r)) return;
         ExecView memory ev = _execView(r);
         IDcaManager.Batch[] memory bs = _oneBatch(pl.ids, r, withQuote ? pl.minOut : 0);
+        bs[0].quotedStablecoinIn = pl.cashIn;
         (bool ok, bytes memory err) = _inlineBatch(pl.swapper, bs);
-        if (ok) property_protectedBatchInputFixed(r, ev);
+        if (ok) property_protectedBatchExecutionRate(r, ev, withQuote);
         if (withQuote) property_minRbtcOutNotWeaponized(r, ev, ok, err);
         if (!ok) property_preparedRowSurvivesWindow(bs, err, pl.ids.length == 1);
     }
@@ -778,7 +781,7 @@ abstract contract AdversarialHandler is DcaManagerHandler {
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = amount;
         vm.prank(actor);
-        try IPurchaseRbtc(h).batchBuyRbtc(buyers, ids, amounts, 0) {
+        try IPurchaseRbtc(h).batchBuyRbtc(buyers, ids, amounts, 0, 0) {
             ok = true;
         } catch (bytes memory e) {
             err = e;

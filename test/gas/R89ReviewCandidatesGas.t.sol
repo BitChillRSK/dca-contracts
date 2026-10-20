@@ -191,7 +191,11 @@ contract R89ReviewCandidatesGasTest is DcaDappTest {
             scheduleIds[i] = scheduleIdAt(dcaManager, s_buyers[i], address(stablecoin), 0);
         }
         IDcaManager.Batch memory batch = IDcaManager.Batch({
-            scheduleIds: scheduleIds, token: address(stablecoin), routeIndex: s_routeIndex, minRbtcOut: 0
+            scheduleIds: scheduleIds,
+            token: address(stablecoin),
+            routeIndex: s_routeIndex,
+            minRbtcOut: 0,
+            quotedStablecoinIn: 0
         });
 
         vm.prank(SWAPPER);

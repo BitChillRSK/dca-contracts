@@ -9,7 +9,6 @@ import {DcaManager} from "../src/DcaManager.sol";
 import {OperationsAdmin} from "../src/OperationsAdmin.sol";
 import {IdleDocHandlerMoc} from "../src/idle/IdleDocHandlerMoc.sol";
 import {LayerBankDocHandlerMoc} from "../src/layerbank/LayerBankDocHandlerMoc.sol";
-import {SovrynDocHandlerMoc} from "../src/sovryn/SovrynDocHandlerMoc.sol";
 import {IdleHandlerDex} from "../src/idle/IdleHandlerDex.sol";
 import {LayerBankHandlerDex} from "../src/layerbank/LayerBankHandlerDex.sol";
 import {IPurchaseUniswap} from "../src/interfaces/IPurchaseUniswap.sol";
@@ -24,7 +23,7 @@ import "./Constants.sol";
  * @title DeployFinal
  * @notice Canonical one-shot live deployment of the full production stack on one
  *         `OperationsAdmin` / one `DcaManager`.
- * @dev Seven handlers: DOC idle / LayerBank / Sovryn (MoC) plus USDRIF and USDT0
+ * @dev Six handlers: DOC idle / LayerBank (MoC) plus USDRIF and USDT0
  *      idle / LayerBank (Uniswap). Fail-closed: missing addresses, zero owner /
  *      collector / swapper, wrong environment, or an incomplete map revert rather
  *      than warn-and-continue. `DeployMocSwaps` / `DeployDexSwaps` and the add-ons
@@ -51,7 +50,6 @@ contract DeployFinal is DeployBase {
         DcaManager dcaManager;
         address docIdle;
         address docLayerBank;
-        address docSovryn;
         address usdrifIdle;
         address usdrifLayerBank;
         address usdt0Idle;
@@ -63,7 +61,6 @@ contract DeployFinal is DeployBase {
         address doc;
         address mocProxy;
         address docLayerBankAToken;
-        address docSovrynShares;
         address usdrif;
         address usdrifLayerBankAToken;
         address usdt0;
@@ -73,10 +70,6 @@ contract DeployFinal is DeployBase {
         address mocOracle;
         address[] usdrifIntermediateTokens;
         uint24[] usdrifPoolFeeRates;
-        /// @dev A second USDRIF path approved at deploy, so the swapper can activate whichever pays more.
-        ///      Empty fee rates skip it.
-        address[] usdrifAltIntermediateTokens;
-        uint24[] usdrifAltPoolFeeRates;
         address[] usdt0IntermediateTokens;
         uint24[] usdt0PoolFeeRates;
         uint256 amountOutMinimumPercent;
@@ -112,7 +105,6 @@ contract DeployFinal is DeployBase {
         dcaManager.setTokenMinPurchaseAmount(s_cfg.usdt0, USDT0_MIN_PURCHASE_AMOUNT);
 
         operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
-        operationsAdmin.registerRoute(SOVRYN_INDEX, true);
         operationsAdmin.addSwapper(s_cfg.initialSwapper);
 
         s_stack.operationsAdmin = operationsAdmin;
@@ -120,18 +112,13 @@ contract DeployFinal is DeployBase {
         s_stack.initialSwapper = s_cfg.initialSwapper;
         s_stack.docIdle = _newDocIdle(address(dcaManager), owner);
         s_stack.docLayerBank = _newDocLayerBank(address(dcaManager), owner);
-        s_stack.docSovryn = _newDocSovryn(address(dcaManager), owner);
         s_stack.usdrifIdle = _newDexIdle(address(dcaManager), owner, false);
         s_stack.usdrifLayerBank = _newDexLayerBank(address(dcaManager), owner, false);
         s_stack.usdt0Idle = _newDexIdle(address(dcaManager), owner, true);
         s_stack.usdt0LayerBank = _newDexLayerBank(address(dcaManager), owner, true);
 
-        _allowUsdrifAltPath(s_stack.usdrifIdle);
-        _allowUsdrifAltPath(s_stack.usdrifLayerBank);
-
         operationsAdmin.assignHandler(s_cfg.doc, IDLE_INDEX, s_stack.docIdle);
         operationsAdmin.assignHandler(s_cfg.doc, LAYERBANK_INDEX, s_stack.docLayerBank);
-        operationsAdmin.assignHandler(s_cfg.doc, SOVRYN_INDEX, s_stack.docSovryn);
         operationsAdmin.assignHandler(s_cfg.usdrif, IDLE_INDEX, s_stack.usdrifIdle);
         operationsAdmin.assignHandler(s_cfg.usdrif, LAYERBANK_INDEX, s_stack.usdrifLayerBank);
         operationsAdmin.assignHandler(s_cfg.usdt0, IDLE_INDEX, s_stack.usdt0Idle);
@@ -141,7 +128,6 @@ contract DeployFinal is DeployBase {
         _proposeFinalOwner(address(dcaManager));
         _proposeFinalOwner(s_stack.docIdle);
         _proposeFinalOwner(s_stack.docLayerBank);
-        _proposeFinalOwner(s_stack.docSovryn);
         _proposeFinalOwner(s_stack.usdrifIdle);
         _proposeFinalOwner(s_stack.usdrifLayerBank);
         _proposeFinalOwner(s_stack.usdt0Idle);
@@ -156,7 +142,6 @@ contract DeployFinal is DeployBase {
         s_cfg.doc = config.doc;
         s_cfg.mocProxy = config.mocProxy;
         s_cfg.docLayerBankAToken = config.docLayerBankAToken;
-        s_cfg.docSovrynShares = config.docSovrynShares;
         s_cfg.usdrif = config.usdrif;
         s_cfg.usdrifLayerBankAToken = config.usdrifLayerBankAToken;
         s_cfg.usdt0 = config.usdt0;
@@ -166,8 +151,6 @@ contract DeployFinal is DeployBase {
         s_cfg.mocOracle = config.mocOracle;
         s_cfg.usdrifIntermediateTokens = config.usdrifIntermediateTokens;
         s_cfg.usdrifPoolFeeRates = config.usdrifPoolFeeRates;
-        s_cfg.usdrifAltIntermediateTokens = config.usdrifAltIntermediateTokens;
-        s_cfg.usdrifAltPoolFeeRates = config.usdrifAltPoolFeeRates;
         s_cfg.usdt0IntermediateTokens = config.usdt0IntermediateTokens;
         s_cfg.usdt0PoolFeeRates = config.usdt0PoolFeeRates;
         s_cfg.amountOutMinimumPercent = config.amountOutMinimumPercent;
@@ -188,20 +171,6 @@ contract DeployFinal is DeployBase {
                 dcaManager,
                 s_cfg.doc,
                 s_cfg.docLayerBankAToken,
-                s_cfg.feeCollector,
-                s_cfg.mocProxy,
-                _docFeeSettings(),
-                owner
-            )
-        );
-    }
-
-    function _newDocSovryn(address dcaManager, address owner) private returns (address) {
-        return address(
-            new SovrynDocHandlerMoc(
-                dcaManager,
-                s_cfg.doc,
-                s_cfg.docSovrynShares,
                 s_cfg.feeCollector,
                 s_cfg.mocProxy,
                 _docFeeSettings(),
@@ -241,13 +210,6 @@ contract DeployFinal is DeployBase {
         );
     }
 
-    /// @dev Runs while the broadcaster still owns the handler: afterwards only the Safe can approve a path.
-    function _allowUsdrifAltPath(address handler) private {
-        if (s_cfg.usdrifAltPoolFeeRates.length == 0) return;
-        IPurchaseUniswap(handler)
-            .setPurchasePathAllowed(s_cfg.usdrifAltIntermediateTokens, s_cfg.usdrifAltPoolFeeRates, true);
-    }
-
     function _docFeeSettings() private view returns (IPurchaseFees.FeeSettings memory) {
         return IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE, maxFeeRate: getMaxFeeRate(), feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
@@ -278,19 +240,10 @@ contract DeployFinal is DeployBase {
         uint24[] memory usdt0Fees = new uint24[](1);
         usdt0Fees[0] = 3000;
 
-        // USDRIF -0.05%-> 6-decimal USDT -0.30%-> WRBTC. Its USDRIF pool is thin: it can pay more than the
-        // default USDT0 hop on small batches, and cannot fill large ones.
-        address[] memory usdrifAltIntermediate = new address[](1);
-        usdrifAltIntermediate[0] = 0xAf368c91793CB22739386DFCbBb2F1A9e4bCBeBf;
-        uint24[] memory usdrifAltFees = new uint24[](2);
-        usdrifAltFees[0] = 500;
-        usdrifAltFees[1] = 3000;
-
         config = FinalNetworkConfig({
             doc: moc.docToken,
             mocProxy: moc.mocProxy,
             docLayerBankAToken: moc.layerbankAToken,
-            docSovrynShares: moc.iToken,
             usdrif: dex.usdrifToken,
             usdrifLayerBankAToken: dex.layerbankUsdrifAToken,
             usdt0: dex.usdt0Token,
@@ -300,8 +253,6 @@ contract DeployFinal is DeployBase {
             mocOracle: dex.mocOracle,
             usdrifIntermediateTokens: dex.swapIntermediateTokens,
             usdrifPoolFeeRates: dex.swapPoolFeeRates,
-            usdrifAltIntermediateTokens: usdrifAltIntermediate,
-            usdrifAltPoolFeeRates: usdrifAltFees,
             usdt0IntermediateTokens: usdt0Intermediate,
             usdt0PoolFeeRates: usdt0Fees,
             amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
@@ -349,7 +300,6 @@ contract DeployFinal is DeployBase {
         if (s_cfg.doc == address(0)) revert DeployFinal__ZeroAddress("doc");
         if (s_cfg.mocProxy == address(0)) revert DeployFinal__ZeroAddress("mocProxy");
         if (s_cfg.docLayerBankAToken == address(0)) revert DeployFinal__IncompleteMap("docLayerBankAToken");
-        if (s_cfg.docSovrynShares == address(0)) revert DeployFinal__IncompleteMap("docSovrynShares");
         if (s_cfg.usdrif == address(0)) revert DeployFinal__ZeroAddress("usdrif");
         if (s_cfg.usdrifLayerBankAToken == address(0)) revert DeployFinal__IncompleteMap("usdrifLayerBankAToken");
         if (s_cfg.usdt0 == address(0)) revert DeployFinal__ZeroAddress("usdt0");
@@ -371,7 +321,6 @@ contract DeployFinal is DeployBase {
         console.log("DcaManager:", address(s_stack.dcaManager));
         console.log("DOC idle:", s_stack.docIdle);
         console.log("DOC LayerBank:", s_stack.docLayerBank);
-        console.log("DOC Sovryn:", s_stack.docSovryn);
         console.log("USDRIF idle:", s_stack.usdrifIdle);
         console.log("USDRIF LayerBank:", s_stack.usdrifLayerBank);
         console.log("USDT0 idle:", s_stack.usdt0Idle);

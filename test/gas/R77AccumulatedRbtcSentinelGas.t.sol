@@ -117,7 +117,7 @@ contract R77AccumulatedRbtcSentinelGasTest is Test {
         scheduleIds[0] = 1;
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = GROSS;
-        harness.batchBuyRbtc(buyers, scheduleIds, amounts, NO_MIN_RBTC_OUT);
+        harness.batchBuyRbtc(buyers, scheduleIds, amounts, NO_MIN_RBTC_OUT, 0);
     }
 
     function _withdraw(address buyer) private {

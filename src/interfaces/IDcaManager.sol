@@ -40,8 +40,10 @@ interface IDcaManager {
     /**
      * @notice One handler's purchase batch.
      * @dev Every id shares `token` and `routeIndex`, which resolve to one handler. Buyer and amount come
-     *      from storage, so caller data cannot redirect or resize a purchase. `minRbtcOut` is a batch-wide
-     *      minimum in rBTC wei, checked against the handler's measured receipt. Uniswap also enforces its
+     *      from storage, so caller data cannot redirect or resize a purchase. `minRbtcOut` is the gross
+     *      rBTC/WRBTC wei minimum quoted for `quotedStablecoinIn` token base units. The handler scales
+     *      it up or down to actual retrieved input, rounding up, then checks measured output. A nonzero
+     *      minimum requires nonzero quoted input. Zero minimum disables this caller bound. Uniswap also enforces its
      *      oracle floor; MoC redeems at its protocol price and has no pool-slippage floor.
      */
     struct Batch {
@@ -49,6 +51,7 @@ interface IDcaManager {
         address token;
         uint256 routeIndex;
         uint256 minRbtcOut;
+        uint256 quotedStablecoinIn;
     }
 
     /**

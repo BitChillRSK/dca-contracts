@@ -164,7 +164,11 @@ contract ProtectedPurchaseWindowTest is DcaDappTest {
         uint64[] memory scheduleIds = new uint64[](1);
         scheduleIds[0] = secondScheduleId;
         batches[0] = IDcaManager.Batch({
-            scheduleIds: scheduleIds, token: address(stablecoin), routeIndex: s_routeIndex, minRbtcOut: 0
+            scheduleIds: scheduleIds,
+            token: address(stablecoin),
+            routeIndex: s_routeIndex,
+            minRbtcOut: 0,
+            quotedStablecoinIn: 0
         });
         vm.prank(SWAPPER);
         dcaManager.batchBuyRbtcAcrossHandlers(batches);

@@ -101,7 +101,7 @@ contract LendingPurchaseConservationHandler is Test {
         amounts[0] = amount;
 
         uint256 handlerBalBefore = address(i_handler).balance;
-        i_handler.batchBuyRbtc(buyers, scheduleIds, amounts, 0);
+        i_handler.batchBuyRbtc(buyers, scheduleIds, amounts, 0, 0);
         s_rbtcReceivedGhost += address(i_handler).balance - handlerBalBefore;
         ++s_buySuccesses;
     }

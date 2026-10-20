@@ -1,8 +1,8 @@
 # Pashov results — dispositions and proposals for R117
 
-Status: **F1 policy, Sovryn exclusion, and alternate-path exclusion confirmed; remaining owner decisions pending**. Updated on 2026-10-20.
+Status: **selected mitigations implemented and locally validated; remaining risk dispositions pending**. Updated on 2026-10-20.
 
-This record supports the R117 implementation spec. It records owner decisions but does not assign implementation work.
+This record accompanies [R117 implementation](./R117-pashov-mitigations.md) in PR #184. It records decisions, implementation evidence, and unresolved conditions.
 No new risk acceptance is approved by this record yet.
 
 ## Evidence and limits
@@ -15,8 +15,8 @@ Reviewed documents at PR [#183](https://github.com/BitChillRSK/dca-contracts/pul
 - [Fizz report](../../fizz_data/report.md), including its replay results and coverage limits.
 
 Repository instructions and the relaunch status were read for workflow and existing policy.
-This review did not inspect contract implementations, run tests, or query live markets.
-Technical claims below come from those reports. Recommendations and deductions are identified as such.
+Initial triage used only those reports. The selected implementation now inspects the purchase pipeline and deployment script and adds targeted tests.
+Unverified report claims retain their conditional status. No new live-market conclusions follow from the implementation tests.
 Liquidity and gas-price observations are historical snapshots, not current launch checks.
 
 The scan has two findings and 28 leads. Its score of 75 measures confidence, not severity.
@@ -48,14 +48,14 @@ Existing acceptance is attributed to the report or repository policy; it is not 
 
 | ID | Report item | Proposal | Reason and closure evidence |
 | --- | --- | --- | --- |
-| F1 | Batch `minRbtcOut` does not scale with the input spent | M — policy confirmed | Keep deposits and creation open; protect the quoted execution rate against actual input changes. The owner confirmed this policy on 2026-10-20. Implementation and verification remain pending. The material attack remains conditional; SP-64 demonstrates only dust. |
-| F2 | `DeployFinal` assigns a Sovryn DOC market with no free DOC | X — exclusion confirmed | The owner excluded all Sovryn integration from the initial release on 2026-10-20. Omit Sovryn handler deployment and route assignments. Implementation remains pending. This avoids new release exposure; it does not fix Sovryn liquidity or accept that risk. L28 has the same disposition. |
+| F1 | Batch `minRbtcOut` does not scale with the input spent | M — policy confirmed | Keep deposits and creation open; protect the quoted execution rate against actual input changes. The owner confirmed this policy on 2026-10-20. Implemented through `quotedStablecoinIn` and an input-scaled minimum; validation is recorded below. The material attack remains conditional; SP-64 demonstrates only dust. |
+| F2 | `DeployFinal` assigns a Sovryn DOC market with no free DOC | X — exclusion confirmed | The owner excluded all Sovryn integration from the initial release on 2026-10-20. Omit Sovryn handler deployment and route assignments. Implemented in this PR; validation is recorded below. This avoids new release exposure; it does not fix Sovryn liquidity or accept that risk. L28 has the same disposition. |
 
 ### F1 — confirmed policy and implementation requirements
 
 **Confirmed policy: keep deposits and schedule creation open, and protect the quoted execution rate.**
 The owner selected this policy on 2026-10-20. It preserves the current window policy.
-The selected protection must account for actual execution input. The exact contract and bot changes remain to be specified.
+The selected protection must account for actual execution input. The contract ABI and the required bot integration are specified in R117; consumer implementation remains outside this repository.
 
 The reports describe two different situations:
 
@@ -66,18 +66,17 @@ Blocking only `depositToken` is incomplete because creation also adds lending sh
 Blocking both calls addresses the reported window case, but purchases still need no window.
 It therefore does not, alone, resolve the entire finding.
 
-Prefer a rate floor derived from the quoted output minimum and quoted input.
-Apply it to the actual input retrieved for execution, with the same fee basis as the quote.
-The implementation must specify token units, rounding, overflow handling, and zero-input behaviour.
-Use token-specific units; do not assume every stablecoin has 18 decimals.
+The batch now carries `minRbtcOut` and `quotedStablecoinIn`.
+The latter is the actual gross stablecoin input used for the quote, in token base units.
+After retrieving funds, `PurchaseRbtc` computes `ceil(minRbtcOut × actualInput / quotedStablecoinIn)` with full-precision arithmetic.
+The same scaled minimum reaches the venue and checks measured gross output before purchase fees.
+A nonzero minimum with zero quoted input reverts. Zero minimum retains the existing opt-out behaviour.
+No token decimal conversion or per-row quote field is required.
 
-An alternative is a cap on the **actual** input associated with the quote.
-The report's Option A sums nominal schedule amounts in the manager.
-That sum can stay fixed when the funded amount of a short row increases.
-This is a deduction from the reported clamp behaviour; verify it before selecting that patch.
-Do not copy the sample patch and assume it protects every reported case.
+A cap based only on nominal row amounts would miss funding changes in short rows.
+The selected ratio applies after retrieval, so it covers both nominal amount edits and changed lending funding.
 
-Required follow-up evidence:
+Regression coverage:
 
 - An amount edit outside a window cannot weaken the quoted execution rate.
 - A deposit and a new schedule inside a window cannot weaken it.
@@ -85,10 +84,11 @@ Required follow-up evidence:
 - Normal full rows, multiple rows, partial funding, and token decimals retain the selected semantics.
 - The bot quotes with the same gross/net output basis as the contract.
 
-SP-64 asserts exact input stability. Keeping deposits open can legitimately leave that assertion false.
-Under that policy, replace the expected invariant with the chosen execution-rate guarantee.
-Retain the dust sequence as a test of allowed behaviour and output protection.
-Do not merely suppress its assertion or describe the behaviour as fixed.
+The original SP-64 demanded exact input stability. The revised property checks the selected execution-rate guarantee.
+The original dust sequence now reverts when upward rounding requires one additional output wei.
+Its regression test verifies that the sequence exercises quote protection.
+Successful purchases must satisfy the exact rate; a one-wei shortfall does not receive an execution tolerance.
+SP-65 permits that rounding-induced refusal in its model-price liveness assertion.
 
 ### F2 — confirmed initial release scope
 
@@ -96,7 +96,7 @@ Do not merely suppress its assertion or describe the behaviour as fixed.
 The owner selected exclusion on 2026-10-20 and cited uncertainty surrounding Sovryn.
 This applies to all Sovryn routes, not only DOC or a temporary deposit pause.
 The initial deployment must omit Sovryn handlers and their route assignments.
-The existing deployment script described by the report still needs that change.
+`DeployFinal` now deploys six handlers and leaves Sovryn route 2 unregistered and unassigned.
 
 A Sovryn handler can be deployed later if the owner decides to integrate Sovryn.
 Before that integration, review current liquidity, remainder burns, exit-fee rounding, and adapter compatibility.
@@ -112,18 +112,18 @@ No deletion of Sovryn source or tests follows from this decision.
 **Confirmed policy: exclude the alternate USDRIF → USDT → WRBTC path from the launch allowlist.**
 The owner selected this policy on 2026-10-20. The report observed an empty pool on that path.
 The observation is historical; this decision does not assert that the pool is still empty.
-The implementation must omit that alternate path's launch permissions on every affected handler.
+`DeployFinal` now omits the alternate path configuration and permission calls. Deployment tests check both USDRIF handlers.
 
 This decision retains the primary USDRIF → USDT0 → WRBTC path described in the report.
 It does not exclude USDRIF or USDT0 from launch.
 Before adding the alternate path later, review current liquidity, execution quality, and quote protection.
-Implementation remains pending. Exclusion does not fix the pool or accept its execution risk.
+Implemented in this PR; validation is recorded below. Exclusion does not fix the pool or accept its execution risk.
 
 ### L01/L08 — intended behaviour and bot execution context
 
 The owner clarified that multiple schedules are allowed. A user need not delete a schedule to create another one.
 The owner also stated that the bot will run weekly at launch and at most once daily under the intended operating policy.
-These are owner-supplied requirements. This report-only review did not inspect the bot or verify its execution policy.
+These are owner-supplied requirements. The implementation review identified consumer integration points but did not verify the complete bot execution policy.
 
 **L01: recommend closure as intended behaviour, not an accepted security risk.**
 There is no stated wallet-wide purchase cooldown for the creation/deletion sequence to bypass.
@@ -160,8 +160,8 @@ L01–L28 identify leads in their original report order. They are local referenc
 | L05 | Creation inside the window grows a short lending row | M — duplicate of F1 | Cover creation as well as deposits in F1's regression cases. This is not another independent loss finding. |
 | L06 | `depositToken` stores a balance read before the handler call | H | No listed token or market callback reaches the swapper in the report. Prefer checks-effects-interactions if this path changes. A theoretical callback is not proof of a current exploit. |
 | L07 | Deposit inside the window adds shares to a short row | M — duplicate of F1 | Cover deposits in F1. The demonstrated no-loss case is rounding dust. |
-| L08 | Period reductions permit several purchases on one day | D — informational; no contract fix proposed | Correct the guide's “one extra purchase” claim. The sequence requires repeat execution of the same schedule after edits. The owner states weekly launch execution, at most daily under the intended policy. Verify one success per schedule per cycle rather than relying on cron frequency alone. No loss to another user is reported. |
-| L09 | Allowlisted USDRIF path uses a pool reported empty | X — exclusion confirmed | The owner excluded USDRIF → USDT → WRBTC from the launch allowlist on 2026-10-20. Retain the primary USDRIF → USDT0 → WRBTC path. Verify that every affected handler omits the alternate permission. Implementation remains pending; any future addition needs a fresh review. |
+| L08 | Period reductions permit several purchases on one day | D — informational; guide corrected | The guide now describes repeated eligibility rather than a categorical one-extra-purchase limit. The sequence requires repeat execution of the same schedule after edits. The owner states weekly launch execution, at most daily under the intended policy. Verify one success per schedule per cycle rather than relying on cron frequency alone. No loss to another user is reported. |
+| L09 | Allowlisted USDRIF path uses a pool reported empty | X — exclusion confirmed | The owner excluded USDRIF → USDT → WRBTC from the launch allowlist on 2026-10-20. Retain the primary USDRIF → USDT0 → WRBTC path. Both USDRIF deployment tests verify that the alternate permission is absent. Any future addition needs a fresh review. |
 | L10 | LayerBank cash shortage blocks exits and bundled purchases | O + A — material dependency risk | External illiquidity is already accepted according to the report. Verify reserve checks, retry behaviour, and exclusion of a failing route from unrelated bundles. Monitoring cannot guarantee an exit or prevent a borrower from taking cash. |
 | L11 | LayerBank changes to round-up share burns | A — conditional upgrade risk | No current rounding mismatch is reported. Preserve exact consumption checks. Record upgrade monitoring, fork probes, replacement planning, and documented retry options. A replacement alone does not guarantee exit from an incompatible old handler. |
 | L12 | A row without shares reverts every batch containing it | O + V — lending-loss case | Verify bot exclusion and recovery behaviour for funded-looking rows with zero backing. The report describes loss-dependent availability failures, not demonstrated theft. Share the review with L16; do not reopen previously declined reserve/grouping designs by default. |
@@ -201,9 +201,9 @@ If Sovryn stays disabled, record this as a condition for enabling it rather than
 | Item | Proposal | Closure requirement |
 | --- | --- | --- |
 | SP-64 | Resolve with F1's selected semantics | Keep its demonstrated dust behaviour distinct from the unproved material attack. Under a rate guarantee, test that guarantee instead of demanding fixed input. |
-| GL-15 | D — correct an overstrong property; Sovryn excluded at launch | A real dust deposit reverts without loss. Condition the minimum-deposit assertion on minting at least one share. Keep the 1e18-deposit assertion. Update the replay's expected result. This harness correction does not require enabling Sovryn. |
+| GL-15 | D — property corrected; Sovryn excluded at launch | A real dust deposit reverts without loss. Condition the minimum-deposit assertion on minting at least one share. Keep the 1e18-deposit assertion. Update the replay's expected result. This harness correction does not require enabling Sovryn. |
 | GL-24 | X/V — unconfirmed Sovryn rounding lead | Retain the smoke-run sequence for a future Sovryn review. Reproduce it before claiming a dust bound or changing the property. It is not an initial release blocker while Sovryn remains excluded. |
-| SP-72 | D — close a coverage gap | Execute a purchase through the intermediate USDT0 path and assert intermediate balance conservation. A declared property with no evaluation provides no evidence. |
+| SP-72 | D — coverage gap closed | The harness starts Dex routes through USDT0. `test_intermediatePathPurchaseEvaluatesSP72` proves a purchase executes, checks the intermediate balance, and checks the property evaluation counter. |
 | Campaign duration | Extend after harness corrections | The report recommends at least four hours, then 24 hours before release, plus Echidna. Preserve results and limitations. Runtime duration alone is not a security proof. |
 | Mock and coverage limits | Preserve limitations; add targeted checks | Mock venues do not validate live fee, burn, liquidity, or oracle rules. Verify those assumptions with focused tests or dependency evidence. Correct the report's coverage explanation through a separate annotation. |
 
@@ -211,7 +211,7 @@ If Sovryn stays disabled, record this as a condition for enabling it rather than
 
 1. Specify and implement F1's confirmed execution-rate protection against actual input changes. Keep deposits and creation open.
 2. Omit Sovryn handler deployment and route assignments from the initial release. Verify the resulting launch map.
-3. Omit USDRIF → USDT → WRBTC from the launch allowlist. Verify its exclusion on every affected handler.
+3. The final deployment excludes USDRIF → USDT → WRBTC. Deployment tests verify both affected handlers.
 4. Close L21, L23, the loss-recovery questions in L12/L16, and any enabled-market L18 case with targeted evidence.
 5. Verify the operational controls for price impact, venue capacity, failed rows, and route isolation.
 6. Correct the cadence documentation and Fizz properties, then run the selected assurance campaigns.
@@ -225,18 +225,24 @@ Availability failures and price-protection gaps stay open until their control or
 
 | Decision | Recommended position | Confirmed position |
 | --- | --- | --- |
-| Deposits and creation during protected windows | Keep them open; protect execution rate against actual input changes | Confirmed by the owner on 2026-10-20. This selects mitigation, not acceptance of F1. Implementation remains pending. |
-| Sovryn integration at launch | Initial proposal was a paused DOC route; the owner selected broader exclusion | Confirmed by the owner on 2026-10-20: omit all Sovryn integration from the initial release. A handler can be deployed later. Deployment changes remain pending; Sovryn-specific risks stay open for a future review. |
-| Alternate path reported empty | Exclude it from the launch allowlist until reviewed | Confirmed by the owner on 2026-10-20: exclude USDRIF → USDT → WRBTC at launch. Retain the primary USDRIF → USDT0 → WRBTC path. Implementation remains pending. |
+| Deposits and creation during protected windows | Keep them open; protect execution rate against actual input changes | Confirmed by the owner on 2026-10-20. This selects mitigation, not acceptance of F1. Implemented in this PR; validation is recorded below. |
+| Sovryn integration at launch | Initial proposal was a paused DOC route; the owner selected broader exclusion | Confirmed by the owner on 2026-10-20: omit all Sovryn integration from the initial release. A handler can be deployed later. `DeployFinal` applies the exclusion; Sovryn-specific risks stay open for a future review. |
+| Alternate path reported empty | Exclude it from the launch allowlist until reviewed | Confirmed by the owner on 2026-10-20: exclude USDRIF → USDT → WRBTC at launch. Retain the primary USDRIF → USDT0 → WRBTC path. Implemented in this PR; validation is recorded below. |
 | New residual risk acceptances | Review the A/O rows with their stated impact and controls | Pending |
 
 Existing accepted policies remain attributed to the report and repository instructions.
 They do not close new evidence gaps or approve unrelated future dependency behaviour.
 
-## PR and implementation boundary
+## Implementation and validation
 
-This supporting PR contains Markdown only. It changes no contract, test, script, or invariant.
-It preserves the original scan and Fizz outputs as evidence.
-The documentation-only gate in `AGENTS.md` requires no build or test run.
-The later R117 spec must select exact files, controls, tests, and consumer follow-ups after decisions are settled.
-Do not treat this proposal as approval to change a contract or launch a route.
+PR #184 includes the selected contract mitigation, launch exclusions, regression tests, and documentation.
+The original scan and Fizz report outputs remain unchanged as evidence of the original runs.
+The initial documentation-only boundary is superseded by the owner's request to include mitigations in the same PR.
+
+- F1: `PurchaseRbtcTest` first reproduced diluted protection and overstrict reduced-input behaviour before the fix.
+- Targeted purchase, quote, and deployment suites pass on the default profile.
+- The updated `FoundryTester` passes all nine tests, including both original sequences and explicit SP-72 evaluation.
+- Full default/deploy gates and required lending/path forks pass. Exact commands and results are in R117. Consumer issue updates await explicit authorisation; their requirements are recorded there.
+- No transaction has been broadcast. Source for excluded adapters remains available for a future integration.
+
+This implementation does not close unverified oracle, dependency, or operational leads through an implied risk acceptance.

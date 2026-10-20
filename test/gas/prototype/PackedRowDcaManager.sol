@@ -187,7 +187,7 @@ contract PackedRowDcaManager is ReentrancyGuard {
             purchaseAmounts[i] = schedulePurchaseAmount;
         }
         IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex)))
-            .batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, batch.minRbtcOut);
+            .batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, batch.minRbtcOut, 0);
     }
 
     function getSchedule(uint64 scheduleId, address user, address token) external view returns (Schedule memory) {

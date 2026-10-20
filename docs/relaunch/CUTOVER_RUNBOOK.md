@@ -23,7 +23,8 @@ Human operator only. Agents must not `--broadcast`.
    - `make fork-sovryn`
    - `make fork-layerbank`
    - `make fork-dex-path` (Dex path allowlist)
-6. Static analysis triaged in [`R73-RELEASE_RECORD.md`](./R73-RELEASE_RECORD.md).
+6. Confirm the selected mitigations and remaining risk dispositions in [R117](./R117-pashov-mitigations.md).
+   Static analysis triaged in [`R73-RELEASE_RECORD.md`](./R73-RELEASE_RECORD.md).
 7. `RSK_MAINNET_RPC_URL`, Blockscout verifier URL, deployer keystore/Ledger ready.
 8. `INITIAL_SWAPPER` = production bot EOA (non-zero).
 9. Safe (`MAINNET_OWNER`) and fee collector (`MAINNET_FEE_COLLECTOR`) match `script/Constants.sol`.
@@ -50,10 +51,10 @@ forge script script/DeployFinal.s.sol:DeployFinal \
 ```
 
 - `--sender` must be the address of the `--account` keystore. `DeployFinal` makes `msg.sender` the
-  owner of all nine contracts until the Safe accepts, and `--account` alone does not set `msg.sender`
+  owner of all eight contracts until the Safe accepts, and `--account` alone does not set `msg.sender`
   inside `run()`.
 - `LENDING_PROTOCOL` must be set because the shared deploy base reads it with no fallback and rejects
-  an unknown value. `DeployFinal` does not use it: it deploys all seven handlers whatever the value.
+  an unknown value. `DeployFinal` does not use it: it deploys all six handlers whatever the value.
 - Simulate first: run the command without `--broadcast` and without the `--verify` line, which forge
   rejects unless `--broadcast` is present. That runs the deployment against the live chain and
   prints the stack without sending anything.
@@ -90,7 +91,11 @@ always reverts.
 
 1. Copy every address from the script log into the consumer issue / ops sheet.
 2. Verify `dcaManager.i_operationsAdmin()` equals the deployed `OperationsAdmin` address.
-   For all seven handlers, verify `handler.i_dcaManager()` equals that exact deployed `DcaManager`.
+   Verify Sovryn route 2 remains unregistered and unassigned.
+   Verify the alternate USDRIF → USDT → WRBTC path is not allowlisted on either USDRIF handler.
+   Verify the primary USDRIF → USDT0 → WRBTC path remains active and allowlisted.
+   Confirm the bot sends `quotedStablecoinIn` in token base units with each quoted `minRbtcOut`.
+   For all six handlers, verify `handler.i_dcaManager()` equals that exact deployed `DcaManager`.
    Verify `handler.i_stablecoin()` equals the token assigned to its pair.
    Compare each handler's verified code and constructor arguments with the frozen release artifact.
    A manager that merely returns the same registry does not establish canonical manager identity.
@@ -100,7 +105,7 @@ always reverts.
 4. Confirm `isSwapper(INITIAL_SWAPPER)` and that `getTokenMinPurchaseAmount` for each token equals
    the approved launch value (precondition 3).
 5. Only once steps 2 through 4 pass: from the Safe, `acceptOwnership()` on `OperationsAdmin`,
-   `DcaManager`, and all seven handlers.
+   `DcaManager`, and all six handlers.
 6. Publish addresses to `front-end`, `swapper-bot`, `data-api`, `bitchill-monitoring`,
    `metrics-dashboard`, and add them to [`ADDRESSES.md`](../../ADDRESSES.md).
 7. Enable bot ticks only after a successful dry-run simulation against the new stack.

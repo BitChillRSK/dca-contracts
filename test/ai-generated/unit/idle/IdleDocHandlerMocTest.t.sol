@@ -90,7 +90,7 @@ contract IdleDocHandlerMocTest is Test {
         purchaseAmounts[0] = 60 ether;
         purchaseAmounts[1] = 140 ether;
 
-        handler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT);
+        handler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT, 0);
 
         uint256 accrued1 = handler.getAccumulatedRbtcBalance(user1);
         uint256 accrued2 = handler.getAccumulatedRbtcBalance(user2);

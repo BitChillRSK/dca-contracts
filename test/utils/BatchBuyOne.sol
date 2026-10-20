@@ -52,10 +52,22 @@ function toBatch(uint64[] memory scheduleIds, address token, uint256 routeIndex,
     pure
     returns (IDcaManager.Batch memory batch)
 {
+    return toBatch(scheduleIds, token, routeIndex, minRbtcOut, 0);
+}
+
+/// @notice Build an explicit quote in gross output wei and actual stablecoin input base units.
+function toBatch(
+    uint64[] memory scheduleIds,
+    address token,
+    uint256 routeIndex,
+    uint256 minRbtcOut,
+    uint256 quotedStablecoinIn
+) pure returns (IDcaManager.Batch memory batch) {
     batch.scheduleIds = scheduleIds;
     batch.token = token;
     batch.routeIndex = routeIndex;
     batch.minRbtcOut = minRbtcOut;
+    batch.quotedStablecoinIn = quotedStablecoinIn;
 }
 
 /**
@@ -81,5 +93,5 @@ function handlerBatchBuyOne(
     buyers[0] = buyer;
     scheduleIds[0] = scheduleId;
     purchaseAmounts[0] = purchaseAmount;
-    handler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, minRbtcOut);
+    handler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, minRbtcOut, purchaseAmount);
 }

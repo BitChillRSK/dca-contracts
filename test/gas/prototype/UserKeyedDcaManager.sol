@@ -182,7 +182,7 @@ contract UserKeyedDcaManager is ReentrancyGuard {
             if (scheduleRouteIndex != batch.routeIndex) revert Prototype__RouteIndexMismatch();
         }
         IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex)))
-            .batchBuyRbtc(batch.buyers, batch.scheduleIds, batch.purchaseAmounts, batch.minRbtcOut);
+            .batchBuyRbtc(batch.buyers, batch.scheduleIds, batch.purchaseAmounts, batch.minRbtcOut, 0);
     }
 
     function getSchedule(uint64 scheduleId, address user) external view returns (Schedule memory) {

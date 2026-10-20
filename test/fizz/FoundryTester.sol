@@ -4,6 +4,7 @@ pragma solidity >=0.6.2 <0.9.0;
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 import {Handlers} from "./handlers/Handlers.sol";
+import {IPurchaseUniswap} from "src/interfaces/IPurchaseUniswap.sol";
 
 /// @dev `cool(address)` is a forge cheatcode the vendored forge-std `Vm` interface does not declare yet.
 interface CoolVm {
@@ -19,6 +20,9 @@ contract FoundryTester is Test, Handlers {
     }
 
     function setUp() public {
+        // Match the mock campaign's genesis time even when this suite runs inside a fork gate.
+        vm.roll(1);
+        vm.warp(1);
         setup();
     }
 
@@ -327,6 +331,20 @@ contract FoundryTester is Test, Handlers {
     bytes4 internal constant PANIC_SELECTOR = 0x4e487b71;
 
     /// @dev Medusa ran both shrunk sequences at block 25, timestamp 25, with no delay between calls.
+    function test_intermediatePathPurchaseEvaluatesSP72() public {
+        Route memory r = routes[3];
+        assertEq(IPurchaseUniswap(r.handler).getSwapPath(), _dexPath(1));
+        dcaManager_createDcaSchedule_clamped(3, 1000 ether, 100 ether, 1);
+        env_donateIntermediateToRouter(1 ether);
+        uint256 intermediateBefore = usdt0.balanceOf(address(swapRouter));
+        uint256 outputBefore = rbtcAsset(r.handler);
+        uint256 checksBefore = intermediatePathChecks;
+        adv_cleanBatchLiveness(3, 0, 0);
+        assertGt(rbtcAsset(r.handler), outputBefore, "Dex purchase must actually execute");
+        assertEq(usdt0.balanceOf(address(swapRouter)), intermediateBefore);
+        assertGt(intermediatePathChecks, checksBefore, "SP-72 must be evaluated");
+    }
+
     function _toMedusaStart() internal {
         vm.roll(25);
         vm.warp(25);
@@ -344,18 +362,15 @@ contract FoundryTester is Test, Handlers {
     /// @dev SP-64 (EXPLORATORY), Finding 1 / "deposits in the protected window" lead. Alice re-enters LayerBank
     ///      with purchaseAmount == deposit; the half-up mint leaves her row clamped (all shares) at planning.
     ///      Inside the window an unguarded `depositToken` un-clamps it, so the batch burns one share more
-    ///      than planned (45339366870081688524800 vs 45339366870081688524799).
+    ///      than planned. The exact quote now refuses the one-output-wei rounding shortfall.
     function test_repro_adv_protectedBatchScenario() public {
         _toMedusaStart();
         adv_fullExitAndReenter(
             21024335355776915299101188012106854391436269275498184707108144420689833445126,
             177684100258073654261007264031024834504374210172652464502406003705877663695
         );
-        try this._repro_helper1() {
-            revert("assertion should have fired");
-        } catch (bytes memory err) {
-            _assertPanicked(err);
-        }
+        this._repro_helper1();
+        assertGt(quoteRoundingReverts, 0, "the original sequence must exercise quote protection");
     }
 
     function _repro_helper1() external {
@@ -379,11 +394,9 @@ contract FoundryTester is Test, Handlers {
             400123900000000000000000000,
             42396913941755556936654186938328322142679471649784381576262641083582743421624
         );
-        try this._repro_helper2() {
-            revert("assertion should have fired");
-        } catch (bytes memory err) {
-            _assertPanicked(err);
-        }
+        this._repro_helper2();
+        assertEq(dcaManager.getTokenMinPurchaseAmount(address(doc)), 1);
+        assertEq(_previewMint(address(sovrynDocMoc), 1, rate(address(sovrynDocMoc))), 0);
     }
 
     function _repro_helper2() external {

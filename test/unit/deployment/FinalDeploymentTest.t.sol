@@ -12,7 +12,6 @@ import {ILendingHandler} from "../../../src/interfaces/ILendingHandler.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {BitChillOwnable} from "../../../src/BitChillOwnable.sol";
 import {LayerBankDocHandlerMoc} from "../../../src/layerbank/LayerBankDocHandlerMoc.sol";
-import {SovrynDocHandlerMoc} from "../../../src/sovryn/SovrynDocHandlerMoc.sol";
 import {LayerBankHandlerDex} from "../../../src/layerbank/LayerBankHandlerDex.sol";
 import {DcaManagerAccessControl} from "../../../src/DcaManagerAccessControl.sol";
 import {TokenHandler} from "../../../src/TokenHandler.sol";
@@ -20,7 +19,6 @@ import {PurchaseMoc} from "../../../src/PurchaseMoc.sol";
 import {PurchaseUniswap} from "../../../src/PurchaseUniswap.sol";
 import {LayerBankHandler} from "../../../src/layerbank/LayerBankHandler.sol";
 import {MockStablecoin} from "../../mocks/MockStablecoin.sol";
-import {MockIToken} from "../../mocks/MockIToken.sol";
 import {MockMocProxy} from "../../mocks/MockMocProxy.sol";
 import {MockLayerBankAToken, MockLayerBankPool} from "../../mocks/MockLayerBank.sol";
 import {MockWrbtcToken} from "../../mocks/MockWrbtcToken.sol";
@@ -38,7 +36,7 @@ contract DeployFinalHarness is DeployFinal {
 }
 
 /**
- * @notice Constructs the canonical seven-handler stack through `DeployFinal.deployStack`.
+ * @notice Constructs the canonical six-handler stack through `DeployFinal.deployStack`.
  * @dev Runs on every lane (no STABLECOIN_TYPE / LENDING_PROTOCOL skip): the final map is
  *      fixed. Harness forces a live-style environment so production fee rates and USDT0
  *      6-decimal bounds apply while Anvil supplies mocks.
@@ -51,7 +49,6 @@ contract FinalDeploymentTest is Test {
     MockStablecoin internal usdrif;
     MockStablecoin internal usdt0;
     MockMocProxy internal mocProxy;
-    MockIToken internal iToken;
     MockLayerBankAToken internal docAToken;
     MockLayerBankAToken internal usdrifAToken;
     MockLayerBankAToken internal usdt0AToken;
@@ -68,7 +65,6 @@ contract FinalDeploymentTest is Test {
         usdrif = new MockStablecoin(address(this));
         usdt0 = new MockStablecoin(address(this));
         mocProxy = new MockMocProxy(address(doc));
-        iToken = new MockIToken(address(doc));
 
         docAToken = new MockLayerBankAToken(address(doc));
         MockLayerBankPool docPool = new MockLayerBankPool(docAToken);
@@ -88,7 +84,7 @@ contract FinalDeploymentTest is Test {
         intermediate = new MockStablecoin(address(this));
     }
 
-    function test_finalStack_mainnetStyle_sevenHandlersAndSafePending() public {
+    function test_finalStack_mainnetStyle_sixHandlersAndSafePending() public {
         DeployFinalHarness harness = new DeployFinalHarness(DeployBase.Environment.MAINNET, SAFE, address(this));
         DeployFinal.FinalStack memory stack = harness.deployStack(_mockConfig(address(this)));
 
@@ -103,7 +99,8 @@ contract FinalDeploymentTest is Test {
             uint256(stack.operationsAdmin.getRouteClass(LAYERBANK_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending)
         );
         assertEq(
-            uint256(stack.operationsAdmin.getRouteClass(SOVRYN_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending)
+            uint256(stack.operationsAdmin.getRouteClass(SOVRYN_INDEX)),
+            uint256(IOperationsAdmin.RouteClass.Unregistered)
         );
         assertEq(
             uint256(stack.operationsAdmin.getRouteClass(TROPYKUS_INDEX)),
@@ -113,7 +110,7 @@ contract FinalDeploymentTest is Test {
 
         assertEq(stack.operationsAdmin.getHandler(address(doc), IDLE_INDEX), stack.docIdle);
         assertEq(stack.operationsAdmin.getHandler(address(doc), LAYERBANK_INDEX), stack.docLayerBank);
-        assertEq(stack.operationsAdmin.getHandler(address(doc), SOVRYN_INDEX), stack.docSovryn);
+        assertEq(stack.operationsAdmin.getHandler(address(doc), SOVRYN_INDEX), address(0), "Sovryn excluded at launch");
         assertEq(stack.operationsAdmin.getHandler(address(usdrif), IDLE_INDEX), stack.usdrifIdle);
         assertEq(stack.operationsAdmin.getHandler(address(usdrif), LAYERBANK_INDEX), stack.usdrifLayerBank);
         assertEq(stack.operationsAdmin.getHandler(address(usdt0), IDLE_INDEX), stack.usdt0Idle);
@@ -132,21 +129,21 @@ contract FinalDeploymentTest is Test {
         assertEq(stack.dcaManager.getMinPurchasePeriod(), 7 days);
         assertEq(stack.dcaManager.getMaxSchedulesPerToken(), 10);
 
-        // Both USDRIF handlers keep the default path active and approve the second one before the Safe owns them.
+        // Both USDRIF handlers retain the primary USDT0 path and exclude the alternate legacy-USDT path.
         bytes memory defaultPath =
-            abi.encodePacked(address(usdrif), uint24(500), address(intermediate), uint24(3000), address(wrbtc));
-        bytes memory altPath =
             abi.encodePacked(address(usdrif), uint24(500), address(usdt0), uint24(3000), address(wrbtc));
+        bytes memory altPath =
+            abi.encodePacked(address(usdrif), uint24(500), address(intermediate), uint24(3000), address(wrbtc));
         address[2] memory usdrifHandlers = [stack.usdrifIdle, stack.usdrifLayerBank];
         for (uint256 i; i < usdrifHandlers.length; ++i) {
             PurchaseUniswap purchase = PurchaseUniswap(payable(usdrifHandlers[i]));
             assertEq(purchase.getSwapPath(), defaultPath, "default path is not active");
-            assertTrue(purchase.isPurchasePathAllowed(keccak256(altPath)), "second USDRIF path not approved");
+            assertTrue(purchase.isPurchasePathAllowed(keccak256(defaultPath)), "primary path not allowed");
+            assertFalse(purchase.isPurchasePathAllowed(keccak256(altPath)), "alternate path must be excluded");
         }
 
         _assertHandlerOwnerPending(stack.docIdle, SAFE);
         _assertHandlerOwnerPending(stack.docLayerBank, SAFE);
-        _assertHandlerOwnerPending(stack.docSovryn, SAFE);
         _assertHandlerOwnerPending(stack.usdrifIdle, SAFE);
         _assertHandlerOwnerPending(stack.usdrifLayerBank, SAFE);
         _assertHandlerOwnerPending(stack.usdt0Idle, SAFE);
@@ -154,14 +151,12 @@ contract FinalDeploymentTest is Test {
 
         _assertCommonHandlerWiring(stack.docIdle, address(stack.dcaManager), address(doc));
         _assertCommonHandlerWiring(stack.docLayerBank, address(stack.dcaManager), address(doc));
-        _assertCommonHandlerWiring(stack.docSovryn, address(stack.dcaManager), address(doc));
         _assertCommonHandlerWiring(stack.usdrifIdle, address(stack.dcaManager), address(usdrif));
         _assertCommonHandlerWiring(stack.usdrifLayerBank, address(stack.dcaManager), address(usdrif));
         _assertCommonHandlerWiring(stack.usdt0Idle, address(stack.dcaManager), address(usdt0));
         _assertCommonHandlerWiring(stack.usdt0LayerBank, address(stack.dcaManager), address(usdt0));
 
         assertEq(address(LayerBankDocHandlerMoc(payable(stack.docLayerBank)).i_aToken()), address(docAToken));
-        assertEq(address(SovrynDocHandlerMoc(payable(stack.docSovryn)).i_iToken()), address(iToken));
         assertEq(address(LayerBankHandlerDex(payable(stack.usdrifLayerBank)).i_aToken()), address(usdrifAToken));
         assertEq(address(LayerBankHandlerDex(payable(stack.usdt0LayerBank)).i_aToken()), address(usdt0AToken));
 
@@ -171,7 +166,6 @@ contract FinalDeploymentTest is Test {
 
         _assertMocWiring(stack.docIdle);
         _assertMocWiring(stack.docLayerBank);
-        _assertMocWiring(stack.docSovryn);
 
         _assertDexWiring(stack.usdrifIdle);
         _assertDexWiring(stack.usdrifLayerBank);
@@ -180,23 +174,20 @@ contract FinalDeploymentTest is Test {
 
         _assertLaunchFees(stack.docIdle, 250e18);
         _assertLaunchFees(stack.docLayerBank, 250e18);
-        _assertLaunchFees(stack.docSovryn, 250e18);
         _assertLaunchFees(stack.usdrifIdle, 250e18);
         _assertLaunchFees(stack.usdrifLayerBank, 250e18);
         _assertLaunchFees(stack.usdt0Idle, 250e6);
         _assertLaunchFees(stack.usdt0LayerBank, 250e6);
 
         assertTrue(IERC165(stack.docLayerBank).supportsInterface(type(ILendingHandler).interfaceId));
-        assertTrue(IERC165(stack.docSovryn).supportsInterface(type(ILendingHandler).interfaceId));
         assertTrue(IERC165(stack.usdrifLayerBank).supportsInterface(type(ILendingHandler).interfaceId));
         assertFalse(IERC165(stack.docIdle).supportsInterface(type(ILendingHandler).interfaceId));
         assertFalse(IERC165(stack.usdt0Idle).supportsInterface(type(ILendingHandler).interfaceId));
 
         // Handler addresses must be unique because each may back only one token-route pair.
-        address[7] memory handlers = [
+        address[6] memory handlers = [
             stack.docIdle,
             stack.docLayerBank,
-            stack.docSovryn,
             stack.usdrifIdle,
             stack.usdrifLayerBank,
             stack.usdt0Idle,
@@ -226,11 +217,10 @@ contract FinalDeploymentTest is Test {
         DeployFinalHarness harness = new DeployFinalHarness(DeployBase.Environment.MAINNET, SAFE, address(this));
         DeployFinal.FinalStack memory stack = harness.deployStack(_mockConfig(address(this)));
 
-        // Lending spenders: LayerBank's Pool and Sovryn's iToken, one per lending leaf.
+        // Each lending leaf approves its LayerBank pool.
         _assertStandingApproval(stack.docLayerBank, doc, docAToken.POOL());
         _assertStandingApproval(stack.usdrifLayerBank, usdrif, usdrifAToken.POOL());
         _assertStandingApproval(stack.usdt0LayerBank, usdt0, usdt0AToken.POOL());
-        _assertStandingApproval(stack.docSovryn, doc, address(iToken));
 
         // The Uniswap router, on every Dex leaf, idle and lending alike.
         _assertStandingApproval(stack.usdrifIdle, usdrif, address(router));
@@ -239,7 +229,6 @@ contract FinalDeploymentTest is Test {
         _assertStandingApproval(stack.usdt0LayerBank, usdt0, address(router));
 
         // A MoC leaf buys by redeeming its own DOC and never swaps, so it approves no router.
-        assertEq(doc.allowance(stack.docSovryn, address(router)), 0, "MoC leaf approved the router");
         assertEq(doc.allowance(stack.docLayerBank, address(router)), 0, "MoC leaf approved the router");
         // The idle DOC leaf neither lends nor swaps, so it holds no standing allowance at all.
         assertEq(doc.allowance(stack.docIdle, address(mocProxy)), 0, "MoC redemption needs no allowance");
@@ -318,13 +307,10 @@ contract FinalDeploymentTest is Test {
 
     function _mockConfig(address feeCollector) internal view returns (DeployFinal.FinalNetworkConfig memory config) {
         address[] memory usdrifIntermediate = new address[](1);
-        usdrifIntermediate[0] = address(intermediate);
+        usdrifIntermediate[0] = address(usdt0);
         uint24[] memory usdrifFees = new uint24[](2);
         usdrifFees[0] = 500;
         usdrifFees[1] = 3000;
-
-        address[] memory usdrifAltIntermediate = new address[](1);
-        usdrifAltIntermediate[0] = address(usdt0);
 
         address[] memory usdt0Intermediate = new address[](0);
         uint24[] memory usdt0Fees = new uint24[](1);
@@ -334,7 +320,6 @@ contract FinalDeploymentTest is Test {
             doc: address(doc),
             mocProxy: address(mocProxy),
             docLayerBankAToken: address(docAToken),
-            docSovrynShares: address(iToken),
             usdrif: address(usdrif),
             usdrifLayerBankAToken: address(usdrifAToken),
             usdt0: address(usdt0),
@@ -344,8 +329,6 @@ contract FinalDeploymentTest is Test {
             mocOracle: address(oracle),
             usdrifIntermediateTokens: usdrifIntermediate,
             usdrifPoolFeeRates: usdrifFees,
-            usdrifAltIntermediateTokens: usdrifAltIntermediate,
-            usdrifAltPoolFeeRates: usdrifFees,
             usdt0IntermediateTokens: usdt0Intermediate,
             usdt0PoolFeeRates: usdt0Fees,
             amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,

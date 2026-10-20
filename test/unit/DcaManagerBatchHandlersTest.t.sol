@@ -78,6 +78,7 @@ contract DcaManagerBatchHandlersTest is DcaDappTest {
         batch.token = address(stablecoin);
         batch.scheduleIds[0] = scheduleIdAt(dcaManager, USER, address(stablecoin), scheduleIndex);
         batch.routeIndex = routeIndex;
+        batch.quotedStablecoinIn = schedule.purchaseAmount;
     }
 
     function _twoHandlers() private view returns (IDcaManager.Batch[] memory batches) {

@@ -8,11 +8,11 @@ requests keep moving.
 ## Production scope
 
 `script/DeployFinal.s.sol`, run under `FOUNDRY_PROFILE=deploy`, is the only production deployment
-path. It creates one `OperationsAdmin`, one `DcaManager`, and seven handlers:
+path. It creates one `OperationsAdmin`, one `DcaManager`, and six handlers:
 
 | Stablecoin | Route 0 (idle) | Route 1 (LayerBank) | Route 2 (Sovryn) | Purchase venue |
 |---|---|---|---|---|
-| DOC | `IdleDocHandlerMoc` | `LayerBankDocHandlerMoc` | `SovrynDocHandlerMoc` | Money on Chain |
+| DOC | `IdleDocHandlerMoc` | `LayerBankDocHandlerMoc` | — | Money on Chain |
 | USDRIF | `IdleHandlerDex` | `LayerBankHandlerDex` | — | Uniswap V3 |
 | USDT0 | `IdleHandlerDex` | `LayerBankHandlerDex` | — | Uniswap V3 |
 
@@ -22,7 +22,7 @@ In scope:
   (`cloc src --exclude-dir=tropykus-legacy`). The [README](./README.md#contracts) has the inheritance
   map. Interfaces of external protocols (`IMocProxy`, `ICoinPairPrice`, `IWRBTC`,
   `IUniswapV3SwapRouter`, `IiToken`, `ILayerBankPool`, `ILayerBankAToken`) are ABIs only.
-  `SovrynHandlerDex` is built and tested but is not one of the seven handlers `DeployFinal` creates.
+  Both Sovryn leaves are retained and tested for a possible future integration. `DeployFinal` deploys neither and leaves route 2 unregistered.
 - `script/DeployFinal.s.sol`, `script/DeployBase.s.sol`, and `script/Constants.sol`: constructor
   inputs, external addresses, the route map, and the launch parameters. `DeployFinal` imports
   `MocHelperConfig` and `UsdrifHelperConfig` for their struct types only and fills them with its own
@@ -82,7 +82,8 @@ afterward.
 | Protected purchase window | 5 blocks | None. It is a constant |
 
 Dex paths at deploy: USDT0 → WRBTC through the 0.30% pool; USDRIF → USDT0 (0.05%) → WRBTC (0.30%)
-active, with USDRIF → USDT (0.05%) → WRBTC (0.30%) also allowlisted on both USDRIF handlers.
+active. The alternate USDRIF → USDT (0.05%) → WRBTC (0.30%) path is not launch-allowlisted.
+Sovryn is excluded from the initial release; its adapter-specific risks require review before any later integration.
 
 ## Asset and call flow
 
@@ -98,7 +99,7 @@ batch is also atomic across all handlers.
 
 DOC is redeemed through Money on Chain. USDRIF and USDT0 are swapped to WRBTC through an allowlisted
 Uniswap V3 path and then unwrapped only when the user withdraws. The Uniswap path checks both an
-oracle-derived floor and the swapper's batch `minRbtcOut`; the stricter bound wins. Across both venues,
+oracle-derived floor and the swapper's input-scaled minimum; the stricter bound wins. Across both venues,
 the handler supplies the whole retrieved (gross) stablecoin to the venue, and a successful purchase must
 consume exactly that amount. No stablecoin fee is withheld first: the purchase fee is a share of the
 measured rBTC/WRBTC output, credited to the fee collector afterward. Uniswap additionally requires every
@@ -189,7 +190,11 @@ invariants**, with the reason for each.
   split over their sum `G`. Each buyer is credited `floor(Q × netᵢ / G)` and the collector
   `floor(Q × F / G)` on the same accumulated-rBTC books, where `netᵢ` is the row's funding weight
   minus its fee and `F` the batch fee. Idle funding weights equal the nominal amounts. `minRbtcOut`
-  and the Uniswap oracle floor bind on `Q`, before the fee share.
+  is quoted for `quotedStablecoinIn`, in token base units. The execution minimum is
+  `ceil(minRbtcOut × retrieved / quotedStablecoinIn)`, computed with full-precision arithmetic.
+  A positive quoted minimum requires nonzero quoted input; a zero minimum disables this caller bound.
+  The venue receives that scaled minimum, which also binds on measured `Q` before the fee share.
+  The independent Uniswap oracle floor uses actual input too.
   The per-row `amountSpent` reported in events is the row's share of the retrieved gross. Integer
   division can leave less than one wei per row, and per fee, uncredited in the handler.
 - Schedule principal is the amount still authorized for purchases, not a mark-to-market claim on a
@@ -215,9 +220,12 @@ A period edit does not move the anchor, so the next due day is the existing anch
 The owner can therefore make their own schedule due again on a day it already bought: after a purchase
 that landed at least one new period late, shortening the period to no more than that lateness puts
 anchor-plus-period on or before today. A 28-day schedule bought seven days late and then set to seven
-days is due again that same day. That second purchase re-anchors on today, so the edit yields one extra
-purchase, not a loop. Only the schedule's owner can trigger it and the amount is still bounded by the
-schedule balance; `updatePurchasePeriod` is blocked during a protected window like every other edit.
+days is due again that same day. Repeated period reductions can make the same schedule eligible
+several times that day if the anchor remains sufficiently old. Each purchase still requires an
+authorised swapper transaction; edits do not execute purchases. The bot runs weekly at launch.
+One successful purchase per schedule per bot cycle prevents the reported repeated-execution sequence;
+cron frequency alone does not prove that execution rule. The user funds each purchase and pays its fee.
+`updatePurchasePeriod` is blocked during a protected window like every other edit.
 This is accepted, not enforced away: refusing a period that makes the schedule immediately due would
 also refuse ordinary mid-cycle shortening.
 
@@ -260,7 +268,7 @@ Other deliberate availability trade-offs:
   No alternate recipient, wrapped claim, or owner rescue exists.
 - Dex input tokens must have at most 18 decimals. Fee-on-transfer tokens and asynchronous or partial
   lending redemptions are unsupported.
-- Sovryn charges a 0.1% exit fee on iToken burns. A user on the Sovryn route therefore receives less
+- Sovryn is not integrated at launch. The retained adapter charges the market's 0.1% exit fee on iToken burns. A user on a future Sovryn route would therefore receive less
   stablecoin than the principal debited on withdrawal, and each purchase spends the net amount
   redeemed. This is the venue-fee case in the accounting properties above, not a loss of shares.
   `make probe-sovryn-exit-fee` measures the live fee; see

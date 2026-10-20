@@ -8,7 +8,7 @@ the user withdraws it.
 
 The contracts are immutable: there are no proxies and no owner migration of user funds.
 
-Three stablecoins are listed. DOC can sit idle, in LayerBank, or in Sovryn, and is redeemed for rBTC
+Three stablecoins are listed. DOC can sit idle or in LayerBank, and is redeemed for rBTC
 at Money on Chain. USDRIF and USDT0 can sit idle or in LayerBank, and are swapped for rBTC on Uniswap
 V3. The route table, with the contract deployed on each route, is under
 [Production scope](./AUDIT_GUIDE.md#production-scope) in the audit guide.
@@ -39,7 +39,7 @@ Custody branch
     IdleHandler             keeps the stablecoin on the handler
     LendingHandler          per-user virtual shares, interest, exact share redemption
       LayerBankHandler      protocol adapter
-      SovrynHandler         protocol adapter
+      SovrynHandler         retained adapter; excluded from initial deployment
 
 Purchase branch
   PurchaseFees              fee curve and fee collector; makes every handler ownable
@@ -52,7 +52,7 @@ Deployed handlers: constructor only, each inheriting one custody contract and on
                     IdleHandlerDex      = IdleHandler + PurchaseUniswap
   src/layerbank/    LayerBankDocHandlerMoc = LayerBankHandler + PurchaseMoc
                     LayerBankHandlerDex    = LayerBankHandler + PurchaseUniswap
-  src/sovryn/       SovrynDocHandlerMoc = SovrynHandler + PurchaseMoc
+  src/sovryn/       SovrynDocHandlerMoc = SovrynHandler + PurchaseMoc   (not in the production map)
                     SovrynHandlerDex    = SovrynHandler + PurchaseUniswap   (not in the production map)
   src/tropykus-legacy/   test-only; never deployed
 ```

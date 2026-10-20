@@ -183,7 +183,7 @@ contract RouteIdDcaManager is ReentrancyGuard {
             buyers[i] = buyer;
             purchaseAmounts[i] = schedulePurchaseAmount;
         }
-        IPurchaseRbtc(handler).batchBuyRbtc(buyers, batch.scheduleIds, purchaseAmounts, batch.minRbtcOut);
+        IPurchaseRbtc(handler).batchBuyRbtc(buyers, batch.scheduleIds, purchaseAmounts, batch.minRbtcOut, 0);
     }
 
     function getSchedule(uint64 scheduleId) external view returns (Schedule memory) {

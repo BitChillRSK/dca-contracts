@@ -126,7 +126,7 @@ contract TropykusDocHandlerMocTest is Test {
         }
 
         // Execute batch buy (onlyDcaManager)
-        handler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT);
+        handler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT, 0);
 
         // Validate each user received rBTC proportionally
         uint256 totalAccrued;

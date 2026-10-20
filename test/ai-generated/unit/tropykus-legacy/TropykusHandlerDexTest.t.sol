@@ -468,7 +468,7 @@ contract TropykusHandlerDexTest is HandlerTestHarness {
 
         // Call batchBuyRbtc, which redeems shares through _batchRetrieveStablecoin
         vm.prank(address(dcaManager));
-        tropykusDexHandler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT);
+        tropykusDexHandler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT, 0);
 
         // Verify the shares were redeemed - lending balances should be reduced
         uint256 finalBalance1 = tropykusDexHandler.getUserShares(user1);
