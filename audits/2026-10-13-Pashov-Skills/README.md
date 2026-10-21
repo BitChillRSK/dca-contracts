@@ -53,6 +53,7 @@ quote protection and deployment exclusions in PR #186 (which replaces #184), wit
 leads, and the Fizz follow-ups. It distinguishes confirmed policy, recommendations, existing
 policy, and open verification conditions. The owner approved PR #184 and consumer publication on 2026-10-21.
 All five consumer issues now contain the final requirements, linked from R117, with implementation gates before relaunch.
+[R118](../../docs/relaunch/R118-pashov-optional-hardening.md) implements the four deferred hardening leads (L06, L14, L17, L25) in PR #187.
 The generated report remains unchanged.
 
 ## Notes for triage

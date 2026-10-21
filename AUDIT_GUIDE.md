@@ -98,7 +98,8 @@ batch is also atomic across all handlers.
 
 DOC is redeemed through Money on Chain. USDRIF and USDT0 are swapped to WRBTC through an allowlisted
 Uniswap V3 path and then unwrapped only when the user withdraws. The Uniswap path checks both an
-oracle-derived floor and the swapper's input-scaled minimum; the stricter bound wins. Across both venues,
+oracle-derived floor and the swapper's input-scaled minimum, each against the measured WRBTC; the
+stricter bound wins. Across both venues,
 the handler supplies the whole retrieved (gross) stablecoin to the venue, and a successful purchase must
 consume exactly that amount. No stablecoin fee is withheld first: the purchase fee is a share of the
 measured rBTC/WRBTC output, credited to the fee collector afterward. Uniswap additionally requires every
@@ -168,7 +169,10 @@ How the boundaries are enforced:
 - Every external function that writes a schedule is `nonReentrant`, except `batchBuyRbtc` and
   `batchBuyRbtcAcrossHandlers`. Those are swapper-only and finish each handler's schedule writes
   before calling it. In an across-handlers call a later handler's schedules are written after earlier
-  handler calls; handlers are BitChill-deployed, so this is accepted.
+  handler calls; handlers are BitChill-deployed, so this is accepted. No user mutator writes back a
+  schedule value it read before its handler call, and a balance written before that call is logged
+  before it too. A purchase reached from a token or market callback during the call therefore keeps
+  its debit, and its `TokenBalanceUpdated` is the schedule's last.
 
 `AGENTS.md` lists these and the other invariants contributors must preserve, under **Protocol
 invariants**, with the reason for each.
@@ -183,6 +187,8 @@ invariants**, with the reason for each.
 - Every successful lending redemption must reduce the handler's external receipt-share balance by
   exactly the virtual shares debited. Rounding can limit the funded amount before redemption.
   A venue fee or realized loss can reduce cash after the debited claim was fully consumed.
+- Every successful lending deposit must reduce the handler's stablecoin balance by exactly the amount
+  supplied to the market. A market that takes less or more reverts the deposit.
 - Integrator return values and balance views are not treated as received cash. Stablecoin and native
   receipts are measured by balance deltas.
 - Every successful purchase must reduce the handler's stablecoin balance by exactly the gross amount

@@ -67,6 +67,14 @@ interface ILendingHandler is ITokenHandler {
     error LendingHandler__ShareConsumptionMismatch(
         uint256 intendedDecrease, uint256 balanceBefore, uint256 balanceAfter
     );
+    /**
+     * @notice The lending market did not take exactly the stablecoin BitChill deposited.
+     * @dev `balanceBefore` / `balanceAfter` are the handler's stablecoin balances around the protocol
+     *      deposit. Covers partial, excessive, and increasing balances without an arithmetic panic.
+     */
+    error LendingHandler__DepositConsumptionMismatch(
+        uint256 intendedDecrease, uint256 balanceBefore, uint256 balanceAfter
+    );
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS

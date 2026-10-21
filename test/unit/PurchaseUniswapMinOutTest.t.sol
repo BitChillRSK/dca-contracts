@@ -246,6 +246,45 @@ contract PurchaseUniswapMinOutTest is Test {
         _buyOne(six, grossSix, floor + 1);
     }
 
+    /// @dev The oracle floor binds on measured WRBTC, not only on the router's own figure: a router that
+    ///      clears `amountOutMinimum` on paper but delivers less is rejected with no caller minimum.
+    function testOracleFloorBindsOnMeasuredOutput() public {
+        MinOutHarness harness = _deployHarness(18);
+        uint256 gross = _fundedGross(harness, 18);
+
+        uint256 floor = harness.getAmountOutMinimum(gross);
+        swapRouter.setAmountOut(floor);
+        swapRouter.setDeliveryShortfall(1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IPurchaseUniswap.PurchaseUniswap__BelowOracleFloor.selector, floor - 1, floor)
+        );
+        _buyOne(harness, gross, NO_MIN_RBTC_OUT);
+
+        // Measured output exactly at the floor clears it.
+        swapRouter.setAmountOut(floor + 1);
+        _buyOne(harness, gross, NO_MIN_RBTC_OUT);
+        assertEq(harness.getAccumulatedRbtcBalance(BUYER), _buyerCredit(harness, gross, floor));
+    }
+
+    /// @dev A measured output above the oracle floor but below a binding caller minimum keeps the caller
+    ///      minimum's own error, so each bound reports itself.
+    function testMeasuredShortfallAgainstTheCallerMinimumKeepsItsError() public {
+        MinOutHarness harness = _deployHarness(18);
+        uint256 gross = _fundedGross(harness, 18);
+
+        uint256 callerMinimum = harness.getAmountOutMinimum(gross) + 10;
+        swapRouter.setAmountOut(callerMinimum);
+        swapRouter.setDeliveryShortfall(5);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, callerMinimum - 5, callerMinimum
+            )
+        );
+        _buyOne(harness, gross, callerMinimum);
+    }
+
     /// @dev The owner may retighten the live floor without touching the wall, and the swap follows it
     ///      immediately. This is the knob that exists so the wall never has to move.
     function testOwnerCanRetightenTheFloorAndTheSwapFollows() public {
@@ -410,7 +449,9 @@ contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
 /**
  * @notice A router that pays a settable amount of WRBTC and enforces `amountOutMinimum`, so a test can ask
  *         whether a given payout clears the handler's floor. `MockSwapRouter02` prices its own output, which
- *         cannot express "pay what the pre-R43 formula would have allowed".
+ *         cannot express "pay what the pre-R43 formula would have allowed". A delivery shortfall checks
+ *         `amountOutMinimum` against the settable amount but pays less, so the router's figure and the
+ *         measured receipt differ.
  */
 contract MockFloorSwapRouter {
     struct ExactInputParams {
@@ -422,6 +463,7 @@ contract MockFloorSwapRouter {
 
     MockWrbtcToken private immutable i_wrbtc;
     uint256 private s_amountOut;
+    uint256 private s_deliveryShortfall;
 
     constructor(MockWrbtcToken wrbtc) {
         i_wrbtc = wrbtc;
@@ -431,6 +473,10 @@ contract MockFloorSwapRouter {
         s_amountOut = amountOut;
     }
 
+    function setDeliveryShortfall(uint256 deliveryShortfall) external {
+        s_deliveryShortfall = deliveryShortfall;
+    }
+
     function exactInput(ExactInputParams calldata params) external payable returns (uint256 amountOut) {
         amountOut = s_amountOut;
         require(params.amountOutMinimum <= amountOut, "Too little received");
@@ -438,7 +484,7 @@ contract MockFloorSwapRouter {
         address tokenIn = address(uint160(bytes20(params.path[:20])));
         require(IERC20(tokenIn).transferFrom(msg.sender, address(this), params.amountIn), "transferFrom failed");
 
-        i_wrbtc.deposit{value: amountOut}(msg.sender);
+        i_wrbtc.deposit{value: amountOut - s_deliveryShortfall}(msg.sender);
     }
 
     receive() external payable {}

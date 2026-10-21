@@ -117,17 +117,24 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     }
 
     /**
-     * @dev TokenHandler reverts unless the pull matches `depositAmount`, so the mint always uses
-     *      the full request. Credited shares are the measured receipt-share gain, never a
-     *      protocol return value. A declining receipt-share balance panics on the checked
-     *      subtraction; a flat balance reverts `LendingHandler__LendingProtocolDepositFailed`.
+     * @dev TokenHandler reverts unless the pull matches `depositAmount`, and the market must then take
+     *      exactly that amount, so the mint always uses the full request and leaves nothing behind.
+     *      Credited shares are the measured receipt-share gain, never a protocol return value. A
+     *      declining receipt-share balance panics on the checked subtraction; a flat balance reverts
+     *      `LendingHandler__LendingProtocolDepositFailed`.
      */
     function _depositToken(address user, uint256 depositAmount) internal virtual override {
         super._depositToken(user, depositAmount);
+        uint256 stablecoinBefore = i_stablecoin.balanceOf(address(this));
         uint256 sharesBefore = _receiptSharesBalance();
         _protocolDeposit(depositAmount);
         uint256 mintedAmount = _receiptSharesBalance() - sharesBefore;
         if (mintedAmount == 0) revert LendingHandler__LendingProtocolDepositFailed();
+        uint256 stablecoinAfter = i_stablecoin.balanceOf(address(this));
+        // `stablecoinBefore` includes the pulled deposit, so the subtraction cannot underflow.
+        if (stablecoinAfter != stablecoinBefore - depositAmount) {
+            revert LendingHandler__DepositConsumptionMismatch(depositAmount, stablecoinBefore, stablecoinAfter);
+        }
         uint256 previousShares = s_shares[user];
         _setUserShares(user, previousShares, previousShares + mintedAmount);
     }
@@ -135,6 +142,7 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     /**
      * @dev Pays out what the redemption actually produced. Cash may be less than requested when
      *      the complete share claim was consumed (fee / realized loss); a partial share burn reverts.
+     *      Shares worth nothing redeem nothing, and no zero transfer is made.
      */
     function _withdrawToken(address user, uint256 withdrawalAmount) internal virtual override returns (uint256) {
         uint256 exchangeRate = _exchangeRate();
@@ -148,6 +156,7 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
 
         // Pay out what the redemption actually produced, which may be less than requested
         withdrawalAmount = _redeemShares(user, userShares, withdrawalAmount, exchangeRate);
+        if (withdrawalAmount == 0) return 0;
         return super._withdrawToken(user, withdrawalAmount);
     }
 
