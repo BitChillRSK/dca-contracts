@@ -2,12 +2,13 @@
 pragma solidity 0.8.36;
 
 import {Test} from "forge-std/Test.sol";
+import {VmSafe} from "forge-std/Vm.sol";
 import {DcaManager} from "../../src/DcaManager.sol";
 import {OperationsAdmin} from "../../src/OperationsAdmin.sol";
 import {TropykusDocHandlerMoc} from "../../src/tropykus-legacy/TropykusDocHandlerMoc.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {IPurchaseFees} from "../../src/interfaces/IPurchaseFees.sol";
-import {MockReentrantStablecoin, ITransferFromHook} from "../mocks/MockReentrantStablecoin.sol";
+import {MockReentrantStablecoin, ITransferHook} from "../mocks/MockReentrantStablecoin.sol";
 import {MockKdocToken} from "../mocks/MockKdocToken.sol";
 import {MockMocProxy} from "../mocks/MockMocProxy.sol";
 import "../Constants.sol";
@@ -15,7 +16,7 @@ import {reentrantCall} from "../utils/OzRevert.sol";
 import {scheduleCount} from "test/utils/ScheduleAt.sol";
 import {toBatch} from "test/utils/BatchBuyOne.sol";
 
-contract ReentrantDepositor is ITransferFromHook {
+contract ReentrantDepositor is ITransferHook {
     DcaManager public dca;
     address public token;
     uint64 public deleteId;
@@ -33,22 +34,21 @@ contract ReentrantDepositor is ITransferFromHook {
         deleteId = id;
     }
 
-    /// @dev Buy `id` from inside the deposit's pull. Only reaches the manager if this contract is a swapper.
+    /// @dev Buy `id` from inside the next hooked transfer. Only reaches the manager if this contract is a swapper.
     function armBuy(uint64 id) external {
         buy = true;
         buyId = id;
     }
 
     function onTransferFrom(address, address, uint256) external {
-        if (buy) {
-            buy = false;
-            uint64[] memory ids = new uint64[](1);
-            ids[0] = buyId;
-            dca.batchBuyRbtc(toBatch(ids, token, TROPYKUS_INDEX));
-        }
+        _buyIfArmed();
         if (!attack) return;
         attack = false;
         dca.deleteDcaSchedule(token, deleteId, type(uint256).max);
+    }
+
+    function onTransferReceived(address, uint256) external {
+        _buyIfArmed();
     }
 
     function createSchedule(uint256 depositAmount, uint256 purchaseAmount, uint256 period, uint256 lendingIndex)
@@ -66,8 +66,20 @@ contract ReentrantDepositor is ITransferFromHook {
         dca.deleteDcaSchedule(token, scheduleId, index);
     }
 
+    function withdraw(uint64 scheduleId, uint256 amount) external {
+        dca.withdrawToken(token, scheduleId, amount);
+    }
+
     function deposit(uint64 scheduleId, uint256 amount) external {
         dca.depositToken(token, scheduleId, amount);
+    }
+
+    function _buyIfArmed() private {
+        if (!buy) return;
+        buy = false;
+        uint64[] memory ids = new uint64[](1);
+        ids[0] = buyId;
+        dca.batchBuyRbtc(toBatch(ids, token, TROPYKUS_INDEX));
     }
 }
 
@@ -169,29 +181,35 @@ contract DepositSwapPopReentrancyTest is Test {
 
     /**
      * @dev A purchase is not `nonReentrant`, so a pull that calls back into an allowlisted swapper can buy
-     *      the schedule being funded. The deposit credit is stored before the pull, so that purchase debits
-     *      the new balance. Storing it after the pull overwrote the debit and left the schedule holding
-     *      stablecoin the handler had already spent.
+     *      the schedule being funded. The deposit credit is stored and logged before the pull, so that
+     *      purchase debits the new balance and logs after it. Storing after the pull overwrote the debit;
+     *      logging after it left a stale balance as the schedule's last event.
      */
     function test_depositToken_purchaseFromPullCallback_keepsItsDebit() public {
-        user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
-        (uint64[] memory ids,) = dcaManager.getDcaSchedules(address(user), address(token));
-        uint64 idA = ids[0];
+        uint64 idA = _createScheduleAndArmBuy();
 
-        vm.prank(OWNER);
-        operationsAdmin.addSwapper(address(user));
-        // Live MoC burns DOC without an allowance; the mock pulls it.
-        vm.prank(address(handler));
-        token.approve(address(mocProxy), type(uint256).max);
-        user.armBuy(idA);
-        token.setHook(address(user), true);
-
+        vm.recordLogs();
         user.deposit(idA, EXTRA);
 
         assertFalse(user.buy(), "the pull did not call back");
-        (, IDcaManager.DcaSchedule[] memory schedules) = dcaManager.getDcaSchedules(address(user), address(token));
-        assertEq(schedules[0].tokenBalance, DEPOSIT + EXTRA - MIN_PURCHASE_AMOUNT, "the purchase debit was lost");
+        uint256 stored = _tokenBalance();
+        assertEq(stored, DEPOSIT + EXTRA - MIN_PURCHASE_AMOUNT, "the purchase debit was lost");
         assertGt(handler.getAccumulatedRbtcBalance(address(user)), 0, "the callback purchase was not credited");
+        _assertBalanceEvents(idA, DEPOSIT + EXTRA, stored);
+    }
+
+    /// @dev Same callback during the withdrawal payout: the debit is logged before the handler call, so the
+    ///      purchase's balance event is the last one.
+    function test_withdrawToken_purchaseFromPayoutCallback_logsTheStoredBalanceLast() public {
+        uint64 idA = _createScheduleAndArmBuy();
+
+        vm.recordLogs();
+        user.withdraw(idA, EXTRA);
+
+        assertFalse(user.buy(), "the payout did not call back");
+        uint256 stored = _tokenBalance();
+        assertEq(stored, DEPOSIT - EXTRA - MIN_PURCHASE_AMOUNT, "the purchase debit was lost");
+        _assertBalanceEvents(idA, DEPOSIT - EXTRA, stored);
     }
 
     /// @dev create,create,delete,create in one block used to remint the survivor's id.
@@ -250,6 +268,45 @@ contract DepositSwapPopReentrancyTest is Test {
         assertEq(afterSchedulesIds[1], beforeSchedulesIds[1]);
         assertEq(afterSchedules[0].tokenBalance, beforeSchedules[0].tokenBalance);
         assertEq(afterSchedules[1].tokenBalance, beforeSchedules[1].tokenBalance);
+    }
+
+    /// @dev One schedule owned by `user`, which is made a swapper and set to buy it from the next hooked transfer.
+    function _createScheduleAndArmBuy() private returns (uint64 id) {
+        user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
+        (uint64[] memory ids,) = dcaManager.getDcaSchedules(address(user), address(token));
+        id = ids[0];
+
+        vm.prank(OWNER);
+        operationsAdmin.addSwapper(address(user));
+        // Live MoC burns DOC without an allowance; the mock pulls it.
+        vm.prank(address(handler));
+        token.approve(address(mocProxy), type(uint256).max);
+        user.armBuy(id);
+        token.setHook(address(user), true);
+    }
+
+    function _tokenBalance() private view returns (uint256) {
+        (, IDcaManager.DcaSchedule[] memory schedules) = dcaManager.getDcaSchedules(address(user), address(token));
+        return schedules[0].tokenBalance;
+    }
+
+    /// @dev The schedule's recorded `TokenBalanceUpdated` amounts are the user call's, then the purchase's.
+    function _assertBalanceEvents(uint64 scheduleId, uint256 userCallBalance, uint256 storedBalance) private {
+        VmSafe.Log[] memory logs = vm.getRecordedLogs();
+        uint256[] memory amounts = new uint256[](logs.length);
+        uint256 count;
+        for (uint256 i; i < logs.length; ++i) {
+            if (
+                logs[i].emitter == address(dcaManager)
+                    && logs[i].topics[0] == IDcaManager.DcaManager__TokenBalanceUpdated.selector
+                    && logs[i].topics[2] == bytes32(uint256(scheduleId))
+            ) {
+                amounts[count++] = abi.decode(logs[i].data, (uint256));
+            }
+        }
+        assertEq(count, 2, "expected the user call's and the purchase's balance events");
+        assertEq(amounts[0], userCallBalance, "the user call must log its balance first");
+        assertEq(amounts[1], storedBalance, "the last balance event must be the stored balance");
     }
 
     function _createTwoSchedules() private {
