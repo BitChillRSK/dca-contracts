@@ -106,17 +106,22 @@ Follow direct imports, callers, compilation errors, and failing tests. List expa
 
 ## Consumer follow-up status
 
-The owner authorised publication on 2026-10-21. All five existing issues now contain the approved R117 requirements.
-Each issue description links to its update and has an unchecked implementation gate before relaunch.
+The owner authorised publication on 2026-10-21. The first updates were comments on the five existing relaunch issues.
+Those issues already have related implementation PRs, so R117 now has separate follow-up issues for the additional work.
+Each dedicated issue requires a new follow-up PR above its current relaunch stack and retains an unchecked completion gate.
+The older issues point to the new gates. Merging their existing PRs does not complete R117.
 The contracts PR does not implement sibling repositories. Consumer implementation remains a release requirement.
 
-| Consumer | Existing issue | Required R117 update |
-| --- | --- | --- |
-| swapper-bot | [#15 update](https://github.com/BitChillRSK/swapper-bot/issues/15#issuecomment-6314274536) | Regenerate manager/handler ABIs; retain the existing quote input with its minimum; send the new field; classify the zero-quote error; use six launch handlers; check per-schedule cycle execution. |
-| front-end | [#15 update](https://github.com/BitChillRSK/front-end/issues/15#issuecomment-6314275094) | Regenerate ABIs; omit Sovryn creation and live-yield choices on the new deployment; preserve historical positions. |
-| bitchill-monitoring | [#10 update](https://github.com/BitChillRSK/bitchill-monitoring/issues/10#issuecomment-6314275589) | Watch six new handlers; regenerate error ABIs; interpret the minimum error's second argument as the scaled threshold. Events remain unchanged. |
-| data-api | [#9 update](https://github.com/BitChillRSK/data-api/issues/9#issuecomment-6314276066) | Serve the new six-handler map; omit Sovryn availability; preserve deployment-specific historical labels. Schedule getters remain unchanged. |
-| metrics-dashboard | [#7 update](https://github.com/BitChillRSK/metrics-dashboard/issues/7#issuecomment-6314276584) | Consume the new deployment map; omit new-deployment Sovryn availability; preserve historical labels. |
+| Consumer | R117 follow-up issue | Current PR base | Required R117 update |
+| --- | --- | --- | --- |
+| swapper-bot | [#23](https://github.com/BitChillRSK/swapper-bot/issues/23) | [#21](https://github.com/BitChillRSK/swapper-bot/pull/21) | Regenerate manager/handler ABIs; retain the existing quote input with its minimum; send the new field; classify the zero-quote error; use six launch handlers; check per-schedule cycle execution. |
+| front-end | [#42](https://github.com/BitChillRSK/front-end/issues/42) | [#40](https://github.com/BitChillRSK/front-end/pull/40) | Regenerate ABIs; omit Sovryn creation and live-yield choices on the new deployment; preserve historical positions. |
+| bitchill-monitoring | [#49](https://github.com/BitChillRSK/bitchill-monitoring/issues/49) | [#46](https://github.com/BitChillRSK/bitchill-monitoring/pull/46) | Watch six new handlers; regenerate error ABIs; interpret the minimum error's second argument as the scaled threshold. Events remain unchanged. |
+| data-api | [#25](https://github.com/BitChillRSK/data-api/issues/25) | [#23](https://github.com/BitChillRSK/data-api/pull/23) | Serve the new six-handler map; omit Sovryn availability; preserve deployment-specific historical labels. Schedule getters remain unchanged. |
+| metrics-dashboard | [#17](https://github.com/BitChillRSK/metrics-dashboard/issues/17) | [#15](https://github.com/BitChillRSK/metrics-dashboard/pull/15) | Consume the new deployment map; omit new-deployment Sovryn availability; preserve historical labels. |
+
+Use the subsequent tip if a consumer stack advances. Each issue records its checked base commit and the original approved requirements.
+Already compatible paths need configuration or verification evidence; avoid unnecessary code changes.
 
 The bot update targets its relaunch stack, not the legacy local branch.
 The stack already sums purchase amounts and obtains DEX quotes; R117 retains that input alongside its minimum.

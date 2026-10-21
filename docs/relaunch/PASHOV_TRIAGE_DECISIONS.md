@@ -229,7 +229,7 @@ Availability failures and price-protection gaps stay open until their control or
 | Deposits and creation during protected windows | Keep them open; protect execution rate against actual input changes | Confirmed by the owner on 2026-10-20. This selects mitigation, not acceptance of F1. Implemented in this PR; validation is recorded below. |
 | Sovryn integration at launch | Initial proposal was a paused DOC route; the owner selected broader exclusion | Confirmed by the owner on 2026-10-20: omit all Sovryn integration from the initial release. A handler can be deployed later. `DeployFinal` applies the exclusion; Sovryn-specific risks stay open for a future review. |
 | Alternate path reported empty | Exclude it from the launch allowlist until reviewed | Confirmed by the owner on 2026-10-20: exclude USDRIF → USDT → WRBTC at launch. Retain the primary USDRIF → USDT0 → WRBTC path. Implemented in this PR; validation is recorded below. |
-| PR #184 implementation and consumer updates | Retain the rate check; keep protected windows optional; publish the consumer requirements | Confirmed by the owner on 2026-10-21. All five consumer issues now contain the final requirements and an implementation gate before relaunch. Links are in R117. |
+| PR #184 implementation and consumer updates | Retain the rate check; keep protected windows optional; publish the consumer requirements | Confirmed by the owner on 2026-10-21. Five dedicated R117 follow-up issues now contain the final requirements. Each requires a new PR above its existing relaunch stack. Links are in R117. |
 | New residual risk acceptances | Review the A/O rows with their stated impact and controls | Evidence-dependent items remain open under their stated closure requirements. PR approval does not waive those conditions. |
 
 Existing accepted policies remain attributed to the report and repository instructions.
@@ -245,8 +245,9 @@ The initial documentation-only boundary is superseded by the owner's request to 
 - Targeted purchase, quote, and deployment suites pass on the default profile.
 - The updated `FoundryTester` passes all nine tests, including both original sequences and explicit SP-72 evaluation.
 - Full default/deploy gates and required lending/path forks pass. Exact commands and results are in R117.
-- The owner approved publication on 2026-10-21. All five consumer issue updates are published and linked in R117.
-- Each consumer issue retains an unchecked implementation gate before relaunch. Publication does not imply consumer implementation is complete.
+- The owner approved publication on 2026-10-21. All five dedicated R117 consumer issues are published and linked in R117.
+- The older issues point to those independent implementation gates. Their existing PRs do not close the additional R117 work.
+- Each dedicated issue retains an unchecked completion gate before relaunch. Publication does not imply consumer implementation is complete.
 - No transaction has been broadcast. Source for excluded adapters remains available for a future integration.
 
 This implementation does not close unverified oracle, dependency, or operational leads through an implied risk acceptance.
