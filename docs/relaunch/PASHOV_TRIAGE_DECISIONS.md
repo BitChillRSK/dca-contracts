@@ -1,9 +1,10 @@
 # Pashov results — dispositions and proposals for R117
 
-Status: **selected mitigations implemented and locally validated; remaining risk dispositions pending**. Updated on 2026-10-20.
+Status: **selected implementation owner-approved and locally validated; consumer issues updated; verification gates remain open**. Updated on 2026-10-21.
 
 This record accompanies [R117 implementation](./R117-pashov-mitigations.md) in PR #184. It records decisions, implementation evidence, and unresolved conditions.
-No new risk acceptance is approved by this record yet.
+The owner approved PR #184 and its consumer issue publication on 2026-10-21.
+Items with unmet evidence or verification conditions remain open under their stated closure requirements.
 
 ## Evidence and limits
 
@@ -228,7 +229,8 @@ Availability failures and price-protection gaps stay open until their control or
 | Deposits and creation during protected windows | Keep them open; protect execution rate against actual input changes | Confirmed by the owner on 2026-10-20. This selects mitigation, not acceptance of F1. Implemented in this PR; validation is recorded below. |
 | Sovryn integration at launch | Initial proposal was a paused DOC route; the owner selected broader exclusion | Confirmed by the owner on 2026-10-20: omit all Sovryn integration from the initial release. A handler can be deployed later. `DeployFinal` applies the exclusion; Sovryn-specific risks stay open for a future review. |
 | Alternate path reported empty | Exclude it from the launch allowlist until reviewed | Confirmed by the owner on 2026-10-20: exclude USDRIF → USDT → WRBTC at launch. Retain the primary USDRIF → USDT0 → WRBTC path. Implemented in this PR; validation is recorded below. |
-| New residual risk acceptances | Review the A/O rows with their stated impact and controls | Pending |
+| PR #184 implementation and consumer updates | Retain the rate check; keep protected windows optional; publish the consumer requirements | Confirmed by the owner on 2026-10-21. All five consumer issues now contain the final requirements and an implementation gate before relaunch. Links are in R117. |
+| New residual risk acceptances | Review the A/O rows with their stated impact and controls | Evidence-dependent items remain open under their stated closure requirements. PR approval does not waive those conditions. |
 
 Existing accepted policies remain attributed to the report and repository instructions.
 They do not close new evidence gaps or approve unrelated future dependency behaviour.
@@ -242,7 +244,9 @@ The initial documentation-only boundary is superseded by the owner's request to 
 - F1: `PurchaseRbtcTest` first reproduced diluted protection and overstrict reduced-input behaviour before the fix.
 - Targeted purchase, quote, and deployment suites pass on the default profile.
 - The updated `FoundryTester` passes all nine tests, including both original sequences and explicit SP-72 evaluation.
-- Full default/deploy gates and required lending/path forks pass. Exact commands and results are in R117. Consumer issue updates await explicit authorisation; their requirements are recorded there.
+- Full default/deploy gates and required lending/path forks pass. Exact commands and results are in R117.
+- The owner approved publication on 2026-10-21. All five consumer issue updates are published and linked in R117.
+- Each consumer issue retains an unchecked implementation gate before relaunch. Publication does not imply consumer implementation is complete.
 - No transaction has been broadcast. Source for excluded adapters remains available for a future integration.
 
 This implementation does not close unverified oracle, dependency, or operational leads through an implied risk acceptance.

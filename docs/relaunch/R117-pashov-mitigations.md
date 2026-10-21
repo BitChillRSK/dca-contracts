@@ -1,6 +1,6 @@
 # R117 — Pashov triage and mitigations
 
-Status: **implemented; local validation passed; review and consumer updates pending** · Assigned: yes · Optional/further-review: no
+Status: **implemented; local validation passed; owner approved; consumer issues updated** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
@@ -12,6 +12,8 @@ Keep the original generated reports unchanged.
 [The disposition register](./PASHOV_TRIAGE_DECISIONS.md) records the report and the owner's decisions.
 On 2026-10-20, the owner requested one PR containing the mitigations, decisions, and documentation updates.
 This supersedes the initial documentation-only boundary for #184.
+On 2026-10-21, the owner approved PR #184 and authorised publication of the five consumer issue updates.
+The quoted-rate check stays in place. Protected purchase windows remain optional.
 
 ## Open product decisions
 
@@ -36,7 +38,7 @@ Other unverified leads remain explicitly open in the register. Do not silently a
 - [x] Correct the L08 guide wording and update launch, ABI, and operational documentation affected by these changes.
 - [x] Update SP-64 to test the selected execution-rate guarantee. Correct GL-15 and exercise SP-72's intermediate path.
 - [x] Update the decision register with verified results and remaining conditions. Preserve generated report provenance.
-- [ ] Open or update affected consumer issues with exact ABI and launch-map changes.
+- [x] Open or update affected consumer issues with exact ABI and launch-map changes.
 
 ## Out of scope
 
@@ -79,7 +81,7 @@ Follow direct imports, callers, compilation errors, and failing tests. List expa
 - [x] The original report hash remains unchanged.
 - [x] Selected regression tests, both profile gates, and required forks pass.
 - [x] Decision and deployment documents match the final code and distinguish remaining open leads.
-- [ ] PR description and affected consumer issues describe the final ABI and launch map.
+- [x] PR description and affected consumer issues describe the final ABI and launch map.
 
 ## Reviewer checklist
 
@@ -104,16 +106,23 @@ Follow direct imports, callers, compilation errors, and failing tests. List expa
 
 ## Consumer follow-up status
 
-These existing issues need R117 updates. Posting the prepared comments awaits explicit owner authorisation.
-The contracts PR does not implement sibling repositories.
+The owner authorised publication on 2026-10-21. All five existing issues now contain the approved R117 requirements.
+Each issue description links to its update and has an unchecked implementation gate before relaunch.
+The contracts PR does not implement sibling repositories. Consumer implementation remains a release requirement.
 
 | Consumer | Existing issue | Required R117 update |
 | --- | --- | --- |
-| swapper-bot | [#15](https://github.com/BitChillRSK/swapper-bot/issues/15) | Regenerate manager/handler ABIs; quote actual gross input; send the new field; classify the zero-quote error; use six launch handlers; check per-schedule cycle execution. |
-| front-end | [#15](https://github.com/BitChillRSK/front-end/issues/15) | Regenerate ABIs; omit Sovryn creation and live-yield choices on the new deployment; preserve historical positions. |
-| bitchill-monitoring | [#10](https://github.com/BitChillRSK/bitchill-monitoring/issues/10) | Watch six new handlers; regenerate error ABIs; interpret the minimum error's second argument as the scaled threshold. Events remain unchanged. |
-| data-api | [#9](https://github.com/BitChillRSK/data-api/issues/9) | Serve the new six-handler map; omit Sovryn availability; preserve deployment-specific historical labels. Schedule getters remain unchanged. |
-| metrics-dashboard | [#7](https://github.com/BitChillRSK/metrics-dashboard/issues/7) | Consume the new deployment map; omit new-deployment Sovryn availability; preserve historical labels. |
+| swapper-bot | [#15 update](https://github.com/BitChillRSK/swapper-bot/issues/15#issuecomment-6314274536) | Regenerate manager/handler ABIs; retain the existing quote input with its minimum; send the new field; classify the zero-quote error; use six launch handlers; check per-schedule cycle execution. |
+| front-end | [#15 update](https://github.com/BitChillRSK/front-end/issues/15#issuecomment-6314275094) | Regenerate ABIs; omit Sovryn creation and live-yield choices on the new deployment; preserve historical positions. |
+| bitchill-monitoring | [#10 update](https://github.com/BitChillRSK/bitchill-monitoring/issues/10#issuecomment-6314275589) | Watch six new handlers; regenerate error ABIs; interpret the minimum error's second argument as the scaled threshold. Events remain unchanged. |
+| data-api | [#9 update](https://github.com/BitChillRSK/data-api/issues/9#issuecomment-6314276066) | Serve the new six-handler map; omit Sovryn availability; preserve deployment-specific historical labels. Schedule getters remain unchanged. |
+| metrics-dashboard | [#7 update](https://github.com/BitChillRSK/metrics-dashboard/issues/7#issuecomment-6314276584) | Consume the new deployment map; omit new-deployment Sovryn availability; preserve historical labels. |
+
+The bot update targets its relaunch stack, not the legacy local branch.
+The stack already sums purchase amounts and obtains DEX quotes; R117 retains that input alongside its minimum.
+This argument needs no new database field or additional database read by itself.
+Splitting a batch does not mandate a new quote: a consistent original input/minimum pair preserves its rate limit.
+Fresh quotes can improve accuracy when trade size or pool state changes.
 
 ## Implementation evidence
 
@@ -139,4 +148,5 @@ The contracts PR does not implement sibling repositories.
 
 The temporary output/cache paths isolate compiler profiles. Repository compiler settings and test lanes remain unchanged.
 The original scan hash remains `33e3aa21193300b7c8ee0d026686d43f0f8d1916267ecdb22502a1150213c918`.
-Consumer comment publication and remaining risk dispositions still need owner review. No broadcast occurred.
+The owner approved the selected implementation. Consumer issue publication is complete.
+Consumer implementations and the register's remaining verification conditions stay open before release. No broadcast occurred.

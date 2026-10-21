@@ -51,7 +51,9 @@ through USDT0. [R117](../../docs/relaunch/R117-pashov-mitigations.md) now implem
 quote protection and deployment exclusions in PR #184, with regression tests. The notes below are scan input, not decisions. The separate
 [disposition register](../../docs/relaunch/PASHOV_TRIAGE_DECISIONS.md) covers both findings, all 28
 leads, and the Fizz follow-ups. It distinguishes confirmed policy, recommendations, existing
-policy, and pending owner decisions. The generated report remains unchanged.
+policy, and open verification conditions. The owner approved PR #184 and consumer publication on 2026-10-21.
+All five consumer issues now contain the final requirements, linked from R117, with implementation gates before relaunch.
+The generated report remains unchanged.
 
 ## Notes for triage
 
