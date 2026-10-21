@@ -115,8 +115,12 @@ intermediate-token balance on the shared router to return to its pre-swap value.
 
 The swapper is trusted for liveness and batch selection. It may omit a due schedule, submit a zero
 caller minimum, or choose any governance-allowlisted Dex path. It is not trusted for custody: the
-schedule supplies the buyer and amount, and the handler's oracle floor remains when `minRbtcOut` is
-zero. Governance is a configuration trust boundary. Add-only handler assignment limits a bad future
+schedule supplies the buyer and amount, and a Dex handler's oracle floor remains when `minRbtcOut` is
+zero. MoC has no separate BitChill oracle floor; its caller minimum still binds on measured output.
+The production bot policy requires positive quoted minimums: MoC pricing after venue fees for DOC,
+and DEX quotes for the other launch tokens, each with a configured tolerance. This is an operational
+requirement; the contracts retain the zero-minimum option.
+Governance is a configuration trust boundary. Add-only handler assignment limits a bad future
 configuration to newly registered pairs/routes, but a malicious or misconfigured owner can still make
 unsafe fee, oracle, floor, path, or listing decisions within the explicit setter bounds. The Dex
 safety-check bound stops a single percentage change from widening the floor; it does not cover

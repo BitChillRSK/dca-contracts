@@ -2,7 +2,7 @@
 
 Status: **selected implementation owner-approved and locally validated; consumer issues updated; verification gates remain open**. Updated on 2026-10-21.
 
-This record accompanies [R117 implementation](./R117-pashov-mitigations.md) in PR #184. It records decisions, implementation evidence, and unresolved conditions.
+This record accompanies [R117 implementation](./R117-pashov-mitigations.md) in PR #186 (replacing #184). It records decisions, implementation evidence, and unresolved conditions.
 The owner approved PR #184 and its consumer issue publication on 2026-10-21.
 Items with unmet evidence or verification conditions remain open under their stated closure requirements.
 
@@ -174,7 +174,7 @@ L01–L28 identify leads in their original report order. They are local referenc
 | L18 | Zero-valued interest redeem reverts combined withdrawal | X — Sovryn case deferred; LayerBank premise excluded | The reported fee-rounding case needs Sovryn, which is excluded. Under LayerBank's documented index ≥ RAY assumption, _underlyingForExactScaledBurn converts every positive share debit to at least one underlying wei. LayerBank has no adapter exit-fee deduction. Exact share consumption and positive received cash remain required. Reassess if Pool semantics change or Sovryn is enabled. |
 | L19 | Money on Chain caps transaction gas price | O + A — dependency constraint; swapper-bot#23 | Read the current cap when building transactions. Separate MoC and Dex calls when needed and retry unsupported MoC execution. The historical 16% headroom is not a current limit. No contract redesign is recommended from this report alone. |
 | L20 | Money on Chain redeems only available free DOC | O + A — dependency constraint; swapper-bot#23 | Check available capacity, size batches, and retry when capacity changes. Keep the exact-input revert. Do not accept a partial spend to force a purchase through. |
-| L21 | MoC has no independent contract price floor | V + O — explicit DOC-policy decision | The bot issue currently permits zero DOC minimum under the earlier policy. That conflicts with the proposed interim positive minimum; neither overrides the other silently. The owner must choose a positive simulated-output minimum or retain zero with verified deployed MoC pricing evidence. Track the selected policy and tests in swapper-bot#23. Upstream source evidence and its limits are recorded below. |
+| L21 | MoC has no independent contract price floor | O — positive MoC quote policy confirmed; swapper-bot#23 | On 2026-10-21 the owner selected a positive DOC minimum from MoC pricing, after venue fees and before BitChill fees, with a configured tolerance. Preserve its exact DOC input as quotedStablecoinIn. This replaces the prior zero-minimum bot policy. No zero fallback on quote failure. Bot implementation and deployed-pricing evidence remain required; this protection does not create an independent oracle floor. |
 | L22 | One large row worsens every row's average price | O + A — execution policy; swapper-bot#23 | Apply batch-size and price-impact limits in the bot. Model an excessive row and verify its handling. Shared execution price is expected; the broad contract floor is not a target execution quality. No profitable attacker strategy was established. |
 | L23 | Uniswap floor ignores oracle publication age | A/V — bounded-validity dependency; deployment check remains | Upstream CoinPairPriceFree forwards CoinPairPrice validity. CoinPairPrice rejects age ≥ validPricePeriodInBlocks. The auditor reports a 20-block deployed setting. Confirm the actual wrapper, implementation, parameter, and positive-price publication rule before release. Retain MoC governance and feed correctness as dependencies; this review did not independently verify deployed source or state. |
 | L24 | Stablecoin floor assumes a dollar peg | A — explicit economic assumption | The report identifies prior acceptance of the peg assumption. Record the added downside: purchases can stop during a depeg while withdrawals remain available. Prefer a safe stop over an automatic floor reduction. A lower floor needs a deliberate risk decision. |
@@ -206,8 +206,8 @@ L01–L28 identify leads in their original report order. They are local referenc
 | Work | Responsible component | Completion evidence |
 | --- | --- | --- |
 | L03, L04, L08, L10, L12, L16, L19, L20, L22 | Bot maintainer; [swapper-bot#23](https://github.com/BitChillRSK/swapper-bot/issues/23) | Tests or existing-code evidence for each control; follow-up PR above the current bot stack. |
-| L21 policy | Protocol owner, then bot maintainer | Explicit DOC minimum decision and matching issue, implementation, and tests. No conflicting zero/positive requirements. |
-| L23 deployed oracle, and deployed MoC pricing if zero DOC minimum is retained | Release owner and dependency reviewer | Verified implementation identities, current parameters, positive-price and validity rules, with dated evidence at the frozen release. |
+| L21 policy | Bot maintainer; swapper-bot#23 | Owner confirmed MoC-derived positive DOC minimum with tolerance on 2026-10-21. Implement it, verify deployed pricing, and test failure handling. |
+| L23 deployed oracle and L21 deployed MoC pricing | Release owner and dependency reviewer | Verified implementation identities, current parameters, positive-price and validity rules, with dated evidence at the frozen release. |
 | L06, L14, L17, L25 | Protocol owner | The owner requested a separate later stacked PR on 2026-10-21: [contracts#185](https://github.com/BitChillRSK/dca-contracts/issues/185). No change in R117; no permanent risk acceptance. |
 | Extended Medusa and Echidna campaigns | Release owner and fuzzing reviewer | Commands, revision, configurations, seeds, outputs, and dispositions required by CUTOVER_RUNBOOK. |
 
@@ -243,7 +243,7 @@ If Sovryn stays disabled, record this as a condition for enabling it rather than
 1. Specify and implement F1's confirmed execution-rate protection against actual input changes. Keep deposits and creation open.
 2. Omit Sovryn handler deployment and route assignments from the initial release. Verify the resulting launch map.
 3. The final deployment excludes USDRIF → USDT → WRBTC. Deployment tests verify both affected handlers.
-4. Settle L21 and verify the deployed L23 dependency. Keep L12/L16 bot recovery checks in swapper-bot#23.
+4. Implement the confirmed L21 MoC quote policy in swapper-bot#23 and verify the deployed L23 dependency. Keep L12/L16 bot recovery checks there.
 5. Verify the operational controls for price impact, venue capacity, failed rows, and route isolation.
 6. Correct the cadence documentation and Fizz properties, then run the selected assurance campaigns.
 7. Review L06/L14/L17/L25 in the owner-requested separate stacked PR tracked by contracts#185.
@@ -260,6 +260,7 @@ Availability failures and price-protection gaps stay open until their control or
 | Sovryn integration at launch | Initial proposal was a paused DOC route; the owner selected broader exclusion | Confirmed by the owner on 2026-10-20: omit all Sovryn integration from the initial release. A handler can be deployed later. `DeployFinal` applies the exclusion; Sovryn-specific risks stay open for a future review. |
 | Alternate path reported empty | Exclude it from the launch allowlist until reviewed | Confirmed by the owner on 2026-10-20: exclude USDRIF → USDT → WRBTC at launch. Retain the primary USDRIF → USDT0 → WRBTC path. Implemented in this PR; validation is recorded below. |
 | PR #184 implementation and consumer updates | Retain the rate check; keep protected windows optional; publish the consumer requirements | Confirmed by the owner on 2026-10-21. Five dedicated R117 follow-up issues now contain the final requirements. Each requires a new PR above its existing relaunch stack. Links are in R117. |
+| DOC quote policy (L21) | Quote MoC rather than a secondary pool | Confirmed on 2026-10-21: positive DOC minimum from MoC conversion after venue fees, with a tolerance. Retain the paired DOC input; no zero fallback. This changes bot policy, not the contract ABI. |
 | Optional hardening L06/L14/L17/L25 | Review separately | Confirmed on 2026-10-21: defer to a later stacked PR tracked by contracts#185. This is not a permanent rejection or risk acceptance. |
 | New residual risk acceptances | Review the A/O rows with their stated impact and controls | Evidence-dependent items remain open under their stated closure requirements. PR approval does not waive those conditions. |
 
@@ -268,7 +269,7 @@ They do not close new evidence gaps or approve unrelated future dependency behav
 
 ## Implementation and validation
 
-PR #184 includes the selected contract mitigation, launch exclusions, regression tests, and documentation.
+PR #186 replaces #184 and includes the selected contract mitigation, launch exclusions, regression tests, and documentation.
 The original scan and Fizz report outputs remain unchanged as evidence of the original runs.
 The initial documentation-only boundary is superseded by the owner's request to include mitigations in the same PR.
 

@@ -26,9 +26,9 @@ Human operator only. Agents must not `--broadcast`.
 6. Complete the R117 release gates in [the disposition register](./PASHOV_TRIAGE_DECISIONS.md#review-evidence-and-assigned-release-work).
    The release owner records completion at the frozen revision:
    - Complete all five dedicated consumer issues linked in [R117](./R117-pashov-mitigations.md#consumer-follow-up-status).
-   - Settle the DOC minimum policy and verify the bot controls assigned to swapper-bot#23.
+   - Implement the confirmed positive MoC quote policy for DOC and verify the bot controls assigned to swapper-bot#23.
    - Verify the configured oracle implementation, bounded validity period, and positive-price rules.
-     If DOC uses zero minimum, also verify the deployed MoC conversion, fee, and oracle assumptions.
+     Verify the deployed MoC conversion, fee branches, and oracle assumptions used by DOC quotes.
    - After the corrected harness passes replay checks, run Medusa for at least four hours.
      Before release, complete a 24-hour Medusa campaign and an Echidna campaign on the frozen executable revision.
      Preserve commands, configurations, seeds, corpus, outputs, and coverage limits.

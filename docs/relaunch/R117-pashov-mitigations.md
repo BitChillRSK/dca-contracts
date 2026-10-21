@@ -4,7 +4,7 @@ Status: **implemented; local validation passed; owner approved; consumer issues 
 
 ## Objective
 
-Implement the selected Pashov mitigations, regression tests, and decision records in PR #184, stacked on #183.
+Implement the selected Pashov mitigations, regression tests, and decision records in PR #186, stacked on #183. PR #186 replaces #184 with the required `fix/` branch and non-draft status.
 Keep the original generated reports unchanged.
 
 ## Background
@@ -17,7 +17,7 @@ The quoted-rate check stays in place. Protected purchase windows remain optional
 
 ## Open product decisions
 
-None for the selected implementation:
+None for the selected contract implementation:
 
 - Deposits and schedule creation remain open during protected windows.
 - Protect the quoted execution rate against changes in actual funded batch input.
@@ -26,6 +26,9 @@ None for the selected implementation:
 - Treat L01 as intended scheduling behaviour. Treat L08 as informational and correct the guide; do not change cadence rules.
 
 Other unverified leads remain explicitly open in the register. Do not silently accept new residual risks.
+On 2026-10-21, the owner also selected positive DOC minimums from MoC conversion after venue fees, with a configured tolerance.
+Swapper-bot#23 must implement this policy; it supersedes the earlier zero-DOC-minimum policy.
+The contract retains its explicit zero-minimum option.
 The owner assigned L06/L14/L17/L25 to a separate later stacked PR, tracked by [contracts#185](https://github.com/BitChillRSK/dca-contracts/issues/185).
 
 ## Scope
@@ -118,7 +121,7 @@ The contracts PR does not implement sibling repositories. Consumer implementatio
 
 | Consumer | R117 follow-up issue | Current PR base | Required R117 update |
 | --- | --- | --- | --- |
-| swapper-bot | [#23](https://github.com/BitChillRSK/swapper-bot/issues/23) | [#21](https://github.com/BitChillRSK/swapper-bot/pull/21) | Regenerate manager/handler ABIs; retain the existing quote input with its minimum; send the new field; classify the zero-quote error; use six launch handlers; check per-schedule cycle execution. |
+| swapper-bot | [#23](https://github.com/BitChillRSK/swapper-bot/issues/23) | [#21](https://github.com/BitChillRSK/swapper-bot/pull/21) | Regenerate ABIs; retain paired DEX quote inputs; add MoC-derived positive DOC minimums with tolerance; verify the six launch handlers, per-schedule cycle rule, and operational controls. |
 | front-end | [#42](https://github.com/BitChillRSK/front-end/issues/42) | [#40](https://github.com/BitChillRSK/front-end/pull/40) | Regenerate ABIs; omit Sovryn creation and live-yield choices on the new deployment; preserve historical positions. |
 | bitchill-monitoring | [#49](https://github.com/BitChillRSK/bitchill-monitoring/issues/49) | [#46](https://github.com/BitChillRSK/bitchill-monitoring/pull/46) | Watch six new handlers; regenerate error ABIs; interpret the minimum error's second argument as the scaled threshold. Events remain unchanged. |
 | data-api | [#25](https://github.com/BitChillRSK/data-api/issues/25) | [#23](https://github.com/BitChillRSK/data-api/pull/23) | Serve the new six-handler map; omit Sovryn availability; preserve deployment-specific historical labels. Schedule getters remain unchanged. |
@@ -132,6 +135,10 @@ The stack already sums purchase amounts and obtains DEX quotes; R117 retains tha
 This argument needs no new database field or additional database read by itself.
 Splitting a batch does not mandate a new quote: a consistent original input/minimum pair preserves its rate limit.
 Fresh quotes can improve accuracy when trade size or pool state changes.
+The separately selected DOC policy requires a new MoC quote service and additional chain reads.
+Compute expected native rBTC after venue fees and before BitChill fees; apply the configured tolerance.
+Do not substitute a zero minimum when quoting fails. Verify the actual deployed MoC calculations before cutover.
+MoC-derived quotes still depend on MoC's oracle; they are not an independent oracle floor.
 
 ## Implementation evidence
 
@@ -181,3 +188,5 @@ All 42 first-party artifacts retain identical ABIs and selectors in both profile
 All ten non-empty runtime and creation artifacts are byte-identical after their trailing CBOR metadata is removed.
 Six complete runtime artifacts differ through metadata only. The comparison excludes the deploy profile's separate legacy-codegen test artifacts.
 No test lane or fork rerun is required for this comment-only tier under AGENTS.md.
+
+The owner confirmed the positive MoC-derived DOC quote policy on 2026-10-21. Swapper-bot#23 tracks implementation and tests.
