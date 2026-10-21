@@ -48,6 +48,11 @@ Dependency evidence, Rootstock mainnet block 9,344,056 (2026-10-21), read-only `
   purchase cannot address a schedule `createDcaSchedule` has not stored yet (`InexistentSchedule`).
   Under `deploy` the reads and writes are unchanged. R94 reverted this order as a gas candidate
   because it saved nothing there, not for a safety reason. A failed handler call still rolls the store back.
+- **Event order.** `depositToken` and `_withdrawToken` also emit `DcaManager__TokenBalanceUpdated`
+  right after their write, before the handler call. Emitting after the call let a callback purchase
+  log the stored balance first and the user call's stale balance last, so an indexer keeping the
+  last event per schedule would hold the wrong value. `depositToken` reads `routeIndex` before the
+  write, as `_withdrawToken` already did, so via-IR does not reread the schedule slot after the emit.
 
 ### L14 — lending deposit does not prove full market consumption
 
@@ -135,7 +140,8 @@ Dependency evidence, Rootstock mainnet block 9,344,056 (2026-10-21), read-only `
 - `src/LendingHandler.sol`, `src/interfaces/ILendingHandler.sol`
 - `src/PurchaseUniswap.sol`, `src/interfaces/IPurchaseUniswap.sol`
 - `test/unit/DepositSwapPopReentrancyTest.t.sol`, `test/mocks/MockReentrantStablecoin.sol` (L06
-  swapper-callback regression; the mock gains the `burn` the MoC mock calls)
+  swapper-callback regressions; the mock gains the `burn` the MoC mock calls and a recipient hook)
+- `test/unit/DcaDappTest.t.sol` (the shared deposit helper expects the balance event first)
 - `test/mocks/MockLayerBank.sol`, `test/ai-generated/unit/layerbank/LayerBankHandlerTest.t.sol` (L14, L17)
 - `test/unit/PurchaseUniswapMinOutTest.t.sol` (L25)
 - `AGENTS.md`, `AUDIT_GUIDE.md`, `audits/2026-10-13-Pashov-Skills/README.md` (status sentence only)
@@ -146,8 +152,9 @@ Dependency evidence, Rootstock mainnet block 9,344,056 (2026-10-21), read-only `
 ## Required tests
 
 - L06: a depositor that is also an allowlisted swapper buys its own schedule from the stablecoin's
-  `transferFrom` hook. The schedule ends at `old + deposit − purchase`, and the purchase's rBTC is
-  credited. Fails on the parent commit.
+  `transferFrom` hook. The schedule ends at `old + deposit − purchase`, the purchase's rBTC is
+  credited, and the schedule's balance events are the deposit's then the purchase's. The same
+  purchase from a `transfer` hook during a withdrawal payout logs the stored balance last.
 - L14: a LayerBank pool that pulls less, or more, than the deposit reverts with the new error; the
   user keeps their stablecoin and receives no shares. A normal deposit still leaves the handler with
   no stablecoin (`test_layerbank_aTokenMinting`).
@@ -170,13 +177,13 @@ figures are Foundry gas, and storage writes are unchanged on every path.
 | Path | Change | Foundry default | Foundry deploy | Extra operations (deploy) | Rootstock (deploy) |
 |---|---|---:|---:|---|---:|
 | Lending `createDcaSchedule` | L14 | +2,132 | +2,013 | 2 calls into the stablecoin, 2 `SLOAD` | ≈ +3,400 |
-| Lending `depositToken` | L06 + L14 | +2,044 | +2,028 | same as create | ≈ +3,400 |
-| Lending `withdrawToken` | L17 | +22 | +23 | none | +23 |
+| Lending `depositToken` | L06 + L14 | +2,033 | +2,005 | same as create | ≈ +3,400 |
+| Lending `withdrawToken` | L17 + event order | +1 | +42 | none | +42 |
 | Dex handler batch | L25 | +29 | +30 | none | +30 |
 
 The Rootstock column adds 600 for each repeat call into an already-touched contract (100 → 700)
 and 100 for each `SLOAD` (warm 100 → flat 200), per `ROOTSTOCK-GAS-SCHEDULE.md`. Under `deploy`
-the L06 reorder leaves the reads unchanged (+15 Foundry against create's delta). Under default it
+the L06 reorder leaves the reads unchanged (−8 Foundry against create's delta). Under default it
 drops one re-read of the schedule slot.
 
 ## Implementation evidence
@@ -187,20 +194,28 @@ drops one re-read of the schedule slot.
 - Existing tests keep their errors: a market that pulls the deposit and mints nothing still reverts
   `LendingHandler__LendingProtocolDepositFailed`, because the mint check runs first.
 
+## Auditor follow-up (2026-10-21)
+
+- [P2] `depositToken` emitted its balance after the handler call. In the L06 callback test the
+  purchase logged 100 and the deposit then logged 125, while 100 was stored. `_withdrawToken` had
+  the same order. Both now emit right after their write (see **Event order** under L06). The deposit
+  callback test now checks event order, and a new withdrawal-payout test covers the second path.
+  Both fail on `2c008674`, the last commit before this follow-up. The shared `depositStablecoin`
+  helper in `DcaDappTest` expected the old order and now expects the balance event first.
+
 ## Final local validation
 
 | Command | Result |
 |---|---|
 | `make check` | All eight unit lanes pass; all 24 dedicated invariant tests pass. |
 | `FOUNDRY_OUT=out-deploy FOUNDRY_CACHE_PATH=cache-deploy make check-deploy` (scratch copy) | Same lanes and counts as `make check`. |
-| `make fork-sovryn` | 511 passed, 0 failed, 42 skipped. |
-| `make fork-layerbank` | 511 passed, 0 failed, 42 skipped. |
-| `make fork-dex-path` | 16 passed, 0 failed, 1 skipped on each lane. |
-| `SWAP_TYPE=dexSwaps STABLECOIN_TYPE=USDRIF make fork-layerbank` / `fork-none` (not gating) | 508 / 507 passed through the live router. The 5 / 2 failures fail identically on the parent at block 9,344,102: three router `Too little received` reverts, a 1-wei allocation assertion, and an assertion that the live fee-collector address holds no USDRIF. |
+| `make fork-sovryn` | 512 passed, 0 failed, 42 skipped. |
+| `make fork-layerbank` | 512 passed, 0 failed, 42 skipped. |
+| `make fork-dex-path` | 16 passed, 0 failed, 1 skipped on each lane (at `2c008674`; the follow-up does not touch Dex paths). |
+| `SWAP_TYPE=dexSwaps STABLECOIN_TYPE=USDRIF make fork-layerbank` / `fork-none` (not gating, at `2c008674`) | 508 / 507 passed through the live router. The 5 / 2 failures fail identically on the parent at block 9,344,102: three router `Too little received` reverts, a 1-wei allocation assertion, and an assertion that the live fee-collector address holds no USDRIF. |
 
-The comment-only commit after these runs was checked by the `AGENTS.md` method: under both profiles all
-42 first-party artifacts keep their ABIs, and the 10 non-empty runtime and creation codes are
-byte-identical after their CBOR metadata is removed.
+`make check`, `make check-deploy`, `make fork-sovryn` and `make fork-layerbank` ran on `f008e1f2`, which
+includes the auditor follow-up.
 
 ## Success criteria
 

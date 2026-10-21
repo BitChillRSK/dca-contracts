@@ -170,8 +170,9 @@ How the boundaries are enforced:
   `batchBuyRbtcAcrossHandlers`. Those are swapper-only and finish each handler's schedule writes
   before calling it. In an across-handlers call a later handler's schedules are written after earlier
   handler calls; handlers are BitChill-deployed, so this is accepted. No user mutator writes back a
-  schedule value it read before its handler call, so a purchase reached from a token or market
-  callback during that call keeps its debit.
+  schedule value it read before its handler call, and a balance written before that call is logged
+  before it too. A purchase reached from a token or market callback during the call therefore keeps
+  its debit, and its `TokenBalanceUpdated` is the schedule's last.
 
 `AGENTS.md` lists these and the other invariants contributors must preserve, under **Protocol
 invariants**, with the reason for each.
