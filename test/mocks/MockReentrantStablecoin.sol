@@ -20,6 +20,11 @@ contract MockReentrantStablecoin is ERC20, ERC20Permit {
         _mint(to, amount);
     }
 
+    /// @dev `MockMocProxy` burns the DOC it redeems.
+    function burn(uint256 amount) external {
+        _burn(msg.sender, amount);
+    }
+
     function setHook(address target, bool enabled) external {
         hookTarget = target;
         hookEnabled = enabled;

@@ -13,12 +13,15 @@ import {MockMocProxy} from "../mocks/MockMocProxy.sol";
 import "../Constants.sol";
 import {reentrantCall} from "../utils/OzRevert.sol";
 import {scheduleCount} from "test/utils/ScheduleAt.sol";
+import {toBatch} from "test/utils/BatchBuyOne.sol";
 
 contract ReentrantDepositor is ITransferFromHook {
     DcaManager public dca;
     address public token;
     uint64 public deleteId;
     bool public attack;
+    uint64 public buyId;
+    bool public buy;
 
     constructor(DcaManager dca_, address token_) {
         dca = dca_;
@@ -30,7 +33,19 @@ contract ReentrantDepositor is ITransferFromHook {
         deleteId = id;
     }
 
+    /// @dev Buy `id` from inside the deposit's pull. Only reaches the manager if this contract is a swapper.
+    function armBuy(uint64 id) external {
+        buy = true;
+        buyId = id;
+    }
+
     function onTransferFrom(address, address, uint256) external {
+        if (buy) {
+            buy = false;
+            uint64[] memory ids = new uint64[](1);
+            ids[0] = buyId;
+            dca.batchBuyRbtc(toBatch(ids, token, TROPYKUS_INDEX));
+        }
         if (!attack) return;
         attack = false;
         dca.deleteDcaSchedule(token, deleteId, type(uint256).max);
@@ -67,6 +82,7 @@ contract DepositSwapPopReentrancyTest is Test {
     MockReentrantStablecoin internal token;
     MockKdocToken internal kToken;
     TropykusDocHandlerMoc internal handler;
+    MockMocProxy internal mocProxy;
     ReentrantDepositor internal user;
 
     uint256 internal constant DEPOSIT = 100 ether;
@@ -83,7 +99,8 @@ contract DepositSwapPopReentrancyTest is Test {
         vm.prank(OWNER);
         dcaManager.setTokenMinPurchaseAmount(address(token), MIN_PURCHASE_AMOUNT);
         kToken = new MockKdocToken(address(token));
-        MockMocProxy mocProxy = new MockMocProxy(address(token));
+        mocProxy = new MockMocProxy(address(token));
+        vm.deal(address(mocProxy), 100 ether);
 
         vm.startPrank(OWNER);
         operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
@@ -148,6 +165,33 @@ contract DepositSwapPopReentrancyTest is Test {
         assertEq(afterSchedules.length, 1);
         assertEq(afterSchedulesIds[0], idA);
         assertEq(afterSchedules[0].tokenBalance, beforeSchedules[0].tokenBalance);
+    }
+
+    /**
+     * @dev A purchase is not `nonReentrant`, so a pull that calls back into an allowlisted swapper can buy
+     *      the schedule being funded. The deposit credit is stored before the pull, so that purchase debits
+     *      the new balance. Storing it after the pull overwrote the debit and left the schedule holding
+     *      stablecoin the handler had already spent.
+     */
+    function test_depositToken_purchaseFromPullCallback_keepsItsDebit() public {
+        user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
+        (uint64[] memory ids,) = dcaManager.getDcaSchedules(address(user), address(token));
+        uint64 idA = ids[0];
+
+        vm.prank(OWNER);
+        operationsAdmin.addSwapper(address(user));
+        // Live MoC burns DOC without an allowance; the mock pulls it.
+        vm.prank(address(handler));
+        token.approve(address(mocProxy), type(uint256).max);
+        user.armBuy(idA);
+        token.setHook(address(user), true);
+
+        user.deposit(idA, EXTRA);
+
+        assertFalse(user.buy(), "the pull did not call back");
+        (, IDcaManager.DcaSchedule[] memory schedules) = dcaManager.getDcaSchedules(address(user), address(token));
+        assertEq(schedules[0].tokenBalance, DEPOSIT + EXTRA - MIN_PURCHASE_AMOUNT, "the purchase debit was lost");
+        assertGt(handler.getAccumulatedRbtcBalance(address(user)), 0, "the callback purchase was not credited");
     }
 
     /// @dev create,create,delete,create in one block used to remint the survivor's id.
