@@ -1,6 +1,6 @@
 # R118 — Pashov optional hardening (L06, L14, L17, L25)
 
-Status: **assigned** · Assigned: yes · Optional/further-review: no · Tracks [contracts#185](https://github.com/BitChillRSK/dca-contracts/issues/185)
+Status: **implemented** · Assigned: yes · Optional/further-review: no · Tracks [contracts#185](https://github.com/BitChillRSK/dca-contracts/issues/185)
 
 ## Objective
 
@@ -46,28 +46,28 @@ Dependency evidence, Rootstock mainnet block 9,344,056 (2026-10-21), read-only `
   mutator that writes back a schedule value it read before an external call. `_withdrawToken` and
   `deleteDcaSchedule` write first, `topUpFromInterest` reads the balance after its call, and a
   purchase cannot address a schedule `createDcaSchedule` has not stored yet (`InexistentSchedule`).
-  The reads and writes are unchanged. R94 reverted this order as a gas candidate because it saved
-  nothing under `deploy`, not for a safety reason. A failed handler call still rolls the store back.
+  Under `deploy` the reads and writes are unchanged. R94 reverted this order as a gas candidate
+  because it saved nothing there, not for a safety reason. A failed handler call still rolls the store back.
 
 ### L14 — lending deposit does not prove full market consumption
 
 - **Premise: confirmed.** `LendingHandler._depositToken` checks the user pull (TokenHandler) and a
   positive share gain, not how much stablecoin the market took. The market holds an unlimited
   allowance, so it can pull less or more than `depositAmount`.
-- **Supported markets consume exactly the deposit.** LayerBank's Pool `supply`, the retained Sovryn
-  iToken `mint`, and the Tropykus kToken `mint` each transfer the full amount. The new check runs on
-  every fork-lane deposit, so `make fork-layerbank` and `make fork-sovryn` verify it against live code.
-  The LayerBank Pool and aTokens are upgradeable behind an immutable handler.
+- **Supported markets consume exactly the deposit.** The new check runs on every fork-lane deposit,
+  so `make fork-layerbank` and `make fork-sovryn` verify it against the live LayerBank Pool and the
+  retained Sovryn iToken. The LayerBank Pool and aTokens are upgradeable behind an immutable handler.
 - **Consequence without a check.** A remainder the market leaves stays in the handler with no path
   out (no owner sweep, by decision), while `DcaManager` credits the schedule the full deposit, so the
   depositing user loses it. An excess pull takes other idle stablecoin, normally none.
 - **Decision: implement.** Measure the handler's stablecoin balance around `_protocolDeposit` and
-  revert `LendingHandler__DepositNotFullySupplied(expectedAmount, balanceBefore, balanceAfter)` unless
-  it fell by exactly `depositAmount`. This is the exact-consumption rule invariants 11 and 12 already
-  apply to redeems and purchases, and it fails closed with the user's funds intact.
-- **Cost.** Two `balanceOf` calls on user-paid deposits and creations on lending routes. Returning
-  the post-pull balance from `TokenHandler._depositToken` would save one read but couple the base to an
-  adapter check. Declined under the user-paid bar in `AGENTS.md`.
+  revert `LendingHandler__DepositConsumptionMismatch(intendedDecrease, balanceBefore, balanceAfter)`
+  unless it fell by exactly `depositAmount`. This is the exact-consumption rule invariants 11 and 12
+  already apply to redeems and purchases, and it fails closed with the user's funds intact.
+- **Cost.** Two `balanceOf` calls on user-paid deposits and creations on lending routes, about 3,400
+  Rootstock gas (see **Measured cost**). Returning the post-pull balance from
+  `TokenHandler._depositToken` would save one of them but add a return value that only the adapter
+  check uses. Declined under the user-paid bar in `AGENTS.md`.
 
 ### L17 — zero-valued withdrawal still transfers zero tokens
 
@@ -106,17 +106,17 @@ Dependency evidence, Rootstock mainnet block 9,344,056 (2026-10-21), read-only `
 
 ## Scope
 
-- [ ] L06: `DcaManager.depositToken` stores `tokenBalance` before the handler call.
-- [ ] L14: `LendingHandler._depositToken` requires the protocol deposit to reduce the handler's
+- [x] L06: `DcaManager.depositToken` stores `tokenBalance` before the handler call.
+- [x] L14: `LendingHandler._depositToken` requires the protocol deposit to reduce the handler's
       stablecoin balance by exactly `depositAmount`; new error on `ILendingHandler`.
-- [ ] L17: `LendingHandler._withdrawToken` returns 0 without a transfer when nothing was redeemed.
-- [ ] L25: `PurchaseUniswap._purchaseRbtc` requires measured WRBTC ≥ the oracle floor; new error on
+- [x] L17: `LendingHandler._withdrawToken` returns 0 without a transfer when nothing was redeemed.
+- [x] L25: `PurchaseUniswap._purchaseRbtc` requires measured WRBTC ≥ the oracle floor; new error on
       `IPurchaseUniswap`.
-- [ ] State the deposit rule beside invariant 11 in `AGENTS.md`, and the deposit and floor facts in
-      `AUDIT_GUIDE.md`.
-- [ ] Update the four register rows, the work table, and the decision log in
+- [x] State the deposit rule in invariant 11 and the write-back rule in invariant 6 of `AGENTS.md`,
+      and the deposit, floor, and write-back facts in `AUDIT_GUIDE.md`.
+- [x] Update the four register rows, the work table, and the decision log in
       `PASHOV_TRIAGE_DECISIONS.md`.
-- [ ] Price the gas changes on both schedules and record them here.
+- [x] Price the gas changes on both schedules and record them here.
 - [ ] Consumer follow-up for the two new errors and the zero-withdrawal event change.
 
 ## Out of scope
@@ -134,20 +134,23 @@ Dependency evidence, Rootstock mainnet block 9,344,056 (2026-10-21), read-only `
 - `src/DcaManager.sol`
 - `src/LendingHandler.sol`, `src/interfaces/ILendingHandler.sol`
 - `src/PurchaseUniswap.sol`, `src/interfaces/IPurchaseUniswap.sol`
-- `test/unit/DepositSwapPopReentrancyTest.t.sol` (L06 swapper-callback regression)
+- `test/unit/DepositSwapPopReentrancyTest.t.sol`, `test/mocks/MockReentrantStablecoin.sol` (L06
+  swapper-callback regression; the mock gains the `burn` the MoC mock calls)
 - `test/mocks/MockLayerBank.sol`, `test/ai-generated/unit/layerbank/LayerBankHandlerTest.t.sol` (L14, L17)
 - `test/unit/PurchaseUniswapMinOutTest.t.sol` (L25)
-- `AGENTS.md`, `AUDIT_GUIDE.md`
+- `AGENTS.md`, `AUDIT_GUIDE.md`, `audits/2026-10-13-Pashov-Skills/README.md` (status sentence only)
+- `docs/relaunch/ROOTSTOCK-GAS-AUDIT.md` (the R94 entry that recorded the deposit reorder as reverted)
 - `docs/relaunch/R118-pashov-optional-hardening.md`, `docs/relaunch/PASHOV_TRIAGE_DECISIONS.md`,
   `docs/relaunch/README.md`, `docs/relaunch/IMPLEMENTATION_ORDER.md`
 
 ## Required tests
 
 - L06: a depositor that is also an allowlisted swapper buys its own schedule from the stablecoin's
-  `transferFrom` hook. The schedule ends at `old + deposit − purchase`, and the handler's books agree.
-  Fails on the parent commit.
-- L14: a LayerBank pool that pulls less, or more, than the deposit reverts with the new error, and no
-  shares or schedule balance are credited. A normal deposit leaves the handler's stablecoin unchanged.
+  `transferFrom` hook. The schedule ends at `old + deposit − purchase`, and the purchase's rBTC is
+  credited. Fails on the parent commit.
+- L14: a LayerBank pool that pulls less, or more, than the deposit reverts with the new error; the
+  user keeps their stablecoin and receives no shares. A normal deposit still leaves the handler with
+  no stablecoin (`test_layerbank_aTokenMinting`).
 - L17: a zero-value withdrawal makes no stablecoin `transfer` call, returns 0, and succeeds when the
   token rejects zero transfers (`vm.mockCallRevert`). A positive withdrawal is unchanged.
 - L25: a router that enforces the floor on its own figure but delivers less WRBTC reverts with the new
@@ -157,6 +160,32 @@ Dependency evidence, Rootstock mainnet block 9,344,056 (2026-10-21), read-only `
   `deploy`, before and after, converted to Rootstock with `ROOTSTOCK-GAS-SCHEDULE.md`.
 - `make check`, `make check-deploy`, `make fork-sovryn`, `make fork-layerbank`, `make fork-dex-path`.
   The fork lanes exercise the L14 check against live LayerBank and Sovryn deposits.
+
+## Measured cost
+
+A scratch probe, run unchanged on the parent (`51e2b093`) and on this head with the parent's mocks,
+measured each call in its own test function and counted storage accesses in a separate one. The
+figures are Foundry gas, and storage writes are unchanged on every path.
+
+| Path | Change | Foundry default | Foundry deploy | Extra operations (deploy) | Rootstock (deploy) |
+|---|---|---:|---:|---|---:|
+| Lending `createDcaSchedule` | L14 | +2,132 | +2,013 | 2 calls into the stablecoin, 2 `SLOAD` | ≈ +3,400 |
+| Lending `depositToken` | L06 + L14 | +2,044 | +2,028 | same as create | ≈ +3,400 |
+| Lending `withdrawToken` | L17 | +22 | +23 | none | +23 |
+| Dex handler batch | L25 | +29 | +30 | none | +30 |
+
+The Rootstock column adds 600 for each repeat call into an already-touched contract (100 → 700)
+and 100 for each `SLOAD` (warm 100 → flat 200), per `ROOTSTOCK-GAS-SCHEDULE.md`. Under `deploy`
+the L06 reorder leaves the reads unchanged (+15 Foundry against create's delta). Under default it
+drops one re-read of the schedule slot.
+
+## Implementation evidence
+
+- Each regression test fails with its change reverted on a copy of this head (four mutants, four
+  kills) and passes on the head itself. The L06 test also fails on the parent commit with "the
+  purchase debit was lost".
+- Existing tests keep their errors: a market that pulls the deposit and mints nothing still reverts
+  `LendingHandler__LendingProtocolDepositFailed`, because the mint check runs first.
 
 ## Success criteria
 
@@ -169,14 +198,15 @@ Dependency evidence, Rootstock mainnet block 9,344,056 (2026-10-21), read-only `
 ## Reviewer checklist
 
 - [ ] Matches **Scope**; nothing from **Out of scope**.
-- [ ] Protocol invariants in `AGENTS.md` still hold; invariant 11 gains the deposit rule.
+- [ ] Protocol invariants in `AGENTS.md` still hold; invariant 6 gains the write-back rule and
+      invariant 11 the deposit rule.
 - [ ] Tests in the PR match **Required tests**.
 - [ ] Files beyond this list are limited to direct dependencies and are named in the PR.
 - [ ] No unrelated refactors; history is reviewable.
 
 ## ABI / deploy / cutover impact
 
-- ABI: new errors `ILendingHandler.LendingHandler__DepositNotFullySupplied(uint256,uint256,uint256)`
+- ABI: new errors `ILendingHandler.LendingHandler__DepositConsumptionMismatch(uint256,uint256,uint256)`
   and `IPurchaseUniswap.PurchaseUniswap__BelowOracleFloor(uint256,uint256)`. A zero-value lending
   withdrawal no longer emits `TokenHandler__TokenWithdrawn`. No selector, argument, or storage change.
 - Scripts: none.
