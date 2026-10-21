@@ -176,7 +176,7 @@ Consumer implementations and the register's remaining verification conditions st
 - The owner requested a replacement non-draft PR from `fix/r117-pashov-mitigations`, still based on #183.
 - The owner requested a separate later hardening PR: [contracts#185](https://github.com/BitChillRSK/dca-contracts/issues/185).
 
-Only NatSpec and Markdown change after `0aad7b7d`. Both full builds pass:
+The earlier follow-up (`0aad7b7d` → `2464bdb3`) changed only NatSpec and Markdown. Both full builds passed:
 
 ```bash
 forge build --out /tmp/r117-review-followup-20261021/after-default --cache-path /tmp/r117-review-followup-20261021/cache-after-default
@@ -187,6 +187,19 @@ Compared against source-only builds of `0aad7b7db49933fdde78e1bae46baf42eaf72550
 All 42 first-party artifacts retain identical ABIs and selectors in both profiles.
 All ten non-empty runtime and creation artifacts are byte-identical after their trailing CBOR metadata is removed.
 Six complete runtime artifacts differ through metadata only. The comparison excludes the deploy profile's separate legacy-codegen test artifacts.
-No test lane or fork rerun is required for this comment-only tier under AGENTS.md.
+No test lane or fork rerun was required for that comment-only tier under AGENTS.md.
 
 The owner confirmed the positive MoC-derived DOC quote policy on 2026-10-21. Swapper-bot#23 tracks implementation and tests.
+
+## Test-review follow-up (2026-10-21)
+
+Moved the zero-minimum comment beside `test_minRbtcOut_zeroIsInert`.
+Removed the quote-only rate assertion and its unused output binding from the protected-window funding helper.
+The actual 99% rejection, rollback checks, and 100% successful purchase remain the rate regression.
+Changed the README instruction to “Do not deploy before cutover.” Retained the empty Sovryn column.
+
+`PurchaseRbtcTest` and `BatchMinRbtcOutTest` pass under both default and deploy profiles.
+The latter ran across all eight configured unit lanes. Each profile reports 88 passed, 0 failed, and 14 expected skips.
+The Sovryn/USDRIF fixture skips; conditional window tests run on both LayerBank DEX token lanes without skips.
+Only tests and Markdown changed; AGENTS.md requires no full suite or fork rerun for this tier.
+Exact commands are recorded in PR #186. Production source, ABI, and deployment configuration are unchanged by this follow-up.

@@ -533,7 +533,6 @@ contract PurchaseRbtcTest is Test {
                     R51: THE CALLER'S PER-BATCH MINIMUM
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev `0` is the pre-R51 contract: the venue's own floor stays the only bound.
     function test_inputGrowthMustNotDiluteQuotedMinimum() public {
         harness.setRbtcOut(1.5 ether);
         vm.expectRevert(
@@ -625,6 +624,7 @@ contract PurchaseRbtcTest is Test {
         if (!ok) assertEq(harness.getAccumulatedRbtcBalance(buyerA), 0, "failure must roll back credits");
     }
 
+    /// @dev `0` is the pre-R51 contract: the venue's own floor stays the only bound.
     function test_minRbtcOut_zeroIsInert() public {
         (address[] memory buyers, uint64[] memory scheduleIds, uint256[] memory amounts) = _twoBuyerBatch();
         uint256 purchaseAmountsSum = amounts[0] + amounts[1];
