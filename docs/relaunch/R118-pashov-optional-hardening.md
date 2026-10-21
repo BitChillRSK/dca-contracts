@@ -238,7 +238,9 @@ includes the auditor follow-up.
 
 - ABI: new errors `ILendingHandler.LendingHandler__DepositConsumptionMismatch(uint256,uint256,uint256)`
   and `IPurchaseUniswap.PurchaseUniswap__BelowOracleFloor(uint256,uint256)`. A zero-value lending
-  withdrawal no longer emits `TokenHandler__TokenWithdrawn`. No selector, argument, or storage change.
+  withdrawal no longer emits `TokenHandler__TokenWithdrawn`. In deposits and withdrawals,
+  `DcaManager__TokenBalanceUpdated` now precedes the handler's events. No selector, argument, or
+  storage change.
 - Scripts: none.
 - Cutover: comments on the R117 consumer issues, folded into their ABI regeneration: [bitchill-monitoring#49](https://github.com/BitChillRSK/bitchill-monitoring/issues/49#issuecomment-6316902882) (both
-  errors and the event change), [front-end#42](https://github.com/BitChillRSK/front-end/issues/42#issuecomment-6316903528) (the deposit error), [swapper-bot#23](https://github.com/BitChillRSK/swapper-bot/issues/23#issuecomment-6316904324) (the purchase error).
+  errors and the event change; [log order](https://github.com/BitChillRSK/bitchill-monitoring/issues/49#issuecomment-6318944749)), [front-end#42](https://github.com/BitChillRSK/front-end/issues/42#issuecomment-6316903528) (the deposit error), [swapper-bot#23](https://github.com/BitChillRSK/swapper-bot/issues/23#issuecomment-6316904324) (the purchase error).
