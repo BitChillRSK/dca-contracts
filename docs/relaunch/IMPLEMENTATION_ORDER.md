@@ -1526,7 +1526,7 @@ exclude Sovryn and the alternate USDRIF launch path, correct cadence documentati
 SP-64/GL-15/SP-72. Retain unverified leads explicitly rather than silently accepting them.
 Ask: none for these selected controls. The relevant product choices are decided.
 
-### R118 - Review Pashov optional hardening ([spec](./R118-pashov-optional-hardening.md), [#185](https://github.com/BitChillRSK/dca-contracts/issues/185))
+### R118 - Review Pashov optional hardening ([spec](./R118-pashov-optional-hardening.md), [#187](https://github.com/BitChillRSK/dca-contracts/pull/187), [#185](https://github.com/BitChillRSK/dca-contracts/issues/185))
 
 After R117; the owner requested a separate stacked PR on 2026-10-21. The review confirms all four
 premises and finds none reachable at launch. It ships four small hardening changes: deposit credit

@@ -1,6 +1,6 @@
 # R118 — Pashov optional hardening (L06, L14, L17, L25)
 
-Status: **implemented** · Assigned: yes · Optional/further-review: no · Tracks [contracts#185](https://github.com/BitChillRSK/dca-contracts/issues/185)
+Status: **implemented** · GitHub [#187](https://github.com/BitChillRSK/dca-contracts/pull/187) · Assigned: yes · Optional/further-review: no · Tracks [contracts#185](https://github.com/BitChillRSK/dca-contracts/issues/185)
 
 ## Objective
 
@@ -117,7 +117,7 @@ Dependency evidence, Rootstock mainnet block 9,344,056 (2026-10-21), read-only `
 - [x] Update the four register rows, the work table, and the decision log in
       `PASHOV_TRIAGE_DECISIONS.md`.
 - [x] Price the gas changes on both schedules and record them here.
-- [ ] Consumer follow-up for the two new errors and the zero-withdrawal event change.
+- [x] Consumer follow-up for the two new errors and the zero-withdrawal event change.
 
 ## Out of scope
 
@@ -208,7 +208,7 @@ byte-identical after their CBOR metadata is removed.
 - [x] The four changes ship with regression tests that fail without them.
 - [x] Gas deltas are priced on both schedules.
 - [x] Gates above pass; the register, guide, and invariants match the code.
-- [ ] Consumer issues name the new errors and the event change.
+- [x] Consumer issues name the new errors and the event change.
 
 ## Reviewer checklist
 
@@ -225,4 +225,5 @@ byte-identical after their CBOR metadata is removed.
   and `IPurchaseUniswap.PurchaseUniswap__BelowOracleFloor(uint256,uint256)`. A zero-value lending
   withdrawal no longer emits `TokenHandler__TokenWithdrawn`. No selector, argument, or storage change.
 - Scripts: none.
-- Cutover: bitchill-monitoring regenerates error ABIs; front-end decodes the deposit error.
+- Cutover: comments on the R117 consumer issues, folded into their ABI regeneration: [bitchill-monitoring#49](https://github.com/BitChillRSK/bitchill-monitoring/issues/49#issuecomment-6316902882) (both
+  errors and the event change), [front-end#42](https://github.com/BitChillRSK/front-end/issues/42#issuecomment-6316903528) (the deposit error), [swapper-bot#23](https://github.com/BitChillRSK/swapper-bot/issues/23#issuecomment-6316904324) (the purchase error).
