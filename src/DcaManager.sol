@@ -172,9 +172,10 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         _validateDeposit(depositAmount);
         DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
         uint128 newTokenBalance = (uint256(dcaSchedule.tokenBalance) + depositAmount.toUint128()).toUint128();
+        uint256 routeIndex = dcaSchedule.routeIndex;
         dcaSchedule.tokenBalance = newTokenBalance;
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
-        _handlerForDeposit(token, dcaSchedule.routeIndex).depositToken(msg.sender, depositAmount);
+        _handlerForDeposit(token, routeIndex).depositToken(msg.sender, depositAmount);
     }
 
     /// @inheritdoc IDcaManager
