@@ -187,12 +187,27 @@ drops one re-read of the schedule slot.
 - Existing tests keep their errors: a market that pulls the deposit and mints nothing still reverts
   `LendingHandler__LendingProtocolDepositFailed`, because the mint check runs first.
 
+## Final local validation
+
+| Command | Result |
+|---|---|
+| `make check` | All eight unit lanes pass; all 24 dedicated invariant tests pass. |
+| `FOUNDRY_OUT=out-deploy FOUNDRY_CACHE_PATH=cache-deploy make check-deploy` (scratch copy) | Same lanes and counts as `make check`. |
+| `make fork-sovryn` | 511 passed, 0 failed, 42 skipped. |
+| `make fork-layerbank` | 511 passed, 0 failed, 42 skipped. |
+| `make fork-dex-path` | 16 passed, 0 failed, 1 skipped on each lane. |
+| `SWAP_TYPE=dexSwaps STABLECOIN_TYPE=USDRIF make fork-layerbank` / `fork-none` (not gating) | 508 / 507 passed through the live router. The 5 / 2 failures fail identically on the parent at block 9,344,102: three router `Too little received` reverts, a 1-wei allocation assertion, and an assertion that the live fee-collector address holds no USDRIF. |
+
+The comment-only commit after these runs was checked by the `AGENTS.md` method: under both profiles all
+42 first-party artifacts keep their ABIs, and the 10 non-empty runtime and creation codes are
+byte-identical after their CBOR metadata is removed.
+
 ## Success criteria
 
-- [ ] Each lead has a recorded premise check, dependency assumption, and disposition.
-- [ ] The four changes ship with regression tests that fail without them.
-- [ ] Gas deltas are priced on both schedules.
-- [ ] Gates above pass; the register, guide, and invariants match the code.
+- [x] Each lead has a recorded premise check, dependency assumption, and disposition.
+- [x] The four changes ship with regression tests that fail without them.
+- [x] Gas deltas are priced on both schedules.
+- [x] Gates above pass; the register, guide, and invariants match the code.
 - [ ] Consumer issues name the new errors and the event change.
 
 ## Reviewer checklist
