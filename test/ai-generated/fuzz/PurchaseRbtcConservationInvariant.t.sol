@@ -77,7 +77,7 @@ contract PurchaseRbtcConservationHandler is Test {
         // The harness pays its books in native rBTC, so it must actually hold what it says it bought.
         vm.deal(address(i_harness), address(i_harness).balance + rbtcOut);
 
-        i_harness.batchBuyRbtc(buyers, scheduleIds, amounts, 0);
+        i_harness.batchBuyRbtc(buyers, scheduleIds, amounts, 0, 0);
         s_rbtcBoughtGhost += rbtcOut;
         // k = rows + 1 floors (buyers + fee) leave at most k-1 = rows wei uncredited.
         s_flooredSlackGhost += rows;

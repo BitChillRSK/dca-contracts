@@ -43,6 +43,8 @@ interface IPurchaseRbtc is IStablecoinSource {
     error PurchaseRbtc__RbtcBatchPurchaseFailed(address tokenSpent);
     /// @notice The measured rBTC this batch bought is below the minimum the caller attached to it.
     error PurchaseRbtc__BelowSwapperMinimum(uint256 rbtcReceived, uint256 minRbtcOut);
+    /// @notice A positive quoted output minimum requires a nonzero quoted stablecoin input.
+    error PurchaseRbtc__ZeroQuotedStablecoinInput();
     /// @notice Venue did not reduce the handler's purchase-token balance by exactly `expectedAmount`.
     error PurchaseRbtc__InputAmountNotFullySpent(uint256 expectedAmount, uint256 balanceBefore, uint256 balanceAfter);
 
@@ -55,8 +57,10 @@ interface IPurchaseRbtc is IStablecoinSource {
      * @param buyers Users to buy for. An address may appear more than once.
      * @param scheduleIds Schedule id for each row, used only in `RbtcBought`.
      * @param purchaseAmounts Nominal stablecoin requested per row. Lending may reduce the funding weights.
-     * @param minRbtcOut Minimum rBTC this batch must buy (rBTC/WRBTC wei). `0` disables. Binds
-     *        gross measured output before the protocol fee is taken from that output.
+     * @param minRbtcOut Gross rBTC/WRBTC wei minimum quoted for `quotedStablecoinIn`. `0` disables.
+     *        Scales to actual retrieved input, rounding up, before the output fee is taken.
+     * @param quotedStablecoinIn Actual gross input used for the quote, in this token's base units.
+     *        Must be nonzero when the quoted output minimum is nonzero. It does not resize schedule debits.
      * @dev DcaManager has already debited the schedules. Venue spends full retrieved stablecoin.
      *      A lending row its buyer's remaining shares cannot cover is funded with those shares and
      *      weighted at their stablecoin value; a row worth nothing reverts the batch. Fees use the
@@ -69,7 +73,8 @@ interface IPurchaseRbtc is IStablecoinSource {
         address[] calldata buyers,
         uint64[] calldata scheduleIds,
         uint256[] calldata purchaseAmounts,
-        uint256 minRbtcOut
+        uint256 minRbtcOut,
+        uint256 quotedStablecoinIn
     ) external;
 
     /**

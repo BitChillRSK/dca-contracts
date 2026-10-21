@@ -40,8 +40,10 @@ interface IDcaManager {
     /**
      * @notice One handler's purchase batch.
      * @dev Every id shares `token` and `routeIndex`, which resolve to one handler. Buyer and amount come
-     *      from storage, so caller data cannot redirect or resize a purchase. `minRbtcOut` is a batch-wide
-     *      minimum in rBTC wei, checked against the handler's measured receipt. Uniswap also enforces its
+     *      from storage, so caller data cannot redirect or resize a purchase. `minRbtcOut` is the gross
+     *      rBTC/WRBTC wei minimum quoted for `quotedStablecoinIn` token base units. The handler scales
+     *      it up or down to actual retrieved input, rounding up, then checks measured output. A nonzero
+     *      minimum requires nonzero quoted input. Zero minimum disables this caller bound. Uniswap also enforces its
      *      oracle floor; MoC redeems at its protocol price and has no pool-slippage floor.
      */
     struct Batch {
@@ -49,6 +51,7 @@ interface IDcaManager {
         address token;
         uint256 routeIndex;
         uint256 minRbtcOut;
+        uint256 quotedStablecoinIn;
     }
 
     /**
@@ -375,7 +378,8 @@ interface IDcaManager {
      *      remains due the following Monday.
      *      Any paused row fails the whole batch or multi-handler bundle. The token is part of each
      *      schedule key and the route is checked, so rows cannot cross handlers. A measured receipt below
-     *      `minRbtcOut` reverts the purchase and all schedule debits.
+     *      `ceil(minRbtcOut * actualRetrievedInput / quotedStablecoinIn)` reverts the purchase and all
+     *      schedule debits. A zero minimum disables this caller bound.
      */
     function batchBuyRbtc(Batch calldata batch) external;
 
@@ -384,7 +388,7 @@ interface IDcaManager {
      * @param batches Each element is one handler's purchase batch (`token` + `routeIndex`).
      * @dev Authenticates the caller once, then purchases each handler's batch in order through the
      *      same one-handler helper. A failure in any batch — including a paused row or a batch that
-     *      bought less than its own `minRbtcOut` — reverts every handler, so a later batch's minimum
+     *      bought less than its own input-scaled minimum — reverts every handler, so a later batch's minimum
      *      undoes an earlier handler's purchase. `batchBuyRbtc` remains available for one-handler
      *      retries (same `Batch` type).
      */

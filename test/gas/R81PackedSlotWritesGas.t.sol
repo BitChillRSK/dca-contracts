@@ -154,8 +154,9 @@ contract R81PackedSlotWritesGasTest is Test {
     }
 
     function _buy(uint64[] memory scheduleIds) private {
-        IDcaManager.Batch memory batch =
-            IDcaManager.Batch({token: s_token, scheduleIds: scheduleIds, routeIndex: ROUTE_INDEX, minRbtcOut: 0});
+        IDcaManager.Batch memory batch = IDcaManager.Batch({
+            token: s_token, scheduleIds: scheduleIds, routeIndex: ROUTE_INDEX, minRbtcOut: 0, quotedStablecoinIn: 0
+        });
         vm.prank(s_swapper);
         s_manager.batchBuyRbtc(batch);
     }

@@ -61,7 +61,7 @@ contract PurchaseMocBehaviorTest is Test {
         amounts[0] = purchaseAmount;
 
         uint256 rbtcBefore = IPurchaseRbtc(address(handler)).getAccumulatedRbtcBalance(buyer);
-        handler.batchBuyRbtc(buyers, scheduleIds, amounts, 0);
+        handler.batchBuyRbtc(buyers, scheduleIds, amounts, 0, 0);
         uint256 rbtcAfter = IPurchaseRbtc(address(handler)).getAccumulatedRbtcBalance(buyer);
 
         assertGt(rbtcAfter, rbtcBefore);
@@ -80,7 +80,7 @@ contract PurchaseMocBehaviorTest is Test {
         amounts[0] = 25 ether;
 
         vm.expectRevert(bytes("moc free redeem failed"));
-        handler.batchBuyRbtc(buyers, scheduleIds, amounts, 0);
+        handler.batchBuyRbtc(buyers, scheduleIds, amounts, 0, 0);
     }
 
     function test_partialFreeDocRedemptionRevertsAndRollsBack() public {
@@ -105,7 +105,7 @@ contract PurchaseMocBehaviorTest is Test {
                 inputBalanceBefore - partialAmount
             )
         );
-        handler.batchBuyRbtc(buyers, scheduleIds, amounts, 0);
+        handler.batchBuyRbtc(buyers, scheduleIds, amounts, 0, 0);
 
         PurchaseState memory afterRevert = _snapshot();
         assertEq(afterRevert.handlerDoc, before.handlerDoc);
@@ -132,7 +132,7 @@ contract PurchaseMocBehaviorTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(IPurchaseRbtc.PurchaseRbtc__RbtcBatchPurchaseFailed.selector, address(doc))
         );
-        handler.batchBuyRbtc(buyers, scheduleIds, amounts, 0);
+        handler.batchBuyRbtc(buyers, scheduleIds, amounts, 0, 0);
     }
 
     function _snapshot() private view returns (PurchaseState memory state) {

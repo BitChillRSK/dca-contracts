@@ -162,7 +162,7 @@ contract StandingApprovalRecoveryTest is Test {
         docToken.approve(address(router), 0);
 
         (bool bought,) = address(dexHandler)
-            .call(abi.encodeCall(IPurchaseRbtc.batchBuyRbtc, (_buyers(), _scheduleIds(), _amounts(), 0)));
+            .call(abi.encodeCall(IPurchaseRbtc.batchBuyRbtc, (_buyers(), _scheduleIds(), _amounts(), 0, 0)));
         assertFalse(bought, "a cleared allowance should stop the buy, not pass silently");
 
         vm.prank(STRANGER);

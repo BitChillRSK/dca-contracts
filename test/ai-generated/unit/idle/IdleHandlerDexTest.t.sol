@@ -129,7 +129,7 @@ contract IdleHandlerDexTest is HandlerTestHarness {
 
         vm.expectRevert();
         vm.prank(address(dcaManager));
-        idleDexHandler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT);
+        idleDexHandler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT, 0);
 
         assertEq(stablecoin.balanceOf(address(handler)), DEPOSIT_AMOUNT * 2);
         assertEq(idleDexHandler.getAccumulatedRbtcBalance(user1), 0);

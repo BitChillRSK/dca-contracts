@@ -182,7 +182,7 @@ contract UserTokenIdDcaManager is ReentrancyGuard {
             purchaseAmounts[i] = schedulePurchaseAmount;
         }
         IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex)))
-            .batchBuyRbtc(batch.buyers, batch.scheduleIds, purchaseAmounts, batch.minRbtcOut);
+            .batchBuyRbtc(batch.buyers, batch.scheduleIds, purchaseAmounts, batch.minRbtcOut, 0);
     }
 
     function getSchedule(address user, address token, uint64 scheduleId) external view returns (Schedule memory) {

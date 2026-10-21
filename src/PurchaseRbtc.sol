@@ -5,6 +5,7 @@ import {IPurchaseRbtc} from "./interfaces/IPurchaseRbtc.sol";
 import {DcaManagerAccessControl} from "./DcaManagerAccessControl.sol";
 import {PurchaseFees} from "./PurchaseFees.sol";
 import {StablecoinSource} from "./StablecoinSource.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @title PurchaseRbtc
@@ -48,13 +49,20 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
         address[] calldata buyers,
         uint64[] calldata scheduleIds,
         uint256[] memory purchaseAmounts,
-        uint256 minRbtcOut
+        uint256 minRbtcOut,
+        uint256 quotedStablecoinIn
     ) external override onlyDcaManager {
+        if (minRbtcOut != 0 && quotedStablecoinIn == 0) {
+            revert PurchaseRbtc__ZeroQuotedStablecoinInput();
+        }
         uint256[] memory netWeights;
         uint256 purchaseAmountsSum;
         uint256 totalFee;
         // Retrieve stablecoin first so the potentially clamped amounts are used to calculate fees and net weights.
         uint256 totalStablecoinRetrieved = _batchRetrieveStablecoin(buyers, purchaseAmounts);
+        if (minRbtcOut != 0) {
+            minRbtcOut = Math.mulDiv(minRbtcOut, totalStablecoinRetrieved, quotedStablecoinIn, Math.Rounding.Ceil);
+        }
         (totalFee, netWeights, purchaseAmountsSum) = _calculateFeeAndNetWeights(purchaseAmounts);
 
         uint256 totalPurchasedRbtc;

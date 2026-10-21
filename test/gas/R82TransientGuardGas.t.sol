@@ -54,7 +54,10 @@ contract ReenteringDepositHandler is IERC165, ITokenHandler, IPurchaseRbtc {
         return amount;
     }
 
-    function batchBuyRbtc(address[] calldata, uint64[] calldata, uint256[] calldata, uint256) external override {}
+    function batchBuyRbtc(address[] calldata, uint64[] calldata, uint256[] calldata, uint256, uint256)
+        external
+        override
+    {}
 
     function withdrawAccumulatedRbtc(address) external override {}
 

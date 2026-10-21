@@ -178,6 +178,8 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R114 | after R113, before audit freeze / relaunch deploy | none (AuditAgent report; targeted lending fixes for findings 1/5/6; accepted 2/3; operational checks for 4) |
 | R115 | after R114, before audit freeze / relaunch deploy | **decided 2026-10-08:** drop `DcaManager.withdrawAccumulatedRbtc`; one-element `withdrawAllAccumulatedRbtc` is the single-handler withdraw |
 | R116 | after R115, before audit freeze / relaunch deploy | none (publish the Pashov skills scan, X-Ray map and Fizz fuzzing suite; no `src/` change; triage is R117) |
+| R117 | after R116, before audit freeze / relaunch deploy | decided: keep deposits/creation open with execution-rate protection; omit Sovryn and the alternate USDRIF launch path; combine selected mitigations, tests, and decisions in #186 (replaces #184) |
+| R118 | after R117; separate owner-requested hardening review | none for investigation: review L06/L14/L17/L25, justify each change or disposition, and open a separate stacked PR; tracked by [#185](https://github.com/BitChillRSK/dca-contracts/issues/185) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1515,6 +1517,21 @@ findings, 28 leads), the X-Ray pre-audit map, and the Fizz suite in `test/fizz/`
 Medusa campaign, two EXPLORATORY violations with Foundry repros). No `src/` or `script/` change.
 Triage, including the window-deposit product decision under `AGENTS.md` invariant 10, is R117.
 Ask: none.
+
+### R117 - Pashov triage and mitigations ([spec](./R117-pashov-mitigations.md), [#186](https://github.com/BitChillRSK/dca-contracts/pull/186))
+
+After R116, before audit freeze / relaunch deploy. The owner requested selected mitigations,
+decisions, documentation, and tests in one PR. Protect quoted execution rates using actual input,
+exclude Sovryn and the alternate USDRIF launch path, correct cadence documentation, and update
+SP-64/GL-15/SP-72. Retain unverified leads explicitly rather than silently accepting them.
+Ask: none for these selected controls. The relevant product choices are decided.
+
+### R118 - Review Pashov optional hardening ([#185](https://github.com/BitChillRSK/dca-contracts/issues/185))
+
+The owner requested a separate later stacked PR on 2026-10-21. Review L06, L14, L17, and L25.
+Do not implement these items in R117. Draft and assign the R118 spec before Solidity changes.
+Establish supported-dependency behaviour, justify any hardening, and record dispositions for declined changes.
+Apply the existing gas and change-tier rules. No current exploit is established by these four report leads.
 
 ## Closed non-implementation decisions
 

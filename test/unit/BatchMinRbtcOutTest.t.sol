@@ -4,6 +4,10 @@ pragma solidity 0.8.36;
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
+import {Vm} from "forge-std/Vm.sol";
+import {LayerBankHandler} from "../../src/layerbank/LayerBankHandler.sol";
+import {MockLayerBankAToken} from "../mocks/MockLayerBank.sol";
+import {MockSwapRouter02} from "../mocks/MockSwapRouter02.sol";
 import {toBatch, NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
 import "../Constants.sol";
 import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
@@ -12,8 +16,8 @@ import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
  * @notice R51: the swapper's per-batch minimum rBTC output, on whichever venue the lane is running.
  * @dev The check lives in the shared `PurchaseRbtc` pipeline, so it must behave identically on MoC redemption
  *      and on a Uniswap swap, and on an idle or a lending route. Rather than predict the output — which the
- *      lending lanes only reach approximately — each test reads the measured amount out of the revert the
- *      contract itself reports, which also proves the failure leaves no trace to clean up.
+ *      lending lanes only reach approximately — each test quotes measured input and output from a
+ *      successful purchase inside a reverted snapshot.
  */
 contract BatchMinRbtcOutTest is DcaDappTest {
     function setUp() public override {
@@ -24,7 +28,41 @@ contract BatchMinRbtcOutTest is DcaDappTest {
                                  TESTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev `0` is the pre-R51 contract on every venue: the batch buys and credits exactly as before.
+    function testInputGrowthAfterQuoteCannotWeakenPrice() external {
+        if (!isDexSwaps || block.chainid != ANVIL_CHAIN_ID) {
+            vm.skip(true);
+            return;
+        }
+        IDcaManager.Batch memory batch = _batch(_measuredOutput());
+        uint256 balanceBefore = _schedule().tokenBalance;
+        uint64 scheduleId = _scheduleId();
+        vm.prank(USER);
+        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, 2 * AMOUNT_TO_SPEND);
+        MockSwapRouter02(dexHelperConfig.getActiveNetworkConfig().swapRouter).setOutputFillPercent(0.99 ether);
+        vm.expectRevert(bytes("Insufficient output amount"));
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(batch);
+        assertEq(_schedule().tokenBalance, balanceBefore, "quote failure must preserve principal");
+        assertEq(_schedule().cadenceAnchor, 0, "quote failure must preserve eligibility");
+
+        MockSwapRouter02(dexHelperConfig.getActiveNetworkConfig().swapRouter).setOutputFillPercent(1 ether);
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(batch);
+        assertEq(_schedule().tokenBalance, balanceBefore - 2 * AMOUNT_TO_SPEND);
+        assertGt(_accumulatedRbtc(), 0, "the changed input must succeed at the original price");
+    }
+
+    /// @dev A loss makes a real lending row short. A deposit inside the window restores full funding
+    ///      without changing its nominal amount. The old absolute minimum would accept the worse rate.
+    function testProtectedWindowDepositRestoresShortRowWithQuotedRate() external {
+        _checkProtectedWindowFundingGrowth(false);
+    }
+
+    function testProtectedWindowCreationRestoresShortRowWithQuotedRate() external {
+        _checkProtectedWindowFundingGrowth(true);
+    }
+
+    /// @dev A zero minimum preserves the existing opt-out on every venue.
     function testZeroMinimumBuysAsBefore() external {
         uint256 rbtcBefore = _accumulatedRbtc();
         uint256 balanceBefore = _schedule().tokenBalance;
@@ -142,6 +180,52 @@ contract BatchMinRbtcOutTest is DcaDappTest {
         dcaManager.batchBuyRbtc(batch);
     }
 
+    function _checkProtectedWindowFundingGrowth(bool createSchedule) private {
+        if (!isDexSwaps || !isLayerbank || block.chainid != ANVIL_CHAIN_ID) {
+            vm.skip(true);
+            return;
+        }
+        MockLayerBankAToken(address(LayerBankHandler(address(stablecoinHandler)).i_aToken()))
+            .setNormalizedIncome(5e25, true);
+        (uint256 quotedOutput, uint256 quotedInput) = _quoteGross();
+        assertLt(quotedInput, AMOUNT_TO_SPEND, "the quote must retrieve a short row");
+        IDcaManager.Batch memory batch = _batch(quotedOutput);
+        uint64 scheduleId = _scheduleId();
+        uint256 nominalBefore = _schedule().purchaseAmount;
+        vm.prank(SWAPPER);
+        dcaManager.activateProtectedPurchaseWindow();
+        vm.startPrank(USER);
+        stablecoin.approve(address(stablecoinHandler), type(uint256).max);
+        if (createSchedule) {
+            dcaManager.createDcaSchedule(
+                address(stablecoin), AMOUNT_TO_SPEND, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_routeIndex
+            );
+        } else {
+            dcaManager.depositToken(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
+        }
+        vm.stopPrank();
+        assertEq(_schedule().purchaseAmount, nominalBefore, "funding must not change the nominal amount");
+        (, uint256 fullInput) = _quoteGross();
+        assertGt(fullInput, quotedInput, "funding must increase actual input");
+        assertEq(fullInput, AMOUNT_TO_SPEND, "the funded row must spend its nominal amount");
+        uint256 balanceBefore = _schedule().tokenBalance;
+        uint256 sharesBefore = stablecoinHandler.getUserShares(USER);
+        MockSwapRouter02 router = MockSwapRouter02(dexHelperConfig.getActiveNetworkConfig().swapRouter);
+        router.setOutputFillPercent(0.99 ether);
+        vm.expectRevert(bytes("Insufficient output amount"));
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(batch);
+        assertEq(_schedule().tokenBalance, balanceBefore);
+        assertEq(_schedule().cadenceAnchor, 0);
+        assertEq(stablecoinHandler.getUserShares(USER), sharesBefore, "rejection must restore funding shares");
+
+        router.setOutputFillPercent(1 ether);
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(batch);
+        assertEq(_schedule().tokenBalance, balanceBefore - AMOUNT_TO_SPEND);
+        assertGt(_accumulatedRbtc(), 0, "the funded row must buy inside the window");
+    }
+
     function _expectMinimumViolationRevert(uint256 measured, uint256 minRbtcOut) private {
         if (isDexSwaps) {
             // The router rejects `max(amountOutLowerBound, minRbtcOut)` before the measured check can run.
@@ -160,45 +244,35 @@ contract BatchMinRbtcOutTest is DcaDappTest {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Gross venue output Q. On MoC, an unreachable `minRbtcOut` reverts with Q in
-     *      `PurchaseRbtc__BelowSwapperMinimum` and rolls the whole batch back. On Dex, the router would
-     *      reject `type(uint256).max` before that check, so take a snapshot, buy with `0`, sum handler
-     *      WRBTC (buyer credits + collector credit + dust), and revert the world.
+     * @dev Read measured gross output and actual input from a successful zero-minimum purchase,
+     *      then restore all state. The quote includes lending redemption effects and precedes fees.
      */
     function _measuredOutput() private returns (uint256 measured) {
-        if (isDexSwaps) {
-            uint256 snapshot = vm.snapshot();
-            uint256 handlerBefore = wrbtc.balanceOf(address(stablecoinHandler));
-            _buy(NO_MIN_RBTC_OUT);
-            measured = wrbtc.balanceOf(address(stablecoinHandler)) - handlerBefore;
-            assertGt(measured, 0, "the batch must buy something for the minimum to be meaningful");
-            vm.revertTo(snapshot);
-            return measured;
-        }
-
-        IDcaManager.Batch memory batch = _batch(type(uint256).max);
-        vm.prank(SWAPPER);
-        (bool ok, bytes memory returnData) = address(dcaManager).call(abi.encodeCall(IDcaManager.batchBuyRbtc, (batch)));
-
-        assertFalse(ok, "an unreachable minimum must revert");
-        assertEq(
-            bytes4(returnData),
-            IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector,
-            "the probe must fail on the caller minimum, not on something else"
-        );
-
-        bytes memory args = new bytes(returnData.length - 4);
-        for (uint256 i; i < args.length; ++i) {
-            args[i] = returnData[i + 4];
-        }
-        (measured,) = abi.decode(args, (uint256, uint256));
-        assertGt(measured, 0, "the batch must buy something for the minimum to be meaningful");
+        (measured,) = _quoteGross();
     }
 
-    function _batch(uint256 minRbtcOut) private view returns (IDcaManager.Batch memory) {
+    function _quoteGross() private returns (uint256 measured, uint256 quotedInput) {
+        uint256 snapshot = vm.snapshot();
+        vm.recordLogs();
+        _buy(0);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 batchEvent = keccak256("PurchaseRbtc__SuccessfulRbtcBatchPurchase(address,uint256,uint256)");
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].emitter == address(stablecoinHandler) && logs[i].topics[0] == batchEvent) {
+                (measured, quotedInput) = abi.decode(logs[i].data, (uint256, uint256));
+            }
+        }
+        vm.revertTo(snapshot);
+        assertGt(measured, 0, "quote must observe a purchase");
+        assertGt(quotedInput, 0, "quote must observe actual input");
+    }
+
+    function _batch(uint256 minRbtcOut) private returns (IDcaManager.Batch memory) {
         uint64[] memory scheduleIds = new uint64[](1);
         scheduleIds[0] = _scheduleId();
-        return toBatch(scheduleIds, address(stablecoin), s_routeIndex, minRbtcOut);
+        uint256 quotedInput;
+        if (minRbtcOut != 0) (, quotedInput) = _quoteGross();
+        return toBatch(scheduleIds, address(stablecoin), s_routeIndex, minRbtcOut, quotedInput);
     }
 
     function _buy(uint256 minRbtcOut) private {

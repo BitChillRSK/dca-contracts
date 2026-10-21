@@ -104,7 +104,7 @@ contract LayerBankDocHandlerMocTest is Test {
             purchaseAmounts[i] = purchaseBase * (i + 1);
         }
 
-        handler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT);
+        handler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT, 0);
 
         uint256 totalAccrued;
         for (uint256 i = 0; i < buyers.length; i++) {

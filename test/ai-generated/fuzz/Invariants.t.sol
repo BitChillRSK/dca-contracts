@@ -459,24 +459,20 @@ contract TropykusHandlerWrapper is TropykusHandler {
      * @notice Mock implementation of batchBuyRbtc for testing
      * @dev Must track `IPurchaseRbtc.batchBuyRbtc` exactly. DcaManager reaches these wrappers through an
      *      interface cast, so a stale signature is not a compile error — it is a selector miss at runtime
-     *      that reverts every purchase while the invariants above still pass, vacuously. R51 added
-     *      `minRbtcOut`; `test_invariantHandlerBuysRbtcThroughDcaManager` is the guard that keeps this
-     *      honest if the signature drifts again.
+     *      that reverts every purchase while the invariants above still pass, vacuously. This harness
+     *      submits only zero-minimum batches. The real purchase tests cover quote protection.
+     *      `test_invariantHandlerBuysRbtcThroughDcaManager` guards against selector drift.
      */
     function batchBuyRbtc(
         address[] calldata buyers,
         uint64[] calldata scheduleIds,
         uint256[] calldata purchaseAmounts,
-        uint256 minRbtcOut
+        uint256 minRbtcOut,
+        uint256 quotedStablecoinIn
     ) external onlyDcaManager {
-        uint256 totalPurchasedRbtc;
+        require(minRbtcOut == 0 && quotedStablecoinIn == 0, "Wrapper supports unquoted purchases only");
         for (uint256 i = 0; i < buyers.length; i++) {
-            totalPurchasedRbtc += _buyRbtcInternal(buyers[i:i + 1], scheduleIds[i], purchaseAmounts[i:i + 1]);
-        }
-        // The real pipeline checks before crediting; a revert here undoes the credits above, so the
-        // all-or-nothing outcome the caller sees is the same.
-        if (totalPurchasedRbtc < minRbtcOut) {
-            revert IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum(totalPurchasedRbtc, minRbtcOut);
+            _buyRbtcInternal(buyers[i:i + 1], scheduleIds[i], purchaseAmounts[i:i + 1]);
         }
     }
 
@@ -569,24 +565,20 @@ contract SovrynHandlerWrapper is SovrynHandler {
      * @notice Mock implementation of batchBuyRbtc for testing
      * @dev Must track `IPurchaseRbtc.batchBuyRbtc` exactly. DcaManager reaches these wrappers through an
      *      interface cast, so a stale signature is not a compile error — it is a selector miss at runtime
-     *      that reverts every purchase while the invariants above still pass, vacuously. R51 added
-     *      `minRbtcOut`; `test_invariantHandlerBuysRbtcThroughDcaManager` is the guard that keeps this
-     *      honest if the signature drifts again.
+     *      that reverts every purchase while the invariants above still pass, vacuously. This harness
+     *      submits only zero-minimum batches. The real purchase tests cover quote protection.
+     *      `test_invariantHandlerBuysRbtcThroughDcaManager` guards against selector drift.
      */
     function batchBuyRbtc(
         address[] calldata buyers,
         uint64[] calldata scheduleIds,
         uint256[] calldata purchaseAmounts,
-        uint256 minRbtcOut
+        uint256 minRbtcOut,
+        uint256 quotedStablecoinIn
     ) external onlyDcaManager {
-        uint256 totalPurchasedRbtc;
+        require(minRbtcOut == 0 && quotedStablecoinIn == 0, "Wrapper supports unquoted purchases only");
         for (uint256 i = 0; i < buyers.length; i++) {
-            totalPurchasedRbtc += _buyRbtcInternal(buyers[i:i + 1], scheduleIds[i], purchaseAmounts[i:i + 1]);
-        }
-        // The real pipeline checks before crediting; a revert here undoes the credits above, so the
-        // all-or-nothing outcome the caller sees is the same.
-        if (totalPurchasedRbtc < minRbtcOut) {
-            revert IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum(totalPurchasedRbtc, minRbtcOut);
+            _buyRbtcInternal(buyers[i:i + 1], scheduleIds[i], purchaseAmounts[i:i + 1]);
         }
     }
 

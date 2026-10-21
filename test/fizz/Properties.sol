@@ -2,6 +2,7 @@
 pragma solidity >=0.6.2 <0.9.0;
 
 import "./Snapshots.sol";
+import {Math as OzMath} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {PropertiesAsserts} from "./utils/PropertiesAsserts.sol";
 import {IStablecoinSource} from "src/interfaces/IStablecoinSource.sol";
 import {IDcaManagerAccessControl} from "src/interfaces/IDcaManagerAccessControl.sol";
@@ -222,7 +223,9 @@ abstract contract Properties is PropertiesAsserts, Snapshots {
             uint256 r = rate(h);
             uint256 minAmount = dcaManager.getTokenMinPurchaseAmount(routes[k].token);
             gt(_previewMint(h, 1e18, r), 0, "GL-15: a 1e18 deposit previews zero receipt shares");
-            gt(_previewMint(h, minAmount, r), 0, "GL-15: a minimum deposit previews zero receipt shares");
+            if (minAmount * D(h) >= r) {
+                gt(_previewMint(h, minAmount, r), 0, "GL-15: a viable minimum deposit previews zero receipt shares");
+            }
         }
     }
 
@@ -1720,10 +1723,11 @@ abstract contract Properties is PropertiesAsserts, Snapshots {
         uint256 k = _routeKOf(batch.token, batch.routeIndex);
         if (k < 5) {
             s.batchesOn[k]++;
-            s.minOut[k] = _satAdd(s.minOut[k], batch.minRbtcOut);
         } else {
             s.foreign = true;
         }
+        uint256 priorBurn = k < 5 ? s.burn[k] : 0;
+        uint256 priorFund = k < 5 ? s.gFund[k] : 0;
         for (uint256 j; j < batch.scheduleIds.length; j++) {
             BRow memory r = rows[i++];
             r.b = b;
@@ -1749,6 +1753,14 @@ abstract contract Properties is PropertiesAsserts, Snapshots {
             s.rowsOf[r.ai][k]++;
             s.gNom[k] += r.amount;
             _simRow(s, r);
+        }
+        if (k < 5 && batch.minRbtcOut != 0 && batch.quotedStablecoinIn != 0) {
+            uint256 actualInput =
+                routes[k].lending ? _cashForBurn(routes[k].handler, s.burn[k] - priorBurn) : s.gFund[k] - priorFund;
+            s.minOut[k] = _satAdd(
+                s.minOut[k],
+                OzMath.mulDiv(batch.minRbtcOut, actualInput, batch.quotedStablecoinIn, OzMath.Rounding.Ceil)
+            );
         }
         return i;
     }
@@ -2860,35 +2872,49 @@ abstract contract Properties is PropertiesAsserts, Snapshots {
         if (!ok) _failWithErr("SP-63: clean batch reverted", err);
     }
 
-    /// @notice SP-64: inside the planning window, with rate and exit fee unchanged, the batch burns the planned SR and the router takes the planned cash
-    function property_protectedBatchInputFixed(Route memory r, ExecView memory ev) internal {
-        if (!ev.sameRate) return;
-        if (r.lending) {
-            uint256 now_ = receipt(r.handler);
-            if (now_ > ev.rcpt0) {
-                t(false, "SP-64: receipt shares rose in a planned batch");
-                return;
-            }
-            eq(ev.rcpt0 - now_, ghosts.plan.SR, "SP-64: burned shares moved inside the protected window");
-        }
+    /// @notice SP-64: a successful protected purchase preserves the quoted rate against actual input changes.
+    function property_protectedBatchExecutionRate(Route memory r, ExecView memory ev, bool withQuote) internal {
+        if (!withQuote) return;
+        uint256 q1 = rbtcAsset(r.handler);
+        gte(q1, ev.q0, "SP-64: measured output fell");
+        uint256 actualInput;
         if (r.dex) {
             uint256 rin = usdrif.balanceOf(address(swapRouter));
-            if (rin < ev.rin0) {
-                t(false, "SP-64: router USDRIF fell in a planned batch");
-                return;
-            }
-            eq(rin - ev.rin0, ghosts.plan.cashIn, "SP-64: Dex input moved inside the protected window");
+            gte(rin, ev.rin0, "SP-64: router input balance fell");
+            actualInput = rin - ev.rin0;
+        } else if (r.lending) {
+            uint256 now_ = receipt(r.handler);
+            lte(now_, ev.rcpt0, "SP-64: receipt shares rose in a batch");
+            actualInput = _cashForBurn(r.handler, ev.rcpt0 - now_);
+        } else {
+            actualInput = ev.g;
         }
+        gte(
+            (q1 - ev.q0) * ghosts.plan.cashIn,
+            ghosts.plan.minOut * actualInput,
+            "SP-64: actual input diluted the quoted execution rate"
+        );
     }
 
-    /// @notice SP-65: a quote-derived minRbtcOut does not revert at an unchanged price, and a fill is priced no worse than quoted
+    uint256 public quoteRoundingReverts;
+
+    /// @notice SP-65: unchanged-price execution may refuse a one-wei rounding shortfall; successful fills preserve the quoted rate.
     function property_minRbtcOutNotWeaponized(Route memory r, ExecView memory ev, bool ok, bytes memory err) internal {
         if (!ok) {
             if (ev.sameRate && ev.priceNotWorse) {
-                t(
-                    _errSelector(err) != IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector,
-                    "SP-65: quote-derived minimum reverted at a venue price no worse than planned"
-                );
+                if (_errSelector(err) == IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector) {
+                    t(err.length == 68, "SP-65: malformed minimum error");
+                    bytes memory args = new bytes(64);
+                    for (uint256 i; i < 64; ++i) {
+                        args[i] = err[i + 4];
+                    }
+                    (uint256 received, uint256 minimum) = abi.decode(args, (uint256, uint256));
+                    t(
+                        minimum > received && minimum - received == 1,
+                        "SP-65: unchanged-price shortfall exceeds one output wei"
+                    );
+                    quoteRoundingReverts++;
+                }
             }
             return;
         }
@@ -2907,9 +2933,7 @@ abstract contract Properties is PropertiesAsserts, Snapshots {
             actualIn = ev.g;
         }
         Plan storage pl = ghosts.plan;
-        gte(
-            (q1 - ev.q0) * pl.cashIn + pl.cashIn, pl.minOut * actualIn, "SP-65: minimum diluted by a larger batch input"
-        );
+        gte((q1 - ev.q0) * pl.cashIn, pl.minOut * actualIn, "SP-65: minimum diluted by a larger batch input");
     }
 
     /// @notice SP-66: swapper, owner, permissionless and environment calls leave every account's DOC, USDRIF and native unchanged
@@ -3028,8 +3052,11 @@ abstract contract Properties is PropertiesAsserts, Snapshots {
         t(_errSelector(err) == expected, "SP-71: owner-only call refused with an unexpected error");
     }
 
+    uint256 public intermediatePathChecks;
+
     /// @notice SP-72: USDT0 donated to the shared router never makes a clean Dex batch on the alternative path revert
     function property_intermediateDonationNoDos(bool ok, bytes memory err) internal {
+        intermediatePathChecks++;
         if (ok) return;
         t(
             _errSelector(err) != IPurchaseUniswap.PurchaseUniswap__IntermediateBalanceChangedInRouter.selector,

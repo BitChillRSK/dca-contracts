@@ -39,12 +39,13 @@ import {FizzFeeProbe} from "./mocks/FizzFeeProbe.sol";
 import {ReentrantActor} from "./ReentrantActor.sol";
 
 /// @notice Base contract with state variables and setup functions
-/// @dev Deployment mirrors the launch topology on one DcaManager / OperationsAdmin pair:
+/// @dev Deployment retains the audited test topology on one DcaManager / OperationsAdmin pair:
 ///      DOC  → route 0 IdleDocHandlerMoc, route 1 LayerBankDocHandlerMoc, route 2 SovrynDocHandlerMoc
 ///      USDRIF → route 0 IdleHandlerDex, route 1 LayerBankHandlerDex
 ///      External venues are the repo's own mocks (MoC proxy, SwapRouter02, WRBTC, MoC oracle, LayerBank)
 ///      plus `FizzIToken`, a Sovryn iToken whose price can fall. `SovrynHandlerDex` is not deployed
-///      (built but not deployed, per AUDIT_GUIDE) and `src/tropykus-legacy/` is out of scope.
+///      and `src/tropykus-legacy/` is out of scope. Sovryn is retained for regression coverage;
+///      the canonical initial launch excludes it.
 abstract contract Base is StringUtils, Clamp, Deployer, Math {
     using DecimalPrinter for uint256;
 
@@ -383,12 +384,15 @@ abstract contract Base is StringUtils, Clamp, Deployer, Math {
     }
 
     function _uniswapSettings() private view returns (IPurchaseUniswap.UniswapSettings memory settings) {
-        uint24[] memory fees = new uint24[](1);
-        fees[0] = DEFAULT_POOL_FEE;
+        uint24[] memory fees = new uint24[](2);
+        fees[0] = ALT_POOL_FEE;
+        fees[1] = DEFAULT_POOL_FEE;
+        address[] memory intermediateTokens = new address[](1);
+        intermediateTokens[0] = address(usdt0);
         settings = IPurchaseUniswap.UniswapSettings({
             wrbtc: IWRBTC(address(wrbtc)),
             swapRouter: IUniswapV3SwapRouter(address(swapRouter)),
-            swapIntermediateTokens: new address[](0),
+            swapIntermediateTokens: intermediateTokens,
             swapPoolFeeRates: fees,
             mocOracle: ICoinPairPrice(address(mocOracle))
         });

@@ -406,7 +406,7 @@ contract R64BatchGasBenchmarkTest is Test {
             purchaseAmounts[i] = PURCHASE_AMOUNT;
         }
         gasUsed = gasleft();
-        s_handlers[design][size].batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, 0);
+        s_handlers[design][size].batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, 0, 0);
         gasUsed -= gasleft();
     }
 
@@ -453,7 +453,13 @@ contract R64BatchGasBenchmarkTest is Test {
         if (design == 0) {
             return abi.encodeCall(
                 IDcaManager.batchBuyRbtc,
-                (IDcaManager.Batch({scheduleIds: scheduleIds, token: token, routeIndex: ROUTE_INDEX, minRbtcOut: 0}))
+                (IDcaManager.Batch({
+                        scheduleIds: scheduleIds,
+                        token: token,
+                        routeIndex: ROUTE_INDEX,
+                        minRbtcOut: 0,
+                        quotedStablecoinIn: 0
+                    }))
             );
         }
         if (design == 1) {

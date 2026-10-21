@@ -77,7 +77,7 @@ contract BatchTailScheduleTest is Test {
     function test_lendingTail_singleScheduleSpendingFullBalancePurchases() external {
         lendingHandler.depositToken(ALICE, ALICE_DEPOSIT);
         uint256 before = iToken.balanceOf(address(lendingHandler));
-        lendingHandler.batchBuyRbtc(_one(ALICE), _oneId(1), _one(ALICE_DEPOSIT), NO_MIN_RBTC_OUT);
+        lendingHandler.batchBuyRbtc(_one(ALICE), _oneId(1), _one(ALICE_DEPOSIT), NO_MIN_RBTC_OUT, 0);
         assertEq(lendingHandler.getUserShares(ALICE), 0);
         assertEq(iToken.balanceOf(address(lendingHandler)), 0);
         assertGt(before, 0);
@@ -97,7 +97,7 @@ contract BatchTailScheduleTest is Test {
         amounts[0] = ALICE_DEPOSIT;
         amounts[1] = 100 ether;
         uint256 bobBefore = lendingHandler.getUserShares(BOB);
-        lendingHandler.batchBuyRbtc(buyers, scheduleIds, amounts, NO_MIN_RBTC_OUT);
+        lendingHandler.batchBuyRbtc(buyers, scheduleIds, amounts, NO_MIN_RBTC_OUT, 0);
         assertEq(lendingHandler.getUserShares(ALICE), 0);
         assertGt(lendingHandler.getAccumulatedRbtcBalance(ALICE), 0);
         assertGt(lendingHandler.getAccumulatedRbtcBalance(BOB), 0);
@@ -109,7 +109,7 @@ contract BatchTailScheduleTest is Test {
         idleHandler.depositToken(ALICE, ALICE_DEPOSIT);
 
         // Idle funding remains the nominal purchase amount.
-        idleHandler.batchBuyRbtc(_one(ALICE), _oneId(1), _one(ALICE_DEPOSIT), NO_MIN_RBTC_OUT);
+        idleHandler.batchBuyRbtc(_one(ALICE), _oneId(1), _one(ALICE_DEPOSIT), NO_MIN_RBTC_OUT, 0);
 
         assertEq(docToken.balanceOf(address(idleHandler)), 0);
         assertGt(idleHandler.getAccumulatedRbtcBalance(ALICE), 0);

@@ -234,6 +234,7 @@ contract NethermindLayerBankAuditTest is LayerBankDcaManagerTest {
 
         IDcaManager.Batch memory batch = toBatch(_ids(short, healthy), address(docToken), 1);
         batch.minRbtcOut = type(uint128).max;
+        batch.quotedStablecoinIn = 150 ether;
         vm.expectRevert(
             abi.encodeWithSelector(IPurchaseRbtc.PurchaseRbtc__BelowSwapperMinimum.selector, 3e15, type(uint128).max)
         );

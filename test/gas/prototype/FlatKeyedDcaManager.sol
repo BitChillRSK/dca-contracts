@@ -199,7 +199,7 @@ contract FlatKeyedDcaManager is ReentrancyGuard {
             purchaseAmounts[i] = purchaseAmount;
         }
         IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex)))
-            .batchBuyRbtc(buyers, batch.scheduleIds, purchaseAmounts, batch.minRbtcOut);
+            .batchBuyRbtc(buyers, batch.scheduleIds, purchaseAmounts, batch.minRbtcOut, 0);
     }
 
     /// @dev One `SLOAD` per id for the list, then three per schedule; the nested design reads a
