@@ -130,8 +130,8 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
         _protocolDeposit(depositAmount);
         uint256 mintedAmount = _receiptSharesBalance() - sharesBefore;
         if (mintedAmount == 0) revert LendingHandler__LendingProtocolDepositFailed();
-        // `stablecoinBefore` includes the pulled deposit, so the subtraction cannot underflow.
         uint256 stablecoinAfter = i_stablecoin.balanceOf(address(this));
+        // `stablecoinBefore` includes the pulled deposit, so the subtraction cannot underflow.
         if (stablecoinAfter != stablecoinBefore - depositAmount) {
             revert LendingHandler__DepositConsumptionMismatch(depositAmount, stablecoinBefore, stablecoinAfter);
         }
