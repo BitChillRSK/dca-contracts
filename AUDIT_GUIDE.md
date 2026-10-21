@@ -83,7 +83,6 @@ afterward.
 
 Dex paths at deploy: USDT0 → WRBTC through the 0.30% pool; USDRIF → USDT0 (0.05%) → WRBTC (0.30%)
 active. The alternate USDRIF → USDT (0.05%) → WRBTC (0.30%) path is not launch-allowlisted.
-Sovryn is excluded from the initial release; its adapter-specific risks require review before any later integration.
 
 ## Asset and call flow
 
@@ -268,7 +267,7 @@ Other deliberate availability trade-offs:
   No alternate recipient, wrapped claim, or owner rescue exists.
 - Dex input tokens must have at most 18 decimals. Fee-on-transfer tokens and asynchronous or partial
   lending redemptions are unsupported.
-- Sovryn is not integrated at launch. The retained adapter charges the market's 0.1% exit fee on iToken burns. A user on a future Sovryn route would therefore receive less
+- The retained Sovryn adapter charges the market's 0.1% exit fee on iToken burns. A user on a future Sovryn route would therefore receive less
   stablecoin than the principal debited on withdrawal, and each purchase spends the net amount
   redeemed. This is the venue-fee case in the accounting properties above, not a loss of shares.
   `make probe-sovryn-exit-fee` measures the live fee; see

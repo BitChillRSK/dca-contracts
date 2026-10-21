@@ -378,7 +378,8 @@ interface IDcaManager {
      *      remains due the following Monday.
      *      Any paused row fails the whole batch or multi-handler bundle. The token is part of each
      *      schedule key and the route is checked, so rows cannot cross handlers. A measured receipt below
-     *      `minRbtcOut` reverts the purchase and all schedule debits.
+     *      `ceil(minRbtcOut * actualRetrievedInput / quotedStablecoinIn)` reverts the purchase and all
+     *      schedule debits. A zero minimum disables this caller bound.
      */
     function batchBuyRbtc(Batch calldata batch) external;
 
@@ -387,7 +388,7 @@ interface IDcaManager {
      * @param batches Each element is one handler's purchase batch (`token` + `routeIndex`).
      * @dev Authenticates the caller once, then purchases each handler's batch in order through the
      *      same one-handler helper. A failure in any batch — including a paused row or a batch that
-     *      bought less than its own `minRbtcOut` — reverts every handler, so a later batch's minimum
+     *      bought less than its own input-scaled minimum — reverts every handler, so a later batch's minimum
      *      undoes an earlier handler's purchase. `batchBuyRbtc` remains available for one-handler
      *      retries (same `Batch` type).
      */

@@ -8,11 +8,12 @@ Commit under test: recorded at PR open (see Status). Profile for shipped bytecod
 
 - Script: [`script/DeployFinal.s.sol`](../../script/DeployFinal.s.sol)
 - Tests: [`test/unit/deployment/FinalDeploymentTest.t.sol`](../../test/unit/deployment/FinalDeploymentTest.t.sol)
-- Map (one `OperationsAdmin` / one `DcaManager`, seven handlers):
-  - DOC: idle / LayerBank / Sovryn → MoC
+- Map (one `OperationsAdmin` / one `DcaManager`, six handlers; updated by R117):
+  - DOC: idle / LayerBank → MoC
   - USDRIF: idle / LayerBank → Uniswap
   - USDT0: idle / LayerBank → Uniswap
-- Fail-closed: zero addresses, incomplete LayerBank/Sovryn wiring, missing `INITIAL_SWAPPER`,
+- Sovryn route 2 remains unregistered and unassigned. The retained adapter stays in the audit scope.
+- Fail-closed: zero addresses, incomplete LayerBank wiring, missing `INITIAL_SWAPPER`,
   non-live environment, and non-mainnet `run()` all revert. Rootstock **testnet** lacks the
   LayerBank aTokens this map needs, so the live `run()` path is **mainnet-only**; Anvil tests
   exercise `deployStack` with mocks.

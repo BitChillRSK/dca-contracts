@@ -23,8 +23,18 @@ Human operator only. Agents must not `--broadcast`.
    - `make fork-sovryn`
    - `make fork-layerbank`
    - `make fork-dex-path` (Dex path allowlist)
-6. Confirm the selected mitigations and remaining risk dispositions in [R117](./R117-pashov-mitigations.md).
-   Static analysis triaged in [`R73-RELEASE_RECORD.md`](./R73-RELEASE_RECORD.md).
+6. Complete the R117 release gates in [the disposition register](./PASHOV_TRIAGE_DECISIONS.md#review-evidence-and-assigned-release-work).
+   The release owner records completion at the frozen revision:
+   - Complete all five dedicated consumer issues linked in [R117](./R117-pashov-mitigations.md#consumer-follow-up-status).
+   - Settle the DOC minimum policy and verify the bot controls assigned to swapper-bot#23.
+   - Verify the configured oracle implementation, bounded validity period, and positive-price rules.
+     If DOC uses zero minimum, also verify the deployed MoC conversion, fee, and oracle assumptions.
+   - After the corrected harness passes replay checks, run Medusa for at least four hours.
+     Before release, complete a 24-hour Medusa campaign and an Echidna campaign on the frozen executable revision.
+     Preserve commands, configurations, seeds, corpus, outputs, and coverage limits.
+     Resolve every SHOULD-HOLD failure and record dispositions for EXPLORATORY failures.
+     Campaign duration alone does not establish security.
+   Static analysis remains triaged in [`R73-RELEASE_RECORD.md`](./R73-RELEASE_RECORD.md).
 7. `RSK_MAINNET_RPC_URL`, Blockscout verifier URL, deployer keystore/Ledger ready.
 8. `INITIAL_SWAPPER` = production bot EOA (non-zero).
 9. Safe (`MAINNET_OWNER`) and fee collector (`MAINNET_FEE_COLLECTOR`) match `script/Constants.sol`.

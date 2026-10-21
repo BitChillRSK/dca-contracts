@@ -26,6 +26,7 @@ None for the selected implementation:
 - Treat L01 as intended scheduling behaviour. Treat L08 as informational and correct the guide; do not change cadence rules.
 
 Other unverified leads remain explicitly open in the register. Do not silently accept new residual risks.
+The owner assigned L06/L14/L17/L25 to a separate later stacked PR, tracked by [contracts#185](https://github.com/BitChillRSK/dca-contracts/issues/185).
 
 ## Scope
 
@@ -65,6 +66,9 @@ Follow direct imports, callers, compilation errors, and failing tests. List expa
 
 ## Required tests
 
+- Review follow-up: correct the manager's scaled-minimum NatSpec, stale property citations, and release-map documentation.
+  Build both profiles and compare metadata-stripped runtime and creation code against the preceding commit.
+  Keep executable behaviour unchanged. Track unresolved bot controls and assurance campaigns as explicit release gates.
 - Targeted F1 regressions: changed nominal amounts, short lending rows, deposits and creation during a window, and unchanged input.
 - Exercise conservative rounding, invalid quote input, zero caller minimum, 6/18 decimal tokens, and fee accounting.
 - Deployment tests: Sovryn absent; the alternate USDRIF path disallowed; primary paths and enabled handlers preserved.
@@ -155,3 +159,25 @@ The temporary output/cache paths isolate compiler profiles. Repository compiler 
 The original scan hash remains `33e3aa21193300b7c8ee0d026686d43f0f8d1916267ecdb22502a1150213c918`.
 The owner approved the selected implementation. Consumer issue publication is complete.
 Consumer implementations and the register's remaining verification conditions stay open before release. No broadcast occurred.
+
+## Auditor follow-up (2026-10-21)
+
+- Corrected both manager purchase comments to describe the input-scaled minimum.
+- Corrected the R73 six-handler map and the GL-17/SP-32/SP-33 guide citations.
+- Consolidated the Sovryn launch exclusion in the guide without removing retained adapter scope or fee assumptions.
+- Assigned the remaining bot controls to swapper-bot#23 and assurance/dependency checks to the release owner.
+- The owner requested a replacement non-draft PR from `fix/r117-pashov-mitigations`, still based on #183.
+- The owner requested a separate later hardening PR: [contracts#185](https://github.com/BitChillRSK/dca-contracts/issues/185).
+
+Only NatSpec and Markdown change after `0aad7b7d`. Both full builds pass:
+
+```bash
+forge build --out /tmp/r117-review-followup-20261021/after-default --cache-path /tmp/r117-review-followup-20261021/cache-after-default
+FOUNDRY_PROFILE=deploy forge build --out /tmp/r117-review-followup-20261021/after-deploy --cache-path /tmp/r117-review-followup-20261021/cache-after-deploy
+```
+
+Compared against source-only builds of `0aad7b7db49933fdde78e1bae46baf42eaf72550` under the same profiles.
+All 42 first-party artifacts retain identical ABIs and selectors in both profiles.
+All ten non-empty runtime and creation artifacts are byte-identical after their trailing CBOR metadata is removed.
+Six complete runtime artifacts differ through metadata only. The comparison excludes the deploy profile's separate legacy-codegen test artifacts.
+No test lane or fork rerun is required for this comment-only tier under AGENTS.md.
