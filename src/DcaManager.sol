@@ -164,14 +164,16 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
 
     /**
      * @inheritdoc IDcaManager
-     * @dev Widths are checked before the handler pull so an overflowing credit cannot move tokens.
+     * @dev Widths are checked before the handler pull so an overflowing credit cannot move tokens. The
+     *      credit is stored before the pull, so a purchase reached from a callback during the pull debits
+     *      the new balance instead of being overwritten by it.
      */
     function depositToken(address token, uint64 scheduleId, uint256 depositAmount) external override nonReentrant {
         _validateDeposit(depositAmount);
         DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
         uint128 newTokenBalance = (uint256(dcaSchedule.tokenBalance) + depositAmount.toUint128()).toUint128();
-        _handlerForDeposit(token, dcaSchedule.routeIndex).depositToken(msg.sender, depositAmount);
         dcaSchedule.tokenBalance = newTokenBalance;
+        _handlerForDeposit(token, dcaSchedule.routeIndex).depositToken(msg.sender, depositAmount);
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
     }
 
