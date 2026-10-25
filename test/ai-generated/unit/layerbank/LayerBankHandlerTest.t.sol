@@ -231,6 +231,75 @@ contract LayerBankHandlerTest is HandlerTestHarness {
         assertEq(aToken.scaledBalanceOf(address(handler)), 0);
     }
 
+    /// @dev A market that leaves part of the deposit behind would strand it in the handler.
+    function test_layerbank_partialSupplyReverts() public {
+        pool.setSupplyPullOverride(DEPOSIT_AMOUNT - 1, true);
+        uint256 userBalanceBefore = stablecoin.balanceOf(USER);
+
+        vm.prank(address(dcaManager));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ILendingHandler.LendingHandler__DepositConsumptionMismatch.selector, DEPOSIT_AMOUNT, DEPOSIT_AMOUNT, 1
+            )
+        );
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        assertEq(stablecoin.balanceOf(USER), userBalanceBefore);
+        assertEq(layerbankHandler.getUserShares(USER), 0);
+    }
+
+    /// @dev The market's standing allowance lets it take more than the deposit, from other idle stablecoin.
+    function test_layerbank_excessSupplyReverts() public {
+        uint256 idle = 7 ether;
+        stablecoin.mint(address(handler), idle);
+        pool.setSupplyPullOverride(DEPOSIT_AMOUNT + idle, true);
+
+        vm.prank(address(dcaManager));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ILendingHandler.LendingHandler__DepositConsumptionMismatch.selector,
+                DEPOSIT_AMOUNT,
+                DEPOSIT_AMOUNT + idle,
+                0
+            )
+        );
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        assertEq(stablecoin.balanceOf(address(handler)), idle);
+        assertEq(layerbankHandler.getUserShares(USER), 0);
+    }
+
+    /**
+     * @dev A short row can spend a buyer's whole position, leaving a schedule whose nominal balance has
+     *      no share value behind it. Withdrawing it pays nothing and makes no transfer, so it still
+     *      succeeds on a token that rejects zero-value transfers.
+     */
+    function test_layerbank_zeroValueWithdrawalMakesNoTransfer() public {
+        address user1 = makeAddr("user1");
+        address[] memory users = new address[](1);
+        users[0] = user1;
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = DEPOSIT_AMOUNT;
+
+        stablecoin.mint(user1, DEPOSIT_AMOUNT);
+        vm.prank(user1);
+        stablecoin.approve(address(layerbankHandler), type(uint256).max);
+        vm.prank(address(dcaManager));
+        handler.depositToken(user1, DEPOSIT_AMOUNT / 10);
+        layerbankHandler.testBatchRetrieveStablecoin(users, amounts);
+        assertEq(layerbankHandler.getUserShares(user1), 0);
+
+        vm.mockCallRevert(
+            address(stablecoin), abi.encodeCall(IERC20.transfer, (user1, 0)), bytes("zero-value transfer")
+        );
+        vm.expectCall(address(stablecoin), abi.encodeWithSelector(IERC20.transfer.selector), 0);
+        vm.expectEmit(address(handler));
+        emit ILendingHandler.LendingHandler__WithdrawalAmountAdjusted(user1, WITHDRAWAL_AMOUNT, 0);
+
+        vm.prank(address(dcaManager));
+        assertEq(handler.withdrawToken(user1, WITHDRAWAL_AMOUNT), 0);
+    }
+
     function test_layerbank_zeroPayoutRedeemReverts() public {
         vm.prank(address(dcaManager));
         handler.depositToken(USER, DEPOSIT_AMOUNT);

@@ -188,12 +188,15 @@ contract MockLayerBankAToken is ERC20 {
  * @title MockLayerBankPool
  * @notice Forwards supply/withdraw to the aToken as the live Aave Pool does. `supply` matches
  *         the live ABI (no return). `withdraw` can lie about its return so tests prove the
- *         handler measures DOC `balanceOf` deltas instead of trusting it.
+ *         handler measures DOC `balanceOf` deltas instead of trusting it. `supply` can pull a
+ *         different amount than requested so tests prove the handler measures what the market took.
  */
 contract MockLayerBankPool {
     MockLayerBankAToken public immutable aToken;
     uint256 public withdrawReturnOverride;
     bool public useWithdrawReturnOverride;
+    uint256 public supplyPullOverride;
+    bool public useSupplyPullOverride;
 
     constructor(MockLayerBankAToken aToken_) {
         aToken = aToken_;
@@ -204,10 +207,16 @@ contract MockLayerBankPool {
         useWithdrawReturnOverride = enabled;
     }
 
+    /// @notice Pull `value` on `supply` instead of the requested amount, minting for what arrived.
+    function setSupplyPullOverride(uint256 value, bool enabled) external {
+        supplyPullOverride = value;
+        useSupplyPullOverride = enabled;
+    }
+
     function supply(address asset, uint256 amount, address onBehalfOf, uint16) external {
         IERC20 token = IERC20(asset);
         uint256 balanceBefore = token.balanceOf(address(aToken));
-        token.transferFrom(msg.sender, address(aToken), amount);
+        token.transferFrom(msg.sender, address(aToken), useSupplyPullOverride ? supplyPullOverride : amount);
         uint256 received = token.balanceOf(address(aToken)) - balanceBefore;
         aToken.mintScaled(onBehalfOf, received);
     }

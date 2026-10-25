@@ -128,10 +128,12 @@ adjacent with nothing that can revert, log, or call between them. Cancun prices 
 - **Move `BitChillOwnable` off `FeeHandler`** — would force Dex oracle/floor/path setters to move
   with the fee setters and change layout, for no hot-path gas. Closed under
   [R94](./R94-dcamanager-store-before-pull.md#closed-decisions-2026-09-27).
-- **Store-before-pull on `depositToken` / early `purchaseAmount` on top-up** — both measured under
-  [R94](./R94-dcamanager-store-before-pull.md) and **reverted**. Create's early nonce store does drop
-  one settings re-read under deploy (≈ −200 Rootstock); withdrawal's dropped `toUint128()` saves
-  compute on both profiles.
+- **Early `purchaseAmount` on top-up** — measured under [R94](./R94-dcamanager-store-before-pull.md)
+  and **reverted**. Create's early nonce store does drop one settings re-read under deploy (≈ −200
+  Rootstock); withdrawal's dropped `toUint128()` saves compute on both profiles. `depositToken`'s
+  store-before-pull saved nothing under deploy as an optimization; it ships in
+  [R118](./R118-pashov-optional-hardening.md) for checks-effects-interactions, with the same reads
+  and writes.
 
 ## Deferred candidates (2026-09-25)
 
