@@ -1,14 +1,14 @@
-# R118 — Pashov optional hardening (L06, L14, L17, L25)
+# R118 — Pashov optional hardening (L06, L14, L17; L25 declined)
 
 Status: **implemented** · GitHub [#187](https://github.com/BitChillRSK/dca-contracts/pull/187) · Assigned: yes · Optional/further-review: no · Tracks [contracts#185](https://github.com/BitChillRSK/dca-contracts/issues/185)
 
 ## Objective
 
 Review the four Pashov leads the owner deferred from R117 against the supported tokens, markets, and
-current code, and ship the four small hardening changes the review justifies: store the deposit
-credit before the handler call, require lending deposits to consume exactly the deposit, skip the
-zero-value principal transfer, and check measured WRBTC against the Uniswap oracle floor. Record each
-lead's evidence, dependency assumption, and disposition in the Pashov register.
+current code, and ship the three small hardening changes the review justifies: store the deposit
+credit before the handler call, require lending deposits to consume exactly the deposit, and skip the
+zero-value principal transfer. L25 is recorded as a dependency assumption. Record each lead's
+evidence, dependency assumption, and disposition in the Pashov register.
 
 ## Background
 
@@ -99,11 +99,17 @@ Dependency evidence, Rootstock mainnet block 9,344,056 (2026-10-21), read-only `
 - **Trusted-router assumption.** SwapRouter02 and WRBTC are not proxies, and every hop is a
   factory-deployed pool. The router derives its figure from pool balance deltas, so measured output
   equals that figure today, and the report shows no divergence.
-- **Decision: implement.** Also require measured WRBTC to reach the oracle floor:
-  `PurchaseUniswap__BelowOracleFloor(wrbtcReceived, oracleFloor)`. This applies invariant 1 (measured
-  receipts, never an integrator figure) to the floor. Only the oracle floor is compared here, so a
-  short output against the caller minimum keeps reverting `PurchaseRbtc__BelowSwapperMinimum`. Cost:
-  one comparison per Dex batch, with no storage access, so it is the same on both gas schedules.
+- **Decision: declined (auditor review, 2026-10-25).** The router enforces the larger of the caller
+  minimum and the oracle floor, and `PurchaseRbtc` checks the measured receipt against the caller
+  minimum, which bot policy always sets above zero. Credits already use the measured WRBTC delta, so
+  invariant 1 holds. A second check would only matter if the router reported a figure it did not
+  deliver, and SwapRouter02, WRBTC and the pools are immutable, so no upgrade can give them that
+  behaviour. A check against a dependency that cannot change earns nothing for its gas. L14 differs:
+  the LayerBank Pool is an upgradeable proxy behind an immutable handler.
+  An earlier revision of this PR implemented the check as `PurchaseUniswap__BelowOracleFloor`; it was
+  removed with its tests before merge.
+- **Assumption recorded.** SwapRouter02, WRBTC, and every hop's factory pool keep their current code,
+  and the router's reported output equals the WRBTC it delivers to the handler.
 
 ## Open product decisions
 
@@ -115,14 +121,13 @@ Dependency evidence, Rootstock mainnet block 9,344,056 (2026-10-21), read-only `
 - [x] L14: `LendingHandler._depositToken` requires the protocol deposit to reduce the handler's
       stablecoin balance by exactly `depositAmount`; new error on `ILendingHandler`.
 - [x] L17: `LendingHandler._withdrawToken` returns 0 without a transfer when nothing was redeemed.
-- [x] L25: `PurchaseUniswap._purchaseRbtc` requires measured WRBTC ≥ the oracle floor; new error on
-      `IPurchaseUniswap`.
+- [x] L25: record the router-immutability assumption and decline the duplicate check.
 - [x] State the deposit rule in invariant 11 and the write-back rule in invariant 6 of `AGENTS.md`,
-      and the deposit, floor, and write-back facts in `AUDIT_GUIDE.md`.
+      and the deposit and write-back facts in `AUDIT_GUIDE.md`.
 - [x] Update the four register rows, the work table, and the decision log in
       `PASHOV_TRIAGE_DECISIONS.md`.
 - [x] Price the gas changes on both schedules and record them here.
-- [x] Consumer follow-up for the two new errors and the zero-withdrawal event change.
+- [x] Consumer follow-up for the new deposit error, the zero-withdrawal event change, and the log order.
 
 ## Out of scope
 
@@ -143,7 +148,6 @@ Dependency evidence, Rootstock mainnet block 9,344,056 (2026-10-21), read-only `
   swapper-callback regressions; the mock gains the `burn` the MoC mock calls and a recipient hook)
 - `test/unit/DcaDappTest.t.sol` (the shared deposit helper expects the balance event first)
 - `test/mocks/MockLayerBank.sol`, `test/ai-generated/unit/layerbank/LayerBankHandlerTest.t.sol` (L14, L17)
-- `test/unit/PurchaseUniswapMinOutTest.t.sol` (L25)
 - `AGENTS.md`, `AUDIT_GUIDE.md`, `audits/2026-10-13-Pashov-Skills/README.md` (status sentence only)
 - `docs/relaunch/ROOTSTOCK-GAS-AUDIT.md` (the R94 entry that recorded the deposit reorder as reverted)
 - `docs/relaunch/R118-pashov-optional-hardening.md`, `docs/relaunch/PASHOV_TRIAGE_DECISIONS.md`,
@@ -160,9 +164,6 @@ Dependency evidence, Rootstock mainnet block 9,344,056 (2026-10-21), read-only `
   no stablecoin (`test_layerbank_aTokenMinting`).
 - L17: a zero-value withdrawal makes no stablecoin `transfer` call, returns 0, and succeeds when the
   token rejects zero transfers (`vm.mockCallRevert`). A positive withdrawal is unchanged.
-- L25: a router that enforces the floor on its own figure but delivers less WRBTC reverts with the new
-  error when the caller minimum is zero. Output at the floor still succeeds, and a short output
-  against a binding caller minimum keeps the existing error.
 - Gas: Foundry figures for a lending deposit, a lending withdrawal, and a Dex batch under default and
   `deploy`, before and after, converted to Rootstock with `ROOTSTOCK-GAS-SCHEDULE.md`.
 - `make check`, `make check-deploy`, `make fork-sovryn`, `make fork-layerbank`, `make fork-dex-path`.
@@ -179,7 +180,6 @@ figures are Foundry gas, and storage writes are unchanged on every path.
 | Lending `createDcaSchedule` | L14 | +2,132 | +2,013 | 2 calls into the stablecoin, 2 `SLOAD` | ≈ +3,400 |
 | Lending `depositToken` | L06 + L14 | +2,033 | +2,005 | same as create | ≈ +3,400 |
 | Lending `withdrawToken` | L17 + event order | +1 | +42 | none | +42 |
-| Dex handler batch | L25 | +29 | +30 | none | +30 |
 
 The Rootstock column adds 600 for each repeat call into an already-touched contract (100 → 700)
 and 100 for each `SLOAD` (warm 100 → flat 200), per `ROOTSTOCK-GAS-SCHEDULE.md`. Under `deploy`
@@ -188,8 +188,8 @@ drops one re-read of the schedule slot.
 
 ## Implementation evidence
 
-- Each regression test fails with its change reverted on a copy of this head (four mutants, four
-  kills) and passes on the head itself. The L06 test also fails on the parent commit with "the
+- Each regression test fails with its change reverted on a copy of this head (three mutants, three
+  kills; L25's mutant was removed with its check) and passes on the head itself. The L06 test also fails on the parent commit with "the
   purchase debit was lost".
 - Existing tests keep their errors: a market that pulls the deposit and mints nothing still reverts
   `LendingHandler__LendingProtocolDepositFailed`, because the mint check runs first.
@@ -220,7 +220,7 @@ includes the auditor follow-up.
 ## Success criteria
 
 - [x] Each lead has a recorded premise check, dependency assumption, and disposition.
-- [x] The four changes ship with regression tests that fail without them.
+- [x] The three changes ship with regression tests that fail without them.
 - [x] Gas deltas are priced on both schedules.
 - [x] Gates above pass; the register, guide, and invariants match the code.
 - [x] Consumer issues name the new errors and the event change.
@@ -236,11 +236,11 @@ includes the auditor follow-up.
 
 ## ABI / deploy / cutover impact
 
-- ABI: new errors `ILendingHandler.LendingHandler__DepositConsumptionMismatch(uint256,uint256,uint256)`
-  and `IPurchaseUniswap.PurchaseUniswap__BelowOracleFloor(uint256,uint256)`. A zero-value lending
+- ABI: new error `ILendingHandler.LendingHandler__DepositConsumptionMismatch(uint256,uint256,uint256)`.
+  A zero-value lending
   withdrawal no longer emits `TokenHandler__TokenWithdrawn`. In deposits and withdrawals,
   `DcaManager__TokenBalanceUpdated` now precedes the handler's events. No selector, argument, or
   storage change.
 - Scripts: none.
-- Cutover: comments on the R117 consumer issues, folded into their ABI regeneration: [bitchill-monitoring#49](https://github.com/BitChillRSK/bitchill-monitoring/issues/49#issuecomment-6316902882) (both
-  errors and the event change; [log order](https://github.com/BitChillRSK/bitchill-monitoring/issues/49#issuecomment-6318944749)), [front-end#42](https://github.com/BitChillRSK/front-end/issues/42#issuecomment-6316903528) (the deposit error), [swapper-bot#23](https://github.com/BitChillRSK/swapper-bot/issues/23#issuecomment-6316904324) (the purchase error).
+- Cutover: comments on the R117 consumer issues, folded into their ABI regeneration: [bitchill-monitoring#49](https://github.com/BitChillRSK/bitchill-monitoring/issues/49#issuecomment-6316902882) (the
+  deposit error and the event change; [log order](https://github.com/BitChillRSK/bitchill-monitoring/issues/49#issuecomment-6318944749)), [front-end#42](https://github.com/BitChillRSK/front-end/issues/42#issuecomment-6316903528) (the deposit error), [swapper-bot#23](https://github.com/BitChillRSK/swapper-bot/issues/23#issuecomment-6316904324) (no change: its earlier purchase-error note was withdrawn).

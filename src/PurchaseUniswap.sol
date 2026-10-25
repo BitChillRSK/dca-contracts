@@ -223,11 +223,10 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Sends the router the stricter of the oracle and caller floors and credits only the measured
-     *      WRBTC delta. That delta must reach the oracle floor here; PurchaseRbtc checks it against the
-     *      caller's floor and proves the exact stablecoin input left this handler. This venue-specific
-     *      layer also requires every intermediate-token router balance to return to its pre-swap value.
-     *      Comparing deltas, not zero balances, prevents donated tokens from blocking it.
+     * @dev Uses the stricter of the oracle and caller floors, and credits only the measured WRBTC delta.
+     *      PurchaseRbtc proves the exact stablecoin input left this handler. This venue-specific layer also
+     *      requires every intermediate-token router balance to return to its pre-swap value. Comparing
+     *      deltas, not zero balances, prevents donated tokens from blocking it.
      */
     function _purchaseRbtc(uint256 stablecoinAmount, uint256 minRbtcOut) internal override returns (uint256 amountOut) {
         uint256 amountOutLowerBound = _getAmountOutLowerBound(stablecoinAmount);
@@ -257,7 +256,6 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         }
 
         amountOut = _balanceOf(address(i_wrbtc), address(this)) - wrbtcBalanceBefore;
-        if (amountOut < amountOutLowerBound) revert PurchaseUniswap__BelowOracleFloor(amountOut, amountOutLowerBound);
     }
 
     /**

@@ -81,8 +81,6 @@ interface IPurchaseUniswap {
     error PurchaseUniswap__IntermediateBalanceChangedInRouter(
         address token, uint256 balanceBefore, uint256 balanceAfter
     );
-    /// @notice The measured WRBTC delta is below the oracle floor the router was asked to enforce.
-    error PurchaseUniswap__BelowOracleFloor(uint256 wrbtcReceived, uint256 oracleFloor);
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS

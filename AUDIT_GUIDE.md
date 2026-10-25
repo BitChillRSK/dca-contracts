@@ -98,8 +98,7 @@ batch is also atomic across all handlers.
 
 DOC is redeemed through Money on Chain. USDRIF and USDT0 are swapped to WRBTC through an allowlisted
 Uniswap V3 path and then unwrapped only when the user withdraws. The Uniswap path checks both an
-oracle-derived floor and the swapper's input-scaled minimum, each against the measured WRBTC; the
-stricter bound wins. Across both venues,
+oracle-derived floor and the swapper's input-scaled minimum; the stricter bound wins. Across both venues,
 the handler supplies the whole retrieved (gross) stablecoin to the venue, and a successful purchase must
 consume exactly that amount. No stablecoin fee is withheld first: the purchase fee is a share of the
 measured rBTC/WRBTC output, credited to the fee collector afterward. Uniswap additionally requires every

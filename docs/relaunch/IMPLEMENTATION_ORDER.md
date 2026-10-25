@@ -179,7 +179,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R115 | after R114, before audit freeze / relaunch deploy | **decided 2026-10-08:** drop `DcaManager.withdrawAccumulatedRbtc`; one-element `withdrawAllAccumulatedRbtc` is the single-handler withdraw |
 | R116 | after R115, before audit freeze / relaunch deploy | none (publish the Pashov skills scan, X-Ray map and Fizz fuzzing suite; no `src/` change; triage is R117) |
 | R117 | after R116, before audit freeze / relaunch deploy | decided: keep deposits/creation open with execution-rate protection; omit Sovryn and the alternate USDRIF launch path; combine selected mitigations, tests, and decisions in #186 (replaces #184) |
-| R118 | after R117; separate owner-requested hardening review | none (L06 deposit credit before the handler call; L14 exact lending-deposit consumption; L17 no zero-value transfer; L25 measured oracle floor; tracked by [#185](https://github.com/BitChillRSK/dca-contracts/issues/185)) |
+| R118 | after R117; separate owner-requested hardening review | none (L06 deposit credit before the handler call; L14 exact lending-deposit consumption; L17 no zero-value transfer; L25 declined as a dependency assumption; tracked by [#185](https://github.com/BitChillRSK/dca-contracts/issues/185)) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1529,9 +1529,10 @@ Ask: none for these selected controls. The relevant product choices are decided.
 ### R118 - Review Pashov optional hardening ([spec](./R118-pashov-optional-hardening.md), [#187](https://github.com/BitChillRSK/dca-contracts/pull/187), [#185](https://github.com/BitChillRSK/dca-contracts/issues/185))
 
 After R117; the owner requested a separate stacked PR on 2026-10-21. The review confirms all four
-premises and finds none reachable at launch. It ships four small hardening changes: deposit credit
-stored before the handler call (L06), exact stablecoin consumption on lending deposits (L14), no
-zero-value principal transfer (L17), and measured WRBTC checked against the oracle floor (L25).
+premises and finds none reachable at launch. It ships three small hardening changes: deposit credit
+stored before the handler call (L06), exact stablecoin consumption on lending deposits (L14), and no
+zero-value principal transfer (L17). L25 is declined as a dependency assumption: the router, WRBTC and
+pools are immutable and the measured receipt is already checked against the caller minimum.
 Ask: none.
 
 ## Closed non-implementation decisions
