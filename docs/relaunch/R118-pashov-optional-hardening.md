@@ -209,13 +209,11 @@ drops one re-read of the schedule slot.
 |---|---|
 | `make check` | All eight unit lanes pass; all 24 dedicated invariant tests pass. |
 | `FOUNDRY_OUT=out-deploy FOUNDRY_CACHE_PATH=cache-deploy make check-deploy` (scratch copy) | Same lanes and counts as `make check`. |
-| `make fork-sovryn` | 512 passed, 0 failed, 42 skipped. |
-| `make fork-layerbank` | 512 passed, 0 failed, 42 skipped. |
-| `make fork-dex-path` | 16 passed, 0 failed, 1 skipped on each lane (at `2c008674`; the follow-up does not touch Dex paths). |
-| `SWAP_TYPE=dexSwaps STABLECOIN_TYPE=USDRIF make fork-layerbank` / `fork-none` (not gating, at `2c008674`) | 508 / 507 passed through the live router. The 5 / 2 failures fail identically on the parent at block 9,344,102: three router `Too little received` reverts, a 1-wei allocation assertion, and an assertion that the live fee-collector address holds no USDRIF. |
+| `make fork-sovryn` | 510 passed, 0 failed, 42 skipped. |
+| `make fork-layerbank` | 510 passed, 0 failed, 42 skipped. |
+| `make fork-dex-path` | 16 passed, 0 failed, 1 skipped on each lane. |
 
-`make check`, `make check-deploy`, `make fork-sovryn` and `make fork-layerbank` ran on `f008e1f2`, which
-includes the auditor follow-up.
+All five ran on the commit that removes the L25 check.
 
 ## Success criteria
 
