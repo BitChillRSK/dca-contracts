@@ -110,7 +110,7 @@ intermediate-token balance on the shared router to return to its pre-swap value.
 |---|---|---|
 | Governance owner (intended Safe) | Configure manager limits; register new route indexes; assign each token-route handler once; pause deposits per pair; manage swappers; configure each handler's fees and Dex safety settings | Replace an assigned handler, reclassify a route, migrate or rescue user funds, renounce ownership |
 | Swapper | Activate the five-block protected window; execute due batches; switch a Dex handler among paths governance already allowlisted | Add a path, change fees/oracle/floors, withdraw user funds, redirect a row's buyer or amount |
-| Schedule owner | Fund and manage their schedules; withdraw their stablecoin, interest, and accumulated rBTC | Address another user's schedule through a mutator |
+| Schedule owner | Fund and manage their schedules; withdraw their stablecoin, interest, and accumulated rBTC; take their whole lending position on a token and route as the venue's receipt token | Address another user's schedule through a mutator |
 | External protocols and listed tokens | Provide custody, redemption, exchange rates, prices, and swaps used by handlers | — |
 
 The swapper is trusted for liveness and batch selection. It may omit a due schedule, submit a zero
@@ -129,7 +129,7 @@ against the previous oracle.
 
 **Worst case for a leaked swapper key.** The key can reopen the protected window in the block the previous
 one ends, submit a zero caller minimum, and activate any allowlisted Dex path. While windows are
-chained, users cannot pause, edit, delete, or withdraw stablecoin or interest. Each Dex schedule that
+chained, users cannot pause, edit, delete, withdraw stablecoin or interest, or exit a lending position in kind. Each Dex schedule that
 comes due in that time can be filled down to the oracle floor (3% below the oracle at launch settings),
 once per period. MoC routes have no pool to move. Principal cannot leave to anyone but its owner, and
 `revokeSwapper` ends it. This is accepted without a mandatory gap between windows: a gap would give
@@ -188,6 +188,9 @@ invariants**, with the reason for each.
   A venue fee or realized loss can reduce cash after the debited claim was fully consumed.
 - Every successful lending deposit must reduce the handler's stablecoin balance by exactly the amount
   supplied to the market. A market that takes less or more reverts the deposit.
+- An in-kind exit zeroes the user's virtual shares and every schedule balance they hold on that token
+  and route, then transfers those shares to the user as the venue's receipt token. The handler's
+  receipt-share balance must fall by exactly the shares zeroed; no stablecoin moves.
 - Integrator return values and balance views are not treated as received cash. Stablecoin and native
   receipts are measured by balance deltas.
 - Every successful purchase must reduce the handler's stablecoin balance by exactly the gross amount
@@ -237,8 +240,8 @@ cron frequency alone does not prove that execution rule. The user funds each pur
 This is accepted, not enforced away: refusing a period that makes the schedule immediately due would
 also refuse ordinary mid-cycle shortening.
 
-The protected purchase window blocks only schedule edits/deletion and stablecoin/interest withdrawals
-through activation block `N + 4`; those actions resume at `N + 5`. Creation, deposits, interest top-up,
+The protected purchase window blocks only schedule edits/deletion, stablecoin/interest withdrawals, and
+in-kind lending exits through activation block `N + 4`; those actions resume at `N + 5`. Creation, deposits, interest top-up,
 rBTC withdrawal, reads, governance, and purchases remain open. Purchases do not require a live window.
 
 Other deliberate availability trade-offs:
@@ -264,6 +267,11 @@ Other deliberate availability trade-offs:
 - Listed stablecoins, Money on Chain, lending markets, the Uniswap router/pools, WRBTC, and the MoC
   BTC/USD oracle remain correct and available. External illiquidity or pauses can revert purchases or
   withdrawals.
+- A user can always take their lending position in kind, unless the venue blocks receipt-token
+  transfers. `exitLendingPositionInKind` redeems nothing: it hands over the receipt tokens, and the
+  user redeems them at the venue when it can pay, including through any withdrawal queue the venue
+  runs. A venue pause that also blocks transfers blocks this exit; on LayerBank a paused reserve does,
+  a frozen one does not. The exit is blocked during a protected window like every other withdrawal.
 - Dex pricing assumes the input stablecoin is worth one USD; there is no stablecoin/USD oracle.
   A downward depeg can stop swaps at the configured BTC/USD-derived floor. An upward depeg does not
   raise that floor. A fair pool can pay the premium, but the floor does not require it; a tight
@@ -285,9 +293,9 @@ Other deliberate availability trade-offs:
   and a liquidity index of at least one RAY. Upstream Aave v3 has since moved burns to round up. If the
   LayerBank Pool adopts that, a large share of LayerBank redemptions (purchases and withdrawals) revert
   on the exact share-consumption check until a re-derived handler is deployed on a new route; no claim
-  is orphaned and no funds move. `make fork-layerbank` and `make fork-sovryn` assert the live rounding
-  (`LayerBankLivePoolProbe`), so operations should rerun one of them whenever the Pool or aToken
-  implementation changes. See `src/layerbank/README.md`.
+  is orphaned and no funds move. In-kind exits size aToken transfers the same way. `make fork-layerbank`
+  asserts the live burn and transfer rounding at the chain tip (`LayerBankLivePoolProbe`), so operations
+  should rerun it whenever the Pool or aToken implementation changes. See `src/layerbank/README.md`.
   This upgrade assumption is separate from current half-up mint rounding: a fresh deposit can mint
   fewer shares than a nominal full-principal purchase requires. The per-row share clamp and adjusted
   allocation weights handle that current rounding gap without relaxing the burn check.

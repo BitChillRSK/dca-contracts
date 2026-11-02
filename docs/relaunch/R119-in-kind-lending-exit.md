@@ -1,6 +1,6 @@
 # R119 — Exit a lending position in kind
 
-Status: **not started** · Assigned: no · Optional/further-review: no
+Status: **implemented; open for review** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
@@ -61,7 +61,7 @@ Facts the implementer relies on, at pin `6b2ed77`:
 
 ## Scope
 
-- [ ] `IDcaManager` / `DcaManager`: `exitLendingPositionInKind(address token, uint256 routeIndex)`,
+- [x] `IDcaManager` / `DcaManager`: `exitLendingPositionInKind(address token, uint256 routeIndex)`,
       `whenUserMutationsAllowed nonReentrant` (invariants 6 and 10).
   - Revert unless the route is a lending route (`_checkTokenIsLent`) and has a handler.
   - Walk `s_scheduleIds[msg.sender][token]`. For each id on `routeIndex`, reach the schedule through
@@ -70,20 +70,60 @@ Facts the implementer relies on, at pin `6b2ed77`:
     R118 does for deposits and withdrawals).
   - Call `ILendingHandler(handler).exitInKind(msg.sender)`.
   - Revert if the caller has no shares in that handler, so an empty call is not a silent success.
-- [ ] `ILendingHandler` / `LendingHandler`: `exitInKind(address user) onlyDcaManager returns (uint256 shares)`.
+- [x] `ILendingHandler` / `LendingHandler`: `exitInKind(address user) onlyDcaManager returns (uint256 shares)`.
   - Read `s_shares[user]`, set it to 0 through `_setUserShares` (invariant 14), then transfer the
     receipt token through a new adapter hook `_protocolTransferShares(address to, uint256 shares)`.
   - Measure the handler's receipt-share balance around the hook and require it to fall by exactly
     `shares` (extend invariant 11 to in-kind exits). The handler's stablecoin balance must not change.
   - Emit one new event, `LendingHandler__PositionExitedInKind(address indexed user, address indexed receiptToken, uint256 shares)`.
-- [ ] `LayerBankHandler._protocolTransferShares`: transfer aTokens so that exactly `shares` scaled
+- [x] `LayerBankHandler._protocolTransferShares`: transfer aTokens so that exactly `shares` scaled
       units move. An aToken `transfer` takes underlying units and scales them with the live index, so
       reuse or mirror `_underlyingForExactScaledBurn` and let the measurement in the base be the
       judge. Confirm the rounding on a fork before choosing the formula.
-- [ ] `SovrynHandler._protocolTransferShares`: iToken `transfer`.
-- [ ] `AGENTS.md`: invariant 10 lists the new function; invariant 11 covers in-kind exits.
-- [ ] `AUDIT_GUIDE.md`: trust model gains "a user can always take their lending position in kind,
+- [x] `SovrynHandler._protocolTransferShares`: iToken `transfer`.
+- [x] `AGENTS.md`: invariant 10 lists the new function; invariant 11 covers in-kind exits.
+- [x] `AUDIT_GUIDE.md`: trust model gains "a user can always take their lending position in kind,
       unless the venue blocks receipt-token transfers", with the pause limit stated.
+
+### As implemented
+
+Where the code differs from the bullets above, or fills in what they left open:
+
+- The zero-share refusal lives in the handler, which holds the shares:
+  `LendingHandler__NoSharesToExit(user)`, raised before any transfer. The whole call reverts, schedule
+  writes included.
+- A schedule on the route that is already at zero balance is neither written nor logged.
+- `LendingHandler` supplies a default `_protocolTransferShares` (`safeTransfer` of the receipt token,
+  in share units) and a new abstract `_receiptToken()` for the event. Sovryn and Tropykus implement only
+  `_receiptToken()`; LayerBank also overrides the transfer, because an aToken transfer takes underlying.
+  Tropykus is in the diff only because the new abstract hook would not compile without it.
+- LayerBank sizes the transfer with the redeem formula; the private helper is renamed
+  `_underlyingForExactScaledAmount` since it now serves both.
+- "The handler's stablecoin balance must not change" is asserted by tests and by the stateful
+  `invariant_handlerStablecoinBalanceZero`, not checked at runtime: a receipt-token transfer moves no
+  stablecoin, so a runtime check would add two calls and an error for nothing the venue can do.
+- `invariant_virtualSharesNeverExceedReceiptShares` in `InvariantTest` is tightened to equality and
+  renamed `invariant_virtualSharesEqualReceiptShares`, which is what Required tests asks for.
+
+Fork results (chain tip, 2026-11-02, LayerBank Pool `POOL_REVISION()` 7):
+
+- Live aToken `transfer` moves the half-up `rayDiv` of the underlying amount, the same rounding as a
+  burn (`test_liveAToken_transferMovesHalfUpScaledShares`, 16 samples, several separating half-up from
+  round-up). The exit moved exactly the booked scaled shares, and the user then redeemed exactly
+  4,000 DOC at the Pool from their own address (`test_fork_layerBankExitThenRedeemAtPool`).
+- A paused reserve blocks the exit: `finalizeTransfer` reverts `29` (`RESERVE_PAUSED`). A frozen
+  reserve does not (`test_fork_layerBankPausedReserveBlocksExit`,
+  `test_fork_layerBankFrozenReserveAllowsExit`).
+
+Runtime sizes, default profile (`forge build --sizes`), EIP-170 24,576 B:
+
+| Contract | Before | After |
+|---|---:|---:|
+| `DcaManager` | 13,236 | 13,763 |
+| `LayerBankDocHandlerMoc` | 11,316 | 11,814 |
+| `LayerBankHandlerDex` | 16,717 | 17,204 |
+| `SovrynDocHandlerMoc` | — | 11,518 |
+| `SovrynHandlerDex` | — | 16,930 |
 
 ## Out of scope
 
