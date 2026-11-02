@@ -180,7 +180,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R116 | after R115, before audit freeze / relaunch deploy | none (publish the Pashov skills scan, X-Ray map and Fizz fuzzing suite; no `src/` change; triage is R117) |
 | R117 | after R116, before audit freeze / relaunch deploy | decided: keep deposits/creation open with execution-rate protection; omit Sovryn and the alternate USDRIF launch path; combine selected mitigations, tests, and decisions in #186 (replaces #184) |
 | R118 | after R117; separate owner-requested hardening review | none (L06 deposit credit before the handler call; L14 exact lending-deposit consumption; L17 no zero-value transfer; L25 declined as a dependency assumption; tracked by [#185](https://github.com/BitChillRSK/dca-contracts/issues/185)) |
-| R119 | after R118, before audit freeze / relaunch deploy | **open:** trigger (explicit vs automatic), granularity, schedules after exit, protected window, Sovryn adapter (see spec) |
+| R119 | after R118, before audit freeze / relaunch deploy | **decided 2026-11-02:** explicit user function; whole position per token and route; schedules kept at zero balance; blocked in the protected window; Sovryn adapter included |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1543,7 +1543,7 @@ withdrawal delay (SIP-0096) and protocol pause left V1 users unable to withdraw.
 whole position on one token and lending route as the venue's receipt token, so illiquidity or a
 delayed-withdrawal queue at the venue never needs a BitChill buffer. A venue pause that blocks
 receipt-token transfers stays a documented limit.
-Ask: the five open product decisions in the spec.
+Ask: none (decided 2026-11-02; see the spec).
 
 ## Closed non-implementation decisions
 

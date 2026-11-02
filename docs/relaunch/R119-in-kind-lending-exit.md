@@ -46,25 +46,20 @@ Facts the implementer relies on, at pin `6b2ed77`:
 
 ## Open product decisions
 
-Recommendations are in bold. Ask the owner to confirm each before Solidity.
+**none.** Decided by the owner on 2026-11-02:
 
-1. **Trigger.** **(a) An explicit user function, callable at any time.** (b) Automatic fallback: try
-   the cash redeem and pay in kind if the venue reverts. (b) needs a `try`/`catch` around venue calls
-   that would also catch unrelated reverts and out-of-gas, and it hands users a token they did not ask
-   for. The front-end can offer (a) when a simulated cash withdrawal fails.
-2. **Granularity.** **Whole position per token and lending route** (all of the caller's shares in that
-   handler, so interest is included). The alternative, a per-schedule amount in kind, needs share
-   rounding against a partial interest split and adds surface for an emergency path.
-3. **Schedules after the exit.** **Keep them, with `tokenBalance` set to 0**, as a full
-   `withdrawToken` does today. The user can top them up later or delete them. Alternative: delete them.
-4. **Protected window.** **Blocked during the window** (add the function to invariant 10's guarded
-   set), like every other withdrawal. A batch in flight cannot then lose rows mid-window.
-5. **Sovryn.** If `src/sovryn/` stays in the audit scope, the Sovryn adapter implements the hook too.
-   If the owner drops Sovryn from the scope, only LayerBank and the base implement it.
+1. **Trigger: an explicit user function, callable at any time.** No automatic fallback inside
+   `withdrawToken` / `withdrawInterest`: that would need a `try`/`catch` around venue calls that also
+   catches unrelated reverts and out-of-gas, and would hand users a token they did not ask for. When a
+   venue cannot pay, the front-end offers this exit instead of the cash withdrawal.
+2. **Granularity: the caller's whole position per token and lending route.** Shares are kept per user
+   in each handler, not per schedule, so the position (principal and interest) leaves together.
+3. **Schedules after the exit: kept, with `tokenBalance` set to 0**, as after a full `withdrawToken`.
+4. **Protected window: blocked**, like every other withdrawal (invariant 10's guarded set grows by one).
+5. **Sovryn: the Sovryn adapter implements the hook too**, whether or not `src/sovryn/` stays in the
+   audit scope. Code outside the audit scope is not deployed.
 
 ## Scope
-
-Written for the recommended answers. Adjust if the owner decides otherwise.
 
 - [ ] `IDcaManager` / `DcaManager`: `exitLendingPositionInKind(address token, uint256 routeIndex)`,
       `whenUserMutationsAllowed nonReentrant` (invariants 6 and 10).
@@ -85,7 +80,7 @@ Written for the recommended answers. Adjust if the owner decides otherwise.
       units move. An aToken `transfer` takes underlying units and scales them with the live index, so
       reuse or mirror `_underlyingForExactScaledBurn` and let the measurement in the base be the
       judge. Confirm the rounding on a fork before choosing the formula.
-- [ ] `SovrynHandler._protocolTransferShares` (only if decision 5 keeps Sovryn): iToken `transfer`.
+- [ ] `SovrynHandler._protocolTransferShares`: iToken `transfer`.
 - [ ] `AGENTS.md`: invariant 10 lists the new function; invariant 11 covers in-kind exits.
 - [ ] `AUDIT_GUIDE.md`: trust model gains "a user can always take their lending position in kind,
       unless the venue blocks receipt-token transfers", with the pause limit stated.
@@ -105,19 +100,20 @@ Written for the recommended answers. Adjust if the owner decides otherwise.
 - `src/DcaManager.sol`, `src/interfaces/IDcaManager.sol`
 - `src/LendingHandler.sol`, `src/interfaces/ILendingHandler.sol`
 - `src/layerbank/LayerBankHandler.sol`, `src/layerbank/ILayerBankAToken.sol` (only if the hook needs a view it lacks)
-- `src/sovryn/SovrynHandler.sol` (decision 5)
+- `src/sovryn/SovrynHandler.sol`
 - `test/mocks/` lending mocks: an illiquid mode (redeem reverts, transfers work) and a paused mode (both revert)
 - `test/unit/` lending and DcaManager suites; the stateful invariant handler in `test/ai-generated/fuzz/`
 - `AGENTS.md`, `AUDIT_GUIDE.md`
 
 ## Required tests
 
-- Unit, each lending protocol lane (`LENDING_PROTOCOL=layerbank`, and `sovryn` if decision 5 keeps it):
+- Unit, each lending protocol lane (`LENDING_PROTOCOL=layerbank` and `LENDING_PROTOCOL=sovryn`):
   - With the venue illiquid, `withdrawToken` reverts and `exitLendingPositionInKind` succeeds. The user
     receives receipt tokens worth their principal plus interest at the current index, their shares are
     0, every schedule on the route has `tokenBalance == 0`, and schedules on other routes are untouched.
   - Other users' shares, the handler's total receipt-share balance minus the exited shares, and the
     handler's stablecoin balance are unchanged.
+  - With the venue paused (mock blocks redeems and transfers), the exit reverts: the documented limit.
   - Reverts: idle route, unassigned pair, zero shares, during the protected window (`N` to `N + 4`;
     succeeds at `N + 5`), re-entry from a token callback.
   - A share-consumption mismatch in the hook reverts the whole call, schedule balances included.
@@ -129,12 +125,11 @@ Written for the recommended answers. Adjust if the owner decides otherwise.
 - Fork (`make fork-layerbank`): exit in kind on the live LayerBank pool, then redeem the received
   aTokens from the user's address through the LayerBank pool directly. Record the transfer rounding
   observed. Record whether LayerBank's paused and frozen reserve states block aToken transfers.
-- Full gates before push: `make check`, `make check-deploy`, `make fork-layerbank`, and
-  `make fork-sovryn` if decision 5 keeps Sovryn.
+- Full gates before push: `make check`, `make check-deploy`, `make fork-layerbank` and
+  `make fork-sovryn`.
 
 ## Success criteria
 
-- [ ] Decisions 1–5 answered and recorded in this spec.
 - [ ] A user on a lending route can leave with their whole position when the venue cannot pay cash,
       with no BitChill funds or operator action involved.
 - [ ] Invariants 6, 8, 10, 11 and 14 hold as amended.
