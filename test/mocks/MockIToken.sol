@@ -47,8 +47,8 @@ contract MockIToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
     bool private s_increaseBalanceOnBurn;
     /// @notice When set, iToken transfers revert (a protocol-wide pause; burns revert via `s_revertOnBurn`).
     bool private s_revertOnTransfer;
-    /// @notice When set, a transfer moves one iToken less than requested.
-    bool private s_shortTransfer;
+    /// @notice A transfer moves this many iTokens more (or fewer, if negative) than requested.
+    int256 private s_transferShareAdjustment;
     /// @notice When set, a transfer calls `target` with `data` first and bubbles its revert.
     address private s_transferCallbackTarget;
     bytes private s_transferCallbackData;
@@ -155,8 +155,8 @@ contract MockIToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
         s_revertOnTransfer = revertOnTransfer;
     }
 
-    function setShortTransfer(bool shortTransfer) external {
-        s_shortTransfer = shortTransfer;
+    function setTransferShareAdjustment(int256 adjustment) external {
+        s_transferShareAdjustment = adjustment;
     }
 
     function setTransferCallback(address target, bytes calldata data) external {
@@ -175,11 +175,11 @@ contract MockIToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
     }
 
     function _update(address from, address to, uint256 value) internal override {
-        // Mint and burn pass through; only holder-to-holder transfers are paused or shortened.
+        // Mint and burn pass through; only holder-to-holder transfers are paused or resized.
         if (from != address(0) && to != address(0)) {
             if (s_revertOnTransfer) revert("MockIToken: paused");
             _runTransferCallback();
-            if (s_shortTransfer) value -= 1;
+            value = uint256(int256(value) + s_transferShareAdjustment);
         }
         super._update(from, to, value);
     }

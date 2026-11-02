@@ -630,7 +630,7 @@ contract Handler is Test {
     }
 
     /**
-     * @notice Take a user's whole lending position out as receipt tokens and zero their route balances.
+     * @notice Take a user's lending position out as receipt tokens and zero their route balances.
      * @dev The only action that moves receipt shares out of the handler without redeeming them.
      */
     function exitLendingPositionInKind(uint256 userSeed) external {

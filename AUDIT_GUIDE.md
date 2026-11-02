@@ -111,7 +111,7 @@ intermediate-token balance on the shared router to return to its pre-swap value.
 |---|---|---|
 | Governance owner (intended Safe) | Configure manager limits; register new route indexes; assign each token-route handler once; pause deposits per pair; manage swappers; configure each handler's fees and Dex safety settings | Replace an assigned handler, reclassify a route, migrate or rescue user funds, renounce ownership |
 | Swapper | Activate the five-block protected window; execute due batches; switch a Dex handler among paths governance already allowlisted | Add a path, change fees/oracle/floors, withdraw user funds, redirect a row's buyer or amount |
-| Schedule owner | Fund and manage their schedules; withdraw their stablecoin, interest, and accumulated rBTC; take their whole lending position on a token and route as the venue's receipt token | Address another user's schedule through a mutator |
+| Schedule owner | Fund and manage their schedules; withdraw their stablecoin, interest, and accumulated rBTC; take their lending position on a token and route as the venue's receipt token | Address another user's schedule through a mutator |
 | External protocols and listed tokens | Provide custody, redemption, exchange rates, prices, and swaps used by handlers | — |
 
 The swapper is trusted for liveness and batch selection. It may omit a due schedule, submit a zero
@@ -189,9 +189,11 @@ invariants**, with the reason for each.
   A venue fee or realized loss can reduce cash after the debited claim was fully consumed.
 - Every successful lending deposit must reduce the handler's stablecoin balance by exactly the amount
   supplied to the market. A market that takes less or more reverts the deposit.
-- An in-kind exit zeroes the user's virtual shares and every schedule balance they hold on that token
-  and route, then transfers those shares to the user as the venue's receipt token. The handler's
-  receipt-share balance must fall by exactly the shares zeroed; no stablecoin moves.
+- An in-kind exit zeroes every schedule balance the user holds on that token and route and transfers
+  their virtual shares to them as the venue's receipt token. The user is debited exactly the fall in
+  the handler's receipt-share balance, which must be positive and at most their booked shares; a
+  remainder (at most one LayerBank scaled share) stays booked and a later exit moves it. No
+  stablecoin moves.
 - Integrator return values and balance views are not treated as received cash. Stablecoin and native
   receipts are measured by balance deltas.
 - Every successful purchase must reduce the handler's stablecoin balance by exactly the gross amount
@@ -271,9 +273,8 @@ Other deliberate availability trade-offs:
 - An in-kind exit avoids cash redemption. `exitLendingPositionInKind` hands over the receipt tokens,
   and the user redeems them at the venue when it can pay, including through any withdrawal queue the
   venue runs. It still depends on the venue: a pause that blocks transfers blocks it (on LayerBank a
-  paused reserve does, a frozen one does not), and the handler's receipt-share balance must fall by
-  exactly the shares booked. The handler checks that decrease, not the user's increase, so a venue
-  transfer fee falls on the exiting user. LayerBank's exit sizing assumptions are in
+  paused reserve does, a frozen one does not). The handler debits its own receipt-share decrease, not
+  the user's increase, so a venue transfer fee falls on the exiting user. LayerBank's exit sizing is in
   [`src/layerbank/README.md`](./src/layerbank/README.md). The exit is blocked during a protected
   window like every other withdrawal.
 - Dex pricing assumes the input stablecoin is worth one USD; there is no stablecoin/USD oracle.
@@ -292,7 +293,8 @@ Other deliberate availability trade-offs:
   and a liquidity index of at least one RAY. Upstream Aave v3 has since moved burns to round up. If the
   LayerBank Pool adopts that, a large share of LayerBank redemptions (purchases and withdrawals) revert
   on the exact share-consumption check until a re-derived handler is deployed on a new route; no claim
-  is orphaned and no funds move. In-kind exits size aToken transfers the same way. `make fork-layerbank`
+  is orphaned and no funds move. In-kind exits keep working: they transfer the floored amount, which
+  never moves more than the booked shares under either rule. `make fork-layerbank`
   asserts the live burn and transfer rounding at the chain tip (`LayerBankLivePoolProbe`), so operations
   should rerun it whenever the Pool or aToken implementation changes. See `src/layerbank/README.md`.
   This upgrade assumption is separate from current half-up mint rounding: a fresh deposit can mint
