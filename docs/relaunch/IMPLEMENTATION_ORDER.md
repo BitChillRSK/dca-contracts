@@ -181,6 +181,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R117 | after R116, before audit freeze / relaunch deploy | decided: keep deposits/creation open with execution-rate protection; omit Sovryn and the alternate USDRIF launch path; combine selected mitigations, tests, and decisions in #186 (replaces #184) |
 | R118 | after R117; separate owner-requested hardening review | none (L06 deposit credit before the handler call; L14 exact lending-deposit consumption; L17 no zero-value transfer; L25 declined as a dependency assumption; tracked by [#185](https://github.com/BitChillRSK/dca-contracts/issues/185)) |
 | R119 | after R118, before audit freeze / relaunch deploy | **decided 2026-11-02:** explicit user function; whole position per token and route; schedules kept at zero balance; blocked in the protected window; Sovryn adapter included |
+| R120 | after R119, before audit freeze / relaunch deploy | **decided 2026-11-02:** Sovryn becomes legacy like Tropykus: `src/sovryn-legacy/`, out of the deployment and audit scope, route 2 burned, legacy lanes out of the required gates |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1544,6 +1545,15 @@ whole position on one token and lending route as the venue's receipt token, so i
 delayed-withdrawal queue at the venue never needs a BitChill buffer. A venue pause that blocks
 receipt-token transfers stays a documented limit.
 Ask: none (decided 2026-11-02; see the spec).
+
+### R120 - Retire Sovryn to legacy ([spec](./R120-sovryn-legacy.md))
+
+After R119. Owner decision of 2026-11-02, after Sovryn's withdrawal queue and post-exploit pause:
+Sovryn is dropped from the deployment and the audit scope and becomes a test-only legacy adapter, as
+Tropykus did in R37. Its sources move to `src/sovryn-legacy/`, both live deploy branches reject it,
+`SOVRYN_INDEX` leaves `script/`'s compile scope, and route 2 stays unused. CI's invariant lane moves to
+LayerBank. Sovryn is reconsidered only if the venue recovers.
+Ask: none.
 
 ## Closed non-implementation decisions
 

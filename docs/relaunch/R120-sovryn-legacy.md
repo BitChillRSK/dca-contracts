@@ -59,8 +59,9 @@ the required gates, as Tropykus's did.
       change touches `src/sovryn-legacy/`.
 - [ ] `AUDIT_GUIDE.md`: `src/sovryn-legacy/` is out of scope, route 2 is unused, the exit-fee
       assumption leaves, and the release gates drop `make fork-sovryn`.
-- [ ] `AGENTS.md`, `README.md`, `ADDRESSES.md`, `script/Constants.sol`'s index-map comment, and the
-      R119 spec's Sovryn wording state the new facts.
+- [ ] `AGENTS.md`, `README.md`, `ADDRESSES.md`, `docs/relaunch/TASK_TEMPLATE.md` and
+      `script/Constants.sol`'s index-map comment state the new facts. Earlier specs keep the paths they
+      landed with; R119's decision 5 (the Sovryn adapter implements the exit hook) still holds.
 
 ## Out of scope
 
@@ -82,7 +83,7 @@ the required gates, as Tropykus's did.
   `test/ai-generated/fuzz/README_INVARIANTS.md`
 - Every test importing `src/sovryn/` (compiler lists them)
 - `Makefile`, `.github/workflows/test.yml`
-- `AGENTS.md`, `AUDIT_GUIDE.md`, `README.md`, `ADDRESSES.md`, `docs/relaunch/R119-in-kind-lending-exit.md`
+- `AGENTS.md`, `AUDIT_GUIDE.md`, `README.md`, `ADDRESSES.md`, `docs/relaunch/TASK_TEMPLATE.md`
 
 ## Required tests
 

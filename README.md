@@ -39,7 +39,6 @@ Custody branch
     IdleHandler             keeps the stablecoin on the handler
     LendingHandler          per-user virtual shares, interest, exact share redemption
       LayerBankHandler      protocol adapter
-      SovrynHandler         retained adapter; excluded from initial deployment
 
 Purchase branch
   PurchaseFees              fee curve and fee collector; makes every handler ownable
@@ -52,8 +51,7 @@ Deployed handlers: constructor only, each inheriting one custody contract and on
                     IdleHandlerDex      = IdleHandler + PurchaseUniswap
   src/layerbank/    LayerBankDocHandlerMoc = LayerBankHandler + PurchaseMoc
                     LayerBankHandlerDex    = LayerBankHandler + PurchaseUniswap
-  src/sovryn/       SovrynDocHandlerMoc = SovrynHandler + PurchaseMoc   (not in the production map)
-                    SovrynHandlerDex    = SovrynHandler + PurchaseUniswap   (not in the production map)
+  src/sovryn-legacy/     test-only; never deployed
   src/tropykus-legacy/   test-only; never deployed
 ```
 
@@ -93,7 +91,7 @@ if they are set there.
 | Variable | Values |
 |---|---|
 | `SWAP_TYPE` | `mocSwaps` (DOC through Money on Chain), `dexSwaps` (Uniswap V3) |
-| `LENDING_PROTOCOL` | `none` (idle), `layerbank`, `sovryn`, `tropykus` (legacy mocks) |
+| `LENDING_PROTOCOL` | `none` (idle), `layerbank`, `sovryn` / `tropykus` (legacy mocks) |
 | `STABLECOIN_TYPE` | `DOC`, `USDRIF`, `USDT0` |
 
 ```bash
@@ -103,13 +101,12 @@ make check-deploy   # the same lanes against the via-IR bytecode that ships; slo
 # single lanes
 make moc-none                               # DOC, idle
 make moc-layerbank                          # DOC, LayerBank
-make moc-sovryn                             # DOC, Sovryn
 STABLECOIN_TYPE=USDRIF make dex-none        # USDRIF, idle (also USDT0)
 STABLECOIN_TYPE=USDT0 make dex-layerbank    # USDT0, LayerBank (also USDRIF)
-make invariants-sovryn                      # stateful fuzzing: 64 runs × 512 calls
+make invariants-layerbank                   # stateful fuzzing: 64 runs × 512 calls
 
 # one test file in a chosen lane
-SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=DOC \
+SWAP_TYPE=mocSwaps LENDING_PROTOCOL=layerbank STABLECOIN_TYPE=DOC \
   forge test --match-path test/unit/DcaScheduleTest.t.sol -vvv
 ```
 
@@ -117,18 +114,19 @@ Fork tests run against live Rootstock state and need `RSK_MAINNET_RPC_URL` in `.
 CI.
 
 ```bash
-make fork-sovryn      # pinned to block 9325651 (2026-10-14)
 make fork-layerbank
 make fork-dex-path    # Dex path allowlist against live Uniswap pools
 ```
 
-`make fork-sovryn` runs at a pinned block because Sovryn no longer works at the chain tip. From
-2026-10-26 it queues voluntary lending withdrawals for 24 hours (SIP-0096), and on 2026-10-31, after an
-exploit of its swap converter registry, it paused every iToken call. Every deposit, withdrawal and
-purchase through a Sovryn handler reverts after that, so the lane would fail on the venue rather than
-on BitChill code. The other fork lanes run at the chain tip.
+Sovryn and Tropykus are legacy adapters: never deployed, out of the audit scope, and kept as a second
+lending adapter for the shared lending base. Their mock lanes (`make moc-sovryn`, `make moc-tropykus`,
+…) are not in `make check` or CI. Their fork lanes run at pinned blocks because neither venue works at
+the chain tip. `make fork-sovryn` pins block 9325651 (2026-10-14): from 2026-10-26 Sovryn queues
+voluntary lending withdrawals for 24 hours (SIP-0096), and on 2026-10-31, after an exploit of its swap
+converter registry, it paused every iToken call, so the lane would fail on the venue rather than on
+BitChill code. The launch fork lanes run at the chain tip.
 
-`make help` lists the remaining lanes, including the Tropykus mock lanes and the live probes under
+`make help` lists the remaining lanes, including the legacy lanes and the live probes under
 `test/mainnet-debug/`. [`test/ai-generated/fuzz/README_INVARIANTS.md`](./test/ai-generated/fuzz/README_INVARIANTS.md)
 describes what each invariant suite proves.
 

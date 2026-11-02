@@ -10,19 +10,19 @@ requests keep moving.
 `script/DeployFinal.s.sol`, run under `FOUNDRY_PROFILE=deploy`, is the only production deployment
 path. It creates one `OperationsAdmin`, one `DcaManager`, and six handlers:
 
-| Stablecoin | Route 0 (idle) | Route 1 (LayerBank) | Route 2 (Sovryn) | Purchase venue |
-|---|---|---|---|---|
-| DOC | `IdleDocHandlerMoc` | `LayerBankDocHandlerMoc` | — | Money on Chain |
-| USDRIF | `IdleHandlerDex` | `LayerBankHandlerDex` | — | Uniswap V3 |
-| USDT0 | `IdleHandlerDex` | `LayerBankHandlerDex` | — | Uniswap V3 |
+| Stablecoin | Route 0 (idle) | Route 1 (LayerBank) | Purchase venue |
+|---|---|---|---|
+| DOC | `IdleDocHandlerMoc` | `LayerBankDocHandlerMoc` | Money on Chain |
+| USDRIF | `IdleHandlerDex` | `LayerBankHandlerDex` | Uniswap V3 |
+| USDT0 | `IdleHandlerDex` | `LayerBankHandlerDex` | Uniswap V3 |
 
 In scope:
 
-- `src/`, except `src/tropykus-legacy/`: about 1,900 lines excluding comments and blank lines
-  (`cloc src --exclude-dir=tropykus-legacy`). The [README](./README.md#contracts) has the inheritance
-  map. Interfaces of external protocols (`IMocProxy`, `ICoinPairPrice`, `IWRBTC`,
-  `IUniswapV3SwapRouter`, `IiToken`, `ILayerBankPool`, `ILayerBankAToken`) are ABIs only.
-  Both Sovryn leaves are retained and tested for a possible future integration. `DeployFinal` deploys neither and leaves route 2 unregistered.
+- `src/`, except `src/sovryn-legacy/` and `src/tropykus-legacy/`: about 1,950 lines excluding comments
+  and blank lines (`cloc src --exclude-dir=sovryn-legacy,tropykus-legacy`). The
+  [README](./README.md#contracts) has the inheritance map. Interfaces of external protocols
+  (`IMocProxy`, `ICoinPairPrice`, `IWRBTC`, `IUniswapV3SwapRouter`, `ILayerBankPool`,
+  `ILayerBankAToken`) are ABIs only.
 - `script/DeployFinal.s.sol`, `script/DeployBase.s.sol`, and `script/Constants.sol`: constructor
   inputs, external addresses, the route map, and the launch parameters. `DeployFinal` imports
   `MocHelperConfig` and `UsdrifHelperConfig` for their struct types only and fills them with its own
@@ -33,10 +33,11 @@ In scope:
 
 Out of scope:
 
-- `src/tropykus-legacy/`. It is kept for local and pinned-fork coverage of a second lending adapter.
-  `DeployMocSwaps` and `DeployDexSwaps` construct it on local and fork runs only: their testnet and
-  mainnet branches revert on Tropykus, and `DeployFinal` never names it. Route index 4 is left unused
-  so it is never reinterpreted as another venue.
+- `src/sovryn-legacy/` and `src/tropykus-legacy/`. They are kept for local and pinned-fork coverage of
+  the shared lending base through a second adapter. `DeployMocSwaps` and `DeployDexSwaps` construct
+  them on local and fork runs only: their testnet and mainnet branches revert on Sovryn and Tropykus,
+  and `DeployFinal` names neither. Route indexes 2 (Sovryn) and 4 (Tropykus) are left unused so they
+  are never reinterpreted as another venue.
 - Every other deploy script. BitChill deploys production with `DeployFinal` only. That is a
   deployment decision, not something the other scripts enforce: `DeployMocSwaps` and `DeployDexSwaps`
   create their own `OperationsAdmin` and `DcaManager`, and both have testnet and mainnet branches
@@ -284,11 +285,6 @@ Other deliberate availability trade-offs:
   No alternate recipient, wrapped claim, or owner rescue exists.
 - Dex input tokens must have at most 18 decimals. Fee-on-transfer tokens and asynchronous or partial
   lending redemptions are unsupported.
-- The retained Sovryn adapter charges the market's 0.1% exit fee on iToken burns. A user on a future Sovryn route would therefore receive less
-  stablecoin than the principal debited on withdrawal, and each purchase spends the net amount
-  redeemed. This is the venue-fee case in the accounting properties above, not a loss of shares.
-  `make probe-sovryn-exit-fee` measures the live fee; see
-  `test/mainnet-debug/sovryn-exit-fee/README.md`.
 - LayerBank redemptions are sized for the Pool's current aToken burn rounding (Aave half-up `rayDiv`)
   and a liquidity index of at least one RAY. Upstream Aave v3 has since moved burns to round up. If the
   LayerBank Pool adopts that, a large share of LayerBank redemptions (purchases and withdrawals) revert
@@ -329,7 +325,6 @@ positive or accepted design, is in
 git submodule update --init --recursive
 make check
 make check-deploy
-make fork-sovryn
 make fork-layerbank
 make fork-dex-path
 make slither

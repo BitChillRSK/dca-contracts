@@ -32,7 +32,6 @@
 
 ```
 make check
-make fork-sovryn
 make fork-layerbank
 ```
 
