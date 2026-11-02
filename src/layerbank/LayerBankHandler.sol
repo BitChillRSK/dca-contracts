@@ -99,23 +99,12 @@ abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
     }
 
     /**
-     * @dev An aToken transfer takes an underlying amount and moves its rounded `rayDiv` at the live
-     *      index. The floor of `sharesAmount` moves exactly `sharesAmount` under a ceiling `rayDiv`
-     *      (upstream Aave's transfer rounding) and `sharesAmount` or one less under half-up (live
-     *      LayerBank's); a short floor is topped up with the shortfall, sized like a redeem. Unlike
-     *      `_protocolRedeem`, the exit thus survives a LayerBank upgrade to ceiling rounding, at the
-     *      cost of an extra read and sometimes a second transfer on a rare, user-paid call. The
-     *      shared base still requires the exact total.
+     * @dev An aToken transfer takes an underlying amount and moves its half-up `rayDiv` at the live
+     *      index, the same rounding as a withdraw burn, so it is sized the same way as `_protocolRedeem`.
      */
     function _protocolTransferShares(address to, uint256 sharesAmount) internal override {
-        uint256 index = _viewExchangeRate();
-        uint256 sharesBefore = i_aToken.scaledBalanceOf(address(this));
-        IERC20(address(i_aToken)).safeTransfer(to, _sharesToStablecoin(sharesAmount, index));
-        uint256 sharesAfter = i_aToken.scaledBalanceOf(address(this));
-        if (sharesAfter < sharesBefore && sharesBefore - sharesAfter < sharesAmount) {
-            uint256 shortfall = sharesAmount - (sharesBefore - sharesAfter);
-            IERC20(address(i_aToken)).safeTransfer(to, _underlyingForExactScaledAmount(shortfall, index));
-        }
+        uint256 amount = _underlyingForExactScaledAmount(sharesAmount, _viewExchangeRate());
+        IERC20(address(i_aToken)).safeTransfer(to, amount);
     }
 
     function _receiptToken() internal view override returns (address) {
@@ -127,8 +116,7 @@ abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
      *      Under the `index >= RAY` assumption on `_protocolRedeem`, floor never rayDivs above
      *      the target; when it undershoots, one more wei is enough. Callers only pass
      *      `sharesAmount >= 1` (a single redeem no-ops a zero debit, every batch row debits at
-     *      least one share, and an in-kind exit tops up only a positive shortfall), so the result is
-     *      never zero.
+     *      least one share, and an in-kind exit refuses zero shares), so the result is never zero.
      */
     function _underlyingForExactScaledAmount(uint256 sharesAmount, uint256 index)
         private
