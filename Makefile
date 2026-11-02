@@ -12,6 +12,8 @@ FORK_TEST_CMD := forge test --no-match-test invariant --no-match-contract Compar
 # mint on a fork: block 8739512 (2026-04-16 16:20 UTC) still mints, 8740674 (2026-04-17 00:13 UTC)
 # reverts with kToken error "C2". Do not raise this past 8739512.
 FORK_BLOCK_TROPYKUS ?= 8700000
+# 2026-10-14 23:59:54 UTC: before Sovryn's delayed withdrawals (SIP-0096, 2026-10-26) and protocol pause (2026-10-31).
+FORK_BLOCK_SOVRYN ?= 9325651
 # Rootstock mainnet 2026-08-31 10:39:35 UTC. Pins the R51 Dex quote-vs-floor table
 # (`make probe-dex-quote-floor`) so its rows reproduce. Bump only when re-observing.
 FORK_BLOCK_DEX_QUOTE ?= 9198813
@@ -164,14 +166,14 @@ fork-none:
 	SWAP_TYPE=$(SWAP_TYPE) LENDING_PROTOCOL=none EXPECTED_LENDING_PROTOCOL=none STABLECOIN_TYPE=$(STABLECOIN_TYPE) \
 	$(FORK_TEST_CMD) --fork-url $$RSK_MAINNET_RPC_URL
 fork-sovryn:
-	@echo "Executing Sovryn fork tests with SWAP_TYPE=$(SWAP_TYPE) $(STABLECOIN_TYPE)..."
+	@echo "Executing Sovryn fork tests with SWAP_TYPE=$(SWAP_TYPE) $(STABLECOIN_TYPE) at block $(FORK_BLOCK_SOVRYN)..."
 	@set -a; [ -f .env ] && . ./.env; set +a; \
 	if [ -z "$$RSK_MAINNET_RPC_URL" ]; then \
 		echo "error: RSK_MAINNET_RPC_URL is not set. Add it to .env or export it."; \
 		exit 1; \
 	fi; \
 	SWAP_TYPE=$(SWAP_TYPE) LENDING_PROTOCOL=sovryn EXPECTED_LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=$(STABLECOIN_TYPE) \
-	$(FORK_TEST_CMD) --fork-url $$RSK_MAINNET_RPC_URL
+	$(FORK_TEST_CMD) --fork-url $$RSK_MAINNET_RPC_URL --fork-block-number $(FORK_BLOCK_SOVRYN)
 fork-layerbank:
 	@echo "Executing LayerBank fork tests with SWAP_TYPE=$(SWAP_TYPE) $(STABLECOIN_TYPE)..."
 	@set -a; [ -f .env ] && . ./.env; set +a; \
@@ -303,7 +305,7 @@ help:
 	@echo "  make fork                      # Fork tests (reads RSK_MAINNET_RPC_URL from env/.env); tropykus pins block $(FORK_BLOCK_TROPYKUS)"
 	@echo "  make fork-none                 # Idle (none) fork tests (chain tip; use SWAP_TYPE=dexSwaps STABLECOIN_TYPE=USDRIF for idle+DEX)"
 	@echo "  make fork-tropykus             # Tropykus fork tests (pinned: kDOC mint paused 2026-04-27)"
-	@echo "  make fork-sovryn               # Sovryn fork tests (chain tip)"
+	@echo "  make fork-sovryn               # Sovryn fork tests (pins block $(FORK_BLOCK_SOVRYN))"
 	@echo "  make fork-layerbank            # LayerBank fork tests (chain tip; default mocSwaps)"
 	@echo "  make fork-dex-path             # R52 Dex path allowlist on LayerBank and idle USDRIF Uniswap forks"
 	@echo "  make probe-sovryn-exit-fee     # Live iSUSD burn: is SIP-0094's 0.1% fee charging?"
