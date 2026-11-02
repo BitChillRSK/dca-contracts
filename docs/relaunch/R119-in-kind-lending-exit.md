@@ -119,8 +119,9 @@ Fork results (chain tip, 2026-11-02, LayerBank Pool `POOL_REVISION()` 7):
 
 - Live aToken `transfer` moves the half-up `rayDiv` of the underlying amount, the same rounding as a
   burn (`test_liveAToken_transferMovesHalfUpScaledShares`, 16 samples, several separating half-up from
-  round-up). The exit moved exactly the booked scaled shares, and the user then redeemed exactly
-  4,000 DOC at the Pool from their own address (`test_fork_layerBankExitThenRedeemAtPool`).
+  round-up). The exit moved the half-up shares of the floored amount, with any remainder booked, and
+  the user then redeemed 4,000 DOC less one wei at the Pool from their own address
+  (`test_fork_layerBankExitThenRedeemAtPool`, 2026-11-03).
 - A paused reserve blocks the exit: `finalizeTransfer` reverts `29` (`RESERVE_PAUSED`). A frozen
   reserve does not (`test_fork_layerBankPausedReserveBlocksExit`,
   `test_fork_layerBankFrozenReserveAllowsExit`).
