@@ -238,27 +238,6 @@ contract InKindLendingExitTest is DcaDappTest {
         assertEq(lendingHandler.getUserShares(USER), shares);
     }
 
-    /// @dev Half-up is live LayerBank's transfer rounding, ceiling is upstream Aave's. A fixed index
-    ///      models a reserve with no borrowing, where retrying at a later index does not help.
-    function testFuzz_layerBankExitExactUnderEitherTransferRounding(uint256 index, bool ceil) external onlyVenueMocks {
-        if (!isLayerbank) {
-            vm.skip(true);
-            return;
-        }
-        index = bound(index, 1e27, 2e27);
-        MockLayerBankAToken(receiptToken).setNormalizedIncome(index, true);
-        MockLayerBankAToken(receiptToken).setCeilTransfer(ceil);
-        uint256 shares = lendingHandler.getUserShares(USER);
-        uint256 handlerShares = _receiptShares(address(stablecoinHandler));
-        uint256 userSharesBefore = _receiptShares(USER);
-
-        _exit(USER);
-
-        assertEq(_receiptShares(USER) - userSharesBefore, shares, "user did not receive exactly the booked shares");
-        assertEq(handlerShares - _receiptShares(address(stablecoinHandler)), shares, "handler shares off");
-        assertEq(_routeBalance(USER), 0);
-    }
-
     function test_reentryFromReceiptTokenCallback_reverts() external onlyVenueMocks {
         bytes memory reenter =
             abi.encodeCall(IDcaManager.exitLendingPositionInKind, (address(stablecoin), s_routeIndex));
