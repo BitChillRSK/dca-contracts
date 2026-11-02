@@ -16,7 +16,8 @@ interface ILendingHandler is ITokenHandler {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Canonical per-user virtual lending-share balance after a successful mint or burn.
+     * @notice Canonical per-user virtual lending-share balance after a successful share transition
+     *         (mint, burn, or in-kind exit).
      * @dev Only `user` is indexed. `newShares` is the balance immediately after this transition.
      *      When a buyer appears more than once in a batch, earlier events carry intermediate
      *      balances; only the last event for that user equals `getUserShares(user)` after the call.
@@ -101,10 +102,10 @@ interface ILendingHandler is ITokenHandler {
      * @notice Transfer `user`'s whole position to them as the venue's receipt token.
      * @param user The address whose booked shares are zeroed and who receives the receipt tokens.
      * @return shares The receipt shares that left this handler.
-     * @dev Called only by DcaManager. Redeems nothing, so it works while the venue cannot pay cash;
-     *      `user` then redeems at the venue directly. It cannot work while the venue blocks
-     *      receipt-token transfers. Reverts unless this handler's receipt-share balance falls by
-     *      exactly the shares debited.
+     * @dev Called only by DcaManager. Redeems nothing, so the venue's cash liquidity does not limit
+     *      it; `user` redeems the receipt tokens at the venue directly, on the venue's terms. Reverts
+     *      if the venue blocks receipt-token transfers, and unless this handler's receipt-share
+     *      balance falls by exactly the shares debited.
      */
     function exitInKind(address user) external returns (uint256 shares);
 

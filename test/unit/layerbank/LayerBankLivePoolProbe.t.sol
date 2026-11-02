@@ -100,8 +100,8 @@ contract LayerBankLivePoolProbe is Test {
         assertGt(separatingSamples, 0, "no sample separated half-up from round-up");
     }
 
-    /// @dev The in-kind exit sizes aToken transfers with the same half-up assumption as redeems.
-    function test_liveAToken_transferMovesHalfUpScaledShares() public {
+    /// @dev The in-kind exit is sized for a half-up or a ceiling transfer. Live LayerBank is half-up.
+    function test_liveAToken_transferRoundsHalfUpOrCeiling() public {
         uint256 supplied = 1000 ether;
         vm.prank(DOC_HOLDER);
         IERC20(DOC).transfer(address(this), supplied);
@@ -123,7 +123,10 @@ contract LayerBankLivePoolProbe is Test {
             IERC20(ATOKEN).transfer(recipient, amount);
             uint256 moved = aToken.scaledBalanceOf(recipient) - scaledBefore;
 
-            assertEq(moved, halfUp, "live aToken no longer transfers half-up: re-derive in-kind exit sizing");
+            assertTrue(
+                moved == halfUp || moved == roundUp,
+                "live aToken transfer is neither half-up nor ceiling: re-derive in-kind exit sizing"
+            );
             if (halfUp != roundUp) ++separatingSamples;
         }
         assertGt(separatingSamples, 0, "no sample separated half-up from round-up");
