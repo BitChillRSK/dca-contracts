@@ -12,7 +12,7 @@ import "test/Constants.sol";
 /**
  * @title LayerBankLivePoolProbe
  * @notice View + construct probe against the live Rootstock LayerBank Aave Pool / lRooDOC aToken.
- * @dev Lives under `test/unit/` so `make fork-sovryn` (chain tip) runs it. Skips when the aToken
+ * @dev Lives under `test/unit/` so `make fork-sovryn` (pinned block) runs it too. Skips when the aToken
  *      has no code (Anvil, or a Tropykus pin from before this market existed). Does not add
  *      `LENDING_PROTOCOL=layerbank`.
  */
@@ -95,6 +95,35 @@ contract LayerBankLivePoolProbe is Test {
             uint256 burned = scaledBefore - aToken.scaledBalanceOf(address(this));
 
             assertEq(burned, halfUp, "live Pool no longer burns half-up: re-derive LayerBankHandler redeem sizing");
+            if (halfUp != roundUp) ++separatingSamples;
+        }
+        assertGt(separatingSamples, 0, "no sample separated half-up from round-up");
+    }
+
+    /// @dev The in-kind exit sizes aToken transfers with the same half-up assumption as redeems.
+    function test_liveAToken_transferMovesHalfUpScaledShares() public {
+        uint256 supplied = 1000 ether;
+        vm.prank(DOC_HOLDER);
+        IERC20(DOC).transfer(address(this), supplied);
+        IERC20(DOC).approve(POOL, supplied);
+
+        ILayerBankPool pool = ILayerBankPool(POOL);
+        ILayerBankAToken aToken = ILayerBankAToken(ATOKEN);
+        pool.supply(DOC, supplied, address(this), 0);
+        uint256 index = pool.getReserveNormalizedIncome(DOC);
+        address recipient = makeAddr("recipient");
+
+        uint256 separatingSamples;
+        for (uint256 i; i < 16; ++i) {
+            uint256 amount = 1 ether + i * 7;
+            uint256 halfUp = (amount * 1e27 + index / 2) / index;
+            uint256 roundUp = (amount * 1e27 + index - 1) / index;
+
+            uint256 scaledBefore = aToken.scaledBalanceOf(recipient);
+            IERC20(ATOKEN).transfer(recipient, amount);
+            uint256 moved = aToken.scaledBalanceOf(recipient) - scaledBefore;
+
+            assertEq(moved, halfUp, "live aToken no longer transfers half-up: re-derive in-kind exit sizing");
             if (halfUp != roundUp) ++separatingSamples;
         }
         assertGt(separatingSamples, 0, "no sample separated half-up from round-up");

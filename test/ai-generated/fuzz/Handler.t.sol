@@ -83,6 +83,8 @@ contract Handler is Test {
     ///      never landed one would leave the reconciliation invariants untouched by this path.
     uint256 public topUpFromInterestCalls;
     uint256 public topUpFromInterestSuccesses;
+    /// @dev Wins for the in-kind exit: most attempts land on a user with no shares and revert.
+    uint256 public exitInKindSuccesses;
 
     /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR
@@ -625,6 +627,20 @@ contract Handler is Test {
             // Ignore failures
         }
         vm.stopPrank();
+    }
+
+    /**
+     * @notice Take a user's whole lending position out as receipt tokens and zero their route balances.
+     * @dev The only action that moves receipt shares out of the handler without redeeming them.
+     */
+    function exitLendingPositionInKind(uint256 userSeed) external {
+        address user = s_users[userSeed % s_users.length];
+        vm.prank(user);
+        try dcaManager.exitLendingPositionInKind(address(stablecoin), routeIndex) {
+            exitInKindSuccesses++;
+        } catch {
+            // No shares on the handler.
+        }
     }
 
     /*//////////////////////////////////////////////////////////////

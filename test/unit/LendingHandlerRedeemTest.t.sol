@@ -894,4 +894,13 @@ contract LendingHandlerHarness is LendingHandler {
             MockStablecoin(address(i_stablecoin)).mint(address(this), amount);
         }
     }
+
+    /// @dev Protocol shares leave by `burnBps`, so a short transfer can be modelled like a partial burn.
+    function _protocolTransferShares(address, uint256 sharesAmount) internal override {
+        protocolShares -= sharesAmount * burnBps / BPS_DENOMINATOR;
+    }
+
+    function _receiptToken() internal view override returns (address) {
+        return address(this);
+    }
 }
