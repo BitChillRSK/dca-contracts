@@ -5,15 +5,19 @@ import {LendingHandler} from "../LendingHandler.sol";
 import {ILayerBankAToken} from "./ILayerBankAToken.sol";
 import {ILayerBankHandler} from "./ILayerBankHandler.sol";
 import {ILayerBankPool} from "./ILayerBankPool.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title LayerBankHandler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice LayerBank adapter: Aave-v3 Pool supply/withdraw. Share accounting lives on LendingHandler.
- * @dev Supply and withdraw go through the Pool. Shares are aToken scaled amounts; rebasing
- *      `balanceOf` is never mixed into their accounting.
+ * @dev Supply and withdraw go through the Pool; an in-kind exit transfers aTokens. Shares are aToken
+ *      scaled amounts; rebasing `balanceOf` is never mixed into their accounting.
  */
 abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
+    using SafeERC20 for IERC20;
+
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
@@ -86,7 +90,7 @@ abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
      *      case burns one share too many and reverts in that same check.
      */
     function _protocolRedeem(uint256 sharesAmount, uint256 exchangeRate) internal override {
-        uint256 amountOut = _underlyingForExactScaledBurn(sharesAmount, exchangeRate);
+        uint256 amountOut = _underlyingForExactScaledAmount(sharesAmount, exchangeRate);
         i_pool.withdraw(address(i_stablecoin), amountOut, address(this));
     }
 
@@ -95,13 +99,30 @@ abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
     }
 
     /**
+     * @dev An aToken transfer takes an underlying amount and moves its half-up `rayDiv` at the live
+     *      index, the same rounding as a withdraw burn, so it is sized the same way as `_protocolRedeem`.
+     */
+    function _protocolTransferShares(address to, uint256 sharesAmount) internal override {
+        uint256 amount = _underlyingForExactScaledAmount(sharesAmount, _viewExchangeRate());
+        IERC20(address(i_aToken)).safeTransfer(to, amount);
+    }
+
+    function _receiptToken() internal view override returns (address) {
+        return address(i_aToken);
+    }
+
+    /**
      * @dev Underlying `a` such that Aave's `(a * RAY + index/2) / index` equals `sharesAmount`.
      *      Under the `index >= RAY` assumption on `_protocolRedeem`, floor never rayDivs above
      *      the target; when it undershoots, one more wei is enough. Callers only pass
-     *      `sharesAmount >= 1` (a single redeem no-ops a zero debit, and every batch row debits at
-     *      least one share), so the result is never zero.
+     *      `sharesAmount >= 1` (a single redeem no-ops a zero debit, every batch row debits at
+     *      least one share, and an in-kind exit refuses zero shares), so the result is never zero.
      */
-    function _underlyingForExactScaledBurn(uint256 sharesAmount, uint256 index) private view returns (uint256 amount) {
+    function _underlyingForExactScaledAmount(uint256 sharesAmount, uint256 index)
+        private
+        view
+        returns (uint256 amount)
+    {
         amount = _sharesToStablecoin(sharesAmount, index);
         if (_rayDiv(amount, index) < sharesAmount) {
             unchecked {

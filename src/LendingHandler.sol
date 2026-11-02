@@ -11,8 +11,8 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
  * @title LendingHandler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Shared per-user share accounting, share ↔ stablecoin conversion, withdraw clamp,
- *         interest, and exact-sum batch redeem for lending handlers. Protocol adapters implement
- *         the exchange-rate and mint/redeem hooks.
+ *         interest, exact-sum batch redeem, and in-kind exit for lending handlers. Protocol adapters
+ *         implement the exchange-rate, mint/redeem, and receipt-token hooks.
  */
 abstract contract LendingHandler is TokenHandler, ILendingHandler {
     using SafeERC20 for IERC20;
@@ -62,6 +62,20 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
             i_stablecoin.safeTransfer(user, stablecoinReceived);
         }
         emit LendingHandler__InterestWithdrawn(user, address(i_stablecoin), stablecoinReceived);
+    }
+
+    /// @inheritdoc ILendingHandler
+    function exitInKind(address user) external override onlyDcaManager returns (uint256 shares) {
+        shares = s_shares[user];
+        if (shares == 0) revert LendingHandler__NoSharesToExit(user);
+        _setUserShares(user, shares, 0);
+        uint256 sharesBefore = _receiptSharesBalance();
+        _protocolTransferShares(user, shares);
+        uint256 sharesAfter = _receiptSharesBalance();
+        if (sharesAfter >= sharesBefore || sharesBefore - sharesAfter != shares) {
+            revert LendingHandler__ShareConsumptionMismatch(shares, sharesBefore, sharesAfter);
+        }
+        emit LendingHandler__PositionExitedInKind(user, _receiptToken(), shares);
     }
 
     /// @inheritdoc ILendingHandler
@@ -241,6 +255,18 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
      *      declare `balanceOf` without that mutability.
      */
     function _receiptSharesBalance() internal virtual returns (uint256);
+
+    /**
+     * @dev Move `sharesAmount` receipt shares from this contract to `to`. The default suits a receipt
+     *      token whose transfer amount is in share units; override when it is not. The base measures
+     *      the receipt-share delta.
+     */
+    function _protocolTransferShares(address to, uint256 sharesAmount) internal virtual {
+        IERC20(_receiptToken()).safeTransfer(to, sharesAmount);
+    }
+
+    /// @dev The venue's receipt token for this handler's stablecoin.
+    function _receiptToken() internal view virtual returns (address);
 
     /**
      * @dev Convert stablecoin to shares. Rounds up so the virtual share debit is never below

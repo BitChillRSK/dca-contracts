@@ -41,6 +41,12 @@ interface ILendingHandler is ITokenHandler {
     event LendingHandler__WithdrawalAmountAdjusted(
         address indexed user, uint256 originalAmount, uint256 adjustedAmount
     );
+    /**
+     * @notice `user`'s whole position left this handler as the venue's receipt token.
+     * @dev `shares` is in receipt-share units (aToken scaled amount, or iToken/kToken balance): the
+     *      exact decrease of this handler's receipt-share balance, and of the user's booked shares.
+     */
+    event LendingHandler__PositionExitedInKind(address indexed user, address indexed receiptToken, uint256 shares);
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -75,6 +81,8 @@ interface ILendingHandler is ITokenHandler {
     error LendingHandler__DepositConsumptionMismatch(
         uint256 intendedDecrease, uint256 balanceBefore, uint256 balanceAfter
     );
+    /// @notice An in-kind exit was requested for a user who holds no shares on this handler.
+    error LendingHandler__NoSharesToExit(address user);
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
@@ -88,6 +96,17 @@ interface ILendingHandler is ITokenHandler {
      * @dev Called only by DcaManager. No-op when there is no interest.
      */
     function withdrawInterest(address user, uint256 stablecoinLockedInDcaSchedules) external;
+
+    /**
+     * @notice Transfer `user`'s whole position to them as the venue's receipt token.
+     * @param user The address whose booked shares are zeroed and who receives the receipt tokens.
+     * @return shares The receipt shares that left this handler.
+     * @dev Called only by DcaManager. Redeems nothing, so it works while the venue cannot pay cash;
+     *      `user` then redeems at the venue directly. It cannot work while the venue blocks
+     *      receipt-token transfers. Reverts unless this handler's receipt-share balance falls by
+     *      exactly the shares debited.
+     */
+    function exitInKind(address user) external returns (uint256 shares);
 
     /**
      * @notice Interest `user` has accrued above locked principal, without withdrawing it.

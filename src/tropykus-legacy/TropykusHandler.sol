@@ -77,4 +77,9 @@ abstract contract TropykusHandler is LendingHandler, ITropykusHandler {
     function _receiptSharesBalance() internal override returns (uint256) {
         return i_kToken.balanceOf(address(this));
     }
+
+    /// @dev kToken transfers move share units, so the base's default transfer applies.
+    function _receiptToken() internal view override returns (address) {
+        return address(i_kToken);
+    }
 }
