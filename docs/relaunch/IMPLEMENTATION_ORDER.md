@@ -1536,7 +1536,7 @@ zero-value principal transfer (L17). L25 is declined as a dependency assumption:
 pools are immutable and the measured receipt is already checked against the caller minimum.
 Ask: none.
 
-### R119 - Exit a lending position in kind ([spec](./R119-in-kind-lending-exit.md))
+### R119 - Exit a lending position in kind ([spec](./R119-in-kind-lending-exit.md), [#189](https://github.com/BitChillRSK/dca-contracts/pull/189))
 
 After R118, before audit freeze / relaunch deploy. Owner request of 2026-11-02, after Sovryn's
 withdrawal delay (SIP-0096) and protocol pause left V1 users unable to withdraw. A user takes their
