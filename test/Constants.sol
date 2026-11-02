@@ -6,10 +6,11 @@ pragma solidity 0.8.36;
 // Constants declared below are test-only: nothing under `script/` may see them.
 import "../script/Constants.sol";
 
-// Legacy Tropykus route index. Test-only on purpose: nothing under `script/` may name it, so no
-// deploy path can register or assign a Tropykus route by accident. Index 4 stays burned — never
-// reuse it for another venue. The shared harness registers every index on one `OperationsAdmin`,
-// which is why this is 4 rather than colliding with `LAYERBANK_INDEX`.
+// Legacy Sovryn and Tropykus route indexes. Test-only on purpose: nothing under `script/` may name
+// them, so no deploy path can register or assign a legacy route by accident. Indexes 2 and 4 stay
+// burned — never reuse them for another venue. The shared harness registers every index on one
+// `OperationsAdmin`, which is why Tropykus is 4 rather than colliding with `LAYERBANK_INDEX`.
+uint256 constant SOVRYN_INDEX = 2;
 uint256 constant TROPYKUS_INDEX = 4;
 
 // A route index no lane ever registers, so `getHandler` returns `address(0)` for every token

@@ -6,7 +6,7 @@ import {DeployBase} from "./DeployBase.s.sol";
 import {MocHelperConfig} from "./MocHelperConfig.s.sol";
 import {DcaManager} from "../src/DcaManager.sol";
 import {TropykusDocHandlerMoc} from "../src/tropykus-legacy/TropykusDocHandlerMoc.sol";
-import {SovrynDocHandlerMoc} from "../src/sovryn/SovrynDocHandlerMoc.sol";
+import {SovrynDocHandlerMoc} from "../src/sovryn-legacy/SovrynDocHandlerMoc.sol";
 import {IdleDocHandlerMoc} from "../src/idle/IdleDocHandlerMoc.sol";
 import {LayerBankDocHandlerMoc} from "../src/layerbank/LayerBankDocHandlerMoc.sol";
 import {OperationsAdmin} from "../src/OperationsAdmin.sol";
@@ -149,18 +149,20 @@ contract DeployMocSwaps is DeployBase {
 
             docHandlerMoc = deployDocHandlerMoc(params);
         }
-        // Live networks: production map is idle=0, LayerBank=1, Sovryn=2. Tropykus is not registered.
+        // Live networks: production map is idle=0, LayerBank=1. Sovryn and Tropykus are not registered.
         else if (environment == Environment.TESTNET || environment == Environment.MAINNET) {
+            if (protocol == Protocol.SOVRYN) {
+                revert("Sovryn is not on the production MoC map");
+            }
             if (protocol == Protocol.TROPYKUS) {
                 revert("Tropykus is not on the production MoC map");
             }
 
-            console.log("Deploying production handlers (idle / LayerBank / Sovryn)");
+            console.log("Deploying production handlers (idle / LayerBank)");
 
             // Owner is the Foundry broadcaster for this transaction so `registerRoute` /
             // `assignHandler` succeed. Mainnet proposes MAINNET_OWNER (the Safe) after setup.
             operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
-            operationsAdmin.registerRoute(SOVRYN_INDEX, true);
 
             address idleHandler = deployDocHandlerMoc(
                 DeployParams({
@@ -202,35 +204,6 @@ contract DeployMocSwaps is DeployBase {
                 if (protocol == Protocol.LAYERBANK) {
                     docHandlerMoc = layerbankHandler;
                 }
-            }
-
-            if (!isUSDRIF) {
-                address sovrynShareToken = networkConfig.iToken;
-                if (sovrynShareToken == address(0)) {
-                    if (protocol == Protocol.SOVRYN) {
-                        revert("Sovryn shares not available for this stablecoin");
-                    }
-                    console.log("Warning: Sovryn shares not available for this stablecoin");
-                } else {
-                    address sovrynHandler = deployDocHandlerMoc(
-                        DeployParams({
-                            protocol: Protocol.SOVRYN,
-                            dcaManager: address(dcaManager),
-                            stablecoin: docToken,
-                            shareToken: sovrynShareToken,
-                            mocProxy: mocProxy,
-                            feeCollector: feeCollector
-                        })
-                    );
-                    console.log("Sovryn handler deployed at:", sovrynHandler);
-                    operationsAdmin.assignHandler(docToken, SOVRYN_INDEX, sovrynHandler);
-                    _proposeFinalOwner(sovrynHandler);
-                    if (protocol == Protocol.SOVRYN) {
-                        docHandlerMoc = sovrynHandler;
-                    }
-                }
-            } else {
-                console.log("Skipping Sovryn handler deployment for USDRIF as it's not supported");
             }
         }
 

@@ -8,7 +8,7 @@ import {IWRBTC} from "src/interfaces/IWRBTC.sol";
 import {ICoinPairPrice} from "src/interfaces/ICoinPairPrice.sol";
 import {IUniswapV3SwapRouter} from "../../src/interfaces/IUniswapV3SwapRouter.sol";
 import {DexHelperConfig} from "script/DexHelperConfig.s.sol";
-import {SovrynHandlerDex} from "src/sovryn/SovrynHandlerDex.sol";
+import {SovrynHandlerDex} from "src/sovryn-legacy/SovrynHandlerDex.sol";
 import {MockIToken} from "test/mocks/MockIToken.sol";
 import {BitChillOwnable} from "src/BitChillOwnable.sol";
 import {ownableUnauthorized} from "../utils/OzRevert.sol";

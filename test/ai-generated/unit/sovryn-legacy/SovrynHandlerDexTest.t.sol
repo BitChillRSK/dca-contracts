@@ -8,7 +8,7 @@ import {IPurchaseUniswap} from "../../../../src/interfaces/IPurchaseUniswap.sol"
 import {IWRBTC} from "../../../../src/interfaces/IWRBTC.sol";
 import {IUniswapV3SwapRouter} from "../../../../src/interfaces/IUniswapV3SwapRouter.sol";
 import {ICoinPairPrice} from "../../../../src/interfaces/ICoinPairPrice.sol";
-import {SovrynHandlerDex} from "../../../../src/sovryn/SovrynHandlerDex.sol";
+import {SovrynHandlerDex} from "../../../../src/sovryn-legacy/SovrynHandlerDex.sol";
 import {MockIToken} from "../../../mocks/MockIToken.sol";
 import {MockWrbtcToken} from "../../../mocks/MockWrbtcToken.sol";
 import {MockMocOracle} from "../../../mocks/MockMocOracle.sol";

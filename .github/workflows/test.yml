@@ -45,19 +45,15 @@ jobs:
             stablecoin: DOC
           - target: moc-layerbank
             stablecoin: DOC
-          - target: moc-sovryn
-            stablecoin: DOC
           - target: dex-none
             stablecoin: USDRIF
           - target: dex-none
             stablecoin: USDT0
-          - target: dex-sovryn
-            stablecoin: USDRIF
           - target: dex-layerbank
             stablecoin: USDRIF
           - target: dex-layerbank
             stablecoin: USDT0
-          - target: invariants-sovryn
+          - target: invariants-layerbank
             stablecoin: DOC
     steps:
       - uses: actions/checkout@v4

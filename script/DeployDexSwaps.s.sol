@@ -6,7 +6,7 @@ import {DeployBase} from "./DeployBase.s.sol";
 import {DexHelperConfig} from "./DexHelperConfig.s.sol";
 import {DcaManager} from "../src/DcaManager.sol";
 import {TropykusHandlerDex} from "../src/tropykus-legacy/TropykusHandlerDex.sol";
-import {SovrynHandlerDex} from "../src/sovryn/SovrynHandlerDex.sol";
+import {SovrynHandlerDex} from "../src/sovryn-legacy/SovrynHandlerDex.sol";
 import {LayerBankHandlerDex} from "../src/layerbank/LayerBankHandlerDex.sol";
 import {IdleHandlerDex} from "../src/idle/IdleHandlerDex.sol";
 import {IPurchaseUniswap} from "../src/interfaces/IPurchaseUniswap.sol";
@@ -124,10 +124,13 @@ contract DeployDexSwaps is DeployBase {
         bool isUSDRIF,
         bool isUSDT0
     ) internal returns (address selectedHandler) {
-        // Live dex stables are USDRIF / USDT0. Production map: idle=0, LayerBank=1; Sovryn is
-        // registered as a lending class but has no handler for these stables. DexHelperConfig's
+        // Live dex stables are USDRIF / USDT0. Production map: idle=0, LayerBank=1. DexHelperConfig's
         // else arm is DOC config, so anything not exactly those two (unset STABLECOIN_TYPE, DOC,
-        // or a typo) must revert — DOC buys rBTC through MoC redemption. Tropykus is test-only.
+        // or a typo) must revert — DOC buys rBTC through MoC redemption. Sovryn and Tropykus are
+        // test-only.
+        if (protocol == Protocol.SOVRYN) {
+            revert("Sovryn is not on the production dex map");
+        }
         if (protocol == Protocol.TROPYKUS) {
             revert("Tropykus is not on the production dex map");
         }
@@ -139,7 +142,6 @@ contract DeployDexSwaps is DeployBase {
 
         // Owner is the Foundry broadcaster for this transaction so route registration succeeds.
         // Mainnet proposes MAINNET_OWNER (the Safe) after setup. Index 0 is already Idle.
-        operationsAdmin.registerRoute(SOVRYN_INDEX, true);
         operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
 
         address idleHandler = deployDocHandlerDex(

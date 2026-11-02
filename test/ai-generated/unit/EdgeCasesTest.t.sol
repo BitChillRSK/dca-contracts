@@ -10,7 +10,7 @@ import {MockMocOracle} from "test/mocks/MockMocOracle.sol";
 import {MockSwapRouter02} from "test/mocks/MockSwapRouter02.sol";
 import {MockWrbtcToken} from "test/mocks/MockWrbtcToken.sol";
 import {TropykusDocHandlerMoc} from "src/tropykus-legacy/TropykusDocHandlerMoc.sol";
-import {SovrynDocHandlerMoc} from "src/sovryn/SovrynDocHandlerMoc.sol";
+import {SovrynDocHandlerMoc} from "src/sovryn-legacy/SovrynDocHandlerMoc.sol";
 import {TropykusHandlerDex} from "src/tropykus-legacy/TropykusHandlerDex.sol";
 import {IPurchaseUniswap} from "src/interfaces/IPurchaseUniswap.sol";
 import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";

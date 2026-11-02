@@ -11,7 +11,7 @@ interface ITropykusComptroller {
 /**
  * @title KusdrifMintPauseProbe
  * @notice Decision 3 of R36: kUSDRIF mint is paused on the live tip (kToken error `C2`), same as kDOC.
- * @dev Runs on `make fork-sovryn` (chain tip). Skips on Anvil and on the Tropykus pin
+ * @dev Runs on `make fork-layerbank` (chain tip). Skips on Anvil and on the Tropykus pin
  *      (`FORK_BLOCK_TROPYKUS=8700000`), which is before the measured pause window.
  */
 contract KusdrifMintPauseProbe is Test {

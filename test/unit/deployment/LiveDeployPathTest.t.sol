@@ -131,7 +131,11 @@ contract LiveDeployPathTest is Test {
 
         assertEq(uint256(operationsAdmin.getRouteClass(IDLE_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle));
         assertEq(uint256(operationsAdmin.getRouteClass(LAYERBANK_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
-        assertEq(uint256(operationsAdmin.getRouteClass(SOVRYN_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
+        assertEq(
+            uint256(operationsAdmin.getRouteClass(SOVRYN_INDEX)),
+            uint256(IOperationsAdmin.RouteClass.Unregistered),
+            "live path must not register the legacy Sovryn route"
+        );
         assertNotEq(
             operationsAdmin.getHandler(_docTokenFromHandler(handler), IDLE_INDEX),
             address(0),
@@ -151,7 +155,11 @@ contract LiveDeployPathTest is Test {
         assertEq(Ownable(handler).owner(), address(this));
         assertEq(BitChillOwnable(handler).pendingOwner(), SAFE);
         assertEq(uint256(operationsAdmin.getRouteClass(LAYERBANK_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
-        assertEq(uint256(operationsAdmin.getRouteClass(SOVRYN_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
+        assertEq(
+            uint256(operationsAdmin.getRouteClass(SOVRYN_INDEX)),
+            uint256(IOperationsAdmin.RouteClass.Unregistered),
+            "live path must not register the legacy Sovryn route"
+        );
 
         vm.prank(SAFE);
         operationsAdmin.acceptOwnership();
@@ -179,7 +187,11 @@ contract LiveDeployPathTest is Test {
             uint256(IOperationsAdmin.RouteClass.Unregistered),
             "live dex path must not register the legacy Tropykus route"
         );
-        assertEq(uint256(operationsAdmin.getRouteClass(SOVRYN_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
+        assertEq(
+            uint256(operationsAdmin.getRouteClass(SOVRYN_INDEX)),
+            uint256(IOperationsAdmin.RouteClass.Unregistered),
+            "live path must not register the legacy Sovryn route"
+        );
         assertEq(uint256(operationsAdmin.getRouteClass(IDLE_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle));
 
         string memory coinType = vm.envOr("STABLECOIN_TYPE", DOC_STRING);
@@ -238,12 +250,47 @@ contract LiveDeployPathTest is Test {
             vm.skip(true);
             return;
         }
+        bytes32 protocolHash = keccak256(abi.encodePacked(vm.envString("LENDING_PROTOCOL")));
         if (
-            keccak256(abi.encodePacked(vm.envString("LENDING_PROTOCOL")))
-                == keccak256(abi.encodePacked(TROPYKUS_STRING))
+            protocolHash == keccak256(abi.encodePacked(SOVRYN_STRING))
+                || protocolHash == keccak256(abi.encodePacked(TROPYKUS_STRING))
+        ) {
+            vm.skip(true); // legacy venues are off both live maps; the live branches revert for them
+        }
+    }
+
+    /// @notice Sovryn is test-only on the MoC map and must fail loudly, not deploy quietly.
+    function test_mocLive_revertsForSovryn() public {
+        string memory coinType = vm.envOr("STABLECOIN_TYPE", DOC_STRING);
+        if (
+            keccak256(abi.encodePacked(vm.envString("LENDING_PROTOCOL"))) != keccak256(abi.encodePacked(SOVRYN_STRING))
+                || keccak256(abi.encodePacked(coinType)) != keccak256(abi.encodePacked(DOC_STRING))
         ) {
             vm.skip(true);
+            return;
         }
+        DeployMocSwapsHarness harness = new DeployMocSwapsHarness(DeployBase.Environment.MAINNET, SAFE, address(this));
+        vm.expectRevert(bytes("Sovryn is not on the production MoC map"));
+        harness.run();
+    }
+
+    /// @notice Sovryn is test-only on the Dex map. A dex stable is refused earlier, as unlisted on Sovryn.
+    function test_dexLive_revertsForSovryn() public {
+        if (keccak256(abi.encodePacked(vm.envString("LENDING_PROTOCOL"))) != keccak256(abi.encodePacked(SOVRYN_STRING)))
+        {
+            vm.skip(true);
+            return;
+        }
+        bytes32 coinHash = keccak256(abi.encodePacked(vm.envOr("STABLECOIN_TYPE", DOC_STRING)));
+        bool isDexStable = coinHash == keccak256(abi.encodePacked(USDRIF_STRING))
+            || coinHash == keccak256(abi.encodePacked(USDT0_STRING));
+        DeployDexSwapsHarness harness = new DeployDexSwapsHarness(DeployBase.Environment.MAINNET, SAFE, address(this));
+        vm.expectRevert(
+            isDexStable
+                ? bytes("Sovryn does not list this stablecoin")
+                : bytes("Sovryn is not on the production dex map")
+        );
+        harness.run();
     }
 
     /// @notice Tropykus is test-only on the Dex map and must fail loudly, not deploy quietly.
@@ -268,9 +315,12 @@ contract LiveDeployPathTest is Test {
             return;
         }
         bytes32 protocolHash = keccak256(abi.encodePacked(vm.envString("LENDING_PROTOCOL")));
-        // Tropykus live dex reverts first, for a different reason. Every other funding base —
-        // idle included, now that it has a Dex leaf — must reach the DOC guard.
-        if (protocolHash == keccak256(abi.encodePacked(TROPYKUS_STRING))) {
+        // Sovryn and Tropykus live dex runs revert first, for a different reason. Every other
+        // funding base — idle included, now that it has a Dex leaf — must reach the DOC guard.
+        if (
+            protocolHash == keccak256(abi.encodePacked(SOVRYN_STRING))
+                || protocolHash == keccak256(abi.encodePacked(TROPYKUS_STRING))
+        ) {
             vm.skip(true);
             return;
         }
@@ -290,12 +340,11 @@ contract LiveDeployPathTest is Test {
             vm.skip(true); // live dex path allowlists USDRIF / USDT0 only
             return;
         }
-        if (protocolHash == keccak256(abi.encodePacked(SOVRYN_STRING)) && (isUSDRIF || isUSDT0)) {
-            vm.skip(true);
-            return;
-        }
-        if (protocolHash == keccak256(abi.encodePacked(TROPYKUS_STRING))) {
-            vm.skip(true); // Tropykus is off both live maps; the live dex branch reverts for it
+        if (
+            protocolHash == keccak256(abi.encodePacked(SOVRYN_STRING))
+                || protocolHash == keccak256(abi.encodePacked(TROPYKUS_STRING))
+        ) {
+            vm.skip(true); // legacy venues are off both live maps; the live dex branch reverts for them
         }
     }
 

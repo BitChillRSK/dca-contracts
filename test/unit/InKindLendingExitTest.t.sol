@@ -7,7 +7,7 @@ import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ILendingHandler} from "../../src/interfaces/ILendingHandler.sol";
 import {ILayerBankAToken} from "../../src/layerbank/ILayerBankAToken.sol";
 import {ILayerBankPool} from "../../src/layerbank/ILayerBankPool.sol";
-import {IiToken} from "../../src/sovryn/IiToken.sol";
+import {IiToken} from "../../src/sovryn-legacy/IiToken.sol";
 import {DeployIdleHandler} from "../../script/DeployIdleHandler.s.sol";
 import {MockLayerBankAToken} from "../mocks/MockLayerBank.sol";
 import {MockIToken} from "../mocks/MockIToken.sol";

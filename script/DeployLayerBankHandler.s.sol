@@ -21,7 +21,7 @@ import "./Constants.sol";
  *      `getEnvironment()` returns FORK for a real RSK RPC unless that env var is set — FORK must
  *      not take the live path (test `feeCollector` / 2% cap would permanently occupy `(DOC, 1)`).
  *      Fork tests use `deployMocksAndHandler` (no broadcast). Occupied `(token, LAYERBANK_INDEX)`
- *      reverts `HandlerAlreadyAssigned` — do not skip. Map: idle=0 / LayerBank=1 / Sovryn=2.
+ *      reverts `HandlerAlreadyAssigned` — do not skip. Map: idle=0 / LayerBank=1.
  */
 contract DeployLayerBankHandler is DeployBase {
     struct DeployParams {

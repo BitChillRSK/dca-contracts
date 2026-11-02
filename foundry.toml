@@ -24,7 +24,7 @@ fail_on_revert = true
 [profile.ci]
 # Named so CI's FOUNDRY_PROFILE=ci is valid. Inherits default compiler settings.
 # Inherits [invariant] (64×512, fail_on_revert). Do not add a reduced
-# [profile.ci.invariant] — the invariants-sovryn CI job is that suite.
+# [profile.ci.invariant] — the invariants-layerbank CI job is that suite.
 via_ir = false
 
 [profile.ci.fuzz]
@@ -72,7 +72,7 @@ ignore = [
     "src/interfaces/IWRBTC.sol",
     "src/interfaces/ICoinPairPrice.sol",
     "src/tropykus-legacy/IkToken.sol",
-    "src/sovryn/IiToken.sol",
+    "src/sovryn-legacy/IiToken.sol",
     "src/layerbank/ILayerBankPool.sol",
     "src/layerbank/ILayerBankAToken.sol",
 ]

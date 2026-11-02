@@ -7,7 +7,8 @@ import {StdInvariant} from "forge-std/StdInvariant.sol";
 import {DcaManager} from "src/DcaManager.sol";
 import {OperationsAdmin} from "src/OperationsAdmin.sol";
 import {TropykusHandler} from "src/tropykus-legacy/TropykusHandler.sol";
-import {SovrynHandler} from "src/sovryn/SovrynHandler.sol";
+import {SovrynHandler} from "src/sovryn-legacy/SovrynHandler.sol";
+import {LayerBankHandler} from "src/layerbank/LayerBankHandler.sol";
 import {PurchaseRbtc} from "src/PurchaseRbtc.sol";
 import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
 import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
@@ -17,6 +18,7 @@ import {IDcaManager} from "src/interfaces/IDcaManager.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockKdocToken} from "test/mocks/MockKdocToken.sol";
 import {MockIToken} from "test/mocks/MockIToken.sol";
+import {MockLayerBankAToken, MockLayerBankPool} from "test/mocks/MockLayerBank.sol";
 import "test/Constants.sol";
 import {Handler} from "./Handler.t.sol";
 import {scheduleAt} from "test/utils/ScheduleAt.sol";
@@ -38,6 +40,7 @@ contract InvariantTest is StdInvariant, Test {
     MockStablecoin public stablecoin;
     MockKdocToken public kToken;
     MockIToken public iToken;
+    MockLayerBankAToken public aToken;
     Handler public fuzzHandler;
 
     /*//////////////////////////////////////////////////////////////
@@ -74,7 +77,9 @@ contract InvariantTest is StdInvariant, Test {
         }
 
         // Set route index from the lending-protocol env lane
-        if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(TROPYKUS_STRING))) {
+        if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(LAYERBANK_STRING))) {
+            s_routeIndex = LAYERBANK_INDEX;
+        } else if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(TROPYKUS_STRING))) {
             s_routeIndex = TROPYKUS_INDEX;
         } else if (keccak256(abi.encodePacked(lendingProtocol)) == keccak256(abi.encodePacked(SOVRYN_STRING))) {
             s_routeIndex = SOVRYN_INDEX;
@@ -97,12 +102,21 @@ contract InvariantTest is StdInvariant, Test {
         // Setup swappers and lending routes
         vm.startPrank(OWNER);
         operationsAdmin.addSwapper(SWAPPER);
+        operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
         operationsAdmin.registerRoute(TROPYKUS_INDEX, true);
         operationsAdmin.registerRoute(SOVRYN_INDEX, true);
         vm.stopPrank();
 
         // Deploy appropriate handler wrapper based on lending protocol
-        if (s_routeIndex == TROPYKUS_INDEX) {
+        if (s_routeIndex == LAYERBANK_INDEX) {
+            aToken = new MockLayerBankAToken(address(stablecoin));
+            aToken.setPool(address(new MockLayerBankPool(aToken)));
+            handler = IPurchaseRbtc(
+                address(new LayerBankHandlerWrapper(address(dcaManager), address(stablecoin), address(aToken)))
+            );
+            // Give the aToken sufficient balance for operations
+            stablecoin.mint(address(aToken), HANDLER_INITIAL_BALANCE);
+        } else if (s_routeIndex == TROPYKUS_INDEX) {
             kToken = new MockKdocToken(address(stablecoin));
             handler = IPurchaseRbtc(
                 address(new TropykusHandlerWrapper(address(dcaManager), address(stablecoin), address(kToken)))
@@ -259,7 +273,9 @@ contract InvariantTest is StdInvariant, Test {
         // Convert shares balances to stablecoin equivalent
         uint256 totalStablecoinInLendingProtocol = 0;
         if (totalLendingBalances > 0) {
-            if (s_routeIndex == TROPYKUS_INDEX) {
+            if (s_routeIndex == LAYERBANK_INDEX) {
+                totalStablecoinInLendingProtocol = totalLendingBalances * aToken.getNormalizedIncome() / 1e27;
+            } else if (s_routeIndex == TROPYKUS_INDEX) {
                 totalStablecoinInLendingProtocol = totalLendingBalances * kToken.exchangeRateCurrent() / 1e18;
             } else {
                 totalStablecoinInLendingProtocol = totalLendingBalances * iToken.tokenPrice() / 1e18;
@@ -345,7 +361,12 @@ contract InvariantTest is StdInvariant, Test {
      * @notice The lending protocol exchange rate should only increase over time (interest accrual)
      */
     function invariant_exchangeRateOnlyIncreases() public {
-        if (s_routeIndex == TROPYKUS_INDEX) {
+        if (s_routeIndex == LAYERBANK_INDEX) {
+            // The liquidity index starts at one RAY and only grows; nothing earlier is stored to compare.
+            uint256 income = aToken.getNormalizedIncome();
+            assertGe(income, 1e27);
+            console2.log("Current normalized income:", income);
+        } else if (s_routeIndex == TROPYKUS_INDEX) {
             uint256 previousRate = kToken.exchangeRateStored();
             uint256 currentRate = kToken.exchangeRateCurrent();
             assertGe(currentRate, previousRate);
@@ -444,8 +465,14 @@ contract InvariantTest is StdInvariant, Test {
             totalVirtualShares += ILendingHandler(address(handler)).getUserShares(s_users[i]);
         }
 
-        uint256 receiptShares =
-            s_routeIndex == TROPYKUS_INDEX ? kToken.balanceOf(address(handler)) : iToken.balanceOf(address(handler));
+        uint256 receiptShares;
+        if (s_routeIndex == LAYERBANK_INDEX) {
+            receiptShares = aToken.scaledBalanceOf(address(handler));
+        } else if (s_routeIndex == TROPYKUS_INDEX) {
+            receiptShares = kToken.balanceOf(address(handler));
+        } else {
+            receiptShares = iToken.balanceOf(address(handler));
+        }
 
         assertEq(totalVirtualShares, receiptShares, "virtual lending shares differ from receipt shares held");
     }
@@ -569,6 +596,113 @@ contract SovrynHandlerWrapper is SovrynHandler {
     mapping(address user => uint256 amount) internal s_usersAccumulatedRbtc;
 
     constructor(address dcaManager, address stablecoin, address iToken) SovrynHandler(dcaManager, stablecoin, iToken) {}
+
+    /**
+     * @notice Allow the contract to receive and hold rBTC
+     */
+    receive() external payable {}
+
+    /**
+     * @notice Mock implementation of batchBuyRbtc for testing
+     * @dev Must track `IPurchaseRbtc.batchBuyRbtc` exactly. DcaManager reaches these wrappers through an
+     *      interface cast, so a stale signature is not a compile error — it is a selector miss at runtime
+     *      that reverts every purchase while the invariants above still pass, vacuously. This harness
+     *      submits only zero-minimum batches. The real purchase tests cover quote protection.
+     *      `test_invariantHandlerBuysRbtcThroughDcaManager` guards against selector drift.
+     */
+    function batchBuyRbtc(
+        address[] calldata buyers,
+        uint64[] calldata scheduleIds,
+        uint256[] calldata purchaseAmounts,
+        uint256 minRbtcOut,
+        uint256 quotedStablecoinIn
+    ) external onlyDcaManager {
+        require(minRbtcOut == 0 && quotedStablecoinIn == 0, "Wrapper supports unquoted purchases only");
+        for (uint256 i = 0; i < buyers.length; i++) {
+            _buyRbtcInternal(buyers[i:i + 1], scheduleIds[i], purchaseAmounts[i:i + 1]);
+        }
+    }
+
+    /**
+     * @notice Get the accumulated rBTC balance for a specific user
+     */
+    function getAccumulatedRbtcBalance(address user) external view returns (uint256) {
+        return s_usersAccumulatedRbtc[user];
+    }
+
+    /**
+     * @notice Withdraw accumulated rBTC - transfers rBTC from handler to user
+     */
+    function withdrawAccumulatedRbtc(address user) external onlyDcaManager {
+        uint256 rbtcBalance = s_usersAccumulatedRbtc[user];
+        if (rbtcBalance == 0) return;
+
+        s_usersAccumulatedRbtc[user] = 0;
+
+        // Actually transfer rBTC (this properly decreases handler balance)
+        (bool success,) = payable(user).call{value: rbtcBalance}("");
+        require(success, "rBTC transfer failed");
+
+        emit PurchaseRbtc__rBtcWithdrawn(user, rbtcBalance);
+    }
+
+    /**
+     * @notice Internal function for rBTC purchase logic
+     */
+    function _buyRbtcInternal(address[] calldata buyerOne, uint64 scheduleId, uint256[] calldata amountOne)
+        internal
+        returns (uint256)
+    {
+        // Retrieve the stablecoin the purchase will spend (length-1 batch — the only purchase path)
+        uint256 retrieved = _batchRetrieveStablecoin(buyerOne, amountOne);
+        address buyer = buyerOne[0];
+        uint256 purchaseAmount = amountOne[0];
+
+        // ✅ SIMULATE: Consume the stablecoin retrieved (as it would be used for actual rBTC purchase)
+        // In real protocol, this stablecoin gets sent to DEX/MoC and consumed
+        // We simulate this by transferring it away (burn it)
+        uint256 handlerBalance = i_stablecoin.balanceOf(address(this));
+        if (handlerBalance > 0) {
+            i_stablecoin.transfer(address(0xdead), handlerBalance); // Burn the stablecoin
+        }
+
+        // Mock conversion: 1 stablecoin = 0.00003 rBTC
+        uint256 rbtcAmount = (retrieved * 3e16) / 1e18; // 0.03 rBTC per token
+
+        // Ensure handler has enough rBTC (should have been allocated in setUp)
+        require(address(this).balance >= rbtcAmount, "Handler insufficient rBTC balance");
+
+        // Add to user's rBTC balance
+        s_usersAccumulatedRbtc[buyer] += rbtcAmount;
+
+        emit PurchaseRbtc__RbtcBought(buyer, address(i_stablecoin), rbtcAmount, scheduleId, purchaseAmount);
+
+        return rbtcAmount;
+    }
+
+    // Events for testing
+    event PurchaseRbtc__RbtcBought(
+        address indexed user,
+        address indexed tokenSpent,
+        uint256 rBtcBought,
+        uint64 indexed scheduleId,
+        uint256 amountSpent
+    );
+    event PurchaseRbtc__rBtcWithdrawn(address indexed user, uint256 amount);
+}
+
+/**
+ * @title LayerBankHandlerWrapper
+ * @notice Concrete implementation of LayerBankHandler for testing
+ * @dev Runs the invariant suite on the adapter that ships
+ */
+contract LayerBankHandlerWrapper is LayerBankHandler {
+    // Track users' accumulated RBTC for testing
+    mapping(address user => uint256 amount) internal s_usersAccumulatedRbtc;
+
+    constructor(address dcaManager, address stablecoin, address aToken)
+        LayerBankHandler(dcaManager, stablecoin, aToken)
+    {}
 
     /**
      * @notice Allow the contract to receive and hold rBTC

@@ -24,7 +24,7 @@ PROBE_VERBOSITY ?= -vv
 PROBE_MATCH ?=
 
 # Targets
-.PHONY: all test moc dex help check ci check-deploy build build-deploy slither moc-none moc-layerbank moc-tropykus moc-sovryn dex-none dex-tropykus dex-sovryn dex-layerbank invariants invariants-sovryn fork fork-none fork-tropykus fork-sovryn fork-layerbank fork-dex-path probe-sovryn-exit-fee probe-moc-redeem-free-doc probe-dex-quote-floor probe-standing-approvals coverage license-check fmt-check
+.PHONY: all test moc dex help check ci check-deploy build build-deploy slither moc-none moc-layerbank moc-tropykus moc-sovryn dex-none dex-tropykus dex-sovryn dex-layerbank invariants invariants-layerbank invariants-sovryn fork fork-none fork-tropykus fork-sovryn fork-layerbank fork-dex-path probe-sovryn-exit-fee probe-moc-redeem-free-doc probe-dex-quote-floor probe-standing-approvals coverage license-check fmt-check
 
 all: help
 
@@ -59,30 +59,26 @@ fmt-check:
 	@echo "Checking forge fmt..."
 	@forge fmt --check
 
-# Local "am I done" gate. Mirrors required CI lanes and includes the local Tropykus mock lane.
+# Local "am I done" gate. Mirrors the required CI lanes; the legacy Sovryn and Tropykus lanes are not in it.
 # Run `make slither` explicitly when needed.
 check: build license-check fmt-check
 	$(MAKE) moc-none
 	$(MAKE) moc-layerbank
-	$(MAKE) moc-sovryn
 	STABLECOIN_TYPE=USDRIF $(MAKE) dex-none
 	STABLECOIN_TYPE=USDT0 $(MAKE) dex-none
-	STABLECOIN_TYPE=USDRIF $(MAKE) dex-sovryn
 	STABLECOIN_TYPE=USDRIF $(MAKE) dex-layerbank
 	STABLECOIN_TYPE=USDT0 $(MAKE) dex-layerbank
-	$(MAKE) invariants-sovryn
+	$(MAKE) invariants-layerbank
 
 ci: fmt-check
 	FOUNDRY_PROFILE=ci $(MAKE) build
 	FOUNDRY_PROFILE=ci $(MAKE) moc-none
 	FOUNDRY_PROFILE=ci $(MAKE) moc-layerbank
-	FOUNDRY_PROFILE=ci $(MAKE) moc-sovryn
 	FOUNDRY_PROFILE=ci STABLECOIN_TYPE=USDRIF $(MAKE) dex-none
 	FOUNDRY_PROFILE=ci STABLECOIN_TYPE=USDT0 $(MAKE) dex-none
-	FOUNDRY_PROFILE=ci STABLECOIN_TYPE=USDRIF $(MAKE) dex-sovryn
 	FOUNDRY_PROFILE=ci STABLECOIN_TYPE=USDRIF $(MAKE) dex-layerbank
 	FOUNDRY_PROFILE=ci STABLECOIN_TYPE=USDT0 $(MAKE) dex-layerbank
-	FOUNDRY_PROFILE=ci $(MAKE) invariants-sovryn
+	FOUNDRY_PROFILE=ci $(MAKE) invariants-layerbank
 
 # R60: what actually gets deployed. [profile.deploy] compiles src/, test/ and script/ under via_ir
 # (foundry.toml), so every lane here runs the full suite against the same optimized IR bytecode
@@ -92,13 +88,11 @@ ci: fmt-check
 check-deploy: build-deploy
 	FOUNDRY_PROFILE=deploy $(MAKE) moc-none
 	FOUNDRY_PROFILE=deploy $(MAKE) moc-layerbank
-	FOUNDRY_PROFILE=deploy $(MAKE) moc-sovryn
 	FOUNDRY_PROFILE=deploy STABLECOIN_TYPE=USDRIF $(MAKE) dex-none
 	FOUNDRY_PROFILE=deploy STABLECOIN_TYPE=USDT0 $(MAKE) dex-none
-	FOUNDRY_PROFILE=deploy STABLECOIN_TYPE=USDRIF $(MAKE) dex-sovryn
 	FOUNDRY_PROFILE=deploy STABLECOIN_TYPE=USDRIF $(MAKE) dex-layerbank
 	FOUNDRY_PROFILE=deploy STABLECOIN_TYPE=USDT0 $(MAKE) dex-layerbank
-	FOUNDRY_PROFILE=deploy $(MAKE) invariants-sovryn
+	FOUNDRY_PROFILE=deploy $(MAKE) invariants-layerbank
 
 build-deploy:
 	FOUNDRY_PROFILE=deploy forge --version
@@ -274,6 +268,8 @@ dex-layerbank:
 invariants:
 	@echo "Executing invariant tests with LENDING_PROTOCOL=$(LENDING_PROTOCOL)..."
 	SWAP_TYPE=mocSwaps LENDING_PROTOCOL=$(LENDING_PROTOCOL) EXPECTED_LENDING_PROTOCOL=$(LENDING_PROTOCOL) STABLECOIN_TYPE=$(STABLECOIN_TYPE) forge test --match-contract InvariantTest -j 1
+invariants-layerbank:
+	$(MAKE) invariants LENDING_PROTOCOL=layerbank EXPECTED_LENDING_PROTOCOL=layerbank
 invariants-sovryn:
 	$(MAKE) invariants LENDING_PROTOCOL=sovryn EXPECTED_LENDING_PROTOCOL=sovryn
 
@@ -284,29 +280,30 @@ coverage:
 # Help target
 help:
 	@echo "Available targets:"
-	@echo "  make check                     # Build + moc-* + dex-none/sovryn/layerbank + invariants-sovryn"
+	@echo "  make check                     # Build + moc-none/layerbank + dex-none/layerbank + invariants-layerbank"
 	@echo "  make ci                        # Build + required CI lanes (dex-none and dex-layerbank each on USDRIF and USDT0)"
 	@echo "  make check-deploy              # Same lanes as check, compiled via_ir=true (R60) — slow; run before deploying"
 	@echo "  make slither                   # Run slither (must be installed)"
-	@echo "  make test SWAP_TYPE=mocSwaps LENDING_PROTOCOL=sovryn STABLECOIN_TYPE=DOC"
+	@echo "  make test SWAP_TYPE=mocSwaps LENDING_PROTOCOL=layerbank STABLECOIN_TYPE=DOC"
 	@echo ""
 	@echo "  make moc                       # MocSwaps local tests (LENDING_PROTOCOL from env, default tropykus)"
 	@echo "  make moc-none                  # MocSwaps + idle handler (index 0)"
 	@echo "  make moc-layerbank             # MocSwaps + LayerBank (index 1)"
 	@echo "  make moc-tropykus              # MocSwaps + Tropykus (legacy mocks; not in the production map)"
-	@echo "  make moc-sovryn                # MocSwaps + Sovryn (index 2)"
+	@echo "  make moc-sovryn                # MocSwaps + Sovryn (legacy mocks; not in the production map)"
 	@echo "  make dex                       # DexSwaps local tests (LENDING_PROTOCOL from env, default tropykus)"
 	@echo "  make dex-none                  # DexSwaps + idle handler (index 0; USDRIF or USDT0)"
 	@echo "  make dex-tropykus              # DexSwaps + Tropykus"
-	@echo "  make dex-sovryn                # DexSwaps + Sovryn"
+	@echo "  make dex-sovryn                # DexSwaps + Sovryn (legacy)"
 	@echo "  make dex-layerbank             # DexSwaps + LayerBank (USDRIF or USDT0)"
 	@echo "  make invariants                # Stateful InvariantTest (LENDING_PROTOCOL from env, default tropykus)"
-	@echo "  make invariants-sovryn         # InvariantTest + Sovryn (CI lane)"
+	@echo "  make invariants-layerbank      # InvariantTest + LayerBank (CI lane)"
+	@echo "  make invariants-sovryn         # InvariantTest + Sovryn (legacy)"
 	@echo ""
 	@echo "  make fork                      # Fork tests (reads RSK_MAINNET_RPC_URL from env/.env); tropykus pins block $(FORK_BLOCK_TROPYKUS)"
 	@echo "  make fork-none                 # Idle (none) fork tests (chain tip; use SWAP_TYPE=dexSwaps STABLECOIN_TYPE=USDRIF for idle+DEX)"
 	@echo "  make fork-tropykus             # Tropykus fork tests (pinned: kDOC mint paused 2026-04-27)"
-	@echo "  make fork-sovryn               # Sovryn fork tests (pins block $(FORK_BLOCK_SOVRYN))"
+	@echo "  make fork-sovryn               # Sovryn fork tests (legacy; pins block $(FORK_BLOCK_SOVRYN))"
 	@echo "  make fork-layerbank            # LayerBank fork tests (chain tip; default mocSwaps)"
 	@echo "  make fork-dex-path             # R52 Dex path allowlist on LayerBank and idle USDRIF Uniswap forks"
 	@echo "  make probe-sovryn-exit-fee     # Live iSUSD burn: is SIP-0094's 0.1% fee charging?"
@@ -316,7 +313,7 @@ help:
 	@echo ""
 	@echo "Environment variables:"
 	@echo "  SWAP_TYPE: mocSwaps (default) or dexSwaps"
-	@echo "  LENDING_PROTOCOL: tropykus (default, legacy), none, layerbank, or sovryn"
+	@echo "  LENDING_PROTOCOL: tropykus (default, legacy), none, layerbank, or sovryn (legacy)"
 	@echo "  STABLECOIN_TYPE: DOC (default), USDRIF, or USDT0"
 	@echo ""
 	@echo "Example:"

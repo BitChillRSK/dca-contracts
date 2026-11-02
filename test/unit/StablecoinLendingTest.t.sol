@@ -7,7 +7,7 @@ import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
 import {TropykusDocHandlerMoc} from "../../src/tropykus-legacy/TropykusDocHandlerMoc.sol";
-import {SovrynDocHandlerMoc} from "../../src/sovryn/SovrynDocHandlerMoc.sol";
+import {SovrynDocHandlerMoc} from "../../src/sovryn-legacy/SovrynDocHandlerMoc.sol";
 import {IShareToken} from "../interfaces/IShareToken.sol";
 import {IkToken} from "../../src/tropykus-legacy/IkToken.sol";
 import {MocHelperConfig} from "../../script/MocHelperConfig.s.sol";

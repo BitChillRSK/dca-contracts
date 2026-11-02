@@ -2,8 +2,8 @@
 pragma solidity 0.8.36;
 
 import {Test} from "forge-std/Test.sol";
-import {SovrynDocHandlerMoc} from "src/sovryn/SovrynDocHandlerMoc.sol";
-import {SovrynHandlerDex} from "src/sovryn/SovrynHandlerDex.sol";
+import {SovrynDocHandlerMoc} from "src/sovryn-legacy/SovrynDocHandlerMoc.sol";
+import {SovrynHandlerDex} from "src/sovryn-legacy/SovrynHandlerDex.sol";
 import {IdleHandlerDex} from "src/idle/IdleHandlerDex.sol";
 import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
