@@ -346,14 +346,16 @@ interface IDcaManager {
     function withdrawAllAccumulatedInterest(address[] calldata tokens, uint256[] calldata routeIndexes) external;
 
     /**
-     * @notice Take the caller's whole position on one token and lending route as the venue's receipt
-     *         token, and set every schedule balance on that route to zero.
+     * @notice Take the caller's position on one token and lending route as the venue's receipt token,
+     *         and set every schedule balance on that route to zero.
      * @param token The stablecoin of the position.
      * @param routeIndex The lending route that holds it.
      * @dev For when the venue cannot pay cash: nothing is redeemed, so the caller redeems the receipt
      *      tokens at the venue directly. It moves principal and interest together and keeps the
-     *      schedules, which can be funded again. It cannot work while the venue blocks receipt-token
-     *      transfers. Reverts on an idle or unassigned route and when the caller holds no shares there.
+     *      schedules, which can be funded again. Transfer rounding can leave a remainder of shares (one
+     *      LayerBank scaled share) booked to the caller; calling again moves it. It cannot work while
+     *      the venue blocks receipt-token transfers. Reverts on an idle or unassigned route and when
+     *      the caller holds no shares there.
      */
     function exitLendingPositionInKind(address token, uint256 routeIndex) external;
 

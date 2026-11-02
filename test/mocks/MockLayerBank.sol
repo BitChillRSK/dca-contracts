@@ -32,7 +32,8 @@ contract MockLayerBankAToken is ERC20 {
     bool private s_overBurn;
     bool private s_increaseBalanceOnBurn;
     bool private s_revertOnTransfer;
-    bool private s_shortTransfer;
+    int256 private s_transferShareAdjustment;
+    bool private s_roundUpTransfer;
     /// @notice When set, a transfer calls `target` with `data` first and bubbles its revert.
     address private s_transferCallbackTarget;
     bytes private s_transferCallbackData;
@@ -113,9 +114,14 @@ contract MockLayerBankAToken is ERC20 {
         s_revertOnTransfer = revertOnTransfer;
     }
 
-    /// @notice Move one scaled unit less than Aave's `rayDiv` on transfer.
-    function setShortTransfer(bool shortTransfer) external {
-        s_shortTransfer = shortTransfer;
+    /// @notice Move `adjustment` scaled units more (or fewer, if negative) than the rounded `rayDiv` on transfer.
+    function setTransferShareAdjustment(int256 adjustment) external {
+        s_transferShareAdjustment = adjustment;
+    }
+
+    /// @notice Round transfers up, as upstream Aave does, instead of live LayerBank's half-up.
+    function setRoundUpTransfer(bool roundUp) external {
+        s_roundUpTransfer = roundUp;
     }
 
     function setTransferCallback(address target, bytes calldata data) external {
@@ -211,9 +217,9 @@ contract MockLayerBankAToken is ERC20 {
     function _transferUnderlying(address from, address to, uint256 amount) private {
         if (s_revertOnTransfer) revert("MockLayerBankAToken: reserve paused");
         _runTransferCallback();
-        uint256 scaled = _rayDiv(amount, getNormalizedIncome());
-        if (s_shortTransfer) scaled -= 1;
-        _transfer(from, to, scaled);
+        uint256 rayIndex = getNormalizedIncome();
+        uint256 scaled = s_roundUpTransfer ? (amount * RAY + rayIndex - 1) / rayIndex : _rayDiv(amount, rayIndex);
+        _transfer(from, to, uint256(int256(scaled) + s_transferShareAdjustment));
     }
 
     /// @dev Aave WadRayMath.rayDiv: round nearest. Used for mint, burn and transfer.

@@ -99,12 +99,13 @@ abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
     }
 
     /**
-     * @dev An aToken transfer takes an underlying amount and moves its half-up `rayDiv` at the live
-     *      index, the same rounding as a withdraw burn, so it is sized the same way as `_protocolRedeem`.
+     * @dev An aToken transfer takes an underlying amount and moves its rounded `rayDiv` at the live
+     *      index. With `index >= RAY`, the floored amount moves `sharesAmount` under upstream Aave's
+     *      round-up and `sharesAmount` or one less under live LayerBank's half-up, never more. The
+     *      shared base debits what moved; a one-share remainder stays booked to the user.
      */
     function _protocolTransferShares(address to, uint256 sharesAmount) internal override {
-        uint256 amount = _underlyingForExactScaledAmount(sharesAmount, _viewExchangeRate());
-        IERC20(address(i_aToken)).safeTransfer(to, amount);
+        IERC20(address(i_aToken)).safeTransfer(to, _sharesToStablecoin(sharesAmount, _viewExchangeRate()));
     }
 
     function _receiptToken() internal view override returns (address) {
@@ -115,8 +116,8 @@ abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
      * @dev Underlying `a` such that Aave's `(a * RAY + index/2) / index` equals `sharesAmount`.
      *      Under the `index >= RAY` assumption on `_protocolRedeem`, floor never rayDivs above
      *      the target; when it undershoots, one more wei is enough. Callers only pass
-     *      `sharesAmount >= 1` (a single redeem no-ops a zero debit, every batch row debits at
-     *      least one share, and an in-kind exit refuses zero shares), so the result is never zero.
+     *      `sharesAmount >= 1` (a single redeem no-ops a zero debit, and every batch row debits at
+     *      least one share), so the result is never zero.
      */
     function _underlyingForExactScaledAmount(uint256 sharesAmount, uint256 index)
         private

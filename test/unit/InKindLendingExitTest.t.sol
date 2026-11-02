@@ -30,8 +30,8 @@ interface ILayerBankGovernance {
 
 /**
  * @title InKindLendingExitTest
- * @notice R119: a user takes their whole lending position as the venue's receipt token.
- * @dev Venue failure modes (illiquid, paused, short transfer, re-entrant token) come from the LayerBank
+ * @notice R119: a user takes their lending position as the venue's receipt token.
+ * @dev Venue failure modes (illiquid, paused, resized transfer, re-entrant token) come from the LayerBank
  *      and Sovryn mocks, so those cases run on Anvil only. The rest also run on fork lanes, where the
  *      LayerBank cases redeem the received aTokens at the live Pool.
  */
@@ -78,10 +78,11 @@ contract InKindLendingExitTest is DcaDappTest {
                          EVERY LENDING LANE
     //////////////////////////////////////////////////////////////*/
 
-    function test_exitMovesWholePositionAndZeroesRouteBalances() external onlyLendingLane {
+    function test_exitMovesPositionAndZeroesRouteBalances() external onlyLendingLane {
         updateExchangeRate(100 days);
         uint256 principal = _routeBalance(USER);
         uint256 shares = lendingHandler.getUserShares(USER);
+        uint256 moved = _expectedMovedShares(shares);
         uint256 handlerShares = _receiptShares(address(stablecoinHandler));
         uint256 handlerStablecoin = stablecoin.balanceOf(address(stablecoinHandler));
         uint256 userSharesBefore = _receiptShares(USER);
@@ -93,16 +94,17 @@ contract InKindLendingExitTest is DcaDappTest {
             emit DcaManager__TokenBalanceUpdated(address(stablecoin), scheduleIds[i], 0);
         }
         vm.expectEmit(true, false, false, true, address(stablecoinHandler));
-        emit LendingHandler__UserSharesUpdated(USER, shares, 0);
+        emit LendingHandler__UserSharesUpdated(USER, shares, shares - moved);
         vm.expectEmit(true, true, false, true, address(stablecoinHandler));
-        emit LendingHandler__PositionExitedInKind(USER, receiptToken, shares);
+        emit LendingHandler__PositionExitedInKind(USER, receiptToken, moved);
         _exit(USER);
 
-        assertEq(lendingHandler.getUserShares(USER), 0, "booked shares not zeroed");
-        assertEq(_receiptShares(USER) - userSharesBefore, shares, "user did not receive exactly the booked shares");
-        assertEq(handlerShares - _receiptShares(address(stablecoinHandler)), shares, "handler shares off");
+        assertLe(shares - moved, isLayerbank ? 1 : 0, "remainder above one LayerBank scaled share");
+        assertEq(lendingHandler.getUserShares(USER), shares - moved, "remainder not booked");
+        assertEq(_receiptShares(USER) - userSharesBefore, moved, "user did not receive the shares debited");
+        assertEq(handlerShares - _receiptShares(address(stablecoinHandler)), moved, "handler shares off");
         assertEq(stablecoin.balanceOf(address(stablecoinHandler)), handlerStablecoin, "handler stablecoin moved");
-        assertGe(_receiptValue(USER) - userValueBefore + 1, principal, "receipt tokens worth less than principal");
+        assertGe(_receiptValue(USER) - userValueBefore + 2, principal, "receipt tokens worth less than principal");
         assertEq(_routeBalance(USER), 0, "a schedule on the route kept a balance");
     }
 
@@ -145,6 +147,7 @@ contract InKindLendingExitTest is DcaDappTest {
         _exit(OTHER_USER);
 
         _exit(USER);
+        if (lendingHandler.getUserShares(USER) > 0) _exit(USER);
         vm.expectRevert(abi.encodeWithSelector(ILendingHandler.LendingHandler__NoSharesToExit.selector, USER));
         _exit(USER);
     }
@@ -163,8 +166,10 @@ contract InKindLendingExitTest is DcaDappTest {
         }
 
         vm.roll(allowedFromBlock);
+        uint256 shares = lendingHandler.getUserShares(USER);
+        uint256 remainder = shares - _expectedMovedShares(shares);
         _exit(USER);
-        assertEq(lendingHandler.getUserShares(USER), 0);
+        assertEq(lendingHandler.getUserShares(USER), remainder);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -187,16 +192,17 @@ contract InKindLendingExitTest is DcaDappTest {
         uint256 otherShares = lendingHandler.getUserShares(OTHER_USER);
         uint256 handlerShares = _receiptShares(address(stablecoinHandler));
         uint256 handlerStablecoin = stablecoin.balanceOf(address(stablecoinHandler));
-        uint256 expectedValue = _receiptValueOfShares(shares);
+        uint256 moved = _expectedMovedShares(shares);
+        uint256 expectedValue = _receiptValueOfShares(moved);
 
         _exit(USER);
 
-        assertEq(_receiptShares(USER), shares);
-        assertEq(_receiptValue(USER), expectedValue, "receipt tokens not worth the position at the current rate");
+        assertEq(_receiptShares(USER), moved);
+        assertEq(_receiptValue(USER), expectedValue, "receipt tokens not worth the shares at the current rate");
         assertGt(expectedValue, principal, "position carries no interest");
-        assertEq(lendingHandler.getUserShares(USER), 0);
+        assertEq(lendingHandler.getUserShares(USER), shares - moved);
         assertEq(lendingHandler.getUserShares(OTHER_USER), otherShares, "another user's shares moved");
-        assertEq(_receiptShares(address(stablecoinHandler)), handlerShares - shares);
+        assertEq(_receiptShares(address(stablecoinHandler)), handlerShares - moved);
         assertEq(stablecoin.balanceOf(address(stablecoinHandler)), handlerStablecoin);
         assertEq(_routeBalance(USER), 0);
         if (idleScheduleId != 0) {
@@ -217,25 +223,76 @@ contract InKindLendingExitTest is DcaDappTest {
         assertEq(lendingHandler.getUserShares(USER), shares);
     }
 
-    function test_shortReceiptTransfer_revertsWholeExit() external onlyVenueMocks {
-        if (isLayerbank) MockLayerBankAToken(receiptToken).setShortTransfer(true);
-        else MockIToken(receiptToken).setShortTransfer(true);
-        uint256 principal = _routeBalance(USER);
+    /// @dev The user gets what moved and keeps the rest booked; a later exit moves the remainder.
+    function test_partialReceiptTransfer_debitsWhatMovedAndKeepsRemainder() external onlyVenueMocks {
+        uint256 shares = lendingHandler.getUserShares(USER);
+        uint256 moved = _expectedMovedShares(shares) - 1;
+        uint256 handlerShares = _receiptShares(address(stablecoinHandler));
+        _setTransferShareAdjustment(-1);
+
+        vm.expectEmit(true, false, false, true, address(stablecoinHandler));
+        emit LendingHandler__UserSharesUpdated(USER, shares, shares - moved);
+        vm.expectEmit(true, true, false, true, address(stablecoinHandler));
+        emit LendingHandler__PositionExitedInKind(USER, receiptToken, moved);
+        _exit(USER);
+
+        assertEq(_receiptShares(USER), moved);
+        assertEq(lendingHandler.getUserShares(USER), shares - moved);
+        assertEq(_receiptShares(address(stablecoinHandler)), handlerShares - moved);
+        assertEq(_routeBalance(USER), 0);
+
+        _setTransferShareAdjustment(0);
+        uint256 remainder = shares - moved;
+        uint256 recovered = _expectedMovedShares(remainder);
+        vm.expectEmit(true, true, false, true, address(stablecoinHandler));
+        emit LendingHandler__PositionExitedInKind(USER, receiptToken, recovered);
+        _exit(USER);
+
+        assertEq(lendingHandler.getUserShares(USER), remainder - recovered);
+        assertEq(_receiptShares(USER), moved + recovered);
+        assertEq(_receiptShares(address(stablecoinHandler)), handlerShares - moved - recovered);
+    }
+
+    function test_receiptTransferMovingNothing_revertsWholeExit() external onlyVenueMocks {
+        uint256 shares = lendingHandler.getUserShares(USER);
+        _setTransferShareAdjustment(-int256(_expectedMovedShares(shares)));
+        _assertExitRevertsWithMovedShares(0);
+    }
+
+    /// @dev Another user's shares back the excess, so only the share check stops it.
+    function test_receiptTransferMovingMoreThanBooked_revertsWholeExit() external onlyVenueMocks {
+        _depositAsOtherUser();
+        uint256 shares = lendingHandler.getUserShares(USER);
+        _setTransferShareAdjustment(int256(shares - _expectedMovedShares(shares)) + 1);
+        _assertExitRevertsWithMovedShares(shares + 1);
+    }
+
+    /// @dev Half-up is live LayerBank's transfer rounding, round-up is upstream Aave's. Either way one
+    ///      floored transfer moves the position or all but one scaled share, and a second exit moves that.
+    function testFuzz_layerBankExitUnderEitherTransferRounding(uint256 index, bool roundUp) external onlyVenueMocks {
+        if (!isLayerbank) {
+            vm.skip(true);
+            return;
+        }
+        index = bound(index, 1e27, 2e27);
+        MockLayerBankAToken(receiptToken).setNormalizedIncome(index, true);
+        MockLayerBankAToken(receiptToken).setRoundUpTransfer(roundUp);
         uint256 shares = lendingHandler.getUserShares(USER);
         uint256 handlerShares = _receiptShares(address(stablecoinHandler));
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ILendingHandler.LendingHandler__ShareConsumptionMismatch.selector,
-                shares,
-                handlerShares,
-                handlerShares - shares + 1
-            )
-        );
         _exit(USER);
 
-        assertEq(_routeBalance(USER), principal);
-        assertEq(lendingHandler.getUserShares(USER), shares);
+        uint256 moved = _receiptShares(USER);
+        assertEq(moved, roundUp ? shares : _expectedMovedShares(shares), "moved shares off");
+        assertGe(moved + 1, shares, "more than one scaled share left behind");
+        assertEq(lendingHandler.getUserShares(USER), shares - moved);
+        assertEq(handlerShares - _receiptShares(address(stablecoinHandler)), moved);
+        assertEq(_routeBalance(USER), 0);
+
+        if (moved < shares) _exit(USER);
+        assertEq(lendingHandler.getUserShares(USER), 0, "remainder not recovered");
+        assertEq(_receiptShares(USER), shares);
+        assertEq(handlerShares - _receiptShares(address(stablecoinHandler)), shares);
     }
 
     function test_reentryFromReceiptTokenCallback_reverts() external onlyVenueMocks {
@@ -249,7 +306,8 @@ contract InKindLendingExitTest is DcaDappTest {
     }
 
     /// @dev Purchases are not reentrancy-guarded. A purchase for another user nested in the receipt
-    ///      transfer burns that user's shares inside the measured interval, so the exit reverts.
+    ///      transfer burns that user's shares inside the measured interval, so the handler's balance
+    ///      falls by more than the exiting user's booked shares and the exit reverts.
     function test_purchaseFromReceiptTokenCallback_revertsWholeExit() external onlyVenueMocks {
         stablecoin.mint(OTHER_USER, AMOUNT_TO_DEPOSIT);
         vm.startPrank(OTHER_USER);
@@ -286,23 +344,26 @@ contract InKindLendingExitTest is DcaDappTest {
                          LAYERBANK FORK
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev The received aTokens redeem at the live Pool from the user's own address, for the full position.
+    /// @dev The received aTokens redeem at the live Pool from the user's own address, for the position
+    ///      less at most one scaled share, which stays booked.
     function test_fork_layerBankExitThenRedeemAtPool() external onlyLayerBankFork {
         ILayerBankPool pool = ILayerBankPool(ILayerBankAToken(receiptToken).POOL());
         uint256 principal = _routeBalance(USER);
         uint256 shares = lendingHandler.getUserShares(USER);
+        uint256 moved = _expectedMovedShares(shares);
         uint256 scaledBefore = _receiptShares(USER);
 
         _exit(USER);
-        assertEq(_receiptShares(USER) - scaledBefore, shares, "aToken transfer did not move exactly the shares");
+        assertEq(_receiptShares(USER) - scaledBefore, moved, "aToken transfer did not move the half-up shares");
+        assertEq(lendingHandler.getUserShares(USER), shares - moved);
 
-        uint256 amount = shares * pool.getReserveNormalizedIncome(address(stablecoin)) / 1e27;
+        uint256 amount = moved * pool.getReserveNormalizedIncome(address(stablecoin)) / 1e27;
         uint256 stablecoinBefore = stablecoin.balanceOf(USER);
         vm.prank(USER);
         pool.withdraw(address(stablecoin), amount, USER);
         assertEq(stablecoin.balanceOf(USER) - stablecoinBefore, amount);
         assertApproxEqAbs(amount, principal, 2, "redeemed position differs from principal");
-        console2.log("LayerBank in-kind exit: scaled shares moved", shares, "underlying redeemed", amount);
+        console2.log("LayerBank in-kind exit: scaled shares moved", moved, "underlying redeemed", amount);
     }
 
     function test_fork_layerBankPausedReserveBlocksExit() external onlyLayerBankFork {
@@ -314,10 +375,10 @@ contract InKindLendingExitTest is DcaDappTest {
 
     function test_fork_layerBankFrozenReserveAllowsExit() external onlyLayerBankFork {
         _layerBankGovernance().setReserveFreeze(address(stablecoin), true);
-        uint256 shares = lendingHandler.getUserShares(USER);
+        uint256 moved = _expectedMovedShares(lendingHandler.getUserShares(USER));
         uint256 scaledBefore = _receiptShares(USER);
         _exit(USER);
-        assertEq(_receiptShares(USER) - scaledBefore, shares);
+        assertEq(_receiptShares(USER) - scaledBefore, moved);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -327,6 +388,35 @@ contract InKindLendingExitTest is DcaDappTest {
     function _exit(address user) private {
         vm.prank(user);
         dcaManager.exitLendingPositionInKind(address(stablecoin), s_routeIndex);
+    }
+
+    /// @dev Expects the exit to revert because the handler's receipt-share balance fell by `moved`.
+    function _assertExitRevertsWithMovedShares(uint256 moved) private {
+        uint256 principal = _routeBalance(USER);
+        uint256 shares = lendingHandler.getUserShares(USER);
+        uint256 handlerShares = _receiptShares(address(stablecoinHandler));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ILendingHandler.LendingHandler__ShareConsumptionMismatch.selector,
+                shares,
+                handlerShares,
+                handlerShares - moved
+            )
+        );
+        _exit(USER);
+
+        assertEq(_routeBalance(USER), principal);
+        assertEq(lendingHandler.getUserShares(USER), shares);
+        assertEq(_receiptShares(USER), 0);
+    }
+
+    /// @dev Shares an exit of `shares` moves: LayerBank's half-up `rayDiv` of the floored underlying
+    ///      (live and mocked), the booked amount on venues that transfer share units.
+    function _expectedMovedShares(uint256 shares) private view returns (uint256) {
+        if (!isLayerbank) return shares;
+        uint256 index =
+            ILayerBankPool(ILayerBankAToken(receiptToken).POOL()).getReserveNormalizedIncome(address(stablecoin));
+        return (shares * index / 1e27 * 1e27 + index / 2) / index;
     }
 
     function _routeBalance(address user) private view returns (uint256 total) {
@@ -357,6 +447,11 @@ contract InKindLendingExitTest is DcaDappTest {
     function _setRedeemsRevert(bool enabled) private {
         if (isLayerbank) MockLayerBankAToken(receiptToken).setRevertOnBurn(enabled);
         else MockIToken(receiptToken).setRevertOnBurn(enabled);
+    }
+
+    function _setTransferShareAdjustment(int256 adjustment) private {
+        if (isLayerbank) MockLayerBankAToken(receiptToken).setTransferShareAdjustment(adjustment);
+        else MockIToken(receiptToken).setTransferShareAdjustment(adjustment);
     }
 
     function _setTransfersRevert(bool enabled) private {

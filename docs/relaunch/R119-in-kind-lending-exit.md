@@ -5,7 +5,7 @@ Status: **implemented; open for review** · Assigned: yes · Optional/further-re
 ## Objective
 
 A user can leave a lending route even when the venue cannot pay cash. A new user function moves the
-caller's whole position on one token and lending route out of BitChill as the venue's own receipt
+caller's position on one token and lending route out of BitChill as the venue's own receipt
 token (LayerBank aTokens, Sovryn iTokens), and zeroes the caller's schedule balances on that route.
 The user then redeems at the venue directly, whenever the venue allows. BitChill holds nothing for
 them, so no buffer or operator action is needed.
@@ -97,11 +97,16 @@ Where the code differs from the bullets above, or fills in what they left open:
   in share units) and a new abstract `_receiptToken()` for the event. Sovryn and Tropykus implement only
   `_receiptToken()`; LayerBank also overrides the transfer, because an aToken transfer takes underlying.
   Tropykus is in the diff only because the new abstract hook would not compile without it.
-- LayerBank sizes the transfer with the redeem formula; the private helper is renamed
-  `_underlyingForExactScaledAmount` since it now serves both. Not taken: a rounding-agnostic
-  transfer (floor, then top up a one-share shortfall), or a floor transfer that abandons up to one
-  scaled share. Under a round-up upgrade the exit needs at most a retry at a later index, and the
-  illiquid reserve it exists for has borrowers paying interest, so its index moves every block.
+- The exit debits the user the measured fall in the handler's receipt-share balance instead of
+  requiring all booked shares to leave, and writes the booked shares once, after the transfer. It
+  reverts if the balance does not fall or falls by more than the booked shares. A remainder stays
+  booked to the user; the schedules are still zeroed, and calling again moves it. Deposits,
+  redemptions and purchases keep the exact check.
+- LayerBank transfers the floor of the booked shares' underlying. Under live half-up rounding that
+  moves the booked shares or one fewer; under upstream Aave's round-up, exactly them. Not taken:
+  sizing with the redeem formula (its `+ 1` case moves one share too many under round-up), a second
+  transfer to top up a shortfall, and tolerating an abandoned share. The redeem helper is renamed
+  `_underlyingForExactScaledAmount`.
 - The base checks the handler's receipt-share decrease, not the user's increase. A venue transfer
   fee falls on the exiting user; requiring exact delivery would instead block the exit.
 - "The handler's stablecoin balance must not change" is asserted by tests and by the stateful
@@ -125,12 +130,12 @@ Runtime sizes, default profile (`forge build --sizes`), EIP-170 24,576 B:
 | Contract | Before | After |
 |---|---:|---:|
 | `DcaManager` | 13,236 | 13,763 |
-| `LayerBankDocHandlerMoc` | 11,316 | 11,814 |
-| `LayerBankHandlerDex` | 16,717 | 17,204 |
-| `SovrynDocHandlerMoc` | 11,040 | 11,518 |
-| `SovrynHandlerDex` | 16,463 | 16,930 |
-| `TropykusDocHandlerMoc` (test-only) | 11,185 | 11,663 |
-| `TropykusHandlerDex` (test-only) | 16,608 | 17,075 |
+| `LayerBankDocHandlerMoc` | 11,316 | 11,820 |
+| `LayerBankHandlerDex` | 16,717 | 17,210 |
+| `SovrynDocHandlerMoc` | 11,040 | 11,526 |
+| `SovrynHandlerDex` | 16,463 | 16,938 |
+| `TropykusDocHandlerMoc` (test-only) | 11,185 | 11,671 |
+| `TropykusHandlerDex` (test-only) | 16,608 | 17,083 |
 
 ## Out of scope
 

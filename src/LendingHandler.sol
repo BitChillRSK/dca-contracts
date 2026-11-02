@@ -66,15 +66,18 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
 
     /// @inheritdoc ILendingHandler
     function exitInKind(address user) external override onlyDcaManager returns (uint256 shares) {
-        shares = s_shares[user];
-        if (shares == 0) revert LendingHandler__NoSharesToExit(user);
-        _setUserShares(user, shares, 0);
+        uint256 bookedShares = s_shares[user];
+        if (bookedShares == 0) revert LendingHandler__NoSharesToExit(user);
         uint256 sharesBefore = _receiptSharesBalance();
-        _protocolTransferShares(user, shares);
+        _protocolTransferShares(user, bookedShares);
         uint256 sharesAfter = _receiptSharesBalance();
-        if (sharesAfter >= sharesBefore || sharesBefore - sharesAfter != shares) {
-            revert LendingHandler__ShareConsumptionMismatch(shares, sharesBefore, sharesAfter);
+        if (sharesAfter >= sharesBefore || sharesBefore - sharesAfter > bookedShares) {
+            revert LendingHandler__ShareConsumptionMismatch(bookedShares, sharesBefore, sharesAfter);
         }
+        unchecked {
+            shares = sharesBefore - sharesAfter;
+        }
+        _setUserShares(user, bookedShares, bookedShares - shares);
         emit LendingHandler__PositionExitedInKind(user, _receiptToken(), shares);
     }
 
@@ -257,9 +260,9 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     function _receiptSharesBalance() internal virtual returns (uint256);
 
     /**
-     * @dev Move `sharesAmount` receipt shares from this contract to `to`. The default suits a receipt
-     *      token whose transfer amount is in share units; override when it is not. The base measures
-     *      the receipt-share delta.
+     * @dev Move up to `sharesAmount` receipt shares from this contract to `to`. The default suits a
+     *      receipt token whose transfer amount is in share units; override when it is not. The base
+     *      measures the receipt-share delta and debits the user exactly that.
      */
     function _protocolTransferShares(address to, uint256 sharesAmount) internal virtual {
         IERC20(_receiptToken()).safeTransfer(to, sharesAmount);
