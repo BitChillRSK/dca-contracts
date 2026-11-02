@@ -190,9 +190,10 @@ invariants**, with the reason for each.
   supplied to the market. A market that takes less or more reverts the deposit.
 - An in-kind exit zeroes every schedule balance the user holds on that token and route and transfers
   their virtual shares to them as the venue's receipt token. The user is debited exactly the fall in
-  the handler's receipt-share balance, which must be positive and at most their booked shares; a
-  remainder (at most one LayerBank scaled share) stays booked and a later exit moves it. No
-  stablecoin moves.
+  the handler's receipt-share balance, which must be positive and at most their booked shares; any
+  remainder stays booked to the user and a later exit can move it. Under supported LayerBank
+  rounding (half-up or round-up) the remainder is at most one scaled share; a venue that transfers
+  less than requested can leave more. No stablecoin moves.
 - Integrator return values and balance views are not treated as received cash. Stablecoin and native
   receipts are measured by balance deltas.
 - Every successful purchase must reduce the handler's stablecoin balance by exactly the gross amount

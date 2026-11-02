@@ -7,8 +7,9 @@ Status: **implemented; open for review** · Assigned: yes · Optional/further-re
 A user can leave a lending route even when the venue cannot pay cash. A new user function moves the
 caller's position on one token and lending route out of BitChill as the venue's own receipt
 token (LayerBank aTokens, Sovryn iTokens), and zeroes the caller's schedule balances on that route.
-The user then redeems at the venue directly, whenever the venue allows. BitChill holds nothing for
-them, so no buffer or operator action is needed.
+The user then redeems at the venue directly, whenever the venue allows. BitChill holds no cash for
+them, so no buffer or operator action is needed. Receipt shares that do not leave stay booked to the
+user until a later exit moves them.
 
 ## Background
 
