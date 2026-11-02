@@ -97,8 +97,12 @@ Where the code differs from the bullets above, or fills in what they left open:
   in share units) and a new abstract `_receiptToken()` for the event. Sovryn and Tropykus implement only
   `_receiptToken()`; LayerBank also overrides the transfer, because an aToken transfer takes underlying.
   Tropykus is in the diff only because the new abstract hook would not compile without it.
-- LayerBank sizes the transfer with the redeem formula; the private helper is renamed
-  `_underlyingForExactScaledAmount` since it now serves both.
+- LayerBank transfers the floor of the shares' underlying, then tops up any shortfall with the
+  redeem formula, so the exit is exact under live half-up and upstream Aave's ceiling transfer
+  rounding, at a fixed index too (`testFuzz_layerBankExitExactUnderEitherTransferRounding`). The
+  private helper is renamed `_underlyingForExactScaledAmount` since it serves both.
+- The base checks the handler's receipt-share decrease, not the user's increase. A venue transfer
+  fee falls on the exiting user; requiring exact delivery would instead block the exit.
 - "The handler's stablecoin balance must not change" is asserted by tests and by the stateful
   `invariant_handlerStablecoinBalanceZero`, not checked at runtime: a receipt-token transfer moves no
   stablecoin, so a runtime check would add two calls and an error for nothing the venue can do.
@@ -108,7 +112,7 @@ Where the code differs from the bullets above, or fills in what they left open:
 Fork results (chain tip, 2026-11-02, LayerBank Pool `POOL_REVISION()` 7):
 
 - Live aToken `transfer` moves the half-up `rayDiv` of the underlying amount, the same rounding as a
-  burn (`test_liveAToken_transferMovesHalfUpScaledShares`, 16 samples, several separating half-up from
+  burn (`test_liveAToken_transferRoundsHalfUpOrCeiling`, 16 samples, several separating half-up from
   round-up). The exit moved exactly the booked scaled shares, and the user then redeemed exactly
   4,000 DOC at the Pool from their own address (`test_fork_layerBankExitThenRedeemAtPool`).
 - A paused reserve blocks the exit: `finalizeTransfer` reverts `29` (`RESERVE_PAUSED`). A frozen
@@ -120,8 +124,8 @@ Runtime sizes, default profile (`forge build --sizes`), EIP-170 24,576 B:
 | Contract | Before | After |
 |---|---:|---:|
 | `DcaManager` | 13,236 | 13,763 |
-| `LayerBankDocHandlerMoc` | 11,316 | 11,814 |
-| `LayerBankHandlerDex` | 16,717 | 17,204 |
+| `LayerBankDocHandlerMoc` | 11,316 | 12,160 |
+| `LayerBankHandlerDex` | 16,717 | 17,548 |
 | `SovrynDocHandlerMoc` | 11,040 | 11,518 |
 | `SovrynHandlerDex` | 16,463 | 16,930 |
 | `TropykusDocHandlerMoc` (test-only) | 11,185 | 11,663 |

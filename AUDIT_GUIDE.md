@@ -268,11 +268,14 @@ Other deliberate availability trade-offs:
 - Listed stablecoins, Money on Chain, lending markets, the Uniswap router/pools, WRBTC, and the MoC
   BTC/USD oracle remain correct and available. External illiquidity or pauses can revert purchases or
   withdrawals.
-- A user can always take their lending position in kind, unless the venue blocks receipt-token
-  transfers. `exitLendingPositionInKind` redeems nothing: it hands over the receipt tokens, and the
-  user redeems them at the venue when it can pay, including through any withdrawal queue the venue
-  runs. A venue pause that also blocks transfers blocks this exit; on LayerBank a paused reserve does,
-  a frozen one does not. The exit is blocked during a protected window like every other withdrawal.
+- An in-kind exit avoids cash redemption. `exitLendingPositionInKind` hands over the receipt tokens,
+  and the user redeems them at the venue when it can pay, including through any withdrawal queue the
+  venue runs. It still depends on the venue: a pause that blocks transfers blocks it (on LayerBank a
+  paused reserve does, a frozen one does not), and the handler's receipt-share balance must fall by
+  exactly the shares booked. The handler checks that decrease, not the user's increase, so a venue
+  transfer fee falls on the exiting user. LayerBank's exit sizing assumptions are in
+  [`src/layerbank/README.md`](./src/layerbank/README.md). The exit is blocked during a protected
+  window like every other withdrawal.
 - Dex pricing assumes the input stablecoin is worth one USD; there is no stablecoin/USD oracle.
   A downward depeg can stop swaps at the configured BTC/USD-derived floor. An upward depeg does not
   raise that floor. A fair pool can pay the premium, but the floor does not require it; a tight

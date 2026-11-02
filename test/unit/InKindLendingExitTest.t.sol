@@ -15,6 +15,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import "../Constants.sol";
 import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
+import {toBatch} from "test/utils/BatchBuyOne.sol";
 
 /// @dev The slice of LayerBank's Aave-v3 governance surface the fork cases use to pause and freeze a reserve.
 interface ILayerBankGovernance {
@@ -237,6 +238,27 @@ contract InKindLendingExitTest is DcaDappTest {
         assertEq(lendingHandler.getUserShares(USER), shares);
     }
 
+    /// @dev Half-up is live LayerBank's transfer rounding, ceiling is upstream Aave's. A fixed index
+    ///      models a reserve with no borrowing, where retrying at a later index does not help.
+    function testFuzz_layerBankExitExactUnderEitherTransferRounding(uint256 index, bool ceil) external onlyVenueMocks {
+        if (!isLayerbank) {
+            vm.skip(true);
+            return;
+        }
+        index = bound(index, 1e27, 2e27);
+        MockLayerBankAToken(receiptToken).setNormalizedIncome(index, true);
+        MockLayerBankAToken(receiptToken).setCeilTransfer(ceil);
+        uint256 shares = lendingHandler.getUserShares(USER);
+        uint256 handlerShares = _receiptShares(address(stablecoinHandler));
+        uint256 userSharesBefore = _receiptShares(USER);
+
+        _exit(USER);
+
+        assertEq(_receiptShares(USER) - userSharesBefore, shares, "user did not receive exactly the booked shares");
+        assertEq(handlerShares - _receiptShares(address(stablecoinHandler)), shares, "handler shares off");
+        assertEq(_routeBalance(USER), 0);
+    }
+
     function test_reentryFromReceiptTokenCallback_reverts() external onlyVenueMocks {
         bytes memory reenter =
             abi.encodeCall(IDcaManager.exitLendingPositionInKind, (address(stablecoin), s_routeIndex));
@@ -245,6 +267,40 @@ contract InKindLendingExitTest is DcaDappTest {
 
         vm.expectRevert(ReentrancyGuardTransient.ReentrancyGuardReentrantCall.selector);
         _exit(USER);
+    }
+
+    /// @dev Purchases are not reentrancy-guarded. A purchase for another user nested in the receipt
+    ///      transfer burns that user's shares inside the measured interval, so the exit reverts.
+    function test_purchaseFromReceiptTokenCallback_revertsWholeExit() external onlyVenueMocks {
+        stablecoin.mint(OTHER_USER, AMOUNT_TO_DEPOSIT);
+        vm.startPrank(OTHER_USER);
+        stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
+        dcaManager.createDcaSchedule(
+            address(stablecoin), AMOUNT_TO_DEPOSIT, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_routeIndex
+        );
+        vm.stopPrank();
+        uint64[] memory scheduleIds = new uint64[](1);
+        scheduleIds[0] = scheduleIdAt(dcaManager, OTHER_USER, address(stablecoin), 0);
+        bytes memory purchase =
+            abi.encodeCall(IDcaManager.batchBuyRbtc, (toBatch(scheduleIds, address(stablecoin), s_routeIndex)));
+        vm.prank(OWNER);
+        operationsAdmin.addSwapper(receiptToken);
+        if (isLayerbank) MockLayerBankAToken(receiptToken).setTransferCallback(address(dcaManager), purchase);
+        else MockIToken(receiptToken).setTransferCallback(address(dcaManager), purchase);
+        uint256 principal = _routeBalance(USER);
+        uint256 shares = lendingHandler.getUserShares(USER);
+        uint256 otherShares = lendingHandler.getUserShares(OTHER_USER);
+
+        vm.prank(USER);
+        (bool ok, bytes memory reason) = address(dcaManager)
+            .call(abi.encodeCall(IDcaManager.exitLendingPositionInKind, (address(stablecoin), s_routeIndex)));
+        assertFalse(ok);
+        assertEq(bytes4(reason), ILendingHandler.LendingHandler__ShareConsumptionMismatch.selector);
+
+        assertEq(_routeBalance(USER), principal);
+        assertEq(lendingHandler.getUserShares(USER), shares);
+        assertEq(lendingHandler.getUserShares(OTHER_USER), otherShares);
+        assertEq(_routeBalance(OTHER_USER), AMOUNT_TO_DEPOSIT);
     }
 
     /*//////////////////////////////////////////////////////////////

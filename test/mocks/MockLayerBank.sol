@@ -33,6 +33,7 @@ contract MockLayerBankAToken is ERC20 {
     bool private s_increaseBalanceOnBurn;
     bool private s_revertOnTransfer;
     bool private s_shortTransfer;
+    bool private s_ceilTransfer;
     /// @notice When set, a transfer calls `target` with `data` first and bubbles its revert.
     address private s_transferCallbackTarget;
     bytes private s_transferCallbackData;
@@ -116,6 +117,11 @@ contract MockLayerBankAToken is ERC20 {
     /// @notice Move one scaled unit less than Aave's `rayDiv` on transfer.
     function setShortTransfer(bool shortTransfer) external {
         s_shortTransfer = shortTransfer;
+    }
+
+    /// @notice Move upstream Aave's ceiling `rayDiv` on transfer instead of live LayerBank's half-up.
+    function setCeilTransfer(bool ceilTransfer) external {
+        s_ceilTransfer = ceilTransfer;
     }
 
     function setTransferCallback(address target, bytes calldata data) external {
@@ -211,7 +217,8 @@ contract MockLayerBankAToken is ERC20 {
     function _transferUnderlying(address from, address to, uint256 amount) private {
         if (s_revertOnTransfer) revert("MockLayerBankAToken: reserve paused");
         _runTransferCallback();
-        uint256 scaled = _rayDiv(amount, getNormalizedIncome());
+        uint256 rayIndex = getNormalizedIncome();
+        uint256 scaled = s_ceilTransfer ? (amount * RAY + rayIndex - 1) / rayIndex : _rayDiv(amount, rayIndex);
         if (s_shortTransfer) scaled -= 1;
         _transfer(from, to, scaled);
     }
