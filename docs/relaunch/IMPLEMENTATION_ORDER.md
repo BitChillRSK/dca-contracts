@@ -1546,7 +1546,7 @@ delayed-withdrawal queue at the venue never needs a BitChill buffer. A venue pau
 receipt-token transfers stays a documented limit.
 Ask: none (decided 2026-11-02; see the spec).
 
-### R120 - Retire Sovryn to legacy ([spec](./R120-sovryn-legacy.md))
+### R120 - Retire Sovryn to legacy ([spec](./R120-sovryn-legacy.md), [#190](https://github.com/BitChillRSK/dca-contracts/pull/190))
 
 After R119. Owner decision of 2026-11-02, after Sovryn's withdrawal queue and post-exploit pause:
 Sovryn is dropped from the deployment and the audit scope and becomes a test-only legacy adapter, as
