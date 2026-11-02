@@ -12,7 +12,8 @@ FORK_TEST_CMD := forge test --no-match-test invariant --no-match-contract Compar
 # mint on a fork: block 8739512 (2026-04-16 16:20 UTC) still mints, 8740674 (2026-04-17 00:13 UTC)
 # reverts with kToken error "C2". Do not raise this past 8739512.
 FORK_BLOCK_TROPYKUS ?= 8700000
-# 2026-10-14 23:59:54 UTC: before Sovryn's delayed withdrawals (SIP-0096, 2026-10-26) and protocol pause (2026-10-31).
+# 2026-10-14 23:59:54 UTC: before Sovryn's delayed withdrawals (SIP-0096, 2026-10-26) and its protocol pause
+# after the 2026-10-31 exploit. At the tip every iToken call reverts, so the lane would fail on the venue.
 FORK_BLOCK_SOVRYN ?= 9325651
 # Rootstock mainnet 2026-08-31 10:39:35 UTC. Pins the R51 Dex quote-vs-floor table
 # (`make probe-dex-quote-floor`) so its rows reproduce. Bump only when re-observing.
