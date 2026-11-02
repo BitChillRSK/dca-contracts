@@ -122,8 +122,10 @@ Runtime sizes, default profile (`forge build --sizes`), EIP-170 24,576 B:
 | `DcaManager` | 13,236 | 13,763 |
 | `LayerBankDocHandlerMoc` | 11,316 | 11,814 |
 | `LayerBankHandlerDex` | 16,717 | 17,204 |
-| `SovrynDocHandlerMoc` | — | 11,518 |
-| `SovrynHandlerDex` | — | 16,930 |
+| `SovrynDocHandlerMoc` | 11,040 | 11,518 |
+| `SovrynHandlerDex` | 16,463 | 16,930 |
+| `TropykusDocHandlerMoc` (test-only) | 11,185 | 11,663 |
+| `TropykusHandlerDex` (test-only) | 16,608 | 17,075 |
 
 ## Out of scope
 
@@ -167,6 +169,8 @@ Runtime sizes, default profile (`forge build --sizes`), EIP-170 24,576 B:
   observed. Record whether LayerBank's paused and frozen reserve states block aToken transfers.
 - Full gates before push: `make check`, `make check-deploy`, `make fork-layerbank` and
   `make fork-sovryn`.
+  `make fork-sovryn` pins block 9325651 (2026-10-14): at the tip every iToken call reverts since
+  Sovryn's 2026-10-31 pause.
 
 ## Success criteria
 
