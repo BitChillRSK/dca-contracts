@@ -356,8 +356,8 @@ interface IDcaManager {
      *      remain available for funding. Shares the lending protocol does not transfer stay booked
      *      and can be requested in a later call, even with every schedule balance at zero. Blocked
      *      during the protected purchase window and while the lending protocol blocks receipt-token
-     *      transfers (on LayerBank, a paused reserve). Reverts on an idle or unassigned route and
-     *      when the caller holds no shares there.
+     *      transfers. Reverts on an idle or unassigned route and when the caller holds no shares
+     *      there.
      */
     function withdrawLendingShares(address token, uint256 routeIndex) external;
 
