@@ -6,7 +6,7 @@ import {DeployMocSwaps} from "../../../script/DeployMocSwaps.s.sol";
 import {OperationsAdmin} from "../../../src/OperationsAdmin.sol";
 import {DcaManager} from "../../../src/DcaManager.sol";
 import {TropykusDocHandlerMoc} from "../../../src/tropykus-legacy/TropykusDocHandlerMoc.sol";
-import {SovrynDocHandlerMoc} from "../../../src/sovryn/SovrynDocHandlerMoc.sol";
+import {SovrynDocHandlerMoc} from "../../../src/sovryn-legacy/SovrynDocHandlerMoc.sol";
 import {MocHelperConfig} from "../../../script/MocHelperConfig.s.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {BitChillOwnable} from "../../../src/BitChillOwnable.sol";

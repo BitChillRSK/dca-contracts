@@ -23,7 +23,7 @@ BitChill purchases therefore call `redeemFreeDoc` only and let MoC revert data b
 
 - MoC enforces a low `maxGasPrice`. The probe pins `tx.gasprice` to `20_000_000` wei (**0.02 gwei** — RSK prices run ~1000x below Ethereum norms) so Anvil's default does not false-fail with `"gas price is above the max allowed"`. On 2026-09-07 the proxy's `maxGasPrice()` was `30_300_000` wei (0.0303 gwei) and the network price 0.026 gwei; re-read it with `cast call <moc proxy> "maxGasPrice()(uint256)"` if the probe starts reverting.
 - `DOC_HOLDER` must hold DOC on the tip you fork.
-- This is evidence for the R71 source-phase MoC decision, not a substitute for `make fork-sovryn` / `make fork-tropykus` purchase coverage.
+- This is evidence for the R71 source-phase MoC decision, not a substitute for `make fork-layerbank` purchase coverage.
 
 ## Addresses (RSK mainnet)
 

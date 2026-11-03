@@ -4,7 +4,7 @@ pragma solidity 0.8.36;
 import {HandlerTestHarness} from "../HandlerTestHarness.t.sol";
 import {ITokenHandler} from "../../../../src/interfaces/ITokenHandler.sol";
 import {IPurchaseFees} from "../../../../src/interfaces/IPurchaseFees.sol";
-import {SovrynHandler} from "../../../../src/sovryn/SovrynHandler.sol";
+import {SovrynHandler} from "../../../../src/sovryn-legacy/SovrynHandler.sol";
 import {PurchaseFees} from "../../../../src/PurchaseFees.sol";
 import {MockIToken} from "../../../mocks/MockIToken.sol";
 import {MockStablecoin} from "../../../mocks/MockStablecoin.sol";

@@ -12,9 +12,9 @@ import "test/Constants.sol";
 /**
  * @title LayerBankLivePoolProbe
  * @notice View + construct probe against the live Rootstock LayerBank Aave Pool / lRooDOC aToken.
- * @dev Lives under `test/unit/` so `make fork-sovryn` (pinned block) runs it too. Skips when the aToken
- *      has no code (Anvil, or a Tropykus pin from before this market existed). Does not add
- *      `LENDING_PROTOCOL=layerbank`.
+ * @dev Lives under `test/unit/` so every fork lane runs it, the legacy pinned ones too. Skips when
+ *      the aToken has no code (Anvil, or a Tropykus pin from before this market existed). Does not
+ *      add `LENDING_PROTOCOL=layerbank`.
  */
 contract LayerBankLivePoolProbe is Test {
     address internal constant ATOKEN = 0x3F04280C66314b78E9712A41BF8C1A214460cAa2;

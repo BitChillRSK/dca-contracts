@@ -3,7 +3,7 @@
 pragma solidity 0.8.36;
 
 import {IkToken} from "../../src/tropykus-legacy/IkToken.sol";
-import {IiToken} from "../../src/sovryn/IiToken.sol";
+import {IiToken} from "../../src/sovryn-legacy/IiToken.sol";
 
 /**
  * @title IShareToken

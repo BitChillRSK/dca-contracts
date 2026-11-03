@@ -2,9 +2,9 @@
 pragma solidity 0.8.36;
 
 import {Test} from "forge-std/Test.sol";
-import {SovrynDocHandlerMoc} from "src/sovryn/SovrynDocHandlerMoc.sol";
+import {SovrynDocHandlerMoc} from "src/sovryn-legacy/SovrynDocHandlerMoc.sol";
 import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
-import {IiToken} from "src/sovryn/IiToken.sol";
+import {IiToken} from "src/sovryn-legacy/IiToken.sol";
 import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import "test/Constants.sol";
 

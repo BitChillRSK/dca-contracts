@@ -32,8 +32,9 @@ with `setPurchasePathAllowed`.
 | LayerBank aToken, USDT0 (lRooUSDT0) | `0x6bE7d4cfCe825b106aa88F6916A412c5af230Ec0` | Constructor of `LayerBankHandlerDex` (USDT0) |
 | LayerBank Pool | `0x526D06c65777eA6D56d7a1Dd47cD79230dDf72E9` | Not passed in. Each LayerBank handler reads it from its aToken's `POOL()` at construction and stores it as an immutable |
 
-Sovryn and the alternate USDRIF path through legacy USDT are excluded from the initial deployment.
-Their historical integration details remain in the original audit reports and retained adapter test configuration.
+The alternate USDRIF path through legacy USDT is excluded from the initial deployment. Sovryn is a
+legacy adapter that is never deployed. Their historical integration details remain in the original
+audit reports and the legacy adapter's test configuration.
 
 Explorer: <https://rootstock.blockscout.com>.
 

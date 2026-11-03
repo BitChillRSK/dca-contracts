@@ -4,7 +4,7 @@ pragma solidity 0.8.36;
 import {Test, console2} from "forge-std/Test.sol";
 import {DcaDappTest} from "../../unit/DcaDappTest.t.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IiToken} from "../../../src/sovryn/IiToken.sol";
+import {IiToken} from "../../../src/sovryn-legacy/IiToken.sol";
 import {BPS_DENOMINATOR, DOC_HOLDER} from "../../Constants.sol";
 
 interface IExitFeeControllerView {

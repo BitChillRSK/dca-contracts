@@ -26,7 +26,7 @@ import {IdleDocHandlerMoc} from "src/idle/IdleDocHandlerMoc.sol";
 import {IdleHandlerDex} from "src/idle/IdleHandlerDex.sol";
 import {LayerBankDocHandlerMoc} from "src/layerbank/LayerBankDocHandlerMoc.sol";
 import {LayerBankHandlerDex} from "src/layerbank/LayerBankHandlerDex.sol";
-import {SovrynDocHandlerMoc} from "src/sovryn/SovrynDocHandlerMoc.sol";
+import {SovrynDocHandlerMoc} from "src/sovryn-legacy/SovrynDocHandlerMoc.sol";
 
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";

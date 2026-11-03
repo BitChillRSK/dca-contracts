@@ -2,7 +2,7 @@
 pragma solidity 0.8.36;
 
 import {Test} from "forge-std/Test.sol";
-import {SovrynDocHandlerMoc} from "src/sovryn/SovrynDocHandlerMoc.sol";
+import {SovrynDocHandlerMoc} from "src/sovryn-legacy/SovrynDocHandlerMoc.sol";
 import {IdleDocHandlerMoc} from "src/idle/IdleDocHandlerMoc.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
 import {MockIToken} from "test/mocks/MockIToken.sol";

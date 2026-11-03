@@ -40,18 +40,17 @@ uint256 constant IDLE_INDEX = 0; // constructor pre-registers this as idle
 string constant NONE_STRING = "none";
 string constant LAYERBANK_STRING = "layerbank";
 uint256 constant LAYERBANK_INDEX = 1;
-string constant SOVRYN_STRING = "sovryn";
-uint256 constant SOVRYN_INDEX = 2;
 // Index 3 is reserved for a future MoC lending venue and is deliberately not declared: an unused
 // constant invites a script to register it. Do not hand it to another protocol.
 
-// Legacy Tropykus. Test-only: no deploy script builds or registers a Tropykus handler on a live
-// network, on either map, and index 4 is burned so it is never reinterpreted as another venue.
-// The index constant lives in `test/Constants.sol`, which is out of scope for every `script/`
-// file — so a script that tries to name a Tropykus route fails to compile rather than failing
-// review. `TROPYKUS_STRING` stays here: `MocHelperConfig` / `DexHelperConfig` / `DeployBase`
-// read it to select Tropykus mocks for the local `LENDING_PROTOCOL=tropykus` lane, and none of
-// them uses the index. Only the index can land in production storage.
+// Legacy Sovryn and Tropykus. Test-only: no deploy script builds or registers either handler on a
+// live network, on either map, and indexes 2 and 4 are burned so neither is reinterpreted as
+// another venue. The index constants live in `test/Constants.sol`, which is out of scope for every
+// `script/` file — so a script that tries to name a legacy route fails to compile rather than
+// failing review. The strings stay here: `MocHelperConfig` / `DexHelperConfig` / `DeployBase` read
+// them to select mocks for the local `LENDING_PROTOCOL=sovryn` / `tropykus` lanes, and none of them
+// uses an index. Only an index can land in production storage.
+string constant SOVRYN_STRING = "sovryn";
 string constant TROPYKUS_STRING = "tropykus";
 
 // Default configurations

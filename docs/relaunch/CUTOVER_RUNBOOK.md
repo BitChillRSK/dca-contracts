@@ -20,7 +20,6 @@ Human operator only. Agents must not `--broadcast`.
 5. Green on the frozen revision:
    - `make check`
    - `make check-deploy`
-   - `make fork-sovryn`
    - `make fork-layerbank`
    - `make fork-dex-path` (Dex path allowlist)
 6. Complete the R117 release gates in [the disposition register](./PASHOV_TRIAGE_DECISIONS.md#review-evidence-and-assigned-release-work).

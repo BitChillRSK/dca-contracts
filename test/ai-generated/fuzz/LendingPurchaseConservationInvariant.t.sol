@@ -3,19 +3,19 @@ pragma solidity 0.8.36;
 
 import {Test} from "forge-std/Test.sol";
 import {StdInvariant} from "forge-std/StdInvariant.sol";
-import {SovrynDocHandlerMoc} from "src/sovryn/SovrynDocHandlerMoc.sol";
+import {LayerBankDocHandlerMoc} from "src/layerbank/LayerBankDocHandlerMoc.sol";
 import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
 import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
-import {MockIToken} from "test/mocks/MockIToken.sol";
+import {MockLayerBankAToken, MockLayerBankPool} from "test/mocks/MockLayerBank.sol";
 import {MockMocProxy} from "test/mocks/MockMocProxy.sol";
 
 /**
  * @title LendingPurchaseConservationHandler
- * @notice Fuzz actions over production Sovryn lending + production `PurchaseRbtc` (via MoC).
+ * @notice Fuzz actions over production LayerBank lending + production `PurchaseRbtc` (via MoC).
  * @dev The fuzz actor is the handler's `dcaManager` and owner, so it can call `onlyDcaManager`
- *      entry points and rotate the fee collector. Deposits mint iDOC; purchases redeem through
+ *      entry points and rotate the fee collector. Deposits mint aDOC; purchases redeem through
  *      `MockMocProxy` and credit through the real shared pipeline. Expected-empty cases return
  *      early; production calls are not wrapped in try/catch so `fail_on_revert` surfaces handler
  *      regressions.
@@ -24,11 +24,11 @@ contract LendingPurchaseConservationHandler is Test {
     uint256 internal constant MIN_AMOUNT = 25 ether;
     uint256 internal constant MAX_AMOUNT = 10_000 ether;
     uint256 internal constant MAX_SCHEDULE_ID = 64;
-    uint256 internal constant EXCHANGE_RATE_DECIMALS = 1e18;
+    uint256 internal constant EXCHANGE_RATE_DECIMALS = 1e27;
 
-    SovrynDocHandlerMoc public immutable i_handler;
+    LayerBankDocHandlerMoc public immutable i_handler;
     MockStablecoin public immutable i_doc;
-    MockIToken public immutable i_iToken;
+    MockLayerBankAToken public immutable i_aToken;
     address[] public s_users;
     address[] public s_collectors;
     address public s_feeCollector;
@@ -43,15 +43,15 @@ contract LendingPurchaseConservationHandler is Test {
     uint256 public s_rbtcWithdrawnGhost;
 
     constructor(
-        SovrynDocHandlerMoc handler,
+        LayerBankDocHandlerMoc handler,
         MockStablecoin doc,
-        MockIToken iToken,
+        MockLayerBankAToken aToken,
         address[] memory users,
         address initialCollector
     ) {
         i_handler = handler;
         i_doc = doc;
-        i_iToken = iToken;
+        i_aToken = aToken;
         s_users = users;
         s_feeCollector = initialCollector;
         s_collectors.push(initialCollector);
@@ -65,7 +65,7 @@ contract LendingPurchaseConservationHandler is Test {
         return s_collectors.length;
     }
 
-    /// @notice Deposit DOC into Sovryn lending for a fuzzed user.
+    /// @notice Deposit DOC into LayerBank lending for a fuzzed user.
     function depositToken(uint256 userSeed, uint256 amountSeed) external {
         address user = s_users[userSeed % s_users.length];
         uint256 amount = bound(amountSeed, MIN_AMOUNT, MAX_AMOUNT);
@@ -135,7 +135,8 @@ contract LendingPurchaseConservationHandler is Test {
 
     /// @dev Round-down share → stablecoin, matching LendingHandler's withdrawable ceiling.
     function _shareBackedStablecoin(address user) private view returns (uint256) {
-        return ILendingHandler(address(i_handler)).getUserShares(user) * i_iToken.tokenPrice() / EXCHANGE_RATE_DECIMALS;
+        return ILendingHandler(address(i_handler)).getUserShares(user) * i_aToken.getNormalizedIncome()
+            / EXCHANGE_RATE_DECIMALS;
     }
 
     function _account(uint256 seed) private view returns (address) {
@@ -162,9 +163,9 @@ abstract contract LendingPurchaseConservationInvariantBase is StdInvariant, Test
     address internal constant INITIAL_COLLECTOR = address(0xFEE);
 
     MockStablecoin internal doc;
-    MockIToken internal iToken;
+    MockLayerBankAToken internal aToken;
     MockMocProxy internal mocProxy;
-    SovrynDocHandlerMoc internal handler;
+    LayerBankDocHandlerMoc internal handler;
     LendingPurchaseConservationHandler internal fuzzHandler;
     address[] internal s_users;
 
@@ -172,7 +173,8 @@ abstract contract LendingPurchaseConservationInvariantBase is StdInvariant, Test
 
     function setUp() public {
         doc = new MockStablecoin(address(this));
-        iToken = new MockIToken(address(doc));
+        aToken = new MockLayerBankAToken(address(doc));
+        aToken.setPool(address(new MockLayerBankPool(aToken)));
         mocProxy = new MockMocProxy(address(doc));
         // MoC pays native rBTC on redeem; keep a cushion for the whole fuzz run.
         vm.deal(address(mocProxy), 1_000_000 ether);
@@ -182,20 +184,20 @@ abstract contract LendingPurchaseConservationInvariantBase is StdInvariant, Test
         }
 
         address predictedFuzzHandler = vm.computeCreateAddress(address(this), vm.getNonce(address(this)) + 1);
-        handler = new SovrynDocHandlerMoc(
+        handler = new LayerBankDocHandlerMoc(
             predictedFuzzHandler,
             address(doc),
-            address(iToken),
+            address(aToken),
             INITIAL_COLLECTOR,
             address(mocProxy),
             _feeSettings(),
             predictedFuzzHandler
         );
-        fuzzHandler = new LendingPurchaseConservationHandler(handler, doc, iToken, s_users, INITIAL_COLLECTOR);
+        fuzzHandler = new LendingPurchaseConservationHandler(handler, doc, aToken, s_users, INITIAL_COLLECTOR);
         assertEq(address(fuzzHandler), predictedFuzzHandler, "dcaManager/owner wiring missed the fuzz handler");
 
         // Local MockMocProxy pulls DOC via transferFrom; live MoC does not. Same fixture step as
-        // SovrynDocHandlerMocTest / DcaDappTest Anvil setup.
+        // LayerBankDocHandlerMocTest / DcaDappTest Anvil setup.
         vm.prank(address(handler));
         doc.approve(address(mocProxy), type(uint256).max);
 
@@ -266,13 +268,13 @@ abstract contract LendingPurchaseConservationInvariantBase is StdInvariant, Test
         );
     }
 
-    /// @notice Virtual lending shares never exceed the iDOC the leaf actually holds.
+    /// @notice Virtual lending shares never exceed the scaled aDOC the leaf actually holds.
     function invariant_virtualSharesNeverExceedReceiptShares() public {
         uint256 totalVirtual;
         for (uint256 i; i < s_users.length; ++i) {
             totalVirtual += ILendingHandler(address(handler)).getUserShares(s_users[i]);
         }
-        assertLe(totalVirtual, iToken.balanceOf(address(handler)), "virtual shares exceed iDOC held");
+        assertLe(totalVirtual, aToken.scaledBalanceOf(address(handler)), "virtual shares exceed aDOC held");
     }
 
     /// @notice Successful ops leave no idle DOC on the handler.
