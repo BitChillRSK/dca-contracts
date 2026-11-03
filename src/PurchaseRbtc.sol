@@ -41,7 +41,7 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessC
                            EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Allow the contract to receive native rBTC from MoC or from unwrapping WRBTC.
+    /// @dev Allow the contract to receive native rBTC from a purchase or from unwrapping WRBTC.
     receive() external payable {}
 
     /// @inheritdoc IPurchaseRbtc

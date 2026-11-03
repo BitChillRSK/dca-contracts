@@ -99,10 +99,11 @@ abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
     }
 
     /**
-     * @dev An aToken transfer takes an underlying amount and moves its rounded `rayDiv` at the live
-     *      index. With `index >= RAY`, the floored amount moves `sharesAmount` under upstream Aave's
-     *      round-up and `sharesAmount` or one less under live LayerBank's half-up, never more. The
-     *      shared base debits what moved; a one-share remainder stays booked to the user.
+     * @dev aToken transfers take an underlying amount, so send the floored underlying of
+     *      `sharesAmount`; the aToken moves its rounded `rayDiv` at the live index. With
+     *      `index >= RAY` that is `sharesAmount` under upstream Aave's round-up and `sharesAmount` or
+     *      one less under live LayerBank's half-up, never more. The shared base debits what moved; at
+     *      most one share stays booked to the user.
      */
     function _protocolTransferShares(address to, uint256 sharesAmount) internal override {
         IERC20(address(i_aToken)).safeTransfer(to, _sharesToStablecoin(sharesAmount, _viewExchangeRate()));

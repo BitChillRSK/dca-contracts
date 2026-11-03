@@ -65,7 +65,7 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     }
 
     /// @inheritdoc ILendingHandler
-    function withdrawShares(address user) external override onlyDcaManager returns (uint256 shares) {
+    function withdrawShares(address user) external override onlyDcaManager returns (uint256 withdrawnShares) {
         uint256 bookedShares = s_shares[user];
         if (bookedShares == 0) revert LendingHandler__NoSharesToWithdraw(user);
         uint256 sharesBefore = _receiptSharesBalance();
@@ -75,10 +75,10 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
             revert LendingHandler__ShareConsumptionMismatch(bookedShares, sharesBefore, sharesAfter);
         }
         unchecked {
-            shares = sharesBefore - sharesAfter;
+            withdrawnShares = sharesBefore - sharesAfter;
         }
-        _setUserShares(user, bookedShares, bookedShares - shares);
-        emit LendingHandler__SharesWithdrawn(user, _receiptToken(), shares);
+        _setUserShares(user, bookedShares, bookedShares - withdrawnShares);
+        emit LendingHandler__SharesWithdrawn(user, _receiptToken(), withdrawnShares);
     }
 
     /// @inheritdoc ILendingHandler
@@ -126,7 +126,7 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Never add a `fallback` or `executeOperation` here: an Aave-style flash loan naming this
+     * @dev Never add a `fallback` or a flash-loan receiver callback here: a flash loan naming this
      *      handler as receiver would repay itself from this allowance.
      */
     function _approveLendingSpender() internal {
@@ -253,9 +253,9 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     function _protocolRedeem(uint256 sharesAmount, uint256 exchangeRate) internal virtual;
 
     /**
-     * @dev This handler's external receipt-share balance: iToken/kToken `balanceOf`, or aToken
-     *      `scaledBalanceOf`. Never a protocol return value. Not `view`: the iToken/kToken ABIs
-     *      declare `balanceOf` without that mutability.
+     * @dev This handler's external receipt-share balance, read from the receipt token. Never a
+     *      protocol return value. Not `view`: some receipt-token ABIs declare their balance getter
+     *      without that mutability.
      */
     function _receiptSharesBalance() internal virtual returns (uint256);
 
@@ -268,7 +268,7 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
         IERC20(_receiptToken()).safeTransfer(to, sharesAmount);
     }
 
-    /// @dev The venue's receipt token for this handler's stablecoin.
+    /// @dev The lending protocol's receipt token for this handler's stablecoin.
     function _receiptToken() internal view virtual returns (address);
 
     /**

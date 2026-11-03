@@ -71,7 +71,7 @@ Facts the implementer relies on, at pin `6b2ed77`:
     R118 does for deposits and withdrawals).
   - Call `ILendingHandler(handler).withdrawShares(msg.sender)`.
   - Revert if the caller has no shares in that handler, so an empty call is not a silent success.
-- [x] `ILendingHandler` / `LendingHandler`: `withdrawShares(address user) onlyDcaManager returns (uint256 shares)`.
+- [x] `ILendingHandler` / `LendingHandler`: `withdrawShares(address user) onlyDcaManager returns (uint256 withdrawnShares)`.
   - Read `s_shares[user]`, set it to 0 through `_setUserShares` (invariant 14), then transfer the
     receipt token through a new adapter hook `_protocolTransferShares(address to, uint256 shares)`.
   - Measure the handler's receipt-share balance around the hook and require it to fall by exactly

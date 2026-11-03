@@ -43,8 +43,8 @@ interface IDcaManager {
      *      from storage, so caller data cannot redirect or resize a purchase. `minRbtcOut` is the gross
      *      rBTC/WRBTC wei minimum quoted for `quotedStablecoinIn` token base units. The handler scales
      *      it up or down to actual retrieved input, rounding up, then checks measured output. A nonzero
-     *      minimum requires nonzero quoted input. Zero minimum disables this caller bound. Uniswap also enforces its
-     *      oracle floor; MoC redeems at its protocol price and has no pool-slippage floor.
+     *      minimum requires nonzero quoted input. Zero minimum disables this caller bound. A purchase
+     *      handler may also enforce its own floor.
      */
     struct Batch {
         uint64[] scheduleIds;
@@ -377,9 +377,9 @@ interface IDcaManager {
      * @notice Open a five-block window for preparing and submitting purchases against fixed user state.
      * @dev Only an allowlisted swapper may call. Activation in block `N` blocks amount/period/pause edits,
      *      deletion, principal withdrawal, principal-plus-interest withdrawal, bulk interest withdrawal, and
-     *      lending-share withdrawal through `N + 4`; all resume at `N + 5`. Other calls remain available. A live window cannot be
-     *      extended; after expiry another may begin. The bot waits for activation, refreshes or simulates,
-     *      then submits against the locked state.
+     *      lending-share withdrawal through `N + 4`; all resume at `N + 5`. Other calls remain available.
+     *      A live window cannot be extended; after expiry another may begin. The bot waits for
+     *      activation, refreshes or simulates, then submits against the locked state.
      */
     function activateProtectedPurchaseWindow() external;
 
