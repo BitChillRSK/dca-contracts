@@ -100,7 +100,7 @@ contract LayerBankLivePoolProbe is Test {
         assertGt(separatingSamples, 0, "no sample separated half-up from round-up");
     }
 
-    /// @dev The in-kind exit works under either rounding; its tests predict the half-up shares it moves.
+    /// @dev The share withdrawal works under either rounding; its tests predict the half-up shares it moves.
     function test_liveAToken_transferMovesHalfUpScaledShares() public {
         uint256 supplied = 1000 ether;
         vm.prank(DOC_HOLDER);
@@ -123,7 +123,7 @@ contract LayerBankLivePoolProbe is Test {
             IERC20(ATOKEN).transfer(recipient, amount);
             uint256 moved = aToken.scaledBalanceOf(recipient) - scaledBefore;
 
-            assertEq(moved, halfUp, "live aToken no longer transfers half-up: update the in-kind exit tests");
+            assertEq(moved, halfUp, "live aToken no longer transfers half-up: update the share withdrawal tests");
             if (halfUp != roundUp) ++separatingSamples;
         }
         assertGt(separatingSamples, 0, "no sample separated half-up from round-up");

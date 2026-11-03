@@ -104,7 +104,7 @@ Assert:
 - A live `DeployMocSwaps` or `DeployDexSwaps` run leaves route 2 `Unregistered` and reverts for
   `LENDING_PROTOCOL=sovryn`.
 - The legacy Sovryn lanes keep passing; the Sovryn fork lane stays pinned.
-- `invariants-layerbank` runs every action, including in-kind exits, against the LayerBank wrapper.
+- `invariants-layerbank` runs every action, including share withdrawals, against the LayerBank wrapper.
 
 ## Success criteria
 

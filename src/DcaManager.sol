@@ -326,10 +326,10 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
 
     /**
      * @inheritdoc IDcaManager
-     * @dev Balances are zeroed and logged before the handler call, as on a cash withdrawal. A schedule
-     *      already at zero is neither written nor logged.
+     * @dev Balances are zeroed and logged before the handler call, as on a stablecoin withdrawal. A
+     *      schedule already at zero is neither written nor logged.
      */
-    function exitLendingPositionInKind(address token, uint256 routeIndex)
+    function withdrawLendingShares(address token, uint256 routeIndex)
         external
         override
         whenUserMutationsAllowed
@@ -346,7 +346,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
             dcaSchedule.tokenBalance = 0;
             emit DcaManager__TokenBalanceUpdated(token, scheduleId, 0);
         }
-        lendingHandler.exitInKind(msg.sender);
+        lendingHandler.withdrawShares(msg.sender);
     }
 
     /// @inheritdoc IDcaManager

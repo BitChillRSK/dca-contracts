@@ -226,15 +226,15 @@ contract InvariantTest is StdInvariant, Test {
         );
     }
 
-    /// @dev Coverage guard: the in-kind exit must actually move a position, or the share invariant
+    /// @dev Coverage guard: the share withdrawal must actually move shares, or the share invariant
     ///      below never sees receipt shares leave without a redeem.
-    function test_invariantHandlerExitsInKind() public {
+    function test_invariantHandlerWithdrawsLendingShares() public {
         fuzzHandler.createDcaSchedule(0, MIN_PURCHASE_AMOUNT * 10, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD);
-        assertEq(fuzzHandler.createScheduleSuccesses(), 1, "Handler never created a schedule to exit");
+        assertEq(fuzzHandler.createScheduleSuccesses(), 1, "Handler never created a schedule to withdraw from");
 
-        fuzzHandler.exitLendingPositionInKind(0);
+        fuzzHandler.withdrawLendingShares(0);
 
-        assertEq(fuzzHandler.exitInKindSuccesses(), 1, "the exit never reached DcaManager");
+        assertEq(fuzzHandler.shareWithdrawalSuccesses(), 1, "the share withdrawal never reached DcaManager");
         assertEq(ILendingHandler(address(handler)).getUserShares(s_users[0]), 0);
         assertEq(scheduleAt(dcaManager, s_users[0], address(stablecoin), 0).tokenBalance, 0);
     }
@@ -455,9 +455,9 @@ contract InvariantTest is StdInvariant, Test {
     /**
      * @notice BitChill's per-user virtual lending shares sum to exactly the handler's receipt tokens.
      * @dev Replaces the old `invariant_interestOnlyIncreases`, which asserted `uint256 >= 0` and so
-     *      encoded nothing. Deposits credit the measured mint, and withdrawals, purchases and in-kind
-     *      exits move both books by the same amount; a credit that outran the external mint, or a
-     *      burn or transfer that skipped the virtual ledger, would fail this.
+     *      encoded nothing. Deposits credit the measured mint, and stablecoin withdrawals, purchases
+     *      and share withdrawals move both books by the same amount; a credit that outran the external
+     *      mint, or a burn or transfer that skipped the virtual ledger, would fail this.
      */
     function invariant_virtualSharesEqualReceiptShares() public {
         uint256 totalVirtualShares;

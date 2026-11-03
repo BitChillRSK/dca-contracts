@@ -130,7 +130,7 @@ against the previous oracle.
 
 **Worst case for a leaked swapper key.** The key can reopen the protected window in the block the previous
 one ends, submit a zero caller minimum, and activate any allowlisted Dex path. While windows are
-chained, users cannot pause, edit, delete, withdraw stablecoin or interest, or exit a lending position in kind. Each Dex schedule that
+chained, users cannot pause, edit, delete, withdraw stablecoin or interest, or withdraw lending shares. Each Dex schedule that
 comes due in that time can be filled down to the oracle floor (3% below the oracle at launch settings),
 once per period. MoC routes have no pool to move. Principal cannot leave to anyone but its owner, and
 `revokeSwapper` ends it. This is accepted without a mandatory gap between windows: a gap would give
@@ -189,10 +189,10 @@ invariants**, with the reason for each.
   A venue fee or realized loss can reduce cash after the debited claim was fully consumed.
 - Every successful lending deposit must reduce the handler's stablecoin balance by exactly the amount
   supplied to the market. A market that takes less or more reverts the deposit.
-- An in-kind exit zeroes every schedule balance the user holds on that token and route and transfers
-  their virtual shares to them as the venue's receipt token. The user is debited exactly the fall in
-  the handler's receipt-share balance, which must be positive and at most their booked shares; any
-  remainder stays booked to the user and a later exit can move it. Under supported LayerBank
+- A lending-share withdrawal zeroes every schedule balance the user holds on that token and route and
+  transfers their virtual shares to them as the venue's receipt token. The user is debited exactly the
+  fall in the handler's receipt-share balance, which must be positive and at most their booked shares.
+  Untransferred shares remain booked and available for a later withdrawal. Under supported LayerBank
   rounding (half-up or round-up) the remainder is at most one scaled share; a venue that transfers
   less than requested can leave more. No stablecoin moves.
 - Integrator return values and balance views are not treated as received cash. Stablecoin and native
@@ -245,7 +245,7 @@ This is accepted, not enforced away: refusing a period that makes the schedule i
 also refuse ordinary mid-cycle shortening.
 
 The protected purchase window blocks only schedule edits/deletion, stablecoin/interest withdrawals, and
-in-kind lending exits through activation block `N + 4`; those actions resume at `N + 5`. Creation, deposits, interest top-up,
+lending-share withdrawals through activation block `N + 4`; those actions resume at `N + 5`. Creation, deposits, interest top-up,
 rBTC withdrawal, reads, governance, and purchases remain open. Purchases do not require a live window.
 
 Other deliberate availability trade-offs:
@@ -271,13 +271,13 @@ Other deliberate availability trade-offs:
 - Listed stablecoins, Money on Chain, lending markets, the Uniswap router/pools, WRBTC, and the MoC
   BTC/USD oracle remain correct and available. External illiquidity or pauses can revert purchases or
   withdrawals.
-- An in-kind exit avoids cash redemption. `exitLendingPositionInKind` hands over the receipt tokens,
+- A lending-share withdrawal redeems no stablecoin. `withdrawLendingShares` hands over the receipt tokens,
   and the user redeems them at the venue when it can pay, including through any withdrawal queue the
   venue runs. It still depends on the venue: a pause that blocks transfers blocks it (on LayerBank a
   paused reserve does, a frozen one does not). The handler debits its own receipt-share decrease, not
-  the user's increase, so a venue transfer fee falls on the exiting user. LayerBank's exit sizing is in
-  [`src/layerbank/README.md`](./src/layerbank/README.md). The exit is blocked during a protected
-  window like every other withdrawal.
+  the user's increase, so a venue transfer fee falls on the withdrawing user. LayerBank's transfer sizing is in
+  [`src/layerbank/README.md`](./src/layerbank/README.md). The share withdrawal is blocked during a
+  protected window like every other withdrawal.
 - Dex pricing assumes the input stablecoin is worth one USD; there is no stablecoin/USD oracle.
   A downward depeg can stop swaps at the configured BTC/USD-derived floor. An upward depeg does not
   raise that floor. A fair pool can pay the premium, but the floor does not require it; a tight
@@ -294,7 +294,7 @@ Other deliberate availability trade-offs:
   and a liquidity index of at least one RAY. Upstream Aave v3 has since moved burns to round up. If the
   LayerBank Pool adopts that, a large share of LayerBank redemptions (purchases and withdrawals) revert
   on the exact share-consumption check until a re-derived handler is deployed on a new route; no claim
-  is orphaned and no funds move. In-kind exits keep working: they transfer the floored amount, which
+  is orphaned and no funds move. Lending-share withdrawals keep working: they transfer the floored amount, which
   never moves more than the booked shares under either rule. `make fork-layerbank`
   asserts the live burn and transfer rounding at the chain tip (`LayerBankLivePoolProbe`), so operations
   should rerun it whenever the Pool or aToken implementation changes. See `src/layerbank/README.md`.

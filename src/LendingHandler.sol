@@ -11,7 +11,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
  * @title LendingHandler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Shared per-user share accounting, share ↔ stablecoin conversion, withdraw clamp,
- *         interest, exact-sum batch redeem, and in-kind exit for lending handlers. Protocol adapters
+ *         interest, exact-sum batch redeem, and share withdrawal for lending handlers. Protocol adapters
  *         implement the exchange-rate, mint/redeem, and receipt-token hooks.
  */
 abstract contract LendingHandler is TokenHandler, ILendingHandler {
@@ -65,9 +65,9 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     }
 
     /// @inheritdoc ILendingHandler
-    function exitInKind(address user) external override onlyDcaManager returns (uint256 shares) {
+    function withdrawShares(address user) external override onlyDcaManager returns (uint256 shares) {
         uint256 bookedShares = s_shares[user];
-        if (bookedShares == 0) revert LendingHandler__NoSharesToExit(user);
+        if (bookedShares == 0) revert LendingHandler__NoSharesToWithdraw(user);
         uint256 sharesBefore = _receiptSharesBalance();
         _protocolTransferShares(user, bookedShares);
         uint256 sharesAfter = _receiptSharesBalance();
@@ -78,7 +78,7 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
             shares = sharesBefore - sharesAfter;
         }
         _setUserShares(user, bookedShares, bookedShares - shares);
-        emit LendingHandler__PositionExitedInKind(user, _receiptToken(), shares);
+        emit LendingHandler__SharesWithdrawn(user, _receiptToken(), shares);
     }
 
     /// @inheritdoc ILendingHandler
