@@ -12,8 +12,8 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
  * @title LayerBankHandler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice LayerBank adapter: Aave-v3 Pool supply/withdraw. Share accounting lives on LendingHandler.
- * @dev Supply and withdraw go through the Pool; an in-kind exit transfers aTokens. Shares are aToken
- *      scaled amounts; rebasing `balanceOf` is never mixed into their accounting.
+ * @dev Supply and withdraw go through the Pool; a share withdrawal transfers aTokens. Shares are
+ *      aToken scaled amounts; rebasing `balanceOf` is never mixed into their accounting.
  */
 abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
     using SafeERC20 for IERC20;
@@ -90,7 +90,7 @@ abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
      *      case burns one share too many and reverts in that same check.
      */
     function _protocolRedeem(uint256 sharesAmount, uint256 exchangeRate) internal override {
-        uint256 amountOut = _underlyingForExactScaledAmount(sharesAmount, exchangeRate);
+        uint256 amountOut = _underlyingForExactScaledBurn(sharesAmount, exchangeRate);
         i_pool.withdraw(address(i_stablecoin), amountOut, address(this));
     }
 
@@ -119,11 +119,7 @@ abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
      *      `sharesAmount >= 1` (a single redeem no-ops a zero debit, and every batch row debits at
      *      least one share), so the result is never zero.
      */
-    function _underlyingForExactScaledAmount(uint256 sharesAmount, uint256 index)
-        private
-        view
-        returns (uint256 amount)
-    {
+    function _underlyingForExactScaledBurn(uint256 sharesAmount, uint256 index) private view returns (uint256 amount) {
         amount = _sharesToStablecoin(sharesAmount, index);
         if (_rayDiv(amount, index) < sharesAmount) {
             unchecked {

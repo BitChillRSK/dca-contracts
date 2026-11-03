@@ -1,15 +1,15 @@
-# R119 — Exit a lending position in kind
+# R119 — Withdraw lending shares as receipt tokens
 
 Status: **implemented; open for review** · Assigned: yes · Optional/further-review: no
 
 ## Objective
 
-A user can leave a lending route even when the venue cannot pay cash. A new user function moves the
-caller's position on one token and lending route out of BitChill as the venue's own receipt
+A user can leave a lending route even when the venue cannot pay cash. A new user function withdraws the
+caller's lending shares on one token and lending route out of BitChill as the venue's own receipt
 token (LayerBank aTokens, Sovryn iTokens), and zeroes the caller's schedule balances on that route.
 The user then redeems at the venue directly, whenever the venue allows. BitChill holds no cash for
-them, so no buffer or operator action is needed. Receipt shares that do not leave stay booked to the
-user until a later exit moves them.
+them, so no buffer or operator action is needed. Untransferred shares remain booked to the user and
+available for a later withdrawal.
 
 ## Background
 
@@ -52,38 +52,38 @@ Facts the implementer relies on, at pin `6b2ed77`:
 1. **Trigger: an explicit user function, callable at any time.** No automatic fallback inside
    `withdrawToken` / `withdrawInterest`: that would need a `try`/`catch` around venue calls that also
    catches unrelated reverts and out-of-gas, and would hand users a token they did not ask for. When a
-   venue cannot pay, the front-end offers this exit instead of the cash withdrawal.
+   venue cannot pay, the front-end offers this share withdrawal instead of the stablecoin withdrawal.
 2. **Granularity: the caller's whole position per token and lending route.** Shares are kept per user
    in each handler, not per schedule, so the position (principal and interest) leaves together.
-3. **Schedules after the exit: kept, with `tokenBalance` set to 0**, as after a full `withdrawToken`.
+3. **Schedules after the withdrawal: kept, with `tokenBalance` set to 0**, as after a full `withdrawToken`.
 4. **Protected window: blocked**, like every other withdrawal (invariant 10's guarded set grows by one).
 5. **Sovryn: the Sovryn adapter implements the hook too**, whether or not `src/sovryn/` stays in the
    audit scope. Code outside the audit scope is not deployed.
 
 ## Scope
 
-- [x] `IDcaManager` / `DcaManager`: `exitLendingPositionInKind(address token, uint256 routeIndex)`,
+- [x] `IDcaManager` / `DcaManager`: `withdrawLendingShares(address token, uint256 routeIndex)`,
       `whenUserMutationsAllowed nonReentrant` (invariants 6 and 10).
   - Revert unless the route is a lending route (`_checkTokenIsLent`) and has a handler.
   - Walk `s_scheduleIds[msg.sender][token]`. For each id on `routeIndex`, reach the schedule through
     `_callersSchedule` (invariant 8: no direct `s_dcaSchedules` read in a mutator), set
     `tokenBalance` to 0 and emit `DcaManager__TokenBalanceUpdated`, before the handler call (CEI, as
     R118 does for deposits and withdrawals).
-  - Call `ILendingHandler(handler).exitInKind(msg.sender)`.
+  - Call `ILendingHandler(handler).withdrawShares(msg.sender)`.
   - Revert if the caller has no shares in that handler, so an empty call is not a silent success.
-- [x] `ILendingHandler` / `LendingHandler`: `exitInKind(address user) onlyDcaManager returns (uint256 shares)`.
+- [x] `ILendingHandler` / `LendingHandler`: `withdrawShares(address user) onlyDcaManager returns (uint256 shares)`.
   - Read `s_shares[user]`, set it to 0 through `_setUserShares` (invariant 14), then transfer the
     receipt token through a new adapter hook `_protocolTransferShares(address to, uint256 shares)`.
   - Measure the handler's receipt-share balance around the hook and require it to fall by exactly
-    `shares` (extend invariant 11 to in-kind exits). The handler's stablecoin balance must not change.
-  - Emit one new event, `LendingHandler__PositionExitedInKind(address indexed user, address indexed receiptToken, uint256 shares)`.
+    `shares` (extend invariant 11 to share withdrawals). The handler's stablecoin balance must not change.
+  - Emit one new event, `LendingHandler__SharesWithdrawn(address indexed user, address indexed receiptToken, uint256 shares)`.
 - [x] `LayerBankHandler._protocolTransferShares`: transfer aTokens so that exactly `shares` scaled
       units move. An aToken `transfer` takes underlying units and scales them with the live index, so
       reuse or mirror `_underlyingForExactScaledBurn` and let the measurement in the base be the
       judge. Confirm the rounding on a fork before choosing the formula.
 - [x] `SovrynHandler._protocolTransferShares`: iToken `transfer`.
-- [x] `AGENTS.md`: invariant 10 lists the new function; invariant 11 covers in-kind exits.
-- [x] `AUDIT_GUIDE.md`: trust model gains "a user can always take their lending position in kind,
+- [x] `AGENTS.md`: invariant 10 lists the new function; invariant 11 covers share withdrawals.
+- [x] `AUDIT_GUIDE.md`: trust model gains "a user can always withdraw their lending shares as receipt tokens,
       unless the venue blocks receipt-token transfers", with the pause limit stated.
 
 ### As implemented
@@ -91,25 +91,24 @@ Facts the implementer relies on, at pin `6b2ed77`:
 Where the code differs from the bullets above, or fills in what they left open:
 
 - The zero-share refusal lives in the handler, which holds the shares:
-  `LendingHandler__NoSharesToExit(user)`, raised before any transfer. The whole call reverts, schedule
+  `LendingHandler__NoSharesToWithdraw(user)`, raised before any transfer. The whole call reverts, schedule
   writes included.
 - A schedule on the route that is already at zero balance is neither written nor logged.
 - `LendingHandler` supplies a default `_protocolTransferShares` (`safeTransfer` of the receipt token,
   in share units) and a new abstract `_receiptToken()` for the event. Sovryn and Tropykus implement only
   `_receiptToken()`; LayerBank also overrides the transfer, because an aToken transfer takes underlying.
   Tropykus is in the diff only because the new abstract hook would not compile without it.
-- The exit debits the user the measured fall in the handler's receipt-share balance instead of
+- The withdrawal debits the user the measured fall in the handler's receipt-share balance instead of
   requiring all booked shares to leave, and writes the booked shares once, after the transfer. It
-  reverts if the balance does not fall or falls by more than the booked shares. A remainder stays
-  booked to the user; the schedules are still zeroed, and calling again moves it. Deposits,
+  reverts if the balance does not fall or falls by more than the booked shares. Untransferred
+  shares remain booked and available for a later withdrawal; the schedules are still zeroed. Deposits,
   redemptions and purchases keep the exact check.
 - LayerBank transfers the floor of the booked shares' underlying. Under live half-up rounding that
   moves the booked shares or one fewer; under upstream Aave's round-up, exactly them. Not taken:
   sizing with the redeem formula (its `+ 1` case moves one share too many under round-up), a second
-  transfer to top up a shortfall, and tolerating an abandoned share. The redeem helper is renamed
-  `_underlyingForExactScaledAmount`.
+  transfer to top up a shortfall, and tolerating an abandoned share.
 - The base checks the handler's receipt-share decrease, not the user's increase. A venue transfer
-  fee falls on the exiting user; requiring exact delivery would instead block the exit.
+  fee falls on the withdrawing user; requiring exact delivery would instead block the withdrawal.
 - "The handler's stablecoin balance must not change" is asserted by tests and by the stateful
   `invariant_handlerStablecoinBalanceZero`, not checked at runtime: a receipt-token transfer moves no
   stablecoin, so a runtime check would add two calls and an error for nothing the venue can do.
@@ -120,23 +119,23 @@ Fork results (chain tip, 2026-11-02, LayerBank Pool `POOL_REVISION()` 7):
 
 - Live aToken `transfer` moves the half-up `rayDiv` of the underlying amount, the same rounding as a
   burn (`test_liveAToken_transferMovesHalfUpScaledShares`, 16 samples, several separating half-up from
-  round-up). The exit moved the half-up shares of the floored amount, with any remainder booked, and
+  round-up). The withdrawal moved the half-up shares of the floored amount, with any remainder booked, and
   the user then redeemed 4,000 DOC less one wei at the Pool from their own address
-  (`test_fork_layerBankExitThenRedeemAtPool`, 2026-11-03).
-- A paused reserve blocks the exit: `finalizeTransfer` reverts `29` (`RESERVE_PAUSED`). A frozen
-  reserve does not (`test_fork_layerBankPausedReserveBlocksExit`,
-  `test_fork_layerBankFrozenReserveAllowsExit`).
+  (`test_fork_layerBankWithdrawalThenRedeemAtPool`, 2026-11-03).
+- A paused reserve blocks the withdrawal: `finalizeTransfer` reverts `29` (`RESERVE_PAUSED`). A frozen
+  reserve does not (`test_fork_layerBankPausedReserveBlocksWithdrawal`,
+  `test_fork_layerBankFrozenReserveAllowsWithdrawal`).
 
 Runtime sizes, default profile (`forge build --sizes`), EIP-170 24,576 B:
 
 | Contract | Before | After |
 |---|---:|---:|
-| `DcaManager` | 13,236 | 13,763 |
-| `LayerBankDocHandlerMoc` | 11,316 | 11,820 |
+| `DcaManager` | 13,236 | 13,764 |
+| `LayerBankDocHandlerMoc` | 11,316 | 11,824 |
 | `LayerBankHandlerDex` | 16,717 | 17,210 |
-| `SovrynDocHandlerMoc` | 11,040 | 11,526 |
+| `SovrynDocHandlerMoc` | 11,040 | 11,530 |
 | `SovrynHandlerDex` | 16,463 | 16,938 |
-| `TropykusDocHandlerMoc` (test-only) | 11,185 | 11,671 |
+| `TropykusDocHandlerMoc` (test-only) | 11,185 | 11,675 |
 | `TropykusHandlerDex` (test-only) | 16,608 | 17,083 |
 
 ## Out of scope
@@ -144,7 +143,7 @@ Runtime sizes, default profile (`forge build --sizes`), EIP-170 24,576 B:
 - [ ] Automatic fallback inside `withdrawToken` / `withdrawInterest` (decision 1b).
 - [ ] Any async request/claim lifecycle, including purchases from a venue with delayed withdrawals.
       Such a venue needs its own handler and route, not a change here.
-- [ ] Moving a position in kind into another route or handler (no migration).
+- [ ] Moving receipt shares into another route or handler (no migration).
 - [ ] Idle routes: the handler already holds the stablecoin itself.
 - [ ] V1 contracts and the V1 withdrawal buffer.
 - [ ] Re-enabling Sovryn, deploy scripts and live configuration.
@@ -162,21 +161,21 @@ Runtime sizes, default profile (`forge build --sizes`), EIP-170 24,576 B:
 ## Required tests
 
 - Unit, each lending protocol lane (`LENDING_PROTOCOL=layerbank` and `LENDING_PROTOCOL=sovryn`):
-  - With the venue illiquid, `withdrawToken` reverts and `exitLendingPositionInKind` succeeds. The user
+  - With the venue illiquid, `withdrawToken` reverts and `withdrawLendingShares` succeeds. The user
     receives receipt tokens worth their principal plus interest at the current index, their shares are
     0, every schedule on the route has `tokenBalance == 0`, and schedules on other routes are untouched.
-  - Other users' shares, the handler's total receipt-share balance minus the exited shares, and the
+  - Other users' shares, the handler's total receipt-share balance minus the withdrawn shares, and the
     handler's stablecoin balance are unchanged.
-  - With the venue paused (mock blocks redeems and transfers), the exit reverts: the documented limit.
+  - With the venue paused (mock blocks redeems and transfers), the withdrawal reverts: the documented limit.
   - Reverts: idle route, unassigned pair, zero shares, during the protected window (`N` to `N + 4`;
     succeeds at `N + 5`), re-entry from a token callback.
   - A share-consumption mismatch in the hook reverts the whole call, schedule balances included.
   - Event order: `TokenBalanceUpdated` for each schedule, then `UserSharesUpdated`, then
-    `PositionExitedInKind`.
-  - After the exit, a top-up and a purchase on a kept schedule work normally.
-- Stateful invariants: add the exit to the fuzz handler. The sum of `s_shares` still equals the
-  handler's receipt-share balance after any sequence that includes exits.
-- Fork (`make fork-layerbank`): exit in kind on the live LayerBank pool, then redeem the received
+    `LendingHandler__SharesWithdrawn`.
+  - After the withdrawal, a top-up and a purchase on a kept schedule work normally.
+- Stateful invariants: add the share withdrawal to the fuzz handler. The sum of `s_shares` still equals the
+  handler's receipt-share balance after any sequence that includes share withdrawals.
+- Fork (`make fork-layerbank`): withdraw shares on the live LayerBank pool, then redeem the received
   aTokens from the user's address through the LayerBank pool directly. Record the transfer rounding
   observed. Record whether LayerBank's paused and frozen reserve states block aToken transfers.
 - Full gates before push: `make check`, `make check-deploy`, `make fork-layerbank` and
@@ -205,7 +204,7 @@ Runtime sizes, default profile (`forge build --sizes`), EIP-170 24,576 B:
 - ABI: one new `DcaManager` function, one new `ILendingHandler` function, one new event. Consumers
   regenerate ABIs.
 - Scripts: none.
-- Cutover: consumer issues on front-end (offer the exit when a simulated cash withdrawal fails, and
+- Cutover: consumer issues on front-end (offer the share withdrawal when a simulated stablecoin withdrawal fails, and
   explain the receipt token and how to redeem it at the venue), data-api and bitchill-monitoring
   (index the new event; schedule balances already follow `TokenBalanceUpdated`), swapper-bot
   (confirm that it skips zero-balance schedules), docs (user guide entry).

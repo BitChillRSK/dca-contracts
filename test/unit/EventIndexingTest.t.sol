@@ -111,7 +111,7 @@ contract EventIndexingTest is DcaDappTest {
         dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
         if (isLendingLane) {
             vm.prank(USER);
-            dcaManager.exitLendingPositionInKind(address(stablecoin), s_routeIndex);
+            dcaManager.withdrawLendingShares(address(stablecoin), s_routeIndex);
         }
         vm.prank(USER);
         dcaManager.deleteDcaSchedule(address(stablecoin), scheduleId, SCHEDULE_INDEX);
@@ -204,7 +204,7 @@ contract EventIndexingTest is DcaDappTest {
         if (sig == keccak256("LendingHandler__SharesRedeemedBatch(uint256,uint256)")) return (true, 0);
         if (sig == keccak256("LendingHandler__InterestWithdrawn(address,address,uint256)")) return (true, 2);
         if (sig == keccak256("LendingHandler__WithdrawalAmountAdjusted(address,uint256,uint256)")) return (true, 1);
-        if (sig == keccak256("LendingHandler__PositionExitedInKind(address,address,uint256)")) return (true, 2);
+        if (sig == keccak256("LendingHandler__SharesWithdrawn(address,address,uint256)")) return (true, 2);
         if (sig == keccak256("TokenHandler__TokenDeposited(address,address,uint256)")) return (true, 2);
         if (sig == keccak256("TokenHandler__TokenWithdrawn(address,address,uint256)")) return (true, 2);
         if (sig == keccak256("PurchaseRbtc__rBtcWithdrawn(address,uint256)")) return (true, 1);

@@ -88,7 +88,7 @@ contract ProtectedPurchaseWindowTest is DcaDappTest {
             abi.encodeCall(IDcaManager.withdrawAllAccumulatedInterest, (tokens, routeIndexes)), expectedRevert
         );
         _assertUserCallRevertsLocked(
-            abi.encodeCall(IDcaManager.exitLendingPositionInKind, (address(stablecoin), s_routeIndex)), expectedRevert
+            abi.encodeCall(IDcaManager.withdrawLendingShares, (address(stablecoin), s_routeIndex)), expectedRevert
         );
 
         vm.roll(allowedFromBlock);

@@ -17,7 +17,7 @@ interface ILendingHandler is ITokenHandler {
 
     /**
      * @notice Canonical per-user virtual lending-share balance after a successful share transition
-     *         (mint, burn, or in-kind exit).
+     *         (mint, burn, or share withdrawal).
      * @dev Only `user` is indexed. `newShares` is the balance immediately after this transition.
      *      When a buyer appears more than once in a batch, earlier events carry intermediate
      *      balances; only the last event for that user equals `getUserShares(user)` after the call.
@@ -43,12 +43,12 @@ interface ILendingHandler is ITokenHandler {
         address indexed user, uint256 originalAmount, uint256 adjustedAmount
     );
     /**
-     * @notice `user`'s position left this handler as the venue's receipt token.
+     * @notice Receipt shares were withdrawn for `user` as the venue's receipt token.
      * @dev `shares` is in receipt-share units (aToken scaled amount, or iToken/kToken balance): the
      *      exact decrease of this handler's receipt-share balance, and of the user's booked shares.
      *      Any remainder stays booked; `UserSharesUpdated` in the same call carries it.
      */
-    event LendingHandler__PositionExitedInKind(address indexed user, address indexed receiptToken, uint256 shares);
+    event LendingHandler__SharesWithdrawn(address indexed user, address indexed receiptToken, uint256 shares);
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -70,9 +70,9 @@ interface ILendingHandler is ITokenHandler {
      * @notice The lending protocol did not consume exactly the receipt shares BitChill debited.
      * @dev `balanceBefore` / `balanceAfter` are the handler's external receipt-share balances
      *      around the protocol call (iToken/kToken `balanceOf`, or aToken `scaledBalanceOf`).
-     *      Covers zero, partial, excessive, and increasing balances without an arithmetic panic. An
-     *      in-kind exit reverts with it only when the balance does not fall or falls by more than
-     *      the user's booked shares (`intendedDecrease`).
+     *      Covers zero, partial, excessive, and increasing balances without an arithmetic panic. A share
+     *      withdrawal reverts with it only when the balance does not fall or falls by more than the
+     *      user's booked shares (`intendedDecrease`).
      */
     error LendingHandler__ShareConsumptionMismatch(
         uint256 intendedDecrease, uint256 balanceBefore, uint256 balanceAfter
@@ -85,8 +85,8 @@ interface ILendingHandler is ITokenHandler {
     error LendingHandler__DepositConsumptionMismatch(
         uint256 intendedDecrease, uint256 balanceBefore, uint256 balanceAfter
     );
-    /// @notice An in-kind exit was requested for a user who holds no shares on this handler.
-    error LendingHandler__NoSharesToExit(address user);
+    /// @notice A share withdrawal was requested for a user who holds no shares on this handler.
+    error LendingHandler__NoSharesToWithdraw(address user);
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
@@ -102,17 +102,17 @@ interface ILendingHandler is ITokenHandler {
     function withdrawInterest(address user, uint256 stablecoinLockedInDcaSchedules) external;
 
     /**
-     * @notice Transfer `user`'s position to them as the venue's receipt token.
+     * @notice Withdraw `user`'s booked shares to them as the venue's receipt token.
      * @param user The address whose booked shares are transferred and who receives the receipt tokens.
-     * @return shares The receipt shares that left this handler, debited from `user`'s booked shares.
-     * @dev Called only by DcaManager. Redeems nothing, so the venue's cash liquidity does not limit
-     *      it; `user` redeems the receipt tokens at the venue directly, on the venue's terms. Debits
-     *      the measured fall in this handler's receipt-share balance. A venue's transfer rounding can
-     *      leave a remainder (one LayerBank scaled share), which stays booked and a later exit moves.
-     *      Reverts if the venue blocks receipt-token transfers, or if the balance does not fall or
-     *      falls by more than `user`'s booked shares.
+     * @return shares The receipt shares withdrawn, debited from `user`'s booked shares.
+     * @dev Called only by DcaManager. Redeems nothing, so the venue's stablecoin liquidity does not
+     *      limit it; `user` redeems the receipt tokens at the venue directly, on the venue's terms.
+     *      Debits the measured fall in this handler's receipt-share balance. Untransferred shares
+     *      remain booked and available for a later withdrawal. Reverts if the venue blocks
+     *      receipt-token transfers, or if the balance does not fall or falls by more than `user`'s
+     *      booked shares.
      */
-    function exitInKind(address user) external returns (uint256 shares);
+    function withdrawShares(address user) external returns (uint256 shares);
 
     /**
      * @notice Interest `user` has accrued above locked principal, without withdrawing it.
