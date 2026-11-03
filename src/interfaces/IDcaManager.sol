@@ -350,7 +350,7 @@ interface IDcaManager {
      *         on this route.
      * @param token The position's stablecoin.
      * @param routeIndex The lending route holding the position.
-     * @dev Recovery path when stablecoin withdrawals revert, including after a lending-protocol
+     * @dev Recovery path when stablecoin withdrawals revert, including after a lending protocol
      *      upgrade. Attempts to transfer all the caller's receipt shares without redeeming
      *      stablecoins. Clearing schedule balances removes their purchase allocations; the schedules
      *      remain available for funding. Shares the lending protocol does not transfer stay booked
