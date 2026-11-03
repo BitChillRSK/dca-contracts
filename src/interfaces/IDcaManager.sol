@@ -351,12 +351,13 @@ interface IDcaManager {
      * @param token The position's stablecoin.
      * @param routeIndex The lending route holding the position.
      * @dev Recovery path when stablecoin withdrawals revert, including after a lending-protocol
-     *      upgrade; no failed withdrawal is required first. Attempts to transfer the full position
-     *      without redeeming stablecoins. Clearing schedule balances removes their purchase
-     *      allocations; the schedules remain available for funding. Untransferred shares remain
-     *      booked and can be withdrawn again, even with every schedule balance at zero. The
-     *      protected purchase window and venue transfer restrictions can block it. Reverts on an
-     *      idle or unassigned route and when the caller holds no shares there.
+     *      upgrade. Attempts to transfer all the caller's receipt shares without redeeming
+     *      stablecoins. Clearing schedule balances removes their purchase allocations; the schedules
+     *      remain available for funding. Shares the lending protocol does not transfer stay booked
+     *      and can be requested in a later call, even with every schedule balance at zero. Blocked
+     *      during the protected purchase window and while the lending protocol blocks receipt-token
+     *      transfers (on LayerBank, a paused reserve). Reverts on an idle or unassigned route and
+     *      when the caller holds no shares there.
      */
     function withdrawLendingShares(address token, uint256 routeIndex) external;
 
