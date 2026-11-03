@@ -117,10 +117,16 @@ Fork tests run against live Rootstock state and need `RSK_MAINNET_RPC_URL` in `.
 CI.
 
 ```bash
-make fork-sovryn
+make fork-sovryn      # pinned to block 9325651 (2026-10-14)
 make fork-layerbank
 make fork-dex-path    # Dex path allowlist against live Uniswap pools
 ```
+
+`make fork-sovryn` runs at a pinned block because Sovryn no longer works at the chain tip. From
+2026-10-26 it queues voluntary lending withdrawals for 24 hours (SIP-0096), and on 2026-10-31, after an
+exploit of its swap converter registry, it paused every iToken call. Every deposit, withdrawal and
+purchase through a Sovryn handler reverts after that, so the lane would fail on the venue rather than
+on BitChill code. The other fork lanes run at the chain tip.
 
 `make help` lists the remaining lanes, including the Tropykus mock lanes and the live probes under
 `test/mainnet-debug/`. [`test/ai-generated/fuzz/README_INVARIANTS.md`](./test/ai-generated/fuzz/README_INVARIANTS.md)

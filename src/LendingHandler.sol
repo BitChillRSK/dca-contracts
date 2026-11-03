@@ -11,8 +11,8 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
  * @title LendingHandler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Shared per-user share accounting, share ↔ stablecoin conversion, withdraw clamp,
- *         interest, and exact-sum batch redeem for lending handlers. Protocol adapters implement
- *         the exchange-rate and mint/redeem hooks.
+ *         interest, exact-sum batch redeem, and share withdrawal for lending handlers. Protocol adapters
+ *         implement the exchange-rate, mint/redeem, and receipt-token hooks.
  */
 abstract contract LendingHandler is TokenHandler, ILendingHandler {
     using SafeERC20 for IERC20;
@@ -65,6 +65,23 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     }
 
     /// @inheritdoc ILendingHandler
+    function withdrawShares(address user) external override onlyDcaManager returns (uint256 withdrawnShares) {
+        uint256 bookedShares = s_shares[user];
+        if (bookedShares == 0) revert LendingHandler__NoSharesToWithdraw(user);
+        uint256 sharesBefore = _receiptSharesBalance();
+        _protocolTransferShares(user, bookedShares);
+        uint256 sharesAfter = _receiptSharesBalance();
+        if (sharesAfter >= sharesBefore || sharesBefore - sharesAfter > bookedShares) {
+            revert LendingHandler__ShareConsumptionMismatch(bookedShares, sharesBefore, sharesAfter);
+        }
+        unchecked {
+            withdrawnShares = sharesBefore - sharesAfter;
+        }
+        _setUserShares(user, bookedShares, bookedShares - withdrawnShares);
+        emit LendingHandler__SharesWithdrawn(user, _receiptToken(), withdrawnShares);
+    }
+
+    /// @inheritdoc ILendingHandler
     function getAccruedInterest(address user, uint256 stablecoinLockedInDcaSchedules)
         external
         override
@@ -109,7 +126,7 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Never add a `fallback` or `executeOperation` here: an Aave-style flash loan naming this
+     * @dev Never add a `fallback` or a flash-loan receiver callback here: a flash loan naming this
      *      handler as receiver would repay itself from this allowance.
      */
     function _approveLendingSpender() internal {
@@ -236,11 +253,23 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     function _protocolRedeem(uint256 sharesAmount, uint256 exchangeRate) internal virtual;
 
     /**
-     * @dev This handler's external receipt-share balance: iToken/kToken `balanceOf`, or aToken
-     *      `scaledBalanceOf`. Never a protocol return value. Not `view`: the iToken/kToken ABIs
-     *      declare `balanceOf` without that mutability.
+     * @dev This handler's external receipt-share balance, read from the receipt token. Never a
+     *      protocol return value. Not `view`: some receipt-token ABIs declare their balance getter
+     *      without that mutability.
      */
     function _receiptSharesBalance() internal virtual returns (uint256);
+
+    /**
+     * @dev Move up to `sharesAmount` receipt shares from this contract to `to`. The default suits a
+     *      receipt token whose transfer amount is in share units; override when it is not. The base
+     *      measures the receipt-share delta and debits the user exactly that.
+     */
+    function _protocolTransferShares(address to, uint256 sharesAmount) internal virtual {
+        IERC20(_receiptToken()).safeTransfer(to, sharesAmount);
+    }
+
+    /// @dev The lending protocol's receipt token for this handler's stablecoin.
+    function _receiptToken() internal view virtual returns (address);
 
     /**
      * @dev Convert stablecoin to shares. Rounds up so the virtual share debit is never below

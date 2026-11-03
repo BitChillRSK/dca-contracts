@@ -46,17 +46,17 @@ their own fixtures and ignore the env.
    (funds are in lending or burned by the purchase simulation).
 3. **Exchange-rate monotonicity** — Tropykus `exchangeRateCurrent() >= exchangeRateStored()`;
    Sovryn `tokenPrice() > 0` (the mock has no stored previous rate to compare).
-4. **Virtual shares ≤ receipt shares** — sum of `getUserShares` never exceeds the handler's
-   kToken / iSUSD balance.
+4. **Virtual shares = receipt shares** — sum of `getUserShares` equals the handler's kToken / iSUSD
+   balance after any sequence of deposits, redeems, purchases and share withdrawals.
 5. **Schedule sanity** — live schedules keep `purchaseAmount >= MIN_PURCHASE_AMOUNT`,
    `purchasePeriod >= MIN_PURCHASE_PERIOD`, and a non-zero `scheduleId`.
 6. **Paused schedules never purchase** — a schedule the ghost holds as paused keeps an unchanged
    `cadenceAnchor` (only a purchase writes that field).
 
-Coverage guards (deterministic, not fuzzed) pin that create / pause / buy / top-up actions can still
-reach the chain: `test_invariantHandlerCreatesScheduleAtSelectedRoute`,
+Coverage guards (deterministic, not fuzzed) pin that create / pause / buy / top-up / share withdrawal
+actions can still reach the chain: `test_invariantHandlerCreatesScheduleAtSelectedRoute`,
 `test_invariantHandlerPausesAndRecordsGhost`, `test_invariantHandlerBuysRbtcThroughDcaManager`,
-`test_invariantHandlerTopsUpFromInterest`. `afterInvariant` refuses a vacuous pause run when pauses
+`test_invariantHandlerTopsUpFromInterest`, `test_invariantHandlerWithdrawsLendingShares`. `afterInvariant` refuses a vacuous pause run when pauses
 were attempted on live schedules.
 
 **Not claimed here:** rBTC solvency, production purchase allocation, or “user interest only

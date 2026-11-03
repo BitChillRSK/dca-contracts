@@ -31,6 +31,12 @@ contract MockLayerBankAToken is ERC20 {
     bool private s_revertOnBurn;
     bool private s_overBurn;
     bool private s_increaseBalanceOnBurn;
+    bool private s_revertOnTransfer;
+    int256 private s_transferShareAdjustment;
+    bool private s_roundUpTransfer;
+    /// @notice When set, a transfer calls `target` with `data` first and bubbles its revert.
+    address private s_transferCallbackTarget;
+    bytes private s_transferCallbackData;
     uint256 private constant BPS_DENOMINATOR = 10_000;
 
     error MockLayerBankAToken__OnlyPool();
@@ -103,6 +109,36 @@ contract MockLayerBankAToken is ERC20 {
         s_increaseBalanceOnBurn = increaseBalanceOnBurn;
     }
 
+    /// @notice Model a paused reserve: aToken transfers revert (as do redeems, via `setRevertOnBurn`).
+    function setRevertOnTransfer(bool revertOnTransfer) external {
+        s_revertOnTransfer = revertOnTransfer;
+    }
+
+    /// @notice Move `adjustment` scaled units more (or fewer, if negative) than the rounded `rayDiv` on transfer.
+    function setTransferShareAdjustment(int256 adjustment) external {
+        s_transferShareAdjustment = adjustment;
+    }
+
+    /// @notice Round transfers up, as upstream Aave does, instead of live LayerBank's half-up.
+    function setRoundUpTransfer(bool roundUp) external {
+        s_roundUpTransfer = roundUp;
+    }
+
+    function setTransferCallback(address target, bytes calldata data) external {
+        s_transferCallbackTarget = target;
+        s_transferCallbackData = data;
+    }
+
+    function _runTransferCallback() private {
+        if (s_transferCallbackTarget == address(0)) return;
+        (bool ok, bytes memory returnData) = s_transferCallbackTarget.call(s_transferCallbackData);
+        if (!ok) {
+            assembly {
+                revert(add(returnData, 32), mload(returnData))
+            }
+        }
+    }
+
     function POOL() external view returns (address) {
         return pool;
     }
@@ -118,6 +154,18 @@ contract MockLayerBankAToken is ERC20 {
     /// @notice Rebasing view. Do not store this; the handler uses `scaledBalanceOf`.
     function balanceOf(address account) public view override returns (uint256) {
         return super.balanceOf(account) * getNormalizedIncome() / RAY;
+    }
+
+    /// @notice Live aToken semantics: `amount` is underlying, and its `rayDiv` at the live index moves.
+    function transfer(address to, uint256 amount) public override returns (bool) {
+        _transferUnderlying(msg.sender, to, amount);
+        return true;
+    }
+
+    function transferFrom(address from, address to, uint256 amount) public override returns (bool) {
+        _spendAllowance(from, msg.sender, amount);
+        _transferUnderlying(from, to, amount);
+        return true;
     }
 
     function getNormalizedIncome() public view returns (uint256) {
@@ -166,7 +214,15 @@ contract MockLayerBankAToken is ERC20 {
         return _payout(to, cashOut);
     }
 
-    /// @dev Aave WadRayMath.rayDiv: round nearest. Used for both mint and burn.
+    function _transferUnderlying(address from, address to, uint256 amount) private {
+        if (s_revertOnTransfer) revert("MockLayerBankAToken: reserve paused");
+        _runTransferCallback();
+        uint256 rayIndex = getNormalizedIncome();
+        uint256 scaled = s_roundUpTransfer ? (amount * RAY + rayIndex - 1) / rayIndex : _rayDiv(amount, rayIndex);
+        _transfer(from, to, uint256(int256(scaled) + s_transferShareAdjustment));
+    }
+
+    /// @dev Aave WadRayMath.rayDiv: round nearest. Used for mint, burn and transfer.
     function _rayDiv(uint256 a, uint256 rayIndex) private pure returns (uint256) {
         return (a * RAY + rayIndex / 2) / rayIndex;
     }

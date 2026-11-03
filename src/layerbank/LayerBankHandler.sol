@@ -5,15 +5,19 @@ import {LendingHandler} from "../LendingHandler.sol";
 import {ILayerBankAToken} from "./ILayerBankAToken.sol";
 import {ILayerBankHandler} from "./ILayerBankHandler.sol";
 import {ILayerBankPool} from "./ILayerBankPool.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title LayerBankHandler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice LayerBank adapter: Aave-v3 Pool supply/withdraw. Share accounting lives on LendingHandler.
- * @dev Supply and withdraw go through the Pool. Shares are aToken scaled amounts; rebasing
- *      `balanceOf` is never mixed into their accounting.
+ * @dev Supply and withdraw go through the Pool; a share withdrawal transfers aTokens. Shares are
+ *      aToken scaled amounts; rebasing `balanceOf` is never mixed into their accounting.
  */
 abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
+    using SafeERC20 for IERC20;
+
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
@@ -92,6 +96,21 @@ abstract contract LayerBankHandler is LendingHandler, ILayerBankHandler {
 
     function _receiptSharesBalance() internal override returns (uint256) {
         return i_aToken.scaledBalanceOf(address(this));
+    }
+
+    /**
+     * @dev aToken transfers take an underlying amount, so send the floored underlying of
+     *      `sharesAmount`; the aToken moves its rounded `rayDiv` at the live index. With
+     *      `index >= RAY` that is `sharesAmount` under upstream Aave's round-up and `sharesAmount` or
+     *      one less under live LayerBank's half-up, never more. The shared base debits what moved; at
+     *      most one share stays booked to the user.
+     */
+    function _protocolTransferShares(address to, uint256 sharesAmount) internal override {
+        IERC20(address(i_aToken)).safeTransfer(to, _sharesToStablecoin(sharesAmount, _viewExchangeRate()));
+    }
+
+    function _receiptToken() internal view override returns (address) {
+        return address(i_aToken);
     }
 
     /**

@@ -43,8 +43,8 @@ interface IDcaManager {
      *      from storage, so caller data cannot redirect or resize a purchase. `minRbtcOut` is the gross
      *      rBTC/WRBTC wei minimum quoted for `quotedStablecoinIn` token base units. The handler scales
      *      it up or down to actual retrieved input, rounding up, then checks measured output. A nonzero
-     *      minimum requires nonzero quoted input. Zero minimum disables this caller bound. Uniswap also enforces its
-     *      oracle floor; MoC redeems at its protocol price and has no pool-slippage floor.
+     *      minimum requires nonzero quoted input. Zero minimum disables this caller bound. A purchase
+     *      handler may also enforce its own floor.
      */
     struct Batch {
         uint64[] scheduleIds;
@@ -346,6 +346,21 @@ interface IDcaManager {
     function withdrawAllAccumulatedInterest(address[] calldata tokens, uint256[] calldata routeIndexes) external;
 
     /**
+     * @notice Withdraw the caller's lending shares as receipt tokens and clear their schedule balances
+     *         on this route.
+     * @param token The position's stablecoin.
+     * @param routeIndex The lending route holding the position.
+     * @dev Recovery path for when redeeming shares for stablecoins fails: attempts to transfer all
+     *      the caller's receipt shares instead. Clearing schedule balances removes their purchase
+     *      allocations; the schedules remain available for funding. Shares the lending protocol
+     *      does not transfer stay booked and can be requested in a later call, even with every
+     *      schedule balance at zero. Blocked during the protected purchase window and while the
+     *      lending protocol blocks receipt-token transfers. Reverts on an idle or unassigned route
+     *      and when the caller holds no shares there.
+     */
+    function withdrawLendingShares(address token, uint256 routeIndex) external;
+
+    /**
      * @notice Withdraw all rBTC the caller has accumulated on each named token×route pair.
      * @param tokens The token of each pair.
      * @param routeIndexes The route of each pair.
@@ -361,10 +376,10 @@ interface IDcaManager {
     /**
      * @notice Open a five-block window for preparing and submitting purchases against fixed user state.
      * @dev Only an allowlisted swapper may call. Activation in block `N` blocks amount/period/pause edits,
-     *      deletion, principal withdrawal, principal-plus-interest withdrawal, and bulk interest withdrawal
-     *      through `N + 4`; all resume at `N + 5`. Other calls remain available. A live window cannot be
-     *      extended; after expiry another may begin. The bot waits for activation, refreshes or simulates,
-     *      then submits against the locked state.
+     *      deletion, principal withdrawal, principal-plus-interest withdrawal, bulk interest withdrawal, and
+     *      lending-share withdrawal through `N + 4`; all resume at `N + 5`. Other calls remain available.
+     *      A live window cannot be extended; after expiry another may begin. The bot waits for
+     *      activation, refreshes or simulates, then submits against the locked state.
      */
     function activateProtectedPurchaseWindow() external;
 

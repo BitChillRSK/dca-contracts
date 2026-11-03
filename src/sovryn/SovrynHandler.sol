@@ -70,4 +70,9 @@ abstract contract SovrynHandler is LendingHandler {
     function _receiptSharesBalance() internal override returns (uint256) {
         return i_iToken.balanceOf(address(this));
     }
+
+    /// @dev iToken transfers move share units, so the base's default transfer applies.
+    function _receiptToken() internal view override returns (address) {
+        return address(i_iToken);
+    }
 }

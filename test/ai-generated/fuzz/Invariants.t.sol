@@ -212,6 +212,19 @@ contract InvariantTest is StdInvariant, Test {
         );
     }
 
+    /// @dev Coverage guard: the share withdrawal must actually move shares, or the share invariant
+    ///      below never sees receipt shares leave without a redeem.
+    function test_invariantHandlerWithdrawsLendingShares() public {
+        fuzzHandler.createDcaSchedule(0, MIN_PURCHASE_AMOUNT * 10, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD);
+        assertEq(fuzzHandler.createScheduleSuccesses(), 1, "Handler never created a schedule to withdraw from");
+
+        fuzzHandler.withdrawLendingShares(0);
+
+        assertEq(fuzzHandler.shareWithdrawalSuccesses(), 1, "the share withdrawal never reached DcaManager");
+        assertEq(ILendingHandler(address(handler)).getUserShares(s_users[0]), 0);
+        assertEq(scheduleAt(dcaManager, s_users[0], address(stablecoin), 0).tokenBalance, 0);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             INVARIANT TESTS
     //////////////////////////////////////////////////////////////*/
@@ -419,12 +432,13 @@ contract InvariantTest is StdInvariant, Test {
     }
 
     /**
-     * @notice BitChill's per-user virtual lending shares never exceed the handler's receipt tokens.
+     * @notice BitChill's per-user virtual lending shares sum to exactly the handler's receipt tokens.
      * @dev Replaces the old `invariant_interestOnlyIncreases`, which asserted `uint256 >= 0` and so
-     *      encoded nothing. Withdrawals and purchases burn both books together; a credit that outran
-     *      the external mint (or a burn that skipped the virtual ledger) would fail this.
+     *      encoded nothing. Deposits credit the measured mint, and stablecoin withdrawals, purchases
+     *      and share withdrawals move both books by the same amount; a credit that outran the external
+     *      mint, or a burn or transfer that skipped the virtual ledger, would fail this.
      */
-    function invariant_virtualSharesNeverExceedReceiptShares() public {
+    function invariant_virtualSharesEqualReceiptShares() public {
         uint256 totalVirtualShares;
         for (uint256 i = 0; i < s_users.length; i++) {
             totalVirtualShares += ILendingHandler(address(handler)).getUserShares(s_users[i]);
@@ -433,7 +447,7 @@ contract InvariantTest is StdInvariant, Test {
         uint256 receiptShares =
             s_routeIndex == TROPYKUS_INDEX ? kToken.balanceOf(address(handler)) : iToken.balanceOf(address(handler));
 
-        assertLe(totalVirtualShares, receiptShares, "virtual lending shares exceed receipt shares held");
+        assertEq(totalVirtualShares, receiptShares, "virtual lending shares differ from receipt shares held");
     }
 }
 

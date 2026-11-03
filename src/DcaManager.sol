@@ -56,7 +56,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     mapping(address token => uint256) private s_tokenMinPurchaseAmounts;
     /**
      * @dev Zero means never activated: every real block number is at least zero, so mutations start
-     *      unlocked. While live this holds the first block at which the seven guarded calls resume.
+     *      unlocked. While live this holds the first block at which the eight guarded calls resume.
      */
     uint256 private s_userMutationsAllowedFromBlock;
 
@@ -322,6 +322,31 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
             if (!_isLendingRoute(routeIndexes[i])) continue;
             _withdrawInterest(ILendingHandler(handler), tokens[i], routeIndexes[i]);
         }
+    }
+
+    /**
+     * @inheritdoc IDcaManager
+     * @dev Balances are zeroed and logged before the handler call, as on a stablecoin withdrawal. A
+     *      schedule already at zero is neither written nor logged.
+     */
+    function withdrawLendingShares(address token, uint256 routeIndex)
+        external
+        override
+        whenUserMutationsAllowed
+        nonReentrant
+    {
+        _checkTokenIsLent(token, routeIndex);
+        ILendingHandler lendingHandler = ILendingHandler(address(_handler(token, routeIndex)));
+        uint64[] memory scheduleIds = s_scheduleIds[msg.sender][token];
+        uint256 scheduleCount = scheduleIds.length;
+        for (uint256 i; i < scheduleCount; ++i) {
+            uint64 scheduleId = scheduleIds[i];
+            DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
+            if (dcaSchedule.routeIndex != routeIndex || dcaSchedule.tokenBalance == 0) continue;
+            dcaSchedule.tokenBalance = 0;
+            emit DcaManager__TokenBalanceUpdated(token, scheduleId, 0);
+        }
+        lendingHandler.withdrawShares(msg.sender);
     }
 
     /// @inheritdoc IDcaManager

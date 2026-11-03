@@ -16,7 +16,8 @@ interface ILendingHandler is ITokenHandler {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Canonical per-user virtual lending-share balance after a successful mint or burn.
+     * @notice Canonical per-user virtual lending-share balance after a successful share transition
+     *         (mint, burn, or share withdrawal).
      * @dev Only `user` is indexed. `newShares` is the balance immediately after this transition.
      *      When a buyer appears more than once in a batch, earlier events carry intermediate
      *      balances; only the last event for that user equals `getUserShares(user)` after the call.
@@ -41,6 +42,13 @@ interface ILendingHandler is ITokenHandler {
     event LendingHandler__WithdrawalAmountAdjusted(
         address indexed user, uint256 originalAmount, uint256 adjustedAmount
     );
+    /**
+     * @notice Receipt shares were withdrawn for `user` as the lending protocol's receipt token.
+     * @dev `shares` is in receipt-share units: the exact decrease of this handler's receipt-share
+     *      balance, and of the user's booked shares. Any remainder stays booked; `UserSharesUpdated`
+     *      in the same call carries it.
+     */
+    event LendingHandler__SharesWithdrawn(address indexed user, address indexed receiptToken, uint256 shares);
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -61,8 +69,9 @@ interface ILendingHandler is ITokenHandler {
     /**
      * @notice The lending protocol did not consume exactly the receipt shares BitChill debited.
      * @dev `balanceBefore` / `balanceAfter` are the handler's external receipt-share balances
-     *      around the protocol call (iToken/kToken `balanceOf`, or aToken `scaledBalanceOf`).
-     *      Covers zero, partial, excessive, and increasing balances without an arithmetic panic.
+     *      around the protocol call. Covers zero, partial, excessive, and increasing balances without
+     *      an arithmetic panic. A share withdrawal reverts with it only when the balance does not fall
+     *      or falls by more than the user's booked shares (`intendedDecrease`).
      */
     error LendingHandler__ShareConsumptionMismatch(
         uint256 intendedDecrease, uint256 balanceBefore, uint256 balanceAfter
@@ -75,6 +84,8 @@ interface ILendingHandler is ITokenHandler {
     error LendingHandler__DepositConsumptionMismatch(
         uint256 intendedDecrease, uint256 balanceBefore, uint256 balanceAfter
     );
+    /// @notice A share withdrawal was requested for a user who holds no shares on this handler.
+    error LendingHandler__NoSharesToWithdraw(address user);
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
@@ -88,6 +99,19 @@ interface ILendingHandler is ITokenHandler {
      * @dev Called only by DcaManager. No-op when there is no interest.
      */
     function withdrawInterest(address user, uint256 stablecoinLockedInDcaSchedules) external;
+
+    /**
+     * @notice Withdraw `user`'s booked shares to them as the lending protocol's receipt token.
+     * @param user The address whose booked shares are transferred and who receives the receipt tokens.
+     * @return withdrawnShares The receipt shares withdrawn, debited from `user`'s booked shares.
+     * @dev Called only by DcaManager. Redeems nothing, so the lending protocol's stablecoin liquidity
+     *      does not limit it; `user` redeems the receipt tokens at the lending protocol directly, on
+     *      its terms. Debits the measured fall in this handler's receipt-share balance. Untransferred
+     *      shares remain booked and available for a later withdrawal. Reverts if the lending protocol
+     *      blocks receipt-token transfers, or if the balance does not fall or falls by more than
+     *      `user`'s booked shares.
+     */
+    function withdrawShares(address user) external returns (uint256 withdrawnShares);
 
     /**
      * @notice Interest `user` has accrued above locked principal, without withdrawing it.
