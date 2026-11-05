@@ -19,10 +19,14 @@ import "../../Constants.sol";
  *      multi-block calibration that gates Dex relaunch: that extends this table across recent blocks and
  *      the supported batch-size envelope before governance picks a durable per-handler backstop.
  *
- *      There is no Uniswap Quoter deployment on Rootstock, so each row quotes by executing the swap through
- *      the live SwapRouter02 with `amountOutMinimum = 0` inside a frame that always reverts. The measured
- *      WRBTC delta comes back as revert data, so the pool is priced by a real swap of the real size and no
- *      row moves the pool for the next one.
+ *      Each row quotes by executing the real swap through the live SwapRouter02 with
+ *      `amountOutMinimum = 0` inside a frame that always reverts. That is the same router and path the
+ *      handler uses, so the row prices exactly what the handler would execute. The measured WRBTC delta
+ *      comes back as revert data, so the pool is priced by a real swap of the real size and no row moves
+ *      the pool for the next one. This is the technique Uniswap's QuoterV2 uses internally. A QuoterV2 is
+ *      live on Rootstock (0xb51727c996C68E60F598A923a5006853cd2fEB31, factory() is the Uniswap V3 factory
+ *      0xaF37EC98A00FD63689CF3060BF3B6784E00caD82) and the swapper bot quotes the same pools through it;
+ *      this probe keeps the reverted swap so it measures through the handler's own router.
  */
 contract DexQuoteFloorProbe is Test {
     /*//////////////////////////////////////////////////////////////
