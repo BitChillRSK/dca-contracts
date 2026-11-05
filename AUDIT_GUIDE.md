@@ -16,19 +16,21 @@ path. It creates one `OperationsAdmin`, one `DcaManager`, and six handlers:
 | USDRIF | `IdleHandlerDex` | `LayerBankHandlerDex` | Uniswap V3 |
 | USDT0 | `IdleHandlerDex` | `LayerBankHandlerDex` | Uniswap V3 |
 
-In scope:
+In scope: `src/`, except `src/sovryn-legacy/` and `src/tropykus-legacy/`: about 1,900 lines excluding
+comments and blank lines (`cloc src --exclude-dir=sovryn-legacy,tropykus-legacy`). The
+[README](./README.md#contracts) has the inheritance map. Interfaces of external protocols
+(`IMocProxy`, `ICoinPairPrice`, `IWRBTC`, `IUniswapV3SwapRouter`, `ILayerBankPool`,
+`ILayerBankAToken`) are ABIs only.
 
-- `src/`, except `src/sovryn-legacy/` and `src/tropykus-legacy/`: about 1,950 lines excluding comments
-  and blank lines (`cloc src --exclude-dir=sovryn-legacy,tropykus-legacy`). The
-  [README](./README.md#contracts) has the inheritance map. Interfaces of external protocols
-  (`IMocProxy`, `ICoinPairPrice`, `IWRBTC`, `IUniswapV3SwapRouter`, `ILayerBankPool`,
-  `ILayerBankAToken`) are ABIs only.
+Not reviewed, but context for the review:
+
 - `script/DeployFinal.s.sol`, `script/DeployBase.s.sol`, and `script/Constants.sol`: constructor
   inputs, external addresses, the route map, and the launch parameters. `DeployFinal` imports
   `MocHelperConfig` and `UsdrifHelperConfig` for their struct types only and fills them with its own
   mainnet values. [`ADDRESSES.md`](./ADDRESSES.md) lists the external contracts the deployment binds
-  to.
-- `foundry.toml` and the OpenZeppelin submodule commit: the compiler and dependency artifact.
+  to. [Launch configuration](#launch-configuration) lists the values the review can assume.
+- `foundry.toml` and the OpenZeppelin submodule commit: the compiler and dependency artifact
+  ([Compiler and dependencies](#compiler-and-dependencies)).
 - `test/unit/deployment/FinalDeploymentTest.t.sol`: asserts the wiring `DeployFinal` produces.
 
 Out of scope:
