@@ -2,14 +2,14 @@
 pragma solidity 0.8.36;
 
 // Protocol configuration
+// @notice the fee rate and bound constants carry IPurchaseFees.FeeSettings' widths so deploy scripts
+// and tests can build that struct without a cast.
 uint256 constant MIN_PURCHASE_AMOUNT = 25 ether; // at least 25 DOC on each purchase
-uint256 constant MIN_FEE_RATE = 100;
-uint256 constant MAX_FEE_RATE_TEST = 200; // 2% for testing - allows for better fee range testing
-uint256 constant MAX_FEE_RATE_PRODUCTION = 100; // 1% flat rate for production (same as MIN_FEE_RATE for flat fee)
-uint256 constant FEE_PURCHASE_LOWER_BOUND = 1000 ether; // 1000 DOC
-uint256 constant FEE_PURCHASE_UPPER_BOUND = 100_000 ether; // 100,000 DOC
-uint256 constant FEE_PERCENTAGE_DIVISOR = 10_000;
-uint256 constant MIN_PURCHASE_PERIOD = 1 days; // Default to at most one purchase each day
+uint16 constant MIN_FEE_RATE = 20; // 0.2% asymptotic minimum
+uint16 constant MAX_FEE_RATE_TEST = 200; // 2% for testing - allows for better fee range testing
+uint16 constant MAX_FEE_RATE_PRODUCTION = 100; // 1% at or below the purchase threshold
+uint112 constant FEE_PURCHASE_LOWER_BOUND = 250 ether; // 250 tokens with 18 decimals
+uint256 constant MIN_PURCHASE_PERIOD = 7 days; // Launch default: at most one purchase each week
 uint256 constant MAX_SCHEDULES_PER_TOKEN = 10; // Default to a maximum of 10 DCA schedules per token
 
 // Chain IDs
@@ -17,42 +17,67 @@ uint256 constant ANVIL_CHAIN_ID = 31337;
 uint256 constant RSK_MAINNET_CHAIN_ID = 30;
 uint256 constant RSK_TESTNET_CHAIN_ID = 31;
 
-// Lending protocols
-string constant TROPYKUS_STRING = "tropykus";
-uint256 constant TROPYKUS_INDEX = 1;
-string constant SOVRYN_STRING = "sovryn";
-uint256 constant SOVRYN_INDEX = 2;
-// No lending -> 0
-// "tropykus" -> 1
-// "sovryn" -> 2
+// Live governance. Foundry broadcasts from an EOA (`forge script --account` / `--ledger`).
+// Testnet: that EOA is the owner. Mainnet: the EOA deploys and proposes the Safe, which must
+// `acceptOwnership` on each contract. Do not set MAINNET_OWNER as `initialOwner` in the same
+// script that calls `onlyOwner` setup — a Safe cannot sign a Foundry broadcast.
+address constant TESTNET_OWNER = 0x31e0FacEa072EE621f22971DF5bAE3a1317E41A4;
+address constant MAINNET_OWNER = 0xdeAbdc410aB7B0f1Da830A6b355B5b938208315f;
+address constant TESTNET_FEE_COLLECTOR = TESTNET_OWNER;
+address constant MAINNET_FEE_COLLECTOR = 0x3caB92C050514A0368D71815CAc42ad746350F16;
 
-// Default configurations
-string constant DEFAULT_STABLECOIN = "DOC"; // Default stablecoin to use if not specified
-uint256 constant DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT = 0.995 ether; // 99.5% -> 0.5% slippage
-uint256 constant DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK = 0.95 ether; // 95%
-uint256 constant MAX_SLIPPAGE_PERCENT = 1 ether - DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT; 
-uint256 constant EXCHANGE_RATE_DECIMALS = 1e18; // Valid for DOC and USDRIF in both Tropykus and Sovryn
-
-
-/*//////////////////////////////////////////////////////////////
-                        TESTS CONSTANTS
-//////////////////////////////////////////////////////////////*/
-
-// Test account names
+// Local and fork deploy accounts. `DeployBase` derives the owner and the fee collector from these
+// labels with `makeAddr` when no live network is targeted; the addresses above win on testnet and
+// mainnet. Deploy-side, not test-side: the harness reads whatever `DeployBase` produced.
 string constant OWNER_STRING = "owner";
-string constant USER_STRING = "user";
-string constant ADMIN_STRING = "ADMIN";
-string constant SWAPPER_STRING = "SWAPPER";
 string constant FEE_COLLECTOR_STRING = "feeCollector";
 
-// Test values
+// Production route indexes (fresh relaunch map) and LENDING_PROTOCOL env strings.
+// Lane scripts `DeployMocSwaps` and `DeployDexSwaps` each build their own admin for
+// local/fork tests; the canonical live cutover is `DeployFinal`, which registers both
+// MoC and Dex handlers on one admin. Index meanings are shared across that one admin.
+uint256 constant IDLE_INDEX = 0; // constructor pre-registers this as idle
+string constant NONE_STRING = "none";
+string constant LAYERBANK_STRING = "layerbank";
+uint256 constant LAYERBANK_INDEX = 1;
+// Index 3 is reserved for a future MoC lending venue and is deliberately not declared: an unused
+// constant invites a script to register it. Do not hand it to another protocol.
+
+// Legacy Sovryn and Tropykus. Test-only: no deploy script builds or registers either handler on a
+// live network, on either map, and indexes 2 and 4 are burned so neither is reinterpreted as
+// another venue. The index constants live in `test/Constants.sol`, which is out of scope for every
+// `script/` file — so a script that tries to name a legacy route fails to compile rather than
+// failing review. The strings stay here: `MocHelperConfig` / `DexHelperConfig` / `DeployBase` read
+// them to select mocks for the local `LENDING_PROTOCOL=sovryn` / `tropykus` lanes, and none of them
+// uses an index. Only an index can land in production storage.
+string constant SOVRYN_STRING = "sovryn";
+string constant TROPYKUS_STRING = "tropykus";
+
+// Default configurations
+string constant DOC_STRING = "DOC"; // Unset STABLECOIN_TYPE falls back to this in `_stablecoinType()`.
+string constant USDRIF_STRING = "USDRIF";
+string constant USDT0_STRING = "USDT0";
+// Swap-time oracle floor. Deliberately loose: the swapper's per-batch `minRbtcOut` is the operational
+// bound, and this is what holds when that minimum is absent, stale, or hostile. Derived from the live
+// quote table (`make probe-dex-quote-floor`, block 9198813): the worst realistic-size fill was LayerBank
+// USDRIF (via USDT0) at 99.58% of oracle for a $1,000 batch, so 97% leaves ~258 bps for peg drift, oracle
+// drift, and pool movement between quote and inclusion, while capping a compromised-swapper loss at 3%.
+uint256 constant DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT = 0.97 ether; // 97%
+// The wall the owner cannot cross in one transaction when widening the floor above.
+uint256 constant DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK = 0.95 ether; // 95%
+
+// Price the local mocks quote. `DexHelperConfig` and `UsdrifHelperConfig` pass it to `MockSwapRouter02`,
+// and `MockMocOracle` / `MockMocProxy` redeem at it, so it is a deploy-helper value rather than a test one.
 uint256 constant BTC_PRICE = 50_000; // 1 BTC = 50,000 DOC
 
-// Token holders on mainnet with significant balances (for fork testing)
-address constant DOC_HOLDER = 0x65d189e839aF28B78567bD7255f3f796495141bc; // Large DOC holder on RSK mainnet
-address constant USDRIF_HOLDER = 0xD07d569322a93a47B62D71203e21f0AFf8246099; // Large USDRIF holder on RSK mainnet 
-// If these get rid of their holdings, we can look for other holders at 
-// https://rootstock.blockscout.com/token/0x3A15461d8AE0f0Fb5fA2629e9dA7D66A794a6E37?tab=holders
-// Token holders on testnet with significant balances (for fork testing)
-address constant DOC_HOLDER_TESTNET = 0x53Ec0aF115619c536480C95Dec4a065e27E6419F; // Large DOC holder on RSK testnet
-address constant USDRIF_HOLDER_TESTNET = 0xe38C86970543173D334b828485D8bc48d19Ff701; // Large USDRIF holder on RSK testnet
+// USDT0 is 6 decimals. Do not pass MIN_PURCHASE_AMOUNT / FEE_PURCHASE_* (18-decimal DOC/USDRIF
+// units) into a USDT0 handler or as its `setTokenMinPurchaseAmount` — that would make the min
+// ~25 trillion USDT0 and put every real purchase at the max fee band. Live/mainnet USDT0 deploy
+// paths use these magnitudes. There is no protocol-wide default min; every listed stable must be set.
+uint256 constant USDT0_MIN_PURCHASE_AMOUNT = 25e6;
+uint112 constant USDT0_FEE_PURCHASE_LOWER_BOUND = 250e6;
+
+// Mainnet LayerBank aTokens on Pool `0x526D06c65777eA6D56d7a1Dd47cD79230dDf72E9` (looked up 2026-08-28).
+address constant USDT0_MAINNET = 0x779Ded0c9e1022225f8E0630b35a9b54bE713736;
+address constant LAYERBANK_USDRIF_ATOKEN = 0xc96fBD12bE56Dd565b258d243344bCf792A51128; // lRooUSDRIF
+address constant LAYERBANK_USDT0_ATOKEN = 0x6bE7d4cfCe825b106aa88F6916A412c5af230Ec0; // lRooUSDT0

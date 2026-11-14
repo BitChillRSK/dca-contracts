@@ -17,5 +17,23 @@ node_modules/
 # Aderyn report
 report.md
 
-# Cursor (commit .cursorignore so clones skip out/ and lib/ in search)
-.cursor
+# Krait audit output and cache
+.audit/
+.krait-cache/
+
+# Cursor (commit .cursorignore so clones skip out/ and lib/ in search).
+# Keep .cursor/rules/ versioned; ignore everything else (e.g. relaunch-plan.md).
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
+
+# Local product-decision notes (not assigned relaunch specs).
+docs/relaunch/FEE-CURRENCY-OPTIONS.md
+# Fizz fuzzing caches (regenerable; kept locally so later campaigns can reuse the corpus).
+fizz_data/crytic-export/
+fizz_data/slither_results.json
+fizz_data/corpus_medusa/call_sequences/
+fizz_data/corpus_medusa/coverage/coverage_report.html
+fizz_data/corpus_echidna/
+# The Aderyn rule above would also hide the Fizz report.
+!fizz_data/report.md

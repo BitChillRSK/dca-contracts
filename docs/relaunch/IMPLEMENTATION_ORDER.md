@@ -9,22 +9,64 @@ Status: **planning guide**. Orders PRs. Not an implementation spec. Human prompt
 - Ask product questions only from the **Ask** column below. Empty Ask = do not ask; implement.
 - Branch before edits; stack on the latest open relaunch PR, else `main`. Commit, push, open the PR (`AGENTS.md`). Update `docs/relaunch/README.md` **Status** with the PR link and next unassigned prompt (follow-up commit if the URL was unknown before open). Stop. Remind the human of that next prompt. Human merges in order.
 - Run targeted tests, then the `AGENTS.md` done-gate.
-- Do not `--broadcast`. Keep OpenZeppelin `v4.9.3` until an optional late upgrade PR.
+- Do not `--broadcast`. Keep OpenZeppelin `v4.9.3` through R39, then R44 pins `v5.7.0`; every later PR builds on that version.
 
 ## Rootstock compiler / EVM proof
 
 **Passed (2026-08-15).** Rootstock testnet (chain 31) accepted first-party bytecode compiled with solc **0.8.36** / `cancun`. Blockscout verified `OperationsAdmin`, `DcaManager`, and `TropykusDocHandlerMoc` at those settings. Anvil/`forge test --fork-url` is still not rskj; this testnet tx is the consensus proof. PR 3+ may merge on this pin. Do not set `prague` / `osaka` / `amsterdam`. Do not use blob opcodes.
 
-## Product gates (PR 2)
+Both proofs in this section, the 2026-08-15 proof above and R52's re-proof below, used the default no-IR
+pipeline. `[profile.default]` enables the legacy optimizer (`optimizer = true`, `optimizer_runs = 200`,
+`via_ir = false`) starting with R52 so Dex handlers can hold their own path allowlist under EIP-170.
+R52 owns the Rootstock testnet + Blockscout re-proof of that optimizer-on artifact
+(`script/DeployOptimizerProof.s.sol`). **Passed (2026-09-01).** CREATE
+[0x3a63dc2458142cca09144a3f290ed6d996780c616acb8adbdf15f57f736ff5bc](https://rootstock-testnet.blockscout.com/tx/0x3a63dc2458142cca09144a3f290ed6d996780c616acb8adbdf15f57f736ff5bc)
+verified [`OperationsAdmin` `0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD`](https://rootstock-testnet.blockscout.com/address/0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD)
+on chain 31 (block 8031347; optimizer 200, no IR).
+R52 owns the flip and corrected its own figures; R53 re-baselines every other recorded size, margin,
+and gas number — see [Measurement basis](./README.md#measurement-basis), which is the one place that
+states the profile every figure in `docs/relaunch/` is measured at. Schedule top-up is R54; solx / via-IR
+evaluation and `ZeroTokenPurchaseUniswap` repair are R55 — defined in stacked
+[#105](https://github.com/BitChillRSK/dca-contracts/pull/105), which needs rebase after #104.
 
-Record these **before the first PR that changes fee logic, `DcaDetails`, handler per-user storage, or event ABI** (not before R2). If the human starts that later PR and PR 2 is not merged, ask **only** the gates that PR needs.
+**Superseded by [R60](./R60-src-only-via-ir.md).** This section once said there was no
+`[profile.deploy]`; there is one now. `[profile.deploy]` (`via_ir = true`, selected with
+`FOUNDRY_PROFILE=deploy`) is the profile that ships:
 
-- Fee model: keep linear / flatten to one rate / leave as-is for now.
-- R18 packing: skip / `DcaDetails` only / `DcaDetails` plus handler per-user state.
-- R19 pause: this relaunch or defer.
-- Optional: R12 compound, R13 admin, owner sweep, on-chain deposit pause.
+- `make check-deploy` runs the full suite against that exact bytecode.
+- [`CUTOVER_RUNBOOK.md`](./CUTOVER_RUNBOOK.md) deploys with it.
+- Gas figures that argue production cost, such as R78's and the
+  [Rootstock gas audit](./ROOTSTOCK-GAS-AUDIT.md), are stated under it.
 
-Defaults if the human says “use defaults”: keep OZ `v4.9.3`; skip packing (still `calldata` on handler batch arrays); defer R12, R13, R19, owner sweep, deposit pause. Do not apply defaults unless they say so.
+`[profile.default]` (`via_ir = false`) remains the day-to-day `make check` profile and the recorded
+[Measurement basis](./README.md#measurement-basis) for sizes and historical figures.
+
+What is still missing is the Rootstock proof for the via-IR artifact. R60 left its Rootstock testnet
+deploy and Blockscout verification to a human operator, and neither is recorded as done. Until it is,
+the consensus proofs above cover only no-IR bytecode.
+
+## Final scope decisions
+
+PR 2 was the original decision-record placeholder. GitHub PR [#74](https://github.com/BitChillRSK/dca-contracts/pull/74) supersedes it and closes every remaining gate on 2026-08-27. The remaining implementation prompts have **no product questions**.
+
+- R108 supersedes the linear fee model with monotone absolute fees and a smooth asymptotic rate.
+- Delete `buyRbtc`; a length-1 `batchBuyRbtc` is the single-schedule operational path (R39).
+- Upgrade to pinned OpenZeppelin `v5.7.0` (R44), then ship two-step ownership with direct initial ownership and no renunciation (R45).
+- Remove `setOperationsAdmin` and pin the constructor admin (R46). Enforce one assignment per handler address (R47).
+- Ship a per-token×route deposit pause (R48) and per-schedule purchase pause (R19).
+- Rename the schedule struct `DcaDetails` → `DcaSchedule` (R49), pack it to three slots (R18), then finish packing in R50 (`uint64` nonce as `scheduleId`, fees, admin handler+pause, DcaManager scalars, Dex percents, `uint32` route keys on every OperationsAdmin entry). Do not narrow handler balance/share mappings.
+- R12 interest compounding is **reopened** as [R54](./R54-schedule-top-up-from-interest.md): the recorded rejection described an in-handler design that was never proposed, and the real blocker was an unoptimized EIP-170 budget. See the reopened entry under **Closed non-implementation decisions**.
+- Do **not** add an owner sweep: pooled stablecoin and rBTC cannot be safely distinguished from liabilities, and signer-only withdrawal remains the custody boundary.
+- Licensing is **reopened** (was: keep MIT). Two questions, both open: whether MIT is the right license for BitChill at all, and a GPL compliance gap that exists today regardless of that answer. See **Licensing — reopened** below.
+- Dex: keep the $1-listed-stable + MoC BTC/USD on-chain floor, decimal-correct it, and leave extra MEV policy to the bot (R43). LayerBank is route 1 for USDRIF/USDT0; keep Sovryn DOC at route 2; USDT0 bounds are `25e6` / `1000e6` / `100_000e6` (R36).
+- Keep Tropykus local/fork lanes but no live deploy path; burn index 4 (R37).
+- Replace cartesian withdraw-all semantics and keep the existing names (R38). Swapper batcher is all-or-nothing; bot EOA stays allowlisted (R42). R9 adds no extra purchase-event fields.
+
+## External lending incentives
+
+The relaunch handlers distribute native lending interest only. They do not claim or redistribute temporary third-party incentives. Future campaign support should use off-chain forwarding directly to users; if a provider does not integrate BitChill, the handler leaves those rewards unclaimed rather than adding an approximate harvest-time allocation or an owner claim. Frontends must not present an incentive-inclusive APR as BitChill yield unless forwarding is live.
+
+This does **not** depend on a provider response. R9 must make the handlers indexer-ready by emitting one canonical per-user virtual lending-share balance transition after every share mint or burn. See [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md) for the decided event shape, required emit sites, and scope boundary.
 
 ## PR order
 
@@ -33,32 +75,121 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | Start with | PR | Ask |
 |---|---|---|
 | R23 | 1 (merged) | — |
-| PR 2, decision record | 2 | Fee model, R18, R19, optionals listed above |
+| PR 2, decision record | 2 (superseded by #74) | none |
 | R2 | 3 | none |
 | R7, R11, R14 | 4 | none |
 | R3, R4, R5 | 5 | Fee model if PR 2 did not record it |
 | R6, R17 | 6 | none |
 | R8 | 7 | none |
 | R1, R20 | 8 | none |
-| R15 | 9 | none |
-| R22 (folders) | 10 | none |
-| R22 (idle) | 11 | none |
-| R22 (LayerBank) | 12 | none |
-| R22 (deploy/CI) | 13 | none |
-| R9 | 14 | R18/R19 if not recorded (ABI freeze) |
-| R16 | 15 | none |
-| R10 | 16 | none |
-| R12, R13, R18, R19, OZ 5.x | optional late | only if the human named that item |
+| R24 | 9 | none |
+| R15 | 10 | none |
+| R22 (folders) | 11 | none |
+| R22 (idle) | 12 | none |
+| R21 | 13 | none |
+| R16 | 14 | none |
+| R22 (LayerBank) | 15 | none |
+| R25 | 16 | none |
+| R26 | 17 | none |
+| R27 | 18 | none |
+| R28 | 19 | none |
+| R29 | 20 | none |
+| R30 | 21 | none |
+| Post-R30 architecture plan | 22 (docs only) | none; records the later gates |
+| R33 | 23 | none |
+| R13 | 24 | one-shot user migration: manual exit without future cooperative migration, or ship fully specified user-initiated migration now |
+| R31 | 25 | individual fee setters or atomic-only fee mutation |
+| R34 | 26 | schedule mutation surface; frontend/backend consumer cutover |
+| R35 | 27 | none |
+| R32 | 28 | none |
+| R22 (deploy/CI) | 29 | none |
+| R39 | 30 | none (delete `buyRbtc`) |
+| R44 | 31 | none (pin OpenZeppelin `v5.7.0`) |
+| R45 | 32 | none (two-step ownership; direct initial owner; no renounce) |
+| R46 | 33 | none (remove `setOperationsAdmin`; immutable constructor admin) |
+| R47 | 34 | none (one assignment per handler address) |
+| R43 | 35 | none (decisions recorded above) |
+| R41 | 36 | none (reject FOT hop-1 shortfall) |
+| R40 | 37 | none (`updatePurchaseAmount` / `updatePurchasePeriod`) |
+| R48 | 38 | none (per-token×route deposit pause) |
+| R19 | 39 | none (per-schedule purchase pause) |
+| R49 | 40 | none (`DcaDetails` → `DcaSchedule`, rename-only) |
+| R18 | 41 | none (`DcaSchedule` only) |
+| R36 | 42 | none (decisions recorded above; kUSDRIF pause is a fork fact to measure) |
+| R50 | 43 | none (`uint64` nonce id; pack fees/admin/scalars/dex; `uint32` pause keys) |
+| R37 | 44 | none (keep legacy lanes; burn index 4) |
+| R38 | 45 | none (replace semantics; keep names) |
+| R42 | 46 | none (atomic; keep bot EOA) |
+| R9 | 47 | none (no extra purchase-event fields) |
+| R10 | 48 | none |
+| R42 integration | 49 ([#101](https://github.com/BitChillRSK/dca-contracts/pull/101)) | none (`Batch` for both entry points) |
+| R51 | 50 (planned GitHub #103) | none (first fork table in PR; durable live floor is a relaunch gate) |
+| R52 | 51 ([#104](https://github.com/BitChillRSK/dca-contracts/pull/104)) | none (same production Safe; divergent owners keep naturally split authority) |
+| R57 | 52 ([#106](https://github.com/BitChillRSK/dca-contracts/pull/106)) | **decided 2026-09-02: keep `registerRoute(SOVRYN_INDEX, true)`** — Sovryn is a real lending route; the hole is a Dex handler for DOC |
+| R56 | 53 ([#107](https://github.com/BitChillRSK/dca-contracts/pull/107)) | none (97% swap-time floor; 95% config wall; bot `minRbtcOut` is operational) |
+| R58 | 54 ([#108](https://github.com/BitChillRSK/dca-contracts/pull/108)) | none (test-only constant split; no deploy or `src/` change) |
+| R53 | 55 ([#109](https://github.com/BitChillRSK/dca-contracts/pull/109)) | none (documentation-only optimized baseline) |
+| R54 | 56 ([#110](https://github.com/BitChillRSK/dca-contracts/pull/110)) | answered (amount; top-up ignores deposit pause; `topUpFromInterest`) |
+| R59 | 57 ([#112](https://github.com/BitChillRSK/dca-contracts/pull/112)) | none (fail closed on incomplete Uniswap input; gas and size ceilings are fixed) |
+| R55 | 58 ([#113](https://github.com/BitChillRSK/dca-contracts/pull/113)) | none (measured; recommendation is keep stock solc, no IR) |
+| R60 | 59 (planned) | none (`via_ir` deploy profile; whole suite runs against shipped bytecode) |
+| R68 | 68 ([#124](https://github.com/BitChillRSK/dca-contracts/pull/124)) | none (full external lending-share consumption or revert; cash may still be net of fee/loss) |
+| R69 | 69 ([#126](https://github.com/BitChillRSK/dca-contracts/pull/126)) | none (OZ IERC165; SafeERC20 approve on Dex; external+internal deposit/withdraw; floor dust documented, not credited) |
+| R70 | 70 ([#127](https://github.com/BitChillRSK/dca-contracts/pull/127)) | none (public `i_operationsAdmin`; fail-closed per-token mins; `_requireUserMutationsAllowed` comment) |
+| R71 | 71 ([#128](https://github.com/BitChillRSK/dca-contracts/pull/128) source phase) | **license/SPDX deferred; Dex admin keep; batch lending-event semantics; evidence-gated MoC sequence/reverts** (src first in #128; deploy/release work follows) |
+| R76 | post-R75 pre-deployment fix | none (shared exact purchase-input consumption; zero-oracle constructor guard) |
+| R77 | post-R74 gas encoding | none (accumulated-rBTC `claimable + 1` storage sentinel) |
+| R78 | post-R77 gas fast path | none (flat-fee batches skip the unused fee-bound storage word) |
+| R80 | post-R78, before relaunch deploy | remove `DcaManager__CadenceAnchorUpdated` (decided 2026-09-23); five-repo event cutover |
+| R81 | post-R80, before relaunch deploy | none (one `SSTORE` per packed slot: purchase row, create; fee setter measured and declined) |
+| R82 | post-R81, before relaunch deploy | none (`ReentrancyGuardTransient`; same guarded set) |
+| R83 | post-R82, before relaunch deploy | **answered 2026-09-24: standing approvals on every Dex handler and every lending adapter** |
+| R84 | post-R83, before relaunch deploy | none (no repeated registry reads; the `getRouteInfo` view may be dropped, keeping the internal `withdrawTokenAndInterest` fix) |
+| R85 | after R84; not deployment-bound | none (one-line NatSpec uses `///`, multi-line uses `/** */`; comment-only) |
+| R79 | after R85; not deployment-bound | **closed 2026-09-25 without implementation** (repeated-buyer write coalescing; about 1% of a batch; docs-only record) |
+| R86 | after R79, before relaunch deploy | none (`calldata` for the purchase batch arrays, decided 2026-09-25; path setters kept `memory` 2026-09-26; six deferred gas candidates recorded in the gas audit) |
+| R87 | after R86, before relaunch deploy | **one verdict per deferred gas candidate, after measurement** (idle ledger, purchase-row event fields, fee sweep, `FeeTransferred`, balance reuse, `optimizer_runs`); no PR if none is approved |
+| R88 | after R87, before relaunch deploy if either Solidity candidate ships | **decided 2026-09-26:** reject shared scale declaration; **inline** LayerBank `_normalizedIncome` (source-only); cheatcode rename waits for an independently justified `forge-std` upgrade |
+| R89 | after R88, before relaunch deploy | **decided 2026-09-26:** implement every post-R88 review candidate (redundant reads, bounded `unchecked`, Dex constructor zero-token check, handler/token match on assignment, stale NatSpec, stray `IStablecoin`); record the rejected ones |
+| R90 | after R89, before relaunch deploy | **decided 2026-09-27:** ship oracle packing + unchecked lending zero-cash sum; defer PurchaseFees move and `forge fmt` to R91/R92; reject swap-pop bounds assembly and the other keep-rejected/checked rows |
+| R91 | after R90; not deployment-bound | none (`forge fmt` one-shot + CI enforce; metadata-stripped bytecode identity) |
+| R92 | after R91, before relaunch deploy | none (PurchaseFees off `TokenHandler`; solve default-profile Dex stack-too-deep) |
+| R93 | after R92, before relaunch deploy | none (report already-measured receipt shares on zero-cash reverts; delete the diagnostic-only batch loop) |
+| R94 | after R93, before relaunch deploy | none (create nonce before pull; drop withdrawal downcast; deposit store-before-pull and top-up hoist measured and reverted; record closed canvas leftovers) |
+| R95 | after R94, before relaunch deploy | **decided 2026-09-27:** merge `TokenLending` into the lending base and rename it `LendingHandler` / `ILendingHandler` (prefix `LendingHandler__`); scale visibility, R85 slip, declaration order, relative imports (runtime identical up to renamed topics/selectors); record the verdict on every candidate of the PRs 138–160 review |
+| R96 | after R95, before relaunch deploy | **decided 2026-09-27:** `ceilDiv` share conversion; drop `OperationsAdmin.isLendingRoute` for `getRouteClass`; private helper renamed `_isLendingRoute`; `DcaManager__TokenDoesNotYieldInterest` → `DcaManager__TokenIsNotLent` |
+| R97 | — | **closed 2026-09-27 without merging** ([#163](https://github.com/BitChillRSK/dca-contracts/pull/163)): redeem-to-user saves gas only on user-paid exits and adds a `receiver` mode to every adapter; R28's always-redeem-onto-the-handler stands |
+| R98 | after R96, before relaunch deploy | none (remove unreachable inner redeem clamp + `AmountToRedeemAdjusted`; `_redeemShares` private; share debit checked) |
+| R99 | after R98, before relaunch deploy | none (centralize measured deposit-share accounting into `LendingHandler._depositToken`) |
+| R100 | after R99; not deployment-bound | none (invariant suite honesty + integrated lending/purchase coverage) |
+| R101 | after R100, before relaunch deploy | **decided 2026-09-27:** registry checks a handler's DcaManager pin; min-purchase check before the create pull; dead top-up guard dropped; Tropykus-only redeem error off `ILendingHandler`; `…MustBeAtLeastMinimum` renames; stale NatSpec; lending-exit balance reuse and the `withdrawTokenAndInterest` reorder closed |
+| R102 | after R101, before relaunch deploy | none (`PurchaseUniswap` unwraps through `_withdrawRbtc`; encoding + path helpers `private`; NatSpec) |
+| R103 | after R102, before relaunch deploy | **decided 2026-09-28: `PurchaseFees`** (Handler taxonomy: strip `Erc20`, fee mixin off Handler, `getHandler` / `assignHandler`) |
+| R104 | after R103, before relaunch deploy | none (identifier polish + NatSpec trim; stack on R103 names) |
+| R105 | after R104, before relaunch deploy | none (strip redundant `Address` from address params / matching locals; stack on R104) |
+| R106 | after R105, before relaunch deploy | none (`s_shares` / Uniswap path state `private`; correct `UserSharesUpdated` docs; stack on R105) |
+| R107 | after R106, before audit freeze / relaunch deploy | none (hardcoded rBTC MoC / WRBTC Dex fees credited on accumulated books; decided 2026-09-29 / 2026-09-30) |
+| R108 | after R107, before audit freeze / relaunch deploy | none (monotone purchase-fee formula; launch defaults 100/20 bps, lower bound 250 tokens) |
+| R109 | after R108, before audit freeze / relaunch deploy | none (`_setUserShares` always emit; checked `FeeCredited` product; variable-fee conservation coverage) |
+| R110 | after R109, before audit freeze / relaunch deploy | none (internal audit follow-ups: stale fee and cadence docs, Sovryn/Tropykus underlying check, LayerBank burn-rounding assumption and probe) |
+| R111 | after R110, before audit freeze / relaunch deploy | none (`IiSusdToken` → `IiToken`, `MockIsusdToken` → `MockIToken`, remaining `iSusd` identifiers → `iToken`) |
+| R112 | after R111, before audit freeze / relaunch deploy | none (publish the Krait audit report under `audits/2026-10-02-Krait/`; follow-ups are comments and documents only; no window gap) |
+| R113 | after R112, before audit freeze / relaunch deploy | none (reviewer-facing documents; Markdown only) |
+| R114 | after R113, before audit freeze / relaunch deploy | none (AuditAgent report; targeted lending fixes for findings 1/5/6; accepted 2/3; operational checks for 4) |
+| R115 | after R114, before audit freeze / relaunch deploy | **decided 2026-10-08:** drop `DcaManager.withdrawAccumulatedRbtc`; one-element `withdrawAllAccumulatedRbtc` is the single-handler withdraw |
+| R116 | after R115, before audit freeze / relaunch deploy | none (publish the Pashov skills scan, X-Ray map and Fizz fuzzing suite; no `src/` change; triage is R117) |
+| R117 | after R116, before audit freeze / relaunch deploy | decided: keep deposits/creation open with execution-rate protection; omit Sovryn and the alternate USDRIF launch path; combine selected mitigations, tests, and decisions in #186 (replaces #184) |
+| R118 | after R117; separate owner-requested hardening review | none (L06 deposit credit before the handler call; L14 exact lending-deposit consumption; L17 no zero-value transfer; L25 declined as a dependency assumption; tracked by [#185](https://github.com/BitChillRSK/dca-contracts/issues/185)) |
+| R119 | after R118, before audit freeze / relaunch deploy | **decided 2026-11-02:** explicit user function; whole position per token and route; schedules kept at zero balance; blocked in the protected window; Sovryn adapter included |
+| R120 | after R119, before audit freeze / relaunch deploy | **decided 2026-11-02:** Sovryn becomes legacy like Tropykus: `src/sovryn-legacy/`, out of the deployment and audit scope, route 2 burned, legacy lanes out of the required gates |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
 **Merged.** First-party `0.8.36` / `cancun`. Uniswap git sources stay `=0.7.6`; `make patch-deps` remains required. OZ `v4.9.3`. Testnet proof passed.
 
-### PR 2 - Decision record
+### PR 2 - Decision record (superseded)
 
-Record the fee-model, R18 packing, and R19 pause decisions in the relevant specs before touching those surfaces.
-
-This can be docs-only if no code is needed. If the decision is to defer an optional item, say so explicitly.
+The original placeholder was never needed as a separate implementation PR. GitHub PR [#74](https://github.com/BitChillRSK/dca-contracts/pull/74) records the final scope decisions above and supplies specs for every item that will ship. Rejected items are closed decisions, not a later queue.
 
 ### PR 3 - R2 purchase-period UTC boundary
 
@@ -84,9 +215,11 @@ If the fee model is flattened, this PR becomes the one-rate rewrite instead. Do 
 
 ### PR 6 - R6 and R17 hot-path cleanup
 
-Trim only gas-only purchase reverts while keeping period, schedule-id, amount, lending-index, access-control, and malformed-calldata checks.
+Drop `nonReentrant` on `buyRbtc` / `batchBuyRbtc` and cache `SWAPPER_ROLE` on `DcaManager`. That is where the measured 3,437 gas is; both are swapper-only and write nothing after their handler call. Keep period, schedule-id, amount, lending-index, access-control, malformed-calldata, underfunded-schedule, and empty-batch checks (the last two are diagnostic, not hot-path).
 
-Remove unnecessary `nonReentrant` modifiers from non-rBTC-withdraw paths and make `depositToken` / `updateDcaSchedule` pull before crediting.
+Keep `nonReentrant` on **every** external function that writes `s_dcaSchedules` (`AGENTS.md` invariant 6). Removing it from user paths saves ~2,300 gas — about 1.4 cents, paid by users, not the protocol — and three review rounds produced three exploitable states trying to reason it away. A partial set is worse than none, since OZ's guard only blocks other *guarded* functions.
+
+Schedule ids come from a monotonic `s_scheduleNonce`, never from array state (`AGENTS.md` invariant 7). `depositToken` pulls before crediting. `updateDcaSchedule` keeps its memory-copy order — the storage write was always after the pull, so reordering it was a no-op. See `R6-hot-path-cleanup.md`.
 
 ### PR 7 - R8 remove stuck-rBTC rescue
 
@@ -98,13 +231,39 @@ Fix Sovryn for SIP-0094 and apply the broader rule that integrator return values
 
 Measure token/native balance deltas after Sovryn, Tropykus, MoC, and Uniswap operations that move funds to BitChill or to the user. Use views only to size share burns, then clamp to shares held.
 
-### PR 9 - R15 withdraw-all sentinel and share dust
+**R6 leftover — clamp desync, this PR owns it:** `DcaManager._withdrawToken` / `deleteDcaSchedule` deduct the *requested* amount, then Tropykus/Sovryn `withdrawToken` may clamp to the user's lending position and pay less. That is not R1 (Sovryn `burn` return vs net). It is R20: do not treat the requested amount as cash paid. After the handler call, measure the user's token delta (or take the actual payout) and only deduct that from `tokenBalance`. Do not leave this as a footnote on R1.
 
-Add `type(uint256).max` as "withdraw this schedule's full tokenBalance." Sweep leftover lending shares when the user's locked balance for that token/protocol is zero.
+### Heads-up for any future idle-funds handler
+
+**Read this before writing a handler that holds the stablecoin instead of lending it.**
+
+Per-user accounting for lending lives in `LendingErc20Handler.s_shares`. Idle has its own mapping in `IdleHandler`. The base `TokenHandler.withdrawToken` is a bare `safeTransfer` with **no cap and no mapping behind it**, so a handler that extends `TokenHandler` without adding its own per-user tracking pays out whatever `DcaManager` asks from a pooled balance.
+
+Lending handlers clamp a withdrawal to the caller's own position (`LendingErc20Handler.withdrawToken`) instead of reverting. That clamp is what currently bounds *every* `DcaManager` accounting bug to the user who caused it. Remove it and the same bugs become solvency bugs against other users' pooled funds. Concretely, the `updateDcaSchedule` stale-write-back reentrancy that R6 analysed is self-desync under a lending handler and a straight pool drain under an idle one.
+
+So, for an idle-funds handler:
+
+- It **must** carry per-user accounting and clamp `withdrawToken` to the caller's own balance, or it inherits an uncapped withdraw. R28 put that clamp on `LendingErc20Handler` for the lending twins; Idle already has its own. Do not drop the clamp from a new idle handler.
+- Invariant 6 in `AGENTS.md` (comprehensive `nonReentrant` on schedule mutators) stops being cheap insurance and becomes load-bearing. Do not relax it in the same relaunch that introduces pooled idle funds.
+- The R20 balance-delta work above matters more, not less: with no clamp, `DcaManager.tokenBalance` is the only thing standing between a user and the pool.
+
+### Handler replacement — assigned to R13
+
+R13 owns the complete `OperationsAdmin` security and lifecycle surface. A live `(token, routeIndex)` becomes add-only: governance upgrades by registering a new versioned route, while old schedules keep resolving to the old handler that holds their funds. Same-index overwrite, owner rescue, and owner-selected migration destinations are prohibited.
+
+The remaining product gate is whether relaunch also ships a fully specified **user-initiated** migration or uses versioned routes with manual user exit/re-entry. This is a one-shot cutover decision: cooperative migration must be callable on the old immutable handler, so choosing manual exit means the handlers deployed by the relaunch cannot acquire that capability later. See [`R13-operations-admin-lifecycle.md`](./R13-operations-admin-lifecycle.md).
+
+### PR 9 - R24 test harness matrix
+
+Stacked on PR 8. Test/Makefile only. `make moc-sovryn` must actually run Sovryn (`BaseDeploymentTest` must not `vm.setEnv` `LENDING_PROTOCOL`). `make fork-*` must pass a single `--no-match-path`. Tropykus fork tests pin Rootstock block `8700000` (2026-04-05); kDOC mint was paused between blocks 8739512 and 8740674. See `R24-test-harness-matrix.md`.
+
+### PR 10 - R15 withdraw-all sentinel
+
+Add `type(uint256).max` as "withdraw this schedule's full tokenBalance." Lending-share dust is deferred, not fixed; the decision is recorded in `R15-withdraw-all-sentinel.md`.
 
 This should follow R1/R20 so net redemption behavior is settled first.
 
-### PR 10 - R22 repo layout preparation
+### PR 11 - R22 repo layout preparation
 
 Move protocol-specific sources and tests into folders:
 
@@ -115,19 +274,129 @@ Move protocol-specific sources and tests into folders:
 
 Keep behavior unchanged where possible. Tropykus remains legacy code and tests, but it must not be registered in the new deployment path.
 
-### PR 11 - R22 idle handler
+### PR 12 - R22 idle handler
 
 Ship the index-0 idle DOC + MoC handler. Deposits stay on the handler; no lending token is minted; buys and withdrawals spend idle DOC.
 
-Interest calls for index 0 should continue to revert because no protocol name is registered for index 0.
+Interest calls for index 0 should continue to revert. R13 later replaces the absence-of-name test with a direct lending-route flag that is always false for index 0.
 
-### PR 12 - R22 LayerBank handler
+### PR 13 - R21 fee-on-transfer deposits
 
-Add LayerBank as index 1 for DOC + MoC. Use balance-delta accounting from the start. Add mocks or fork tests based on the Rootstock LayerBank lToken ABI.
+R1 left deposit accounting as "credit the requested amount." Idle already credits the handler mapping from a balance delta; `DcaManager` still credits `depositAmount`. FOT is not a supported token class. This PR is hop-1 hygiene so a listed proxy that suddenly turns on a transfer fee cannot mint more than the handler holds and cannot freeze withdrawals. Purchases after that are not guaranteed.
+
+`TokenHandler.depositToken` measures `balanceOf(address(this))` before/after `transferFrom` and returns the received amount. `DcaManager` create / deposit / update credits that return, and validates `purchaseAmount` against the post-deposit `tokenBalance`. Lending handlers mint from the received amount, not the requested one. A lending hop-2 lag can make `batchBuyRbtc` revert for the whole batch (named error; swapper drops the row) — same as any share shortfall. Do not change the R20 withdraw rule (principal falls by the requested amount; a fee consumes principal). Do not add recipient-side withdraw measurement.
+
+Land this before LayerBank so the new handler copies the measured-deposit pattern. Tests: a `MockFeeOnTransferStablecoin` in the same style as `MockReentrantStablecoin` / `DepositSwapPopReentrancyTest`. See `R21-fee-on-transfer-deposits.md`.
+
+### PR 14 - R16 redeem glossary
+
+Rename first-party internals, events, variables, and comments so "redeem" names the token being given up. Do not rename third-party ABI functions (`redeemFreeDoc`, `redeemUnderlying`, iToken `burn`, …). No behavior change; no new tests.
+
+PurchaseRbtc's `_redeemStablecoin` hook is "make stablecoin available to spend," not a redeem. Idle only debits a mapping. MoC's first-party wrapper spends DOC to receive rBTC. Land this before LayerBank so the new handler does not copy the current names. See `R16-redeem-glossary.md`.
+
+This should land before the full natspec pass (R10).
+
+### PR 15 - R22 LayerBank handler
+
+Add LayerBank as index 1 for DOC + MoC. Use balance-delta accounting from the start (including R21 deposit returns). Add mocks or a live fork probe based on the Rootstock LayerBank **Pool / aToken** ABI (Aave-v3-style lRooDOC). Do not implement against the stale v2 Core / lToken README — that Core never listed DOC.
+
+LayerBank owns exact per-user virtual **scaled aToken** balances and implements the shared `getUserShares(user)` getter. External incentives are out of scope: no Merkl interfaces, reward token, harvest, claim, operator, reward-debt, or unwrap logic. R9 later adds the canonical balance-transition event across the final lending-handler set; LayerBank must expose every share mutation cleanly enough for that event to cover deposits, withdrawals, interest, and single/batch purchases. See [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md).
 
 Do not rename Tropykus in place and do not deploy USDRIF/Uniswap handlers for this relaunch.
 
-### PR 13 - R22 deploy scripts, constants, harness, and CI matrix
+### PR 16 - R25 lending redeem helper naming
+
+Leftover from R16 (PR 14): that glossary pass still left `_burnKtoken` and a “repay” alias. Rename-only (plus tiny leaf cleanup), after LayerBank exists so all three lending handlers match. Drop `_burnKtoken` / `_burnAtoken` and `*ToRepay` locals in favor of `_redeemByUnderlying` / `_redeemByShares` (Tropykus/LayerBank) and `*ToRedeem` locals (all three). Sovryn stays one share-sized helper with a recipient overload; stop reusing `stablecoinInterestAmount` for the measured payout; rename `totalErc20InLending` → `totalStablecoinInLending`. Copy Sovryn’s `getAccruedInterest` natspec onto Tropykus/LayerBank. Drop unused `minPurchaseAmount` from Tropykus/Sovryn MoC/Dex constructors (LayerBank already omitted it); fix SovrynDocHandlerMoc’s “Tropykus' iSUSD” natspec. Also rename the shared event to `TokenLending__AmountToRedeemAdjusted` — the relaunch deploys fresh with no live log consumer, and R9 (now PR 47) freezes the event surface, so this is the last cheap moment. See `R25-lending-redeem-naming.md`.
+
+Land before R26 and deploy/CI so neither PR freezes the old helper names.
+
+### PR 17 - R26 share terminology
+
+"Lending token" is not DeFi nomenclature and reads backwards — `_stablecoinToLendingToken` sounds like "the token being lent", which is the stablecoin. Aave says `aToken`, Compound (Tropykus's fork parent) says `cToken`; the recognized generic is ERC-4626's **shares**. Rename the receipt-token noun to `shares` across `ITokenLending`, `TokenLending`, and the handlers: `getUsersLendingTokenBalance` → `getUserShares`, `_stablecoinToLendingToken` / `_lendingTokenToStablecoin` → `_stablecoinToShares` / `_sharesToStablecoin`, `TokenLending__LendingTokenRedeemed(Batch)` → `…SharesRedeemed(Batch)`, `TokenLending__InsufficientLendingTokenBalance` → `TokenLending__InsufficientShares`, and Sovryn's `_redeemLendingToken` → `_redeemShares`.
+
+Keep `ITokenLending` / `TokenLending` / `LENDING_PROTOCOL` / `LendingProtocol*Failed` — "lending" as a domain word is fine; only "lending **token**" is wrong. *(2026-09-27: [R95](./R95-merge-token-lending.md) renamed the pair `ILendingHandler` / `LendingHandler`, keeping "lending".)* Keep `stablecoin` as the asset noun; do not adopt 4626's `assets`.
+
+Land before R22 deploy/CI (now PR 28) for the same reason R25 did: that PR splits the harness where 76 of the 295 matching lines live, so renaming afterwards writes them twice. **R9 (now PR 29) is the ABI freeze** and already specifies `TokenLending__UserSharesUpdated(…, previousShares, newShares)`; until this PR reworded it, the R9 entry below also required a test asserting `newShares == getUsersLendingTokenBalance(user)` — two names for one quantity. Settle the noun before that lands. See `R26-share-terminology.md`.
+
+### PR 18 - R27 Tropykus lending cash guards
+
+Human reordered (2026-08-25): land R27 and R28 **before** R22 deploy/CI so the Tropykus cash bugs are fixed and the shared lending base exists before the harness/CI cutover and well before R9's ABI freeze. R27 does not depend on the new index map — Tropykus stays legacy-only either way.
+
+After a 0 Compound `mint` code, revert `TokenLending__LendingProtocolDepositFailed` if the measured kToken delta is 0 (Sovryn `:66`, LayerBank `:80` already do). After a 0 Compound batch `redeemUnderlying` code, revert `TokenLending__ZeroStablecoinReceived` if the measured DOC delta is 0 (Sovryn `:226`, LayerBank `:284`); do not emit-and-return zero. Keep Tropykus’s single-redeem `stablecoinAmount > 0 &&` conjunct — that is the Compound analogue of LayerBank skipping a zero `Pool.withdraw`, not a third bug.
+
+Do not extract a shared base here. See `R27-tropykus-lending-guards.md`. Must land before R28 so the base copies the aligned guards. Stack on R26 (PR 17).
+
+### PR 19 - R28 extract `LendingErc20Handler`
+
+Promoted from optional late (human named it for this slot). Collapse the three lending `*Erc20Handler` twins into one abstract `LendingErc20Handler is TokenHandler, TokenLending`. Idle stays out; `TokenLending` stays conversion math. Requires R27 first. Cheapest before R9 (one `UserSharesUpdated` emit site) and before R22 deploy/CI splits the harness around the old three-file shape. See `R28-lending-erc20-handler.md`.
+
+### PR 20 - R29 hardcode each adapter’s exchange-rate scale
+
+Sovryn and Tropykus still take `exchangeRateDecimals` as a constructor argument; LayerBank already hardcodes `RAY`. The scale is a protocol constant, not a deploy knob — passing `Constants.sol`’s `1e18` into LayerBank would size withdrawals 1e9× too large. Bind `1e18` as `EXCHANGE_RATE_DECIMALS` on the Sovryn and Tropykus adapters (same shape as LayerBank’s `RAY`). Drop the arg from those adapters, their Moc/Dex leaves, and every `new` / script call site. Do not add the arg to LayerBank. `TokenLending` still receives the value from the adapter.
+
+Must land before R30 and R22 deploy/CI so neither inherits or freezes the extra constructor arg. Stack on R28 (PR 19, GitHub #63). See `R29-hardcode-exchange-rate-scale.md`.
+
+### PR 21 - R30 shared rBTC purchase pipeline
+
+Promoted from Candidates A+B in the post-R29 full-`src/` review. Move the duplicated MoC/Uniswap single and batch algorithm into `PurchaseRbtc`, with route hooks that continue to return measured native rBTC or WRBTC cash. Add a shared `StablecoinSource` declaration inherited by the purchase and funding bases so the six leaves can delete twelve forwarding resolvers.
+
+This is behavior-preserving architecture work: no ABI, fee, allocation, event, error, constructor, slippage, or deploy changes. It is primarily a maintenance/drift win, not promised bytecode headroom; measure the concrete handlers and keep both Dex handlers below EIP-170. Give the common algorithm base-level tests plus MoC/Uniswap route-adapter coverage. See [`R30-purchase-pipeline.md`](./R30-purchase-pipeline.md).
+
+GitHub [#65](https://github.com/BitChillRSK/dca-contracts/pull/65). Stack on R29 (PR 20, GitHub #64). Land before R22 deploy/CI (now PR 28) so the harness is split around the final purchase shape.
+
+### PR 22 - Post-R30 architecture plan (docs only)
+
+Resolve the former unassigned checkpoint into implementation specs and order. No Solidity or behavior changes:
+
+- Candidate F plus the handler-replacement question becomes required [R13](./R13-operations-admin-lifecycle.md).
+- Candidate E becomes [R33](./R33-uniswap-slippage-validation.md).
+- Candidate C becomes [R31](./R31-handler-abi-trim.md).
+- Candidate D is split into public-ABI [R34](./R34-dca-manager-abi.md) and behavior-preserving [R32](./R32-internal-cleanup.md).
+
+The split is intentional: authority/fund lifecycle, configuration behavior, handler ABI, DcaManager ABI, and internal cleanup each receive their own review boundary. The old checkpoint is closed; none of Candidates C–F remains in limbo.
+
+The R28 snapshot measured runtime bytecode at 21,081 bytes for `DcaManager`, 24,243 for `SovrynHandlerDex`, and 24,366 for `TropykusHandlerDex` — unoptimized, like every figure recorded before #104 ([Measurement basis](./README.md#measurement-basis)). R30 changed those numbers; R31 must re-measure actual base/head sizes rather than carrying the snapshot forward as a promise.
+
+Deliberate non-candidates remain excluded (the `TokenLending` merge was reopened and shipped by [R95](./R95-merge-token-lending.md) on 2026-09-27): do not merge `TokenLending` into `LendingErc20Handler`, absorb Idle into the lending base, add speculative adapter layers, or introduce proxies, delegatecall, owner rescue, or a withdrawal `to` parameter.
+
+### PR 23 - R33 Uniswap slippage validation
+
+Use the same settings invariant in construction and both existing setters. Raising the safety floor above the active minimum must revert without changing state. This is a small intentional owner-configuration tightening, kept separate from selector pruning. It has no gate or file overlap with R13, so landing it first keeps the rest of the stack moving while R13's migration decision is answered. See [`R33-uniswap-slippage-validation.md`](./R33-uniswap-slippage-validation.md).
+
+### PR 24 - R13 operations authority and handler lifecycle
+
+Remove the unused owner/admin split: production has assigned both powers to the same multisig for a year, so one owner-governance boundary is clearer than parallel `Ownable` and `AccessControl` systems. Keep the real operational separation by representing the existing multi-swapper allowlist through a narrow typed mapping.
+
+At the same time, remove the unused string protocol registry, replace it with an explicit one-shot route-class registry, and make `(token, routeIndex)` assignments add-only. An index identifies an immutable route/version, not a unique external provider. Governance deploys upgrades at new indexes; old schedules continue to resolve to the handlers holding their funds. A wrong assignment consumes its index even before use because governance cannot prove globally that a handler is empty.
+
+**No open product gates — do not ask.** Both decisions were recorded in the spec on 2026-08-26:
+
+- **Migration gate: option (a), manual exit/re-entry.** No cooperative migration ships; these handler versions will never gain the hook. Migration would not survive the bug scenarios that motivate it (it redeems through the same path), `SovrynHandlerDex` has 426 bytes of runtime margin, and a position-moving function on immutable unaudited contracts is the worst place for a bug. The work is the four conditions attached to the decision, not new code. Never allow governance to move another user's funds. **Re-baselined by R53:** that 426 bytes was an unoptimized measurement and the leaf now has 9,097 ([Measurement basis](./README.md#measurement-basis)), so the size half of this decision is void. The other three reasons — migration redeems through the same broken path, it is the highest-value target on immutable contracts, and generation 2 can still ship the hook — do not depend on bytecode. Re-judge in its own PR if at all; R53 does not.
+- **Idle is a route class, not index zero.** Each index registers once as idle or lending, the constructor pre-registers `0` as idle, and handler assignment requires a registered class. Without this, add-only assignment would make a buggy idle handler unrecoverable for new users on that token — because `(token, 0)` is the only idle slot and no non-zero index accepts a non-lending handler.
+
+`DcaManager.setOperationsAdmin` and ownership-transfer hardening are explicitly **out of scope** here. Their later review is now resolved: R45 adds the acceptance flow and R46 removes the setter in favor of an immutable constructor admin. Class↔handler ERC-165 (`ITokenLending` on `assignHandler`) is the same error class as a mistyped index and is **required on R31**. See [`R13-operations-admin-lifecycle.md`](./R13-operations-admin-lifecycle.md).
+
+### PR 25 - R31 handler ABI trim
+
+Remove redundant handler getters and aliases before R9 freezes the shipped surface, and decide whether fee-band mutation remains available through individual setters or only the atomic setter. Preserve fee math, the 5% cap, every concrete handler constructor ABI, storage layout, and purchase behavior; remove dead stablecoin parameters only from the abstract purchase bases. Re-measure every concrete handler's selectors and runtime margin.
+
+Also close the R13 class↔handler hole: `assignHandler` must match `RouteClass` to `ITokenLending` via ERC-165 (lending handlers advertise it; idle handlers must not). If Dex margin cannot absorb that after pruning, assign a follow-up spec in the same PR — do not merge with only a cutover warning. See [`R31-handler-abi-trim.md`](./R31-handler-abi-trim.md).
+
+### PR 26 - R34 DcaManager ABI
+
+Consolidate duplicated schedule/read APIs, derive `withdrawTokenAndInterest` routing from the validated schedule, and decide the public schedule-mutation surface with the relaunch consumer. Keep schedule storage, purchase behavior, and invariant 6 unchanged. See [`R34-dca-manager-abi.md`](./R34-dca-manager-abi.md).
+
+### PR 27 - R35 route-index terminology
+
+Inserted after R34 (PR 26, GitHub [#70](https://github.com/BitChillRSK/dca-contracts/pull/70)). GitHub [#71](https://github.com/BitChillRSK/dca-contracts/pull/71). Rename DcaManager's leftover `lendingProtocolIndex` to `routeIndex` so the schedule-routing noun matches `OperationsAdmin` and remains accurate for idle (non-lending) handlers. Rename-only: storage layout and remaining function selectors unchanged; the mismatch error name (and its selector) changes. See [`R35-route-index-terminology.md`](./R35-route-index-terminology.md).
+
+Stack on R34. Land before R32 so internal cleanup is written against the final names.
+
+### PR 28 - R32 internal cleanup
+
+Only after R13, R34, and R35 settle the surrounding surfaces, remove redundant DcaManager memory copies/lookups/loops and identical exchange-rate overrides. No external selector, event, error, storage, or cash-accounting change. See [`R32-internal-cleanup.md`](./R32-internal-cleanup.md). The pre-existing two-routes-one-handler uniqueness hole is not part of this cleanup; R47 now closes it before new handler assignment.
+
+### PR 29 - R22 deploy scripts, constants, harness, and CI matrix
 
 Update constants and deploy scripts for the new map:
 
@@ -136,46 +405,1302 @@ Update constants and deploy scripts for the new map:
 - `2`: Sovryn
 - `3`: reserved for future MoC lending
 
-Split the shared test harness so lending-token assertions live only in lending-protocol-specific tests. CI should cover `none`, `layerbank`, and `sovryn` with `SWAP_TYPE=mocSwaps`.
+Split the shared test harness so lending-share assertions live only in lending-protocol-specific tests. CI should cover `none`, `layerbank`, and `sovryn` with `SWAP_TYPE=mocSwaps`.
 
-### PR 14 - R9 event indexing and ABI cleanup
+**Required in this PR:** round-up solvency regression on the LayerBank lane — virtual scaled books must stay ≤ handler `scaledBalanceOf` after odd-amount redeems against Aave-like round-nearest burns; the test must fail if `_stablecoinToShares` rounded down. Shared rule lives on `TokenLending`; do not re-document it only on LayerBank. See `R22-deploy-ci.md`.
 
-Index only addresses and `scheduleId`. Do not index amounts, timestamps, periods, rates, strings, bytes, or arrays.
+Stack on R32 (PR 28). Tropykus is not in this map; R27 already corrected the legacy handler.
 
-Do this once the shipped ABI surface is known, including any optional pause or compound-interest events that were approved.
+### PR 30 - R39 remove `buyRbtc`
 
-### PR 15 - R16 redeem glossary
+Delete `DcaManager.buyRbtc` and `PurchaseRbtc.buyRbtc`. Production uses `batchBuyRbtc`; a length-1 batch is the remaining one-schedule path. The single selector is cheaper for one schedule, so R39 must record an apples-to-apples gas delta before deletion; the plan knowingly accepts that rare overhead in exchange for one cash path and freed DcaManager/Dex bytecode before R9 spends it on share events. See [`R39-remove-single-buy.md`](./R39-remove-single-buy.md).
 
-Rename first-party internals, events, variables, and comments so "redeem" names the token being given up. Do not rename third-party ABI functions.
+This goes first because it removes the dead purchase branch and creates bytecode headroom before R43 changes `PurchaseUniswap` and before R36 adds the final Dex handler.
 
-This should land before the full natspec pass.
+**Must land before R9 (PR 47).**
 
-### PR 16 - R10 natspec and comments
+### PR 31 - R44 OpenZeppelin 5.7 upgrade
 
-Rewrite first-party natspec after ABI, names, handlers, and layout are stable. Put user-facing docs on interfaces and use `@inheritdoc` in implementations.
+Pin OpenZeppelin Contracts `v5.7.0` and migrate imports, constructors, libraries, mocks, and exact revert assertions without adding BitChill behavior. Compare sizes, gas, and storage layouts. The relaunch is a fresh deployment, so this is the correct point to take the supported major before later PRs build on it. See [`R44-openzeppelin-5-upgrade.md`](./R44-openzeppelin-5-upgrade.md).
+
+R39 lands first so the migration measures the batch-only bytecode. R45 depends on OZ5's ownership implementation.
+
+### PR 32 - R45 two-step ownership
+
+Use one shared `Ownable2Step`-based governance policy for DcaManager, OperationsAdmin, and production handlers: pass the intended owner at construction, require acceptance for future transfers, and forbid renunciation. Update every deploy path and re-measure EIP-170 margin. See [`R45-two-step-ownership.md`](./R45-two-step-ownership.md).
+
+### PR 33 - R46 pin OperationsAdmin
+
+Make DcaManager's constructor-supplied OperationsAdmin immutable and remove `setOperationsAdmin` plus its event. Whole-registry replacement bypasses R13's add-only/versioned-route rule and can redirect every live schedule. Keep the canonical getter. See [`R46-pin-operations-admin.md`](./R46-pin-operations-admin.md).
+
+### PR 34 - R47 handler-address uniqueness
+
+An OperationsAdmin may assign each handler address exactly once. This closes the cross-route principal/share hole: DcaManager locks principal per route, while handler shares are per handler. The stronger one-assignment rule also prevents reuse across tokens or route classes, for which the handler has no keyed accounting. See [`R47-handler-address-uniqueness.md`](./R47-handler-address-uniqueness.md).
+
+### PR 35 - R43 dex path review (peg, slippage, MEV)
+
+Dex becomes a production venue (USDRIF + USDT0 on LayerBank). Review `PurchaseUniswap` before R36 copies it and before R9 freezes it: the $1-stable assumption against the MoC BTC/USD oracle, how `amountOutMinimum` is built, the unused-at-swap-time safety-check, SwapRouter02’s missing deadline, and Rootstock MEV. The current min-out formula is 18-decimal; **USDT0 is 6 decimals** and cannot ship on it. Implement the recorded decisions in this PR (minimum: decimal scaling if the peg is kept). See [`R43-dex-path-review.md`](./R43-dex-path-review.md).
+
+This deliberately follows R39 so the reviewed Dex bytecode no longer contains the single-buy branch, and it deliberately precedes R36 so the new handler consumes settled shared swap behavior.
+
+**Must land before R36 (PR 42) and R9 (PR 47).**
+
+**Decided:** keep the listed-stable $1 assumption plus MoC BTC/USD; keep a decimal-correct on-chain oracle floor; do not add a handler deadline/private-relay dependency. Bot policy may tighten the floor operationally.
+
+### PR 36 - R41 reject fee-on-transfer deposits
+
+Keep R21’s hop-1 measurement; revert `TokenHandler__DepositAmountMismatch` if `received != requested`. Listed stables are 1:1; a surprise transfer fee fails closed instead of crediting a shortfall. New custom error is ABI, so this is pre-freeze. Land it before R36 so the new USDT0/USDRIF deployments start with the settled deposit policy. See [`R41-reject-fot-deposits.md`](./R41-reject-fot-deposits.md).
+
+### PR 37 - R40 `updatePurchaseAmount` / `updatePurchasePeriod`
+
+Rename `setPurchaseAmount` → `updatePurchaseAmount` and `setPurchasePeriod` → `updatePurchasePeriod`. Events become `PurchaseAmountUpdated(user, scheduleId, previousAmount, newAmount)` and `PurchasePeriodUpdated(user, scheduleId, previousPeriod, newPeriod)`, with neither amount nor period indexed (R9 rule). Both mutators only ever edit a schedule `createDcaSchedule` already wrote, so both read as updates; doing them together breaks the ABI once instead of twice. Combined amount+period edits remain two transactions. See [`R40-update-purchase-period.md`](./R40-update-purchase-period.md).
+
+**Must land before R9 (PR 47).** Frontend follow-up required.
+
+### PR 38 - R48 deposit pause
+
+Add a governance circuit breaker per `(token, routeIndex)`: block only `createDcaSchedule` and `depositToken` before cash moves. Purchases, configuration, withdrawals, interest/rBTC claims, and deletion remain available. This replaces the vague global "on-chain deposit pause" idea with a narrow incident-control surface. The surface is `setDepositsPaused` / `areDepositsPaused`; R19's user-owned `setSchedulePaused` stops purchases, so the two need no extra qualifier. See [`R48-deposit-pause.md`](./R48-deposit-pause.md).
+
+### PR 39 - R19 per-schedule purchase pause
+
+Add user-owned `setSchedulePaused(..., bool)`. A paused schedule cannot appear in a successful `batchBuyRbtc`, but every deposit/configuration/exit path remains available. Add the final schedule field before packing. See [`R19-schedule-pause.md`](./R19-schedule-pause.md).
+
+### PR 40 - R49 rename `DcaDetails` to `DcaSchedule`
+
+Rename-only. `Details` is a noise word; the struct is the schedule, and every other identifier
+around it already says so (`s_dcaSchedules`, `createDcaSchedule`, `getDcaSchedule`, `scheduleId`,
+`scheduleIndex`, `setSchedulePaused`), including the local variables holding the type. Same class of
+correction as R26 and R35.
+
+No selector, event, error, storage-layout, or behavior change — verified, not assumed, by diffing
+`forge inspect` `methodIdentifiers` (byte-identical) and `storageLayout` (identical slots; only the
+type label moves). `DcaSettings` was rejected: the struct carries `tokenBalance` and
+`lastPurchaseTimestamp`, which are protocol-written state, and naming it after its config half
+invites the stale-write-back hazard R6 analysed.
+
+Deliberately before R18 so the packing PR is written against the final name instead of rewriting the
+same lines twice, and well before R9's freeze. See [`R49-schedule-struct-name.md`](./R49-schedule-struct-name.md).
+
+### PR 41 - R18 DcaSchedule storage packing
+
+Pack `DcaSchedule` into three slots with checked widths: two `uint128` amounts; `uint32` period, `uint48` timestamp, `uint32` route, and `bool paused`; then `bytes32 scheduleId`. External function inputs remain `uint256`; casts are checked before cash/state mutation. Handler balance/share mappings stay `uint256` because narrowing them saves no slot and increases financial risk. Further packing (nonce as `uint64` id, fees, admin, scalars, dex percents, remaining `uint32` route keys) is R50. See [`R18-storage-packing.md`](./R18-storage-packing.md).
+
+### PR 42 - R36 LayerBank dex stables (USDRIF + USDT0)
+
+Ship `LayerBankHandlerDex` (`LayerBankHandler` + `PurchaseUniswap`, constructor-only, modelled on `SovrynHandlerDex`) and deploy it twice: USDRIF (replacing `TropykusHandlerDex`) and USDT0 (new listing). Same bytecode; config differs. Add a `dex-layerbank` lane to the Makefile and CI for both `STABLECOIN_TYPE=USDRIF` and `STABLECOIN_TYPE=USDT0`.
+
+R22 (PR 29) took Tropykus off the production **MoC** map but it is still live on the **dex** map: `DeployUsdrifHandler` and the `DeployDexSwaps` live branch both deploy Tropykus dex handlers. LayerBank lists USDRIF **and** USDT0. R22 listed "LayerBank Uniswap / USDRIF" as out of scope; this is that deferred item plus the USDT0 twin.
+
+USDT0 is 6 decimals (`0x779Ded0c9e1022225f8E0630b35a9b54bE713736`). Do not pass `Constants.sol`'s 18-decimal `MIN_PURCHASE_AMOUNT` / `FEE_PURCHASE_*` into the USDT0 handler. Fee bounds are per-handler constructor args; the min is `DcaManager.setTokenMinPurchaseAmount`. **Blocked on R43:** `_getAmountOutMinimum` currently treats stablecoin units as 18-decimal USD.
+
+Lands before R9 and R10 on purpose: the event freeze must exercise the final shipped lending-handler set, including both LayerBank Dex deployments, and the natspec pass must include the new handler and deploy surface instead of requiring a one-off style exception.
+
+**Decided:** LayerBank is index 1 for USDRIF and USDT0; keep the Sovryn DOC arm at index 2; USDT0 min/fee magnitudes are `25e6` / `1000e6` / `100_000e6`. Probe and record kUSDRIF's live pause status; that is a fact, not a product gate. See `R36-layerbank-usdrif-dex.md`.
+
+### PR 43 - R50 packing follow-up
+
+Two-slot `DcaSchedule` with a public `uint64 scheduleId` equal to the monotonic nonce (no keccak). Pack `PurchaseFees` (rates + collector; two `uint128` bounds), OperationsAdmin handler+pause into one `TokenRoute` value, DcaManager protocol scalars + nonce into one slot, and the two Uniswap slippage percents into one slot. Apply R18’s `toUint32()` bound to `setDepositsPaused` and every other OperationsAdmin route-index argument (R18 review: pause still keyed the mapping with raw `uint256`). Keep `s_scheduleNonce`; do not bitmap-pack address flags; do not narrow handler financial mappings. See [`R50-packing-follow-up.md`](./R50-packing-follow-up.md).
+
+**Must land before R9 (PR 47).** ABI: `bytes32 scheduleId` → `uint64` on every function, event, and error that carries it.
+
+### PR 44 - R37 retire Tropykus from every live path
+
+Remove Tropykus from every live deploy branch, move its deploy scripts under `script/tropykus-legacy/`, and move `TROPYKUS_INDEX` from `script/Constants.sol` to `test/Constants.sol` so a future `script/` file naming it fails to compile. `TROPYKUS_STRING` stays in `script/Constants.sol` — `MocHelperConfig` / `DexHelperConfig` need it to select mocks for the local lane, and neither uses the index.
+
+**Blocked on R36 (PR 42).** Removing the Tropykus dex arm before a LayerBank USDRIF handler exists deletes USDRIF DCA. USDT0 is new and is not on Tropykus; it does not change this block. Git-stack on R50 (PR 43) so packing lands first.
+
+Handler contracts and their tests stay; `make moc-tropykus` / `dex-tropykus` / `fork-tropykus` keep their mock and live coverage of `LendingErc20Handler` through a second adapter. A sentinel "unreachable" index was considered and rejected: `routeIndex` is an unpacked `uint256`, `s_routeClass` is a sparse mapping, and nothing in `src/` enumerates indexes, so a large number enforces nothing. Compilation scope is the enforcement. Completes the `src/` / `script/` split that R22-repo-layout (PR 11) started.
+
+**Decided:** keep the local/fork Tropykus lanes and keep index 4 burned. See `R37-retire-tropykus-live-paths.md`.
+
+### PR 45 - R38 zip withdraw-all route pairs
+
+Replace the `tokens × routeIndexes` cartesian product in `withdrawAllAccumulatedInterest` and `withdrawAllAccumulatedRbtc` with positional `(token, routeIndex)` pairs, so a caller can name exactly the routes it holds a balance on. See [`R38-withdraw-all-route-pairs.md`](./R38-withdraw-all-route-pairs.md).
+
+R36 and R37 now land first, so this PR is written and tested against the final production route topology rather than asking an implementation decision from a later PR. Even if the shipped maps do not contain a mixed-token/mixed-route partial grid, the add-only route registry can acquire one later and the cartesian API still cannot express a set of pairs.
+
+Not a live cash defect after R37: the only handler whose no-op call does real work is Tropykus, whose `_exchangeRate()` override is the state-changing `exchangeRateCurrent()`; everything else inherits the view default. This remains required because R9 freezes the signature for the life of the deployment.
+
+**Must land before R9 (PR 47).**
+
+**Decided:** replace the cartesian semantics without a legacy alias and keep the `withdrawAllAccumulated*` names.
+
+### PR 46 - R42 swapper batcher
+
+A dedicated contract, allowlisted as a swapper, that forwards several `DcaManager.batchBuyRbtc` calls in one tx (one group per token×route). No `multicall` on `DcaManager`. Holds no user funds. Land it after the final route map and before the freeze so R9 audits the complete first-party surface and R10 documents it. See [`R42-swapper-batcher.md`](./R42-swapper-batcher.md).
+
+**Decided:** all-or-nothing, and keep the bot EOA allowlisted for break-glass/single-handler retries.
+
+### PR 47 - R9 event indexing and ABI freeze
+
+Index every existing scalar `address` and `scheduleId`, and index nothing else. Do not index amounts, timestamps, periods, rates, strings, bytes, arrays, address arrays, or encoded paths. Do not shorten diagnostic custom-error argument lists (R6).
+
+Add `TokenLending__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares)` to the shared lending interface and emit it after every successful per-user virtual lending-share mutation in the shipped lending handlers. Deposits report the exact measured lending-token mint, not the stablecoin input. Withdrawals, interest, and every buyer debit in a batch are covered; repeated users in one batch produce sequential transitions. Tests must show each `newShares` equals `getUserShares(user)` and that replay from a fresh deployment reconstructs current balances. The shipped set now includes the LayerBank Dex handler added by R36. See [`EXTERNAL_REWARDS.md`](./EXTERNAL_REWARDS.md) and [`R9-event-indexing.md`](./R9-event-indexing.md).
+
+Add `PurchaseFees__FeeTransferred(token, collector, amount)` from `_transferFee` when the fee is non-zero (one event per batch for the aggregated fee). Per-user rBTC in a batch is already `PurchaseRbtc__RbtcBought` — that is a monitoring consumer, not a new event.
+
+R18/R19/R49/R50 already landed. Add no extra purchase-event fields.
+
+### PR 48 - R10 natspec and comments
+
+Rewrite first-party natspec only after ABI, names, handlers, route maps, and the batcher are stable. Put user-facing docs on interfaces and use `@inheritdoc` in implementations.
 
 Do not make behavior changes in this PR.
 
-## Optional late PRs
+### PR 49 - R42 integrate grouped purchases in DcaManager ([#101](https://github.com/BitChillRSK/dca-contracts/pull/101))
 
-These are deliberately after the core relaunch path:
+Follow up the standalone R42 batcher after measuring the completed manager: move
+`batchBuyRbtcAcrossHandlers` into `DcaManager`, authenticate once, and loop the same one-handler helper
+so each handler's batch completes its checks, effects, and handler call before the next. Remove
+the standalone contract, interface, and deploy add-on. The one-handler retry entry remains, but PR 101
+also makes it consume the same `Batch` tuple as each across-handlers element; the former six-argument
+selector does not ship. See [`R42-swapper-batcher.md`](./R42-swapper-batcher.md).
 
-- R12: compound accrued interest into a chosen schedule.
-- R13: simplify or redesign `OperationsAdmin` owner/admin/swapper roles.
-- R18: storage packing, only if not already chosen and implemented before layout froze.
-- R19: per-schedule pause, only if not already included before event ABI froze.
-- OpenZeppelin major upgrade: evaluate `v4.9.3` to latest audited `5.x` in a standalone PR.
+**Decided:** the final manager is not planned to grow further, so the recurring hot-path saving is
+worth the remaining EIP-170 margin. (**R53 re-baseline:** the margin traded away was measured
+unoptimized. `DcaManager` is 13,767 B / 10,809 B margin today, so the trade cost far less than it
+looked; the gas argument that decided it is unaffected — see
+[Measurement basis](./README.md#measurement-basis).) Grouped calls remain atomic and the bot EOA remains allowlisted.
+The cheaper one-loop implementation is preferred over a bundle-wide CEI two-pass: handlers are
+BitChill-deployed, purchase paths stay `onlySwapper`, and the extra pass costs gas on every tick.
+
+### PR 50 - R51 per-batch minimum rBTC output (planned GitHub #103)
+
+Append `minRbtcOut` to the `Batch` tuple PR 101 already uses for both swapper entry points. The shared
+handler pipeline checks it against measured aggregate rBTC before buyer credits, so it works for Dex and
+MoC and cannot loosen the governance-owned Uniswap oracle floor. `0` preserves today's behavior; the
+production off-chain policy requires a meaningful nonzero quote-derived value for Dex and explicitly uses
+`0` for MoC until a tested redemption preview exists. Stablecoin decimals affect the quote input;
+`minRbtcOut` itself is always 18-decimal WRBTC/native-rBTC wei. See
+[`R51-per-batch-min-rbtc-out.md`](./R51-per-batch-min-rbtc-out.md).
+
+Added after R10, so it deliberately changes both DcaManager purchase selectors before relaunch. PR 101
+already settled the struct-shaped one-handler call; R51 does not reopen it. PR 103 keeps the 99.5% / 95% source
+defaults, but does not assume 99.5% is the final live value. It records one named-block fork table for every
+production path at representative batch sizes: after 0.30–0.35% of LP fees, the current floor leaves little
+room for impact and pool/oracle drift. Negative findings are valid and do not block the contracts PR. PR 103
+only has to record that first evidence and open/update the off-chain issues; multi-observation calibration,
+off-chain implementation, and route enablement gate relaunch instead.
+
+Before relaunch, governance approves the highest per-handler oracle backstop that clears the wider measured
+operating envelope with quantified headroom, records the resulting maximum-loss budget, and leaves a route
+disabled if that budget is unacceptable. Cutover installs the percentage and then, in a separately reviewed
+Safe execution, raises the safety check to the same value before enabling the route; this preserves R43's
+two-action widening speed bump. It is not adjusted every week. The bot supplies a fresh quote-derived minimum
+on every Dex call; the two independent predicates coexist and whichever is stricter wins. A caller minimum
+below the live oracle floor is not itself a reason to skip a viable trade. If the pool quote cannot clear the
+floor, the bot automatically requotes, splits the group, or switches to a pre-approved R52 path. Only a
+structural failure across bounded retries and all approved paths pages governance; an indivisible oversized
+schedule is isolated so it cannot block the rest. Monitoring alerts on a zero Dex minimum while exempting the
+deliberate zero used by MoC.
+
+The swapper bot stays the sole signing service and consumes reusable, read-only quote logic derived from
+`rsk-uniswap-pools`; do not give a second repository/process the private key. Update/cross-link the off-chain
+issues in the same turn as the contracts PR, and treat their quote-policy and floor-liveness acceptance criteria
+as a Dex relaunch gate rather than a PR-merge gate. R9 indexing and R10 natspec rules apply. **No contract-PR
+product gates; the Safe approves the measured static live backstops once during cutover.**
+
+Current PR 101 baseline: `DcaManager` 23,683 bytes (893 margin) and
+`LayerBankHandlerDex` 23,418 (1,158 margin) — unoptimized
+([Measurement basis](./README.md#measurement-basis)); today they are 13,767 / 10,809 and 15,692 / 8,884. DcaManager already takes `Batch`, so the obsolete
+seven-argument manager-stack finding no longer applies. The handler ABI addition has been compiled against
+PR 101 and does fail legacy no-IR codegen as written. Preserve its arithmetic/event order and re-measure
+every leaf.
+
+**No `_creditBuyers` extraction (corrected 2026-08-31, PR 103).** This entry previously called that helper
+required rather than conditional. It is neither: the function is one slot over, and scoping `aggregatedFee`
+to the block that pays the fee releases that slot, so the loop stays inline *and* keeps its cached
+`buyers.length` under `via_ir = false`. That is 87–416 gas cheaper and 17 bytes smaller per Dex handler than
+extracting.
+Checked rather than assumed: enabling the legacy optimizer (`optimizer = true`, `via_ir = false`) — now the
+default profile's own setting since #104 — does **not** relieve stack-too-deep — solc asks for via-IR *with* the optimizer, and via-IR stays out of bounds for
+EIP-170 and deployment decisions under the Rootstock compiler/EVM proof rule above.
+
+**Sovryn DOC is not a shipped Dex route (recorded 2026-08-31, PR 103).** DOC buys rBTC only through MoC
+redemption; it may appear in a Uniswap path as an intermediate hop but never as a Dex handler's input token.
+The shipped Dex set is LayerBank USDRIF and LayerBank USDT0. This supersedes the live-map wording in the R37
+(PR 44) entry, which predates the correction. PR 103's fork probe measured the DOC path anyway and found it
+**starved** — the DOC/rUSDT 0.05% pool held ~1.48 rUSDT — which is evidence for deleting the route, not for
+calibrating it. The `DcaManager`/handler ABI is unaffected; the DOC Dex handler stays as test-only legacy, in
+the same position as Tropykus after R37.
+
+### R57 - close the DOC Dex deploy hole ([spec](./R57-close-doc-dex-deploy-hole.md), [#106](https://github.com/BitChillRSK/dca-contracts/pull/106))
+
+`DeployDexSwaps`' live branch still registers `SOVRYN_INDEX` and constructs `SovrynHandlerDex` when
+`STABLECOIN_TYPE=DOC`, and its comment at `script/DeployDexSwaps.s.sol:113` still names Sovryn (DOC) as part
+of the live dex map. Deploy-script work is outside R51's Solidity scope, so PR 103 left it alone. The fix
+reverts on DOC in the live Dex branch (DOC is not a Dex token; MoC redemption is its route) and deletes the
+DOC Dex construction arm. **Keep `registerRoute(SOVRYN_INDEX, true)`** — Sovryn is a real lending route;
+this hole is a Dex handler for DOC, not a Sovryn retirement. Sequence this before any Dex cutover
+broadcast; it does not block R52.
+
+**Promoted to R57 on 2026-09-02.** It had no R-id and no spec, which made it the only queued item a
+handover prompt could not name, and left the reader to reassemble the hazard from three documents. The
+spec records what makes it a hazard rather than untidiness: `DOC_STRING` is `DOC`, so an unset
+`STABLECOIN_TYPE` is enough to trigger it; `assignHandler` is add-only, so `(DOC, SOVRYN_INDEX)` is
+burned permanently once taken — the same key `DeployMocSwaps` needs for the production
+`SovrynDocHandlerMoc`; and the live DOC arm is currently exercised and green by `LiveDeployPathTest` on
+the `moc-sovryn` lane, so closing it changes existing tests rather than only adding one.
+
+### PR 51 - R52 allowlisted Dex path failover ([#104](https://github.com/BitChillRSK/dca-contracts/pull/104))
+
+Move exact-path policy onto `PurchaseUniswap`: the handler owner allowlists full encoded paths derived from
+`intermediateTokens` / `poolFeeRates`, while an existing swapper or that same handler owner may activate only
+those paths. OperationsAdmin keeps the global swapper allowlist and has no purchase-path mapping. Production
+expects the same Safe on both contracts; if owners diverge, authority diverges with them — there is no
+OperationsAdmin-owner break-glass onto a handler they do not own. Reject revocation of the active path; switch
+first, then revoke, so every active route remains approved without a lookup on every purchase. This is
+persistent availability failover for a drained/paused pool, not per-batch route selection. See
+[`R52-allowlisted-dex-path-failover.md`](./R52-allowlisted-dex-path-failover.md).
+
+Deployment order is construct handler (constructor self-allowlists the initial path) → operator
+reads `getSwapPath()` and confirms the intended stablecoin / intermediate / WRBTC route → assign
+handler. Update `DeployDexSwaps` and `DeployUsdrifHandler`; `DeployLayerBankHandler` is MoC-only and stays untouched.
+Revoking a compromised swapper does not mutate the last active path, so the recovery runbook also restores the
+preferred path when necessary. The bot remains the sole signer and route intelligence remains read-only.
+Before claiming automatic path failover at relaunch, each enabled Dex handler needs at least one validated,
+owner-approved alternate path. A handler with no viable alternate is explicitly labeled single-path/no automated
+path failover and pages governance after bounded quote/split retries instead of claiming redundant automation.
+No DcaManager ABI change. R9 indexing and R10 natspec rules apply. **No contract-PR product gates.**
+
+Handler-local policy depends on the default-profile optimizer. This PR enables `optimizer = true` /
+`optimizer_runs = 200` / `via_ir = false` on `[profile.default]` rather than keeping a centralized admin
+registry for an unoptimized EIP-170 budget. Measure with full `forge build --sizes`. There is no
+`[profile.deploy]`. Re-prove the optimizer-on pin on Rootstock testnet + Blockscout
+in this PR (`script/DeployOptimizerProof.s.sol`). **Passed (2026-09-01)** — CREATE
+[0x3a63dc…](https://rootstock-testnet.blockscout.com/tx/0x3a63dc2458142cca09144a3f290ed6d996780c616acb8adbdf15f57f736ff5bc)
+verified at [`0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD`](https://rootstock-testnet.blockscout.com/address/0x8D7B64ed7Ef7B862bB52c7381b9246d2669a4FAD).
+Do not treat R53 as still owning the optimizer baseline — that work is absorbed here.
+Remaining R54/R55/R56 items live in stacked [#105](https://github.com/BitChillRSK/dca-contracts/pull/105).
+
+**Superseded 2026-09-01.** The earlier plan put the allowlist on `OperationsAdmin` because a prototype with
+policy on the Dex leaf exceeded EIP-170. That budget was *unoptimized*. With `optimizer = true` the leaf has
+~9 KB of margin, and #104 accordingly moved policy back onto `PurchaseUniswap`, where per-handler storage also
+makes cross-handler misuse impossible. Do not reuse the bytecode argument for a centralized registry.
+
+### R56 - Dex slippage band and bot minRbtcOut ([spec](./R56-dex-oracle-floor-is-safety-check.md), [#107](https://github.com/BitChillRSK/dca-contracts/pull/107), stacked on #106)
+
+R51 follow-up that PR 103 correctly left out of scope. `s_amountOutMinimumPercent` (99.5%) is still the
+Uniswap floor today; R51 added `minRbtcOut` but did not wire it into `ExactInputParams`. Keep both
+slippage words and the handler ABI unchanged from mainnet-current: the swap-time floor stays
+`s_amountOutMinimumPercent`, retuned **99.5% → 97%** (probe-derived at block 9198813); the **95%**
+`s_amountOutMinimumSafetyCheck` remains the configuration wall (`safetyCheck <= percent <= 100%`).
+Pass `max(amountOutLowerBound, minRbtcOut)` into the router; `PurchaseRbtc` still checks measured output.
+Inside `[95%, 100%]` the owner retightens or widens the live floor in one transaction; widening
+*past* 95% still needs two transactions (lower the safety check first). Production Dex still sends a
+nonzero quote-derived `minRbtcOut`.
+
+Ask: none.
+
+**Supersedes** the R51 cutover that installed 99.5% then re-locked the safety check to the same value.
+Does **not** collapse R43's two-word band onto the safety check alone.
+
+### R58 - split test-only constants out of `script/Constants.sol` ([spec](./R58-split-script-test-constants.md), PR 54, [#108](https://github.com/BitChillRSK/dca-contracts/pull/108))
+
+Housekeeping after the deploy map work (R37/R57). `script/Constants.sol` still carries a `TESTS CONSTANTS`
+block that tests import directly; move account labels, fork holders, slippage tolerances, and dead duplicates
+into `test/Constants.sol`, keep deploy/helper values (including `BTC_PRICE` for mock routers) in script, and
+leave the R37 `TROPYKUS_STRING` / `TROPYKUS_INDEX` split untouched. Test/Makefile only; no ABI or broadcast
+change. Ask: none.
+
+Shipped as specified, with `RESERVED_MOC_LENDING_INDEX` dropped rather than moved - it reserves index 3 on the
+production MoC map, so `test/Constants.sol` is the wrong home, and an unused constant is what invites a script
+to register it; a comment beside `SOVRYN_INDEX` reserves the number without offering a symbol to pass. Fork
+holders consolidate on the `_TESTNET` suffix (`DOC_HOLDER_TESTNET` is what `DcaDappTest` already calls). The
+PR also hardened the R37 guard, which holds today only because `script/*.s.sol` imports mocks with the named
+`import {Mock} from ...` form: `MockMocOracle` is repointed back at `script/Constants.sol` and
+`MockSwapRouter02`'s dead import deleted, so no mock a deploy script constructs sees `TROPYKUS_INDEX` under
+any import form.
+
+### R53 - re-baseline the recorded sizes and gas ([spec](./R53-optimizer-baseline.md), PR 55, [#109](https://github.com/BitChillRSK/dca-contracts/pull/109))
+
+The optimizer flip itself is no longer R53's. `[profile.default]` never set `optimizer` and forge defaults it
+to `false`, so the relaunch was measured unoptimized throughout; #104 pins `optimizer = true` /
+`optimizer_runs = 200` / `via_ir = false` because handler-local path policy needs it to clear EIP-170, and #104
+also owns the Rootstock testnet + Blockscout re-proof of that artifact. The measurement rule at the top of this
+file and its `AGENTS.md` mirror are already rewritten to *optimized* no-IR.
+
+What remains is the re-baseline #104 did not do: it corrected only its own figures. Every runtime size, EIP-170
+margin, and gas number recorded in the R18 / R31 / R42 / R50 / R51 entries and specs was still unoptimized. For
+scale, the flip moved `DcaManager` 23,703 B / 873 B margin -> 13,767 B / 10,809 B, `testSinglePurchase`
+283,711 -> 243,817 gas, and `testBatchPurchasesOneUser` 2,244,557 -> 1,562,720. Append the corrected figure to
+each historical entry; do not rewrite why a shipped PR chose what it chose.
+
+The optimized budget also voids the bytecode premise under decisions R53 does not re-judge: the migration
+gate's manual exit/re-entry (justified partly by "426 bytes of runtime margin") and R51's `_creditBuyers`
+reasoning. [#111](https://github.com/BitChillRSK/dca-contracts/pull/111) closed that follow-up list without
+reopening anything: R31 / R39 / R42 / R51 stand as shipped; R13 cooperative migration and R50's merged
+per-user slot stay decided against on their non-size merits.
+`via_ir` stays out (R55 measured it and recommends against adopting it).
+
+Ask: none. `optimizer_runs = 200` and CI inheritance were settled in #104.
+
+Shipped as specified, documentation only. The fresh full-build table and the two hot-path gas numbers live in
+one place — [Measurement basis](./README.md#measurement-basis) in `docs/relaunch/README.md` — and every entry
+or spec that still quotes a pre-#104 number now says so beside the number instead of repeating the table.
+Measured at the R58 head rather than by rebuilding each historical commit, which the entries state, because a
+delta against an old entry otherwise reads as the optimizer's alone. Two figures moved since #104: the three
+Dex leaves are 100 B larger (R56), and `testSinglePurchase` / `testBatchPurchasesOneUser` are 243,790 /
+1,562,441 against #104's 243,817 / 1,562,720. Decisions argued from bytecode scarcity are recorded in the
+spec ([R53](./R53-optimizer-baseline.md#bytecode-scarcity-decisions-closed)); R53 re-judged none of them.
+[#111](https://github.com/BitChillRSK/dca-contracts/pull/111) closed the queue: four shipped choices stand,
+R13 / R50 stay decided against. One argument is narrowed rather than reopened: R51's `_creditBuyers`
+reasoning turned on no-IR stack-too-deep, which the optimizer does not relieve — R51 checked that at the
+time and it still holds — so only the 17-bytes-per-handler half of that argument was budget-driven, and
+via-IR (R55) is what would reopen it. R55 measured via-IR and recommends against it, so that half stays
+closed too.
+
+### R54 - top a schedule up from accrued interest ([spec](./R54-schedule-top-up-from-interest.md), PR 56, [#110](https://github.com/BitChillRSK/dca-contracts/pull/110))
+
+Revives R12. `DcaManager.topUpFromInterest(token, scheduleIndex, scheduleId, amount)` credits the caller's accrued
+lending interest to one schedule's `tokenBalance`, so yield buys rBTC without a withdraw-then-deposit round
+trip - which also avoids Sovryn's SIP-0094 exit fee, since nothing is redeemed. `DcaManager`-only: no handler
+call, no token movement, no redeem-then-remint. The credited figure is the same expression the interest
+withdrawal uses, so the route's summed principal lands exactly on the position's floored value and never
+above it - the same end state an interest withdrawal already produces, reached from the other side.
+
+Measured at `proto/r12-compound-interest` (`7dd00fb`): +1,020 B unoptimized (margin **-147**, does not fit),
++600 B with the optimizer (margin 10,209), +508 B under IR. Gated on the #104 optimizer pin for exactly that reason; dropping the
+dedicated event saves only 112 B and does not rescue it.
+
+Ask: whether the R48 deposit pause blocks a top-up (recommend yes - a pause means stop growing exposure on
+that route, whatever the funds' source); naming (`topUpFromInterest`, because "compound" collides with Compound
+the lending protocol that Tropykus forks - the same collision class R26 fixed for "lending token"); and
+all-or-part (recommend all, no `amount` parameter).
+
+Answered 2026-09-02, two of three against the spec's recommendation. The pause does **not** block a top-up
+(`_handler`, not `_handlerForDeposit`): R48's pause stops users putting new funds into a route, and interest
+already sitting in that route's position is not new funds, so crediting it changes no balance the pause was
+protecting. The recommendation had read the pause as "stop growing DCA exposure", which is broader than what
+R48 shipped. The name is `topUpFromInterest`. And **all-or-part went the other way** - the function takes an
+`amount`, because one pot of route interest feeding two schedules is wanted and reaching it by crediting one
+schedule then withdrawing the difference pays the exit fee the feature exists to avoid. `amount` is bounded
+above by the accrued figure and below by having to raise the balance past its **next whole purchase**, so
+interest cannot be moved across in dust while a schedule holding 10.5 purchases needs only half a purchase
+amount. A flat `amount >= purchaseAmount` floor was rejected in the same exchange: it strands interest smaller
+than one purchase.
+
+Shipped with that shape. `DcaManager` 13,767 -> 14,542 B (margin 10,809 -> 10,034), +775 rather than the
+probe's +600: the `amount` parameter, its two bounded-credit errors, and the purchase-boundary comparison are
+all new since `7dd00fb`. No handler's funds movement or share math changed, and the path moves no cash - the
+suite asserts that on the user's share balance and on the absence of any stablecoin log, which no redemption
+or transfer could avoid.
+
+One thing the spec put out of scope is taken anyway, and the shape it landed in is the second one tried. R54
+turns the accrued figure from something a user reads into something a user spends against, so the bound must
+be taken at the rate a write path would get: on a lazily accruing market - only the legacy Tropykus adapter,
+which overrides `_exchangeRate` with `exchangeRateCurrent()` - the stored rate is stale, and a year of
+interest reads as exactly zero until someone pokes the market. The first attempt pointed `getAccruedInterest`
+at `_exchangeRate()` and let the mutability propagate, which dropped `view` from `DcaManager.getInterestAccrued`
+too. That is not additive: same selector and same return, and `eth_call` still reads it free, but a regenerated
+ABI marks it non-constant, so generated clients route it through write bindings - in ethers v6 a plain call to
+a non-view function *sends a transaction*, turning a balance display into a wallet prompt. The audit's second
+pass rejected the trade on the ground that `_exchangeRate` is overridden by exactly one adapter, and that
+adapter is on neither production map: for Idle, LayerBank, and Sovryn the base `_exchangeRate()` is literally
+`return _viewExchangeRate();`, so the whole cost landed on the user-facing getter to buy behaviour no
+deployable route can observe.
+
+Split instead, since the two readers are two different jobs. `ITokenLending.getAccruedInterest` stays non-view
+and is the **spendable ceiling** the top-up bounds on; it is `onlyDcaManager`, so its mutability never reaches
+a generated client. A new `ITokenLending.quoteAccruedInterest` is the **display quote**, reads
+`_viewExchangeRate()`, and keeps `DcaManager.getInterestAccrued` a `view`. Both call one private helper that
+takes the rate as an argument, so the only difference between them is which rate goes in. The pair is safe
+because the gap has a direction: a stored rate only ever trails a current one, so the quote is at most equal
+to the ceiling and never above it. A caller passing the displayed number therefore never breaches the upper
+bound, though the independent purchase-boundary minimum can still reject it; the worst a stale quote costs
+against the ceiling is a slice left for the next call. `ITokenLending` gains a function, so its ERC-165
+id changes; handlers and `OperationsAdmin` compute it from the same source and ship together, so the lending
+gate in `assignHandler` is unaffected.
+
+That split is what put `DcaManager` 23 B *below* the non-view attempt and within 1 B of the shape before it
+(14,541 -> 14,542): a `view` external call compiles to `staticcall`. The cost lands on the lending handlers
+instead, where there is room - Sovryn/LayerBank Dex +136 B each (margins 8,961 and 8,748), the MoC leaves
++147 and +162, the Tropykus Dex leaf +229 because its two rate paths genuinely differ. `IdleDocHandlerMoc` is
+byte-identical: it is not a lending handler.
+
+The stateful invariant actor **is** extended with the top-up, and a coverage guard
+(`test_invariantHandlerTopsUpFromInterest`) lands one deterministic credit, because almost every fuzzed attempt
+is discarded and `Handler` swallows the rest. It is the only action that raises principal with no matching
+deposit, so it is what stresses `invariant_totalDepositedTokensMatchesLendingProtocol` and its 100-wei
+tolerance; 64x512 passes with zero reverts. Noted, not fixed here: `invariant_interestOnlyIncreases` asserts
+`assertGe(uint256, 0)` and so encodes nothing at all.
+
+Cutover: [front-end#22](https://github.com/BitChillRSK/front-end/issues/22#issuecomment-5512733974),
+[bitchill-monitoring#10](https://github.com/BitChillRSK/bitchill-monitoring/issues/10#issuecomment-5512737902),
+[data-api#9](https://github.com/BitChillRSK/data-api/issues/9#issuecomment-5512738181), and
+`metrics-dashboard`; `swapper-bot` needs none.
+
+### R59 - enforce complete Uniswap input consumption ([spec](./R59-uniswap-exact-consumption.md), PR 57, [#112](https://github.com/BitChillRSK/dca-contracts/pull/112))
+
+Fail closed when SwapRouter02 does not consume the full stablecoin input or leaves a new
+intermediate-token balance in the router. Uniswap V3 `exactInput` can stop at a pool's terminal price
+limit before consuming the requested amount; an aggregate `amountOutMinimum` does not prove complete
+input consumption. A first-hop partial fill leaves stablecoin in the handler, while a later-hop
+partial fill can leave an intermediate token in the public router.
+
+Store the active intermediate-token list beside the already stored path. Around `exactInput`, compare
+the handler's purchase-token balance delta with the exact requested amount and compare each router
+intermediate-token balance after the swap with its own pre-swap value. Preserve WRBTC balance-delta
+crediting and revert the whole batch on either mismatch. Do not decode the packed path, add assembly,
+trust the router return, or add sweep/refund authority.
+
+This is a recurring protocol-paid hot-path check, so it ships only at no more than +8,000 gas for a
+direct path, +15,000 gas for a one-intermediate path, and +800 bytes of runtime per Dex leaf. Measure
+against the implementation PR's base under the `#104` pin (`optimizer = true`, `optimizer_runs = 200`,
+`via_ir = false`). R59 precedes R55: the safety check ships on the known production profile; R55 is
+measure-and-recommend only and does not change settings, so a later adoption PR (if any) re-measures
+these ceilings. Ask: none.
+
+Shipped as specified, with one deviation from the spec's suggested code shape — and that deviation is
+what clears the spec's own ceilings. Written as sketched, the change is **+1,163 B** per Dex leaf, 363
+over the 800-byte gate. Ablation against that shape: the input-spent check is 298 B, the memory→storage
+array copy in `_setPurchasePath` 158 B, and the two purchase-time loops plus the second error 593 B.
+Most of that 593 is six inline copies of one `balanceOf` encode/staticcall/decode, so the purchase's six
+balance reads now share a private `_balanceOf(address,address)`: 508 B cheaper, one JUMP per read, and
+nothing the spec fixes — the observable checks, the per-token comparison against its own pre-swap value,
+and both errors' data — moves. Measured `7b18781` → `614cdf7` under the #104 pin: **+655 B** on each Dex
+leaf (LayerBank 16,483 / margin 8,093; Sovryn 16,270 / 8,306; Tropykus 16,414 / 8,162), with
+`DcaManager`, `OperationsAdmin` and `IdleDocHandlerMoc` byte-identical, and **+4,891 gas** direct /
+**+14,135 gas** through one intermediate on `testSinglePurchase` — the all-cold length-1 batch, so the
+worst case for a once-per-batch check — against ceilings of 8,000 and 15,000. Also measured and
+rejected: indexing `s_swapIntermediateTokens` from storage in both loops instead of caching it in memory
+saves a further 44 B and 45 gas on the multihop path but costs 226 gas on the direct path, which is a
+live route.
+
+Files beyond the spec's list, for a reason the spec could not have known: **both** Anvil dex configs gave
+their intermediate token as `makeAddr("rUSDT")`. The purchase now reads that token's `balanceOf` on the
+router, and a high-level call to a codeless address reverts, so `script/DexHelperConfig.s.sol` and
+`script/UsdrifHelperConfig.s.sol` each deploy a real `MockStablecoin` for that slot instead. No
+live-network branch, constructor argument, or broadcast changes.
+
+The `UsdrifHelperConfig` half is worth recording as a testing lesson rather than a typo. Its deployment
+suite asserted ownership, registration, aToken wiring, and constructor path allowlisting, and every one
+of those assertions passes on a handler whose configured route cannot execute a single swap — they read
+constructor state and never call `batchBuyRbtc`. The add-on route was only ever proven deployable, not
+usable, so `test/unit/deployment/NewHandlerDeploymentTest.t.sol` now buys once through it; without the
+config fix that test fails with "call to non-contract address". The third extra file,
+`test/unit/DexPathFailoverTest.t.sol`, is where the spec itself asked the path-activation case to live.
+
+Fork behaviour is split deliberately. `SWAP_TYPE=dexSwaps STABLECOIN_TYPE=USDRIF make fork-layerbank` runs
+the configured-path success case against the live SwapRouter02 and the real USDRIF / rUSDT / WRBTC pools,
+which is the only evidence that these checks hold against Uniswap's own router rather than a mock; it
+passes, and that lane's remaining failures are `SchedulePackingTest`'s three pre-existing `SafeCast`
+overflows, which fail identically at the base commit because the impersonated whale's balance does not fit
+the packed `uint128`. The cases that activate a route the test invents — a direct pair, or a hop through a
+token the file just deployed — are local-only: on a fork there is no such pool, so they would revert on
+liquidity and prove nothing about the check under test. One assertion is local-only for the same class of
+reason: `MockSwapRouter02` keeps the input it pulls, while the real SwapRouter02 forwards it into the pool
+and ends the call holding none of it, so "the router gained exactly the net amount" is a statement about
+the mock. The handler-side delta is the venue-independent half, and a successful purchase is itself the
+consumption proof, since anything less now reverts.
+
+### R55 - evaluate solx and the IR pipeline ([spec](./R55-solx-and-ir-evaluation.md), PR 58, [#113](https://github.com/BitChillRSK/dca-contracts/pull/113), after R59 [#112](https://github.com/BitChillRSK/dca-contracts/pull/112), gated on #104)
+
+Measure and recommend; change no compiler setting. Compare stock solc no-IR, stock solc `via_ir`, and solx on
+runtime size, hot-path gas, whether the full matrix passes, and whether Blockscout can verify the result on
+Rootstock. Every number must be against the optimized baseline #104 pins - the optimizer already takes 14-30% and
+`via_ir` a further 2-4%, so solx competes against ~239k gas on `testSinglePurchase`, not ~284k, and crediting
+it with the optimizer's win would be the easiest mistake to make here.
+
+EIP-170 is explicitly not a motivation: once #104 lands nothing is size-constrained. The deciding factor is risk,
+not gas. These contracts are immutable and unproxied and hold user funds, R23's toolchain proof was obtained
+with stock solc, and a gas win that Blockscout cannot verify on Rootstock is not shippable. An explicit "keep
+stock solc" option is chosen unless a candidate clears both the gas bar and verification.
+
+Follows R59 so the Uniswap fail-closed checks are already in the tree R55 measures; R55 still changes no
+compiler setting in its own PR.
+
+**Decided: keep stock solc, no IR.** Nothing in `foundry.toml`, CI, or any deploy path changed; the PR is the
+measurement and the recommendation. Full numbers, commands and the verification evidence are in the spec's
+[Findings](./R55-solx-and-ir-evaluation.md#findings-measured-2026-09-03).
+
+solx v0.1.8 wins the gas contest and loses on every other axis. Contract-side `DcaManager.batchBuyRbtc` is
+188,806 against the baseline's 202,530 (-6.8%), `testSinglePurchase` 222,031 (-8.9%), and the whole seven-lane
+matrix passes under it with test-for-test identical counts to a stock-solc control, invariants included. But its
+Solidity front end is `0.8.34` and every first-party file pins `pragma solidity 0.8.36;`, so solx cannot compile
+this repository at all - adoption means downgrading 143 pragmas, which the spec puts out of scope, and re-proving
+R23 at a lower solc. Its front end is also a *fork* (`0.8.34+commit.91fef221` against upstream `80d5c536`), it
+stamps `solx:0.1.8;solc:0.8.34` into the CBOR metadata, and both Rootstock Blockscout instances advertise only
+stock Solidity and Vyper compilers in `/api/v2/smart-contracts/verification/config`. A solx deployment would be
+unverifiable bytecode holding user funds, and solx's own README still says beta, testing and experimentation
+only. That fails the spec's bar before gas is even weighed.
+
+`via_ir` is stock solc, so the verification story is intact, and it buys -2.6% on `batchBuyRbtc` (-2.0% and
+-4.2% on the two hot-path tests) plus ~20-26% smaller runtime that nothing needs. It costs test work that is not
+worth doing before relaunch: `ZeroTokenPurchaseUniswap` still fails with error 1284 as predicted, and a **second,
+previously unrecorded** blocker turned up - `test/unit/RbtcWithdrawalTest.t.sol` hits Yul stack-too-deep in the
+shared harness's `makeSeveralPurchasesWithSeveralSchedules`, which `via_ir` is supposed to cure rather than cause.
+Skipping both, one test still fails on every lane, and it reduces to a `block.timestamp` cached in a local before
+`vm.warp` reading back as the post-warp value: the Yul optimizer rematerialises `TIMESTAMP`, which is valid on
+chain and wrong under a cheatcode. That is a harness hazard, not a production miscompilation, and it is also the
+clearest illustration in this evaluation that a green suite is weak evidence about a code generator. (1) can be
+handled without touching the test, through `additional_compiler_profiles` + `compilation_restrictions`, at the
+price of compiling every production contract twice and having that test exercise legacy bytecode while production
+ships IR.
+
+The Rootstock testnet deploy in the spec's scope was **not** performed: `AGENTS.md` forbids broadcasting, the only
+candidate whose verifiability was in doubt cannot compile the tree at 0.8.36 in the first place, and the
+explorer's own verifier configuration already answers the question. R53's note that via-IR is what would reopen
+R51's `_creditBuyers` reasoning therefore stays closed.
+
+Residual risk of the recommendation, stated plainly: the protocol pays 2.6-6.8% more gas per purchase than the
+cheapest measured option, permanently, in exchange for bytecode anyone can reproduce with upstream solc and a
+toolchain proof that stays valid.
+
+**Reopened 2026-09-03 as [R60](./R60-src-only-via-ir.md).** R55's "keep stock solc, no IR" weighed `via_ir` as
+a single project-wide setting, and every cost it found - `ZeroTokenPurchaseUniswap`'s error 1284, the
+`RbtcWithdrawalTest.t.sol` stack-too-deep, the `block.timestamp`/`vm.warp` rematerialization - is a *test-file*
+failure, not a `src/` one.
+
+The first design considered was compiling only `src/**` under IR via `compilation_restrictions`, keeping
+`test/**`/`script/**` on legacy codegen. That does make all three failures disappear, but it does not satisfy
+"run the whole suite against the bytecode that actually ships": a legacy-compiled test's `new DcaManager(...)`
+resolves to a **second, legacy-codegen build** of that contract (confirmed by trace -
+`DcaManager.legacy-codegen::getOperationsAdminAddress()` - not the IR one `forge script` would deploy), because
+Foundry links a constructor call to whatever was built in the calling file's own compilation profile. That is
+parity evidence between two different builds, not identity, so the design changed: `[profile.deploy]` compiles
+`via_ir = true` everywhere - `src/`, `test/`, and `script/` - with exactly one file excluded, and the three R55
+failures had to be fixed for real rather than routed around by directory. `ZeroTokenPurchaseUniswap`'s error
+1284 turned out to be the known upstream solc/via-IR limit
+[ethereum/solidity#11642](https://github.com/ethereum/solidity/issues/11642) - the optimizer proves that
+contract's deliberately always-reverting constructor (`_purchaseToken()` is `pure`, hardcoded to `address(0)`)
+never returns, dead-code-eliminates the immutable assignment after the revert, and a later checker reports it
+unassigned; no reordering inside `PurchaseUniswap`'s real constructor changes that this one derived test contract
+always reverts by design. Fixed by moving it into its own file
+(`test/unit/ZeroTokenPurchaseUniswapTest.sol`) and excluding only that file from IR - the sole restriction in
+`[profile.deploy]`. The withdrawal-harness stack-too-deep was fixed by splitting
+`DcaDappTest.makeSeveralPurchasesWithSeveralSchedules`'s inner loop into a private helper. The `vm.warp` fuzz
+failure was fixed by moving the cached pre-warp timestamp from a stack local (which the Yul optimizer can
+rematerialize across a cheatcode-driven clock change) into a private storage variable (which it cannot). All
+three fixes are assertion-identical to what they replaced; no `src/` file changed. `make check-deploy` (all
+seven lanes, `FOUNDRY_PROFILE=deploy`) now passes with the same counts R55 recorded for its project-wide via-IR
+run, and a from-scratch `--sizes` build reproduces R55's `DcaManager` IR size (11,712 B) with no
+`.legacy-codegen` duplicate anywhere - the restriction stays scoped to the one excluded file. Default
+`make check`/`make ci` are unchanged (still `via_ir=false`).
+
+R60 does not reopen the solx question - that recommendation (unverifiable on Rootstock, cannot compile the
+pinned pragma) stands - and still owes the one thing R55 deliberately skipped: a real Rootstock testnet deploy
+and Blockscout verification of `via_ir=true` bytecode, since R55's verifier-config check only proved stock
+Solidity versions are listed, not that a `via_ir` artifact from this exact configuration verifies end to end.
+That needs a human operator (`AGENTS.md` forbids broadcasting from an agent session) and is the one open item
+in R60's Scope.
+
+### R60 - a `via_ir` deploy profile that runs the whole suite against the shipped bytecode ([spec](./R60-src-only-via-ir.md), planned PR 59)
+
+Implemented except the Rootstock testnet deploy + Blockscout verification, which needs a human operator. See
+the spec's Scope and Success criteria for the full account of the design change from the original `src/`-only
+plan, the two solc/via-IR compile-failure root causes, and the timestamp-rematerialization fix.
+
+### R66 - protected purchase window ([spec](./R66-batch-row-front-running.md), GitHub [#121](https://github.com/BitChillRSK/dca-contracts/pull/121))
+
+Pre-cutover security follow-up discovered during R64 review. The selected response is a dormant,
+five-block execution window that an authorized swapper may activate whenever none is live. It
+temporarily blocks only the user mutations that can invalidate a batch prepared after activation;
+the bot must wait for activation inclusion and then refresh or simulate before purchasing. An active
+window cannot be extended; after expiry the swapper may activate again with no daily budget. Existing
+batch calldata, absolute min-out, handler behavior, and all-or-nothing semantics stay unchanged.
+
+### R67 - exact batch share accounting ([spec](./R67-exact-batch-share-accounting.md))
+
+Approved 2026-09-06. Lending batches debit each row with the same `ceil(stablecoin → shares)`
+as a single redeem and burn exactly that sum, so virtual books never orphan shares the
+protocol did not redeem. Preserves the insufficient-share revert; does not revive R66's
+discarded row-skipping or handler-return redesign.
+
+### R68 - enforce complete lending-share consumption ([spec](./R68-lending-redeem-exact-consumption.md), planning [#123](https://github.com/BitChillRSK/dca-contracts/pull/123), [#124](https://github.com/BitChillRSK/dca-contracts/pull/124))
+
+Pre-cutover accounting follow-up discovered while reviewing `ITokenHandler.withdrawToken` after
+R67. A successful lending redemption must consume exactly the external receipt shares removed from
+BitChill's virtual books. Cash may be lower when that complete claim paid a protocol fee or realized
+a loss (Sovryn SIP-0094), but positive cash cannot make a partial share burn successful while the
+unpaid claim remains withdrawable. The rule covers principal, interest, and purchases; a future
+partial/queued protocol needs a separate explicit lifecycle. Lands after R67 and before relaunch.
+
+Shipped: shared `_measuredProtocolRedeem` reads `_receiptSharesBalance` before/after and reverts
+`TokenLending__ShareConsumptionMismatch` unless the decrease equals the virtual debit; adapters
+implement that balance (iToken/kToken `balanceOf`, aToken `scaledBalanceOf`); LayerBank selects
+floor or floor+1 underlying so Aave half-up maps back to the exact scaled burn. Measured at base
+`4ffecb1` → this PR under `#104` pin: lending leaves +194–258 B; once-per-redeem path
+`testSinglePurchase` / fee-free withdraw **+8,080** gas; 5-row `testBatchPurchasesOneUser`
+**+16,355**; harness `batchRetrieve` 1/10/200 rows 65,134 / 70,225 / 1,188,494.
+
+### R69 - token I/O consistency, visibility style, and batch rBTC dust ([spec](./R69-token-io-consistency-and-batch-dust.md), planning [#125](https://github.com/BitChillRSK/dca-contracts/pull/125), [#126](https://github.com/BitChillRSK/dca-contracts/pull/126))
+
+Pre-cutover housekeeping after R68. Four small gaps that should not ship: `OperationsAdmin` imports
+`IERC165` from forge-std while handlers advertise through OpenZeppelin; `PurchaseUniswap` is the only
+first-party path that uses Uniswap `TransferHelper.safeApprove` instead of `SafeERC20.forceApprove`
+(and that library is the only Uniswap code compiled into Dex leaves); `TokenHandler.depositToken` /
+`withdrawToken` (and `setPurchasePath`) are `public` only so inheritance/`super` works, against the
+house `external` + `_helper` pattern; and `batchBuyRbtc`'s floor pro-rata can leave up to `n − 1` wei
+of measured rBTC on the handler with no `s_usersAccumulatedRbtc` credit — stranded after R8 removed
+the owner rescue. Fix: one OZ IERC165 import, SafeERC20 on the Dex approve, `_depositToken` /
+`_withdrawToken` internals with `external` ABI entries, `setPurchasePath` → `external`, and NatSpec
+plus tests that state the floor dust rather than a last-buyer remainder (a remainder was tried and
+reverted: ~1e-13 dollars of residue is not worth a cross-file hot-path subtraction whose failure
+mode is a whole-batch revert). Gas of public+`super` vs external+internal is a wash for
+these signatures — choose the clearer seam. Public construction immutables stay. Does not flatten
+handler inheritance, reopen licensing, or revive a rescue. Lands after R68 and before relaunch.
+
+### R70 - public OperationsAdmin pin, fail-closed per-token mins, comment accuracy ([spec](./R70-ops-admin-visibility-and-fail-closed-mins.md))
+
+Review follow-ups after R69. Three small, independent fixes: (1) `i_operationsAdmin` becomes
+`public immutable` and `getOperationsAdminAddress` is removed so the pin matches the house
+immutable convention R69 already stated; (2) drop `defaultMinPurchaseAmount` — a single raw-unit
+default is unsafe across 18-dec and 6-dec stables, so unset tokens revert and every listed stable
+gets an explicit `setTokenMinPurchaseAmount` at deploy; (3) reword `_requireUserMutationsAllowed`'s
+`@dev` so it does not claim the helper is the single gate (the modifier already is). Does not
+flatten inheritance, reopen licensing, or pad the freed `ProtocolSettings` bytes. Lands after R69.
+
+### R71 - final pre-deployment hardening and release truthfulness ([spec](./R71-final-predeployment-hardening.md))
+
+The last **source** implementation item before any final deployment. Source phase shipped in
+[#128](https://github.com/BitChillRSK/dca-contracts/pull/128). Phases 3–5 (deploy script, Slither/
+Aderyn, public-doc truthfulness) are [R73](./R73-deploy-slither-release-docs.md).
+
+### R73 - deploy script, static analysis, release docs ([spec](./R73-deploy-slither-release-docs.md))
+
+Canonical `DeployFinal` one-shot stack, deployment tests, Slither + Aderyn triage, size/storage
+gates, README/SECURITY/audits truthfulness, cutover runbook and release record. No further `src/`
+behavior change. Ask: none.
+
+### R74 - launch economics calibration ([spec](./R74-economics-parameters-revisit.md))
+
+Unassigned product/operations decision. Approve fees, per-token minimum purchase amounts, and the
+minimum purchase period before the final mainnet broadcast if any launch default may change. Existing
+setters mean this is not a Solidity-security blocker, but deploying unreviewed placeholder defaults is
+not an acceptable substitute for a deliberate launch matrix.
+
+### R75 - final audit: no-catch-up cadence and concise source docs ([spec](./R75-final-audit-cadence-and-source-docs.md))
+
+Direct final-audit request after R73 and review follow-ups #131–#133. Fix the UTC-day edge where a
+missed-cycle purchase can leave the same schedule immediately eligible again, prove a Tuesday retry
+keeps the following Monday due date, and make verified-source rationale concise and stand-alone.
+R74 remains an independent product decision and should be completed before the mainnet broadcast.
+
+Same-PR follow-up review: the fix was correct but subtle, because the anchor carried a time of day
+that eligibility never reads. Snap the anchor to UTC midnight, require whole-day periods, and the
+one-purchase-per-UTC-day rule becomes true by construction instead of by proof. Rename
+`lastPurchaseTimestamp` to `cadenceAnchor`, since the field is a grid point that is never in the
+future and never the execution time. Reaffirms skip-don't-recover — the policy has been intended
+since `6335994` — and records the reasoning, which had never been written down. **ABI-affecting, so
+it cannot land after the relaunch deploy.** Ask: none.
+
+### R76 - exact stablecoin consumption on every purchase venue ([spec](./R76-exact-purchase-input-consumption.md))
+
+Pre-deployment accounting fix stacked on R75. Move the existing Uniswap input balance-delta check to
+the shared `PurchaseRbtc` pipeline so a positive partial Money on Chain redemption cannot commit full
+schedule and handler-book debits while leaving unowned DOC behind. Keep Uniswap's intermediate-token
+router check in the venue implementation. Also reject a zero MoC oracle in the Dex constructor, matching
+the existing setter and canonical deployment guard. Ask: none.
+
+### R77 - accumulated rBTC storage sentinel ([spec](./R77-accumulated-rbtc-storage-sentinel.md))
+
+Post-R74 operator-gas encoding. Store each handler's per-user accumulated rBTC as `claimable + 1` so
+a full withdrawal leaves sentinel `1` instead of clearing the slot; getters and withdrawals decode and
+still pay the complete claim. On Rootstock this moves 15,000 gas per withdraw-and-rebuy cycle from the
+swapper (SET→RESET) onto the user (forgone CLEAR−REFUND); system net is 0 because
+`SET − REFUND = RESET` ([ROOTSTOCK-GAS-SCHEDULE.md](./ROOTSTOCK-GAS-SCHEDULE.md)). Accepts permanent
+one-slot state per ever-credited user×handler and Foundry-measured always-on encode overhead. Ask:
+none (human accepted the tradeoff 2026-09-18). The decision is keep; the revert-or-keep window closes
+at relaunch deployment because this mapping encoding is not layout-compatible with deployed handlers.
+
+### R78 - flat-fee purchase fast path ([spec](./R78-flat-fee-fast-path.md))
+
+Post-R77 behavior-preserving purchase optimization. When min/max rates are equal, choose the flat
+calculation once per batch; both fee branches call one shared fee-at-rate helper. Pack both internal
+`uint112` bounds plus both rates into one word and narrow the public struct bounds to their stored
+width before deployment. The variable
+loop keeps the four fee parameters on the stack instead of loading them from a memory struct per row,
+and does not repeat the dispatcher's unequal-rate test inside that loop. Only the batch calculator and
+fee transfer remain inheritance hooks; the calculation details are private and ordered by call flow.
+Under deploy (`via_ir`), the compute-only fast path saves **280 / 1,091 / 18,995 gas** for one / five / 100 rows on
+both Foundry and Rootstock. Packing separately avoids one 200-gas Rootstock `SLOAD` per batch, making
+the complete R77 delta approximately **480 / 1,291 / 19,195 gas**. If governance later sets unequal
+rates, the recurring fee-loop premium on Rootstock (deploy/`via_ir`, one `SLOAD` on each path) is
+**250 / 1,034 / 19,654 gas** for one / five / 100 full-interpolation rows (~197 gas/row at scale); see
+[Ongoing purchase cost after activating the variable fee](./R78-flat-fee-fast-path.md#ongoing-purchase-cost-after-activating-the-variable-fee).
+The redundant-test removal also saves 43 gas per row while variable rates are active. Ask: none.
+
+### R80 - remove the cadence-anchor purchase event ([spec](./R80-remove-cadence-anchor-event.md), [analysis](./R78-flat-fee-fast-path.md#r80-survivor-remove-dcamanager__cadenceanchorupdated))
+
+**Decided remove (2026-09-23).** Drop `DcaManager__CadenceAnchorUpdated` for ~1,813 gas/row under
+deploy/`via_ir` (1,946 under default). The write stays; indexers recompute from prior state or read
+`getDcaSchedule`. Five-consumer event cutover. Stack on the post-R78 tip before relaunch deploy.
+
+### R81 - one storage write per packed slot ([spec](./R81-one-write-per-packed-slot.md))
+
+From the [Rootstock gas audit](./ROOTSTOCK-GAS-AUDIT.md). The compiler writes each packed field as
+its own `SSTORE` unless the writes are adjacent with nothing that can revert, log, or call between
+them. Foundry prices the extra writes at ~100; Rootstock prices them at 5,000. Shipped without assembly.
+Write counts are `SSTORE`s per slot (`vm.stopAndReturnStateDiff`). Rootstock figures are
+5,000 per removed `RESET` plus 200 per removed `SLOAD` of that slot. Foundry figures are Cancun
+regression deltas on the same harness, not the production bill.
+
+- Each purchase row stores `DcaSchedule` slot 0 once. The two field assignments sit in a small helper;
+  inside `_rBtcPurchaseChecksEffects` the legacy compiler splits them. Steady-state (later) row,
+  Foundry **−184** (default) / **−315** (deploy). Rootstock **−5,200** per row on the default profile
+  (one `RESET`, one `SLOAD`) and **−5,400** under deploy (one `RESET`, two `SLOAD`s). Protocol-paid.
+- `createDcaSchedule` stores slots 0+1 once each on both profiles (1 write and 1 read of slot 0,
+  1 write and 0 reads of slot 1), down from 5+2 and 5+1. `routeIndex` is assigned before
+  `purchasePeriod`; declaration order still stores slot 0 twice under deploy. Foundry **−2,178** /
+  **−1,273**. Rootstock **−26,200** / **−20,800**.
+- `setFeeRateParams` merge measured (Foundry **−782** / **−496**, Rootstock **−16,200** /
+  **−15,600**) and declined: owner-only, at most yearly; keep the per-field if/write/emit shape.
+
+No ABI, event, or layout change. Ask: none.
+
+### R82 - transient reentrancy guard ([spec](./R82-transient-reentrancy-guard.md))
+
+Swap `ReentrancyGuard` for `ReentrancyGuardTransient` in `DcaManager`, keeping the same guarded set
+(invariant 6). The storage guard costs ~10,200 per guarded call on Rootstock (two `RESET`s, no restore
+refund), not the ~2,300 Foundry reports. The transient guard costs ~300; Rootstock has had
+`TLOAD`/`TSTORE` since Lovell 7.0.0. Saves ~9,900 on each of twelve user entry points. No ABI change.
+Ask: none.
+
+Shipped: `DcaManager` inherits `ReentrancyGuardTransient`; no modifier moved, and the storage layout
+is unchanged. Rootstock: guard **≈10,200 → ≈300** per guarded user call (`SLOAD` + two `RESET`s →
+one `TLOAD` + two `TSTORE`s), plus no 20,000 `SET` at deploy. Foundry (Cancun execution before
+refunds, stub handler, cold guard slot): **−4,792** on each of `updatePurchaseAmount`,
+`setSchedulePaused`, and `depositToken` (default), **−4,807** each under deploy; the audit's −2,800
+is the same swap with the guard slot already warm. Cancun later refunds
+2,800 of the storage guard's restore, so its net saving is about 2,000; that refund is the one
+Rootstock does not pay. `test/gas/R82TransientGuardGas.t.sol` pins no persistent access to the
+ERC-7201 guard slot and re-entry refused with `ReentrancyGuardReentrantCall`.
+
+### R83 - standing vs per-use spender approvals ([spec](./R83-standing-spender-approvals.md))
+
+The Dex purchase and lending deposit paths approve an exact amount before every spend. That 0 → X → 0
+allowance round trip costs ~10,000 net on Rootstock and ~2,300 on Ethereum. A standing approval costs
+a one-time ~20,000 at deploy and breaks even after about 2–4 uses.
+
+**Ask:** whether Dex handlers (all, lending-only, or none) and lending handlers should hold a standing
+approval to their spender instead. Ask only after the PR records each spender's code identity,
+upgradeability, and admins, SwapRouter02 included. The main exposure is idle deposits held by
+`IdleHandlerDex`.
+
+Lending approvals must be set at the end of each adapter's constructor. The base constructor would
+read the spender immutable as `address(0)`.
+
+**Answered 2026-09-24: standing approvals on both sites** — every Dex handler, idle and lending alike,
+and every lending adapter. The exposure question resolved on evidence rather than on judgement. Every
+deposit, redeem and swap entry point on the three live spenders pulls only from its own caller:
+SwapRouter02's verified source has just two
+`transferFrom` sites (`pay`, whose payer is the swap's `msg.sender`, and `pull`, whose `from` is
+`msg.sender`), and its callback — the one place a payer is caller-supplied — is reachable only by a
+factory-derived pool, which calls back whoever invoked `swap`. A fork probe
+([`StandingApprovalProbe`](../../test/mainnet-debug/standing-approvals/StandingApprovalProbe.t.sol),
+`make probe-standing-approvals`) fails every attacker route against a victim holding a standing `max`
+allowance — `pull`, `exactInput`, a forged callback, and a pool-relayed callback — and the same holds for
+iSUSD `mint` and LayerBank `supply`. The exception is Aave's flash loan, which repays from a
+caller-named receiver: LayerBank has it disabled on all three reserves (their switch), and a lending
+handler answers no `executeOperation` and has no `fallback`, so the callback reverts (ours, and carried
+as a precondition in the headers). With that held, a standing allowance adds no third-party reachability; it adds
+exposure only to the spender's own future code. That is nil for the router (not upgradeable, no admin),
+a 24–48 h Bitocracy timelock at Sovryn, and an instant EOA upgrade at LayerBank — whose Pool already
+custodies the whole position, leaving only transient deposit-time stablecoin and dust as new surface.
+
+Shipped: `LendingErc20Handler._approveLendingSpender()` called as the last statement of the Sovryn,
+LayerBank, and Tropykus constructors; `PurchaseUniswap`'s constructor approves the router. Neither
+runtime path reads or writes an allowance any more. Because a constructor grant is one-shot, and nothing
+here can rule out a clearing — two of the three shipped stablecoins are upgradeable proxies, so whether
+an allowance survives is the issuer's decision — each site carries an unpermissioned restore next to the
+constructor statement it mirrors: `restoreLendingApproval()` (declared on `ITokenLending`) and
+`restoreSwapRouterApproval()` (declared on `IPurchaseUniswap`), each re-granting `max` to that
+constructor's own immutable spender. They are the only new ABI, and the only way back from a cleared
+allowance on a handler that cannot be upgraded. Adding one to `ITokenLending` moves
+`type(ITokenLending).interfaceId`, which every in-repo site computes from the same source and no
+consumer hardcodes. Live decrement facts: USDRIF preserves a `max` allowance (saving ~10,400 per use), DOC and
+USDT0 decrement it (~5,400). Allowance-slot writes **2 → 0** per deposit; Foundry, execution before
+refunds: **−23,480** (default) / **−22,880** (deploy) against a live reconstruction of the pre-R83
+deposit, and zero writes on the Dex batch. One 20,000 `SET` per standing approval at deploy; break-even
+≈ 2–4 uses.
+
+### R84 - no repeated registry reads ([spec](./R84-no-repeated-registry-reads.md))
+
+Several `DcaManager` paths read the same registry fact for the same route twice, or read two facts
+through two calls where one would do. On Rootstock each extra `OperationsAdmin` call costs a flat 700
+plus a 200 read. Fixes, under deploy:
+
+- `withdrawTokenAndInterest` reuses the handler `_withdrawToken` already resolved: ≈ −1,900. No ABI
+  change.
+- One additive `getRouteInfo` view (handler, deposit pause, route class) serves deposit routing,
+  `topUpFromInterest`, and each `withdrawAllAccumulatedInterest` pair: ≈ −950 each.
+
+The human may drop the view and keep only the internal fix. Ask: none.
+
+**Implemented without the view (decided 2026-09-25).** The savings fall on rarely run user paths, at
+about 1% of each call and under a cent, so only an edit that improves the code on its own merits ships.
+`withdrawTokenAndInterest` now withdraws interest from the handler `_withdrawToken` just paid out
+through, so registry calls go 3 → 2. The additive `getRouteInfo` view and the three paths it would have
+served (deposit routing, `topUpFromInterest`, the interest batch) are closed: the view would add
+permanent registry surface that overlaps three existing getters. Measured in Foundry with
+a one-off harness kept at [`02884fe`](https://github.com/BitChillRSK/dca-contracts/blob/02884fe88467d9bed7e11306b64d91cf46ea9713/test/gas/R84RegistryReadsGas.t.sol) and not shipped, registry pre-warmed so both sides price its calls alike, then
+repriced for Rootstock: −1,389 Foundry / ≈ −2,089 Rootstock (default), −1,194 / ≈ **−1,894** (deploy).
+Errors unchanged. ABI change: none.
+
+### R85 - NatSpec delimiter ([spec](./R85-natspec-delimiter.md))
+
+After R84 and not deployment-bound: one NatSpec tag line uses `///`, not a three-line `/** */`
+wrapper, and NatSpec of two or more lines uses a `/** */` block, not a `///` run (the second half
+was added to scope by the human on 2026-09-24). Write the rule into `AGENTS.md` and apply it across
+first-party `src/`. Comment-only; metadata-stripped runtime must stay byte-identical. Ask: none.
+
+### R86 - `calldata` for external array parameters ([spec](./R86-calldata-array-parameters.md))
+
+After R79 and before relaunch deploy, because it changes shipped bytecode. The human decided it on
+2026-09-25: every array parameter of an external, non-constructor function in `src/` becomes
+`calldata`. That covers `PurchaseRbtc.batchBuyRbtc`, carried down through the fee and retrieval
+helpers. The two Uniswap path setters were switched too, then reverted to `memory` on 2026-09-26,
+because `calldata` made each one about 1,200 gas dearer. No ABI change.
+
+Measured under deploy (`via_ir`), which is what ships, a 5-row purchase batch saves 849–1,184 gas.
+
+The same PR records the six purchase-path candidates the human deferred on 2026-09-25. Ask: none.
+
+### R87 - consider the deferred gas candidates ([spec](./R87-deferred-gas-candidates.md))
+
+After R86 and before relaunch deploy. The six candidates in
+[the gas audit's deferred record](./ROOTSTOCK-GAS-AUDIT.md#deferred-candidates-2026-09-25) receive
+Rootstock decision figures first. The verdict run used the shipping deploy profile; because its throwaway
+harness was not retained, the implementation PR must retain reproducible evidence, measure both profiles,
+and re-record the conversions. For `optimizer_runs`, that includes the R81 packed-write check with the
+helpers as they are and inlined. The human then decides each one.
+
+The verdicts are recorded in a docs-only PR. Approved candidates ship in a follow-up R87 implementation
+PR, one commit each. Ask: the six verdicts, all at once, after measuring.
+
+**Decided 2026-09-26** ([verdicts](./R87-deferred-gas-candidates.md#verdicts-2026-09-26)); **implemented** in
+the stacked follow-up PR: remove the idle ledger after its per-user ghost, aggregate solvency,
+enumeration, cross-user, and transition-coverage proofs pass; drop `PurchaseFees__FeeTransferred` and
+monitor the stablecoin's standard `Transfer`; and add an `unchecked` credit in `_creditRbtc` under the
+explicit received-rBTC and native-supply bound. Every other candidate, and assembly in the purchase path,
+is closed.
+
+### R88 - consider the post-R87 structural cleanups ([spec](./R88-post-r87-structural-cleanups.md))
+
+After R87. **Decided 2026-09-26** ([verdicts](./R88-post-r87-structural-cleanups.md#verdicts-2026-09-26)):
+reject a shared `EXCHANGE_RATE_DECIMALS` on `TokenLending` (size regression; renaming the immutable
+would change the getter ABI or leave a duplicate public name); **inline** LayerBank's single-use
+`_normalizedIncome()` into `_viewExchangeRate()` as source simplification only (default −9 bytes;
+deploy size-neutral, not a shipped gas claim); keep the R87 gas-test `snapshot` / `revertTo` warning
+until an independently justified compatible `forge-std` upgrade exposes `snapshotState` /
+`revertToState`.
+
+### R89 - implement the post-R88 review candidates ([spec](./R89-post-r88-review-candidates.md))
+
+After R88 and before relaunch deploy. A whole-protocol review, excluding `tropykus-legacy`, measured on
+the `deploy` profile with per-slot read counts, turned up redundant reads, compiler checks that cannot
+fire, a stale constructor ordering constraint, a missing handler/token check on assignment, stale idle
+NatSpec, and a stray interface file. **Decided 2026-09-26:** implement all of them, one commit each. The
+spec records every candidate the review weighed and did not ship, with its reason, and lists what earlier
+specs already decided. Ask: none.
+
+**Implemented** ([results](./R89-post-r88-review-candidates.md#results-2026-09-26)). On the `deploy`
+profile, 10-row batches save 2,853–3,795 gas on Rootstock (compute).
+`withdrawAllAccumulatedInterest` saves about 4,160 at 10 schedules, and each lending withdraw or create
+saves about 210–520. An external review of the first push put three `unchecked` blocks back to checked:
+the `amountSpent` product, whose bound is an unenforced stablecoin supply, and the lending share sum
+and deposit credit, whose bound is the market's receipt token. It also added a cached route class in
+`assignHandler` and two `unchecked` widening adds (spec items 11–12). Runtime size under `deploy`:
+- handlers change by −117 to +40 bytes (LayerBank Dex is a `via_ir` layout effect);
+- `DcaManager` grows by 241 and `OperationsAdmin` by 88.
+The owner's review then moved the zero-stablecoin check into `StablecoinSource` (item 13), so every
+handler leaf rejects one at construction, not only idle Dex. That changes constructors only; runtime
+code is byte-identical. The ABI changes are the new `OperationsAdmin__HandlerTokenMismatch` and the
+constructor error `PurchaseUniswap__ZeroPurchaseToken`, replaced by `StablecoinSource__ZeroStablecoin`.
+
+### R90 - final optimization and handler-structure decisions ([spec](./R90-final-optimization-decisions.md))
+
+After R89, in a separate PR. Ships Dex oracle/live-floor packing and the unchecked lending zero-cash
+sum. PurchaseFees ownership move and `forge fmt` enforcement are **approved but deferred** to their own
+PRs (diagram cleanup / format-only; do not mix into R90). Gross-total `_batchRetrieveStablecoin` and
+Idle fold stay rejected; keep-checked arithmetic stays checked. Swap-pop bounds assembly **rejected**
+(packed `uint64[]`; rare path). Ask: none remaining for this PR's executable subset.
+
+### R91 - `forge fmt` one-shot and CI enforce ([spec](./R91-forge-fmt.md))
+
+After R90; not deployment-bound. Format the first-party tree, ignore vendored ABIs in
+`foundry.toml` `[fmt]`, wire `make fmt-check` into `make check` and CI, and prove metadata-stripped
+creation/runtime identity on every deployable contract under both profiles. Ask: none.
+
+### R92 - PurchaseFees ownership move ([spec](./R92-feehandler-ownership.md) — write before Solidity)
+
+After R91, before relaunch deploy. Move `PurchaseFees` off `TokenHandler` onto the purchase branch;
+solve default-profile Dex stack-too-deep. Ask: none (approved under R90).
+
+### R93 - zero-cash receipt-share diagnostic ([spec](./R93-zero-cash-share-diagnostic.md))
+
+After R92, before relaunch deploy. Replace the reconstructed stablecoin-attempted payload on
+`TokenLending__ZeroStablecoinReceived(uint256)` with the exact receipt shares the protocol consumed
+before rollback. The single and batch paths already hold that value; delete the batch's second loop
+without adding work to the successful path. The selector and encoded type stay unchanged. Ask: none
+(approved during PR 155 review).
+
+### R94 - store known credits before the handler pull ([spec](./R94-dcamanager-store-before-pull.md))
+
+After R93, before relaunch deploy. `createDcaSchedule` stores the schedule nonce before the handler
+pull (≈ −200 Rootstock under deploy); `_withdrawToken` drops the impossible `toUint128()`. Deposit
+store-before-pull and the top-up `purchaseAmount` hoist were measured and **reverted**. Also records
+the canvas closed leftovers (Idle fold, shared scale, purchase slot-0 further collapse, joined
+OperationsAdmin view, Uniswap path `calldata`, `BitChillOwnable` off `PurchaseFees`). Ask: none
+(locked 2026-09-27).
+
+### R95 - merge `TokenLending`, rename the lending base, and source-order cleanups ([spec](./R95-merge-token-lending.md))
+
+After R94, before relaunch deploy. Delete `TokenLending`; `LendingHandler is TokenHandler,
+ILendingHandler` (formerly `LendingErc20Handler` / `ITokenLending`) holds the scale immutable (now
+explicitly `internal`) and both conversion helpers. Errors and events take the `LendingHandler__` prefix;
+`bitchill-monitoring` follows up. Also the `PurchaseRbtc` `///` slip, constants → immutables → storage in
+`PurchaseUniswap` and `PurchaseFees`, and relative `src/` imports. Runtime identical on both profiles up
+to the renamed topics and selectors. Records the verdict on every
+candidate from the 2026-09-27 review of PRs 138–160. Ask: none (decided 2026-09-27).
+
+### R96 - `ceilDiv` share conversion and one route-class getter ([spec](./R96-ceildiv-and-one-route-class-getter.md))
+
+After R95, before relaunch deploy. `_stablecoinToShares` uses a checked `ceilDiv` (equivalent at every
+reachable input; about −1,000 per 10-row lending batch under deploy). `OperationsAdmin.isLendingRoute`
+is removed; `DcaManager` compares `getRouteClass` itself, in a helper renamed `_isLendingRoute`. The
+interest-route revert becomes `DcaManager__TokenIsNotLent` (raised by `_checkTokenIsLent`). Ask: none
+(decided 2026-09-27).
+
+### R97 - redeem lending exits straight to the user ([spec](./R97-redeem-lending-exits-to-user.md))
+
+After R96, before relaunch deploy. Principal and interest exits redeem with the user as receiver and
+measure the user's balance; batch funding still redeems onto the handler. **Closed 2026-09-27 without
+merging** ([#163](https://github.com/BitChillRSK/dca-contracts/pull/163)); see the spec's **Closed** section. As proposed: `TokenHandler._withdrawToken`
+becomes abstract and idle keeps the transfer body. About −15,000 Rootstock gas per lending exit and
+−28,000 on `withdrawTokenAndInterest`. Reverses R28's PR 19 "always redeem onto the handler" and R21's
+recipient-side measurement note. Ask: none.
+
+### R98 - remove the unreachable inner redeem clamp ([spec](./R98-remove-unreachable-redeem-clamp.md))
+
+After R96, before relaunch deploy. Drop the dead `sharesToRedeem > usersShares` branch in
+`_redeemShares`, delete `LendingHandler__AmountToRedeemAdjusted`, make the helper `private`, keep the
+share debit **checked** (no wrap if a future caller broke the bound), and prove the bound through
+`withdrawToken` / `withdrawInterest` (including fuzzes). Keep the outer withdrawal clamp and batch
+`InsufficientShares`, later renamed `LendingHandler__ZeroShareValue` (R114 limits this to zero-value purchase rows). Ask: none.
+
+### R99 - centralize measured deposit-share accounting ([spec](./R99-centralize-deposit-share-accounting.md))
+
+After R98, before relaunch deploy. `LendingHandler._depositToken` measures the receipt-share delta
+around `_protocolDeposit`; adapters keep only the protocol call. Matches the redemption split. No
+ABI change. Ask: none.
+
+### R100 - invariant suite honesty and integrated lending/purchase coverage ([spec](./R100-invariant-suite-debt.md))
+
+After R99; not deployment-bound. Fix the tautological interest invariant, correct
+`README_INVARIANTS.md`, and exercise the production lending + purchase pipeline together. Ask: none.
+
+### R101 - post-R100 review cleanups ([spec](./R101-post-r100-review-cleanups.md), [#167](https://github.com/BitChillRSK/dca-contracts/pull/167))
+
+After R100, before relaunch deploy. The 2026-09-27 pass over the R100 tip found no purchase-path gas
+left. It ships: `assignHandler` requires the handler's `i_dcaManager()` to pin this registry
+(new `OperationsAdmin__HandlerDcaManagerMismatch`); `_validatePurchaseAmount` runs before the create
+pull (max-schedules stays after it: +450 under deploy otherwise); the unreachable
+`purchaseAmount == 0` top-up guard is removed; `LendingHandler__LendingProtocolRedeemFailed` moves to
+`ITropykusHandler`; the two `…MustBeGreaterThanMinimum` errors become `…MustBeAtLeastMinimum`;
+stale NatSpec is fixed. It closes reusing the lending redeem's balance reading, and the
+`withdrawTokenAndInterest` route-check reorder (dropped after review). Ask: none (decided 2026-09-27).
+
+### R102 - unwrap WRBTC through the withdraw seam ([spec](./R102-wrbtc-withdraw-seam.md), [#168](https://github.com/BitChillRSK/dca-contracts/pull/168))
+
+After R101, before relaunch deploy. `PurchaseUniswap` overrides `_withdrawRbtc` (unwrap, then `super`)
+instead of restating the guarded external withdraw; `_withdrawRbtcChecksEffects`, `_claimableRbtc`, and
+the single-caller path helpers become `private`; NatSpec that predates interest top-up and R101's early
+amount check is fixed. No ABI change. Ask: none. Post-ship review (2026-09-28) closed fee-collector
+packing, the MoC balance local, and three cold-path leave-as-is items — see the closed register and
+[R102 § Post-ship review](./R102-wrbtc-withdraw-seam.md#post-ship-review-2026-09-28).
+
+### R103 - Handler taxonomy renames ([spec](./R103-handler-taxonomy-renames.md))
+
+After R102, before relaunch deploy. `*Handler` means fund custody/execution only (`TokenHandler`
+lineage). Strip `Erc20` from protocol bases and Dex leaves; rename the fee mixin off `*Handler`
+(**name open** — ask before Solidity; lean `FeeLogic`); OpsAdmin `getHandler` /
+`assignHandler` / `HandlerAssigned` (keep `assign`, not `set`; keep `ContractIsNotTokenHandler`).
+`Purchase*` and `*DocHandlerMoc` unchanged. Rename-only. Identifier and NatSpec polish → R104.
+
+### R104 - Identifier polish and NatSpec trim ([spec](./R104-identifier-and-natspec-polish.md))
+
+After R103, before relaunch deploy. Public immutables (`i_wrbtc`, `i_swapRouter`, `i_iSusd`);
+`modify*`/`update*` → `set*` where config is overwriteable; `getInterestAccrued` →
+`getAccruedInterest`; `withdrawRbtcFromTokenHandler` → `withdrawAccumulatedRbtc(token, routeIndex)`;
+fee collector drops `Address`; local grammar (`purchaseCount`, `userShares`, `handler`); NatSpec trim
+(no constructor-supplied `@return` boilerplate, no state-var restatement `//`, no scope apologetics).
+Ask: none (decided 2026-09-28 with R103).
+
+### R105 - Strip redundant `Address` from address parameters ([spec](./R105-strip-address-param-suffix.md))
+
+After R104, before relaunch deploy. Constructor / function `address` parameters and matching locals
+drop the `Address` suffix (`stablecoinAddress` → `stablecoin`, `dcaManagerAddress` → `dcaManager`,
+`kDocTokenAddress` → `kToken`, …). Type already says address. Events, errors, public immutables, and
+historical specs stay. Ask: none.
+
+### R106 - Private accounting boundaries ([spec](./R106-private-accounting-boundaries.md))
+
+After R105, before relaunch deploy. `LendingHandler.s_shares` and `PurchaseUniswap`'s
+`s_swapPath` / `s_swapIntermediateTokens` become `private` (compiler-enforced, same teeth as
+invariants 8 and 13). Correct `UserSharesUpdated` NatSpec / `EXTERNAL_REWARDS.md`: `newShares` is
+the balance after that transition; only the last event for a repeated batch buyer matches the
+final getter. Ask: none.
+
+### R107 - rBTC / WRBTC purchase fees ([spec](./R107-rbtc-fees.md))
+
+After R106, before the audit revision freezes (and before relaunch deploy). Venue spends the full
+retrieved stablecoin; after measured rBTC/WRBTC arrives, credit `floor(Q × F / G)` to the
+collector on `s_accumulatedRbtc` **last**, after buyer credits. Emit
+`PurchaseFees__FeeCredited` (rBTC amount + stablecoin share). Gross `minRbtcOut` and gross
+`amountSpent`. No currency toggle; no push in the purchase tx. Ask: none (fees decided
+2026-09-29; credit-not-push decided 2026-09-30).
+
+### R108 - Monotone purchase fees ([spec](./R108-monotone-purchase-fees.md))
+
+Replace linear rate interpolation with a smooth asymptotic rate and nondecreasing absolute fees. Remove the obsolete upper bound. Launch defaults approved: maximum 100 bps, minimum 20 bps, lower bound 250 tokens. Retain configurable flat mode. Ask: none.
+
+### R109 - Post-R108 review cleanups ([spec](./R109-always-emit-user-shares.md))
+
+After R108, before audit freeze / relaunch deploy. Always emit `UserSharesUpdated` from
+`_setUserShares` (drop unreachable equality branch); restore checked arithmetic on
+`FeeCredited.stablecoinAmount`; exercise launch variable fees plus collector withdraw/rotation in
+the stateful conservation suites. No storage or ABI change. Ask: none.
+
+### R110 - Internal audit follow-ups ([spec](./R110-internal-audit-followups.md))
+
+After R109, before audit freeze / relaunch deploy. Correct `AUDIT_GUIDE.md` for the R107 fee flow;
+state that the one-buy-per-UTC-day rule holds only while the period is unchanged and pin the
+period-edit case with a test (no contract change); add the underlying-token constructor check to
+`SovrynHandler` and the legacy `TropykusHandler`; document the LayerBank half-up burn-rounding
+assumption and pin it with a live probe. R114 supersedes the last-shares tail revert previously
+retained here and in R43. Ask: none.
+
+### R111 - Sovryn iToken type and identifier rename ([spec](./R111-itoken-rename.md))
+
+After R110, before audit freeze / relaunch deploy. Finish R104's Sovryn naming: `IiSusdToken` →
+`IiToken`, `MockIsusdToken` → `MockIToken`, and remaining first-party `iSusd` / `Isusd` identifiers →
+`iToken` / `IToken`. Names only; no behavior change. Ask: none.
+
+### R112 - Krait audit report and follow-ups ([spec](./R112-krait-audit-report.md))
+
+After R111, before audit freeze / relaunch deploy. Publish the Krait AI audit of `src/` at `5a9ff0fe`
+under `audits/2026-10-02-Krait/` with a provenance note and a resolution section; state the
+leaked-swapper worst case in `AUDIT_GUIDE.md` (no mandatory gap between windows, decided 2026-10-02);
+qualify the Dex floor NatSpec for `setMocOracle`; add the fee collector rotation step to the runbook;
+correct two stale document lines. Comments and documents only. Ask: none.
+
+### R113 - Reviewer-facing documents ([spec](./R113-audit-readiness-docs.md))
+
+After R112, before audit freeze / relaunch deploy. Markdown only. `AUDIT_GUIDE.md` gains explicit
+scope lists, compiler and dependency facts, the launch configuration, and earlier reviews;
+`README.md` drops generic sections and operator procedures; `DEPENDENCY_MODIFICATIONS.md` is removed;
+`ADDRESSES.md` lists the external contracts `DeployFinal` binds to; the cutover runbook gates on
+`make fork-layerbank` and receives the ownership, add-on, and compromised-swapper procedures.
+Ask: none.
+
+### R114 - Nethermind AuditAgent report and accounting fixes ([spec](./R114-nethermind-audit-followups.md))
+
+After R113, before audit freeze / relaunch deploy. Preserve the supplied automated report unchanged.
+Clamp each short lending row to its buyer's remaining shares and adjust only that row's funding
+weight before fees and allocation. Withdrawals and interest retain R113 behavior. This supersedes
+R43/R110's tail-revert decision; a zero-value row still reverts.
+Retain the accepted peg/account limitations and exact manager checks during assignment.
+Ask: none. BitChill authorized the review rework and arranges the separate Claude review.
+
+### R115 - Drop the single accumulated-rBTC withdraw ([spec](./R115-drop-single-rbtc-withdraw.md))
+
+After R114, before audit freeze / relaunch deploy. Remove `DcaManager.withdrawAccumulatedRbtc`.
+Accumulated rBTC leaves only through `withdrawAllAccumulatedRbtc`, including a one-element pair
+list. `PurchaseRbtc.withdrawAccumulatedRbtc(user)` stays.
+Ask: none. Decided 2026-10-08.
+
+### R116 - Pashov skills audit results ([spec](./R116-pashov-skills-audit.md), [#183](https://github.com/BitChillRSK/dca-contracts/pull/183))
+
+After R115, before audit freeze / relaunch deploy. Publish three automated runs of Pashov Audit
+Group's open-source skills on `src/` at `d5c09c32`: the solidity-auditor report (unchanged; 2
+findings, 28 leads), the X-Ray pre-audit map, and the Fizz suite in `test/fizz/` (106 properties, one
+Medusa campaign, two EXPLORATORY violations with Foundry repros). No `src/` or `script/` change.
+Triage, including the window-deposit product decision under `AGENTS.md` invariant 10, is R117.
+Ask: none.
+
+### R117 - Pashov triage and mitigations ([spec](./R117-pashov-mitigations.md), [#186](https://github.com/BitChillRSK/dca-contracts/pull/186))
+
+After R116, before audit freeze / relaunch deploy. The owner requested selected mitigations,
+decisions, documentation, and tests in one PR. Protect quoted execution rates using actual input,
+exclude Sovryn and the alternate USDRIF launch path, correct cadence documentation, and update
+SP-64/GL-15/SP-72. Retain unverified leads explicitly rather than silently accepting them.
+Ask: none for these selected controls. The relevant product choices are decided.
+
+### R118 - Review Pashov optional hardening ([spec](./R118-pashov-optional-hardening.md), [#187](https://github.com/BitChillRSK/dca-contracts/pull/187), [#185](https://github.com/BitChillRSK/dca-contracts/issues/185))
+
+After R117; the owner requested a separate stacked PR on 2026-10-21. The review confirms all four
+premises and finds none reachable at launch. It ships three small hardening changes: deposit credit
+stored before the handler call (L06), exact stablecoin consumption on lending deposits (L14), and no
+zero-value principal transfer (L17). L25 is declined as a dependency assumption: the router, WRBTC and
+pools are immutable and the measured receipt is already checked against the caller minimum.
+Ask: none.
+
+### R119 - Exit a lending position in kind ([spec](./R119-in-kind-lending-exit.md), [#189](https://github.com/BitChillRSK/dca-contracts/pull/189))
+
+After R118, before audit freeze / relaunch deploy. Owner request of 2026-11-02, after Sovryn's
+withdrawal delay (SIP-0096) and protocol pause left V1 users unable to withdraw. A user takes their
+whole position on one token and lending route as the venue's receipt token, so illiquidity or a
+delayed-withdrawal queue at the venue never needs a BitChill buffer. A venue pause that blocks
+receipt-token transfers stays a documented limit.
+Ask: none (decided 2026-11-02; see the spec).
+
+### R120 - Retire Sovryn to legacy ([spec](./R120-sovryn-legacy.md), [#190](https://github.com/BitChillRSK/dca-contracts/pull/190))
+
+After R119. Owner decision of 2026-11-02, after Sovryn's withdrawal queue and post-exploit pause:
+Sovryn is dropped from the deployment and the audit scope and becomes a test-only legacy adapter, as
+Tropykus did in R37. Its sources move to `src/sovryn-legacy/`, both live deploy branches reject it,
+`SOVRYN_INDEX` leaves `script/`'s compile scope, and route 2 stays unused. CI's invariant lane moves to
+LayerBank. Sovryn is reconsidered only if the venue recovers.
+Ask: none.
+
+## Closed non-implementation decisions
+
+There is no optional-late queue. Items either have an ordered spec above or are closed here:
+
+- **R114 principal reserve and buyer grouping — withdrawn 2026-10-07 after review.**
+  The reserve can block purchases and reduce partial withdrawals to zero after a lending loss.
+  Manager callbacks enumerate schedules on the purchase path. Grouping adds a hash table and weight
+  splitting when the per-row clamp already resolves the reported failures. Review measurements,
+  deploy profile, local mocks, Rootstock pricing, ten steady-state LayerBank rows: R113 411,203 gas;
+  reserve/grouping 491,278 (+8,008 per row); 734,378 with ten schedules per buyer (+32,318 per row);
+  clamp alone 412,131 (+93 per row, no extra call or SLOAD). These are review measurements.
+  Independent measurements appear in [R114](./R114-nethermind-audit-followups.md).
+
+- **R88 shared exchange-rate scale declaration — rejected 2026-09-26.** A shared field would remain
+  named `i_exchangeRateDecimals`; exposing that changes the getter ABI, and keeping a separate
+  `EXCHANGE_RATE_DECIMALS()` undermines consolidation. Measured stripped size also grew on every
+  lending leaf. Adapter-local constants and the `i_exchangeRateDecimals` immutable (on
+  `LendingHandler` since [R95](./R95-merge-token-lending.md)) stay. See
+  [R88](./R88-post-r87-structural-cleanups.md#verdicts-2026-09-26). Reaffirmed 2026-09-27 under
+  [R94](./R94-dcamanager-store-before-pull.md#closed-decisions-2026-09-27).
+
+- **Fold `IdleHandler` into `TokenHandler` — rejected (R90, reaffirmed R94 2026-09-27).**
+  Idle funding as `TokenHandler`'s default batch rule would be a diagram lie lending must override.
+  The short class is where the no-ledger residual risk is stated.
+
+- **Move `BitChillOwnable` off `PurchaseFees` — rejected 2026-09-27 (R94).** Dex owner setters for the
+  oracle, floor, and path would force the fee setters to move too and change storage layout, for no
+  hot-path gas. Ownership stays on `PurchaseFees` after R92's purchase-branch move.
+
+- **Gas candidates deferred 2026-09-25 — queued as [R87](./R87-deferred-gas-candidates.md).** The
+  purchase-path review behind [R86](./R86-calldata-array-parameters.md) deferred six candidates:
+  - the idle ledger;
+  - purchase-row event fields;
+  - fee sweeping;
+  - `FeeTransferred`;
+  - reusing the lending redeem's balance reading;
+  - `optimizer_runs`.
+
+  Each one's saving and reason to wait, and for `optimizer_runs` what to check about the R81 helpers,
+  is in [the gas audit](./ROOTSTOCK-GAS-AUDIT.md#deferred-candidates-2026-09-25). R87 measures
+  them and asks for a verdict on each.
+
+- **R12 compound interest into a chosen schedule — reopened 2026-08-31 as [R54](./R54-schedule-top-up-from-interest.md).** The original rejection is quoted here because it should not be reused: "The existing explicit withdraw-interest then deposit flow is legible and user-controlled. An atomic compound path must reconcile per-handler shares with per-route/per-schedule principal and adds a new cash-moving entry point to immutable handlers for convenience, not solvency." That describes an in-handler design which was never proposed — R12 was always `DcaManager`-only, with no handler call and no token movement. The unrecorded real blocker was EIP-170, and it was genuine: the function does not fit unoptimized. R53 removes it.
+- **R13 cooperative / user-initiated migration — rejected (option a stands).** Manual exit/re-entry was the recorded gate answer on 2026-08-26. R53 voided the bytecode half of reason 2; reasons 1, 3, and 4 still hold. Closed with no follow-up PR in [#111](https://github.com/BitChillRSK/dca-contracts/pull/111) — see [R53](./R53-optimizer-baseline.md#bytecode-scarcity-decisions-closed).
+- **R50 merged per-user stablecoin/rBTC slot — rejected.** Tried and reverted in R50; `StablecoinSource` is the wrong home for rBTC state and a `uint128` share cap is venue-dependent. The EIP-170 objection is void under the optimizer, but the architectural ones are not. Closed in [#111](https://github.com/BitChillRSK/dca-contracts/pull/111).
+- **Owner sweep — rejected.** A pooled balance cannot prove which tokens are harmless dust versus user liabilities. Governance must not gain a path around signer-only withdrawals.
+- **Handler per-user storage packing — rejected.** Each mapping value is already one slot and contains a financial amount. Narrowing it saves no slot across mapping entries.
+- **Address-keyed bool bitmaps — rejected.** `s_swappers` and `s_handlerAssigned` are sparse address keys; they never share a word, so a bitmap is extra math for the same SLOAD. R50 packs the `(token, routeIndex)` handler+pause pair instead.
+- **R79 repeated-buyer write coalescing — closed 2026-09-25 without implementation.** Implemented,
+  fuzzed, and measured in [#148](https://github.com/BitChillRSK/dca-contracts/pull/148), then
+  withdrawn: ≈ −10,700 Rootstock gas per batch over live history, about 1% of a batch, a few cents per
+  batch and a couple of dollars a year of swapper gas. That does not justify moving balance writes in
+  three immutable accounting loops to deferred run-level state, with a saving that depends on the
+  swapper's row order. Reasons, measurements, and reopen conditions:
+  [R79](./R79-coalesce-repeated-buyer-writes.md); code at the tag
+  [`archive/r79-coalesced-writes`](https://github.com/BitChillRSK/dca-contracts/tree/archive/r79-coalesced-writes).
+- **R97 redeem lending exits straight to the user — closed 2026-09-27 without merging.** Implemented,
+  measured, and green in [#163](https://github.com/BitChillRSK/dca-contracts/pull/163): ≈ −15,000
+  Rootstock gas per lending exit, ≈ −27,500 on `withdrawTokenAndInterest`. The saving is user-paid and
+  off the purchase path, so it had to simplify the code, and it does the opposite: `_protocolRedeem`
+  regains the `receiver` parameter R28 removed (a mode every adapter implements), Tropykus needs a
+  measure-and-forward branch, the withdraw event moves from the base into each subclass, and exits
+  measure the user's balance instead of the handler's. Do not re-propose a recipient on the redeem hook
+  (Sovryn `burn(user)`, LayerBank `withdraw(..., user)`, or any variant) for gas. Reopen only if exits
+  become protocol-paid, or if a correctness change needs the recipient anyway. Reasons and
+  measurements: [R97](./R97-redeem-lending-exits-to-user.md); code on the branch
+  `perf/r97-redeem-exits-to-user`.
+- **Reuse the lending redeem's stablecoin balance in the withdrawal transfer — closed 2026-09-27
+  (R101).** `_measuredProtocolRedeem` ends with a stablecoin `balanceOf` and
+  `TokenHandler._withdrawToken` starts with another, so a lending exit reads the handler's balance
+  twice in a row. Removing that saves about 1,000 Rootstock gas per exit, but it is user-paid and ties
+  the redeem measurement to the transfer measurement across layers, the same objection as R87's
+  rejected balance reuse. See [R101](./R101-post-r100-review-cleanups.md#verdicts).
+- **Check the route class before principal moves in `withdrawTokenAndInterest` — closed 2026-09-28
+  (R101, implemented then dropped after review).** An idle call already reverts the whole
+  transaction, so no principal stays withdrawn; the reorder only changes which of two true errors an
+  over-balance amount reports and skips a handler call the revert undoes. It cost a second slot-0
+  read on every successful lending exit (+109 under deploy, about one 200-gas SLOAD on Rootstock),
+  user-paid, and a storage parameter on `_withdrawToken`. Reopen only if that call gains an effect a
+  revert cannot undo. See [R101](./R101-post-r100-review-cleanups.md#verdicts).
+- **Pack the fee collector beside the fee rates — closed 2026-09-28 (R95 item 4, post-R102 pass).**
+  R95 left this as "reopen with a deploy measurement." Layout closes it without one: the fee word is
+  already full (`uint112` × 2 + `uint16` × 2 = 256 bits); the collector is 160 bits; narrowing the
+  bounds to `uint96` frees only 32 bits; the 12 spare bytes beside Ownable2Step's `_pendingOwner`
+  cannot hold an address; packing into the Dex safety-check word still leaves a purchase-path
+  `SLOAD` because purchases never load that word. The path already does the minimum (fee word once,
+  collector when the fee is nonzero — ~200 Rootstock gas). See
+  [R102 post-ship review](./R102-wrbtc-withdraw-seam.md#post-ship-review-2026-09-28).
+- **Cache MoC's post-redeem `address(this).balance` in a local — closed 2026-09-28 (keep re-read).**
+  Compiles to `SELFBALANCE` (5 gas on Foundry and Rootstock), not `BALANCE` (400). Naming the
+  post-balance costs more stack shuffling than the extra read. Solc 0.8.36 / optimizer 200: the
+  re-read wins by 1–5 gas depending on profile and whether the redeem pays. Matches `096719a`. See
+  [R102 post-ship review](./R102-wrbtc-withdraw-seam.md#post-ship-review-2026-09-28).
+- **Owner no-op write guards, purchase-only `getHandler`, and `Batch.routeIndex` as `uint32` —
+  closed 2026-09-28 without shipping.** Equality checks on `addSwapper` / `revokeSwapper` /
+  `setFeeCollectorAddress` are owner cold-path code for a rare 5,000-gas Rootstock `RESET`. A
+  purchase-only handler getter would duplicate the shared view for a few gas inside an external call.
+  Narrowing `Batch.routeIndex` does not shrink ABI calldata. Recorded under
+  [R102 post-ship review](./R102-wrbtc-withdraw-seam.md#post-ship-review-2026-09-28) items 7–9.
+- **SPDX change — reopened 2026-08-31, answered 2026-09-07.** The earlier rejection argued that re-licensing "requires an explicit legal/product process outside the contract implementation stack" and then closed the decision on that basis, which is self-defeating: that is a reason to route the question to a human, not to answer it. See **Licensing — decided**.
+
+## Licensing — decided
+
+Reopened 2026-08-31, answered 2026-09-07. Was not latent Solidity work and was not an agent decision;
+it needed a human, which is what happened — this section is retained as the record, with the original
+findings below and the decision layered on top. Free to change again before the relaunch cutover,
+since verified source is immortal on explorers regardless.
+
+**1. A compliance gap existed, independent of the relicensing choice — now closed.** All 42 files in
+`src/` declared `MIT`. But `src/PurchaseUniswap.sol` imported `TransferHelper`, `ISwapRouter02`, and
+`IV3SwapRouter`, and `src/interfaces/IPurchaseUniswap.sol` imported `ISwapRouter02` — all four carried
+`SPDX-License-Identifier: GPL-2.0-or-later`. `TransferHelper` was a library whose code compiled into
+the deployed Dex handlers, not merely an interface, so an MIT declaration over that derivative was at
+best contested. Uniswap handle this on their own tree by shipping periphery as GPL-2.0-or-later and
+core as BUSL-1.1. `lib/v3-core` is BUSL-1.1 but nothing in `src/` imports it, so that half was moot.
+**R69** ([spec](./R69-token-io-consistency-and-batch-dust.md)) had already removed the compiled
+`TransferHelper` dependency in favour of `SafeERC20.forceApprove`, leaving only the router
+*interfaces* as GPL imports. **R72** ([spec](./R72-licensing.md)) closed the rest: `PurchaseUniswap`
+and `IPurchaseUniswap` now import a first-party `IUniswapV3SwapRouter` declaring only the one function
+(`exactInput`) BitChill calls, under BitChill's own license. No GPL import remains anywhere in `src/`.
+
+**2. Which license — decided: BUSL-1.1.** Four realistic options were considered. MIT (the prior
+state) is maximally permissive with no patent grant. Apache-2.0 is permissive with an explicit patent
+grant and a trademark clause, and is strictly better than MIT for a company that wants to stay
+permissive. BUSL-1.1 (Uniswap v3, Aave v3) is source-available with production use restricted for up
+to four years, then auto-converting to a nominated Change License; it needs Licensor, Change Date,
+Change License, and an Additional Use Grant. GPL-3.0/AGPL-3.0 (Uniswap v2) forces forks to stay open
+without preventing them.
+
+The deciding question was what is actually being protected. The original framing here — that the moat
+is the Rootstock lending integrations, the swapper bot, and deployed liquidity rather than the
+Solidity — argued for leaning Apache-2.0 "only if no specific plausible forker can be named." On
+reconsideration, BitChill is a self-contained product with a fee switch (schedules, purchases, a fee
+parameter), the SushiSwap-shaped case BUSL exists for, and a more concretely nameable forker than that
+original framing assumed. Verified source still means anyone can copy it whatever the header says — a
+license buys recourse, not prevention — and BUSL is still not OSI-approved and may be screened out by
+some integrators or grant programs (check before relying on any grant program that requires one). R72
+implements: 4-year term, `GPL-2.0-or-later` Change License (GPL-2.0-compatible, unlike Apache-2.0,
+and matches Uniswap's own choice), and an Additional Use Grant carving out non-production use
+(testing, security research, audits, academic use, public testnets). `Licensor` is BitChill (see
+https://github.com/BitChillRSK). Every commit touching `src/` is one author, so relicensing itself
+has no third-party consent problem — see R72 for the full record, including the caveat that
+already-published (pre-relaunch) code stays MIT forever regardless.
 
 ## OpenZeppelin policy
 
-The compiler/EVM bump and OpenZeppelin major upgrade are separate risk axes.
+The compiler/EVM bump and OpenZeppelin major upgrade remain separate risk axes. R23 already proved solc `0.8.36` / `cancun` on Rootstock. R44 is now a required standalone dependency migration from `v4.9.3` to pinned stable `v5.7.0`, after R39 removes dead bytecode and before later security/ABI work.
 
-Keep OpenZeppelin `v4.9.3` through the required relaunch work because the repo already depends on v4 behavior for `Ownable`, `AccessControl`, `ReentrancyGuard`, `SafeERC20`, `ERC20`, `ERC20Permit`, `Math`, and tests that expect v4 revert strings. OpenZeppelin 5.x is a major-version migration with API and behavior changes; it should not be bundled into the Rootstock compiler/EVM proof or handler hardening.
-
-If pursued, the OpenZeppelin upgrade PR should:
-
-- update imports and constructors intentionally;
-- update tests for custom errors or changed revert behavior;
-- compare bytecode size and gas for deployed contracts;
-- run `make check`, `make ci`, and a Rootstock testnet/fork deploy smoke;
-- document why the upgrade is worth including before relaunch rather than after.
+R44 must update imports/constructors intentionally, retain exact error assertions, compare runtime/gas/storage, and run the full local/CI/fork matrix. It must not add Ownable2Step or BitChill behavior; R45 owns that reviewable behavior change.

@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
-import {IStablecoin} from "../../src/interfaces/IStablecoin.sol";
+import {IStablecoin} from "../interfaces/IStablecoin.sol";
 import {console} from "forge-std/Test.sol";
 
 contract MockKToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
@@ -16,9 +16,17 @@ contract MockKToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
     uint256 constant ANNUAL_INCREASE = 5; // The DOC tokens redeemed by each kDOC token increase by 5% annually (mocking behaviour)
     uint256 constant YEAR_IN_SECONDS = 31536000;
 
-    constructor(address stablecoinAddress) ERC20("Tropykus kToken", "kToken") Ownable() ERC20Permit("Tropykus kToken") {
-        i_stablecoin = IStablecoin(stablecoinAddress);
+    constructor(address stablecoin)
+        ERC20("Tropykus kToken", "kToken")
+        Ownable(msg.sender)
+        ERC20Permit("Tropykus kToken")
+    {
+        i_stablecoin = IStablecoin(stablecoin);
         i_deploymentTimestamp = block.timestamp;
+    }
+
+    function underlying() external view returns (address) {
+        return address(i_stablecoin);
     }
 
     function mint(uint256 amount) public returns (uint256) {
@@ -43,15 +51,15 @@ contract MockKToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
     }
 
     function redeem(uint256 kTokenToBurn) public returns (uint256) {
-        uint256 stablecoinToRedeem = kTokenToBurn * exchangeRateCurrent() / DECIMALS;
+        uint256 stablecoinAmount = kTokenToBurn * exchangeRateCurrent() / DECIMALS;
         require(balanceOf(msg.sender) >= kTokenToBurn, "Insufficient balance");
         // Ensure we have enough stablecoin to transfer (mint if needed to simulate yield generation)
         uint256 currentBalance = i_stablecoin.balanceOf(address(this));
-        if (currentBalance < stablecoinToRedeem) {
+        if (currentBalance < stablecoinAmount) {
             // Mint the difference to simulate yield generation from the lending protocol
-            IStablecoin(address(i_stablecoin)).mint(address(this), stablecoinToRedeem - currentBalance);
+            IStablecoin(address(i_stablecoin)).mint(address(this), stablecoinAmount - currentBalance);
         }
-        i_stablecoin.transfer(msg.sender, stablecoinToRedeem);
+        i_stablecoin.transfer(msg.sender, stablecoinAmount);
         _burn(msg.sender, kTokenToBurn); // Burn an amount of kDOC equivalent to the amount of DOC divided by the exchange rate (e.g.: 1 DOC redeemed => 1 / 0.02 = 50 kDOC burnt)
         return 0;
     }

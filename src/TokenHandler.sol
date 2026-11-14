@@ -1,71 +1,86 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
-import {FeeHandler} from "./FeeHandler.sol";
 import {DcaManagerAccessControl} from "./DcaManagerAccessControl.sol";
+import {StablecoinSource} from "./StablecoinSource.sol";
 
 /**
  * @title TokenHandler
- * @dev Base contract for handling stablecoins.
+ * @author BitChill team: Antonio Rodríguez-Ynyesto
+ * @notice Base contract for depositing and withdrawing a handler's stablecoin.
  */
-abstract contract TokenHandler is ITokenHandler, ERC165, Ownable, FeeHandler, DcaManagerAccessControl {
+abstract contract TokenHandler is ITokenHandler, ERC165, DcaManagerAccessControl, StablecoinSource {
     using SafeERC20 for IERC20;
 
-    IERC20 public immutable i_stableToken; // The stablecoin token to be deposited
+    /*//////////////////////////////////////////////////////////////
+                               CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
 
     /**
-     * @param dcaManagerAddress: the address of the DCA manager
-     * @param tokenAddress: the address of the token to be deposited
-     * @param feeCollector: the address of the fee collector
-     * @param feeSettings: the fee settings
+     * @param dcaManager The DcaManager allowed to call deposit and withdraw.
+     * @param stablecoin The stablecoin this handler holds.
      */
-    constructor(
-        address dcaManagerAddress,
-        address tokenAddress,
-        address feeCollector,
-        FeeSettings memory feeSettings
-    ) FeeHandler(feeCollector, feeSettings) DcaManagerAccessControl(dcaManagerAddress) {
-        i_stableToken = IERC20(tokenAddress);
-    }
+    constructor(address dcaManager, address stablecoin)
+        DcaManagerAccessControl(dcaManager)
+        StablecoinSource(stablecoin)
+    {}
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice deposit the full token amount for DCA on the contract
-     * @notice This function transfers the selected token from the user to this contract. The user must have called the token contract's
-     * approve function with this contract's address and the amount approved
-     * @param user: the address of the user making the deposit
-     * @param depositAmount: the amount to deposit
+     * @inheritdoc ITokenHandler
+     * @dev A deposit cannot be negative: if `balanceOf` falls, the subtraction panics. That is an
+     *      invariant break, not a mismatch amount. This function does not return the credited amount.
      */
-    function depositToken(address user, uint256 depositAmount) public virtual override onlyDcaManager {
-        i_stableToken.safeTransferFrom(user, address(this), depositAmount);
-        emit TokenHandler__TokenDeposited(address(i_stableToken), user, depositAmount);
+    function depositToken(address user, uint256 depositAmount) external override onlyDcaManager {
+        _depositToken(user, depositAmount);
     }
 
-    /**
-     * @notice withdraw some or all of the stablecoin token previously deposited
-     * @notice This function transfers stablecoin token from this contract back to the user
-     * @param user: the address of the user making the withdrawal
-     * @param withdrawalAmount: the amount of stablecoin token to withdraw
-     */
-    function withdrawToken(address user, uint256 withdrawalAmount) public virtual override onlyDcaManager {
-        i_stableToken.safeTransfer(user, withdrawalAmount);
-        emit TokenHandler__TokenWithdrawn(address(i_stableToken), user, withdrawalAmount);
+    /// @inheritdoc ITokenHandler
+    function withdrawToken(address user, uint256 withdrawalAmount)
+        external
+        override
+        onlyDcaManager
+        returns (uint256 withdrawnAmount)
+    {
+        return _withdrawToken(user, withdrawalAmount);
     }
 
-    /**
-     * @notice check if the contract supports an interface
-     * @param interfaceID: the interface ID to check
-     * @return true if the contract supports the interface, false otherwise
-     */
+    /*//////////////////////////////////////////////////////////////
+                                GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev ERC-165: `ITokenHandler` plus whatever the parent advertises.
     function supportsInterface(bytes4 interfaceID) public view virtual override returns (bool) {
         return interfaceID == type(ITokenHandler).interfaceId || super.supportsInterface(interfaceID);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           INTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Pull `depositAmount` from `user` and revert unless the measured balance delta matches.
+    function _depositToken(address user, uint256 depositAmount) internal virtual {
+        uint256 balanceBefore = i_stablecoin.balanceOf(address(this));
+        i_stablecoin.safeTransferFrom(user, address(this), depositAmount);
+        uint256 depositedAmount = i_stablecoin.balanceOf(address(this)) - balanceBefore;
+        if (depositedAmount != depositAmount) {
+            revert TokenHandler__DepositAmountMismatch(depositAmount, depositedAmount);
+        }
+        emit TokenHandler__TokenDeposited(address(i_stablecoin), user, depositAmount);
+    }
+
+    /// @dev Pay `withdrawalAmount` of the stablecoin to `user` and return the measured balance delta.
+    function _withdrawToken(address user, uint256 withdrawalAmount) internal virtual returns (uint256 withdrawnAmount) {
+        uint256 balanceBefore = i_stablecoin.balanceOf(address(this));
+        i_stablecoin.safeTransfer(user, withdrawalAmount);
+        withdrawnAmount = balanceBefore - i_stablecoin.balanceOf(address(this));
+        emit TokenHandler__TokenWithdrawn(address(i_stablecoin), user, withdrawnAmount);
     }
 }

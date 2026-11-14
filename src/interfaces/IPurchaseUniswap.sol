@@ -1,22 +1,27 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
 import {IWRBTC} from "./IWRBTC.sol";
-import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces/ISwapRouter02.sol";
+import {IUniswapV3SwapRouter} from "./IUniswapV3SwapRouter.sol";
 import {ICoinPairPrice} from "./ICoinPairPrice.sol";
 
 /**
  * @title IPurchaseUniswap
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @dev Interface for DEX swapping
+ * @notice Uniswap V3 purchase configuration: encoded path, slippage band, and MoC BTC/USD oracle.
+ * @dev Min-out assumes the handler's stablecoin is worth one USD and uses the MoC BTC/USD oracle;
+ *      no stablecoin/USD feed enforces that peg. Governance owns this deployment precondition. Tokens
+ *      above 18 decimals revert. A downward depeg can stop swaps at the oracle-implied floor. An upward
+ *      depeg does not raise that floor; a quote-derived caller minimum must protect the premium.
  */
 interface IPurchaseUniswap {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
     //////////////////////////////////////////////////////////////*/
+    /// @notice Constructor bundle for the Uniswap router, wrapped rBTC, path, and MoC BTC/USD oracle.
     struct UniswapSettings {
-        IWRBTC wrBtcToken;
-        ISwapRouter02 swapRouter02;
+        IWRBTC wrbtc;
+        IUniswapV3SwapRouter swapRouter;
         address[] swapIntermediateTokens;
         uint24[] swapPoolFeeRates;
         ICoinPairPrice mocOracle;
@@ -26,73 +31,148 @@ interface IPurchaseUniswap {
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    event PurchaseUniswap_NewPathSet(
-        address[] indexed intermediateTokens, uint24[] indexed poolFeeRates, bytes indexed newPath
+    /// @notice An approved Uniswap V3 path was activated by construction, a swapper, or this handler's owner.
+    event PurchaseUniswap__NewPathSet(address[] intermediateTokens, uint24[] poolFeeRates, bytes newPath);
+    /**
+     * @notice Exact encoded path derived from `intermediateTokens` / `poolFeeRates` was allowed or revoked.
+     * @dev Construction emits `allowed = true` for the initial path. Later writes are owner-only.
+     */
+    event PurchaseUniswap__PurchasePathAllowedSet(
+        bytes32 pathHash, bytes encodedPath, address[] intermediateTokens, uint24[] poolFeeRates, bool allowed
     );
-    event PurchaseUniswap_AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
-    event PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(uint256 oldValue, uint256 newValue);
-    event PurchaseUniswap_OracleUpdated(address oldOracle, address newOracle);
+    /// @notice Owner changed the swap-time oracle floor.
+    event PurchaseUniswap__AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
+    /// @notice Owner changed the lower bound on the swap-time oracle floor.
+    event PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(uint256 oldValue, uint256 newValue);
+    /// @notice Owner pointed the min-out oracle at a new MoC BTC/USD feed.
+    event PurchaseUniswap__OracleUpdated(address indexed oldOracle, address indexed newOracle);
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Path encoding requires `poolFeeRates.length == intermediateTokens.length + 1`.
     error PurchaseUniswap__WrongNumberOfTokensOrFeeRates(uint256 numberOfIntermediateTokens, uint256 numberOfFeeRates);
+    /// @notice Swap-time oracle floor cannot exceed 100%.
     error PurchaseUniswap__AmountOutMinimumPercentTooHigh();
+    /// @notice Swap-time oracle floor cannot be set below the safety-check bound.
     error PurchaseUniswap__AmountOutMinimumPercentTooLow();
+    /// @notice Safety-check bound cannot exceed 100%.
     error PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh();
+    /// @notice Oracle address cannot be zero.
     error PurchaseUniswap__InvalidOracleAddress();
+    /// @notice MoC oracle `getPriceInfo` reported an invalid price.
     error PurchaseUniswap__OutdatedPrice();
+    /// @notice The handler's stablecoin has more than 18 decimals, so min-out cannot be scaled.
+    error PurchaseUniswap__UnsupportedStablecoinDecimals(uint8 stablecoinDecimals);
+    /// @notice The allow/revoke write would not change stored permission.
+    error PurchaseUniswap__PurchasePathPermissionUnchanged(bytes32 pathHash, bool allowed);
+    /// @notice The currently active path cannot be revoked; activate another allowed path first.
+    error PurchaseUniswap__CannotRevokeActivePurchasePath(bytes32 pathHash);
+    /// @notice `caller` is neither this handler's owner nor an OperationsAdmin swapper.
+    error PurchaseUniswap__UnauthorizedPurchasePathSetter(address caller);
+    /// @notice `pathHash` is not allowlisted on this handler.
+    error PurchaseUniswap__PurchasePathNotAllowed(bytes32 pathHash);
+    /**
+     * @notice A later hop stopped short and left an intermediate token in the shared router.
+     * @dev The comparison is against the router's own pre-swap balance, not zero, so dust anyone can send
+     *      to a public contract does not block purchases.
+     */
+    error PurchaseUniswap__IntermediateBalanceChangedInRouter(
+        address token, uint256 balanceBefore, uint256 balanceAfter
+    );
+
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Sets a new swap path.
-     *  @param intermediateTokens The array of intermediate token addresses in the path.
-     * @param poolFeeRates The array of pool fees for each swap step.
+     * @notice Allow or revoke the exact Uniswap V3 path built from these components.
+     * @param intermediateTokens Intermediate token addresses (empty for a direct pair).
+     * @param poolFeeRates Pool fee for each hop. Length must be `intermediateTokens.length + 1`.
+     * @param allowed True to approve the derived path, false to revoke it.
+     * @dev Owner-only. Encodes through the same pinned stablecoin and WRBTC as `setPurchasePath`.
+     *      Emits the derived bytes and hash. The active path cannot be revoked. A repeated write reverts.
+     *      New paths after construction are approved here; the constructor path is approved at deploy.
+     */
+    function setPurchasePathAllowed(address[] memory intermediateTokens, uint24[] memory poolFeeRates, bool allowed)
+        external;
+
+    /**
+     * @notice Replace the Uniswap V3 path from this handler's stablecoin to WRBTC.
+     * @param intermediateTokens Intermediate token addresses in the path (empty for a direct pair).
+     * @param poolFeeRates Pool fee for each hop. Length must be `intermediateTokens.length + 1`.
+     * @dev Builds the canonical path from this handler's pinned stablecoin and WRBTC. `msg.sender` must
+     *      be this handler's owner or an OperationsAdmin swapper, and the derived path must already be
+     *      allowlisted. Constructor installation does not use this function; it self-allowlists the
+     *      initial path.
      */
     function setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates) external;
 
     /**
-     * @notice Set the minimum percentage of rBTC that must be received from the swap.
-     * @param amountOutMinimumPercent The minimum percentage of rBTC that must be received from the swap.
+     * @notice Set the swap-time oracle floor as a 1e18-scaled fraction of the oracle-implied rBTC.
+     * @param amountOutMinimumPercent New fraction. Cannot exceed 100% or fall below the safety check.
+     * @dev Uniswap `amountOutMinimum` is `max(thisFloor, minRbtcOut)`, so the swapper's quote-derived
+     *      `minRbtcOut` sets operational tightness and this value is the bound that holds when that
+     *      minimum is absent, stale, or hostile. Deploy it loose enough that a healthy batch never
+     *      reverts on it; the swapper, not this setter, is the weekly knob.
      */
     function setAmountOutMinimumPercent(uint256 amountOutMinimumPercent) external;
-    
-    /**
-     * @notice Get the minimum percentage of rBTC that must be received from the swap.
-     * @return The minimum percentage of rBTC that must be received from the swap.
-     */
-    function getAmountOutMinimumPercent() external view returns (uint256);
 
     /**
-     * @notice Set the minimum percentage of rBTC that must be received from the swap.
-     * @param amountOutMinimumSafetyCheck The minimum percentage of rBTC that must be received from the swap.
+     * @notice Set the lowest `amountOutMinimumPercent` the owner may configure.
+     * @param amountOutMinimumSafetyCheck New bound, 1e18-scaled. Never enters swap math.
+     * @dev The floor percentage cannot be set below this bound, so lowering it further takes two
+     *      transactions, this bound first. Raising this bound above the active floor reverts without
+     *      changing state.
      */
     function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external;
 
     /**
-     * @notice Get the minimum percentage of rBTC that must be received from the swap.
-     * @return The minimum percentage of rBTC that must be received from the swap.
+     * @notice Point min-out at a new MoC BTC/USD oracle.
+     * @param newOracle New oracle. Cannot be zero.
+     * @dev Not bounded by the safety check: a new oracle changes the floor in one transaction.
      */
-    function getAmountOutMinimumSafetyCheck() external view returns (uint256);
-    
-    /**
-     * @notice Updates the oracle address to a new one.
-     * @param newOracle The address of the new oracle to use.
-     */
-    function updateMocOracle(address newOracle) external;
+    function setMocOracle(address newOracle) external;
 
     /**
-     * @notice Get the oracle used for price checks.
-     * @return The oracle used for price checks.
+     * @notice Re-grant SwapRouter02 the unbounded stablecoin allowance set at construction.
+     * @dev Anyone may call it: it re-grants `max` to the constructor's own immutable router, so it
+     *      authorizes nothing new.
+     */
+    function restoreSwapRouterApproval() external;
+
+    /*//////////////////////////////////////////////////////////////
+                                GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Current swap-time oracle floor, 1e18-scaled.
+     * @return The fraction applied to the oracle-implied rBTC when building `amountOutMinimum`.
+     */
+    function getAmountOutMinimumPercent() external view returns (uint256);
+
+    /**
+     * @notice The bound that limits how far `setAmountOutMinimumPercent` may widen the live floor.
+     * @return The lowest value `setAmountOutMinimumPercent` accepts.
+     */
+    function getAmountOutMinimumSafetyCheck() external view returns (uint256);
+
+    /**
+     * @notice Oracle currently used to build `amountOutMinimum`.
+     * @return The MoC BTC/USD feed.
      */
     function getMocOracle() external view returns (ICoinPairPrice);
 
     /**
-     * @notice Get the current swap path.
-     * @return The current swap path.
+     * @notice Encoded Uniswap V3 path from this handler's stablecoin to WRBTC.
+     * @return The current path bytes.
      */
     function getSwapPath() external view returns (bytes memory);
+
+    /**
+     * @notice Whether `pathHash` is an approved encoded path on this handler.
+     * @param pathHash `keccak256` of the exact encoded path bytes.
+     */
+    function isPurchasePathAllowed(bytes32 pathHash) external view returns (bool);
 }

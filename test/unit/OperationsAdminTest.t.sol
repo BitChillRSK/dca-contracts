@@ -4,24 +4,30 @@ pragma solidity 0.8.36;
 
 import {Test, console} from "forge-std/Test.sol";
 import {DcaDappTest} from "./DcaDappTest.t.sol";
+import {OperationsAdmin} from "../../src/OperationsAdmin.sol";
+import {BitChillOwnable} from "../../src/BitChillOwnable.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
-import {IFeeHandler} from "../../src/interfaces/IFeeHandler.sol";
-import {TropykusDocHandlerMoc} from "../../src/TropykusDocHandlerMoc.sol";
+import {IDcaManagerAccessControl} from "../../src/interfaces/IDcaManagerAccessControl.sol";
+import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
 import {IOperationsAdmin} from "../../src/interfaces/IOperationsAdmin.sol";
 import "./TestsHelper.t.sol";
+import {ownableUnauthorized} from "../utils/OzRevert.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 contract OperationsAdminTest is DcaDappTest {
-    // Events
-    event OperationsAdmin__AdminRoleGranted(address indexed admin);
-    event OperationsAdmin__SwapperRoleGranted(address indexed swapper);
-    event OperationsAdmin__AdminRoleRevoked(address indexed admin);
-    event OperationsAdmin__SwapperRoleRevoked(address indexed swapper);
-    
+    event OperationsAdmin__SwapperAdded(address indexed swapper);
+    event OperationsAdmin__SwapperRevoked(address indexed swapper);
+    event OperationsAdmin__RouteRegistered(uint256 index, bool lends);
+    event OperationsAdmin__DepositsPauseSet(address indexed token, uint256 routeIndex, bool paused);
+
+    uint256 private constant TOKEN_ROUTE_MAPPING_SLOT = 2;
+    uint256 private constant SECOND_IDLE_INDEX = 10;
+    uint256 private constant SECOND_LENDING_INDEX = 11;
+
     function setUp() public override {
         super.setUp();
     }
-
-    event OperationsAdmin__LendingProtocolAdded(uint256 indexed index, string indexed name);
 
     /*//////////////////////////////////////////////////////////////
                          ADMIN OPERATIONS TESTS
@@ -30,127 +36,790 @@ contract OperationsAdminTest is DcaDappTest {
         vm.startBroadcast();
         DummyERC165Contract dummyERC165Contract = new DummyERC165Contract();
         vm.stopBroadcast();
+
+        vm.prank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+
         bytes memory encodedRevert = abi.encodeWithSelector(
             IOperationsAdmin.OperationsAdmin__ContractIsNotTokenHandler.selector, address(dummyERC165Contract)
         );
 
         vm.expectRevert(encodedRevert);
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(
-            address(stablecoin), s_lendingProtocolIndex, address(dummyERC165Contract)
-        );
+        vm.prank(OWNER);
+        operationsAdmin.assignHandler(address(stablecoin), SECOND_LENDING_INDEX, address(dummyERC165Contract));
 
         vm.expectRevert();
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(address(stablecoin), s_lendingProtocolIndex, address(dcaManager));
+        vm.prank(OWNER);
+        operationsAdmin.assignHandler(address(stablecoin), SECOND_LENDING_INDEX, address(dcaManager));
     }
 
     function testUpdateTokenHandlerFailsIfAddressIsEoa() external {
-        address dummyAddress = makeAddr("dummyAddress");
+        address dummy = makeAddr("dummy");
         bytes memory encodedRevert =
-            abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__EoaCannotBeHandler.selector, dummyAddress);
+            abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__EoaCannotBeHandler.selector, dummy);
         vm.expectRevert(encodedRevert);
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(address(stablecoin), s_lendingProtocolIndex, dummyAddress);
+        vm.prank(OWNER);
+        operationsAdmin.assignHandler(address(stablecoin), s_routeIndex, dummy);
     }
 
-    function testTokenHandlerUpdated() external {
-        address prevTropykusDocHandlerMoc = operationsAdmin.getTokenHandler(address(stablecoin), s_lendingProtocolIndex);
-        vm.startBroadcast();
-        TropykusDocHandlerMoc newTropykusDocHandlerMoc = new TropykusDocHandlerMoc(
-            address(dcaManager),
-            address(stablecoin),
-            address(lendingToken),
-            MIN_PURCHASE_AMOUNT,
-            FEE_COLLECTOR,
-            address(mocProxy),
-            IFeeHandler.FeeSettings({
-                minFeeRate: MIN_FEE_RATE,
-                maxFeeRate: MAX_FEE_RATE_TEST,
-                feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-                feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
-            }),
-            EXCHANGE_RATE_DECIMALS
+    function testAssignTokenHandlerFailsIfRouteUnregistered() external {
+        bytes memory encodedRevert =
+            abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__RouteNotRegistered.selector, 3);
+        vm.expectRevert(encodedRevert);
+        vm.prank(OWNER);
+        operationsAdmin.assignHandler(address(stablecoin), 3, address(stablecoinHandler));
+    }
+
+    /// @dev Both the pair check and R47's address check would fire here; the pair check runs first,
+    ///      so this error is unchanged by R47.
+    function testDuplicateHandlerAssignmentReverts() external {
+        bytes memory encodedRevert = abi.encodeWithSelector(
+            IOperationsAdmin.OperationsAdmin__HandlerAlreadyAssigned.selector, address(stablecoin), s_routeIndex
         );
-        vm.stopBroadcast();
-        assert(prevTropykusDocHandlerMoc != address(newTropykusDocHandlerMoc));
+        vm.expectRevert(encodedRevert);
+        vm.prank(OWNER);
+        operationsAdmin.assignHandler(address(stablecoin), s_routeIndex, address(stablecoinHandler));
+    }
+
+    function testOnlyOwnerCanRegisterRoutesAndSwappers() external {
         vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(
-            address(stablecoin), s_lendingProtocolIndex, address(newTropykusDocHandlerMoc)
+        vm.expectRevert(ownableUnauthorized(ADMIN));
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+
+        vm.prank(SWAPPER);
+        vm.expectRevert(ownableUnauthorized(SWAPPER));
+        operationsAdmin.addSwapper(address(2));
+
+        vm.prank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        assertEq(
+            uint256(operationsAdmin.getRouteClass(SECOND_LENDING_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending)
+        );
+    }
+
+    function testOwnerCannotRenounceOwnership() external {
+        vm.expectRevert(BitChillOwnable.BitChillOwnable__OwnershipCannotBeRenounced.selector);
+        vm.prank(OWNER);
+        operationsAdmin.renounceOwnership();
+
+        vm.expectRevert(BitChillOwnable.BitChillOwnable__OwnershipCannotBeRenounced.selector);
+        vm.prank(USER);
+        operationsAdmin.renounceOwnership();
+
+        assertEq(operationsAdmin.owner(), OWNER);
+    }
+
+    function testConstructorEmitsIdleRouteRegistered() external {
+        vm.expectEmit(false, false, false, true);
+        emit OperationsAdmin__RouteRegistered(0, false);
+        OperationsAdmin freshAdmin = new OperationsAdmin(OWNER);
+        assertEq(uint256(freshAdmin.getRouteClass(0)), uint256(IOperationsAdmin.RouteClass.Idle));
+        assertEq(freshAdmin.owner(), OWNER);
+        assertEq(freshAdmin.pendingOwner(), address(0));
+    }
+
+    function testAddAndRevokeSwapper() external {
+        address extraSwapper = address(2);
+        vm.prank(OWNER);
+        vm.expectEmit(true, true, true, true);
+        emit OperationsAdmin__SwapperAdded(extraSwapper);
+        operationsAdmin.addSwapper(extraSwapper);
+        assertTrue(operationsAdmin.isSwapper(SWAPPER));
+        assertTrue(operationsAdmin.isSwapper(extraSwapper));
+
+        vm.expectEmit(true, true, true, true);
+        emit OperationsAdmin__SwapperRevoked(SWAPPER);
+        vm.prank(OWNER);
+        operationsAdmin.revokeSwapper(SWAPPER);
+        assertFalse(operationsAdmin.isSwapper(SWAPPER));
+        assertTrue(operationsAdmin.isSwapper(extraSwapper));
+    }
+
+    function testRevokeSwapperFailsIfNotOwner() external {
+        address notOwner = makeAddr("notOwner");
+        vm.prank(notOwner);
+        vm.expectRevert(ownableUnauthorized(notOwner));
+        operationsAdmin.revokeSwapper(SWAPPER);
+    }
+
+    function testRevokedSwapperCannotPurchase() external {
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
+        vm.prank(OWNER);
+        operationsAdmin.revokeSwapper(SWAPPER);
+
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__UnauthorizedSwapper.selector, SWAPPER));
+        buyRbtcOne(scheduleId);
+    }
+
+    function testReregisteringAnyIndexReverts() external {
+        vm.startPrank(OWNER);
+        vm.expectRevert(abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__RouteAlreadyRegistered.selector, 0));
+        operationsAdmin.registerRoute(0, false);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__RouteAlreadyRegistered.selector, s_routeIndex)
+        );
+        operationsAdmin.registerRoute(s_routeIndex, true);
+        vm.stopPrank();
+    }
+
+    function testGetRouteClassReadsRecordedClass() external {
+        assertEq(uint256(operationsAdmin.getRouteClass(0)), uint256(IOperationsAdmin.RouteClass.Idle));
+        assertEq(uint256(operationsAdmin.getRouteClass(TROPYKUS_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
+        assertEq(uint256(operationsAdmin.getRouteClass(SOVRYN_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
+        assertEq(uint256(operationsAdmin.getRouteClass(LAYERBANK_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending));
+        assertEq(uint256(operationsAdmin.getRouteClass(999)), uint256(IOperationsAdmin.RouteClass.Unregistered));
+    }
+
+    function testRegisterRouteEmitsAndClassifies() external {
+        vm.expectEmit(false, false, false, true);
+        emit OperationsAdmin__RouteRegistered(SECOND_LENDING_INDEX, true);
+        vm.prank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        assertEq(
+            uint256(operationsAdmin.getRouteClass(SECOND_LENDING_INDEX)), uint256(IOperationsAdmin.RouteClass.Lending)
+        );
+
+        vm.expectEmit(false, false, false, true);
+        emit OperationsAdmin__RouteRegistered(SECOND_IDLE_INDEX, false);
+        vm.prank(OWNER);
+        operationsAdmin.registerRoute(SECOND_IDLE_INDEX, false);
+        assertEq(uint256(operationsAdmin.getRouteClass(SECOND_IDLE_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle));
+    }
+
+    function testMistakenClassificationRecoveredAtNewIndex() external {
+        vm.startPrank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, false);
+        assertEq(
+            uint256(operationsAdmin.getRouteClass(SECOND_LENDING_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle)
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__RouteAlreadyRegistered.selector, SECOND_LENDING_INDEX
+            )
+        );
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX + 1, true);
+        vm.stopPrank();
+        assertEq(
+            uint256(operationsAdmin.getRouteClass(SECOND_LENDING_INDEX + 1)),
+            uint256(IOperationsAdmin.RouteClass.Lending)
         );
         assertEq(
-            operationsAdmin.getTokenHandler(address(stablecoin), s_lendingProtocolIndex),
-            address(newTropykusDocHandlerMoc)
+            uint256(operationsAdmin.getRouteClass(SECOND_LENDING_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle)
         );
     }
 
-    function testSetRoles() external {
+    function testMistakenHandlerAssignmentRecoveredAtNewIndex() external {
+        address oldHandler = operationsAdmin.getHandler(address(stablecoin), s_routeIndex);
+        DummyLendingHandler unusedHandler = new DummyLendingHandler(address(stablecoin), address(dcaManager));
+
+        vm.startPrank(OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__HandlerAlreadyAssigned.selector, address(stablecoin), s_routeIndex
+            )
+        );
+        operationsAdmin.assignHandler(address(stablecoin), s_routeIndex, address(unusedHandler));
+
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        operationsAdmin.assignHandler(address(stablecoin), SECOND_LENDING_INDEX, address(unusedHandler));
+        vm.stopPrank();
+
+        assertEq(operationsAdmin.getHandler(address(stablecoin), s_routeIndex), oldHandler);
+        assertEq(operationsAdmin.getHandler(address(stablecoin), SECOND_LENDING_INDEX), address(unusedHandler));
+    }
+
+    function testIdleHandlerAtNonZeroIndexLeavesOriginalIdleResolvable() external {
+        DummyTokenHandler idleAtZero = new DummyTokenHandler(address(stablecoin), address(dcaManager));
+        DummyTokenHandler idleAtTen = new DummyTokenHandler(address(stablecoin), address(dcaManager));
+
+        vm.startPrank(OWNER);
+        if (operationsAdmin.getHandler(address(stablecoin), IDLE_INDEX) == address(0)) {
+            operationsAdmin.assignHandler(address(stablecoin), IDLE_INDEX, address(idleAtZero));
+        }
+        operationsAdmin.registerRoute(SECOND_IDLE_INDEX, false);
+        operationsAdmin.assignHandler(address(stablecoin), SECOND_IDLE_INDEX, address(idleAtTen));
+
+        DummyTokenHandler extra = new DummyTokenHandler(address(stablecoin), address(dcaManager));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__HandlerAlreadyAssigned.selector,
+                address(stablecoin),
+                SECOND_IDLE_INDEX
+            )
+        );
+        operationsAdmin.assignHandler(address(stablecoin), SECOND_IDLE_INDEX, address(extra));
+        vm.stopPrank();
+
+        assertTrue(operationsAdmin.getHandler(address(stablecoin), IDLE_INDEX) != address(0));
+        assertEq(operationsAdmin.getHandler(address(stablecoin), SECOND_IDLE_INDEX), address(idleAtTen));
+        assertEq(uint256(operationsAdmin.getRouteClass(IDLE_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle));
+        assertEq(uint256(operationsAdmin.getRouteClass(SECOND_IDLE_INDEX)), uint256(IOperationsAdmin.RouteClass.Idle));
+    }
+
+    function testOldRouteStillPaysUserAfterNewHandlerRegistered() external {
+        address oldHandler = operationsAdmin.getHandler(address(stablecoin), s_routeIndex);
+        DummyLendingHandler newHandler = new DummyLendingHandler(address(stablecoin), address(dcaManager));
+
+        vm.startPrank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        vm.expectEmit(true, true, true, true);
+        emit OperationsAdmin__HandlerAssigned(address(stablecoin), SECOND_LENDING_INDEX, address(newHandler));
+        operationsAdmin.assignHandler(address(stablecoin), SECOND_LENDING_INDEX, address(newHandler));
+        vm.stopPrank();
+
+        assertEq(operationsAdmin.getHandler(address(stablecoin), s_routeIndex), oldHandler);
+        assertEq(operationsAdmin.getHandler(address(stablecoin), SECOND_LENDING_INDEX), address(newHandler));
+
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
+        uint256 remaining = scheduleAt(dcaManager, USER, address(stablecoin), 0).tokenBalance;
+        uint256 userBalanceBefore = stablecoin.balanceOf(USER);
+
+        vm.prank(USER);
+        dcaManager.withdrawToken(address(stablecoin), scheduleId, remaining);
+
+        assertGt(stablecoin.balanceOf(USER), userBalanceBefore);
+        assertEq(scheduleAt(dcaManager, USER, address(stablecoin), 0).tokenBalance, 0);
+        assertEq(operationsAdmin.getHandler(address(stablecoin), s_routeIndex), oldHandler);
+    }
+
+    function testOwnerCannotMoveAnotherUsersTokens() external {
+        uint64 userScheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
+        uint256 userRemaining = scheduleAt(dcaManager, USER, address(stablecoin), 0).tokenBalance;
+        uint256 userWalletBefore = stablecoin.balanceOf(USER);
+
+        deal(address(stablecoin), OWNER, AMOUNT_TO_DEPOSIT);
+        vm.startPrank(OWNER);
+        stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
+        dcaManager.createDcaSchedule(
+            address(stablecoin), AMOUNT_TO_DEPOSIT, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_routeIndex
+        );
+        vm.stopPrank();
+
+        uint64 ownerScheduleId = scheduleIdAt(dcaManager, OWNER, address(stablecoin), 0);
+        uint256 ownerRemaining = scheduleAt(dcaManager, OWNER, address(stablecoin), 0).tokenBalance;
+        uint256 ownerWalletBefore = stablecoin.balanceOf(OWNER);
+
         vm.prank(OWNER);
-        vm.expectEmit(true, true, true, true);
-        emit OperationsAdmin__AdminRoleGranted(address(1));
-        operationsAdmin.setAdminRole(address(1));
-        assert(operationsAdmin.hasRole(operationsAdmin.ADMIN_ROLE(), address(1)));
-        vm.prank(ADMIN);
-        vm.expectEmit(true, true, true, true);
-        emit OperationsAdmin__SwapperRoleGranted(address(2));
-        operationsAdmin.setSwapperRole(address(2));
-        assert(operationsAdmin.hasRole(operationsAdmin.SWAPPER_ROLE(), address(2)));
-    }
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDcaManager.DcaManager__NotScheduleOwner.selector, address(stablecoin), userScheduleId, USER
+            )
+        );
+        dcaManager.withdrawToken(address(stablecoin), userScheduleId, userRemaining);
 
-    function testRevokeAdminRole() external {
-        vm.expectEmit(true, true, true, true);
-        emit OperationsAdmin__AdminRoleRevoked(ADMIN);
         vm.prank(OWNER);
-        operationsAdmin.revokeAdminRole(ADMIN);
-        assertFalse(operationsAdmin.hasRole(operationsAdmin.ADMIN_ROLE(), ADMIN));
+        vm.expectRevert(IDcaManagerAccessControl.DcaManagerAccessControl__OnlyDcaManagerCanCall.selector);
+        ITokenHandler(address(stablecoinHandler)).withdrawToken(USER, userRemaining);
+
+        vm.prank(OWNER);
+        dcaManager.withdrawToken(address(stablecoin), ownerScheduleId, ownerRemaining);
+
+        assertGt(stablecoin.balanceOf(OWNER), ownerWalletBefore);
+        assertEq(scheduleAt(dcaManager, OWNER, address(stablecoin), 0).tokenBalance, 0);
+        assertEq(scheduleAt(dcaManager, USER, address(stablecoin), 0).tokenBalance, userRemaining);
+        assertEq(stablecoin.balanceOf(USER), userWalletBefore);
+
+        DummyLendingHandler dummy = new DummyLendingHandler(address(stablecoin), address(dcaManager));
+        vm.startPrank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        operationsAdmin.assignHandler(address(stablecoin), SECOND_LENDING_INDEX, address(dummy));
+        operationsAdmin.addSwapper(address(0xBEEF));
+        vm.stopPrank();
+
+        assertEq(scheduleAt(dcaManager, USER, address(stablecoin), 0).tokenBalance, userRemaining);
+        assertEq(stablecoin.balanceOf(USER), userWalletBefore);
+        assertEq(operationsAdmin.getHandler(address(stablecoin), s_routeIndex), address(stablecoinHandler));
     }
 
-    function testRevokeSwapperRole() external {
-        vm.expectEmit(true, true, true, true);
-        emit OperationsAdmin__SwapperRoleRevoked(SWAPPER);
-        vm.prank(ADMIN);
-        operationsAdmin.revokeSwapperRole(SWAPPER);
-        assertFalse(operationsAdmin.hasRole(operationsAdmin.SWAPPER_ROLE(), address(2)));
+    function testLendingHandlerRejectedAtIdleIndexZero() external {
+        address otherToken = makeAddr("r31IdleZeroToken");
+        DummyLendingHandler lendingStub = new DummyLendingHandler(otherToken, address(dcaManager));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__LendingHandlerOnIdleRoute.selector, address(lendingStub)
+            )
+        );
+        vm.prank(OWNER);
+        operationsAdmin.assignHandler(otherToken, IDLE_INDEX, address(lendingStub));
     }
 
-    function testRevokeAdminRoleFailsIfNotOwner() external {
-        vm.prank(ADMIN);
-        vm.expectRevert("Ownable: caller is not the owner");
-        operationsAdmin.revokeAdminRole(ADMIN);
+    function testLendingHandlerRejectedAtRegisteredIdleIndex() external {
+        address otherToken = makeAddr("r31IdleIndexToken");
+        DummyLendingHandler lendingStub = new DummyLendingHandler(otherToken, address(dcaManager));
+        vm.startPrank(OWNER);
+        operationsAdmin.registerRoute(SECOND_IDLE_INDEX, false);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__LendingHandlerOnIdleRoute.selector, address(lendingStub)
+            )
+        );
+        operationsAdmin.assignHandler(otherToken, SECOND_IDLE_INDEX, address(lendingStub));
+        vm.stopPrank();
     }
 
-    function testRevokeSwapperRoleFailsIfNotAdmin() external {
-        vm.prank(makeAddr("notAdmin"));
+    function testIdleHandlerRejectedAtLendingIndex() external {
+        address otherToken = makeAddr("r31LendingToken");
+        DummyTokenHandler idleStub = new DummyTokenHandler(otherToken, address(dcaManager));
+        vm.startPrank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__ContractIsNotLendingHandler.selector, address(idleStub)
+            )
+        );
+        operationsAdmin.assignHandler(otherToken, SECOND_LENDING_INDEX, address(idleStub));
+        vm.stopPrank();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    R47 HANDLER-ADDRESS UNIQUENESS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Same token, two lending indexes: DcaManager locks principal per route while the
+    ///      handler keys shares by user alone, so the second route would read the first's principal as yield.
+    function testHandlerAddressCannotBackTwoLendingRoutes() external {
+        address token = makeAddr("r47SameTokenLending");
+        DummyLendingHandler lendingStub = new DummyLendingHandler(token, address(dcaManager));
+
+        vm.startPrank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX + 1, true);
+        operationsAdmin.assignHandler(token, SECOND_LENDING_INDEX, address(lendingStub));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__HandlerAddressAlreadyInUse.selector, address(lendingStub)
+            )
+        );
+        operationsAdmin.assignHandler(token, SECOND_LENDING_INDEX + 1, address(lendingStub));
+        vm.stopPrank();
+
+        assertEq(operationsAdmin.getHandler(token, SECOND_LENDING_INDEX), address(lendingStub));
+        assertEq(operationsAdmin.getHandler(token, SECOND_LENDING_INDEX + 1), address(0));
+    }
+
+    /// @dev Idle handlers hold balances keyed by user only, so the rule is not lending-specific.
+    function testHandlerAddressCannotBackTwoIdleRoutes() external {
+        address token = makeAddr("r47SameTokenIdle");
+        DummyTokenHandler idleStub = new DummyTokenHandler(token, address(dcaManager));
+
+        vm.startPrank(OWNER);
+        operationsAdmin.assignHandler(token, IDLE_INDEX, address(idleStub));
+        operationsAdmin.registerRoute(SECOND_IDLE_INDEX, false);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__HandlerAddressAlreadyInUse.selector, address(idleStub)
+            )
+        );
+        operationsAdmin.assignHandler(token, SECOND_IDLE_INDEX, address(idleStub));
+        vm.stopPrank();
+
+        assertEq(operationsAdmin.getHandler(token, IDLE_INDEX), address(idleStub));
+        assertEq(operationsAdmin.getHandler(token, SECOND_IDLE_INDEX), address(0));
+    }
+
+    /// @dev A handler is constructed for one stablecoin, so a second token is never a legitimate reuse.
+    function testHandlerAddressCannotBeReusedForASecondToken() external {
+        address firstToken = makeAddr("r47FirstToken");
+        address secondToken = makeAddr("r47SecondToken");
+        DummyLendingHandler lendingStub = new DummyLendingHandler(firstToken, address(dcaManager));
+
+        vm.startPrank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        operationsAdmin.assignHandler(firstToken, SECOND_LENDING_INDEX, address(lendingStub));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__HandlerAddressAlreadyInUse.selector, address(lendingStub)
+            )
+        );
+        operationsAdmin.assignHandler(secondToken, SECOND_LENDING_INDEX, address(lendingStub));
+        vm.stopPrank();
+
+        assertEq(operationsAdmin.getHandler(secondToken, SECOND_LENDING_INDEX), address(0));
+    }
+
+    /// @dev Uniqueness is checked before the class checks, so crossing lending → idle with a second
+    ///      token reports the reuse rather than the class mismatch. Neither path lets the address through.
+    function testHandlerAddressCannotBeReusedAcrossRouteClasses() external {
+        address firstToken = makeAddr("r47ClassFirstToken");
+        address secondToken = makeAddr("r47ClassSecondToken");
+        DummyLendingHandler lendingStub = new DummyLendingHandler(firstToken, address(dcaManager));
+
+        vm.startPrank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        operationsAdmin.assignHandler(firstToken, SECOND_LENDING_INDEX, address(lendingStub));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__HandlerAddressAlreadyInUse.selector, address(lendingStub)
+            )
+        );
+        operationsAdmin.assignHandler(secondToken, IDLE_INDEX, address(lendingStub));
+        vm.stopPrank();
+
+        assertEq(operationsAdmin.getHandler(secondToken, IDLE_INDEX), address(0));
+    }
+
+    /// @dev Versioned routes stay usable: distinct instances are what ops must deploy per pair.
+    function testDistinctHandlerInstancesRemainAssignable() external {
+        address token = makeAddr("r47DistinctInstances");
+        DummyLendingHandler firstStub = new DummyLendingHandler(token, address(dcaManager));
+        DummyLendingHandler secondStub = new DummyLendingHandler(token, address(dcaManager));
+
+        vm.startPrank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX + 1, true);
+        operationsAdmin.assignHandler(token, SECOND_LENDING_INDEX, address(firstStub));
+        operationsAdmin.assignHandler(token, SECOND_LENDING_INDEX + 1, address(secondStub));
+        vm.stopPrank();
+
+        assertEq(operationsAdmin.getHandler(token, SECOND_LENDING_INDEX), address(firstStub));
+        assertEq(operationsAdmin.getHandler(token, SECOND_LENDING_INDEX + 1), address(secondStub));
+    }
+
+    /// @dev Only a successful assignment consumes the address: a class-rejected handler is still assignable.
+    function testRevertedAssignmentDoesNotConsumeHandlerAddress() external {
+        address token = makeAddr("r47RevertedAssignment");
+        DummyTokenHandler idleStub = new DummyTokenHandler(token, address(dcaManager));
+
+        vm.startPrank(OWNER);
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__ContractIsNotLendingHandler.selector, address(idleStub)
+            )
+        );
+        operationsAdmin.assignHandler(token, SECOND_LENDING_INDEX, address(idleStub));
+
+        operationsAdmin.assignHandler(token, IDLE_INDEX, address(idleStub));
+        vm.stopPrank();
+
+        assertEq(operationsAdmin.getHandler(token, IDLE_INDEX), address(idleStub));
+    }
+
+    function testMatchingClassAssignmentsSucceed() external {
+        address otherToken = makeAddr("r31OtherToken");
+        DummyTokenHandler idleStub = new DummyTokenHandler(otherToken, address(dcaManager));
+        DummyLendingHandler lendingStub = new DummyLendingHandler(otherToken, address(dcaManager));
+
+        vm.startPrank(OWNER);
+        operationsAdmin.assignHandler(otherToken, IDLE_INDEX, address(idleStub));
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        operationsAdmin.assignHandler(otherToken, SECOND_LENDING_INDEX, address(lendingStub));
+        vm.stopPrank();
+
+        assertEq(operationsAdmin.getHandler(otherToken, IDLE_INDEX), address(idleStub));
+        assertEq(operationsAdmin.getHandler(otherToken, SECOND_LENDING_INDEX), address(lendingStub));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    R89 HANDLER STABLECOIN MATCH
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Assignment is add-only, so a handler built for another stablecoin would hold the pair forever.
+    function testHandlerBuiltForAnotherTokenIsRejected() external {
+        address token = makeAddr("r89AssignedToken");
+        address otherToken = makeAddr("r89OtherToken");
+        DummyTokenHandler idleStub = new DummyTokenHandler(otherToken, address(dcaManager));
+        DummyLendingHandler lendingStub = new DummyLendingHandler(otherToken, address(dcaManager));
+
+        vm.startPrank(OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__HandlerTokenMismatch.selector, token, address(idleStub)
+            )
+        );
+        operationsAdmin.assignHandler(token, IDLE_INDEX, address(idleStub));
+
+        operationsAdmin.registerRoute(SECOND_LENDING_INDEX, true);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__HandlerTokenMismatch.selector, token, address(lendingStub)
+            )
+        );
+        operationsAdmin.assignHandler(token, SECOND_LENDING_INDEX, address(lendingStub));
+        vm.stopPrank();
+
+        assertEq(operationsAdmin.getHandler(token, IDLE_INDEX), address(0));
+        assertEq(operationsAdmin.getHandler(token, SECOND_LENDING_INDEX), address(0));
+    }
+
+    /// @dev The stablecoin is checked last, so a handler wrong on both counts reports its class first.
+    function testClassMismatchIsReportedBeforeTokenMismatch() external {
+        address token = makeAddr("r89ClassFirstToken");
+        DummyLendingHandler lendingStub =
+            new DummyLendingHandler(makeAddr("r89ClassFirstOtherToken"), address(dcaManager));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__LendingHandlerOnIdleRoute.selector, address(lendingStub)
+            )
+        );
+        vm.prank(OWNER);
+        operationsAdmin.assignHandler(token, IDLE_INDEX, address(lendingStub));
+    }
+
+    /// @dev A contract that cannot name its stablecoin is refused rather than assigned unchecked.
+    function testHandlerWithoutStablecoinGetterIsRejected() external {
+        DummyTokenHandlerWithoutStablecoin stub = new DummyTokenHandlerWithoutStablecoin();
+        address token = makeAddr("r89NoGetterToken");
+
         vm.expectRevert();
-        operationsAdmin.revokeSwapperRole(address(2));
+        vm.prank(OWNER);
+        operationsAdmin.assignHandler(token, IDLE_INDEX, address(stub));
+
+        assertEq(operationsAdmin.getHandler(token, IDLE_INDEX), address(0));
     }
 
-    function testAssignTokenHandlerFailsIfLendingProtocolNotAdded() external {
-        bytes memory encodedRevert =
-            abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__LendingProtocolNotAllowed.selector, 3);
-        vm.expectRevert(encodedRevert);
-        vm.prank(ADMIN);
-        operationsAdmin.assignOrUpdateTokenHandler(address(stablecoin), 3, address(stablecoinHandler));
+    /// @dev A mismatch reverts before any write, so the handler stays assignable for its own stablecoin.
+    function testTokenMismatchDoesNotConsumeHandlerAddress() external {
+        address ownToken = makeAddr("r89OwnToken");
+        address wrongToken = makeAddr("r89WrongToken");
+        DummyTokenHandler idleStub = new DummyTokenHandler(ownToken, address(dcaManager));
+
+        vm.startPrank(OWNER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__HandlerTokenMismatch.selector, wrongToken, address(idleStub)
+            )
+        );
+        operationsAdmin.assignHandler(wrongToken, IDLE_INDEX, address(idleStub));
+
+        operationsAdmin.assignHandler(ownToken, IDLE_INDEX, address(idleStub));
+        vm.stopPrank();
+
+        assertEq(operationsAdmin.getHandler(ownToken, IDLE_INDEX), address(idleStub));
     }
 
-    function testAddOrUpdateLendingProtocol() external {
-        vm.expectEmit(true, true, true, false);
-        emit OperationsAdmin__LendingProtocolAdded(3, "dummyProtocol");
-        vm.prank(ADMIN);
-        operationsAdmin.addOrUpdateLendingProtocol("dummyProtocol", 3);
-        assertEq(operationsAdmin.getLendingProtocolIndex("dummyProtocol"), 3);
-        assertEq(operationsAdmin.getLendingProtocolName(3), "dummyProtocol");
+    /// @dev A fresh registry refuses the lane's handler even for its own stablecoin: its DcaManager is
+    ///      pinned to the lane's registry.
+    function testDeployedHandlerIsAssignableOnlyForItsOwnStablecoinAndRegistry() external {
+        OperationsAdmin freshAdmin = new OperationsAdmin(address(this));
+        if (s_routeIndex != IDLE_INDEX) {
+            freshAdmin.registerRoute(
+                s_routeIndex, operationsAdmin.getRouteClass(s_routeIndex) == IOperationsAdmin.RouteClass.Lending
+            );
+        }
+        address otherToken = makeAddr("r89DeployedOtherToken");
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__HandlerTokenMismatch.selector, otherToken, address(stablecoinHandler)
+            )
+        );
+        freshAdmin.assignHandler(otherToken, s_routeIndex, address(stablecoinHandler));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__HandlerDcaManagerMismatch.selector,
+                address(stablecoinHandler),
+                address(dcaManager)
+            )
+        );
+        freshAdmin.assignHandler(address(stablecoin), s_routeIndex, address(stablecoinHandler));
+
+        assertEq(freshAdmin.getHandler(address(stablecoin), s_routeIndex), address(0));
+        assertEq(operationsAdmin.getHandler(address(stablecoin), s_routeIndex), address(stablecoinHandler));
     }
 
-    function testLendingProtocolIndexCannotBeZero() external {
-        vm.expectRevert(IOperationsAdmin.OperationsAdmin__LendingProtocolIndexCannotBeZero.selector);
-        vm.prank(ADMIN);
-        operationsAdmin.addOrUpdateLendingProtocol("dummyProtocol", 0);
+    /// @dev A handler pinned to a non-DcaManager fails closed and does not consume its address.
+    function testHandlerPinnedToANonDcaManagerIsRejected() external {
+        address token = makeAddr("r101PinnedElsewhereToken");
+        DummyTokenHandler idleStub = new DummyTokenHandler(token, address(stablecoin));
+
+        vm.expectRevert();
+        vm.prank(OWNER);
+        operationsAdmin.assignHandler(token, IDLE_INDEX, address(idleStub));
+
+        assertEq(operationsAdmin.getHandler(token, IDLE_INDEX), address(0));
     }
 
-    function testLendingProtocolStringNonEmpty() external {
-        vm.expectRevert(IOperationsAdmin.OperationsAdmin__LendingProtocolNameNotSet.selector);
-        vm.prank(ADMIN);
-        operationsAdmin.addOrUpdateLendingProtocol("", 3);
+    /*//////////////////////////////////////////////////////////////
+                          DEPOSIT PAUSE TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testRoutesStartWithDepositsUnpaused() external {
+        assertFalse(operationsAdmin.areDepositsPaused(address(stablecoin), s_routeIndex));
+    }
+
+    function testOwnerPausesAndUnpausesDeposits() external {
+        vm.expectEmit(true, false, false, true);
+        emit OperationsAdmin__DepositsPauseSet(address(stablecoin), s_routeIndex, true);
+        vm.prank(OWNER);
+        operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, true);
+        assertTrue(operationsAdmin.areDepositsPaused(address(stablecoin), s_routeIndex));
+
+        vm.expectEmit(true, false, false, true);
+        emit OperationsAdmin__DepositsPauseSet(address(stablecoin), s_routeIndex, false);
+        vm.prank(OWNER);
+        operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, false);
+        assertFalse(operationsAdmin.areDepositsPaused(address(stablecoin), s_routeIndex));
+    }
+
+    function testOnlyOwnerCanPauseDeposits() external {
+        address stranger = makeAddr("r48Stranger");
+        vm.expectRevert(ownableUnauthorized(stranger));
+        vm.prank(stranger);
+        operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, true);
+        assertFalse(operationsAdmin.areDepositsPaused(address(stablecoin), s_routeIndex));
+    }
+
+    /// @dev Pausing deposits on a pair nobody can deposit into would only mislead an operator.
+    function testPausingAnUnassignedPairReverts() external {
+        address unassignedToken = makeAddr("r48UnassignedToken");
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__HandlerNotAssigned.selector, unassignedToken, s_routeIndex
+            )
+        );
+        vm.prank(OWNER);
+        operationsAdmin.setDepositsPaused(unassignedToken, s_routeIndex, true);
+    }
+
+    function testPausingAnUnregisteredRouteReverts() external {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__HandlerNotAssigned.selector, address(stablecoin), SECOND_LENDING_INDEX
+            )
+        );
+        vm.prank(OWNER);
+        operationsAdmin.setDepositsPaused(address(stablecoin), SECOND_LENDING_INDEX, true);
+    }
+
+    /// @dev Every emitted event is a real transition, so an indexer never sees a repeated state.
+    function testRepeatingTheCurrentPauseStateReverts() external {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__DepositsPauseUnchanged.selector,
+                address(stablecoin),
+                s_routeIndex,
+                false
+            )
+        );
+        vm.prank(OWNER);
+        operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, false);
+
+        vm.prank(OWNER);
+        operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, true);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOperationsAdmin.OperationsAdmin__DepositsPauseUnchanged.selector,
+                address(stablecoin),
+                s_routeIndex,
+                true
+            )
+        );
+        vm.prank(OWNER);
+        operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, true);
+    }
+
+    /// @dev The flag is keyed per pair: a second token and a second route stay open.
+    function testPauseIsScopedToOnePair() external {
+        address otherToken = makeAddr("r48OtherToken");
+        DummyTokenHandler otherTokenStub = new DummyTokenHandler(otherToken, address(dcaManager));
+        DummyTokenHandler otherRouteStub = new DummyTokenHandler(address(stablecoin), address(dcaManager));
+
+        vm.startPrank(OWNER);
+        operationsAdmin.assignHandler(otherToken, IDLE_INDEX, address(otherTokenStub));
+        operationsAdmin.registerRoute(SECOND_IDLE_INDEX, false);
+        operationsAdmin.assignHandler(address(stablecoin), SECOND_IDLE_INDEX, address(otherRouteStub));
+        operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, true);
+        vm.stopPrank();
+
+        assertTrue(operationsAdmin.areDepositsPaused(address(stablecoin), s_routeIndex));
+        assertFalse(operationsAdmin.areDepositsPaused(otherToken, IDLE_INDEX));
+        assertFalse(operationsAdmin.areDepositsPaused(address(stablecoin), SECOND_IDLE_INDEX));
+    }
+
+    function testRegisterRouteAcceptsUint32Max() external {
+        uint256 maxRoute = type(uint32).max;
+        vm.prank(OWNER);
+        operationsAdmin.registerRoute(maxRoute, false);
+        assertEq(uint256(operationsAdmin.getRouteClass(maxRoute)), uint256(IOperationsAdmin.RouteClass.Idle));
+    }
+
+    function testRegisterRouteRevertsUint32MaxPlusOne() external {
+        uint256 overflowing = uint256(type(uint32).max) + 1;
+        vm.prank(OWNER);
+        vm.expectRevert(abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 32, overflowing));
+        operationsAdmin.registerRoute(overflowing, true);
+    }
+
+    function testAssignTokenHandlerRevertsUint32MaxPlusOne() external {
+        uint256 overflowing = uint256(type(uint32).max) + 1;
+        DummyTokenHandler stub = new DummyTokenHandler(address(stablecoin), address(dcaManager));
+        vm.prank(OWNER);
+        vm.expectRevert(abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 32, overflowing));
+        operationsAdmin.assignHandler(address(stablecoin), overflowing, address(stub));
+    }
+
+    function testSetDepositsPausedRevertsUint32MaxPlusOne() external {
+        uint256 overflowing = uint256(type(uint32).max) + 1;
+        vm.prank(OWNER);
+        vm.expectRevert(_routeIndexOverflow(overflowing));
+        operationsAdmin.setDepositsPaused(address(stablecoin), overflowing, true);
+    }
+
+    function testRouteIndexGettersRevertUint32MaxPlusOne() external {
+        uint256 overflowing = uint256(type(uint32).max) + 1;
+
+        vm.expectRevert(_routeIndexOverflow(overflowing));
+        operationsAdmin.areDepositsPaused(address(stablecoin), overflowing);
+
+        vm.expectRevert(_routeIndexOverflow(overflowing));
+        operationsAdmin.getHandler(address(stablecoin), overflowing);
+
+        vm.expectRevert(_routeIndexOverflow(overflowing));
+        operationsAdmin.getRouteClass(overflowing);
+    }
+
+    function testInRangeRouteIndexGettersAreUnchanged() external {
+        assertEq(operationsAdmin.getHandler(address(stablecoin), s_routeIndex), address(stablecoinHandler));
+        assertFalse(operationsAdmin.areDepositsPaused(address(stablecoin), s_routeIndex));
+        assertEq(operationsAdmin.getHandler(address(stablecoin), SECOND_IDLE_INDEX), address(0));
+        assertFalse(operationsAdmin.areDepositsPaused(address(stablecoin), SECOND_IDLE_INDEX));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        HANDLER + PAUSE PACKING
+    //////////////////////////////////////////////////////////////*/
+
+    function testHandlerAndPauseShareOneMappingValue() external {
+        bytes32 valueSlot = _tokenRouteSlot(address(stablecoin), s_routeIndex);
+        uint256 packed = uint256(vm.load(address(operationsAdmin), valueSlot));
+
+        assertEq(address(uint160(packed)), address(stablecoinHandler), "the handler is not the low 20 bytes");
+        assertEq(packed >> 160, 0, "deposits read as paused before any pause");
+
+        vm.prank(OWNER);
+        operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, true);
+
+        packed = uint256(vm.load(address(operationsAdmin), valueSlot));
+        assertEq(address(uint160(packed)), address(stablecoinHandler), "pausing moved the handler");
+        assertEq(packed >> 160, 1, "the pause flag is not the byte above the handler");
+    }
+
+    function testUnassignedPairReadsAsZeroAndUnpaused() external {
+        bytes32 valueSlot = _tokenRouteSlot(address(stablecoin), SECOND_LENDING_INDEX);
+        assertEq(uint256(vm.load(address(operationsAdmin), valueSlot)), 0);
+        assertEq(operationsAdmin.getHandler(address(stablecoin), SECOND_LENDING_INDEX), address(0));
+        assertFalse(operationsAdmin.areDepositsPaused(address(stablecoin), SECOND_LENDING_INDEX));
+    }
+
+    function _routeIndexOverflow(uint256 value) private pure returns (bytes memory) {
+        return abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 32, value);
+    }
+
+    /// @dev `s_tokenRoute` is the first BitChill variable, at slot 2 (Ownable2Step takes 0 and 1).
+    function _tokenRouteSlot(address token, uint256 routeIndex) private pure returns (bytes32) {
+        bytes32 inner = keccak256(abi.encode(token, uint256(TOKEN_ROUTE_MAPPING_SLOT)));
+        return keccak256(abi.encode(routeIndex, inner));
     }
 }

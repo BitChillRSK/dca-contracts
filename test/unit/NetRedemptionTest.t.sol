@@ -1,0 +1,475 @@
+//SPDX-License-Identifier: MIT
+
+pragma solidity 0.8.36;
+
+import {DcaDappTest} from "./DcaDappTest.t.sol";
+import {Vm} from "forge-std/Test.sol";
+import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
+import {ILendingHandler} from "../../src/interfaces/ILendingHandler.sol";
+import {IPurchaseFees} from "../../src/interfaces/IPurchaseFees.sol";
+import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
+import {MockIToken} from "../mocks/MockIToken.sol";
+import {toBatch} from "../utils/BatchBuyOne.sol";
+import "../Constants.sol";
+import {scheduleAt, scheduleIdAt} from "test/utils/ScheduleAt.sol";
+
+/**
+ * @title NetRedemptionTest
+ * @notice R1 / R20. Sovryn's burn() returns the GROSS amount and pays the NET one once the SIP-0094
+ * Perimeter Fee is enabled, so every path that trusted the return value asked for DOC the handler did not
+ * hold and reverted. These tests run the mock with that fee switched on and assert BitChill moves, credits,
+ * and deducts the amount it actually received — and that with the fee off nothing is haircut.
+ * @dev Sovryn + MoC + local mocks only: the exit fee is a mock switch, and the rBTC solvency check reads the
+ * handler's native balance.
+ */
+contract NetRedemptionTest is DcaDappTest {
+    uint256 constant EXIT_FEE_BPS = 10; // the 0.10% Sovryn approved
+    /// @dev not SIP-0094: a lending protocol withholding almost the whole redemption (rug / insolvency)
+    uint256 constant RUG_EXIT_FEE_BPS = 9950;
+    uint256 constant WITHDRAWAL_AMOUNT = AMOUNT_TO_DEPOSIT / 2;
+    uint256 constant ROUNDING_TOLERANCE = 1e6; // the share conversion rounds up, so payouts can exceed the request by dust
+
+    function setUp() public override {
+        super.setUp();
+    }
+
+    /**
+     * @notice these assertions only mean something against the Sovryn mock on a local chain
+     */
+    modifier onlySovrynMocMocks() {
+        if (s_routeIndex != SOVRYN_INDEX || !isMocSwaps || block.chainid != ANVIL_CHAIN_ID) {
+            vm.skip(true);
+            return;
+        }
+        _;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            EXIT FEE ENABLED
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice The single-purchase break: the handler received net DOC and used to spend the gross return.
+     */
+    function test_sovryn_singleScheduleBatchSpendsTheNetRedeemedAmount() public onlySovrynMocMocks {
+        _enableExitFee();
+
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
+        uint256 rbtcBefore = _accumulatedRbtc();
+
+        buyRbtcOne(scheduleId);
+
+        uint256 rbtcBought = _accumulatedRbtc() - rbtcBefore;
+        uint256 netRedeemed = _afterExitFee(AMOUNT_TO_SPEND);
+        uint256 feeWeight = feeCalculator.calculateFee(AMOUNT_TO_SPEND);
+        uint256 expected = (netRedeemed * (AMOUNT_TO_SPEND - feeWeight) / AMOUNT_TO_SPEND) / s_btcPrice;
+
+        assertApproxEqRel(rbtcBought, expected, _maxPurchaseSlippage());
+        // the exit fee is a haircut on the purchase, not a free lunch: strictly less rBTC than a fee-free redeem
+        assertLt(rbtcBought, (AMOUNT_TO_SPEND - feeCalculator.calculateFee(AMOUNT_TO_SPEND)) / s_btcPrice);
+    }
+
+    /**
+     * @notice A batch must never distribute more rBTC than the purchase actually produced. The per-user
+     * weights are shares of the planned net total, so they still sum to one when the redeem pays less.
+     */
+    function test_sovryn_batchBuyRbtcCreditsNoMoreRbtcThanReceived() public onlySovrynMocMocks {
+        createSeveralDcaSchedules();
+        _enableExitFee();
+
+        (address[] memory users,, uint64[] memory scheduleIds,) = _batchArrays();
+
+        uint256 handlerRbtcBefore = address(stablecoinHandler).balance;
+        uint256 creditedBefore = _accumulatedRbtc();
+
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(toBatch(scheduleIds, address(stablecoin), s_routeIndex));
+
+        uint256 received = address(stablecoinHandler).balance - handlerRbtcBefore;
+        uint256 credited = _accumulatedRbtc() - creditedBefore;
+
+        assertGt(credited, 0);
+        assertLe(credited, received, "credited more rBTC than the handler received");
+    }
+
+    /**
+     * @notice The user is paid the net amount, but the schedule is debited the amount requested. The exit fee
+     * consumes principal: the iTokens for the full request were burned and the difference went to Sovryn's
+     * vault. Crediting it back would invent principal the handler does not hold, and that dust would later
+     * revert in `burn`. Purchases already work this way — the schedule pays the full purchaseAmount.
+     */
+    function test_sovryn_withdrawTokenDebitsTheRequestedAmount() public onlySovrynMocMocks {
+        _enableExitFee();
+
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
+        uint256 scheduleBalanceBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
+        uint256 userDocBefore = stablecoin.balanceOf(USER);
+
+        vm.prank(USER);
+        dcaManager.withdrawToken(address(stablecoin), scheduleId, WITHDRAWAL_AMOUNT);
+
+        uint256 paid = stablecoin.balanceOf(USER) - userDocBefore;
+        uint256 deducted =
+            scheduleBalanceBefore - scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
+
+        assertLt(paid, WITHDRAWAL_AMOUNT, "the exit fee should have produced a shortfall");
+        assertApproxEqAbs(paid, _afterExitFee(WITHDRAWAL_AMOUNT), ROUNDING_TOLERANCE);
+        assertEq(deducted, WITHDRAWAL_AMOUNT, "the schedule must be debited what was requested");
+    }
+
+    /**
+     * @notice What is left on the schedule is exactly what was not requested — the fee does not linger as
+     * phantom principal — and that remainder is still withdrawable.
+     */
+    function test_sovryn_remainderIsWhatWasNotRequestedAndStaysWithdrawable() public onlySovrynMocMocks {
+        _enableExitFee();
+
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
+        vm.prank(USER);
+        dcaManager.withdrawToken(address(stablecoin), scheduleId, WITHDRAWAL_AMOUNT);
+
+        uint256 remaining = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
+        assertEq(remaining, AMOUNT_TO_DEPOSIT - WITHDRAWAL_AMOUNT, "the fee must not be credited back");
+
+        uint256 userDocBefore = stablecoin.balanceOf(USER);
+        vm.prank(USER);
+        dcaManager.withdrawToken(address(stablecoin), scheduleId, remaining);
+        assertGt(stablecoin.balanceOf(USER) - userDocBefore, 0, "remainder was not claimable");
+        assertEq(scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance, 0);
+    }
+
+    /**
+     * @notice The schedule is gone by the time the handler pays, so the event must at least stop overstating.
+     */
+    function test_sovryn_deleteDcaScheduleReportsTheAmountActuallyPaid() public onlySovrynMocMocks {
+        _enableExitFee();
+
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
+        uint256 userDocBefore = stablecoin.balanceOf(USER);
+
+        vm.recordLogs();
+        vm.prank(USER);
+        dcaManager.deleteDcaSchedule(address(stablecoin), scheduleId, SCHEDULE_INDEX);
+
+        uint256 paid = stablecoin.balanceOf(USER) - userDocBefore;
+        assertLt(paid, AMOUNT_TO_DEPOSIT, "the exit fee should have produced a shortfall");
+        assertEq(_deletedEventAmount(), paid, "the event overstates what the user was paid");
+    }
+
+    /**
+     * @notice Interest redeems onto the handler then transfers; the event must report the net the user received.
+     */
+    function test_sovryn_withdrawInterestPaysAndReportsNet() public onlySovrynMocMocks {
+        vm.warp(block.timestamp + 365 days); // the mock's exchange rate grows 5% a year
+        _enableExitFee();
+
+        address[] memory tokens = new address[](1);
+        tokens[0] = address(stablecoin);
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = s_routeIndex;
+
+        uint256 userDocBefore = stablecoin.balanceOf(USER);
+
+        vm.recordLogs();
+        vm.prank(USER);
+        dcaManager.withdrawAllAccumulatedInterest(tokens, routeIndexes);
+
+        uint256 paid = stablecoin.balanceOf(USER) - userDocBefore;
+        assertGt(paid, 0, "no interest was paid");
+        assertEq(_interestWithdrawnEventAmount(), paid, "the event overstates the interest paid");
+    }
+
+    /**
+     * @notice Per-user events must add up to the batch event. After a short redemption the batch reports the
+     * smaller actual (gross) spend, so reporting each buyer's *planned* amount would make the per-user totals
+     * exceed the cash that moved. The planned amounts are allocation weights, not amounts spent.
+     */
+    function test_sovryn_batchBuyRbtcEventsReportActualSpending() public onlySovrynMocMocks {
+        createSeveralDcaSchedules();
+        _enableExitFee();
+
+        (,, uint64[] memory scheduleIds, uint256[] memory purchaseAmounts) = _batchArrays();
+
+        uint256 purchaseAmountsSum;
+        for (uint256 i; i < purchaseAmounts.length; ++i) {
+            purchaseAmountsSum += purchaseAmounts[i];
+        }
+
+        vm.recordLogs();
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(toBatch(scheduleIds, address(stablecoin), s_routeIndex));
+
+        (uint256 perUserSpentTotal, uint256 batchSpent) = _batchSpendFromLogs();
+
+        assertLt(batchSpent, purchaseAmountsSum, "the exit fee should have shortened the spend");
+        assertLe(perUserSpentTotal, batchSpent, "per-user events report more spending than the batch did");
+        assertApproxEqAbs(perUserSpentTotal, batchSpent, NUM_OF_SCHEDULES);
+    }
+
+    /**
+     * @notice A redemption that cannot cover today's BitChill fee still purchases: the venue spends
+     *         the retrieved gross and the rBTC fee scales with measured output.
+     */
+    function test_sovryn_batchBuyRbtcShortRedeemStillPurchases() public onlySovrynMocMocks {
+        createSeveralDcaSchedules();
+
+        MockIToken(address(shareToken)).setExitFeeBps(RUG_EXIT_FEE_BPS);
+
+        (,, uint64[] memory scheduleIds, uint256[] memory purchaseAmounts) = _batchArrays();
+
+        uint256 totalFee;
+        uint256 totalPurchase;
+        for (uint256 i; i < purchaseAmounts.length; ++i) {
+            totalFee += feeCalculator.calculateFee(purchaseAmounts[i]);
+            totalPurchase += purchaseAmounts[i];
+        }
+        uint256 expectedRedeemed = totalPurchase * (BPS_DENOMINATOR - RUG_EXIT_FEE_BPS) / BPS_DENOMINATOR;
+        assertGt(expectedRedeemed, 0, "a zero payout is a different error");
+        assertLe(expectedRedeemed, totalFee, "the redeem should fall short of the total fee");
+
+        address collector = IPurchaseFees(address(stablecoinHandler)).getFeeCollector();
+        uint256 collectorCreditBefore = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(collector);
+        uint256 collectorNativeBefore = collector.balance;
+        uint256 rbtcBefore = _accumulatedRbtc();
+
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(toBatch(scheduleIds, address(stablecoin), s_routeIndex));
+
+        assertGt(_accumulatedRbtc(), rbtcBefore, "short redeem should still credit some rBTC");
+        assertGt(
+            IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(collector),
+            collectorCreditBefore,
+            "short redeem should still credit an rBTC fee"
+        );
+        assertEq(collector.balance, collectorNativeBefore, "the collector is not paid until it withdraws");
+        assertEq(stablecoin.balanceOf(collector), 0);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           EXIT FEE DISABLED
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Pre-activation, and Sovryn's fail-open path, both pay 100%. No haircut may appear where there
+     * is no fee.
+     */
+    function test_sovryn_withoutExitFeeWithdrawalStaysOneToOne() public onlySovrynMocMocks {
+        assertEq(MockIToken(address(shareToken)).getExitFeeBps(), 0);
+
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
+        uint256 scheduleBalanceBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
+        uint256 userDocBefore = stablecoin.balanceOf(USER);
+
+        vm.prank(USER);
+        dcaManager.withdrawToken(address(stablecoin), scheduleId, WITHDRAWAL_AMOUNT);
+
+        uint256 paid = stablecoin.balanceOf(USER) - userDocBefore;
+        uint256 deducted =
+            scheduleBalanceBefore - scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
+
+        assertGe(paid, WITHDRAWAL_AMOUNT, "a fee-free redemption must not pay less than requested");
+        assertApproxEqAbs(paid, WITHDRAWAL_AMOUNT, ROUNDING_TOLERANCE);
+        assertEq(deducted, WITHDRAWAL_AMOUNT, "nothing should be credited back when the full amount was paid");
+    }
+
+    /**
+     * @notice Same purchase, no fee: the rBTC bought matches the fee-free expectation exactly.
+     */
+    function test_sovryn_withoutExitFeeBuyRbtcIsUnchanged() public onlySovrynMocMocks {
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
+        uint256 rbtcBefore = _accumulatedRbtc();
+
+        buyRbtcOne(scheduleId);
+
+        uint256 netPurchaseAmount = AMOUNT_TO_SPEND - feeCalculator.calculateFee(AMOUNT_TO_SPEND);
+        assertApproxEqRel(_accumulatedRbtc() - rbtcBefore, netPurchaseAmount / s_btcPrice, _maxPurchaseSlippage());
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                HELPERS
+    //////////////////////////////////////////////////////////////*/
+
+    function _enableExitFee() internal {
+        MockIToken(address(shareToken)).setExitFeeBps(EXIT_FEE_BPS);
+    }
+
+    function _afterExitFee(uint256 grossAmount) internal pure returns (uint256) {
+        return grossAmount - (grossAmount * EXIT_FEE_BPS / BPS_DENOMINATOR);
+    }
+
+    function _accumulatedRbtc() internal view returns (uint256) {
+        return IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
+    }
+
+    function _batchArrays()
+        internal
+        view
+        returns (
+            address[] memory users,
+            uint256[] memory scheduleIndexes,
+            uint64[] memory scheduleIds,
+            uint256[] memory purchaseAmounts
+        )
+    {
+        users = new address[](NUM_OF_SCHEDULES);
+        scheduleIndexes = new uint256[](NUM_OF_SCHEDULES);
+        scheduleIds = new uint64[](NUM_OF_SCHEDULES);
+        purchaseAmounts = new uint256[](NUM_OF_SCHEDULES);
+
+        for (uint256 i; i < NUM_OF_SCHEDULES; ++i) {
+            users[i] = USER;
+            scheduleIndexes[i] = i;
+            scheduleIds[i] = scheduleIdAt(dcaManager, USER, address(stablecoin), i);
+            purchaseAmounts[i] = scheduleAt(dcaManager, USER, address(stablecoin), i).purchaseAmount;
+        }
+    }
+
+    /**
+     * @dev Sums the amountSpent of every PurchaseRbtc__RbtcBought and reads the batch event's total spend.
+     * RbtcBought indexes user, tokenSpent and scheduleId, leaving (rBtcBought, amountSpent) in data;
+     * SuccessfulRbtcBatchPurchase indexes only the token, so its spend is the second data word.
+     */
+    function _batchSpendFromLogs() internal returns (uint256 perUserSpentTotal, uint256 batchSpent) {
+        bytes32 boughtSig = keccak256("PurchaseRbtc__RbtcBought(address,address,uint256,uint64,uint256)");
+        bytes32 batchSig = keccak256("PurchaseRbtc__SuccessfulRbtcBatchPurchase(address,uint256,uint256)");
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bool foundBatch;
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].topics[0] == boughtSig) {
+                (, uint256 amountSpent) = abi.decode(logs[i].data, (uint256, uint256));
+                perUserSpentTotal += amountSpent;
+            } else if (logs[i].topics[0] == batchSig) {
+                (, batchSpent) = abi.decode(logs[i].data, (uint256, uint256));
+                foundBatch = true;
+            }
+        }
+        assertTrue(foundBatch, "no PurchaseRbtc__SuccessfulRbtcBatchPurchase log recorded");
+        assertGt(perUserSpentTotal, 0, "no PurchaseRbtc__RbtcBought logs recorded");
+    }
+
+    /// @dev refundedAmount is the only non-indexed field of DcaManager__DcaScheduleDeleted
+    function _deletedEventAmount() internal returns (uint256 amount) {
+        bytes32 sig = keccak256("DcaManager__DcaScheduleDeleted(address,address,uint64,uint256)");
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bool found;
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].topics[0] == sig) {
+                amount = abi.decode(logs[i].data, (uint256));
+                found = true;
+            }
+        }
+        assertTrue(found, "no DcaManager__DcaScheduleDeleted log recorded");
+    }
+
+    /// @dev user and token are indexed; the amount is the only data word
+    function _interestWithdrawnEventAmount() internal returns (uint256 amount) {
+        bytes32 sig = keccak256("LendingHandler__InterestWithdrawn(address,address,uint256)");
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bool found;
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].topics[0] == sig) {
+                amount = abi.decode(logs[i].data, (uint256));
+                found = true;
+            }
+        }
+        assertTrue(found, "no LendingHandler__InterestWithdrawn log recorded");
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                     EXACT SHARE CONSUMPTION (R68)
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Positive cash with a partial iToken burn must revert; schedule and shares roll back.
+     */
+    function test_sovryn_partialShareBurnOnWithdrawRevertsAndRollsBack() public onlySovrynMocMocks {
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
+        uint256 scheduleBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
+        uint256 userSharesBefore = ILendingHandler(address(stablecoinHandler)).getUserShares(USER);
+        uint256 iTokenBefore = shareToken.balanceOf(address(stablecoinHandler));
+        uint256 userDocBefore = stablecoin.balanceOf(USER);
+
+        MockIToken(address(shareToken)).setPartialBurnBps(5_000);
+
+        vm.expectRevert();
+        vm.prank(USER);
+        dcaManager.withdrawToken(address(stablecoin), scheduleId, WITHDRAWAL_AMOUNT);
+
+        assertEq(scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance, scheduleBefore);
+        assertEq(ILendingHandler(address(stablecoinHandler)).getUserShares(USER), userSharesBefore);
+        assertEq(shareToken.balanceOf(address(stablecoinHandler)), iTokenBefore);
+        assertEq(stablecoin.balanceOf(USER), userDocBefore);
+    }
+
+    /**
+     * @notice A batch purchase with a partial iToken burn reverts the whole tick and rolls back
+     *         schedule balances/anchors, fee transfer, share books, stablecoin, and rBTC credits.
+     * @dev The EVM already undoes everything on revert; these assertions document the fields the
+     *      R68 spec named so a weaker helper cannot silently leave one of them unchecked.
+     */
+    function test_sovryn_partialShareBurnOnBatchRevertsAndRollsBack() public onlySovrynMocMocks {
+        createSeveralDcaSchedules();
+        MockIToken(address(shareToken)).setPartialBurnBps(5_000);
+
+        (,, uint64[] memory scheduleIds,) = _batchArrays();
+        uint256 n = scheduleIds.length;
+        uint256[] memory balancesBefore = new uint256[](n);
+        uint256[] memory anchorsBefore = new uint256[](n);
+        for (uint256 i; i < n; ++i) {
+            IDcaManager.DcaSchedule memory schedule = scheduleAt(dcaManager, USER, address(stablecoin), i);
+            balancesBefore[i] = schedule.tokenBalance;
+            anchorsBefore[i] = schedule.cadenceAnchor;
+        }
+
+        address feeCollector = IPurchaseFees(address(stablecoinHandler)).getFeeCollector();
+        uint256 feeCollectorDocBefore = stablecoin.balanceOf(feeCollector);
+        uint256 feeCollectorRbtcBefore = feeCollector.balance;
+        uint256 collectorCreditBefore =
+            IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(feeCollector);
+        uint256 userSharesBefore = ILendingHandler(address(stablecoinHandler)).getUserShares(USER);
+        uint256 iTokenBefore = shareToken.balanceOf(address(stablecoinHandler));
+        uint256 handlerDocBefore = stablecoin.balanceOf(address(stablecoinHandler));
+        uint256 userDocBefore = stablecoin.balanceOf(USER);
+        uint256 rbtcBefore = _accumulatedRbtc();
+
+        vm.expectRevert();
+        vm.prank(SWAPPER);
+        dcaManager.batchBuyRbtc(toBatch(scheduleIds, address(stablecoin), s_routeIndex));
+
+        for (uint256 i; i < n; ++i) {
+            IDcaManager.DcaSchedule memory schedule = scheduleAt(dcaManager, USER, address(stablecoin), i);
+            assertEq(schedule.tokenBalance, balancesBefore[i], "schedule balance rolled back");
+            assertEq(schedule.cadenceAnchor, anchorsBefore[i], "schedule cadence anchor rolled back");
+        }
+        assertEq(stablecoin.balanceOf(feeCollector), feeCollectorDocBefore, "fee collector DOC rolled back");
+        assertEq(feeCollector.balance, feeCollectorRbtcBefore, "fee collector rBTC rolled back");
+        assertEq(
+            IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(feeCollector),
+            collectorCreditBefore,
+            "fee collector credit rolled back"
+        );
+        assertEq(ILendingHandler(address(stablecoinHandler)).getUserShares(USER), userSharesBefore);
+        assertEq(shareToken.balanceOf(address(stablecoinHandler)), iTokenBefore);
+        assertEq(stablecoin.balanceOf(address(stablecoinHandler)), handlerDocBefore);
+        assertEq(stablecoin.balanceOf(USER), userDocBefore);
+        assertEq(_accumulatedRbtc(), rbtcBefore);
+    }
+
+    /**
+     * @notice Exit-fee net cash with a full iToken burn still succeeds and debits requested principal.
+     */
+    function test_sovryn_exitFeeFullBurnStillSucceeds() public onlySovrynMocMocks {
+        _enableExitFee();
+
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
+        uint256 iTokenBefore = shareToken.balanceOf(address(stablecoinHandler));
+        uint256 userSharesBefore = ILendingHandler(address(stablecoinHandler)).getUserShares(USER);
+
+        vm.prank(USER);
+        dcaManager.withdrawToken(address(stablecoin), scheduleId, WITHDRAWAL_AMOUNT);
+
+        uint256 sharesDebited = userSharesBefore - ILendingHandler(address(stablecoinHandler)).getUserShares(USER);
+        assertEq(iTokenBefore - shareToken.balanceOf(address(stablecoinHandler)), sharesDebited);
+        assertGt(sharesDebited, 0);
+    }
+}

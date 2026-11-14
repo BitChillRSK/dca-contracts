@@ -1,0 +1,219 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.36;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import {IStablecoin} from "../interfaces/IStablecoin.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+
+import {console} from "forge-std/Test.sol";
+
+contract MockIToken is ERC20, ERC20Burnable, Ownable, ERC20Permit {
+    IStablecoin immutable i_docToken;
+    uint256 constant DECIMALS = 1e18;
+    uint256 constant STARTING_EXCHANGE_RATE = 2 * DECIMALS / 100; // Each DOC token deposited mints 50 iTokens, each iToken redeems 0.02 DOC tokens
+    uint256 immutable i_deploymentTimestamp;
+    uint256 constant ANNUAL_INCREASE = 5; // The DOC tokens redeemed by each iToken increase by 5% annually (mocking behaviour)
+    uint256 constant YEAR_IN_SECONDS = 31536000;
+    uint256 constant BPS_DENOMINATOR = 10_000;
+    /**
+     * @notice SIP-0094 Perimeter Fee, in basis points, charged on burn().
+     * @dev Zero models both the pre-activation state and Sovryn's fail-open path, where net == gross.
+     * When non-zero, burn() pays the receiver the NET amount and still returns the GROSS one, which is the
+     * behaviour that breaks any integrator trusting the return value.
+     */
+    uint256 private s_exitFeeBps;
+    /**
+     * @notice When set, burn() burns the iToken, transfers nothing, and still returns the GROSS amount.
+     * @dev Models a Sovryn iToken that reports success while paying out nothing. Integrators that
+     *      trust the return value lose the burnt shares; the handler must revert on a zero DOC delta.
+     */
+    bool private s_silentZeroPayout;
+    /**
+     * @notice When set, burn only this many BPS of the requested iToken and pay cash for that fraction.
+     * @dev Models a partial-liquidity fill that leaves the unpaid claim withdrawable. BPS_DENOMINATOR = full.
+     */
+    uint256 private s_partialBurnBps = BPS_DENOMINATOR;
+    /**
+     * @notice When set, burn fails before any transfer or share movement (atomic liquidity shortage).
+     */
+    bool private s_revertOnBurn;
+    /**
+     * @notice When set, burn consumes more iToken than requested (or mints if negative via separate flag).
+     */
+    bool private s_overBurn;
+    bool private s_increaseBalanceOnBurn;
+    /// @notice When set, iToken transfers revert (a protocol-wide pause; burns revert via `s_revertOnBurn`).
+    bool private s_revertOnTransfer;
+    /// @notice A transfer moves this many iTokens more (or fewer, if negative) than requested.
+    int256 private s_transferShareAdjustment;
+    /// @notice When set, a transfer calls `target` with `data` first and bubbles its revert.
+    address private s_transferCallbackTarget;
+    bytes private s_transferCallbackData;
+
+    constructor(address docToken) ERC20("Mock iToken", "iToken") Ownable(msg.sender) ERC20Permit("Mock iToken") {
+        i_docToken = IStablecoin(docToken);
+        i_deploymentTimestamp = block.timestamp;
+    }
+
+    function loanTokenAddress() external view returns (address) {
+        return address(i_docToken);
+    }
+
+    function mint(address receiver, uint256 depositAmount) external returns (uint256 mintAmount) {
+        require(i_docToken.allowance(msg.sender, address(this)) >= depositAmount, "Insufficient allowance");
+        // Measure cash actually received. 1:1 tokens are unchanged (`received == depositAmount`).
+        uint256 balanceBefore = i_docToken.balanceOf(address(this));
+        i_docToken.transferFrom(msg.sender, address(this), depositAmount);
+        uint256 received = i_docToken.balanceOf(address(this)) - balanceBefore;
+        mintAmount = received * DECIMALS / tokenPrice();
+        _mint(receiver, mintAmount);
+        return mintAmount;
+    }
+
+    /**
+     * @dev This function is used to withdraw DOC from the Sovryn protocol, burning the corresponding iToken
+     * @param receiver The account getting the redeemed DOC tokens.
+     * @param burnAmount The amount of iToken to burn.
+     */
+    function burn(address receiver, uint256 burnAmount) external returns (uint256 loanAmountPaid) {
+        if (s_revertOnBurn) revert("MockIToken: insufficient liquidity");
+        require(balanceOf(msg.sender) >= burnAmount, "Insufficient balance");
+
+        // Default: burn exactly `burnAmount`. Partial / over / increase modes override for R68 tests.
+        uint256 sharesToBurn = burnAmount;
+        if (s_increaseBalanceOnBurn) {
+            _mint(msg.sender, 1);
+            sharesToBurn = 0;
+        } else if (s_overBurn) {
+            sharesToBurn = burnAmount + 1;
+            require(balanceOf(msg.sender) >= sharesToBurn, "Insufficient balance for over-burn");
+        } else if (s_partialBurnBps < BPS_DENOMINATOR) {
+            sharesToBurn = burnAmount * s_partialBurnBps / BPS_DENOMINATOR;
+        }
+
+        // Cash follows the burned slice on partial fill; otherwise the full requested gross (SIP-0094).
+        uint256 cashGross = sharesToBurn > 0
+            ? Math.ceilDiv(sharesToBurn * tokenPrice(), DECIMALS)
+            : Math.ceilDiv(burnAmount * tokenPrice(), DECIMALS);
+        loanAmountPaid = Math.ceilDiv(burnAmount * tokenPrice(), DECIMALS); // return stays GROSS of the request
+        uint256 exitFee = cashGross * s_exitFeeBps / BPS_DENOMINATOR;
+        uint256 netPayout = cashGross - exitFee;
+
+        if (s_silentZeroPayout) {
+            if (sharesToBurn > 0) _burn(msg.sender, sharesToBurn);
+            return loanAmountPaid;
+        }
+
+        uint256 currentBalance = i_docToken.balanceOf(address(this));
+        if (netPayout > 0 && currentBalance < netPayout) {
+            IStablecoin(address(i_docToken)).mint(address(this), netPayout - currentBalance);
+        }
+        if (netPayout > 0) {
+            i_docToken.transfer(receiver, netPayout); // NET: fee stays behind, as Sovryn's ExitFeeVault
+        }
+        if (sharesToBurn > 0) {
+            _burn(msg.sender, sharesToBurn);
+        }
+        return loanAmountPaid;
+    }
+
+    /**
+     * @notice Enable or disable the SIP-0094 Perimeter Fee on burn().
+     * @param exitFeeBps the fee in basis points (10 = the 0.10% Sovryn approved). Zero disables it.
+     */
+    function setExitFeeBps(uint256 exitFeeBps) external {
+        require(exitFeeBps <= BPS_DENOMINATOR, "Fee above 100%");
+        s_exitFeeBps = exitFeeBps;
+    }
+
+    function setSilentZeroPayout(bool silentZeroPayout) external {
+        s_silentZeroPayout = silentZeroPayout;
+    }
+
+    /// @notice Burn only `partialBurnBps / BPS_DENOMINATOR` of the requested iToken and pay cash for that slice.
+    function setPartialBurnBps(uint256 partialBurnBps) external {
+        require(partialBurnBps <= BPS_DENOMINATOR, "Bps above 100%");
+        s_partialBurnBps = partialBurnBps;
+    }
+
+    function setRevertOnBurn(bool revertOnBurn) external {
+        s_revertOnBurn = revertOnBurn;
+    }
+
+    function setOverBurn(bool overBurn) external {
+        s_overBurn = overBurn;
+    }
+
+    function setIncreaseBalanceOnBurn(bool increaseBalanceOnBurn) external {
+        s_increaseBalanceOnBurn = increaseBalanceOnBurn;
+    }
+
+    function setRevertOnTransfer(bool revertOnTransfer) external {
+        s_revertOnTransfer = revertOnTransfer;
+    }
+
+    function setTransferShareAdjustment(int256 adjustment) external {
+        s_transferShareAdjustment = adjustment;
+    }
+
+    function setTransferCallback(address target, bytes calldata data) external {
+        s_transferCallbackTarget = target;
+        s_transferCallbackData = data;
+    }
+
+    function _runTransferCallback() private {
+        if (s_transferCallbackTarget == address(0)) return;
+        (bool ok, bytes memory returnData) = s_transferCallbackTarget.call(s_transferCallbackData);
+        if (!ok) {
+            assembly {
+                revert(add(returnData, 32), mload(returnData))
+            }
+        }
+    }
+
+    function _update(address from, address to, uint256 value) internal override {
+        // Mint and burn pass through; only holder-to-holder transfers are paused or resized.
+        if (from != address(0) && to != address(0)) {
+            if (s_revertOnTransfer) revert("MockIToken: paused");
+            _runTransferCallback();
+            value = uint256(int256(value) + s_transferShareAdjustment);
+        }
+        super._update(from, to, value);
+    }
+
+    /**
+     * @notice the exit fee currently charged on burn(), in basis points
+     */
+    function getExitFeeBps() external view returns (uint256) {
+        return s_exitFeeBps;
+    }
+
+    /**
+     * @dev Returns the current exchange rate between DOC and iToken.
+     * @notice Calculates the exchange rate from the underlying DOC to iToken
+     * @return price of iToken/DOC
+     */
+    function tokenPrice() public view returns (uint256 price) {
+        uint256 timeElapsed = block.timestamp - i_deploymentTimestamp; // Time elapsed since deployment in seconds
+        uint256 yearsElapsed = (timeElapsed * DECIMALS) / YEAR_IN_SECONDS; // Convert timeElapsed to years with 18 decimals
+
+        // Calculate the rate increase: STARTING_EXCHANGE_RATE * ANNUAL_INCREASE * yearsElapsed
+        // Divide by 100 for the percentage and by DECIMALS (1e18) to adjust for the extra decimals on yearsElapsed
+        uint256 exchangeRateIncrease = (STARTING_EXCHANGE_RATE * ANNUAL_INCREASE * yearsElapsed) / (100 * DECIMALS);
+
+        return STARTING_EXCHANGE_RATE + exchangeRateIncrease; // Current exchange rate
+    }
+
+    /**
+     * @notice Get the current underlying value of the owner's iToken, interest included.
+     * @dev Matches Sovryn: assetBalanceOf is balance * tokenPrice, not the starting rate. profitOf is gone
+     * with the redeem preflight that misused it (R1); it was a subset of this value, never an addition to it.
+     * @return The user's balance of underlying token.
+     */
+    function assetBalanceOf(address _owner) public view returns (uint256) {
+        return balanceOf(_owner) * tokenPrice() / DECIMALS;
+    }
+}

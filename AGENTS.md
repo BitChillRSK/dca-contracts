@@ -7,7 +7,7 @@ Foundry Solidity repo for BitChill DCA-in contracts on Rootstock (`0.8.36`, EVM 
 1. This file.
 2. `docs/relaunch/IMPLEMENTATION_ORDER.md` when choosing the next relaunch PR or checking dependency gates.
 3. The assigned spec under `docs/relaunch/` (required before Solidity changes).
-4. Start from the spec’s file list. Expand only through imports, inheritance, interfaces, mocks, failing tests, and compiler errors. Name extra files in the PR.
+4. Start from the spec’s file list. Expand only through imports, inheritance, interfaces, mocks, failing tests, and compiler errors. Name extra files in the PR. If a later commit adds or re-purposes a path, update the open PR body in the same turn — the first description is not a one-shot.
 
 Do not implement optional/further-review items unless the spec assigns them. Sibling repo `dca-out-contracts` is out of scope unless named.
 
@@ -20,39 +20,63 @@ The human prompt is one line: `Start with R2` or `Start with PR 3`. Do not expec
 3. Ask the human **only** the open product gates listed for that PR in `IMPLEMENTATION_ORDER.md` (and the spec’s **Open product decisions** section). If that list is empty, do not ask; implement. Do not ask fee / packing / pause / optional items unless that PR’s list names them.
 4. `git fetch`. Branch from `main` if no relaunch PR is open; otherwise from the latest open relaunch PR’s head (stack). Never implement on `main`. Branch **before** the first edit.
 
+## Stack integrity and merge approval
+
+Before creating, updating, or merging stacked PRs, follow [the stack workflow](./docs/STACK_WORKFLOW.md).
+
+- After `git fetch origin`, verify `git merge-base --is-ancestor origin/<parent-branch> HEAD` before creating a child PR.
+- After changing a parent, propagate its current head through every dependent branch, from bottom to top. Verify ancestry again.
+- After publishing, run `python3 tools/check_stack_ancestry.py --pr <number>` for each affected PR. Record any existing gaps explicitly.
+- Before merging a stack, run `python3 tools/check_stack_ancestry.py` and reconcile every reported gap against the reviewed final tree.
+- Present the merge sequence, exact heads, remaining differences, and checks before requesting explicit merge approval.
+- Treat readiness questions as requests for assessment. Authorization to publish a PR does not authorize its merge.
+- Preserve the agreed audit commit and tag. Obtain approval for differences from the audit snapshot before integration.
+
 ## Layout
 
 Do not Grep/`Glob` `out/`, `cache/`, or `lib/` (see `.cursorignore`). Open a `lib/` path only when a `src/` import points there.
 
-```
-DcaManager          user + swapper entry; schedules
-OperationsAdmin     roles; token × lending-index → handler
-FeeHandler          fee math (also inherited by Purchase*)
-TokenHandler        deposit/withdraw stablecoin (owns FeeHandler)
-TokenLending        share ↔ underlying conversion (no TokenHandler inherit)
-PurchaseRbtc        accumulated rBTC; withdraw to signer
-PurchaseMoc         MoC redeem DOC → rBTC
-PurchaseUniswap     Uniswap V3 → WRBTC
+**`*Handler` means fund custody/execution in the `TokenHandler` lineage only.** Protocol bases
+(`IdleHandler`, `SovrynHandler`, …), Dex leaves (`*HandlerDex`), Doc/MoC leaves (`*DocHandlerMoc`),
+`TokenHandler`, and `LendingHandler` are Handlers. `PurchaseFees` and the `Purchase*` mixins are not —
+they price fees or run the purchase pipeline on the purchase branch. OpsAdmin’s registry is
+`getHandler` / `assignHandler`.
 
-Handlers = TokenHandler + TokenLending + a Purchase*:
-  TropykusErc20Handler ─┬─ TropykusDocHandlerMoc      (+ PurchaseMoc)
-                        └─ TropykusErc20HandlerDex    (+ PurchaseUniswap)
-  SovrynErc20Handler   ─┬─ SovrynDocHandlerMoc        (+ PurchaseMoc)
-                        └─ SovrynErc20HandlerDex      (+ PurchaseUniswap)
+```
+DcaManager          user + swapper entry; schedules; single- and multi-handler purchases
+OperationsAdmin     roles; token × route-index → handler
+PurchaseFees        fee math (owned by PurchaseRbtc; MoC / Uniswap route fee construction)
+TokenHandler        deposit/withdraw stablecoin
+LendingHandler      TokenHandler + ILendingHandler; share ↔ underlying conversion, per-user shares, withdraw clamp, interest, exact-sum batch redeem, share withdrawal
+StablecoinSource    shared `i_stablecoin` + batch-funding hook (TokenHandler and PurchaseRbtc inherit; idle/lending implement retrieve)
+PurchaseRbtc        shared buy/batch pipeline; accumulated rBTC; withdraw to signer
+PurchaseMoc         MoC redeem DOC → rBTC (_purchaseRbtc only)
+PurchaseUniswap     Uniswap V3 → WRBTC (_purchaseRbtc + WRBTC unwrap on withdraw)
+
+Handlers = LendingHandler + a Purchase*  (lending adapters) or TokenHandler + a Purchase* (idle):
+  src/idle/              IdleHandler ─┬─ IdleDocHandlerMoc (+ PurchaseMoc)  index 0 (DOC)
+                                          └─ IdleHandlerDex (+ PurchaseUniswap)  index 0 (USDRIF / USDT0)
+  src/layerbank/         LayerBankHandler ─┬─ LayerBankDocHandlerMoc (+ PurchaseMoc) index 1
+                                               └─ LayerBankHandlerDex (+ PurchaseUniswap)  USDRIF / USDT0
+  src/sovryn-legacy/     SovrynHandler ─┬─ SovrynDocHandlerMoc   (+ PurchaseMoc)
+                                            └─ SovrynHandlerDex (+ PurchaseUniswap)
+  src/tropykus-legacy/   TropykusHandler ─┬─ TropykusDocHandlerMoc   (+ PurchaseMoc)
+                                              └─ TropykusHandlerDex (+ PurchaseUniswap)
+                             legacy, test-only: no live deploy branch builds either, on either map
 ```
 
-- `src/interfaces/` — first-party ABIs; keep in sync with implementations.
+- `src/interfaces/` — shared first-party ABIs; keep in sync with implementations. Protocol-specific interfaces (`IiToken`, `IkToken`, `ILayerBankAToken`, `ILayerBankPool`, `ILayerBankHandler`, `ITropykusHandler`) live next to their handlers. Idle has no protocol-specific interface after R87 removed the per-user ledger surface. Lending handlers share `ILendingHandler` directly — R16 removed the empty per-protocol lending interfaces, so do not add one for a new handler unless it actually declares something (errors, events, or protocol-specific views — same bar Idle now meets by having none).
 - `test/unit/DcaDappTest.t.sol` — shared harness; **requires** `SWAP_TYPE` and `LENDING_PROTOCOL` (no fallback).
-- `test/unit/`, `test/mocks/`, `test/ai-generated/` — unit / mocks / extra + fuzz.
-- `script/` — deploy helpers. Do not `--broadcast` or talk to live contracts.
+- `test/unit/`, `test/mocks/`, `test/ai-generated/` — unit / mocks / extra + fuzz. Dedicated handler tests: `test/ai-generated/unit/sovryn-legacy/`, `test/ai-generated/unit/tropykus-legacy/`, `test/ai-generated/unit/idle/`, `test/ai-generated/unit/layerbank/`.
+- `script/` — deploy helpers. Do not `--broadcast` or talk to live contracts. `SOVRYN_INDEX` and `TROPYKUS_INDEX` deliberately live in `test/Constants.sol`, not `script/Constants.sol`, so a `script/` file that names a legacy route does not compile; `SOVRYN_STRING` and `TROPYKUS_STRING` stay in `script/Constants.sol` because the helper configs select mocks with them. Do not move an index back or re-add a legacy arm to a live branch — both live branches reject `Protocol.SOVRYN` and `Protocol.TROPYKUS`. A new production handler ships its deploy path in the same PR: extend `DeployMocSwaps` / `DeployDexSwaps` when it belongs in the main index map, or add a `Deploy<Handler>.s.sol` add-on (see `DeployUsdrifHandler`, `DeployIdleHandler`, `DeployLayerBankHandler`). DcaManager and deployment tests must construct that handler through the script (`DcaDappTest`, `BaseDeploymentTest`, `NewHandlerDeploymentTest`). `new Handler(...)` is only for test subclasses that expose internals, or handler-level tests that set `dcaManager` to the test contract so they can call `onlyDcaManager` entry points.
 
-## Match existing code
+## Toolchain pins
 
-The spec is the behavior source of truth. It is not a license to invent a new shape when the file already has one.
+The compiler target and the OpenZeppelin pin are stated in [`AUDIT_GUIDE.md`](./AUDIT_GUIDE.md) under **Compiler and dependencies**. Rules for changing them:
 
-Before adding a helper, read the neighboring functions in that file and copy their pattern unless the spec is explicitly changing that convention, or you have a concrete reason (say so in the PR).
-
-In `DcaManager`, argument checks are private `_validate*` functions called from the constructor or function body (`_validatePurchasePeriod`, `_validateDeposit`, `_validatePurchaseAmount`). Modifiers are for gates reused across many externals (`validateScheduleIndex`, `onlySwapper`). Do not add a new modifier because the spec said “modifier” if a private function would match those neighbors.
+- Do not set `evm_version` to `prague` / `osaka` / `amsterdam`, and do not use `blobhash` / `block.blobbasefee` in first-party code. Deployed bytecode must not start with `0xEF` (Rootstock Vetiver rejects EOF).
+- Move OpenZeppelin only to a stable release tag; do not follow `master`, a release candidate, or a floating `5.x` ref. Never patch or `sed` files under `lib/openzeppelin-contracts`.
+- `lib/openzeppelin-contracts` carries nested submodules (`forge-std`, `erc4626-tests`, `halmos-cheatcodes`) for OpenZeppelin's own tests. First-party builds never compile them, but switching the OZ pin can leave their gitlinks drifted, which shows as `modified: lib/openzeppelin-contracts (modified content)` with no `.sol` diff behind it. Resync with `git submodule update --init --recursive --force lib/openzeppelin-contracts`; never stage it.
 
 ## Protocol invariants
 
@@ -61,31 +85,194 @@ Unless the assigned spec explicitly changes one:
 1. **Balance-delta cash** — after a call that should move tokens or native to us, measure `balanceOf` / `address(this).balance` (or the user’s balance when paying the user). Do not treat integrator return values as received funds.
 2. **No view as redeem ceiling** — do not cap redemptions with `assetBalanceOf`, `profitOf`, snapshots, or `tokenPrice` as “DOC we will get.” Rates may size share burns, then clamp to shares held.
 3. **rBTC pays the signer** — withdrawals go to `msg.sender`. No `to` parameter; no owner rescue of another account’s rBTC.
-4. **Index addresses and `scheduleId` only** — do not index amounts, timestamps, strings, bytes, or arrays.
-5. **No assembly in purchase paths** — `buyRbtc`, `batchBuyRbtc`, `_rBtcPurchaseChecksEffects`, fee loops — unless the spec authorizes it.
+4. **Index every scalar address and `scheduleId`, and nothing else** — do not index amounts, timestamps, strings, bytes, arrays, or address arrays / bytes paths.
+5. **No assembly in purchase paths** — `batchBuyRbtc`, `_rbtcPurchaseChecksEffects`, fee loops — unless the spec authorizes it.
+6. **Every external function that writes `s_dcaSchedules` carries `nonReentrant`** — the only exceptions are views and the swapper-only purchase paths (`batchBuyRbtc` and `batchBuyRbtcAcrossHandlers`). The single-handler path is CEI-clean and writes nothing after its handler call. The multi-handler path loops that same helper, so a later handler's schedule writes happen after earlier handler calls; handlers are BitChill-deployed and the purchase paths stay `onlySwapper`, so bundle-wide CEI is not worth the extra pass. Checkable with grep, deliberately not a per-function judgement call. The invariant is presence, not position: `nonReentrant` is the first modifier everywhere except behind `whenUserMutationsAllowed` (invariant 10), which is a private view over one slot and so cannot re-enter, and which refuses before the guard's transient write (`TSTORE`). OZ's guard only blocks *other guarded* functions, so a partial set protects nothing: a mutator left unguarded is both an unblocked re-entry point and an entry point that engages no lock. Do not narrow this set for gas. `DcaManager` inherits OZ's `ReentrancyGuardTransient` ([R82](./docs/relaunch/R82-transient-reentrancy-guard.md)): on Rootstock the guard costs ~300 per guarded user call (one `TLOAD` and two `TSTORE`s at 100 each). OZ's storage `ReentrancyGuard` would cost ~10,200 there (an `SLOAD` plus two `RESET`s, with no restore refund); the ~2,300 Foundry figure older specs cite is its Cancun cost, not production. Do not switch back to the storage guard. The protocol-side win lives entirely on the purchase path, which this invariant does not touch. Because purchases stay unguarded, no user mutator writes back a schedule value it read before its handler call, and one that writes a balance before that call also emits its `TokenBalanceUpdated` before it: `depositToken` and `withdrawToken` store and log the new balance first, so a purchase reached from a callback keeps its debit and logs the last balance ([R118](./docs/relaunch/R118-pashov-optional-hardening.md)). See `docs/relaunch/R6-hot-path-cleanup.md` and `docs/relaunch/R42-swapper-batcher.md`.
+7. **The public `scheduleId` is the creation nonce (`uint64`), never a hash and never array state** — `createDcaSchedule` pre-increments `s_protocolSettings.scheduleNonce` and stores that value as the schedule's id, so ids start at 1 and `getSchedulesCreatedCount()` is the last one assigned. `deleteDcaSchedule` swap-pops, which can restore a previous array shape inside one block, so any id derived from array contents (length, last element's id, a hash of the array) can be reminted while the original schedule is still live. Only a strictly increasing counter is safe. R50 removed the `keccak256(user, token, nonce)` wrapper: it added a word per schedule and hid nothing, since ids are public through `getDcaSchedules` and are stale-index checks, not capabilities.
+
+8. **A schedule is keyed by `(token, scheduleId)`, and the stored owner is checked in exactly one place** — `s_dcaSchedules` is `mapping(address token => mapping(uint64 scheduleId => DcaSchedule))`. The stablecoin is keyed first because that is how the work arrives: a batch is one handler's, so one stablecoin's, and its rows are ids. Reach a schedule through `_callersSchedule(token, scheduleId)`, which is the only ownership check in the contract: it refuses a pair that addresses nothing (`InexistentSchedule`) and then refuses a schedule whose stored `user` is not `msg.sender` (`NotScheduleOwner`). Do not add a second owner check anywhere, and never accept a `user` argument on a schedule mutator — a caller-supplied owner is not a check. A reviewer's obligation is one grep: no mutator may read `s_dcaSchedules` directly. The `onlySwapper` purchase path needs no ownership check at all, because it takes the buyer from the schedule rather than from the batch; the stablecoin it names is structural, so a row of another one addresses empty storage and is refused rather than debited by a handler that never held its funds. Every getter is free to read any schedule. `DcaSchedule` is two slots and holds neither half of its key: slot 0 is every field a purchase touches, slot 1 pairs the owner with a `uint96 purchaseAmount`. There is no second, storage-only schedule type — `getDcaSchedules` returns the ids in a parallel array instead of repeating them inside the value. `s_scheduleIds[user][token]` is enumeration only: `getDcaSchedules` and the max-schedules bound read it, and no purchase ever does. See `docs/relaunch/R64-batch-calldata-and-schedule-keying.md`.
+
+9. **A batch row is one `uint64` and nothing else** — `Batch` names schedule ids, plus the `token` and `routeIndex` that resolve to one handler and the batch's `minRbtcOut` and `quotedStablecoinIn`. `_batchBuyRbtc` reads both the buyer and the amount from each schedule. Do not add a per-row buyer back: the owner comes from storage, which is what lets a row be an id rather than an id plus an address, and a caller-supplied owner would be trusted input on the one path that reaches somebody else's schedule. Do not add a per-row amount back as a staleness guard either: it was measured at ~450 gas per row, and what it bought was turning one user's mid-flight edit into a failed tick for every other row in the batch, in order to refuse a purchase at the amount that user had just asked for. The handler scales the quoted `minRbtcOut` by actual retrieved input / `quotedStablecoinIn`, rounding up with full-precision multiplication/division. A positive minimum requires nonzero quoted input; zero minimum disables the caller bound. The same scaled bound reaches the venue and checks measured gross output before fees. A Uniswap route's independent oracle floor also scales with actual input. This adds one quote scalar per batch, not per row. The `routeIndex` comparison is not the same thing and stays: no setter can change a schedule's route, so it is an integrity check that the row belongs to this batch's handler, not a guard against staleness.
+
+10. **The protected purchase window is opt-in, exact, and bounded** — an address currently on the swapper allowlist may activate a five-block window whenever none is live. Activation in block `N` blocks exactly `updatePurchaseAmount`, `updatePurchasePeriod`, `setSchedulePaused`, `deleteDcaSchedule`, `withdrawToken`, `withdrawTokenAndInterest`, `withdrawAllAccumulatedInterest`, and `withdrawLendingShares` through `N + 4`; those calls resume at `N + 5`. An active window cannot be extended or renewed early; once it expires the swapper may activate again with no daily budget. Deposits, creation, interest top-ups, accumulated-rBTC withdrawals, purchases, reads, and governance setters stay open, and purchases never require activation. The bot waits for the activation receipt, refreshes or simulates from the locked state, and only then broadcasts the purchase within the window; five blocks are an execution buffer, not a finality period. Do not make the duration configurable, allow mid-window renewal, add a lock branch to purchases, or broaden the guarded set without a new product decision. See `docs/relaunch/R66-batch-row-front-running.md`.
+
+11. **Exact external consumption on every successful lending redeem and deposit** — after a successful lending redemption (principal, interest, or batch purchase), the handler's external receipt-share balance must decrease by exactly the amount debited from BitChill's per-user virtual books. Measure that decrease with `balanceOf(handler)` for Sovryn iTokens / Tropykus kTokens and `scaledBalanceOf(handler)` for LayerBank aTokens; do not trust a protocol return value. A smaller stablecoin payout is allowed only when that share claim was fully consumed (exit fee / realized loss). Positive cash with a partial share burn must revert the whole operation so no still-withdrawable claim is orphaned. Protocols that silently partial-fill or use async request/claim queues need a separate handler lifecycle, not a tolerance on this check. A successful lending deposit must likewise reduce the handler's stablecoin balance by exactly the deposit, measured around the protocol call, so a market that takes less or more reverts instead of stranding a remainder in the handler ([R118](./docs/relaunch/R118-pashov-optional-hardening.md)). A successful lending-share withdrawal, which transfers the user's receipt shares instead of redeeming them, debits the user's book by exactly the measured decrease of that external balance; the decrease must be positive and at most the user's booked shares, and any remainder stays booked to the user ([R119](./docs/relaunch/R119-in-kind-lending-exit.md)). See `docs/relaunch/R68-lending-redeem-exact-consumption.md`.
+
+12. **Exact stablecoin consumption on every successful purchase** — `PurchaseRbtc` measures the handler's purchase-token balance immediately around `_purchaseRbtc` and requires it to decrease by exactly the retrieved gross supplied to the venue (fee is taken from measured rBTC afterward). A positive rBTC/WRBTC receipt is not proof that Money on Chain or a router consumed the complete input. Keep this check in the shared purchase pipeline so every venue inherits it; venue-specific code may add stricter custody checks, such as Uniswap intermediate-token balance equality. Any partial, excessive, or negative delta reverts the whole batch, including fees, funding debits, schedule effects, and venue state.
+
+13. **Accumulated rBTC encoding lives in three helpers only** — `s_accumulatedRbtc` is `private` and stores `claimable + 1` when live (`0` = never credited; `1` = post-withdraw sentinel). Read or write it only through the three `private` helpers `_creditRbtc`, `_claimableRbtc`, and `_withdrawRbtcChecksEffects`. A raw `+=` on the mapping underpays the account by one wei of encoding on every later decode. Privacy makes a leaf bypass a compile error — same teeth as invariant 8's private `s_dcaSchedules`. Routes that accumulate wrapped rBTC override the separate `internal virtual` `_withdrawRbtc` pay seam (unwrap, then `super`) rather than restating the external withdraw. The purchase-fee collector is credited on this mapping and withdraws through the same path. See `docs/relaunch/R77-accumulated-rbtc-storage-sentinel.md`.
+
+14. **Shared accounting storage that only the owning base may touch is `private`** — `LendingHandler.s_shares`, and `PurchaseUniswap`'s `s_swapPath` / `s_swapIntermediateTokens`, are `private`. Adapters supply protocol operations; they must not bypass the shared books or split the executed path from its intermediate-token checks. Same compiler teeth as invariants 8 and 13. See `docs/relaunch/R106-private-accounting-boundaries.md`.
+
+## Section headers and function order
+
+First-party `src/` files use Foundry-style banners with these exact titles. When a section is non-empty, emit its banner; skip empty ones. Order:
+
+`TYPE DECLARATIONS` → `STATE VARIABLES` → `EVENTS` → `ERRORS` → `MODIFIERS` → `CONSTRUCTOR` → `EXTERNAL FUNCTIONS` → `GETTERS` → `INTERNAL FUNCTIONS` → `PRIVATE FUNCTIONS`.
+
+- **Floor:** constructor-only contracts (the only declaration is `constructor`) carry no banners — that is the leaf-handler shape (`IdleDocHandlerMoc`, `*HandlerDex`, `*DocHandlerMoc`, …). Every other first-party file uses banners for each non-empty section.
+- **Visibility:** external → public → internal → private. The externally reachable surface is therefore always the top of the file, which is what makes it readable in one pass; that property, not the banners, is the point of the ordering.
+- **EXTERNAL FUNCTIONS** holds `external` / `public` entry points that write state, including `receive` / `fallback` and `public` overrides. It is decided by mutability, not by name: `getAccruedInterest` is deliberately non-`view` and belongs here.
+- **GETTERS** holds `view` / `pure` `external` / `public` accessors — reads a caller makes for an answer. `supportsInterface` (the public view ERC-165 override) lives here. A `view` / `pure` function that only reverts is a disabled mutator, not an accessor, and stays with the mutators (`BitChillOwnable.renounceOwnership`).
+- Mutators before views applies **within EXTERNAL FUNCTIONS / GETTERS only** — that split is the whole of the rule. Internal and private helpers are ordered by call order, closest caller first, because grouping them by mutability separates a function from the helper it calls for no reader's benefit.
+- Interfaces follow the same split as their implementation, in the same declaration order, so a reader can diff the pair. `IWRBTC` and the other vendored files below are the exception.
+- Each banner title uses one indentation everywhere: `GETTERS` at column 32, `EXTERNAL FUNCTIONS` at 27. When renaming a banner, re-centre it rather than leaving the old padding.
+- Do not use `FUNCTIONS`, `GETTER FUNCTIONS`, or other spellings.
+- Leave vendored interfaces alone so they stay diffable against upstream: `IMocProxy`, `IWRBTC`, `ICoinPairPrice`, `IkToken`, `IiToken`, `ILayerBankPool`, `ILayerBankAToken`.
+
+## Contract header NatSpec
+
+Solidity inherits NatSpec for functions, events, errors, and public state variables, so the function
+layer is written once, on the interface, and reaches the implementation through `@inheritdoc`. It does
+**not** inherit the `@title`/`@notice`/`@dev` block above a contract, and `@inheritdoc` is not an escape
+hatch: on a contract it fails the compile outright (`Error (6546): Documentation tag @inheritdoc not
+valid for contracts`). Header NatSpec is own-file — it does not cross `is` to an implementation, and it
+does not travel down an inheritance chain either, so `SovrynDocHandlerMoc` inherits nothing from
+`SovrynHandler`'s header. The header layer is therefore written by hand, and this is where.
+
+**A deployed contract must be readable on its own.** Anyone auditing this protocol lands on the verified
+concrete contract. Every contract that is actually deployed — `DcaManager`, `OperationsAdmin`, and the
+handler leaves — carries a short `@dev` covering its own security and lifecycle model: what is
+irreversible, what is guarded, what can be paused, who may call. Write it even when the interface says
+the same thing. That overlap is deliberate redundancy on the artifact that ships, not duplication to be
+factored out, and it is the one place where restating the interface is correct.
+
+Everything else is single-sourced on the interface:
+
+- Every first-party `src/` file carries `@title`, `@author`, and exactly one `@notice` line.
+- The two `@notice` lines of an interface/implementation pair are labels, and must not be the same
+  sentence. The interface's names the surface; the implementation's names what that contract is in the
+  system. A one-line label on each side is not duplication.
+- The full paragraph — the caller-facing rules and the reasoning behind them — belongs to the interface
+  that declares the functions it describes. An **abstract** contract adds a `@dev` only for a fact about
+  its own code that a reader of the surface could not infer; an abstract's header reaches no shipped
+  artifact whichever side it sits on, so there is nothing to be gained by restating the interface there.
+- Two cases where no interface owns the claim, so it stays on the implementation. An interface that
+  declares no functions (`ILayerBankHandler`, `ITropykusHandler`) is a home
+  for errors and events, not a surface: its `@notice` says what it carries. And a fact true of one
+  implementation cannot live on an interface several share — `ILendingHandler` is Sovryn's, LayerBank's,
+  and Tropykus's at once.
+- Constructor-only leaves carry the header even though they carry no banners, and sibling leaves state
+  the same fact the same way: the four `*HandlerDex` contracts each say `Constructor-only leaf`
+  and their approval/lifecycle model in `@dev`, not one of them in `@notice`.
+
+**Do not name a token in a contract that does not name it itself.** `PurchaseUniswap`, `IdleHandler`,
+`LendingHandler`, `TokenHandler` and their interfaces are constructed with whatever stablecoin they
+are given; a comment listing DOC, USDRIF, or USDT0 there is a snapshot of a listing decision that will
+rot, and on the Uniswap path naming DOC is simply wrong — DOC is redeemed at MoC and never swapped.
+State the property the code relies on (a decimal bound, a peg assumption) instead of the roster that
+happens to satisfy it today. Token names are correct only where the contract is token-specific: the
+`*DocHandlerMoc` leaves, `PurchaseMoc`, and the per-protocol `README.md`s.
+
+**Say what is enforced, and what is only assumed.** A header that states an operational policy the
+contract does not check — a listing rule, a delisting process — reads as a safety mechanism and is not
+one. Name it as a precondition and say who owns it.
+
+## Onchain comments
+
+Verified `src/` source (including NatSpec) lives on explorers for the life of the deployment. Do not mention relaunch ticket IDs (`R29`, `R42`, …) in `src/` comments. Write the durable reason instead. Specs, tests, PRs, deploy-script comments, and this file may use R-ids.
+
+**NatSpec delimiter.** A NatSpec comment of one line uses `///`: `/// @inheritdoc IDcaManager`, not a
+three-line `/** */` wrapper around that same line. NatSpec of two or more lines uses a `/** */` block,
+never a run of `///` lines — including a `@notice` / `@dev` pair and a sentence wrapped at the line
+limit. The rule covers every first-party `src/` file except the vendored interfaces listed under
+**Section headers and function order**, and `src/` follows it throughout. This rule is the delimiter
+only — what a comment says and which side of a pair owns it are **Contract header NatSpec** above and
+[R10](./docs/relaunch/R10-natspec.md). Comments do not move an executable byte, so a delimiter change
+is proven by comparing metadata-stripped runtime, not `forge build --sizes` (see
+[R85](./docs/relaunch/R85-natspec-delimiter.md)).
 
 ## Tests and done-gate
 
 - Targeted tests for the spec first. Document exact commands in the PR.
-- **Toolchain:** CI pins Foundry to `v1.7.1` in `.github/workflows/test.yml`. Match it locally (`foundryup -i v1.7.1`) before trusting the done-gate. Forge **1.8.0 is known-broken here**: suites that build fixtures with `vm.prank(OWNER); new OperationsAdmin();` fail at `setUp()` with `vm.prank: cannot overwrite a prank until it is applied at least once` (10 of them on the relaunch stack head; fewer on `main` today, since the stack adds more). That is a known toolchain incompatibility ([#79](https://github.com/BitChillRSK/dca-contracts/issues/79)), not a bug in your change — do not "fix" those tests to chase it, and do not unpin CI.
-- **Done-gate:** `make check` (`forge build`, `make moc-tropykus`, `make moc-sovryn`, and `STABLECOIN_TYPE=USDRIF make dex-sovryn`).
-- **CI (every PR):** `make moc-sovryn` and `STABLECOIN_TYPE=USDRIF make dex-sovryn`. Locally, `make ci` runs those lanes under `FOUNDRY_PROFILE=ci`. Local Tropykus targets remain useful for mock-based coverage; Tropykus fork deposits may fail while live mint is paused.
-- Defaults: `SWAP_TYPE=mocSwaps`, `LENDING_PROTOCOL=tropykus`, `STABLECOIN_TYPE=DOC`. Dex paths often use `STABLECOIN_TYPE=USDRIF`.
-- `make patch-deps` applies the vendored Uniswap pragma compatibility patch used by local builds and CI. It mutates `lib/` submodules; do not commit those submodule dirties.
-- `make slither` if slither is installed; not part of `make check` (no clean baseline yet).
-- Do not `forge fmt` existing files unless the spec says to (`src/` is not fmt-clean).
-- Fork tests (`make fork-*`) need an RPC and are not in CI. `test/mainnet-debug/**` is excluded from normal local/CI runs. They run on **Anvil/revm**, not rskj: useful for live Sovryn/MoC state, **not** a Rootstock opcode/compiler proof. `make fork-*` currently passes `--no-match-path` twice (Forge rejects that); use one glob until that Makefile bug is fixed.
+- **Foundry gas ≠ Rootstock gas.** Foundry/`revm` prices execution like Ethereum Cancun (EIP-2929 cold/warm, EIP-3529 refunds). Rootstock (`rskj`) does not: flat `SLOAD = 200`, Petersburg SSTORE (`SET`/`RESET`/`CLEAR`/`REFUND`), refund cap `gasUsed / 2`. Any gas claim about production must be converted using [`docs/relaunch/ROOTSTOCK-GAS-SCHEDULE.md`](./docs/relaunch/ROOTSTOCK-GAS-SCHEDULE.md), and specs must label which schedule each figure is on. Foundry numbers remain valid as same-build regression pins when labelled as such. **Never rank or accept an optimization that changes SLOAD/SSTORE counts from the Foundry delta alone:** identify the exact reads and current→new writes in both variants, price those operations on Rootstock, and carry over only compute/memory/log deltas whose schedules match. In particular, repeated writes to one nonzero slot cost 5,000 each on Rootstock even when Foundry reports ~100, while `SET − REFUND = RESET` makes clear/set versus keep-nonzero system-neutral. Count writes **per slot**, not just total gas (`vm.startStateDiffRecording`): a packed field write the compiler did not merge, or a slot restored to its value within the same transaction, costs ~100 in Foundry and 5,000 on Rootstock. A repeat call into an already-touched contract costs 100 in Foundry and 700 on Rootstock. [`ROOTSTOCK-GAS-AUDIT.md`](./docs/relaunch/ROOTSTOCK-GAS-AUDIT.md) records the `src/`-wide review against this rule.
+- **Where a gas saving lands decides its bar.** Purchase-path savings (swapper-paid, every tick) ship
+  once equivalence is proven. A saving only on user-paid, off-purchase paths (exits, interest,
+  schedule edits, admin setters) ships only if the code also gets simpler or clearer; if it adds a
+  parameter, mode, branch, or duplicated responsibility, decline it however large the number. Settled
+  cases: [R97](./docs/relaunch/R97-redeem-lending-exits-to-user.md) (redeem exits to the user) and
+  `setFeeRateParams` in the [gas audit](./docs/relaunch/ROOTSTOCK-GAS-AUDIT.md#closed-without-a-spec).
+  Check the **Closed non-implementation decisions** register in
+  [`IMPLEMENTATION_ORDER.md`](./docs/relaunch/IMPLEMENTATION_ORDER.md#closed-non-implementation-decisions)
+  before proposing any optimization.
+- **Done-gate:** `make check` (`forge build`, `make moc-none`, `make moc-layerbank`, `STABLECOIN_TYPE=USDRIF make dex-none`, `STABLECOIN_TYPE=USDT0 make dex-none`, `STABLECOIN_TYPE=USDRIF make dex-layerbank`, `STABLECOIN_TYPE=USDT0 make dex-layerbank`, and `make invariants-layerbank`).
+- **Scale the gate to the change.** Pick the tier from what the push changes against the branch's
+  current remote tip, not from what the PR as a whole touches:
+  - Only Markdown or other docs changed (specs, `README.md`, `AGENTS.md`): run nothing.
+  - Only comments or NatSpec changed in `src/`: `forge build` under the default and `deploy` profiles,
+    then compare metadata-stripped runtime and creation code against the parent (the
+    [R85](./docs/relaunch/R85-natspec-delimiter.md) method). No test lanes, no forks.
+  - Only files under `test/` changed: the suites that import the changed files, under both profiles.
+    If a shared base, mock, or helper changed, `make check`. No forks.
+  - Any executable change in `src/`, `script/`, `foundry.toml`, `remappings.txt`, the `Makefile`,
+    `.github/`, or a `lib/` submodule pointer: the full gate below.
+  - A rebase or restack counts by the content its conflict resolutions changed, plus what the new base
+    brings. A clean replay of already-gated commits onto a base whose new commits are docs- or
+    comment-only needs only `forge build`. Onto a base with new executable commits, `make check`: the
+    combined tree has not been tested. Add the forks only if the PR's own executable code is on a
+    fork-tested path.
+- **Before push (executable changes):** `make check` is not enough. Also run `make fork-layerbank` (needs `RSK_MAINNET_RPC_URL` in `.env`), the launch lending-adapter lane. Sovryn and Tropykus are not deployed, so their lanes are not part of the gate; when a change touches `src/sovryn-legacy/` or `src/tropykus-legacy/`, also run that adapter's `moc-*`, `dex-*` and `fork-*` lanes. Fork tests are not in CI; Anvil lanes will not catch live-protocol mismatches (for example R1's batch event reports net DOC, while `makeBatchPurchasesOneUser` used to expect the requested gross). If the RPC is unset, stop and ask the human — do not push. Document the exact fork commands in the PR.
+- **CI (every PR):** `make moc-none`, `make moc-layerbank`, `STABLECOIN_TYPE=USDRIF make dex-none`, `STABLECOIN_TYPE=USDT0 make dex-none`, `STABLECOIN_TYPE=USDRIF make dex-layerbank`, `STABLECOIN_TYPE=USDT0 make dex-layerbank`, and `make invariants-layerbank`. Locally, `make ci` runs those lanes under `FOUNDRY_PROFILE=ci`. The unit lanes still `--no-match-test invariant` so the 64×512 stateful suite is not multiplied across every target. `ComparePurchaseMethods` stays excluded (Anvil early-return / mainnet-only). The legacy targets (`make moc-sovryn` / `make dex-sovryn` / `make invariants-sovryn` and `make moc-tropykus` / `make dex-tropykus`) remain useful for mock-based coverage of the shared lending base through a second adapter; neither venue is on a production map, and indexes 2 and 4 stay burned. Both legacy fork lanes pin a pre-pause block; see the fork-tests bullet below.
+- Defaults: `SWAP_TYPE=mocSwaps`, `LENDING_PROTOCOL=tropykus` (legacy local default), `STABLECOIN_TYPE=DOC`. Production MoC lanes are `none` / `layerbank`. Dex paths often use `STABLECOIN_TYPE=USDRIF` (idle+DEX and LayerBank).
+- `make slither` / `make aderyn` if installed; not part of `make check` (findings are triaged at cutover in R73, not a clean zero baseline).
+- Keep the first-party tree `forge fmt`-clean (`make fmt-check` / `make check`). Vendored ABIs listed
+  in `foundry.toml` `[fmt].ignore` stay untouched so they remain diffable against upstream. Run
+  `forge fmt` with the same forge version CI pins (see `.github/workflows/test.yml`); a different
+  local forge can rewrite wrapping and fail `fmt-check`. Do not call `vm.skip` at the end of a
+  `setUp` that already ran `super.setUp()` — CI forge reports that as `FAIL: FOUNDRY::SKIP`; gate
+  inside the test (or a modifier) instead.
+- Fork tests (`make fork-*`) need an RPC and are not in CI. `test/mainnet-debug/**` is excluded from normal local/CI runs. They run on **Anvil/revm**, not rskj: useful for live LayerBank/MoC state, **not** a Rootstock opcode/compiler proof. `make fork-*` passes `SWAP_TYPE` (default `mocSwaps`) and sources `.env` for `RSK_MAINNET_RPC_URL` — an empty `--fork-url` makes Forge treat the cwd as an IPC socket. `make fork-tropykus` (and `make fork` when `LENDING_PROTOCOL=tropykus`) pins `--fork-block-number 8700000` (2026-04-05), before Tropykus paused kDOC mint. The pause is between blocks 8739512 and 8740674 (2026-04-16/17), measured by bisecting mint on a fork; above it, deposits revert with kToken error `C2`. `make fork-sovryn` pins `FORK_BLOCK_SOVRYN` (9325651, 2026-10-14), before Sovryn's delayed withdrawals (SIP-0096, 2026-10-26) and its protocol pause after the 2026-10-31 swap converter registry exploit; at the tip every iToken call reverts, so the lane would fail on the venue, not on BitChill code. `make fork-layerbank` and `make fork-none` stay on the chain tip. Dex path allowlist coverage on a fork is `make fork-dex-path` (`DexPathFailoverTest` on USDRIF / LayerBank **and** USDRIF / idle / dexSwaps). Constructor self-allowlists the initial Dex path; do not require a separate `setPurchasePathAllowed` before `assignHandler`. Full live-Uniswap purchase coverage for Dex leaves is `SWAP_TYPE=dexSwaps STABLECOIN_TYPE=USDRIF make fork-layerbank` (LayerBank) and `SWAP_TYPE=dexSwaps STABLECOIN_TYPE=USDRIF make fork-none` (idle); those can still revert `Too little received` and are not the R52 gate. Do not `vm.setEnv("LENDING_PROTOCOL", …)` in tests — it is process-wide and makes every later suite ignore the Makefile lane (`EXPECTED_LENDING_PROTOCOL` is the canary).
 
 ## Git (relaunch)
 
 Do this even if a user-level rule says “don’t commit until asked.” An assigned `docs/relaunch/` spec **is** authorization to branch, commit, push, and open a PR.
 
+Branch names (`<type>/r<n>-<slug>`), commit subjects (`<type>: why`), and PR titles use a [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) type: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, or `chore`.
+
 1. **Branch before the first edit** (`git checkout -b <type>/r<n>-<slug>` from the base in **Starting a relaunch chat**).
 2. **Commit when the spec’s success criteria pass.** Small, targeted commits (spec/docs, then code, then follow-up docs). Subject: `type: why`.
-3. **Push and open a PR** with `.github/PULL_REQUEST_TEMPLATE.md`. Point at the spec. Do not commit `lib/` dirt from `make patch-deps`, secrets, or `.env`.
+3. **Push and open a PR** only after the gate for the change's tier passes (see **Scale the gate to
+   the change**); for an executable change, that is `make check` and `make fork-layerbank`. Use `.github/PULL_REQUEST_TEMPLATE.md`. Point at the spec. Do not commit secrets or `.env`.
 4. **One implementer per PR.** Parallel review (Cursor/Codex/Claude/Bugbot) is expected. Parallel implementation on overlapping Solidity is not. Skip git worktrees for this relaunch except a docs-only PR that does not share files.
 5. After the PR is open, set `docs/relaunch/README.md` **Status** to this PR (full GitHub link) and “next unassigned: …” (the one-line prompt for the following chat). If the URL is only known after opening, add that Status update in a follow-up commit and push, then stop. Do not start the next R-item in this chat. The human merges in order. In the closing message, remind the human of that next prompt so they can spin up the following agent.
+6. **Keep the PR body current.** After any review or audit follow-up that changes the diff, edit the GitHub description in the same turn (`gh pr edit`) before you stop. **Files beyond the spec** must name every path in `gh pr diff --name-only` that the spec’s file list does not, with a one-line why. Update an existing entry when its reason changed (checkbox flips vs a new out-of-scope bullet). Do not leave the body describing only the first push.
+7. **Consumer follow-up** (see below): if this PR changes anything a consumer repo reads, sends, or indexes, open or update an issue on each affected repo in the same turn and paste the URLs in the PR **Cutover / frontend note**.
 
 ## PRs
 
-Small, behavior-scoped, reviewable history. No drive-by refactors. Use the template. Do not restate the invariants — say whether they still hold.
+Small, behavior-scoped, reviewable history. No drive-by refactors. Use the template. Do not restate the invariants — say whether they still hold. After review follow-ups, refresh the body so **Files beyond the spec** matches the current diff.
+
+When reviewing a PR by number, fetch its actual diff (e.g. `gh pr diff <N>` or `gh pr view <N> --json files`) and confirm the changed files match before trusting any findings — don't assume the locally checked-out branch is that PR's diff.
+
+## Consumer follow-up
+
+The contracts have five sibling consumers. Do not implement consumer changes in this repo — open an issue there.
+
+| Repo | Consumes | Owns |
+|---|---|---|
+| [`front-end`](https://github.com/BitChillRSK/front-end) | `DcaManager` user surface | user calls, hardcoded ABIs, route indexes, venue names |
+| [`swapper-bot`](https://github.com/BitChillRSK/swapper-bot) | `batchBuyRbtc`, swapper allowlist | tick composition, gas splitting, per-handler cron targets |
+| [`bitchill-monitoring`](https://github.com/BitChillRSK/bitchill-monitoring) | events and custom errors | alerting, backfill, `abi.json` |
+| [`data-api`](https://github.com/BitChillRSK/data-api) | schedule and purchase state | the schedule model the bot and dashboard read |
+| [`metrics-dashboard`](https://github.com/BitChillRSK/metrics-dashboard) | `data-api` output, venue labels | reporting, venue naming |
+
+When a contracts PR changes anything a consumer must handle after relaunch, **search that repo's existing issues first**, then **open a new issue or comment on the matching one** in the same turn as opening or updating the contracts PR. Paste every issue URL in the contracts PR **Cutover / frontend note**. Do not wait for merge.
+
+```
+gh issue list --repo BitChillRSK/<repo> --state all --limit 50
+gh issue create --repo BitChillRSK/<repo> --title "…" --body "…"
+```
+
+`data-api` sits upstream of both `swapper-bot` and `metrics-dashboard`. A change to the schedule model usually needs an issue on `data-api` **and** on each downstream repo — do not assume the API change propagates on its own.
+
+**Open or update an issue when the PR:**
+
+- **front-end** — adds, removes, or changes a public selector, argument list, event, or custom error on `DcaManager`, `OperationsAdmin`, or any contract the UI calls (handlers, fee reads, purchase-rBTC getters); accepts a new argument value the UI cannot send (for example `type(uint256).max` as withdraw-all); adds or remaps a route index or venue; or breaks a behavior the UI assumes (caller-only `getMy*` getters, hardcoded `1 = Tropykus` / `2 = Sovryn`, interest on every index).
+- **swapper-bot** — changes `batchBuyRbtc`'s selector, argument list, or grouping rules; adds state the bot must filter on before batching (a paused schedule reverts the whole batch); changes which addresses are allowlisted swappers or adds a contract the bot should call instead; changes route indexes, the live handler set, or per-handler cron targets; or changes token decimals, minimum purchase amounts, or min-out math the bot reproduces off-chain.
+- **bitchill-monitoring** — adds, removes, renames, or re-indexes any event or custom error; changes the deployed handler set it watches; or changes an event's field meaning even when the signature is stable. Assume `abi.json` needs regenerating.
+- **data-api** — changes the schedule struct, its field names or types, a getter it reads, or the set of tokens and routes it must serve. Storage packing counts if a field's type changes.
+- **metrics-dashboard** — changes venue naming, the route index map, or any `data-api` field it renders.
+
+**Do not open an issue for:** internal-only renames with no ABI effect, tests, Makefile, deploy scripts no consumer calls, owner-only surfaces no consumer exposes, or natspec.
+
+The issue body should name the contracts PR, the old vs new surface (selector and args, or event and fields), the consumer files that still use the old one, and whether it is a small ABI edit or a product change (new venue, new flow). If an existing issue already covers it, comment there instead of duplicating.

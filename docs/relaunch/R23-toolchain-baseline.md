@@ -18,7 +18,7 @@ Uniswap V3 sources still declare `pragma solidity =0.7.6`. Today `make patch-dep
 
 ## Scope
 
-- [x] Set `solc_version = "0.8.36"` and `evm_version = "cancun"` in `[profile.default]`. Set the same two keys explicitly on `[profile.deploy]` (do not omit them there even if inherit would work).
+- [x] Set `solc_version = "0.8.36"` and `evm_version = "cancun"` in `[profile.default]`. At R23, `[profile.deploy]` pinned the same compiler/EVM; R52 later removed that profile.
 - [x] Change first-party `pragma solidity` in `src/`, `test/`, and `script/` to match `0.8.36` (`^0.8.19` scripts become exact `0.8.36`). Do not change `lib/`.
 - [x] Keep OpenZeppelin at `v4.9.3`. Do not bump Uniswap submodules.
 - [x] Experiment, in this order, and keep the first mix that builds first-party + Dex sources:
@@ -79,7 +79,7 @@ Fork tests: not required for merge, and **not** a Rootstock opcode proof (Anvil/
 ## Success criteria
 
 - [x] First-party pragma / `solc_version` are `0.8.36`; `evm_version` is `cancun` (or a documented fallback after a failed Rootstock fork smoke).
-- [x] `[profile.deploy]` sets the same compiler and EVM pins.
+- [x] At R23, `[profile.deploy]` pinned the same compiler and EVM; R52 later removed that profile.
 - [x] Uniswap sources stay 0.7.6 in git; OZ still 4.9.3.
 - [x] The Uniswap compile mix is proven and written down (patch still required vs overrides alone).
 - [x] `DEPENDENCY_MODIFICATIONS.md` no longer says Rootstock requires 0.8.19.

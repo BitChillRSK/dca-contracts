@@ -32,6 +32,7 @@
 
 ```
 make check
+make fork-layerbank
 ```
 
 ## ABI changes
@@ -43,7 +44,7 @@ make check
 
 - [ ] None
 - [ ] `script/` or deploy config changed (local/test only; this PR must not broadcast)
-- [ ] Cutover / frontend note:
+- [ ] Cutover / frontend note: (if ABI or product surface changed, open or update an issue on every affected consumer repo — `front-end`, `swapper-bot`, `bitchill-monitoring`, `data-api`, `metrics-dashboard` — and paste the URLs; see `AGENTS.md` **Consumer follow-up**)
 
 ## Security considerations
 

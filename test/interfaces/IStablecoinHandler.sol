@@ -2,10 +2,10 @@
 pragma solidity 0.8.36;
 
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
-import {ITokenLending} from "../../src/interfaces/ITokenLending.sol";
+import {ILendingHandler} from "../../src/interfaces/ILendingHandler.sol";
 
 /**
  * @title IStablecoinHandler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  */
-interface IStablecoinHandler is ITokenHandler, ITokenLending {}
+interface IStablecoinHandler is ITokenHandler, ILendingHandler {}

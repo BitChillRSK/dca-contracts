@@ -1,60 +1,124 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
-import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
+import {IPurchaseRbtc} from "./interfaces/IPurchaseRbtc.sol";
 import {DcaManagerAccessControl} from "./DcaManagerAccessControl.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {PurchaseFees} from "./PurchaseFees.sol";
+import {StablecoinSource} from "./StablecoinSource.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @title PurchaseRbtc
- * @notice Base contract for purchasing and handling rBTC
+ * @author BitChill team: Antonio Rodríguez-Ynyesto
+ * @notice Shared rBTC purchase pipeline, accumulated-balance accounting, and signer withdrawals.
  */
-abstract contract PurchaseRbtc is IPurchaseRbtc, Ownable, DcaManagerAccessControl {
-    //////////////////////
-    // State variables ///
-    //////////////////////
-    mapping(address user => uint256 amount) internal s_usersAccumulatedRbtc;
+abstract contract PurchaseRbtc is IPurchaseRbtc, PurchaseFees, DcaManagerAccessControl, StablecoinSource {
+    /*//////////////////////////////////////////////////////////////
+                            STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Allow the contract to receive rBTC
+     * @dev Encoded claimable rBTC. `0` means never credited; a live value is `claimable + 1`
+     *      (including post-withdraw sentinel `1`). Keeps the slot nonzero so the next credit after a
+     *      full withdrawal is a cheaper nonzero-to-nonzero SSTORE. Getters and withdrawals decode.
+     *      Private so leaves cannot bypass `_creditRbtc` / `_claimableRbtc` / `_withdrawRbtcChecksEffects`.
      */
+    mapping(address account => uint256 encodedAmount) private s_accumulatedRbtc;
+
+    /*//////////////////////////////////////////////////////////////
+                               CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @param feeConfig Collector and purchase fee settings.
+     * @param initialOwner Address that owns this handler immediately after deploy.
+     */
+    constructor(FeeConfig memory feeConfig, address initialOwner)
+        PurchaseFees(feeConfig.feeCollector, feeConfig.feeSettings, initialOwner)
+    {}
+
+    /*//////////////////////////////////////////////////////////////
+                           EXTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Allow the contract to receive native rBTC from a purchase or from unwrapping WRBTC.
     receive() external payable {}
 
-    /**
-     * @notice the user can at any time withdraw the rBTC that has been accumulated through periodical purchases
-     * @param user: the user to withdraw the rBTC to
-     */
-    function withdrawAccumulatedRbtc(address user) external virtual override onlyDcaManager {
+    /// @inheritdoc IPurchaseRbtc
+    function batchBuyRbtc(
+        address[] calldata buyers,
+        uint64[] calldata scheduleIds,
+        uint256[] memory purchaseAmounts,
+        uint256 minRbtcOut,
+        uint256 quotedStablecoinIn
+    ) external override onlyDcaManager {
+        if (minRbtcOut != 0 && quotedStablecoinIn == 0) {
+            revert PurchaseRbtc__ZeroQuotedStablecoinInput();
+        }
+        uint256[] memory netWeights;
+        uint256 purchaseAmountsSum;
+        uint256 totalFee;
+        // Retrieve stablecoin first so the potentially clamped amounts are used to calculate fees and net weights.
+        uint256 totalStablecoinRetrieved = _batchRetrieveStablecoin(buyers, purchaseAmounts);
+        if (minRbtcOut != 0) {
+            minRbtcOut = Math.mulDiv(minRbtcOut, totalStablecoinRetrieved, quotedStablecoinIn, Math.Rounding.Ceil);
+        }
+        (totalFee, netWeights, purchaseAmountsSum) = _calculateFeeAndNetWeights(purchaseAmounts);
+
+        uint256 totalPurchasedRbtc;
+        {
+            uint256 inputBalanceBefore = i_stablecoin.balanceOf(address(this));
+            totalPurchasedRbtc = _purchaseRbtc(totalStablecoinRetrieved, minRbtcOut);
+            uint256 inputBalanceAfter = i_stablecoin.balanceOf(address(this));
+            if (
+                inputBalanceAfter > inputBalanceBefore
+                    || inputBalanceBefore - inputBalanceAfter != totalStablecoinRetrieved
+            ) {
+                revert PurchaseRbtc__InputAmountNotFullySpent(
+                    totalStablecoinRetrieved, inputBalanceBefore, inputBalanceAfter
+                );
+            }
+        }
+        if (totalPurchasedRbtc == 0) revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(i_stablecoin));
+        // Gross measured Q — never trusts an integrator return. Equality passes.
+        if (totalPurchasedRbtc < minRbtcOut) {
+            revert PurchaseRbtc__BelowSwapperMinimum(totalPurchasedRbtc, minRbtcOut);
+        }
+
+        // Can't overflow: rBTC < 2^85 wei; totalFee ≤ 5% of uint96 purchase amounts.
+        uint256 feeRbtc;
+        unchecked {
+            feeRbtc = totalPurchasedRbtc * totalFee / purchaseAmountsSum;
+        }
+
+        _creditPurchases(
+            buyers,
+            scheduleIds,
+            purchaseAmounts,
+            netWeights,
+            totalPurchasedRbtc,
+            purchaseAmountsSum,
+            totalStablecoinRetrieved
+        );
+        emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
+            address(i_stablecoin), totalPurchasedRbtc, totalStablecoinRetrieved
+        );
+        _creditFee(feeRbtc, totalFee, purchaseAmountsSum, totalStablecoinRetrieved);
+    }
+
+    /// @inheritdoc IPurchaseRbtc
+    function withdrawAccumulatedRbtc(address user) external override onlyDcaManager {
         uint256 rbtcBalance = _withdrawRbtcChecksEffects(user);
         _withdrawRbtc(user, rbtcBalance);
     }
 
-    /**
-     * @notice Emergency function to withdraw rBTC stuck in contracts that cannot receive native tokens
-     * @param stuckUserContract The address of the user contract where rBTC is stuck
-     * @param rescueAddress The address to send the rescued rBTC to
-     * @dev This function can only be called by the owner
-     */
-    function withdrawStuckRbtc(address stuckUserContract, address rescueAddress) external virtual onlyOwner {
-        uint256 rbtcBalance = _withdrawRbtcChecksEffects(stuckUserContract);
-        _withdrawStuckRbtc(stuckUserContract, rescueAddress, rbtcBalance);
-    }
+    /*//////////////////////////////////////////////////////////////
+                                GETTERS
+    //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @notice get the accumulated rBTC balance for a specific user
-     * @param user the address of the user to check the accumulated rBTC balance for
-     * @return the accumulated rBTC balance
-     */
+    /// @inheritdoc IPurchaseRbtc
     function getAccumulatedRbtcBalance(address user) external view override returns (uint256) {
-        return s_usersAccumulatedRbtc[user];
-    }
-
-    /**
-     * @notice get the accumulated rBTC balance for the caller
-     * @return the accumulated rBTC balance
-     */
-    function getAccumulatedRbtcBalance() external view override returns (uint256) {
-        return s_usersAccumulatedRbtc[msg.sender];
+        return _claimableRbtc(user);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -62,70 +126,100 @@ abstract contract PurchaseRbtc is IPurchaseRbtc, Ownable, DcaManagerAccessContro
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice checks and effects for the withdrawal of rBTC from the contract
-     * @param user: the user to withdraw the rBTC to
-     * @return the amount of rBTC to withdraw
+     * @dev Pay `rbtcBalance` native rBTC to `user`. Reverts if the call fails. A route whose purchases
+     *      accumulate wrapped rBTC overrides this to unwrap first.
      */
-    function _withdrawRbtcChecksEffects(address user) internal returns (uint256) {
-        uint256 rbtcBalance = s_usersAccumulatedRbtc[user];
-        if (rbtcBalance == 0) revert PurchaseRbtc__NoAccumulatedRbtcToWithdraw();
-
-        s_usersAccumulatedRbtc[user] = 0;
-        return rbtcBalance;
-    }
-
-    /**
-     * @notice withdraw rBTC from the contract
-     * @param user: the user to withdraw the rBTC to
-     * @param rbtcBalance: the amount of rBTC to withdraw
-     */
-    function _withdrawRbtc(address user, uint256 rbtcBalance) internal {
+    function _withdrawRbtc(address user, uint256 rbtcBalance) internal virtual {
         (bool sent,) = user.call{value: rbtcBalance}("");
         if (!sent) revert PurchaseRbtc__rBtcWithdrawalFailed();
         emit PurchaseRbtc__rBtcWithdrawn(user, rbtcBalance);
     }
 
     /**
-     * @notice withdraw rBTC from stuck contract. Only necessary for users who (poorly) interacted with Bitchill from a contract
-     * @param stuckUserContract: the address of the contract that interacted with Bitchill
-     * @param rescueAddress: the address to send the rBTC to
-     * @param rbtcBalance: the amount of rBTC to withdraw
+     * @dev Spend `stablecoinAmount` of stablecoin; return only measured rBTC/WRBTC.
+     *      Caller proves exact purchase-token consumption. Amount is retrieved gross; the fee is
+     *      taken from measured output afterward.
      */
-    function _withdrawStuckRbtc(address stuckUserContract, address rescueAddress, uint256 rbtcBalance) internal {
-        // First try to send to the contract (might work if it has a fallback)
-        (bool sentToContract,) = stuckUserContract.call{value: rbtcBalance}("");
-        
-        // If failed, send to the rescue address
-        if (!sentToContract) {
-            (bool sentToRescue,) = rescueAddress.call{value: rbtcBalance}("");
-            if (!sentToRescue) revert PurchaseRbtc__rBtcWithdrawalFailed();
-            emit PurchaseRbtc__rBtcRescued(stuckUserContract, rescueAddress, rbtcBalance);
-        } else {
-            emit PurchaseRbtc__rBtcWithdrawn(stuckUserContract, rbtcBalance);
+    function _purchaseRbtc(uint256 stablecoinAmount, uint256 minRbtcOut) internal virtual returns (uint256 rbtcReceived);
+
+    /*//////////////////////////////////////////////////////////////
+                            PRIVATE FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @dev Allocate floored shares of measured output. Split out of `batchBuyRbtc` for legacy codegen.
+     *      Fee and each row floor; under one wei per term can stay uncredited — see IPurchaseRbtc.
+     * @param purchaseAmounts May contain clamped amounts.
+     */
+    function _creditPurchases(
+        address[] calldata buyers,
+        uint64[] calldata scheduleIds,
+        uint256[] memory purchaseAmounts,
+        uint256[] memory netWeights,
+        uint256 totalPurchasedRbtc,
+        uint256 purchaseAmountsSum,
+        uint256 totalStablecoinRetrieved
+    ) private {
+        uint256 purchaseCount = buyers.length;
+        for (uint256 i; i < purchaseCount; ++i) {
+            uint256 userRbtc;
+            unchecked {
+                userRbtc = totalPurchasedRbtc * netWeights[i] / purchaseAmountsSum;
+            }
+            uint256 userStablecoinSpent = totalStablecoinRetrieved * purchaseAmounts[i] / purchaseAmountsSum;
+            // Skip zero floors so a never-credited user is not marked live.
+            if (userRbtc != 0) _creditRbtc(buyers[i], userRbtc);
+            emit PurchaseRbtc__RbtcBought(
+                buyers[i], address(i_stablecoin), userRbtc, scheduleIds[i], userStablecoinSpent
+            );
         }
     }
 
     /**
-     * @notice redeem stablecoin for rBTC
-     * @notice define abstract functions to be implemented by child contracts
-     * @dev these functions semantically belong to the TokenLending contract,
-     * however, putting them there and changing the inheritance graph made it 
-     * impossible to linearize and finding another solution  would have required a major refactor.
-     * @param buyer: the address of the buyer
-     * @param amount: the amount of stablecoin to redeem
-     * @return the amount of stablecoin redeemed
+     * @dev Credit `floor(Q × F / G)` rBTC; emit `floor(retrieved × F / G)` stablecoin. No-op at zero.
      */
-    function _redeemStablecoin(address buyer, uint256 amount) internal virtual returns (uint256);
+    function _creditFee(uint256 feeRbtc, uint256 totalFee, uint256 purchaseAmountsSum, uint256 totalStablecoinRetrieved)
+        private
+    {
+        if (feeRbtc == 0) return;
+        uint256 feeStablecoin = totalStablecoinRetrieved * totalFee / purchaseAmountsSum;
+        address collector = s_feeCollector;
+        _creditRbtc(collector, feeRbtc);
+        emit PurchaseFees__FeeCredited(collector, feeRbtc, feeStablecoin);
+    }
 
     /**
-     * @notice redeem stablecoin for rBTC in batch
-     * @param buyers: the addresses of the buyers
-     * @param purchaseAmounts: the amounts of stablecoin to redeem for each buyer
-     * @param totalStablecoinAmountToRedeem: the total amount of stablecoin to redeem
-     * @return the total amount of stablecoin redeemed
+     * @dev Encode and store a positive rBTC credit. Live slots hold `claimable + 1`.
+     *      The add is unchecked: credits are shares of rBTC this handler measured receiving,
+     *      which are tiny compared to `type(uint256).max`.
      */
-    function _batchRedeemStablecoin(address[] memory buyers, uint256[] memory purchaseAmounts, uint256 totalStablecoinAmountToRedeem)
-        internal
-        virtual
-        returns (uint256);
-} 
+    function _creditRbtc(address account, uint256 amount) private {
+        uint256 stored = s_accumulatedRbtc[account];
+        unchecked {
+            s_accumulatedRbtc[account] = (stored == 0 ? 1 : stored) + amount;
+        }
+    }
+
+    /// @dev Decode claimable rBTC, revert if none, and leave the post-withdraw sentinel. Caller then pays.
+    function _withdrawRbtcChecksEffects(address user) private returns (uint256 rbtcBalance) {
+        uint256 stored = s_accumulatedRbtc[user];
+        // `0` = never credited; `1` = fully withdrawn sentinel. Both mean nothing to pay.
+        if (stored <= 1) revert PurchaseRbtc__NoAccumulatedRbtcToWithdraw();
+
+        unchecked {
+            rbtcBalance = stored - 1;
+        }
+        s_accumulatedRbtc[user] = 1;
+    }
+
+    /**
+     * @dev Claimable rBTC for `user`. Decodes the `claimable + 1` encoding; `0` / sentinel `1` both
+     *      return 0 so callers never see dust.
+     */
+    function _claimableRbtc(address user) private view returns (uint256) {
+        uint256 stored = s_accumulatedRbtc[user];
+        unchecked {
+            return stored == 0 ? 0 : stored - 1;
+        }
+    }
+}

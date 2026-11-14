@@ -1,156 +1,168 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
 import {IOperationsAdmin} from "./interfaces/IOperationsAdmin.sol";
+import {IDcaManager} from "./interfaces/IDcaManager.sol";
+import {IDcaManagerAccessControl} from "./interfaces/IDcaManagerAccessControl.sol";
 import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
-import {IERC165} from "lib/forge-std/src/interfaces/IERC165.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+import {ILendingHandler} from "./interfaces/ILendingHandler.sol";
+import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import {BitChillOwnable} from "./BitChillOwnable.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 /**
  * @title OperationsAdmin
- * @dev Contract to manage administrative tasks and token handlers
+ * @author BitChill team: Antonio Rodríguez-Ynyesto
+ * @notice Registry through which every route class, handler assignment, and swapper check is
+ *         resolved.
+ * @dev The owner registers route classes and assigns each token-route pair once; neither can be
+ *      remapped, preserving exits through retired routes. Per-pair deposit pauses are reversible and
+ *      block only new inflows. The owner also manages the swapper allowlist.
  */
-contract OperationsAdmin is IOperationsAdmin, Ownable, AccessControl {
-    using Address for address;
+contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
+    using SafeCast for uint256;
+
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN");
-    bytes32 public constant SWAPPER_ROLE = keccak256("SWAPPER");
+    /**
+     * @dev Handler and deposit pause share one mapping value, so assigning a handler and pausing
+     *      its pair dirty the same slot. Every route-index argument below is bounded to `uint32`,
+     *      the width a packed `DcaSchedule` can store, so no caller can read or write a route no
+     *      schedule could ever name.
+     */
+    mapping(address token => mapping(uint256 routeIndex => TokenRoute)) private s_tokenRoute;
+    mapping(uint256 routeIndex => RouteClass) private s_routeClass;
+    mapping(address swapper => bool) private s_swappers;
+    mapping(address handler => bool assigned) private s_handlerAssigned;
 
-    mapping(bytes32 tokenProtocolHash => address tokenHandlerContract) private s_tokenHandler;
-    mapping(string lowerCaseProtocolName => uint256 protocolIndex) private s_protocolIndexes;
-    mapping(uint256 protocolIndex => string lowerCaseProtocolName) private s_protocolNames;
+    /*//////////////////////////////////////////////////////////////
+                               CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @param initialOwner the address that owns this contract immediately after deploy
+     * @dev Index 0 is the default idle route. Additional idle or lending indexes are
+     *      registered through `registerRoute`. Emits `RouteRegistered` so indexers see
+     *      the same class write as every later `registerRoute` call.
+     */
+    constructor(address initialOwner) BitChillOwnable(initialOwner) {
+        s_routeClass[0] = RouteClass.Idle;
+        emit OperationsAdmin__RouteRegistered(0, false);
+    }
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    constructor() Ownable() {}
+    /**
+     * @inheritdoc IOperationsAdmin
+     * @dev Recovery from a mistaken class is a new index, not a mutation of this one.
+     */
+    function registerRoute(uint256 index, bool lends) external onlyOwner {
+        uint32 routeIndex = index.toUint32();
+        if (s_routeClass[routeIndex] != RouteClass.Unregistered) {
+            revert OperationsAdmin__RouteAlreadyRegistered(index);
+        }
+        s_routeClass[routeIndex] = lends ? RouteClass.Lending : RouteClass.Idle;
+        emit OperationsAdmin__RouteRegistered(routeIndex, lends);
+    }
 
     /**
-     * @dev Assigns a new TokenHandler to a token.
-     * @param token The address of the token.
-     * @param lendingProtocolIndex The index of the protocol where (if) the token is lent
-     * @param handler The address of the TokenHandler.
-     * @notice lendingProtocolIndex == 0 means the token is not lent
+     * @inheritdoc IOperationsAdmin
+     * @dev Recovery from a mistaken assignment uses a new route because this registry cannot prove a
+     *      handler is empty.
      */
-    function assignOrUpdateTokenHandler(address token, uint256 lendingProtocolIndex, address handler)
-        external
-        onlyRole(ADMIN_ROLE)
-    {
-        if (!address(handler).isContract()) revert OperationsAdmin__EoaCannotBeHandler(handler);
-        if (lendingProtocolIndex != 0 && bytes(s_protocolNames[lendingProtocolIndex]).length == 0) {
-            revert OperationsAdmin__LendingProtocolNotAllowed(lendingProtocolIndex);
+    function assignHandler(address token, uint256 routeIndex, address handler) external onlyOwner {
+        uint32 route = routeIndex.toUint32();
+        if (handler.code.length == 0) revert OperationsAdmin__EoaCannotBeHandler(handler);
+        RouteClass routeClass = s_routeClass[route];
+        if (routeClass == RouteClass.Unregistered) {
+            revert OperationsAdmin__RouteNotRegistered(routeIndex);
         }
+        if (s_tokenRoute[token][route].handler != address(0)) {
+            revert OperationsAdmin__HandlerAlreadyAssigned(token, routeIndex);
+        }
+        if (s_handlerAssigned[handler]) revert OperationsAdmin__HandlerAddressAlreadyInUse(handler);
 
-        IERC165 tokenHandler = IERC165(handler);
-
-        if (tokenHandler.supportsInterface(type(ITokenHandler).interfaceId)) {
-            bytes32 key = _encodeKey(token, lendingProtocolIndex);
-            s_tokenHandler[key] = handler;
-            emit OperationsAdmin__TokenHandlerUpdated(token, lendingProtocolIndex, handler);
-        } else {
+        if (!IERC165(handler).supportsInterface(type(ITokenHandler).interfaceId)) {
             revert OperationsAdmin__ContractIsNotTokenHandler(handler);
         }
+
+        bool supportsLending = IERC165(handler).supportsInterface(type(ILendingHandler).interfaceId);
+        if (routeClass == RouteClass.Lending) {
+            if (!supportsLending) revert OperationsAdmin__ContractIsNotLendingHandler(handler);
+        } else if (supportsLending) {
+            revert OperationsAdmin__LendingHandlerOnIdleRoute(handler);
+        }
+        if (address(ITokenHandler(handler).i_stablecoin()) != token) {
+            revert OperationsAdmin__HandlerTokenMismatch(token, handler);
+        }
+        address dcaManager = IDcaManagerAccessControl(handler).i_dcaManager();
+        if (address(IDcaManager(dcaManager).i_operationsAdmin()) != address(this)) {
+            revert OperationsAdmin__HandlerDcaManagerMismatch(handler, dcaManager);
+        }
+
+        s_tokenRoute[token][route].handler = handler;
+        s_handlerAssigned[handler] = true;
+        emit OperationsAdmin__HandlerAssigned(token, route, handler);
     }
 
     /**
-     * @dev Adds a lending protocol to the system by assigning an index to its name
-     * @param lowerCaseName The name of the lending protocol in lower case
-     * @param index The index to be assigned to it
-     * @notice The index cannot be zero, since all elements in a mapping map to 0 by default
+     * @inheritdoc IOperationsAdmin
+     * @dev Deposits are the only user action this registry can stop. It is a circuit breaker
+     *      for one lending market going bad, not a protocol pause: existing positions keep
+     *      purchasing and can always be withdrawn, and every other `(token, routeIndex)` pair is
+     *      untouched. The flag lives here rather than on the handler so governance can stop deposits
+     *      without a handler that must be trusted to unpause itself.
      */
-    function addOrUpdateLendingProtocol(string calldata lowerCaseName, uint256 index) external onlyRole(ADMIN_ROLE) {
-        if (index == 0) revert OperationsAdmin__LendingProtocolIndexCannotBeZero();
-        if (bytes(lowerCaseName).length == 0) revert OperationsAdmin__LendingProtocolNameNotSet();
-        s_protocolIndexes[lowerCaseName] = index;
-        s_protocolNames[index] = lowerCaseName;
-        emit OperationsAdmin__LendingProtocolAdded(index, lowerCaseName);
+    function setDepositsPaused(address token, uint256 routeIndex, bool paused) external onlyOwner {
+        uint32 route = routeIndex.toUint32();
+        TokenRoute storage tokenRoute = s_tokenRoute[token][route];
+        if (tokenRoute.handler == address(0)) {
+            revert OperationsAdmin__HandlerNotAssigned(token, routeIndex);
+        }
+        if (tokenRoute.depositsPaused == paused) {
+            revert OperationsAdmin__DepositsPauseUnchanged(token, routeIndex, paused);
+        }
+        tokenRoute.depositsPaused = paused;
+        emit OperationsAdmin__DepositsPauseSet(token, route, paused);
     }
 
-    /**
-     * @dev Assigns a new address to the swapper role.
-     * @param swapper The swapper address.
-     */
-    function setSwapperRole(address swapper) external onlyRole(ADMIN_ROLE) {
-        _grantRole(SWAPPER_ROLE, swapper);
-        emit OperationsAdmin__SwapperRoleGranted(swapper);
+    /// @inheritdoc IOperationsAdmin
+    function addSwapper(address swapper) external onlyOwner {
+        s_swappers[swapper] = true;
+        emit OperationsAdmin__SwapperAdded(swapper);
     }
 
-    /**
-     * @dev Revokes the swapper role from an address.
-     * @param swapper The address to revoke the swapper role from.
-     */
-    function revokeSwapperRole(address swapper) external onlyRole(ADMIN_ROLE) {
-        _revokeRole(SWAPPER_ROLE, swapper);
-        emit OperationsAdmin__SwapperRoleRevoked(swapper);
-    }
-
-    /**
-     * @dev Assigns a new address to the admin role.
-     * @param admin The admin address.
-     */
-    function setAdminRole(address admin) external onlyOwner {
-        _grantRole(ADMIN_ROLE, admin);
-        emit OperationsAdmin__AdminRoleGranted(admin);
-    }
-
-    /**
-     * @dev Revokes the admin role from an address.
-     * @param admin The address to revoke the admin role from.
-     */
-    function revokeAdminRole(address admin) external onlyOwner {
-        _revokeRole(ADMIN_ROLE, admin);
-        emit OperationsAdmin__AdminRoleRevoked(admin);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                           PRIVATE FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @dev Encodes the token and lending protocol
-     * @param token The address of the token.
-     * @param lendingProtocolIndex The name of the lending protocol (empty string if token will not be lent)
-     */
-    function _encodeKey(address token, uint256 lendingProtocolIndex) private pure returns (bytes32) {
-        return keccak256(abi.encodePacked(token, lendingProtocolIndex));
+    /// @inheritdoc IOperationsAdmin
+    function revokeSwapper(address swapper) external onlyOwner {
+        s_swappers[swapper] = false;
+        emit OperationsAdmin__SwapperRevoked(swapper);
     }
 
     /*//////////////////////////////////////////////////////////////
                                 GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @dev Retrieves the index of the lending protocol
-     * @param lowerCaseName The name of the lending protocol in lower case
-     * @return The index of the lending protocol
-     */
-    function getLendingProtocolIndex(string calldata lowerCaseName) external view returns (uint256) {
-        return s_protocolIndexes[lowerCaseName];
+    /// @inheritdoc IOperationsAdmin
+    function isSwapper(address account) external view returns (bool) {
+        return s_swappers[account];
     }
 
-    /**
-     * @dev Retrieves the index of the lending protocol
-     * @param index The index of the lending protocol in lower case
-     * @return The name of the lending protocol
-     */
-    function getLendingProtocolName(uint256 index) external view returns (string memory) {
-        return s_protocolNames[index];
+    /// @inheritdoc IOperationsAdmin
+    function getRouteClass(uint256 index) external view returns (RouteClass) {
+        return s_routeClass[index.toUint32()];
     }
 
-    /**
-     * @dev Retrieves the handler for a given token.
-     * @param token The address of the token.
-     * @param lendingProtocolIndex The index of the lending protocol (empty string if token will not be lent)
-     * @return The address of the TokenHandler. If address(0) is returned, the tuple token-protocol is not correct
-     */
-    function getTokenHandler(address token, uint256 lendingProtocolIndex) external view returns (address) {
-        bytes32 key = _encodeKey(token, lendingProtocolIndex);
-        return s_tokenHandler[key];
+    /// @inheritdoc IOperationsAdmin
+    function getHandler(address token, uint256 routeIndex) external view returns (address) {
+        return s_tokenRoute[token][routeIndex.toUint32()].handler;
+    }
+
+    /// @inheritdoc IOperationsAdmin
+    function areDepositsPaused(address token, uint256 routeIndex) external view returns (bool) {
+        return s_tokenRoute[token][routeIndex.toUint32()].depositsPaused;
     }
 }

@@ -1,0 +1,405 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.36;
+
+import {HandlerTestHarness} from "../HandlerTestHarness.t.sol";
+import {ITokenHandler} from "../../../../src/interfaces/ITokenHandler.sol";
+import {IPurchaseFees} from "../../../../src/interfaces/IPurchaseFees.sol";
+import {SovrynHandler} from "../../../../src/sovryn-legacy/SovrynHandler.sol";
+import {PurchaseFees} from "../../../../src/PurchaseFees.sol";
+import {MockIToken} from "../../../mocks/MockIToken.sol";
+import {MockStablecoin} from "../../../mocks/MockStablecoin.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ILendingHandler} from "../../../../src/interfaces/ILendingHandler.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import "../../../Constants.sol";
+
+/**
+ * @title SovrynHandlerTest
+ * @notice Unit tests for SovrynHandler using shared test harness
+ */
+contract SovrynHandlerTest is HandlerTestHarness {
+    // Sovryn-specific contracts
+    MockIToken public iToken;
+    SovrynTestHandler public sovrynHandler;
+
+    /*//////////////////////////////////////////////////////////////
+                           HANDLER-SPECIFIC IMPLEMENTATIONS
+    //////////////////////////////////////////////////////////////*/
+
+    function deployHandler() internal override returns (ITokenHandler) {
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
+        });
+
+        sovrynHandler = new SovrynTestHandler(
+            address(dcaManager), address(stablecoin), address(iToken), FEE_COLLECTOR, feeSettings, OWNER
+        );
+
+        return ITokenHandler(address(sovrynHandler));
+    }
+
+    function getRouteIndex() internal pure override returns (uint256) {
+        return SOVRYN_INDEX;
+    }
+
+    function isDexHandler() internal pure override returns (bool) {
+        return false; // Regular Sovryn handler, not DEX variant
+    }
+
+    function isLendingHandler() internal pure override returns (bool) {
+        return true; // Sovryn handlers support lending
+    }
+
+    function getShareToken() internal view override returns (IERC20) {
+        return IERC20(address(iToken));
+    }
+
+    function setupHandlerSpecifics() internal override {
+        // Deploy mock iDOC token for Sovryn lending
+        iToken = new MockIToken(address(stablecoin));
+
+        // Note: MockIToken has time-based price calculation built in
+
+        // Give iToken some underlying tokens to work with
+        stablecoin.mint(address(iToken), 1000000 ether);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           SOVRYN-SPECIFIC TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_sovryn_exchangeRateDecimalsHardcoded() public {
+        assertEq(sovrynHandler.EXCHANGE_RATE_DECIMALS(), 1e18);
+    }
+
+    function test_sovryn_constructor_revertsIfUnderlyingMismatch() public {
+        MockStablecoin other = new MockStablecoin(address(this));
+        MockIToken mismatch = new MockIToken(address(other));
+
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
+        });
+
+        vm.expectRevert(ILendingHandler.LendingHandler__UnderlyingMismatch.selector);
+        new SovrynTestHandler(
+            address(dcaManager), address(stablecoin), address(mismatch), FEE_COLLECTOR, feeSettings, OWNER
+        );
+    }
+
+    function test_sovryn_iTokenMinting() public {
+        uint256 initialUserLendingBalance = sovrynHandler.getUserShares(USER);
+
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        uint256 finalUserLendingBalance = sovrynHandler.getUserShares(USER);
+        assertGt(finalUserLendingBalance, initialUserLendingBalance);
+    }
+
+    function test_sovryn_tokenPriceEffect() public {
+        // Deposit some tokens
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        // Simulate interest accrual by time passage
+        vm.warp(block.timestamp + 365 days); // 1 year for interest accrual
+
+        // Check that accrued interest is calculated correctly
+        vm.prank(address(dcaManager));
+        uint256 accruedInterest = sovrynHandler.getAccruedInterest(USER, DEPOSIT_AMOUNT);
+        assertGt(accruedInterest, 0);
+    }
+
+    function test_sovryn_redemption_adjustsForAvailableBalance() public {
+        // Deposit tokens
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        uint256 userBalanceBeforeWithdraw = stablecoin.balanceOf(USER);
+
+        // Try to withdraw more than available (should be adjusted)
+        vm.prank(address(dcaManager));
+        handler.withdrawToken(USER, DEPOSIT_AMOUNT * 2);
+
+        // Should have withdrawn what was available, not what was requested
+        uint256 userBalanceAfterWithdraw = stablecoin.balanceOf(USER);
+        uint256 actualWithdrawn = userBalanceAfterWithdraw - userBalanceBeforeWithdraw;
+        assertLe(actualWithdrawn, DEPOSIT_AMOUNT);
+    }
+
+    function test_sovryn_interestWithdrawal() public {
+        // Deposit tokens
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        // Simulate interest accrual by time passage
+        vm.warp(block.timestamp + 365 days); // 1 year for interest accrual
+
+        uint256 userBalanceBeforeInterestWithdraw = stablecoin.balanceOf(USER);
+
+        // Withdraw interest (assume half is locked in DCA schedules)
+        vm.prank(address(dcaManager));
+        sovrynHandler.withdrawInterest(USER, DEPOSIT_AMOUNT / 2);
+
+        uint256 userBalanceAfterInterestWithdraw = stablecoin.balanceOf(USER);
+        assertGt(userBalanceAfterInterestWithdraw, userBalanceBeforeInterestWithdraw);
+        assertEq(stablecoin.balanceOf(address(sovrynHandler)), 0);
+    }
+
+    function test_sovryn_mintFailureHandling() public {
+        // Test with insufficient balance (realistic failure case)
+        // Reset user's balance to ensure clean state
+        uint256 currentBalance = stablecoin.balanceOf(USER);
+        if (currentBalance > 0) {
+            vm.prank(USER);
+            stablecoin.transfer(address(0x999), currentBalance);
+        }
+
+        // Give user just enough for fees but not enough for deposit
+        stablecoin.mint(USER, DEPOSIT_AMOUNT / 2); // Half of what we need
+
+        vm.prank(address(dcaManager));
+        vm.expectRevert(); // Should revert due to insufficient balance
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+    }
+
+    function test_sovryn_burnFailureHandling() public {
+        // First deposit successfully
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        // Test withdrawing more than available (realistic edge case)
+        vm.prank(address(dcaManager));
+        handler.withdrawToken(USER, DEPOSIT_AMOUNT * 10); // Try to withdraw 10x more
+
+        // Should work with amount adjustment (not fail)
+        uint256 userBalance = stablecoin.balanceOf(USER);
+        assertGt(userBalance, 0);
+    }
+
+    function test_sovryn_interestWithdrawal_noInterestScenario() public {
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        uint256 userBalanceBefore = stablecoin.balanceOf(USER);
+
+        vm.prank(address(dcaManager));
+        sovrynHandler.withdrawInterest(USER, DEPOSIT_AMOUNT);
+
+        assertEq(stablecoin.balanceOf(USER), userBalanceBefore);
+    }
+
+    /**
+     * @notice Interest withdrawals go through the same redeem path and must not pay zero either.
+     */
+    function test_sovryn_zeroPayoutInterestWithdrawalReverts() public {
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 sharesBefore = sovrynHandler.getUserShares(USER);
+        uint256 userBalanceBefore = stablecoin.balanceOf(USER);
+
+        iToken.setSilentZeroPayout(true);
+
+        // the interest amount is derived from tokenPrice after a year of warp, so the revert
+        // argument is not predictable here; that the guard fires at all is what matters
+        vm.prank(address(dcaManager));
+        vm.expectRevert();
+        sovrynHandler.withdrawInterest(USER, DEPOSIT_AMOUNT / 2);
+
+        assertEq(stablecoin.balanceOf(USER), userBalanceBefore);
+        assertEq(sovrynHandler.getUserShares(USER), sharesBefore);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           SOVRYN EDGE CASES
+    //////////////////////////////////////////////////////////////*/
+
+    function test_sovryn_zeroTokenPrice() public {
+        // Note: MockIToken has built-in price logic that doesn't allow 0
+        // This test verifies the handler can deal with edge cases
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        // Should succeed as MockIToken has reasonable price logic
+        uint256 lendingBalance = sovrynHandler.getUserShares(USER);
+        assertGt(lendingBalance, 0);
+    }
+
+    function test_sovryn_maxTokenPrice() public {
+        // Test with far future time to get high interest rates
+        vm.warp(block.timestamp + 10000 * 365 days); // 10,000 years for extreme interest
+
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        // Should still work but with adjusted amounts
+        uint256 lendingBalance = sovrynHandler.getUserShares(USER);
+        assertGt(lendingBalance, 0);
+    }
+
+    /**
+     * @notice `burn` takes the share count the base booked out, so the two agree to the wei even
+     *         when SIP-0094's exit fee makes the stablecoin that comes back smaller.
+     */
+    function test_sovryn_bookDebitEqualsITokenBurn() public {
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 bookBefore = sovrynHandler.getUserShares(USER);
+        uint256 heldBefore = iToken.balanceOf(address(handler));
+
+        vm.prank(address(dcaManager));
+        handler.withdrawToken(USER, WITHDRAWAL_AMOUNT);
+
+        uint256 bookDebit = bookBefore - sovrynHandler.getUserShares(USER);
+        assertGt(bookDebit, 0);
+        assertEq(bookDebit, heldBefore - iToken.balanceOf(address(handler)));
+    }
+
+    function test_sovryn_assetBalanceCalculation() public {
+        // Test that asset balance is calculated correctly
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        // The mock implementation should handle asset balance correctly
+        uint256 lendingBalance = sovrynHandler.getUserShares(USER);
+        assertGt(lendingBalance, 0);
+
+        // Test redemption doesn't exceed asset balance
+        vm.prank(address(dcaManager));
+        handler.withdrawToken(USER, WITHDRAWAL_AMOUNT);
+
+        // Should succeed without reverting due to asset balance check
+        assertGt(stablecoin.balanceOf(USER), 0);
+    }
+
+    function test_sovryn_batchRetrieveStablecoin() public {
+        // Set up multiple users and deposits
+        address user1 = makeAddr("user1");
+        address user2 = makeAddr("user2");
+        address[] memory users = new address[](2);
+        users[0] = user1;
+        users[1] = user2;
+
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = DEPOSIT_AMOUNT / 2;
+        amounts[1] = DEPOSIT_AMOUNT / 2;
+
+        // Give tokens to users and set up approvals
+        stablecoin.mint(user1, DEPOSIT_AMOUNT);
+        stablecoin.mint(user2, DEPOSIT_AMOUNT);
+
+        vm.prank(user1);
+        stablecoin.approve(address(sovrynHandler), type(uint256).max);
+        vm.prank(user2);
+        stablecoin.approve(address(sovrynHandler), type(uint256).max);
+
+        // Deposit through DCA manager
+        vm.prank(address(dcaManager));
+        handler.depositToken(user1, DEPOSIT_AMOUNT);
+        vm.prank(address(dcaManager));
+        handler.depositToken(user2, DEPOSIT_AMOUNT);
+
+        // Call _batchRetrieveStablecoin through the test handler
+        uint256 totalToRetrieve = amounts[0] + amounts[1];
+
+        uint256 retrieved = sovrynHandler.testBatchRetrieveStablecoin(users, amounts);
+
+        // Verify the batch redemption worked
+        assertGt(retrieved, 0);
+
+        // Check that users' lending balances were adjusted (decreased from their maximum possible)
+        // Note: Due to interest accrual, balances might be higher than original deposit
+        // but should be lower after redemption than before
+        uint256 finalBalance1 = sovrynHandler.getUserShares(user1);
+        uint256 finalBalance2 = sovrynHandler.getUserShares(user2);
+
+        // Both users should still have some balance remaining (since we only redeemed part of it)
+        assertGt(finalBalance1, 0);
+        assertGt(finalBalance2, 0);
+    }
+
+    /**
+     * @notice An excessive batch row consumes only that buyer's remaining share claim.
+     * @dev Receipt shares bound the debit. Funding weights fall to the shares' stablecoin value;
+     *      a lending-protocol asset view does not set the redeem ceiling.
+     */
+    function test_sovryn_batchRetrieveStablecoin_exceedsBalance_consumesAvailableClaim() public {
+        address user1 = makeAddr("user1");
+        address[] memory users = new address[](1);
+        users[0] = user1;
+
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = DEPOSIT_AMOUNT;
+
+        // Give tokens to user and set up approvals
+        stablecoin.mint(user1, DEPOSIT_AMOUNT);
+        vm.prank(user1);
+        stablecoin.approve(address(sovrynHandler), type(uint256).max);
+
+        // Deposit a smaller amount
+        vm.prank(address(dcaManager));
+        handler.depositToken(user1, DEPOSIT_AMOUNT / 10); // Deposit only 1/10th
+
+        uint256 received = sovrynHandler.testBatchRetrieveStablecoin(users, amounts);
+        assertGt(received, 0);
+        assertEq(sovrynHandler.getUserShares(user1), 0);
+    }
+
+    /**
+     * @notice A stale non-zero allowance below the next deposit must not brick deposits (R44, R83).
+     * @dev OpenZeppelin v4 `safeApprove` refused any non-zero -> non-zero change, so a partial leftover
+     *      allowance permanently reverted every later deposit. `forceApprove` zeroes first; reverting the
+     *      restore to a v4-style approve fails here.
+     */
+    function test_sovryn_staleNonZeroAllowanceIsRestorable() public {
+        // Leave a residual allowance that is non-zero but below the next deposit.
+        vm.prank(address(sovrynHandler));
+        stablecoin.approve(address(iToken), DEPOSIT_AMOUNT / 2);
+        assertEq(stablecoin.allowance(address(sovrynHandler), address(iToken)), DEPOSIT_AMOUNT / 2);
+
+        uint256 sharesBefore = sovrynHandler.getUserShares(USER);
+
+        sovrynHandler.restoreLendingApproval();
+        assertEq(
+            stablecoin.allowance(address(sovrynHandler), address(iToken)),
+            type(uint256).max,
+            "the restore refused a non-zero -> non-zero change"
+        );
+
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        assertGt(sovrynHandler.getUserShares(USER), sharesBefore, "deposit did not mint shares");
+    }
+}
+
+/**
+ * @title SovrynTestHandler
+ * @notice Concrete implementation of SovrynHandler for testing
+ * @dev Implements abstract functions to make testing possible
+ */
+contract SovrynTestHandler is SovrynHandler, PurchaseFees {
+    constructor(
+        address dcaManager,
+        address stablecoin,
+        address iToken,
+        address feeCollector,
+        FeeSettings memory feeSettings,
+        address initialOwner
+    ) SovrynHandler(dcaManager, stablecoin, iToken) PurchaseFees(feeCollector, feeSettings, initialOwner) {}
+
+    /**
+     * @notice Expose _batchRetrieveStablecoin for testing
+     * @dev This allows us to test the internal batch redemption logic
+     */
+    function testBatchRetrieveStablecoin(address[] calldata users, uint256[] calldata purchaseAmounts)
+        external
+        returns (uint256)
+    {
+        return _batchRetrieveStablecoin(users, purchaseAmounts);
+    }
+}

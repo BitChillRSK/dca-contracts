@@ -1,0 +1,143 @@
+⇾ Compiling targets with crytic-compile
+⇾ Running command:
+/opt/homebrew/bin/crytic-compile . --export-format solc --export-dir fizz_data/crytic-export --foundry-compile-all
+⇾ Finished compiling targets in 45s
+⇾ artifacts: Medusa is running against a new set of build artifacts
+⇾ Using cached Slither results found at fizz_data/slither_results.json
+⇾ Running with a timeout of 300 seconds
+⇾ Setting up test chain
+⇾ Finished setting up test chain
+⇾ Creating corpus...
+⇾ Initializing corpus...
+⇾ Fuzzing with 10 workers
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_secondary(uint8,uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_setSchedulePaused(address,uint64,bool)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_updatePurchaseAmount_clamped(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_updatePurchasePeriod_clamped(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_withdrawAllAccumulatedInterest(address[],uint256[])
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_withdrawAllAccumulatedRbtc_asCollector(uint256,uint256)
+⇾ fuzz: elapsed:       0s, calls:          0 (     0/sec), seq/s:      0, branches:   1283, corpus:     0, failures: 0/0, gas/s:            0
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_batchBuyRbtc_zeroMinOut(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_createDcaSchedule(address,uint256,uint256,uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_topUpFromInterest(address,uint64,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_withdrawTokenAndInterest(address,uint64,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_withdrawToken_clamped(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.env_bumpLayerBankIndex(bool,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.env_skipBlocks(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.operationsAdmin_secondary(uint8,uint256,bool)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_depositToken_dust(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_withdrawAllAccumulatedRbtc(address[],uint256[])
+⇾ [NOT STARTED] Assertion Test: FuzzTester.env_donateETH(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_activateProtectedPurchaseWindow_clamped(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_batchBuyRbtcAcrossHandlers((uint64[],address,uint256,uint256)[])
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_batchBuyRbtcAcrossHandlers_clamped(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.env_setDexPrice(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_batchBuyRbtc_clamped(uint256,uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_deleteDcaSchedule_clamped(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_withdrawAllAccumulatedRbtc_clamped(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_withdrawToken(address,uint64,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.env_donateStablecoin(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.env_setOracleValid(bool,bool)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.env_skipDays(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.layerBankHandlerDex_secondary(uint8,uint256,uint256,uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_deleteDcaSchedule(address,uint64,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_batchBuyRbtc((uint64[],address,uint256,uint256))
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_updatePurchasePeriod(address,uint64,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_withdrawTokenAndInterest_clamped(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.env_moveSovrynPrice(uint256,bool)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.env_setOraclePrice(bool,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.setCurrentActor(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_activateProtectedPurchaseWindow()
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_setSchedulePaused_clamped(uint256,bool)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_withdrawToken_full(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.env_setSovrynExitFee(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_batchBuyRbtc_allRows(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_createDcaSchedule_clamped(uint256,uint256,uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_topUpFromInterest_clamped(uint256,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_updatePurchaseAmount(address,uint64,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_withdrawAllAccumulatedInterest_clamped(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.setCurrentSwapper(uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_depositToken(address,uint64,uint256)
+⇾ [NOT STARTED] Assertion Test: FuzzTester.dcaManager_depositToken_clamped(uint256,uint256)
+⇾ fuzz: elapsed:       3s, calls:       5216 (  1730/sec), seq/s:     44, branches:   5536, corpus:   137, failures: 0/134, gas/s:    137824850
+⇾ fuzz: elapsed:       6s, calls:      10624 (  1802/sec), seq/s:     29, branches:   6224, corpus:   224, failures: 0/224, gas/s:    157458130
+⇾ fuzz: elapsed:       9s, calls:      24830 (  4707/sec), seq/s:     53, branches:   6394, corpus:   261, failures: 0/385, gas/s:    427354911
+⇾ fuzz: elapsed:      12s, calls:      40842 (  5334/sec), seq/s:     53, branches:   6514, corpus:   270, failures: 0/547, gas/s:    456296312
+⇾ fuzz: elapsed:      15s, calls:      61291 (  6791/sec), seq/s:     67, branches:   6532, corpus:   275, failures: 0/749, gas/s:    595013577
+⇾ fuzz: elapsed:      18s, calls:      83028 (  7213/sec), seq/s:     72, branches:   6533, corpus:   276, failures: 0/967, gas/s:    624240801
+⇾ fuzz: elapsed:      21s, calls:      96174 (  4375/sec), seq/s:     43, branches:   6537, corpus:   278, failures: 0/1098, gas/s:    380920346
+⇾ fuzz: elapsed:      24s, calls:     119900 (  7906/sec), seq/s:     79, branches:   6537, corpus:   278, failures: 0/1338, gas/s:    678670424
+⇾ fuzz: elapsed:      27s, calls:     138288 (  6002/sec), seq/s:     59, branches:   6537, corpus:   278, failures: 0/1521, gas/s:    533415210
+⇾ fuzz: elapsed:      30s, calls:     153909 (  5166/sec), seq/s:     50, branches:   6537, corpus:   278, failures: 0/1674, gas/s:    457939928
+⇾ fuzz: elapsed:      33s, calls:     177138 (  7709/sec), seq/s:     77, branches:   6539, corpus:   280, failures: 0/1907, gas/s:    655653763
+⇾ fuzz: elapsed:      36s, calls:     193807 (  5540/sec), seq/s:     56, branches:   6541, corpus:   281, failures: 0/2077, gas/s:    479078192
+⇾ fuzz: elapsed:      39s, calls:     211492 (  5891/sec), seq/s:     57, branches:   6545, corpus:   282, failures: 0/2251, gas/s:    528450184
+⇾ fuzz: elapsed:      42s, calls:     233231 (  7235/sec), seq/s:     72, branches:   6547, corpus:   283, failures: 0/2468, gas/s:    637971617
+⇾ fuzz: elapsed:      45s, calls:     248023 (  4908/sec), seq/s:     49, branches:   6548, corpus:   284, failures: 0/2618, gas/s:    432655496
+⇾ fuzz: elapsed:      48s, calls:     267641 (  6515/sec), seq/s:     64, branches:   6548, corpus:   284, failures: 0/2812, gas/s:    602623568
+⇾ fuzz: elapsed:      51s, calls:     287487 (  6590/sec), seq/s:     66, branches:   6549, corpus:   285, failures: 0/3011, gas/s:    599662755
+⇾ fuzz: elapsed:      54s, calls:     300635 (  4346/sec), seq/s:     43, branches:   6549, corpus:   285, failures: 0/3144, gas/s:    405491473
+⇾ fuzz: elapsed:      57s, calls:     322877 (  7387/sec), seq/s:     73, branches:   6550, corpus:   286, failures: 0/3365, gas/s:    662456921
+⇾ fuzz: elapsed:    1m00s, calls:     342295 (  6469/sec), seq/s:     65, branches:   6550, corpus:   286, failures: 0/3561, gas/s:    602857386
+⇾ fuzz: elapsed:    1m03s, calls:     358506 (  5398/sec), seq/s:     53, branches:   6550, corpus:   286, failures: 0/3721, gas/s:    502236861
+⇾ fuzz: elapsed:    1m06s, calls:     380052 (  7146/sec), seq/s:     71, branches:   6550, corpus:   286, failures: 0/3937, gas/s:    651191243
+⇾ fuzz: elapsed:    1m09s, calls:     397506 (  5799/sec), seq/s:     58, branches:   6550, corpus:   286, failures: 0/4112, gas/s:    547570591
+⇾ fuzz: elapsed:    1m12s, calls:     413638 (  5372/sec), seq/s:     53, branches:   6550, corpus:   286, failures: 0/4272, gas/s:    513238797
+⇾ fuzz: elapsed:    1m15s, calls:     434069 (  6809/sec), seq/s:     68, branches:   6550, corpus:   286, failures: 0/4477, gas/s:    647743187
+⇾ fuzz: elapsed:    1m18s, calls:     449962 (  5232/sec), seq/s:     53, branches:   6550, corpus:   286, failures: 0/4638, gas/s:    493019766
+⇾ fuzz: elapsed:    1m21s, calls:     464970 (  5000/sec), seq/s:     48, branches:   6550, corpus:   286, failures: 0/4785, gas/s:    466914560
+⇾ fuzz: elapsed:    1m24s, calls:     483315 (  6087/sec), seq/s:     61, branches:   6552, corpus:   287, failures: 0/4971, gas/s:    575481784
+⇾ fuzz: elapsed:    1m27s, calls:     500455 (  5683/sec), seq/s:     55, branches:   6552, corpus:   287, failures: 0/5139, gas/s:    511998841
+⇾ Transaction test limit reached, halting now...
+⇾ Fuzzer stopped, test results follow below ...
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_activateProtectedPurchaseWindow()[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_activateProtectedPurchaseWindow_clamped(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_batchBuyRbtc((uint64[],address,uint256,uint256))[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_batchBuyRbtc_allRows(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_batchBuyRbtc_clamped(uint256,uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_batchBuyRbtc_zeroMinOut(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_batchBuyRbtcAcrossHandlers((uint64[],address,uint256,uint256)[])[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_batchBuyRbtcAcrossHandlers_clamped(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_createDcaSchedule(address,uint256,uint256,uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_createDcaSchedule_clamped(uint256,uint256,uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_deleteDcaSchedule(address,uint64,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_deleteDcaSchedule_clamped(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_depositToken(address,uint64,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_depositToken_clamped(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_depositToken_dust(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_secondary(uint8,uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_setSchedulePaused(address,uint64,bool)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_setSchedulePaused_clamped(uint256,bool)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_topUpFromInterest(address,uint64,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_topUpFromInterest_clamped(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_updatePurchaseAmount(address,uint64,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_updatePurchaseAmount_clamped(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_updatePurchasePeriod(address,uint64,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_updatePurchasePeriod_clamped(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_withdrawAllAccumulatedInterest(address[],uint256[])[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_withdrawAllAccumulatedInterest_clamped(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_withdrawAllAccumulatedRbtc(address[],uint256[])[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_withdrawAllAccumulatedRbtc_asCollector(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_withdrawAllAccumulatedRbtc_clamped(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_withdrawToken(address,uint64,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_withdrawToken_clamped(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_withdrawToken_full(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_withdrawTokenAndInterest(address,uint64,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.dcaManager_withdrawTokenAndInterest_clamped(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.env_bumpLayerBankIndex(bool,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.env_donateETH(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.env_donateStablecoin(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.env_moveSovrynPrice(uint256,bool)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.env_setDexPrice(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.env_setOraclePrice(bool,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.env_setOracleValid(bool,bool)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.env_setSovrynExitFee(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.env_skipBlocks(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.env_skipDays(uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.layerBankHandlerDex_secondary(uint8,uint256,uint256,uint256,uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.operationsAdmin_secondary(uint8,uint256,bool)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.setCurrentActor(uint256)[0m
+⇾ [1m[32m[PASSED] [0m[0m[1mAssertion Test: FuzzTester.setCurrentSwapper(uint256)[0m
+⇾ Test summary: 48 test(s) passed, 0 test(s) failed
+⇾ html report(s) saved to: fizz_data/corpus_medusa/coverage/coverage_report.html
+⇾ lcov report(s) saved to: fizz_data/corpus_medusa/coverage/lcov.info
