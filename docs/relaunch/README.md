@@ -72,6 +72,8 @@ decided against). No further re-judgement PRs.
 
 ## Status
 
+- Current follow-up: [#193](https://github.com/BitChillRSK/dca-contracts/pull/193), valid whole-day invariant actions, stacked on #192. Next: the user-approved ancestry/process PR; no new R-item is assigned. Merges require separate approval.
+
 - Merged: [R23-toolchain-baseline.md](./R23-toolchain-baseline.md) (PR 1, GitHub [#42](https://github.com/BitChillRSK/dca-contracts/pull/42)). Rootstock testnet accepted solc 0.8.36 / `cancun`.
 - Assigned: [R2-utc-purchase-period.md](./R2-utc-purchase-period.md) (PR 3, GitHub [#44](https://github.com/BitChillRSK/dca-contracts/pull/44)). No product gates. Does not wait on PR 2.
 - Assigned: [R7-dca-manager-small-fixes.md](./R7-dca-manager-small-fixes.md) (PR 4, GitHub [#45](https://github.com/BitChillRSK/dca-contracts/pull/45)). Bundles R7 / R11 / R14. No product gates. Stacked on [#44](https://github.com/BitChillRSK/dca-contracts/pull/44).
