@@ -20,6 +20,18 @@ The human prompt is one line: `Start with R2` or `Start with PR 3`. Do not expec
 3. Ask the human **only** the open product gates listed for that PR in `IMPLEMENTATION_ORDER.md` (and the spec’s **Open product decisions** section). If that list is empty, do not ask; implement. Do not ask fee / packing / pause / optional items unless that PR’s list names them.
 4. `git fetch`. Branch from `main` if no relaunch PR is open; otherwise from the latest open relaunch PR’s head (stack). Never implement on `main`. Branch **before** the first edit.
 
+## Stack integrity and merge approval
+
+Before creating, updating, or merging stacked PRs, follow [the stack workflow](./docs/STACK_WORKFLOW.md).
+
+- After `git fetch origin`, verify `git merge-base --is-ancestor origin/<parent-branch> HEAD` before creating a child PR.
+- After changing a parent, propagate its current head through every dependent branch, from bottom to top. Verify ancestry again.
+- After publishing, run `python3 tools/check_stack_ancestry.py --pr <number>` for each affected PR. Record any existing gaps explicitly.
+- Before merging a stack, run `python3 tools/check_stack_ancestry.py` and reconcile every reported gap against the reviewed final tree.
+- Present the merge sequence, exact heads, remaining differences, and checks before requesting explicit merge approval.
+- Treat readiness questions as requests for assessment. Authorization to publish a PR does not authorize its merge.
+- Preserve the agreed audit commit and tag. Obtain approval for differences from the audit snapshot before integration.
+
 ## Layout
 
 Do not Grep/`Glob` `out/`, `cache/`, or `lib/` (see `.cursorignore`). Open a `lib/` path only when a `src/` import points there.
