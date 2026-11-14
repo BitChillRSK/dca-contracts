@@ -1,12 +1,9 @@
 #!/bin/bash
-# setup.sh - Initializes the project and applies necessary modifications for Rootstock compatibility
+# setup.sh - Initializes the project dependencies and builds it.
 
 echo "🔄 Initializing Git submodules..."
 git submodule init
 git submodule update
-
-echo "🔧 Applying Solidity version compatibility fixes..."
-make patch-deps
 
 echo "🏗️ Building the project..."
 forge build

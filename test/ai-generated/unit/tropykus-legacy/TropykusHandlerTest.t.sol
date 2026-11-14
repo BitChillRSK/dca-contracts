@@ -1,0 +1,416 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.36;
+
+import {HandlerTestHarness} from "../HandlerTestHarness.t.sol";
+import {ITokenHandler} from "../../../../src/interfaces/ITokenHandler.sol";
+import {IPurchaseFees} from "../../../../src/interfaces/IPurchaseFees.sol";
+import {IPurchaseUniswap} from "../../../../src/interfaces/IPurchaseUniswap.sol";
+import {TropykusHandler} from "../../../../src/tropykus-legacy/TropykusHandler.sol";
+import {PurchaseFees} from "../../../../src/PurchaseFees.sol";
+import {MockKdocToken} from "../../../mocks/MockKdocToken.sol";
+import {MockStablecoin} from "../../../mocks/MockStablecoin.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ILendingHandler} from "../../../../src/interfaces/ILendingHandler.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import "../../../Constants.sol";
+
+/**
+ * @title TropykusHandlerTest
+ * @notice Unit tests for TropykusHandler using shared test harness
+ */
+contract TropykusHandlerTest is HandlerTestHarness {
+    // Tropykus-specific contracts
+    MockKdocToken public kToken;
+    TropykusTestHandler public tropykusHandler;
+
+    /*//////////////////////////////////////////////////////////////
+                           HANDLER-SPECIFIC IMPLEMENTATIONS
+    //////////////////////////////////////////////////////////////*/
+
+    function deployHandler() internal override returns (ITokenHandler) {
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
+        });
+
+        tropykusHandler = new TropykusTestHandler(
+            address(dcaManager), address(stablecoin), address(kToken), FEE_COLLECTOR, feeSettings, OWNER
+        );
+
+        return ITokenHandler(address(tropykusHandler));
+    }
+
+    function getRouteIndex() internal pure override returns (uint256) {
+        return TROPYKUS_INDEX;
+    }
+
+    function isDexHandler() internal pure override returns (bool) {
+        return false; // Regular Tropykus handler, not DEX variant
+    }
+
+    function isLendingHandler() internal pure override returns (bool) {
+        return true; // Tropykus handlers support lending
+    }
+
+    function getShareToken() internal view override returns (IERC20) {
+        return IERC20(address(kToken));
+    }
+
+    function setupHandlerSpecifics() internal override {
+        // Deploy mock kToken for Tropykus lending
+        kToken = new MockKdocToken(address(stablecoin));
+
+        // Note: MockKdocToken has built-in time-based exchange rate calculation
+
+        // Give kToken some underlying tokens to work with
+        stablecoin.mint(address(kToken), 1000000 ether);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           TROPYKUS-SPECIFIC TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_tropykus_exchangeRateDecimalsHardcoded() public {
+        assertEq(tropykusHandler.EXCHANGE_RATE_DECIMALS(), 1e18);
+    }
+
+    function test_tropykus_constructor_revertsIfUnderlyingMismatch() public {
+        MockStablecoin other = new MockStablecoin(address(this));
+        MockKdocToken mismatch = new MockKdocToken(address(other));
+
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
+        });
+
+        vm.expectRevert(ILendingHandler.LendingHandler__UnderlyingMismatch.selector);
+        new TropykusTestHandler(
+            address(dcaManager), address(stablecoin), address(mismatch), FEE_COLLECTOR, feeSettings, OWNER
+        );
+    }
+
+    function test_tropykus_kTokenMinting() public {
+        uint256 initialKTokenBalance = kToken.balanceOf(address(handler));
+
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        uint256 finalKTokenBalance = kToken.balanceOf(address(handler));
+        assertGt(finalKTokenBalance, initialKTokenBalance);
+    }
+
+    function test_tropykus_exchangeRateEffect() public {
+        // Deposit some tokens
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        // Simulate interest accrual by advancing time to increase exchange rate
+        vm.warp(block.timestamp + 365 days); // 1 year for 5% interest accrual
+
+        // IMPORTANT: Call exchangeRateCurrent() first to accrue interest after time warp
+        // This updates the stored exchange rate based on the new timestamp
+        kToken.exchangeRateCurrent();
+
+        // Check that accrued interest is calculated correctly
+        vm.prank(address(dcaManager));
+        uint256 accruedInterest = tropykusHandler.getAccruedInterest(USER, DEPOSIT_AMOUNT);
+        assertGt(accruedInterest, 0);
+    }
+
+    /**
+     * @notice The spendable figure and the write paths call `exchangeRateCurrent`, which mutates the
+     *         stored rate; the quote stays on `exchangeRateStored` and pokes nothing.
+     * @dev Tropykus is the only adapter where the two rates differ, and the gap is not dust: with no
+     *      prior poke the stored rate is a year behind, so the quote reports zero while the interest
+     *      is real. That is the whole reason the two readers exist. A top-up must bound on the
+     *      spendable figure or a user waits on someone else's transaction to reach their own yield;
+     *      the quote must stay a `view` or every client reading a balance routes it through a write
+     *      binding. The invariant that makes the pair safe is the direction of the gap: quote first,
+     *      spendable second, never the other way round.
+     */
+    function test_tropykus_quoteIsStaleAndSpendableFigureAccrues() public {
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        uint256 storedAtDeposit = kToken.exchangeRateStored();
+        vm.warp(block.timestamp + 365 days);
+
+        // The quote reads the stale stored rate and leaves it stale: a year of interest reads as zero.
+        vm.prank(address(dcaManager));
+        uint256 quoted = tropykusHandler.quoteAccruedInterest(USER, DEPOSIT_AMOUNT);
+        assertEq(quoted, 0, "the quote poked the market instead of reading it");
+        assertEq(kToken.exchangeRateStored(), storedAtDeposit, "the quote moved the stored rate");
+
+        // The spendable figure accrues the year itself rather than reporting that stale zero.
+        vm.expectCall(address(kToken), abi.encodeWithSelector(kToken.exchangeRateCurrent.selector));
+        vm.prank(address(dcaManager));
+        uint256 spendable = tropykusHandler.getAccruedInterest(USER, DEPOSIT_AMOUNT);
+        assertGt(spendable, 0, "the spendable figure reported a stale zero");
+        assertGe(spendable, quoted, "the quote ran ahead of what a top-up would accept");
+        assertGt(kToken.exchangeRateStored(), storedAtDeposit);
+
+        // Once the market is poked the two agree, so the quote is only ever behind, never wrong.
+        vm.prank(address(dcaManager));
+        assertEq(
+            tropykusHandler.quoteAccruedInterest(USER, DEPOSIT_AMOUNT),
+            spendable,
+            "the two readers disagree on an already-accrued market"
+        );
+
+        uint256 userBefore = stablecoin.balanceOf(USER);
+        vm.expectCall(address(kToken), abi.encodeWithSelector(kToken.exchangeRateCurrent.selector));
+        vm.prank(address(dcaManager));
+        tropykusHandler.withdrawInterest(USER, DEPOSIT_AMOUNT);
+        assertGt(stablecoin.balanceOf(USER), userBefore);
+    }
+
+    function test_tropykus_redemption_adjustsForAvailableBalance() public {
+        // Deposit tokens
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        uint256 userBalanceBeforeWithdraw = stablecoin.balanceOf(USER);
+
+        // Try to withdraw more than available (should be adjusted)
+        vm.prank(address(dcaManager));
+        handler.withdrawToken(USER, DEPOSIT_AMOUNT * 2);
+
+        // Should have withdrawn what was available, not what was requested
+        uint256 userBalanceAfterWithdraw = stablecoin.balanceOf(USER);
+        uint256 actualWithdrawn = userBalanceAfterWithdraw - userBalanceBeforeWithdraw;
+        assertLe(actualWithdrawn, DEPOSIT_AMOUNT);
+    }
+
+    function test_tropykus_interestWithdrawal() public {
+        // Deposit tokens
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        // Simulate interest accrual by advancing time
+        vm.warp(block.timestamp + 365 days); // 1 year for interest accrual
+
+        uint256 userBalanceBeforeInterestWithdraw = stablecoin.balanceOf(USER);
+
+        // Withdraw interest (assume half is locked in DCA schedules)
+        vm.prank(address(dcaManager));
+        tropykusHandler.withdrawInterest(USER, DEPOSIT_AMOUNT / 2);
+
+        uint256 userBalanceAfterInterestWithdraw = stablecoin.balanceOf(USER);
+        assertGe(userBalanceAfterInterestWithdraw, userBalanceBeforeInterestWithdraw);
+    }
+
+    function test_tropykus_mintFailureHandling() public {
+        // Hop-1 insufficient balance (same as the Sovryn/LayerBank twin). The zero-mint guard is
+        // `test_tropykus_zeroMintReverts`.
+        uint256 currentBalance = stablecoin.balanceOf(USER);
+        if (currentBalance > 0) {
+            vm.prank(USER);
+            stablecoin.transfer(address(0x999), currentBalance);
+        }
+
+        stablecoin.mint(USER, DEPOSIT_AMOUNT / 2);
+
+        vm.prank(address(dcaManager));
+        vm.expectRevert();
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+    }
+
+    function test_tropykus_zeroMintReverts() public {
+        kToken.setForceZeroMint(true);
+
+        vm.prank(address(dcaManager));
+        vm.expectRevert(ILendingHandler.LendingHandler__LendingProtocolDepositFailed.selector);
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        assertEq(tropykusHandler.getUserShares(USER), 0);
+        assertEq(kToken.balanceOf(address(handler)), 0);
+    }
+
+    function test_tropykus_redeemFailureHandling() public {
+        // First deposit successfully
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        // Test withdrawing more than available (realistic edge case)
+        vm.prank(address(dcaManager));
+        handler.withdrawToken(USER, DEPOSIT_AMOUNT * 10); // Try to withdraw 10x more
+
+        // Should work with amount adjustment (not fail)
+        uint256 userBalance = stablecoin.balanceOf(USER);
+        assertGt(userBalance, 0);
+    }
+
+    /**
+     * @notice R1 / R20. A Compound-style market can return the success code and still pay nothing. The kToken
+     * is burnt either way, and `DcaManager` has already debited the schedule by then, so accepting that as a
+     * successful withdrawal would hand the user a zero transfer and destroy their principal. The measured
+     * delta, not the return code, decides whether the redemption happened.
+     */
+    function test_tropykus_zeroPayoutRedeemReverts() public {
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        uint256 kTokenBalanceBefore = tropykusHandler.getUserShares(USER);
+        uint256 userBalanceBefore = stablecoin.balanceOf(USER);
+
+        kToken.setSilentZeroPayout(true);
+        uint256 sharesToRedeem =
+            Math.mulDiv(WITHDRAWAL_AMOUNT, EXCHANGE_RATE_DECIMALS, kToken.exchangeRateCurrent(), Math.Rounding.Ceil);
+
+        vm.prank(address(dcaManager));
+        vm.expectRevert(
+            abi.encodeWithSelector(ILendingHandler.LendingHandler__ZeroStablecoinReceived.selector, sharesToRedeem)
+        );
+        handler.withdrawToken(USER, WITHDRAWAL_AMOUNT);
+
+        // the revert must leave both the user's stablecoin and their lending position untouched
+        assertEq(stablecoin.balanceOf(USER), userBalanceBefore);
+        assertEq(tropykusHandler.getUserShares(USER), kTokenBalanceBefore);
+    }
+
+    /**
+     * @notice Interest withdrawals go through the same redeem path and must not pay zero either.
+     */
+    function test_tropykus_zeroPayoutInterestWithdrawalReverts() public {
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 kTokenBalanceBefore = tropykusHandler.getUserShares(USER);
+        uint256 userBalanceBefore = stablecoin.balanceOf(USER);
+
+        kToken.setSilentZeroPayout(true);
+
+        // The share debit depends on the accrued amount and a live rate call, so this test only needs
+        // to prove that the shared zero-cash guard fires and rolls the redemption back.
+        vm.prank(address(dcaManager));
+        vm.expectRevert();
+        tropykusHandler.withdrawInterest(USER, DEPOSIT_AMOUNT / 2);
+
+        assertEq(stablecoin.balanceOf(USER), userBalanceBefore);
+        assertEq(tropykusHandler.getUserShares(USER), kTokenBalanceBefore);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           TROPYKUS EDGE CASES
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice `redeem` burns exactly the share count the base booked out, so the two agree to the wei.
+     * @dev This is what share-sizing buys over `redeemUnderlying`, where Tropykus would derive the burn
+     *      from its own rate and the book could come out below it.
+     */
+    function test_tropykus_bookDebitEqualsKtokenBurn() public {
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 bookBefore = tropykusHandler.getUserShares(USER);
+        uint256 heldBefore = kToken.balanceOf(address(handler));
+
+        vm.prank(address(dcaManager));
+        handler.withdrawToken(USER, WITHDRAWAL_AMOUNT);
+
+        uint256 bookDebit = bookBefore - tropykusHandler.getUserShares(USER);
+        assertGt(bookDebit, 0);
+        assertEq(bookDebit, heldBefore - kToken.balanceOf(address(handler)));
+    }
+
+    function test_tropykus_zeroTimeExchangeRate() public {
+        // Test at deployment time when exchange rate is at starting value
+        uint256 exchangeRate = kToken.exchangeRateCurrent();
+        assertGt(exchangeRate, 0); // Should never be zero
+
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        // Should work with starting exchange rate
+        uint256 lendingBalance = tropykusHandler.getUserShares(USER);
+        assertGt(lendingBalance, 0);
+    }
+
+    function test_tropykus_futureExchangeRate() public {
+        // Test with future time when exchange rate is higher
+        vm.warp(block.timestamp + 365 days * 10); // 10 years in the future
+
+        uint256 exchangeRate = kToken.exchangeRateCurrent();
+        assertGt(exchangeRate, 0.02e18); // Should be higher than starting rate
+
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        // Should still work but with adjusted amounts
+        uint256 lendingBalance = tropykusHandler.getUserShares(USER);
+        assertGt(lendingBalance, 0);
+    }
+
+    function test_tropykus_batchRetrieveStablecoin_exceedsBalance_consumesAvailableClaim() public {
+        address user1 = makeAddr("user1");
+        address[] memory users = new address[](1);
+        users[0] = user1;
+
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = DEPOSIT_AMOUNT;
+
+        stablecoin.mint(user1, DEPOSIT_AMOUNT);
+        vm.prank(user1);
+        stablecoin.approve(address(tropykusHandler), type(uint256).max);
+
+        vm.prank(address(dcaManager));
+        handler.depositToken(user1, DEPOSIT_AMOUNT / 10);
+
+        uint256 received = tropykusHandler.testBatchRetrieveStablecoin(users, amounts);
+        assertGt(received, 0);
+        assertEq(tropykusHandler.getUserShares(user1), 0);
+    }
+
+    function test_tropykus_batchRetrieveStablecoin_zeroPayout_reverts() public {
+        address user1 = makeAddr("user1");
+        address[] memory users = new address[](1);
+        users[0] = user1;
+
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = DEPOSIT_AMOUNT / 2;
+
+        stablecoin.mint(user1, DEPOSIT_AMOUNT);
+        vm.prank(user1);
+        stablecoin.approve(address(tropykusHandler), type(uint256).max);
+
+        vm.prank(address(dcaManager));
+        handler.depositToken(user1, DEPOSIT_AMOUNT);
+
+        uint256 kTokenBalanceBefore = tropykusHandler.getUserShares(user1);
+
+        kToken.setSilentZeroPayout(true);
+        uint256 sharesToRedeem =
+            Math.mulDiv(amounts[0], EXCHANGE_RATE_DECIMALS, kToken.exchangeRateCurrent(), Math.Rounding.Ceil);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ILendingHandler.LendingHandler__ZeroStablecoinReceived.selector, sharesToRedeem)
+        );
+        tropykusHandler.testBatchRetrieveStablecoin(users, amounts);
+
+        assertEq(tropykusHandler.getUserShares(user1), kTokenBalanceBefore);
+    }
+}
+
+/**
+ * @title TropykusTestHandler
+ * @notice Concrete implementation of TropykusHandler for testing
+ * @dev Implements abstract functions to make testing possible
+ */
+contract TropykusTestHandler is TropykusHandler, PurchaseFees {
+    constructor(
+        address dcaManager,
+        address stablecoin,
+        address kToken,
+        address feeCollector,
+        FeeSettings memory feeSettings,
+        address initialOwner
+    ) TropykusHandler(dcaManager, stablecoin, kToken) PurchaseFees(feeCollector, feeSettings, initialOwner) {}
+
+    function testBatchRetrieveStablecoin(address[] calldata users, uint256[] calldata purchaseAmounts)
+        external
+        returns (uint256)
+    {
+        return _batchRetrieveStablecoin(users, purchaseAmounts);
+    }
+}

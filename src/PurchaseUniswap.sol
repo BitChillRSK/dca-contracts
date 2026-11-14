@@ -1,58 +1,364 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
-import {FeeHandler} from "./FeeHandler.sol";
 import {PurchaseRbtc} from "./PurchaseRbtc.sol";
 import {IWRBTC} from "./interfaces/IWRBTC.sol";
-import {TransferHelper} from "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
-import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces/ISwapRouter02.sol";
-import {IV3SwapRouter} from "@uniswap/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol";
+import {IUniswapV3SwapRouter} from "./interfaces/IUniswapV3SwapRouter.sol";
 import {ICoinPairPrice} from "./interfaces/ICoinPairPrice.sol";
 import {IPurchaseUniswap} from "./interfaces/IPurchaseUniswap.sol";
+import {IDcaManager} from "./interfaces/IDcaManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 /**
  * @title PurchaseUniswap
- * @notice This contract handles swaps of stablecoin for rBTC using Uniswap V3
+ * @author BitChill team: Antonio Rodríguez-Ynyesto
+ * @notice Uniswap V3 purchase route: swap stablecoin for WRBTC, unwrap on withdraw.
  */
-abstract contract PurchaseUniswap is
-    FeeHandler,
-    PurchaseRbtc,
-    IPurchaseUniswap
-{
+abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
+    using SafeCast for uint256;
     using SafeERC20 for IERC20;
 
-    //////////////////////
-    // State variables ///
-    //////////////////////
-    IERC20 public immutable i_purchasingToken;
-    IWRBTC public immutable i_wrBtcToken;
-    ISwapRouter02 public immutable i_swapRouter02;
-    ICoinPairPrice public s_mocOracle;
-    uint256 constant HUNDRED_PERCENT = 1 ether;
-    uint256 internal s_amountOutMinimumPercent;
-    uint256 internal s_amountOutMinimumSafetyCheck;
-    bytes internal s_swapPath;
+    /*//////////////////////////////////////////////////////////////
+                            STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
+
+    uint256 internal constant HUNDRED_PERCENT = 1 ether;
+    /// @notice decimals of the MoC BTC/USD price. Hardcoded because the oracle exposes no `decimals()`.
+    uint256 internal constant ORACLE_DECIMALS = 18;
+    /// @notice Wrapped rBTC token this route swaps into and unwraps on withdraw.
+    IWRBTC public immutable i_wrbtc;
+    /// @notice Uniswap V3 SwapRouter02 used to buy WRBTC.
+    IUniswapV3SwapRouter public immutable i_swapRouter;
+    /**
+     * @notice `10 ** (ORACLE_DECIMALS - stablecoin decimals)`, which lifts a stablecoin amount into the oracle's USD units
+     * @dev Fixed at deploy because the handler's stablecoin is immutable, so a 6-decimal stablecoin
+     *      and an 18-decimal one both reach the oracle's units. Above 18 the constructor reverts.
+     */
+    uint256 internal immutable i_stablecoinToUsdScale;
+    /**
+     * @notice MoC BTC/USD oracle used for the swap-time floor.
+     * @dev Packed with the live floor: address (20) + `uint64` percent (8) share one word. The safety
+     *      check occupies the next word alone. Purchase reads the packed word once; rare setters may
+     *      touch both words.
+     */
+    ICoinPairPrice internal s_mocOracle;
+    /**
+     * @notice The swap-time oracle floor: the fraction of oracle-implied rBTC the router must pay.
+     * @dev Deliberately loose. It is the bound that holds when the caller's `minRbtcOut` is absent,
+     * stale, or hostile, not the operational tightness of a healthy batch — the swapper derives that
+     * from a live quote per batch and can only tighten from here. Narrowed to `uint64` because both
+     * setters already cap at `HUNDRED_PERCENT` (1e18), which fits.
+     */
+    uint64 internal s_amountOutMinimumPercent;
+    /**
+     * @notice The lowest swap-time floor the owner may configure. Bounds the setter; never used at swap time.
+     * @dev Separate from the live floor so governance's emergency range need not weaken normal execution.
+     *      Both are 1e18-scaled; the live floor packs with the oracle, this value starts the next word.
+     */
+    uint64 internal s_amountOutMinimumSafetyCheck;
+    bytes private s_swapPath;
+    /// @dev Active path's intermediate tokens, retained so purchases can detect router-stranded balances.
+    address[] private s_swapIntermediateTokens;
+    /// @dev Exact encoded paths this handler may activate. Purchases read `s_swapPath` only.
+    mapping(bytes32 pathHash => bool allowed) private s_purchasePathAllowed;
+
+    /*//////////////////////////////////////////////////////////////
+                               CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
 
     /**
-     * @param stableTokenAddress the address of the stablecoin token on the blockchain of deployment
      * @param uniswapSettings the settings for the uniswap router
-     * @param amountOutMinimumPercent The minimum percentage of rBTC that must be received from the swap (default: 99.7%)
-     * @param amountOutMinimumSafetyCheck The safety check percentage for minimum rBTC output (default: 99%)
+     * @param feeConfig Collector and purchase fee settings.
+     * @param amountOutMinimumPercent The swap-time oracle floor
+     *        (deploy default: `DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT`)
+     * @param amountOutMinimumSafetyCheck The lowest floor the owner may later configure
+     *        (deploy default: `DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK`, 95%)
+     * @param initialOwner Address that owns this handler immediately after deploy.
+     * @dev Caches the stablecoin-to-18-decimal oracle scale; tokens above 18 decimals revert rather than
+     *      weakening the floor through rounding. The initial path is allowlisted here; later paths need
+     *      owner approval. Fee config arrives as one memory struct so Dex leaves stay under the
+     *      legacy-codegen stack limit; ownership stays a separate argument because it also covers
+     *      oracle, path allowlist, and floor setters.
      */
     constructor(
-        address stableTokenAddress,
         UniswapSettings memory uniswapSettings,
+        FeeConfig memory feeConfig,
         uint256 amountOutMinimumPercent,
-        uint256 amountOutMinimumSafetyCheck
-    ) 
-    {
-        i_purchasingToken = IERC20(stableTokenAddress);
-        i_swapRouter02 = uniswapSettings.swapRouter02;
-        i_wrBtcToken = uniswapSettings.wrBtcToken;
+        uint256 amountOutMinimumSafetyCheck,
+        address initialOwner
+    ) PurchaseRbtc(feeConfig, initialOwner) {
+        if (address(uniswapSettings.mocOracle) == address(0)) {
+            revert PurchaseUniswap__InvalidOracleAddress();
+        }
+        i_swapRouter = uniswapSettings.swapRouter;
+        i_wrbtc = uniswapSettings.wrbtc;
         s_mocOracle = uniswapSettings.mocOracle;
-        
+
+        _validateSlippageSettings(amountOutMinimumPercent, amountOutMinimumSafetyCheck);
+
+        s_amountOutMinimumPercent = amountOutMinimumPercent.toUint64();
+        s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint64();
+
+        // The initial owner is not the deployer, so the constructor cannot call the onlyOwner setters
+        // and must install the first path itself.
+        address[] memory intermediateTokens = uniswapSettings.swapIntermediateTokens;
+        uint24[] memory poolFeeRates = uniswapSettings.swapPoolFeeRates;
+        bytes memory newPath = _encodePurchasePath(intermediateTokens, poolFeeRates);
+        bytes32 pathHash = keccak256(newPath);
+        _setPurchasePath(intermediateTokens, poolFeeRates, newPath);
+        _setPurchasePathAllowed(pathHash, newPath, intermediateTokens, poolFeeRates, true);
+
+        uint8 stablecoinDecimals = IERC20Metadata(address(i_stablecoin)).decimals();
+        if (stablecoinDecimals > ORACLE_DECIMALS) {
+            revert PurchaseUniswap__UnsupportedStablecoinDecimals(stablecoinDecimals);
+        }
+        i_stablecoinToUsdScale = 10 ** (ORACLE_DECIMALS - stablecoinDecimals);
+
+        _approveSwapRouter();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           EXTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+    /**
+     * @inheritdoc IPurchaseUniswap
+     * @dev The arrays are `memory` on purpose. The path helpers they reach are shared with the
+     *      constructor, which can only pass `memory`, so `calldata` here would be copied at each helper
+     *      call. That measured dearer than the single copy the ABI decoder makes.
+     */
+    function setPurchasePathAllowed(address[] memory intermediateTokens, uint24[] memory poolFeeRates, bool allowed)
+        external
+        onlyOwner
+    {
+        bytes memory encodedPath = _encodePurchasePath(intermediateTokens, poolFeeRates);
+        bytes32 pathHash = keccak256(encodedPath);
+        if (!allowed && keccak256(s_swapPath) == pathHash) {
+            revert PurchaseUniswap__CannotRevokeActivePurchasePath(pathHash);
+        }
+        if (s_purchasePathAllowed[pathHash] == allowed) {
+            revert PurchaseUniswap__PurchasePathPermissionUnchanged(pathHash, allowed);
+        }
+        _setPurchasePathAllowed(pathHash, encodedPath, intermediateTokens, poolFeeRates, allowed);
+    }
+
+    /// @inheritdoc IPurchaseUniswap
+    function setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates) external override {
+        bytes memory newPath = _encodePurchasePath(intermediateTokens, poolFeeRates);
+        bytes32 pathHash = keccak256(newPath);
+        if (!s_purchasePathAllowed[pathHash]) {
+            revert PurchaseUniswap__PurchasePathNotAllowed(pathHash);
+        }
+        if (msg.sender != owner()) {
+            if (!IDcaManager(i_dcaManager).i_operationsAdmin().isSwapper(msg.sender)) {
+                revert PurchaseUniswap__UnauthorizedPurchasePathSetter(msg.sender);
+            }
+        }
+        _setPurchasePath(intermediateTokens, poolFeeRates, newPath);
+    }
+
+    /// @inheritdoc IPurchaseUniswap
+    function setAmountOutMinimumPercent(uint256 amountOutMinimumPercent) external onlyOwner {
+        _validateSlippageSettings(amountOutMinimumPercent, s_amountOutMinimumSafetyCheck);
+        emit PurchaseUniswap__AmountOutMinimumPercentUpdated(s_amountOutMinimumPercent, amountOutMinimumPercent);
+        s_amountOutMinimumPercent = amountOutMinimumPercent.toUint64();
+    }
+
+    /// @inheritdoc IPurchaseUniswap
+    function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external onlyOwner {
+        _validateSlippageSettings(s_amountOutMinimumPercent, amountOutMinimumSafetyCheck);
+        emit PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(
+            s_amountOutMinimumSafetyCheck, amountOutMinimumSafetyCheck
+        );
+        s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint64();
+    }
+
+    /// @inheritdoc IPurchaseUniswap
+    function setMocOracle(address newOracle) external override onlyOwner {
+        if (newOracle == address(0)) {
+            revert PurchaseUniswap__InvalidOracleAddress();
+        }
+        emit PurchaseUniswap__OracleUpdated(address(s_mocOracle), newOracle);
+        s_mocOracle = ICoinPairPrice(newOracle);
+    }
+
+    /// @inheritdoc IPurchaseUniswap
+    function restoreSwapRouterApproval() external override {
+        _approveSwapRouter();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IPurchaseUniswap
+    function getAmountOutMinimumPercent() external view returns (uint256) {
+        return s_amountOutMinimumPercent;
+    }
+
+    /// @inheritdoc IPurchaseUniswap
+    function getAmountOutMinimumSafetyCheck() external view returns (uint256) {
+        return s_amountOutMinimumSafetyCheck;
+    }
+
+    /// @inheritdoc IPurchaseUniswap
+    function getMocOracle() external view returns (ICoinPairPrice) {
+        return s_mocOracle;
+    }
+
+    /// @inheritdoc IPurchaseUniswap
+    function getSwapPath() external view returns (bytes memory) {
+        return s_swapPath;
+    }
+
+    /// @inheritdoc IPurchaseUniswap
+    function isPurchasePathAllowed(bytes32 pathHash) external view returns (bool) {
+        return s_purchasePathAllowed[pathHash];
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           INTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @dev Uses the stricter of the oracle and caller floors, and credits only the measured WRBTC delta.
+     *      PurchaseRbtc proves the exact stablecoin input left this handler. This venue-specific layer also
+     *      requires every intermediate-token router balance to return to its pre-swap value. Comparing
+     *      deltas, not zero balances, prevents donated tokens from blocking it.
+     */
+    function _purchaseRbtc(uint256 stablecoinAmount, uint256 minRbtcOut) internal override returns (uint256 amountOut) {
+        uint256 amountOutLowerBound = _getAmountOutLowerBound(stablecoinAmount);
+        uint256 amountOutMinimum = minRbtcOut > amountOutLowerBound ? minRbtcOut : amountOutLowerBound;
+
+        IUniswapV3SwapRouter.ExactInputParams memory params = IUniswapV3SwapRouter.ExactInputParams({
+            path: s_swapPath, recipient: address(this), amountIn: stablecoinAmount, amountOutMinimum: amountOutMinimum
+        });
+
+        address[] memory intermediateTokens = s_swapIntermediateTokens;
+        uint256 intermediateCount = intermediateTokens.length;
+        uint256[] memory routerBalancesBefore = new uint256[](intermediateCount);
+        for (uint256 i; i < intermediateCount; ++i) {
+            routerBalancesBefore[i] = _balanceOf(intermediateTokens[i], address(i_swapRouter));
+        }
+
+        uint256 wrbtcBalanceBefore = _balanceOf(address(i_wrbtc), address(this));
+        i_swapRouter.exactInput(params);
+
+        for (uint256 i; i < intermediateCount; ++i) {
+            uint256 routerBalanceAfter = _balanceOf(intermediateTokens[i], address(i_swapRouter));
+            if (routerBalanceAfter != routerBalancesBefore[i]) {
+                revert PurchaseUniswap__IntermediateBalanceChangedInRouter(
+                    intermediateTokens[i], routerBalancesBefore[i], routerBalanceAfter
+                );
+            }
+        }
+
+        amountOut = _balanceOf(address(i_wrbtc), address(this)) - wrbtcBalanceBefore;
+    }
+
+    /**
+     * @param stablecoinAmountToSpend the amount of stablecoin to swap for rBTC
+     * @return minimumRbtcAmount the minimum amount of rBTC that must be received
+     * @dev Assumes the stablecoin is USD-pegged and scales its amount to the 18-decimal BTC/USD oracle;
+     *      the 1e18 floor factor leaves the result in WRBTC wei. The oracle validity and price are checked
+     *      in the execution block; accounting still uses the measured WRBTC delta. SwapRouter02 exact-input
+     *      params have no deadline, and a deadline derived here from `block.timestamp` would be tautological;
+     *      a binding deadline would have to come from the swapper as a new batch argument.
+     */
+    function _getAmountOutLowerBound(uint256 stablecoinAmountToSpend)
+        internal
+        view
+        returns (uint256 minimumRbtcAmount)
+    {
+        (uint256 currentPrice, bool isValid,) = s_mocOracle.getPriceInfo();
+        if (!isValid) revert PurchaseUniswap__OutdatedPrice();
+        minimumRbtcAmount =
+            (stablecoinAmountToSpend * i_stablecoinToUsdScale * s_amountOutMinimumPercent) / currentPrice;
+    }
+
+    /// @dev Purchases accumulate WRBTC; unwrap the withdrawal to native rBTC before paying the signer.
+    function _withdrawRbtc(address user, uint256 rbtcBalance) internal override {
+        i_wrbtc.withdraw(rbtcBalance);
+        super._withdrawRbtc(user, rbtcBalance);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            PRIVATE FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @dev Writes `s_swapPath` and its intermediate tokens together, then emits
+     *      `PurchaseUniswap__NewPathSet`. `newPath` must be
+     *      `_encodePurchasePath(intermediateTokens, poolFeeRates)`; the event's components are how
+     *      off-chain reconstructs the route. The two writes are one statement pair on purpose: the
+     *      purchase checks the router against the active path's intermediate tokens, and a path
+     *      activation that left the previous set behind would check the wrong tokens.
+     */
+    function _setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates, bytes memory newPath)
+        private
+    {
+        s_swapPath = newPath;
+        s_swapIntermediateTokens = intermediateTokens;
+        emit PurchaseUniswap__NewPathSet(intermediateTokens, poolFeeRates, newPath);
+    }
+
+    /**
+     * @dev Raw allowlist write and `PurchaseUniswap__PurchasePathAllowedSet`.
+     *      The caller must already have rejected a no-op permission write and, when
+     *      `allowed` is false, revocation of `keccak256(s_swapPath)`, so every emit is a
+     *      real transition and the active path stays allowed. `encodedPath` must be
+     *      `_encodePurchasePath(intermediateTokens, poolFeeRates)` and `pathHash` must be
+     *      `keccak256(encodedPath)`.
+     */
+    function _setPurchasePathAllowed(
+        bytes32 pathHash,
+        bytes memory encodedPath,
+        address[] memory intermediateTokens,
+        uint24[] memory poolFeeRates,
+        bool allowed
+    ) private {
+        s_purchasePathAllowed[pathHash] = allowed;
+        emit PurchaseUniswap__PurchasePathAllowedSet(pathHash, encodedPath, intermediateTokens, poolFeeRates, allowed);
+    }
+
+    function _approveSwapRouter() private {
+        i_stablecoin.forceApprove(address(i_swapRouter), type(uint256).max);
+    }
+
+    /**
+     * @dev Uniswap V3 `exactInput` bytes: this handler's stablecoin, then each
+     *      `(fee, intermediateToken)`, then the last fee and WRBTC. Empty
+     *      `intermediateTokens` is a direct pair. `poolFeeRates.length` must be
+     *      `intermediateTokens.length + 1`.
+     */
+    function _encodePurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
+        private
+        view
+        returns (bytes memory newPath)
+    {
+        if (poolFeeRates.length != intermediateTokens.length + 1) {
+            revert PurchaseUniswap__WrongNumberOfTokensOrFeeRates(intermediateTokens.length, poolFeeRates.length);
+        }
+
+        newPath = abi.encodePacked(address(i_stablecoin));
+        for (uint256 i = 0; i < intermediateTokens.length; ++i) {
+            newPath = abi.encodePacked(newPath, poolFeeRates[i], intermediateTokens[i]);
+        }
+
+        newPath = abi.encodePacked(newPath, poolFeeRates[poolFeeRates.length - 1], address(i_wrbtc));
+    }
+
+    /**
+     * @dev Both arguments are 1e18-scaled fractions. Neither may exceed 100%, and the swap-time floor
+     *      cannot sit below the safety check, so lowering the floor percentage past what governance
+     *      pre-approved takes two transactions. Used by the constructor and both owner setters.
+     */
+    function _validateSlippageSettings(uint256 amountOutMinimumPercent, uint256 amountOutMinimumSafetyCheck)
+        private
+        pure
+    {
         if (amountOutMinimumPercent > HUNDRED_PERCENT) {
             revert PurchaseUniswap__AmountOutMinimumPercentTooHigh();
         }
@@ -62,243 +368,14 @@ abstract contract PurchaseUniswap is
         if (amountOutMinimumPercent < amountOutMinimumSafetyCheck) {
             revert PurchaseUniswap__AmountOutMinimumPercentTooLow();
         }
-        
-        s_amountOutMinimumPercent = amountOutMinimumPercent;
-        s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck;
-        
-        setPurchasePath(uniswapSettings.swapIntermediateTokens, uniswapSettings.swapPoolFeeRates);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                               FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
     /**
-     * @param buyer: the user on behalf of which the contract is making the rBTC purchase
-     * @param purchaseAmount: the amount to spend on rBTC
-     * @notice this function will be called periodically through a CRON job running on a web server
+     * @dev One shared `balanceOf` call site, so the purchase's balance reads do not each emit their own
+     *      copy of the same encode/staticcall/decode sequence. A purchase makes two of them plus two
+     *      per intermediate token, so the saving grows with the path.
      */
-    function buyRbtc(address buyer, bytes32 scheduleId, uint256 purchaseAmount)
-        external
-        override
-        onlyDcaManager
-    {
-        // Redeem stablecoin (repaying yield bearing token)
-        purchaseAmount = _redeemStablecoin(buyer, purchaseAmount);
-
-        // Charge fee
-        uint256 fee = _calculateFee(purchaseAmount);
-        uint256 netPurchaseAmount = purchaseAmount - fee;
-        _transferFee(i_purchasingToken, fee);
-
-        // Swap stablecoin for WRBTC
-        uint256 wrBtcPurchased = _swapStablecoinForWrbtc(netPurchaseAmount);
-
-        if (wrBtcPurchased > 0) {
-            s_usersAccumulatedRbtc[buyer] += wrBtcPurchased;
-            emit PurchaseRbtc__RbtcBought(
-                buyer, address(i_purchasingToken), wrBtcPurchased, scheduleId, netPurchaseAmount
-            );
-        } else {
-            revert PurchaseRbtc__RbtcPurchaseFailed(buyer, address(i_purchasingToken));
-        }
+    function _balanceOf(address token, address account) private view returns (uint256) {
+        return IERC20(token).balanceOf(account);
     }
-
-    /**
-     * @notice batch buy rBTC
-     * @param buyers: the users on behalf of which the contract is making the rBTC purchase
-     * @param scheduleIds: the schedule ids
-     * @param purchaseAmounts: the amounts to spend on rBTC
-     */
-    function batchBuyRbtc(
-        address[] memory buyers,
-        bytes32[] memory scheduleIds,
-        uint256[] memory purchaseAmounts
-    ) external override onlyDcaManager {
-        uint256 numOfPurchases = buyers.length;
-
-        // Calculate net amounts
-        (uint256 aggregatedFee, uint256[] memory netStablecoinAmountsToSpend, uint256 totalStablecoinAmountToSpend) =
-            _calculateFeeAndNetAmounts(purchaseAmounts);
-
-        // Redeem stablecoin (and repay lending token)
-        uint256 stablecoinRedeemed = _batchRedeemStablecoin(buyers, purchaseAmounts, totalStablecoinAmountToSpend + aggregatedFee); // totalStablecoinAmountToSpend (on rBTC) + aggregatedFee (charged by BitChill)
-        totalStablecoinAmountToSpend = stablecoinRedeemed - aggregatedFee;
-
-        // Charge fees
-        _transferFee(i_purchasingToken, aggregatedFee);
-
-        // Swap stablecoin for wrBTC
-        uint256 wrBtcPurchased = _swapStablecoinForWrbtc(totalStablecoinAmountToSpend);
-
-        if (wrBtcPurchased > 0) {
-            for (uint256 i; i < numOfPurchases; ++i) {
-                uint256 usersPurchasedWrbtc = wrBtcPurchased * netStablecoinAmountsToSpend[i] / totalStablecoinAmountToSpend;
-                s_usersAccumulatedRbtc[buyers[i]] += usersPurchasedWrbtc;
-                emit PurchaseRbtc__RbtcBought(
-                    buyers[i], address(i_purchasingToken), usersPurchasedWrbtc, scheduleIds[i], netStablecoinAmountsToSpend[i]
-                );
-            }
-            emit PurchaseRbtc__SuccessfulRbtcBatchPurchase(
-                address(i_purchasingToken), wrBtcPurchased, totalStablecoinAmountToSpend
-            );
-        } else {
-            revert PurchaseRbtc__RbtcBatchPurchaseFailed(address(i_purchasingToken));
-        }
-    }
-
-    /**
-     * @param user: the user to withdraw the rBTC to
-     * @notice the user can at any time withdraw the rBTC that has been accumulated through periodical purchases
-     */
-    function withdrawAccumulatedRbtc(address user) external override onlyDcaManager {
-        uint256 rbtcBalance = _withdrawRbtcChecksEffects(user);
-
-        // Unwrap rBTC
-        i_wrBtcToken.withdraw(rbtcBalance);
-
-        // Transfer RBTC from this contract back to the user
-        _withdrawRbtc(user, rbtcBalance);
-    }
-
-    /**
-     * @param stuckUserContract: the contract to withdraw the rBTC from
-     * @param rescueAddress: the address to send the rBTC to if the contract has no fallback
-     * @notice the owner can at any time withdraw the rBTC that has been accumulated through periodical purchases
-     */
-    function withdrawStuckRbtc(address stuckUserContract, address rescueAddress) external override onlyOwner {
-        uint256 rbtcBalance = _withdrawRbtcChecksEffects(stuckUserContract);
-        i_wrBtcToken.withdraw(rbtcBalance);
-        _withdrawStuckRbtc(stuckUserContract, rescueAddress, rbtcBalance);
-    }
-
-    /**
-     * @notice Sets a new swap path.
-     *  @param intermediateTokens The array of intermediate token addresses in the path.
-     * @param poolFeeRates The array of pool fees for each swap step.
-     */
-    function setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates)
-        public
-        override
-        onlyOwner
-    {
-        if (poolFeeRates.length != intermediateTokens.length + 1) {
-            revert PurchaseUniswap__WrongNumberOfTokensOrFeeRates(intermediateTokens.length, poolFeeRates.length);
-        }
-
-        bytes memory newPath = abi.encodePacked(address(i_purchasingToken));
-        for (uint256 i = 0; i < intermediateTokens.length; i++) {
-            newPath = abi.encodePacked(newPath, poolFeeRates[i], intermediateTokens[i]);
-        }
-
-        newPath = abi.encodePacked(newPath, poolFeeRates[poolFeeRates.length - 1], address(i_wrBtcToken));
-
-        s_swapPath = newPath;
-        emit PurchaseUniswap_NewPathSet(intermediateTokens, poolFeeRates, s_swapPath);
-    }
-
-    /**
-     * @notice Set the minimum percentage of rBTC that must be received from the swap.
-     * @param amountOutMinimumPercent The minimum percentage of rBTC that must be received from the swap.
-     */
-    function setAmountOutMinimumPercent(uint256 amountOutMinimumPercent) external onlyOwner {
-        if (amountOutMinimumPercent > HUNDRED_PERCENT) {
-            revert PurchaseUniswap__AmountOutMinimumPercentTooHigh();
-        }
-        if (amountOutMinimumPercent < s_amountOutMinimumSafetyCheck) {
-            revert PurchaseUniswap__AmountOutMinimumPercentTooLow();
-        }
-        emit PurchaseUniswap_AmountOutMinimumPercentUpdated(s_amountOutMinimumPercent, amountOutMinimumPercent);
-        s_amountOutMinimumPercent = amountOutMinimumPercent;
-    }
-
-    /**
-     * @notice Set the minimum percentage of rBTC that must be received from the swap.
-     * @param amountOutMinimumSafetyCheck The minimum percentage of rBTC that must be received from the swap.
-     */
-    function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external onlyOwner {
-        if (amountOutMinimumSafetyCheck > HUNDRED_PERCENT) {
-            revert PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh();
-        }
-        emit PurchaseUniswap_AmountOutMinimumSafetyCheckUpdated(s_amountOutMinimumSafetyCheck, amountOutMinimumSafetyCheck);
-        s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck;
-    }
-
-    /**
-     * @notice Updates the oracle address to a new one.
-     * @param newOracle The address of the new oracle to use.
-     */
-    function updateMocOracle(address newOracle) external override onlyOwner {
-        if (newOracle == address(0)) {
-            revert PurchaseUniswap__InvalidOracleAddress();
-        }
-        emit PurchaseUniswap_OracleUpdated(address(s_mocOracle), newOracle);
-        s_mocOracle = ICoinPairPrice(newOracle);
-    }
-
-    /**
-     * @notice Get the minimum percentage of rBTC that must be received from the swap.
-     * @return The minimum percentage of rBTC that must be received from the swap.
-     */     
-    function getAmountOutMinimumPercent() external view returns (uint256) {
-        return s_amountOutMinimumPercent;
-    }
-
-    /**
-     * @notice Get the minimum percentage of rBTC that must be received from the swap.
-     * @return The minimum percentage of rBTC that must be received from the swap.
-     */
-    function getAmountOutMinimumSafetyCheck() external view returns (uint256) {
-        return s_amountOutMinimumSafetyCheck;
-    }
-
-    /**
-     * @notice Get the oracle used for price checks.
-     * @return The oracle used for price checks.
-     */
-    function getMocOracle() external view returns (ICoinPairPrice) {
-        return s_mocOracle;
-    }
-
-    /**
-     * @notice Get the current swap path.
-     * @return The current swap path.
-     */
-    function getSwapPath() external view returns (bytes memory) {
-        return s_swapPath;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                           INTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @param stablecoinAmountToSpend the amount of stablecoin to swap for rBTC
-     * @return amountOut the amount of rBTC received
-     */
-    function _swapStablecoinForWrbtc(uint256 stablecoinAmountToSpend) internal returns (uint256 amountOut) {
-        // Approve the router to spend stablecoin.
-        TransferHelper.safeApprove(address(i_purchasingToken), address(i_swapRouter02), stablecoinAmountToSpend);
-
-        // Set up the swap parameters
-        IV3SwapRouter.ExactInputParams memory params = IV3SwapRouter.ExactInputParams({
-            path: s_swapPath,
-            recipient: address(this),
-            amountIn: stablecoinAmountToSpend,
-            amountOutMinimum: _getAmountOutMinimum(stablecoinAmountToSpend)
-        });
-
-        amountOut = i_swapRouter02.exactInput(params);
-    }
-
-    /**
-     * @param stablecoinAmountToSpend the amount of stablecoin to swap for rBTC
-     * @return minimumRbtcAmount the minimum amount of rBTC that must be received
-     * @dev Verifies that the oracle price is valid and up-to-date before using it
-     */
-    function _getAmountOutMinimum(uint256 stablecoinAmountToSpend) internal view returns (uint256 minimumRbtcAmount) {
-        (uint256 currentPrice, bool isValid, ) = s_mocOracle.getPriceInfo();
-        if (!isValid) revert PurchaseUniswap__OutdatedPrice();
-        minimumRbtcAmount = (stablecoinAmountToSpend * s_amountOutMinimumPercent) / currentPrice;
-    }
-
 }

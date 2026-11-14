@@ -7,9 +7,14 @@ import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
-import "../../script/Constants.sol";
+import "../Constants.sol";
+import {scheduleIdAt} from "test/utils/ScheduleAt.sol";
 
 contract RbtcWithdrawalTest is DcaDappTest {
+    /// @dev One-purchase MoC tip observed ~0.252% under oracle; 0.30% trips a real commission change
+    ///      without the 2× headroom of `MAX_SLIPPAGE_PERCENT` (0.50%). Dex keeps `_maxPurchaseSlippage`.
+    uint256 private constant MOC_ONE_PURCHASE_SLIPPAGE = 0.003 ether;
+
     function setUp() public override {
         super.setUp();
     }
@@ -23,32 +28,32 @@ contract RbtcWithdrawalTest is DcaDappTest {
         uint256 netPurchaseAmount = AMOUNT_TO_SPEND - fee;
 
         vm.prank(USER);
-        IDcaManager.DcaDetails[] memory dcaDetails = dcaManager.getMyDcaSchedules(address(stablecoin));
+        (uint64[] memory dcaDetailsIds, IDcaManager.DcaSchedule[] memory dcaDetails) =
+            dcaManager.getDcaSchedules(USER, address(stablecoin));
 
-        vm.prank(SWAPPER);
-        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, dcaDetails[SCHEDULE_INDEX].scheduleId);
+        buyRbtcOne(dcaDetailsIds[SCHEDULE_INDEX]);
 
         uint256 rbtcBalanceBeforeWithdrawal = USER.balance;
         vm.prank(USER);
-        uint256[] memory lendingProtocolIndexes = new uint256[](1);
-        lendingProtocolIndexes[0] = s_lendingProtocolIndex;
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = s_routeIndex;
         address[] memory tokens = new address[](1);
         tokens[0] = address(stablecoin);
-        dcaManager.withdrawAllAccumulatedRbtc(tokens, lendingProtocolIndexes);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
         uint256 rbtcBalanceAfterWithdrawal = USER.balance;
 
-        if (keccak256(abi.encodePacked(swapType)) == keccak256(abi.encodePacked("mocSwaps"))) {
-            // assertEq(rbtcBalanceAfterWithdrawal - rbtcBalanceBeforeWithdrawal, netPurchaseAmount / s_btcPrice);
-            assertApproxEqRel( // MoC takes some commission so strict equality us not possible
+        if (isMocSwaps) {
+            // Tip MoC commission ~0.252%; keep a tight canary rather than MAX_SLIPPAGE_PERCENT (0.5%).
+            assertApproxEqRel(
                 rbtcBalanceAfterWithdrawal - rbtcBalanceBeforeWithdrawal,
                 netPurchaseAmount / s_btcPrice,
-                0.25e16 // Allow a maximum difference of 0.25%
+                MOC_ONE_PURCHASE_SLIPPAGE
             );
-        } else if (keccak256(abi.encodePacked(swapType)) == keccak256(abi.encodePacked("dexSwaps"))) {
-            assertApproxEqRel( // The mock contract that simulates swapping on Uniswap allows for some slippage
+        } else {
+            assertApproxEqRel(
                 rbtcBalanceAfterWithdrawal - rbtcBalanceBeforeWithdrawal,
                 netPurchaseAmount / s_btcPrice,
-                MAX_SLIPPAGE_PERCENT // Allow a maximum difference of 0.5%
+                _maxPurchaseSlippage()
             );
         }
     }
@@ -58,11 +63,11 @@ contract RbtcWithdrawalTest is DcaDappTest {
         uint256 totalStablecoinSpent = super.makeSeveralPurchasesWithSeveralSchedules(); // 5 purchases
         uint256 rbtcBalanceBeforeWithdrawal = USER.balance;
         vm.prank(USER);
-        uint256[] memory lendingProtocolIndexes = new uint256[](1);
-        lendingProtocolIndexes[0] = s_lendingProtocolIndex;
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = s_routeIndex;
         address[] memory tokens = new address[](1);
         tokens[0] = address(stablecoin);
-        dcaManager.withdrawAllAccumulatedRbtc(tokens, lendingProtocolIndexes);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
         uint256 rbtcBalanceAfterWithdrawal = USER.balance;
         // assertEq(rbtcBalanceAfterWithdrawal - rbtcBalanceBeforeWithdrawal, totalStablecoinSpent / s_btcPrice);
 
@@ -72,7 +77,7 @@ contract RbtcWithdrawalTest is DcaDappTest {
         assertApproxEqRel( // The mock contract that simulates swapping on Uniswap allows for some slippage
             rbtcBalanceAfterWithdrawal - rbtcBalanceBeforeWithdrawal,
             totalStablecoinSpent / s_btcPrice,
-            MAX_SLIPPAGE_PERCENT // Allow a maximum difference of 0.5% (on fork tests we saw this was necessary for both MoC and Uniswap swaps)
+            _maxPurchaseSlippage() // Allow a maximum difference of 0.5% (on fork tests we saw this was necessary for both MoC and Uniswap swaps)
         );
         // }
     }
@@ -81,12 +86,142 @@ contract RbtcWithdrawalTest is DcaDappTest {
         uint256 rbtcBalanceBeforeWithdrawal = USER.balance;
         // vm.expectRevert(IPurchaseRbtc.PurchaseRbtc__NoAccumulatedRbtcToWithdraw.selector);
         vm.prank(USER);
-        uint256[] memory lendingProtocolIndexes = new uint256[](1);
-        lendingProtocolIndexes[0] = s_lendingProtocolIndex;
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = s_routeIndex;
         address[] memory tokens = new address[](1);
         tokens[0] = address(stablecoin);
-        dcaManager.withdrawAllAccumulatedRbtc(tokens, lendingProtocolIndexes);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
         uint256 rbtcBalanceAfterWithdrawal = USER.balance;
         assertEq(rbtcBalanceAfterWithdrawal, rbtcBalanceBeforeWithdrawal);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                      WITHDRAW-ALL RBTC ROUTE PAIRS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice The two arrays are positional pairs, so their lengths must match.
+    function testWithdrawAllRbtcRevertsOnLengthMismatch() external {
+        address[] memory tokens = new address[](2);
+        tokens[0] = address(stablecoin);
+        tokens[1] = address(stablecoin);
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = s_routeIndex;
+
+        vm.prank(USER);
+        vm.expectRevert(IDcaManager.DcaManager__ArraysLengthMismatch.selector);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
+    }
+
+    /// @notice An empty call reverts instead of succeeding silently, matching `batchBuyRbtc`.
+    function testWithdrawAllRbtcRevertsOnEmptyArrays() external {
+        address[] memory tokens = new address[](0);
+        uint256[] memory routeIndexes = new uint256[](0);
+
+        vm.prank(USER);
+        vm.expectRevert(IDcaManager.DcaManager__EmptyWithdrawalArrays.selector);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
+    }
+
+    /// @notice A pair whose route has no handler is skipped, and the pairs after it still execute.
+    function testWithdrawAllRbtcSkipsUnregisteredPairAndKeepsGoing() external {
+        vm.prank(USER);
+        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) =
+            dcaManager.getDcaSchedules(USER, address(stablecoin));
+        buyRbtcOne(schedulesIds[SCHEDULE_INDEX]);
+
+        uint256 accumulatedRbtc = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
+        assertGt(accumulatedRbtc, 0);
+        uint256 rbtcBalanceBeforeWithdrawal = USER.balance;
+
+        address[] memory tokens = new address[](2);
+        tokens[0] = address(stablecoin);
+        tokens[1] = address(stablecoin);
+        uint256[] memory routeIndexes = new uint256[](2);
+        routeIndexes[0] = UNREGISTERED_ROUTE_INDEX;
+        routeIndexes[1] = s_routeIndex;
+
+        vm.prank(USER);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
+
+        assertEq(USER.balance - rbtcBalanceBeforeWithdrawal, accumulatedRbtc);
+        assertEq(IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER), 0);
+    }
+
+    /// @notice Naming the same pair twice pays once: the second pass finds a zero balance and skips.
+    function testWithdrawAllRbtcWithDuplicatePairPaysOnce() external {
+        vm.prank(USER);
+        (uint64[] memory schedulesIds, IDcaManager.DcaSchedule[] memory schedules) =
+            dcaManager.getDcaSchedules(USER, address(stablecoin));
+        buyRbtcOne(schedulesIds[SCHEDULE_INDEX]);
+
+        uint256 accumulatedRbtc = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
+        uint256 rbtcBalanceBeforeWithdrawal = USER.balance;
+
+        address[] memory tokens = new address[](2);
+        tokens[0] = address(stablecoin);
+        tokens[1] = address(stablecoin);
+        uint256[] memory routeIndexes = new uint256[](2);
+        routeIndexes[0] = s_routeIndex;
+        routeIndexes[1] = s_routeIndex;
+
+        vm.prank(USER);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
+
+        assertEq(USER.balance - rbtcBalanceBeforeWithdrawal, accumulatedRbtc);
+        assertEq(IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER), 0);
+    }
+
+    function testWithdrawRbtcFromTokenHandlerCreditsSignerOnly() external {
+        address attacker = makeAddr("attacker");
+        vm.deal(attacker, 10 ether);
+        if (block.chainid == ANVIL_CHAIN_ID) {
+            stablecoin.mint(attacker, AMOUNT_TO_DEPOSIT);
+        } else {
+            vm.prank(USER);
+            stablecoin.transfer(attacker, AMOUNT_TO_DEPOSIT);
+        }
+
+        vm.startPrank(attacker);
+        stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
+        dcaManager.createDcaSchedule(
+            address(stablecoin), AMOUNT_TO_DEPOSIT, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_routeIndex
+        );
+        vm.stopPrank();
+
+        super.makeSinglePurchase();
+
+        uint64 attackerScheduleId = scheduleIdAt(dcaManager, attacker, address(stablecoin), SCHEDULE_INDEX);
+        buyRbtcOne(attackerScheduleId);
+
+        uint256 userAccrued = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER);
+        uint256 attackerAccrued = IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(attacker);
+        assertGt(userAccrued, 0);
+        assertGt(attackerAccrued, 0);
+
+        uint256 userBalanceBefore = USER.balance;
+        uint256 attackerBalanceBefore = attacker.balance;
+        uint256 ownerBalanceBefore = OWNER.balance;
+
+        address[] memory tokens = new address[](1);
+        tokens[0] = address(stablecoin);
+        uint256[] memory routeIndexes = new uint256[](1);
+        routeIndexes[0] = s_routeIndex;
+
+        vm.prank(attacker);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
+
+        assertEq(attacker.balance, attackerBalanceBefore + attackerAccrued, "attacker did not receive only their rBTC");
+        assertEq(USER.balance, userBalanceBefore, "USER native balance moved on attacker withdraw");
+        assertEq(OWNER.balance, ownerBalanceBefore, "OWNER received rBTC");
+        assertEq(IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER), userAccrued);
+        assertEq(IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(attacker), 0);
+
+        vm.prank(USER);
+        dcaManager.withdrawAllAccumulatedRbtc(tokens, routeIndexes);
+
+        assertEq(USER.balance, userBalanceBefore + userAccrued, "USER did not receive only their rBTC");
+        assertEq(attacker.balance, attackerBalanceBefore + attackerAccrued, "attacker balance changed on USER withdraw");
+        assertEq(OWNER.balance, ownerBalanceBefore, "OWNER received rBTC");
+        assertEq(IPurchaseRbtc(address(stablecoinHandler)).getAccumulatedRbtcBalance(USER), 0);
     }
 }

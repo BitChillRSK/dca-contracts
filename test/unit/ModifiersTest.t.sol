@@ -7,13 +7,17 @@ import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {DcaManager} from "../../src/DcaManager.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
-import "../../script/Constants.sol";
+import {ownableUnauthorized} from "../utils/OzRevert.sol";
+import "../Constants.sol";
 
 contract ModifiersTest is DcaDappTest {
     // Events
-    event DcaManager__OperationsAdminUpdated(address indexed newOperationsAdmin);
-    event DcaManager__MinPurchasePeriodModified(uint256 indexed newMinPurchasePeriod);
-    
+    event DcaManager__MinPurchasePeriodModified(uint256 newMinPurchasePeriod);
+
+    /// @dev Pre-R46 `setOperationsAdmin(address)` selector. Kept as a literal so the test
+    ///      still compiles after the function is deleted.
+    bytes4 private constant SET_OPERATIONS_ADMIN_SELECTOR = 0x32742d59;
+
     function setUp() public override {
         super.setUp();
     }
@@ -21,33 +25,64 @@ contract ModifiersTest is DcaDappTest {
     /*//////////////////////////////////////////////////////////////
                             ONLYOWNER TESTS
     //////////////////////////////////////////////////////////////*/
-    function testonlyOwnerCanSetOperationsAdmin() external {
-        address operationsAdminBefore = dcaManager.getOperationsAdminAddress();
-        vm.expectRevert("Ownable: caller is not the owner"); // Adapt to v4.9.3 Ownable contract
-        vm.prank(USER); // User can't
-        dcaManager.setOperationsAdmin(address(dcaManager)); // dummy address, e.g. that of DcaManager
-        address operationsAdminAfter = dcaManager.getOperationsAdminAddress();
-        assertEq(operationsAdminBefore, operationsAdminAfter);
-        vm.prank(OWNER); // Owner can
-        vm.expectEmit(true, true, true, true);
-        emit DcaManager__OperationsAdminUpdated(address(dcaManager));
-        dcaManager.setOperationsAdmin(address(dcaManager));
-        operationsAdminAfter = dcaManager.getOperationsAdminAddress();
-        assertEq(operationsAdminAfter, address(dcaManager));
+    function testSetOperationsAdminSelectorIsAbsent() external {
+        assertEq(SET_OPERATIONS_ADMIN_SELECTOR, bytes4(keccak256("setOperationsAdmin(address)")));
+
+        (bool callSucceeded, bytes memory returnData) =
+            address(dcaManager).call(abi.encodeWithSelector(SET_OPERATIONS_ADMIN_SELECTOR, address(dcaManager)));
+        assertFalse(callSucceeded);
+        assertEq(returnData.length, 0);
+
+        vm.prank(OWNER);
+        (bool ownerCallSucceeded, bytes memory ownerReturnData) =
+            address(dcaManager).call(abi.encodeWithSelector(SET_OPERATIONS_ADMIN_SELECTOR, address(dcaManager)));
+        assertFalse(ownerCallSucceeded);
+        assertEq(ownerReturnData.length, 0);
+
+        assertEq(address(dcaManager.i_operationsAdmin()), address(operationsAdmin));
+    }
+
+    function testOperationsAdminPinnedAtConstruction() external {
+        assertEq(address(dcaManager.i_operationsAdmin()), address(operationsAdmin));
+        assertTrue(address(operationsAdmin).code.length > 0);
+    }
+
+    function testConstructorRevertsIfOperationsAdminIsZero() external {
+        vm.expectRevert(
+            abi.encodeWithSelector(IDcaManager.DcaManager__OperationsAdminIsNotAContract.selector, address(0))
+        );
+        new DcaManager(address(0), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, OWNER);
+    }
+
+    function testConstructorRevertsIfOperationsAdminIsEoa() external {
+        address eoa = makeAddr("notAContract");
+        vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__OperationsAdminIsNotAContract.selector, eoa));
+        new DcaManager(eoa, MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, OWNER);
+    }
+
+    function testOperationsAdminNotInStorage() external {
+        // R45 stored the admin at slot 2. After pinning it lives in immutable bytecode, not
+        // sequential storage — a single-slot check of the mapping root would pass even if
+        // the address had only moved. Sweep the old sequential layout (slots 0–8).
+        uint256 admin = uint256(uint160(address(operationsAdmin)));
+        for (uint256 slot; slot < 9; ++slot) {
+            assertTrue(uint256(vm.load(address(dcaManager), bytes32(slot))) != admin);
+        }
+        assertEq(address(dcaManager.i_operationsAdmin()), address(operationsAdmin));
     }
 
     function testonlyOwnerCanModifyMinPurchasePeriod() external {
         uint256 newMinPurchasePeriod = 2 days;
         uint256 minPurchasePeriodBefore = dcaManager.getMinPurchasePeriod();
-        vm.expectRevert("Ownable: caller is not the owner"); // Adapt to v4.9.3 Ownable contract
+        vm.expectRevert(ownableUnauthorized(USER));
         vm.prank(USER); // User can't
-        dcaManager.modifyMinPurchasePeriod(newMinPurchasePeriod); // dummy address, e.g. that of DcaManager
+        dcaManager.setMinPurchasePeriod(newMinPurchasePeriod); // dummy address, e.g. that of DcaManager
         uint256 minPurchasePeriodAfter = dcaManager.getMinPurchasePeriod();
         assertEq(minPurchasePeriodBefore, minPurchasePeriodAfter);
         vm.prank(OWNER); // Owner can
         vm.expectEmit(true, true, true, true);
         emit DcaManager__MinPurchasePeriodModified(newMinPurchasePeriod);
-        dcaManager.modifyMinPurchasePeriod(newMinPurchasePeriod);
+        dcaManager.setMinPurchasePeriod(newMinPurchasePeriod);
         minPurchasePeriodAfter = dcaManager.getMinPurchasePeriod();
         assertEq(minPurchasePeriodAfter, newMinPurchasePeriod);
     }
@@ -55,32 +90,32 @@ contract ModifiersTest is DcaDappTest {
     function testModifyMinPurchasePeriodRevertsBelowOneDay() external {
         vm.prank(OWNER);
         vm.expectRevert(IDcaManager.DcaManager__MinPurchasePeriodMustBeAtLeastOneDay.selector);
-        dcaManager.modifyMinPurchasePeriod(1 days - 1);
+        dcaManager.setMinPurchasePeriod(1 days - 1);
         assertEq(dcaManager.getMinPurchasePeriod(), MIN_PURCHASE_PERIOD);
     }
 
     function testModifyMinPurchasePeriodAllowsOneDay() external {
         vm.prank(OWNER);
-        dcaManager.modifyMinPurchasePeriod(2 days);
+        dcaManager.setMinPurchasePeriod(2 days);
         vm.prank(OWNER);
-        dcaManager.modifyMinPurchasePeriod(1 days);
+        dcaManager.setMinPurchasePeriod(1 days);
         assertEq(dcaManager.getMinPurchasePeriod(), 1 days);
     }
 
     function testConstructorRevertsIfMinPurchasePeriodBelowOneDay() external {
         vm.expectRevert(IDcaManager.DcaManager__MinPurchasePeriodMustBeAtLeastOneDay.selector);
-        new DcaManager(address(operationsAdmin), 1 days - 1, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT);
+        new DcaManager(address(operationsAdmin), 1 days - 1, MAX_SCHEDULES_PER_TOKEN, OWNER);
     }
 
-    function testModifyMinPurchasePeriodRevertsIfNotWholeDays() external {
+    function testModifyMinPurchasePeriodRevertsOnPartialDay() external {
         vm.prank(OWNER);
         vm.expectRevert(IDcaManager.DcaManager__PurchasePeriodMustBeWholeDays.selector);
-        dcaManager.modifyMinPurchasePeriod(1 days + 12 hours);
+        dcaManager.setMinPurchasePeriod(36 hours);
         assertEq(dcaManager.getMinPurchasePeriod(), MIN_PURCHASE_PERIOD);
     }
 
-    function testConstructorRevertsIfMinPurchasePeriodNotWholeDays() external {
+    function testConstructorRevertsIfMinPurchasePeriodIsPartialDay() external {
         vm.expectRevert(IDcaManager.DcaManager__PurchasePeriodMustBeWholeDays.selector);
-        new DcaManager(address(operationsAdmin), 1 days + 12 hours, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT);
+        new DcaManager(address(operationsAdmin), 36 hours, MAX_SCHEDULES_PER_TOKEN, OWNER);
     }
 }

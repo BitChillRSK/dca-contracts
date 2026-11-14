@@ -1,0 +1,11 @@
+# Static analysis scope for the relaunch release gate (R73).
+# Mirror slither.config.json: first-party src/ only. Raw report.md stays gitignored.
+version = 1
+root = "."
+src = "src/"
+exclude = [
+    "/test/",
+    "/script/",
+    "/lib/",
+    "External interaction examples",
+]

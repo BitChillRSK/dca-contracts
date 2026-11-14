@@ -4,16 +4,13 @@ out = "out"
 libs = ["lib"]
 remappings = [
     '@openzeppelin=lib/openzeppelin-contracts',
-    '@uniswap/v3-core=lib/v3-core',
-    '@uniswap/v3-periphery=lib/v3-periphery',
-    '@uniswap/swap-router-contracts=lib/swap-router-contracts',
 ]
 
 solc_version = "0.8.36"
 evm_version = "cancun"
-# Local Anvil defaults to timestamp 1. 00:00 UTC of that day is 0, which DcaManager
-# treats as "never purchased". Production Rootstock cannot hit that; tests should not either.
-block_timestamp = 86400
+optimizer = true
+optimizer_runs = 200
+via_ir = false
 
 [fuzz]
 runs = 1000
@@ -26,18 +23,56 @@ fail_on_revert = true
 
 [profile.ci]
 # Named so CI's FOUNDRY_PROFILE=ci is valid. Inherits default compiler settings.
+# Inherits [invariant] (64×512, fail_on_revert). Do not add a reduced
+# [profile.ci.invariant] — the invariants-layerbank CI job is that suite.
 via_ir = false
 
 [profile.ci.fuzz]
 runs = 256
 
+# R60: what actually gets deployed. via_ir applies everywhere, including test/ and script/, so
+# `make check-deploy` runs the full suite against the exact same bytecode that ships — a test's
+# `new DcaManager(...)` deploys the identical artifact `forge script` would broadcast. Never use
+# this profile to deploy without first running `make check-deploy` green on the same commit —
+# that run is the only proof this bytecode passes the suite. Default `make check` stays
+# via_ir=false so day-to-day iteration does not pay via-IR's compile time.
 [profile.deploy]
-solc_version = "0.8.36"
-evm_version = "cancun"
-via_ir = true            # Use the Yul IR pipeline for smaller bytecode
-optimizer_runs = 200
+via_ir = true
 
-# This just for quicker testing
-# optimizer = false
+[profile.deploy.fuzz]
+runs = 1000
 
-# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+# LayerBankHandlerDexTest.t.sol trips a via_ir/Yul stack-too-deep ("Variable size is
+# 1 too deep in the stack ... memoryguard was present"): it is the one HandlerTestHarness subclass that
+# is simultaneously a Dex handler and a LayerBank lending handler, and via_ir compiles a contract's full
+# inherited call graph together — that combination overflows the Yul optimizer's stack allocator for
+# this contract specifically, even though the test bodies themselves are unremarkable. Confirmed
+# pre-existing (reproduces on a clean checkout of this branch's base, unrelated to R73) via bisection
+# with `forge build --skip`.
+#
+# This file is the only one excluded from [profile.deploy]'s via_ir; every other test file and all of
+# src/ still compile under IR, and its assertions still run — under legacy codegen — as part of
+# `make check-deploy`.
+[[profile.deploy.additional_compiler_profiles]]
+name = "legacy-codegen"
+via_ir = false
+optimizer = true            # required: this extra profile does not inherit [profile.deploy]'s
+optimizer_runs = 200        # optimizer settings, and without them legacy codegen builds fail
+                             # stack-too-deep (see docs/relaunch/R55-solx-and-ir-evaluation.md)
+
+[[profile.deploy.compilation_restrictions]]
+paths = "test/ai-generated/unit/layerbank/LayerBankHandlerDexTest.t.sol"
+via_ir = false
+
+# Vendored ABIs stay byte-diffable against upstream (AGENTS.md). Only IkToken is currently
+# fmt-dirty; the rest are listed so a future upstream sync cannot be "fixed" by `forge fmt`.
+[fmt]
+ignore = [
+    "src/interfaces/IMocProxy.sol",
+    "src/interfaces/IWRBTC.sol",
+    "src/interfaces/ICoinPairPrice.sol",
+    "src/tropykus-legacy/IkToken.sol",
+    "src/sovryn-legacy/IiToken.sol",
+    "src/layerbank/ILayerBankPool.sol",
+    "src/layerbank/ILayerBankAToken.sol",
+]

@@ -1,0 +1,518 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.36;
+
+import {HandlerTestHarness} from "../HandlerTestHarness.t.sol";
+import {ITokenHandler} from "../../../../src/interfaces/ITokenHandler.sol";
+import {IPurchaseFees} from "../../../../src/interfaces/IPurchaseFees.sol";
+import {IPurchaseUniswap} from "../../../../src/interfaces/IPurchaseUniswap.sol";
+import {IWRBTC} from "../../../../src/interfaces/IWRBTC.sol";
+import {IUniswapV3SwapRouter} from "../../../../src/interfaces/IUniswapV3SwapRouter.sol";
+import {ICoinPairPrice} from "../../../../src/interfaces/ICoinPairPrice.sol";
+import {TropykusHandlerDex} from "../../../../src/tropykus-legacy/TropykusHandlerDex.sol";
+import {MockKToken} from "../../../mocks/MockKToken.sol";
+import {MockWrbtcToken} from "../../../mocks/MockWrbtcToken.sol";
+import {MockMocOracle} from "../../../mocks/MockMocOracle.sol";
+import {MockSwapRouter02} from "../../../mocks/MockSwapRouter02.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "../../../Constants.sol";
+import {handlerBatchBuyOne, NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
+import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
+import {ownableUnauthorized} from "../../../utils/OzRevert.sol";
+
+/**
+ * @title TropykusHandlerDexTest
+ * @notice Unit tests for TropykusHandlerDex (DEX variant) using shared test harness
+ */
+contract TropykusHandlerDexTest is HandlerTestHarness {
+    event PurchaseUniswap__AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
+    event PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(uint256 oldValue, uint256 newValue);
+
+    // Tropykus DEX-specific contracts
+    MockKToken public kToken;
+    MockWrbtcToken public wrbtcToken;
+    MockMocOracle public mocOracle;
+    MockSwapRouter02 public mockRouter;
+    TropykusHandlerDex public tropykusDexHandler;
+
+    /*//////////////////////////////////////////////////////////////
+                           HANDLER-SPECIFIC IMPLEMENTATIONS
+    //////////////////////////////////////////////////////////////*/
+
+    function deployHandler() internal override returns (ITokenHandler) {
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
+        });
+
+        address[] memory intermediateTokens = new address[](0); // No intermediate tokens for direct swap
+        uint24[] memory poolFeeRates = new uint24[](1);
+        poolFeeRates[0] = 3000; // 0.3% fee
+
+        IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
+            wrbtc: IWRBTC(address(wrbtcToken)),
+            swapRouter: IUniswapV3SwapRouter(address(mockRouter)),
+            swapIntermediateTokens: intermediateTokens,
+            swapPoolFeeRates: poolFeeRates,
+            mocOracle: ICoinPairPrice(address(mocOracle))
+        });
+
+        tropykusDexHandler = new TropykusHandlerDex(
+            address(dcaManager),
+            address(stablecoin),
+            address(kToken),
+            uniswapSettings,
+            FEE_COLLECTOR,
+            feeSettings,
+            DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
+            DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
+            OWNER
+        );
+
+        return ITokenHandler(address(tropykusDexHandler));
+    }
+
+    function getRouteIndex() internal pure override returns (uint256) {
+        return TROPYKUS_INDEX;
+    }
+
+    function isDexHandler() internal pure override returns (bool) {
+        return true; // This is the DEX variant
+    }
+
+    function isLendingHandler() internal pure override returns (bool) {
+        return true; // Tropykus handlers support lending
+    }
+
+    function getShareToken() internal view override returns (IERC20) {
+        return IERC20(address(kToken));
+    }
+
+    function setupHandlerSpecifics() internal override {
+        // Deploy mock tokens
+        kToken = new MockKToken(address(stablecoin));
+        wrbtcToken = new MockWrbtcToken();
+        mocOracle = new MockMocOracle();
+        mockRouter = new MockSwapRouter02(wrbtcToken, BTC_PRICE);
+
+        // Note: MockKToken has built-in time-based exchange rate calculation
+
+        // Note: Oracle price setup would need MockMocProxy price methods
+
+        // Give tokens some initial balances
+        stablecoin.mint(address(kToken), 1000000 ether);
+        vm.deal(address(mockRouter), 1000 ether); // Give router some ETH for WRBTC deposits
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           TROPYKUS DEX-SPECIFIC TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_tropykusDex_deployment() public {
+        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT);
+        assertEq(tropykusDexHandler.getAmountOutMinimumSafetyCheck(), DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK);
+        assertNotEq(address(tropykusDexHandler.getMocOracle()), address(0));
+        assertGt(tropykusDexHandler.getSwapPath().length, 0);
+    }
+
+    /// @notice Both of this leaf's spenders are approved once, at construction.
+    function test_tropykusDex_standingSpenderApprovals() public {
+        address handlerAddress = address(tropykusDexHandler);
+        assertEq(stablecoin.allowance(handlerAddress, address(kToken)), type(uint256).max);
+        assertEq(stablecoin.allowance(handlerAddress, address(mockRouter)), type(uint256).max);
+        assertEq(stablecoin.allowance(handlerAddress, address(0)), 0);
+    }
+
+    function test_tropykusDex_setAmountOutMinimumPercent_success() public {
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumPercent(0.98 ether);
+
+        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), 0.98 ether);
+    }
+
+    function test_tropykusDex_setAmountOutMinimumPercent_reverts_notOwner() public {
+        vm.expectRevert(ownableUnauthorized(USER));
+        vm.prank(USER);
+        tropykusDexHandler.setAmountOutMinimumPercent(0.98 ether);
+    }
+
+    /// @dev The wall: one owner transaction cannot widen the live floor past the safety check.
+    function test_tropykusDex_setAmountOutMinimumPercent_reverts_belowSafetyCheck() public {
+        uint256 safetyCheck = tropykusDexHandler.getAmountOutMinimumSafetyCheck();
+        uint256 percentBefore = tropykusDexHandler.getAmountOutMinimumPercent();
+
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumPercent(safetyCheck - 1);
+
+        assertEq(
+            tropykusDexHandler.getAmountOutMinimumPercent(), percentBefore, "the floor must be unchanged on revert"
+        );
+    }
+
+    function test_tropykusDex_setAmountOutMinimumPercent_reverts_tooHigh() public {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooHigh.selector);
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumPercent(1.01 ether);
+    }
+
+    /// @dev Raising the wall above the active floor reverts without changing state, so widening past it
+    ///      is deliberately two transactions.
+    function test_tropykusDex_setAmountOutMinimumSafetyCheck_reverts_aboveCurrentPercent() public {
+        uint256 percent = tropykusDexHandler.getAmountOutMinimumPercent();
+        uint256 safetyBefore = tropykusDexHandler.getAmountOutMinimumSafetyCheck();
+
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumSafetyCheck(percent + 1);
+
+        assertEq(tropykusDexHandler.getAmountOutMinimumSafetyCheck(), safetyBefore);
+        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), percent);
+    }
+
+    /// @dev Widening below the wall takes two owner transactions, in this order.
+    function test_tropykusDex_wideningBelowTheWallTakesTwoTransactions() public {
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumSafetyCheck(0.9 ether);
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumPercent(0.92 ether);
+
+        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), 0.92 ether);
+        assertEq(tropykusDexHandler.getAmountOutMinimumSafetyCheck(), 0.9 ether);
+    }
+
+    function test_tropykusDex_setAmountOutMinimumSafetyCheck_success() public {
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumSafetyCheck(0.9 ether);
+
+        assertEq(tropykusDexHandler.getAmountOutMinimumSafetyCheck(), 0.9 ether);
+    }
+
+    function test_tropykusDex_setAmountOutMinimumSafetyCheck_reverts_invalidRange() public {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh.selector);
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumSafetyCheck(1.01 ether);
+    }
+
+    function test_tropykusDex_setAmountOutMinimumSafetyCheck_reverts_notOwner() public {
+        vm.expectRevert(ownableUnauthorized(USER));
+        vm.prank(USER);
+        tropykusDexHandler.setAmountOutMinimumSafetyCheck(0.9 ether);
+    }
+
+    function test_tropykusDex_constructor_allows_hundred_percent() public {
+        TropykusHandlerDex handler = _deployTropykusDexWithSlippage(1 ether, 1 ether);
+        assertEq(handler.getAmountOutMinimumPercent(), 1 ether);
+        assertEq(handler.getAmountOutMinimumSafetyCheck(), 1 ether);
+    }
+
+    function test_tropykusDex_constructor_allows_equal_percent_and_safety() public {
+        TropykusHandlerDex handler = _deployTropykusDexWithSlippage(0.99 ether, 0.99 ether);
+        assertEq(handler.getAmountOutMinimumPercent(), 0.99 ether);
+        assertEq(handler.getAmountOutMinimumSafetyCheck(), 0.99 ether);
+    }
+
+    function test_tropykusDex_constructor_reverts_when_percent_too_high() public {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooHigh.selector);
+        _deployTropykusDexWithSlippage(1.01 ether, 0.95 ether);
+    }
+
+    function test_tropykusDex_constructor_reverts_when_percent_below_safety() public {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
+        _deployTropykusDexWithSlippage(0.94 ether, 0.95 ether);
+    }
+
+    function test_tropykusDex_constructor_reverts_when_safety_too_high() public {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh.selector);
+        _deployTropykusDexWithSlippage(1 ether, 1.01 ether);
+    }
+
+    function test_tropykusDex_setPurchasePath_success() public {
+        address[] memory intermediateTokens = new address[](0); // Direct swap, no intermediates
+        uint24[] memory poolFeeRates = new uint24[](1);
+        poolFeeRates[0] = 3000; // 0.3%
+
+        vm.prank(OWNER);
+        tropykusDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
+
+        bytes memory expectedPath = abi.encodePacked(address(stablecoin), uint24(3000), address(wrbtcToken));
+        assertEq(tropykusDexHandler.getSwapPath(), expectedPath);
+    }
+
+    function test_tropykusDex_setPurchasePath_reverts_invalidLength() public {
+        address[] memory intermediateTokens = new address[](1);
+        intermediateTokens[0] = address(0x123);
+        uint24[] memory poolFeeRates = new uint24[](1); // Should be 2 for 1 intermediate token
+        poolFeeRates[0] = 3000;
+
+        vm.expectRevert();
+        vm.prank(OWNER);
+        tropykusDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
+    }
+
+    function test_tropykusDex_setPurchasePath_reverts_notOwner() public {
+        address[] memory intermediateTokens = new address[](0);
+        uint24[] memory poolFeeRates = new uint24[](1);
+        poolFeeRates[0] = 3000;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IPurchaseUniswap.PurchaseUniswap__UnauthorizedPurchasePathSetter.selector, USER)
+        );
+        vm.prank(USER);
+        tropykusDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           TROPYKUS DEX ORACLE TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_tropykusDex_oraclePrice() public {
+        uint256 price = tropykusDexHandler.getMocOracle().getPrice();
+        assertGt(price, 0); // Should be greater than 0 by default
+    }
+
+    function test_tropykusDex_oraclePriceValidation() public {
+        // Set oracle to return 0 (should cause issues)
+        mocOracle.setPrice(0);
+
+        // This might cause issues in swap calculations
+        // The exact behavior depends on implementation
+        uint256 price = tropykusDexHandler.getMocOracle().getPrice();
+        assertEq(price, 0);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           TROPYKUS DEX SWAP PATH TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_tropykusDex_swapPathValidation() public {
+        bytes memory path = tropykusDexHandler.getSwapPath();
+        assertGt(path.length, 0);
+
+        // The path should include both input and output tokens
+        // Exact validation depends on how the path is structured
+        assertTrue(path.length >= 43); // Minimum for single-hop path (20 + 3 + 20 bytes)
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           COMBINED FUNCTIONALITY TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_tropykusDex_depositAndLendingCombined() public {
+        // Test that DEX handler maintains lending functionality
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        // Check lending balance (inherited from Tropykus base)
+        uint256 lendingBalance = tropykusDexHandler.getUserShares(USER);
+        assertGt(lendingBalance, 0);
+
+        // Check kToken balance increased
+        uint256 kTokenBalance = kToken.balanceOf(address(handler));
+        assertGt(kTokenBalance, 0);
+    }
+
+    function test_tropykusDex_withdrawWithDexCapabilities() public {
+        // Deposit first
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        // Withdraw (should use Tropykus redemption, not DEX)
+        uint256 userBalanceBefore = stablecoin.balanceOf(USER);
+
+        vm.prank(address(dcaManager));
+        handler.withdrawToken(USER, WITHDRAWAL_AMOUNT);
+
+        uint256 userBalanceAfter = stablecoin.balanceOf(USER);
+        assertGt(userBalanceAfter, userBalanceBefore);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           EDGE CASES FOR DEX VARIANT
+    //////////////////////////////////////////////////////////////*/
+
+    function test_tropykusDex_extremeSlippageSettings() public {
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumSafetyCheck(0.5 ether);
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumPercent(0.5 ether); // 50% — very high slippage
+
+        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), 0.5 ether);
+
+        vm.prank(OWNER);
+        tropykusDexHandler.setAmountOutMinimumPercent(0.9999 ether); // 99.99% — very low slippage
+
+        assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), 0.9999 ether);
+        assertEq(
+            tropykusDexHandler.getAmountOutMinimumSafetyCheck(), 0.5 ether, "the wall stays where governance put it"
+        );
+    }
+
+    function test_tropykusDex_oracleFailure() public {
+        // Test behavior when oracle fails
+        // This depends on how the handler deals with oracle failures
+        mocOracle.setInvalidPrice();
+
+        // Accessing price info should show invalid state
+        (, bool isValid,) = tropykusDexHandler.getMocOracle().getPriceInfo();
+        assertFalse(isValid);
+    }
+
+    function test_tropykusDex_swapPathEdgeCases() public {
+        // Test with multi-hop path
+        address[] memory intermediateTokens = new address[](1);
+        intermediateTokens[0] = address(0x123); // Intermediate token
+        uint24[] memory poolFeeRates = new uint24[](2);
+        poolFeeRates[0] = 3000;
+        poolFeeRates[1] = 3000;
+
+        bytes memory expectedPath =
+            abi.encodePacked(address(stablecoin), uint24(3000), address(0x123), uint24(3000), address(wrbtcToken));
+        vm.prank(OWNER);
+        tropykusDexHandler.setPurchasePathAllowed(intermediateTokens, poolFeeRates, true);
+
+        vm.prank(OWNER);
+        tropykusDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
+
+        assertEq(tropykusDexHandler.getSwapPath(), expectedPath);
+        assertEq(tropykusDexHandler.getSwapPath().length, 66); // 3 addresses + 2 fees
+    }
+
+    function test_tropykusDex_withdrawInterestPaysUser() public {
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        uint256 userBalanceBefore = stablecoin.balanceOf(USER);
+
+        vm.prank(address(dcaManager));
+        tropykusDexHandler.withdrawInterest(USER, 0);
+
+        assertGt(stablecoin.balanceOf(USER), userBalanceBefore);
+        assertEq(stablecoin.balanceOf(address(tropykusDexHandler)), 0);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           PURCHASE PIPELINE COVERAGE
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Test that batchBuyRbtc funds the purchase by redeeming the buyer's lending shares
+     * @dev Covers the shared PurchaseRbtc pipeline resolving _batchRetrieveStablecoin to LendingHandler
+     */
+    function test_tropykusDex_lengthOneBatchRedeemsSharesForPurchase() public {
+        // Setup: User deposits tokens first
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        // Verify initial state
+        uint256 initialLendingBalance = tropykusDexHandler.getUserShares(USER);
+        assertGt(initialLendingBalance, 0);
+
+        uint256 purchaseAmount = 100 ether;
+        uint64 mockScheduleId = 1;
+
+        // Call batchBuyRbtc, which redeems shares through _batchRetrieveStablecoin
+        vm.prank(address(dcaManager));
+        handlerBatchBuyOne(IPurchaseRbtc(address(tropykusDexHandler)), USER, mockScheduleId, purchaseAmount);
+
+        // Verify the shares were redeemed - lending balance should be reduced
+        uint256 finalLendingBalance = tropykusDexHandler.getUserShares(USER);
+        assertLt(finalLendingBalance, initialLendingBalance);
+
+        // Verify RBTC was accumulated
+        uint256 rbtcBalance = tropykusDexHandler.getAccumulatedRbtcBalance(USER);
+        assertGt(rbtcBalance, 0);
+    }
+
+    /**
+     * @notice Test that batchBuyRbtc funds the purchase by redeeming every buyer's lending shares
+     * @dev Covers the shared PurchaseRbtc pipeline resolving _batchRetrieveStablecoin to LendingHandler
+     */
+    function test_tropykusDex_batchBuyRbtcRedeemsSharesForPurchase() public {
+        // Setup: Multiple users deposit tokens
+        address user1 = address(0x2001);
+        address user2 = address(0x2002);
+        uint256 depositAmount1 = 500 ether;
+        uint256 depositAmount2 = 300 ether;
+
+        // Give users stablecoin balance and approve handler
+        stablecoin.mint(user1, depositAmount1);
+        stablecoin.mint(user2, depositAmount2);
+
+        vm.prank(user1);
+        stablecoin.approve(address(handler), type(uint256).max);
+        vm.prank(user2);
+        stablecoin.approve(address(handler), type(uint256).max);
+
+        vm.prank(address(dcaManager));
+        handler.depositToken(user1, depositAmount1);
+        vm.prank(address(dcaManager));
+        handler.depositToken(user2, depositAmount2);
+
+        // Verify initial state
+        uint256 initialBalance1 = tropykusDexHandler.getUserShares(user1);
+        uint256 initialBalance2 = tropykusDexHandler.getUserShares(user2);
+        assertGt(initialBalance1, 0);
+        assertGt(initialBalance2, 0);
+
+        // Prepare batch purchase data
+        address[] memory buyers = new address[](2);
+        buyers[0] = user1;
+        buyers[1] = user2;
+
+        uint64[] memory scheduleIds = new uint64[](2);
+        scheduleIds[0] = 1;
+        scheduleIds[1] = 2;
+
+        uint256[] memory purchaseAmounts = new uint256[](2);
+        purchaseAmounts[0] = 100 ether;
+        purchaseAmounts[1] = 80 ether;
+
+        // Call batchBuyRbtc, which redeems shares through _batchRetrieveStablecoin
+        vm.prank(address(dcaManager));
+        tropykusDexHandler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT, 0);
+
+        // Verify the shares were redeemed - lending balances should be reduced
+        uint256 finalBalance1 = tropykusDexHandler.getUserShares(user1);
+        uint256 finalBalance2 = tropykusDexHandler.getUserShares(user2);
+        assertLt(finalBalance1, initialBalance1);
+        assertLt(finalBalance2, initialBalance2);
+
+        // Verify RBTC was accumulated for both users
+        uint256 rbtcBalance1 = tropykusDexHandler.getAccumulatedRbtcBalance(user1);
+        uint256 rbtcBalance2 = tropykusDexHandler.getAccumulatedRbtcBalance(user2);
+        assertGt(rbtcBalance1, 0);
+        assertGt(rbtcBalance2, 0);
+    }
+
+    function _deployTropykusDexWithSlippage(uint256 amountOutMinimumPercent, uint256 amountOutMinimumSafetyCheck)
+        private
+        returns (TropykusHandlerDex)
+    {
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
+        });
+
+        address[] memory intermediateTokens = new address[](0);
+        uint24[] memory poolFeeRates = new uint24[](1);
+        poolFeeRates[0] = 3000;
+
+        IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
+            wrbtc: IWRBTC(address(wrbtcToken)),
+            swapRouter: IUniswapV3SwapRouter(address(mockRouter)),
+            swapIntermediateTokens: intermediateTokens,
+            swapPoolFeeRates: poolFeeRates,
+            mocOracle: ICoinPairPrice(address(mocOracle))
+        });
+
+        return new TropykusHandlerDex(
+            address(dcaManager),
+            address(stablecoin),
+            address(kToken),
+            uniswapSettings,
+            FEE_COLLECTOR,
+            feeSettings,
+            amountOutMinimumPercent,
+            amountOutMinimumSafetyCheck,
+            OWNER
+        );
+    }
+}

@@ -12,12 +12,23 @@ import {DcaManager} from "../src/DcaManager.sol";
 import {IPurchaseUniswap} from "../src/interfaces/IPurchaseUniswap.sol";
 import {OperationsAdmin} from "../src/OperationsAdmin.sol";
 import {IWRBTC} from "../src/interfaces/IWRBTC.sol";
-import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces/ISwapRouter02.sol";
+import {IUniswapV3SwapRouter} from "../src/interfaces/IUniswapV3SwapRouter.sol";
 import {ICoinPairPrice} from "../src/interfaces/ICoinPairPrice.sol";
 import {console} from "forge-std/Test.sol";
 import "./Constants.sol";
 
+/**
+ * @title DeployMocAndUniswap
+ * @notice Local/fork comparison harness: two independent stacks (MoC + Dex) for
+ *         `ComparePurchaseMethods`. Not a live deploy path.
+ * @dev Reverts when `REAL_DEPLOYMENT=true`. Do not add Safe handoff here — nested
+ *      `DeployMocSwaps` / `DeployDexSwaps` helper instances would split ownership.
+ *      The canonical one-shot live path is `DeployFinal` (one admin/manager, seven
+ *      handlers). Keep this harness for `ComparePurchaseMethods` only.
+ */
 contract DeployMocAndUniswap is DeployBase {
+    error DeployMocAndUniswap__NotALivePath();
+
     // Define a struct to hold all deployment results
     struct DeployedContracts {
         // MoC contracts
@@ -25,74 +36,71 @@ contract DeployMocAndUniswap is DeployBase {
         address handlerMoc;
         DcaManager dcaManMoc;
         MocHelperConfig helpConfMoc;
-        
+
         // Uniswap contracts
         OperationsAdmin adOpsUni;
         address handlerUni;
         DcaManager dcaManUni;
         DexHelperConfig helpConfUni;
     }
-    
+
     // Struct for DeployDexSwaps parameters to avoid stack too deep errors
     struct DexDeployParams {
         Protocol protocol;
         address dcaManager;
-        address tokenAddress;
-        address lendingToken;
+        address stablecoin;
+        address shareToken;
         IPurchaseUniswap.UniswapSettings uniswapSettings;
         address feeCollector;
         uint256 amountOutMinimumPercent;
         uint256 amountOutMinimumSafetyCheck;
     }
-    
+
     string stablecoinType;
-    
+
     constructor() {
         // Initialize stablecoin type from environment or use default
         try vm.envString("STABLECOIN_TYPE") returns (string memory coinType) {
             stablecoinType = coinType;
         } catch {
-            stablecoinType = DEFAULT_STABLECOIN;
+            stablecoinType = DOC_STRING;
         }
     }
-    
+
     // Split the deployment into smaller functions to avoid stack too deep errors
-    function deployMocContracts() 
-        private 
-        returns (
-            OperationsAdmin adOpsMoc,
-            address handlerMoc,
-            DcaManager dcaManMoc,
-            MocHelperConfig helpConfMoc
-        ) 
+    function deployMocContracts()
+        private
+        returns (OperationsAdmin adOpsMoc, address handlerMoc, DcaManager dcaManMoc, MocHelperConfig helpConfMoc)
     {
         helpConfMoc = new MocHelperConfig();
         MocHelperConfig.NetworkConfig memory networkConfig = helpConfMoc.getActiveNetworkConfig();
-        
-        vm.startBroadcast();
-        // Deploy admin operations and DCA manager
-        adOpsMoc = new OperationsAdmin();
-        dcaManMoc = new DcaManager(address(adOpsMoc), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT);
-        
+
+        address owner = adminAddresses[environment];
+        vm.startBroadcast(owner);
+        adOpsMoc = new OperationsAdmin(owner);
+        dcaManMoc = new DcaManager(address(adOpsMoc), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, owner);
+        dcaManMoc.setTokenMinPurchaseAmount(networkConfig.docToken, MIN_PURCHASE_AMOUNT);
+
         // Get fee collector address
         address feeCollector = getFeeCollector(environment);
-        
+
         // Get token addresses from network config
-        address docTokenAddress = networkConfig.docTokenAddress;
-        address mocProxy = networkConfig.mocProxyAddress;
-        
-        // Select the appropriate lending token based on protocol
-        address lendingToken;
-        
+        address docToken = networkConfig.docToken;
+        address mocProxy = networkConfig.mocProxy;
+
+        // Select the appropriate shares based on protocol
+        address shareToken;
+
         if (protocol == Protocol.TROPYKUS) {
-            lendingToken = networkConfig.kDocAddress;
+            shareToken = networkConfig.kDoc;
         } else if (protocol == Protocol.SOVRYN) {
             // Check if this stablecoin is supported by Sovryn
-            bool isUSDRIF = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked("USDRIF"));
-            if (isUSDRIF) {
-                revert("USDRIF is not supported by Sovryn");
+            bool isUSDRIF = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING));
+            bool isUSDT0 = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDT0_STRING));
+            if (isUSDRIF || isUSDT0) {
+                revert("Sovryn does not list this stablecoin");
             }
-            lendingToken = networkConfig.iSusdAddress;
+            shareToken = networkConfig.iToken;
         } else {
             revert("Unsupported lending protocol");
         }
@@ -101,88 +109,78 @@ contract DeployMocAndUniswap is DeployBase {
 
         // Deploy MoC handler
         DeployMocSwaps deployMocSwapContracts = new DeployMocSwaps();
-        
+
         // Create a DeployParams struct to pass to deployDocHandlerMoc
         DeployMocSwaps.DeployParams memory params = DeployMocSwaps.DeployParams({
             protocol: protocol,
             dcaManager: address(dcaManMoc),
-            tokenAddress: docTokenAddress,
-            lendingToken: lendingToken,
+            stablecoin: docToken,
+            shareToken: shareToken,
             mocProxy: mocProxy,
             feeCollector: feeCollector
         });
-        
+
         handlerMoc = deployMocSwapContracts.deployDocHandlerMoc(params);
         console.log("MoC handler deployed at:", handlerMoc);
-        
-        // Get owner address based on environment
-        address owner = adminAddresses[environment];
-        
-        vm.startBroadcast();
-
-        // Transfer ownership of contracts
-        adOpsMoc.transferOwnership(owner);
-        dcaManMoc.transferOwnership(owner);
-        
-        vm.stopBroadcast();
     }
-    
-    function deployUniswapContracts() 
-        private 
-        returns (
-            OperationsAdmin adOpsUni,
-            address handlerUni,
-            DcaManager dcaManUni,
-            DexHelperConfig helpConfUni
-        ) 
+
+    function deployUniswapContracts()
+        private
+        returns (OperationsAdmin adOpsUni, address handlerUni, DcaManager dcaManUni, DexHelperConfig helpConfUni)
     {
         helpConfUni = new DexHelperConfig();
         DexHelperConfig.NetworkConfig memory networkConfig = helpConfUni.getActiveNetworkConfig();
-        
-        vm.startBroadcast();
-        // Deploy admin operations and DCA manager
-        adOpsUni = new OperationsAdmin();
-        dcaManUni = new DcaManager(address(adOpsUni), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT);
-        
+
+        address owner = adminAddresses[environment];
+        vm.startBroadcast(owner);
+        adOpsUni = new OperationsAdmin(owner);
+        dcaManUni = new DcaManager(address(adOpsUni), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, owner);
+
         // Get fee collector address
         address feeCollector = getFeeCollector(environment);
-        
+
         // Get token addresses from network config
-        address stablecoinAddress = networkConfig.stablecoinAddress;
-        
-        // Select the appropriate lending token based on protocol
-        address lendingToken;
-        
+        address stablecoin = networkConfig.stablecoin;
+        uint256 minPurchaseAmount = keccak256(abi.encodePacked(stablecoinType))
+            == keccak256(abi.encodePacked(USDT0_STRING))
+            ? USDT0_MIN_PURCHASE_AMOUNT
+            : MIN_PURCHASE_AMOUNT;
+        dcaManUni.setTokenMinPurchaseAmount(stablecoin, minPurchaseAmount);
+
+        // Select the appropriate shares based on protocol
+        address shareToken;
+
         if (protocol == Protocol.TROPYKUS) {
-            lendingToken = networkConfig.tropykusLendingToken;
+            shareToken = networkConfig.tropykusShareToken;
         } else if (protocol == Protocol.SOVRYN) {
             // Check if this stablecoin is supported by Sovryn
-            bool isUSDRIF = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked("USDRIF"));
-            if (isUSDRIF) {
-                revert("USDRIF is not supported by Sovryn");
+            bool isUSDRIF = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING));
+            bool isUSDT0 = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDT0_STRING));
+            if (isUSDRIF || isUSDT0) {
+                revert("Sovryn does not list this stablecoin");
             }
-            lendingToken = networkConfig.sovrynLendingToken;
+            shareToken = networkConfig.sovrynShareToken;
         } else {
             revert("Unsupported lending protocol");
         }
-        
+
         // Create Uniswap settings from the network config
         IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
-            wrBtcToken: IWRBTC(networkConfig.wrbtcTokenAddress),
-            swapRouter02: ISwapRouter02(networkConfig.swapRouter02Address),
+            wrbtc: IWRBTC(networkConfig.wrbtc),
+            swapRouter: IUniswapV3SwapRouter(networkConfig.swapRouter),
             swapIntermediateTokens: networkConfig.swapIntermediateTokens,
             swapPoolFeeRates: networkConfig.swapPoolFeeRates,
-            mocOracle: ICoinPairPrice(networkConfig.mocOracleAddress)
+            mocOracle: ICoinPairPrice(networkConfig.mocOracle)
         });
-        
+
         vm.stopBroadcast();
 
         // Create deployment parameters struct
         DexDeployParams memory params = DexDeployParams({
             protocol: protocol,
             dcaManager: address(dcaManUni),
-            tokenAddress: stablecoinAddress,
-            lendingToken: lendingToken,
+            stablecoin: stablecoin,
+            shareToken: shareToken,
             uniswapSettings: uniswapSettings,
             feeCollector: feeCollector,
             amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
@@ -195,8 +193,8 @@ contract DeployMocAndUniswap is DeployBase {
             DeployDexSwaps.DeployParams({
                 protocol: params.protocol,
                 dcaManager: params.dcaManager,
-                tokenAddress: params.tokenAddress,
-                lendingToken: params.lendingToken,
+                stablecoin: params.stablecoin,
+                shareToken: params.shareToken,
                 uniswapSettings: params.uniswapSettings,
                 feeCollector: params.feeCollector,
                 amountOutMinimumPercent: params.amountOutMinimumPercent,
@@ -204,32 +202,21 @@ contract DeployMocAndUniswap is DeployBase {
             })
         );
         console.log("Uniswap handler deployed at:", handlerUni);
-        
-        // Get owner address based on environment
-        address owner = adminAddresses[environment];
-        
-        vm.startBroadcast();
-
-        // Transfer ownership of contracts
-        adOpsUni.transferOwnership(owner);
-        dcaManUni.transferOwnership(owner);
-        
-        vm.stopBroadcast();
     }
 
-    function run()
-        external
-        returns (DeployedContracts memory contracts)
-    {
+    function run() external returns (DeployedContracts memory contracts) {
+        if (_isLiveEnvironment()) revert DeployMocAndUniswap__NotALivePath();
+
         console.log("Deploying both MoC and Uniswap handlers for comparison");
         console.log("Using stablecoin type:", stablecoinType);
-        
+
         // Deploy MoC contracts
         (contracts.adOpsMoc, contracts.handlerMoc, contracts.dcaManMoc, contracts.helpConfMoc) = deployMocContracts();
-        
+
         // Deploy Uniswap contracts
-        (contracts.adOpsUni, contracts.handlerUni, contracts.dcaManUni, contracts.helpConfUni) = deployUniswapContracts();
-        
+        (contracts.adOpsUni, contracts.handlerUni, contracts.dcaManUni, contracts.helpConfUni) =
+            deployUniswapContracts();
+
         return contracts;
     }
 }

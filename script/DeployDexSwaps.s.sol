@@ -5,15 +5,16 @@ pragma solidity 0.8.36;
 import {DeployBase} from "./DeployBase.s.sol";
 import {DexHelperConfig} from "./DexHelperConfig.s.sol";
 import {DcaManager} from "../src/DcaManager.sol";
-import {TropykusErc20HandlerDex} from "../src/TropykusErc20HandlerDex.sol";
-import {SovrynErc20HandlerDex} from "../src/SovrynErc20HandlerDex.sol";
+import {TropykusHandlerDex} from "../src/tropykus-legacy/TropykusHandlerDex.sol";
+import {SovrynHandlerDex} from "../src/sovryn-legacy/SovrynHandlerDex.sol";
+import {LayerBankHandlerDex} from "../src/layerbank/LayerBankHandlerDex.sol";
+import {IdleHandlerDex} from "../src/idle/IdleHandlerDex.sol";
 import {IPurchaseUniswap} from "../src/interfaces/IPurchaseUniswap.sol";
 import {OperationsAdmin} from "../src/OperationsAdmin.sol";
 import {IWRBTC} from "../src/interfaces/IWRBTC.sol";
-import {ISwapRouter02} from "@uniswap/swap-router-contracts/contracts/interfaces/ISwapRouter02.sol";
+import {IUniswapV3SwapRouter} from "../src/interfaces/IUniswapV3SwapRouter.sol";
 import {ICoinPairPrice} from "../src/interfaces/ICoinPairPrice.sol";
-import {IFeeHandler} from "../src/interfaces/IFeeHandler.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IPurchaseFees} from "../src/interfaces/IPurchaseFees.sol";
 import {console} from "forge-std/Test.sol";
 import "./Constants.sol";
 
@@ -22,209 +23,260 @@ contract DeployDexSwaps is DeployBase {
     struct DeployParams {
         Protocol protocol;
         address dcaManager;
-        address tokenAddress;
-        address lendingToken;
+        address stablecoin;
+        address shareToken;
         IPurchaseUniswap.UniswapSettings uniswapSettings;
         address feeCollector;
         uint256 amountOutMinimumPercent;
         uint256 amountOutMinimumSafetyCheck;
     }
 
-    function deployDocHandlerDex(DeployParams memory params) public returns (address) {
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
+    function _isUsdt0(string memory stablecoinType) internal pure returns (bool) {
+        return keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDT0_STRING));
+    }
+
+    function _isUsdrif(string memory stablecoinType) internal pure returns (bool) {
+        return keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked(USDRIF_STRING));
+    }
+
+    /// @notice Live USDT0 uses 6-decimal bounds; local/fork mocks stay 18-decimal.
+    function feeSettingsForToken(bool isUsdt0Live) public view returns (IPurchaseFees.FeeSettings memory) {
+        return IPurchaseFees.FeeSettings({
             minFeeRate: MIN_FEE_RATE,
             maxFeeRate: getMaxFeeRate(),
-            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+            feePurchaseLowerBound: isUsdt0Live ? USDT0_FEE_PURCHASE_LOWER_BOUND : FEE_PURCHASE_LOWER_BOUND
         });
+    }
 
+    function deployDocHandlerDex(DeployParams memory params) public returns (address) {
+        bool isUsdt0Live = _isLiveEnvironment() && _isUsdt0(_stablecoinType());
+        IPurchaseFees.FeeSettings memory feeSettings = feeSettingsForToken(isUsdt0Live);
+
+        if (params.protocol == Protocol.NONE) {
+            return address(
+                new IdleHandlerDex(
+                    params.dcaManager,
+                    params.stablecoin,
+                    params.uniswapSettings,
+                    params.feeCollector,
+                    feeSettings,
+                    params.amountOutMinimumPercent,
+                    params.amountOutMinimumSafetyCheck,
+                    _initialOwner()
+                )
+            );
+        }
         if (params.protocol == Protocol.TROPYKUS) {
             return address(
-                new TropykusErc20HandlerDex(
-                    params.dcaManager, 
-                    params.tokenAddress, 
-                    params.lendingToken, 
-                    params.uniswapSettings, 
-                    MIN_PURCHASE_AMOUNT, 
-                    params.feeCollector, 
+                new TropykusHandlerDex(
+                    params.dcaManager,
+                    params.stablecoin,
+                    params.shareToken,
+                    params.uniswapSettings,
+                    params.feeCollector,
                     feeSettings,
                     params.amountOutMinimumPercent,
                     params.amountOutMinimumSafetyCheck,
-                    EXCHANGE_RATE_DECIMALS
+                    _initialOwner()
                 )
             );
-        } else {
+        }
+        if (params.protocol == Protocol.SOVRYN) {
             return address(
-                new SovrynErc20HandlerDex(
-                    params.dcaManager, 
-                    params.tokenAddress, 
-                    params.lendingToken, 
-                    params.uniswapSettings, 
-                    MIN_PURCHASE_AMOUNT, 
-                    params.feeCollector, 
+                new SovrynHandlerDex(
+                    params.dcaManager,
+                    params.stablecoin,
+                    params.shareToken,
+                    params.uniswapSettings,
+                    params.feeCollector,
                     feeSettings,
                     params.amountOutMinimumPercent,
                     params.amountOutMinimumSafetyCheck,
-                    EXCHANGE_RATE_DECIMALS
+                    _initialOwner()
                 )
             );
+        }
+        if (params.protocol == Protocol.LAYERBANK) {
+            return address(
+                new LayerBankHandlerDex(
+                    params.dcaManager,
+                    params.stablecoin,
+                    params.shareToken,
+                    params.uniswapSettings,
+                    params.feeCollector,
+                    feeSettings,
+                    params.amountOutMinimumPercent,
+                    params.amountOutMinimumSafetyCheck,
+                    _initialOwner()
+                )
+            );
+        }
+        revert("Dex path is none/tropykus/sovryn/layerbank");
+    }
+
+    function _deployLiveDexHandlers(
+        OperationsAdmin operationsAdmin,
+        DcaManager dcaManager,
+        address stablecoin,
+        DexHelperConfig.NetworkConfig memory networkConfig,
+        IPurchaseUniswap.UniswapSettings memory uniswapSettings,
+        address feeCollector,
+        bool isUSDRIF,
+        bool isUSDT0
+    ) internal returns (address selectedHandler) {
+        // Live dex stables are USDRIF / USDT0. Production map: idle=0, LayerBank=1. DexHelperConfig's
+        // else arm is DOC config, so anything not exactly those two (unset STABLECOIN_TYPE, DOC,
+        // or a typo) must revert — DOC buys rBTC through MoC redemption. Sovryn and Tropykus are
+        // test-only.
+        if (protocol == Protocol.SOVRYN) {
+            revert("Sovryn is not on the production dex map");
+        }
+        if (protocol == Protocol.TROPYKUS) {
+            revert("Tropykus is not on the production dex map");
+        }
+        if (!isUSDRIF && !isUSDT0) {
+            revert("DOC is not on the production dex map");
+        }
+
+        console.log("Deploying production dex handlers (idle / LayerBank)");
+
+        // Owner is the Foundry broadcaster for this transaction so route registration succeeds.
+        // Mainnet proposes MAINNET_OWNER (the Safe) after setup. Index 0 is already Idle.
+        operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
+
+        address idleHandler = deployDocHandlerDex(
+            DeployParams({
+                protocol: Protocol.NONE,
+                dcaManager: address(dcaManager),
+                stablecoin: stablecoin,
+                shareToken: address(0),
+                uniswapSettings: uniswapSettings,
+                feeCollector: feeCollector,
+                amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
+                amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
+            })
+        );
+        console.log("Idle dex handler deployed at:", idleHandler);
+        operationsAdmin.assignHandler(stablecoin, IDLE_INDEX, idleHandler);
+        _proposeFinalOwner(idleHandler);
+        if (protocol == Protocol.NONE) {
+            selectedHandler = idleHandler;
+        }
+
+        address layerbankAToken = networkConfig.layerbankAToken;
+        if (layerbankAToken == address(0)) {
+            if (protocol == Protocol.LAYERBANK) {
+                revert("LayerBank aToken not available on this network");
+            }
+            console.log("Warning: LayerBank aToken not available for this dex stable");
+        } else {
+            address layerbankHandler = deployDocHandlerDex(
+                DeployParams({
+                    protocol: Protocol.LAYERBANK,
+                    dcaManager: address(dcaManager),
+                    stablecoin: stablecoin,
+                    shareToken: layerbankAToken,
+                    uniswapSettings: uniswapSettings,
+                    feeCollector: feeCollector,
+                    amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
+                    amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
+                })
+            );
+            console.log("LayerBank dex handler deployed at:", layerbankHandler);
+            operationsAdmin.assignHandler(stablecoin, LAYERBANK_INDEX, layerbankHandler);
+            _proposeFinalOwner(layerbankHandler);
+            if (protocol == Protocol.LAYERBANK) {
+                selectedHandler = layerbankHandler;
+            }
         }
     }
 
     function run() external returns (OperationsAdmin, address, DcaManager, DexHelperConfig) {
+        _assertLiveBroadcastSender(msg.sender);
         // Initialize DexHelperConfig which reads the STABLECOIN_TYPE env var
         DexHelperConfig helperConfig = new DexHelperConfig();
         DexHelperConfig.NetworkConfig memory networkConfig = helperConfig.getActiveNetworkConfig();
 
-        // Get stablecoin type (or use default if not specified)
-        string memory stablecoinType;
-        try vm.envString("STABLECOIN_TYPE") returns (string memory coinType) {
-            stablecoinType = coinType;
-        } catch {
-            stablecoinType = DEFAULT_STABLECOIN;
-        }
-        
+        string memory stablecoinType = _stablecoinType();
+
         console.log("Using stablecoin type:", stablecoinType);
-        bool isUSDRIF = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked("USDRIF"));
-        
-        // Get tokens based on current stablecoin type
-        address stablecoinAddress = helperConfig.getStablecoinAddress();
-        console.log("Stablecoin address:", stablecoinAddress);
-        
-        // Check if stablecoin is supported by the selected protocol
+        bool isUSDRIF = _isUsdrif(stablecoinType);
+        bool isUSDT0 = _isUsdt0(stablecoinType);
+
+        address stablecoin = helperConfig.getStablecoin();
+        console.log("Stablecoin address:", stablecoin);
+
         bool isSovryn = protocol == Protocol.SOVRYN;
-        
-        if (isSovryn && isUSDRIF) {
-            revert("USDRIF is not supported by Sovryn");
+
+        if (isSovryn && (isUSDRIF || isUSDT0)) {
+            revert("Sovryn does not list this stablecoin");
         }
 
-        vm.startBroadcast();
+        _beginLiveAwareBroadcast(msg.sender);
 
-        OperationsAdmin operationsAdmin = new OperationsAdmin();
-        DcaManager dcaManager = new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT);
+        OperationsAdmin operationsAdmin = new OperationsAdmin(deployOwner);
+        DcaManager dcaManager =
+            new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, deployOwner);
+        dcaManager.setTokenMinPurchaseAmount(stablecoin, isUSDT0 ? USDT0_MIN_PURCHASE_AMOUNT : MIN_PURCHASE_AMOUNT);
         address feeCollector = getFeeCollector(environment);
-        
-        address docHandlerDexAddress;
+
+        address docHandlerDex;
 
         IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
-            wrBtcToken: IWRBTC(networkConfig.wrbtcTokenAddress),
-            swapRouter02: ISwapRouter02(networkConfig.swapRouter02Address),
+            wrbtc: IWRBTC(networkConfig.wrbtc),
+            swapRouter: IUniswapV3SwapRouter(networkConfig.swapRouter),
             swapIntermediateTokens: networkConfig.swapIntermediateTokens,
             swapPoolFeeRates: networkConfig.swapPoolFeeRates,
-            mocOracle: ICoinPairPrice(networkConfig.mocOracleAddress)
+            mocOracle: ICoinPairPrice(networkConfig.mocOracle)
         });
 
         // For local or fork environments, deploy only the selected protocol's handler
         if (environment == Environment.LOCAL || environment == Environment.FORK) {
             console.log("Deploying single handler for local/fork environment");
-            
-            // Get the appropriate lending token address based on protocol
-            address lendingTokenAddress = helperConfig.getLendingTokenAddress();
-            if (lendingTokenAddress == address(0)) {
-                revert("Lending token not available for the selected combination");
+
+            address shareToken;
+            if (protocol != Protocol.NONE) {
+                shareToken = helperConfig.getShareToken();
+                if (shareToken == address(0)) {
+                    revert("Share token not available for the selected combination");
+                }
+                console.log("Share token address:", shareToken);
             }
-            
-            console.log("Lending token address:", lendingTokenAddress);
-            
+
             DeployParams memory params = DeployParams({
                 protocol: protocol,
                 dcaManager: address(dcaManager),
-                tokenAddress: stablecoinAddress,
-                lendingToken: lendingTokenAddress,
+                stablecoin: stablecoin,
+                shareToken: shareToken,
                 uniswapSettings: uniswapSettings,
                 feeCollector: feeCollector,
                 amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
                 amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
             });
-            
-            docHandlerDexAddress = deployDocHandlerDex(params);
 
-            address owner = adminAddresses[environment];
-            operationsAdmin.transferOwnership(owner);
-            dcaManager.transferOwnership(owner);
-            Ownable(docHandlerDexAddress).transferOwnership(owner);
+            docHandlerDex = deployDocHandlerDex(params);
         }
-        // For live networks (testnet/mainnet), deploy handlers for both lending protocols
+        // Live: idle + LayerBank Dex handlers for USDRIF / USDT0 (DOC stays on MoC).
         else if (environment == Environment.TESTNET || environment == Environment.MAINNET) {
-            console.log("Deploying handlers for lending protocols for live network");
-
-            // First register the lending protocols
-            operationsAdmin.setAdminRole(tx.origin);
-            operationsAdmin.addOrUpdateLendingProtocol(TROPYKUS_STRING, TROPYKUS_INDEX); // index 1
-            operationsAdmin.addOrUpdateLendingProtocol(SOVRYN_STRING, SOVRYN_INDEX); // index 2
-
-            // Deploy Tropykus handler if there's a valid lending token
-            address tropykusLendingToken = helperConfig.getLendingTokenAddress();
-            
-            if (tropykusLendingToken == address(0)) {
-                console.log("Warning: Tropykus lending token not available for this stablecoin");
-            } else {
-                // Deploy Tropykus handler
-                address tropykusHandler = deployDocHandlerDex(
-                    DeployParams({
-                        protocol: Protocol.TROPYKUS,
-                        dcaManager: address(dcaManager),
-                        tokenAddress: stablecoinAddress,
-                        lendingToken: tropykusLendingToken,
-                        uniswapSettings: uniswapSettings,
-                        feeCollector: feeCollector,
-                        amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
-                        amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
-                    })
-                );
-                console.log("Tropykus handler deployed at:", tropykusHandler);
-                
-                // Assign the Tropykus handler to the DCA manager
-                operationsAdmin.assignOrUpdateTokenHandler(stablecoinAddress, TROPYKUS_INDEX, tropykusHandler);
-                
-                // If we're deploying for Tropykus, set this as our main handler
-                if (protocol == Protocol.TROPYKUS) {
-                    docHandlerDexAddress = tropykusHandler;
-                }
-            }
-
-            // Only deploy Sovryn handler if the stablecoin is supported by Sovryn
-            if (!isUSDRIF) {
-                // Get Sovryn lending token address
-                address sovrynLendingToken = helperConfig.getLendingTokenAddress();
-                
-                if (sovrynLendingToken == address(0)) {
-                    console.log("Warning: Sovryn lending token not available for this stablecoin");
-                } else {
-                    // Deploy Sovryn handler
-                    address sovrynHandler = deployDocHandlerDex(
-                        DeployParams({
-                            protocol: Protocol.SOVRYN,
-                            dcaManager: address(dcaManager),
-                            tokenAddress: stablecoinAddress,
-                            lendingToken: sovrynLendingToken,
-                            uniswapSettings: uniswapSettings,
-                            feeCollector: feeCollector,
-                            amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
-                            amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
-                        })
-                    );
-                    console.log("Sovryn handler deployed at:", sovrynHandler);
-                    
-                    // Assign the Sovryn handler to the DCA manager
-                    operationsAdmin.assignOrUpdateTokenHandler(stablecoinAddress, SOVRYN_INDEX, sovrynHandler);
-                    
-                    // If we're deploying for Sovryn, set this as our main handler
-                    if (protocol == Protocol.SOVRYN) {
-                        docHandlerDexAddress = sovrynHandler;
-                    }
-                }
-            } else {
-                console.log("Skipping Sovryn handler deployment for USDRIF as it's not supported");
-            }
-
-            if (environment == Environment.TESTNET) {
-                operationsAdmin.setAdminRole(adminAddresses[Environment.TESTNET]);
-            }
+            docHandlerDex = _deployLiveDexHandlers(
+                operationsAdmin, dcaManager, stablecoin, networkConfig, uniswapSettings, feeCollector, isUSDRIF, isUSDT0
+            );
         }
+
+        _proposeFinalOwner(address(operationsAdmin));
+        _proposeFinalOwner(address(dcaManager));
+        _proposeFinalOwner(docHandlerDex);
 
         vm.stopBroadcast();
 
-        return (operationsAdmin, docHandlerDexAddress, dcaManager, helperConfig);
+        return (operationsAdmin, docHandlerDex, dcaManager, helperConfig);
+    }
+
+    function _stablecoinType() internal view returns (string memory stablecoinType) {
+        try vm.envString("STABLECOIN_TYPE") returns (string memory coinType) {
+            stablecoinType = coinType;
+        } catch {
+            stablecoinType = DOC_STRING;
+        }
     }
 }

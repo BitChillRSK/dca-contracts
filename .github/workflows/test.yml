@@ -11,6 +11,29 @@ env:
   FOUNDRY_DISABLE_NIGHTLY_WARNING: 1
 
 jobs:
+  # R72: enforce src/ staying BUSL-1.1 (script/ and test/ stay MIT). Pure grep, no Foundry needed,
+  # so this stays fast and does not compete with the matrix below for toolchain-install time.
+  license-check:
+    name: license-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: src/ is BUSL-1.1
+        run: make license-check
+
+  # R91: first-party tree is forge-fmt-clean (vendored ABIs ignored in foundry.toml).
+  fmt-check:
+    name: fmt-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
+        with:
+          version: v1.7.1
+      - name: forge fmt --check
+        run: make fmt-check
+
   test:
     name: ${{ matrix.target }} (${{ matrix.stablecoin }})
     runs-on: ubuntu-latest
@@ -18,10 +41,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: moc-sovryn
+          - target: moc-none
             stablecoin: DOC
-          - target: dex-sovryn
+          - target: moc-layerbank
+            stablecoin: DOC
+          - target: dex-none
             stablecoin: USDRIF
+          - target: dex-none
+            stablecoin: USDT0
+          - target: dex-layerbank
+            stablecoin: USDRIF
+          - target: dex-layerbank
+            stablecoin: USDT0
+          - target: invariants-layerbank
+            stablecoin: DOC
     steps:
       - uses: actions/checkout@v4
         with:
@@ -53,4 +86,25 @@ jobs:
       - name: Run ${{ matrix.target }}
         env:
           STABLECOIN_TYPE: ${{ matrix.stablecoin }}
-        run: make patch-deps && make ${{ matrix.target }}
+        run: make ${{ matrix.target }}
+
+  # The matrix above is FOUNDRY_PROFILE=ci (via_ir=false). R81's write counts are a codegen result,
+  # and the profile that ships is via_ir. A solc bump that split the packed stores only under IR
+  # would leave this matrix green. This job runs that one test under the deploy profile.
+  r81-deploy-codegen:
+    name: r81 packed writes (deploy)
+    runs-on: ubuntu-latest
+    env:
+      FOUNDRY_PROFILE: deploy
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
+        with:
+          version: v1.7.1
+
+      - name: Count packed-slot writes under via_ir
+        run: forge test --match-path test/gas/R81PackedSlotWritesGas.t.sol -vv

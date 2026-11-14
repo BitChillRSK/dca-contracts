@@ -1,456 +1,504 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
 import {IDcaManager} from "./interfaces/IDcaManager.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import {BitChillOwnable} from "./BitChillOwnable.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {ITokenHandler} from "./interfaces/ITokenHandler.sol";
-import {ITokenLending} from "./interfaces/ITokenLending.sol";
-import {OperationsAdmin} from "./OperationsAdmin.sol";
-import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
+import {ILendingHandler} from "./interfaces/ILendingHandler.sol";
+import {IOperationsAdmin} from "./interfaces/IOperationsAdmin.sol";
+import {IPurchaseRbtc} from "./interfaces/IPurchaseRbtc.sol";
 
 /**
- * @title DCA Manager
- * @author BitChill team: Ynyesto (GitHub: @ynyesto)
- * @notice Entry point for the DCA dApp. Create and manage DCA schedules. 
+ * @title DcaManager
+ * @author BitChill team: Antonio Rodríguez-Ynyesto
+ * @notice Stores every DCA schedule and routes user and swapper calls to the handler that holds the
+ *         funds they name.
+ * @dev Every external schedule mutator is non-reentrant except the allowlisted-swapper purchase paths,
+ *      which complete schedule effects before calling BitChill-deployed handlers. A swapper can open a
+ *      self-expiring five-block window that blocks only user mutations capable of invalidating a batch
+ *      refreshed after activation. Governance can pause new deposits per route, not purchases or exits.
  */
-contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
-    
+contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
+    using SafeCast for uint256;
+
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    OperationsAdmin private s_operationsAdmin;
+    /**
+     * @dev Five block heights including the activation block; fixed because this is an execution
+     *      buffer, not a confirmation or finality period.
+     */
+    uint256 public constant PROTECTED_PURCHASE_WINDOW_BLOCKS = 5;
 
     /**
-     * @notice Each user may create different schedules with one or more stablecoins
+     * @dev Constructor-pinned registry. There is no setter: swapping this address
+     *      would redirect every live schedule and bypass add-only route assignment.
      */
-    mapping(address user => mapping(address tokenDeposited => DcaDetails[] usersDcaSchedules)) private s_dcaSchedules;
-    uint256 private s_minPurchasePeriod; // Minimum time between purchases
-    uint256 private s_maxSchedulesPerToken; // Maximum number of schedules per stablecoin
-    uint256 private s_defaultMinPurchaseAmount; // Default minimum purchase amount for all tokens
-    mapping(address token => uint256) private s_tokenMinPurchaseAmounts; // Custom minimum purchase amounts per token
+    IOperationsAdmin public immutable override i_operationsAdmin;
+
+    /**
+     * @notice Schedules keyed by their stablecoin and protocol-wide creation id.
+     * @dev Keeping both outside the value makes it two slots. A batch row named under the wrong token
+     *      addresses nothing; `_callersSchedule` is the single user-ownership check.
+     */
+    mapping(address token => mapping(uint64 scheduleId => DcaSchedule dcaSchedule)) private s_dcaSchedules;
+
+    /**
+     * @notice The ids each user holds for each stablecoin.
+     * @dev Enumeration only: purchases never read it.
+     */
+    mapping(address user => mapping(address token => uint64[] scheduleIds)) private s_scheduleIds;
+
+    ProtocolSettings private s_protocolSettings;
+    mapping(address token => uint256) private s_tokenMinPurchaseAmounts;
+    /**
+     * @dev Zero means never activated: every real block number is at least zero, so mutations start
+     *      unlocked. While live this holds the first block at which the eight guarded calls resume.
+     */
+    uint256 private s_userMutationsAllowedFromBlock;
 
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
     //////////////////////////////////////////////////////////////*/
-    /**
-     * @notice validate the schedule index
-     * @param user the user address to validate the schedule for
-     * @param token the token address
-     * @param scheduleIndex the schedule index
-     */
-    modifier validateScheduleIndex(address user, address token, uint256 scheduleIndex) {
-        if (scheduleIndex >= s_dcaSchedules[user][token].length) {
-            revert DcaManager__InexistentScheduleIndex();
-        }
+    /// @dev The minimum is at least one whole UTC day to preserve the midnight cadence grid.
+    modifier validateMinPurchasePeriod(uint256 minPurchasePeriod) {
+        if (minPurchasePeriod < 1 days) revert DcaManager__MinPurchasePeriodMustBeAtLeastOneDay();
+        if (minPurchasePeriod % 1 days != 0) revert DcaManager__PurchasePeriodMustBeWholeDays();
         _;
     }
 
-    /**
-     * @notice only allow swapper role
-     */
+    /// @dev Only addresses on the OperationsAdmin swapper allowlist.
     modifier onlySwapper() {
-        if (!s_operationsAdmin.hasRole(s_operationsAdmin.SWAPPER_ROLE(), msg.sender)) {
+        if (!i_operationsAdmin.isSwapper(msg.sender)) {
             revert DcaManager__UnauthorizedSwapper(msg.sender);
         }
         _;
     }
 
+    /// @dev Refuse only the user actions that can invalidate a batch refreshed after window activation.
+    modifier whenUserMutationsAllowed() {
+        _requireUserMutationsAllowed();
+        _;
+    }
+
     /*//////////////////////////////////////////////////////////////
-                               FUNCTIONS
+                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @param operationsAdminAddress the address of the admin operations contract
-     * @param minPurchasePeriod the minimum time between purchases (in seconds)
-     * @param maxSchedulesPerToken the maximum number of schedules allowed per token
-     * @param defaultMinPurchaseAmount the default minimum purchase amount for all tokens
+     * @param operationsAdmin The OperationsAdmin this manager is permanently pinned to.
+     * @param minPurchasePeriod Minimum time between purchases, in seconds; at least one whole UTC day.
+     * @param maxSchedulesPerToken Maximum number of schedules a user may hold per token.
+     * @param initialOwner Address that owns this contract immediately after deploy.
      */
-    constructor(address operationsAdminAddress, uint256 minPurchasePeriod, uint256 maxSchedulesPerToken, uint256 defaultMinPurchaseAmount)
-        Ownable()
+    constructor(address operationsAdmin, uint256 minPurchasePeriod, uint256 maxSchedulesPerToken, address initialOwner)
+        BitChillOwnable(initialOwner)
+        validateMinPurchasePeriod(minPurchasePeriod)
     {
-        _validateMinPurchasePeriod(minPurchasePeriod);
-        s_operationsAdmin = OperationsAdmin(operationsAdminAddress);
-        s_minPurchasePeriod = minPurchasePeriod;
-        s_maxSchedulesPerToken = maxSchedulesPerToken;
-        s_defaultMinPurchaseAmount = defaultMinPurchaseAmount;
+        if (operationsAdmin.code.length == 0) {
+            revert DcaManager__OperationsAdminIsNotAContract(operationsAdmin);
+        }
+        i_operationsAdmin = IOperationsAdmin(operationsAdmin);
+        s_protocolSettings = ProtocolSettings({
+            minPurchasePeriod: minPurchasePeriod.toUint32(),
+            maxSchedulesPerToken: maxSchedulesPerToken.toUint16(),
+            scheduleNonce: 0
+        });
     }
 
-    /**
-     * @notice deposit the full stablecoin amount for DCA on the contract
-     * @param token the token address
-     * @param scheduleIndex the schedule index
-     * @param scheduleId the schedule id for validation
-     * @param depositAmount the amount of stablecoin to deposit
-     */
-    function depositToken(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 depositAmount)
-        external
-        override
-        nonReentrant
-        validateScheduleIndex(msg.sender, token, scheduleIndex)
-    {
-        _validateDeposit(depositAmount);
-        DcaDetails storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
-        _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
-        uint256 newTokenBalance = dcaSchedule.tokenBalance + depositAmount;
-        dcaSchedule.tokenBalance = newTokenBalance;
-        _handler(token, dcaSchedule.lendingProtocolIndex).depositToken(msg.sender, depositAmount);
-        emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
-    }
+    /*//////////////////////////////////////////////////////////////
+                           EXTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    // User operations: schedule lifecycle, funding, withdrawals, and rBTC claims.
 
     /**
-     * @param token the token address
-     * @param scheduleIndex the schedule index
-     * @param scheduleId the schedule id for validation
-     * @param purchaseAmount the amount of stablecoin to swap periodically for rBTC
-     * @notice the amount cannot be greater than or equal to half of the deposited amount
-     */
-    function setPurchaseAmount(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 purchaseAmount)
-        external
-        override
-        validateScheduleIndex(msg.sender, token, scheduleIndex)
-    {
-        DcaDetails storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
-        _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
-        _validatePurchaseAmount(token, purchaseAmount, dcaSchedule.tokenBalance);
-        dcaSchedule.purchaseAmount = purchaseAmount;
-        emit DcaManager__PurchaseAmountSet(msg.sender, scheduleId, purchaseAmount);
-    }
-
-    /**
-     * @param token the token address
-     * @param scheduleIndex the schedule index
-     * @param scheduleId the schedule id for validation
-     * @param purchasePeriod the time (in seconds) between rBTC purchases for each user
-     * @notice the period
-     */
-    function setPurchasePeriod(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 purchasePeriod)
-        external
-        override
-        validateScheduleIndex(msg.sender, token, scheduleIndex)
-    {
-        DcaDetails storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
-        _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
-        _validatePurchasePeriod(purchasePeriod);
-        dcaSchedule.purchasePeriod = purchasePeriod;
-        emit DcaManager__PurchasePeriodSet(msg.sender, scheduleId, purchasePeriod);
-    }
-
-    /**
-     * @notice deposit the full stablecoin amount for DCA on the contract, set the period and the amount for purchases
-     * @param token: the token address of stablecoin to deposit
-     * @param depositAmount: the amount of stablecoin to deposit
-     * @param purchaseAmount: the amount of stablecoin to swap periodically for rBTC
-     * @param purchasePeriod: the time (in seconds) between rBTC purchases for each user
-     * @param lendingProtocolIndex: the lending protocol, if any, where the token will be deposited to generate yield
+     * @inheritdoc IDcaManager
+     * @dev Argument checks run before the pull; an overflowing argument or an exhausted counter
+     *      reverts with SafeCast data.
      */
     function createDcaSchedule(
         address token,
         uint256 depositAmount,
         uint256 purchaseAmount,
         uint256 purchasePeriod,
-        uint256 lendingProtocolIndex
-    ) external override {
-        _validatePurchasePeriod(purchasePeriod);
+        uint256 routeIndex
+    ) external override nonReentrant {
+        if (token == address(0)) revert DcaManager__TokenNotAccepted(token, routeIndex);
+        uint128 deposit = depositAmount.toUint128();
+        uint96 purchase = purchaseAmount.toUint96();
+        uint32 period = purchasePeriod.toUint32();
+        uint32 route = routeIndex.toUint32();
+
+        // One load of the packed scalars, and the id this schedule will carry. Stored before the
+        // pull so the settings word is not reloaded after it.
+        ProtocolSettings memory settings = s_protocolSettings;
+        uint64 scheduleId;
+        // A widened uint64 plus one cannot overflow; `toUint64` still reverts once the nonce is exhausted.
+        unchecked {
+            scheduleId = (uint256(settings.scheduleNonce) + 1).toUint64();
+        }
+        s_protocolSettings.scheduleNonce = scheduleId;
+
+        _validatePurchasePeriod(purchasePeriod, settings.minPurchasePeriod);
         _validateDeposit(depositAmount);
         _validatePurchaseAmount(token, purchaseAmount, depositAmount);
-        _handler(token, lendingProtocolIndex).depositToken(msg.sender, depositAmount);
+        _handlerForDeposit(token, route).depositToken(msg.sender, depositAmount);
 
-        DcaDetails[] storage schedules = s_dcaSchedules[msg.sender][token];
-        uint256 numOfSchedules = schedules.length;
-        if (numOfSchedules == s_maxSchedulesPerToken) {
+        // Checked after the pull, beside the push it guards: checking earlier makes the push reread
+        // the list's length.
+        uint64[] storage scheduleIds = s_scheduleIds[msg.sender][token];
+        if (scheduleIds.length >= settings.maxSchedulesPerToken) {
             revert DcaManager__MaxSchedulesPerTokenReached(token);
         }
-
-        bytes32 scheduleId =
-            keccak256(abi.encodePacked(msg.sender, token, block.timestamp, numOfSchedules));
-
-        DcaDetails memory dcaSchedule = DcaDetails(
-            depositAmount,
-            purchaseAmount,
-            purchasePeriod,
-            0, // lastPurchaseTimestamp
-            scheduleId,
-            lendingProtocolIndex
-        );
-
-        schedules.push(dcaSchedule);
+        // A new id addresses empty storage, so the zero cadence anchor and paused flag are left unset.
+        _storeNewSchedule(s_dcaSchedules[token][scheduleId], deposit, period, route, msg.sender, purchase);
+        scheduleIds.push(scheduleId);
         emit DcaManager__DcaScheduleCreated(
-            msg.sender, 
-            token,
-            scheduleId, 
-            depositAmount, 
-            purchaseAmount, 
-            purchasePeriod, 
-            lendingProtocolIndex
+            msg.sender, token, scheduleId, depositAmount, purchaseAmount, purchasePeriod, routeIndex
         );
     }
 
     /**
-     * @notice deposit the full stablecoin amount for DCA on the contract, set the period and the amount for purchases
-     * @notice if the purchase or deposit amounts, or the purchase period are set to 0, they don't get updated
-     * @param token: the token address of stablecoin to deposit
-     * @param scheduleIndex: the index of the schedule to create or update
-     * @param scheduleId: the schedule id for validation
-     * @param depositAmount: the amount of stablecoin to add to the existing schedule (final token balance for the schedule is the previous balance + depositAmount)
-     * @param purchaseAmount: the amount of stablecoin to swap periodically for rBTC
-     * @param purchasePeriod: the time (in seconds) between rBTC purchases for each user
+     * @inheritdoc IDcaManager
+     * @dev Widths are checked before the handler pull so an overflowing credit cannot move tokens. The
+     *      credit is stored and logged before the pull, so a purchase reached from a callback during the
+     *      pull debits the new balance, and its balance event is the last one.
      */
-    function updateDcaSchedule(
-        address token,
-        uint256 scheduleIndex,
-        bytes32 scheduleId,
-        uint256 depositAmount,
-        uint256 purchaseAmount,
-        uint256 purchasePeriod
-    ) external override validateScheduleIndex(msg.sender, token, scheduleIndex) {
-        DcaDetails[] storage schedules = s_dcaSchedules[msg.sender][token];
-        DcaDetails memory dcaSchedule = schedules[scheduleIndex];
-        _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
-
-        if (purchasePeriod > 0) {
-            _validatePurchasePeriod(purchasePeriod);
-            dcaSchedule.purchasePeriod = purchasePeriod;
-        }
-        if (depositAmount > 0) {
-            dcaSchedule.tokenBalance += depositAmount;
-            _handler(token, dcaSchedule.lendingProtocolIndex).depositToken(msg.sender, depositAmount);
-        }
-        if (purchaseAmount > 0) {
-            _validatePurchaseAmount(token, purchaseAmount, dcaSchedule.tokenBalance);
-            dcaSchedule.purchaseAmount = purchaseAmount;
-        }
-
-        schedules[scheduleIndex] = dcaSchedule;
-
-        emit DcaManager__DcaScheduleUpdated(
-            msg.sender,
-            token,
-            dcaSchedule.scheduleId,
-            dcaSchedule.tokenBalance,
-            dcaSchedule.purchaseAmount,
-            dcaSchedule.purchasePeriod
-        );
+    function depositToken(address token, uint64 scheduleId, uint256 depositAmount) external override nonReentrant {
+        _validateDeposit(depositAmount);
+        DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
+        uint128 newTokenBalance = (uint256(dcaSchedule.tokenBalance) + depositAmount.toUint128()).toUint128();
+        uint256 routeIndex = dcaSchedule.routeIndex;
+        dcaSchedule.tokenBalance = newTokenBalance;
+        emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
+        _handlerForDeposit(token, routeIndex).depositToken(msg.sender, depositAmount);
     }
 
-    /**
-     * @notice delete a DCA schedule
-     * @param token: the token of the schedule to delete
-     * @param scheduleIndex: the index of the schedule to delete
-     * @param scheduleId: the id of the schedule to delete for validation
-     */
-    function deleteDcaSchedule(address token, uint256 scheduleIndex, bytes32 scheduleId) external override 
-        validateScheduleIndex(msg.sender, token, scheduleIndex)
+    /// @inheritdoc IDcaManager
+    function updatePurchaseAmount(address token, uint64 scheduleId, uint256 newPurchaseAmount)
+        external
+        override
+        whenUserMutationsAllowed
         nonReentrant
     {
-        DcaDetails[] storage schedules = s_dcaSchedules[msg.sender][token];
-        
-        DcaDetails memory dcaSchedule = schedules[scheduleIndex];
-        _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
+        DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
+        uint96 newAmount = newPurchaseAmount.toUint96();
+        _validatePurchaseAmount(token, newAmount, dcaSchedule.tokenBalance);
+        uint256 previousPurchaseAmount = dcaSchedule.purchaseAmount;
+        dcaSchedule.purchaseAmount = newAmount;
+        emit DcaManager__PurchaseAmountUpdated(msg.sender, scheduleId, previousPurchaseAmount, newPurchaseAmount);
+    }
+
+    /// @inheritdoc IDcaManager
+    function updatePurchasePeriod(address token, uint64 scheduleId, uint256 newPurchasePeriod)
+        external
+        override
+        whenUserMutationsAllowed
+        nonReentrant
+    {
+        DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
+        _validatePurchasePeriod(newPurchasePeriod, s_protocolSettings.minPurchasePeriod);
+        uint256 previousPurchasePeriod = dcaSchedule.purchasePeriod;
+        dcaSchedule.purchasePeriod = newPurchasePeriod.toUint32();
+        emit DcaManager__PurchasePeriodUpdated(msg.sender, scheduleId, previousPurchasePeriod, newPurchasePeriod);
+    }
+
+    /// @inheritdoc IDcaManager
+    function setSchedulePaused(address token, uint64 scheduleId, bool paused)
+        external
+        override
+        whenUserMutationsAllowed
+        nonReentrant
+    {
+        DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
+        if (dcaSchedule.paused == paused) return;
+        dcaSchedule.paused = paused;
+        emit DcaManager__SchedulePauseSet(msg.sender, scheduleId, paused);
+    }
+
+    /// @inheritdoc IDcaManager
+    function deleteDcaSchedule(address token, uint64 scheduleId, uint256 scheduleIdIndex)
+        external
+        override
+        whenUserMutationsAllowed
+        nonReentrant
+    {
+        DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
+
+        // Both fields are read before the schedule is deleted, and both live in its first slot.
+        uint256 tokenBalance = dcaSchedule.tokenBalance;
+        uint256 routeIndex = dcaSchedule.routeIndex;
+
+        // Both structures drop the schedule before the handler call: the schedule itself, and the id's
+        // place in its owner's list for this token.
+        _removeScheduleId(msg.sender, token, scheduleId, scheduleIdIndex);
+        delete s_dcaSchedules[token][scheduleId];
+
+        uint256 amountWithdrawn;
+        if (tokenBalance > 0) {
+            amountWithdrawn = _handler(token, routeIndex).withdrawToken(msg.sender, tokenBalance);
+        }
+
+        // The event reports what left the handler, which may be less than the schedule's tokenBalance.
+        emit DcaManager__DcaScheduleDeleted(msg.sender, token, scheduleId, amountWithdrawn);
+    }
+
+    /// @inheritdoc IDcaManager
+    function withdrawToken(address token, uint64 scheduleId, uint256 withdrawalAmount)
+        external
+        override
+        whenUserMutationsAllowed
+        nonReentrant
+    {
+        _withdrawToken(token, scheduleId, withdrawalAmount);
+    }
+
+    /**
+     * @inheritdoc IDcaManager
+     * @dev The route index is captured from the schedule before the handler call, and interest is
+     *      withdrawn from the handler that just paid out the principal.
+     */
+    function withdrawTokenAndInterest(address token, uint64 scheduleId, uint256 withdrawalAmount)
+        external
+        override
+        whenUserMutationsAllowed
+        nonReentrant
+    {
+        (uint256 routeIndex, ITokenHandler handler) = _withdrawToken(token, scheduleId, withdrawalAmount);
+        _checkTokenIsLent(token, routeIndex);
+        _withdrawInterest(ILendingHandler(address(handler)), token, routeIndex);
+    }
+
+    /**
+     * @inheritdoc IDcaManager
+     * @dev Moves no cash. The interest already sits in the handler's lending position, so raising this
+     *      schedule's claim over it is a storage write; the accrued-interest call only reads, and never
+     *      redeems, mints, or transfers. On a market that accrues lazily that read also pokes the accrual.
+     */
+    function topUpFromInterest(address token, uint64 scheduleId, uint256 amount) external override nonReentrant {
+        DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
+        uint256 routeIndex = dcaSchedule.routeIndex;
+        _checkTokenIsLent(token, routeIndex);
+
+        uint256 accruedInterest = ILendingHandler(address(_handler(token, routeIndex)))
+            .getAccruedInterest(msg.sender, _lockedPrincipal(msg.sender, token, routeIndex));
+        if (accruedInterest == 0) revert DcaManager__NoInterestToTopUpWith(token, routeIndex);
+        if (amount > accruedInterest) {
+            revert DcaManager__TopUpExceedsAccruedInterest(token, routeIndex, amount, accruedInterest);
+        }
 
         uint256 tokenBalance = dcaSchedule.tokenBalance;
-        uint256 lendingProtocolIndex = dcaSchedule.lendingProtocolIndex;
-
-        // Remove the schedule by poping the last one and overwriting the one to delete with it
-        uint256 lastIndex = schedules.length - 1;
-        if (scheduleIndex != lastIndex) {
-            schedules[scheduleIndex] = schedules[lastIndex];
-        }
-        schedules.pop();
-
-        if (tokenBalance > 0) {
-            _handler(token, lendingProtocolIndex).withdrawToken(msg.sender, tokenBalance);
+        uint256 purchaseAmount = dcaSchedule.purchaseAmount;
+        uint128 newTokenBalance = (tokenBalance + amount).toUint128();
+        // The credit must buy at least one more purchase than the balance could already fund, so
+        // interest cannot be moved over in dust. `purchaseAmount` is never zero: every write meets the
+        // token minimum.
+        if (newTokenBalance / purchaseAmount == tokenBalance / purchaseAmount) {
+            revert DcaManager__TopUpDoesNotFundAnotherPurchase(token, scheduleId, amount);
         }
 
-        emit DcaManager__DcaScheduleDeleted(msg.sender, token, scheduleId, tokenBalance);
+        dcaSchedule.tokenBalance = newTokenBalance;
+        emit DcaManager__ScheduleToppedUpFromInterest(msg.sender, token, scheduleId, amount);
+        emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
+    }
+
+    /// @inheritdoc IDcaManager
+    function withdrawAllAccumulatedInterest(address[] calldata tokens, uint256[] calldata routeIndexes)
+        external
+        override
+        whenUserMutationsAllowed
+        nonReentrant
+    {
+        uint256 pairCount = _requirePairedWithdrawalArrays(tokens, routeIndexes);
+        for (uint256 i; i < pairCount; ++i) {
+            address handler = i_operationsAdmin.getHandler(tokens[i], routeIndexes[i]);
+            if (handler == address(0)) continue;
+            // Skip idle routes so a mixed idle+lending call still withdraws interest
+            // from the indexes that yield. Unassigned pairs already continued above.
+            if (!_isLendingRoute(routeIndexes[i])) continue;
+            _withdrawInterest(ILendingHandler(handler), tokens[i], routeIndexes[i]);
+        }
     }
 
     /**
-     * @notice withdraw amount for DCA from the contract
-     * @param token: the token to withdraw
-     * @param scheduleIndex: the index of the schedule to withdraw from
-     * @param scheduleId: the schedule id for validation
-     * @param withdrawalAmount: the amount to withdraw
+     * @inheritdoc IDcaManager
+     * @dev Balances are zeroed and logged before the handler call, as on a stablecoin withdrawal. A
+     *      schedule already at zero is neither written nor logged.
      */
-    function withdrawToken(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 withdrawalAmount)
+    function withdrawLendingShares(address token, uint256 routeIndex)
+        external
+        override
+        whenUserMutationsAllowed
+        nonReentrant
+    {
+        _checkTokenIsLent(token, routeIndex);
+        ILendingHandler lendingHandler = ILendingHandler(address(_handler(token, routeIndex)));
+        uint64[] memory scheduleIds = s_scheduleIds[msg.sender][token];
+        uint256 scheduleCount = scheduleIds.length;
+        for (uint256 i; i < scheduleCount; ++i) {
+            uint64 scheduleId = scheduleIds[i];
+            DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
+            if (dcaSchedule.routeIndex != routeIndex || dcaSchedule.tokenBalance == 0) continue;
+            dcaSchedule.tokenBalance = 0;
+            emit DcaManager__TokenBalanceUpdated(token, scheduleId, 0);
+        }
+        lendingHandler.withdrawShares(msg.sender);
+    }
+
+    /// @inheritdoc IDcaManager
+    function withdrawAllAccumulatedRbtc(address[] calldata tokens, uint256[] calldata routeIndexes)
         external
         override
         nonReentrant
     {
-        _withdrawToken(token, scheduleIndex, scheduleId, withdrawalAmount);
-    }
-
-    /**
-     * @notice buy rBTC for a user
-     * @param buyer: the address of the user
-     * @param token: the token to buy rBTC with
-     * @param scheduleIndex: the index of the schedule to buy rBTC from
-     * @param scheduleId: the id of the schedule to buy rBTC from
-     */
-    function buyRbtc(address buyer, address token, uint256 scheduleIndex, bytes32 scheduleId)
-        external
-        override
-        nonReentrant
-        onlySwapper
-    {
-        (uint256 purchaseAmount, uint256 lendingProtocolIndex) =
-            _rBtcPurchaseChecksEffects(buyer, token, scheduleIndex, scheduleId);
-
-        IPurchaseRbtc(address(_handler(token, lendingProtocolIndex))).buyRbtc(
-            buyer, scheduleId, purchaseAmount
-        );
-    }
-
-    /**
-     * @param buyers the array of addresses of the users on behalf of whom rBTC is going to be bought
-     * @notice a buyer may be featured more than once in the buyers array if two or more their schedules are due for a purchase
-     * @notice we need to take extra care in the back end to not mismatch a user's address with a wrong DCA schedule
-     * @param token the stablecoin that all users in the array will spend to purchase rBTC
-     * @param scheduleIndexes the indexes of the DCA schedules that correspond to each user's purchase
-     * @param purchaseAmounts the purchase amount that corresponds to each user's purchase
-     * @param lendingProtocolIndex the lending protocol to withdraw the tokens from before purchasing
-     * @notice the token and lending protocol are the same for all dca schedules in the batch.
-     * @notice SWAPPER MUST NOT MIX SCHEDULES WITH DIFFERENT TOKENS OR LENDING PROTOCOLS IN THE SAME BATCH
-     * @notice This is unchecked to save gas because access to this function is controlled by the onlySwapper modifier
-     */
-    function batchBuyRbtc(
-        address[] calldata buyers,
-        address token,
-        uint256[] calldata scheduleIndexes,
-        bytes32[] calldata scheduleIds,
-        uint256[] calldata purchaseAmounts,
-        uint256 lendingProtocolIndex
-    ) external override nonReentrant onlySwapper {
-        uint256 numOfPurchases = buyers.length;
-        if (numOfPurchases == 0) revert DcaManager__EmptyBatchPurchaseArrays();
-        if (
-            numOfPurchases != scheduleIndexes.length || numOfPurchases != scheduleIds.length
-                || numOfPurchases != purchaseAmounts.length
-        ) revert DcaManager__BatchPurchaseArraysLengthMismatch();
-        for (uint256 i; i < numOfPurchases; ++i) {
-            (uint256 scheudulePurchaseAmount, uint256 scheduleLendingProtocolIndex) = _rBtcPurchaseChecksEffects(buyers[i], token, scheduleIndexes[i], scheduleIds[i]);
-            if (scheudulePurchaseAmount != purchaseAmounts[i]) revert DcaManager__PurchaseAmountMismatch(buyers[i], token, scheduleIds[i], scheduleIndexes[i], scheudulePurchaseAmount, purchaseAmounts[i]);
-            if (scheduleLendingProtocolIndex != lendingProtocolIndex) revert DcaManager__LendingProtocolIndexMismatch(buyers[i], token, scheduleIds[i], scheduleIndexes[i], scheduleLendingProtocolIndex, lendingProtocolIndex);
-        }
-        IPurchaseRbtc(address(_handler(token, lendingProtocolIndex))).batchBuyRbtc(
-            buyers, scheduleIds, purchaseAmounts
-        );
-    }
-
-    /**
-     * @notice Users can withdraw the rBtc accumulated through all the DCA strategies created using a given stablecoin
-     * @param token The token address of the stablecoin
-     * @param lendingProtocolIndex The index of the lending protocol where the stablecoin is lent (0 if it is not lent)
-     */
-    function withdrawRbtcFromTokenHandler(address token, uint256 lendingProtocolIndex) external override nonReentrant {
-        IPurchaseRbtc(address(_handler(token, lendingProtocolIndex))).withdrawAccumulatedRbtc(msg.sender);
-    }
-
-    /**
-     * @notice Withdraw all of the rBTC accumulated by a user through their various DCA strategies
-     * @param tokens Array of token addresses to withdraw rBTC from
-     * @param lendingProtocolIndexes Array of lending protocol indexes where the user has positions
-     */
-    function withdrawAllAccumulatedRbtc(address[] calldata tokens, uint256[] calldata lendingProtocolIndexes) external override nonReentrant {
-        for (uint256 i; i < tokens.length; ++i) {
-            for (uint256 j; j < lendingProtocolIndexes.length; ++j) {
-                address tokenHandlerAddress = s_operationsAdmin.getTokenHandler(tokens[i], lendingProtocolIndexes[j]);
-                if (tokenHandlerAddress == address(0)) continue;
-                IPurchaseRbtc handler = IPurchaseRbtc(tokenHandlerAddress);
-                if (handler.getAccumulatedRbtcBalance(msg.sender) == 0) continue;
-                handler.withdrawAccumulatedRbtc(msg.sender);
-            }
+        uint256 pairCount = _requirePairedWithdrawalArrays(tokens, routeIndexes);
+        for (uint256 i; i < pairCount; ++i) {
+            IPurchaseRbtc handler = IPurchaseRbtc(i_operationsAdmin.getHandler(tokens[i], routeIndexes[i]));
+            if (address(handler) == address(0)) continue;
+            if (handler.getAccumulatedRbtcBalance(msg.sender) == 0) continue;
+            handler.withdrawAccumulatedRbtc(msg.sender);
         }
     }
 
-    /**
-     * @notice withdraw amount for DCA from the contract, as well as the yield generated across all DCA schedules
-     * @param token: the token of which to withdraw the specified amount and yield
-     * @param scheduleIndex: the index of the schedule to withdraw from
-     * @param scheduleId: the schedule id for validation
-     * @param withdrawalAmount: the amount to withdraw
-     * @param lendingProtocolIndex: the lending protocol index
-     */
-    function withdrawTokenAndInterest(
-        address token,
-        uint256 scheduleIndex,
-        bytes32 scheduleId,
-        uint256 withdrawalAmount,
-        uint256 lendingProtocolIndex
-    ) external override nonReentrant {
-        _withdrawToken(token, scheduleIndex, scheduleId, withdrawalAmount);
-        _withdrawInterest(token, lendingProtocolIndex);
+    // Swapper-only operations: protected-window activation and batch execution.
+
+    /// @inheritdoc IDcaManager
+    function activateProtectedPurchaseWindow() external override onlySwapper {
+        uint256 userMutationsAllowedFromBlock = s_userMutationsAllowedFromBlock;
+        if (block.number < userMutationsAllowedFromBlock) {
+            revert DcaManager__ProtectedPurchaseWindowStillActive(userMutationsAllowedFromBlock);
+        }
+
+        unchecked {
+            userMutationsAllowedFromBlock = block.number + PROTECTED_PURCHASE_WINDOW_BLOCKS;
+        }
+        s_userMutationsAllowedFromBlock = userMutationsAllowedFromBlock;
+        emit DcaManager__ProtectedPurchaseWindowActivated(msg.sender, userMutationsAllowedFromBlock);
     }
 
-    /**
-     * @dev Users can withdraw the stablecoin interests accrued by the deposits they made
-     * @param tokens Array of token addresses to withdraw interest from
-     * @param lendingProtocolIndexes Array of lending protocol indexes to withdraw interest from
-     */
-    function withdrawAllAccumulatedInterest(address[] calldata tokens, uint256[] calldata lendingProtocolIndexes)
-        external
-        override
-        nonReentrant
-    {
-        for (uint256 i; i < tokens.length; ++i) {
-            for (uint256 j; j < lendingProtocolIndexes.length; ++j) {
-                address tokenHandlerAddress = s_operationsAdmin.getTokenHandler(tokens[i], lendingProtocolIndexes[j]);
-                if (tokenHandlerAddress == address(0)) continue;
-                _withdrawInterest(tokens[i], lendingProtocolIndexes[j]);
-            }
+    /// @inheritdoc IDcaManager
+    function batchBuyRbtc(Batch calldata batch) external override onlySwapper {
+        _batchBuyRbtc(batch);
+    }
+
+    /// @inheritdoc IDcaManager
+    function batchBuyRbtcAcrossHandlers(Batch[] calldata batches) external override onlySwapper {
+        uint256 numBatches = batches.length;
+        if (numBatches == 0) revert DcaManager__EmptyHandlerBatches();
+
+        for (uint256 i; i < numBatches; ++i) {
+            _batchBuyRbtc(batches[i]);
         }
     }
 
-    /**
-     * @notice update the admin operations contract
-     * @param operationsAdminAddress: the address of admin operations
-     */
-    function setOperationsAdmin(address operationsAdminAddress) external override onlyOwner {
-        s_operationsAdmin = OperationsAdmin(operationsAdminAddress);
-        emit DcaManager__OperationsAdminUpdated(operationsAdminAddress);
-    }
+    // Owner-only operations: protocol configuration.
 
-    /**
-     * @notice modify the minimum period between purchases
-     * @param minPurchasePeriod: the new period
-     */
-    function modifyMinPurchasePeriod(uint256 minPurchasePeriod)
+    /// @inheritdoc IDcaManager
+    function setMinPurchasePeriod(uint256 minPurchasePeriod)
         external
         override
         onlyOwner
+        validateMinPurchasePeriod(minPurchasePeriod)
     {
-        _validateMinPurchasePeriod(minPurchasePeriod);
-        s_minPurchasePeriod = minPurchasePeriod;
+        s_protocolSettings.minPurchasePeriod = minPurchasePeriod.toUint32();
         emit DcaManager__MinPurchasePeriodModified(minPurchasePeriod);
     }
 
-    /**
-     * @notice modify the maximum number of schedules per token
-     * @param maxSchedulesPerToken: the new maximum number of schedules per token
-     */
-    function modifyMaxSchedulesPerToken(uint256 maxSchedulesPerToken) external override onlyOwner {
-        s_maxSchedulesPerToken = maxSchedulesPerToken;
+    /// @inheritdoc IDcaManager
+    function setMaxSchedulesPerToken(uint256 maxSchedulesPerToken) external override onlyOwner {
+        s_protocolSettings.maxSchedulesPerToken = maxSchedulesPerToken.toUint16();
         emit DcaManager__MaxSchedulesPerTokenModified(maxSchedulesPerToken);
     }
 
-    /**
-     * @notice modify the default minimum purchase amount for all tokens
-     * @param defaultMinPurchaseAmount: the new default minimum purchase amount
-     */
-    function modifyDefaultMinPurchaseAmount(uint256 defaultMinPurchaseAmount) external override onlyOwner {
-        s_defaultMinPurchaseAmount = defaultMinPurchaseAmount;
-        emit DcaManager__DefaultMinPurchaseAmountModified(defaultMinPurchaseAmount);
-    }
-
-    /**
-     * @notice set a custom minimum purchase amount for a specific token
-     * @param token: the token address
-     * @param minPurchaseAmount: the custom minimum purchase amount for this token
-     */
+    /// @inheritdoc IDcaManager
     function setTokenMinPurchaseAmount(address token, uint256 minPurchaseAmount) external override onlyOwner {
+        if (minPurchaseAmount == 0) {
+            revert DcaManager__TokenMinPurchaseAmountMustBeGreaterThanZero(token);
+        }
         s_tokenMinPurchaseAmounts[token] = minPurchaseAmount;
         emit DcaManager__TokenMinPurchaseAmountSet(token, minPurchaseAmount);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IDcaManager
+    function getDcaSchedule(address token, uint64 scheduleId) external view override returns (DcaSchedule memory) {
+        DcaSchedule memory dcaSchedule = s_dcaSchedules[token][scheduleId];
+        if (dcaSchedule.user == address(0)) revert DcaManager__InexistentSchedule(token, scheduleId);
+        return dcaSchedule;
+    }
+
+    /// @inheritdoc IDcaManager
+    function getDcaSchedules(address user, address token)
+        external
+        view
+        override
+        returns (uint64[] memory scheduleIds, DcaSchedule[] memory schedules)
+    {
+        scheduleIds = s_scheduleIds[user][token];
+        uint256 scheduleCount = scheduleIds.length;
+        schedules = new DcaSchedule[](scheduleCount);
+        for (uint256 i; i < scheduleCount; ++i) {
+            schedules[i] = s_dcaSchedules[token][scheduleIds[i]];
+        }
+    }
+
+    /// @inheritdoc IDcaManager
+    function getSchedulesCreatedCount() external view override returns (uint256) {
+        return s_protocolSettings.scheduleNonce;
+    }
+
+    /// @inheritdoc IDcaManager
+    function getAccumulatedRbtcBalance(address user, address token, uint256 routeIndex)
+        external
+        view
+        override
+        returns (uint256)
+    {
+        return IPurchaseRbtc(address(_handler(token, routeIndex))).getAccumulatedRbtcBalance(user);
+    }
+
+    /// @inheritdoc IDcaManager
+    function getAccruedInterest(address user, address token, uint256 routeIndex)
+        external
+        view
+        override
+        returns (uint256)
+    {
+        _checkTokenIsLent(token, routeIndex);
+        return ILendingHandler(address(_handler(token, routeIndex)))
+            .quoteAccruedInterest(user, _lockedPrincipal(user, token, routeIndex));
+    }
+
+    /// @inheritdoc IDcaManager
+    function getUserMutationsAllowedFromBlock() external view override returns (uint256) {
+        return s_userMutationsAllowedFromBlock;
+    }
+
+    /// @inheritdoc IDcaManager
+    function canActivateProtectedPurchaseWindow() external view override returns (bool) {
+        return block.number >= s_userMutationsAllowedFromBlock;
+    }
+
+    /// @inheritdoc IDcaManager
+    function getMinPurchasePeriod() external view override returns (uint256) {
+        return s_protocolSettings.minPurchasePeriod;
+    }
+
+    /// @inheritdoc IDcaManager
+    function getMaxSchedulesPerToken() external view override returns (uint256) {
+        return s_protocolSettings.maxSchedulesPerToken;
+    }
+
+    /// @inheritdoc IDcaManager
+    function getTokenMinPurchaseAmount(address token) external view override returns (uint256) {
+        return s_tokenMinPurchaseAmounts[token];
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -458,415 +506,300 @@ contract DcaManager is IDcaManager, Ownable, ReentrancyGuard {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice validate that the schedule id matches the schedule at the given index
-     * @param scheduleId: the schedule id to validate
-     * @param dcaScheduleScheduleId: the schedule id to validate against
+     * @dev The multi-line lock check (load unlock block, compare `block.number`, revert with that
+     *      block) lives here for readability; `whenUserMutationsAllowed` is the single gate and
+     *      calls this.
      */
-    function _validateScheduleId(bytes32 scheduleId, bytes32 dcaScheduleScheduleId) private pure {
-        if (scheduleId != dcaScheduleScheduleId) revert DcaManager__ScheduleIdAndIndexMismatch();
+    function _requireUserMutationsAllowed() private view {
+        uint256 userMutationsAllowedFromBlock = s_userMutationsAllowedFromBlock;
+        if (block.number < userMutationsAllowedFromBlock) {
+            revert DcaManager__UserMutationsLocked(userMutationsAllowedFromBlock);
+        }
+    }
+
+    /// @dev Validate one handler's batch, debit every named schedule, then call that handler.
+    function _batchBuyRbtc(Batch calldata batch) private {
+        uint256 purchaseCount = batch.scheduleIds.length;
+        if (purchaseCount == 0) revert DcaManager__EmptyBatchPurchaseArrays();
+        // What each row spends, and who it is bought for, are read from the schedule rather than taken
+        // from the caller: the handler is paid the amounts the ledger holds and credits the accounts
+        // the ledger names, so a batch can neither spend an amount a schedule does not hold nor send
+        // one account's rBTC to another.
+        address[] memory buyers = new address[](purchaseCount);
+        uint256[] memory purchaseAmounts = new uint256[](purchaseCount);
+        for (uint256 i; i < purchaseCount; ++i) {
+            (address buyer, uint256 schedulePurchaseAmount, uint256 scheduleRouteIndex) =
+                _rbtcPurchaseChecksEffects(batch.token, batch.scheduleIds[i]);
+            if (scheduleRouteIndex != batch.routeIndex) {
+                revert DcaManager__RouteIndexMismatch(
+                    batch.token, batch.scheduleIds[i], scheduleRouteIndex, batch.routeIndex
+                );
+            }
+            buyers[i] = buyer;
+            purchaseAmounts[i] = schedulePurchaseAmount;
+        }
+        IPurchaseRbtc(address(_handler(batch.token, batch.routeIndex)))
+            .batchBuyRbtc(buyers, batch.scheduleIds, purchaseAmounts, batch.minRbtcOut, batch.quotedStablecoinIn);
     }
 
     /**
-     * @notice validate that the purchase amount to be set is valid
-     * @param token: the token spent on DCA
-     * @param purchaseAmount: the purchase amount to validate
-     * @param tokenBalance: the current balance of the token in that DCA schedule
+     * @dev Checks and effects of one purchase row, before the handler interaction.
+     *      The `(token, scheduleId)` pair is the storage key, so a row of another stablecoin addresses
+     *      nothing and is refused here rather than being debited by a handler that never held its
+     *      funds — the stablecoin check is the lookup itself rather than a comparison after it. No
+     *      owner is supplied by the caller either: the account credited with the purchase is read from
+     *      the schedule. The route comparison stays with the caller, which is where its error is raised.
+     * @return The schedule's owner, purchase amount and route index.
      */
-    function _validatePurchaseAmount(
-        address token,
-        uint256 purchaseAmount,
-        uint256 tokenBalance
-    ) private view {
+    function _rbtcPurchaseChecksEffects(address token, uint64 scheduleId) private returns (address, uint256, uint256) {
+        // Read the two packed schedule slots through a storage pointer instead of copying every field.
+        DcaSchedule storage dcaSchedule = s_dcaSchedules[token][scheduleId];
+
+        address buyer = dcaSchedule.user;
+        if (buyer == address(0)) revert DcaManager__InexistentSchedule(token, scheduleId);
+
+        if (dcaSchedule.paused) revert DcaManager__SchedulePaused(token, scheduleId);
+
+        uint256 cadenceAnchor = dcaSchedule.cadenceAnchor;
+        uint256 purchasePeriod = dcaSchedule.purchasePeriod;
+
+        // The first buy anchors today; whole-day periods keep every later due date on that midnight grid.
+        uint256 newAnchor;
+        unchecked {
+            // Safe: modulo cannot exceed the timestamp and uint48 + uint32 cannot overflow uint256.
+            // A future midnight exceeds block.timestamp; after eligibility, all results are at most today.
+            uint256 currentDayStart = block.timestamp - (block.timestamp % 1 days);
+            newAnchor = currentDayStart;
+
+            if (cadenceAnchor != 0) {
+                uint256 nextDue = cadenceAnchor + purchasePeriod;
+                if (currentDayStart < nextDue) {
+                    revert DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed(
+                        token, scheduleId, nextDue - block.timestamp
+                    );
+                }
+
+                // Consume the newest due slot without rebasing the grid; rebasing would shift every
+                // later due day whenever a multi-day purchase succeeds late.
+                uint256 periodsElapsed = (currentDayStart - cadenceAnchor) / purchasePeriod;
+                newAnchor = cadenceAnchor + periodsElapsed * purchasePeriod;
+            }
+        }
+
+        uint96 purchaseAmount = dcaSchedule.purchaseAmount;
+        uint128 tokenBalance = dcaSchedule.tokenBalance;
+        uint256 routeIndex = dcaSchedule.routeIndex;
+        if (purchaseAmount > tokenBalance) {
+            revert DcaManager__ScheduleBalanceNotEnoughForPurchase(token, scheduleId, tokenBalance);
+        }
+        unchecked {
+            tokenBalance -= purchaseAmount;
+        }
+        // No anchor log: purchases emit RbtcBought, and the new anchor follows from the prior one and the period.
+        _storePurchaseProgress(dcaSchedule, tokenBalance, newAnchor.toUint48());
+        emit DcaManager__TokenBalanceUpdated(token, scheduleId, tokenBalance);
+
+        return (buyer, purchaseAmount, routeIndex);
+    }
+
+    /**
+     * @dev Both fields live in slot 0. They merge into one store only in their own frame; inlined into
+     *      the caller the compiler splits them, which costs a full storage write on Rootstock.
+     */
+    function _storePurchaseProgress(DcaSchedule storage dcaSchedule, uint128 tokenBalance, uint48 cadenceAnchor)
+        private
+    {
+        dcaSchedule.tokenBalance = tokenBalance;
+        dcaSchedule.cadenceAnchor = cadenceAnchor;
+    }
+
+    /// @dev The single owner check for user mutators. A zero owner means the key addresses no schedule.
+    function _callersSchedule(address token, uint64 scheduleId) private view returns (DcaSchedule storage dcaSchedule) {
+        dcaSchedule = s_dcaSchedules[token][scheduleId];
+        address owner = dcaSchedule.user;
+        if (owner == address(0)) revert DcaManager__InexistentSchedule(token, scheduleId);
+        if (owner != msg.sender) revert DcaManager__NotScheduleOwner(token, scheduleId, owner);
+    }
+
+    /**
+     * @dev Swap-pop the id from the owner's token list. The supplied index must currently contain
+     *      scheduleId.
+     */
+    function _removeScheduleId(address user, address token, uint64 scheduleId, uint256 index) private {
+        uint64[] storage scheduleIds = s_scheduleIds[user][token];
+        uint256 scheduleCount = scheduleIds.length;
+        if (index >= scheduleCount || scheduleIds[index] != scheduleId) {
+            revert DcaManager__ScheduleIdIndexMismatch(token, scheduleId, index);
+        }
+
+        uint256 lastIndex;
+        unchecked {
+            lastIndex = scheduleCount - 1;
+        }
+        if (index != lastIndex) scheduleIds[index] = scheduleIds[lastIndex];
+        scheduleIds.pop();
+    }
+
+    /// @dev Purchase amount must be at least the token's configured minimum and at most `tokenBalance`.
+    function _validatePurchaseAmount(address token, uint256 purchaseAmount, uint256 tokenBalance) private view {
         uint256 minPurchaseAmount = s_tokenMinPurchaseAmounts[token];
         if (minPurchaseAmount == 0) {
-            minPurchaseAmount = s_defaultMinPurchaseAmount;
+            revert DcaManager__TokenMinPurchaseAmountNotSet(token);
         }
-        
+
         if (purchaseAmount < minPurchaseAmount) {
-            revert DcaManager__PurchaseAmountMustBeGreaterThanMinimum(token, minPurchaseAmount);
+            revert DcaManager__PurchaseAmountMustBeAtLeastMinimum(token, minPurchaseAmount);
         }
-        /**
-         * @notice Purchase amount must be at least twice the balance of the token in the contract to allow at least two DCA purchases
-         */
-        if (purchaseAmount > (tokenBalance) / 2) {
-            revert DcaManager__PurchaseAmountMustBeLowerThanHalfOfBalance();
+        if (purchaseAmount > tokenBalance) {
+            revert DcaManager__PurchaseAmountExceedsBalance(token, purchaseAmount, tokenBalance);
         }
     }
 
     /**
-     * @notice validate the protocol minimum purchase period
-     * @param minPurchasePeriod the minimum purchase period to validate
+     * @dev The period must meet the protocol minimum and preserve the midnight cadence grid. The caller
+     *      supplies the minimum so creation can take it from the settings word it already loaded.
      */
-    function _validateMinPurchasePeriod(uint256 minPurchasePeriod) private pure {
-        if (minPurchasePeriod < 1 days) revert DcaManager__MinPurchasePeriodMustBeAtLeastOneDay();
-        _requireWholeDays(minPurchasePeriod);
+    function _validatePurchasePeriod(uint256 purchasePeriod, uint256 minPurchasePeriod) private pure {
+        if (purchasePeriod < minPurchasePeriod) {
+            revert DcaManager__PurchasePeriodMustBeAtLeastMinimum();
+        }
+        if (purchasePeriod % 1 days != 0) revert DcaManager__PurchasePeriodMustBeWholeDays();
     }
 
-    /**
-     * @notice validate the purchase period
-     * @param purchasePeriod the purchase period to validate
-     */
-    function _validatePurchasePeriod(uint256 purchasePeriod) private view {
-        if (purchasePeriod < s_minPurchasePeriod) revert DcaManager__PurchasePeriodMustBeGreaterThanMinimum();
-        _requireWholeDays(purchasePeriod);
-    }
-
-    /**
-     * @notice require that the period is a whole day
-     * @param period the period to validate
-     */
-    function _requireWholeDays(uint256 period) private pure {
-        if (period % 1 days != 0) revert DcaManager__PurchasePeriodMustBeWholeDays();
-    }
-
-    /**
-     * @notice deposit the full stablecoin amount for DCA on the contract
-     * @param depositAmount: the amount to deposit
-     */
+    /// @dev Deposit amount must be greater than zero.
     function _validateDeposit(uint256 depositAmount) private pure {
         if (depositAmount == 0) revert DcaManager__DepositAmountMustBeGreaterThanZero();
     }
 
     /**
-     * @notice get the token handler for a token and lending protocol index
-     * @param token: the token
-     * @param lendingProtocolIndex: the lending protocol index
-     * @return the token handler
+     * @dev Slot 0 and slot 1 of a new schedule. `routeIndex` is assigned before `purchasePeriod`:
+     *      that order stores slot 0 once. Declaration order stores it twice.
      */
-    function _handler(address token, uint256 lendingProtocolIndex) private view returns (ITokenHandler) {
-        address tokenHandlerAddress = s_operationsAdmin.getTokenHandler(token, lendingProtocolIndex);
-        if (tokenHandlerAddress == address(0)) revert DcaManager__TokenNotAccepted(token, lendingProtocolIndex);
-        return ITokenHandler(tokenHandlerAddress);
+    function _storeNewSchedule(
+        DcaSchedule storage created,
+        uint128 deposit,
+        uint32 period,
+        uint32 route,
+        address user,
+        uint96 purchase
+    ) private {
+        created.tokenBalance = deposit;
+        created.routeIndex = route;
+        created.purchasePeriod = period;
+        created.user = user;
+        created.purchaseAmount = purchase;
     }
 
     /**
-     * @notice checks and effects of the purchase, before interactions take place
-     * @param buyer: the address of the buyer
-     * @param token: the token
-     * @param scheduleIndex: the index of the schedule
-     * @param scheduleId: the id of the schedule
-     * @return the purchase amount and lending protocol index
+     * @dev Revert unless `tokens` and `routeIndexes` are a non-empty positional pair list.
+     * @return pairCount The shared length of the two arrays.
      */
-    function _rBtcPurchaseChecksEffects(address buyer, address token, uint256 scheduleIndex, bytes32 scheduleId)
+    function _requirePairedWithdrawalArrays(address[] calldata tokens, uint256[] calldata routeIndexes)
         private
-        validateScheduleIndex(buyer, token, scheduleIndex)
-        returns (uint256, uint256)
+        pure
+        returns (uint256 pairCount)
     {
-        DcaDetails storage dcaScheduleStorage = s_dcaSchedules[buyer][token][scheduleIndex];
-        DcaDetails memory dcaSchedule = dcaScheduleStorage;
-
-        _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
-
-        // After the first purchase, eligible once the UTC day of last + period has started.
-        // last and period are whole days, so last + period is already that day's 00:00 UTC.
-        uint256 currentDayStart;
-        if (dcaSchedule.lastPurchaseTimestamp != 0) {
-            currentDayStart = block.timestamp - (block.timestamp % 1 days);
-            uint256 nextDueTimestamp = dcaSchedule.lastPurchaseTimestamp + dcaSchedule.purchasePeriod;
-            if (currentDayStart < nextDueTimestamp) {
-                revert DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed(nextDueTimestamp - block.timestamp);
-            }
-        }
-
-        if (dcaSchedule.purchaseAmount > dcaSchedule.tokenBalance) {
-            revert DcaManager__ScheduleBalanceNotEnoughForPurchase(scheduleIndex, scheduleId, token, dcaSchedule.tokenBalance);
-        }
-        dcaSchedule.tokenBalance -= dcaSchedule.purchaseAmount;
-        dcaScheduleStorage.tokenBalance = dcaSchedule.tokenBalance;
-        emit DcaManager__TokenBalanceUpdated(token, scheduleId, dcaSchedule.tokenBalance);
-
-        // First purchase stamps 00:00 UTC of that day (0 stays "never purchased").
-        // Later purchases add whole periods from that midnight so weekly stays on the
-        // original weekday after a gap.
-        if (dcaSchedule.lastPurchaseTimestamp == 0) {
-            dcaSchedule.lastPurchaseTimestamp = block.timestamp - (block.timestamp % 1 days);
-        } else {
-            uint256 periodsElapsed = (block.timestamp - dcaSchedule.lastPurchaseTimestamp) / dcaSchedule.purchasePeriod;
-            unchecked {
-                dcaSchedule.lastPurchaseTimestamp += periodsElapsed * dcaSchedule.purchasePeriod;
-            }
-        }
-        dcaScheduleStorage.lastPurchaseTimestamp = dcaSchedule.lastPurchaseTimestamp;
-        emit DcaManager__LastPurchaseTimestampUpdated(token, scheduleId, dcaSchedule.lastPurchaseTimestamp);
-
-        return (dcaSchedule.purchaseAmount, dcaSchedule.lendingProtocolIndex);
+        pairCount = tokens.length;
+        if (pairCount == 0) revert DcaManager__EmptyWithdrawalArrays();
+        if (pairCount != routeIndexes.length) revert DcaManager__ArraysLengthMismatch();
     }
 
     /**
-     * @notice withdraw a token from a DCA schedule
-     * @param token: the token to withdraw
-     * @param scheduleIndex: the index of the schedule
-     * @param scheduleId: the schedule id for validation
-     * @param withdrawalAmount: the amount to withdraw
+     * @dev Resolve the handler for a deposit, rejecting the call if governance paused deposits.
+     *      Only `depositToken` and `createDcaSchedule` route through here, and both do so before
+     *      any token moves, so a paused pair never takes cash it would have to refund. Every other
+     *      caller keeps using `_handler`: purchases, edits, deletion, and withdrawals must stay
+     *      available on a paused route.
      */
-    function _withdrawToken(address token, uint256 scheduleIndex, bytes32 scheduleId, uint256 withdrawalAmount) 
+    function _handlerForDeposit(address token, uint256 routeIndex) private view returns (ITokenHandler) {
+        ITokenHandler handler = _handler(token, routeIndex);
+        if (i_operationsAdmin.areDepositsPaused(token, routeIndex)) {
+            revert DcaManager__DepositsPaused(token, routeIndex);
+        }
+        return handler;
+    }
+
+    /// @dev Resolve the handler for a token and route. Reverts if none is assigned.
+    function _handler(address token, uint256 routeIndex) private view returns (ITokenHandler) {
+        address handler = i_operationsAdmin.getHandler(token, routeIndex);
+        if (handler == address(0)) revert DcaManager__TokenNotAccepted(token, routeIndex);
+        return ITokenHandler(handler);
+    }
+
+    /**
+     * @dev Withdraw principal from one schedule. Debits the requested amount, not what the handler
+     *      paid out. `type(uint256).max` means this schedule's whole `tokenBalance`. The debit is stored
+     *      and logged before the handler call, so a purchase reached from a callback during the payout
+     *      logs the last balance.
+     * @return routeIndex The schedule's stored route, captured before the handler call.
+     * @return handler The handler that paid out, so a caller need not resolve it again.
+     */
+    function _withdrawToken(address token, uint64 scheduleId, uint256 withdrawalAmount)
         private
-        validateScheduleIndex(msg.sender, token, scheduleIndex)
+        returns (uint256 routeIndex, ITokenHandler handler)
     {
+        DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
+        uint128 tokenBalance = dcaSchedule.tokenBalance;
+        if (withdrawalAmount == type(uint256).max) withdrawalAmount = tokenBalance;
         if (withdrawalAmount == 0) revert DcaManager__WithdrawalAmountMustBeGreaterThanZero();
-        DcaDetails storage dcaSchedule = s_dcaSchedules[msg.sender][token][scheduleIndex];
-        _validateScheduleId(scheduleId, dcaSchedule.scheduleId);
-        uint256 tokenBalance = dcaSchedule.tokenBalance;
         if (withdrawalAmount > tokenBalance) {
             revert DcaManager__WithdrawalAmountExceedsBalance(token, withdrawalAmount, tokenBalance);
         }
-        uint256 newTokenBalance = tokenBalance - withdrawalAmount;
+        // Subtract the requested withdrawal amount, not the amount the handler paid out.
+        // Fits in uint128: withdrawalAmount <= tokenBalance.
+        uint128 newTokenBalance;
+        unchecked {
+            newTokenBalance = uint128(uint256(tokenBalance) - withdrawalAmount);
+        }
+        routeIndex = dcaSchedule.routeIndex;
         dcaSchedule.tokenBalance = newTokenBalance;
-        _handler(token, dcaSchedule.lendingProtocolIndex).withdrawToken(msg.sender, withdrawalAmount);
         emit DcaManager__TokenBalanceUpdated(token, scheduleId, newTokenBalance);
+        // Lending success means the external share claim was fully consumed; cash may still be net of
+        // a fee. The measured return is deliberately unused for the principal debit.
+        handler = _handler(token, routeIndex);
+        handler.withdrawToken(msg.sender, withdrawalAmount);
     }
 
     /**
-     * @notice withdraw interest from a lending protocol
-     * @param token: the token to withdraw interest from
-     * @param lendingProtocolIndex: the lending protocol index
+     * @dev Withdraw interest from an already-resolved lending handler.
+     *      Callers must already have established that `routeIndex` is a lending
+     *      route (`_checkTokenIsLent` to revert, or `_isLendingRoute` to skip).
+     *      This helper does not re-check.
      */
-    function _withdrawInterest(address token, uint256 lendingProtocolIndex) private {
-        _checkTokenYieldsInterest(token, lendingProtocolIndex);
-        ITokenHandler tokenHandler = _handler(token, lendingProtocolIndex);
-        DcaDetails[] memory dcaSchedules = s_dcaSchedules[msg.sender][token];
-        uint256 lockedTokenAmount;
-        for (uint256 i; i < dcaSchedules.length; ++i) {
-            if (dcaSchedules[i].lendingProtocolIndex == lendingProtocolIndex) {
-                lockedTokenAmount += dcaSchedules[i].tokenBalance;
+    function _withdrawInterest(ILendingHandler lendingHandler, address token, uint256 routeIndex) private {
+        lendingHandler.withdrawInterest(msg.sender, _lockedPrincipal(msg.sender, token, routeIndex));
+    }
+
+    /**
+     * @dev Sum locked principal for one user, token, and route. The ids are copied to memory once:
+     *      they pack four to a word, and indexing the storage array would re-read its length and
+     *      the id's word on every iteration.
+     */
+    function _lockedPrincipal(address user, address token, uint256 routeIndex)
+        private
+        view
+        returns (uint256 lockedTokenAmount)
+    {
+        uint64[] memory scheduleIds = s_scheduleIds[user][token];
+        uint256 scheduleCount = scheduleIds.length;
+        for (uint256 i; i < scheduleCount; ++i) {
+            DcaSchedule storage dcaSchedule = s_dcaSchedules[token][scheduleIds[i]];
+            if (dcaSchedule.routeIndex == routeIndex) {
+                // Fewer than 2^16 uint128 balances, since the schedule cap is a uint16.
+                unchecked {
+                    lockedTokenAmount += dcaSchedule.tokenBalance;
+                }
             }
         }
-        ITokenLending(address(tokenHandler)).withdrawInterest(msg.sender, lockedTokenAmount);
     }
 
-    /**
-     * @notice check if a token yields interest
-     * @param token: the token to check
-     * @param lendingProtocolIndex: the lending protocol index
-     */
-    function _checkTokenYieldsInterest(address token, uint256 lendingProtocolIndex) private view {
-        bytes32 protocolNameHash =
-            keccak256(abi.encodePacked(s_operationsAdmin.getLendingProtocolName(lendingProtocolIndex)));
-        if (protocolNameHash == keccak256(abi.encodePacked(""))) revert DcaManager__TokenDoesNotYieldInterest(token);
+    /// @dev Revert unless `token` is lent on `routeIndex`, i.e. the route is a lending route.
+    function _checkTokenIsLent(address token, uint256 routeIndex) private view {
+        if (!_isLendingRoute(routeIndex)) revert DcaManager__TokenIsNotLent(token);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                            GETTER FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice get all DCA schedules for the caller
-     * @param token: the token to get schedules for
-     * @return the DCA schedules
-     */
-    function getMyDcaSchedules(address token) external view override returns (DcaDetails[] memory) {
-        return getDcaSchedules(msg.sender, token);
-    }
-
-    /**
-     * @notice get all DCA schedules for a specific user
-     * @param user: the user to get schedules for
-     * @param token: the token to get schedules for
-     * @return the DCA schedules
-     */
-    function getDcaSchedules(address user, address token) public view override returns (DcaDetails[] memory) {
-        return s_dcaSchedules[user][token];
-    }
-
-    /**
-     * @notice get the token balance for a DCA schedule (caller's schedule)
-     * @param token: the token to get the balance for
-     * @param scheduleIndex: the index of the schedule
-     * @return the token balance
-     */
-    function getMyScheduleTokenBalance(address token, uint256 scheduleIndex)
-        external
-        view
-        override
-        returns (uint256)
-    {
-        return getScheduleTokenBalance(msg.sender, token, scheduleIndex);
-    }
-
-    /**
-     * @notice get the token balance for a DCA schedule
-     * @param user: the user to get the balance for
-     * @param token: the token to get the balance for
-     * @param scheduleIndex: the index of the schedule
-     * @return the token balance
-     */
-    function getScheduleTokenBalance(address user, address token, uint256 scheduleIndex)
-        public
-        view
-        override
-        validateScheduleIndex(user, token, scheduleIndex)
-        returns (uint256)
-    {
-        return s_dcaSchedules[user][token][scheduleIndex].tokenBalance;
-    }
-
-    /**
-     * @notice get the purchase amount for a DCA schedule (caller's schedule)
-     * @param token: the token to get the purchase amount for
-     * @param scheduleIndex: the index of the schedule
-     * @return the purchase amount
-     */
-    function getMySchedulePurchaseAmount(address token, uint256 scheduleIndex)
-        external
-        view
-        override
-        returns (uint256)
-    {
-        return getSchedulePurchaseAmount(msg.sender, token, scheduleIndex);
-    }
-
-    /**
-     * @notice get the purchase amount for a DCA schedule
-     * @param user: the user to get the purchase amount for
-     * @param token: the token to get the purchase amount for
-     * @param scheduleIndex: the index of the schedule
-     * @return the purchase amount
-     */
-    function getSchedulePurchaseAmount(address user, address token, uint256 scheduleIndex)
-        public
-        view
-        override
-        validateScheduleIndex(user, token, scheduleIndex)
-        returns (uint256)
-    {
-        return s_dcaSchedules[user][token][scheduleIndex].purchaseAmount;
-    }
-
-    /**
-     * @notice get the purchase period for a DCA schedule (caller's schedule)
-     * @param token: the token to get the purchase period for
-     * @param scheduleIndex: the index of the schedule
-     * @return the purchase period
-     */
-    function getMySchedulePurchasePeriod(address token, uint256 scheduleIndex)
-        external
-        view
-        override
-        returns (uint256)
-    {
-        return getSchedulePurchasePeriod(msg.sender, token, scheduleIndex);
-    }
-
-    /**
-     * @notice get the purchase period for a DCA schedule
-     * @param user: the user to get the purchase period for
-     * @param token: the token to get the purchase period for
-     * @param scheduleIndex: the index of the schedule
-     * @return the purchase period
-     */
-    function getSchedulePurchasePeriod(address user, address token, uint256 scheduleIndex)
-        public
-        view
-        override
-        validateScheduleIndex(user, token, scheduleIndex)
-        returns (uint256)
-    {
-        return s_dcaSchedules[user][token][scheduleIndex].purchasePeriod;
-    }
-
-    /**
-     * @notice get the schedule id for a DCA schedule (caller's schedule)
-     * @param token: the token to get the schedule id for
-     * @param scheduleIndex: the index of the schedule
-     * @return the schedule id
-     */
-    function getMyScheduleId(address token, uint256 scheduleIndex) external view override returns (bytes32) {
-        return getScheduleId(msg.sender, token, scheduleIndex);
-    }
-
-    /**
-     * @notice get the schedule id for a DCA schedule
-     * @param user: the user to get the schedule id for
-     * @param token: the token to get the schedule id for
-     * @param scheduleIndex: the index of the schedule
-     * @return the schedule id
-     */
-    function getScheduleId(address user, address token, uint256 scheduleIndex)
-        public
-        view
-        override
-        validateScheduleIndex(user, token, scheduleIndex)
-        returns (bytes32)
-    {
-        return s_dcaSchedules[user][token][scheduleIndex].scheduleId;
-    }
-
-    /**
-     * @notice get the admin operations address
-     * @return the admin operations address
-     */
-    function getOperationsAdminAddress() external view override returns (address) {
-        return address(s_operationsAdmin);
-    }
-
-    /**
-     * @notice get the minimum purchase period
-     * @return the minimum purchase period
-     */
-    function getMinPurchasePeriod() external view override returns (uint256) {
-        return s_minPurchasePeriod;
-    }
-
-    /**
-     * @notice get the maximum number of schedules per token
-     * @return the maximum number of schedules per token
-     */
-    function getMaxSchedulesPerToken() external view override returns (uint256) {
-        return s_maxSchedulesPerToken;
-    }
-
-    /**
-     * @notice get the default minimum purchase amount for all tokens
-     * @return the default minimum purchase amount
-     */
-    function getDefaultMinPurchaseAmount() external view override returns (uint256) {
-        return s_defaultMinPurchaseAmount;
-    }
-
-    /**
-     * @notice get the minimum purchase amount for a specific token
-     * @param token: the token address
-     * @return minPurchaseAmount the minimum purchase amount for this token
-     * @return customMinAmountSet whether a custom amount is set (false means using default)
-     */
-    function getTokenMinPurchaseAmount(address token) external view override returns (uint256 minPurchaseAmount, bool customMinAmountSet) {
-        uint256 customAmount = s_tokenMinPurchaseAmounts[token];
-        customMinAmountSet = customAmount != 0;
-        minPurchaseAmount = customMinAmountSet ? customAmount : s_defaultMinPurchaseAmount;
-    }
-
-    /**
-     * @notice get the interest accrued by the caller with a given stablecoin in a given lending protocol
-     * @param token: the token to get the interest for
-     * @param lendingProtocolIndex: the lending protocol index to get the interest for
-     * @return the interest accrued
-     */
-    function getMyInterestAccrued(address token, uint256 lendingProtocolIndex) external view override returns (uint256) {
-        return getInterestAccrued(msg.sender, token, lendingProtocolIndex);
-    }
-
-    /**
-     * @notice get the interest accrued by the caller with a given stablecoin in a given lending protocol
-     * @param user: the user to get the interest for
-     * @param token: the token to get the interest for
-     * @param lendingProtocolIndex: the lending protocol index to get the interest for
-     * @return the interest accrued
-     */
-    function getInterestAccrued(address user, address token, uint256 lendingProtocolIndex)
-        public
-        view
-        override
-        returns (uint256)
-    {
-        _checkTokenYieldsInterest(token, lendingProtocolIndex);
-        ITokenHandler tokenHandler = _handler(token, lendingProtocolIndex);
-        DcaDetails[] memory dcaSchedules = s_dcaSchedules[user][token];
-        uint256 lockedTokenAmount;
-        for (uint256 i; i < dcaSchedules.length; ++i) {
-            if (dcaSchedules[i].lendingProtocolIndex == lendingProtocolIndex) {
-                lockedTokenAmount += dcaSchedules[i].tokenBalance;
-            }
-        }
-        return ITokenLending(address(tokenHandler)).getAccruedInterest(user, lockedTokenAmount);
+    /// @dev Whether `routeIndex` was registered as a lending route.
+    function _isLendingRoute(uint256 routeIndex) private view returns (bool) {
+        return i_operationsAdmin.getRouteClass(routeIndex) == IOperationsAdmin.RouteClass.Lending;
     }
 }

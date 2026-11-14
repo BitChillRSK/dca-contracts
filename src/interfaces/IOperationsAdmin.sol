@@ -1,77 +1,161 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
 /**
- * @title IAdminOperation
+ * @title IOperationsAdmin
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @dev Interface for the OperationsAdmin contract.
+ * @notice Governance registry for route classes, token handlers, swappers, and per-pair deposit pause.
+ * @dev The owner registers route classes and token-route handlers once, preserving exits through
+ *      retired routes. One handler address may back only one pair because its accounting is keyed by
+ *      user alone. Deposit pauses affect only inflows; the swapper allowlist remains mutable.
  */
 interface IOperationsAdmin {
-    //////////////////////
-    // Events ////////////
-    //////////////////////
-    event OperationsAdmin__TokenHandlerUpdated(
-        address indexed token, uint256 indexed lendingProtocolIndex, address indexed newHandler
-    );
-    event OperationsAdmin__LendingProtocolAdded(uint256 indexed index, string indexed name);
-    event OperationsAdmin__AdminRoleGranted(address indexed admin);
-    event OperationsAdmin__AdminRoleRevoked(address indexed admin);
-    event OperationsAdmin__SwapperRoleGranted(address indexed swapper);
-    event OperationsAdmin__SwapperRoleRevoked(address indexed swapper);
+    /**
+     * @notice Classification recorded when a route index is registered.
+     * @dev `Unregistered` is the mapping default. Once an index is `Idle` or `Lending`, it is never mutated.
+     */
+    enum RouteClass {
+        Unregistered,
+        Idle,
+        Lending
+    }
 
-    //////////////////////
-    // Errors ////////////
-    //////////////////////
+    /**
+     * @notice The per-`(token, routeIndex)` pair state: who holds the funds, and whether new
+     *         deposits are accepted.
+     * @dev One slot (21 of 32 bytes). An unassigned pair reads as `(address(0), false)`.
+     */
+    struct TokenRoute {
+        address handler;
+        bool depositsPaused;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                 EVENTS
+    //////////////////////////////////////////////////////////////*/
+    /// @notice A handler was assigned to a `(token, routeIndex)` pair. Add-only.
+    event OperationsAdmin__HandlerAssigned(address indexed token, uint256 routeIndex, address indexed handler);
+    /// @notice A route index was classified as idle (`lends == false`) or lending. One-shot.
+    event OperationsAdmin__RouteRegistered(uint256 index, bool lends);
+    /// @notice `swapper` was added to the allowlist. Idempotent.
+    event OperationsAdmin__SwapperAdded(address indexed swapper);
+    /// @notice `swapper` was removed from the allowlist.
+    event OperationsAdmin__SwapperRevoked(address indexed swapper);
+    /// @notice New deposits for this pair were paused or unpaused. Every emit is a real transition.
+    event OperationsAdmin__DepositsPauseSet(address indexed token, uint256 routeIndex, bool paused);
+
+    /*//////////////////////////////////////////////////////////////
+                                 ERRORS
+    //////////////////////////////////////////////////////////////*/
+    /// @notice A handler must be a contract, not an EOA.
     error OperationsAdmin__EoaCannotBeHandler(address newHandler);
+    /// @notice `handler` does not ERC-165 advertise `ITokenHandler`.
     error OperationsAdmin__ContractIsNotTokenHandler(address newHandler);
-    error OperationsAdmin__LendingProtocolIndexCannotBeZero();
-    error OperationsAdmin__LendingProtocolNameNotSet();
-    error OperationsAdmin__LendingProtocolNotAllowed(uint256 index);
+    /// @notice A lending route requires ERC-165 `ILendingHandler`.
+    error OperationsAdmin__ContractIsNotLendingHandler(address handler);
+    /// @notice An idle route rejects a handler that advertises `ILendingHandler`.
+    error OperationsAdmin__LendingHandlerOnIdleRoute(address handler);
+    /// @notice `handler` holds a different stablecoin than the `token` it is being assigned for.
+    error OperationsAdmin__HandlerTokenMismatch(address token, address handler);
+    /// @notice `handler` answers to a DcaManager that is not pinned to this registry.
+    error OperationsAdmin__HandlerDcaManagerMismatch(address handler, address dcaManager);
+    /// @notice This route index is already classified and cannot be changed.
+    error OperationsAdmin__RouteAlreadyRegistered(uint256 index);
+    /// @notice Handler assignment requires a registered route index.
+    error OperationsAdmin__RouteNotRegistered(uint256 index);
+    /// @notice This `(token, routeIndex)` already has a handler.
+    error OperationsAdmin__HandlerAlreadyAssigned(address token, uint256 routeIndex);
+    /// @notice This handler address already backs another pair.
+    error OperationsAdmin__HandlerAddressAlreadyInUse(address handler);
+    /// @notice Deposit pause requires a pair that already has a handler.
+    error OperationsAdmin__HandlerNotAssigned(address token, uint256 routeIndex);
+    /// @notice `setDepositsPaused` must change the flag; a repeated write reverts.
+    error OperationsAdmin__DepositsPauseUnchanged(address token, uint256 routeIndex, bool paused);
 
-    ///////////////////////////////
-    // External functions /////////
-    ///////////////////////////////
+    /*//////////////////////////////////////////////////////////////
+                           EXTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Registers token handler for a given stablecoin token address
-     * @param token The address of the stablecoin for which the token handler is created.
-     * @param lendingProtocolIndex The index of the lending protocol (empty string if token will not be lent)
-     * @param handler The handler corresponding to the token and lending protocol (if any)
+     * @notice Register a route index as idle or lending. One-shot: the class is never changed or deleted.
+     * @param index The route index to register. Must fit `uint32`, the width the packed schedule
+     *        stores. Index 0 is pre-registered as idle by the constructor, which emits
+     *        `RouteRegistered(0, false)` like any other registration.
+     * @param lends True to classify the route as lending; false to classify it as idle.
      */
-    function assignOrUpdateTokenHandler(address token, uint256 lendingProtocolIndex, address handler) external;
+    function registerRoute(uint256 index, bool lends) external;
 
     /**
-     * @dev Retrieves the handler for a given token and lending protocol.
-     * @param token The address of the token.
-     * @param lendingProtocolIndex The name of the lending protocol (empty string if token will not be lent)
-     * @return handler The address of the TokenHandler. If address(0) is returned, the tuple token-protocol is not correct
+     * @notice Assign the token handler for a `(token, routeIndex)` pair. Add-only: reassignment reverts.
+     * @param token The stablecoin whose handler is being assigned.
+     * @param routeIndex The registered route index (idle or lending). Must fit `uint32`.
+     * @param handler The TokenHandler for that token and route, not yet assigned anywhere in this admin.
+     * @dev Requires ERC-165 `ITokenHandler`; lending routes also require `ILendingHandler`, while idle
+     *      routes reject it. The handler's `i_stablecoin()` must be `token`, and its
+     *      reported manager must return this registry from `i_operationsAdmin()`. This proves registry
+     *      affiliation, not canonical manager identity. Before assignment, the owner must verify the
+     *      handler's immutable `i_dcaManager()` equals the intended deployment's manager and its code
+     *      matches the released artifact. One handler address may back only one pair.
+     *      An accepted handler bound to another manager permanently occupies the pair and rejects deposits
+     *      through the intended manager.
      */
-    function getTokenHandler(address token, uint256 lendingProtocolIndex) external view returns (address handler);
+    function assignHandler(address token, uint256 routeIndex, address handler) external;
 
     /**
-     * @dev Assigns a new address to the swapper role.
+     * @notice Pause or unpause new stablecoin deposits for one assigned `(token, routeIndex)` pair.
+     * @param token The stablecoin whose deposits are being paused.
+     * @param routeIndex The route index whose deposits are being paused. Must fit `uint32`.
+     * @param paused True to block new deposits, false to allow them again.
+     * @dev Checked only before schedule creation and deposit move cash. Purchases, edits, deletion,
+     *      and every withdrawal remain available. The pair must be assigned and the flag must change;
+     *      each pair is updated separately.
+     */
+    function setDepositsPaused(address token, uint256 routeIndex, bool paused) external;
+
+    /**
+     * @notice Add `swapper` to the swapper allowlist. Idempotent; does not replace other swappers.
      * @param swapper The swapper address.
      */
-    function setSwapperRole(address swapper) external;
+    function addSwapper(address swapper) external;
 
     /**
-     * @dev Assigns a new address to the admin role.
-     * @param admin The admin address.
+     * @notice Remove `swapper` from the swapper allowlist.
+     * @param swapper The swapper address.
      */
-    function setAdminRole(address admin) external;
+    function revokeSwapper(address swapper) external;
+
+    /*//////////////////////////////////////////////////////////////
+                                GETTERS
+    //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Adds a lending protocol to the system by assigining an index to its name
-     * @param lowerCaseName The name of the lending protocol in lower case
-     * @param index The index to be assigned to it
-     * @notice The index cannot be zero, since all elements in a mapping map to 0 by default
+     * @notice Whether `account` is an authorized swapper.
+     * @param account Address to query.
+     * @return True if `account` is on the swapper allowlist.
      */
-    function addOrUpdateLendingProtocol(string calldata lowerCaseName, uint256 index) external;
+    function isSwapper(address account) external view returns (bool);
 
     /**
-     * @dev Retrieves the index of the lending protocol
-     * @param lowerCaseName The name of the lending protocol in lower case
-     * @return The address index of the lending protocol
+     * @notice Recorded class of `index`.
+     * @param index The route index. Must fit `uint32`.
+     * @return The registered class, or `Unregistered` if it has never been classified.
      */
-    function getLendingProtocolIndex(string calldata lowerCaseName) external returns (uint256);
+    function getRouteClass(uint256 index) external view returns (RouteClass);
+
+    /**
+     * @notice Handler registered for a token and route index.
+     * @param token The stablecoin.
+     * @param routeIndex The route index. Must fit `uint32`.
+     * @return handler The TokenHandler, or `address(0)` if none is assigned.
+     */
+    function getHandler(address token, uint256 routeIndex) external view returns (address handler);
+
+    /**
+     * @notice Whether new deposits to `(token, routeIndex)` are currently blocked.
+     * @param token The stablecoin.
+     * @param routeIndex The route index. Must fit `uint32`.
+     * @return paused True when `DcaManager` must reject new deposits for this pair.
+     * @dev False for unassigned pairs: only an assigned pair can be paused.
+     */
+    function areDepositsPaused(address token, uint256 routeIndex) external view returns (bool paused);
 }

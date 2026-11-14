@@ -5,223 +5,218 @@ pragma solidity 0.8.36;
 import {DeployBase} from "./DeployBase.s.sol";
 import {MocHelperConfig} from "./MocHelperConfig.s.sol";
 import {DcaManager} from "../src/DcaManager.sol";
-import {TropykusDocHandlerMoc} from "../src/TropykusDocHandlerMoc.sol";
-import {SovrynDocHandlerMoc} from "../src/SovrynDocHandlerMoc.sol";
+import {TropykusDocHandlerMoc} from "../src/tropykus-legacy/TropykusDocHandlerMoc.sol";
+import {SovrynDocHandlerMoc} from "../src/sovryn-legacy/SovrynDocHandlerMoc.sol";
+import {IdleDocHandlerMoc} from "../src/idle/IdleDocHandlerMoc.sol";
+import {LayerBankDocHandlerMoc} from "../src/layerbank/LayerBankDocHandlerMoc.sol";
 import {OperationsAdmin} from "../src/OperationsAdmin.sol";
 import {ICoinPairPrice} from "../src/interfaces/ICoinPairPrice.sol";
-import {IFeeHandler} from "../src/interfaces/IFeeHandler.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IPurchaseFees} from "../src/interfaces/IPurchaseFees.sol";
 import {console} from "forge-std/Test.sol";
 import "./Constants.sol";
-
 
 contract DeployMocSwaps is DeployBase {
     // Struct to group deployment parameters to avoid stack too deep errors
     struct DeployParams {
         Protocol protocol;
         address dcaManager;
-        address tokenAddress;
-        address lendingToken;
+        address stablecoin;
+        address shareToken;
         address mocProxy;
         address feeCollector;
     }
 
     function deployDocHandlerMoc(DeployParams memory params) public returns (address) {
-        IFeeHandler.FeeSettings memory feeSettings = IFeeHandler.FeeSettings({
-            minFeeRate: MIN_FEE_RATE,
-            maxFeeRate: getMaxFeeRate(),
-            feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND,
-            feePurchaseUpperBound: FEE_PURCHASE_UPPER_BOUND
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: getMaxFeeRate(), feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
         });
 
+        if (params.protocol == Protocol.NONE) {
+            return address(
+                new IdleDocHandlerMoc(
+                    params.dcaManager,
+                    params.stablecoin,
+                    params.feeCollector,
+                    params.mocProxy,
+                    feeSettings,
+                    _initialOwner()
+                )
+            );
+        }
+        if (params.protocol == Protocol.LAYERBANK) {
+            return address(
+                new LayerBankDocHandlerMoc(
+                    params.dcaManager,
+                    params.stablecoin,
+                    params.shareToken,
+                    params.feeCollector,
+                    params.mocProxy,
+                    feeSettings,
+                    _initialOwner()
+                )
+            );
+        }
         if (params.protocol == Protocol.TROPYKUS) {
             return address(
                 new TropykusDocHandlerMoc(
-                    params.dcaManager, 
-                    params.tokenAddress, 
-                    params.lendingToken, 
-                    MIN_PURCHASE_AMOUNT, 
-                    params.feeCollector, 
-                    params.mocProxy, 
+                    params.dcaManager,
+                    params.stablecoin,
+                    params.shareToken,
+                    params.feeCollector,
+                    params.mocProxy,
                     feeSettings,
-                    EXCHANGE_RATE_DECIMALS
-                )
-            );
-        } else {
-            return address(
-                new SovrynDocHandlerMoc(
-                    params.dcaManager, 
-                    params.tokenAddress, 
-                    params.lendingToken, 
-                    MIN_PURCHASE_AMOUNT, 
-                    params.feeCollector, 
-                    params.mocProxy, 
-                    feeSettings,
-                    EXCHANGE_RATE_DECIMALS
+                    _initialOwner()
                 )
             );
         }
+        if (params.protocol == Protocol.SOVRYN) {
+            return address(
+                new SovrynDocHandlerMoc(
+                    params.dcaManager,
+                    params.stablecoin,
+                    params.shareToken,
+                    params.feeCollector,
+                    params.mocProxy,
+                    feeSettings,
+                    _initialOwner()
+                )
+            );
+        }
+        revert("Invalid lending protocol");
     }
 
     function run() external returns (OperationsAdmin, address, DcaManager, MocHelperConfig) {
+        _assertLiveBroadcastSender(msg.sender);
         console.log("==== DeployMocSwaps.run() called ====");
         console.log("LENDING_PROTOCOL (env var):", vm.envString("LENDING_PROTOCOL"));
         console.log("STABLECOIN_TYPE (env var):", vm.envString("STABLECOIN_TYPE"));
-        
-        // Lots of debugging here
-        try vm.envString("LENDING_PROTOCOL") returns (string memory lendingProtocolFromEnv) {
-            console.log("Got LENDING_PROTOCOL from env:", lendingProtocolFromEnv);
-        } catch {
-            console.log("Failed to get LENDING_PROTOCOL from env");
-        }
-        
-        try vm.envString("STABLECOIN_TYPE") returns (string memory stablecoinTypeFromEnv) {
-            console.log("Got STABLECOIN_TYPE from env:", stablecoinTypeFromEnv);
-        } catch {
-            console.log("Failed to get STABLECOIN_TYPE from env");
-        }
 
-        // Initialize MocHelperConfig which reads the STABLECOIN_TYPE env var
         MocHelperConfig helperConfig = new MocHelperConfig();
         MocHelperConfig.NetworkConfig memory networkConfig = helperConfig.getActiveNetworkConfig();
 
-        // Get stablecoin type (or use default if not specified)
         string memory stablecoinType;
         try vm.envString("STABLECOIN_TYPE") returns (string memory coinType) {
             stablecoinType = coinType;
         } catch {
-            stablecoinType = DEFAULT_STABLECOIN;
+            stablecoinType = DOC_STRING;
         }
-        
-        console.log("Using stablecoin type:", stablecoinType);
-        
-        // Get the DOC token address
-        address docTokenAddress = helperConfig.getStablecoinAddress();
-        console.log("DOC token address:", docTokenAddress);
-        
-        address mocProxyAddress = networkConfig.mocProxyAddress;
-        console.log("MoC Proxy address:", mocProxyAddress);
 
-        // Check if stablecoin is supported by the selected protocol
+        console.log("Using stablecoin type:", stablecoinType);
+
+        address docToken = helperConfig.getStablecoin();
+        console.log("DOC token address:", docToken);
+
+        address mocProxy = networkConfig.mocProxy;
+        console.log("MoC Proxy address:", mocProxy);
+
         bool isSovryn = protocol == Protocol.SOVRYN;
         bool isUSDRIF = keccak256(abi.encodePacked(stablecoinType)) == keccak256(abi.encodePacked("USDRIF"));
-        
+
         if (isSovryn && isUSDRIF) {
             revert("USDRIF is not supported by Sovryn");
         }
 
-        vm.startBroadcast();
+        _beginLiveAwareBroadcast(msg.sender);
 
-        OperationsAdmin operationsAdmin = new OperationsAdmin();
-        DcaManager dcaManager = new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, MIN_PURCHASE_AMOUNT);
+        OperationsAdmin operationsAdmin = new OperationsAdmin(deployOwner);
+        DcaManager dcaManager =
+            new DcaManager(address(operationsAdmin), MIN_PURCHASE_PERIOD, MAX_SCHEDULES_PER_TOKEN, deployOwner);
+        dcaManager.setTokenMinPurchaseAmount(docToken, MIN_PURCHASE_AMOUNT);
         address feeCollector = getFeeCollector(environment);
-        address docHandlerMocAddress;
+        address docHandlerMoc;
 
         // For local or fork environments, deploy only the selected protocol's handler
         if (environment == Environment.LOCAL || environment == Environment.FORK) {
             console.log("Deploying single handler for local/fork environment");
-            
-            // Get the appropriate lending token address based on protocol
-            address lendingTokenAddress = helperConfig.getLendingTokenAddress();
-            if (lendingTokenAddress == address(0)) {
-                revert("Lending token not available for the selected combination");
+
+            address shareToken;
+            if (protocol != Protocol.NONE) {
+                shareToken = helperConfig.getShareToken();
+                if (shareToken == address(0)) {
+                    revert("Share token not available for the selected combination");
+                }
+                console.log("Share token address:", shareToken);
             }
-            
-            console.log("Lending token address:", lendingTokenAddress);
-            
+
             DeployParams memory params = DeployParams({
                 protocol: protocol,
                 dcaManager: address(dcaManager),
-                tokenAddress: docTokenAddress,
-                lendingToken: lendingTokenAddress,
-                mocProxy: mocProxyAddress,
+                stablecoin: docToken,
+                shareToken: shareToken,
+                mocProxy: mocProxy,
                 feeCollector: feeCollector
             });
-            
-            docHandlerMocAddress = deployDocHandlerMoc(params);
 
-            address owner = adminAddresses[environment];
-            operationsAdmin.transferOwnership(owner);
-            dcaManager.transferOwnership(owner);
-            Ownable(docHandlerMocAddress).transferOwnership(owner);
+            docHandlerMoc = deployDocHandlerMoc(params);
         }
-        // For live networks (testnet/mainnet), deploy handlers for both lending protocols
+        // Live networks: production map is idle=0, LayerBank=1. Sovryn and Tropykus are not registered.
         else if (environment == Environment.TESTNET || environment == Environment.MAINNET) {
-            console.log("Deploying handlers for lending protocols for live network");
+            if (protocol == Protocol.SOVRYN) {
+                revert("Sovryn is not on the production MoC map");
+            }
+            if (protocol == Protocol.TROPYKUS) {
+                revert("Tropykus is not on the production MoC map");
+            }
 
-            // First register the lending protocols
-            operationsAdmin.setAdminRole(tx.origin);
-            operationsAdmin.addOrUpdateLendingProtocol(TROPYKUS_STRING, TROPYKUS_INDEX); // index 1
-            operationsAdmin.addOrUpdateLendingProtocol(SOVRYN_STRING, SOVRYN_INDEX); // index 2
+            console.log("Deploying production handlers (idle / LayerBank)");
 
-            // Deploy Tropykus handler if there's a valid lending token
-            address tropykusLendingToken = networkConfig.kDocAddress;
-            
-            if (tropykusLendingToken == address(0)) {
-                console.log("Warning: Tropykus lending token not available for this stablecoin");
-            } else {
-                // Deploy Tropykus handler
-                DeployParams memory tropykusParams = DeployParams({
-                    protocol: Protocol.TROPYKUS,
+            // Owner is the Foundry broadcaster for this transaction so `registerRoute` /
+            // `assignHandler` succeed. Mainnet proposes MAINNET_OWNER (the Safe) after setup.
+            operationsAdmin.registerRoute(LAYERBANK_INDEX, true);
+
+            address idleHandler = deployDocHandlerMoc(
+                DeployParams({
+                    protocol: Protocol.NONE,
                     dcaManager: address(dcaManager),
-                    tokenAddress: docTokenAddress,
-                    lendingToken: tropykusLendingToken,
-                    mocProxy: mocProxyAddress,
+                    stablecoin: docToken,
+                    shareToken: address(0),
+                    mocProxy: mocProxy,
                     feeCollector: feeCollector
-                });
-                
-                address tropykusHandler = deployDocHandlerMoc(tropykusParams);
-                console.log("Tropykus handler deployed at:", tropykusHandler);
-                
-                // Assign the Tropykus handler
-                operationsAdmin.assignOrUpdateTokenHandler(docTokenAddress, TROPYKUS_INDEX, tropykusHandler);
-                
-                // If we're deploying for Tropykus, set this as our return handler
-                if (protocol == Protocol.TROPYKUS) {
-                    docHandlerMocAddress = tropykusHandler;
-                }
+                })
+            );
+            console.log("Idle handler deployed at:", idleHandler);
+            operationsAdmin.assignHandler(docToken, IDLE_INDEX, idleHandler);
+            _proposeFinalOwner(idleHandler);
+            if (protocol == Protocol.NONE) {
+                docHandlerMoc = idleHandler;
             }
 
-            // Only deploy Sovryn handler if the stablecoin is supported
-            if (!isUSDRIF) {
-                // Get Sovryn lending token address
-                address sovrynLendingToken = networkConfig.iSusdAddress;
-                
-                if (sovrynLendingToken == address(0)) {
-                    console.log("Warning: Sovryn lending token not available for this stablecoin");
-                } else {
-                    // Deploy Sovryn handler
-                    DeployParams memory sovrynParams = DeployParams({
-                        protocol: Protocol.SOVRYN,
-                        dcaManager: address(dcaManager),
-                        tokenAddress: docTokenAddress,
-                        lendingToken: sovrynLendingToken,
-                        mocProxy: mocProxyAddress,
-                        feeCollector: feeCollector
-                    });
-                    
-                    address sovrynHandler = deployDocHandlerMoc(sovrynParams);
-                    console.log("Sovryn handler deployed at:", sovrynHandler);
-                    
-                    // Assign the Sovryn handler
-                    operationsAdmin.assignOrUpdateTokenHandler(docTokenAddress, SOVRYN_INDEX, sovrynHandler);
-                    
-                    // If we're deploying for Sovryn, set this as our return handler
-                    if (protocol == Protocol.SOVRYN) {
-                        docHandlerMocAddress = sovrynHandler;
-                    }
+            address layerbankAToken = networkConfig.layerbankAToken;
+            if (layerbankAToken == address(0)) {
+                if (protocol == Protocol.LAYERBANK) {
+                    revert("LayerBank aToken not available on this network");
                 }
+                console.log("Warning: LayerBank aToken not available; index 1 is now immutable Lending with no handler");
             } else {
-                console.log("Skipping Sovryn handler deployment for USDRIF as it's not supported");
-            }
-
-            if (environment == Environment.TESTNET) {
-                operationsAdmin.setAdminRole(adminAddresses[Environment.TESTNET]);
+                address layerbankHandler = deployDocHandlerMoc(
+                    DeployParams({
+                        protocol: Protocol.LAYERBANK,
+                        dcaManager: address(dcaManager),
+                        stablecoin: docToken,
+                        shareToken: layerbankAToken,
+                        mocProxy: mocProxy,
+                        feeCollector: feeCollector
+                    })
+                );
+                console.log("LayerBank handler deployed at:", layerbankHandler);
+                operationsAdmin.assignHandler(docToken, LAYERBANK_INDEX, layerbankHandler);
+                _proposeFinalOwner(layerbankHandler);
+                if (protocol == Protocol.LAYERBANK) {
+                    docHandlerMoc = layerbankHandler;
+                }
             }
         }
+
+        if (docHandlerMoc == address(0)) {
+            revert("Selected protocol handler was not deployed");
+        }
+
+        _proposeFinalOwner(address(operationsAdmin));
+        _proposeFinalOwner(address(dcaManager));
+        _proposeFinalOwner(docHandlerMoc);
 
         vm.stopBroadcast();
 
-        return (operationsAdmin, docHandlerMocAddress, dcaManager, helperConfig);
+        return (operationsAdmin, docHandlerMoc, dcaManager, helperConfig);
     }
 }

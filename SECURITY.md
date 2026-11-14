@@ -1,28 +1,35 @@
 # Security Policy
-## Reporting a Vulnerability
-Security vulnerabilities should be reported to the BitChill team through the following methods:
 
-- Email: arynyestos@gmail.com
-  
-## Bug Bounty
-We appreciate the responsible disclosure of security vulnerabilities. Although we do not currently have a formal bug bounty program, we encourage researchers to report vulnerabilities to us, and we will acknowledge and reward significant contributions.
+## Reporting a vulnerability
 
-## Security Patches
-Security vulnerabilities will be patched as soon as responsibly possible and published as advisories on this repository.
+Email arynyestos@gmail.com with enough detail to reproduce the issue. Do not open a public GitHub issue
+for an unfixed vulnerability in a live deployment.
 
-## Supported Versions
-Security patches will be released for the latest version of the protocol. Critical severity bug fixes will be backported to past major releases.
+## Bug bounty
 
-| Version | Critical Security Fixes | Other Security Fixes |
-| ------- | ----------------------- | -------------------- |
-| 1.x     |    :white_check_mark:   |  :white_check_mark:  |
+There is no formal bug-bounty program and no guaranteed reward. Significant, good-faith reports may be
+acknowledged and rewarded at BitChill's discretion.
 
-Note as well that the Solidity language itself only guarantees security updates for the latest release.
+## Incident response
 
-## Legal
-Smart contracts are a nascent technology and carry a high level of technical risk and uncertainty. The BitChill dApp is made available under the MIT License, which disclaims all warranties in relation to the project and limits the liability of those that contribute and maintain the project. Your use of the project is at your own risk.
+Production contracts are immutable: no proxies, no upgradeability, and no owner migration of user
+funds. A vulnerability in deployed bytecode cannot be patched in place. The response is:
 
----
-For any further questions or issues, please contact the BitChill team at arynyestos@gmail.com.
+1. Contain: revoke the swapper, pause deposits on the affected routes, stop the bot.
+2. Deploy fixed contracts at new route indexes where needed.
+3. Users exit the old handlers and re-enter on the new routes themselves.
 
+Off-chain consumers (front end, bot, monitoring) can be updated independently.
 
+## Supported deployments
+
+| Deployment | Support |
+| ---------- | ------- |
+| Relaunch deployment (after cutover) | Incident response as above |
+| Pre-relaunch mainnet contracts | None. Users should exit |
+
+## License
+
+`src/` is licensed under the Business Source License 1.1 (see [`LICENSE`](./LICENSE)), with an
+Additional Use Grant for non-production use and a Change License of `GPL-2.0-or-later` after the Change
+Date. `script/` and `test/` are MIT.

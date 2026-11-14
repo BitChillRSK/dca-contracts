@@ -1,0 +1,161 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity 0.8.36;
+
+import {ITokenHandler} from "./ITokenHandler.sol";
+
+/**
+ * @title ILendingHandler
+ * @author BitChill team: Antonio Rodríguez-Ynyesto
+ * @notice Lending-handler surface: per-user virtual shares, interest, and share-transition events.
+ * @dev Idle handlers do not implement this. OperationsAdmin requires it on lending routes and
+ *      rejects it on idle routes.
+ */
+interface ILendingHandler is ITokenHandler {
+    /*//////////////////////////////////////////////////////////////
+                                 EVENTS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Canonical per-user virtual lending-share balance after a successful share transition
+     *         (mint, burn, or share withdrawal).
+     * @dev Only `user` is indexed. `newShares` is the balance immediately after this transition.
+     *      When a buyer appears more than once in a batch, earlier events carry intermediate
+     *      balances; only the last event for that user equals `getUserShares(user)` after the call.
+     *      Reverted mutations produce no lasting log. Idle handlers do not emit this.
+     */
+    event LendingHandler__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares);
+    /**
+     * @notice One user's shares were redeemed for measured stablecoin.
+     * @dev Emitted only on single-user redeems (`withdraw` / interest). `underlyingAmount` is the
+     *      stablecoin this handler measured receiving for that user. Batch purchases do not emit
+     *      this: each row's exact share debit is `UserSharesUpdated`, and measured cash for the
+     *      whole redeem is `SharesRedeemedBatch`.
+     */
+    event LendingHandler__SharesRedeemed(address indexed user, uint256 underlyingAmount, uint256 sharesAmountRedeemed);
+    /// @notice A batch redemption's measured stablecoin and share totals.
+    event LendingHandler__SharesRedeemedBatch(uint256 underlyingAmount, uint256 sharesAmountRedeemed);
+    /// @notice Interest was paid out to `user` in `token`.
+    event LendingHandler__InterestWithdrawn(
+        address indexed user, address indexed token, uint256 underlyingAmountWithdrawn
+    );
+    /// @notice A withdrawal was clamped to the user's share-backed stablecoin.
+    event LendingHandler__WithdrawalAmountAdjusted(
+        address indexed user, uint256 originalAmount, uint256 adjustedAmount
+    );
+    /**
+     * @notice Receipt shares were withdrawn for `user` as the lending protocol's receipt token.
+     * @dev `shares` is in receipt-share units: the exact decrease of this handler's receipt-share
+     *      balance, and of the user's booked shares. Any remainder stays booked; `UserSharesUpdated`
+     *      in the same call carries it.
+     */
+    event LendingHandler__SharesWithdrawn(address indexed user, address indexed receiptToken, uint256 shares);
+
+    /*//////////////////////////////////////////////////////////////
+                                 ERRORS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice The receipt token's underlying is not the stablecoin this handler was constructed with.
+    error LendingHandler__UnderlyingMismatch();
+    /// @notice The lending protocol accepted a deposit call but this handler gained no shares.
+    error LendingHandler__LendingProtocolDepositFailed();
+    /// @notice A zero-cash redemption reports its consumed receipt shares before the call rolls back.
+    error LendingHandler__ZeroStablecoinReceived(uint256 sharesRedeemed);
+    /**
+     * @notice A batch row's buyer holds no shares worth any stablecoin.
+     * @dev Defensive guard after an exchange-rate loss; positive-value rounding shortfalls are clamped.
+     *      `requested` is the rounded-up share debit; `available` is the buyer's remaining shares.
+     */
+    error LendingHandler__ZeroShareValue(address user, uint256 requested, uint256 available);
+    /**
+     * @notice The lending protocol did not consume exactly the receipt shares BitChill debited.
+     * @dev `balanceBefore` / `balanceAfter` are the handler's external receipt-share balances
+     *      around the protocol call. Covers zero, partial, excessive, and increasing balances without
+     *      an arithmetic panic. A share withdrawal reverts with it only when the balance does not fall
+     *      or falls by more than the user's booked shares (`intendedDecrease`).
+     */
+    error LendingHandler__ShareConsumptionMismatch(
+        uint256 intendedDecrease, uint256 balanceBefore, uint256 balanceAfter
+    );
+    /**
+     * @notice The lending market did not take exactly the stablecoin BitChill deposited.
+     * @dev `balanceBefore` / `balanceAfter` are the handler's stablecoin balances around the protocol
+     *      deposit. Covers partial, excessive, and increasing balances without an arithmetic panic.
+     */
+    error LendingHandler__DepositConsumptionMismatch(
+        uint256 intendedDecrease, uint256 balanceBefore, uint256 balanceAfter
+    );
+    /// @notice A share withdrawal was requested for a user who holds no shares on this handler.
+    error LendingHandler__NoSharesToWithdraw(address user);
+
+    /*//////////////////////////////////////////////////////////////
+                           EXTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Pay `user` the stablecoin interest above `stablecoinLockedInDcaSchedules`.
+     * @param user The address receiving the interest.
+     * @param stablecoinLockedInDcaSchedules Principal DcaManager still locks for this user on this
+     *        handler's route. Interest is `share-backed stablecoin - this amount`, or zero.
+     * @dev Called only by DcaManager. No-op when there is no interest.
+     */
+    function withdrawInterest(address user, uint256 stablecoinLockedInDcaSchedules) external;
+
+    /**
+     * @notice Withdraw `user`'s booked shares to them as the lending protocol's receipt token.
+     * @param user The address whose booked shares are transferred and who receives the receipt tokens.
+     * @return withdrawnShares The receipt shares withdrawn, debited from `user`'s booked shares.
+     * @dev Called only by DcaManager. Redeems nothing, so the lending protocol's stablecoin liquidity
+     *      does not limit it; `user` redeems the receipt tokens at the lending protocol directly, on
+     *      its terms. Debits the measured fall in this handler's receipt-share balance. Untransferred
+     *      shares remain booked and available for a later withdrawal. Reverts if the lending protocol
+     *      blocks receipt-token transfers, or if the balance does not fall or falls by more than
+     *      `user`'s booked shares.
+     */
+    function withdrawShares(address user) external returns (uint256 withdrawnShares);
+
+    /**
+     * @notice Interest `user` has accrued above locked principal, without withdrawing it.
+     * @param user Account to query.
+     * @param stablecoinLockedInDcaSchedules Principal DcaManager still locks for this user on this
+     *        handler's route.
+     * @return Accrued interest in stablecoin units, or zero.
+     * @dev Deliberately not a `view`, and do not make it one: the figure is taken at the market's
+     *      current exchange rate, which on a market that accrues lazily is a call that updates that
+     *      rate. This is the figure a caller may spend against, so it must not sit a poke behind what
+     *      a withdrawal would pay. The non-view mutability costs consumers nothing because only
+     *      DcaManager can reach this function; `quoteAccruedInterest` is the `view` display read.
+     */
+    function getAccruedInterest(address user, uint256 stablecoinLockedInDcaSchedules) external returns (uint256);
+
+    /**
+     * @notice Re-grant the lending spender the unbounded stablecoin allowance set at construction.
+     * @dev Anyone may call it: it re-grants `max` to the constructor's own immutable spender, so it
+     *      authorizes nothing new.
+     */
+    function restoreLendingApproval() external;
+
+    /*//////////////////////////////////////////////////////////////
+                                GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice This user's virtual lending-share balance on this handler.
+     * @param user Account to query.
+     * @return The booked share balance. Equals `newShares` on the latest `UserSharesUpdated` for
+     *         that user (intermediate emits in the same call may differ).
+     */
+    function getUserShares(address user) external view returns (uint256);
+
+    /**
+     * @notice The same figure as `getAccruedInterest`, read without poking the market.
+     * @param user Account to query.
+     * @param stablecoinLockedInDcaSchedules Principal DcaManager still locks for this user on this
+     *        handler's route.
+     * @return Accrued interest in stablecoin units, or zero.
+     * @dev The display quote, and what keeps `IDcaManager.getAccruedInterest` a `view`. On a market
+     *      that accrues lazily this can sit below what `getAccruedInterest` reports, never above,
+     *      because a stored rate only trails a current one. The quote therefore never exceeds the
+     *      top-up ceiling; DcaManager separately enforces its minimum purchase-boundary rule.
+     */
+    function quoteAccruedInterest(address user, uint256 stablecoinLockedInDcaSchedules) external view returns (uint256);
+}

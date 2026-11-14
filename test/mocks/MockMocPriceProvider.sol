@@ -50,11 +50,7 @@ contract MockMocPriceProvider {
     }
 
     // Return the result of getPrice, getIsValid and getLastPublicationBlock at once.
-    function getPriceInfo()
-        external
-        view
-        returns (uint256 price, bool isValid, uint256 lastPubBlock)
-    {
+    function getPriceInfo() external view returns (uint256 price, bool isValid, uint256 lastPubBlock) {
         return (uint256(mocPrice), true, lastPublicationBlock);
     }
 }

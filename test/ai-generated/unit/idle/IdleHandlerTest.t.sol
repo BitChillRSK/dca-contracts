@@ -1,0 +1,131 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.36;
+
+import {HandlerTestHarness} from "../HandlerTestHarness.t.sol";
+import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
+import {IPurchaseFees} from "src/interfaces/IPurchaseFees.sol";
+import {IdleHandler} from "src/idle/IdleHandler.sol";
+import {PurchaseFees} from "src/PurchaseFees.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "test/Constants.sol";
+
+/**
+ * @title IdleHandlerTest
+ * @notice Unit tests for idle (non-lending) deposit/withdraw accounting after the per-user ledger
+ *         removal. Schedule liability lives in DcaManager; this handler only holds pooled cash.
+ */
+contract IdleHandlerTest is HandlerTestHarness {
+    IdleTestHandler public idleHandler;
+
+    function deployHandler() internal override returns (ITokenHandler) {
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
+        });
+
+        idleHandler = new IdleTestHandler(address(dcaManager), address(stablecoin), FEE_COLLECTOR, feeSettings, OWNER);
+        return ITokenHandler(address(idleHandler));
+    }
+
+    function getRouteIndex() internal pure override returns (uint256) {
+        return IDLE_INDEX;
+    }
+
+    function isDexHandler() internal pure override returns (bool) {
+        return false;
+    }
+
+    function isLendingHandler() internal pure override returns (bool) {
+        return false;
+    }
+
+    function getShareToken() internal pure override returns (IERC20) {
+        return IERC20(address(0));
+    }
+
+    function setupHandlerSpecifics() internal override {}
+
+    function test_idle_deposit_staysOnHandler() public {
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        assertEq(stablecoin.balanceOf(address(handler)), DEPOSIT_AMOUNT);
+    }
+
+    function test_idle_withdraw_paysRequestedFromPool() public {
+        address other = address(0xBEEF);
+        stablecoin.mint(other, DEPOSIT_AMOUNT);
+        vm.prank(other);
+        stablecoin.approve(address(handler), type(uint256).max);
+
+        vm.startPrank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+        handler.depositToken(other, DEPOSIT_AMOUNT);
+        handler.withdrawToken(USER, WITHDRAWAL_AMOUNT);
+        vm.stopPrank();
+
+        assertEq(stablecoin.balanceOf(address(handler)), DEPOSIT_AMOUNT * 2 - WITHDRAWAL_AMOUNT);
+        assertEq(stablecoin.balanceOf(USER), USER_INITIAL_BALANCE - DEPOSIT_AMOUNT + WITHDRAWAL_AMOUNT);
+    }
+
+    function test_idle_batchRetrieveStablecoin_sumsPurchaseAmounts() public {
+        address user1 = makeAddr("user1");
+        address user2 = makeAddr("user2");
+        stablecoin.mint(user1, DEPOSIT_AMOUNT);
+        stablecoin.mint(user2, DEPOSIT_AMOUNT);
+        vm.prank(user1);
+        stablecoin.approve(address(handler), type(uint256).max);
+        vm.prank(user2);
+        stablecoin.approve(address(handler), type(uint256).max);
+
+        vm.startPrank(address(dcaManager));
+        handler.depositToken(user1, DEPOSIT_AMOUNT);
+        handler.depositToken(user2, DEPOSIT_AMOUNT);
+        vm.stopPrank();
+
+        address[] memory users = new address[](2);
+        users[0] = user1;
+        users[1] = user2;
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = DEPOSIT_AMOUNT / 2;
+        amounts[1] = DEPOSIT_AMOUNT / 4;
+
+        uint256 total = idleHandler.testBatchRetrieveStablecoin(users, amounts);
+        assertEq(total, amounts[0] + amounts[1]);
+        // Funding is bookkeeping only: cash stays on the handler until MoC / Uniswap spends it.
+        assertEq(stablecoin.balanceOf(address(handler)), DEPOSIT_AMOUNT * 2);
+    }
+
+    /// @dev The sum runs unchecked because every row is a schedule's uint96 purchase amount. A long batch
+    ///      of rows at that bound must still match full-width arithmetic.
+    function test_idle_batchRetrieveStablecoin_uint96RowsMatchFullWidth() public {
+        uint256 rows = 256;
+        address[] memory users = new address[](rows);
+        uint256[] memory amounts = new uint256[](rows);
+        for (uint256 i; i < rows; ++i) {
+            users[i] = address(uint160(0x1000 + i));
+            amounts[i] = type(uint96).max;
+        }
+        assertEq(idleHandler.testBatchRetrieveStablecoin(users, amounts), rows * uint256(type(uint96).max));
+    }
+}
+
+/**
+ * @title IdleTestHandler
+ * @notice Concrete IdleHandler for deposit/withdraw/take unit tests.
+ */
+contract IdleTestHandler is IdleHandler, PurchaseFees {
+    constructor(
+        address dcaManager,
+        address stablecoin,
+        address feeCollector,
+        FeeSettings memory feeSettings,
+        address initialOwner
+    ) IdleHandler(dcaManager, stablecoin) PurchaseFees(feeCollector, feeSettings, initialOwner) {}
+
+    function testBatchRetrieveStablecoin(address[] calldata users, uint256[] calldata purchaseAmounts)
+        external
+        returns (uint256)
+    {
+        return _batchRetrieveStablecoin(users, purchaseAmounts);
+    }
+}

@@ -1,83 +1,98 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
+
+import {IStablecoinSource} from "./IStablecoinSource.sol";
 
 /**
  * @title IPurchaseRbtc
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @dev Interface for the RBTC purchase related functions
+ * @notice Shared rBTC purchase and signer-withdrawal surface. Called only by DcaManager.
  */
-interface IPurchaseRbtc {
+interface IPurchaseRbtc is IStablecoinSource {
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
-    event PurchaseRbtc__rBtcWithdrawn(address indexed user, uint256 indexed amount);
+    /// @notice Accumulated rBTC was paid to `user` (`msg.sender` on DcaManager).
+    event PurchaseRbtc__rBtcWithdrawn(address indexed user, uint256 amount);
+    /// @notice One schedule in a batch bought rBTC. `amountSpent` is that row's share of gross stablecoin.
     event PurchaseRbtc__RbtcBought(
         address indexed user,
         address indexed tokenSpent,
         uint256 rBtcBought,
-        bytes32 indexed scheduleId,
+        uint64 indexed scheduleId,
         uint256 amountSpent
     );
+    /**
+     * @notice A batch purchase completed. Totals are measured cash, not the amounts requested.
+     * @dev `totalPurchasedRbtc` is gross measured output (includes the collector share; generally
+     *      exceeds ∑ `RbtcBought.rBtcBought`). `totalStablecoinAmountSpent` is retrieved gross.
+     */
     event PurchaseRbtc__SuccessfulRbtcBatchPurchase(
-        address indexed token, uint256 indexed totalPurchasedRbtc, uint256 indexed totalStablecoinAmountSpent
+        address indexed token, uint256 totalPurchasedRbtc, uint256 totalStablecoinAmountSpent
     );
-    event PurchaseRbtc__rBtcRescued(address indexed stuckContract, address indexed rescueAddress, uint256 amount);
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice `user` has no accumulated rBTC to withdraw.
     error PurchaseRbtc__NoAccumulatedRbtcToWithdraw();
+    /// @notice Native rBTC transfer to the signer failed.
     error PurchaseRbtc__rBtcWithdrawalFailed();
-    error PurchaseRbtc__RbtcPurchaseFailed(address user, address tokenSpent);
+    /// @notice The purchase path returned no rBTC for this batch.
     error PurchaseRbtc__RbtcBatchPurchaseFailed(address tokenSpent);
+    /// @notice The measured rBTC this batch bought is below the minimum the caller attached to it.
+    error PurchaseRbtc__BelowSwapperMinimum(uint256 rbtcReceived, uint256 minRbtcOut);
+    /// @notice A positive quoted output minimum requires a nonzero quoted stablecoin input.
+    error PurchaseRbtc__ZeroQuotedStablecoinInput();
+    /// @notice Venue did not reduce the handler's purchase-token balance by exactly `expectedAmount`.
+    error PurchaseRbtc__InputAmountNotFullySpent(uint256 expectedAmount, uint256 balanceBefore, uint256 balanceAfter);
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @param buyer: the user on behalf of which the contract is making the rBTC purchase
-     * @param scheduleId: the ID of the DCA schedule to which the purchase belongs
-     * @param purchaseAmount: the amount of the token to be spent on BTC
-     * @notice this function will be called periodically through a CRON job running on a web server
-     */
-    function buyRbtc(address buyer, bytes32 scheduleId, uint256 purchaseAmount) external;
-
-    /**
-     * @param buyers: the users on behalf of which the contract is making the rBTC purchases
-     * @param scheduleIds: the IDs of the DCA schedules to which the purchases belong
-     * @param purchaseAmounts: the amounts of the token to be spent on BTC
-     * @notice this function will be called periodically through a CRON job running on a web server
+     * @notice Spend each buyer's stablecoin and credit their accumulated rBTC.
+     * @param buyers Users to buy for. An address may appear more than once.
+     * @param scheduleIds Schedule id for each row, used only in `RbtcBought`.
+     * @param purchaseAmounts Nominal stablecoin requested per row. Lending may reduce the funding weights.
+     * @param minRbtcOut Gross rBTC/WRBTC wei minimum quoted for `quotedStablecoinIn`. `0` disables.
+     *        Scales to actual retrieved input, rounding up, before the output fee is taken.
+     * @param quotedStablecoinIn Actual gross input used for the quote, in this token's base units.
+     *        Must be nonzero when the quoted output minimum is nonzero. It does not resize schedule debits.
+     * @dev DcaManager has already debited the schedules. Venue spends full retrieved stablecoin.
+     *      A lending row its buyer's remaining shares cannot cover is funded with those shares and
+     *      weighted at their stablecoin value; a row worth nothing reverts the batch. Fees use the
+     *      funded weights. Measured output `Q` splits over their sum (`G`): buyers
+     *      `floor(Q × netᵢ / G)`, collector `floor(Q × F / G)`, floor dust uncredited.
+     *      `amountSpent` is each row's share of retrieved gross. Exact stablecoin consumption
+     *      required. Collector fee credited last on the same accumulated-rBTC books.
      */
     function batchBuyRbtc(
-        address[] memory buyers,
-        bytes32[] memory scheduleIds,
-        uint256[] memory purchaseAmounts
+        address[] calldata buyers,
+        uint64[] calldata scheduleIds,
+        uint256[] calldata purchaseAmounts,
+        uint256 minRbtcOut,
+        uint256 quotedStablecoinIn
     ) external;
 
     /**
-     * @notice the user can at any time withdraw the rBTC that has been accumulated through periodical purchases
+     * @notice Pay `user` the rBTC this handler has accumulated for them.
+     * @param user Account paid. DcaManager always passes `msg.sender` — no `to`, no owner rescue.
+     *        The fee collector withdraws here too.
+     * @dev The account must accept native rBTC with empty calldata. Failed payments preserve its credit.
      */
     function withdrawAccumulatedRbtc(address user) external;
 
-    /**
-     * @notice Emergency function to withdraw rBTC stuck in contracts that cannot receive native tokens
-     * @param stuckUserContract The address of the user contract where rBTC is stuck
-     * @param rescueAddress The address to send the rescued rBTC to
-     * @dev This function can only be called by the owner
-     */
-    function withdrawStuckRbtc(address stuckUserContract, address rescueAddress) external;
+    /*//////////////////////////////////////////////////////////////
+                                GETTERS
+    //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev returns the rBTC that has been accumulated by the user through periodical purchases
-     * @param user the address of the user to check the accumulated rBTC balance for
+     * @notice rBTC this handler has accumulated for `user` and not yet withdrawn.
+     * @param user Account to query.
+     * @return Accumulated rBTC in wei — the full amount a withdrawal would pay.
      */
     function getAccumulatedRbtcBalance(address user) external view returns (uint256);
-
-    /**
-     * @dev returns the rBTC that has been accumulated by the caller through periodical purchases
-     * @notice This is a convenience function that calls getAccumulatedRbtcBalance(msg.sender)
-     */
-    function getAccumulatedRbtcBalance() external view returns (uint256);
 }

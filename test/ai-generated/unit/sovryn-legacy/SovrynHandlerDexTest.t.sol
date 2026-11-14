@@ -1,0 +1,602 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.36;
+
+import {HandlerTestHarness} from "../HandlerTestHarness.t.sol";
+import {ITokenHandler} from "../../../../src/interfaces/ITokenHandler.sol";
+import {IPurchaseFees} from "../../../../src/interfaces/IPurchaseFees.sol";
+import {IPurchaseUniswap} from "../../../../src/interfaces/IPurchaseUniswap.sol";
+import {IWRBTC} from "../../../../src/interfaces/IWRBTC.sol";
+import {IUniswapV3SwapRouter} from "../../../../src/interfaces/IUniswapV3SwapRouter.sol";
+import {ICoinPairPrice} from "../../../../src/interfaces/ICoinPairPrice.sol";
+import {SovrynHandlerDex} from "../../../../src/sovryn-legacy/SovrynHandlerDex.sol";
+import {MockIToken} from "../../../mocks/MockIToken.sol";
+import {MockWrbtcToken} from "../../../mocks/MockWrbtcToken.sol";
+import {MockMocOracle} from "../../../mocks/MockMocOracle.sol";
+import {MockSwapRouter02} from "../../../mocks/MockSwapRouter02.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "../../../Constants.sol";
+import {handlerBatchBuyOne, NO_MIN_RBTC_OUT} from "test/utils/BatchBuyOne.sol";
+import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
+import {ownableUnauthorized} from "../../../utils/OzRevert.sol";
+
+/**
+ * @title SovrynHandlerDexTest
+ * @notice Unit tests for SovrynHandlerDex (DEX variant) using shared test harness
+ */
+contract SovrynHandlerDexTest is HandlerTestHarness {
+    event PurchaseUniswap__AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
+    event PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(uint256 oldValue, uint256 newValue);
+
+    // Sovryn DEX-specific contracts
+    MockIToken public iToken;
+    MockWrbtcToken public wrbtcToken;
+    MockMocOracle public mocOracle;
+    MockSwapRouter02 public mockRouter;
+    SovrynHandlerDex public sovrynDexHandler;
+
+    /*//////////////////////////////////////////////////////////////
+                           HANDLER-SPECIFIC IMPLEMENTATIONS
+    //////////////////////////////////////////////////////////////*/
+
+    function deployHandler() internal override returns (ITokenHandler) {
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
+        });
+
+        address[] memory intermediateTokens = new address[](0); // No intermediate tokens for direct swap
+        uint24[] memory poolFeeRates = new uint24[](1);
+        poolFeeRates[0] = 3000; // 0.3% fee
+
+        IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
+            wrbtc: IWRBTC(address(wrbtcToken)),
+            swapRouter: IUniswapV3SwapRouter(address(mockRouter)),
+            swapIntermediateTokens: intermediateTokens,
+            swapPoolFeeRates: poolFeeRates,
+            mocOracle: ICoinPairPrice(address(mocOracle))
+        });
+
+        sovrynDexHandler = new SovrynHandlerDex(
+            address(dcaManager),
+            address(stablecoin),
+            address(iToken),
+            uniswapSettings,
+            FEE_COLLECTOR,
+            feeSettings,
+            DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
+            DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
+            OWNER
+        );
+
+        return ITokenHandler(address(sovrynDexHandler));
+    }
+
+    function getRouteIndex() internal pure override returns (uint256) {
+        return SOVRYN_INDEX;
+    }
+
+    function isDexHandler() internal pure override returns (bool) {
+        return true; // This is the DEX variant
+    }
+
+    function isLendingHandler() internal pure override returns (bool) {
+        return true; // Sovryn handlers support lending
+    }
+
+    function getShareToken() internal view override returns (IERC20) {
+        return IERC20(address(iToken));
+    }
+
+    function setupHandlerSpecifics() internal override {
+        // Deploy mock tokens
+        iToken = new MockIToken(address(stablecoin));
+        wrbtcToken = new MockWrbtcToken();
+        mocOracle = new MockMocOracle();
+        mockRouter = new MockSwapRouter02(wrbtcToken, BTC_PRICE);
+
+        // Note: MockIToken has built-in token price logic
+        // Setup oracle price (e.g., 1 Stablecoin = 0.00003 BTC) - will need oracle mock methods
+
+        // Give tokens some initial balances
+        stablecoin.mint(address(iToken), 1000000 ether);
+        vm.deal(address(mockRouter), 1000 ether); // Give router some ETH for WRBTC deposits
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           SOVRYN DEX-SPECIFIC TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_sovrynDex_deployment() public {
+        assertEq(sovrynDexHandler.getAmountOutMinimumPercent(), DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT);
+        assertEq(sovrynDexHandler.getAmountOutMinimumSafetyCheck(), DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK);
+        assertNotEq(address(sovrynDexHandler.getMocOracle()), address(0));
+        assertGt(sovrynDexHandler.getSwapPath().length, 0);
+    }
+
+    /// @notice Both of this leaf's spenders are approved once, at construction — this leaf is not on the
+    ///         production map, so `FinalDeploymentTest` never builds it.
+    function test_sovrynDex_standingSpenderApprovals() public {
+        address handlerAddress = address(sovrynDexHandler);
+        assertEq(stablecoin.allowance(handlerAddress, address(iToken)), type(uint256).max);
+        assertEq(stablecoin.allowance(handlerAddress, address(mockRouter)), type(uint256).max);
+    }
+
+    function test_sovrynDex_setAmountOutMinimumPercent_success() public {
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumPercent(0.98 ether);
+
+        assertEq(sovrynDexHandler.getAmountOutMinimumPercent(), 0.98 ether);
+    }
+
+    function test_sovrynDex_setAmountOutMinimumPercent_reverts_notOwner() public {
+        vm.expectRevert(ownableUnauthorized(USER));
+        vm.prank(USER);
+        sovrynDexHandler.setAmountOutMinimumPercent(0.98 ether);
+    }
+
+    /// @dev The wall: one owner transaction cannot widen the live floor past the safety check.
+    function test_sovrynDex_setAmountOutMinimumPercent_reverts_belowSafetyCheck() public {
+        uint256 safetyCheck = sovrynDexHandler.getAmountOutMinimumSafetyCheck();
+        uint256 percentBefore = sovrynDexHandler.getAmountOutMinimumPercent();
+
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumPercent(safetyCheck - 1);
+
+        assertEq(sovrynDexHandler.getAmountOutMinimumPercent(), percentBefore, "the floor must be unchanged on revert");
+    }
+
+    function test_sovrynDex_setAmountOutMinimumPercent_reverts_tooHigh() public {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooHigh.selector);
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumPercent(1.01 ether);
+    }
+
+    /// @dev Raising the wall above the active floor reverts without changing state, so widening past it
+    ///      is deliberately two transactions.
+    function test_sovrynDex_setAmountOutMinimumSafetyCheck_reverts_aboveCurrentPercent() public {
+        uint256 percent = sovrynDexHandler.getAmountOutMinimumPercent();
+        uint256 safetyBefore = sovrynDexHandler.getAmountOutMinimumSafetyCheck();
+
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumSafetyCheck(percent + 1);
+
+        assertEq(sovrynDexHandler.getAmountOutMinimumSafetyCheck(), safetyBefore);
+        assertEq(sovrynDexHandler.getAmountOutMinimumPercent(), percent);
+    }
+
+    /// @dev Widening below the wall takes two owner transactions, in this order.
+    function test_sovrynDex_wideningBelowTheWallTakesTwoTransactions() public {
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumSafetyCheck(0.9 ether);
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumPercent(0.92 ether);
+
+        assertEq(sovrynDexHandler.getAmountOutMinimumPercent(), 0.92 ether);
+        assertEq(sovrynDexHandler.getAmountOutMinimumSafetyCheck(), 0.9 ether);
+    }
+
+    function test_sovrynDex_setAmountOutMinimumSafetyCheck_success() public {
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumSafetyCheck(0.9 ether);
+
+        assertEq(sovrynDexHandler.getAmountOutMinimumSafetyCheck(), 0.9 ether);
+    }
+
+    function test_sovrynDex_setAmountOutMinimumSafetyCheck_reverts_invalidRange() public {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh.selector);
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumSafetyCheck(1.01 ether);
+    }
+
+    function test_sovrynDex_setAmountOutMinimumSafetyCheck_reverts_notOwner() public {
+        vm.expectRevert(ownableUnauthorized(USER));
+        vm.prank(USER);
+        sovrynDexHandler.setAmountOutMinimumSafetyCheck(0.9 ether);
+    }
+
+    function test_sovrynDex_constructor_allows_hundred_percent() public {
+        SovrynHandlerDex handler = _deploySovrynDexWithSlippage(1 ether, 1 ether);
+        assertEq(handler.getAmountOutMinimumPercent(), 1 ether);
+        assertEq(handler.getAmountOutMinimumSafetyCheck(), 1 ether);
+    }
+
+    function test_sovrynDex_constructor_allows_equal_percent_and_safety() public {
+        SovrynHandlerDex handler = _deploySovrynDexWithSlippage(0.99 ether, 0.99 ether);
+        assertEq(handler.getAmountOutMinimumPercent(), 0.99 ether);
+        assertEq(handler.getAmountOutMinimumSafetyCheck(), 0.99 ether);
+    }
+
+    function test_sovrynDex_constructor_reverts_when_percent_too_high() public {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooHigh.selector);
+        _deploySovrynDexWithSlippage(1.01 ether, 0.95 ether);
+    }
+
+    function test_sovrynDex_constructor_reverts_when_percent_below_safety() public {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
+        _deploySovrynDexWithSlippage(0.94 ether, 0.95 ether);
+    }
+
+    function test_sovrynDex_constructor_reverts_when_safety_too_high() public {
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh.selector);
+        _deploySovrynDexWithSlippage(1 ether, 1.01 ether);
+    }
+
+    /**
+     * @notice R1 / R20. When the redeem pays less than planned — SIP-0094's exit fee, or any short
+     * redemption — the batch must not hand out more WRBTC than the swap produced. The per-user weights are
+     * shares of the planned net total, so they still sum to one; dividing by the smaller actual spend would
+     * credit each buyer a slice of rBTC the handler never received.
+     */
+    function test_sovrynDex_batchBuyRbtcCreditsNoMoreRbtcThanReceived() public {
+        address buyerOne = makeAddr("dexBuyerOne");
+        address buyerTwo = makeAddr("dexBuyerTwo");
+
+        stablecoin.mint(buyerOne, DEPOSIT_AMOUNT);
+        stablecoin.mint(buyerTwo, DEPOSIT_AMOUNT);
+        vm.prank(buyerOne);
+        stablecoin.approve(address(sovrynDexHandler), type(uint256).max);
+        vm.prank(buyerTwo);
+        stablecoin.approve(address(sovrynDexHandler), type(uint256).max);
+
+        vm.startPrank(address(dcaManager));
+        sovrynDexHandler.depositToken(buyerOne, DEPOSIT_AMOUNT);
+        sovrynDexHandler.depositToken(buyerTwo, DEPOSIT_AMOUNT);
+        vm.stopPrank();
+
+        iToken.setExitFeeBps(10); // the 0.10% Sovryn approved
+
+        address[] memory buyers = new address[](2);
+        buyers[0] = buyerOne;
+        buyers[1] = buyerTwo;
+        uint64[] memory scheduleIds = new uint64[](2);
+        scheduleIds[0] = 1;
+        scheduleIds[1] = 2;
+        uint256[] memory purchaseAmounts = new uint256[](2);
+        purchaseAmounts[0] = DEPOSIT_AMOUNT / 4;
+        purchaseAmounts[1] = DEPOSIT_AMOUNT / 2;
+
+        uint256 handlerWrbtcBefore = wrbtcToken.balanceOf(address(sovrynDexHandler));
+
+        vm.prank(address(dcaManager));
+        sovrynDexHandler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT, 0);
+
+        uint256 received = wrbtcToken.balanceOf(address(sovrynDexHandler)) - handlerWrbtcBefore;
+        uint256 credited =
+            sovrynDexHandler.getAccumulatedRbtcBalance(buyerOne) + sovrynDexHandler.getAccumulatedRbtcBalance(buyerTwo);
+
+        assertGt(credited, 0);
+        assertLe(credited, received, "credited more rBTC than the handler received");
+    }
+
+    function test_sovrynDex_setPurchasePath_success() public {
+        address[] memory intermediateTokens = new address[](0); // Direct swap, no intermediates
+        uint24[] memory poolFeeRates = new uint24[](1);
+        poolFeeRates[0] = 3000; // 0.3%
+
+        vm.prank(OWNER);
+        sovrynDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
+
+        bytes memory expectedPath = abi.encodePacked(address(stablecoin), uint24(3000), address(wrbtcToken));
+        assertEq(sovrynDexHandler.getSwapPath(), expectedPath);
+    }
+
+    function test_sovrynDex_setPurchasePath_reverts_invalidLength() public {
+        address[] memory intermediateTokens = new address[](1);
+        intermediateTokens[0] = address(0x123);
+        uint24[] memory poolFeeRates = new uint24[](1); // Should be 2 for 1 intermediate token
+        poolFeeRates[0] = 3000;
+
+        vm.expectRevert();
+        vm.prank(OWNER);
+        sovrynDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
+    }
+
+    function test_sovrynDex_setPurchasePath_reverts_notOwner() public {
+        address[] memory intermediateTokens = new address[](0);
+        uint24[] memory poolFeeRates = new uint24[](1);
+        poolFeeRates[0] = 3000;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IPurchaseUniswap.PurchaseUniswap__UnauthorizedPurchasePathSetter.selector, USER)
+        );
+        vm.prank(USER);
+        sovrynDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           SOVRYN DEX ORACLE TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_sovrynDex_oraclePrice() public {
+        uint256 price = sovrynDexHandler.getMocOracle().getPrice();
+        assertGt(price, 0); // Should be greater than 0 by default
+    }
+
+    function test_sovrynDex_oraclePriceValidation() public {
+        // Set oracle to return 0 (should cause issues)
+        mocOracle.setPrice(0);
+
+        // This might cause issues in swap calculations
+        // The exact behavior depends on implementation
+        uint256 price = sovrynDexHandler.getMocOracle().getPrice();
+        assertEq(price, 0);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           SOVRYN DEX SWAP PATH TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_sovrynDex_swapPathValidation() public {
+        bytes memory path = sovrynDexHandler.getSwapPath();
+        assertGt(path.length, 0);
+
+        // The path should include both input and output tokens
+        // Exact validation depends on how the path is structured
+        assertTrue(path.length >= 43); // Minimum for single-hop path (20 + 3 + 20 bytes)
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           COMBINED FUNCTIONALITY TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_sovrynDex_depositAndLendingCombined() public {
+        // Test that DEX handler maintains lending functionality
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        // Check lending balance (inherited from Sovryn base)
+        uint256 lendingBalance = sovrynDexHandler.getUserShares(USER);
+        assertGt(lendingBalance, 0);
+
+        // Check iDOC balance (in our mock, handler holds tokens instead of burning)
+        uint256 iTokenBalance = iToken.balanceOf(address(handler));
+        assertGt(iTokenBalance, 0); // Mock implementation holds tokens in handler
+
+        // But user should have lending balance
+        assertGt(lendingBalance, 0);
+    }
+
+    function test_sovrynDex_withdrawWithDexCapabilities() public {
+        // Deposit first
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        // Withdraw (should use Sovryn redemption, not DEX)
+        uint256 userBalanceBefore = stablecoin.balanceOf(USER);
+
+        vm.prank(address(dcaManager));
+        handler.withdrawToken(USER, WITHDRAWAL_AMOUNT);
+
+        uint256 userBalanceAfter = stablecoin.balanceOf(USER);
+        assertGt(userBalanceAfter, userBalanceBefore);
+    }
+
+    function test_sovrynDex_interestWithLendingProtocol() public {
+        // Deposit tokens
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        // Simulate interest accrual by time passage
+        vm.warp(block.timestamp + 365 days); // 1 year for interest accrual
+
+        // Check accrued interest
+        vm.prank(address(dcaManager));
+        uint256 accruedInterest = sovrynDexHandler.getAccruedInterest(USER, DEPOSIT_AMOUNT);
+        assertGt(accruedInterest, 0);
+
+        // Withdraw interest
+        uint256 userBalanceBeforeInterestWithdraw = stablecoin.balanceOf(USER);
+
+        vm.prank(address(dcaManager));
+        sovrynDexHandler.withdrawInterest(USER, DEPOSIT_AMOUNT / 2);
+
+        uint256 userBalanceAfterInterestWithdraw = stablecoin.balanceOf(USER);
+        assertGe(userBalanceAfterInterestWithdraw, userBalanceBeforeInterestWithdraw);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           EDGE CASES FOR SOVRYN DEX VARIANT
+    //////////////////////////////////////////////////////////////*/
+
+    function test_sovrynDex_extremeSlippageSettings() public {
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumSafetyCheck(0.5 ether);
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumPercent(0.5 ether); // 50% — very high slippage
+
+        assertEq(sovrynDexHandler.getAmountOutMinimumPercent(), 0.5 ether);
+
+        vm.prank(OWNER);
+        sovrynDexHandler.setAmountOutMinimumPercent(0.9999 ether); // 99.99% — very low slippage
+
+        assertEq(sovrynDexHandler.getAmountOutMinimumPercent(), 0.9999 ether);
+        assertEq(sovrynDexHandler.getAmountOutMinimumSafetyCheck(), 0.5 ether, "the wall stays where governance put it");
+    }
+
+    function test_sovrynDex_oracleFailure() public {
+        // Test behavior when oracle fails
+        mocOracle.setInvalidPrice();
+
+        // Accessing price info should show invalid state
+        (, bool isValid,) = sovrynDexHandler.getMocOracle().getPriceInfo();
+        assertFalse(isValid);
+    }
+
+    function test_sovrynDex_swapPathEdgeCases() public {
+        // Test with multi-hop path
+        address[] memory intermediateTokens = new address[](1);
+        intermediateTokens[0] = address(0x456); // Intermediate token
+        uint24[] memory poolFeeRates = new uint24[](2);
+        poolFeeRates[0] = 3000;
+        poolFeeRates[1] = 3000;
+
+        bytes memory expectedPath =
+            abi.encodePacked(address(stablecoin), uint24(3000), address(0x456), uint24(3000), address(wrbtcToken));
+        vm.prank(OWNER);
+        sovrynDexHandler.setPurchasePathAllowed(intermediateTokens, poolFeeRates, true);
+
+        vm.prank(OWNER);
+        sovrynDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
+
+        assertEq(sovrynDexHandler.getSwapPath(), expectedPath);
+        assertEq(sovrynDexHandler.getSwapPath().length, 66); // 3 addresses + 2 fees
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           SOVRYN-SPECIFIC LENDING + DEX INTEGRATION
+    //////////////////////////////////////////////////////////////*/
+
+    function test_sovrynDex_lendingProtocolIntegration() public {
+        // Test that Sovryn's iDOC burn works with DEX
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        // Check that user has lending balance but handler has no tokens
+        uint256 lendingBalance = sovrynDexHandler.getUserShares(USER);
+        uint256 handlerBalance = iToken.balanceOf(address(handler));
+
+        assertGt(lendingBalance, 0);
+        assertGt(handlerBalance, 0); // Mock implementation holds tokens in handler (unlike real Sovryn)
+    }
+
+    function test_sovrynDex_withdrawInterestPaysUser() public {
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        uint256 userBalanceBefore = stablecoin.balanceOf(USER);
+
+        vm.prank(address(dcaManager));
+        sovrynDexHandler.withdrawInterest(USER, 0);
+
+        assertGt(stablecoin.balanceOf(USER), userBalanceBefore);
+        assertEq(stablecoin.balanceOf(address(sovrynDexHandler)), 0);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           PURCHASE PIPELINE COVERAGE
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Test that batchBuyRbtc funds the purchase by redeeming the buyer's lending shares
+     * @dev Covers the shared PurchaseRbtc pipeline resolving _batchRetrieveStablecoin to LendingHandler
+     */
+    function test_sovrynDex_lengthOneBatchRedeemsSharesForPurchase() public {
+        // Setup: User deposits tokens first
+        vm.prank(address(dcaManager));
+        handler.depositToken(USER, DEPOSIT_AMOUNT);
+
+        // Verify initial state
+        uint256 initialLendingBalance = sovrynDexHandler.getUserShares(USER);
+        assertGt(initialLendingBalance, 0);
+
+        uint256 purchaseAmount = 100 ether;
+        uint64 mockScheduleId = 1;
+
+        // Call batchBuyRbtc, which redeems shares through _batchRetrieveStablecoin
+        vm.prank(address(dcaManager));
+        handlerBatchBuyOne(IPurchaseRbtc(address(sovrynDexHandler)), USER, mockScheduleId, purchaseAmount);
+
+        // Verify the shares were redeemed - lending balance should be reduced
+        uint256 finalLendingBalance = sovrynDexHandler.getUserShares(USER);
+        assertLt(finalLendingBalance, initialLendingBalance);
+
+        // Verify RBTC was accumulated
+        uint256 rbtcBalance = sovrynDexHandler.getAccumulatedRbtcBalance(USER);
+        assertGt(rbtcBalance, 0);
+    }
+
+    /**
+     * @notice Test that batchBuyRbtc funds the purchase by redeeming every buyer's lending shares
+     * @dev Covers the shared PurchaseRbtc pipeline resolving _batchRetrieveStablecoin to LendingHandler
+     */
+    function test_sovrynDex_batchBuyRbtcRedeemsSharesForPurchase() public {
+        // Setup: Multiple users deposit tokens
+        address user1 = address(0x1001);
+        address user2 = address(0x1002);
+        uint256 depositAmount1 = 500 ether;
+        uint256 depositAmount2 = 300 ether;
+
+        // Give users stablecoin balance and approve handler
+        stablecoin.mint(user1, depositAmount1);
+        stablecoin.mint(user2, depositAmount2);
+
+        vm.prank(user1);
+        stablecoin.approve(address(handler), type(uint256).max);
+        vm.prank(user2);
+        stablecoin.approve(address(handler), type(uint256).max);
+
+        vm.prank(address(dcaManager));
+        handler.depositToken(user1, depositAmount1);
+        vm.prank(address(dcaManager));
+        handler.depositToken(user2, depositAmount2);
+
+        // Verify initial state
+        uint256 initialBalance1 = sovrynDexHandler.getUserShares(user1);
+        uint256 initialBalance2 = sovrynDexHandler.getUserShares(user2);
+        assertGt(initialBalance1, 0);
+        assertGt(initialBalance2, 0);
+
+        // Prepare batch purchase data
+        address[] memory buyers = new address[](2);
+        buyers[0] = user1;
+        buyers[1] = user2;
+
+        uint64[] memory scheduleIds = new uint64[](2);
+        scheduleIds[0] = 1;
+        scheduleIds[1] = 2;
+
+        uint256[] memory purchaseAmounts = new uint256[](2);
+        purchaseAmounts[0] = 100 ether;
+        purchaseAmounts[1] = 80 ether;
+
+        // Call batchBuyRbtc, which redeems shares through _batchRetrieveStablecoin
+        vm.prank(address(dcaManager));
+        sovrynDexHandler.batchBuyRbtc(buyers, scheduleIds, purchaseAmounts, NO_MIN_RBTC_OUT, 0);
+
+        // Verify the shares were redeemed - lending balances should be reduced
+        uint256 finalBalance1 = sovrynDexHandler.getUserShares(user1);
+        uint256 finalBalance2 = sovrynDexHandler.getUserShares(user2);
+        assertLt(finalBalance1, initialBalance1);
+        assertLt(finalBalance2, initialBalance2);
+
+        // Verify RBTC was accumulated for both users
+        uint256 rbtcBalance1 = sovrynDexHandler.getAccumulatedRbtcBalance(user1);
+        uint256 rbtcBalance2 = sovrynDexHandler.getAccumulatedRbtcBalance(user2);
+        assertGt(rbtcBalance1, 0);
+        assertGt(rbtcBalance2, 0);
+    }
+
+    function _deploySovrynDexWithSlippage(uint256 amountOutMinimumPercent, uint256 amountOutMinimumSafetyCheck)
+        private
+        returns (SovrynHandlerDex)
+    {
+        IPurchaseFees.FeeSettings memory feeSettings = IPurchaseFees.FeeSettings({
+            minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
+        });
+
+        address[] memory intermediateTokens = new address[](0);
+        uint24[] memory poolFeeRates = new uint24[](1);
+        poolFeeRates[0] = 3000;
+
+        IPurchaseUniswap.UniswapSettings memory uniswapSettings = IPurchaseUniswap.UniswapSettings({
+            wrbtc: IWRBTC(address(wrbtcToken)),
+            swapRouter: IUniswapV3SwapRouter(address(mockRouter)),
+            swapIntermediateTokens: intermediateTokens,
+            swapPoolFeeRates: poolFeeRates,
+            mocOracle: ICoinPairPrice(address(mocOracle))
+        });
+
+        return new SovrynHandlerDex(
+            address(dcaManager),
+            address(stablecoin),
+            address(iToken),
+            uniswapSettings,
+            FEE_COLLECTOR,
+            feeSettings,
+            amountOutMinimumPercent,
+            amountOutMinimumSafetyCheck,
+            OWNER
+        );
+    }
+}

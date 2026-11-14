@@ -1,0 +1,1485 @@
+{
+  "version": 1,
+  "createdAt": "2026-10-19T21:17:07.350Z",
+  "projectRoot": ".",
+  "suiteDir": "test/fizz",
+  "metaDir": "fizz_data",
+  "contracts": [
+    {
+      "name": "DcaManager",
+      "sourcePath": "src/DcaManager.sol",
+      "sourceHash": "sha256:41fe6c05c93ab10523df6915ebf00aca7cc6b8d32c908fdad3625c4c36f4542b",
+      "constructor": {
+        "inputs": [
+          {
+            "name": "operationsAdmin",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "minPurchasePeriod",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxSchedulesPerToken",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "initialOwner",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      "functions": [
+        {
+          "name": "acceptOwnership",
+          "inputs": [],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "acceptOwnership()"
+        },
+        {
+          "name": "activateProtectedPurchaseWindow",
+          "inputs": [],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "activateProtectedPurchaseWindow()"
+        },
+        {
+          "name": "batchBuyRbtc",
+          "inputs": [
+            {
+              "name": "batch",
+              "type": "tuple",
+              "internalType": "IDcaManager.Batch"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "batchBuyRbtc(IDcaManager.Batch)"
+        },
+        {
+          "name": "batchBuyRbtcAcrossHandlers",
+          "inputs": [
+            {
+              "name": "batches",
+              "type": "array",
+              "internalType": "IDcaManager.Batch[]"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "batchBuyRbtcAcrossHandlers(IDcaManager.Batch[])"
+        },
+        {
+          "name": "createDcaSchedule",
+          "inputs": [
+            {
+              "name": "token",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "depositAmount",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "purchaseAmount",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "purchasePeriod",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "routeIndex",
+              "type": "uint256",
+              "internalType": "uint256"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "createDcaSchedule(address,uint256,uint256,uint256,uint256)"
+        },
+        {
+          "name": "deleteDcaSchedule",
+          "inputs": [
+            {
+              "name": "token",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "scheduleId",
+              "type": "uint64",
+              "internalType": "uint64"
+            },
+            {
+              "name": "scheduleIdIndex",
+              "type": "uint256",
+              "internalType": "uint256"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "deleteDcaSchedule(address,uint64,uint256)"
+        },
+        {
+          "name": "depositToken",
+          "inputs": [
+            {
+              "name": "token",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "scheduleId",
+              "type": "uint64",
+              "internalType": "uint64"
+            },
+            {
+              "name": "depositAmount",
+              "type": "uint256",
+              "internalType": "uint256"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "depositToken(address,uint64,uint256)"
+        },
+        {
+          "name": "setMaxSchedulesPerToken",
+          "inputs": [
+            {
+              "name": "maxSchedulesPerToken",
+              "type": "uint256",
+              "internalType": "uint256"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "secondary",
+          "signature": "setMaxSchedulesPerToken(uint256)"
+        },
+        {
+          "name": "setMinPurchasePeriod",
+          "inputs": [
+            {
+              "name": "minPurchasePeriod",
+              "type": "uint256",
+              "internalType": "uint256"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "secondary",
+          "signature": "setMinPurchasePeriod(uint256)"
+        },
+        {
+          "name": "setSchedulePaused",
+          "inputs": [
+            {
+              "name": "token",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "scheduleId",
+              "type": "uint64",
+              "internalType": "uint64"
+            },
+            {
+              "name": "paused",
+              "type": "bool",
+              "internalType": "bool"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "setSchedulePaused(address,uint64,bool)"
+        },
+        {
+          "name": "setTokenMinPurchaseAmount",
+          "inputs": [
+            {
+              "name": "token",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "minPurchaseAmount",
+              "type": "uint256",
+              "internalType": "uint256"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "secondary",
+          "signature": "setTokenMinPurchaseAmount(address,uint256)"
+        },
+        {
+          "name": "topUpFromInterest",
+          "inputs": [
+            {
+              "name": "token",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "scheduleId",
+              "type": "uint64",
+              "internalType": "uint64"
+            },
+            {
+              "name": "amount",
+              "type": "uint256",
+              "internalType": "uint256"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "topUpFromInterest(address,uint64,uint256)"
+        },
+        {
+          "name": "transferOwnership",
+          "inputs": [
+            {
+              "name": "newOwner",
+              "type": "address",
+              "internalType": "address"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "transferOwnership(address)"
+        },
+        {
+          "name": "updatePurchaseAmount",
+          "inputs": [
+            {
+              "name": "token",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "scheduleId",
+              "type": "uint64",
+              "internalType": "uint64"
+            },
+            {
+              "name": "newPurchaseAmount",
+              "type": "uint256",
+              "internalType": "uint256"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "updatePurchaseAmount(address,uint64,uint256)"
+        },
+        {
+          "name": "updatePurchasePeriod",
+          "inputs": [
+            {
+              "name": "token",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "scheduleId",
+              "type": "uint64",
+              "internalType": "uint64"
+            },
+            {
+              "name": "newPurchasePeriod",
+              "type": "uint256",
+              "internalType": "uint256"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "updatePurchasePeriod(address,uint64,uint256)"
+        },
+        {
+          "name": "withdrawAllAccumulatedInterest",
+          "inputs": [
+            {
+              "name": "tokens",
+              "type": "array",
+              "internalType": "address[]"
+            },
+            {
+              "name": "routeIndexes",
+              "type": "array",
+              "internalType": "uint256[]"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "withdrawAllAccumulatedInterest(address[],uint256[])"
+        },
+        {
+          "name": "withdrawAllAccumulatedRbtc",
+          "inputs": [
+            {
+              "name": "tokens",
+              "type": "array",
+              "internalType": "address[]"
+            },
+            {
+              "name": "routeIndexes",
+              "type": "array",
+              "internalType": "uint256[]"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "withdrawAllAccumulatedRbtc(address[],uint256[])"
+        },
+        {
+          "name": "withdrawToken",
+          "inputs": [
+            {
+              "name": "token",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "scheduleId",
+              "type": "uint64",
+              "internalType": "uint64"
+            },
+            {
+              "name": "withdrawalAmount",
+              "type": "uint256",
+              "internalType": "uint256"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "withdrawToken(address,uint64,uint256)"
+        },
+        {
+          "name": "withdrawTokenAndInterest",
+          "inputs": [
+            {
+              "name": "token",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "scheduleId",
+              "type": "uint64",
+              "internalType": "uint64"
+            },
+            {
+              "name": "withdrawalAmount",
+              "type": "uint256",
+              "internalType": "uint256"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "withdrawTokenAndInterest(address,uint64,uint256)"
+        }
+      ]
+    },
+    {
+      "name": "OperationsAdmin",
+      "sourcePath": "src/OperationsAdmin.sol",
+      "sourceHash": "sha256:c28b90ded7a4f23f2209eaa5595be53979f163f7710479a48e1c275c65732370",
+      "constructor": {
+        "inputs": [
+          {
+            "name": "initialOwner",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      "functions": [
+        {
+          "name": "acceptOwnership",
+          "inputs": [],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "acceptOwnership()"
+        },
+        {
+          "name": "addSwapper",
+          "inputs": [
+            {
+              "name": "swapper",
+              "type": "address",
+              "internalType": "address"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "secondary",
+          "signature": "addSwapper(address)"
+        },
+        {
+          "name": "assignHandler",
+          "inputs": [
+            {
+              "name": "token",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "routeIndex",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "handler",
+              "type": "address",
+              "internalType": "address"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "assignHandler(address,uint256,address)"
+        },
+        {
+          "name": "registerRoute",
+          "inputs": [
+            {
+              "name": "index",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "lends",
+              "type": "bool",
+              "internalType": "bool"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "registerRoute(uint256,bool)"
+        },
+        {
+          "name": "revokeSwapper",
+          "inputs": [
+            {
+              "name": "swapper",
+              "type": "address",
+              "internalType": "address"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "secondary",
+          "signature": "revokeSwapper(address)"
+        },
+        {
+          "name": "setDepositsPaused",
+          "inputs": [
+            {
+              "name": "token",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "routeIndex",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "paused",
+              "type": "bool",
+              "internalType": "bool"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "secondary",
+          "signature": "setDepositsPaused(address,uint256,bool)"
+        },
+        {
+          "name": "transferOwnership",
+          "inputs": [
+            {
+              "name": "newOwner",
+              "type": "address",
+              "internalType": "address"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "transferOwnership(address)"
+        }
+      ]
+    },
+    {
+      "name": "LayerBankHandlerDex",
+      "sourcePath": "src/layerbank/LayerBankHandlerDex.sol",
+      "sourceHash": "sha256:a603d87d3c5db0c680e69b6404954a084dea6168277f34fe6b8efc72970decd3",
+      "constructor": {
+        "inputs": [
+          {
+            "name": "dcaManager",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "stablecoin",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "aToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "uniswapSettings",
+            "type": "tuple",
+            "internalType": "IPurchaseUniswap.UniswapSettings"
+          },
+          {
+            "name": "feeCollector",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "feeSettings",
+            "type": "tuple",
+            "internalType": "IPurchaseFees.FeeSettings"
+          },
+          {
+            "name": "amountOutMinimumPercent",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "amountOutMinimumSafetyCheck",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "initialOwner",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      "functions": [
+        {
+          "name": "acceptOwnership",
+          "inputs": [],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "acceptOwnership()"
+        },
+        {
+          "name": "batchBuyRbtc",
+          "inputs": [
+            {
+              "name": "buyers",
+              "type": "array",
+              "internalType": "address[]"
+            },
+            {
+              "name": "scheduleIds",
+              "type": "array",
+              "internalType": "uint64[]"
+            },
+            {
+              "name": "purchaseAmounts",
+              "type": "array",
+              "internalType": "uint256[]"
+            },
+            {
+              "name": "minRbtcOut",
+              "type": "uint256",
+              "internalType": "uint256"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "batchBuyRbtc(address[],uint64[],uint256[],uint256)"
+        },
+        {
+          "name": "depositToken",
+          "inputs": [
+            {
+              "name": "user",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "depositAmount",
+              "type": "uint256",
+              "internalType": "uint256"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "depositToken(address,uint256)"
+        },
+        {
+          "name": "getAccruedInterest",
+          "inputs": [
+            {
+              "name": "user",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "stablecoinLockedInDcaSchedules",
+              "type": "uint256",
+              "internalType": "uint256"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "getAccruedInterest(address,uint256)"
+        },
+        {
+          "name": "restoreLendingApproval",
+          "inputs": [],
+          "stateMutability": "nonpayable",
+          "tier": "secondary",
+          "signature": "restoreLendingApproval()"
+        },
+        {
+          "name": "restoreSwapRouterApproval",
+          "inputs": [],
+          "stateMutability": "nonpayable",
+          "tier": "secondary",
+          "signature": "restoreSwapRouterApproval()"
+        },
+        {
+          "name": "setAmountOutMinimumPercent",
+          "inputs": [
+            {
+              "name": "amountOutMinimumPercent",
+              "type": "uint256",
+              "internalType": "uint256"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "secondary",
+          "signature": "setAmountOutMinimumPercent(uint256)"
+        },
+        {
+          "name": "setAmountOutMinimumSafetyCheck",
+          "inputs": [
+            {
+              "name": "amountOutMinimumSafetyCheck",
+              "type": "uint256",
+              "internalType": "uint256"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "secondary",
+          "signature": "setAmountOutMinimumSafetyCheck(uint256)"
+        },
+        {
+          "name": "setFeeCollector",
+          "inputs": [
+            {
+              "name": "feeCollector",
+              "type": "address",
+              "internalType": "address"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "secondary",
+          "signature": "setFeeCollector(address)"
+        },
+        {
+          "name": "setFeeRateParams",
+          "inputs": [
+            {
+              "name": "minFeeRate",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "maxFeeRate",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "feePurchaseLowerBound",
+              "type": "uint256",
+              "internalType": "uint256"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "secondary",
+          "signature": "setFeeRateParams(uint256,uint256,uint256)"
+        },
+        {
+          "name": "setMocOracle",
+          "inputs": [
+            {
+              "name": "newOracle",
+              "type": "address",
+              "internalType": "address"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "secondary",
+          "signature": "setMocOracle(address)"
+        },
+        {
+          "name": "setPurchasePath",
+          "inputs": [
+            {
+              "name": "intermediateTokens",
+              "type": "array",
+              "internalType": "address[]"
+            },
+            {
+              "name": "poolFeeRates",
+              "type": "array",
+              "internalType": "uint24[]"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "secondary",
+          "signature": "setPurchasePath(address[],uint24[])"
+        },
+        {
+          "name": "setPurchasePathAllowed",
+          "inputs": [
+            {
+              "name": "intermediateTokens",
+              "type": "array",
+              "internalType": "address[]"
+            },
+            {
+              "name": "poolFeeRates",
+              "type": "array",
+              "internalType": "uint24[]"
+            },
+            {
+              "name": "allowed",
+              "type": "bool",
+              "internalType": "bool"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "secondary",
+          "signature": "setPurchasePathAllowed(address[],uint24[],bool)"
+        },
+        {
+          "name": "transferOwnership",
+          "inputs": [
+            {
+              "name": "newOwner",
+              "type": "address",
+              "internalType": "address"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "transferOwnership(address)"
+        },
+        {
+          "name": "withdrawAccumulatedRbtc",
+          "inputs": [
+            {
+              "name": "user",
+              "type": "address",
+              "internalType": "address"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "withdrawAccumulatedRbtc(address)"
+        },
+        {
+          "name": "withdrawInterest",
+          "inputs": [
+            {
+              "name": "user",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "stablecoinLockedInDcaSchedules",
+              "type": "uint256",
+              "internalType": "uint256"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "withdrawInterest(address,uint256)"
+        },
+        {
+          "name": "withdrawToken",
+          "inputs": [
+            {
+              "name": "user",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "withdrawalAmount",
+              "type": "uint256",
+              "internalType": "uint256"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "tier": "primary",
+          "signature": "withdrawToken(address,uint256)"
+        }
+      ]
+    }
+  ],
+  "handlers": {
+    "AdversarialHandler.sol": "sha256:faff56fc05b05005874a8fc018f73205e43027e7a472b4b75fc3692ea4d38e91",
+    "DcaManagerHandler.sol": "sha256:32516bdd3cc5c2f2f461fd363d82af2293fd2da4e2fc1f5f61c494040d413763",
+    "EnvironmentHandler.sol": "sha256:68e5a46854283ed764a4f50a693d2b29e1a661e18b1e017ec11c48310d1ea9b2",
+    "Handlers.sol": "sha256:90877a8f376ba8cceb20ca9b5e363bdfcad27fcb945dcc2270fac9685784ae9f",
+    "LayerBankHandlerDexHandler.sol": "sha256:aa5bc7ca6d6d0dd19643f27e80496deeb23fcada610e02a9e3a1f1b7f3cc0ce5",
+    "OperationsAdminHandler.sol": "sha256:5a7efc0c3a408953ac7e1e7bbf7ed4715a50ab4308063d5705105047bd7438e8",
+    "RoundTripHandler.sol": "sha256:ffa1f0621bcfe3ba158882928bf3edb810ce38bbbd9057a80a3ca9d3333654f5"
+  },
+  "properties": [
+    {
+      "id": "GL-01",
+      "checkbox": "x",
+      "functionName": "property_rbtcSolvency",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-02",
+      "checkbox": "x",
+      "functionName": "property_rbtcBooksExact",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-03",
+      "checkbox": "x",
+      "functionName": "property_rbtcAssetSplit",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-04",
+      "checkbox": "x",
+      "functionName": "property_idleCashCoversPrincipal",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-05",
+      "checkbox": "x",
+      "functionName": "property_idleCashExact",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-06",
+      "checkbox": "x",
+      "functionName": "property_lendingNoRawStablecoin",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-07",
+      "checkbox": "x",
+      "functionName": "property_virtualSharesBacked",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-08",
+      "checkbox": "x",
+      "functionName": "property_virtualSharesExact",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-09",
+      "checkbox": "x",
+      "functionName": "property_accruedInterestIdentity",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-10",
+      "checkbox": "x",
+      "functionName": "property_principalBackedNoLoss",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-11",
+      "checkbox": "x",
+      "functionName": "property_scheduleCounts",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-12",
+      "checkbox": "x",
+      "functionName": "property_nativeConservation",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-13",
+      "checkbox": "x",
+      "functionName": "property_stablecoinConservation",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-14",
+      "checkbox": "x",
+      "functionName": "property_marketValueCoversUserValues",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-15",
+      "checkbox": "x",
+      "functionName": "property_sharePreviewPositive",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-16",
+      "checkbox": "x",
+      "functionName": "property_retiredIdsStayDead",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-17",
+      "checkbox": "x",
+      "functionName": "property_oneBuyPerDay",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-18",
+      "checkbox": "x",
+      "functionName": "property_windowFreeze",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-19",
+      "checkbox": "x",
+      "functionName": "property_routesFixed",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-20",
+      "checkbox": "x",
+      "functionName": "property_anchorOnGrid",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-21",
+      "checkbox": "x",
+      "functionName": "property_scheduleDomains",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-22",
+      "checkbox": "x",
+      "functionName": "property_activePathAllowlisted",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-23",
+      "checkbox": "x",
+      "functionName": "property_settingsDomains",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-24",
+      "checkbox": "x",
+      "functionName": "property_principalHasSharesNoLoss",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-25",
+      "checkbox": "x",
+      "functionName": "property_windowBounded",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-26",
+      "checkbox": "x",
+      "functionName": "property_canActivateSync",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-27",
+      "checkbox": "x",
+      "functionName": "property_privilegedHoldNothing",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-28",
+      "checkbox": "x",
+      "functionName": "property_previewsNeverRevert",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "GL-29",
+      "checkbox": "x",
+      "functionName": "property_depositPauseOnlyAssigned",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-01",
+      "checkbox": "x",
+      "functionName": "property_depositExact",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-02",
+      "checkbox": "x",
+      "functionName": "property_createPostconditions",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-03",
+      "checkbox": "x",
+      "functionName": "property_lendingDepositCredit",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-04",
+      "checkbox": "x",
+      "functionName": "property_donationMovesNoBook",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-05",
+      "checkbox": "x",
+      "functionName": "property_postDonationDepositCredit",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-06",
+      "checkbox": "x",
+      "functionName": "property_depositPauseRespected",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-07",
+      "checkbox": "x",
+      "functionName": "property_createRespectsCap",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-08",
+      "checkbox": "x",
+      "functionName": "property_withdrawExact",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-09",
+      "checkbox": "x",
+      "functionName": "property_lendingPayoutNoLoss",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-10",
+      "checkbox": "x",
+      "functionName": "property_redeemDebitCeil",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-11",
+      "checkbox": "x",
+      "functionName": "property_redeemPaysAtMostBurned",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-12",
+      "checkbox": "x",
+      "functionName": "property_noBurnMismatchRevert",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-13",
+      "checkbox": "x",
+      "functionName": "property_deletePostconditions",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-14",
+      "checkbox": "x",
+      "functionName": "property_interestWithdrawalSafe",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-15",
+      "checkbox": "x",
+      "functionName": "property_interestSecondCallNoop",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-16",
+      "checkbox": "x",
+      "functionName": "property_interestPayoutVsQuote",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-17",
+      "checkbox": "x",
+      "functionName": "property_topUpExact",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-18",
+      "checkbox": "x",
+      "functionName": "property_topUpQuoteSafe",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-19",
+      "checkbox": "x",
+      "functionName": "property_rtLendingNoValue",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-20",
+      "checkbox": "x",
+      "functionName": "property_rtIdleExact",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-21",
+      "checkbox": "x",
+      "functionName": "property_rtNoFreeShares",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-22",
+      "checkbox": "x",
+      "functionName": "property_rtMaxOneShareLoss",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-23",
+      "checkbox": "x",
+      "functionName": "property_rtCreateDelete",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-24",
+      "checkbox": "x",
+      "functionName": "property_batchCreditsBounded",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-25",
+      "checkbox": "x",
+      "functionName": "property_batchFeeCap",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-26",
+      "checkbox": "x",
+      "functionName": "property_batchFeeLowerBounds",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-27",
+      "checkbox": "x",
+      "functionName": "property_batchDebitsExact",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-28",
+      "checkbox": "x",
+      "functionName": "property_lendingBatchFunding",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-29",
+      "checkbox": "x",
+      "functionName": "property_idleOutputMatchesVenue",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-30",
+      "checkbox": "x",
+      "functionName": "property_batchShareSimulation",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-31",
+      "checkbox": "x",
+      "functionName": "property_batchCreditsExact",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-32",
+      "checkbox": "x",
+      "functionName": "property_dexOracleFloor",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-33",
+      "checkbox": "x",
+      "functionName": "property_minRbtcOutBinds",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-34",
+      "checkbox": "x",
+      "functionName": "property_acrossDexFloor",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-35",
+      "checkbox": "x",
+      "functionName": "property_oracleValidity",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-36",
+      "checkbox": "x",
+      "functionName": "property_batchRowLegality",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-37",
+      "checkbox": "x",
+      "functionName": "property_cadenceRefusalsMatchSpec",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-38",
+      "checkbox": "x",
+      "functionName": "property_pauseTransitions",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-39",
+      "checkbox": "x",
+      "functionName": "property_rbtcClaimExact",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-40",
+      "checkbox": "x",
+      "functionName": "property_rbtcBookMovesOnlyByClaimOrBatch",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-41",
+      "checkbox": "x",
+      "functionName": "property_rbtcSentinelSlot",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-42",
+      "checkbox": "x",
+      "functionName": "property_noCrossUserEffect",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-43",
+      "checkbox": "x",
+      "functionName": "property_mutatorFieldFrame",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-44",
+      "checkbox": "x",
+      "functionName": "property_nonScheduleCallFrame",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-45",
+      "checkbox": "x",
+      "functionName": "property_anchorMonotone",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-46",
+      "checkbox": "x",
+      "functionName": "property_unlockMonotone",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-47",
+      "checkbox": "x",
+      "functionName": "property_shareChangeAttribution",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-48",
+      "checkbox": "x",
+      "functionName": "property_noOpRaisesInterest",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-49",
+      "checkbox": "x",
+      "functionName": "property_shortfallNotDeepened",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-50",
+      "checkbox": "x",
+      "functionName": "property_activationSemantics",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-51",
+      "checkbox": "x",
+      "functionName": "property_windowGatesGuardedCalls",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-52",
+      "checkbox": "x",
+      "functionName": "property_refusalAttribution",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-53",
+      "checkbox": "x",
+      "functionName": "property_swapperAllowlistTransitions",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-54",
+      "checkbox": "x",
+      "functionName": "property_pathStateMachine",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-55",
+      "checkbox": "x",
+      "functionName": "property_preparedRowSurvivesWindow",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-56",
+      "checkbox": "x",
+      "functionName": "property_mutatorsOnlyLiveOwnedKeys",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-57",
+      "checkbox": "x",
+      "functionName": "property_noRouteRemap",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-58",
+      "checkbox": "x",
+      "functionName": "property_withdrawLiveness",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-59",
+      "checkbox": "x",
+      "functionName": "property_deleteLiveness",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-60",
+      "checkbox": "x",
+      "functionName": "property_interestExitLiveness",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-61",
+      "checkbox": "x",
+      "functionName": "property_claimLiveness",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-62",
+      "checkbox": "x",
+      "functionName": "property_reenterOnEqualTerms",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-63",
+      "checkbox": "x",
+      "functionName": "property_cleanBatchLiveness",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-64",
+      "checkbox": "x",
+      "functionName": "property_protectedBatchInputFixed",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-65",
+      "checkbox": "x",
+      "functionName": "property_minRbtcOutNotWeaponized",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-66",
+      "checkbox": "x",
+      "functionName": "property_nonUserCallsKeepWallets",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-67",
+      "checkbox": "x",
+      "functionName": "property_noProfitPerUserCall",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-68",
+      "checkbox": "x",
+      "functionName": "property_nonSwapperCannotActAsSwapper",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-69",
+      "checkbox": "x",
+      "functionName": "property_handlersOnlyFromManager",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-70",
+      "checkbox": "x",
+      "functionName": "property_noForeignScheduleMutation",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-71",
+      "checkbox": "x",
+      "functionName": "property_nonOwnerSettersRevert",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-72",
+      "checkbox": "x",
+      "functionName": "property_intermediateDonationNoDos",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-73",
+      "checkbox": "x",
+      "functionName": "property_fundingLiveness",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-74",
+      "checkbox": "x",
+      "functionName": "property_reentrantClaimSafe",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-75",
+      "checkbox": "x",
+      "functionName": "property_approvalRestorersHarmless",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-76",
+      "checkbox": "x",
+      "functionName": "property_feeCurveMatchesSpec",
+      "file": "test/fizz/Properties.sol"
+    },
+    {
+      "id": "SP-77",
+      "checkbox": "x",
+      "functionName": "property_feeSplitNoGain",
+      "file": "test/fizz/Properties.sol"
+    }
+  ]
+}
