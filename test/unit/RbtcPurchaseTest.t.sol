@@ -56,13 +56,130 @@ contract RbtcPurchaseTest is DcaDappTest {
         vm.stopPrank();
         vm.prank(SWAPPER);
         dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId); // first purchase
+        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
         bytes memory encodedRevert = abi.encodeWithSelector(
             IDcaManager.DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed.selector,
-            block.timestamp + MIN_PURCHASE_PERIOD - block.timestamp
+            _secondsUntilDueUtcDayStart(schedule.lastPurchaseTimestamp, schedule.purchasePeriod)
         );
         vm.expectRevert(encodedRevert);
         vm.prank(SWAPPER);
         dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId); // second purchase
+    }
+
+    function testBuyAllowedAtUtcDayStartOfDueDay() external {
+        uint256 firstBuy = _nextUtcTimestamp(20 hours);
+        vm.warp(firstBuy);
+        bytes32 scheduleId = dcaManager.getScheduleId(USER, address(stablecoin), SCHEDULE_INDEX);
+        vm.prank(SWAPPER);
+        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
+
+        uint256 dueDayStart = _utcDayStart(firstBuy) + 1 days;
+        vm.warp(dueDayStart);
+        vm.prank(SWAPPER);
+        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
+
+        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
+        assertEq(schedule.lastPurchaseTimestamp, _utcDayStart(firstBuy) + MIN_PURCHASE_PERIOD);
+    }
+
+    function testFirstPurchaseStampsUtcDayStart() external {
+        uint256 firstBuy = _nextUtcTimestamp(20 hours);
+        vm.warp(firstBuy);
+        bytes32 scheduleId = dcaManager.getScheduleId(USER, address(stablecoin), SCHEDULE_INDEX);
+        vm.prank(SWAPPER);
+        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
+
+        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
+        assertEq(schedule.lastPurchaseTimestamp, _utcDayStart(firstBuy));
+        assertTrue(schedule.lastPurchaseTimestamp != 0);
+    }
+
+    function testCannotBuyOneSecondBeforeDueUtcDay() external {
+        uint256 firstBuy = _nextUtcTimestamp(20 hours);
+        vm.warp(firstBuy);
+        bytes32 scheduleId = dcaManager.getScheduleId(USER, address(stablecoin), SCHEDULE_INDEX);
+        vm.prank(SWAPPER);
+        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
+
+        uint256 dueDayStart = _utcDayStart(firstBuy) + 1 days;
+        vm.warp(dueDayStart - 1);
+        bytes memory encodedRevert = abi.encodeWithSelector(
+            IDcaManager.DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed.selector,
+            uint256(1)
+        );
+        vm.expectRevert(encodedRevert);
+        vm.prank(SWAPPER);
+        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
+    }
+
+    function testUtcDayEarlyBuyConsumesOnePeriodAndBlocksSameDaySecondBuy() external {
+        uint256 firstBuy = _nextUtcTimestamp(20 hours);
+        vm.warp(firstBuy);
+        bytes32 scheduleId = dcaManager.getScheduleId(USER, address(stablecoin), SCHEDULE_INDEX);
+        vm.prank(SWAPPER);
+        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
+
+        uint256 dueDayStart = _utcDayStart(firstBuy) + 1 days;
+        vm.warp(dueDayStart); // 00:00 UTC of the due day, before last + period wall-clock
+        vm.prank(SWAPPER);
+        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
+
+        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
+        assertEq(schedule.lastPurchaseTimestamp, _utcDayStart(firstBuy) + MIN_PURCHASE_PERIOD);
+
+        vm.warp(dueDayStart + 9 hours); // still the due UTC day
+        bytes memory encodedRevert = abi.encodeWithSelector(
+            IDcaManager.DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed.selector,
+            _secondsUntilDueUtcDayStart(schedule.lastPurchaseTimestamp, schedule.purchasePeriod)
+        );
+        vm.expectRevert(encodedRevert);
+        vm.prank(SWAPPER);
+        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
+    }
+
+    function testWeeklyBuyAllowedOnDueUtcDay() external {
+        uint256 weeklyPeriod = 7 days;
+        uint256 firstBuy = _nextUtcTimestamp(20 hours);
+        vm.warp(firstBuy);
+        bytes32 scheduleId = dcaManager.getScheduleId(USER, address(stablecoin), SCHEDULE_INDEX);
+        vm.prank(USER);
+        dcaManager.setPurchasePeriod(address(stablecoin), SCHEDULE_INDEX, scheduleId, weeklyPeriod);
+        vm.prank(SWAPPER);
+        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
+
+        uint256 dueDayStart = _utcDayStart(firstBuy) + weeklyPeriod;
+        vm.warp(dueDayStart); // due UTC day 00:00, 20 hours before last + period
+        vm.prank(SWAPPER);
+        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
+
+        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
+        assertEq(schedule.lastPurchaseTimestamp, _utcDayStart(firstBuy) + weeklyPeriod);
+    }
+
+    function testGapResumeOnDueUtcDayConsumesThatDaySlot() external {
+        uint256 firstBuy = _nextUtcTimestamp(20 hours);
+        vm.warp(firstBuy);
+        bytes32 scheduleId = dcaManager.getScheduleId(USER, address(stablecoin), SCHEDULE_INDEX);
+        vm.prank(SWAPPER);
+        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
+
+        // Day 0 20:00, then resume at 00:00 UTC of the third due day (52h later, 2 wall-clock periods)
+        uint256 thirdDueDayStart = _utcDayStart(firstBuy) + 3 days;
+        vm.warp(thirdDueDayStart);
+        vm.prank(SWAPPER);
+        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
+
+        IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
+        assertEq(schedule.lastPurchaseTimestamp, _utcDayStart(firstBuy) + 3 * MIN_PURCHASE_PERIOD);
+
+        vm.warp(thirdDueDayStart + 9 hours);
+        bytes memory encodedRevert = abi.encodeWithSelector(
+            IDcaManager.DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed.selector,
+            _secondsUntilDueUtcDayStart(schedule.lastPurchaseTimestamp, schedule.purchasePeriod)
+        );
+        vm.expectRevert(encodedRevert);
+        vm.prank(SWAPPER);
+        dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
     }
 
     function testSeveralPurchasesOneSchedule() external {
@@ -100,22 +217,22 @@ contract RbtcPurchaseTest is DcaDappTest {
     function testLastPurchaseTimestampConsistencyWhenScheduleResumed(uint256 timeUntilResume) public {
         if (timeUntilResume < MIN_PURCHASE_PERIOD) return; // Avoid known revert
         if (timeUntilResume > 100 * 52 weeks) return; // Avoid overflows
-        uint256 firstPurchaseTimestamp = block.timestamp;
         bytes32 scheduleId = dcaManager.getScheduleId(USER, address(stablecoin), SCHEDULE_INDEX);
         vm.prank(SWAPPER);
         dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
-        
-        // Imagine after the first purchase, the schedule runs out of stablecoin and is resumed later 
-        vm.warp(vm.getBlockTimestamp() + timeUntilResume); 
-        
+        uint256 gridOrigin = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX].lastPurchaseTimestamp;
+
+        // Imagine after the first purchase, the schedule runs out of stablecoin and is resumed later
+        vm.warp(vm.getBlockTimestamp() + timeUntilResume);
+
         vm.prank(SWAPPER);
         dcaManager.buyRbtc(USER, address(stablecoin), SCHEDULE_INDEX, scheduleId);
 
         IDcaManager.DcaDetails memory schedule = dcaManager.getDcaSchedules(USER, address(stablecoin))[SCHEDULE_INDEX];
-        assertLe(schedule.lastPurchaseTimestamp, block.timestamp);
+        uint256 expectedLast = _snappedLastPurchaseTimestamp(gridOrigin, MIN_PURCHASE_PERIOD, block.timestamp);
+        assertEq(schedule.lastPurchaseTimestamp, expectedLast);
+        assertLt(schedule.lastPurchaseTimestamp, block.timestamp + MIN_PURCHASE_PERIOD);
         assertGt(schedule.lastPurchaseTimestamp, block.timestamp - MIN_PURCHASE_PERIOD);
-        uint256 periodsElapsed = (block.timestamp - firstPurchaseTimestamp) / MIN_PURCHASE_PERIOD;
-        assertEq(schedule.lastPurchaseTimestamp, firstPurchaseTimestamp + periodsElapsed * MIN_PURCHASE_PERIOD);
     }
 
     function testRevertPurchasetIfStablecoinRunsOut() external {
@@ -739,5 +856,37 @@ contract RbtcPurchaseTest is DcaDappTest {
             );
         }
         vm.stopPrank();
+    }
+
+    function _utcDayStart(uint256 timestamp) private pure returns (uint256) {
+        return timestamp - (timestamp % 1 days);
+    }
+
+    function _nextUtcTimestamp(uint256 hourOfDay) private view returns (uint256) {
+        // Skip unix day 0 so a 00:00 stamp cannot collide with the "never purchased" sentinel.
+        uint256 ts = block.timestamp < 1 days ? 1 days : block.timestamp;
+        uint256 candidate = _utcDayStart(ts) + hourOfDay;
+        if (candidate < ts) {
+            candidate += 1 days;
+        }
+        return candidate;
+    }
+
+    function _secondsUntilDueUtcDayStart(uint256 lastPurchaseTimestamp, uint256 purchasePeriod)
+        private
+        view
+        returns (uint256)
+    {
+        uint256 nextDueTimestamp = lastPurchaseTimestamp + purchasePeriod;
+        return nextDueTimestamp - block.timestamp;
+    }
+
+    function _snappedLastPurchaseTimestamp(uint256 lastPurchaseTimestamp, uint256 purchasePeriod, uint256 timestamp)
+        private
+        pure
+        returns (uint256)
+    {
+        uint256 periodsElapsed = (timestamp - lastPurchaseTimestamp) / purchasePeriod;
+        return lastPurchaseTimestamp + periodsElapsed * purchasePeriod;
     }
 }

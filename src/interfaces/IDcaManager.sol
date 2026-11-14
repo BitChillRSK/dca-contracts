@@ -63,6 +63,8 @@ interface IDcaManager {
     error DcaManager__WithdrawalAmountExceedsBalance(address token, uint256 amount, uint256 balance);
     error DcaManager__PurchaseAmountMustBeGreaterThanMinimum(address token, uint256 minPurchaseAmount);
     error DcaManager__PurchasePeriodMustBeGreaterThanMinimum();
+    error DcaManager__MinPurchasePeriodMustBeAtLeastOneDay();
+    error DcaManager__PurchasePeriodMustBeWholeDays();
     error DcaManager__PurchaseAmountMustBeLowerThanHalfOfBalance();
     error DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed(uint256 timeRemaining);
     error DcaManager__InexistentScheduleIndex();
