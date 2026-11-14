@@ -23,14 +23,8 @@ The human prompt is one line: `Start with R2` or `Start with PR 3`. Do not expec
 ## Stack integrity and merge approval
 
 Before creating, updating, or merging stacked PRs, follow [the stack workflow](./docs/STACK_WORKFLOW.md).
-
-- After `git fetch origin`, verify `git merge-base --is-ancestor origin/<parent-branch> HEAD` before creating a child PR.
-- After changing a parent, propagate its current head through every dependent branch, from bottom to top. Verify ancestry again.
-- After publishing, run `python3 tools/check_stack_ancestry.py --pr <number>` for each affected PR. Record any existing gaps explicitly.
-- Before merging a stack, run `python3 tools/check_stack_ancestry.py` and reconcile every reported gap against the reviewed final tree.
-- Present the merge sequence, exact heads, remaining differences, and checks before requesting explicit merge approval.
-- Treat readiness questions as requests for assessment. Authorization to publish a PR does not authorize its merge.
-- Preserve the agreed audit commit and tag. Obtain approval for differences from the audit snapshot before integration.
+The human approves merges. An agent may execute a merge only after explicit approval for the identified PRs or stack.
+Readiness questions request assessment. Authorization to publish a PR does not authorize its merge.
 
 ## Layout
 
@@ -234,7 +228,7 @@ Branch names (`<type>/r<n>-<slug>`), commit subjects (`<type>: why`), and PR tit
 3. **Push and open a PR** only after the gate for the change's tier passes (see **Scale the gate to
    the change**); for an executable change, that is `make check` and `make fork-layerbank`. Use `.github/PULL_REQUEST_TEMPLATE.md`. Point at the spec. Do not commit secrets or `.env`.
 4. **One implementer per PR.** Parallel review (Cursor/Codex/Claude/Bugbot) is expected. Parallel implementation on overlapping Solidity is not. Skip git worktrees for this relaunch except a docs-only PR that does not share files.
-5. After the PR is open, set `docs/relaunch/README.md` **Status** to this PR (full GitHub link) and “next unassigned: …” (the one-line prompt for the following chat). If the URL is only known after opening, add that Status update in a follow-up commit and push, then stop. Do not start the next R-item in this chat. The human merges in order. In the closing message, remind the human of that next prompt so they can spin up the following agent.
+5. After the PR is open, set `docs/relaunch/README.md` **Status** to this PR (full GitHub link) and “next unassigned: …” (the one-line prompt for the following chat). If the URL is only known after opening, add that Status update in a follow-up commit and push, then stop. Do not start the next R-item in this chat. For merge sequencing and approval, follow **Stack integrity and merge approval**. In the closing message, remind the human of that next prompt so they can spin up the following agent.
 6. **Keep the PR body current.** After any review or audit follow-up that changes the diff, edit the GitHub description in the same turn (`gh pr edit`) before you stop. **Files beyond the spec** must name every path in `gh pr diff --name-only` that the spec’s file list does not, with a one-line why. Update an existing entry when its reason changed (checkbox flips vs a new out-of-scope bullet). Do not leave the body describing only the first push.
 7. **Consumer follow-up** (see below): if this PR changes anything a consumer repo reads, sends, or indexes, open or update an issue on each affected repo in the same turn and paste the URLs in the PR **Cutover / frontend note**.
 
