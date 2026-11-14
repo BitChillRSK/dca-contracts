@@ -162,6 +162,45 @@ contract InvariantTest is StdInvariant, Test {
         assertEq(schedules[0].routeIndex, s_routeIndex);
     }
 
+    /// @dev Generated second-based inputs must produce successful whole-day schedule actions.
+    function testFuzz_invariantHandlerCreatesWithGeneratedPeriod(uint256 periodSeed) public {
+        uint256 inputPeriod = bound(periodSeed, MIN_PURCHASE_PERIOD, 520 weeks);
+        fuzzHandler.createDcaSchedule(0, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_AMOUNT, inputPeriod);
+
+        assertEq(fuzzHandler.createScheduleSuccesses(), 1, "generated creation period was rejected");
+        IDcaManager.DcaSchedule memory schedule = scheduleAt(dcaManager, s_users[0], address(stablecoin), 0);
+        assertEq(schedule.purchasePeriod, inputPeriod / 1 days * 1 days);
+    }
+
+    function testFuzz_invariantHandlerUpdatesWithGeneratedPeriod(uint256 periodSeed) public {
+        fuzzHandler.createDcaSchedule(0, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD);
+        uint256 inputPeriod = bound(periodSeed, MIN_PURCHASE_PERIOD + 1 days, 520 weeks);
+        fuzzHandler.applyScheduleEdits(0, 0, 0, 0, inputPeriod);
+
+        IDcaManager.DcaSchedule memory schedule = scheduleAt(dcaManager, s_users[0], address(stablecoin), 0);
+        assertEq(schedule.purchasePeriod, inputPeriod / 1 days * 1 days, "generated period update was rejected");
+    }
+
+    function testFuzz_invariantHandlerSetsGeneratedMinimum(uint256 periodSeed) public {
+        uint256 inputPeriod = bound(periodSeed, 2 days, 365 days);
+        fuzzHandler.setMinPurchasePeriod(inputPeriod);
+        assertEq(dcaManager.getMinPurchasePeriod(), inputPeriod / 1 days * 1 days, "generated minimum was rejected");
+    }
+
+    /// @dev Creation and edits must use the current minimum after a generated admin action.
+    function test_invariantHandlerUsesRaisedMinimum() public {
+        fuzzHandler.setMinPurchasePeriod(7 days + 1);
+        fuzzHandler.createDcaSchedule(0, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD + 1);
+        assertEq(fuzzHandler.createScheduleSuccesses(), 1, "creation ignored the current minimum");
+        assertEq(scheduleAt(dcaManager, s_users[0], address(stablecoin), 0).purchasePeriod, 7 days);
+
+        fuzzHandler.setMinPurchasePeriod(14 days + 1);
+        fuzzHandler.applyScheduleEdits(0, 0, 0, 0, MIN_PURCHASE_PERIOD + 1);
+        uint256 updatedPeriod = scheduleAt(dcaManager, s_users[0], address(stablecoin), 0).purchasePeriod;
+        assertGe(updatedPeriod, 14 days);
+        assertEq(updatedPeriod % 1 days, 0);
+    }
+
     /// @dev The pause action reaches the chain and records its ghost entry, so a failure of
     ///      `invariant_pausedSchedulesNeverPurchase` means the protocol moved, not the harness.
     function test_invariantHandlerPausesAndRecordsGhost() public {

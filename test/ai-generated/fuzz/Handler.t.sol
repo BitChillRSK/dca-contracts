@@ -132,7 +132,7 @@ contract Handler is Test {
 
         // Prevent pathological gas / overflow situations without shrinking search-space too much
         depositAmount = bound(depositAmount, MIN_DEPOSIT_AMOUNT, INTERNAL_UPPER_AMOUNT);
-        purchasePeriod = bound(purchasePeriod, MIN_PURCHASE_PERIOD, INTERNAL_UPPER_PERIOD);
+        purchasePeriod = _boundPurchasePeriod(purchasePeriod);
         purchaseAmount = bound(purchaseAmount, MIN_PURCHASE_AMOUNT, depositAmount);
 
         // Mint enough tokens for the user and approve handler without arbitrary caps
@@ -281,7 +281,7 @@ contract Handler is Test {
 
         if (purchasePeriod > 0) {
             vm.assume(purchasePeriod >= MIN_PURCHASE_PERIOD);
-            purchasePeriod = bound(purchasePeriod, MIN_PURCHASE_PERIOD, INTERNAL_UPPER_PERIOD);
+            purchasePeriod = _boundPurchasePeriod(purchasePeriod);
         }
 
         if (depositAmount > 0) {
@@ -651,7 +651,7 @@ contract Handler is Test {
      * @notice Test modifying minimum purchase period (owner-only)
      */
     function setMinPurchasePeriod(uint256 newMinPurchasePeriod) external {
-        newMinPurchasePeriod = bound(newMinPurchasePeriod, 1 days, 365 days);
+        newMinPurchasePeriod = bound(newMinPurchasePeriod, 1 days, 365 days) / 1 days * 1 days;
 
         vm.startPrank(OWNER);
         try dcaManager.setMinPurchasePeriod(newMinPurchasePeriod) {
@@ -698,6 +698,11 @@ contract Handler is Test {
     /*//////////////////////////////////////////////////////////////
                             HELPER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    /// @dev Generate valid periods against the live minimum, including after admin actions.
+    function _boundPurchasePeriod(uint256 period) private view returns (uint256) {
+        return bound(period, dcaManager.getMinPurchasePeriod(), INTERNAL_UPPER_PERIOD) / 1 days * 1 days;
+    }
 
     function min(uint256 a, uint256 b) internal pure returns (uint256) {
         return a < b ? a : b;
