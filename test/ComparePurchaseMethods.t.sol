@@ -8,6 +8,7 @@ import {DcaManager} from "../src/DcaManager.sol";
 import {OperationsAdmin} from "../src/OperationsAdmin.sol";
 import {IPurchaseRbtc} from "../src/interfaces/IPurchaseRbtc.sol";
 import {ICoinPairPrice} from "../src/interfaces/ICoinPairPrice.sol";
+import {IMocOraclePrice} from "./mocks/MocInterfaces.sol";
 import {MocHelperConfig} from "../script/MocHelperConfig.s.sol";
 import {DexHelperConfig} from "../script/DexHelperConfig.s.sol";
 import {MockStablecoin} from "../test/mocks/MockStablecoin.sol";
@@ -151,7 +152,7 @@ contract ComparePurchaseMethods is Test {
         }
 
         // Get BTC price from oracle for Uniswap implementation
-        btcPrice = priceOracle.getPrice() / 1e18;
+        btcPrice = IMocOraclePrice(address(priceOracle)).getPrice() / 1e18;
         console2.log("BTC price from mainnet oracle: %d USD", btcPrice);
 
         // Output DOC balances for verification

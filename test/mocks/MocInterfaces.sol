@@ -9,6 +9,11 @@ interface IMocStateV1 {
     function getBitcoinPrice() external view returns (uint256);
 }
 
+/// @dev Money on Chain oracle read the tests use; `ICoinPairPrice` declares only what `src/` calls.
+interface IMocOraclePrice {
+    function getPrice() external view returns (uint256);
+}
+
 interface IChangeContract {
     function execute() external;
 }

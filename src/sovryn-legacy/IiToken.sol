@@ -26,13 +26,6 @@ interface IiToken {
     function burn(address receiver, uint256 burnAmount) external returns (uint256 loanAmountPaid);
 
     /**
-     * @notice Get loan token balance.
-     * @return The user's balance of underlying token.
-     *
-     */
-    function assetBalanceOf(address _owner) external view returns (uint256);
-
-    /**
      * @dev Returns the balance of the specified address.
      * @param owner The address to query the balance of.
      * @return The balance of the specified address.
