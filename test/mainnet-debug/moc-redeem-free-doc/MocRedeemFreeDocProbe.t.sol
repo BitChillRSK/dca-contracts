@@ -6,11 +6,16 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IMocProxy} from "src/interfaces/IMocProxy.sol";
 import {DOC_HOLDER} from "../../Constants.sol";
 
+/// @dev MoC's request entry, which `IMocProxy` omits because BitChill never calls it.
+interface IMocRedeemDocRequest {
+    function redeemDocRequest(uint256 docAmount) external;
+}
+
 /**
  * @title MocRedeemFreeDocProbe
  * @notice R71 evidence: live MoC `redeemFreeDoc` alone redeems DOC for rBTC. No prior
- *         `redeemDocRequest` is required for free DOC. BitChill purchases therefore drop the
- *         settlement-queue hop.
+ *         `redeemDocRequest` is required for free DOC, and the request call itself pays nothing.
+ *         BitChill purchases therefore call `redeemFreeDoc` only.
  * @dev Excluded from `make check` / `make fork-*` / CI (`test/mainnet-debug/`).
  *      Run: `make probe-moc-redeem-free-doc` (needs `RSK_MAINNET_RPC_URL`).
  *      MoC rejects high tx gas prices; pin under its live `maxGasPrice()`
@@ -60,10 +65,10 @@ contract MocRedeemFreeDocProbe is Test {
         uint256 rbtcBefore = DOC_HOLDER.balance;
 
         vm.startPrank(DOC_HOLDER);
-        // Settlement-queue path: may enqueue or no-op depending on MoC state; it must not
-        // be required before redeemFreeDoc, and it must not itself pay immediate rBTC here.
-        try IMocProxy(MOC_PROXY).redeemDocRequest(REDEEM_AMOUNT) {
-            console2.log("redeemDocRequest: succeeded (queue path)");
+        // The deployed request function returns without moving tokens. It must not be required
+        // before redeemFreeDoc, and it must not itself pay immediate rBTC.
+        try IMocRedeemDocRequest(MOC_PROXY).redeemDocRequest(REDEEM_AMOUNT) {
+            console2.log("redeemDocRequest: succeeded");
         } catch (bytes memory reason) {
             console2.log("redeemDocRequest: reverted (acceptable for this probe)");
             console2.logBytes(reason);
