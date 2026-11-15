@@ -259,12 +259,12 @@ abstract contract R114PurchaseClampGasBase is BaseDeploymentTest, AccessPricer {
             docHandlerMoc = new DeployIdleHandler()
                 .deployIdleDocHandlerMoc(
                     DeployIdleHandler.DeployParams({
-                    dcaManager: address(dcaManager),
-                    stablecoin: address(docToken),
-                    mocProxy: address(mocProxy),
-                    feeCollector: makeAddr(FEE_COLLECTOR_STRING),
-                    initialOwner: OWNER
-                })
+                        dcaManager: address(dcaManager),
+                        stablecoin: address(docToken),
+                        mocProxy: address(mocProxy),
+                        feeCollector: makeAddr(FEE_COLLECTOR_STRING),
+                        initialOwner: OWNER
+                    })
                 );
         }
         address target = _measuredHandler();

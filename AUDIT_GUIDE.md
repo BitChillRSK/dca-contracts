@@ -339,7 +339,7 @@ make slither
 make aderyn
 ```
 
-CI pins Foundry v1.7.1; use the same version locally. Fork commands require `RSK_MAINNET_RPC_URL`.
+CI pins Foundry v1.9.0; use the same version locally. Fork commands require `RSK_MAINNET_RPC_URL`.
 `make check-deploy` is separate and slow because it recompiles everything under via-IR. The fork
 suites run on Anvil/revm against live state and are not a Rootstock consensus or compiler proof. The
 [README](./README.md#testing) describes each lane.
