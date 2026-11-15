@@ -779,7 +779,9 @@ contract LendingHandlerRedeemTest is Test {
      */
     function _creditShares(address user, uint256 shares) private {
         uint256 previous = harness.getUserShares(user);
-        stdstore.target(address(harness)).sig(harness.getUserShares.selector).with_key(user)
+        stdstore.target(address(harness))
+            .sig(harness.getUserShares.selector)
+            .with_key(user)
             .checked_write(previous + shares);
         harness.addProtocolShares(shares);
     }

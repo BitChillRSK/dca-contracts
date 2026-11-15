@@ -270,7 +270,9 @@ contract R89ReviewCandidatesGasTest is DcaDappTest {
     /// @dev Found through the public getter, so the pin does not depend on each leaf's storage layout.
     function _userSharesSlot(address user) private returns (bytes32) {
         return bytes32(
-            stdstore.target(address(stablecoinHandler)).sig(ILendingHandler.getUserShares.selector).with_key(user)
+            stdstore.target(address(stablecoinHandler))
+                .sig(ILendingHandler.getUserShares.selector)
+                .with_key(user)
                 .find()
         );
     }

@@ -71,7 +71,7 @@ batch allocation.
 
 ## Development
 
-Requires [Foundry](https://book.getfoundry.sh/). CI pins forge v1.7.1; a different version can format
+Requires [Foundry](https://book.getfoundry.sh/). CI pins forge v1.9.0; a different version can format
 differently and fail `make fmt-check`.
 
 ```bash

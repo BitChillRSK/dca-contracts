@@ -472,12 +472,12 @@ contract LendingShareWithdrawalTest is DcaDappTest {
         address idleHandler = new DeployIdleHandler()
             .deployIdleDocHandlerMoc(
                 DeployIdleHandler.DeployParams({
-                dcaManager: address(dcaManager),
-                stablecoin: address(stablecoin),
-                mocProxy: address(mocProxy),
-                feeCollector: FEE_COLLECTOR,
-                initialOwner: OWNER
-            })
+                    dcaManager: address(dcaManager),
+                    stablecoin: address(stablecoin),
+                    mocProxy: address(mocProxy),
+                    feeCollector: FEE_COLLECTOR,
+                    initialOwner: OWNER
+                })
             );
         vm.prank(OWNER);
         operationsAdmin.assignHandler(address(stablecoin), IDLE_INDEX, idleHandler);
