@@ -8,6 +8,7 @@ import {IPurchaseUniswap} from "../../../../src/interfaces/IPurchaseUniswap.sol"
 import {IWRBTC} from "../../../../src/interfaces/IWRBTC.sol";
 import {IUniswapV3SwapRouter} from "../../../../src/interfaces/IUniswapV3SwapRouter.sol";
 import {ICoinPairPrice} from "../../../../src/interfaces/ICoinPairPrice.sol";
+import {IMocOraclePrice} from "../../../mocks/MocInterfaces.sol";
 import {TropykusHandlerDex} from "../../../../src/tropykus-legacy/TropykusHandlerDex.sol";
 import {MockKToken} from "../../../mocks/MockKToken.sol";
 import {MockWrbtcToken} from "../../../mocks/MockWrbtcToken.sol";
@@ -265,7 +266,7 @@ contract TropykusHandlerDexTest is HandlerTestHarness {
     //////////////////////////////////////////////////////////////*/
 
     function test_tropykusDex_oraclePrice() public {
-        uint256 price = tropykusDexHandler.getMocOracle().getPrice();
+        uint256 price = IMocOraclePrice(address(tropykusDexHandler.getMocOracle())).getPrice();
         assertGt(price, 0); // Should be greater than 0 by default
     }
 
@@ -275,7 +276,7 @@ contract TropykusHandlerDexTest is HandlerTestHarness {
 
         // This might cause issues in swap calculations
         // The exact behavior depends on implementation
-        uint256 price = tropykusDexHandler.getMocOracle().getPrice();
+        uint256 price = IMocOraclePrice(address(tropykusDexHandler.getMocOracle())).getPrice();
         assertEq(price, 0);
     }
 

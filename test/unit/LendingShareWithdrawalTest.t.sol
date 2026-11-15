@@ -7,7 +7,6 @@ import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {ILendingHandler} from "../../src/interfaces/ILendingHandler.sol";
 import {ILayerBankAToken} from "../../src/layerbank/ILayerBankAToken.sol";
 import {ILayerBankPool} from "../../src/layerbank/ILayerBankPool.sol";
-import {IiToken} from "../../src/sovryn-legacy/IiToken.sol";
 import {DeployIdleHandler} from "../../script/DeployIdleHandler.s.sol";
 import {MockLayerBankAToken} from "../mocks/MockLayerBank.sol";
 import {MockIToken} from "../mocks/MockIToken.sol";
@@ -26,6 +25,11 @@ interface ILayerBankGovernance {
     function addPoolAdmin(address admin) external;
     function setReservePause(address asset, bool paused) external;
     function setReserveFreeze(address asset, bool freeze) external;
+}
+
+/// @dev Sovryn's underlying-value read; `IiToken` declares only what `src/` calls.
+interface ISovrynAssetBalance {
+    function assetBalanceOf(address owner) external view returns (uint256);
 }
 
 /**
@@ -438,7 +442,7 @@ contract LendingShareWithdrawalTest is DcaDappTest {
     /// @dev What `holder`'s receipt tokens redeem for at the venue's current rate.
     function _receiptValue(address holder) private returns (uint256) {
         if (isLayerbank) return IERC20(receiptToken).balanceOf(holder);
-        if (isSovryn) return IiToken(receiptToken).assetBalanceOf(holder);
+        if (isSovryn) return ISovrynAssetBalance(receiptToken).assetBalanceOf(holder);
         return IERC20(receiptToken).balanceOf(holder) * shareToken.exchangeRateCurrent() / 1e18;
     }
 

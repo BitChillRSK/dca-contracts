@@ -8,6 +8,7 @@ import {IPurchaseUniswap} from "../../../../src/interfaces/IPurchaseUniswap.sol"
 import {IWRBTC} from "../../../../src/interfaces/IWRBTC.sol";
 import {IUniswapV3SwapRouter} from "../../../../src/interfaces/IUniswapV3SwapRouter.sol";
 import {ICoinPairPrice} from "../../../../src/interfaces/ICoinPairPrice.sol";
+import {IMocOraclePrice} from "../../../mocks/MocInterfaces.sol";
 import {SovrynHandlerDex} from "../../../../src/sovryn-legacy/SovrynHandlerDex.sol";
 import {MockIToken} from "../../../mocks/MockIToken.sol";
 import {MockWrbtcToken} from "../../../mocks/MockWrbtcToken.sol";
@@ -309,7 +310,7 @@ contract SovrynHandlerDexTest is HandlerTestHarness {
     //////////////////////////////////////////////////////////////*/
 
     function test_sovrynDex_oraclePrice() public {
-        uint256 price = sovrynDexHandler.getMocOracle().getPrice();
+        uint256 price = IMocOraclePrice(address(sovrynDexHandler.getMocOracle())).getPrice();
         assertGt(price, 0); // Should be greater than 0 by default
     }
 
@@ -319,7 +320,7 @@ contract SovrynHandlerDexTest is HandlerTestHarness {
 
         // This might cause issues in swap calculations
         // The exact behavior depends on implementation
-        uint256 price = sovrynDexHandler.getMocOracle().getPrice();
+        uint256 price = IMocOraclePrice(address(sovrynDexHandler.getMocOracle())).getPrice();
         assertEq(price, 0);
     }
 

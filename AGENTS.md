@@ -109,10 +109,10 @@ First-party `src/` files use Foundry-style banners with these exact titles. When
 - **EXTERNAL FUNCTIONS** holds `external` / `public` entry points that write state, including `receive` / `fallback` and `public` overrides. It is decided by mutability, not by name: `getAccruedInterest` is deliberately non-`view` and belongs here.
 - **GETTERS** holds `view` / `pure` `external` / `public` accessors — reads a caller makes for an answer. `supportsInterface` (the public view ERC-165 override) lives here. A `view` / `pure` function that only reverts is a disabled mutator, not an accessor, and stays with the mutators (`BitChillOwnable.renounceOwnership`).
 - Mutators before views applies **within EXTERNAL FUNCTIONS / GETTERS only** — that split is the whole of the rule. Internal and private helpers are ordered by call order, closest caller first, because grouping them by mutability separates a function from the helper it calls for no reader's benefit.
-- Interfaces follow the same split as their implementation, in the same declaration order, so a reader can diff the pair. `IWRBTC` and the other vendored files below are the exception.
+- Interfaces follow the same split as their implementation, in the same declaration order, so a reader can diff the pair. The external-protocol interfaces below are the exception.
 - Each banner title uses one indentation everywhere: `GETTERS` at column 32, `EXTERNAL FUNCTIONS` at 27. When renaming a banner, re-centre it rather than leaving the old padding.
 - Do not use `FUNCTIONS`, `GETTER FUNCTIONS`, or other spellings.
-- Leave vendored interfaces alone so they stay diffable against upstream: `IMocProxy`, `IWRBTC`, `ICoinPairPrice`, `IkToken`, `IiToken`, `ILayerBankPool`, `ILayerBankAToken`.
+- External-protocol interfaces declare only what `src/` calls. A test that needs more of a venue's ABI declares it under `test/` (for example `IMocOraclePrice` in `test/mocks/MocInterfaces.sol`). `IMocProxy`, `IWRBTC`, `ICoinPairPrice`, `IkToken`, `IiToken`, `ILayerBankPool`, and `ILayerBankAToken` keep their own layout: banners, the NatSpec delimiter rule, and `forge fmt` do not apply to them. `IUniswapV3SwapRouter` is formatted as first-party code.
 
 ## Contract header NatSpec
 
@@ -169,7 +169,7 @@ Verified `src/` source (including NatSpec) lives on explorers for the life of th
 **NatSpec delimiter.** A NatSpec comment of one line uses `///`: `/// @inheritdoc IDcaManager`, not a
 three-line `/** */` wrapper around that same line. NatSpec of two or more lines uses a `/** */` block,
 never a run of `///` lines — including a `@notice` / `@dev` pair and a sentence wrapped at the line
-limit. The rule covers every first-party `src/` file except the vendored interfaces listed under
+limit. The rule covers every first-party `src/` file except the external-protocol interfaces listed under
 **Section headers and function order**, and `src/` follows it throughout. This rule is the delimiter
 only — what a comment says and which side of a pair owns it are **Contract header NatSpec** above and
 [R10](./docs/relaunch/R10-natspec.md). Comments do not move an executable byte, so a delimiter change
@@ -209,8 +209,8 @@ is proven by comparing metadata-stripped runtime, not `forge build --sizes` (see
 - **CI (every PR):** `make moc-none`, `make moc-layerbank`, `STABLECOIN_TYPE=USDRIF make dex-none`, `STABLECOIN_TYPE=USDT0 make dex-none`, `STABLECOIN_TYPE=USDRIF make dex-layerbank`, `STABLECOIN_TYPE=USDT0 make dex-layerbank`, and `make invariants-layerbank`. Locally, `make ci` runs those lanes under `FOUNDRY_PROFILE=ci`. The unit lanes still `--no-match-test invariant` so the 64×512 stateful suite is not multiplied across every target. `ComparePurchaseMethods` stays excluded (Anvil early-return / mainnet-only). The legacy targets (`make moc-sovryn` / `make dex-sovryn` / `make invariants-sovryn` and `make moc-tropykus` / `make dex-tropykus`) remain useful for mock-based coverage of the shared lending base through a second adapter; neither venue is on a production map, and indexes 2 and 4 stay burned. Both legacy fork lanes pin a pre-pause block; see the fork-tests bullet below.
 - Defaults: `SWAP_TYPE=mocSwaps`, `LENDING_PROTOCOL=tropykus` (legacy local default), `STABLECOIN_TYPE=DOC`. Production MoC lanes are `none` / `layerbank`. Dex paths often use `STABLECOIN_TYPE=USDRIF` (idle+DEX and LayerBank).
 - `make slither` / `make aderyn` if installed; not part of `make check` (findings are triaged at cutover in R73, not a clean zero baseline).
-- Keep the first-party tree `forge fmt`-clean (`make fmt-check` / `make check`). Vendored ABIs listed
-  in `foundry.toml` `[fmt].ignore` stay untouched so they remain diffable against upstream. Run
+- Keep the first-party tree `forge fmt`-clean (`make fmt-check` / `make check`). External-protocol
+  interfaces listed in `foundry.toml` `[fmt].ignore` keep their own layout. Run
   `forge fmt` with the same forge version CI pins (see `.github/workflows/test.yml`); a different
   local forge can rewrite wrapping and fail `fmt-check`. Do not call `vm.skip` at the end of a
   `setUp` that already ran `super.setUp()` — CI forge reports that as `FAIL: FOUNDRY::SKIP`; gate

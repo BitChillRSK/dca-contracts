@@ -15,7 +15,7 @@ make probe-moc-redeem-free-doc
 | Test | Claim |
 |---|---|
 | `test_redeemFreeDocAlonePaysRbtcWithoutPriorRequest` | Calling `redeemFreeDoc` **without** a prior `redeemDocRequest` spends DOC and pays native rBTC. |
-| `test_redeemDocRequestDoesNotPayImmediateRbtc` | `redeemDocRequest` is the settlement-queue path: it does not pay immediate rBTC (success or revert both acceptable; rBTC delta must stay 0). |
+| `test_redeemDocRequestDoesNotPayImmediateRbtc` | `redeemDocRequest` does not pay immediate rBTC (success or revert both acceptable; rBTC delta must stay 0). The probe declares it locally; `IMocProxy` omits it. |
 
 BitChill purchases therefore call `redeemFreeDoc` only and let MoC revert data bubble. Zero measured rBTC still fails closed in `PurchaseRbtc`.
 

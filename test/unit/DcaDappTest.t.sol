@@ -23,7 +23,7 @@ import {DeployMocSwaps} from "../../script/DeployMocSwaps.s.sol";
 import {MockStablecoin} from "../mocks/MockStablecoin.sol";
 import {IShareToken} from "../interfaces/IShareToken.sol";
 import {MockMocProxy} from "../mocks/MockMocProxy.sol";
-import {IMocStateV1} from "../mocks/MocInterfaces.sol";
+import {IMocStateV1, IMocOraclePrice} from "../mocks/MocInterfaces.sol";
 import {MockMocPriceProvider} from "../mocks/MockMocPriceProvider.sol";
 import {GovernorMock} from "../mocks/MockMocGovernor.sol";
 import {MockWrbtcToken} from "../mocks/MockWrbtcToken.sol";
@@ -295,7 +295,7 @@ contract DcaDappTest is Test {
 
                 // Get BTC price from oracle
                 mocOracle = ICoinPairPrice(MOC_ORACLE_MAINNET);
-                s_btcPrice = mocOracle.getPrice() / 1e18;
+                s_btcPrice = IMocOraclePrice(address(mocOracle)).getPrice() / 1e18;
                 _overrideMocPriceProvider(MOC_STATEV1_MAINNET);
             } else if (block.chainid == RSK_TESTNET_CHAIN_ID) {
                 vm.store(
@@ -314,7 +314,7 @@ contract DcaDappTest is Test {
                 }
 
                 mocOracle = ICoinPairPrice(MOC_ORACLE_TESTNET);
-                s_btcPrice = mocOracle.getPrice() / 1e18;
+                s_btcPrice = IMocOraclePrice(address(mocOracle)).getPrice() / 1e18;
                 _overrideMocPriceProvider(MOC_STATEV1_TESTNET);
             }
         } else if (isDexSwaps) {
@@ -362,7 +362,7 @@ contract DcaDappTest is Test {
                 }
 
                 mocOracle = ICoinPairPrice(MOC_ORACLE_MAINNET);
-                s_btcPrice = mocOracle.getPrice() / 1e18;
+                s_btcPrice = IMocOraclePrice(address(mocOracle)).getPrice() / 1e18;
                 _overrideMocPriceProvider(MOC_STATEV1_MAINNET);
                 // } else if (block.chainid == RSK_TESTNET_CHAIN_ID) {
                 // THERE ARE NO UNSIWAP CONTRACTS ON RSK TESTNET, SO THIS BRANCH CAN'T BE TESTED
@@ -379,7 +379,7 @@ contract DcaDappTest is Test {
                 //     require(success, "Mint function call failed");
 
                 //     mocOracle = ICoinPairPrice(MOC_ORACLE_TESTNET);
-                //     s_btcPrice = mocOracle.getPrice() / 1e18;
+                //     s_btcPrice = IMocOraclePrice(address(mocOracle)).getPrice() / 1e18;
                 // _overrideMocPriceProvider(MOC_STATEV1_TESTNET);
             }
         } else {
