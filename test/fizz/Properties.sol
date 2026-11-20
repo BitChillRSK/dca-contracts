@@ -2335,7 +2335,6 @@ abstract contract Properties is PropertiesAsserts, Snapshots {
             eq(uint256(a.purchaseAmount), ctx.amount, "SP-43: purchase amount != requested");
             uint256 ti = _tokenIdx(ctx.token);
             if (ti < 2) gte(ctx.amount, stateBefore.minAmount[ti], "SP-43: purchase amount below the token minimum");
-            lte(uint256(a.purchaseAmount), uint256(a.tokenBalance), "SP-43: purchase amount above the balance");
         } else {
             eq(uint256(a.purchaseAmount), uint256(b.purchaseAmount), "SP-43: mutator changed the purchase amount");
         }

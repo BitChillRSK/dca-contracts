@@ -303,6 +303,76 @@ contract TopUpFromInterestTest is DcaDappTest {
         );
     }
 
+    /// @notice Kann #1: an empty schedule whose interest is below its purchase amount restarts at a
+    ///         smaller size by lowering the amount first and then topping up.
+    function testEmptyScheduleRestartsSmallerFromInterest() external onlyLendingLane {
+        _restartSmallerFromInterest(false);
+    }
+
+    /// @notice The same restart while deposits are paused, when a top-up is the only way to add funds.
+    function testEmptyScheduleRestartsSmallerFromInterestWhileDepositsArePaused() external onlyLendingLane {
+        _restartSmallerFromInterest(true);
+    }
+
+    function _restartSmallerFromInterest(bool pauseDeposits) private {
+        // A second schedule keeps principal (and so interest) on the route while the first is emptied.
+        vm.startPrank(USER);
+        stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
+        dcaManager.createDcaSchedule(
+            address(stablecoin), AMOUNT_TO_DEPOSIT, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_routeIndex
+        );
+        vm.stopPrank();
+
+        updateExchangeRate(LONG_ACCRUAL_TIME);
+        // Buy the whole balance at once, then empty the schedule: its interest stays below that size.
+        uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
+        uint256 wholeBalance = _schedule(SCHEDULE_INDEX).tokenBalance;
+        vm.startPrank(USER);
+        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, wholeBalance);
+        dcaManager.withdrawToken(address(stablecoin), scheduleId, type(uint256).max);
+        vm.stopPrank();
+        assertEq(_schedule(SCHEDULE_INDEX).tokenBalance, 0, "the schedule was not emptied");
+
+        uint256 credit = _accruedInterest();
+        uint256 oldPurchaseAmount = _schedule(SCHEDULE_INDEX).purchaseAmount;
+        assertGt(credit, 0, "the lane accrued no interest at all");
+        assertLt(credit, oldPurchaseAmount, "the interest already funds a purchase at the old size");
+        // The restart size must clear the token minimum. Size it against what this lane paid.
+        vm.prank(OWNER);
+        dcaManager.setTokenMinPurchaseAmount(address(stablecoin), credit / 2);
+        if (pauseDeposits) {
+            vm.prank(OWNER);
+            operationsAdmin.setDepositsPaused(address(stablecoin), s_routeIndex, true);
+        }
+
+        // At the old size the credit funds no purchase, so the top-up is refused.
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDcaManager.DcaManager__TopUpDoesNotFundAnotherPurchase.selector,
+                address(stablecoin),
+                scheduleId,
+                credit
+            )
+        );
+        vm.prank(USER);
+        dcaManager.topUpFromInterest(address(stablecoin), scheduleId, credit);
+
+        // Lower first (allowed on an empty schedule), then top up.
+        vm.prank(USER);
+        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, credit);
+        _topUp(SCHEDULE_INDEX, credit);
+        assertEq(_schedule(SCHEDULE_INDEX).tokenBalance, credit, "the empty schedule was not credited");
+
+        uint256 rbtcBefore = dcaManager.getAccumulatedRbtcBalance(USER, address(stablecoin), s_routeIndex);
+        super.buyRbtcOne(scheduleId);
+        assertEq(_schedule(SCHEDULE_INDEX).tokenBalance, 0, "the purchase did not spend the credit");
+        assertGt(
+            dcaManager.getAccumulatedRbtcBalance(USER, address(stablecoin), s_routeIndex),
+            rbtcBefore,
+            "the restarted schedule bought no rBTC"
+        );
+    }
+
     /*//////////////////////////////////////////////////////////////
                              EXIT BOUNDARIES
     //////////////////////////////////////////////////////////////*/

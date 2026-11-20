@@ -128,18 +128,41 @@ contract DcaConfigurationTest is DcaDappTest {
         vm.stopPrank();
     }
 
-    function testPurchaseAmountCannotExceedBalance() external {
-        vm.prank(USER);
+    /// @notice Kann #1: an edit may set a purchase amount above the balance. Purchases then refuse the
+    ///         row, so the row waits until its balance covers one purchase.
+    function testPurchaseAmountCanExceedBalanceAndPurchaseRefusesTheRow() external {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        bytes memory encodedRevert = abi.encodeWithSelector(
-            IDcaManager.DcaManager__PurchaseAmountExceedsBalance.selector,
-            address(stablecoin),
-            AMOUNT_TO_DEPOSIT + 1,
-            AMOUNT_TO_DEPOSIT
-        );
-        vm.expectRevert(encodedRevert);
+        uint256 newPurchaseAmount = AMOUNT_TO_DEPOSIT + 1;
+        vm.expectEmit(true, true, true, true);
+        emit DcaManager__PurchaseAmountUpdated(USER, scheduleId, AMOUNT_TO_SPEND, newPurchaseAmount);
         vm.prank(USER);
-        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, AMOUNT_TO_DEPOSIT + 1);
+        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, newPurchaseAmount);
+        assertEq(newPurchaseAmount, scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).purchaseAmount);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDcaManager.DcaManager__ScheduleBalanceNotEnoughForPurchase.selector,
+                address(stablecoin),
+                scheduleId,
+                AMOUNT_TO_DEPOSIT
+            )
+        );
+        buyRbtcOne(scheduleId);
+    }
+
+    /// @notice The minimum still applies to an edit, also above the balance.
+    function testPurchaseAmountBelowMinimumStillReverts() external {
+        uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
+        uint256 minPurchaseAmount = dcaManager.getTokenMinPurchaseAmount(address(stablecoin));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDcaManager.DcaManager__PurchaseAmountMustBeAtLeastMinimum.selector,
+                address(stablecoin),
+                minPurchaseAmount
+            )
+        );
+        vm.prank(USER);
+        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, minPurchaseAmount - 1);
     }
 
     function testCreateScheduleFundedForExactlyOnePurchase() external {

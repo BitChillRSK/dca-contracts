@@ -176,8 +176,10 @@ abstract contract DcaManagerHandler is Properties {
         TrackedSchedule memory s = trackedSchedules[idx];
         IDcaManager.DcaSchedule memory sched = dcaManager.getDcaSchedule(s.token, s.scheduleId);
         uint256 minPurchase = dcaManager.getTokenMinPurchaseAmount(s.token);
-        if (sched.tokenBalance < minPurchase) return;
-        newPurchaseAmount = clampBetween(newPurchaseAmount, minPurchase, sched.tokenBalance);
+        // An edit may exceed the balance (Kann #1), also on an empty schedule. Twice the larger of the
+        // balance and the minimum reaches that range and keeps the row fundable by a later credit.
+        uint256 upper = 2 * (sched.tokenBalance > minPurchase ? sched.tokenBalance : minPurchase);
+        newPurchaseAmount = clampBetween(newPurchaseAmount, minPurchase, upper);
         dcaManager_updatePurchaseAmount(s.token, s.scheduleId, newPurchaseAmount);
     }
 
