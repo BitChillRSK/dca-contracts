@@ -132,12 +132,15 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
 
     /// @inheritdoc IOperationsAdmin
     function addSwapper(address swapper) external onlyOwner {
+        if (swapper == address(0)) revert OperationsAdmin__SwapperIsZeroAddress();
+        if (s_swappers[swapper]) revert OperationsAdmin__SwapperUnchanged(swapper, true);
         s_swappers[swapper] = true;
         emit OperationsAdmin__SwapperAdded(swapper);
     }
 
     /// @inheritdoc IOperationsAdmin
     function revokeSwapper(address swapper) external onlyOwner {
+        if (!s_swappers[swapper]) revert OperationsAdmin__SwapperUnchanged(swapper, false);
         s_swappers[swapper] = false;
         emit OperationsAdmin__SwapperRevoked(swapper);
     }

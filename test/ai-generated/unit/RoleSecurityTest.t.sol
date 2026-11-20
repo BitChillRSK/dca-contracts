@@ -404,6 +404,8 @@ contract RoleSecurityTest is Test {
 
         // Owner can set new admin
         address newAdmin = address(uint160(bound(adminSeed, 1, type(uint160).max))); // Ensure non-zero address
+        // Adding a current swapper reverts `SwapperUnchanged`, so only a new address is a success case.
+        vm.assume(!operationsAdmin.isSwapper(newAdmin));
 
         vm.prank(OWNER);
         operationsAdmin.addSwapper(newAdmin);
