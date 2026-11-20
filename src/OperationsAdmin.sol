@@ -34,8 +34,8 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
      */
     mapping(address token => mapping(uint256 routeIndex => TokenRoute)) private s_tokenRoute;
     mapping(uint256 routeIndex => RouteClass) private s_routeClass;
-    mapping(address swapper => bool) private s_swappers;
-    mapping(address handler => bool assigned) private s_handlerAssigned;
+    mapping(address swapper => bool) private s_isSwapper;
+    mapping(address handler => bool assigned) private s_isHandlerAssigned;
 
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
@@ -84,7 +84,7 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
         if (s_tokenRoute[token][route].handler != address(0)) {
             revert OperationsAdmin__HandlerAlreadyAssigned(token, routeIndex);
         }
-        if (s_handlerAssigned[handler]) revert OperationsAdmin__HandlerAddressAlreadyInUse(handler);
+        if (s_isHandlerAssigned[handler]) revert OperationsAdmin__HandlerAddressAlreadyInUse(handler);
 
         if (!IERC165(handler).supportsInterface(type(ITokenHandler).interfaceId)) {
             revert OperationsAdmin__ContractIsNotTokenHandler(handler);
@@ -105,7 +105,7 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
         }
 
         s_tokenRoute[token][route].handler = handler;
-        s_handlerAssigned[handler] = true;
+        s_isHandlerAssigned[handler] = true;
         emit OperationsAdmin__HandlerAssigned(token, route, handler);
     }
 
@@ -133,15 +133,15 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
     /// @inheritdoc IOperationsAdmin
     function addSwapper(address swapper) external onlyOwner {
         if (swapper == address(0)) revert OperationsAdmin__SwapperIsZeroAddress();
-        if (s_swappers[swapper]) revert OperationsAdmin__SwapperUnchanged(swapper, true);
-        s_swappers[swapper] = true;
+        if (s_isSwapper[swapper]) revert OperationsAdmin__SwapperUnchanged(swapper, true);
+        s_isSwapper[swapper] = true;
         emit OperationsAdmin__SwapperAdded(swapper);
     }
 
     /// @inheritdoc IOperationsAdmin
     function revokeSwapper(address swapper) external onlyOwner {
-        if (!s_swappers[swapper]) revert OperationsAdmin__SwapperUnchanged(swapper, false);
-        s_swappers[swapper] = false;
+        if (!s_isSwapper[swapper]) revert OperationsAdmin__SwapperUnchanged(swapper, false);
+        s_isSwapper[swapper] = false;
         emit OperationsAdmin__SwapperRevoked(swapper);
     }
 
@@ -151,7 +151,7 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
 
     /// @inheritdoc IOperationsAdmin
     function isSwapper(address account) external view returns (bool) {
-        return s_swappers[account];
+        return s_isSwapper[account];
     }
 
     /// @inheritdoc IOperationsAdmin

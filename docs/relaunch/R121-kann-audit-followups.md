@@ -56,6 +56,10 @@ Implement the dispositions given on the Kann audit
       deposits on the pair; unpause only when the handler again holds the pair's principal; otherwise new
       deposits go to a new route.
 - [ ] **`PROPERTIES.md`:** SP-53 no longer cites "Idempotent".
+- [ ] **Naming (owner request, 2026-11-21):** the private boolean mappings take the `s_is…` form of their
+      getters: `s_swappers` → `s_isSwapper`, `s_handlerAssigned` → `s_isHandlerAssigned`
+      (`OperationsAdmin`), `s_purchasePathAllowed` → `s_isPurchasePathAllowed` (`PurchaseUniswap`). No
+      storage-layout or ABI change; metadata-stripped bytecode is unchanged.
 
 ## Out of scope
 
@@ -71,7 +75,7 @@ Implement the dispositions given on the Kann audit
 ## Files likely touched
 
 - `src/DcaManager.sol`, `src/interfaces/IDcaManager.sol`
-- `src/OperationsAdmin.sol`, `src/interfaces/IOperationsAdmin.sol`
+- `src/OperationsAdmin.sol`, `src/interfaces/IOperationsAdmin.sol`, `src/PurchaseUniswap.sol` (rename only)
 - `test/unit/DcaConfigurationTest.t.sol` (update bound test), a restart-flow test beside the
   `topUpFromInterest` tests, `test/unit/OperationsAdminTest.t.sol`
 - `test/fizz/handlers/DcaManagerHandler.sol` (`dcaManager_updatePurchaseAmount_clamped`),

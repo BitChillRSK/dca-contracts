@@ -643,8 +643,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         scheduleIds.pop();
     }
 
-    /// @dev Purchase amount must be at least the token's configured minimum. Only creation also bounds
-    ///      it by the balance; an edit may exceed it, and purchases refuse the row until it is funded.
+    /// @dev Purchase amount must be at least the token's configured minimum.
     function _validatePurchaseAmount(address token, uint256 purchaseAmount) private view {
         uint256 minPurchaseAmount = s_tokenMinPurchaseAmounts[token];
         if (minPurchaseAmount == 0) {
