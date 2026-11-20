@@ -253,6 +253,9 @@ rBTC withdrawal, reads, governance, and purchases remain open. Purchases do not 
 Other deliberate availability trade-offs:
 
 - A bad row reverts its entire handler batch; a bad handler batch reverts an across-handlers call.
+- A Dex batch executes at the pool price when it is included. Any account can move a thin pool past the
+  batch's minimum output just before inclusion and revert it. No funds move, and each schedule keeps its
+  balance; whether a schedule buys later depends on its cadence and the bot's execution policy.
 - Lending schedule principal is nominal; receipt shares are the actual claim. Each purchase row uses
   a rounded-up share debit. If the buyer has fewer shares, the row consumes those shares and reduces
   its funding weight to their stablecoin value. Fees and output allocation use the funded weights.
@@ -267,12 +270,23 @@ Other deliberate availability trade-offs:
   purchases and exits.
 - Contracts are not proxies. Recovery from a defective immutable handler is a new route index plus
   manual user exit/re-entry, not an in-place upgrade or owner migration.
+- Each Dex handler's Uniswap router is immutable. The router pulls the input stablecoin from the handler
+  and holds each intermediate token between pools, so a stablecoin issuer that blocks the router (for
+  example USDT0) stops purchases on every Dex handler whose path uses that token. Exits do not use the
+  router. Recovery is the new-route path above.
 
 ## External assumptions and unsupported cases
 
 - Listed stablecoins, Money on Chain, lending markets, the Uniswap router/pools, WRBTC, and the MoC
-  BTC/USD oracle remain correct and available. External illiquidity or pauses can revert purchases or
-  withdrawals.
+  BTC/USD oracle remain correct and available. External illiquidity, pauses or market limits can revert
+  purchases, withdrawals or deposits. A lending market can refuse a deposit, for example when the
+  deposit would exceed its supply cap or the reserve is frozen; the idle route for the same token stays
+  open.
+- If a stablecoin issuer removes an idle handler's cash, the handler cannot pay every schedule's
+  principal. Idle handlers keep no per-route ledger, so purchases and withdrawals pay from the remaining
+  cash in arrival order: the loss falls on the users who withdraw or are bought for last, including
+  users who deposit before the owner pauses deposits on that pair. The owner's response is in
+  [the cutover runbook](./docs/relaunch/CUTOVER_RUNBOOK.md#stablecoin-issuer-action-against-a-handler).
 - A lending-share withdrawal redeems no stablecoin. `withdrawLendingShares` hands over the receipt tokens,
   and the user redeems them at the venue when it can pay, including through any withdrawal queue the
   venue runs. It still depends on the venue: a pause that blocks transfers blocks it (on LayerBank a
