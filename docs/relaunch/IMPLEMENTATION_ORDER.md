@@ -182,6 +182,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R118 | after R117; separate owner-requested hardening review | none (L06 deposit credit before the handler call; L14 exact lending-deposit consumption; L17 no zero-value transfer; L25 declined as a dependency assumption; tracked by [#185](https://github.com/BitChillRSK/dca-contracts/issues/185)) |
 | R119 | after R118, before audit freeze / relaunch deploy | **decided 2026-11-02:** explicit user function; whole position per token and route; schedules kept at zero balance; blocked in the protected window; Sovryn adapter included |
 | R120 | after R119, before audit freeze / relaunch deploy | **decided 2026-11-02:** Sovryn becomes legacy like Tropykus: `src/sovryn-legacy/`, out of the deployment and audit scope, route 2 burned, legacy lanes out of the required gates |
+| R121 | after R120 (merged); Kann audit follow-ups | **decided 2026-11-20:** `updatePurchaseAmount` drops the balance bound (Kann #1); swapper setters reject no-op writes and `address(0)` (Kann #10); `AUDIT_GUIDE.md` and runbook lines for Kann #3–#6 |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
@@ -1553,6 +1554,15 @@ Sovryn is dropped from the deployment and the audit scope and becomes a test-onl
 Tropykus did in R37. Its sources move to `src/sovryn-legacy/`, both live deploy branches reject it,
 `SOVRYN_INDEX` leaves `script/`'s compile scope, and route 2 stays unused. CI's invariant lane moves to
 LayerBank. Sovryn is reconsidered only if the venue recovers.
+Ask: none.
+
+### R121 - Kann audit follow-ups ([spec](./R121-kann-audit-followups.md))
+
+After R120. Implements the dispositions posted on the
+[Kann audit](https://github.com/Kann-Audits/BitChill-Audit/issues) (pinned at `a229ea3b`). An edit can
+set a purchase amount above the balance, so an empty lending schedule restarts smaller from interest.
+`addSwapper` and `revokeSwapper` revert when nothing changes, and `addSwapper` rejects `address(0)`.
+Reviewer documents state the deposit refusal, issuer, router and pool-move findings.
 Ask: none.
 
 ## Closed non-implementation decisions
