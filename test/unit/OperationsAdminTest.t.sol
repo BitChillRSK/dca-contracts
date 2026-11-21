@@ -135,6 +135,41 @@ contract OperationsAdminTest is DcaDappTest {
         assertTrue(operationsAdmin.isSwapper(extraSwapper));
     }
 
+    /// @notice Kann #10: a swapper write that changes nothing reverts, so every event is a transition.
+    function testAddingACurrentSwapperReverts() external {
+        vm.expectRevert(
+            abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__SwapperUnchanged.selector, SWAPPER, true)
+        );
+        vm.prank(OWNER);
+        operationsAdmin.addSwapper(SWAPPER);
+        assertTrue(operationsAdmin.isSwapper(SWAPPER));
+    }
+
+    function testRevokingANonSwapperReverts() external {
+        address notSwapper = makeAddr("notSwapper");
+        vm.expectRevert(
+            abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__SwapperUnchanged.selector, notSwapper, false)
+        );
+        vm.prank(OWNER);
+        operationsAdmin.revokeSwapper(notSwapper);
+
+        // A second revocation of a revoked swapper is refused the same way.
+        vm.startPrank(OWNER);
+        operationsAdmin.revokeSwapper(SWAPPER);
+        vm.expectRevert(
+            abi.encodeWithSelector(IOperationsAdmin.OperationsAdmin__SwapperUnchanged.selector, SWAPPER, false)
+        );
+        operationsAdmin.revokeSwapper(SWAPPER);
+        vm.stopPrank();
+    }
+
+    function testAddingTheZeroAddressAsSwapperReverts() external {
+        vm.expectRevert(IOperationsAdmin.OperationsAdmin__SwapperIsZeroAddress.selector);
+        vm.prank(OWNER);
+        operationsAdmin.addSwapper(address(0));
+        assertFalse(operationsAdmin.isSwapper(address(0)));
+    }
+
     function testRevokeSwapperFailsIfNotOwner() external {
         address notOwner = makeAddr("notOwner");
         vm.prank(notOwner);

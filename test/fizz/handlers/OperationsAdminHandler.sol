@@ -24,6 +24,8 @@ abstract contract OperationsAdminHandler is Properties {
             snapshotAfter();
             property_depositPauseRespected(ctx);
         } else {
+            // A swapper write that changes nothing reverts `SwapperUnchanged`, so it is skipped.
+            if (operationsAdmin.isSwapper(swappers[arg0 % swappers.length]) == (selector == 0)) return;
             ctx = _newCtx(OP_SWAPPER_SET, admin);
             ctx.target = arg0 % swappers.length;
             ctx.flag = selector == 0;

@@ -172,6 +172,17 @@ Revoking the swapper does not by itself change which path a handler uses. The wo
 key is live is stated under **Authority and trust boundaries** in
 [`AUDIT_GUIDE.md`](../../AUDIT_GUIDE.md).
 
+## Stablecoin issuer action against a handler
+
+If the issuer of a stablecoin blocks a handler or removes its balance (see **External assumptions** in
+[`AUDIT_GUIDE.md`](../../AUDIT_GUIDE.md)):
+
+1. `operationsAdmin.setDepositsPaused(token, routeIndex, true)` on the affected pair, so new deposits
+   do not pay for the shortfall. Deposits made before the pause remain exposed.
+2. Keep deposits paused until the handler again holds the principal of every schedule on the pair.
+3. If the handler cannot be made whole, leave the pair paused. New deposits go to a new route
+   (**Adding a handler after cutover**).
+
 ## Fee collector rotation
 
 `setFeeCollector` redirects future fee credits only. rBTC already credited stays with the previous

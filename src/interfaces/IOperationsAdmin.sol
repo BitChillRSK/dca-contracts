@@ -37,9 +37,9 @@ interface IOperationsAdmin {
     event OperationsAdmin__HandlerAssigned(address indexed token, uint256 routeIndex, address indexed handler);
     /// @notice A route index was classified as idle (`lends == false`) or lending. One-shot.
     event OperationsAdmin__RouteRegistered(uint256 index, bool lends);
-    /// @notice `swapper` was added to the allowlist. Idempotent.
+    /// @notice `swapper` was added to the allowlist. Every emit is a real transition.
     event OperationsAdmin__SwapperAdded(address indexed swapper);
-    /// @notice `swapper` was removed from the allowlist.
+    /// @notice `swapper` was removed from the allowlist. Every emit is a real transition.
     event OperationsAdmin__SwapperRevoked(address indexed swapper);
     /// @notice New deposits for this pair were paused or unpaused. Every emit is a real transition.
     event OperationsAdmin__DepositsPauseSet(address indexed token, uint256 routeIndex, bool paused);
@@ -71,6 +71,10 @@ interface IOperationsAdmin {
     error OperationsAdmin__HandlerNotAssigned(address token, uint256 routeIndex);
     /// @notice `setDepositsPaused` must change the flag; a repeated write reverts.
     error OperationsAdmin__DepositsPauseUnchanged(address token, uint256 routeIndex, bool paused);
+    /// @notice `addSwapper` must add a new swapper and `revokeSwapper` must remove a current one.
+    error OperationsAdmin__SwapperUnchanged(address swapper, bool allowed);
+    /// @notice `addSwapper` rejects `address(0)`.
+    error OperationsAdmin__SwapperIsZeroAddress();
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
@@ -113,14 +117,14 @@ interface IOperationsAdmin {
     function setDepositsPaused(address token, uint256 routeIndex, bool paused) external;
 
     /**
-     * @notice Add `swapper` to the swapper allowlist. Idempotent; does not replace other swappers.
-     * @param swapper The swapper address.
+     * @notice Add `swapper` to the swapper allowlist. Does not replace other swappers.
+     * @param swapper The swapper address. Must not be `address(0)` or already a swapper.
      */
     function addSwapper(address swapper) external;
 
     /**
      * @notice Remove `swapper` from the swapper allowlist.
-     * @param swapper The swapper address.
+     * @param swapper The swapper address. Must be a current swapper.
      */
     function revokeSwapper(address swapper) external;
 

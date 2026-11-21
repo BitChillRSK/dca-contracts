@@ -63,7 +63,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     /// @dev Active path's intermediate tokens, retained so purchases can detect router-stranded balances.
     address[] private s_swapIntermediateTokens;
     /// @dev Exact encoded paths this handler may activate. Purchases read `s_swapPath` only.
-    mapping(bytes32 pathHash => bool allowed) private s_purchasePathAllowed;
+    mapping(bytes32 pathHash => bool allowed) private s_isPurchasePathAllowed;
 
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
@@ -138,7 +138,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         if (!allowed && keccak256(s_swapPath) == pathHash) {
             revert PurchaseUniswap__CannotRevokeActivePurchasePath(pathHash);
         }
-        if (s_purchasePathAllowed[pathHash] == allowed) {
+        if (s_isPurchasePathAllowed[pathHash] == allowed) {
             revert PurchaseUniswap__PurchasePathPermissionUnchanged(pathHash, allowed);
         }
         _setPurchasePathAllowed(pathHash, encodedPath, intermediateTokens, poolFeeRates, allowed);
@@ -148,7 +148,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
     function setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates) external override {
         bytes memory newPath = _encodePurchasePath(intermediateTokens, poolFeeRates);
         bytes32 pathHash = keccak256(newPath);
-        if (!s_purchasePathAllowed[pathHash]) {
+        if (!s_isPurchasePathAllowed[pathHash]) {
             revert PurchaseUniswap__PurchasePathNotAllowed(pathHash);
         }
         if (msg.sender != owner()) {
@@ -215,7 +215,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
 
     /// @inheritdoc IPurchaseUniswap
     function isPurchasePathAllowed(bytes32 pathHash) external view returns (bool) {
-        return s_purchasePathAllowed[pathHash];
+        return s_isPurchasePathAllowed[pathHash];
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -319,7 +319,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         uint24[] memory poolFeeRates,
         bool allowed
     ) private {
-        s_purchasePathAllowed[pathHash] = allowed;
+        s_isPurchasePathAllowed[pathHash] = allowed;
         emit PurchaseUniswap__PurchasePathAllowedSet(pathHash, encodedPath, intermediateTokens, poolFeeRates, allowed);
     }
 

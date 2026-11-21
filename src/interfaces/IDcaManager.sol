@@ -151,7 +151,7 @@ interface IDcaManager {
     error DcaManager__MinPurchasePeriodMustBeAtLeastOneDay();
     /// @notice Purchase period must be a whole number of UTC days.
     error DcaManager__PurchasePeriodMustBeWholeDays();
-    /// @notice Purchase amount exceeds the schedule's current `tokenBalance`.
+    /// @notice At creation, the purchase amount exceeds the deposit.
     error DcaManager__PurchaseAmountExceedsBalance(address token, uint256 purchaseAmount, uint256 tokenBalance);
     /**
      * @notice The next cadence boundary has not been reached.
@@ -256,8 +256,9 @@ interface IDcaManager {
      * @notice Replace the periodic purchase amount on an existing schedule.
      * @param token The stablecoin the schedule spends, which is half its storage key.
      * @param scheduleId The schedule to edit. Must belong to the caller.
-     * @param newPurchaseAmount New amount to spend periodically on rBTC. Cannot exceed the schedule's
-     *        current `tokenBalance` or fall below the token minimum, and is stored as `uint96`.
+     * @param newPurchaseAmount New amount to spend periodically on rBTC. Cannot fall below the token
+     *        minimum, and is stored as `uint96`. It may exceed the schedule's `tokenBalance`; purchases
+     *        then refuse the schedule until its balance covers one purchase.
      * @dev Emits `DcaManager__PurchaseAmountUpdated` only after validation.
      */
     function updatePurchaseAmount(address token, uint64 scheduleId, uint256 newPurchaseAmount) external;

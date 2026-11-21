@@ -145,7 +145,10 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
 
         _validatePurchasePeriod(purchasePeriod, settings.minPurchasePeriod);
         _validateDeposit(depositAmount);
-        _validatePurchaseAmount(token, purchaseAmount, depositAmount);
+        _validatePurchaseAmount(token, purchaseAmount);
+        if (purchaseAmount > depositAmount) {
+            revert DcaManager__PurchaseAmountExceedsBalance(token, purchaseAmount, depositAmount);
+        }
         _handlerForDeposit(token, route).depositToken(msg.sender, depositAmount);
 
         // Checked after the pull, beside the push it guards: checking earlier makes the push reread
@@ -187,7 +190,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     {
         DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
         uint96 newAmount = newPurchaseAmount.toUint96();
-        _validatePurchaseAmount(token, newAmount, dcaSchedule.tokenBalance);
+        _validatePurchaseAmount(token, newAmount);
         uint256 previousPurchaseAmount = dcaSchedule.purchaseAmount;
         dcaSchedule.purchaseAmount = newAmount;
         emit DcaManager__PurchaseAmountUpdated(msg.sender, scheduleId, previousPurchaseAmount, newPurchaseAmount);
@@ -640,8 +643,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         scheduleIds.pop();
     }
 
-    /// @dev Purchase amount must be at least the token's configured minimum and at most `tokenBalance`.
-    function _validatePurchaseAmount(address token, uint256 purchaseAmount, uint256 tokenBalance) private view {
+    /// @dev Purchase amount must be at least the token's configured minimum.
+    function _validatePurchaseAmount(address token, uint256 purchaseAmount) private view {
         uint256 minPurchaseAmount = s_tokenMinPurchaseAmounts[token];
         if (minPurchaseAmount == 0) {
             revert DcaManager__TokenMinPurchaseAmountNotSet(token);
@@ -649,9 +652,6 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
 
         if (purchaseAmount < minPurchaseAmount) {
             revert DcaManager__PurchaseAmountMustBeAtLeastMinimum(token, minPurchaseAmount);
-        }
-        if (purchaseAmount > tokenBalance) {
-            revert DcaManager__PurchaseAmountExceedsBalance(token, purchaseAmount, tokenBalance);
         }
     }
 
