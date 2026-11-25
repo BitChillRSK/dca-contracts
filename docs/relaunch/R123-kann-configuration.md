@@ -2,7 +2,7 @@
 
 Status: **assigned** · Assigned: yes · Optional/further-review: no
 
-Base: `main`, after merged R122 / [#199](https://github.com/BitChillRSK/dca-contracts/pull/199).
+Base: `main` (R122 / [#199](https://github.com/BitChillRSK/dca-contracts/pull/199) merged).
 
 ## Objective
 
