@@ -105,9 +105,8 @@ interface ILendingHandler is ITokenHandler {
      *      its terms. Debits the measured fall in this handler's receipt-share balance. If exactly one
      *      share remains, it is forfeited and left unbooked in the handler so the exited route has no
      *      rounding-dust interest claim. A larger remainder stays booked for a later withdrawal.
-     *      Reverts if the lending protocol
-     *      blocks receipt-token transfers, or if the balance does not fall or falls by more than
-     *      `user`'s booked shares.
+     *      Reverts if the lending protocol blocks receipt-token transfers, or if the balance does not
+     *      fall or falls by more than `user`'s booked shares.
      */
     function withdrawShares(address user) external returns (uint256 withdrawnShares);
 

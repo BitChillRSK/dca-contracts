@@ -65,7 +65,7 @@ contract LendingHandlerRedeemTest is Test {
             assertNotEq(
                 logs[i].topics[0],
                 keccak256("LendingHandler__WithdrawalAmountAdjusted(address,uint256,uint256)"),
-                "dedicated clamp event was removed"
+                "removed clamp event was emitted"
             );
             if (logs[i].topics[0] == keccak256("TokenHandler__TokenWithdrawn(address,address,uint256)")) {
                 assertEq(abi.decode(logs[i].data, (uint256)), USER_A_DEPOSIT);

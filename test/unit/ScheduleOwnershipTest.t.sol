@@ -4,6 +4,7 @@ pragma solidity 0.8.36;
 
 import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
+import {ILendingHandler} from "../../src/interfaces/ILendingHandler.sol";
 import {UNUSED_SCHEDULE_ID} from "../utils/BatchBuyOne.sol";
 import "./TestsHelper.t.sol";
 import {scheduleAt, scheduleIdAt, scheduleCount} from "test/utils/ScheduleAt.sol";
@@ -12,11 +13,13 @@ import {scheduleAt, scheduleIdAt, scheduleCount} from "test/utils/ScheduleAt.sol
  * @notice R64: no entry point can reach a schedule that is not the caller's.
  * @dev A schedule is keyed by `(token, scheduleId)`, so ownership is a **checked field** rather than
  *      the mapping key: `_callersSchedule` compares the stored `user` against `msg.sender`. That check
- *      exists once, and every user-facing mutator reaches a schedule through it — but "it is checked in
- *      the one place they all go through" is a claim about every entry point at once, and a checked
- *      owner is exactly the kind of thing that can be forgotten on a path added later. So this walks
- *      the whole mutator surface rather than a sample of it, and it is the test that fails if a future
- *      entry point reads `s_dcaSchedules` directly.
+ *      exists once, and every user-facing mutator that takes a `scheduleId` reaches a schedule through
+ *      it. `withdrawLendingShares` takes no id: it walks the caller's own id list and reads each
+ *      schedule directly (AGENTS.md invariant 8). "Checked in the one place they all go through" is a
+ *      claim about every entry point at once, and a checked owner is exactly the kind of thing that can
+ *      be forgotten on a path added later. So this walks the whole mutator surface rather than a
+ *      sample of it, including the share exit, and fails if an entry point reaches another user's
+ *      schedule.
  *
  *      Two refusals, deliberately distinguished: a schedule that exists and belongs to somebody else
  *      reverts `DcaManager__NotScheduleOwner` and names the owner, while a pair that addresses no
@@ -124,6 +127,39 @@ contract ScheduleOwnershipTest is DcaDappTest {
         assertEq(unchanged.purchasePeriod, before.purchasePeriod);
         assertEq(unchanged.paused, before.paused);
         assertEq(scheduleCount(dcaManager, s_stranger, address(stablecoin)), 0, "a stranger gained a schedule");
+    }
+
+    /// @dev The share exit takes no id and reads the caller's own list, so a stranger's exit clears
+    ///      only the stranger's schedule and moves only the stranger's shares.
+    function testAStrangersShareExitLeavesAnotherUsersPositionUntouched() external {
+        if (!isLendingLane) return;
+        ILendingHandler lendingHandler = ILendingHandler(address(stablecoinHandler));
+        uint64 usersId = _scheduleId();
+        uint256 usersBalance = dcaManager.getDcaSchedule(address(stablecoin), usersId).tokenBalance;
+        uint256 usersShares = lendingHandler.getUserShares(USER);
+        assertGt(usersBalance, 0);
+        assertGt(usersShares, 0);
+
+        vm.prank(s_stranger);
+        vm.expectRevert(abi.encodeWithSelector(ILendingHandler.LendingHandler__NoSharesToWithdraw.selector, s_stranger));
+        dcaManager.withdrawLendingShares(address(stablecoin), s_routeIndex);
+
+        vm.startPrank(s_stranger);
+        stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
+        dcaManager.createDcaSchedule(
+            address(stablecoin), AMOUNT_TO_DEPOSIT, AMOUNT_TO_SPEND, MIN_PURCHASE_PERIOD, s_routeIndex
+        );
+        dcaManager.withdrawLendingShares(address(stablecoin), s_routeIndex);
+        vm.stopPrank();
+
+        assertEq(scheduleAt(dcaManager, s_stranger, address(stablecoin), 0).tokenBalance, 0);
+        assertEq(lendingHandler.getUserShares(s_stranger), 0);
+        assertEq(
+            dcaManager.getDcaSchedule(address(stablecoin), usersId).tokenBalance,
+            usersBalance,
+            "a stranger's exit cleared another user's balance"
+        );
+        assertEq(lendingHandler.getUserShares(USER), usersShares, "a stranger's exit moved another user's shares");
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -8,6 +8,9 @@ import {IDcaManager} from "src/interfaces/IDcaManager.sol";
 import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
 import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
 import {LayerBankHandler} from "src/layerbank/LayerBankHandler.sol";
+import {SovrynHandler} from "src/sovryn-legacy/SovrynHandler.sol";
+import {TropykusHandler} from "src/tropykus-legacy/TropykusHandler.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {OperationsAdmin} from "src/OperationsAdmin.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
@@ -640,25 +643,29 @@ contract Handler is Test {
     function withdrawLendingShares(uint256 userSeed) external {
         address user = s_users[userSeed % s_users.length];
         uint256 sharesBefore = ILendingHandler(address(tokenHandler)).getUserShares(user);
-        uint256 receiptBefore;
-        if (routeIndex == LAYERBANK_INDEX) {
-            receiptBefore = LayerBankHandler(address(tokenHandler)).i_aToken().scaledBalanceOf(address(tokenHandler));
-        }
+        uint256 receiptBefore = _handlerReceiptShares();
         vm.prank(user);
         try dcaManager.withdrawLendingShares(address(stablecoin), routeIndex) {
             shareWithdrawalSuccesses++;
-            if (routeIndex == LAYERBANK_INDEX) {
-                uint256 moved = receiptBefore
-                    - LayerBankHandler(address(tokenHandler)).i_aToken().scaledBalanceOf(address(tokenHandler));
-                uint256 sharesAfter = ILendingHandler(address(tokenHandler)).getUserShares(user);
-                uint256 forfeited = sharesBefore - sharesAfter - moved;
-                assertLe(forfeited, 1, "share exit forfeited more than one share");
-                if (forfeited != 0) assertEq(sharesAfter, 0, "forfeiture left a booked remainder");
-                forfeitedShares += forfeited;
-            }
+            uint256 moved = receiptBefore - _handlerReceiptShares();
+            uint256 sharesAfter = ILendingHandler(address(tokenHandler)).getUserShares(user);
+            uint256 forfeited = sharesBefore - sharesAfter - moved;
+            assertLe(forfeited, 1, "share exit forfeited more than one share");
+            if (forfeited != 0) assertEq(sharesAfter, 0, "forfeiture left a booked remainder");
+            forfeitedShares += forfeited;
         } catch {
             // No shares on the handler.
         }
+    }
+
+    /// @dev The handler's receipt-share balance in the units its virtual shares use.
+    function _handlerReceiptShares() private view returns (uint256) {
+        address handler = address(tokenHandler);
+        if (routeIndex == LAYERBANK_INDEX) return LayerBankHandler(handler).i_aToken().scaledBalanceOf(handler);
+        if (routeIndex == TROPYKUS_INDEX) {
+            return IERC20(address(TropykusHandler(handler).i_kToken())).balanceOf(handler);
+        }
+        return IERC20(address(SovrynHandler(handler).i_iToken())).balanceOf(handler);
     }
 
     /*//////////////////////////////////////////////////////////////

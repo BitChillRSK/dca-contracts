@@ -355,9 +355,9 @@ interface IDcaManager {
      *      the caller's receipt shares instead. Clearing schedule balances removes their purchase
      *      allocations; the schedules remain available for funding. A one-share transfer remainder
      *      is forfeited and stays unbooked on the handler. Larger remainders stay booked and can be
-     *      requested later, even with every schedule balance at zero. Blocked during the protected purchase window and while the
-     *      lending protocol blocks receipt-token transfers. Reverts on an idle or unassigned route
-     *      and when the caller holds no shares there.
+     *      requested later, even with every schedule balance at zero. Blocked during the protected
+     *      purchase window and while the lending protocol blocks receipt-token transfers. Reverts on
+     *      an idle or unassigned route and when the caller holds no shares there.
      */
     function withdrawLendingShares(address token, uint256 routeIndex) external;
 
