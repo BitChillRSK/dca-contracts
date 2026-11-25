@@ -130,10 +130,11 @@ which replaces the price the floor is computed from in one transaction with no b
 previous oracle.
 
 **Worst case for a swapper key, leaked or run under a bad policy.** The key can reopen the protected
-window in the block the previous one ends, submit a zero caller minimum, and activate any allowlisted Dex path. While windows are
-chained, users cannot pause, edit, delete, withdraw stablecoin or interest, or withdraw lending shares. Each Dex schedule that
-comes due in that time can be filled down to the oracle floor (3% below the oracle at launch settings,
-never more than 5%), once per period. MoC routes have no pool to move. Principal cannot leave to anyone but its owner, and
+window in the block the previous one ends, submit a zero caller minimum, and activate any allowlisted
+Dex path. While windows are chained, users cannot pause or unpause, edit, delete, withdraw stablecoin
+or interest, or withdraw lending shares. Each Dex schedule that comes due in that time can be filled
+down to the oracle floor (3% below the oracle at launch settings, never more than 5%), once per
+period. MoC routes have no pool to move. Principal cannot leave to anyone but its owner, and
 `revokeSwapper` ends it. An honest bot that reactivates after every failed purchase chains windows
 the same way, so the operating policy forbids automatic reactivation after a venue failure
 ([R66](./docs/relaunch/R66-batch-row-front-running.md)). This is accepted without a mandatory gap
@@ -286,7 +287,8 @@ Other deliberate availability trade-offs:
   open.
 - Borrowers can take a lending reserve's cash, including in the same block as a preflight read. That
   stops lending purchases and cash exits on the route until cash returns, and no check before the call
-  can guarantee it succeeds. `withdrawLendingShares` and the idle route keep working.
+  can guarantee it succeeds. `withdrawLendingShares` needs no reserve cash, and the idle route for the
+  same token is unaffected.
 - The lending index is the venue's accounting rate, not proof that its claims are backed. A reserve
   deficit does not lower it: a loss reaches users as failed redemptions or as lower measured cash.
   Handlers compute no haircut of their own.
@@ -306,8 +308,8 @@ Other deliberate availability trade-offs:
   [`src/layerbank/README.md`](./src/layerbank/README.md). The share withdrawal is blocked during a
   protected window like every other withdrawal.
 - The Dex floor accepts any price the configured MoC BTC/USD feed reports as valid. The feed's validity
-  period (20 blocks when checked for the Kann response) is its only freshness bound: a valid price can
-  lag the market within it, which loosens the floor or reverts a fair swap. Handlers add no second age
+  period, which the cutover runbook records, is its only freshness bound: a valid price can lag the
+  market within it, which loosens the floor or reverts a fair swap. Handlers add no second age
   check and do not compare the price with the pool.
 - Dex pricing assumes the input stablecoin is worth one USD; there is no stablecoin/USD oracle.
   A downward depeg can stop swaps at the configured BTC/USD-derived floor. An upward depeg does not

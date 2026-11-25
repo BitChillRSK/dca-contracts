@@ -687,9 +687,10 @@ slippage words and the handler ABI unchanged from mainnet-current: the swap-time
 `s_amountOutMinimumPercent`, retuned **99.5% → 97%** (probe-derived at block 9198813); the **95%**
 `s_amountOutMinimumSafetyCheck` remains the configuration wall (`safetyCheck <= percent <= 100%`).
 Pass `max(amountOutLowerBound, minRbtcOut)` into the router; `PurchaseRbtc` still checks measured output.
-Inside `[95%, 100%]` the owner retightens or widens the live floor in one transaction; widening
-*past* 95% still needs two transactions (lower the safety check first). Production Dex still sends a
-nonzero quote-derived `minRbtcOut`.
+Inside `[95%, 100%]` the owner retightens or widens the live floor in one call; widening *past* 95%
+takes two calls (lower the safety check first), which one Safe transaction can batch. Production Dex
+still sends a nonzero quote-derived `minRbtcOut`. [R126](./R126-dex-floor-cap.md) replaces the
+safety check with a fixed 95% bound, so no owner call widens past it.
 
 Ask: none.
 
@@ -1690,10 +1691,10 @@ There is no optional-late queue. Items either have an ordered spec above or are 
 - **Pack the fee collector beside the fee rates — closed 2026-09-28 (R95 item 4, post-R102 pass).**
   R95 left this as "reopen with a deploy measurement." Layout closes it without one: the fee word is
   one `uint112` bound and two `uint16` rates (144 bits); the collector is 160 bits, so it does not fit
-  beside them; the 12 spare bytes beside Ownable2Step's `_pendingOwner`
-  cannot hold an address; packing into the Dex safety-check word still leaves a purchase-path
-  `SLOAD` because purchases never load that word. The path already does the minimum (fee word once,
-  collector when the fee is nonzero — ~200 Rootstock gas). See
+  beside them; the 12 spare bytes beside Ownable2Step's `_pendingOwner` cannot hold an address;
+  packing into the Dex safety-check word still leaves a purchase-path `SLOAD` because purchases never
+  load that word. The path already does the minimum (fee word once, collector when the fee is
+  nonzero — ~200 Rootstock gas). See
   [R102 post-ship review](./R102-wrbtc-withdraw-seam.md#post-ship-review-2026-09-28).
 - **Cache MoC's post-redeem `address(this).balance` in a local — closed 2026-09-28 (keep re-read).**
   Compiles to `SELFBALANCE` (5 gas on Foundry and Rootstock), not `BALANCE` (400). Naming the
@@ -1705,8 +1706,7 @@ There is no optional-late queue. Items either have an ordered spec above or are 
   [R121](./R121-kann-audit-followups.md) (`addSwapper` / `revokeSwapper`) and
   [R123](./R123-kann-configuration.md) (`setFeeCollector` and seven other setters) after Kann #10 and
   #12. The 2026-09-28 reasoning was gas only: owner cold-path code for a rare 5,000-gas Rootstock
-  `RESET`. A
-  purchase-only handler getter would duplicate the shared view for a few gas inside an external call.
+  `RESET`. A purchase-only handler getter would duplicate the shared view for a few gas inside an external call.
   Narrowing `Batch.routeIndex` does not shrink ABI calldata. Recorded under
   [R102 post-ship review](./R102-wrbtc-withdraw-seam.md#post-ship-review-2026-09-28) items 7–9.
 - **SPDX change — reopened 2026-08-31, answered 2026-09-07.** The earlier rejection argued that re-licensing "requires an explicit legal/product process outside the contract implementation stack" and then closed the decision on that basis, which is self-defeating: that is a reason to route the question to a human, not to answer it. See **Licensing — decided**.

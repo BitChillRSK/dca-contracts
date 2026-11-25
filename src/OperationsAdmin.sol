@@ -112,11 +112,8 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
 
     /**
      * @inheritdoc IOperationsAdmin
-     * @dev Deposits are the only user action this registry can stop. It is a circuit breaker
-     *      for one lending market going bad, not a protocol pause: it does not stop existing positions
-     *      purchasing or exiting, and every other `(token, routeIndex)` pair is untouched. A protected
-     *      window or the venue itself can still block those calls. The flag lives here rather than on the handler so governance can stop deposits
-     *      without a handler that must be trusted to unpause itself.
+     * @dev The flag lives here rather than on the handler so governance can stop deposits without a
+     *      handler that must be trusted to unpause itself.
      */
     function setDepositsPaused(address token, uint256 routeIndex, bool paused) external onlyOwner {
         uint32 route = routeIndex.toUint32();

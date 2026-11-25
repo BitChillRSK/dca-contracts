@@ -11,8 +11,9 @@ import {ICoinPairPrice} from "./ICoinPairPrice.sol";
  * @notice Uniswap V3 purchase configuration: encoded path, slippage band, and MoC BTC/USD oracle.
  * @dev Min-out assumes the handler's stablecoin is worth one USD and uses the MoC BTC/USD oracle;
  *      no stablecoin/USD feed enforces that peg. Governance owns this deployment precondition. The
- *      stablecoin must implement `decimals()` and report at most 18, or construction reverts. A downward depeg can stop swaps at the oracle-implied floor. An upward
- *      depeg does not raise that floor; a quote-derived caller minimum must protect the premium.
+ *      stablecoin must implement `decimals()` and report at most 18, or construction reverts. A
+ *      downward depeg can stop swaps at the oracle-implied floor. An upward depeg does not raise that
+ *      floor; a quote-derived caller minimum must protect the premium.
  */
 interface IPurchaseUniswap {
     /*//////////////////////////////////////////////////////////////
@@ -128,7 +129,7 @@ interface IPurchaseUniswap {
     /**
      * @notice Point min-out at a new MoC BTC/USD oracle.
      * @param newOracle New oracle. Cannot be zero.
-     * @dev Not bounded by the safety check: a new oracle changes the floor in one transaction.
+     * @dev Not bounded by `MIN_AMOUNT_OUT_MINIMUM_PERCENT`: a new oracle moves the floor in one call.
      *      Reverts with `PurchaseUniswap__OracleUnchanged` if it is already the oracle.
      */
     function setMocOracle(address newOracle) external;

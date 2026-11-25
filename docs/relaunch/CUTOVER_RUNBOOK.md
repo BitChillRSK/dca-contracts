@@ -38,10 +38,9 @@ Human operator only. Agents must not `--broadcast`.
 7. `RSK_MAINNET_RPC_URL`, Blockscout verifier URL, deployer keystore/Ledger ready.
 8. `INITIAL_SWAPPER` = production bot EOA (non-zero).
 9. Safe (`MAINNET_OWNER`) and fee collector (`MAINNET_FEE_COLLECTOR`) match `script/Constants.sol`.
-   The collector must be able to call `DcaManager` and accept native rBTC with empty calldata: an
-   EOA or a correctly configured Safe can, a receive-only contract cannot claim. Each purchase
-   **credits** its accumulated rBTC on that
-   handler; it withdraws through `DcaManager.withdrawAllAccumulatedRbtc`, one `(token, routeIndex)`
+   The collector must be able to call `DcaManager` and accept native rBTC with empty calldata. An
+   EOA or a correctly configured Safe can; a receive-only contract cannot claim. Each purchase
+   **credits** its accumulated rBTC on that handler; it withdraws through `DcaManager.withdrawAllAccumulatedRbtc`, one `(token, routeIndex)`
    pair per live handler (Dex unwraps WRBTC then pays native). A wallet that cannot receive native
    rBTC does not revert purchases; it cannot claim until it can receive, and `setFeeCollector` does
    not migrate already-credited balances. Sweep every live handler after deploy, then confirm

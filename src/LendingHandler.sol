@@ -160,8 +160,8 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
     }
 
     /**
-     * @dev Pays out what the redemption actually produced. Share rounding can make that a base unit more
-     *      or less than requested, and a fee or realized loss can make it less once the complete share
+     * @dev Pays out what the redemption actually produced. Share rounding can make that slightly more or
+     *      less than requested, and a fee or realized loss can make it less once the complete share
      *      claim is consumed; a partial share burn reverts. Shares worth nothing redeem nothing, and no
      *      zero transfer is made.
      */
@@ -174,7 +174,6 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
             withdrawalAmount = totalStablecoinInLending;
         }
 
-        // Pay out what the redemption actually produced
         withdrawalAmount = _redeemShares(user, userShares, withdrawalAmount, exchangeRate);
         if (withdrawalAmount == 0) return 0;
         return super._withdrawToken(user, withdrawalAmount);
@@ -371,12 +370,12 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
         returns (uint256 stablecoinReceived)
     {
         uint256 sharesBefore = _receiptSharesBalance();
-        uint256 stablecoinBalanceBefore = i_stablecoin.balanceOf(address(this));
+        uint256 stablecoinBefore = i_stablecoin.balanceOf(address(this));
         _protocolRedeem(sharesAmount, exchangeRate);
         uint256 sharesAfter = _receiptSharesBalance();
         if (sharesAfter >= sharesBefore || sharesBefore - sharesAfter != sharesAmount) {
             revert LendingHandler__ShareConsumptionMismatch(sharesAmount, sharesBefore, sharesAfter);
         }
-        stablecoinReceived = i_stablecoin.balanceOf(address(this)) - stablecoinBalanceBefore;
+        stablecoinReceived = i_stablecoin.balanceOf(address(this)) - stablecoinBefore;
     }
 }
