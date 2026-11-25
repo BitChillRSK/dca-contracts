@@ -411,10 +411,10 @@ interface IDcaManager {
      * @notice Buy rBTC through several handlers atomically in one transaction.
      * @param batches Each element is one handler's purchase batch (`token` + `routeIndex`).
      * @dev Authenticates the caller and takes the reentrancy guard once, then purchases each handler's
-     *      batch in order through the same one-handler helper. A failure in any batch — including a paused row or a batch that
-     *      bought less than its own input-scaled minimum — reverts every handler, so a later batch's minimum
-     *      undoes an earlier handler's purchase. `batchBuyRbtc` remains available for one-handler
-     *      retries (same `Batch` type).
+     *      batch in order through the same one-handler helper. A failure in any batch, including a
+     *      paused row or a batch that bought less than its own input-scaled minimum, reverts every
+     *      handler, so a later batch's minimum undoes an earlier handler's purchase. `batchBuyRbtc`
+     *      remains available for one-handler retries (same `Batch` type).
      */
     function batchBuyRbtcAcrossHandlers(Batch[] calldata batches) external;
 

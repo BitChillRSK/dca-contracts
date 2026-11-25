@@ -169,8 +169,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     /**
      * @inheritdoc IDcaManager
      * @dev Widths are checked before the handler pull so an overflowing credit cannot move tokens. The
-     *      credit is stored and logged before the pull, so a purchase reached from a callback during the
-     *      pull debits the new balance, and its balance event is the last one.
+     *      credit is stored and logged before the pull.
      */
     function depositToken(address token, uint64 scheduleId, uint256 depositAmount) external override nonReentrant {
         _validateDeposit(depositAmount);
@@ -740,8 +739,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     /**
      * @dev Withdraw principal from one schedule. Debits the requested amount, not what the handler
      *      paid out. `type(uint256).max` means this schedule's whole `tokenBalance`. The debit is stored
-     *      and logged before the handler call, so a purchase reached from a callback during the payout
-     *      logs the last balance.
+     *      and logged before the handler call.
      * @return routeIndex The schedule's stored route, captured before the handler call.
      * @return handler The handler that paid out, so a caller need not resolve it again.
      */

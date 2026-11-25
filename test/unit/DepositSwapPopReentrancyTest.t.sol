@@ -2,7 +2,9 @@
 pragma solidity 0.8.36;
 
 import {Test} from "forge-std/Test.sol";
+import {VmSafe} from "forge-std/Vm.sol";
 import {DcaManager} from "../../src/DcaManager.sol";
+import {ITokenHandler} from "../../src/interfaces/ITokenHandler.sol";
 import {OperationsAdmin} from "../../src/OperationsAdmin.sol";
 import {TropykusDocHandlerMoc} from "../../src/tropykus-legacy/TropykusDocHandlerMoc.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
@@ -22,6 +24,9 @@ contract ReentrantDepositor is ITransferHook {
     bool public attack;
     uint64 public buyId;
     bool public buy;
+    uint64 public probeId;
+    bool public probe;
+    uint256 public probedBalance;
 
     constructor(DcaManager dca_, address token_) {
         dca = dca_;
@@ -33,13 +38,21 @@ contract ReentrantDepositor is ITransferHook {
         deleteId = id;
     }
 
-    /// @dev Buy `id` from inside the next hooked transfer. Only reaches the manager if this contract is a swapper.
+    /// @dev Buy `id` from inside the next hooked transfer. Made a swapper so that, without the guard,
+    ///      the purchase would succeed.
     function armBuy(uint64 id) external {
         buy = true;
         buyId = id;
     }
 
+    /// @dev Read `id`'s stored balance from inside the next hooked transfer. Views are unguarded.
+    function armProbe(uint64 id) external {
+        probe = true;
+        probeId = id;
+    }
+
     function onTransferFrom(address, address, uint256) external {
+        _probeIfArmed();
         _buyIfArmed();
         if (!attack) return;
         attack = false;
@@ -47,6 +60,7 @@ contract ReentrantDepositor is ITransferHook {
     }
 
     function onTransferReceived(address, uint256) external {
+        _probeIfArmed();
         _buyIfArmed();
     }
 
@@ -71,6 +85,12 @@ contract ReentrantDepositor is ITransferHook {
 
     function deposit(uint64 scheduleId, uint256 amount) external {
         dca.depositToken(token, scheduleId, amount);
+    }
+
+    function _probeIfArmed() private {
+        if (!probe) return;
+        probe = false;
+        probedBalance = dca.getDcaSchedule(token, probeId).tokenBalance;
     }
 
     function _buyIfArmed() private {
@@ -201,6 +221,28 @@ contract DepositSwapPopReentrancyTest is Test {
         _assertNothingMoved(userTokens);
     }
 
+    /// @dev The credit is stored and logged before the pull (R118 ordering).
+    function test_depositToken_storesAndLogsTheCreditBeforeThePull() public {
+        uint64 idA = _createScheduleAndArmProbe();
+
+        vm.recordLogs();
+        user.deposit(idA, EXTRA);
+
+        assertEq(user.probedBalance(), DEPOSIT + EXTRA, "the credit was not stored before the pull");
+        _assertBalanceLoggedBefore(idA, DEPOSIT + EXTRA, ITokenHandler.TokenHandler__TokenDeposited.selector);
+    }
+
+    /// @dev The debit is stored and logged before the payout (R118 ordering).
+    function test_withdrawToken_storesAndLogsTheDebitBeforeThePayout() public {
+        uint64 idA = _createScheduleAndArmProbe();
+
+        vm.recordLogs();
+        user.withdraw(idA, EXTRA);
+
+        assertEq(user.probedBalance(), DEPOSIT - EXTRA, "the debit was not stored before the payout");
+        _assertBalanceLoggedBefore(idA, DEPOSIT - EXTRA, ITokenHandler.TokenHandler__TokenWithdrawn.selector);
+    }
+
     /// @dev create,create,delete,create in one block used to remint the survivor's id.
     function test_createDeleteCreate_mintsUniqueScheduleIds() public {
         (uint64 idB, uint64 idC) = _createDeleteCreateSequence();
@@ -272,6 +314,38 @@ contract DepositSwapPopReentrancyTest is Test {
         token.approve(address(mocProxy), type(uint256).max);
         user.armBuy(id);
         token.setHook(address(user), true);
+    }
+
+    function _createScheduleAndArmProbe() private returns (uint64 id) {
+        user.createSchedule(DEPOSIT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD, TROPYKUS_INDEX);
+        (uint64[] memory ids,) = dcaManager.getDcaSchedules(address(user), address(token));
+        id = ids[0];
+        user.armProbe(id);
+        token.setHook(address(user), true);
+    }
+
+    /// @dev The schedule's `TokenBalanceUpdated(balance)` comes before the handler's `handlerEvent`.
+    function _assertBalanceLoggedBefore(uint64 scheduleId, uint256 balance, bytes32 handlerEvent) private {
+        VmSafe.Log[] memory logs = vm.getRecordedLogs();
+        uint256 balanceAt = type(uint256).max;
+        uint256 handlerAt = type(uint256).max;
+        for (uint256 i; i < logs.length; ++i) {
+            if (
+                balanceAt == type(uint256).max && logs[i].emitter == address(dcaManager)
+                    && logs[i].topics[0] == IDcaManager.DcaManager__TokenBalanceUpdated.selector
+                    && logs[i].topics[2] == bytes32(uint256(scheduleId))
+            ) {
+                assertEq(abi.decode(logs[i].data, (uint256)), balance, "logged balance");
+                balanceAt = i;
+            }
+            if (
+                handlerAt == type(uint256).max && logs[i].emitter == address(handler)
+                    && logs[i].topics[0] == handlerEvent
+            ) {
+                handlerAt = i;
+            }
+        }
+        assertLt(balanceAt, handlerAt, "the balance was not logged before the handler moved tokens");
     }
 
     function _tokenBalance() private view returns (uint256) {

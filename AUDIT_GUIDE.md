@@ -172,8 +172,9 @@ How the boundaries are enforced:
 - Every external function that writes a schedule is `nonReentrant`, both purchase entry points
   included. A purchase reached from a token or market callback during a user call reverts, and so
   does a claim or any other guarded call made during a purchase. `batchBuyRbtcAcrossHandlers` loops
-  the private one-handler helper, not the guarded entry point. User mutators still store and log a
-  balance before their handler call and never write back a value read before it, as defense in depth.
+  the private one-handler helper, not the guarded entry point. As defense in depth, `depositToken` and
+  `withdrawToken` store and log the new balance before their handler call, and no user mutator writes
+  back a value read before it.
 
 `AGENTS.md` lists these and the other invariants contributors must preserve, under **Protocol
 invariants**, with the reason for each.

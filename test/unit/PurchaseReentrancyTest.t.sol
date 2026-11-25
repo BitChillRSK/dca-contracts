@@ -5,6 +5,7 @@ import {DcaDappTest} from "./DcaDappTest.t.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {IDcaManager} from "../../src/interfaces/IDcaManager.sol";
 import {IPurchaseRbtc} from "../../src/interfaces/IPurchaseRbtc.sol";
+import {ILendingHandler} from "../../src/interfaces/ILendingHandler.sol";
 import {MockStablecoin} from "../mocks/MockStablecoin.sol";
 import {MockMocProxy} from "../mocks/MockMocProxy.sol";
 import {MockSwapRouter02} from "../mocks/MockSwapRouter02.sol";
@@ -200,15 +201,25 @@ contract PurchaseReentrancyTest is DcaDappTest {
         assertEq(address(s_claimant).balance, claimantRbtc, "claim paid during the purchase");
     }
 
-    /// @dev The outer purchase of USER's schedule reverts with the guard error and moves nothing.
+    /// @dev The outer purchase of USER's schedule reverts with the guard error and moves nothing,
+    ///      including either user's lending shares.
     function _assertOuterPurchaseRefused(bool outerAcross) private {
         bytes memory outer = outerAcross ? _acrossHandlersCall(s_userScheduleId) : _singleHandlerCall(s_userScheduleId);
+        uint256 userShares = _shares(USER);
+        uint256 claimantShares = _shares(address(s_claimant));
         vm.prank(SWAPPER);
         (bool ok, bytes memory reason) = address(dcaManager).call(outer);
         assertFalse(ok, "outer purchase succeeded");
         assertEq(bytes4(reason), ReentrancyGuardTransient.ReentrancyGuardReentrantCall.selector);
         assertEq(_tokenBalance(USER, SCHEDULE_INDEX), AMOUNT_TO_DEPOSIT, "outer purchase debited");
         assertEq(_claim(USER), 0, "outer purchase credited");
+        assertEq(_shares(USER), userShares, "outer purchase moved shares");
+        assertEq(_shares(address(s_claimant)), claimantShares, "nested purchase moved shares");
+    }
+
+    /// @dev Booked lending shares, or zero on an idle route.
+    function _shares(address user) private view returns (uint256) {
+        return isLendingLane ? ILendingHandler(address(stablecoinHandler)).getUserShares(user) : 0;
     }
 
     function _singleHandlerCall(uint64 scheduleId) private view returns (bytes memory) {
