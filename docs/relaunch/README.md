@@ -73,7 +73,7 @@ decided against). No further re-judgement PRs.
 ## Status
 
 - Merged: [R122-kann-lending-withdrawals.md](./R122-kann-lending-withdrawals.md) (GitHub [#199](https://github.com/BitChillRSK/dca-contracts/pull/199)), Kann #14, #19 and #20 item 1.
-- Current follow-ups: [R123-kann-configuration.md](./R123-kann-configuration.md), assigned on 2026-11-25, GitHub [#200](https://github.com/BitChillRSK/dca-contracts/pull/200), Kann #12, #23 and #20 item 5; and [R124-kann-purchase-reentrancy.md](./R124-kann-purchase-reentrancy.md), assigned on 2026-11-25 and stacked on #200, GitHub [#201](https://github.com/BitChillRSK/dca-contracts/pull/201), Kann #18 I-09. Next unassigned: the remaining audit documentation and the source-consistency sweep.
+- Current follow-ups: [R123-kann-configuration.md](./R123-kann-configuration.md), assigned on 2026-11-25, GitHub [#200](https://github.com/BitChillRSK/dca-contracts/pull/200), Kann #12, #23 and #20 item 5; and [R124-kann-purchase-reentrancy.md](./R124-kann-purchase-reentrancy.md), assigned on 2026-11-25 and stacked on #200, GitHub [#201](https://github.com/BitChillRSK/dca-contracts/pull/201), Kann #18 I-09; and [R125-kann-docs-and-consistency.md](./R125-kann-docs-and-consistency.md), assigned on 2026-11-25 and stacked on #201, Kann #13 and #16–#26 documentation and the source-consistency sweep.
 
 - Merged: [R23-toolchain-baseline.md](./R23-toolchain-baseline.md) (PR 1, GitHub [#42](https://github.com/BitChillRSK/dca-contracts/pull/42)). Rootstock testnet accepted solc 0.8.36 / `cancun`.
 - Assigned: [R2-utc-purchase-period.md](./R2-utc-purchase-period.md) (PR 3, GitHub [#44](https://github.com/BitChillRSK/dca-contracts/pull/44)). No product gates. Does not wait on PR 2.

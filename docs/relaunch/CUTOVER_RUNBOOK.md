@@ -27,6 +27,7 @@ Human operator only. Agents must not `--broadcast`.
    - Complete all five dedicated consumer issues linked in [R117](./R117-pashov-mitigations.md#consumer-follow-up-status).
    - Implement the confirmed positive MoC quote policy for DOC and verify the bot controls assigned to swapper-bot#23.
    - Verify the configured oracle implementation, bounded validity period, and positive-price rules.
+     Record the wrapper, the underlying feed it reads and that feed's `getValidPricePeriodInBlocks()`.
      Verify the deployed MoC conversion, fee branches, and oracle assumptions used by DOC quotes.
    - After the corrected harness passes replay checks, run Medusa for at least four hours.
      Before release, complete a 24-hour Medusa campaign and an Echidna campaign on the frozen executable revision.
@@ -37,7 +38,9 @@ Human operator only. Agents must not `--broadcast`.
 7. `RSK_MAINNET_RPC_URL`, Blockscout verifier URL, deployer keystore/Ledger ready.
 8. `INITIAL_SWAPPER` = production bot EOA (non-zero).
 9. Safe (`MAINNET_OWNER`) and fee collector (`MAINNET_FEE_COLLECTOR`) match `script/Constants.sol`.
-   The collector is a passive EOA. Each purchase **credits** its accumulated rBTC on that
+   The collector must be able to call `DcaManager` and accept native rBTC with empty calldata: an
+   EOA or a correctly configured Safe can, a receive-only contract cannot claim. Each purchase
+   **credits** its accumulated rBTC on that
    handler; it withdraws through `DcaManager.withdrawAllAccumulatedRbtc`, one `(token, routeIndex)`
    pair per live handler (Dex unwraps WRBTC then pays native). A wallet that cannot receive native
    rBTC does not revert purchases; it cannot claim until it can receive, and `setFeeCollector` does
@@ -107,12 +110,23 @@ always reverts.
    For all six handlers, verify `handler.i_dcaManager()` equals that exact deployed `DcaManager`.
    Verify `handler.i_stablecoin()` equals the token assigned to its pair.
    Compare each handler's verified code and constructor arguments with the frozen release artifact.
+   Verify each handler's venue addresses against the release configuration: the MoC proxy, the
+   Uniswap router and WRBTC, the LayerBank aToken and Pool, and their implementations where they are
+   proxies. A code-length or interface check cannot show that a compatible contract behaves correctly.
    A manager that merely returns the same registry does not establish canonical manager identity.
    Record the addresses and check results before Safe acceptance or consumer publication.
 3. Confirm Dex `getSwapPath()` on each Dex handler matches the intended route (constructor
    already allowlisted it).
 4. Confirm `isSwapper(INITIAL_SWAPPER)` and that `getTokenMinPurchaseAmount` for each token equals
-   the approved launch value (precondition 3).
+   the approved launch value (precondition 3). Amounts are in each token's base units:
+
+   | Token | Decimals | Minimum purchase (25 tokens) | Fee lower bound (250 tokens) |
+   |---|---|---|---|
+   | DOC | 18 | `25e18` | `250e18` |
+   | USDRIF | 18 | `25e18` | `250e18` |
+   | USDT0 | 6 | `25e6` | `250e6` |
+
+   Check every encoded amount in a Safe transaction against this table before signing.
 5. Only once steps 2 through 4 pass: from the Safe, `acceptOwnership()` on `OperationsAdmin`,
    `DcaManager`, and all six handlers.
 6. Publish addresses to `front-end`, `swapper-bot`, `data-api`, `bitchill-monitoring`,

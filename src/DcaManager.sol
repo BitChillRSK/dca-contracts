@@ -13,6 +13,7 @@ import {IPurchaseRbtc} from "./interfaces/IPurchaseRbtc.sol";
 /**
  * @title DcaManager
  * @author BitChill team: Antonio Rodríguez-Ynyesto
+ * @custom:security-contact security@bitchill.app
  * @notice Stores every DCA schedule and routes user and swapper calls to the handler that holds the
  *         funds they name.
  * @dev Every external schedule mutator, purchases included, is non-reentrant. A swapper can open a
@@ -47,7 +48,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
 
     /**
      * @notice The ids each user holds for each stablecoin.
-     * @dev Enumeration only: purchases never read it.
+     * @dev Serves enumeration, the schedule cap, locked principal and share withdrawals. Purchases never
+     *      read it.
      */
     mapping(address user => mapping(address token => uint64[] scheduleIds)) private s_scheduleIds;
 
@@ -246,7 +248,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
             amountWithdrawn = _handler(token, routeIndex).withdrawToken(msg.sender, tokenBalance);
         }
 
-        // The event reports what left the handler, which may be less than the schedule's tokenBalance.
+        // The event reports what left the handler, which can differ from the schedule's tokenBalance.
         emit DcaManager__DcaScheduleDeleted(msg.sender, token, scheduleId, amountWithdrawn);
     }
 
@@ -297,9 +299,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         uint256 tokenBalance = dcaSchedule.tokenBalance;
         uint256 purchaseAmount = dcaSchedule.purchaseAmount;
         uint128 newTokenBalance = (tokenBalance + amount).toUint128();
-        // The credit must buy at least one more purchase than the balance could already fund, so
-        // interest cannot be moved over in dust. `purchaseAmount` is never zero: every write meets the
-        // token minimum.
+        // The new balance must fund at least one more purchase than the old one. `purchaseAmount` is
+        // never zero: every write meets the token minimum.
         if (newTokenBalance / purchaseAmount == tokenBalance / purchaseAmount) {
             revert DcaManager__TopUpDoesNotFundAnotherPurchase(token, scheduleId, amount);
         }

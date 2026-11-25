@@ -592,9 +592,10 @@ contract RbtcPurchaseTest is DcaDappTest {
         uint256 initialInterestSecondUser =
             dcaManager.getAccruedInterest(SECOND_USER, address(stablecoin), s_routeIndex);
 
-        // Both users should have 0 interest initially
-        assertEq(initialInterestUser, 0, "USER should have 0 interest initially");
-        assertEq(initialInterestSecondUser, 0, "SECOND_USER should have 0 interest initially");
+        // No interest yet beyond mint rounding: a live half-up mint can value each deposit's shares up to
+        // one base unit above its principal.
+        assertLe(initialInterestUser, SCHEDULES_PER_USER, "USER has interest beyond mint rounding");
+        assertLe(initialInterestSecondUser, SCHEDULES_PER_USER, "SECOND_USER has interest beyond mint rounding");
 
         // Perform the required number of purchase rounds
         for (uint256 round; round < purchasesPerSchedule; ++round) {
@@ -694,9 +695,10 @@ contract RbtcPurchaseTest is DcaDappTest {
         uint256 initialInterestSecondUser =
             dcaManager.getAccruedInterest(SECOND_USER, address(stablecoin), s_routeIndex);
 
-        // Both users should have 0 interest initially
-        assertEq(initialInterestUser, 0, "USER should have 0 interest initially");
-        assertEq(initialInterestSecondUser, 0, "SECOND_USER should have 0 interest initially");
+        // No interest yet beyond mint rounding: a live half-up mint can value each deposit's shares up to
+        // one base unit above its principal.
+        assertLe(initialInterestUser, SCHEDULES_PER_USER, "USER has interest beyond mint rounding");
+        assertLe(initialInterestSecondUser, SCHEDULES_PER_USER, "SECOND_USER has interest beyond mint rounding");
 
         // Perform the required number of purchase rounds
         for (uint256 round; round < purchasesPerSchedule; ++round) {
@@ -796,9 +798,10 @@ contract RbtcPurchaseTest is DcaDappTest {
         uint256 initialInterestSecondUser =
             dcaManager.getAccruedInterest(SECOND_USER, address(stablecoin), s_routeIndex);
 
-        // Both users should have 0 interest initially
-        assertEq(initialInterestUser, 0, "USER should have 0 interest initially");
-        assertEq(initialInterestSecondUser, 0, "SECOND_USER should have 0 interest initially");
+        // No interest yet beyond mint rounding: a live half-up mint can value each deposit's shares up to
+        // one base unit above its principal.
+        assertLe(initialInterestUser, SCHEDULES_PER_USER, "USER has interest beyond mint rounding");
+        assertLe(initialInterestSecondUser, SCHEDULES_PER_USER, "SECOND_USER has interest beyond mint rounding");
 
         address[] memory tokens = new address[](1);
         tokens[0] = address(stablecoin);

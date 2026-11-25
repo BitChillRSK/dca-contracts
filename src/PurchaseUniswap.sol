@@ -170,8 +170,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         if (amountOutMinimumPercent == oldValue) {
             revert PurchaseUniswap__AmountOutMinimumPercentUnchanged(amountOutMinimumPercent);
         }
-        emit PurchaseUniswap__AmountOutMinimumPercentUpdated(oldValue, amountOutMinimumPercent);
         s_amountOutMinimumPercent = amountOutMinimumPercent.toUint64();
+        emit PurchaseUniswap__AmountOutMinimumPercentUpdated(oldValue, amountOutMinimumPercent);
     }
 
     /// @inheritdoc IPurchaseUniswap
@@ -181,8 +181,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         if (amountOutMinimumSafetyCheck == oldValue) {
             revert PurchaseUniswap__AmountOutMinimumSafetyCheckUnchanged(amountOutMinimumSafetyCheck);
         }
-        emit PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(oldValue, amountOutMinimumSafetyCheck);
         s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint64();
+        emit PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(oldValue, amountOutMinimumSafetyCheck);
     }
 
     /// @inheritdoc IPurchaseUniswap
@@ -192,8 +192,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         }
         address oldOracle = address(s_mocOracle);
         if (newOracle == oldOracle) revert PurchaseUniswap__OracleUnchanged(newOracle);
-        emit PurchaseUniswap__OracleUpdated(oldOracle, newOracle);
         s_mocOracle = ICoinPairPrice(newOracle);
+        emit PurchaseUniswap__OracleUpdated(oldOracle, newOracle);
     }
 
     /// @inheritdoc IPurchaseUniswap
@@ -364,8 +364,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
 
     /**
      * @dev Both arguments are 1e18-scaled fractions. Neither may exceed 100%, and the swap-time floor
-     *      cannot sit below the safety check, so lowering the floor percentage past what governance
-     *      pre-approved takes two transactions. Used by the constructor and both owner setters.
+     *      cannot sit below the safety check, so lowering the floor percentage past it takes two calls,
+     *      which one Safe transaction can batch. Used by the constructor and both owner setters.
      */
     function _validateSlippageSettings(uint256 amountOutMinimumPercent, uint256 amountOutMinimumSafetyCheck)
         private

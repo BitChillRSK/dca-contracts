@@ -1593,6 +1593,13 @@ store-and-log-before-call ordering stays. Ask: none.
 
 Next: the remaining audit documentation and the source-consistency sweep, with its own spec.
 
+### R125 - Kann documentation and source consistency ([spec](./R125-kann-docs-and-consistency.md))
+
+After R124. Last of the four Kann follow-up PRs: the documentation half of the responses to #13 and
+#16–#26, the security contact, an R66 amendment (D3, #17), and the `src/` consistency sweep listed in
+the spec. No ABI change; only the Dex setters' store-then-emit reorder changes runtime bytecode.
+Ask: none.
+
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:
@@ -1675,8 +1682,8 @@ There is no optional-late queue. Items either have an ordered spec above or are 
   revert cannot undo. See [R101](./R101-post-r100-review-cleanups.md#verdicts).
 - **Pack the fee collector beside the fee rates — closed 2026-09-28 (R95 item 4, post-R102 pass).**
   R95 left this as "reopen with a deploy measurement." Layout closes it without one: the fee word is
-  already full (`uint112` × 2 + `uint16` × 2 = 256 bits); the collector is 160 bits; narrowing the
-  bounds to `uint96` frees only 32 bits; the 12 spare bytes beside Ownable2Step's `_pendingOwner`
+  one `uint112` bound and two `uint16` rates (144 bits); the collector is 160 bits, so it does not fit
+  beside them; the 12 spare bytes beside Ownable2Step's `_pendingOwner`
   cannot hold an address; packing into the Dex safety-check word still leaves a purchase-path
   `SLOAD` because purchases never load that word. The path already does the minimum (fee word once,
   collector when the fee is nonzero — ~200 Rootstock gas). See
@@ -1687,8 +1694,11 @@ There is no optional-late queue. Items either have an ordered spec above or are 
   re-read wins by 1–5 gas depending on profile and whether the redeem pays. Matches `096719a`. See
   [R102 post-ship review](./R102-wrbtc-withdraw-seam.md#post-ship-review-2026-09-28).
 - **Owner no-op write guards, purchase-only `getHandler`, and `Batch.routeIndex` as `uint32` —
-  closed 2026-09-28 without shipping.** Equality checks on `addSwapper` / `revokeSwapper` /
-  `setFeeCollectorAddress` are owner cold-path code for a rare 5,000-gas Rootstock `RESET`. A
+  closed 2026-09-28 without shipping.** The no-op guards were later shipped by
+  [R121](./R121-kann-audit-followups.md) (`addSwapper` / `revokeSwapper`) and
+  [R123](./R123-kann-configuration.md) (`setFeeCollector` and seven other setters) after Kann #10 and
+  #12. The 2026-09-28 reasoning was gas only: owner cold-path code for a rare 5,000-gas Rootstock
+  `RESET`. A
   purchase-only handler getter would duplicate the shared view for a few gas inside an external call.
   Narrowing `Batch.routeIndex` does not shrink ABI calldata. Recorded under
   [R102 post-ship review](./R102-wrbtc-withdraw-seam.md#post-ship-review-2026-09-28) items 7–9.

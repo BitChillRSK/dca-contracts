@@ -73,7 +73,12 @@ interface IDcaManager {
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
-    /// @notice A schedule's stablecoin principal changed by a deposit, withdrawal, purchase, or interest top-up.
+    /**
+     * @notice A schedule's stablecoin principal changed by a deposit, withdrawal, purchase, interest
+     *         top-up, or lending-share withdrawal.
+     * @dev Creation and deletion do not emit it: `DcaScheduleCreated` carries the opening balance and
+     *      `DcaScheduleDeleted` retires the schedule.
+     */
     event DcaManager__TokenBalanceUpdated(address indexed token, uint64 indexed scheduleId, uint256 amount);
     /// @notice The caller replaced a schedule's periodic purchase amount.
     event DcaManager__PurchaseAmountUpdated(
@@ -115,8 +120,8 @@ interface IDcaManager {
         address indexed user, address indexed token, uint64 indexed scheduleId, uint256 interest
     );
     /**
-     * @notice A schedule was deleted. `refundedAmount` is what left the handler, which may be less than
-     *         the schedule's `tokenBalance` if the handler paid out less than it was asked for.
+     * @notice A schedule was deleted. `refundedAmount` is what left the handler, which can differ from
+     *         the schedule's `tokenBalance`: a lending payout reflects fees and share rounding.
      */
     event DcaManager__DcaScheduleDeleted(
         address indexed user, address indexed token, uint64 indexed scheduleId, uint256 refundedAmount
@@ -288,6 +293,7 @@ interface IDcaManager {
      * @dev A paused schedule keeps its funds on its route and stays open to deposits, amount and
      *      period edits, withdrawals, interest and rBTC claims, and deletion. Setting the state it
      *      already holds is a no-op and emits nothing, so every emitted event is a real transition.
+     *      During a protected purchase window both directions revert with `UserMutationsLocked`.
      *      A paused row in `batchBuyRbtc` reverts that handler's batch. The same row in
      *      `batchBuyRbtcAcrossHandlers` reverts every handler in the bundle.
      */
@@ -301,9 +307,8 @@ interface IDcaManager {
      *        a mismatch reverts.
      * @dev Clears the schedule and swap-pops its id out of the owner's list for that stablecoin, so the
      *      id is retired rather than reused: ids come from a strictly increasing counter. The deleted
-     *      event reports what left the handler, which may be less than `tokenBalance` if the handler
-     *      paid out less than it was asked for. Accumulated rBTC and lending interest are not claimed
-     *      here — withdraw those first.
+     *      event reports what left the handler, which can differ from `tokenBalance`. Accumulated rBTC
+     *      and lending interest are not claimed here — withdraw those first.
      */
     function deleteDcaSchedule(address token, uint64 scheduleId, uint256 scheduleIdIndex) external;
 
@@ -339,8 +344,8 @@ interface IDcaManager {
      *        the market's current rate. `getAccruedInterest` can quote less on a lazily-accruing market.
      * @dev Interest belongs to a user-token-route position, so the caller chooses which schedule on that
      *      route receives it. No tokens move; this raises the schedule's claim over funds already lent and
-     *      remains available while deposits are paused. The amount must be accrued and fund at least one
-     *      additional purchase, preventing dust top-ups.
+     *      remains available while deposits are paused. The amount must be accrued, and the new balance
+     *      must fund at least one more purchase than the old one.
      */
     function topUpFromInterest(address token, uint64 scheduleId, uint256 amount) external;
 
@@ -350,6 +355,8 @@ interface IDcaManager {
      * @param routeIndexes The route of each pair. Idle routes are skipped.
      * @dev The two arrays are positional pairs: `tokens[i]` is only withdrawn from `routeIndexes[i]`.
      *      The arrays must be the same length and non-empty; an unassigned or non-lending pair is skipped.
+     *      Each route index must fit `uint32`. One failing pair reverts the whole call; claim the other
+     *      pairs separately.
      */
     function withdrawAllAccumulatedInterest(address[] calldata tokens, uint256[] calldata routeIndexes) external;
 
@@ -374,8 +381,9 @@ interface IDcaManager {
      * @param routeIndexes The route of each pair.
      * @dev The two arrays are positional pairs: `tokens[i]` is only withdrawn from `routeIndexes[i]`.
      *      The arrays must be the same length and non-empty; an unassigned or zero-balance pair is skipped.
-     *      The caller must accept native rBTC with empty calldata. A rejected payment reverts every
-     *      claim in this call and preserves all accumulated credits.
+     *      Each route index must fit `uint32`. One failing pair, including a rejected payment, reverts
+     *      every claim in this call and preserves all accumulated credits. The caller must accept native
+     *      rBTC with empty calldata.
      */
     function withdrawAllAccumulatedRbtc(address[] calldata tokens, uint256[] calldata routeIndexes) external;
 
@@ -437,8 +445,9 @@ interface IDcaManager {
     /**
      * @notice Set the minimum purchase amount for a stablecoin.
      * @param token The stablecoin.
-     * @param minPurchaseAmount New minimum in that token's native units. Must be greater than zero;
-     *        there is no protocol-wide default.
+     * @param minPurchaseAmount New minimum in the token's base units: 25 tokens is `25e6` for a 6-decimal
+     *        token and `25e18` for an 18-decimal one. Must be greater than zero; there is no
+     *        protocol-wide default.
      * @dev Reverts with `DcaManager__TokenMinPurchaseAmountUnchanged` if it equals the current minimum.
      */
     function setTokenMinPurchaseAmount(address token, uint256 minPurchaseAmount) external;

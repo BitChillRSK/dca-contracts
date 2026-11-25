@@ -10,8 +10,8 @@ import {ICoinPairPrice} from "./ICoinPairPrice.sol";
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Uniswap V3 purchase configuration: encoded path, slippage band, and MoC BTC/USD oracle.
  * @dev Min-out assumes the handler's stablecoin is worth one USD and uses the MoC BTC/USD oracle;
- *      no stablecoin/USD feed enforces that peg. Governance owns this deployment precondition. Tokens
- *      above 18 decimals revert. A downward depeg can stop swaps at the oracle-implied floor. An upward
+ *      no stablecoin/USD feed enforces that peg. Governance owns this deployment precondition. The
+ *      stablecoin must implement `decimals()` and report at most 18, or construction reverts. A downward depeg can stop swaps at the oracle-implied floor. An upward
  *      depeg does not raise that floor; a quote-derived caller minimum must protect the premium.
  */
 interface IPurchaseUniswap {
@@ -134,8 +134,8 @@ interface IPurchaseUniswap {
     /**
      * @notice Set the lowest `amountOutMinimumPercent` the owner may configure.
      * @param amountOutMinimumSafetyCheck New bound, 1e18-scaled. Never enters swap math.
-     * @dev The floor percentage cannot be set below this bound, so lowering it further takes two
-     *      transactions, this bound first. Raising this bound above the active floor reverts without
+     * @dev The floor percentage cannot be set below this bound, so lowering it further takes two calls,
+     *      this bound first. One Safe transaction can batch them. Raising this bound above the active floor reverts without
      *      changing state. Reverts with `PurchaseUniswap__AmountOutMinimumSafetyCheckUnchanged` if it
      *      equals the current bound.
      */

@@ -2,6 +2,15 @@
 
 Status: **assigned** · Assigned: yes · Optional/further-review: no
 
+## Amendment — 2026-11-25
+
+[R125](./R125-kann-docs-and-consistency.md) restricts this spec's retry guidance (Kann #17, owner
+decision D3). The swapper must not reactivate a window automatically after a purchase fails for a venue
+reason (illiquidity, a paused reserve, a venue revert). An automated loop that reactivates on each such
+failure can keep the guarded user calls blocked indefinitely, since the contract guarantees no unlocked
+block between windows. Reactivation after expiry remains allowed for the hostile-edit case this spec
+was written for, and any automatic activation policy needs its own review. The contract is unchanged.
+
 ## Objective
 
 Give the swapper a narrowly bounded incident-response mechanism for a malicious schedule owner who

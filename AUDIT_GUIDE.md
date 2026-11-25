@@ -130,16 +130,18 @@ safety-check bound stops a single percentage change from widening the floor; it 
 `setMocOracle`, which replaces the price the floor is computed from in one transaction with no bound
 against the previous oracle.
 
-**Worst case for a leaked swapper key.** The key can reopen the protected window in the block the previous
-one ends, submit a zero caller minimum, and activate any allowlisted Dex path. While windows are
+**Worst case for a swapper key, leaked or run under a bad policy.** The key can reopen the protected
+window in the block the previous one ends, submit a zero caller minimum, and activate any allowlisted Dex path. While windows are
 chained, users cannot pause, edit, delete, withdraw stablecoin or interest, or withdraw lending shares. Each Dex schedule that
 comes due in that time can be filled down to the oracle floor (3% below the oracle at launch settings),
 once per period. MoC routes have no pool to move. Principal cannot leave to anyone but its owner, and
-`revokeSwapper` ends it. This is accepted without a mandatory gap between windows: a gap would give
-users a few open blocks they are unlikely to use before the Safe revokes the key, and a loose fill pays
-the key holder only if they also move the pool around the batch.
+`revokeSwapper` ends it. An honest bot that reactivates after every failed purchase chains windows
+the same way, so the operating policy forbids automatic reactivation after a venue failure
+([R66](./docs/relaunch/R66-batch-row-front-running.md)). This is accepted without a mandatory gap
+between windows: a gap would give users a few open blocks they are unlikely to use before the Safe
+revokes the key, and a loose fill pays the key holder only if they also move the pool around the batch.
 
-All nine ownable deployments are constructed under the broadcaster EOA, configured, and then propose
+All eight ownable deployments are constructed under the broadcaster EOA, configured, and then propose
 the Safe as pending owner. The Safe must accept each one. Until acceptance, the broadcaster remains
 owner; afterward, ownership is independent per contract and configuration can diverge unless operations
 apply the same decision everywhere it is meant to apply.
@@ -283,6 +285,14 @@ Other deliberate availability trade-offs:
   purchases, withdrawals or deposits. A lending market can refuse a deposit, for example when the
   deposit would exceed its supply cap or the reserve is frozen; the idle route for the same token stays
   open.
+- Borrowers can take a lending reserve's cash, including in the same block as a preflight read. That
+  stops lending purchases and cash exits on the route until cash returns, and no check before the call
+  can guarantee it succeeds. `withdrawLendingShares` and the idle route keep working.
+- The lending index is the venue's accounting rate, not proof that its claims are backed. A reserve
+  deficit does not lower it: a loss reaches users as failed redemptions or as lower measured cash.
+  Handlers compute no haircut of their own.
+- MoC refuses a DOC redemption whose transaction gas price exceeds its `maxGasPrice`. If Rootstock's
+  minimum gas price rises above that cap, no DOC purchase can execute. Exits do not use MoC.
 - If a stablecoin issuer removes an idle handler's cash, the handler cannot pay every schedule's
   principal. Idle handlers keep no per-route ledger, so purchases and withdrawals pay from the remaining
   cash in arrival order: the loss falls on the users who withdraw or are bought for last, including
@@ -296,6 +306,10 @@ Other deliberate availability trade-offs:
   is forfeited; larger remainders remain claimable. LayerBank's transfer sizing is in
   [`src/layerbank/README.md`](./src/layerbank/README.md). The share withdrawal is blocked during a
   protected window like every other withdrawal.
+- The Dex floor accepts any price the configured MoC BTC/USD feed reports as valid. The feed's validity
+  period (20 blocks when checked for the Kann response) is its only freshness bound: a valid price can
+  lag the market within it, which loosens the floor or reverts a fair swap. Handlers add no second age
+  check and do not compare the price with the pool.
 - Dex pricing assumes the input stablecoin is worth one USD; there is no stablecoin/USD oracle.
   A downward depeg can stop swaps at the configured BTC/USD-derived floor. An upward depeg does not
   raise that floor. A fair pool can pay the premium, but the floor does not require it; a tight

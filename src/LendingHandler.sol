@@ -148,21 +148,22 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
         uint256 stablecoinBefore = i_stablecoin.balanceOf(address(this));
         uint256 sharesBefore = _receiptSharesBalance();
         _protocolDeposit(depositAmount);
-        uint256 mintedAmount = _receiptSharesBalance() - sharesBefore;
-        if (mintedAmount == 0) revert LendingHandler__LendingProtocolDepositFailed();
+        uint256 mintedShares = _receiptSharesBalance() - sharesBefore;
+        if (mintedShares == 0) revert LendingHandler__LendingProtocolDepositFailed();
         uint256 stablecoinAfter = i_stablecoin.balanceOf(address(this));
         // `stablecoinBefore` includes the pulled deposit, so the subtraction cannot underflow.
         if (stablecoinAfter != stablecoinBefore - depositAmount) {
             revert LendingHandler__DepositConsumptionMismatch(depositAmount, stablecoinBefore, stablecoinAfter);
         }
         uint256 previousShares = s_shares[user];
-        _setUserShares(user, previousShares, previousShares + mintedAmount);
+        _setUserShares(user, previousShares, previousShares + mintedShares);
     }
 
     /**
-     * @dev Pays out what the redemption actually produced. Cash may be less than requested when
-     *      the complete share claim was consumed (fee / realized loss); a partial share burn reverts.
-     *      Shares worth nothing redeem nothing, and no zero transfer is made.
+     * @dev Pays out what the redemption actually produced. Share rounding can make that a base unit more
+     *      or less than requested, and a fee or realized loss can make it less once the complete share
+     *      claim is consumed; a partial share burn reverts. Shares worth nothing redeem nothing, and no
+     *      zero transfer is made.
      */
     function _withdrawToken(address user, uint256 withdrawalAmount) internal virtual override returns (uint256) {
         uint256 exchangeRate = _exchangeRate();
@@ -173,7 +174,7 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
             withdrawalAmount = totalStablecoinInLending;
         }
 
-        // Pay out what the redemption actually produced, which may be less than requested
+        // Pay out what the redemption actually produced
         withdrawalAmount = _redeemShares(user, userShares, withdrawalAmount, exchangeRate);
         if (withdrawalAmount == 0) return 0;
         return super._withdrawToken(user, withdrawalAmount);
@@ -212,7 +213,8 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
             // Per-user facts on this path are `UserSharesUpdated` (exact virtual debit) and, after
             // the protocol call, one measured `SharesRedeemedBatch`. Do not emit `SharesRedeemed`
             // here: that event's `underlyingAmount` is measured cash on single redeems, and the
-            // planned gross is not measured cash.
+            // planned gross is not measured cash. A clamped row has no event of its own: its nominal
+            // debit is in `TokenBalanceUpdated` and its funded spending in `RbtcBought.amountSpent`.
         }
         uint256 stablecoinReceived = _measuredProtocolRedeem(totalSharesToRedeem, exchangeRate);
         if (stablecoinReceived > 0) {
@@ -364,7 +366,10 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
      *      succeeds; positive cash with a partial burn reverts. Compare before/after without
      *      subtracting when the balance did not decrease, so a flat or rising balance cannot panic.
      */
-    function _measuredProtocolRedeem(uint256 sharesAmount, uint256 exchangeRate) private returns (uint256 received) {
+    function _measuredProtocolRedeem(uint256 sharesAmount, uint256 exchangeRate)
+        private
+        returns (uint256 stablecoinReceived)
+    {
         uint256 sharesBefore = _receiptSharesBalance();
         uint256 stablecoinBalanceBefore = i_stablecoin.balanceOf(address(this));
         _protocolRedeem(sharesAmount, exchangeRate);
@@ -372,6 +377,6 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
         if (sharesAfter >= sharesBefore || sharesBefore - sharesAfter != sharesAmount) {
             revert LendingHandler__ShareConsumptionMismatch(sharesAmount, sharesBefore, sharesAfter);
         }
-        received = i_stablecoin.balanceOf(address(this)) - stablecoinBalanceBefore;
+        stablecoinReceived = i_stablecoin.balanceOf(address(this)) - stablecoinBalanceBefore;
     }
 }

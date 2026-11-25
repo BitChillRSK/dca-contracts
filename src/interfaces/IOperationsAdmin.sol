@@ -110,8 +110,8 @@ interface IOperationsAdmin {
      * @param token The stablecoin whose deposits are being paused.
      * @param routeIndex The route index whose deposits are being paused. Must fit `uint32`.
      * @param paused True to block new deposits, false to allow them again.
-     * @dev Checked only before schedule creation and deposit move cash. Purchases, edits, deletion,
-     *      and every withdrawal remain available. The pair must be assigned and the flag must change;
+     * @dev Checked only before schedule creation and deposit move cash. The pause does not block
+     *      purchases, edits, deletion or withdrawals; a protected window or the venue can. The pair must be assigned and the flag must change;
      *      each pair is updated separately.
      */
     function setDepositsPaused(address token, uint256 routeIndex, bool paused) external;
