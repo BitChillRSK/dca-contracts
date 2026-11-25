@@ -35,8 +35,8 @@ contract UnchangedConfigurationTest is DcaDappTest {
         assertEq(dcaManager.getMinPurchasePeriod(), current + 1 days);
     }
 
-    /// @dev Validation precedes the comparison: a period that is not whole days is refused as such.
-    function testSetMinPurchasePeriodValidatesBeforeComparing() external {
+    /// @dev A period that is not whole days still gets its validation error.
+    function testSetMinPurchasePeriodStillRejectsPartialDays() external {
         uint256 notWholeDays = dcaManager.getMinPurchasePeriod() + 1;
         vm.expectRevert(IDcaManager.DcaManager__PurchasePeriodMustBeWholeDays.selector);
         vm.prank(OWNER);
@@ -101,7 +101,8 @@ contract UnchangedConfigurationTest is DcaDappTest {
         assertEq(fees.getFeeCollector(), next);
     }
 
-    function testSetFeeCollectorRejectsZeroBeforeComparing() external {
+    /// @dev A zero collector still gets its validation error.
+    function testSetFeeCollectorStillRejectsZero() external {
         vm.expectRevert(IPurchaseFees.PurchaseFees__InvalidFeeCollector.selector);
         vm.prank(OWNER);
         IPurchaseFees(address(stablecoinHandler)).setFeeCollector(address(0));

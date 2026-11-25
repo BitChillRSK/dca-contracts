@@ -2,7 +2,7 @@
 
 Status: **assigned** · Assigned: yes · Optional/further-review: no
 
-Base: stacked on [R122](./R122-kann-lending-withdrawals.md) / [#199](https://github.com/BitChillRSK/dca-contracts/pull/199) while it is open; `main` once it merges.
+Base: `main`, after merged R122 / [#199](https://github.com/BitChillRSK/dca-contracts/pull/199).
 
 ## Objective
 

@@ -1578,7 +1578,7 @@ These later PRs require their own specs and are not assigned by R122.
 
 ### R123 - Kann configuration follow-ups ([spec](./R123-kann-configuration.md))
 
-After R122 (stacked while #199 is open). Second of the four Kann follow-up PRs. The eight named
+After R122. Second of the four Kann follow-up PRs. The eight named
 setters reject an unchanged value (#12), the three configuration constructors emit their initial
 events (#23), and `DcaManagerAccessControl` rejects a zero manager (#20 item 5). Ask: none.
 
