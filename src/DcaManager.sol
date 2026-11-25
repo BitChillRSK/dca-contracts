@@ -248,7 +248,6 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
             amountWithdrawn = _handler(token, routeIndex).withdrawToken(msg.sender, tokenBalance);
         }
 
-        // The event reports what left the handler, which can differ from the schedule's tokenBalance.
         emit DcaManager__DcaScheduleDeleted(msg.sender, token, scheduleId, amountWithdrawn);
     }
 
@@ -392,10 +391,10 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
 
     /// @inheritdoc IDcaManager
     function batchBuyRbtcAcrossHandlers(Batch[] calldata batches) external override nonReentrant onlySwapper {
-        uint256 numBatches = batches.length;
-        if (numBatches == 0) revert DcaManager__EmptyHandlerBatches();
+        uint256 batchCount = batches.length;
+        if (batchCount == 0) revert DcaManager__EmptyHandlerBatches();
 
-        for (uint256 i; i < numBatches; ++i) {
+        for (uint256 i; i < batchCount; ++i) {
             _batchBuyRbtc(batches[i]);
         }
     }

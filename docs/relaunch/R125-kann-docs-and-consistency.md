@@ -61,6 +61,9 @@ Findings, listed before editing as the owner asked:
 | S5 | Comparison direction | No change. Reverts compare requested > available and clamps available < requested, as the owner decided under #19. R122 aligned both clamps |
 | S6 | The exact-consumption checks use `after > before` (stablecoin) and `after >= before` (shares) | No change. They differ only for a zero amount, and there only the shares check must refuse |
 | S7 | Error names that a selector change would fix: the zero-address errors are spelled four ways (`InvalidFeeCollector`, `InvalidOracleAddress`, `SwapperIsZeroAddress`, `ZeroDcaManager`); `PurchaseRbtc__rBtcWithdrawalFailed` and `PurchaseRbtc__rBtcWithdrawn` use `rBtc` where everything else uses `Rbtc`; `InexistentSchedule` | No change. A rename changes the error or event ABI for every consumer at the audit freeze, against the sweep's no-behavior-change rule |
+| S8 | `DcaManager.batchBuyRbtcAcrossHandlers` names its loop bound `numBatches`; every other loop bound is `*Count` | Rename to `batchCount` |
+| S9 | `LendingHandler._measuredProtocolRedeem` names its pre-balance `stablecoinBalanceBefore`; `_depositToken` names the same measurement `stablecoinBefore` | Rename to `stablecoinBefore` |
+| S10 | `PurchaseUniswap._encodePurchasePath` writes `uint256 i = 0`; every other loop leaves the zero implicit | No change. Dropping the zero changes the default-profile bytecode, and so would caching `intermediateTokens.length`, against the sweep's no-behavior-change rule |
 
 ### Reviewer documents
 
@@ -80,12 +83,12 @@ Findings, listed before editing as the owner asked:
 - #18 I-06: runbook precondition 9. The collector must be able to call `DcaManager` and accept native rBTC with empty calldata. A receive-only contract cannot claim.
 - #18 I-11: `AUDIT_GUIDE.md`. The lending index is the venue's accounting rate, not proof of backing. A reserve deficit does not lower it, so a loss would surface as failed redemptions or lower measured cash.
 - #18 I-12: the runbook has a per-token table of encoded minimums and fee bounds. Verify them before any Safe transaction.
-- #26: `AUDIT_GUIDE.md` external assumptions. The Dex floor accepts any price the configured feed reports as valid. Its validity period, 20 blocks at the time of the response, is the only freshness bound. The runbook records the feed wiring and that period at release.
+- #26: `AUDIT_GUIDE.md` external assumptions. The Dex floor accepts any price the configured feed reports as valid. Its validity period is the only freshness bound. The runbook records the feed wiring and that period at release.
 
 ### Test fix
 
-- `RbtcPurchaseTest.testDepleteHandlerBalance*` asserts exactly zero accrued interest right after deposits. On live LayerBank, half-up rounding can value fresh shares 1 base unit above principal, so the fork lane fails at some blocks.
-  - Allow at most one base unit there.
+- `RbtcPurchaseTest.testDepleteHandlerBalance*` asserts exactly zero accrued interest right after deposits. On live LayerBank, half-up mint rounding adds up to half a share per deposit, so a user's summed shares can be worth a base unit or two above principal, and the fork lane fails at some blocks.
+  - Allow at most one base unit per deposit there: `SCHEDULES_PER_USER` per user.
   - Every other assertion in those tests stays.
 
 ## Out of scope
@@ -104,7 +107,7 @@ Findings, listed before editing as the owner asked:
 ## Required tests
 
 - Metadata-stripped runtime and creation code compared with the base for every deployable contract, on both profiles.
-  - Identical everywhere except `IdleHandlerDex` and `LayerBankHandlerDex`, where only S1 may move it.
+  - Identical everywhere except the four Dex leaves (`IdleHandlerDex`, `LayerBankHandlerDex`, and the legacy Sovryn and Tropykus Dex handlers), where only S1 may move it.
   - Prove that by rebuilding the head with S1 reverted.
 - `make check`, `make check-deploy` and `make fork-layerbank`, with the three deplete tests passing at a block where they failed before.
 
@@ -125,6 +128,6 @@ Findings, listed before editing as the owner asked:
 ## ABI / deploy / cutover impact
 
 - ABI: none.
-- Bytecode: S1 changes the two Dex leaves' runtime. Everything else changes only the metadata hash.
+- Bytecode: S1 changes the four Dex leaves' runtime. Everything else changes only the metadata hash.
 - Scripts: none.
 - Consumers: front-end (#25) and docs (event model), as above.

@@ -121,7 +121,8 @@ interface IDcaManager {
     );
     /**
      * @notice A schedule was deleted. `refundedAmount` is what left the handler, which can differ from
-     *         the schedule's `tokenBalance`: a lending payout reflects fees and share rounding.
+     *         the schedule's `tokenBalance`: a lending payout reflects fees, realized losses and share
+     *         rounding.
      */
     event DcaManager__DcaScheduleDeleted(
         address indexed user, address indexed token, uint64 indexed scheduleId, uint256 refundedAmount
@@ -306,9 +307,8 @@ interface IDcaManager {
      * @param scheduleIdIndex The id's current index in the caller's list returned by getDcaSchedules;
      *        a mismatch reverts.
      * @dev Clears the schedule and swap-pops its id out of the owner's list for that stablecoin, so the
-     *      id is retired rather than reused: ids come from a strictly increasing counter. The deleted
-     *      event reports what left the handler, which can differ from `tokenBalance`. Accumulated rBTC
-     *      and lending interest are not claimed here — withdraw those first.
+     *      id is retired rather than reused: ids come from a strictly increasing counter. Accumulated
+     *      rBTC and lending interest are not claimed here — withdraw those first.
      */
     function deleteDcaSchedule(address token, uint64 scheduleId, uint256 scheduleIdIndex) external;
 

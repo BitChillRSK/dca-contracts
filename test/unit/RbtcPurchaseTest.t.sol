@@ -587,13 +587,13 @@ contract RbtcPurchaseTest is DcaDappTest {
         // Each schedule can execute AMOUNT_TO_DEPOSIT / AMOUNT_TO_SPEND purchases before running out of balance
         uint256 purchasesPerSchedule = AMOUNT_TO_DEPOSIT / AMOUNT_TO_SPEND;
 
-        // Store initial interest accrued (should be 0 initially)
+        // Store initial interest accrued
         uint256 initialInterestUser = dcaManager.getAccruedInterest(USER, address(stablecoin), s_routeIndex);
         uint256 initialInterestSecondUser =
             dcaManager.getAccruedInterest(SECOND_USER, address(stablecoin), s_routeIndex);
 
-        // No interest yet beyond mint rounding: a live half-up mint can value each deposit's shares up to
-        // one base unit above its principal.
+        // No interest yet beyond mint rounding. Each half-up mint can add up to half a share, so a user's
+        // summed shares can be worth a base unit or two more than their deposits; one per deposit is loose.
         assertLe(initialInterestUser, SCHEDULES_PER_USER, "USER has interest beyond mint rounding");
         assertLe(initialInterestSecondUser, SCHEDULES_PER_USER, "SECOND_USER has interest beyond mint rounding");
 
@@ -690,13 +690,13 @@ contract RbtcPurchaseTest is DcaDappTest {
         // Each schedule can execute AMOUNT_TO_DEPOSIT / AMOUNT_TO_SPEND purchases before running out of balance
         uint256 purchasesPerSchedule = AMOUNT_TO_DEPOSIT / AMOUNT_TO_SPEND;
 
-        // Store initial interest accrued (should be 0 initially)
+        // Store initial interest accrued
         uint256 initialInterestUser = dcaManager.getAccruedInterest(USER, address(stablecoin), s_routeIndex);
         uint256 initialInterestSecondUser =
             dcaManager.getAccruedInterest(SECOND_USER, address(stablecoin), s_routeIndex);
 
-        // No interest yet beyond mint rounding: a live half-up mint can value each deposit's shares up to
-        // one base unit above its principal.
+        // No interest yet beyond mint rounding. Each half-up mint can add up to half a share, so a user's
+        // summed shares can be worth a base unit or two more than their deposits; one per deposit is loose.
         assertLe(initialInterestUser, SCHEDULES_PER_USER, "USER has interest beyond mint rounding");
         assertLe(initialInterestSecondUser, SCHEDULES_PER_USER, "SECOND_USER has interest beyond mint rounding");
 
@@ -793,13 +793,13 @@ contract RbtcPurchaseTest is DcaDappTest {
         // Each schedule can execute AMOUNT_TO_DEPOSIT / AMOUNT_TO_SPEND purchases before running out of balance
         uint256 purchasesPerSchedule = AMOUNT_TO_DEPOSIT / AMOUNT_TO_SPEND;
 
-        // Store initial interest accrued (should be 0 initially)
+        // Store initial interest accrued
         uint256 initialInterestUser = dcaManager.getAccruedInterest(USER, address(stablecoin), s_routeIndex);
         uint256 initialInterestSecondUser =
             dcaManager.getAccruedInterest(SECOND_USER, address(stablecoin), s_routeIndex);
 
-        // No interest yet beyond mint rounding: a live half-up mint can value each deposit's shares up to
-        // one base unit above its principal.
+        // No interest yet beyond mint rounding. Each half-up mint can add up to half a share, so a user's
+        // summed shares can be worth a base unit or two more than their deposits; one per deposit is loose.
         assertLe(initialInterestUser, SCHEDULES_PER_USER, "USER has interest beyond mint rounding");
         assertLe(initialInterestSecondUser, SCHEDULES_PER_USER, "SECOND_USER has interest beyond mint rounding");
 
