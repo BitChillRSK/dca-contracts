@@ -113,8 +113,9 @@ interface IOperationsAdmin {
      * @dev A circuit breaker for one `(token, routeIndex)` pair, not a protocol pause. Checked only
      *      before schedule creation and deposit move cash; every other pair is untouched. The pause does not block
      *      purchases, edits, deletion or withdrawals. A protected window can block edits, deletion and
-     *      withdrawals, and the venue can block purchases and exits. The pair must be assigned and the
-     *      flag must change; each pair is updated separately.
+     *      withdrawals. The swap venue (MoC or Uniswap) can block purchases, and on a lending route the
+     *      lending venue can block purchases and exits. The pair must be assigned and the flag must
+     *      change; each pair is updated separately.
      */
     function setDepositsPaused(address token, uint256 routeIndex, bool paused) external;
 
