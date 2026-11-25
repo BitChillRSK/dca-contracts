@@ -224,7 +224,6 @@ contract EventIndexingTest is DcaDappTest {
         if (sig == keccak256("PurchaseFees__FeeCredited(address,uint256,uint256)")) return (true, 1);
         if (sig == keccak256("PurchaseUniswap__NewPathSet(address[],uint24[],bytes)")) return (true, 0);
         if (sig == keccak256("PurchaseUniswap__AmountOutMinimumPercentUpdated(uint256,uint256)")) return (true, 0);
-        if (sig == keccak256("PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(uint256,uint256)")) return (true, 0);
         if (sig == keccak256("PurchaseUniswap__OracleUpdated(address,address)")) return (true, 2);
         if (sig == OWNERSHIP_TRANSFERRED) return (true, 2);
         if (sig == OWNERSHIP_TRANSFER_STARTED) return (true, 2);

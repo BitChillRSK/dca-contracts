@@ -1600,6 +1600,13 @@ After R124. Last of the four Kann follow-up PRs: the documentation half of the r
 the spec. No ABI change; only the Dex setters' store-then-emit reorder changes runtime bytecode.
 Ask: none.
 
+### R126 - Fixed lower bound on the Dex oracle floor ([spec](./R126-dex-floor-cap.md))
+
+After R125 (owner request, 2026-11-25). The owner can still move the Dex oracle floor, but never
+below the constant `MIN_AMOUNT_OUT_MINIMUM_PERCENT` (95%), like the 5% fee cap. The owner-settable
+safety check, its setter, getter, event, two errors and constructor argument are removed. ABI and
+constructor change on the Dex leaves. Ask: none.
+
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:

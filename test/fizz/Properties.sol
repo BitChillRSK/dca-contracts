@@ -367,7 +367,8 @@ abstract contract Properties is PropertiesAsserts, Snapshots {
         for (uint256 i; i < dexHandlers.length; i++) {
             IPurchaseUniswap u = IPurchaseUniswap(dexHandlers[i]);
             uint256 percent = u.getAmountOutMinimumPercent();
-            lte(u.getAmountOutMinimumSafetyCheck(), percent, "GL-23: safety check above the floor percent");
+            lte(MIN_AMOUNT_OUT_MINIMUM_PERCENT, percent, "GL-23: floor percent below the fixed bound");
+            eq(u.MIN_AMOUNT_OUT_MINIMUM_PERCENT(), MIN_AMOUNT_OUT_MINIMUM_PERCENT, "GL-23: fixed bound moved");
             lte(percent, 1e18, "GL-23: floor percent above 100%");
             t(address(u.getMocOracle()) != address(0), "GL-23: zero MoC oracle");
         }
@@ -694,9 +695,9 @@ abstract contract Properties is PropertiesAsserts, Snapshots {
         catch {
             t(false, "GL-28: getAmountOutMinimumPercent reverted");
         }
-        try u.getAmountOutMinimumSafetyCheck() {}
+        try u.MIN_AMOUNT_OUT_MINIMUM_PERCENT() {}
         catch {
-            t(false, "GL-28: getAmountOutMinimumSafetyCheck reverted");
+            t(false, "GL-28: MIN_AMOUNT_OUT_MINIMUM_PERCENT reverted");
         }
     }
 

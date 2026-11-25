@@ -22,7 +22,6 @@ contract LayerBankHandlerDex is LayerBankHandler, PurchaseUniswap {
      * @param feeCollector Address that receives purchase fees.
      * @param feeSettings Purchase fee parameters.
      * @param amountOutMinimumPercent Swap-time oracle floor, 1e18-scaled.
-     * @param amountOutMinimumSafetyCheck Lowest floor the owner may configure, 1e18-scaled.
      * @param initialOwner Address that owns fee/oracle configuration immediately after deploy.
      */
     constructor(
@@ -33,7 +32,6 @@ contract LayerBankHandlerDex is LayerBankHandler, PurchaseUniswap {
         address feeCollector,
         FeeSettings memory feeSettings,
         uint256 amountOutMinimumPercent,
-        uint256 amountOutMinimumSafetyCheck,
         address initialOwner
     )
         LayerBankHandler(dcaManager, stablecoin, aToken)
@@ -41,7 +39,6 @@ contract LayerBankHandlerDex is LayerBankHandler, PurchaseUniswap {
             uniswapSettings,
             FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}),
             amountOutMinimumPercent,
-            amountOutMinimumSafetyCheck,
             initialOwner
         )
     {}

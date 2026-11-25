@@ -486,7 +486,6 @@ contract NethermindDepegAuditTest is Test {
             token,
             IPurchaseFees.FeeSettings({minFeeRate: 0, maxFeeRate: 0, feePurchaseLowerBound: 250 ether}),
             settings,
-            95e16,
             95e16
         );
         uint256 bound = harness.getAmountOutMinimum(100 ether);

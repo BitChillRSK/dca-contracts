@@ -239,10 +239,8 @@ contract GettersTest is DcaDappTest {
                 return;
             }
 
-            try IPurchaseUniswap(address(stablecoinHandler)).getAmountOutMinimumSafetyCheck() returns (
-                uint256 safetyCheck
-            ) {
-                assertEq(safetyCheck, DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK);
+            try IPurchaseUniswap(address(stablecoinHandler)).MIN_AMOUNT_OUT_MINIMUM_PERCENT() returns (uint256 bound) {
+                assertEq(bound, 0.95 ether);
             } catch {
                 return;
             }

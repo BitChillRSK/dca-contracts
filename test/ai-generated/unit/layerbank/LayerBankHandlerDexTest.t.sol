@@ -55,7 +55,6 @@ contract LayerBankHandlerDexTest is HandlerTestHarness {
             FEE_COLLECTOR,
             feeSettings,
             DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
-            DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
             OWNER
         );
 

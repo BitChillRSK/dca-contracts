@@ -884,7 +884,7 @@ abstract contract AdversarialHandler is DcaManagerHandler {
                 err = e;
             }
         } else if (which == 4) {
-            try IPurchaseUniswap(dex).setAmountOutMinimumSafetyCheck(0) {
+            try IPurchaseUniswap(dex).setAmountOutMinimumPercent(0) {
                 ok = true;
             } catch (bytes memory e) {
                 err = e;

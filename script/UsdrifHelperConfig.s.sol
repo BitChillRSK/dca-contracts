@@ -23,7 +23,6 @@ contract UsdrifHelperConfig is Script {
         address operationsAdmin;
         address dcaManager;
         uint256 amountOutMinimumPercent;
-        uint256 amountOutMinimumSafetyCheck;
     }
 
     NetworkConfig internal activeNetworkConfig;
@@ -62,8 +61,7 @@ contract UsdrifHelperConfig is Script {
             mocOracle: 0xe2927A0620b82A66D67F678FC9b826B0E01B1bFD, // MoC Oracle on mainnet
             operationsAdmin: 0x07623b4bfA188687B683CbF242C12A7d4bD7D355, // OperationsAdmin
             dcaManager: 0x6287F0Ef7dcb288603B484d666785c59f7F6aa70, // DcaManager
-            amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
-            amountOutMinimumSafetyCheck: DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK
+            amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT
         });
     }
 
@@ -87,8 +85,7 @@ contract UsdrifHelperConfig is Script {
             mocOracle: 0x0000000000000000000000000000000000000000, // Replace with MoC Oracle on testnet
             operationsAdmin: 0x0000000000000000000000000000000000000000, // Placeholder for OperationsAdmin
             dcaManager: 0x0000000000000000000000000000000000000000, // Placeholder for DcaManager
-            amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
-            amountOutMinimumSafetyCheck: DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK
+            amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT
         });
     }
 
@@ -167,8 +164,7 @@ contract UsdrifHelperConfig is Script {
             mocOracle: address(mockMocOracle),
             operationsAdmin: operationsAdmin,
             dcaManager: dcaManager,
-            amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
-            amountOutMinimumSafetyCheck: DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK
+            amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT
         });
 
         // Save the config

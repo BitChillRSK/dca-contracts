@@ -67,7 +67,8 @@ abstract contract Base is StringUtils, Clamp, Deployer, Math {
     uint16 internal constant MAX_FEE_RATE = 100;
     uint112 internal constant FEE_PURCHASE_LOWER_BOUND = 250 ether;
     uint256 internal constant AMOUNT_OUT_MINIMUM_PERCENT = 0.97 ether;
-    uint256 internal constant AMOUNT_OUT_MINIMUM_SAFETY_CHECK = 0.95 ether;
+    /// @dev `PurchaseUniswap.MIN_AMOUNT_OUT_MINIMUM_PERCENT`, the fixed lower bound on the floor.
+    uint256 internal constant MIN_AMOUNT_OUT_MINIMUM_PERCENT = 0.95 ether;
     uint256 internal constant BTC_PRICE_USD = 50_000; // MockMocProxy and MockSwapRouter02 both price at this
     uint24 internal constant DEFAULT_POOL_FEE = 3000;
     uint24 internal constant ALT_POOL_FEE = 500;
@@ -359,7 +360,6 @@ abstract contract Base is StringUtils, Clamp, Deployer, Math {
             feeCollector,
             feeSettings,
             AMOUNT_OUT_MINIMUM_PERCENT,
-            AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
             admin
         );
         layerBankUsdrifDex = new LayerBankHandlerDex(
@@ -370,7 +370,6 @@ abstract contract Base is StringUtils, Clamp, Deployer, Math {
             feeCollector,
             feeSettings,
             AMOUNT_OUT_MINIMUM_PERCENT,
-            AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
             admin
         );
         dexHandlers.push(address(idleUsdrifDex));

@@ -40,7 +40,6 @@ contract DeployUsdrifHandler is DeployBase {
         address feeCollector;
         IPurchaseFees.FeeSettings feeSettings;
         uint256 amountOutMinimumPercent;
-        uint256 amountOutMinimumSafetyCheck;
         address initialOwner;
     }
 
@@ -54,7 +53,6 @@ contract DeployUsdrifHandler is DeployBase {
                 params.feeCollector,
                 params.feeSettings,
                 params.amountOutMinimumPercent,
-                params.amountOutMinimumSafetyCheck,
                 params.initialOwner
             )
         );
@@ -116,7 +114,6 @@ contract DeployUsdrifHandler is DeployBase {
             feeCollector: getFeeCollector(environment),
             feeSettings: feeSettingsForToken(isUsdt0Live),
             amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
-            amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck,
             initialOwner: operationsAdmin.owner()
         });
 

@@ -53,7 +53,6 @@ contract DeployMocAndUniswap is DeployBase {
         IPurchaseUniswap.UniswapSettings uniswapSettings;
         address feeCollector;
         uint256 amountOutMinimumPercent;
-        uint256 amountOutMinimumSafetyCheck;
     }
 
     string stablecoinType;
@@ -183,8 +182,7 @@ contract DeployMocAndUniswap is DeployBase {
             shareToken: shareToken,
             uniswapSettings: uniswapSettings,
             feeCollector: feeCollector,
-            amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
-            amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
+            amountOutMinimumPercent: networkConfig.amountOutMinimumPercent
         });
 
         // Deploy Uniswap handler
@@ -197,8 +195,7 @@ contract DeployMocAndUniswap is DeployBase {
                 shareToken: params.shareToken,
                 uniswapSettings: params.uniswapSettings,
                 feeCollector: params.feeCollector,
-                amountOutMinimumPercent: params.amountOutMinimumPercent,
-                amountOutMinimumSafetyCheck: params.amountOutMinimumSafetyCheck
+                amountOutMinimumPercent: params.amountOutMinimumPercent
             })
         );
         console.log("Uniswap handler deployed at:", handlerUni);

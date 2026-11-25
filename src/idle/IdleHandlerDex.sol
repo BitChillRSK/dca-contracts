@@ -21,7 +21,6 @@ contract IdleHandlerDex is IdleHandler, PurchaseUniswap {
      * @param feeCollector Address that receives purchase fees.
      * @param feeSettings Purchase fee parameters.
      * @param amountOutMinimumPercent Swap-time oracle floor, 1e18-scaled.
-     * @param amountOutMinimumSafetyCheck Lowest floor the owner may configure, 1e18-scaled.
      * @param initialOwner Address that owns fee/oracle configuration immediately after deploy.
      */
     constructor(
@@ -31,7 +30,6 @@ contract IdleHandlerDex is IdleHandler, PurchaseUniswap {
         address feeCollector,
         FeeSettings memory feeSettings,
         uint256 amountOutMinimumPercent,
-        uint256 amountOutMinimumSafetyCheck,
         address initialOwner
     )
         IdleHandler(dcaManager, stablecoin)
@@ -39,7 +37,6 @@ contract IdleHandlerDex is IdleHandler, PurchaseUniswap {
             uniswapSettings,
             FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}),
             amountOutMinimumPercent,
-            amountOutMinimumSafetyCheck,
             initialOwner
         )
     {}

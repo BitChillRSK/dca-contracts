@@ -28,7 +28,6 @@ contract DeployDexSwaps is DeployBase {
         IPurchaseUniswap.UniswapSettings uniswapSettings;
         address feeCollector;
         uint256 amountOutMinimumPercent;
-        uint256 amountOutMinimumSafetyCheck;
     }
 
     function _isUsdt0(string memory stablecoinType) internal pure returns (bool) {
@@ -61,7 +60,6 @@ contract DeployDexSwaps is DeployBase {
                     params.feeCollector,
                     feeSettings,
                     params.amountOutMinimumPercent,
-                    params.amountOutMinimumSafetyCheck,
                     _initialOwner()
                 )
             );
@@ -76,7 +74,6 @@ contract DeployDexSwaps is DeployBase {
                     params.feeCollector,
                     feeSettings,
                     params.amountOutMinimumPercent,
-                    params.amountOutMinimumSafetyCheck,
                     _initialOwner()
                 )
             );
@@ -91,7 +88,6 @@ contract DeployDexSwaps is DeployBase {
                     params.feeCollector,
                     feeSettings,
                     params.amountOutMinimumPercent,
-                    params.amountOutMinimumSafetyCheck,
                     _initialOwner()
                 )
             );
@@ -106,7 +102,6 @@ contract DeployDexSwaps is DeployBase {
                     params.feeCollector,
                     feeSettings,
                     params.amountOutMinimumPercent,
-                    params.amountOutMinimumSafetyCheck,
                     _initialOwner()
                 )
             );
@@ -152,8 +147,7 @@ contract DeployDexSwaps is DeployBase {
                 shareToken: address(0),
                 uniswapSettings: uniswapSettings,
                 feeCollector: feeCollector,
-                amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
-                amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
+                amountOutMinimumPercent: networkConfig.amountOutMinimumPercent
             })
         );
         console.log("Idle dex handler deployed at:", idleHandler);
@@ -178,8 +172,7 @@ contract DeployDexSwaps is DeployBase {
                     shareToken: layerbankAToken,
                     uniswapSettings: uniswapSettings,
                     feeCollector: feeCollector,
-                    amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
-                    amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
+                    amountOutMinimumPercent: networkConfig.amountOutMinimumPercent
                 })
             );
             console.log("LayerBank dex handler deployed at:", layerbankHandler);
@@ -250,8 +243,7 @@ contract DeployDexSwaps is DeployBase {
                 shareToken: shareToken,
                 uniswapSettings: uniswapSettings,
                 feeCollector: feeCollector,
-                amountOutMinimumPercent: networkConfig.amountOutMinimumPercent,
-                amountOutMinimumSafetyCheck: networkConfig.amountOutMinimumSafetyCheck
+                amountOutMinimumPercent: networkConfig.amountOutMinimumPercent
             });
 
             docHandlerDex = deployDocHandlerDex(params);
