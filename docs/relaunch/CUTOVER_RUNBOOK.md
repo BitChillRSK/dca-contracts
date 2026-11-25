@@ -40,11 +40,12 @@ Human operator only. Agents must not `--broadcast`.
 9. Safe (`MAINNET_OWNER`) and fee collector (`MAINNET_FEE_COLLECTOR`) match `script/Constants.sol`.
    The collector must be able to call `DcaManager` and accept native rBTC with empty calldata. An
    EOA or a correctly configured Safe can; a receive-only contract cannot claim. Each purchase
-   **credits** its accumulated rBTC on that handler; it withdraws through `DcaManager.withdrawAllAccumulatedRbtc`, one `(token, routeIndex)`
-   pair per live handler (Dex unwraps WRBTC then pays native). A wallet that cannot receive native
-   rBTC does not revert purchases; it cannot claim until it can receive, and `setFeeCollector` does
-   not migrate already-credited balances. Sweep every live handler after deploy, then confirm
-   each pair's accumulated balance is zero.
+   **credits** its accumulated rBTC on that handler; it withdraws through
+   `DcaManager.withdrawAllAccumulatedRbtc`, one `(token, routeIndex)` pair per live handler (Dex
+   unwraps WRBTC then pays native). A wallet that cannot receive native rBTC does not revert
+   purchases; it cannot claim until it can receive, and `setFeeCollector` does not migrate
+   already-credited balances. Sweep every live handler after deploy, then confirm each pair's
+   accumulated balance is zero.
 
 ## Deploy
 

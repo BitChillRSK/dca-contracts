@@ -133,13 +133,15 @@ against the previous oracle.
 **Worst case for a swapper key, leaked or run under a bad policy.** The key can reopen the protected
 window in the block the previous one ends, submit a zero caller minimum, and activate any allowlisted
 Dex path. While windows are chained, users cannot pause or unpause, edit, delete, withdraw stablecoin
-or interest, or withdraw lending shares. Each Dex schedule that comes due in that time can be filled down to the oracle floor (3% below the oracle at launch settings),
-once per period. MoC routes have no pool to move. Principal cannot leave to anyone but its owner, and
-`revokeSwapper` ends it. An honest bot that reactivates after every failed purchase chains windows
-the same way, so the operating policy forbids automatic reactivation after a venue failure
+or interest, or withdraw lending shares. Each Dex schedule that comes due in that time can be filled
+down to the oracle floor (3% below the oracle at launch settings), once per period. MoC routes have no
+pool to move. Principal cannot leave to anyone but its owner, and `revokeSwapper` ends it. An honest
+bot that reactivates after every failed purchase chains windows the same way, so the operating policy
+forbids automatic reactivation after a venue failure
 ([R66](./docs/relaunch/R66-batch-row-front-running.md)). This is accepted without a mandatory gap
 between windows: a gap would give users a few open blocks they are unlikely to use before the Safe
-revokes the key, and a loose fill pays the key holder only if they also move the pool around the batch.
+revokes the key, and a loose fill pays the key holder only if they also move the pool around the
+batch.
 
 All eight ownable deployments are constructed under the broadcaster EOA, configured, and then propose
 the Safe as pending owner. The Safe must accept each one. Until acceptance, the broadcaster remains
