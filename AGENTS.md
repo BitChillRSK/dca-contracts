@@ -163,6 +163,12 @@ future venue would share must not name a specific lending protocol or its receip
 an example. State the generic rule; the venue's own handler, interface or `README.md` gives the
 instance.
 
+Swap venues follow the same rule. `OperationsAdmin`, `DcaManager`, `IDcaManager`, `IOperationsAdmin` and
+every other file that serves all routes must not name a specific swap venue (MoC, Uniswap, or any DEX
+a later handler may use), not even as an example. Say "the route's swap venue", or "its venue".
+The venue's own handler, interface or `README.md` names it. A contract that is specific to a venue
+(`PurchaseMoc`, `PurchaseUniswap`) may name it.
+
 **Say what is enforced, and what is only assumed.** A header that states an operational policy the
 contract does not check — a listing rule, a delisting process — reads as a safety mechanism and is not
 one. Name it as a precondition and say who owns it.
