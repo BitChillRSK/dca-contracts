@@ -15,8 +15,7 @@ import {IPurchaseRbtc} from "./interfaces/IPurchaseRbtc.sol";
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Stores every DCA schedule and routes user and swapper calls to the handler that holds the
  *         funds they name.
- * @dev Every external schedule mutator is non-reentrant except the allowlisted-swapper purchase paths,
- *      which complete schedule effects before calling BitChill-deployed handlers. A swapper can open a
+ * @dev Every external schedule mutator, purchases included, is non-reentrant. A swapper can open a
  *      self-expiring five-block window that blocks only user mutations capable of invalidating a batch
  *      refreshed after activation. Governance can pause new deposits per route, not purchases or exits.
  */
@@ -387,12 +386,12 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     }
 
     /// @inheritdoc IDcaManager
-    function batchBuyRbtc(Batch calldata batch) external override onlySwapper {
+    function batchBuyRbtc(Batch calldata batch) external override nonReentrant onlySwapper {
         _batchBuyRbtc(batch);
     }
 
     /// @inheritdoc IDcaManager
-    function batchBuyRbtcAcrossHandlers(Batch[] calldata batches) external override onlySwapper {
+    function batchBuyRbtcAcrossHandlers(Batch[] calldata batches) external override nonReentrant onlySwapper {
         uint256 numBatches = batches.length;
         if (numBatches == 0) revert DcaManager__EmptyHandlerBatches();
 

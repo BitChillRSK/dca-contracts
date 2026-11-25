@@ -2,7 +2,6 @@
 pragma solidity 0.8.36;
 
 import {Test} from "forge-std/Test.sol";
-import {VmSafe} from "forge-std/Vm.sol";
 import {DcaManager} from "../../src/DcaManager.sol";
 import {OperationsAdmin} from "../../src/OperationsAdmin.sol";
 import {TropykusDocHandlerMoc} from "../../src/tropykus-legacy/TropykusDocHandlerMoc.sol";
@@ -179,37 +178,27 @@ contract DepositSwapPopReentrancyTest is Test {
         assertEq(afterSchedules[0].tokenBalance, beforeSchedules[0].tokenBalance);
     }
 
-    /**
-     * @dev A purchase is not `nonReentrant`, so a pull that calls back into an allowlisted swapper can buy
-     *      the schedule being funded. The deposit credit is stored and logged before the pull, so that
-     *      purchase debits the new balance and logs after it. Storing after the pull overwrote the debit;
-     *      logging after it left a stale balance as the schedule's last event.
-     */
-    function test_depositToken_purchaseFromPullCallback_keepsItsDebit() public {
+    /// @dev A pull that calls back into an allowlisted swapper cannot buy the schedule being funded:
+    ///      the purchase hits the guard and the whole deposit rolls back.
+    function test_depositToken_purchaseFromPullCallback_revertsTheDeposit() public {
         uint64 idA = _createScheduleAndArmBuy();
+        uint256 userTokens = token.balanceOf(address(user));
 
-        vm.recordLogs();
+        vm.expectRevert(reentrantCall());
         user.deposit(idA, EXTRA);
 
-        assertFalse(user.buy(), "the pull did not call back");
-        uint256 stored = _tokenBalance();
-        assertEq(stored, DEPOSIT + EXTRA - MIN_PURCHASE_AMOUNT, "the purchase debit was lost");
-        assertGt(handler.getAccumulatedRbtcBalance(address(user)), 0, "the callback purchase was not credited");
-        _assertBalanceEvents(idA, DEPOSIT + EXTRA, stored);
+        _assertNothingMoved(userTokens);
     }
 
-    /// @dev Same callback during the withdrawal payout: the debit is logged before the handler call, so the
-    ///      purchase's balance event is the last one.
-    function test_withdrawToken_purchaseFromPayoutCallback_logsTheStoredBalanceLast() public {
+    /// @dev Same callback during the withdrawal payout: the purchase is refused and the withdrawal rolls back.
+    function test_withdrawToken_purchaseFromPayoutCallback_revertsTheWithdrawal() public {
         uint64 idA = _createScheduleAndArmBuy();
+        uint256 userTokens = token.balanceOf(address(user));
 
-        vm.recordLogs();
+        vm.expectRevert(reentrantCall());
         user.withdraw(idA, EXTRA);
 
-        assertFalse(user.buy(), "the payout did not call back");
-        uint256 stored = _tokenBalance();
-        assertEq(stored, DEPOSIT - EXTRA - MIN_PURCHASE_AMOUNT, "the purchase debit was lost");
-        _assertBalanceEvents(idA, DEPOSIT - EXTRA, stored);
+        _assertNothingMoved(userTokens);
     }
 
     /// @dev create,create,delete,create in one block used to remint the survivor's id.
@@ -290,23 +279,11 @@ contract DepositSwapPopReentrancyTest is Test {
         return schedules[0].tokenBalance;
     }
 
-    /// @dev The schedule's recorded `TokenBalanceUpdated` amounts are the user call's, then the purchase's.
-    function _assertBalanceEvents(uint64 scheduleId, uint256 userCallBalance, uint256 storedBalance) private {
-        VmSafe.Log[] memory logs = vm.getRecordedLogs();
-        uint256[] memory amounts = new uint256[](logs.length);
-        uint256 count;
-        for (uint256 i; i < logs.length; ++i) {
-            if (
-                logs[i].emitter == address(dcaManager)
-                    && logs[i].topics[0] == IDcaManager.DcaManager__TokenBalanceUpdated.selector
-                    && logs[i].topics[2] == bytes32(uint256(scheduleId))
-            ) {
-                amounts[count++] = abi.decode(logs[i].data, (uint256));
-            }
-        }
-        assertEq(count, 2, "expected the user call's and the purchase's balance events");
-        assertEq(amounts[0], userCallBalance, "the user call must log its balance first");
-        assertEq(amounts[1], storedBalance, "the last balance event must be the stored balance");
+    /// @dev The refused user call left the schedule, the user's tokens and the rBTC books as they were.
+    function _assertNothingMoved(uint256 userTokens) private {
+        assertEq(_tokenBalance(), DEPOSIT, "schedule balance moved");
+        assertEq(token.balanceOf(address(user)), userTokens, "user tokens moved");
+        assertEq(handler.getAccumulatedRbtcBalance(address(user)), 0, "the callback purchase was credited");
     }
 
     function _createTwoSchedules() private {

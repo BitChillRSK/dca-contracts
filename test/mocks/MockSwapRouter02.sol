@@ -53,12 +53,18 @@ contract MockSwapRouter02 is IUniswapV3SwapRouter {
             MockStablecoin(s_strandedIntermediateToken).mint(address(this), s_strandedIntermediateAmount);
         }
 
+        _beforePayout();
+
         // To simulate the handler receiving WRBTC when exactInput is called, deposit rBTC in the WRBTC contract
         // msg.sender is the handler
         s_mockWrbtcToken.deposit{value: amountOut}(msg.sender);
 
         return amountOut;
     }
+
+    /// @dev Runs after the input is pulled and before the WRBTC is paid. Empty here, so swaps through
+    ///      this mock read no extra storage; a test subclass overrides it to call out.
+    function _beforePayout() internal virtual {}
 
     // Allow changing the price of the output token for testing purposes
     function setFixedAmountOut(uint256 _newPrice) external {

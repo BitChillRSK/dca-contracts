@@ -1585,6 +1585,14 @@ value (#12), the three configuration constructors emit their initial events (#23
 Next: purchase reentrancy (#18 I-09), then the remaining audit documentation and source
 consistency. Each needs its own spec.
 
+### R124 - Kann purchase reentrancy guard ([spec](./R124-kann-purchase-reentrancy.md))
+
+After R123. Third of the four Kann follow-up PRs. `batchBuyRbtc` and `batchBuyRbtcAcrossHandlers`
+take the transient reentrancy guard (D5, #18 I-09), so invariant 6 has no exceptions. The R118
+store-and-log-before-call ordering stays. Ask: none.
+
+Next: the remaining audit documentation and the source-consistency sweep, with its own spec.
+
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:

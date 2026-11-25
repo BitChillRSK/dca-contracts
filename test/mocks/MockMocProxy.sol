@@ -45,11 +45,16 @@ contract MockMocProxy {
         mockDocToken.transferFrom(msg.sender, address(this), finalDocAmount);
         uint256 received = mockDocToken.balanceOf(address(this)) - balanceBefore;
         mockDocToken.burn(received);
+        _beforePayout();
         (bool success,) = msg.sender.call{value: redeemedRbtc}("");
         if (success) {
             emit MockMocProxy__DocRedeemed(msg.sender, finalDocAmount, redeemedRbtc);
         }
     }
+
+    /// @dev Runs after the DOC is pulled and before the rBTC is paid. Empty here, so purchases through
+    ///      this mock read no extra storage; a test subclass overrides it to call out.
+    function _beforePayout() internal virtual {}
 
     function mintDoc(uint256 rbtcToDeposit) external payable {}
     function mintDocVendors(uint256 rbtcToDeposit, address payable vendorAccount) external payable {}
