@@ -106,7 +106,10 @@ abstract contract Properties is PropertiesAsserts, Snapshots {
         }
     }
 
-    /// @notice GL-08: Σ accounts' virtual shares == the handler's receipt shares
+    /// @notice GL-08: exact share equality in this closed environment.
+    /// @dev This harness has no receipt-token donations or share-exit actions. Either can create
+    ///      unbooked surplus; GL-07 remains the unconditional backing bound. The Foundry stateful
+    ///      suite exercises share exits and reconciles their forfeitures separately.
     function property_virtualSharesExact() public {
         for (uint256 k; k < routes.length; k++) {
             if (!routes[k].lending) continue;

@@ -1565,6 +1565,17 @@ set a purchase amount above the balance, so an empty lending schedule restarts s
 Reviewer documents state the deposit refusal, issuer, router and pool-move findings.
 Ask: none.
 
+### R122 - Kann lending withdrawals ([spec](./R122-kann-lending-withdrawals.md))
+
+After R121. First of four owner-approved Kann follow-up PRs (2026-11-25). Forfeit a measured
+one-share exit remainder (#14), remove the dedicated withdrawal clamp event (#19), and use the
+caller-owned schedule list directly in the share-exit loop (#20 item 1). Include the required tests,
+surplus accounting, and documentation. Ask: none.
+
+Next, after separate review and owner merge approval: configuration (#12, #23, #20 item 5),
+purchase reentrancy (#18 I-09), then remaining audit documentation and source consistency.
+These later PRs require their own specs and are not assigned by R122.
+
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:

@@ -340,32 +340,4 @@ contract StablecoinLendingTest is DcaDappTest {
         // One missed schedule would treat that principal as yield (~AMOUNT_TO_DEPOSIT / NUM_OF_SCHEDULES).
         assertLt(interest, AMOUNT_TO_DEPOSIT / NUM_OF_SCHEDULES);
     }
-
-    // @notice: This is difficult to test, because the withdrawal amount is adjusted to the balance
-    // in the lending protocol, which only happenes in edge cases on mainnet or a live testnet
-    // function testWithdrawalAmountAdjustedToBalance() external {
-    //     // Add debug logging
-    //     console2.log("Initial user shares balance:", stablecoinHandler.getUserShares(USER));
-
-    //     uint256 exchangeRate =
-    //         s_routeIndex == TROPYKUS_INDEX ? shareToken.exchangeRateCurrent() : shareToken.tokenPrice();
-    //     console2.log("Exchange rate:", exchangeRate);
-
-    //     uint256 stablecoinInLendingProtocol = stablecoinHandler.getUserShares(USER) * exchangeRate / 1e18;
-    //     console2.log("Stablecoin in lending protocol:", stablecoinInLendingProtocol);
-
-    //     uint256 attemptedWithdrawalAmount = stablecoinInLendingProtocol + 1;
-    //     console2.log("Attempted withdrawal amount:", attemptedWithdrawalAmount);
-
-    //     vm.expectEmit(true, true, true, true);
-    //     emit LendingHandler__WithdrawalAmountAdjusted(USER, attemptedWithdrawalAmount, stablecoinInLendingProtocol);
-
-    //     vm.prank(USER);
-    //     dcaManager.withdrawToken(address(stablecoin), address(stablecoin), 0, attemptedWithdrawalAmount);
-
-    //     // Verify user received their full balance
-    //     assertEq(stablecoin.balanceOf(USER), stablecoinInLendingProtocol);
-    //     // Verify shares balance is now 0
-    //     assertEq(stablecoinHandler.getUserShares(USER), 0);
-    // }
 }

@@ -159,9 +159,6 @@ contract DcaDappTest is Test {
     event MockMocProxy__DocRedeemed(address indexed user, uint256 docAmount, uint256 btcAmount);
 
     //LendingHandler
-    event LendingHandler__WithdrawalAmountAdjusted(
-        address indexed user, uint256 originalAmount, uint256 adjustedAmount
-    );
     event LendingHandler__SharesRedeemedBatch(uint256 underlyingAmount, uint256 sharesAmountRedeemed);
 
     modifier onlyDexSwaps() {

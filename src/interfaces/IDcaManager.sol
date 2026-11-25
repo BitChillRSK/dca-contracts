@@ -353,9 +353,9 @@ interface IDcaManager {
      * @param routeIndex The lending route holding the position.
      * @dev Recovery path for when redeeming shares for stablecoins fails: attempts to transfer all
      *      the caller's receipt shares instead. Clearing schedule balances removes their purchase
-     *      allocations; the schedules remain available for funding. Shares the lending protocol
-     *      does not transfer stay booked and can be requested in a later call, even with every
-     *      schedule balance at zero. Blocked during the protected purchase window and while the
+     *      allocations; the schedules remain available for funding. A one-share transfer remainder
+     *      is forfeited and stays unbooked on the handler. Larger remainders stay booked and can be
+     *      requested later, even with every schedule balance at zero. Blocked during the protected purchase window and while the
      *      lending protocol blocks receipt-token transfers. Reverts on an idle or unassigned route
      *      and when the caller holds no shares there.
      */

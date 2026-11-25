@@ -278,6 +278,20 @@ contract InvariantTest is StdInvariant, Test {
         assertEq(scheduleAt(dcaManager, s_users[0], address(stablecoin), 0).tokenBalance, 0);
     }
 
+    /// @dev Exact reconciliation must include dust forfeited by a real share-exit action.
+    function test_invariantHandlerReconcilesForfeitedShare() public {
+        if (s_routeIndex != LAYERBANK_INDEX) return;
+        fuzzHandler.createDcaSchedule(0, MIN_PURCHASE_AMOUNT * 10, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD);
+        aToken.setNormalizedIncome(1e27 + uint256(1e27) / 7, true);
+
+        fuzzHandler.withdrawLendingShares(0);
+
+        assertEq(fuzzHandler.shareWithdrawalSuccesses(), 1);
+        assertEq(fuzzHandler.forfeitedShares(), 1, "coverage did not reach a one-share remainder");
+        assertEq(ILendingHandler(address(handler)).getUserShares(s_users[0]), 0);
+        invariant_virtualSharesEqualReceiptShares();
+    }
+
     /*//////////////////////////////////////////////////////////////
                             INVARIANT TESTS
     //////////////////////////////////////////////////////////////*/
@@ -492,11 +506,11 @@ contract InvariantTest is StdInvariant, Test {
     }
 
     /**
-     * @notice BitChill's per-user virtual lending shares sum to exactly the handler's receipt tokens.
+     * @notice Virtual shares plus recorded exit forfeitures equal the handler's receipt shares.
      * @dev Replaces the old `invariant_interestOnlyIncreases`, which asserted `uint256 >= 0` and so
      *      encoded nothing. Deposits credit the measured mint, and stablecoin withdrawals, purchases
-     *      and share withdrawals move both books by the same amount; a credit that outran the external
-     *      mint, or a burn or transfer that skipped the virtual ledger, would fail this.
+     *      move both books by the same amount. Share exits can additionally forfeit one share, tracked
+     *      by the test handler. This environment has no external receipt-token donations.
      */
     function invariant_virtualSharesEqualReceiptShares() public {
         uint256 totalVirtualShares;
@@ -513,7 +527,12 @@ contract InvariantTest is StdInvariant, Test {
             receiptShares = iToken.balanceOf(address(handler));
         }
 
-        assertEq(totalVirtualShares, receiptShares, "virtual lending shares differ from receipt shares held");
+        assertLe(totalVirtualShares, receiptShares, "virtual lending shares exceed receipt shares held");
+        assertEq(
+            totalVirtualShares + fuzzHandler.forfeitedShares(),
+            receiptShares,
+            "virtual shares plus forfeitures differ from receipt shares held"
+        );
     }
 }
 

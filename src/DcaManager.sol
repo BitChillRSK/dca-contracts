@@ -344,7 +344,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         uint256 scheduleCount = scheduleIds.length;
         for (uint256 i; i < scheduleCount; ++i) {
             uint64 scheduleId = scheduleIds[i];
-            DcaSchedule storage dcaSchedule = _callersSchedule(token, scheduleId);
+            // The ids come from the caller's own list, so each schedule already belongs to the caller.
+            DcaSchedule storage dcaSchedule = s_dcaSchedules[token][scheduleId];
             if (dcaSchedule.routeIndex != routeIndex || dcaSchedule.tokenBalance == 0) continue;
             dcaSchedule.tokenBalance = 0;
             emit DcaManager__TokenBalanceUpdated(token, scheduleId, 0);

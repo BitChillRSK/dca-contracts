@@ -6,6 +6,8 @@ import {Test, console2} from "forge-std/Test.sol";
 import {DcaManager} from "src/DcaManager.sol";
 import {IDcaManager} from "src/interfaces/IDcaManager.sol";
 import {ITokenHandler} from "src/interfaces/ITokenHandler.sol";
+import {ILendingHandler} from "src/interfaces/ILendingHandler.sol";
+import {LayerBankHandler} from "src/layerbank/LayerBankHandler.sol";
 import {IPurchaseRbtc} from "src/interfaces/IPurchaseRbtc.sol";
 import {OperationsAdmin} from "src/OperationsAdmin.sol";
 import {MockStablecoin} from "test/mocks/MockStablecoin.sol";
@@ -85,6 +87,8 @@ contract Handler is Test {
     uint256 public topUpFromInterestSuccesses;
     /// @dev Wins for the share withdrawal: most attempts land on a user with no shares and revert.
     uint256 public shareWithdrawalSuccesses;
+    /// @dev Test-only receipt surplus from forfeited one-share exit remainders.
+    uint256 public forfeitedShares;
 
     /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR
@@ -635,9 +639,23 @@ contract Handler is Test {
      */
     function withdrawLendingShares(uint256 userSeed) external {
         address user = s_users[userSeed % s_users.length];
+        uint256 sharesBefore = ILendingHandler(address(tokenHandler)).getUserShares(user);
+        uint256 receiptBefore;
+        if (routeIndex == LAYERBANK_INDEX) {
+            receiptBefore = LayerBankHandler(address(tokenHandler)).i_aToken().scaledBalanceOf(address(tokenHandler));
+        }
         vm.prank(user);
         try dcaManager.withdrawLendingShares(address(stablecoin), routeIndex) {
             shareWithdrawalSuccesses++;
+            if (routeIndex == LAYERBANK_INDEX) {
+                uint256 moved = receiptBefore
+                    - LayerBankHandler(address(tokenHandler)).i_aToken().scaledBalanceOf(address(tokenHandler));
+                uint256 sharesAfter = ILendingHandler(address(tokenHandler)).getUserShares(user);
+                uint256 forfeited = sharesBefore - sharesAfter - moved;
+                assertLe(forfeited, 1, "share exit forfeited more than one share");
+                if (forfeited != 0) assertEq(sharesAfter, 0, "forfeiture left a booked remainder");
+                forfeitedShares += forfeited;
+            }
         } catch {
             // No shares on the handler.
         }

@@ -19,9 +19,6 @@ import "../Constants.sol";
 contract LendingHandlerRedeemTest is Test {
     using stdStorage for StdStorage;
 
-    event LendingHandler__WithdrawalAmountAdjusted(
-        address indexed user, uint256 originalAmount, uint256 adjustedAmount
-    );
     event LendingHandler__SharesRedeemed(address indexed user, uint256 underlyingAmount, uint256 sharesAmountRedeemed);
     event LendingHandler__UserSharesUpdated(address indexed user, uint256 previousShares, uint256 newShares);
     event LendingHandler__InterestWithdrawn(
@@ -59,10 +56,23 @@ contract LendingHandlerRedeemTest is Test {
         uint256 userBShares = harness.getUserShares(userB);
         uint256 userStableBefore = stablecoin.balanceOf(userA);
 
-        vm.expectEmit(true, true, true, true, address(harness));
-        emit LendingHandler__WithdrawalAmountAdjusted(userA, OVERSTATED_REQUEST, USER_A_DEPOSIT);
-
+        vm.recordLogs();
         uint256 received = harness.withdrawToken(userA, OVERSTATED_REQUEST);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bool measuredPayoutSeen;
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].emitter != address(harness)) continue;
+            assertNotEq(
+                logs[i].topics[0],
+                keccak256("LendingHandler__WithdrawalAmountAdjusted(address,uint256,uint256)"),
+                "dedicated clamp event was removed"
+            );
+            if (logs[i].topics[0] == keccak256("TokenHandler__TokenWithdrawn(address,address,uint256)")) {
+                assertEq(abi.decode(logs[i].data, (uint256)), USER_A_DEPOSIT);
+                measuredPayoutSeen = true;
+            }
+        }
+        assertTrue(measuredPayoutSeen, "measured payout event missing");
 
         assertEq(received, USER_A_DEPOSIT);
         assertEq(stablecoin.balanceOf(userA), userStableBefore + USER_A_DEPOSIT);
