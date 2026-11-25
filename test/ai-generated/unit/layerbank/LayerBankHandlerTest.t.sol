@@ -293,8 +293,6 @@ contract LayerBankHandlerTest is HandlerTestHarness {
             address(stablecoin), abi.encodeCall(IERC20.transfer, (user1, 0)), bytes("zero-value transfer")
         );
         vm.expectCall(address(stablecoin), abi.encodeWithSelector(IERC20.transfer.selector), 0);
-        vm.expectEmit(address(handler));
-        emit ILendingHandler.LendingHandler__WithdrawalAmountAdjusted(user1, WITHDRAWAL_AMOUNT, 0);
 
         vm.prank(address(dcaManager));
         assertEq(handler.withdrawToken(user1, WITHDRAWAL_AMOUNT), 0);

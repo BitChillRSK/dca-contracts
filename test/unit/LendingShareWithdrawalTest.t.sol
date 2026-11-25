@@ -98,13 +98,13 @@ contract LendingShareWithdrawalTest is DcaDappTest {
             emit DcaManager__TokenBalanceUpdated(address(stablecoin), scheduleIds[i], 0);
         }
         vm.expectEmit(true, false, false, true, address(stablecoinHandler));
-        emit LendingHandler__UserSharesUpdated(USER, shares, shares - moved);
+        emit LendingHandler__UserSharesUpdated(USER, shares, 0);
         vm.expectEmit(true, true, false, true, address(stablecoinHandler));
         emit LendingHandler__SharesWithdrawn(USER, receiptToken, moved);
         _withdrawShares(USER);
 
         assertLe(shares - moved, isLayerbank ? 1 : 0, "remainder above one LayerBank scaled share");
-        assertEq(lendingHandler.getUserShares(USER), shares - moved, "remainder not booked");
+        assertEq(lendingHandler.getUserShares(USER), 0, "rounding remainder not forfeited");
         assertEq(_receiptShares(USER) - userSharesBefore, moved, "user did not receive the shares debited");
         assertEq(handlerShares - _receiptShares(address(stablecoinHandler)), moved, "handler shares off");
         assertEq(stablecoin.balanceOf(address(stablecoinHandler)), handlerStablecoin, "handler stablecoin moved");
@@ -151,7 +151,6 @@ contract LendingShareWithdrawalTest is DcaDappTest {
         _withdrawShares(OTHER_USER);
 
         _withdrawShares(USER);
-        if (lendingHandler.getUserShares(USER) > 0) _withdrawShares(USER);
         vm.expectRevert(abi.encodeWithSelector(ILendingHandler.LendingHandler__NoSharesToWithdraw.selector, USER));
         _withdrawShares(USER);
     }
@@ -170,10 +169,8 @@ contract LendingShareWithdrawalTest is DcaDappTest {
         }
 
         vm.roll(allowedFromBlock);
-        uint256 shares = lendingHandler.getUserShares(USER);
-        uint256 remainder = shares - _expectedMovedShares(shares);
         _withdrawShares(USER);
-        assertEq(lendingHandler.getUserShares(USER), remainder);
+        assertEq(lendingHandler.getUserShares(USER), 0);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -204,7 +201,7 @@ contract LendingShareWithdrawalTest is DcaDappTest {
         assertEq(_receiptShares(USER), moved);
         assertEq(_receiptValue(USER), expectedValue, "receipt tokens not worth the shares at the current rate");
         assertGt(expectedValue, principal, "position carries no interest");
-        assertEq(lendingHandler.getUserShares(USER), shares - moved);
+        assertEq(lendingHandler.getUserShares(USER), 0);
         assertEq(lendingHandler.getUserShares(OTHER_USER), otherShares, "another user's shares moved");
         assertEq(_receiptShares(address(stablecoinHandler)), handlerShares - moved);
         assertEq(stablecoin.balanceOf(address(stablecoinHandler)), handlerStablecoin);
@@ -230,9 +227,9 @@ contract LendingShareWithdrawalTest is DcaDappTest {
     /// @dev The user gets what moved and keeps the rest booked; a later withdrawal moves the remainder.
     function test_partialReceiptTransfer_debitsWhatMovedAndKeepsRemainder() external onlyVenueMocks {
         uint256 shares = lendingHandler.getUserShares(USER);
-        uint256 moved = _expectedMovedShares(shares) - 1;
+        uint256 moved = _expectedMovedShares(shares) - 2;
         uint256 handlerShares = _receiptShares(address(stablecoinHandler));
-        _setTransferShareAdjustment(-1);
+        _setTransferShareAdjustment(-2);
 
         vm.expectEmit(true, false, false, true, address(stablecoinHandler));
         emit LendingHandler__UserSharesUpdated(USER, shares, shares - moved);
@@ -252,7 +249,7 @@ contract LendingShareWithdrawalTest is DcaDappTest {
         emit LendingHandler__SharesWithdrawn(USER, receiptToken, recovered);
         _withdrawShares(USER);
 
-        assertEq(lendingHandler.getUserShares(USER), remainder - recovered);
+        assertEq(lendingHandler.getUserShares(USER), 0);
         assertEq(_receiptShares(USER), moved + recovered);
         assertEq(_receiptShares(address(stablecoinHandler)), handlerShares - moved - recovered);
     }
@@ -272,8 +269,7 @@ contract LendingShareWithdrawalTest is DcaDappTest {
     }
 
     /// @dev Half-up is live LayerBank's transfer rounding, round-up is upstream Aave's. Either way one
-    ///      floored transfer moves the position or all but one scaled share, and a second withdrawal
-    ///      moves that.
+    ///      floored transfer moves the position or all but one scaled share, which is forfeited.
     function testFuzz_layerBankWithdrawalUnderEitherTransferRounding(uint256 index, bool roundUp)
         external
         onlyVenueMocks
@@ -293,14 +289,13 @@ contract LendingShareWithdrawalTest is DcaDappTest {
         uint256 moved = _receiptShares(USER);
         assertEq(moved, roundUp ? shares : _expectedMovedShares(shares), "moved shares off");
         assertGe(moved + 1, shares, "more than one scaled share left behind");
-        assertEq(lendingHandler.getUserShares(USER), shares - moved);
+        assertEq(lendingHandler.getUserShares(USER), 0);
         assertEq(handlerShares - _receiptShares(address(stablecoinHandler)), moved);
         assertEq(_routeBalance(USER), 0);
 
-        if (moved < shares) _withdrawShares(USER);
-        assertEq(lendingHandler.getUserShares(USER), 0, "remainder not recovered");
-        assertEq(_receiptShares(USER), shares);
-        assertEq(handlerShares - _receiptShares(address(stablecoinHandler)), shares);
+        assertEq(_receiptShares(address(stablecoinHandler)), handlerShares - moved);
+        vm.expectRevert(abi.encodeWithSelector(ILendingHandler.LendingHandler__NoSharesToWithdraw.selector, USER));
+        _withdrawShares(USER);
     }
 
     function test_reentryFromReceiptTokenCallback_reverts() external onlyVenueMocks {
@@ -352,7 +347,7 @@ contract LendingShareWithdrawalTest is DcaDappTest {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev The received aTokens redeem at the live Pool from the user's own address, for the position
-    ///      less at most one scaled share, which stays booked.
+    ///      less at most one scaled share, which stays unbooked on the handler.
     function test_fork_layerBankWithdrawalThenRedeemAtPool() external onlyLayerBankFork {
         ILayerBankPool pool = ILayerBankPool(ILayerBankAToken(receiptToken).POOL());
         uint256 principal = _routeBalance(USER);
@@ -362,7 +357,7 @@ contract LendingShareWithdrawalTest is DcaDappTest {
 
         _withdrawShares(USER);
         assertEq(_receiptShares(USER) - scaledBefore, moved, "aToken transfer did not move the half-up shares");
-        assertEq(lendingHandler.getUserShares(USER), shares - moved);
+        assertEq(lendingHandler.getUserShares(USER), 0);
 
         uint256 amount = moved * pool.getReserveNormalizedIncome(address(stablecoin)) / 1e27;
         uint256 stablecoinBefore = stablecoin.balanceOf(USER);

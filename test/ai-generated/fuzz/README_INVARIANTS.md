@@ -50,9 +50,11 @@ their own fixtures and ignore the env.
 3. **Exchange-rate monotonicity** — LayerBank normalized income `>= 1e27`; Tropykus
    `exchangeRateCurrent() >= exchangeRateStored()`; Sovryn `tokenPrice() > 0` (the LayerBank and
    Sovryn mocks have no stored previous rate to compare).
-4. **Virtual shares = receipt shares** — sum of `getUserShares` equals the handler's aToken scaled
+4. **Virtual shares + exit forfeitures = receipt shares** — sum of `getUserShares` plus the
+   test handler's measured one-share exit forfeitures equals the handler's aToken scaled
    balance (or kToken / iToken balance) after any sequence of deposits, redeems, purchases and
-   share withdrawals.
+   share withdrawals. The environment has no external receipt-token donations. Virtual shares
+   remain bounded by receipt shares unconditionally.
 5. **Schedule sanity** — live schedules keep `purchaseAmount >= MIN_PURCHASE_AMOUNT`,
    `purchasePeriod >= MIN_PURCHASE_PERIOD`, and a non-zero `scheduleId`.
 6. **Paused schedules never purchase** — a schedule the ghost holds as paused keeps an unchanged

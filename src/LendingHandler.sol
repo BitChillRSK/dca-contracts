@@ -77,7 +77,10 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
         unchecked {
             withdrawnShares = sharesBefore - sharesAfter;
         }
-        _setUserShares(user, bookedShares, bookedShares - withdrawnShares);
+        uint256 remainingShares = bookedShares - withdrawnShares;
+        // Forfeit one share of transfer-rounding dust so an exited route has no residual interest claim.
+        if (remainingShares == 1) remainingShares = 0;
+        _setUserShares(user, bookedShares, remainingShares);
         emit LendingHandler__SharesWithdrawn(user, _receiptToken(), withdrawnShares);
     }
 
@@ -167,7 +170,6 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
         uint256 totalStablecoinInLending = _sharesToStablecoin(userShares, exchangeRate);
 
         if (totalStablecoinInLending < withdrawalAmount) {
-            emit LendingHandler__WithdrawalAmountAdjusted(user, withdrawalAmount, totalStablecoinInLending);
             withdrawalAmount = totalStablecoinInLending;
         }
 
@@ -196,7 +198,7 @@ abstract contract LendingHandler is TokenHandler, ILendingHandler {
         for (uint256 i; i < purchaseCount; ++i) {
             uint256 sharesToRedeem = _stablecoinToShares(purchaseAmounts[i], exchangeRate);
             uint256 userShares = s_shares[users[i]];
-            if (sharesToRedeem > userShares) {
+            if (userShares < sharesToRedeem) {
                 purchaseAmounts[i] = _sharesToStablecoin(userShares, exchangeRate);
                 if (purchaseAmounts[i] == 0) {
                     revert LendingHandler__ZeroShareValue(users[i], sharesToRedeem, userShares);

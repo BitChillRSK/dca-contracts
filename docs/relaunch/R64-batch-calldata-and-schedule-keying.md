@@ -302,10 +302,11 @@ owner-in-key and 17,746 for pre-R64.
 
 The ownership check is the price, and it is worth stating plainly rather than explaining away: a
 stored owner can be forgotten, where a key cannot. What makes it acceptable is that it exists once,
-in `_callersSchedule`, that every user-facing mutator reaches a schedule through it, and that the
+in `_callersSchedule`, that caller-selected user mutations reach a schedule through it, and that the
 purchase path — the only path that touches a schedule on somebody else's behalf — takes the owner
 from storage and so has no check to forget. Invariant 8 in `AGENTS.md` states that, and states the
-one grep that verifies it.
+direct-access exceptions that reviewers must verify. R122 additionally permits the share-exit loop
+to use the caller's own id list, as `_lockedPrincipal` already does.
 
 Invariant 7 in `AGENTS.md` — the public `scheduleId` is the creation nonce, never array state — is
 unchanged either way, and still holds: ids still come from a strictly increasing counter, and the
@@ -363,10 +364,11 @@ without a third slot, so the choice is which one:
   those grounds, not on gas.
 
 The ownership check the shipped design pays for lives in `_callersSchedule(token, scheduleId)` and
-nowhere else. Every user-facing mutator reaches a schedule through it; the purchase path needs no
+nowhere else. Caller-selected schedule mutations reach a schedule through it; the purchase path needs no
 check at all, because it reads the buyer from the schedule rather than taking one from the caller.
-That is what invariant 8 in `AGENTS.md` now says, and the reviewer's obligation it names is a single
-grep: no mutator may read `s_dcaSchedules` directly.
+Invariant 8 in `AGENTS.md` lists the direct-access exceptions: creation under a fresh nonce, deletion
+after the check, getters, the purchase path, and the caller-owned id-list loops in `_lockedPrincipal`
+and `withdrawLendingShares` (R122 amendment, 2026-11-25).
 
 **Key order was measured, not assumed, and it is a dead heat.** `[token][scheduleId]` and
 `[scheduleId][token]` are the same storage and the same work; the token being outermost makes its hash

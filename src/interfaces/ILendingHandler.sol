@@ -7,8 +7,9 @@ import {ITokenHandler} from "./ITokenHandler.sol";
  * @title ILendingHandler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Lending-handler surface: per-user virtual shares, interest, and share-transition events.
- * @dev Idle handlers do not implement this. OperationsAdmin requires it on lending routes and
- *      rejects it on idle routes.
+ * @dev A share is one base unit of the handler's receipt-share balance, so "one share" is the
+ *      smallest amount the book can hold. Idle handlers do not implement this. OperationsAdmin
+ *      requires it on lending routes and rejects it on idle routes.
  */
 interface ILendingHandler is ITokenHandler {
     /*//////////////////////////////////////////////////////////////
@@ -38,15 +39,11 @@ interface ILendingHandler is ITokenHandler {
     event LendingHandler__InterestWithdrawn(
         address indexed user, address indexed token, uint256 underlyingAmountWithdrawn
     );
-    /// @notice A withdrawal was clamped to the user's share-backed stablecoin.
-    event LendingHandler__WithdrawalAmountAdjusted(
-        address indexed user, uint256 originalAmount, uint256 adjustedAmount
-    );
     /**
      * @notice Receipt shares were withdrawn for `user` as the lending protocol's receipt token.
      * @dev `shares` is in receipt-share units: the exact decrease of this handler's receipt-share
-     *      balance, and of the user's booked shares. Any remainder stays booked; `UserSharesUpdated`
-     *      in the same call carries it.
+     *      balance. `UserSharesUpdated` reports the final book: a one-share remainder is forfeited;
+     *      a larger remainder stays booked. The forfeited share is not included in `shares`.
      */
     event LendingHandler__SharesWithdrawn(address indexed user, address indexed receiptToken, uint256 shares);
 
@@ -103,13 +100,14 @@ interface ILendingHandler is ITokenHandler {
     /**
      * @notice Withdraw `user`'s booked shares to them as the lending protocol's receipt token.
      * @param user The address whose booked shares are transferred and who receives the receipt tokens.
-     * @return withdrawnShares The receipt shares withdrawn, debited from `user`'s booked shares.
+     * @return withdrawnShares The measured receipt shares transferred, excluding any forfeited remainder.
      * @dev Called only by DcaManager. Redeems nothing, so the lending protocol's stablecoin liquidity
      *      does not limit it; `user` redeems the receipt tokens at the lending protocol directly, on
-     *      its terms. Debits the measured fall in this handler's receipt-share balance. Untransferred
-     *      shares remain booked and available for a later withdrawal. Reverts if the lending protocol
-     *      blocks receipt-token transfers, or if the balance does not fall or falls by more than
-     *      `user`'s booked shares.
+     *      its terms. Debits the measured fall in this handler's receipt-share balance. If exactly one
+     *      share remains, it is forfeited and left unbooked in the handler so the exited route has no
+     *      rounding-dust interest claim. A larger remainder stays booked for a later withdrawal.
+     *      Reverts if the lending protocol blocks receipt-token transfers, or if the balance does not
+     *      fall or falls by more than `user`'s booked shares.
      */
     function withdrawShares(address user) external returns (uint256 withdrawnShares);
 

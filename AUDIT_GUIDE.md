@@ -165,9 +165,10 @@ How the boundaries are enforced:
 - Lending handlers keep a standing unlimited stablecoin allowance to their lending market, and Dex
   handlers to SwapRouter02. The spender can therefore pull any stablecoin the handler holds at any
   time, not only during a BitChill call.
-- `DcaManager` has one ownership check, `_callersSchedule`. Every user call that changes an existing
-  schedule reaches it through that function and takes no owner argument. The purchase path needs no
-  ownership check: it reads the buyer from the schedule.
+- `DcaManager` checks a caller-selected schedule's owner in `_callersSchedule`, with no owner argument.
+  `withdrawLendingShares` instead walks the caller's own id list and reads those schedules directly,
+  as `_lockedPrincipal` does. Creation uses a fresh nonce; deletion follows the owner check. Getters
+  can read any schedule. The purchase path reads the buyer from the schedule and needs no owner check.
 - Every external function that writes a schedule is `nonReentrant`, except `batchBuyRbtc` and
   `batchBuyRbtcAcrossHandlers`. Those are swapper-only and finish each handler's schedule writes
   before calling it. In an across-handlers call a later handler's schedules are written after earlier
@@ -192,11 +193,12 @@ invariants**, with the reason for each.
 - Every successful lending deposit must reduce the handler's stablecoin balance by exactly the amount
   supplied to the market. A market that takes less or more reverts the deposit.
 - A lending-share withdrawal zeroes every schedule balance the user holds on that token and route and
-  transfers their virtual shares to them as the venue's receipt token. The user is debited exactly the
-  fall in the handler's receipt-share balance, which must be positive and at most their booked shares.
-  Untransferred shares remain booked and available for a later withdrawal. Under supported LayerBank
-  rounding (half-up or round-up) the remainder is at most one scaled share; a venue that transfers
-  less than requested can leave more. No stablecoin moves.
+  transfers receipt shares to them. The measured fall in the handler's receipt-share balance must
+  be positive and at most their booked shares. A one-share remainder is forfeited and stays unbooked
+  on the handler; a larger remainder stays booked for a later withdrawal. Under supported LayerBank
+  rounding (half-up or round-up), the remainder is at most one scaled share. `SharesWithdrawn` reports
+  only the measured transfer; `UserSharesUpdated` reports the final book after any forfeiture.
+  No stablecoin moves.
 - Integrator return values and balance views are not treated as received cash. Stablecoin and native
   receipts are measured by balance deltas.
 - Every successful purchase must reduce the handler's stablecoin balance by exactly the gross amount
@@ -291,7 +293,8 @@ Other deliberate availability trade-offs:
   and the user redeems them at the venue when it can pay, including through any withdrawal queue the
   venue runs. It still depends on the venue: a pause that blocks transfers blocks it (on LayerBank a
   paused reserve does, a frozen one does not). The handler debits its own receipt-share decrease, not
-  the user's increase, so a venue transfer fee falls on the withdrawing user. LayerBank's transfer sizing is in
+  the user's increase, so a venue transfer fee falls on the withdrawing user. A one-share remainder
+  is forfeited; larger remainders remain claimable. LayerBank's transfer sizing is in
   [`src/layerbank/README.md`](./src/layerbank/README.md). The share withdrawal is blocked during a
   protected window like every other withdrawal.
 - Dex pricing assumes the input stablecoin is worth one USD; there is no stablecoin/USD oracle.

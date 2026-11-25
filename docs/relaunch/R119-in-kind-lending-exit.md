@@ -2,6 +2,19 @@
 
 Status: **implemented; open for review** · Assigned: yes · Optional/further-review: no
 
+## Amendment — 2026-11-25
+
+[R122](./R122-kann-lending-withdrawals.md) supersedes this spec's decision to retain every transfer
+remainder. After a positive, non-excessive measured transfer, exactly one remaining share is forfeited
+and left unbooked on the handler. A larger remainder stays booked. `SharesWithdrawn` still reports
+only the external transfer; `UserSharesUpdated` reports the final book. This prevents an impaired
+exited route's rounding share from blocking a later bulk interest withdrawal (Kann #14).
+
+The stateful suite now reconciles virtual shares plus measured forfeitures against held receipt
+shares. Equality without surplus applies only when no share was forfeited and no external receipt
+tokens were donated. GL-07's backing inequality remains unconditional. The decisions and results
+below describe the original implementation.
+
 ## Objective
 
 A user can leave a lending route even when the venue cannot pay cash. A new user function withdraws the
