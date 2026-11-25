@@ -20,4 +20,6 @@ interface IDcaManagerAccessControl {
     //////////////////////////////////////////////////////////////*/
     /// @notice Caller is not the DcaManager this handler was constructed with.
     error DcaManagerAccessControl__OnlyDcaManagerCanCall();
+    /// @notice The DcaManager passed at construction is the zero address.
+    error DcaManagerAccessControl__ZeroDcaManager();
 }

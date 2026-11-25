@@ -174,8 +174,13 @@ contract DexPathFailoverTest is DcaDappTest {
         IPurchaseUniswap(address(stablecoinHandler)).setAmountOutMinimumPercent(0.996 ether);
         assertEq(IPurchaseUniswap(address(stablecoinHandler)).getAmountOutMinimumPercent(), 0.996 ether);
 
+        // The handler owner can switch paths too; the alternate is active, so it switches back.
+        (address[] memory constructorMids, uint24[] memory constructorFees) = _constructorComponents();
         vm.prank(HANDLER_OWNER);
-        IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(mids, fees);
+        IPurchaseUniswap(address(stablecoinHandler)).setPurchasePath(constructorMids, constructorFees);
+        assertEq(
+            IPurchaseUniswap(address(stablecoinHandler)).getSwapPath(), _encodePath(constructorMids, constructorFees)
+        );
     }
 
     function testSlippageAndOracleRemainHandlerOwnerOnly() public {

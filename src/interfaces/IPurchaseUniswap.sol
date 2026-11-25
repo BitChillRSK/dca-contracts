@@ -40,11 +40,13 @@ interface IPurchaseUniswap {
     event PurchaseUniswap__PurchasePathAllowedSet(
         bytes32 pathHash, bytes encodedPath, address[] intermediateTokens, uint24[] poolFeeRates, bool allowed
     );
-    /// @notice Owner changed the swap-time oracle floor.
+    /// @notice The swap-time oracle floor was set at construction (`oldValue` 0) or changed by the owner.
     event PurchaseUniswap__AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
-    /// @notice Owner changed the lower bound on the swap-time oracle floor.
+    /// @notice The lower bound on the swap-time oracle floor was set at construction (`oldValue` 0) or
+    ///         changed by the owner.
     event PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(uint256 oldValue, uint256 newValue);
-    /// @notice Owner pointed the min-out oracle at a new MoC BTC/USD feed.
+    /// @notice The min-out MoC BTC/USD oracle was set at construction (`oldOracle` zero) or changed by
+    ///         the owner.
     event PurchaseUniswap__OracleUpdated(address indexed oldOracle, address indexed newOracle);
 
     /*//////////////////////////////////////////////////////////////
@@ -67,6 +69,14 @@ interface IPurchaseUniswap {
     error PurchaseUniswap__UnsupportedStablecoinDecimals(uint8 stablecoinDecimals);
     /// @notice The allow/revoke write would not change stored permission.
     error PurchaseUniswap__PurchasePathPermissionUnchanged(bytes32 pathHash, bool allowed);
+    /// @notice `pathHash` is already the active path.
+    error PurchaseUniswap__PurchasePathUnchanged(bytes32 pathHash);
+    /// @notice `oracle` is already the min-out oracle.
+    error PurchaseUniswap__OracleUnchanged(address oracle);
+    /// @notice The swap-time oracle floor already has this value.
+    error PurchaseUniswap__AmountOutMinimumPercentUnchanged(uint256 amountOutMinimumPercent);
+    /// @notice The safety-check bound already has this value.
+    error PurchaseUniswap__AmountOutMinimumSafetyCheckUnchanged(uint256 amountOutMinimumSafetyCheck);
     /// @notice The currently active path cannot be revoked; activate another allowed path first.
     error PurchaseUniswap__CannotRevokeActivePurchasePath(bytes32 pathHash);
     /// @notice `caller` is neither this handler's owner nor an OperationsAdmin swapper.
@@ -99,13 +109,14 @@ interface IPurchaseUniswap {
         external;
 
     /**
-     * @notice Replace the Uniswap V3 path from this handler's stablecoin to WRBTC.
+     * @notice Activate another allowlisted Uniswap V3 path from this handler's stablecoin to WRBTC.
      * @param intermediateTokens Intermediate token addresses in the path (empty for a direct pair).
      * @param poolFeeRates Pool fee for each hop. Length must be `intermediateTokens.length + 1`.
      * @dev Builds the canonical path from this handler's pinned stablecoin and WRBTC. `msg.sender` must
      *      be this handler's owner or an OperationsAdmin swapper, and the derived path must already be
-     *      allowlisted. Constructor installation does not use this function; it self-allowlists the
-     *      initial path.
+     *      allowlisted. Reverts with `PurchaseUniswap__PurchasePathUnchanged` if that path is already
+     *      active; the allowlist and caller checks run first. Constructor installation does not use
+     *      this function; it self-allowlists the initial path.
      */
     function setPurchasePath(address[] memory intermediateTokens, uint24[] memory poolFeeRates) external;
 
@@ -115,7 +126,8 @@ interface IPurchaseUniswap {
      * @dev Uniswap `amountOutMinimum` is `max(thisFloor, minRbtcOut)`, so the swapper's quote-derived
      *      `minRbtcOut` sets operational tightness and this value is the bound that holds when that
      *      minimum is absent, stale, or hostile. Deploy it loose enough that a healthy batch never
-     *      reverts on it; the swapper, not this setter, is the weekly knob.
+     *      reverts on it; the swapper, not this setter, is the weekly knob. Reverts with
+     *      `PurchaseUniswap__AmountOutMinimumPercentUnchanged` if it equals the current floor.
      */
     function setAmountOutMinimumPercent(uint256 amountOutMinimumPercent) external;
 
@@ -124,7 +136,8 @@ interface IPurchaseUniswap {
      * @param amountOutMinimumSafetyCheck New bound, 1e18-scaled. Never enters swap math.
      * @dev The floor percentage cannot be set below this bound, so lowering it further takes two
      *      transactions, this bound first. Raising this bound above the active floor reverts without
-     *      changing state.
+     *      changing state. Reverts with `PurchaseUniswap__AmountOutMinimumSafetyCheckUnchanged` if it
+     *      equals the current bound.
      */
     function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external;
 
@@ -132,6 +145,7 @@ interface IPurchaseUniswap {
      * @notice Point min-out at a new MoC BTC/USD oracle.
      * @param newOracle New oracle. Cannot be zero.
      * @dev Not bounded by the safety check: a new oracle changes the floor in one transaction.
+     *      Reverts with `PurchaseUniswap__OracleUnchanged` if it is already the oracle.
      */
     function setMocOracle(address newOracle) external;
 

@@ -27,6 +27,8 @@ abstract contract LayerBankHandlerDexHandler is Properties {
             return;
         }
         if (selector == 0 && !_route(handlerSeed).lending) return;
+        // A write that changes nothing reverts `…Unchanged`, so it is skipped.
+        if (_unchangedSetting(selector, handlerSeed, arg0)) return;
         OpCtx memory ctx = _newCtx(selector <= 1 ? OP_PERMISSIONLESS : OP_ADMIN, selector <= 1 ? actor : admin);
         snapshotBefore();
         if (selector == 0) {
@@ -148,6 +150,26 @@ abstract contract LayerBankHandlerDexHandler is Properties {
     }
 
     // ―――――――――――――――――――――――― Helpers ―――――――――――――――――――――――――――
+
+    /// @dev Whether selectors 2, 3, 4 or 6 would write the value already stored.
+    function _unchangedSetting(uint8 selector, uint256 handlerSeed, uint256 arg0) internal returns (bool) {
+        if (selector == 2) {
+            IPurchaseUniswap h = IPurchaseUniswap(_dexHandler(handlerSeed));
+            return clampBetween(arg0, h.getAmountOutMinimumSafetyCheck(), 1 ether) == h.getAmountOutMinimumPercent();
+        }
+        if (selector == 3) {
+            IPurchaseUniswap h = IPurchaseUniswap(_dexHandler(handlerSeed));
+            return clampLte(arg0, h.getAmountOutMinimumPercent()) == h.getAmountOutMinimumSafetyCheck();
+        }
+        if (selector == 4) {
+            return _collectorCandidate(arg0) == IPurchaseFees(_route(handlerSeed).handler).getFeeCollector();
+        }
+        if (selector == 6) {
+            address oracle = arg0 % 2 == 0 ? address(mocOracle) : address(mocOracleAlt);
+            return oracle == address(IPurchaseUniswap(_dexHandler(handlerSeed)).getMocOracle());
+        }
+        return false;
+    }
 
     /// @dev The fixed spender `restoreLendingApproval` approves: the LayerBank pool or the Sovryn iToken.
     function _lendingSpenderOf(address h) internal view returns (address) {

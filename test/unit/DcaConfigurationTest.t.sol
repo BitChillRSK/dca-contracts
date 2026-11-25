@@ -114,10 +114,10 @@ contract DcaConfigurationTest is DcaDappTest {
 
     function testModifyMaxSchedulesPerToken() external {
         vm.expectEmit(true, true, true, true);
-        emit DcaManager__MaxSchedulesPerTokenModified(MAX_SCHEDULES_PER_TOKEN);
+        emit DcaManager__MaxSchedulesPerTokenModified(MAX_SCHEDULES_PER_TOKEN + 1);
         vm.startPrank(OWNER);
-        dcaManager.setMaxSchedulesPerToken(MAX_SCHEDULES_PER_TOKEN);
-        assertEq(MAX_SCHEDULES_PER_TOKEN, dcaManager.getMaxSchedulesPerToken());
+        dcaManager.setMaxSchedulesPerToken(MAX_SCHEDULES_PER_TOKEN + 1);
+        assertEq(MAX_SCHEDULES_PER_TOKEN + 1, dcaManager.getMaxSchedulesPerToken());
     }
 
     function testPurchaseAmountEqualToBalanceSucceeds() external {

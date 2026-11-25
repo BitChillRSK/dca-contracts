@@ -107,6 +107,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
             maxSchedulesPerToken: maxSchedulesPerToken.toUint16(),
             scheduleNonce: 0
         });
+        emit DcaManager__MinPurchasePeriodModified(minPurchasePeriod);
+        emit DcaManager__MaxSchedulesPerTokenModified(maxSchedulesPerToken);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -408,12 +410,18 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         onlyOwner
         validateMinPurchasePeriod(minPurchasePeriod)
     {
+        if (minPurchasePeriod == s_protocolSettings.minPurchasePeriod) {
+            revert DcaManager__MinPurchasePeriodUnchanged(minPurchasePeriod);
+        }
         s_protocolSettings.minPurchasePeriod = minPurchasePeriod.toUint32();
         emit DcaManager__MinPurchasePeriodModified(minPurchasePeriod);
     }
 
     /// @inheritdoc IDcaManager
     function setMaxSchedulesPerToken(uint256 maxSchedulesPerToken) external override onlyOwner {
+        if (maxSchedulesPerToken == s_protocolSettings.maxSchedulesPerToken) {
+            revert DcaManager__MaxSchedulesPerTokenUnchanged(maxSchedulesPerToken);
+        }
         s_protocolSettings.maxSchedulesPerToken = maxSchedulesPerToken.toUint16();
         emit DcaManager__MaxSchedulesPerTokenModified(maxSchedulesPerToken);
     }
@@ -422,6 +430,9 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     function setTokenMinPurchaseAmount(address token, uint256 minPurchaseAmount) external override onlyOwner {
         if (minPurchaseAmount == 0) {
             revert DcaManager__TokenMinPurchaseAmountMustBeGreaterThanZero(token);
+        }
+        if (minPurchaseAmount == s_tokenMinPurchaseAmounts[token]) {
+            revert DcaManager__TokenMinPurchaseAmountUnchanged(token, minPurchaseAmount);
         }
         s_tokenMinPurchaseAmounts[token] = minPurchaseAmount;
         emit DcaManager__TokenMinPurchaseAmountSet(token, minPurchaseAmount);

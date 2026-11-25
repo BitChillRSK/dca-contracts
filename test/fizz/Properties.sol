@@ -2567,6 +2567,15 @@ abstract contract Properties is PropertiesAsserts, Snapshots {
                     "SP-54: switch to a non-allowlisted path reverted with another error"
                 );
             }
+            if (
+                op == OP_SET_PATH && stateBefore.pathAllowed[d][p] && stateBefore.pathHash[d] == h
+                    && ctx.caller == admin
+            ) {
+                t(
+                    s == IPurchaseUniswap.PurchaseUniswap__PurchasePathUnchanged.selector,
+                    "SP-54: owner re-sending the active path reverted with another error"
+                );
+            }
             return;
         }
         t(
@@ -2581,6 +2590,7 @@ abstract contract Properties is PropertiesAsserts, Snapshots {
         if (op == OP_SET_PATH) {
             t(stateAfter.pathHash[d] == h, "SP-54: active path != the requested canonical path");
             t(stateBefore.pathAllowed[d][p], "SP-54: switched to a path that was not allowlisted");
+            t(stateBefore.pathHash[d] != h, "SP-54: re-sending the active path was accepted");
             t(
                 stateAfter.pathAllowed[d][0] == stateBefore.pathAllowed[d][0]
                     && stateAfter.pathAllowed[d][1] == stateBefore.pathAllowed[d][1],

@@ -240,17 +240,25 @@ abstract contract DcaManagerHandler is Properties {
 
     function dcaManager_secondary(uint8 selector, uint256 arg0, uint256 arg1) public {
         selector = uint8(selector % 3);
-        OpCtx memory ctx = _newCtx(selector == 0 ? OP_SET_MAX_SCHEDULES : OP_ADMIN, admin);
-        snapshotBefore();
+        address token = arg1 % 2 == 0 ? address(doc) : address(usdrif);
+        uint256 value;
+        // A write that changes nothing reverts `…Unchanged`, so it is skipped.
         if (selector == 0) {
             // Includes 0 and values below live counts: the cap is not retroactive (x-ray I-8).
-            _dcaManager_setMaxSchedulesPerToken(clampLte(arg0, 2 * MAX_SCHEDULES_PER_TOKEN));
+            value = clampLte(arg0, 2 * MAX_SCHEDULES_PER_TOKEN);
+            if (value == dcaManager.getMaxSchedulesPerToken()) return;
         } else if (selector == 1) {
-            _dcaManager_setMinPurchasePeriod(clampBetween(arg0, 1, 14) * 1 days);
+            value = clampBetween(arg0, 1, 14) * 1 days;
+            if (value == dcaManager.getMinPurchasePeriod()) return;
         } else {
-            address token = arg1 % 2 == 0 ? address(doc) : address(usdrif);
-            _dcaManager_setTokenMinPurchaseAmount(token, clampBetween(arg0, 1, 100 ether));
+            value = clampBetween(arg0, 1, 100 ether);
+            if (value == dcaManager.getTokenMinPurchaseAmount(token)) return;
         }
+        OpCtx memory ctx = _newCtx(selector == 0 ? OP_SET_MAX_SCHEDULES : OP_ADMIN, admin);
+        snapshotBefore();
+        if (selector == 0) _dcaManager_setMaxSchedulesPerToken(value);
+        else if (selector == 1) _dcaManager_setMinPurchasePeriod(value);
+        else _dcaManager_setTokenMinPurchaseAmount(token, value);
         snapshotAfter();
         if (selector == 0) property_createRespectsCap(ctx);
         _postCommon(ctx);
