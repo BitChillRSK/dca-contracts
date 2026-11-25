@@ -7,8 +7,9 @@ import {ITokenHandler} from "./ITokenHandler.sol";
  * @title ILendingHandler
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Lending-handler surface: per-user virtual shares, interest, and share-transition events.
- * @dev Idle handlers do not implement this. OperationsAdmin requires it on lending routes and
- *      rejects it on idle routes.
+ * @dev A share is one base unit of the handler's receipt-share balance, so "one share" is the
+ *      smallest amount the book can hold. Idle handlers do not implement this. OperationsAdmin
+ *      requires it on lending routes and rejects it on idle routes.
  */
 interface ILendingHandler is ITokenHandler {
     /*//////////////////////////////////////////////////////////////
