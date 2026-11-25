@@ -4,6 +4,8 @@ Status: **assigned** · Assigned: yes · Optional/further-review: no
 
 Base: stacked on [R125](./R125-kann-docs-and-consistency.md) / [#202](https://github.com/BitChillRSK/dca-contracts/pull/202) while it is open; `main` once the Kann stack merges.
 
+PR: [#203](https://github.com/BitChillRSK/dca-contracts/pull/203).
+
 ## Objective
 
 Replace the owner-settable Dex safety check with a constant. The owner can still move the swap-time oracle floor (`amountOutMinimumPercent`, 97% at launch), but never below 95% of the oracle-implied output. That is a bound in code, like the 5% fee cap and the five-block protected window. The safety check's storage word, setter, getter, event, two errors and constructor argument go away.
