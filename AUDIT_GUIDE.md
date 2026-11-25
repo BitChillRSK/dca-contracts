@@ -139,7 +139,8 @@ period. MoC routes have no pool to move. Principal cannot leave to anyone but it
 the same way, so the operating policy forbids automatic reactivation after a venue failure
 ([R66](./docs/relaunch/R66-batch-row-front-running.md)). This is accepted without a mandatory gap
 between windows: a gap would give users a few open blocks they are unlikely to use before the Safe
-revokes the key, and a loose fill pays the key holder only if they also move the pool around the batch.
+revokes the key, and a loose fill pays the key holder only if they also move the pool around the
+batch.
 
 All eight ownable deployments are constructed under the broadcaster EOA, configured, and then propose
 the Safe as pending owner. The Safe must accept each one. Until acceptance, the broadcaster remains
