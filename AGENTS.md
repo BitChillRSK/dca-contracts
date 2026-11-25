@@ -158,6 +158,11 @@ State the property the code relies on (a decimal bound, a peg assumption) instea
 happens to satisfy it today. Token names are correct only where the contract is token-specific: the
 `*DocHandlerMoc` leaves, `PurchaseMoc`, and the per-protocol `README.md`s.
 
+The same goes for lending protocols. `LendingHandler`, `ILendingHandler` and every other file a
+future venue would share must not name a specific lending protocol or its receipt token, not even as
+an example. State the generic rule; the venue's own handler, interface or `README.md` gives the
+instance.
+
 **Say what is enforced, and what is only assumed.** A header that states an operational policy the
 contract does not check — a listing rule, a delisting process — reads as a safety mechanism and is not
 one. Name it as a precondition and say who owns it.
