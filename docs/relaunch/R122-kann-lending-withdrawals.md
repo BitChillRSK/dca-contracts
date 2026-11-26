@@ -79,6 +79,6 @@ Approved public test boundaries: `DcaManager.withdrawLendingShares`, bulk intere
 ## ABI / deploy / cutover impact
 
 - ABI: remove `LendingHandler__WithdrawalAmountAdjusted(address,uint256,uint256)`. No function selector or argument changes.
-- Behavior: a successful share exit can forfeit one untransferred receipt-share unit. Subsequent exits have no remainder to recover. Measured transfer events retain their external-transfer meaning.
+- Behavior: a successful share exit forfeits a remainder of exactly one untransferred receipt share, so a later exit has nothing of it to recover. A larger remainder stays booked and claimable. Measured transfer events retain their external-transfer meaning.
 - Scripts: unchanged. Contracts remain immutable; this change applies to the future release artifact.
 - Consumers: search existing issues first. Track the front-end remainder-recovery flow and the event removal in affected front-end/monitoring consumers. Record exact inspected consumer heads; do not move pins.

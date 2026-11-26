@@ -346,13 +346,21 @@ Other deliberate availability trade-offs:
 
 [`audits/README.md`](./audits/README.md) lists every report. Two manual reviews from 2025 cover the
 pre-relaunch code. The relaunch code has had three automated audits (Krait, Nethermind AuditAgent, and
-Pashov Audit Group's open-source solidity-auditor skill, October 2026) and no third-party manual
-audit. The Krait report's **Resolution** section records its decisions. The
+Pashov Audit Group's open-source solidity-auditor skill, October 2026) and a third-party review by
+Kann Audits (November 2026). The Krait report's **Resolution** section records its decisions. The
 [AuditAgent companion](./audits/2026-10-06-Nethermind/README.md) records all six dispositions
 separately from the unchanged original report. Its accounting fixes change executable code after the
-first two scans. The Pashov scan ran after those fixes and has not been triaged yet. The
-[Pashov companion](./audits/2026-10-13-Pashov-Skills/README.md) also covers the X-Ray pre-audit map and
-the Fizz fuzzing suite in `test/fizz/`. Accepted risks are stated in this guide.
+first two scans. The Pashov scan ran after those fixes. Its two findings, 28 leads and Fizz follow-ups
+have owner-approved dispositions in
+[`PASHOV_TRIAGE_DECISIONS.md`](./docs/relaunch/PASHOV_TRIAGE_DECISIONS.md), implemented by
+[R117](./docs/relaunch/R117-pashov-mitigations.md) and
+[R118](./docs/relaunch/R118-pashov-optional-hardening.md); the register lists the closure conditions
+still open. The [Pashov companion](./audits/2026-10-13-Pashov-Skills/README.md) also covers the X-Ray
+pre-audit map and the Fizz fuzzing suite in `test/fizz/`. Kann Audits reviewed `a229ea3b` and filed
+issues #1–#26 in two rounds, in a private repository. BitChill's responses are posted on the issues,
+and the fixes and documentation lines they promise are
+[R121](./docs/relaunch/R121-kann-audit-followups.md) to
+[R125](./docs/relaunch/R125-kann-docs-and-consistency.md). Accepted risks are stated in this guide.
 
 Slither and Aderyn run on `src/` only (`make slither`, `make aderyn`). Slither exits non-zero because
 its triaged findings are kept visible instead of suppressed. Each detector's classification, false

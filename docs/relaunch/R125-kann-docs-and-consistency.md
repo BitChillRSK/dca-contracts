@@ -84,6 +84,8 @@ Findings, listed before editing as the owner asked:
 - #18 I-11: `AUDIT_GUIDE.md`. The lending index is the venue's accounting rate, not proof of backing. A reserve deficit does not lower it, so a loss would surface as failed redemptions or lower measured cash.
 - #18 I-12: the runbook has a per-token table of encoded minimums and fee bounds. Verify them before any Safe transaction.
 - #26: `AUDIT_GUIDE.md` external assumptions. The Dex floor accepts any price the configured feed reports as valid. Its validity period is the only freshness bound. The runbook records the feed wiring and that period at release.
+- Audit history: `AUDIT_GUIDE.md`, `audits/README.md` and the Pashov companion record the Kann review and point to the owner-approved Pashov dispositions.
+- R122's ABI section: only a one-share remainder is forfeited; a larger one stays claimable, as its checklist says.
 
 ### Test fix
 
@@ -94,14 +96,14 @@ Findings, listed before editing as the owner asked:
 ## Out of scope
 
 - [ ] Any executable change beyond S1, any error, event or selector rename, and any new event or check.
-- [ ] Historical specs other than R66's amendment, and published third-party audit files under `audits/`.
+- [ ] Historical specs other than R66's amendment and R122's remainder sentence, and the third-party reports under `audits/` (the index and companion documents are BitChill's).
 - [ ] Consumer code and pins.
 
 ## Files likely touched
 
 - `src/DcaManager.sol`, `src/OperationsAdmin.sol`, `src/LendingHandler.sol`, `src/PurchaseFees.sol`, `src/PurchaseUniswap.sol`, the four leaves under `src/idle/` and `src/layerbank/`
 - `src/interfaces/IDcaManager.sol`, `IPurchaseFees.sol`, `IPurchaseUniswap.sol`, `ITokenHandler.sol`, `IOperationsAdmin.sol` (if its pause wording needs the same correction)
-- `AGENTS.md`, `AUDIT_GUIDE.md`, `PROPERTIES.md`, `SECURITY.md`, `docs/relaunch/CUTOVER_RUNBOOK.md`, `docs/relaunch/R66-batch-row-front-running.md`, `docs/relaunch/IMPLEMENTATION_ORDER.md`, `docs/relaunch/README.md`, this spec
+- `AGENTS.md`, `AUDIT_GUIDE.md`, `PROPERTIES.md`, `SECURITY.md`, `docs/relaunch/CUTOVER_RUNBOOK.md`, `docs/relaunch/R66-batch-row-front-running.md`, `docs/relaunch/R122-kann-lending-withdrawals.md`, `docs/relaunch/IMPLEMENTATION_ORDER.md`, `audits/README.md`, `audits/2026-10-13-Pashov-Skills/README.md`, `docs/relaunch/README.md`, this spec
 - `test/unit/RbtcPurchaseTest.t.sol`
 
 ## Required tests
