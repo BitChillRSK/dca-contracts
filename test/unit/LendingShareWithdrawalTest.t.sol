@@ -358,12 +358,16 @@ contract LendingShareWithdrawalTest is DcaDappTest {
         assertEq(_receiptShares(USER) - scaledBefore, moved, "aToken transfer did not move the half-up shares");
         assertEq(lendingHandler.getUserShares(USER), 0);
 
-        uint256 amount = moved * pool.getReserveNormalizedIncome(address(stablecoin)) / 1e27;
+        uint256 index = pool.getReserveNormalizedIncome(address(stablecoin));
+        uint256 amount = moved * index / 1e27;
         uint256 stablecoinBefore = stablecoin.balanceOf(USER);
         vm.prank(USER);
         pool.withdraw(address(stablecoin), amount, USER);
         assertEq(stablecoin.balanceOf(USER) - stablecoinBefore, amount);
-        assertApproxEqAbs(amount, principal, 2, "redeemed position differs from principal");
+        // The two half-up deposit mints can lose one scaled share in total, and the transfer
+        // can leave one more. Convert that two-share bound to underlying units, rounding up.
+        uint256 roundingTolerance = (2 * index + 1e27 - 1) / 1e27;
+        assertApproxEqAbs(amount, principal, roundingTolerance, "redeemed position differs from principal");
         console2.log("LayerBank share withdrawal: scaled shares moved", moved, "underlying redeemed", amount);
     }
 
