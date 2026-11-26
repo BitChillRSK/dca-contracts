@@ -25,7 +25,7 @@ import {ownableUnauthorized} from "../../../utils/OzRevert.sol";
  * @notice Unit tests for TropykusHandlerDex (DEX variant) using shared test harness
  */
 contract TropykusHandlerDexTest is HandlerTestHarness {
-    event PurchaseUniswap__AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
+    event PurchaseUniswap__AmountOutMinimumPercentSet(uint256 oldValue, uint256 newValue);
 
     // Tropykus DEX-specific contracts
     MockKToken public kToken;

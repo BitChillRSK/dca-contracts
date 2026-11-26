@@ -841,7 +841,7 @@ abstract contract Base is StringUtils, Clamp, Deployer, Math {
         ghosts.buysOnDay[token][id]++;
     }
 
-    /// @dev Every successful updatePurchasePeriod.
+    /// @dev Every successful setPurchasePeriod.
     function _ghostPeriodEdit(address token, uint64 id) internal {
         uint256 today = _today();
         if (ghosts.editDay[token][id] != today) {

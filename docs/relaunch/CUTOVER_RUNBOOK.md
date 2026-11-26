@@ -14,7 +14,7 @@ Human operator only. Agents must not `--broadcast`.
 4. Deploy and Blockscout-verify a representative `FOUNDRY_PROFILE=deploy` (`via_ir = true`) artifact
    on Rootstock testnet. This is the outstanding R60 compiler/verifier proof. On that deployment,
    execute at least two guarded `DcaManager` user calls in separate transactions (for example
-   `createDcaSchedule`, then `updatePurchaseAmount` on the new schedule). The reentrancy guard is the
+   `createDcaSchedule`, then `setPurchaseAmount` on the new schedule). The reentrancy guard is the
    first `TSTORE` in shipped bytecode ([R82](./R82-transient-reentrancy-guard.md)); the second call
    succeeding proves rskj executes it and clears the lock between transactions.
 5. Green on the frozen revision:

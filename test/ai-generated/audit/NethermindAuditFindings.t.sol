@@ -169,8 +169,8 @@ contract NethermindLayerBankAuditTest is LayerBankDcaManagerTest {
         _index(index);
         vm.startPrank(USER);
         dcaManager.withdrawTokenAndInterest(address(docToken), first, withdrawal);
-        dcaManager.updatePurchaseAmount(address(docToken), first, 1000 ether - withdrawal);
-        dcaManager.updatePurchaseAmount(address(docToken), second, 500 ether);
+        dcaManager.setPurchaseAmount(address(docToken), first, 1000 ether - withdrawal);
+        dcaManager.setPurchaseAmount(address(docToken), second, 500 ether);
         vm.stopPrank();
 
         _buy(_ids(first, second));
@@ -289,7 +289,7 @@ contract NethermindLayerBankAuditTest is LayerBankDcaManagerTest {
         uint256 topUp = dcaManager.getAccruedInterest(USER, address(docToken), 1);
         vm.startPrank(USER);
         dcaManager.topUpFromInterest(address(docToken), first, topUp);
-        dcaManager.updatePurchaseAmount(address(docToken), first, 100 ether + topUp);
+        dcaManager.setPurchaseAmount(address(docToken), first, 100 ether + topUp);
         vm.stopPrank();
         uint256 shares = handler.getUserShares(USER);
         uint256 separateDebits =
@@ -314,8 +314,8 @@ contract NethermindLayerBankAuditTest is LayerBankDcaManagerTest {
         vm.startPrank(USER);
         dcaManager.topUpFromInterest(address(docToken), second, 50 ether - 2);
         dcaManager.topUpFromInterest(address(docToken), third, 50 ether + 1);
-        dcaManager.updatePurchaseAmount(address(docToken), second, 100 ether - 2);
-        dcaManager.updatePurchaseAmount(address(docToken), third, 100 ether + 1);
+        dcaManager.setPurchaseAmount(address(docToken), second, 100 ether - 2);
+        dcaManager.setPurchaseAmount(address(docToken), third, 100 ether + 1);
         vm.stopPrank();
         uint256 shares = handler.getUserShares(USER);
         uint256 newIndex = 15e26 + 5_000_000;

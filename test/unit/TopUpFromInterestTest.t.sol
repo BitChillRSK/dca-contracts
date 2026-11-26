@@ -275,7 +275,7 @@ contract TopUpFromInterestTest is DcaDappTest {
 
         uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
         vm.startPrank(USER);
-        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, purchaseAmount);
+        dcaManager.setPurchaseAmount(address(stablecoin), scheduleId, purchaseAmount);
         dcaManager.withdrawToken(address(stablecoin), scheduleId, type(uint256).max);
         vm.stopPrank();
         assertEq(_schedule(SCHEDULE_INDEX).tokenBalance, 0, "the schedule was not depleted");
@@ -328,7 +328,7 @@ contract TopUpFromInterestTest is DcaDappTest {
         uint64 scheduleId = _scheduleId(SCHEDULE_INDEX);
         uint256 wholeBalance = _schedule(SCHEDULE_INDEX).tokenBalance;
         vm.startPrank(USER);
-        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, wholeBalance);
+        dcaManager.setPurchaseAmount(address(stablecoin), scheduleId, wholeBalance);
         dcaManager.withdrawToken(address(stablecoin), scheduleId, type(uint256).max);
         vm.stopPrank();
         assertEq(_schedule(SCHEDULE_INDEX).tokenBalance, 0, "the schedule was not emptied");
@@ -359,7 +359,7 @@ contract TopUpFromInterestTest is DcaDappTest {
 
         // Lower first (allowed on an empty schedule), then top up.
         vm.prank(USER);
-        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, credit);
+        dcaManager.setPurchaseAmount(address(stablecoin), scheduleId, credit);
         _topUp(SCHEDULE_INDEX, credit);
         assertEq(_schedule(SCHEDULE_INDEX).tokenBalance, credit, "the empty schedule was not credited");
 

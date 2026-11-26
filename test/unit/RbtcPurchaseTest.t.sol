@@ -58,8 +58,8 @@ contract RbtcPurchaseTest is DcaDappTest {
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
-        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, TEST_PURCHASE_PERIOD);
+        dcaManager.setPurchaseAmount(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
+        dcaManager.setPurchasePeriod(address(stablecoin), scheduleId, TEST_PURCHASE_PERIOD);
         vm.stopPrank();
         buyRbtcOne(scheduleId); // first purchase
         IDcaManager.DcaSchedule memory schedule = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
@@ -135,7 +135,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         vm.warp(firstBuy);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.prank(USER);
-        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, weeklyPeriod);
+        dcaManager.setPurchasePeriod(address(stablecoin), scheduleId, weeklyPeriod);
         buyRbtcOne(scheduleId);
 
         uint256 dueDayStart = _utcDayStart(firstBuy) + weeklyPeriod;
@@ -152,7 +152,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         vm.warp(firstBuy);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.prank(USER);
-        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, weeklyPeriod);
+        dcaManager.setPurchasePeriod(address(stablecoin), scheduleId, weeklyPeriod);
         buyRbtcOne(scheduleId);
 
         // Skip the first due week and resume at 00:00 on the following due day. Although fewer than
@@ -181,7 +181,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         vm.warp(firstBuy);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.prank(USER);
-        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, weeklyPeriod);
+        dcaManager.setPurchasePeriod(address(stablecoin), scheduleId, weeklyPeriod);
         buyRbtcOne(scheduleId);
 
         uint256 missedMondayStart = _utcDayStart(firstBuy) + weeklyPeriod;
@@ -216,7 +216,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         vm.warp(firstBuy);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.prank(USER);
-        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, longPeriod);
+        dcaManager.setPurchasePeriod(address(stablecoin), scheduleId, longPeriod);
         buyRbtcOne(scheduleId);
 
         // Bought seven days late; the anchor stays on the 28-day grid.
@@ -240,7 +240,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         buyRbtcOne(scheduleId);
 
         vm.prank(USER);
-        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, shortPeriod);
+        dcaManager.setPurchasePeriod(address(stablecoin), scheduleId, shortPeriod);
 
         // Old anchor + new period is today.
         buyRbtcOne(scheduleId);
@@ -265,7 +265,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.prank(USER);
         vm.expectRevert(IDcaManager.DcaManager__PurchasePeriodMustBeWholeDays.selector);
-        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, 36 hours);
+        dcaManager.setPurchasePeriod(address(stablecoin), scheduleId, 36 hours);
     }
 
     /// @dev The no-catch-up rule also holds for whole-day periods that are not whole weeks.
@@ -275,7 +275,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         vm.warp(firstBuy);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.prank(USER);
-        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, purchasePeriod);
+        dcaManager.setPurchasePeriod(address(stablecoin), scheduleId, purchasePeriod);
         buyRbtcOne(scheduleId);
 
         // Skip the slot three days out and buy on the one six days out, at that UTC day's start.
@@ -305,7 +305,7 @@ contract RbtcPurchaseTest is DcaDappTest {
 
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.prank(USER);
-        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, TEST_PURCHASE_PERIOD);
+        dcaManager.setPurchasePeriod(address(stablecoin), scheduleId, TEST_PURCHASE_PERIOD);
         for (uint256 i; i < purchaseCount; ++i) {
             buyRbtcOne(scheduleId);
             vm.warp(vm.getBlockTimestamp() + TEST_PURCHASE_PERIOD);
@@ -450,7 +450,7 @@ contract RbtcPurchaseTest is DcaDappTest {
         uint256 editedAmount = AMOUNT_TO_SPEND / 2;
 
         vm.prank(USER);
-        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, editedAmount);
+        dcaManager.setPurchaseAmount(address(stablecoin), scheduleId, editedAmount);
 
         uint256 balanceBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance;
 
@@ -880,7 +880,7 @@ contract RbtcPurchaseTest is DcaDappTest {
     function _setPurchasePeriod(uint256 purchasePeriod) private {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.prank(USER);
-        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, purchasePeriod);
+        dcaManager.setPurchasePeriod(address(stablecoin), scheduleId, purchasePeriod);
     }
 
     function _secondsUntilDueUtcDayStart(uint256 cadenceAnchor, uint256 purchasePeriod) private view returns (uint256) {

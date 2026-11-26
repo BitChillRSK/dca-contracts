@@ -37,7 +37,7 @@ contract BatchMinRbtcOutTest is DcaDappTest {
         uint256 balanceBefore = _schedule().tokenBalance;
         uint64 scheduleId = _scheduleId();
         vm.prank(USER);
-        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, 2 * AMOUNT_TO_SPEND);
+        dcaManager.setPurchaseAmount(address(stablecoin), scheduleId, 2 * AMOUNT_TO_SPEND);
         MockSwapRouter02(dexHelperConfig.getActiveNetworkConfig().swapRouter).setOutputFillPercent(0.99 ether);
         vm.expectRevert(bytes("Insufficient output amount"));
         vm.prank(SWAPPER);

@@ -81,11 +81,11 @@ interface IDcaManager {
      */
     event DcaManager__TokenBalanceUpdated(address indexed token, uint64 indexed scheduleId, uint256 amount);
     /// @notice The caller replaced a schedule's periodic purchase amount.
-    event DcaManager__PurchaseAmountUpdated(
+    event DcaManager__PurchaseAmountSet(
         address indexed user, uint64 indexed scheduleId, uint256 previousAmount, uint256 newAmount
     );
     /// @notice The caller replaced a schedule's purchase period.
-    event DcaManager__PurchasePeriodUpdated(
+    event DcaManager__PurchasePeriodSet(
         address indexed user, uint64 indexed scheduleId, uint256 previousPeriod, uint256 newPeriod
     );
     /// @notice A new schedule was created and funded. `scheduleId` is the creation nonce (starts at 1).
@@ -100,7 +100,7 @@ interface IDcaManager {
     );
     /**
      * @notice The caller paused or resumed purchases on one of their schedules.
-     * @dev Filterable by user and scheduleId only, matching PurchaseAmountUpdated / PurchasePeriodUpdated.
+     * @dev Filterable by user and scheduleId only, matching PurchaseAmountSet / PurchasePeriodSet.
      *      Token is recovered by joining on scheduleId; it is not a third topic.
      */
     event DcaManager__SchedulePauseSet(address indexed user, uint64 indexed scheduleId, bool paused);
@@ -128,10 +128,10 @@ interface IDcaManager {
         address indexed user, address indexed token, uint64 indexed scheduleId, uint256 refundedAmount
     );
     /// @notice The per-token schedule cap was set at construction or changed by the owner.
-    event DcaManager__MaxSchedulesPerTokenModified(uint256 newMaxSchedulesPerToken);
+    event DcaManager__MaxSchedulesPerTokenSet(uint256 newMaxSchedulesPerToken);
     /// @notice The protocol minimum purchase period (whole UTC days, never below one) was set at
     ///         construction or changed by the owner.
-    event DcaManager__MinPurchasePeriodModified(uint256 newMinPurchasePeriod);
+    event DcaManager__MinPurchasePeriodSet(uint256 newMinPurchasePeriod);
     /// @notice Owner set a per-token minimum purchase amount. Zero is not allowed.
     event DcaManager__TokenMinPurchaseAmountSet(address indexed token, uint256 minPurchaseAmount);
 
@@ -169,7 +169,7 @@ interface IDcaManager {
     /**
      * @notice The next cadence boundary has not been reached.
      * @dev Names the row like every other purchase-path revert, so a batch that a mid-flight
-     *      `updatePurchasePeriod` unwound tells the caller which schedule to drop before retrying.
+     *      `setPurchasePeriod` unwound tells the caller which schedule to drop before retrying.
      */
     error DcaManager__CannotBuyIfPurchasePeriodHasNotElapsed(address token, uint64 scheduleId, uint256 timeRemaining);
     /**
@@ -272,9 +272,9 @@ interface IDcaManager {
      * @param newPurchaseAmount New amount to spend periodically on rBTC. Cannot fall below the token
      *        minimum, and is stored as `uint96`. It may exceed the schedule's `tokenBalance`; purchases
      *        then refuse the schedule until its balance covers one purchase.
-     * @dev Emits `DcaManager__PurchaseAmountUpdated` only after validation.
+     * @dev Emits `DcaManager__PurchaseAmountSet` only after validation.
      */
-    function updatePurchaseAmount(address token, uint64 scheduleId, uint256 newPurchaseAmount) external;
+    function setPurchaseAmount(address token, uint64 scheduleId, uint256 newPurchaseAmount) external;
 
     /**
      * @notice Replace the purchase period on an existing schedule.
@@ -282,9 +282,9 @@ interface IDcaManager {
      * @param scheduleId The schedule to edit. Must belong to the caller.
      * @param newPurchasePeriod New seconds between purchases. Must be a whole number of UTC days and at
      *        least the protocol minimum.
-     * @dev Emits `DcaManager__PurchasePeriodUpdated` only after validation.
+     * @dev Emits `DcaManager__PurchasePeriodSet` only after validation.
      */
-    function updatePurchasePeriod(address token, uint64 scheduleId, uint256 newPurchasePeriod) external;
+    function setPurchasePeriod(address token, uint64 scheduleId, uint256 newPurchasePeriod) external;
 
     /**
      * @notice Pause or resume rBTC purchases for one of the caller's schedules.

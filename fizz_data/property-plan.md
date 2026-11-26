@@ -233,7 +233,7 @@ Global-property rules (7A):
 | nativeTotal | uint256 | end of `setup()` | GL-12 |
 | privBaseline | mapping(address token => uint256) | end of `setup()` (admin's DOC/USDRIF/USDT0/WRBTC) | GL-27 |
 | buyDay / buysOnDay | mapping(address => mapping(uint64 => uint256)) ×2 | `_ghostBuy(token,id)` ← each bought row | GL-17 |
-| editDay / editsOnDay | same shape | `_ghostPeriodEdit(token,id)` ← successful updatePurchasePeriod | GL-17 |
+| editDay / editsOnDay | same shape | `_ghostPeriodEdit(token,id)` ← successful setPurchasePeriod | GL-17 |
 | winEpoch | uint256 | `_ghostWindowActivated()` (++) | keys the window mappings (mappings cannot be cleared) |
 | winUnlock | uint256 | `_ghostWindowActivated()` | GL-18, SP-55 |
 | winSnapToken / winSnapId / winSnap / winEligible | address[] / uint64[] / IDcaManager.DcaSchedule[] / bool[] | `_ghostWindowActivated()` (delete and refill from `trackedSchedules`; eligible = specDue && !paused && amount ≤ balance && (!lending ‖ V(owner,h) > 0)) | GL-18, SP-55 |
@@ -305,8 +305,8 @@ Account shares and claims come from `stateBefore`. The batch funnel therefore ca
 | dcaManager_withdrawTokenAndInterest | YES | lending: shareSlack +2 | SP-08, SP-10, SP-11, SP-14, SP-15, SP-43, SP-56 + Common; fail: SP-12, SP-51, SP-52 |
 | dcaManager_deleteDcaSchedule (funnel for _clamped) | YES (+ actor id list) | `_untrackSchedule` (counters, deletedIds); lending: shareSlack +1 | SP-08, SP-09, SP-10, SP-11, SP-13, SP-56 + Common; fail: SP-12, SP-51, SP-52 |
 | dcaManager_topUpFromInterest (+ _clamped with try/catch) | YES | — | SP-17, SP-43, SP-56 + Common; _clamped fail: SP-18; fail: SP-51, SP-52 |
-| dcaManager_updatePurchaseAmount | YES | — | SP-43, SP-56 + Common; fail: SP-51, SP-52 |
-| dcaManager_updatePurchasePeriod | YES | `_ghostPeriodEdit(token,id)` | SP-43, SP-56 + Common; fail: SP-51, SP-52 |
+| dcaManager_setPurchaseAmount | YES | — | SP-43, SP-56 + Common; fail: SP-51, SP-52 |
+| dcaManager_setPurchasePeriod | YES | `_ghostPeriodEdit(token,id)` | SP-43, SP-56 + Common; fail: SP-51, SP-52 |
 | dcaManager_setSchedulePaused | YES | — | SP-38, SP-43, SP-56 + Common; fail: SP-51, SP-52 |
 | dcaManager_withdrawAllAccumulatedInterest (funnel for _clamped) | YES | shareSlack +1 per lending pair redeemed | SP-10, SP-11, SP-14, SP-15, SP-16 + Common(user non-schedule); fail: SP-12, SP-51, SP-52 |
 | dcaManager_withdrawAllAccumulatedRbtc (+ _clamped) and _asCollector | YES (+ raw slots if H8) | — | SP-39, SP-41 + Common; fail: SP-51, SP-52 |

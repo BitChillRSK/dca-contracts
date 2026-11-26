@@ -43,7 +43,7 @@ contract ReenteringDepositHandler is IERC165, ITokenHandler, IPurchaseRbtc {
     function depositToken(address, uint256) external override {
         if (!s_armed) return;
         s_armed = false;
-        try i_manager.updatePurchaseAmount(s_token, s_scheduleId, 2e18) {
+        try i_manager.setPurchaseAmount(s_token, s_scheduleId, 2e18) {
             s_innerRevert = "";
         } catch (bytes memory reason) {
             s_innerRevert = reason;
@@ -130,7 +130,7 @@ contract R82TransientGuardGasTest is Test {
         vm.prank(s_buyer);
         s_manager.depositToken(s_token, scheduleId, DEPOSIT_AMOUNT);
         vm.prank(s_buyer);
-        s_manager.updatePurchaseAmount(s_token, scheduleId, 2 * PURCHASE_AMOUNT);
+        s_manager.setPurchaseAmount(s_token, scheduleId, 2 * PURCHASE_AMOUNT);
         vm.prank(s_buyer);
         s_manager.setSchedulePaused(s_token, scheduleId, true);
         Vm.AccountAccess[] memory accesses = vm.stopAndReturnStateDiff();

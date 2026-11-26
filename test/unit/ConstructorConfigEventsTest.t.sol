@@ -59,11 +59,11 @@ contract ConstructorConfigEventsTest is Test {
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         Vm.Log memory period =
-            _onlyLog(logs, address(dcaManager), IDcaManager.DcaManager__MinPurchasePeriodModified.selector);
+            _onlyLog(logs, address(dcaManager), IDcaManager.DcaManager__MinPurchasePeriodSet.selector);
         assertEq(abi.decode(period.data, (uint256)), dcaManager.getMinPurchasePeriod());
         assertEq(dcaManager.getMinPurchasePeriod(), 2 days);
         Vm.Log memory cap =
-            _onlyLog(logs, address(dcaManager), IDcaManager.DcaManager__MaxSchedulesPerTokenModified.selector);
+            _onlyLog(logs, address(dcaManager), IDcaManager.DcaManager__MaxSchedulesPerTokenSet.selector);
         assertEq(abi.decode(cap.data, (uint256)), dcaManager.getMaxSchedulesPerToken());
         assertEq(dcaManager.getMaxSchedulesPerToken(), MAX_SCHEDULES);
     }
@@ -96,11 +96,11 @@ contract ConstructorConfigEventsTest is Test {
         _assertFeeEvents(logs, handler);
 
         IPurchaseUniswap uniswap = IPurchaseUniswap(handler);
-        Vm.Log memory oracle = _onlyLog(logs, handler, IPurchaseUniswap.PurchaseUniswap__OracleUpdated.selector);
+        Vm.Log memory oracle = _onlyLog(logs, handler, IPurchaseUniswap.PurchaseUniswap__OracleSet.selector);
         assertEq(oracle.topics[1], bytes32(0), "initial old oracle is not zero");
         assertEq(address(uint160(uint256(oracle.topics[2]))), address(uniswap.getMocOracle()));
         Vm.Log memory percent =
-            _onlyLog(logs, handler, IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentUpdated.selector);
+            _onlyLog(logs, handler, IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentSet.selector);
         (uint256 oldPercent, uint256 newPercent) = abi.decode(percent.data, (uint256, uint256));
         assertEq(oldPercent, 0);
         assertEq(newPercent, uniswap.getAmountOutMinimumPercent());

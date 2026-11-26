@@ -306,7 +306,7 @@ contract Handler is Test {
         }
 
         if (purchaseAmount > 0) {
-            try dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, purchaseAmount) {
+            try dcaManager.setPurchaseAmount(address(stablecoin), scheduleId, purchaseAmount) {
             // Success
             }
                 catch {
@@ -315,7 +315,7 @@ contract Handler is Test {
         }
 
         if (purchasePeriod > 0) {
-            try dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, purchasePeriod) {
+            try dcaManager.setPurchasePeriod(address(stablecoin), scheduleId, purchasePeriod) {
             // Success
             }
                 catch {

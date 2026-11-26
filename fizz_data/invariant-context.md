@@ -122,7 +122,7 @@ ACCESS_CONTROL
 - A `withdrawToken` / `deleteDcaSchedule` on a lending route can pay less than the debit; a zero-share
   user withdraws zero tokens.
 - Revoking a swapper leaves its window and its chosen path in place (x-ray X-5).
-- `updatePurchasePeriod` keeps the anchor, so cutting the period can make a schedule due again; delete +
+- `setPurchasePeriod` keeps the anchor, so cutting the period can make a schedule due again; delete +
   create starts a new schedule with anchor 0 (x-ray I-12; pinned by an existing test).
 - Fee/credit flooring leaves under one wei per row plus one per fee on the handler.
 - Stray donations sit on a handler, credited to no one.

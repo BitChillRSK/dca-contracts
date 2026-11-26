@@ -221,7 +221,7 @@
         "tier": "primary"
       },
       {
-        "name": "updatePurchaseAmount",
+        "name": "setPurchaseAmount",
         "inputs": [
           {
             "name": "token",
@@ -243,7 +243,7 @@
         "tier": "primary"
       },
       {
-        "name": "updatePurchasePeriod",
+        "name": "setPurchasePeriod",
         "inputs": [
           {
             "name": "token",

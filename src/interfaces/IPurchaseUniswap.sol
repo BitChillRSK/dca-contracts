@@ -42,10 +42,10 @@ interface IPurchaseUniswap {
         bytes32 pathHash, bytes encodedPath, address[] intermediateTokens, uint24[] poolFeeRates, bool allowed
     );
     /// @notice The swap-time oracle floor was set at construction (`oldValue` 0) or changed by the owner.
-    event PurchaseUniswap__AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
+    event PurchaseUniswap__AmountOutMinimumPercentSet(uint256 oldValue, uint256 newValue);
     /// @notice The min-out MoC BTC/USD oracle was set at construction (`oldOracle` zero) or changed by
     ///         the owner.
-    event PurchaseUniswap__OracleUpdated(address indexed oldOracle, address indexed newOracle);
+    event PurchaseUniswap__OracleSet(address indexed oldOracle, address indexed newOracle);
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS

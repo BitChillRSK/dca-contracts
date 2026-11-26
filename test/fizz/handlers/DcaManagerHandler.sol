@@ -170,7 +170,7 @@ abstract contract DcaManagerHandler is Properties {
         if (!ok) property_topUpQuoteSafe(err);
     }
 
-    function dcaManager_updatePurchaseAmount_clamped(uint256 scheduleSeed, uint256 newPurchaseAmount) public {
+    function dcaManager_setPurchaseAmount_clamped(uint256 scheduleSeed, uint256 newPurchaseAmount) public {
         uint256 idx = _pickOwnedSchedule(actor, scheduleSeed);
         if (idx == type(uint256).max) return;
         TrackedSchedule memory s = trackedSchedules[idx];
@@ -180,15 +180,15 @@ abstract contract DcaManagerHandler is Properties {
         // balance and the minimum reaches that range and keeps the row fundable by a later credit.
         uint256 upper = 2 * (sched.tokenBalance > minPurchase ? sched.tokenBalance : minPurchase);
         newPurchaseAmount = clampBetween(newPurchaseAmount, minPurchase, upper);
-        dcaManager_updatePurchaseAmount(s.token, s.scheduleId, newPurchaseAmount);
+        dcaManager_setPurchaseAmount(s.token, s.scheduleId, newPurchaseAmount);
     }
 
-    function dcaManager_updatePurchasePeriod_clamped(uint256 scheduleSeed, uint256 periodDays) public {
+    function dcaManager_setPurchasePeriod_clamped(uint256 scheduleSeed, uint256 periodDays) public {
         uint256 idx = _pickOwnedSchedule(actor, scheduleSeed);
         if (idx == type(uint256).max) return;
         TrackedSchedule memory s = trackedSchedules[idx];
         uint256 newPurchasePeriod = clampBetween(periodDays, _minPeriodDays(), MAX_PERIOD_DAYS) * 1 days;
-        dcaManager_updatePurchasePeriod(s.token, s.scheduleId, newPurchasePeriod);
+        dcaManager_setPurchasePeriod(s.token, s.scheduleId, newPurchasePeriod);
     }
 
     function dcaManager_withdrawAllAccumulatedInterest_clamped(uint256 routeMask) public {
@@ -320,24 +320,24 @@ abstract contract DcaManagerHandler is Properties {
         _topUpOp(actor, token, scheduleId, amount);
     }
 
-    function dcaManager_updatePurchaseAmount(address token, uint64 scheduleId, uint256 newPurchaseAmount) public {
+    function dcaManager_setPurchaseAmount(address token, uint64 scheduleId, uint256 newPurchaseAmount) public {
         OpCtx memory ctx = _schedCtx(OP_UPDATE_AMOUNT, actor, token, scheduleId);
         ctx.amount = newPurchaseAmount;
         snapshotBefore();
         vm.prank(ctx.caller);
-        try dcaManager.updatePurchaseAmount(token, scheduleId, newPurchaseAmount) {
+        try dcaManager.setPurchaseAmount(token, scheduleId, newPurchaseAmount) {
             _afterEdit(ctx);
         } catch (bytes memory err) {
             _onRevert(ctx, err);
         }
     }
 
-    function dcaManager_updatePurchasePeriod(address token, uint64 scheduleId, uint256 newPurchasePeriod) public {
+    function dcaManager_setPurchasePeriod(address token, uint64 scheduleId, uint256 newPurchasePeriod) public {
         OpCtx memory ctx = _schedCtx(OP_UPDATE_PERIOD, actor, token, scheduleId);
         ctx.amount = newPurchasePeriod;
         snapshotBefore();
         vm.prank(ctx.caller);
-        try dcaManager.updatePurchasePeriod(token, scheduleId, newPurchasePeriod) {
+        try dcaManager.setPurchasePeriod(token, scheduleId, newPurchasePeriod) {
             _ghostPeriodEdit(token, scheduleId);
             _afterEdit(ctx);
         } catch (bytes memory err) {
@@ -597,7 +597,7 @@ abstract contract DcaManagerHandler is Properties {
         _postCommonWith(ctx, sp);
     }
 
-    /// @dev Success path shared by updatePurchaseAmount, updatePurchasePeriod and setSchedulePaused.
+    /// @dev Success path shared by setPurchaseAmount, setPurchasePeriod and setSchedulePaused.
     function _afterEdit(OpCtx memory ctx) internal {
         snapshotAfter();
         SchedPair[] memory sp = _schedPairs();

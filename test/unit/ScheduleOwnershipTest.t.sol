@@ -84,11 +84,11 @@ contract ScheduleOwnershipTest is DcaDappTest {
 
         vm.prank(s_stranger);
         vm.expectRevert(_notOwner(scheduleId));
-        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
+        dcaManager.setPurchaseAmount(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
 
         vm.prank(s_stranger);
         vm.expectRevert(_notOwner(scheduleId));
-        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, MIN_PURCHASE_PERIOD);
+        dcaManager.setPurchasePeriod(address(stablecoin), scheduleId, MIN_PURCHASE_PERIOD);
 
         vm.prank(s_stranger);
         vm.expectRevert(_notOwner(scheduleId));
@@ -180,10 +180,10 @@ contract ScheduleOwnershipTest is DcaDappTest {
         dcaManager.withdrawTokenAndInterest(address(stablecoin), ghost, AMOUNT_TO_SPEND);
 
         vm.expectRevert(_inexistent(ghost));
-        dcaManager.updatePurchaseAmount(address(stablecoin), ghost, AMOUNT_TO_SPEND);
+        dcaManager.setPurchaseAmount(address(stablecoin), ghost, AMOUNT_TO_SPEND);
 
         vm.expectRevert(_inexistent(ghost));
-        dcaManager.updatePurchasePeriod(address(stablecoin), ghost, MIN_PURCHASE_PERIOD);
+        dcaManager.setPurchasePeriod(address(stablecoin), ghost, MIN_PURCHASE_PERIOD);
 
         vm.expectRevert(_inexistent(ghost));
         dcaManager.setSchedulePaused(address(stablecoin), ghost, true);

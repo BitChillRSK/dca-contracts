@@ -92,8 +92,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         _validateAmountOutMinimumPercent(amountOutMinimumPercent);
 
         s_amountOutMinimumPercent = amountOutMinimumPercent.toUint64();
-        emit PurchaseUniswap__OracleUpdated(address(0), address(uniswapSettings.mocOracle));
-        emit PurchaseUniswap__AmountOutMinimumPercentUpdated(0, amountOutMinimumPercent);
+        emit PurchaseUniswap__OracleSet(address(0), address(uniswapSettings.mocOracle));
+        emit PurchaseUniswap__AmountOutMinimumPercentSet(0, amountOutMinimumPercent);
 
         // The initial owner is not the deployer, so the constructor cannot call the onlyOwner setters
         // and must install the first path itself.
@@ -161,7 +161,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
             revert PurchaseUniswap__AmountOutMinimumPercentUnchanged(amountOutMinimumPercent);
         }
         s_amountOutMinimumPercent = amountOutMinimumPercent.toUint64();
-        emit PurchaseUniswap__AmountOutMinimumPercentUpdated(oldValue, amountOutMinimumPercent);
+        emit PurchaseUniswap__AmountOutMinimumPercentSet(oldValue, amountOutMinimumPercent);
     }
 
     /// @inheritdoc IPurchaseUniswap
@@ -172,7 +172,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         address oldOracle = address(s_mocOracle);
         if (newOracle == oldOracle) revert PurchaseUniswap__OracleUnchanged(newOracle);
         s_mocOracle = ICoinPairPrice(newOracle);
-        emit PurchaseUniswap__OracleUpdated(oldOracle, newOracle);
+        emit PurchaseUniswap__OracleSet(oldOracle, newOracle);
     }
 
     /// @inheritdoc IPurchaseUniswap
