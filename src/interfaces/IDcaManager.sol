@@ -123,8 +123,10 @@ interface IDcaManager {
     );
     /// @notice The per-token schedule cap was set at construction or changed by the owner.
     event DcaManager__MaxSchedulesPerTokenModified(uint256 newMaxSchedulesPerToken);
-    /// @notice The protocol minimum purchase period (whole UTC days, never below one) was set at
-    ///         construction or changed by the owner.
+    /**
+     * @notice The protocol minimum purchase period (whole UTC days, never below one) was set at
+     *         construction or changed by the owner.
+     */
     event DcaManager__MinPurchasePeriodModified(uint256 newMinPurchasePeriod);
     /// @notice Owner set a per-token minimum purchase amount. Zero is not allowed.
     event DcaManager__TokenMinPurchaseAmountSet(address indexed token, uint256 minPurchaseAmount);
