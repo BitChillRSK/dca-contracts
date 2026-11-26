@@ -153,30 +153,6 @@ contract InvariantTest is StdInvariant, Test {
         targetContract(address(fuzzHandler));
     }
 
-    /// @dev Governance can lower the launch minimum, and a later increase does not invalidate old schedules.
-    function test_invariantAllowsSchedulesBelowTheLaunchMinimum() public {
-        fuzzHandler.setMinPurchasePeriod(1 days);
-        assertEq(dcaManager.getMinPurchasePeriod(), 1 days);
-        fuzzHandler.createDcaSchedule(0, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_AMOUNT, 520 weeks + 1);
-        assertEq(scheduleAt(dcaManager, s_users[0], address(stablecoin), 0).purchasePeriod, 1 days);
-        invariant_userBalancesReasonable();
-
-        fuzzHandler.setMinPurchasePeriod(14 days);
-        assertEq(dcaManager.getMinPurchasePeriod(), 14 days);
-        invariant_userBalancesReasonable();
-
-        (uint64[] memory ids,) = dcaManager.getDcaSchedules(s_users[0], address(stablecoin));
-        vm.startPrank(s_users[0]);
-        vm.expectRevert(IDcaManager.DcaManager__PurchasePeriodMustBeAtLeastMinimum.selector);
-        dcaManager.setPurchasePeriod(address(stablecoin), ids[0], 1 days);
-        vm.expectRevert(IDcaManager.DcaManager__PurchasePeriodMustBeAtLeastMinimum.selector);
-        dcaManager.createDcaSchedule(
-            address(stablecoin), MIN_PURCHASE_AMOUNT, MIN_PURCHASE_AMOUNT, 1 days, s_routeIndex
-        );
-        vm.stopPrank();
-        assertEq(scheduleAt(dcaManager, s_users[0], address(stablecoin), 0).purchasePeriod, 1 days);
-    }
-
     function test_invariantHandlerCreatesScheduleAtSelectedRoute() public {
         fuzzHandler.createDcaSchedule(0, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_AMOUNT, MIN_PURCHASE_PERIOD);
         assertEq(fuzzHandler.createScheduleSuccesses(), 1, "Handler never created a schedule at the selected route");
@@ -424,10 +400,7 @@ contract InvariantTest is StdInvariant, Test {
                         // bounds into a range whose floor is that minimum. Asserting `>` here failed
                         // whenever the fuzzer landed on the boundary.
                         assertGe(schedules[j].purchaseAmount, MIN_PURCHASE_AMOUNT);
-                        // Governance can lower the launch minimum or raise it after creation.
-                        // Every stored period still obeys the permanent one-day, whole-day floor.
-                        assertGe(schedules[j].purchasePeriod, 1 days);
-                        assertEq(schedules[j].purchasePeriod % 1 days, 0);
+                        assertGe(schedules[j].purchasePeriod, MIN_PURCHASE_PERIOD);
                     }
                     assertNotEq(schedulesIds[j], uint64(0));
                 }

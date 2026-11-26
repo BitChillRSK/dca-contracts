@@ -36,10 +36,6 @@ LayerBank's `v2-contracts` repository lists a Core contract, `0xc30991623fb2a63E
 
 ## Burn rounding (assumption and monitoring)
 
-For the exact two-deposit example at block 9443471, the index-derived cash bound, and the distinction
-between handler forfeiture and a user's recoverable Pool residue, see
-[`LAYERBANK_ROUNDING.md`](../../docs/relaunch/LAYERBANK_ROUNDING.md).
-
 The Pool has no share-sized withdraw, so the handler picks the underlying amount `a` whose burn is exactly the `s` scaled shares debited from the user's book: `floor(s × index / RAY)`, plus one wei when half-up `rayDiv` of that floor lands on `s − 1`. `LendingHandler` then requires `scaledBalanceOf` to fall by exactly `s`.
 
 Upstream Aave v3 now burns with a ceiling (`TokenMath.getATokenBurnScaledAmount` uses `rayDivCeil`; mints floor). Under that rule the floor is always exact for `index ≥ RAY` and the `+ 1` case burns `s + 1`, which reverts `LendingHandler__ShareConsumptionMismatch`. The sizing cannot be made correct under both rules with one withdrawal: half-up needs `a × RAY / index ∈ [s − ½, s + ½)`, round-up needs `(s − 1, s]`, and the overlap `[s − ½, s]` is narrower than one wei of `a` whenever `index < 2 RAY` — which is where a live index sits. Whenever the floor lands below `s − ½`, half-up needs `floor + 1` and round-up needs `floor`. The rounding-agnostic alternative (withdraw the floor, read `scaledBalanceOf`, withdraw one more wei if one share short) costs an extra aToken read on every redeem and a second Pool `withdraw` on roughly half of them, on the swapper-paid purchase path, to cover an upgrade that fails closed. It was declined; the exact-consumption check is unchanged.

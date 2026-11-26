@@ -33,9 +33,6 @@ The ABI changes are intentional. No compatibility aliases are required.
 - [x] Check all first-party explicit configuration setters against the convention.
 - [x] Record the convention in `AGENTS.md` and update its current function references.
 - [x] Open or update affected consumer issues in the same turn as the PR.
-- [x] Correct the pre-existing LayerBank share-withdrawal fork assertion described below. Preserve its exact share-transfer and cash-receipt checks.
-- [x] Correct the pre-existing schedule-period invariant described below and add its deterministic regression.
-- [x] Complete the LayerBank fork redemption checks and document the rounding example for audit review.
 
 ## Out of scope
 
@@ -62,8 +59,6 @@ The ABI changes are intentional. No compatibility aliases are required.
 - `src/PurchaseUniswap.sol`
 - `src/interfaces/IDcaManager.sol`
 - `src/interfaces/IPurchaseUniswap.sol`
-- `src/layerbank/README.md` (rounding-note link only)
-- `docs/relaunch/LAYERBANK_ROUNDING.md`
 - `test/ai-generated/audit/NethermindAuditFindings.t.sol`
 - `test/ai-generated/fuzz/Handler.t.sol`
 - `test/ai-generated/fuzz/Invariants.t.sol`
@@ -132,54 +127,11 @@ make fork-layerbank
 - Check existing issues and actual consumer references before opening follow-ups. Update relevant documentation references when required.
 - No broadcast or live addresses are authorized by this spec.
 
-## Fork-gate amendment — 2026-11-26
-
-The first `make fork-layerbank` run failed only in `test_fork_layerBankWithdrawalThenRedeemAtPool` at block 9443471.
-The payout was `3999999999999999999997` against principal `4000000000000000000000`.
-The assertion allowed two underlying base units, but the difference was three.
-The same isolated test failed identically on parent `c6fd7703` at that block.
-
-This fixture makes two deposits. Half-up minting can lose at most one scaled share across those deposits.
-The share transfer can leave one further scaled share on the handler.
-The correct underlying tolerance is therefore `ceil(2 * index / 1e27)`, not a fixed two base units.
-At the failing live index, this bound is three base units.
-
-Change only this test assertion and its explanatory comment. Keep the exact measured share and cash checks.
-Run the isolated regression at block 9443471 under both compiler profiles, then repeat the required gates.
-
-```bash
-# Load RSK_MAINNET_RPC_URL from .env without displaying its value.
-set -a; . ./.env; set +a
-SWAP_TYPE=mocSwaps LENDING_PROTOCOL=layerbank EXPECTED_LENDING_PROTOCOL=layerbank STABLECOIN_TYPE=DOC forge test --match-contract LendingShareWithdrawalTest --match-test test_fork_layerBankWithdrawalThenRedeemAtPool --fork-block-number 9443471 --fork-url "$RSK_MAINNET_RPC_URL"
-FOUNDRY_PROFILE=deploy SWAP_TYPE=mocSwaps LENDING_PROTOCOL=layerbank EXPECTED_LENDING_PROTOCOL=layerbank STABLECOIN_TYPE=DOC forge test --match-contract LendingShareWithdrawalTest --match-test test_fork_layerBankWithdrawalThenRedeemAtPool --fork-block-number 9443471 --fork-url "$RSK_MAINNET_RPC_URL"
-```
-
-This amendment changes no production lending code or protocol invariant.
-
 ## Parent update — 2026-11-26
 
 The owner requested a rebase onto #203 commit `fa838c6e`.
 The branch preserves its internal Dex floor bound and removed public getter.
 Repeat the full gates for this combined tree because the parent update changes executable code.
-
-## Invariant-gate amendment — 2026-11-26
-
-The rebased `make check` found a second test-only defect in `invariant_userBalancesReasonable`.
-Its two-call counterexample lowers the protocol minimum, then creates a schedule below the seven-day launch default.
-The invariant compares that valid schedule against the launch default instead of the permanent one-day floor.
-Existing schedules also remain valid when governance later raises the minimum.
-
-Add a regression that creates a one-day schedule after lowering the minimum and checks it again after a later increase.
-Assert the permanent one-day floor and whole-day periods in the invariant. Preserve the other balance assertions.
-Replay the exact two-action pattern on the parent before accepting this correction.
-This changes no contract or schedule behavior.
-
-The same deterministic regression fails on parent `fa838c6e`: `86400 >= 604800` is false.
-The corrected invariant and regression both pass with the failing seed:
-
-```bash
-SWAP_TYPE=mocSwaps LENDING_PROTOCOL=layerbank EXPECTED_LENDING_PROTOCOL=layerbank STABLECOIN_TYPE=DOC forge test --match-contract '^InvariantTest$' --match-test 'test_invariantAllowsSchedulesBelowTheLaunchMinimum|invariant_userBalancesReasonable' --fuzz-seed 0x77dc9eec8cfcdd8facc3f2a5e6fc2bccbf842cada378658f8546a8e20d2c6e46 -vv
-```
 
 ## Verification results — combined tree on `fa838c6e`
 
@@ -202,34 +154,3 @@ SWAP_TYPE=mocSwaps LENDING_PROTOCOL=layerbank EXPECTED_LENDING_PROTOCOL=layerban
 
 The scoped stack check for #204 reports zero ancestry gaps against parent `fa838c6e`.
 Next unassigned: none.
-
-## Review follow-up — complete share redemption and audit evidence
-
-The owner requested stronger tests and a durable explanation of the rounding observed at block 9443471.
-This follow-up changes tests and documentation only. Production accounting and the accepted one-share forfeiture remain unchanged.
-
-- Extend `test_fork_layerBankWithdrawalThenRedeemAtPool` to check the handler's exact external share decrease and any one-share forfeiture.
-- Measure the user's scaled-share burn after the first floored Pool withdrawal. Assert the exact cash receipt and the predicted residual shares.
-- Seed a separate, nonzero user-held Pool position so the preservation check exercises actual pre-existing shares.
-- Redeem any residual received share and assert its exact cash receipt. Restore the user's pre-existing scaled balance without spending pre-existing shares.
-- Compare total measured cash from both withdrawals against the index-derived bound. The bound covers this two-deposit fixture, not an arbitrary deposit history.
-- Strengthen the schedule-period regression with explicit minimum-setting assertions and rejection checks below the raised minimum.
-- Add `docs/relaunch/LAYERBANK_ROUNDING.md` with exact pinned-block values, the distinction between handler forfeiture and wallet residue, the rounding bound, and audit assumptions.
-- Link that note from `AUDIT_GUIDE.md` and `src/layerbank/README.md`.
-- Run the two changed suites under default and deploy profiles. Replay the original invariant seed and the LayerBank fork suite at block 9443471 and the chain tip under both profiles.
-
-Do not characterize this amount/index-dependent behavior as infrequent without measurements.
-Do not promise an audit severity. Present the accepted forfeiture and external-protocol assumptions for independent review.
-
-### Follow-up verification
-
-- Both profiles: the two changed suites pass with the original invariant seed (26 passed, three fork-only skips per profile).
-- After adding the nonzero wallet fixture, `LendingShareWithdrawalTest` passes under both profiles (14 passed, three fork-only skips per profile).
-- The same suite passes at block 9443471 and the chain tip under both profiles (nine passed, eight mock-only skips per run).
-- At block 9443471, the first withdrawal pays `3999999999999999999997` base units and leaves one received scaled share.
-- The second withdrawal consumes that share and raises total cash to `3999999999999999999998`. The seeded wallet shares remain intact.
-- The raised-minimum regression explicitly verifies both assignments and refuses new creation and period edits below fourteen days.
-- `forge fmt --check`, `git diff --check`, and the local documentation-link check pass.
-- The scoped stack check passes with zero ancestry gaps. Production Solidity remains unchanged from the prior PR head.
-
-The exact follow-up commands and the earlier full-gate results appear in the PR description.
